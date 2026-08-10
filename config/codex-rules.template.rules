@@ -1,0 +1,69 @@
+# Copy to:
+#   C:\Dev\KingmakerBuffPlannerLab\codex-home\rules\default.rules
+# Validate on the desktop with `codex execpolicy check` before unattended work.
+
+prefix_rule(
+    pattern = ["git", "reset"],
+    decision = "forbidden",
+    justification = "Destructive Git state changes can discard autonomous work or unknown user changes."
+)
+
+prefix_rule(
+    pattern = ["git", "clean"],
+    decision = "forbidden",
+    justification = "Cleaning can irreversibly delete untracked mission records and evidence."
+)
+
+prefix_rule(
+    pattern = ["git", "checkout", "--"],
+    decision = "forbidden",
+    justification = "Do not discard working-tree changes through checkout."
+)
+
+prefix_rule(
+    pattern = ["git", "restore"],
+    decision = "forbidden",
+    justification = "Do not discard working-tree or staged changes without explicit human review."
+)
+
+prefix_rule(
+    pattern = ["git", "push"],
+    decision = "forbidden",
+    justification = "Direct pushes are blocked; use the repository-owned guarded push helper."
+)
+
+prefix_rule(
+    pattern = ["gh", "repo", "delete"],
+    decision = "forbidden",
+    justification = "Repository deletion is outside this mission."
+)
+
+prefix_rule(
+    pattern = ["gh", "release", "create"],
+    decision = "forbidden",
+    justification = "Public release publication requires separate user authorization."
+)
+
+prefix_rule(
+    pattern = ["Remove-Item"],
+    decision = "prompt",
+    justification = "Deletion requires review even inside the project lab."
+)
+
+prefix_rule(
+    pattern = ["Stop-Process"],
+    decision = "prompt",
+    justification = "Process termination must be scoped and justified."
+)
+
+prefix_rule(
+    pattern = ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "C:/Dev/KingmakerBuffPlannerLab/codex-policy/Push-KingmakerBuffPlanner.ps1"],
+    decision = "prompt",
+    justification = "The guarded helper is the only authorized publication path and remains reviewable."
+)
+
+prefix_rule(
+    pattern = ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "C:/Dev/KingmakerBuffPlannerLab/repo/KingmakerBuffPlanner/scripts/Invoke-KingmakerRuntimeTest.ps1"],
+    decision = "prompt",
+    justification = "Runtime launch is allowed only through the repository-owned guarded transaction."
+)

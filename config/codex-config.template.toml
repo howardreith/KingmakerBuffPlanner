@@ -1,0 +1,37 @@
+# Copy to:
+#   C:\Dev\KingmakerBuffPlannerLab\codex-home\config.toml
+# Then set CODEX_HOME to that codex-home directory before launching the desktop project.
+
+approval_policy = "on-request"
+approvals_reviewer = "auto_review"
+sandbox_mode = "workspace-write"
+project_doc_max_bytes = 131072
+background_terminal_max_timeout = 300000
+
+[windows]
+sandbox = "elevated"
+
+[sandbox_workspace_write]
+network_access = true
+writable_roots = [
+  "C:\\Dev\\KingmakerBuffPlannerLab\\codex-policy",
+  "C:\\Dev\\KingmakerBuffPlannerLab\\runtime-state",
+  "C:\\Dev\\KingmakerBuffPlannerLab\\runtime-staging",
+  "C:\\Dev\\KingmakerBuffPlannerLab\\runtime-evidence",
+  "C:\\Dev\\KingmakerBuffPlannerLab\\runtime-backups",
+  "C:\\Dev\\KingmakerBuffPlannerLab\\artifacts",
+  "C:\\Dev\\KingmakerBuffPlannerLab\\logs"
+]
+
+[projects.'C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner']
+trust_level = "trusted"
+
+[auto_review]
+policy = """
+Approve ordinary read, edit, build, test, package, Git status/diff/add/commit, and narrowly scoped diagnostic commands inside the standalone repository and the explicitly configured operational writable roots.
+Approve read-only inspection of the installed Pathfinder Kingmaker directory and exact locally copied open-source references.
+Approve the repository-owned guarded runtime harness only after its source-only and WhatIf gates pass and only when it proves transactional Mods restoration, uses KBP-prefixed disposable saves, and refuses unexpected Steam or account dialogs.
+Approve ordinary network access for official documentation, package restoration, Git fetch, and publication through the project-owned guarded push helper.
+Do not approve destructive Git history or worktree commands, direct force pushes, arbitrary writes outside the lab root, credentials or secret-store access, valued-save access, unguarded Mods-directory mutation, arbitrary process killing, third-party binary modification, or public release publication.
+When a command falls outside this policy, require the user rather than broadening authority.
+"""

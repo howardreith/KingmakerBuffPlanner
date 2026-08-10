@@ -1,0 +1,55 @@
+# Machine-local game/build paths
+GamePath.props
+*.user
+*.suo
+.vs/
+bin/
+obj/
+TestResults/
+
+# Generated build/release/runtime data
+artifacts/
+runtime-state/
+runtime-staging/
+runtime-evidence/
+runtime-backups/
+logs/
+coverage/
+*.trx
+
+# Private local references and transfer payloads
+reference-source/
+harness-reference/
+examples/
+incoming/
+private/
+environment-intake.json
+environment*.json
+*.private-transfer.zip
+*.private-transfer.zip.sha256
+
+# Game/mod binaries and saves never belong in this repository
+Assembly-CSharp*.dll
+Assembly-CSharp-firstpass*.dll
+UnityEngine*.dll
+UnityModManager.dll
+0Harmony*.dll
+Newtonsoft.Json.dll
+*.zks
+*.sav
+
+# Codex/authentication and credentials
+.codex/
+auth.json
+credentials*
+*.pfx
+*.p12
+*.key
+
+# Editor/OS noise
+.idea/
+_ReSharper*/
+*.DotSettings.user
+.DS_Store
+Thumbs.db
+Desktop.ini
