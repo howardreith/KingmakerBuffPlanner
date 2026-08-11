@@ -66,6 +66,7 @@
   <ItemGroup>
     <Compile Include="Discovery\ActionGraphScanner.cs" />
     <Compile Include="Discovery\DiscoveryNode.cs" />
+    <Compile Include="Discovery\NativeAccessibilityIndex.cs" />
     <Compile Include="Discovery\NativeCatalogExporter.cs" />
     <Compile Include="Domain\Effects\EffectExpression.cs" />
     <Compile Include="Domain\Identity\StableKeys.cs" />

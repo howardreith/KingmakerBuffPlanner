@@ -95,7 +95,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     string catalogJson = Serialize(catalog);
                     JObject catalogDocument = JObject.Parse(catalogJson);
                     JArray abilityDocuments = catalogDocument["abilities"] as JArray;
-                    if ((int)catalogDocument["schemaVersion"] != 1 || abilityDocuments == null ||
+                    if ((int)catalogDocument["schemaVersion"] != 2 || abilityDocuments == null ||
                         abilityDocuments.Count != catalog.AbilityCount)
                         throw new InvalidDataException("Serialized catalog contract did not reconcile.");
                     foreach (JObject abilityDocument in abilityDocuments.OfType<JObject>())

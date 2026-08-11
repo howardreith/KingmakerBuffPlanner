@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Kingmaker.Blueprints;
+using Kingmaker.Blueprints.Facts;
+using Kingmaker.UnitLogic.Buffs.Blueprints;
 using Kingmaker.UnitLogic.Abilities.Blueprints;
 using KingmakerBuffPlanner.Domain.Effects;
 using KingmakerBuffPlanner.GameAdapters;
@@ -14,6 +16,7 @@ namespace KingmakerBuffPlanner.Discovery
         internal NativeCatalogExport Export()
         {
             var entries = new List<NativeCatalogEntry>();
+            NativeAccessibilityIndex accessibility = NativeAccessibilityIndex.Build();
             var adapter = new KingmakerActionGraphAdapter();
             var scanner = new ActionGraphScanner();
             foreach (BlueprintAbility ability in ResourcesLibrary.GetBlueprints<BlueprintAbility>()
@@ -25,7 +28,10 @@ namespace KingmakerBuffPlanner.Discovery
                 {
                     DiscoveryScanResult scan = scanner.Scan(adapter.Adapt(ability));
                     bool detected = EffectExpressionAnalysis.ContainsLeaf(scan.Expression);
-                    bool candidate = ability.IsSpell || detected;
+                    string[] accessibilitySources = accessibility.GetSources(ability.AssetGuid);
+                    NativeSpellListRecord[] spellLists = accessibility.GetSpellLists(ability.AssetGuid);
+                    bool candidate = accessibilitySources.Length != 0;
+                    NativeEffectRecord[] effects = GetEffects(scan.Expression);
                     entries.Add(new NativeCatalogEntry
                     {
                         AbilityGuid = ability.AssetGuid,
@@ -36,21 +42,39 @@ namespace KingmakerBuffPlanner.Discovery
                         InternalName = ability.name ?? string.Empty,
                         DisplayName = ability.Name ?? string.Empty,
                         SourceAssembly = ability.GetType().Assembly.FullName,
+                        Ownership = "native",
                         IsSpell = ability.IsSpell,
                         IsCandidate = candidate,
                         HasDetectedEffect = detected,
+                        AbilityType = ability.Type.ToString(),
+                        ActionType = ability.ActionType.ToString(),
+                        Range = ability.Range.ToString(),
+                        EffectOnAlly = ability.EffectOnAlly.ToString(),
+                        EffectOnEnemy = ability.EffectOnEnemy.ToString(),
                         CanTargetSelf = ability.CanTargetSelf,
                         CanTargetFriends = ability.CanTargetFriends,
                         CanTargetEnemies = ability.CanTargetEnemies,
                         CanTargetPoint = ability.CanTargetPoint,
                         IsStickyTouch = ability.StickyTouch != null,
+                        IsMass = effects.Any(e => e.Target == EffectTarget.Party.ToString()),
+                        IsArea = effects.Any(e => e.Kind == EffectKind.AreaBuff.ToString() ||
+                            e.Target == EffectTarget.AreaRecipients.ToString()),
+                        AccessibilitySources = accessibilitySources,
+                        SpellLists = spellLists,
                         ResourceIds = (ability.GetResourceIds() ?? new string[0])
                             .OrderBy(v => v, StringComparer.Ordinal).ToArray(),
+                        MaterialItemGuid = ability.MaterialComponent.Item == null
+                            ? string.Empty : ability.MaterialComponent.Item.AssetGuid,
+                        MaterialCount = ability.MaterialComponent.Item == null
+                            ? 0 : ability.MaterialComponent.Count,
+                        RecognizedActionContracts = effects.Select(e => e.SourceContract)
+                            .Where(v => !string.IsNullOrEmpty(v)).Distinct(StringComparer.Ordinal)
+                            .OrderBy(v => v, StringComparer.Ordinal).ToArray(),
+                        Effects = effects,
                         Expression = scan.Expression,
                         Diagnostics = scan.Diagnostics.ToArray(),
-                        Disposition = scan.Diagnostics.Count != 0
-                            ? "scanner-diagnostic"
-                            : detected ? "detected-effect" : "no-detected-effect"
+                        Disposition = GetPreliminaryDisposition(candidate, effects, scan.Diagnostics.Count),
+                        DispositionReason = GetPreliminaryReason(candidate, effects, scan.Diagnostics.Count)
                     });
                 }
                 catch (Exception exception)
@@ -76,7 +100,7 @@ namespace KingmakerBuffPlanner.Discovery
 
             return new NativeCatalogExport
             {
-                SchemaVersion = 1,
+                SchemaVersion = 2,
                 Profile = "native-only",
                 GeneratorCommit = BuildInfo.Commit,
                 AbilityCount = entries.Count,
@@ -85,6 +109,94 @@ namespace KingmakerBuffPlanner.Discovery
                 DiagnosticAbilityCount = entries.Count(e => e.Diagnostics.Length != 0),
                 Abilities = entries.ToArray()
             };
+        }
+
+        private static NativeEffectRecord[] GetEffects(EffectExpression expression)
+        {
+            var leaves = new List<EffectLeafExpression>();
+            CollectLeaves(expression, leaves);
+            return leaves.Select(leaf =>
+            {
+                bool? harmful = null;
+                string name = string.Empty;
+                var buff = ResourcesLibrary.TryGetBlueprint<BlueprintBuff>(leaf.EffectId);
+                if (buff != null)
+                {
+                    harmful = buff.Harmful;
+                    name = buff.name ?? string.Empty;
+                }
+                else
+                {
+                    var fact = ResourcesLibrary.TryGetBlueprint<BlueprintUnitFact>(leaf.EffectId);
+                    if (fact != null) name = fact.name ?? string.Empty;
+                }
+                return new NativeEffectRecord
+                {
+                    Kind = leaf.Kind.ToString(),
+                    EffectGuid = leaf.EffectId,
+                    EffectName = name,
+                    Target = leaf.Target.ToString(),
+                    Harmful = harmful,
+                    SourceContract = leaf.SourceContract,
+                    ActionPath = leaf.ActionPath
+                };
+            }).OrderBy(e => e.ActionPath, StringComparer.Ordinal)
+                .ThenBy(e => e.EffectGuid, StringComparer.Ordinal).ToArray();
+        }
+
+        private static void CollectLeaves(EffectExpression expression, List<EffectLeafExpression> leaves)
+        {
+            var leaf = expression as EffectLeafExpression;
+            if (leaf != null) { leaves.Add(leaf); return; }
+            var sequence = expression as SequenceEffectExpression;
+            if (sequence != null)
+            {
+                foreach (EffectExpression child in sequence.Children) CollectLeaves(child, leaves);
+                return;
+            }
+            var conditional = expression as ConditionalEffectExpression;
+            if (conditional != null)
+            {
+                CollectLeaves(conditional.WhenTrue, leaves);
+                CollectLeaves(conditional.WhenFalse, leaves);
+                return;
+            }
+            var targeted = expression as TargetedEffectExpression;
+            if (targeted != null) { CollectLeaves(targeted.Child, leaves); return; }
+            var referenced = expression as ReferencedAbilityExpression;
+            if (referenced != null) CollectLeaves(referenced.Child, leaves);
+        }
+
+        private static string GetPreliminaryDisposition(
+            bool candidate, NativeEffectRecord[] effects, int diagnosticCount)
+        {
+            if (!candidate) return "not-player-accessible";
+            if (effects.Length == 0)
+                return diagnosticCount == 0 ? "exclude" : "audit-unknown-action-no-effect";
+            if (effects.All(e => e.Harmful == true)) return "exclude";
+            if (effects.Any(e => e.Harmful == null) ||
+                (effects.Any(e => e.Harmful == true) && effects.Any(e => e.Harmful == false)))
+                return "audit-mixed-or-unresolved";
+            return diagnosticCount == 0 ? "include-structural" : "audit-diagnostic-adjunct";
+        }
+
+        private static string GetPreliminaryReason(
+            bool candidate, NativeEffectRecord[] effects, int diagnosticCount)
+        {
+            if (!candidate) return "Not reachable from native player class spellbooks, class/archetype progression, race features, or feat progression.";
+            if (effects.Length == 0)
+                return diagnosticCount == 0
+                    ? "No persistent buff, area-buff, or worn-item enchantment effect was detected."
+                    : "No persistent effect was detected, but unsupported action nodes require exception audit.";
+            if (effects.All(e => e.Harmful == true))
+                return "All detected persistent unit/area buffs are marked harmful by the exact native blueprint contract.";
+            if (effects.Any(e => e.Harmful == null))
+                return "At least one persistent effect has no BlueprintBuff harmful-polarity contract.";
+            if (effects.Any(e => e.Harmful == true))
+                return "The graph contains both harmful and beneficial persistent effects; safe branch semantics require audit.";
+            return diagnosticCount == 0
+                ? "Player-accessible graph contains only resolved non-harmful persistent buff effects."
+                : "Resolved non-harmful persistent effects coexist with unsupported action nodes; adjunct semantics require audit.";
         }
 
     }
@@ -123,29 +235,56 @@ namespace KingmakerBuffPlanner.Discovery
         public string DisplayName { get; set; }
         [JsonProperty("sourceAssembly", Order = 6)]
         public string SourceAssembly { get; set; }
-        [JsonProperty("isSpell", Order = 7)]
+        [JsonProperty("ownership", Order = 7)]
+        public string Ownership { get; set; }
+        [JsonProperty("isSpell", Order = 8)]
         public bool IsSpell { get; set; }
-        [JsonProperty("isCandidate", Order = 8)]
+        [JsonProperty("isCandidate", Order = 9)]
         public bool IsCandidate { get; set; }
-        [JsonProperty("hasDetectedEffect", Order = 9)]
+        [JsonProperty("hasDetectedEffect", Order = 10)]
         public bool HasDetectedEffect { get; set; }
-        [JsonProperty("canTargetSelf", Order = 10)]
+        [JsonProperty("abilityType", Order = 11)] public string AbilityType { get; set; }
+        [JsonProperty("actionType", Order = 12)] public string ActionType { get; set; }
+        [JsonProperty("range", Order = 13)] public string Range { get; set; }
+        [JsonProperty("effectOnAlly", Order = 14)] public string EffectOnAlly { get; set; }
+        [JsonProperty("effectOnEnemy", Order = 15)] public string EffectOnEnemy { get; set; }
+        [JsonProperty("canTargetSelf", Order = 16)]
         public bool CanTargetSelf { get; set; }
-        [JsonProperty("canTargetFriends", Order = 11)]
+        [JsonProperty("canTargetFriends", Order = 17)]
         public bool CanTargetFriends { get; set; }
-        [JsonProperty("canTargetEnemies", Order = 12)]
+        [JsonProperty("canTargetEnemies", Order = 18)]
         public bool CanTargetEnemies { get; set; }
-        [JsonProperty("canTargetPoint", Order = 13)]
+        [JsonProperty("canTargetPoint", Order = 19)]
         public bool CanTargetPoint { get; set; }
-        [JsonProperty("isStickyTouch", Order = 14)]
+        [JsonProperty("isStickyTouch", Order = 20)]
         public bool IsStickyTouch { get; set; }
-        [JsonProperty("resourceIds", Order = 15)]
+        [JsonProperty("isMass", Order = 21)] public bool IsMass { get; set; }
+        [JsonProperty("isArea", Order = 22)] public bool IsArea { get; set; }
+        [JsonProperty("accessibilitySources", Order = 23)] public string[] AccessibilitySources { get; set; }
+        [JsonProperty("spellLists", Order = 24)] public NativeSpellListRecord[] SpellLists { get; set; }
+        [JsonProperty("resourceIds", Order = 25)]
         public string[] ResourceIds { get; set; }
-        [JsonProperty("expression", Order = 16)]
+        [JsonProperty("materialItemGuid", Order = 26)] public string MaterialItemGuid { get; set; }
+        [JsonProperty("materialCount", Order = 27)] public int MaterialCount { get; set; }
+        [JsonProperty("recognizedActionContracts", Order = 28)] public string[] RecognizedActionContracts { get; set; }
+        [JsonProperty("effects", Order = 29)] public NativeEffectRecord[] Effects { get; set; }
+        [JsonProperty("expression", Order = 30)]
         public EffectExpression Expression { get; set; }
-        [JsonProperty("diagnostics", Order = 17)]
+        [JsonProperty("diagnostics", Order = 31)]
         public DiscoveryDiagnostic[] Diagnostics { get; set; }
-        [JsonProperty("disposition", Order = 18)]
+        [JsonProperty("disposition", Order = 32)]
         public string Disposition { get; set; }
+        [JsonProperty("dispositionReason", Order = 33)] public string DispositionReason { get; set; }
+    }
+
+    internal sealed class NativeEffectRecord
+    {
+        [JsonProperty("kind", Order = 1)] public string Kind { get; set; }
+        [JsonProperty("effectGuid", Order = 2)] public string EffectGuid { get; set; }
+        [JsonProperty("effectName", Order = 3)] public string EffectName { get; set; }
+        [JsonProperty("target", Order = 4)] public string Target { get; set; }
+        [JsonProperty("harmful", Order = 5)] public bool? Harmful { get; set; }
+        [JsonProperty("sourceContract", Order = 6)] public string SourceContract { get; set; }
+        [JsonProperty("actionPath", Order = 7)] public string ActionPath { get; set; }
     }
 }
