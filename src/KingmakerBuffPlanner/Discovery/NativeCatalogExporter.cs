@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Kingmaker.Blueprints;
-using Kingmaker.Blueprints.Facts;
+using Kingmaker.Blueprints.Items.Ecnchantments;
 using Kingmaker.UnitLogic.Buffs.Blueprints;
 using Kingmaker.UnitLogic.Abilities.Blueprints;
 using KingmakerBuffPlanner.Domain.Effects;
@@ -119,16 +119,19 @@ namespace KingmakerBuffPlanner.Discovery
             {
                 bool? harmful = null;
                 string name = string.Empty;
-                var buff = ResourcesLibrary.TryGetBlueprint<BlueprintBuff>(leaf.EffectId);
-                if (buff != null)
+                if (leaf.Kind == EffectKind.Buff || leaf.Kind == EffectKind.AreaBuff)
                 {
-                    harmful = buff.Harmful;
-                    name = buff.name ?? string.Empty;
+                    var buff = ResourcesLibrary.TryGetBlueprint<BlueprintBuff>(leaf.EffectId);
+                    if (buff != null)
+                    {
+                        harmful = buff.Harmful;
+                        name = buff.name ?? string.Empty;
+                    }
                 }
-                else
+                else if (leaf.Kind == EffectKind.WornItemEnchantment)
                 {
-                    var fact = ResourcesLibrary.TryGetBlueprint<BlueprintUnitFact>(leaf.EffectId);
-                    if (fact != null) name = fact.name ?? string.Empty;
+                    var enchantment = ResourcesLibrary.TryGetBlueprint<BlueprintItemEnchantment>(leaf.EffectId);
+                    if (enchantment != null) name = enchantment.name ?? string.Empty;
                 }
                 return new NativeEffectRecord
                 {
