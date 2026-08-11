@@ -85,8 +85,10 @@ namespace KingmakerBuffPlanner.Discovery
             bool hostileOnly =
                 (facts.CanTargetEnemies && !facts.CanTargetFriends && currentTargetEffect) ||
                 (facts.CanTargetEnemies && !facts.CanTargetSelf && !facts.CanTargetFriends) ||
-                (string.Equals(facts.EffectOnEnemy, "Harmful", StringComparison.Ordinal) &&
-                    !facts.CanTargetFriends && currentTargetEffect && !controlledTransform);
+                (facts.CanTargetEnemies &&
+                    string.Equals(facts.EffectOnEnemy, "Harmful", StringComparison.Ordinal) &&
+                    !string.Equals(facts.EffectOnAlly, "Helpful", StringComparison.Ordinal) &&
+                    currentTargetEffect && !controlledTransform);
             if (hostileOnly)
                 return Exclude("hostile-only",
                     "The ability targets enemies and has no structurally controlled caster, pet, or party effect.");

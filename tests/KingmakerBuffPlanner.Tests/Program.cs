@@ -198,8 +198,10 @@ namespace KingmakerBuffPlanner.Tests
             {
                 IsPlayerAccessible = true,
                 CanTargetSelf = true,
+                CanTargetFriends = true,
                 CanTargetEnemies = true,
                 EffectOnAlly = "None",
+                EffectOnEnemy = "Harmful",
                 Effects = new[] { CandidateEffect("Buff", "CurrentTarget", false, "ContextActionApplyBuff", "root") },
                 DiagnosticContracts = new string[0]
             });

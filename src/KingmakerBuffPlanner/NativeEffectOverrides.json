@@ -16,6 +16,36 @@
       "effectMode": "allOf",
       "effects": [],
       "reason": "Spontaneous Healing is direct healing; its only persistent graph leaf is the hidden cooldown marker."
+    },
+    {
+      "abilityGuid": "0087fc2d64b6095478bc7b8d7d512caf",
+      "disposition": "include",
+      "sourceAssembly": "native",
+      "effectMode": "allOf",
+      "effects": [
+        { "kind": "UnitBuff", "guid": "1533e782fca42b84ea370fc1dcbf4fc1" }
+      ],
+      "reason": "Freedom of Movement has a proven friendly persistent delivery buff despite misleading harmful-enemy target metadata."
+    },
+    {
+      "abilityGuid": "4cf3d0fae3239ec478f51e86f49161cb",
+      "disposition": "include",
+      "sourceAssembly": "native",
+      "effectMode": "allOf",
+      "effects": [
+        { "kind": "UnitBuff", "guid": "09b4b69169304474296484c74aa12027" }
+      ],
+      "reason": "True Seeing has a proven friendly persistent delivery buff despite misleading harmful-enemy target metadata."
+    },
+    {
+      "abilityGuid": "1d6364123e1f6a04c88313d83d3b70ee",
+      "disposition": "include",
+      "sourceAssembly": "native",
+      "effectMode": "allOf",
+      "effects": [
+        { "kind": "UnitBuff", "guid": "94dfcf5f3a72ce8478c8de5db69e752b" }
+      ],
+      "reason": "Strength Surge has a proven friendly persistent buff despite allowing hostile targets and carrying harmful-enemy metadata."
     }
   ]
 }
