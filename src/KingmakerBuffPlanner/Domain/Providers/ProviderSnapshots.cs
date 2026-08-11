@@ -148,7 +148,9 @@ namespace KingmakerBuffPlanner.Domain.Providers
             IEnumerable<string> eligibleTokenIds,
             MaterialRequirementSnapshot materialComponent = null,
             int effectiveCasterLevel = 0,
-            int expectedDurationRounds = 0)
+            int expectedDurationRounds = 0,
+            string description = "",
+            string durationText = "")
         {
             Key = key ?? throw new ArgumentNullException("key");
             if (spellLevel < 0) throw new ArgumentOutOfRangeException("spellLevel");
@@ -167,6 +169,8 @@ namespace KingmakerBuffPlanner.Domain.Providers
             MaterialComponent = materialComponent;
             EffectiveCasterLevel = effectiveCasterLevel;
             ExpectedDurationRounds = expectedDurationRounds;
+            Description = description ?? string.Empty;
+            DurationText = durationText ?? string.Empty;
         }
 
         public ProviderKey Key { get; private set; }
@@ -178,6 +182,8 @@ namespace KingmakerBuffPlanner.Domain.Providers
         public MaterialRequirementSnapshot MaterialComponent { get; private set; }
         public int EffectiveCasterLevel { get; private set; }
         public int ExpectedDurationRounds { get; private set; }
+        public string Description { get; private set; }
+        public string DurationText { get; private set; }
     }
 
     public sealed class MaterialRequirementSnapshot

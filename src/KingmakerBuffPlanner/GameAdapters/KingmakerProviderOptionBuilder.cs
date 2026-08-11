@@ -43,7 +43,8 @@ namespace KingmakerBuffPlanner.GameAdapters
                     ? reachableIds.Where(id => id == provider.Key.CasterUnitId).ToArray()
                     : reachableIds;
                 options.Add(new ProviderPlanningOption(provider, reachableIds, anchors,
-                    provider.EffectiveCasterLevel, provider.ExpectedDurationRounds));
+                    provider.EffectiveCasterLevel, provider.ExpectedDurationRounds,
+                    blueprint != null && blueprint.StickyTouch != null));
             }
             return options.OrderBy(o => o.Provider.Key.Canonical, StringComparer.Ordinal).ToArray();
         }

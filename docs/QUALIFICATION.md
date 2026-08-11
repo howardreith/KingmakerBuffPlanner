@@ -63,3 +63,14 @@ Phase 9 native classification qualification PASS; included-source runtime equiva
 | `20260811T2127318144905Z-native-buff-catalog` | `fba6e24` | `1c2881de5c600c430709fac075e0f4fb223d0e050ba52d07bfa7451cf97be0fa` | 974 / 413 / 561 / 0 | PASS exact |
 
 Both runs were byte-identical. Support classes are 396 automatic, 1 generic reflection wrapper, 13 explicit adapters, and 3 overrides. The package/DLL hashes were `766514afc64d96cd719b2237d3435156987f05ba46d6f10b0f09f0806647ca79` / `0e0423f4d33f733421a9181299b661b608b8a328e16ba479661c66c82318cb35`. Source gates were validation 15/15, behavior 43/43, harness 5/5, deployment purity 5/5, package 4/4. No save was selected. The 413 included rows remain runtime-deferred because provider/resource/effect/executor equivalence needs an authorized project-owned save.
+
+Phase 10 executable routine workflow and first no-save HUD smoke PASS; final Phase 10 gate remains IN PROGRESS:
+
+- source commit: `420d7a1f1f20f49706a34d953df5f0d39f67e4a8`;
+- source gates: validation 15/15, behavior 45/45, harness 5/5, deployment purity 5/5, package 4/4;
+- runtime run: `20260811T2144351145396Z-ui-root-smoke`, 11/11 assertions;
+- observed: one UI root, 12 open frames, two open/close cycles, three routine buttons, critical controls on-screen, 2560x1440;
+- package / DLL / MVID: `e544b7b2940a455c9ac886237ae5d42420c8b32b6657736af06661c369406e72` / `bd3248bb56314fa68d8ecaf16761410c114d2578df24fcdd1da4cdcd1e35bdfb` / `cfa3b527-3186-4c0a-ba07-21fbaa49bf36`;
+- transaction: `Restored`, `restorationVerified=true`, no save selected or mutated.
+
+This proves the no-save HUD controls render and fit at one representative resolution. It is smoke 1/2, not the Phase 10 gate: remaining setup polish, common scale/resolution rows, transition/reload subscription evidence, and configured campaign execution require further work or the authorized `KBP_` fixture.

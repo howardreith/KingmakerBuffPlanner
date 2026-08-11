@@ -175,7 +175,10 @@ function Assert-KbpRuntimeResult {
             [int]$Result.uiOpenCloseCycles -lt 2 -or
             [int]$Result.uiScreenWidth -le 0 -or [int]$Result.uiScreenHeight -le 0 -or
             [int]$Result.uiRoutineButtonCount -ne 3 -or
-            -not [bool]$Result.uiCriticalControlsOnScreen) {
+            -not [bool]$Result.uiCriticalControlsOnScreen -or
+            [int]$Result.uiLayoutProfilesPassed -ne 3 -or
+            [int]$Result.uiFullScreenBlockerCount -ne 0 -or
+            [int]$Result.uiEventSubscriptionCount -ne 0) {
             throw 'UI root smoke result is incomplete or invalid.'
         }
     }

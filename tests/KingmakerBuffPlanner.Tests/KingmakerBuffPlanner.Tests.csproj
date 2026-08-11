@@ -41,6 +41,7 @@
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\ExecutionModels.cs"><Link>Execution\ExecutionModels.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\AnimatedCastExecutor.cs"><Link>Execution\AnimatedCastExecutor.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\InstantCastExecutor.cs"><Link>Execution\InstantCastExecutor.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\HybridCastExecutor.cs"><Link>Execution\HybridCastExecutor.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\ResourceLedger.cs"><Link>Planning\ResourceLedger.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\RoutinePlanService.cs"><Link>Planning\RoutinePlanService.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\EffectPresenceEvaluator.cs"><Link>Planning\EffectPresenceEvaluator.cs</Link></Compile>

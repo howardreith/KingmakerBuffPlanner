@@ -77,6 +77,7 @@ namespace KingmakerBuffPlanner.Tests
                 Run("setup-model-persists-stable-targets-and-provider-controls", TestSetupModel);
                 Run("animated-executor-validates-before-queue-and-reports", TestAnimatedExecutor);
                 Run("instant-executor-revalidates-batches-and-reports", TestInstantExecutor);
+                Run("hybrid-executor-routes-and-blocks-fallbacks", TestHybridExecutor);
             }
             finally
             {
@@ -618,13 +619,15 @@ namespace KingmakerBuffPlanner.Tests
                 IgnoredPresenceMarkers = new List<string>()
             });
             var option = new ProviderPlanningOption(provider, new[] { "unit-a" },
-                new[] { "unit-a" }, 1, 10);
+                new[] { "unit-a" }, 1, 10, true);
             RoutinePlanResult result = new RoutinePlanService().Plan(profile, "long", snapshot,
                 new ActiveEffectSnapshot(null),
                 new Dictionary<string, EffectExpression> { { supported.Canonical, Leaf("supported-effect") } },
                 new[] { option });
             if (result.Plan.Steps.Count != 1 || result.UnsupportedSourceIds.Count != 1 ||
-                result.UnsupportedSourceIds[0] != unsupported.Canonical)
+                result.UnsupportedSourceIds[0] != unsupported.Canonical ||
+                result.AnimatedFallbackSourceIds.Count != 1 ||
+                result.AnimatedFallbackSourceIds[0] != supported.Canonical)
                 throw new InvalidOperationException("Routine service did not isolate an unsupported saved source.");
         }
 
@@ -773,6 +776,7 @@ namespace KingmakerBuffPlanner.Tests
             model.SetScale(1.25f);
             model.ToggleExecutionMode();
             model.ToggleOutOfCombatOnly();
+            model.ToggleAnimatedFallback();
             model.ToggleExistingEffectPolicy("long");
             model.ToggleHidden();
             var reordered = new PartyProviderSnapshot(units.Reverse(), new[] { provider }, new[] { pool });
@@ -783,9 +787,14 @@ namespace KingmakerBuffPlanner.Tests
                 reloaded.Profile.Ui.Scale != 1.25f ||
                 reloaded.Profile.Execution.Mode != "instant" ||
                 reloaded.Profile.Execution.OutOfCombatOnly ||
+                reloaded.Profile.Execution.AllowAnimatedFallback ||
                 reloaded.GetExistingEffectPolicy("long") != ExistingEffectPolicy.Overwrite ||
-                !reloaded.Profile.HiddenSourceIds.Contains(ability.Canonical) || saves < 11)
+                !reloaded.Profile.HiddenSourceIds.Contains(ability.Canonical) || saves < 12)
                 throw new InvalidOperationException("Setup state did not survive party reorder/persistence mutations.");
+            reloaded.ToggleRoutine("short");
+            reloaded.ClearRoutine("short");
+            if (reloaded.Profile.Routines.First(r => r.RoutineId == "short").Assignments.Count != 0)
+                throw new InvalidOperationException("Routine clear changed or retained the wrong assignment set.");
         }
 
         private static void TestAnimatedExecutor()
@@ -831,6 +840,46 @@ namespace KingmakerBuffPlanner.Tests
                 report.Succeeded != 8 || report.Failed != 1 || report.SuccessfullyObserved != 8 ||
                 report.ResourcesSpent != 8)
                 throw new InvalidOperationException("Instant executor bypassed validation, batching, or reporting.");
+        }
+
+        private static void TestHybridExecutor()
+        {
+            AbilityKey ability = Ability("hybrid", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("hybrid-free", ResourcePoolKind.Unlimited, 0, 0, null);
+            ProviderSnapshot provider = PlannerProvider("unit-a", "book-a", ability, "hybrid-free", 0);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(new[] { provider }, new[] { pool },
+                "unit-a", "unit-b");
+            var option = new ProviderPlanningOption(provider, new[] { "unit-a", "unit-b" },
+                new[] { "unit-a", "unit-b" }, 1, 1);
+            CastPlan plan = PlannerPlan(snapshot, ability, CastGroupingKind.PerTarget,
+                new[] { "unit-a", "unit-b" }, new[] { option }, EmptyPolicy(),
+                new ActiveEffectSnapshot(null));
+            var animated = new AlwaysAnimatedRuntime();
+            var instant = new AlwaysInstantRuntime();
+            var report = new ExecutionReport(plan);
+            var executor = new HybridCastExecutor(instant, animated,
+                step => step.TargetUnitIds.Contains("unit-a"), true, true);
+            Drain(executor.Execute(plan, report));
+            if (animated.StartCount != 1 || instant.FireCount != 1 || report.Fired != 2 ||
+                report.SuccessfullyObserved != 2 || report.Failed != 0)
+                throw new InvalidOperationException("Hybrid executor did not route exact per-step execution modes.");
+
+            animated = new AlwaysAnimatedRuntime();
+            instant = new AlwaysInstantRuntime();
+            report = new ExecutionReport(plan);
+            executor = new HybridCastExecutor(instant, animated,
+                step => step.TargetUnitIds.Contains("unit-a"), false, true);
+            Drain(executor.Execute(plan, report));
+            if (animated.StartCount != 0 || instant.FireCount != 1 || report.Failed != 1 ||
+                !report.Records.Any(r => r.Detail == "animated-fallback-disabled"))
+                throw new InvalidOperationException("Disabled animated fallback was not blocked before firing.");
+        }
+
+        private static void Drain(System.Collections.IEnumerator enumerator)
+        {
+            int moves = 0;
+            while (enumerator.MoveNext())
+                if (++moves > 100) throw new InvalidOperationException("Executor did not terminate.");
         }
 
         private static EffectLeafExpression Leaf(string id)
@@ -944,6 +993,30 @@ namespace KingmakerBuffPlanner.Tests
                     ? CastRuntimeValidation.Fail("resource-changed")
                     : CastRuntimeValidation.Pass();
             }
+            public InstantCastResult Fire(CastStep step)
+            {
+                FireCount++;
+                return new InstantCastResult(true, true, true, true, "rule-success");
+            }
+        }
+
+        private sealed class AlwaysAnimatedRuntime : ICastRuntimeAdapter
+        {
+            internal int StartCount;
+            public bool IsInCombat { get { return false; } }
+            public CastRuntimeValidation Validate(CastStep step) { return CastRuntimeValidation.Pass(); }
+            public IAnimatedCastOperation StartAnimated(CastStep step)
+            {
+                StartCount++;
+                return new FakeAnimatedOperation();
+            }
+        }
+
+        private sealed class AlwaysInstantRuntime : IInstantCastRuntimeAdapter
+        {
+            internal int FireCount;
+            public bool IsInCombat { get { return false; } }
+            public CastRuntimeValidation Validate(CastStep step) { return CastRuntimeValidation.Pass(); }
             public InstantCastResult Fire(CastStep step)
             {
                 FireCount++;

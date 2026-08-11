@@ -112,8 +112,10 @@ namespace KingmakerBuffPlanner.Planning
                     poolKinds, materials, new[] { targetId }, remaining);
                 if (selection == null)
                 {
-                    outcomes.Add(Unfulfilled(targetId, "no-valid-provider-or-resource"));
-                    diagnostics.Add("unfulfilled:" + targetId + ":no-valid-provider-or-resource");
+                    outcomes.Add(Unfulfilled(targetId,
+                        request.Source.SourceId + ":no-valid-provider-or-resource"));
+                    diagnostics.Add("unfulfilled:" + request.Source.SourceId + ":" +
+                        targetId + ":no-valid-provider-or-resource");
                     remaining.Remove(targetId);
                     continue;
                 }
@@ -121,7 +123,7 @@ namespace KingmakerBuffPlanner.Planning
                     new[] { targetId }, selection.Reservation, selection.MaterialReservation,
                     request.Source.Effects, false));
                 outcomes.Add(new TargetPlanOutcome(targetId, TargetOutcomeKind.Fulfilled,
-                    "planned", new string[0]));
+                    request.Source.SourceId + ":planned", new string[0]));
                 remaining.Remove(targetId);
             }
         }
@@ -147,8 +149,10 @@ namespace KingmakerBuffPlanner.Planning
                 if (selection == null)
                 {
                     foreach (string targetId in remaining)
-                        outcomes.Add(Unfulfilled(targetId, "no-valid-mass-provider-or-resource"));
-                    diagnostics.Add("unfulfilled-mass-targets:" + string.Join(",", remaining.ToArray()));
+                        outcomes.Add(Unfulfilled(targetId,
+                            request.Source.SourceId + ":no-valid-mass-provider-or-resource"));
+                    diagnostics.Add("unfulfilled-mass-targets:" + request.Source.SourceId + ":" +
+                        string.Join(",", remaining.ToArray()));
                     break;
                 }
                 string[] covered = remaining.Where(id => selection.Option.ReachableTargetIds.Contains(id))
@@ -159,7 +163,7 @@ namespace KingmakerBuffPlanner.Planning
                 foreach (string targetId in covered)
                 {
                     outcomes.Add(new TargetPlanOutcome(targetId, TargetOutcomeKind.Fulfilled,
-                        "planned-mass", new string[0]));
+                        request.Source.SourceId + ":planned-mass", new string[0]));
                     remaining.Remove(targetId);
                 }
             }

@@ -11,15 +11,22 @@ namespace KingmakerBuffPlanner.Planning
 {
     public sealed class RoutinePlanResult
     {
-        internal RoutinePlanResult(CastPlan plan, IEnumerable<string> unsupportedSourceIds)
+        internal RoutinePlanResult(
+            CastPlan plan,
+            IEnumerable<string> unsupportedSourceIds,
+            IEnumerable<string> animatedFallbackSourceIds)
         {
             Plan = plan;
             UnsupportedSourceIds = new ReadOnlyCollection<string>((unsupportedSourceIds ?? new string[0])
                 .OrderBy(v => v, StringComparer.Ordinal).ToList());
+            AnimatedFallbackSourceIds = new ReadOnlyCollection<string>(
+                (animatedFallbackSourceIds ?? new string[0]).Distinct(StringComparer.Ordinal)
+                    .OrderBy(v => v, StringComparer.Ordinal).ToList());
         }
 
         public CastPlan Plan { get; private set; }
         public IReadOnlyList<string> UnsupportedSourceIds { get; private set; }
+        public IReadOnlyList<string> AnimatedFallbackSourceIds { get; private set; }
     }
 
     public sealed class RoutinePlanService
@@ -36,6 +43,7 @@ namespace KingmakerBuffPlanner.Planning
             if (snapshot == null) throw new ArgumentNullException("snapshot");
             if (activeEffects == null) throw new ArgumentNullException("activeEffects");
             if (effectsBySource == null) throw new ArgumentNullException("effectsBySource");
+            var optionList = (providerOptions ?? throw new ArgumentNullException("providerOptions")).ToList();
             RoutineProfile routine = profile.Routines.FirstOrDefault(r => r.RoutineId == routineId);
             if (routine == null) throw new ArgumentException("Unknown routine.", "routineId");
             var requests = new List<BuffCastRequest>();
@@ -61,8 +69,13 @@ namespace KingmakerBuffPlanner.Planning
             }
             ProviderSelectionPolicy policy = BuildPolicy(profile.ProviderPreferences);
             CastPlan plan = new CastPlanner().PlanRoutine(snapshot, requests,
-                providerOptions, policy, activeEffects);
-            return new RoutinePlanResult(plan, unsupported);
+                optionList, policy, activeEffects);
+            var fallbackProviderAbilities = new HashSet<string>(optionList
+                .Where(o => o.RequiresAnimatedExecution)
+                .Select(o => o.Provider.Key.Ability.Canonical), StringComparer.Ordinal);
+            return new RoutinePlanResult(plan, unsupported, routine.Assignments
+                .Where(a => fallbackProviderAbilities.Contains(a.Ability.ToKey().Canonical))
+                .Select(a => a.SourceId));
         }
 
         private static ProviderSelectionPolicy BuildPolicy(

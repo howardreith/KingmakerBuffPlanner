@@ -145,6 +145,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     UiScreenHeight = ui == null ? 0 : ui.ScreenHeight,
                     UiRoutineButtonCount = ui == null ? 0 : ui.RoutineButtonCount,
                     UiCriticalControlsOnScreen = ui != null && ui.CriticalControlsOnScreen,
+                    UiLayoutProfilesPassed = ui == null ? 0 : ui.LayoutProfilesPassed,
+                    UiFullScreenBlockerCount = ui == null ? 0 : ui.FullScreenBlockerCount,
+                    UiEventSubscriptionCount = ui == null ? 0 : ui.EventSubscriptionCount,
                     Assertions = new List<RuntimeTestAssertion>
                     {
                         RuntimeTestAssertion.Pass("entry-point-loaded", "true", "true"),
@@ -196,9 +199,23 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     result.Assertions.Add(ui.CriticalControlsOnScreen
                         ? RuntimeTestAssertion.Pass("ui-critical-controls-on-screen", "true", "true")
                         : RuntimeTestAssertion.Fail("ui-critical-controls-on-screen", "true", "false"));
+                    result.Assertions.Add(ui.LayoutProfilesPassed == 3
+                        ? RuntimeTestAssertion.Pass("ui-layout-profiles", "3", "3")
+                        : RuntimeTestAssertion.Fail("ui-layout-profiles", "3",
+                            ui.LayoutProfilesPassed.ToString()));
+                    result.Assertions.Add(ui.FullScreenBlockerCount == 0
+                        ? RuntimeTestAssertion.Pass("ui-full-screen-blockers", "0", "0")
+                        : RuntimeTestAssertion.Fail("ui-full-screen-blockers", "0",
+                            ui.FullScreenBlockerCount.ToString()));
+                    result.Assertions.Add(ui.EventSubscriptionCount == 0
+                        ? RuntimeTestAssertion.Pass("ui-event-subscriptions", "0", "0")
+                        : RuntimeTestAssertion.Fail("ui-event-subscriptions", "0",
+                            ui.EventSubscriptionCount.ToString()));
                     if (ui.RootCount != 1 || ui.RenderedOpenFrames == 0 || ui.OpenCloseCycles < 2 ||
                         ui.ScreenWidth <= 0 || ui.ScreenHeight <= 0 ||
-                        ui.RoutineButtonCount != 3 || !ui.CriticalControlsOnScreen)
+                        ui.RoutineButtonCount != 3 || !ui.CriticalControlsOnScreen ||
+                        ui.LayoutProfilesPassed != 3 || ui.FullScreenBlockerCount != 0 ||
+                        ui.EventSubscriptionCount != 0)
                     {
                         result.Status = "FAIL";
                         result.Stage = "ui-validation";
@@ -307,6 +324,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         [JsonProperty("uiOpenCloseCycles", Order = 32)] public int UiOpenCloseCycles { get; set; }
         [JsonProperty("uiRoutineButtonCount", Order = 33)] public int UiRoutineButtonCount { get; set; }
         [JsonProperty("uiCriticalControlsOnScreen", Order = 34)] public bool UiCriticalControlsOnScreen { get; set; }
+        [JsonProperty("uiLayoutProfilesPassed", Order = 35)] public int UiLayoutProfilesPassed { get; set; }
+        [JsonProperty("uiFullScreenBlockerCount", Order = 36)] public int UiFullScreenBlockerCount { get; set; }
+        [JsonProperty("uiEventSubscriptionCount", Order = 37)] public int UiEventSubscriptionCount { get; set; }
     }
 
     internal sealed class RuntimeTestAssertion

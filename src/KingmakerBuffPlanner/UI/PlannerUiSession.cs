@@ -119,11 +119,20 @@ namespace KingmakerBuffPlanner.UI
                 yield break;
             }
             LastExecutionReport = new ExecutionReport(preview.Plan);
-            ICastExecutor executor = Model.Profile.Execution.Mode == "instant"
-                ? (ICastExecutor)new InstantCastExecutor(new KingmakerInstantCastAdapter(),
-                    Model.Profile.Execution.OutOfCombatOnly)
-                : new AnimatedCastExecutor(new KingmakerAnimatedCastAdapter(),
+            ICastExecutor executor;
+            if (Model.Profile.Execution.Mode == "instant")
+            {
+                var fallbackProviders = new HashSet<string>(_providerOptions
+                    .Where(o => o.RequiresAnimatedExecution)
+                    .Select(o => o.Provider.Key.Canonical), StringComparer.Ordinal);
+                executor = new HybridCastExecutor(
+                    new KingmakerInstantCastAdapter(), new KingmakerAnimatedCastAdapter(),
+                    step => fallbackProviders.Contains(step.Provider.Canonical),
+                    Model.Profile.Execution.AllowAnimatedFallback,
                     Model.Profile.Execution.OutOfCombatOnly);
+            }
+            else executor = new AnimatedCastExecutor(new KingmakerAnimatedCastAdapter(),
+                Model.Profile.Execution.OutOfCombatOnly);
             IsExecuting = true;
             Status = "Executing " + routineId + " routine: " + preview.Plan.Steps.Count + " planned casts.";
             IEnumerator work = executor.Execute(preview.Plan, LastExecutionReport);

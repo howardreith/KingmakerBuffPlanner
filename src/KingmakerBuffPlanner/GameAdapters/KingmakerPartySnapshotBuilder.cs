@@ -191,7 +191,10 @@ namespace KingmakerBuffPlanner.GameAdapters
                 var ability = ToAbilityKey(data, sourceKind);
                 var keyForProvider = new ProviderKey(unit.UniqueId, string.Empty, ability, string.Empty);
                 providers.Add(new ProviderSnapshot(keyForProvider, data.Name, 0,
-                    pool.PoolKey, cost, null, ToMaterialRequirement(data), CasterLevel(data), 0));
+                    pool.PoolKey, cost, null, ToMaterialRequirement(data), CasterLevel(data),
+                    ExpectedDurationRounds(data), data.Blueprint.Description,
+                    data.Blueprint.LocalizedDuration == null ? string.Empty :
+                        data.Blueprint.LocalizedDuration.ToString()));
             }
         }
 
@@ -211,13 +214,30 @@ namespace KingmakerBuffPlanner.GameAdapters
             var key = new ProviderKey(unit.UniqueId, spellbook.Blueprint.AssetGuid, ability, sourceInstance);
             if (providers.Any(p => p.Key.Equals(key))) return;
             providers.Add(new ProviderSnapshot(key, data.Name, data.SpellLevel,
-                poolKey, cost, tokens, ToMaterialRequirement(data), CasterLevel(data), 0));
+                poolKey, cost, tokens, ToMaterialRequirement(data), CasterLevel(data),
+                ExpectedDurationRounds(data), data.Blueprint.Description,
+                data.Blueprint.LocalizedDuration == null ? string.Empty :
+                    data.Blueprint.LocalizedDuration.ToString()));
         }
 
         private static int CasterLevel(AbilityData data)
         {
             try { return Math.Max(0, data.CalculateParams().CasterLevel); }
             catch (Exception) { return 0; }
+        }
+
+        private static int ExpectedDurationRounds(AbilityData data)
+        {
+            int casterLevel = Math.Max(1, CasterLevel(data));
+            string duration = data.Blueprint.LocalizedDuration == null
+                ? string.Empty : data.Blueprint.LocalizedDuration.ToString();
+            string normalized = duration.ToLowerInvariant();
+            if (normalized.Contains("day")) return 14400 * casterLevel;
+            if (normalized.Contains("hour")) return 600 * casterLevel;
+            if (normalized.Contains("10 min") || normalized.Contains("ten min")) return 100 * casterLevel;
+            if (normalized.Contains("minute") || normalized.Contains(" min")) return 10 * casterLevel;
+            if (normalized.Contains("round")) return casterLevel;
+            return 0;
         }
 
         private static IEnumerable<AbilityData> ExpandVariants(IEnumerable<AbilityData> source)

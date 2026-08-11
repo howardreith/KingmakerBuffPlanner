@@ -181,3 +181,18 @@ Status: PASS for classification/reconciliation; runtime equivalence DEFER — EV
 - Qualification boundary: all 413 included rows await save-backed resource/effect/executor equivalence; no runtime PASS inferred
 - External state: game absent, lock absent, whole original `Mods` tree restored exactly
 - Exact next action: checkpoint generated audit/docs, then Phase 10 HUD routine execution and service composition
+
+## 2026-08-11 — Phase 10 routine composition and first HUD smoke
+
+Status: source behavior PASS; no-save HUD smoke 1/2 PASS; full Phase 10 gate IN PROGRESS
+
+- Branch/runtime source: `codex/kingmaker-buff-planner` at `420d7a1f1f20f49706a34d953df5f0d39f67e4a8`
+- Implementation commits: `9191d4a` executable routine workflow; `420d7a1` runtime HUD assertions
+- Source gates: validation 15/15; behavior 45/45; runtime transaction 5/5; deployment WhatIf 5/5; package 4/4
+- Routine planner shares resource pools, material inventory, and provider cast caps across every source in one deterministic routine
+- Player controls: persistent Long/Important/Short HUD buttons, setup preview/run controls, execution-mode and combat-policy controls, preview counts, and actual execution reports
+- Runtime PASS: `20260811T2144351145396Z-ui-root-smoke`, assertions 11/11, 3 routine buttons, critical controls on-screen, 2 open/close cycles, 12 rendered frames, singleton root, 2560x1440
+- Package/DLL/MVID: `e544b7b2940a455c9ac886237ae5d42420c8b32b6657736af06661c369406e72` / `bd3248bb56314fa68d8ecaf16761410c114d2578df24fcdd1da4cdcd1e35bdfb` / `cfa3b527-3186-4c0a-ba07-21fbaa49bf36`
+- Transaction: `Restored`, `restorationVerified=true`; exact original whole `Mods` manifest restored; no save selected or modified
+- Qualification boundary: this is the first of two required HUD smokes and one resolution. Campaign interaction, other required resolutions/scales, setup polish gaps, and save-backed routine execution remain open
+- Exact next action: complete setup filters/sorting/provider-resource/unsupported-fallback detail and reset affordance, then repeat clean no-save HUD smokes

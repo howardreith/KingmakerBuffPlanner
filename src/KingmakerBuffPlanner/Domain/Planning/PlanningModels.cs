@@ -80,7 +80,8 @@ namespace KingmakerBuffPlanner.Domain.Planning
             IEnumerable<string> reachableTargetIds,
             IEnumerable<string> legalAnchorIds,
             int effectiveCasterLevel,
-            int expectedDurationRounds)
+            int expectedDurationRounds,
+            bool requiresAnimatedExecution = false)
         {
             Provider = provider ?? throw new ArgumentNullException("provider");
             if (effectiveCasterLevel < 0) throw new ArgumentOutOfRangeException("effectiveCasterLevel");
@@ -89,6 +90,7 @@ namespace KingmakerBuffPlanner.Domain.Planning
             LegalAnchorIds = Sorted(legalAnchorIds);
             EffectiveCasterLevel = effectiveCasterLevel;
             ExpectedDurationRounds = expectedDurationRounds;
+            RequiresAnimatedExecution = requiresAnimatedExecution;
         }
 
         public ProviderSnapshot Provider { get; private set; }
@@ -96,6 +98,7 @@ namespace KingmakerBuffPlanner.Domain.Planning
         public IReadOnlyList<string> LegalAnchorIds { get; private set; }
         public int EffectiveCasterLevel { get; private set; }
         public int ExpectedDurationRounds { get; private set; }
+        public bool RequiresAnimatedExecution { get; private set; }
 
         private static IReadOnlyList<string> Sorted(IEnumerable<string> values)
         {

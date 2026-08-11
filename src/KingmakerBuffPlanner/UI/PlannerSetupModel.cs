@@ -18,14 +18,20 @@ namespace KingmakerBuffPlanner.UI
             Ability = ability;
             DisplayName = displayName;
             SpellLevel = spellLevel;
-            Providers = new ReadOnlyCollection<ProviderSnapshot>(providers
-                .OrderBy(p => p.Key.Canonical, StringComparer.Ordinal).ToList());
+            var ordered = providers.OrderBy(p => p.Key.Canonical, StringComparer.Ordinal).ToList();
+            Providers = new ReadOnlyCollection<ProviderSnapshot>(ordered);
+            Description = ordered.Select(p => p.Description).FirstOrDefault(v => !string.IsNullOrWhiteSpace(v)) ?? string.Empty;
+            DurationText = ordered.Select(p => p.DurationText).FirstOrDefault(v => !string.IsNullOrWhiteSpace(v)) ?? string.Empty;
+            ExpectedDurationRounds = ordered.Count == 0 ? 0 : ordered.Max(p => p.ExpectedDurationRounds);
         }
 
         public AbilityKey Ability { get; private set; }
         public string DisplayName { get; private set; }
         public int SpellLevel { get; private set; }
         public IReadOnlyList<ProviderSnapshot> Providers { get; private set; }
+        public string Description { get; private set; }
+        public string DurationText { get; private set; }
+        public int ExpectedDurationRounds { get; private set; }
         public string SourceId { get { return Ability.Canonical; } }
     }
 
@@ -65,6 +71,16 @@ namespace KingmakerBuffPlanner.UI
         public IReadOnlyList<SetupSourceRow> Sources { get; private set; }
         public string SelectedSourceId { get; private set; }
         public SetupSourceRow SelectedSource { get { return Sources.FirstOrDefault(s => s.SourceId == SelectedSourceId); } }
+        public IReadOnlyList<string> UnsupportedSavedSourceIds
+        {
+            get
+            {
+                var supported = new HashSet<string>(Sources.Select(s => s.SourceId), StringComparer.Ordinal);
+                return new ReadOnlyCollection<string>(Profile.Routines.SelectMany(r => r.Assignments)
+                    .Select(a => a.SourceId).Where(id => !supported.Contains(id))
+                    .Distinct(StringComparer.Ordinal).OrderBy(id => id, StringComparer.Ordinal).ToList());
+            }
+        }
 
         public void SelectSource(string sourceId)
         {
@@ -189,6 +205,59 @@ namespace KingmakerBuffPlanner.UI
         {
             Profile.Execution.OutOfCombatOnly = !Profile.Execution.OutOfCombatOnly;
             _save(Profile);
+        }
+
+        public void ToggleAnimatedFallback()
+        {
+            Profile.Execution.AllowAnimatedFallback = !Profile.Execution.AllowAnimatedFallback;
+            _save(Profile);
+        }
+
+        public void ClearRoutine(string routineId)
+        {
+            RoutineProfile routine = FindRoutine(routineId);
+            if (routine.Assignments.Count == 0) return;
+            routine.Assignments.Clear();
+            _save(Profile);
+        }
+
+        public string GetCasterDisplayName(ProviderSnapshot provider)
+        {
+            UnitSnapshot unit = Snapshot.Units.FirstOrDefault(u => u.UnitId == provider.Key.CasterUnitId);
+            return unit == null ? provider.Key.CasterUnitId : unit.DisplayName;
+        }
+
+        public ResourcePoolSnapshot GetResourcePool(ProviderSnapshot provider)
+        {
+            return Snapshot.ResourcePools.First(p => p.PoolKey == provider.ResourcePoolKey);
+        }
+
+        public int? GetRemainingCasts(ProviderSnapshot provider)
+        {
+            ResourcePoolSnapshot pool = GetResourcePool(provider);
+            if (pool.Kind == ResourcePoolKind.Unlimited || provider.UnitsPerCast == 0) return null;
+            if (pool.Kind == ResourcePoolKind.PreparedSlots)
+            {
+                int available = pool.Tokens.Count(t => t.Available && t.IsPrimary &&
+                    provider.EligibleTokenIds.Contains(t.TokenId));
+                return available / Math.Max(1, provider.UnitsPerCast);
+            }
+            return pool.Remaining / Math.Max(1, provider.UnitsPerCast);
+        }
+
+        public string GetProviderRejectionReason(ProviderSnapshot provider)
+        {
+            ProviderPreferenceProfile preference = GetProviderPreference(provider.Key.Canonical);
+            if (preference != null && preference.Banned) return "banned by profile";
+            if (provider.MaterialComponent != null &&
+                provider.MaterialComponent.AvailableCount < provider.MaterialComponent.RequiredCount)
+                return "missing material component";
+            int? remaining = GetRemainingCasts(provider);
+            if (remaining != null && remaining.Value == 0) return "resource pool exhausted";
+            UnitSnapshot caster = Snapshot.Units.FirstOrDefault(u => u.UnitId == provider.Key.CasterUnitId);
+            if (caster == null || !caster.TargetValidation.Alive || !caster.TargetValidation.Conscious)
+                return "caster unavailable";
+            return string.Empty;
         }
 
         public void ToggleHidden()

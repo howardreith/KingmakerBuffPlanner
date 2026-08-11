@@ -77,6 +77,7 @@
     <Compile Include="Execution\ExecutionModels.cs" />
     <Compile Include="Execution\AnimatedCastExecutor.cs" />
     <Compile Include="Execution\InstantCastExecutor.cs" />
+    <Compile Include="Execution\HybridCastExecutor.cs" />
     <Compile Include="GameAdapters\KingmakerActionGraphAdapter.cs" />
     <Compile Include="GameAdapters\KingmakerActiveEffectSnapshotBuilder.cs" />
     <Compile Include="GameAdapters\KingmakerAnimatedCastAdapter.cs" />
