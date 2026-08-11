@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using Newtonsoft.Json;
 
 namespace KingmakerBuffPlanner.Domain.Effects
 {
@@ -27,6 +28,7 @@ namespace KingmakerBuffPlanner.Domain.Effects
             ExpressionType = expressionType;
         }
 
+        [JsonProperty("expressionType", Order = 1)]
         public string ExpressionType { get; private set; }
     }
 
@@ -53,11 +55,11 @@ namespace KingmakerBuffPlanner.Domain.Effects
             ActionPath = actionPath ?? string.Empty;
         }
 
-        public EffectKind Kind { get; private set; }
-        public string EffectId { get; private set; }
-        public EffectTarget Target { get; private set; }
-        public string SourceContract { get; private set; }
-        public string ActionPath { get; private set; }
+        [JsonProperty("kind", Order = 2)] public EffectKind Kind { get; private set; }
+        [JsonProperty("effectId", Order = 3)] public string EffectId { get; private set; }
+        [JsonProperty("target", Order = 4)] public EffectTarget Target { get; private set; }
+        [JsonProperty("sourceContract", Order = 5)] public string SourceContract { get; private set; }
+        [JsonProperty("actionPath", Order = 6)] public string ActionPath { get; private set; }
     }
 
     public sealed class SequenceEffectExpression : EffectExpression
@@ -69,6 +71,7 @@ namespace KingmakerBuffPlanner.Domain.Effects
                 new List<EffectExpression>(children ?? throw new ArgumentNullException("children")));
         }
 
+        [JsonProperty("children", Order = 2)]
         public IReadOnlyList<EffectExpression> Children { get; private set; }
     }
 
@@ -85,9 +88,9 @@ namespace KingmakerBuffPlanner.Domain.Effects
             WhenFalse = whenFalse ?? throw new ArgumentNullException("whenFalse");
         }
 
-        public string ConditionContract { get; private set; }
-        public EffectExpression WhenTrue { get; private set; }
-        public EffectExpression WhenFalse { get; private set; }
+        [JsonProperty("conditionContract", Order = 2)] public string ConditionContract { get; private set; }
+        [JsonProperty("whenTrue", Order = 3)] public EffectExpression WhenTrue { get; private set; }
+        [JsonProperty("whenFalse", Order = 4)] public EffectExpression WhenFalse { get; private set; }
     }
 
     public sealed class TargetedEffectExpression : EffectExpression
@@ -99,8 +102,8 @@ namespace KingmakerBuffPlanner.Domain.Effects
             Child = child ?? throw new ArgumentNullException("child");
         }
 
-        public EffectTarget Target { get; private set; }
-        public EffectExpression Child { get; private set; }
+        [JsonProperty("target", Order = 2)] public EffectTarget Target { get; private set; }
+        [JsonProperty("child", Order = 3)] public EffectExpression Child { get; private set; }
     }
 
     public sealed class ReferencedAbilityExpression : EffectExpression
@@ -112,7 +115,7 @@ namespace KingmakerBuffPlanner.Domain.Effects
             Child = child ?? throw new ArgumentNullException("child");
         }
 
-        public string AbilityId { get; private set; }
-        public EffectExpression Child { get; private set; }
+        [JsonProperty("abilityId", Order = 2)] public string AbilityId { get; private set; }
+        [JsonProperty("child", Order = 3)] public EffectExpression Child { get; private set; }
     }
 }

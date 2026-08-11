@@ -42,6 +42,7 @@ namespace KingmakerBuffPlanner.Tests
                 Run("scanner-propagates-target-transform", TestScannerTarget);
                 Run("scanner-reports-cycle", TestScannerCycle);
                 Run("scanner-reports-unknown-node", TestScannerUnknown);
+                Run("scanner-expression-wire-contract", TestScannerExpressionWireContract);
             }
             finally
             {
@@ -124,6 +125,16 @@ namespace KingmakerBuffPlanner.Tests
                 new DiscoveryNode(DiscoveryNodeKind.Unknown, "custom-action", sourceContract: "unsupported"));
             if (result.Diagnostics.Count != 1 || result.Diagnostics[0].Code != "unknown-node")
                 throw new InvalidOperationException("Unknown action was silently discarded.");
+        }
+
+        private static void TestScannerExpressionWireContract()
+        {
+            EffectExpression expression = new ActionGraphScanner().Scan(EffectNode("wire-buff")).Expression;
+            string json = JsonConvert.SerializeObject(expression);
+            if (!json.Contains("\"expressionType\":\"leaf\"") ||
+                !json.Contains("\"effectId\":\"wire-buff\"") ||
+                !json.Contains("\"actionPath\":\"wire-buff\""))
+                throw new InvalidOperationException("Effect expression JSON contract is incomplete: " + json);
         }
 
         private static DiscoveryNode EffectNode(string id)

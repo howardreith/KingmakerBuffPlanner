@@ -38,6 +38,7 @@ namespace KingmakerBuffPlanner.Discovery
                         SourceAssembly = ability.GetType().Assembly.FullName,
                         IsSpell = ability.IsSpell,
                         IsCandidate = candidate,
+                        HasDetectedEffect = detected,
                         CanTargetSelf = ability.CanTargetSelf,
                         CanTargetFriends = ability.CanTargetFriends,
                         CanTargetEnemies = ability.CanTargetEnemies,
@@ -80,7 +81,7 @@ namespace KingmakerBuffPlanner.Discovery
                 GeneratorCommit = BuildInfo.Commit,
                 AbilityCount = entries.Count,
                 CandidateCount = entries.Count(e => e.IsCandidate),
-                DetectedEffectCount = entries.Count(e => e.Disposition == "detected-effect"),
+                DetectedEffectCount = entries.Count(e => e.HasDetectedEffect),
                 DiagnosticAbilityCount = entries.Count(e => e.Diagnostics.Length != 0),
                 Abilities = entries.ToArray()
             };
@@ -139,23 +140,25 @@ namespace KingmakerBuffPlanner.Discovery
         public bool IsSpell { get; set; }
         [JsonProperty("isCandidate", Order = 8)]
         public bool IsCandidate { get; set; }
-        [JsonProperty("canTargetSelf", Order = 9)]
+        [JsonProperty("hasDetectedEffect", Order = 9)]
+        public bool HasDetectedEffect { get; set; }
+        [JsonProperty("canTargetSelf", Order = 10)]
         public bool CanTargetSelf { get; set; }
-        [JsonProperty("canTargetFriends", Order = 10)]
+        [JsonProperty("canTargetFriends", Order = 11)]
         public bool CanTargetFriends { get; set; }
-        [JsonProperty("canTargetEnemies", Order = 11)]
+        [JsonProperty("canTargetEnemies", Order = 12)]
         public bool CanTargetEnemies { get; set; }
-        [JsonProperty("canTargetPoint", Order = 12)]
+        [JsonProperty("canTargetPoint", Order = 13)]
         public bool CanTargetPoint { get; set; }
-        [JsonProperty("isStickyTouch", Order = 13)]
+        [JsonProperty("isStickyTouch", Order = 14)]
         public bool IsStickyTouch { get; set; }
-        [JsonProperty("resourceIds", Order = 14)]
+        [JsonProperty("resourceIds", Order = 15)]
         public string[] ResourceIds { get; set; }
-        [JsonProperty("expression", Order = 15)]
+        [JsonProperty("expression", Order = 16)]
         public EffectExpression Expression { get; set; }
-        [JsonProperty("diagnostics", Order = 16)]
+        [JsonProperty("diagnostics", Order = 17)]
         public DiscoveryDiagnostic[] Diagnostics { get; set; }
-        [JsonProperty("disposition", Order = 17)]
+        [JsonProperty("disposition", Order = 18)]
         public string Disposition { get; set; }
     }
 }

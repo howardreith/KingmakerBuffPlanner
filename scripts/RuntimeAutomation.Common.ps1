@@ -165,5 +165,9 @@ function Assert-KbpRuntimeResult {
             @($catalog.abilities).Count -ne [int]$catalog.abilityCount) {
             throw 'Native catalog JSON contract does not reconcile with the runtime result.'
         }
+        $missingExpressions = @($catalog.abilities | Where-Object {
+            [string]::IsNullOrWhiteSpace([string]$_.expression.expressionType)
+        })
+        if ($missingExpressions.Count -ne 0) { throw 'Native catalog contains expressions without discriminators.' }
     }
 }

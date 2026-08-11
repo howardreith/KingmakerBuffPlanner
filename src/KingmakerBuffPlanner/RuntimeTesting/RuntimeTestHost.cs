@@ -79,6 +79,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     if ((int)catalogDocument["schemaVersion"] != 1 || abilityDocuments == null ||
                         abilityDocuments.Count != catalog.AbilityCount)
                         throw new InvalidDataException("Serialized catalog contract did not reconcile.");
+                    foreach (JObject abilityDocument in abilityDocuments.OfType<JObject>())
+                    {
+                        var expressionDocument = abilityDocument["expression"] as JObject;
+                        if (expressionDocument == null ||
+                            string.IsNullOrWhiteSpace((string)expressionDocument["expressionType"]))
+                            throw new InvalidDataException("Serialized effect expression lost its discriminator.");
+                    }
                     AtomicFile.WriteUtf8(catalogPath, catalogJson);
                     catalogHash = Hashing.Sha256(catalogPath);
                 }
