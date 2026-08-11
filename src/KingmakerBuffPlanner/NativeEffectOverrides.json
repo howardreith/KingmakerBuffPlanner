@@ -1,4 +1,21 @@
 {
   "schemaVersion": 1,
-  "entries": []
+  "entries": [
+    {
+      "abilityGuid": "64aca51981fc11346a20b723d7667e47",
+      "disposition": "exclude",
+      "sourceAssembly": "native",
+      "effectMode": "allOf",
+      "effects": [],
+      "reason": "Heavenly Fire is direct healing or damage; the detected empty buff is only its target cooldown marker."
+    },
+    {
+      "abilityGuid": "f5f45344aa0202c4bbda8287dc63f850",
+      "disposition": "exclude",
+      "sourceAssembly": "native",
+      "effectMode": "allOf",
+      "effects": [],
+      "reason": "Spontaneous Healing is direct healing; its only persistent graph leaf is the hidden cooldown marker."
+    }
+  ]
 }

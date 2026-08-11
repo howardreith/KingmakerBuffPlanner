@@ -251,6 +251,19 @@ namespace KingmakerBuffPlanner.Tests
             if (carrier.Disposition != "exclude" ||
                 !carrier.Reason.StartsWith("sticky-touch-carrier-only:", StringComparison.Ordinal))
                 throw new InvalidOperationException("A transient sticky-touch carrier was exposed as a buff.");
+
+            NativeCandidateAuditDecision weaponCarrier = classifier.Classify(new NativeCandidateAuditFacts
+            {
+                IsPlayerAccessible = true,
+                Range = "Weapon",
+                CanTargetSelf = true,
+                CanTargetEnemies = true,
+                Effects = new[] { CandidateEffect("Buff", "Caster", false, "ContextActionApplyBuff", "attack") },
+                DiagnosticContracts = new string[0]
+            });
+            if (weaponCarrier.Disposition != "exclude" ||
+                !weaponCarrier.Reason.StartsWith("hostile-weapon-carrier:", StringComparison.Ordinal))
+                throw new InvalidOperationException("A hostile weapon carrier was exposed as a buff.");
         }
 
         private static NativeCandidateEffectFacts CandidateEffect(

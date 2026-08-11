@@ -104,6 +104,7 @@ namespace KingmakerBuffPlanner.Discovery
                             IsStickyTouch = entry.IsStickyTouch,
                             EffectOnAlly = entry.EffectOnAlly,
                             EffectOnEnemy = entry.EffectOnEnemy,
+                            Range = entry.Range,
                             Effects = effects.Select(e => new NativeCandidateEffectFacts
                             {
                                 Kind = e.Kind,

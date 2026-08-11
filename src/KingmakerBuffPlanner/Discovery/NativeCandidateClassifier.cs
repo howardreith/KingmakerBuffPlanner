@@ -15,6 +15,7 @@ namespace KingmakerBuffPlanner.Discovery
         public bool IsStickyTouch { get; set; }
         public string EffectOnAlly { get; set; }
         public string EffectOnEnemy { get; set; }
+        public string Range { get; set; }
         public IReadOnlyList<NativeCandidateEffectFacts> Effects { get; set; }
         public IReadOnlyList<string> DiagnosticContracts { get; set; }
     }
@@ -74,6 +75,9 @@ namespace KingmakerBuffPlanner.Discovery
             if (facts.IsStickyTouch && effects.All(e => e.Target == "Caster"))
                 return Exclude("sticky-touch-carrier-only",
                     "Only the transient caster-side delivery carrier was detected; no persistent target effect remains.");
+            if (facts.Range == "Weapon" && facts.CanTargetEnemies && !facts.CanTargetFriends)
+                return Exclude("hostile-weapon-carrier",
+                    "The caster-side marker belongs to a hostile weapon action, not a standalone beneficial cast.");
 
             bool controlledTransform = effects.Any(e =>
                 e.Target == "Caster" || e.Target == "Pet" || e.Target == "Party");
