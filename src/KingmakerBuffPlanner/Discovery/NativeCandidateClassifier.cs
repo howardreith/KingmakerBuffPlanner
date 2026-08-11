@@ -85,7 +85,7 @@ namespace KingmakerBuffPlanner.Discovery
             bool hostileOnly =
                 (facts.CanTargetEnemies && !facts.CanTargetFriends && currentTargetEffect) ||
                 (facts.CanTargetEnemies && !facts.CanTargetSelf && !facts.CanTargetFriends) ||
-                (facts.CanTargetEnemies &&
+                ((facts.CanTargetEnemies || !facts.CanTargetFriends) &&
                     string.Equals(facts.EffectOnEnemy, "Harmful", StringComparison.Ordinal) &&
                     !string.Equals(facts.EffectOnAlly, "Helpful", StringComparison.Ordinal) &&
                     currentTargetEffect && !controlledTransform);
