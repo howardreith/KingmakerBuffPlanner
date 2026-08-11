@@ -49,7 +49,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 Assembly assembly = typeof(Main).Assembly;
                 string assemblyPath = assembly.Location;
                 string dllHash = Hashing.Sha256(assemblyPath);
-                string gameRoot = Directory.GetParent(Directory.GetParent(_modEntry.Path).FullName).FullName;
+                string gameRoot = RuntimePaths.GetGameRoot(_modEntry.Path);
                 string managed = Path.Combine(gameRoot, "Kingmaker_Data", "Managed");
                 string gameExecutable = Path.Combine(gameRoot, "Kingmaker.exe");
                 string umm = Path.Combine(managed, "UnityModManager", "UnityModManager.dll");
@@ -92,7 +92,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 string resultPath = Path.Combine(_request.EvidenceDirectory, "runtime-result.json");
                 AtomicFile.WriteUtf8(
                     resultPath,
-                    JsonConvert.SerializeObject(result, Formatting.Indented) + Environment.NewLine);
+                    Serialize(result));
                 _log.Info("Runtime scenario completed: " + _request.RunId + " " + result.Status + ".");
                 if (_request.ExitAfterCompletion) Application.Quit();
             }
@@ -128,12 +128,25 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 };
                 AtomicFile.WriteUtf8(
                     Path.Combine(_request.EvidenceDirectory, "runtime-result.json"),
-                    JsonConvert.SerializeObject(result, Formatting.Indented) + Environment.NewLine);
+                    Serialize(result));
             }
             catch (Exception writeException)
             {
                 _log.Error("Runtime failure result could not be written.", writeException);
             }
+        }
+
+        private static string Serialize(RuntimeTestResult result)
+        {
+            return JsonConvert.SerializeObject(
+                result,
+                Formatting.Indented,
+                new JsonSerializerSettings
+                {
+                    PreserveReferencesHandling = PreserveReferencesHandling.None,
+                    ReferenceLoopHandling = ReferenceLoopHandling.Error,
+                    TypeNameHandling = TypeNameHandling.None
+                }) + Environment.NewLine;
         }
     }
 

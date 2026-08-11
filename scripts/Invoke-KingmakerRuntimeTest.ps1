@@ -83,6 +83,10 @@ try {
 }
 finally {
     if ($transactionEntered) {
+        if ($null -ne $process) {
+            try { [void]$process.WaitForExit(30000) }
+            catch { Write-Warning "Unable to wait for launched Kingmaker exit: $($_.Exception.Message)" }
+        }
         $running = @(Get-Process -Name Kingmaker -ErrorAction SilentlyContinue)
         if ($running.Count -eq 0) {
             & (Join-Path $PSScriptRoot 'Restore-Local.ps1') -RunId $runId -Confirm:$false

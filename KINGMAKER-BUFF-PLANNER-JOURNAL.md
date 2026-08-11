@@ -65,3 +65,19 @@ Status: IN PROGRESS
 - Privacy decision: raw Steam/account log lines are not copied into evidence; only sanitized state and timestamps are retained
 - Runtime state: no transaction active; no game launched; live `Mods` unchanged
 - Exact next action: checkpoint/rebuild the guarded harness, run top-level runtime WhatIf, then request the guarded fresh-process mod-load run
+
+## 2026-08-11 — First guarded mod-load attempt and recovery
+
+Status: FAIL
+
+- Source commit: `3ae93f8653afa90bb606ffccea1c24d5869ba22e`
+- Active version: 0.0.1
+- Package/DLL SHA-256: `8c9d041bc120ae583bf808ce96ce436df308655b6397e2abbeceb978f230547b` / `f18ce1a81fb8df7b9142bd89af9a3e521a748a7c82d9b3ade3a57a2f133cefed`
+- Runtime evidence ID: `20260811T1931581708021Z-mod-load-smoke`
+- UMM evidence: exact 0.28.2 manager loaded 1/1 mods; Kingmaker Buff Planner 0.0.1 and exact embedded commit loaded/enabled
+- Failure: `RuntimePaths` equivalent logic interpreted a trailing UMM mod path one level too high and looked for `Mods\Kingmaker.exe`; atomic result status FAIL, stage `unhandled-exception`
+- Safety behavior: game requested clean exit; orchestrator observed it during the exit race and conservatively withheld restoration
+- Recovery: after proving Kingmaker absent and sentinel/token ownership exact, guarded `Restore-Local.ps1` completed; status Restored, `restorationVerified=true`, original/live manifest equality true, lock absent
+- No save was selected, loaded, or written
+- Regression: explicit path helper tests trailing and non-trailing paths; protocol suite now PASS 14/14; orchestrator waits up to 30 seconds for its process in `finally`
+- Exact next action: checkpoint fix, rebuild exact package, repeat top-level WhatIf, then run fresh-process mod-load qualification again

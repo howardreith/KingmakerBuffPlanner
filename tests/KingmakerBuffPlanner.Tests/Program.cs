@@ -33,6 +33,8 @@ namespace KingmakerBuffPlanner.Tests
                 Run("invalid-hash-rejected", () => TestMutation(root, "invalid-hash", o => o["expectedDllSha256"] = "not-a-hash"));
                 Run("parameters-rejected", () => TestMutation(root, "parameters", o => o["parameters"] = new Dictionary<string, object> { { "saveName", "KBP_AUTOMATION_BASELINE" } }));
                 Run("result-reuse-rejected", () => TestResultReuse(root));
+                Run("game-root-without-trailing-separator", TestGameRootWithoutTrailingSeparator);
+                Run("game-root-with-trailing-separator", TestGameRootWithTrailingSeparator);
             }
             finally
             {
@@ -51,6 +53,20 @@ namespace KingmakerBuffPlanner.Tests
             string name = new AssemblyName(args.Name).Name + ".dll";
             string path = Path.Combine(game, "Kingmaker_Data", "Managed", name);
             return File.Exists(path) ? Assembly.LoadFrom(path) : null;
+        }
+
+        private static void TestGameRootWithoutTrailingSeparator()
+        {
+            string observed = RuntimePaths.GetGameRoot(@"C:\Games\Pathfinder Kingmaker\Mods\KingmakerBuffPlanner");
+            if (observed != @"C:\Games\Pathfinder Kingmaker")
+                throw new InvalidOperationException("Game root was resolved incorrectly: " + observed);
+        }
+
+        private static void TestGameRootWithTrailingSeparator()
+        {
+            string observed = RuntimePaths.GetGameRoot(@"C:\Games\Pathfinder Kingmaker\Mods\KingmakerBuffPlanner\");
+            if (observed != @"C:\Games\Pathfinder Kingmaker")
+                throw new InvalidOperationException("Trailing separator changed game-root resolution: " + observed);
         }
 
         private static void Run(string name, Action action)

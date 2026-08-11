@@ -55,6 +55,7 @@
     <Compile Include="Main.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="RuntimeTesting\RuntimeTestHost.cs" />
+    <Compile Include="RuntimeTesting\RuntimePaths.cs" />
     <Compile Include="RuntimeTesting\RuntimeTestProtocol.cs" />
     <Compile Include="$(IntermediateOutputPath)BuildInfo.Generated.cs" />
   </ItemGroup>
