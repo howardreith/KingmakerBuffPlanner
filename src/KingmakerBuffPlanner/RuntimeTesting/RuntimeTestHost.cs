@@ -143,6 +143,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     UiOpenCloseCycles = ui == null ? 0 : ui.OpenCloseCycles,
                     UiScreenWidth = ui == null ? 0 : ui.ScreenWidth,
                     UiScreenHeight = ui == null ? 0 : ui.ScreenHeight,
+                    UiRoutineButtonCount = ui == null ? 0 : ui.RoutineButtonCount,
+                    UiCriticalControlsOnScreen = ui != null && ui.CriticalControlsOnScreen,
                     Assertions = new List<RuntimeTestAssertion>
                     {
                         RuntimeTestAssertion.Pass("entry-point-loaded", "true", "true"),
@@ -187,8 +189,16 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                             ui.ScreenWidth + "x" + ui.ScreenHeight)
                         : RuntimeTestAssertion.Fail("ui-resolution-observed", ">0x>0",
                             ui.ScreenWidth + "x" + ui.ScreenHeight));
+                    result.Assertions.Add(ui.RoutineButtonCount == 3
+                        ? RuntimeTestAssertion.Pass("ui-routine-buttons", "3", "3")
+                        : RuntimeTestAssertion.Fail("ui-routine-buttons", "3",
+                            ui.RoutineButtonCount.ToString()));
+                    result.Assertions.Add(ui.CriticalControlsOnScreen
+                        ? RuntimeTestAssertion.Pass("ui-critical-controls-on-screen", "true", "true")
+                        : RuntimeTestAssertion.Fail("ui-critical-controls-on-screen", "true", "false"));
                     if (ui.RootCount != 1 || ui.RenderedOpenFrames == 0 || ui.OpenCloseCycles < 2 ||
-                        ui.ScreenWidth <= 0 || ui.ScreenHeight <= 0)
+                        ui.ScreenWidth <= 0 || ui.ScreenHeight <= 0 ||
+                        ui.RoutineButtonCount != 3 || !ui.CriticalControlsOnScreen)
                     {
                         result.Status = "FAIL";
                         result.Stage = "ui-validation";
@@ -295,6 +305,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         [JsonProperty("uiScreenWidth", Order = 30)] public int UiScreenWidth { get; set; }
         [JsonProperty("uiScreenHeight", Order = 31)] public int UiScreenHeight { get; set; }
         [JsonProperty("uiOpenCloseCycles", Order = 32)] public int UiOpenCloseCycles { get; set; }
+        [JsonProperty("uiRoutineButtonCount", Order = 33)] public int UiRoutineButtonCount { get; set; }
+        [JsonProperty("uiCriticalControlsOnScreen", Order = 34)] public bool UiCriticalControlsOnScreen { get; set; }
     }
 
     internal sealed class RuntimeTestAssertion

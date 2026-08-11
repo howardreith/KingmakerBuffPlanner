@@ -173,7 +173,9 @@ function Assert-KbpRuntimeResult {
     if ($Request.scenario -ceq 'ui-root-smoke') {
         if ([int]$Result.uiRootCount -ne 1 -or [int]$Result.uiRenderedOpenFrames -le 0 -or
             [int]$Result.uiOpenCloseCycles -lt 2 -or
-            [int]$Result.uiScreenWidth -le 0 -or [int]$Result.uiScreenHeight -le 0) {
+            [int]$Result.uiScreenWidth -le 0 -or [int]$Result.uiScreenHeight -le 0 -or
+            [int]$Result.uiRoutineButtonCount -ne 3 -or
+            -not [bool]$Result.uiCriticalControlsOnScreen) {
             throw 'UI root smoke result is incomplete or invalid.'
         }
     }
