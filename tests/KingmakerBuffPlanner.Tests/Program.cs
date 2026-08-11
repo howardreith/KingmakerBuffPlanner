@@ -72,6 +72,7 @@ namespace KingmakerBuffPlanner.Tests
                 Run("profile-malformed-json-recovers-default", () => TestProfileMalformed(root));
                 Run("setup-model-persists-stable-targets-and-provider-controls", TestSetupModel);
                 Run("animated-executor-validates-before-queue-and-reports", TestAnimatedExecutor);
+                Run("instant-executor-revalidates-batches-and-reports", TestInstantExecutor);
             }
             finally
             {
@@ -597,8 +598,30 @@ namespace KingmakerBuffPlanner.Tests
             if (runtime.StartCount != 1 || report.Planned != 2 || report.Fired != 1 ||
                 report.Succeeded != 1 || report.Failed != 1 ||
                 report.SuccessfullyObserved != 1 ||
+                report.ResourcesSpent != 1 ||
                 report.Records.First(r => r.Status == CastExecutionStatus.Failed).Detail != "target-invalid")
                 throw new InvalidOperationException("Animated executor queued an invalid cast or misreported completion.");
+        }
+
+        private static void TestInstantExecutor()
+        {
+            AbilityKey ability = Ability("instant", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("instant-free", ResourcePoolKind.Unlimited, 0, 0, null);
+            ProviderSnapshot provider = PlannerProvider("unit-0", "book-i", ability, "instant-free", 0);
+            string[] units = Enumerable.Range(0, 9).Select(i => "unit-" + i).ToArray();
+            PartyProviderSnapshot snapshot = PlannerSnapshot(new[] { provider }, new[] { pool }, units);
+            var option = new ProviderPlanningOption(provider, units, new[] { "unit-0" }, 1, 1);
+            CastPlan plan = PlannerPlan(snapshot, ability, CastGroupingKind.PerTarget, units,
+                new[] { option }, EmptyPolicy(), new ActiveEffectSnapshot(null));
+            var runtime = new FakeInstantRuntime();
+            var report = new ExecutionReport(plan);
+            var enumerator = new InstantCastExecutor(runtime, true, 4).Execute(plan, report);
+            int yieldedFrames = 0;
+            while (enumerator.MoveNext()) yieldedFrames++;
+            if (yieldedFrames != 2 || runtime.FireCount != 8 || report.Fired != 8 ||
+                report.Succeeded != 8 || report.Failed != 1 || report.SuccessfullyObserved != 8 ||
+                report.ResourcesSpent != 8)
+                throw new InvalidOperationException("Instant executor bypassed validation, batching, or reporting.");
         }
 
         private static EffectLeafExpression Leaf(string id)
@@ -696,7 +719,27 @@ namespace KingmakerBuffPlanner.Tests
             public bool IsCompleted { get { return ++_checks >= 2; } }
             public bool Succeeded { get { return true; } }
             public bool EffectsObserved { get { return true; } }
+            public bool ResourceSpent { get { return true; } }
             public string Detail { get { return "command-success"; } }
+        }
+
+        private sealed class FakeInstantRuntime : IInstantCastRuntimeAdapter
+        {
+            private int _validations;
+            internal int FireCount;
+            public bool IsInCombat { get { return false; } }
+            public CastRuntimeValidation Validate(CastStep step)
+            {
+                _validations++;
+                return _validations == 1
+                    ? CastRuntimeValidation.Fail("resource-changed")
+                    : CastRuntimeValidation.Pass();
+            }
+            public InstantCastResult Fire(CastStep step)
+            {
+                FireCount++;
+                return new InstantCastResult(true, true, true, true, "rule-success");
+            }
         }
 
         private static DiscoveryNode EffectNode(string id)

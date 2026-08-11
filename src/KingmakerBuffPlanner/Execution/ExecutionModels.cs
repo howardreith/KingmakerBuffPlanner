@@ -12,6 +12,7 @@ namespace KingmakerBuffPlanner.Execution
         Fired,
         Succeeded,
         Observed,
+        ResourceSpent,
         Failed
     }
 
@@ -53,6 +54,7 @@ namespace KingmakerBuffPlanner.Execution
         public int Fired { get { return _records.Count(r => r.Status == CastExecutionStatus.Fired); } }
         public int Succeeded { get { return _records.Count(r => r.Status == CastExecutionStatus.Succeeded); } }
         public int SuccessfullyObserved { get { return _records.Count(r => r.Status == CastExecutionStatus.Observed); } }
+        public int ResourcesSpent { get { return _records.Count(r => r.Status == CastExecutionStatus.ResourceSpent); } }
         public int Failed { get { return _records.Count(r => r.Status == CastExecutionStatus.Failed); } }
 
         internal void Add(int stepIndex, CastStep step, CastExecutionStatus status, string detail)
@@ -80,6 +82,7 @@ namespace KingmakerBuffPlanner.Execution
         bool IsCompleted { get; }
         bool Succeeded { get; }
         bool EffectsObserved { get; }
+        bool ResourceSpent { get; }
         string Detail { get; }
     }
 
@@ -93,5 +96,29 @@ namespace KingmakerBuffPlanner.Execution
     public interface ICastExecutor
     {
         IEnumerator Execute(CastPlan plan, ExecutionReport report);
+    }
+
+    public sealed class InstantCastResult
+    {
+        public InstantCastResult(bool fired, bool succeeded, bool effectsObserved, bool resourceSpent, string detail)
+        {
+            Fired = fired;
+            Succeeded = succeeded;
+            EffectsObserved = effectsObserved;
+            ResourceSpent = resourceSpent;
+            Detail = detail ?? string.Empty;
+        }
+        public bool Fired { get; private set; }
+        public bool Succeeded { get; private set; }
+        public bool EffectsObserved { get; private set; }
+        public bool ResourceSpent { get; private set; }
+        public string Detail { get; private set; }
+    }
+
+    public interface IInstantCastRuntimeAdapter
+    {
+        bool IsInCombat { get; }
+        CastRuntimeValidation Validate(CastStep step);
+        InstantCastResult Fire(CastStep step);
     }
 }

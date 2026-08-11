@@ -50,7 +50,7 @@ namespace KingmakerBuffPlanner.GameAdapters
             return new KingmakerAnimatedOperation(command, step);
         }
 
-        private static bool TryResolve(CastStep step, out ResolvedCast resolved, out string reason)
+        internal static bool TryResolve(CastStep step, out ResolvedCast resolved, out string reason)
         {
             resolved = null;
             reason = string.Empty;
@@ -161,7 +161,7 @@ namespace KingmakerBuffPlanner.GameAdapters
             return false;
         }
 
-        private sealed class ResolvedCast
+        internal sealed class ResolvedCast
         {
             internal ResolvedCast(UnitEntityData caster, AbilityData ability, TargetWrapper target)
             {
@@ -198,6 +198,7 @@ namespace KingmakerBuffPlanner.GameAdapters
             }
 
             public bool Succeeded { get { return _command.Result == UnitCommand.ResultType.Success; } }
+            public bool ResourceSpent { get { return Succeeded; } }
             public bool EffectsObserved
             {
                 get

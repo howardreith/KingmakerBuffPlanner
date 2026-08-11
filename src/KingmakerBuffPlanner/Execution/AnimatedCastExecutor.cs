@@ -53,6 +53,8 @@ namespace KingmakerBuffPlanner.Execution
                     operation.Detail);
                 if (operation.Succeeded && operation.EffectsObserved)
                     report.Add(index, step, CastExecutionStatus.Observed, "expected-effects-observed");
+                if (operation.Succeeded && operation.ResourceSpent)
+                    report.Add(index, step, CastExecutionStatus.ResourceSpent, "native-command-spend-completed");
                 yield return null;
             }
         }
