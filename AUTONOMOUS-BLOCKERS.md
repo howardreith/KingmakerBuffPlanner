@@ -12,7 +12,7 @@ Evidence: the live save inventory contains no `KBP_` entry. Existing saves, incl
 
 Current classification: UNAVAILABLE-LOCAL-REFERENCE.
 
-Evidence: transfer inventory and local examples contain no Tabletop Added Rules package or immutable snapshot. This is an explicitly optional row and does not block native completion.
+Evidence: transfer inventory and local examples contain no Tabletop Added Rules package or immutable snapshot. Strict Tabletop-only and combined profiles fail closed as `unavailable-local-reference`; Shield Other is recorded `FEATURE-NOT-PRESENT-IN-SNAPSHOT`. This explicitly optional row does not block native completion.
 
 ## Steam/offline runtime boundary
 

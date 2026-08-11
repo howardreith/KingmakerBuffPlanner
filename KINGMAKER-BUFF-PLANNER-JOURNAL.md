@@ -277,3 +277,16 @@ Status: native-only PASS twice; compatibility identity gate strengthened before 
 - Runtime identity validation now requires exactly one Buff Planner assembly and UMM entry, exactly one expected optional assembly and UMM entry, exact optional UMM version, exact optional assembly hash, and matching loaded counts
 - Rejected shortcut: describing an assembly hash match as full proof of the UMM identity/version requirement
 - Exact next action: commit the strengthened gate and repeat native-only and Call of the Wild twice on one exact commit
+
+## 2026-08-11 — Phase 11 final compatibility qualification
+
+Status: PASS for every locally available no-save profile; unavailable and save-backed boundaries recorded
+
+- Exact commit `57ed740d6fd6bbdf68dcdfe8c26368c744a3c91f`, package `29ee2ddb86f6ace36d9b9ec1cc7e75a2468f81721956836e39dbdae26752deb2`, DLL `2c79eefe2afc9a93ec0574a0056c7c9331ebb1add170561f6da4c72468687b13`, MVID `18be2ec9-702a-4ba1-ae15-306765e4231d`
+- Call of the Wild runs `20260811T2241040368066Z-native-buff-catalog` and `20260811T2242392501436Z-native-buff-catalog`: 26/26 each; exact UMM ID/version and unique entries/assemblies; 7,342 optional abilities, 4,937 candidates, 2,096 included, 0 unsupported; four representative contracts; catalog hash `7b54f3f9f6d90d339c4cabeedb04c9d15bcb4d51d8e7d830150a18ab6eced659`
+- Native-only runs `20260811T2244134771182Z-native-buff-catalog` and `20260811T2245180617144Z-native-buff-catalog`: 12/12 each; 1,722 abilities, 974 candidates, 413 included, 561 excluded, 0 unsupported; catalog hash `50f66299912bef24a50984d9d8398ba2bb340a4f85b551a0ad6ff97c41393f3d`
+- Call of the Wild Harmony inventory `a883dd60218a1f9e989a4e6b03d99318242d401d33f914cd6c068f767b308427`: 207 targets / 228 records / 0 multi-owner / 0 Buff Planner overlap; native inventory `b5605e22bde458a238d63c6ffe33a99eb712bd22bf3cbc74c42d443ad479efb4`: 3 / 3 / 0 / 0
+- Every run used a fresh process, passed its compatibility-specific WhatIf/preflight, restored the original whole `Mods` tree exactly, and selected or wrote no save; final process count 0 and lock absent
+- Tabletop Added Rules and combined profiles: `UNAVAILABLE-LOCAL-REFERENCE`; Shield Other: `FEATURE-NOT-PRESENT-IN-SNAPSHOT`; no external download or unrelated-project mutation
+- Save-backed optional planning/execution remains `DEFER — EVIDENCED`, not PASS, because no authorized `KBP_` fixture exists
+- Exact next action: commit reports and proceed through Phase 12 hardening, deterministic final packaging, final core repetitions, guarded branch publication, and handoff

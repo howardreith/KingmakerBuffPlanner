@@ -13,3 +13,5 @@ Manual acceptance is not a substitute for automated evidence. When an authorized
 - pre/post counts against visible effects and exact slots/resources/components;
 - profile survival after party reorder and save reload;
 - native-only and optional-mod source visibility without duplicate or foreign dependencies.
+
+The no-save native-only and exact Call of the Wild load/catalog/Harmony portions above are already automated and passed twice. Manual acceptance remains limited to the save-backed rows requiring an authorized `KBP_AUTOMATION_WORKING` fixture; Tabletop Added Rules is unavailable locally.

@@ -83,3 +83,12 @@ Phase 10 final no-save HUD gate PASS twice:
 | `20260811T2202528930958Z-ui-root-smoke` | 15/15 | 1 / 1 | 3/3 | 0 / 0 | exact PASS |
 
 Both runs used commit `cfce05c921735c33617342e9b409eeae556a16f9`, package SHA-256 `c2aaac56568366e275302650dbaecd15d984158b5af4f98a670bd90b478937ba`, and DLL SHA-256 `961ac1a3b2c5f9194fb67413e12ba0c5e034ff2d11f2e240f16d1d02cf4e75f6`. Each rendered 12 frames across two cycles, destroyed/reconstructed the owned root once, ended with one root, exposed all three routines, and validated layout bounds for 1920x1080 at 1.0, 2560x1440 at 1.25, and 3840x2160 at 1.5. Actual process resolution was 2560x1440. No save was selected. Configured campaign execution remains `DEFER — EVIDENCED`, not PASS.
+
+Phase 11 exact compatibility qualification PASS for all locally available no-save profiles:
+
+| Profile | Run IDs | Assertions | Catalog SHA-256 | Harmony targets/records/overlaps | Restoration |
+|---|---|---:|---|---|---|
+| `call-of-the-wild` | `20260811T2241040368066Z`, `20260811T2242392501436Z` | 26/26 each | `7b54f3f9f6d90d339c4cabeedb04c9d15bcb4d51d8e7d830150a18ab6eced659` | 207 / 228 / 0 | exact PASS twice |
+| `native-only` | `20260811T2244134771182Z`, `20260811T2245180617144Z` | 12/12 each | `50f66299912bef24a50984d9d8398ba2bb340a4f85b551a0ad6ff97c41393f3d` | 3 / 3 / 0 | exact PASS twice |
+
+All four used commit `57ed740d6fd6bbdf68dcdfe8c26368c744a3c91f`, package SHA-256 `29ee2ddb86f6ace36d9b9ec1cc7e75a2468f81721956836e39dbdae26752deb2`, DLL SHA-256 `2c79eefe2afc9a93ec0574a0056c7c9331ebb1add170561f6da4c72468687b13`, and MVID `18be2ec9-702a-4ba1-ae15-306765e4231d`. The optional runs proved exactly one UMM entry and assembly for both products, exact Call of the Wild version/hash, four representative owned/included abilities, 2,096 optional inclusions, and zero optional unsupported candidates. Catalog and Harmony inventory hashes repeated byte-for-byte per profile. No save was selected or written. Tabletop and combined profiles are unavailable locally; save-backed native/optional execution remains `DEFER — EVIDENCED`. See `docs/CALL-OF-THE-WILD-COMPATIBILITY.md` and `docs/TABLETOP-ADDED-RULES-COMPATIBILITY.md`.
