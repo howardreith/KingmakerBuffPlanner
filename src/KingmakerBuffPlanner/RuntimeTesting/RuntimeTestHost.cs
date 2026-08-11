@@ -8,6 +8,7 @@ using Kingmaker.Blueprints;
 using KingmakerBuffPlanner.Discovery;
 using KingmakerBuffPlanner.Infrastructure;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using UnityEngine;
 using UnityModManagerNet;
 
@@ -72,7 +73,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 {
                     catalog = new NativeCatalogExporter().Export();
                     catalogPath = Path.Combine(_request.EvidenceDirectory, "native-buff-catalog.json");
-                    AtomicFile.WriteUtf8(catalogPath, Serialize(catalog));
+                    string catalogJson = Serialize(catalog);
+                    JObject catalogDocument = JObject.Parse(catalogJson);
+                    JArray abilityDocuments = catalogDocument["abilities"] as JArray;
+                    if ((int)catalogDocument["schemaVersion"] != 1 || abilityDocuments == null ||
+                        abilityDocuments.Count != catalog.AbilityCount)
+                        throw new InvalidDataException("Serialized catalog contract did not reconcile.");
+                    AtomicFile.WriteUtf8(catalogPath, catalogJson);
                     catalogHash = Hashing.Sha256(catalogPath);
                 }
                 var result = new RuntimeTestResult

@@ -5,6 +5,7 @@ using Kingmaker.Blueprints;
 using Kingmaker.UnitLogic.Abilities.Blueprints;
 using KingmakerBuffPlanner.Domain.Effects;
 using KingmakerBuffPlanner.GameAdapters;
+using Newtonsoft.Json;
 
 namespace KingmakerBuffPlanner.Discovery
 {
@@ -102,34 +103,59 @@ namespace KingmakerBuffPlanner.Discovery
 
     internal sealed class NativeCatalogExport
     {
+        [JsonProperty("schemaVersion", Order = 1)]
         public int SchemaVersion { get; set; }
+        [JsonProperty("profile", Order = 2)]
         public string Profile { get; set; }
+        [JsonProperty("generatorCommit", Order = 3)]
         public string GeneratorCommit { get; set; }
+        [JsonProperty("abilityCount", Order = 4)]
         public int AbilityCount { get; set; }
+        [JsonProperty("candidateCount", Order = 5)]
         public int CandidateCount { get; set; }
+        [JsonProperty("detectedEffectCount", Order = 6)]
         public int DetectedEffectCount { get; set; }
+        [JsonProperty("diagnosticAbilityCount", Order = 7)]
         public int DiagnosticAbilityCount { get; set; }
+        [JsonProperty("abilities", Order = 8)]
         public NativeCatalogEntry[] Abilities { get; set; }
     }
 
     internal sealed class NativeCatalogEntry
     {
+        [JsonProperty("abilityGuid", Order = 1)]
         public string AbilityGuid { get; set; }
+        [JsonProperty("parentGuid", Order = 2)]
         public string ParentGuid { get; set; }
+        [JsonProperty("variantGuids", Order = 3)]
         public string[] VariantGuids { get; set; }
+        [JsonProperty("internalName", Order = 4)]
         public string InternalName { get; set; }
+        [JsonProperty("displayName", Order = 5)]
         public string DisplayName { get; set; }
+        [JsonProperty("sourceAssembly", Order = 6)]
         public string SourceAssembly { get; set; }
+        [JsonProperty("isSpell", Order = 7)]
         public bool IsSpell { get; set; }
+        [JsonProperty("isCandidate", Order = 8)]
         public bool IsCandidate { get; set; }
+        [JsonProperty("canTargetSelf", Order = 9)]
         public bool CanTargetSelf { get; set; }
+        [JsonProperty("canTargetFriends", Order = 10)]
         public bool CanTargetFriends { get; set; }
+        [JsonProperty("canTargetEnemies", Order = 11)]
         public bool CanTargetEnemies { get; set; }
+        [JsonProperty("canTargetPoint", Order = 12)]
         public bool CanTargetPoint { get; set; }
+        [JsonProperty("isStickyTouch", Order = 13)]
         public bool IsStickyTouch { get; set; }
+        [JsonProperty("resourceIds", Order = 14)]
         public string[] ResourceIds { get; set; }
+        [JsonProperty("expression", Order = 15)]
         public EffectExpression Expression { get; set; }
+        [JsonProperty("diagnostics", Order = 16)]
         public DiscoveryDiagnostic[] Diagnostics { get; set; }
+        [JsonProperty("disposition", Order = 17)]
         public string Disposition { get; set; }
     }
 }

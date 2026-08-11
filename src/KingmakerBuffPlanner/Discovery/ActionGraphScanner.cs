@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using KingmakerBuffPlanner.Domain.Effects;
+using Newtonsoft.Json;
 
 namespace KingmakerBuffPlanner.Discovery
 {
@@ -13,9 +14,9 @@ namespace KingmakerBuffPlanner.Discovery
             Detail = detail ?? string.Empty;
         }
 
-        public string Code { get; private set; }
-        public string NodeIdentity { get; private set; }
-        public string Detail { get; private set; }
+        [JsonProperty("code", Order = 1)] public string Code { get; private set; }
+        [JsonProperty("nodeIdentity", Order = 2)] public string NodeIdentity { get; private set; }
+        [JsonProperty("detail", Order = 3)] public string Detail { get; private set; }
     }
 
     public sealed class DiscoveryScanResult
