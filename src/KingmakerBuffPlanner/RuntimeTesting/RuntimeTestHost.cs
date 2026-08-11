@@ -7,6 +7,7 @@ using System.Reflection;
 using Kingmaker.Blueprints;
 using KingmakerBuffPlanner.Discovery;
 using KingmakerBuffPlanner.Infrastructure;
+using KingmakerBuffPlanner.UI;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
@@ -21,6 +22,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private readonly ModLog _log;
         private readonly DateTime _startedAtUtc;
         private bool _completed;
+        private int _uiSmokeUpdates;
 
         private RuntimeTestHost(
             RuntimeTestRequest request,
@@ -51,6 +53,16 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (string.Equals(_request.Scenario, "native-buff-catalog", StringComparison.Ordinal) &&
                 ResourcesLibrary.LibraryObject == null)
                 return false;
+            if (string.Equals(_request.Scenario, "ui-root-smoke", StringComparison.Ordinal))
+            {
+                _uiSmokeUpdates++;
+                if (_uiSmokeUpdates == 1)
+                {
+                    BuffPlannerUiRoot.BeginRuntimeSmoke();
+                    return false;
+                }
+                if (_uiSmokeUpdates < 4) return false;
+            }
             _completed = true;
             DateTime started = _startedAtUtc;
             try
@@ -68,6 +80,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 NativeCatalogExport catalog = null;
                 string catalogPath = null;
                 string catalogHash = null;
+                UiRootDiagnostics ui = null;
                 if (dllMatches && string.Equals(
                     _request.Scenario, "native-buff-catalog", StringComparison.Ordinal))
                 {
@@ -89,6 +102,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     AtomicFile.WriteUtf8(catalogPath, catalogJson);
                     catalogHash = Hashing.Sha256(catalogPath);
                 }
+                if (dllMatches && string.Equals(_request.Scenario, "ui-root-smoke", StringComparison.Ordinal))
+                    ui = BuffPlannerUiRoot.EndRuntimeSmoke();
                 var result = new RuntimeTestResult
                 {
                     SchemaVersion = 1,
@@ -116,6 +131,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     CatalogCandidateCount = catalog == null ? 0 : catalog.CandidateCount,
                     CatalogDetectedEffectCount = catalog == null ? 0 : catalog.DetectedEffectCount,
                     CatalogDiagnosticAbilityCount = catalog == null ? 0 : catalog.DiagnosticAbilityCount,
+                    UiRootCount = ui == null ? 0 : ui.RootCount,
+                    UiRenderedOpenFrames = ui == null ? 0 : ui.RenderedOpenFrames,
+                    UiScreenWidth = ui == null ? 0 : ui.ScreenWidth,
+                    UiScreenHeight = ui == null ? 0 : ui.ScreenHeight,
                     Assertions = new List<RuntimeTestAssertion>
                     {
                         RuntimeTestAssertion.Pass("entry-point-loaded", "true", "true"),
@@ -142,6 +161,26 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     {
                         result.Status = "FAIL";
                         result.Stage = "catalog-validation";
+                    }
+                }
+                if (ui != null)
+                {
+                    result.Assertions.Add(ui.RootCount == 1
+                        ? RuntimeTestAssertion.Pass("ui-singleton-root", "1", "1")
+                        : RuntimeTestAssertion.Fail("ui-singleton-root", "1", ui.RootCount.ToString()));
+                    result.Assertions.Add(ui.RenderedOpenFrames > 0
+                        ? RuntimeTestAssertion.Pass("ui-open-frame-rendered", ">0", ui.RenderedOpenFrames.ToString())
+                        : RuntimeTestAssertion.Fail("ui-open-frame-rendered", ">0", "0"));
+                    result.Assertions.Add(ui.ScreenWidth > 0 && ui.ScreenHeight > 0
+                        ? RuntimeTestAssertion.Pass("ui-resolution-observed", ">0x>0",
+                            ui.ScreenWidth + "x" + ui.ScreenHeight)
+                        : RuntimeTestAssertion.Fail("ui-resolution-observed", ">0x>0",
+                            ui.ScreenWidth + "x" + ui.ScreenHeight));
+                    if (ui.RootCount != 1 || ui.RenderedOpenFrames == 0 ||
+                        ui.ScreenWidth <= 0 || ui.ScreenHeight <= 0)
+                    {
+                        result.Status = "FAIL";
+                        result.Stage = "ui-validation";
                     }
                 }
                 string resultPath = Path.Combine(_request.EvidenceDirectory, "runtime-result.json");
@@ -240,6 +279,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         [JsonProperty("catalogCandidateCount", Order = 25)] public int CatalogCandidateCount { get; set; }
         [JsonProperty("catalogDetectedEffectCount", Order = 26)] public int CatalogDetectedEffectCount { get; set; }
         [JsonProperty("catalogDiagnosticAbilityCount", Order = 27)] public int CatalogDiagnosticAbilityCount { get; set; }
+        [JsonProperty("uiRootCount", Order = 28)] public int UiRootCount { get; set; }
+        [JsonProperty("uiRenderedOpenFrames", Order = 29)] public int UiRenderedOpenFrames { get; set; }
+        [JsonProperty("uiScreenWidth", Order = 30)] public int UiScreenWidth { get; set; }
+        [JsonProperty("uiScreenHeight", Order = 31)] public int UiScreenHeight { get; set; }
     }
 
     internal sealed class RuntimeTestAssertion

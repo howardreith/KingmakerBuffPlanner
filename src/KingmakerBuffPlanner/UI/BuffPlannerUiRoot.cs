@@ -25,6 +25,7 @@ namespace KingmakerBuffPlanner.UI
         private bool _configuredOnly;
         private bool _showHidden;
         private string _uiError = string.Empty;
+        private int _renderedOpenFrames;
 
         internal static void Ensure(string modPath, ModLog log)
         {
@@ -48,6 +49,27 @@ namespace KingmakerBuffPlanner.UI
             if (_instance == null) return;
             Destroy(_instance.gameObject);
             _instance = null;
+        }
+
+        internal static void BeginRuntimeSmoke()
+        {
+            if (_instance == null) throw new InvalidOperationException("UI root is absent.");
+            _instance._renderedOpenFrames = 0;
+            _instance._open = true;
+            _instance._session.Refresh();
+        }
+
+        internal static UiRootDiagnostics EndRuntimeSmoke()
+        {
+            if (_instance == null) throw new InvalidOperationException("UI root is absent.");
+            _instance._open = false;
+            return new UiRootDiagnostics
+            {
+                RootCount = FindObjectsOfType<BuffPlannerUiRoot>().Length,
+                RenderedOpenFrames = _instance._renderedOpenFrames,
+                ScreenWidth = Screen.width,
+                ScreenHeight = Screen.height
+            };
         }
 
         private void OnDestroy()
@@ -77,6 +99,7 @@ namespace KingmakerBuffPlanner.UI
                 _window.x = Mathf.Clamp(_window.x, 0, Mathf.Max(0, logicalWidth - _window.width));
                 _window.y = Mathf.Clamp(_window.y, 0, Mathf.Max(0, logicalHeight - _window.height));
                 _window = GUI.Window(847261, _window, DrawWindow, "Kingmaker Buff Planner");
+                _renderedOpenFrames++;
             }
             catch (Exception exception)
             {
@@ -255,5 +278,13 @@ namespace KingmakerBuffPlanner.UI
                 _log.Error("Planner UI action failed.", exception);
             }
         }
+    }
+
+    internal sealed class UiRootDiagnostics
+    {
+        internal int RootCount;
+        internal int RenderedOpenFrames;
+        internal int ScreenWidth;
+        internal int ScreenHeight;
     }
 }

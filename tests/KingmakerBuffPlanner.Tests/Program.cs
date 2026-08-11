@@ -34,6 +34,7 @@ namespace KingmakerBuffPlanner.Tests
                 Run("absent-activation-is-inert", TestAbsentActivation);
                 Run("valid-request-is-accepted", () => TestValidRequest(root));
                 Run("valid-catalog-request-is-accepted", () => TestValidCatalogRequest(root));
+                Run("valid-ui-request-is-accepted", () => TestValidUiRequest(root));
                 Run("duplicate-flag-rejected", () => TestDuplicateFlag(root));
                 Run("outside-path-rejected", TestOutsidePath);
                 Run("unknown-member-rejected", () => TestMutation(root, "unknown-member", AddUnknownMember));
@@ -690,6 +691,16 @@ namespace KingmakerBuffPlanner.Tests
                 new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path }, out rejection);
             if (request == null || rejection.Length != 0 || request.Scenario != "native-buff-catalog")
                 throw new InvalidOperationException("Valid catalog request was rejected: " + rejection);
+        }
+
+        private static void TestValidUiRequest(string root)
+        {
+            string path = WriteRequest(root, "valid-ui", o => o["scenario"] = "ui-root-smoke");
+            string rejection;
+            RuntimeTestRequest request = RuntimeTestProtocol.TryRead(
+                new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path }, out rejection);
+            if (request == null || rejection.Length != 0 || request.Scenario != "ui-root-smoke")
+                throw new InvalidOperationException("Valid UI request was rejected: " + rejection);
         }
 
         private static void TestDuplicateFlag(string root)

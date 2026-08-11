@@ -97,7 +97,7 @@ function New-KbpRuntimeRequest {
     param(
         [string]$RunId, [string]$EvidenceDirectory, $BuildManifest,
         [int]$TimeoutSeconds, [bool]$ExitAfterCompletion,
-        [ValidateSet('mod-load-smoke', 'native-buff-catalog')][string]$Scenario = 'mod-load-smoke')
+        [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke')][string]$Scenario = 'mod-load-smoke')
     return [ordered]@{
         schemaVersion = 1
         enabled = $true
@@ -169,5 +169,11 @@ function Assert-KbpRuntimeResult {
             [string]::IsNullOrWhiteSpace([string]$_.expression.expressionType)
         })
         if ($missingExpressions.Count -ne 0) { throw 'Native catalog contains expressions without discriminators.' }
+    }
+    if ($Request.scenario -ceq 'ui-root-smoke') {
+        if ([int]$Result.uiRootCount -ne 1 -or [int]$Result.uiRenderedOpenFrames -le 0 -or
+            [int]$Result.uiScreenWidth -le 0 -or [int]$Result.uiScreenHeight -le 0) {
+            throw 'UI root smoke result is incomplete or invalid.'
+        }
     }
 }
