@@ -1,12 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using KingmakerBuffPlanner.RuntimeTesting;
 using KingmakerBuffPlanner.Discovery;
 using KingmakerBuffPlanner.Domain.Effects;
 using KingmakerBuffPlanner.Domain.Identity;
 using KingmakerBuffPlanner.Domain.Providers;
+using KingmakerBuffPlanner.Domain.Planning;
 using KingmakerBuffPlanner.Planning;
 using Newtonsoft.Json;
 
@@ -52,6 +54,13 @@ namespace KingmakerBuffPlanner.Tests
                 Run("prepared-domain-slot-eligibility-is-preserved", TestPreparedDomainEligibility);
                 Run("unlimited-pool-is-explicit", TestUnlimitedPool);
                 Run("party-snapshot-orders-by-stable-id", TestPartySnapshotOrdering);
+                Run("effect-presence-preserves-allof-anyof", TestEffectPresenceSemantics);
+                Run("planner-mass-cast-consumes-one-resource", TestPlannerMassSingleCost);
+                Run("planner-priority-cap-and-fallback", TestPlannerPriorityCap);
+                Run("planner-default-order-is-input-independent", TestPlannerDeterminism);
+                Run("planner-reports-active-skip-marker", TestPlannerActiveSkip);
+                Run("planner-honors-ban-and-material-availability", TestPlannerBanAndMaterial);
+                Run("planner-reserves-material-once-per-cast", TestPlannerMaterialReservation);
             }
             finally
             {
@@ -237,6 +246,213 @@ namespace KingmakerBuffPlanner.Tests
             if (snapshot.Units[0].UnitId != "unit-a" || snapshot.Units[1].UnitId != "unit-z" ||
                 snapshot.Units[1].MasterUnitId != "unit-a")
                 throw new InvalidOperationException("Party order or pet linkage depended on transient indexes.");
+        }
+
+        private static void TestEffectPresenceSemantics()
+        {
+            EffectExpression expression = new SequenceEffectExpression(new EffectExpression[]
+            {
+                Leaf("required"),
+                new ConditionalEffectExpression("branch", Leaf("alternative-a"), Leaf("alternative-b"))
+            });
+            var evaluator = new EffectPresenceEvaluator();
+            EffectPresenceResult complete = evaluator.Evaluate(expression,
+                new HashSet<string>(new[] { "required", "alternative-b" }, StringComparer.Ordinal), null);
+            EffectPresenceResult partial = evaluator.Evaluate(expression,
+                new HashSet<string>(new[] { "required" }, StringComparer.Ordinal), null);
+            EffectPresenceResult absent = evaluator.Evaluate(expression,
+                new HashSet<string>(StringComparer.Ordinal), null);
+            EffectPresenceResult wrongKind = evaluator.EvaluateTyped(
+                new EffectLeafExpression(EffectKind.AreaBuff, "required", EffectTarget.AreaRecipients,
+                    "fixture", "fixture/area"),
+                new HashSet<ActiveEffectMarker> { new ActiveEffectMarker(EffectKind.Buff, "required") }, null);
+            if (complete.Kind != EffectPresenceKind.Complete ||
+                partial.Kind != EffectPresenceKind.Partial || absent.Kind != EffectPresenceKind.Absent ||
+                wrongKind.Kind != EffectPresenceKind.Absent)
+                throw new InvalidOperationException("AllOf/conditional-AnyOf presence semantics were flattened.");
+        }
+
+        private static void TestPlannerMassSingleCost()
+        {
+            AbilityKey ability = Ability("mass", string.Empty, 0);
+            const string poolKey = "mass-shared";
+            var pool = new ResourcePoolSnapshot(poolKey, ResourcePoolKind.SpontaneousLevel, 1, 1, null);
+            ProviderSnapshot provider = PlannerProvider("unit-a", "book-a", ability, poolKey, 1);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(new[] { provider }, new[] { pool }, "unit-a", "unit-b", "unit-c");
+            var option = new ProviderPlanningOption(provider,
+                new[] { "unit-a", "unit-b", "unit-c" }, new[] { "unit-a" }, 10, 100);
+            CastPlan plan = PlannerPlan(snapshot, ability, CastGroupingKind.MassConfiguredTargets,
+                new[] { "unit-a", "unit-b", "unit-c" }, new[] { option }, EmptyPolicy(), new ActiveEffectSnapshot(null));
+            if (plan.Steps.Count != 1 || plan.Steps[0].Reservation.Units != 1 ||
+                plan.Steps[0].TargetUnitIds.Count != 3 ||
+                plan.Outcomes.Count(o => o.Kind == TargetOutcomeKind.Fulfilled) != 3)
+                throw new InvalidOperationException("Mass cast was charged per portrait or lost configured targets.");
+        }
+
+        private static void TestPlannerPriorityCap()
+        {
+            AbilityKey ability = Ability("priority", string.Empty, 0);
+            var spontaneousPool = new ResourcePoolSnapshot("spont", ResourcePoolKind.SpontaneousLevel, 2, 2, null);
+            var preparedToken = new ResourceTokenSnapshot("prepared-0", ability, 2,
+                PreparedSlotKind.Common, true, true, null);
+            var preparedPool = new ResourcePoolSnapshot("prepared", ResourcePoolKind.PreparedSlots, 1, 1,
+                new[] { preparedToken });
+            ProviderSnapshot spontaneous = PlannerProvider("unit-a", "book-s", ability, "spont", 1);
+            ProviderSnapshot prepared = new ProviderSnapshot(
+                new ProviderKey("unit-a", "book-p", ability, "level-2"), "prepared", 2,
+                "prepared", 1, new[] { "prepared-0" });
+            PartyProviderSnapshot snapshot = PlannerSnapshot(new[] { prepared, spontaneous },
+                new[] { preparedPool, spontaneousPool }, "unit-a", "unit-b");
+            var options = new[]
+            {
+                new ProviderPlanningOption(prepared, new[] { "unit-a", "unit-b" }, new[] { "unit-a" }, 8, 80),
+                new ProviderPlanningOption(spontaneous, new[] { "unit-a", "unit-b" }, new[] { "unit-a" }, 8, 80)
+            };
+            var priorities = new Dictionary<string, int> { { spontaneous.Key.Canonical, 0 } };
+            var caps = new Dictionary<string, int> { { spontaneous.Key.Canonical, 1 } };
+            CastPlan plan = PlannerPlan(snapshot, ability, CastGroupingKind.PerTarget,
+                new[] { "unit-a", "unit-b" }, options,
+                new ProviderSelectionPolicy(null, priorities, caps), new ActiveEffectSnapshot(null));
+            if (plan.Steps.Count != 2 || !plan.Steps[0].Provider.Equals(spontaneous.Key) ||
+                !plan.Steps[1].Provider.Equals(prepared.Key))
+                throw new InvalidOperationException("Explicit priority/cap did not deterministically fall back.");
+        }
+
+        private static void TestPlannerDeterminism()
+        {
+            AbilityKey ability = Ability("deterministic", string.Empty, 0);
+            var flexiblePool = new ResourcePoolSnapshot("flex", ResourcePoolKind.SpontaneousLevel, 1, 1, null);
+            var token = new ResourceTokenSnapshot("slot", ability, 1, PreparedSlotKind.Common, true, true, null);
+            var preparedPool = new ResourcePoolSnapshot("slot-pool", ResourcePoolKind.PreparedSlots, 1, 1, new[] { token });
+            ProviderSnapshot flexible = PlannerProvider("unit-a", "book-z", ability, "flex", 1);
+            ProviderSnapshot prepared = new ProviderSnapshot(new ProviderKey("unit-a", "book-a", ability, "level-1"),
+                "prepared", 1, "slot-pool", 1, new[] { "slot" });
+            PartyProviderSnapshot snapshot = PlannerSnapshot(new[] { flexible, prepared },
+                new[] { flexiblePool, preparedPool }, "unit-a");
+            var preparedOption = new ProviderPlanningOption(prepared, new[] { "unit-a" }, new[] { "unit-a" }, 5, 50);
+            var flexibleOption = new ProviderPlanningOption(flexible, new[] { "unit-a" }, new[] { "unit-a" }, 5, 50);
+            CastPlan first = PlannerPlan(snapshot, ability, CastGroupingKind.PerTarget, new[] { "unit-a" },
+                new[] { flexibleOption, preparedOption }, EmptyPolicy(), new ActiveEffectSnapshot(null));
+            CastPlan second = PlannerPlan(snapshot, ability, CastGroupingKind.PerTarget, new[] { "unit-a" },
+                new[] { preparedOption, flexibleOption }, EmptyPolicy(), new ActiveEffectSnapshot(null));
+            if (!first.Steps[0].Provider.Equals(prepared.Key) ||
+                first.Steps[0].Provider.Canonical != second.Steps[0].Provider.Canonical)
+                throw new InvalidOperationException("Provider input/dictionary order changed the default plan.");
+        }
+
+        private static void TestPlannerActiveSkip()
+        {
+            AbilityKey ability = Ability("skip", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("free", ResourcePoolKind.Unlimited, 0, 0, null);
+            ProviderSnapshot provider = PlannerProvider("unit-a", "book-a", ability, "free", 0);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(new[] { provider }, new[] { pool }, "unit-a");
+            var option = new ProviderPlanningOption(provider, new[] { "unit-a" }, new[] { "unit-a" }, 1, 1);
+            var active = new ActiveEffectSnapshot(new Dictionary<string, IEnumerable<string>>
+            {
+                { "unit-a", new[] { "active-marker" } }
+            });
+            var source = new BuffSourceDefinition("skip-source", ability, Leaf("active-marker"), CastGroupingKind.PerTarget);
+            var request = new BuffCastRequest(source, new[] { "unit-a" }, ExistingEffectPolicy.SkipAlreadyActive, null);
+            CastPlan plan = new CastPlanner().Plan(snapshot, request, new[] { option }, EmptyPolicy(), active);
+            if (plan.Steps.Count != 0 || plan.Outcomes.Count != 1 ||
+                plan.Outcomes[0].Kind != TargetOutcomeKind.SkippedAlreadyActive ||
+                plan.Outcomes[0].Markers.Count != 1 || plan.Outcomes[0].Markers[0] != "active-marker")
+                throw new InvalidOperationException("Already-active skip omitted its exact marker.");
+        }
+
+        private static void TestPlannerBanAndMaterial()
+        {
+            AbilityKey ability = Ability("filtered", string.Empty, 0);
+            var pools = new[]
+            {
+                new ResourcePoolSnapshot("pool-a", ResourcePoolKind.Unlimited, 0, 0, null),
+                new ResourcePoolSnapshot("pool-b", ResourcePoolKind.Unlimited, 0, 0, null),
+                new ResourcePoolSnapshot("pool-c", ResourcePoolKind.Unlimited, 0, 0, null)
+            };
+            ProviderSnapshot banned = PlannerProvider("unit-a", "book-a", ability, "pool-a", 0);
+            var blockedByMaterial = new ProviderSnapshot(
+                new ProviderKey("unit-a", "book-b", ability, "level-2"), "material", 2,
+                "pool-b", 0, null, new MaterialRequirementSnapshot("diamond", 1, 0));
+            ProviderSnapshot valid = PlannerProvider("unit-a", "book-c", ability, "pool-c", 0);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(new[] { banned, blockedByMaterial, valid }, pools, "unit-a");
+            var options = new[]
+            {
+                new ProviderPlanningOption(banned, new[] { "unit-a" }, new[] { "unit-a" }, 20, 200),
+                new ProviderPlanningOption(blockedByMaterial, new[] { "unit-a" }, new[] { "unit-a" }, 15, 150),
+                new ProviderPlanningOption(valid, new[] { "unit-a" }, new[] { "unit-a" }, 1, 1)
+            };
+            var priorities = new Dictionary<string, int>
+            {
+                { banned.Key.Canonical, 0 },
+                { blockedByMaterial.Key.Canonical, 1 }
+            };
+            CastPlan plan = PlannerPlan(snapshot, ability, CastGroupingKind.PerTarget, new[] { "unit-a" },
+                options, new ProviderSelectionPolicy(new[] { banned.Key.Canonical }, priorities, null),
+                new ActiveEffectSnapshot(null));
+            if (plan.Steps.Count != 1 || !plan.Steps[0].Provider.Equals(valid.Key))
+                throw new InvalidOperationException("Banned or material-invalid provider was scheduled.");
+        }
+
+        private static void TestPlannerMaterialReservation()
+        {
+            AbilityKey ability = Ability("component", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("component-free", ResourcePoolKind.Unlimited, 0, 0, null);
+            var provider = new ProviderSnapshot(
+                new ProviderKey("unit-a", "book-a", ability, "level-1"), "component", 1,
+                "component-free", 0, null, new MaterialRequirementSnapshot("pearl", 1, 1));
+            PartyProviderSnapshot snapshot = PlannerSnapshot(new[] { provider }, new[] { pool }, "unit-a", "unit-b");
+            var option = new ProviderPlanningOption(provider, new[] { "unit-a", "unit-b" },
+                new[] { "unit-a" }, 1, 1);
+            CastPlan plan = PlannerPlan(snapshot, ability, CastGroupingKind.PerTarget,
+                new[] { "unit-a", "unit-b" }, new[] { option }, EmptyPolicy(), new ActiveEffectSnapshot(null));
+            if (plan.Steps.Count != 1 || plan.Steps[0].MaterialReservation == null ||
+                plan.Steps[0].MaterialReservation.ItemGuid != "pearl" ||
+                plan.Outcomes.Count(o => o.Kind == TargetOutcomeKind.Unfulfilled) != 1)
+                throw new InvalidOperationException("One material component was scheduled for multiple casts.");
+        }
+
+        private static EffectLeafExpression Leaf(string id)
+        {
+            return new EffectLeafExpression(EffectKind.Buff, id, EffectTarget.CurrentTarget, "fixture", "fixture/" + id);
+        }
+
+        private static ProviderSnapshot PlannerProvider(
+            string unitId,
+            string bookId,
+            AbilityKey ability,
+            string poolKey,
+            int cost)
+        {
+            return new ProviderSnapshot(new ProviderKey(unitId, bookId, ability, "level-2"),
+                ability.BaseAbilityGuid, 2, poolKey, cost, null);
+        }
+
+        private static PartyProviderSnapshot PlannerSnapshot(
+            IEnumerable<ProviderSnapshot> providers,
+            IEnumerable<ResourcePoolSnapshot> pools,
+            params string[] unitIds)
+        {
+            return new PartyProviderSnapshot(unitIds.Select(id => new UnitSnapshot(id, id, false, string.Empty,
+                new TargetValidationSnapshot(true, true, true, true))), providers, pools);
+        }
+
+        private static ProviderSelectionPolicy EmptyPolicy()
+        {
+            return new ProviderSelectionPolicy(null, null, null);
+        }
+
+        private static CastPlan PlannerPlan(
+            PartyProviderSnapshot snapshot,
+            AbilityKey ability,
+            CastGroupingKind grouping,
+            IEnumerable<string> targets,
+            IEnumerable<ProviderPlanningOption> options,
+            ProviderSelectionPolicy policy,
+            ActiveEffectSnapshot active)
+        {
+            var source = new BuffSourceDefinition("source", ability, Leaf("effect"), grouping);
+            var request = new BuffCastRequest(source, targets, ExistingEffectPolicy.Overwrite, null);
+            return new CastPlanner().Plan(snapshot, request, options, policy, active);
         }
 
         private static AbilityKey Ability(string baseGuid, string variantGuid, int metamagic)

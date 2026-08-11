@@ -145,7 +145,8 @@ namespace KingmakerBuffPlanner.Domain.Providers
             int spellLevel,
             string resourcePoolKey,
             int unitsPerCast,
-            IEnumerable<string> eligibleTokenIds)
+            IEnumerable<string> eligibleTokenIds,
+            MaterialRequirementSnapshot materialComponent = null)
         {
             Key = key ?? throw new ArgumentNullException("key");
             if (spellLevel < 0) throw new ArgumentOutOfRangeException("spellLevel");
@@ -159,6 +160,7 @@ namespace KingmakerBuffPlanner.Domain.Providers
             EligibleTokenIds = new ReadOnlyCollection<string>((eligibleTokenIds ?? new string[0])
                 .Where(v => !string.IsNullOrWhiteSpace(v)).Distinct(StringComparer.Ordinal)
                 .OrderBy(v => v, StringComparer.Ordinal).ToList());
+            MaterialComponent = materialComponent;
         }
 
         public ProviderKey Key { get; private set; }
@@ -167,6 +169,25 @@ namespace KingmakerBuffPlanner.Domain.Providers
         public string ResourcePoolKey { get; private set; }
         public int UnitsPerCast { get; private set; }
         public IReadOnlyList<string> EligibleTokenIds { get; private set; }
+        public MaterialRequirementSnapshot MaterialComponent { get; private set; }
+    }
+
+    public sealed class MaterialRequirementSnapshot
+    {
+        public MaterialRequirementSnapshot(string itemGuid, int requiredCount, int availableCount)
+        {
+            if (string.IsNullOrWhiteSpace(itemGuid)) throw new ArgumentException("Material item GUID is required.", "itemGuid");
+            if (requiredCount < 1) throw new ArgumentOutOfRangeException("requiredCount");
+            if (availableCount < 0) throw new ArgumentOutOfRangeException("availableCount");
+            ItemGuid = itemGuid;
+            RequiredCount = requiredCount;
+            AvailableCount = availableCount;
+        }
+
+        public string ItemGuid { get; private set; }
+        public int RequiredCount { get; private set; }
+        public int AvailableCount { get; private set; }
+        public bool Available { get { return AvailableCount >= RequiredCount; } }
     }
 
     public sealed class PartyProviderSnapshot

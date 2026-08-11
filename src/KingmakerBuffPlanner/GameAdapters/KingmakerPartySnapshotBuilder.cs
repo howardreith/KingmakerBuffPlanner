@@ -184,7 +184,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                 var ability = ToAbilityKey(data, sourceKind);
                 var keyForProvider = new ProviderKey(unit.UniqueId, string.Empty, ability, string.Empty);
                 providers.Add(new ProviderSnapshot(keyForProvider, data.Name, 0,
-                    pool.PoolKey, cost, null));
+                    pool.PoolKey, cost, null, ToMaterialRequirement(data)));
             }
         }
 
@@ -204,7 +204,7 @@ namespace KingmakerBuffPlanner.GameAdapters
             var key = new ProviderKey(unit.UniqueId, spellbook.Blueprint.AssetGuid, ability, sourceInstance);
             if (providers.Any(p => p.Key.Equals(key))) return;
             providers.Add(new ProviderSnapshot(key, data.Name, data.SpellLevel,
-                poolKey, cost, tokens));
+                poolKey, cost, tokens, ToMaterialRequirement(data)));
         }
 
         private static IEnumerable<AbilityData> ExpandVariants(IEnumerable<AbilityData> source)
@@ -231,6 +231,14 @@ namespace KingmakerBuffPlanner.GameAdapters
             string variantGuid = blueprint.Parent == null ? string.Empty : blueprint.AssetGuid;
             int metamagic = data.MetamagicData == null ? 0 : (int)data.MetamagicData.MetamagicMask;
             return new AbilityKey(baseGuid, variantGuid, metamagic, sourceKind, string.Empty);
+        }
+
+        private static MaterialRequirementSnapshot ToMaterialRequirement(AbilityData data)
+        {
+            BlueprintAbility.MaterialComponentData material = data.Blueprint.MaterialComponent;
+            if (!data.RequireMaterialComponent || material.Item == null || material.Count < 1) return null;
+            return new MaterialRequirementSnapshot(material.Item.AssetGuid, material.Count,
+                Game.Instance.Player.Inventory.Count(material.Item));
         }
 
         private static string PoolKey(string unitId, string spellbookGuid, string suffix)

@@ -35,7 +35,10 @@
     <Compile Include="..\..\src\KingmakerBuffPlanner\Domain\Effects\EffectExpression.cs"><Link>Domain\Effects\EffectExpression.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Domain\Identity\StableKeys.cs"><Link>Domain\Identity\StableKeys.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Domain\Providers\ProviderSnapshots.cs"><Link>Domain\Providers\ProviderSnapshots.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Domain\Planning\PlanningModels.cs"><Link>Domain\Planning\PlanningModels.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\ResourceLedger.cs"><Link>Planning\ResourceLedger.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\EffectPresenceEvaluator.cs"><Link>Planning\EffectPresenceEvaluator.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\CastPlanner.cs"><Link>Planning\CastPlanner.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\RuntimeTesting\RuntimePaths.cs">
       <Link>RuntimeTesting\RuntimePaths.cs</Link>
     </Compile>

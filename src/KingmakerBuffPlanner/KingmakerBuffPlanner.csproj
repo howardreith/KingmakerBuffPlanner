@@ -65,13 +65,17 @@
     <Compile Include="Domain\Effects\EffectExpression.cs" />
     <Compile Include="Domain\Identity\StableKeys.cs" />
     <Compile Include="Domain\Providers\ProviderSnapshots.cs" />
+    <Compile Include="Domain\Planning\PlanningModels.cs" />
     <Compile Include="GameAdapters\KingmakerActionGraphAdapter.cs" />
+    <Compile Include="GameAdapters\KingmakerActiveEffectSnapshotBuilder.cs" />
     <Compile Include="GameAdapters\KingmakerPartySnapshotBuilder.cs" />
     <Compile Include="Infrastructure\AtomicFile.cs" />
     <Compile Include="Infrastructure\Hashing.cs" />
     <Compile Include="Infrastructure\ModLog.cs" />
     <Compile Include="Main.cs" />
     <Compile Include="Planning\ResourceLedger.cs" />
+    <Compile Include="Planning\EffectPresenceEvaluator.cs" />
+    <Compile Include="Planning\CastPlanner.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="RuntimeTesting\RuntimeTestHost.cs" />
     <Compile Include="RuntimeTesting\RuntimePaths.cs" />
