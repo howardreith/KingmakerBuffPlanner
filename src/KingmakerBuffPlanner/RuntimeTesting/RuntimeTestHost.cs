@@ -61,7 +61,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     BuffPlannerUiRoot.BeginRuntimeSmoke();
                     return false;
                 }
-                if (_uiSmokeUpdates < 4) return false;
+                if (_uiSmokeUpdates == 4)
+                {
+                    BuffPlannerUiRoot.EndRuntimeSmoke();
+                    BuffPlannerUiRoot.BeginRuntimeSmoke();
+                    return false;
+                }
+                if (_uiSmokeUpdates < 7) return false;
             }
             _completed = true;
             DateTime started = _startedAtUtc;
@@ -133,6 +139,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     CatalogDiagnosticAbilityCount = catalog == null ? 0 : catalog.DiagnosticAbilityCount,
                     UiRootCount = ui == null ? 0 : ui.RootCount,
                     UiRenderedOpenFrames = ui == null ? 0 : ui.RenderedOpenFrames,
+                    UiOpenCloseCycles = ui == null ? 0 : ui.OpenCloseCycles,
                     UiScreenWidth = ui == null ? 0 : ui.ScreenWidth,
                     UiScreenHeight = ui == null ? 0 : ui.ScreenHeight,
                     Assertions = new List<RuntimeTestAssertion>
@@ -171,12 +178,15 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     result.Assertions.Add(ui.RenderedOpenFrames > 0
                         ? RuntimeTestAssertion.Pass("ui-open-frame-rendered", ">0", ui.RenderedOpenFrames.ToString())
                         : RuntimeTestAssertion.Fail("ui-open-frame-rendered", ">0", "0"));
+                    result.Assertions.Add(ui.OpenCloseCycles >= 2
+                        ? RuntimeTestAssertion.Pass("ui-repeated-open-close", ">=2", ui.OpenCloseCycles.ToString())
+                        : RuntimeTestAssertion.Fail("ui-repeated-open-close", ">=2", ui.OpenCloseCycles.ToString()));
                     result.Assertions.Add(ui.ScreenWidth > 0 && ui.ScreenHeight > 0
                         ? RuntimeTestAssertion.Pass("ui-resolution-observed", ">0x>0",
                             ui.ScreenWidth + "x" + ui.ScreenHeight)
                         : RuntimeTestAssertion.Fail("ui-resolution-observed", ">0x>0",
                             ui.ScreenWidth + "x" + ui.ScreenHeight));
-                    if (ui.RootCount != 1 || ui.RenderedOpenFrames == 0 ||
+                    if (ui.RootCount != 1 || ui.RenderedOpenFrames == 0 || ui.OpenCloseCycles < 2 ||
                         ui.ScreenWidth <= 0 || ui.ScreenHeight <= 0)
                     {
                         result.Status = "FAIL";
@@ -283,6 +293,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         [JsonProperty("uiRenderedOpenFrames", Order = 29)] public int UiRenderedOpenFrames { get; set; }
         [JsonProperty("uiScreenWidth", Order = 30)] public int UiScreenWidth { get; set; }
         [JsonProperty("uiScreenHeight", Order = 31)] public int UiScreenHeight { get; set; }
+        [JsonProperty("uiOpenCloseCycles", Order = 32)] public int UiOpenCloseCycles { get; set; }
     }
 
     internal sealed class RuntimeTestAssertion

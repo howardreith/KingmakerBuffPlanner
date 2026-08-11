@@ -26,6 +26,7 @@ namespace KingmakerBuffPlanner.UI
         private bool _showHidden;
         private string _uiError = string.Empty;
         private int _renderedOpenFrames;
+        private int _runtimeOpenCycles;
 
         internal static void Ensure(string modPath, ModLog log)
         {
@@ -54,7 +55,8 @@ namespace KingmakerBuffPlanner.UI
         internal static void BeginRuntimeSmoke()
         {
             if (_instance == null) throw new InvalidOperationException("UI root is absent.");
-            _instance._renderedOpenFrames = 0;
+            if (_instance._runtimeOpenCycles == 0) _instance._renderedOpenFrames = 0;
+            _instance._runtimeOpenCycles++;
             _instance._open = true;
             _instance._session.Refresh();
         }
@@ -67,6 +69,7 @@ namespace KingmakerBuffPlanner.UI
             {
                 RootCount = FindObjectsOfType<BuffPlannerUiRoot>().Length,
                 RenderedOpenFrames = _instance._renderedOpenFrames,
+                OpenCloseCycles = _instance._runtimeOpenCycles,
                 ScreenWidth = Screen.width,
                 ScreenHeight = Screen.height
             };
@@ -284,6 +287,7 @@ namespace KingmakerBuffPlanner.UI
     {
         internal int RootCount;
         internal int RenderedOpenFrames;
+        internal int OpenCloseCycles;
         internal int ScreenWidth;
         internal int ScreenHeight;
     }
