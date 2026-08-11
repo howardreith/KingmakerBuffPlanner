@@ -113,7 +113,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     }
                     AtomicFile.WriteUtf8(catalogPath, catalogJson);
                     catalogHash = Hashing.Sha256(catalogPath);
-                    harmonyInventory = new HarmonyPatchInventoryExporter().Export(_request.ProfileId);
+                    harmonyInventory = new HarmonyPatchInventoryExporter().Export(_request.ProfileId, harmony);
                     string harmonyInventoryPath = Path.Combine(
                         _request.EvidenceDirectory, "harmony-patch-inventory.json");
                     AtomicFile.WriteUtf8(harmonyInventoryPath, Serialize(harmonyInventory));

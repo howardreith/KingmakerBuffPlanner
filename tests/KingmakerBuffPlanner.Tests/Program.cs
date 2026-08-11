@@ -211,8 +211,7 @@ namespace KingmakerBuffPlanner.Tests
             if (string.IsNullOrWhiteSpace(game))
                 throw new InvalidOperationException("KBP_TEST_GAME_PATH is missing.");
             string harmony = Path.Combine(game, "Kingmaker_Data", "Managed", "UnityModManager", "0Harmony12.dll");
-            Assembly.LoadFrom(harmony);
-            HarmonyPatchInventory inventory = new HarmonyPatchInventoryExporter().Export("contract-test");
+            HarmonyPatchInventory inventory = new HarmonyPatchInventoryExporter().Export("contract-test", harmony);
             if (inventory.SchemaVersion != 1 || inventory.ProfileId != "contract-test" ||
                 inventory.TargetCount != inventory.Targets.Count ||
                 inventory.PatchCount != inventory.Targets.Sum(t => t.Patches.Count))

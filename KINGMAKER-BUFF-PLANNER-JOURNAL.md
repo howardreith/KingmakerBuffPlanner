@@ -252,3 +252,16 @@ Status: runtime FAIL repaired; regression PASS; exact restoration PASS
 - Failed-run transaction restoration verified exact; no save was selected or written; game and lock absent afterward
 - Rejected shortcut: removing Harmony evidence or accepting an empty placeholder inventory to make the compatibility gate pass
 - Exact next action: commit the repair and rerun the exact-profile qualification twice
+
+## 2026-08-11 — Call of the Wild final repetition and native zero-patch edge
+
+Status: Call of the Wild PASS twice; native-only runtime defect repaired
+
+- Exact commit `fa5a525842fc095514d76da4869fe06f2d65defc`, package `e133d1002e0e0193579f98b7f1e3b104206cb9062cc2065811561ebb2bf45d39`, DLL `00a7bfa85cb8fbd867ce40094d720c1b889629324913a8b08e3b95581d4e813a`
+- Call of the Wild runs `20260811T2229574550340Z-native-buff-catalog` and `20260811T2231510699549Z-native-buff-catalog` each passed 21/21 assertions and restored exactly
+- Both emitted byte-identical catalog SHA-256 `357e2148c6f4610c3456a9082369fe4bea77580e0faee4de55e637c409bfc8f8` and Harmony inventory SHA-256 `a883dd60218a1f9e989a4e6b03d99318242d401d33f914cd6c068f767b308427`
+- Harmony inventory: 207 targets, 228 ordered patch records; owners CallOfTheWild 225, UnityModManager 2, UnityModManager.UI 1; zero multi-owner targets and zero Buff Planner overlaps
+- Native-only run `20260811T2234085703022Z-native-buff-catalog` exposed that UMM does not load Harmony when no staged mod consumes it; the catalog was written but inventory failed before result assembly
+- Repair: the inventory exporter now loads only the exact installed `0Harmony12.dll` path when the assembly is absent, validates its assembly identity, and then inventories the valid zero-or-more patch state
+- Failed native transaction restored exactly; no save selected; game and lock absent
+- Exact next action: commit, rebuild, and repeat the native-only profile twice

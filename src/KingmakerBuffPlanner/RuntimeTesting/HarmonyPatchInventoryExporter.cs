@@ -11,11 +11,18 @@ namespace KingmakerBuffPlanner.RuntimeTesting
     {
         private const BindingFlags Fields = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
 
-        internal HarmonyPatchInventory Export(string profileId)
+        internal HarmonyPatchInventory Export(string profileId, string harmonyAssemblyPath)
         {
             Assembly harmonyAssembly = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(a =>
                 string.Equals(a.GetName().Name, "0Harmony12", StringComparison.Ordinal));
-            if (harmonyAssembly == null) throw new InvalidOperationException("Harmony12 assembly is not loaded.");
+            if (harmonyAssembly == null)
+            {
+                if (string.IsNullOrWhiteSpace(harmonyAssemblyPath) || !System.IO.File.Exists(harmonyAssemblyPath))
+                    throw new InvalidOperationException("Harmony12 assembly is neither loaded nor available at the exact path.");
+                harmonyAssembly = Assembly.LoadFrom(harmonyAssemblyPath);
+                if (!string.Equals(harmonyAssembly.GetName().Name, "0Harmony12", StringComparison.Ordinal))
+                    throw new InvalidOperationException("Exact Harmony12 path loaded an unexpected assembly identity.");
+            }
             Type harmonyType = harmonyAssembly.GetType("Harmony12.HarmonyInstance", true);
             MethodInfo create = harmonyType.GetMethod("Create", BindingFlags.Static | BindingFlags.Public);
             MethodInfo getPatchedMethods = harmonyType.GetMethod("GetPatchedMethods",
