@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <Import Project="..\..\Version.props" />
+  <Import Project="..\..\GamePath.props" Condition="Exists('..\..\GamePath.props')" />
+  <PropertyGroup>
+    <Configuration Condition="'$(Configuration)' == ''">Debug</Configuration>
+    <Platform Condition="'$(Platform)' == ''">AnyCPU</Platform>
+    <ProjectGuid>{8A76B67F-04F8-4AD2-B722-47A5D9A7D91B}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <RootNamespace>KingmakerBuffPlanner</RootNamespace>
+    <AssemblyName>KingmakerBuffPlanner</AssemblyName>
+    <TargetFrameworkVersion>v4.7</TargetFrameworkVersion>
+    <LangVersion>7.3</LangVersion>
+    <FileAlignment>512</FileAlignment>
+    <Deterministic>true</Deterministic>
+    <WarningLevel>4</WarningLevel>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <KbpSourceRevision Condition="'$(KbpSourceRevision)' == ''">UNKNOWN</KbpSourceRevision>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|AnyCPU'">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>..\..\artifacts\build\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|AnyCPU'">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>..\..\artifacts\build\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="UnityModManager">
+      <HintPath>$(KingmakerInstallDir)\Kingmaker_Data\Managed\UnityModManager\UnityModManager.dll</HintPath>
+      <Private>False</Private>
+      <ExternallyResolved>True</ExternallyResolved>
+    </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>$(KingmakerInstallDir)\Kingmaker_Data\Managed\Newtonsoft.Json.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(KingmakerInstallDir)\Kingmaker_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Infrastructure\AtomicFile.cs" />
+    <Compile Include="Infrastructure\Hashing.cs" />
+    <Compile Include="Infrastructure\ModLog.cs" />
+    <Compile Include="Main.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="RuntimeTesting\RuntimeTestHost.cs" />
+    <Compile Include="RuntimeTesting\RuntimeTestProtocol.cs" />
+    <Compile Include="$(IntermediateOutputPath)BuildInfo.Generated.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Info.json" />
+  </ItemGroup>
+  <Target Name="ValidateLocalReferences" BeforeTargets="BeforeBuild">
+    <Error Condition="'$(KingmakerInstallDir)' == ''" Text="KingmakerInstallDir is missing. Create ignored GamePath.props." />
+    <Error Condition="!Exists('$(KingmakerInstallDir)\Kingmaker_Data\Managed\UnityModManager\UnityModManager.dll')" Text="Exact local UnityModManager reference is missing." />
+    <Error Condition="!Exists('$(KingmakerInstallDir)\Kingmaker_Data\Managed\Newtonsoft.Json.dll')" Text="Exact local Newtonsoft.Json reference is missing." />
+    <Error Condition="!Exists('$(KingmakerInstallDir)\Kingmaker_Data\Managed\UnityEngine.CoreModule.dll')" Text="Exact local UnityEngine.CoreModule reference is missing." />
+  </Target>
+  <Target Name="GenerateBuildInfo" BeforeTargets="BeforeCompile">
+    <ItemGroup>
+      <_BuildInfoLine Include="namespace KingmakerBuffPlanner" />
+      <_BuildInfoLine Include="{" />
+      <_BuildInfoLine Include="    internal static class BuildInfo" />
+      <_BuildInfoLine Include="    {" />
+      <_BuildInfoLine Include="        internal const string Version = &quot;$(KbpVersion)&quot;%3B" />
+      <_BuildInfoLine Include="        internal const string Commit = &quot;$(KbpSourceRevision)&quot;%3B" />
+      <_BuildInfoLine Include="    }" />
+      <_BuildInfoLine Include="}" />
+    </ItemGroup>
+    <WriteLinesToFile File="$(IntermediateOutputPath)BuildInfo.Generated.cs" Lines="@(_BuildInfoLine)" Overwrite="true" Encoding="UTF-8" />
+  </Target>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>

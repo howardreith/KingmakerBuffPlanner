@@ -1,0 +1,11 @@
+{
+  "Id": "KingmakerBuffPlanner",
+  "DisplayName": "Kingmaker Buff Planner",
+  "Author": "Howie Reith",
+  "Version": "0.0.1",
+  "ManagerVersion": "0.28.2",
+  "GameVersion": "2.1.7",
+  "AssemblyName": "KingmakerBuffPlanner.dll",
+  "EntryMethod": "KingmakerBuffPlanner.Main.Load",
+  "Requirements": []
+}
