@@ -240,3 +240,15 @@ Status: PASS as diagnostic evidence; final exact-profile repetition pending
 - Transaction restored exact original `Mods`; no save was selected or written; game and lock absent afterward
 - The run did not yet enforce representative GUIDs or emit the required Harmony owner/order inventory, so it is retained as diagnostic rather than final Phase 11 qualification
 - Exact next action: checkpoint strict representatives plus Harmony inventory instrumentation, then repeat the exact Call of the Wild profile twice from fresh processes
+
+## 2026-08-11 — Harmony inventory runtime defect
+
+Status: runtime FAIL repaired; regression PASS; exact restoration PASS
+
+- Run `20260811T2226321948779Z-native-buff-catalog` failed at `unhandled-exception` because the exporter initially treated legacy Harmony12 `GetPatchedMethods` and `GetPatchInfo` as static APIs
+- Exact assembly inspection proved both methods are public instance methods on `Harmony12.HarmonyInstance`; `Create(string)` remains the public static factory
+- The exporter now creates an inventory-only instance and invokes the exact installed instance API; a new assembly-backed regression test calls the installed `0Harmony12.dll` and reconciles target/patch counts
+- Updated source gates: validation 15/15, behavior/protocol 51/51, transaction 6/6, deployment WhatIf 5/5, package 4/4
+- Failed-run transaction restoration verified exact; no save was selected or written; game and lock absent afterward
+- Rejected shortcut: removing Harmony evidence or accepting an empty placeholder inventory to make the compatibility gate pass
+- Exact next action: commit the repair and rerun the exact-profile qualification twice

@@ -17,19 +17,21 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 string.Equals(a.GetName().Name, "0Harmony12", StringComparison.Ordinal));
             if (harmonyAssembly == null) throw new InvalidOperationException("Harmony12 assembly is not loaded.");
             Type harmonyType = harmonyAssembly.GetType("Harmony12.HarmonyInstance", true);
+            MethodInfo create = harmonyType.GetMethod("Create", BindingFlags.Static | BindingFlags.Public);
             MethodInfo getPatchedMethods = harmonyType.GetMethod("GetPatchedMethods",
-                BindingFlags.Static | BindingFlags.Public);
+                BindingFlags.Instance | BindingFlags.Public);
             MethodInfo getPatchInfo = harmonyType.GetMethod("GetPatchInfo",
-                BindingFlags.Static | BindingFlags.Public);
-            if (getPatchedMethods == null || getPatchInfo == null)
+                BindingFlags.Instance | BindingFlags.Public);
+            if (create == null || getPatchedMethods == null || getPatchInfo == null)
                 throw new MissingMethodException("Harmony12 patch inventory API is unavailable.");
+            object harmony = create.Invoke(null, new object[] { "KingmakerBuffPlanner.Inventory" });
 
-            var methods = ((IEnumerable)getPatchedMethods.Invoke(null, null)).Cast<MethodBase>()
+            var methods = ((IEnumerable)getPatchedMethods.Invoke(harmony, null)).Cast<MethodBase>()
                 .OrderBy(GetMethodIdentity, StringComparer.Ordinal).ToList();
             var targets = new List<HarmonyPatchTarget>();
             foreach (MethodBase method in methods)
             {
-                object patches = getPatchInfo.Invoke(null, new object[] { method });
+                object patches = getPatchInfo.Invoke(harmony, new object[] { method });
                 if (patches == null) continue;
                 var records = new List<HarmonyPatchRecord>();
                 AddRecords(records, patches, "prefix", "Prefixes");

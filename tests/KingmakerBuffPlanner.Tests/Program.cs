@@ -58,6 +58,7 @@ namespace KingmakerBuffPlanner.Tests
                 Run("native-candidate-classification-is-structural", TestNativeCandidateClassification);
                 Run("optional-blueprint-ownership-is-exact", TestBlueprintOwnership);
                 Run("harmony-target-identities-are-stable", TestHarmonyTargetIdentity);
+                Run("installed-harmony-inventory-api-is-callable", TestHarmonyInventoryApi);
                 Run("effect-overrides-are-versioned-and-branch-preserving", TestEffectOverrides);
                 Run("stable-keys-distinguish-variants-and-metamagic", TestStableKeys);
                 Run("spontaneous-providers-share-one-pool", TestSpontaneousSharedPool);
@@ -202,6 +203,20 @@ namespace KingmakerBuffPlanner.Tests
             string identity = HarmonyPatchInventoryExporter.GetMethodIdentity(method);
             if (identity != "mscorlib|System.String|StartsWith(System.String)")
                 throw new InvalidOperationException("Harmony target identity is not stable: " + identity);
+        }
+
+        private static void TestHarmonyInventoryApi()
+        {
+            string game = Environment.GetEnvironmentVariable("KBP_TEST_GAME_PATH");
+            if (string.IsNullOrWhiteSpace(game))
+                throw new InvalidOperationException("KBP_TEST_GAME_PATH is missing.");
+            string harmony = Path.Combine(game, "Kingmaker_Data", "Managed", "UnityModManager", "0Harmony12.dll");
+            Assembly.LoadFrom(harmony);
+            HarmonyPatchInventory inventory = new HarmonyPatchInventoryExporter().Export("contract-test");
+            if (inventory.SchemaVersion != 1 || inventory.ProfileId != "contract-test" ||
+                inventory.TargetCount != inventory.Targets.Count ||
+                inventory.PatchCount != inventory.Targets.Sum(t => t.Patches.Count))
+                throw new InvalidOperationException("Installed Harmony inventory API did not reconcile.");
         }
 
         private static void TestNativeCandidateClassification()
