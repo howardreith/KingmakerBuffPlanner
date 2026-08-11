@@ -63,8 +63,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 }
                 if (_uiSmokeUpdates == 4)
                 {
-                    BuffPlannerUiRoot.EndRuntimeSmoke();
-                    BuffPlannerUiRoot.BeginRuntimeSmoke();
+                    BuffPlannerUiRoot.ReconstructRuntimeSmoke();
                     return false;
                 }
                 if (_uiSmokeUpdates < 7) return false;
@@ -148,6 +147,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     UiLayoutProfilesPassed = ui == null ? 0 : ui.LayoutProfilesPassed,
                     UiFullScreenBlockerCount = ui == null ? 0 : ui.FullScreenBlockerCount,
                     UiEventSubscriptionCount = ui == null ? 0 : ui.EventSubscriptionCount,
+                    UiReconstructionCount = ui == null ? 0 : ui.ReconstructionCount,
                     Assertions = new List<RuntimeTestAssertion>
                     {
                         RuntimeTestAssertion.Pass("entry-point-loaded", "true", "true"),
@@ -211,11 +211,15 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         ? RuntimeTestAssertion.Pass("ui-event-subscriptions", "0", "0")
                         : RuntimeTestAssertion.Fail("ui-event-subscriptions", "0",
                             ui.EventSubscriptionCount.ToString()));
+                    result.Assertions.Add(ui.ReconstructionCount == 1
+                        ? RuntimeTestAssertion.Pass("ui-root-reconstruction", "1", "1")
+                        : RuntimeTestAssertion.Fail("ui-root-reconstruction", "1",
+                            ui.ReconstructionCount.ToString()));
                     if (ui.RootCount != 1 || ui.RenderedOpenFrames == 0 || ui.OpenCloseCycles < 2 ||
                         ui.ScreenWidth <= 0 || ui.ScreenHeight <= 0 ||
                         ui.RoutineButtonCount != 3 || !ui.CriticalControlsOnScreen ||
                         ui.LayoutProfilesPassed != 3 || ui.FullScreenBlockerCount != 0 ||
-                        ui.EventSubscriptionCount != 0)
+                        ui.EventSubscriptionCount != 0 || ui.ReconstructionCount != 1)
                     {
                         result.Status = "FAIL";
                         result.Stage = "ui-validation";
@@ -327,6 +331,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         [JsonProperty("uiLayoutProfilesPassed", Order = 35)] public int UiLayoutProfilesPassed { get; set; }
         [JsonProperty("uiFullScreenBlockerCount", Order = 36)] public int UiFullScreenBlockerCount { get; set; }
         [JsonProperty("uiEventSubscriptionCount", Order = 37)] public int UiEventSubscriptionCount { get; set; }
+        [JsonProperty("uiReconstructionCount", Order = 38)] public int UiReconstructionCount { get; set; }
     }
 
     internal sealed class RuntimeTestAssertion

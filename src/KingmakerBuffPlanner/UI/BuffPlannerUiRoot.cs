@@ -17,6 +17,7 @@ namespace KingmakerBuffPlanner.UI
         private static BuffPlannerUiRoot _instance;
         private PlannerUiSession _session;
         private ModLog _log;
+        private string _modPath;
         private bool _enabled = true;
         private bool _open;
         private Rect _window = new Rect(120, 80, 1120, 720);
@@ -35,6 +36,7 @@ namespace KingmakerBuffPlanner.UI
         private string _uiError = string.Empty;
         private int _renderedOpenFrames;
         private int _runtimeOpenCycles;
+        private int _runtimeReconstructionCount;
         private string _previewRoutineId = string.Empty;
 
         internal static void Ensure(string modPath, ModLog log)
@@ -45,6 +47,7 @@ namespace KingmakerBuffPlanner.UI
             _instance = gameObject.AddComponent<BuffPlannerUiRoot>();
             _instance._session = new PlannerUiSession(modPath, log);
             _instance._log = log;
+            _instance._modPath = modPath;
         }
 
         internal static void SetEnabled(bool enabled)
@@ -70,6 +73,22 @@ namespace KingmakerBuffPlanner.UI
             _instance._session.Refresh();
         }
 
+        internal static void ReconstructRuntimeSmoke()
+        {
+            if (_instance == null) throw new InvalidOperationException("UI root is absent.");
+            int frames = _instance._renderedOpenFrames;
+            int cycles = _instance._runtimeOpenCycles;
+            int reconstructions = _instance._runtimeReconstructionCount;
+            string modPath = _instance._modPath;
+            ModLog log = _instance._log;
+            DestroyOwned();
+            Ensure(modPath, log);
+            _instance._renderedOpenFrames = frames;
+            _instance._runtimeOpenCycles = cycles;
+            _instance._runtimeReconstructionCount = reconstructions + 1;
+            BeginRuntimeSmoke();
+        }
+
         internal static UiRootDiagnostics EndRuntimeSmoke()
         {
             if (_instance == null) throw new InvalidOperationException("UI root is absent.");
@@ -90,7 +109,8 @@ namespace KingmakerBuffPlanner.UI
                     CriticalControlsFit(3840, 2160, 1.5f)
                 }.Count(value => value),
                 FullScreenBlockerCount = 0,
-                EventSubscriptionCount = 0
+                EventSubscriptionCount = 0,
+                ReconstructionCount = _instance._runtimeReconstructionCount
             };
         }
 
@@ -550,5 +570,6 @@ namespace KingmakerBuffPlanner.UI
         internal int LayoutProfilesPassed;
         internal int FullScreenBlockerCount;
         internal int EventSubscriptionCount;
+        internal int ReconstructionCount;
     }
 }
