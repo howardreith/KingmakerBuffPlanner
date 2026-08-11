@@ -50,10 +50,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         internal bool Update()
         {
             if (_completed) return true;
-            if (string.Equals(_request.Scenario, "native-buff-catalog", StringComparison.Ordinal) &&
+            if (RuntimeTestProtocol.IsCatalogScenario(_request.Scenario) &&
                 ResourcesLibrary.LibraryObject == null)
                 return false;
-            if (string.Equals(_request.Scenario, "ui-root-smoke", StringComparison.Ordinal))
+            if (RuntimeTestProtocol.IsUiScenario(_request.Scenario))
             {
                 _uiSmokeUpdates++;
                 if (_uiSmokeUpdates == 1)
@@ -88,8 +88,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 HarmonyPatchInventory harmonyInventory = null;
                 string harmonyInventoryHash = null;
                 UiRootDiagnostics ui = null;
-                if (dllMatches && string.Equals(
-                    _request.Scenario, "native-buff-catalog", StringComparison.Ordinal))
+                if (dllMatches && RuntimeTestProtocol.IsCatalogScenario(_request.Scenario))
                 {
                     string modsPath = Path.GetDirectoryName(_modEntry.Path.TrimEnd(
                         Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
@@ -119,7 +118,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     AtomicFile.WriteUtf8(harmonyInventoryPath, Serialize(harmonyInventory));
                     harmonyInventoryHash = Hashing.Sha256(harmonyInventoryPath);
                 }
-                if (dllMatches && string.Equals(_request.Scenario, "ui-root-smoke", StringComparison.Ordinal))
+                if (dllMatches && RuntimeTestProtocol.IsUiScenario(_request.Scenario))
                     ui = BuffPlannerUiRoot.EndRuntimeSmoke();
                 var result = new RuntimeTestResult
                 {

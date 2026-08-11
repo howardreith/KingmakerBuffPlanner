@@ -99,7 +99,7 @@ function New-KbpRuntimeRequest {
         [int]$TimeoutSeconds, [bool]$ExitAfterCompletion,
         [ValidateSet('native-only', 'call-of-the-wild')][string]$ProfileId = 'native-only',
         [object[]]$ExpectedOptionalMods = @(), [string[]]$ExpectedBlueprintGuids = @(),
-        [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke')][string]$Scenario = 'mod-load-smoke')
+        [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'final-no-save-core')][string]$Scenario = 'mod-load-smoke')
     return [ordered]@{
         schemaVersion = 1
         enabled = $true
@@ -166,7 +166,7 @@ function Assert-KbpRuntimeResult {
     if ([int]$Result.optionalLoadedUmmEntryCount -ne @($Request.expectedOptionalMods).Count) {
         throw 'Loaded optional UMM entry count does not match the requested profile.'
     }
-    if ($Request.scenario -ceq 'native-buff-catalog') {
+    if ($Request.scenario -in @('native-buff-catalog', 'final-no-save-core')) {
         $catalogPath = Join-Path $Request.evidenceDirectory 'native-buff-catalog.json'
         if (-not (Test-Path -LiteralPath $catalogPath -PathType Leaf)) { throw 'Native catalog evidence is missing.' }
         if ($Result.catalogSha256 -cne (Get-KbpSha256 $catalogPath)) { throw 'Native catalog hash mismatch.' }
@@ -219,7 +219,7 @@ function Assert-KbpRuntimeResult {
             }
         }
     }
-    if ($Request.scenario -ceq 'ui-root-smoke') {
+    if ($Request.scenario -in @('ui-root-smoke', 'final-no-save-core')) {
         if ([int]$Result.uiRootCount -ne 1 -or [int]$Result.uiRenderedOpenFrames -le 0 -or
             [int]$Result.uiOpenCloseCycles -lt 2 -or
             [int]$Result.uiScreenWidth -le 0 -or [int]$Result.uiScreenHeight -le 0 -or

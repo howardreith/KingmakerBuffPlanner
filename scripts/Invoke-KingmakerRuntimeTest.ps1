@@ -1,11 +1,12 @@
 [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
 param(
-    [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke')][string]$Scenario = 'mod-load-smoke',
+    [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'final-no-save-core')][string]$Scenario = 'mod-load-smoke',
     [ValidateSet('native-only', 'call-of-the-wild')][string]$CompatibilityProfileId = 'native-only',
     [ValidateRange(5, 1800)][int]$TimeoutSeconds = 180,
     [ValidateRange(5, 300)][int]$LaunchTimeoutSeconds = 60,
     [bool]$ExitAfterCompletion = $true,
-    [string]$SteamPath = 'C:\Program Files (x86)\Steam\steam.exe'
+    [string]$SteamPath = 'C:\Program Files (x86)\Steam\steam.exe',
+    [ValidatePattern('^[A-Za-z0-9._-]{1,100}$')][string]$RunId
 )
 
 Set-StrictMode -Version Latest
@@ -42,8 +43,14 @@ if (-not $PSCmdlet.ShouldProcess(
 
 $ConfirmPreference = 'None'
 $WhatIfPreference = $false
-$runId = [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssfffffffZ') + '-' + $Scenario
+$runId = if ([string]::IsNullOrWhiteSpace($RunId)) {
+    [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssfffffffZ') + '-' + $Scenario
+} else { $RunId }
 $evidence = Join-Path $script:KbpRuntimeEvidenceRoot $runId
+$transactionRecord = Join-Path $script:KbpRuntimeStateRoot "transactions\$runId"
+if ((Test-Path -LiteralPath $evidence) -or (Test-Path -LiteralPath $transactionRecord)) {
+    throw "Runtime run ID is already present and cannot be reused: $runId"
+}
 $transactionEntered = $false
 $process = $null
 New-Item -ItemType Directory -Path $evidence | Out-Null

@@ -66,9 +66,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (!IsSafeIdentifier(request.ProfileId) ||
                 (request.ProfileId != "native-only" && request.ProfileId != "call-of-the-wild"))
                 throw new InvalidDataException("profile-id");
-            if (!string.Equals(request.Scenario, "mod-load-smoke", StringComparison.Ordinal) &&
-                !string.Equals(request.Scenario, "native-buff-catalog", StringComparison.Ordinal) &&
-                !string.Equals(request.Scenario, "ui-root-smoke", StringComparison.Ordinal))
+            if (!IsKnownScenario(request.Scenario))
                 throw new InvalidDataException("scenario");
             if (!string.Equals(request.ExpectedModVersion, BuildInfo.Version, StringComparison.Ordinal))
                 throw new InvalidDataException("version-mismatch");
@@ -148,6 +146,24 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             foreach (char c in value)
                 if (!(c >= '0' && c <= '9') && !(c >= 'a' && c <= 'f')) return false;
             return true;
+        }
+
+        internal static bool IsCatalogScenario(string scenario)
+        {
+            return string.Equals(scenario, "native-buff-catalog", StringComparison.Ordinal) ||
+                string.Equals(scenario, "final-no-save-core", StringComparison.Ordinal);
+        }
+
+        internal static bool IsUiScenario(string scenario)
+        {
+            return string.Equals(scenario, "ui-root-smoke", StringComparison.Ordinal) ||
+                string.Equals(scenario, "final-no-save-core", StringComparison.Ordinal);
+        }
+
+        private static bool IsKnownScenario(string scenario)
+        {
+            return string.Equals(scenario, "mod-load-smoke", StringComparison.Ordinal) ||
+                IsCatalogScenario(scenario) || IsUiScenario(scenario);
         }
 
         private static void RejectDuplicateProperties(string json)

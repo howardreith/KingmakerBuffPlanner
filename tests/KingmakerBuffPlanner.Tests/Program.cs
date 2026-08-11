@@ -37,6 +37,7 @@ namespace KingmakerBuffPlanner.Tests
                 Run("valid-catalog-request-is-accepted", () => TestValidCatalogRequest(root));
                 Run("valid-call-of-the-wild-request-is-accepted", () => TestValidCallOfTheWildRequest(root));
                 Run("valid-ui-request-is-accepted", () => TestValidUiRequest(root));
+                Run("valid-final-core-request-is-accepted", () => TestValidFinalCoreRequest(root));
                 Run("duplicate-flag-rejected", () => TestDuplicateFlag(root));
                 Run("outside-path-rejected", TestOutsidePath);
                 Run("unknown-member-rejected", () => TestMutation(root, "unknown-member", AddUnknownMember));
@@ -1156,6 +1157,18 @@ namespace KingmakerBuffPlanner.Tests
                 new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path }, out rejection);
             if (request == null || rejection.Length != 0 || request.Scenario != "ui-root-smoke")
                 throw new InvalidOperationException("Valid UI request was rejected: " + rejection);
+        }
+
+        private static void TestValidFinalCoreRequest(string root)
+        {
+            string path = WriteRequest(root, "valid-final-core", o => o["scenario"] = "final-no-save-core");
+            string rejection;
+            RuntimeTestRequest request = RuntimeTestProtocol.TryRead(
+                new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path }, out rejection);
+            if (request == null || rejection.Length != 0 ||
+                !RuntimeTestProtocol.IsCatalogScenario(request.Scenario) ||
+                !RuntimeTestProtocol.IsUiScenario(request.Scenario))
+                throw new InvalidOperationException("Valid final core request was rejected: " + rejection);
         }
 
         private static void TestDuplicateFlag(string root)

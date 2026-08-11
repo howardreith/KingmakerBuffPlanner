@@ -303,3 +303,15 @@ Status: implementation/source PASS; clean-head execution pending checkpoint comm
 - Rejected shortcut: direct `git push`; all publication must pass the lab-local project-specific helper
 - External state: no game or deployment lock; no save accessed; no live mod mutation
 - Exact next action: commit tooling/docs, run guarded-push WhatIf, produce and validate the deterministic clean-head release ZIP, then audit and execute final runtime gates
+
+## 2026-08-11 — Phase 12 clean release and composed core scenario
+
+Status: release tooling PASS; composed scenario source PASS; runtime pending checkpoint
+
+- Guarded push helper WhatIf passed 6/6 from clean commit `4c4693b511627da0950ce470ac025f3f876bb244`, without changing HEAD/status or contacting/mutating the remote
+- Clean-head release builder ran two identical builds: validated ZIP `artifacts/release/0.0.1/KingmakerBuffPlanner-0.0.1.zip` SHA-256 `2df128d74a08c0ce2dd77f7f3e784912fd291a75d02d9c9f47791619372844b5`, DLL `1904c5cb5c66999b64ebc2bbf3d4818778163553816bff7bde55326b965f6726`; publication status local-only
+- Definition-of-Done audit confirmed that three separate no-save runtime gates should be composed for the final fresh-process repetition instead of counting packaging or a main-menu load
+- Added `final-no-save-core`: exact identity and uniqueness, full catalog/expression reconciliation, Harmony inventory, UI singleton/reconstruction/layout/blocker/subscription checks, and normal transactional restoration in one process
+- Added optional unique `-RunId`; evidence/transaction reuse is rejected before mutation. Source suite now passes validation 15/15, behavior/protocol 52/52, transaction 6/6, package 4/4, deployment purity 5/5
+- Qualification boundary remains: the composed scenario is NO-SAVE and cannot prove the mandatory save-backed resource/effect/executor scenarios
+- Exact next action: commit, build exact package, pass compatibility-specific WhatIf, and run the composed native core twice from fresh processes
