@@ -69,6 +69,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 throw new InvalidDataException("version-mismatch");
             if (!string.Equals(request.ExpectedCommit, BuildInfo.Commit, StringComparison.Ordinal))
                 throw new InvalidDataException("commit-mismatch");
+            if (!IsSha256(request.ExpectedPackageSha256) || !IsSha256(request.ExpectedDllSha256))
+                throw new InvalidDataException("expected-hash");
             if (request.TimeoutSeconds < 5 || request.TimeoutSeconds > 1800)
                 throw new InvalidDataException("timeout");
             if (request.Parameters == null || request.Parameters.Count != 0)
@@ -104,6 +106,17 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     !(c >= '0' && c <= '9') && c != '.' && c != '_' && c != '-') return false;
             }
 
+            return true;
+        }
+
+        private static bool IsSha256(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value) || value.Length != 64) return false;
+            for (int i = 0; i < value.Length; i++)
+            {
+                char c = value[i];
+                if (!(c >= '0' && c <= '9') && !(c >= 'a' && c <= 'f')) return false;
+            }
             return true;
         }
 
@@ -157,13 +170,19 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         [JsonProperty("evidenceDirectory", Required = Required.Always, Order = 7)]
         public string EvidenceDirectory { get; set; }
 
-        [JsonProperty("timeoutSeconds", Required = Required.Always, Order = 8)]
+        [JsonProperty("expectedPackageSha256", Required = Required.Always, Order = 8)]
+        public string ExpectedPackageSha256 { get; set; }
+
+        [JsonProperty("expectedDllSha256", Required = Required.Always, Order = 9)]
+        public string ExpectedDllSha256 { get; set; }
+
+        [JsonProperty("timeoutSeconds", Required = Required.Always, Order = 10)]
         public int TimeoutSeconds { get; set; }
 
-        [JsonProperty("exitAfterCompletion", Required = Required.Always, Order = 9)]
+        [JsonProperty("exitAfterCompletion", Required = Required.Always, Order = 11)]
         public bool ExitAfterCompletion { get; set; }
 
-        [JsonProperty("parameters", Required = Required.Always, Order = 10)]
+        [JsonProperty("parameters", Required = Required.Always, Order = 12)]
         public Dictionary<string, object> Parameters { get; set; }
     }
 }

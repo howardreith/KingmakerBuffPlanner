@@ -30,6 +30,7 @@ namespace KingmakerBuffPlanner.Tests
                 Run("wrong-scenario-rejected", () => TestMutation(root, "wrong-scenario", o => o["scenario"] = "unknown"));
                 Run("wrong-version-rejected", () => TestMutation(root, "wrong-version", o => o["expectedModVersion"] = "9.9.9"));
                 Run("wrong-commit-rejected", () => TestMutation(root, "wrong-commit", o => o["expectedCommit"] = "WRONG"));
+                Run("invalid-hash-rejected", () => TestMutation(root, "invalid-hash", o => o["expectedDllSha256"] = "not-a-hash"));
                 Run("parameters-rejected", () => TestMutation(root, "parameters", o => o["parameters"] = new Dictionary<string, object> { { "saveName", "KBP_AUTOMATION_BASELINE" } }));
                 Run("result-reuse-rejected", () => TestResultReuse(root));
             }
@@ -168,6 +169,8 @@ namespace KingmakerBuffPlanner.Tests
                 { "expectedModVersion", "0.0.1" },
                 { "expectedCommit", "TEST-COMMIT" },
                 { "evidenceDirectory", root },
+                { "expectedPackageSha256", new string('a', 64) },
+                { "expectedDllSha256", new string('b', 64) },
                 { "timeoutSeconds", 30 },
                 { "exitAfterCompletion", false },
                 { "parameters", new Dictionary<string, object>() }

@@ -72,4 +72,14 @@ if ($LASTEXITCODE -ne 0 -or $ignored -cne 'GamePath.props') {
 [void](Get-KbpGamePath)
 $assertions++
 
+$parseErrors = [Collections.Generic.List[System.Management.Automation.Language.ParseError]]::new()
+foreach ($scriptFile in @(Get-ChildItem -LiteralPath (Join-Path $root 'scripts') -Filter '*.ps1' -File -Recurse)) {
+    $tokens = $null
+    $errors = $null
+    [void][Management.Automation.Language.Parser]::ParseFile($scriptFile.FullName, [ref]$tokens, [ref]$errors)
+    foreach ($error in @($errors)) { $parseErrors.Add($error) }
+}
+if ($parseErrors.Count -ne 0) { throw "PowerShell parse errors: $($parseErrors.Message -join '; ')" }
+$assertions++
+
 Write-Host "Source validation: PASS=$assertions FAIL=0"

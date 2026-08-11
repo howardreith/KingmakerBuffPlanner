@@ -48,18 +48,33 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             {
                 Assembly assembly = typeof(Main).Assembly;
                 string assemblyPath = assembly.Location;
+                string dllHash = Hashing.Sha256(assemblyPath);
+                string gameRoot = Directory.GetParent(Directory.GetParent(_modEntry.Path).FullName).FullName;
+                string managed = Path.Combine(gameRoot, "Kingmaker_Data", "Managed");
+                string gameExecutable = Path.Combine(gameRoot, "Kingmaker.exe");
+                string umm = Path.Combine(managed, "UnityModManager", "UnityModManager.dll");
+                string harmony = Path.Combine(managed, "UnityModManager", "0Harmony12.dll");
+                bool dllMatches = string.Equals(
+                    dllHash, _request.ExpectedDllSha256, StringComparison.Ordinal);
                 var result = new RuntimeTestResult
                 {
                     SchemaVersion = 1,
                     RunId = _request.RunId,
                     Scenario = _request.Scenario,
-                    Status = "PASS",
-                    Stage = "completed",
+                    Status = dllMatches ? "PASS" : "FAIL",
+                    Stage = dllMatches ? "completed" : "identity-validation",
                     LoadedModId = _modEntry.Info.Id,
                     LoadedModVersion = _modEntry.Info.Version,
                     Commit = BuildInfo.Commit,
                     AssemblyMvid = assembly.ManifestModule.ModuleVersionId.ToString("D"),
-                    AssemblySha256 = Hashing.Sha256(assemblyPath),
+                    AssemblySha256 = dllHash,
+                    PackageSha256 = _request.ExpectedPackageSha256,
+                    GameVersion = UnityModManager.gameVersion.ToString(),
+                    GameExecutableSha256 = Hashing.Sha256(gameExecutable),
+                    UmmVersion = UnityModManager.GetVersion().ToString(),
+                    UmmSha256 = Hashing.Sha256(umm),
+                    HarmonyVersion = FileVersionInfo.GetVersionInfo(harmony).FileVersion,
+                    HarmonySha256 = Hashing.Sha256(harmony),
                     ProcessId = Process.GetCurrentProcess().Id,
                     StartedAtUtc = started.ToString("o"),
                     EndedAtUtc = DateTime.UtcNow.ToString("o"),
@@ -68,22 +83,57 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         RuntimeTestAssertion.Pass("entry-point-loaded", "true", "true"),
                         RuntimeTestAssertion.Pass("standalone-id", "KingmakerBuffPlanner", _modEntry.Info.Id),
                         RuntimeTestAssertion.Pass("version", BuildInfo.Version, _modEntry.Info.Version),
-                        RuntimeTestAssertion.Pass("commit", _request.ExpectedCommit, BuildInfo.Commit)
+                        RuntimeTestAssertion.Pass("commit", _request.ExpectedCommit, BuildInfo.Commit),
+                        dllMatches
+                            ? RuntimeTestAssertion.Pass("dll-sha256", _request.ExpectedDllSha256, dllHash)
+                            : RuntimeTestAssertion.Fail("dll-sha256", _request.ExpectedDllSha256, dllHash)
                     }
                 };
                 string resultPath = Path.Combine(_request.EvidenceDirectory, "runtime-result.json");
                 AtomicFile.WriteUtf8(
                     resultPath,
                     JsonConvert.SerializeObject(result, Formatting.Indented) + Environment.NewLine);
-                _log.Info("Runtime scenario completed: " + _request.RunId + " PASS.");
+                _log.Info("Runtime scenario completed: " + _request.RunId + " " + result.Status + ".");
                 if (_request.ExitAfterCompletion) Application.Quit();
             }
             catch (Exception exception)
             {
                 _log.Error("Runtime scenario failed.", exception);
+                TryWriteFailure(started, exception);
+                if (_request.ExitAfterCompletion) Application.Quit();
             }
 
             return true;
+        }
+
+        private void TryWriteFailure(DateTime started, Exception exception)
+        {
+            try
+            {
+                var result = new RuntimeTestResult
+                {
+                    SchemaVersion = 1,
+                    RunId = _request.RunId,
+                    Scenario = _request.Scenario,
+                    Status = "FAIL",
+                    Stage = "unhandled-exception",
+                    LoadedModId = _modEntry.Info.Id,
+                    LoadedModVersion = _modEntry.Info.Version,
+                    Commit = BuildInfo.Commit,
+                    ProcessId = Process.GetCurrentProcess().Id,
+                    StartedAtUtc = started.ToString("o"),
+                    EndedAtUtc = DateTime.UtcNow.ToString("o"),
+                    ExceptionSummary = exception.GetType().FullName + ": " + exception.Message,
+                    Assertions = new List<RuntimeTestAssertion>()
+                };
+                AtomicFile.WriteUtf8(
+                    Path.Combine(_request.EvidenceDirectory, "runtime-result.json"),
+                    JsonConvert.SerializeObject(result, Formatting.Indented) + Environment.NewLine);
+            }
+            catch (Exception writeException)
+            {
+                _log.Error("Runtime failure result could not be written.", writeException);
+            }
         }
     }
 
@@ -99,10 +149,18 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         [JsonProperty("commit", Order = 8)] public string Commit { get; set; }
         [JsonProperty("assemblyMvid", Order = 9)] public string AssemblyMvid { get; set; }
         [JsonProperty("assemblySha256", Order = 10)] public string AssemblySha256 { get; set; }
-        [JsonProperty("processId", Order = 11)] public int ProcessId { get; set; }
-        [JsonProperty("startedAtUtc", Order = 12)] public string StartedAtUtc { get; set; }
-        [JsonProperty("endedAtUtc", Order = 13)] public string EndedAtUtc { get; set; }
-        [JsonProperty("assertions", Order = 14)] public List<RuntimeTestAssertion> Assertions { get; set; }
+        [JsonProperty("packageSha256", Order = 11)] public string PackageSha256 { get; set; }
+        [JsonProperty("gameVersion", Order = 12)] public string GameVersion { get; set; }
+        [JsonProperty("gameExecutableSha256", Order = 13)] public string GameExecutableSha256 { get; set; }
+        [JsonProperty("ummVersion", Order = 14)] public string UmmVersion { get; set; }
+        [JsonProperty("ummSha256", Order = 15)] public string UmmSha256 { get; set; }
+        [JsonProperty("harmonyVersion", Order = 16)] public string HarmonyVersion { get; set; }
+        [JsonProperty("harmonySha256", Order = 17)] public string HarmonySha256 { get; set; }
+        [JsonProperty("processId", Order = 18)] public int ProcessId { get; set; }
+        [JsonProperty("startedAtUtc", Order = 19)] public string StartedAtUtc { get; set; }
+        [JsonProperty("endedAtUtc", Order = 20)] public string EndedAtUtc { get; set; }
+        [JsonProperty("exceptionSummary", Order = 21)] public string ExceptionSummary { get; set; }
+        [JsonProperty("assertions", Order = 22)] public List<RuntimeTestAssertion> Assertions { get; set; }
     }
 
     internal sealed class RuntimeTestAssertion
@@ -120,6 +178,17 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 Expected = expected,
                 Observed = observed,
                 Status = "PASS"
+            };
+        }
+
+        internal static RuntimeTestAssertion Fail(string id, string expected, string observed)
+        {
+            return new RuntimeTestAssertion
+            {
+                Id = id,
+                Expected = expected,
+                Observed = observed,
+                Status = "FAIL"
             };
         }
     }

@@ -16,6 +16,8 @@ try {
     $env:KBP_TEST_GAME_PATH = Get-KbpGamePath
     & $testExe
     if ($LASTEXITCODE -ne 0) { throw "Source-only test runner failed with exit code $LASTEXITCODE." }
+    & (Join-Path $PSScriptRoot 'Test-RuntimeHarness.ps1')
+    & (Join-Path $PSScriptRoot 'Test-DeploymentWhatIf.ps1')
 }
 finally {
     $env:KBP_TEST_GAME_PATH = $prior

@@ -16,6 +16,6 @@ Evidence: transfer inventory and local examples contain no Tabletop Added Rules 
 
 ## Steam/offline runtime boundary
 
-Current classification: IN PROGRESS.
+Current classification: PASS for current-session NO-SAVE preflight; revalidation required immediately before every launch.
 
-Evidence: Steam and a UMM installer UI pre-existed intake. No Kingmaker process was running. Offline Mode and Cloud-disabled state have not yet been safely proven, so runtime launch remains forbidden until the harness preflight can establish them without interacting with credentials, updates, cloud conflicts, or account prompts.
+Evidence: the current Steam session briefly attempted an App 640820 cloud download at startup, then logged off. Later App 640820 records establish `Sync Disabled` and `offlineMode=true`, after the last successful transfer; the app manifest remains fully installed at build ID 6757524. The harness now derives sanitized timestamps and policy state from the current-session logs and refuses launch if a later login or transfer supersedes them. It also refuses while the UMM installer or Kingmaker is running. No dialog or account state was manipulated.

@@ -26,4 +26,6 @@ The PowerShell orchestrator must prove all of the following before live mutation
 
 Unexpected dialogs, account state, cloud conflict, updates, credentials, purchases, unknown saves, ambiguous ownership, or failed restoration stop the harness. It sends no keyboard/mouse input and never force-terminates a process without separate explicit authority.
 
+The Steam preflight requires exactly one already-running client at the exact expected path, a current-session logoff occurring no earlier than the last login, an App 640820 `Sync Disabled`/`offlineMode=true` record after the last successful transfer, and the exact fully-installed app manifest/build. Raw account IDs, tokens, and log lines are not copied into evidence. The state is re-evaluated before every launch.
+
 Statuses are `PASS`, `FAIL`, or `BLOCKED`, with assertion IDs and exact package/DLL/MVID/commit/platform identities. Compilation or main-menu load is never substituted for a gameplay assertion.
