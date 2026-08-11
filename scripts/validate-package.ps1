@@ -16,6 +16,7 @@ try {
     $expected = @(
         'KingmakerBuffPlanner/Info.json',
         'KingmakerBuffPlanner/KingmakerBuffPlanner.dll',
+        'KingmakerBuffPlanner/NativeEffectOverrides.json',
         'KingmakerBuffPlanner/THIRD-PARTY-NOTICES.md') | Sort-Object
     if (($actual -join "`n") -cne ($expected -join "`n")) {
         throw "Package entry allowlist mismatch. Observed: $($actual -join ', ')"

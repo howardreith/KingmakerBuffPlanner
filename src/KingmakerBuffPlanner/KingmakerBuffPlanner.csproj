@@ -66,6 +66,7 @@
   <ItemGroup>
     <Compile Include="Discovery\ActionGraphScanner.cs" />
     <Compile Include="Discovery\DiscoveryNode.cs" />
+    <Compile Include="Discovery\EffectOverrideRegistry.cs" />
     <Compile Include="Discovery\NativeAccessibilityIndex.cs" />
     <Compile Include="Discovery\NativeCandidateClassifier.cs" />
     <Compile Include="Discovery\NativeCatalogExporter.cs" />
@@ -101,6 +102,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Info.json" />
+    <None Include="NativeEffectOverrides.json" />
   </ItemGroup>
   <Target Name="ValidateLocalReferences" BeforeTargets="BeforeBuild">
     <Error Condition="'$(KingmakerInstallDir)' == ''" Text="KingmakerInstallDir is missing. Create ignored GamePath.props." />

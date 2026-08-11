@@ -13,6 +13,13 @@ namespace KingmakerBuffPlanner.Discovery
 {
     internal sealed class NativeCatalogExporter
     {
+        private readonly EffectOverrideRegistry _overrides;
+
+        internal NativeCatalogExporter(EffectOverrideRegistry overrides = null)
+        {
+            _overrides = overrides ?? EffectOverrideRegistry.Empty();
+        }
+
         internal NativeCatalogExport Export()
         {
             var entries = new List<NativeCatalogEntry>();
@@ -28,11 +35,14 @@ namespace KingmakerBuffPlanner.Discovery
                 try
                 {
                     DiscoveryScanResult scan = scanner.Scan(adapter.Adapt(ability));
-                    bool detected = EffectExpressionAnalysis.ContainsLeaf(scan.Expression);
+                    EffectOverrideApplication overrideApplication =
+                        _overrides.Apply(ability.AssetGuid, scan.Expression);
+                    EffectExpression effectiveExpression = overrideApplication.Expression;
+                    bool detected = EffectExpressionAnalysis.ContainsLeaf(effectiveExpression);
                     string[] accessibilitySources = accessibility.GetSources(ability.AssetGuid);
                     NativeSpellListRecord[] spellLists = accessibility.GetSpellLists(ability.AssetGuid);
                     bool candidate = accessibilitySources.Length != 0;
-                    NativeEffectRecord[] effects = GetEffects(scan.Expression);
+                    NativeEffectRecord[] effects = GetEffects(effectiveExpression);
                     var entry = new NativeCatalogEntry
                     {
                         AbilityGuid = ability.AssetGuid,
@@ -72,9 +82,11 @@ namespace KingmakerBuffPlanner.Discovery
                             .Where(v => !string.IsNullOrEmpty(v)).Distinct(StringComparer.Ordinal)
                             .OrderBy(v => v, StringComparer.Ordinal).ToArray(),
                         Effects = effects,
-                        Expression = scan.Expression,
+                        Expression = effectiveExpression,
                         Diagnostics = scan.Diagnostics.ToArray(),
-                        ManualOverride = string.Empty,
+                        ManualOverride = overrideApplication.Entry == null
+                            ? string.Empty : overrideApplication.Entry.Disposition + ": " +
+                                overrideApplication.Entry.Reason,
                         RuntimeEvidence = new string[0]
                     };
                     NativeCandidateAuditDecision decision = classifier.Classify(
@@ -86,6 +98,7 @@ namespace KingmakerBuffPlanner.Discovery
                             CanTargetEnemies = entry.CanTargetEnemies,
                             CanTargetPoint = entry.CanTargetPoint,
                             HasVariants = entry.VariantGuids.Length != 0,
+                            IsStickyTouch = entry.IsStickyTouch,
                             EffectOnAlly = entry.EffectOnAlly,
                             EffectOnEnemy = entry.EffectOnEnemy,
                             Effects = effects.Select(e => new NativeCandidateEffectFacts
@@ -103,6 +116,20 @@ namespace KingmakerBuffPlanner.Discovery
                     entry.SupportClass = decision.SupportClass;
                     entry.DispositionReason = decision.Reason;
                     entry.QualificationStatus = decision.QualificationStatus;
+                    if (overrideApplication.Entry != null)
+                    {
+                        EffectOverrideEntry applied = overrideApplication.Entry;
+                        entry.Disposition = applied.Disposition == "exclude" ? "exclude" :
+                            applied.Disposition == "unsupported-with-reason"
+                                ? "unsupported-with-reason" : "include";
+                        entry.SupportClass = entry.Disposition == "include"
+                            ? "override" : entry.Disposition == "exclude"
+                                ? "excluded-by-override" : "none";
+                        entry.DispositionReason = applied.Reason;
+                        entry.QualificationStatus = entry.Disposition == "include"
+                            ? "DEFER-runtime-qualification" : entry.Disposition == "exclude"
+                                ? "PASS-excluded-by-definition" : "FAIL-unsupported";
+                    }
                     entries.Add(entry);
                 }
                 catch (Exception exception)

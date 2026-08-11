@@ -54,6 +54,7 @@ namespace KingmakerBuffPlanner.Tests
                 Run("scanner-reports-unknown-node", TestScannerUnknown);
                 Run("scanner-expression-wire-contract", TestScannerExpressionWireContract);
                 Run("native-candidate-classification-is-structural", TestNativeCandidateClassification);
+                Run("effect-overrides-are-versioned-and-branch-preserving", TestEffectOverrides);
                 Run("stable-keys-distinguish-variants-and-metamagic", TestStableKeys);
                 Run("spontaneous-providers-share-one-pool", TestSpontaneousSharedPool);
                 Run("prepared-opposition-consumes-linked-slots", TestPreparedLinkedSlots);
@@ -238,6 +239,18 @@ namespace KingmakerBuffPlanner.Tests
             if (container.Disposition != "exclude" ||
                 !container.Reason.StartsWith("non-castable-variant-container:", StringComparison.Ordinal))
                 throw new InvalidOperationException("A non-castable variant parent was treated as a provider.");
+
+            NativeCandidateAuditDecision carrier = classifier.Classify(new NativeCandidateAuditFacts
+            {
+                IsPlayerAccessible = true,
+                IsStickyTouch = true,
+                CanTargetSelf = true,
+                Effects = new[] { CandidateEffect("Buff", "Caster", false, "ContextActionApplyBuff", "delivery") },
+                DiagnosticContracts = new[] { "ContextActionHealTarget|unsupported-action" }
+            });
+            if (carrier.Disposition != "exclude" ||
+                !carrier.Reason.StartsWith("sticky-touch-carrier-only:", StringComparison.Ordinal))
+                throw new InvalidOperationException("A transient sticky-touch carrier was exposed as a buff.");
         }
 
         private static NativeCandidateEffectFacts CandidateEffect(
@@ -251,6 +264,32 @@ namespace KingmakerBuffPlanner.Tests
                 SourceContract = source,
                 ActionPath = path
             };
+        }
+
+        private static void TestEffectOverrides()
+        {
+            const string ability = "11111111111111111111111111111111";
+            const string first = "22222222222222222222222222222222";
+            const string second = "33333333333333333333333333333333";
+            string json = "{\"schemaVersion\":1,\"entries\":[{" +
+                "\"abilityGuid\":\"" + ability + "\",\"disposition\":\"replace-detected-effects\"," +
+                "\"sourceAssembly\":\"native\",\"effectMode\":\"anyOf\",\"effects\":[" +
+                "{\"kind\":\"UnitBuff\",\"guid\":\"" + first + "\"}," +
+                "{\"kind\":\"AreaBuff\",\"guid\":\"" + second + "\"}]," +
+                "\"reason\":\"fixture\"}]}";
+            EffectOverrideApplication application = EffectOverrideRegistry.Parse(json).Apply(
+                ability, Leaf("detected"));
+            var branch = application.Expression as ConditionalEffectExpression;
+            if (application.Entry == null || branch == null ||
+                ((EffectLeafExpression)branch.WhenTrue).EffectId != first ||
+                ((EffectLeafExpression)branch.WhenFalse).EffectId != second)
+                throw new InvalidOperationException("Override replacement flattened anyOf alternatives.");
+            try
+            {
+                EffectOverrideRegistry.Parse("{\"schemaVersion\":1,\"schemaVersion\":1,\"entries\":[]}");
+                throw new InvalidOperationException("Duplicate override property was accepted.");
+            }
+            catch (InvalidDataException) { }
         }
 
         private static void TestStableKeys()

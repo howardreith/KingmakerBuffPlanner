@@ -90,7 +90,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 if (dllMatches && string.Equals(
                     _request.Scenario, "native-buff-catalog", StringComparison.Ordinal))
                 {
-                    catalog = new NativeCatalogExporter().Export();
+                    catalog = new NativeCatalogExporter(EffectOverrideRegistry.Load(
+                        Path.Combine(_modEntry.Path, "NativeEffectOverrides.json"))).Export();
                     catalogPath = Path.Combine(_request.EvidenceDirectory, "native-buff-catalog.json");
                     string catalogJson = Serialize(catalog);
                     JObject catalogDocument = JObject.Parse(catalogJson);

@@ -12,6 +12,7 @@ namespace KingmakerBuffPlanner.Discovery
         public bool CanTargetEnemies { get; set; }
         public bool CanTargetPoint { get; set; }
         public bool HasVariants { get; set; }
+        public bool IsStickyTouch { get; set; }
         public string EffectOnAlly { get; set; }
         public string EffectOnEnemy { get; set; }
         public IReadOnlyList<NativeCandidateEffectFacts> Effects { get; set; }
@@ -70,6 +71,9 @@ namespace KingmakerBuffPlanner.Discovery
                 !facts.CanTargetEnemies && !facts.CanTargetPoint)
                 return Exclude("non-castable-variant-container",
                     "The parent groups castable variants but is not itself a targetable source.");
+            if (facts.IsStickyTouch && effects.All(e => e.Target == "Caster"))
+                return Exclude("sticky-touch-carrier-only",
+                    "Only the transient caster-side delivery carrier was detected; no persistent target effect remains.");
 
             bool controlledTransform = effects.Any(e =>
                 e.Target == "Caster" || e.Target == "Pet" || e.Target == "Party");

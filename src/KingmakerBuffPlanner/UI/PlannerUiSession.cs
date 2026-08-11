@@ -17,10 +17,13 @@ namespace KingmakerBuffPlanner.UI
     {
         private readonly ProfileRepository _profiles;
         private readonly ModLog _log;
+        private readonly EffectOverrideRegistry _overrides;
 
         internal PlannerUiSession(string modPath, ModLog log)
         {
             _profiles = new ProfileRepository(modPath);
+            _overrides = EffectOverrideRegistry.Load(
+                System.IO.Path.Combine(modPath, "NativeEffectOverrides.json"));
             _log = log;
             Status = "Open a campaign to configure routines.";
         }
@@ -52,7 +55,9 @@ namespace KingmakerBuffPlanner.UI
                         ? abilityKey.BaseAbilityGuid
                         : abilityKey.VariantGuid;
                     BlueprintAbility ability = ResourcesLibrary.TryGetBlueprint<BlueprintAbility>(guid);
-                    if (ability != null) effects[abilityKey.Canonical] = scanner.Scan(adapter.Adapt(ability)).Expression;
+                    if (ability != null)
+                        effects[abilityKey.Canonical] = _overrides.Apply(
+                            guid, scanner.Scan(adapter.Adapt(ability)).Expression).Expression;
                 }
                 ProfileLoadResult loaded = _profiles.Load(campaignId);
                 if (!string.IsNullOrEmpty(loaded.Warning))
