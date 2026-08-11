@@ -3,12 +3,12 @@
 Status: IN PROGRESS
 
 - Repository/branch: standalone Kingmaker Buff Planner / `codex/kingmaker-buff-planner`
-- Current commit: `57ed740d6fd6bbdf68dcdfe8c26368c744a3c91f` (`Enforce runtime optional mod identities`)
+- Current commit: `bf7b177` (`Document exact compatibility qualification`)
 - Active version: 0.0.1
 - Last fully runtime-qualified no-save gate: Phase 11 native-only and exact Call of the Wild profiles, each twice
 - Additional runtime proof: Phase 10 HUD gate PASS twice, runs `20260811T2201533093853Z-ui-root-smoke` and `20260811T2202528930958Z-ui-root-smoke`, each 15/15
 - Last source-qualified checkpoint: compatibility profiles/inventory/identity hardening, 51/51 tests
-- Current worktree: Phase 11 final reports, matrices, qualification record, and resume checkpoint pending after clean runtime commit `57ed740`
+- Current worktree: Phase 12 guarded push policy/helper test, deterministic release builder, install/use guide, draft release notes, and current README pending after clean documentation commit `bf7b177`
 - Current hypothesis/failure: all independently actionable Phases 0–11 are complete; save-backed provider/planner/persistence/executor/UI/compatibility execution needs a project-owned `KBP_` fixture and remains `DEFER — EVIDENCED`; Phase 12 hardening/package/publication is independently actionable
 - Runtime state: no game or deployment lock; all four final Phase 11 transactions restored exactly; no save accessed
 - Unrestored external state: none
@@ -20,4 +20,4 @@ Status: IN PROGRESS
 - Final native-only runs before identity hardening: `20260811T2236376737183Z-native-buff-catalog` and `20260811T2237377143159Z-native-buff-catalog`; 10/10 each; byte-identical catalog/Harmony hashes; exact restoration
 - Identity-hardened Call of the Wild runs: `20260811T2241040368066Z-native-buff-catalog` and `20260811T2242392501436Z-native-buff-catalog`, 26/26 each, byte-identical catalog/Harmony hashes, exact restoration
 - Identity-hardened native-only runs: `20260811T2244134771182Z-native-buff-catalog` and `20260811T2245180617144Z-native-buff-catalog`, 12/12 each, byte-identical catalog/Harmony hashes, exact restoration
-- Exact next command: finish and commit Phase 11 reports, then audit Phase 12 requirements and implement the guarded push helper/package/final predetermined core-run workflow
+- Exact next command: commit Phase 12 tooling/docs, run the guarded push helper WhatIf from clean HEAD, build the deterministic release ZIP, then complete the final requirement audit and fresh-process core repetitions

@@ -2,64 +2,29 @@
 
 Standalone Unity Mod Manager mod for **Pathfinder: Kingmaker Enhanced Plus Edition 2.1.7b**.
 
-The project will provide a BubbleBuffs-style interface for discovering, configuring, planning, and applying party buffs while preserving Kingmaker's real targeting, spell-slot, resource, duration, and material-component semantics.
+Kingmaker Buff Planner provides a BubbleBuffs-style workflow for discovering, configuring, planning, and applying party buffs while preserving Kingmaker targeting, spell-slot, resource, duration, and material-component semantics. It is an independent product with assembly, namespace, UMM ID, profiles, packaging, and runtime automation owned by this repository.
+
+## Install and use
+
+Extract the validated release ZIP into Kingmaker's `Mods` directory, producing `Mods\KingmakerBuffPlanner\Info.json`. Load a campaign, then press F10 or use the lower-left `Buff Planner (F10)` button. Configure Long, Important, and Short routines in the setup window and preview resource/target diagnostics before running them.
+
+Detailed instructions and qualification boundaries are in [Installation and Use](docs/INSTALLATION-AND-USE.md), [Qualification](docs/QUALIFICATION.md), and [Manual Acceptance](docs/MANUAL-ACCEPTANCE.md).
 
 ## Product boundary
 
-This repository is completely independent from Kingmaker Gunslinger and the broader Tabletop Added Rules mod. It must not compile against them, share their UMM identity, or make them runtime dependencies.
+This repository is completely independent from Kingmaker Gunslinger and Tabletop Added Rules. It does not compile against or require them. Call of the Wild and other gameplay mods are optional, read-only compatibility inputs discovered after load; no third-party mod payload is bundled.
 
-Optional compatibility is dynamic and fail-soft: ordinary Kingmaker blueprint/action patterns from Call of the Wild, Tabletop Added Rules, and other mods should be discovered structurally after those mods load; exceptional custom mechanics may receive isolated adapters or versioned GUID overrides.
+Profiles live under the mod's `UserSettings` directory and are not written into Kingmaker saves. Removing the standalone mod does not create a save dependency.
 
-## Expected desktop lab
+## Build and qualification
 
-```text
-C:\Dev\KingmakerBuffPlannerLab
+The project targets .NET Framework 4.7 and C# 7.3 against exact locally installed Kingmaker/Unity/UMM references with Copy Local disabled.
+
+```powershell
+.\scripts\Test-SourceOnly.ps1
+.\scripts\Build-Release.ps1
 ```
 
-Expected checkout:
+Runtime qualification may be launched only through the project-owned guarded harness documented in [Windows Autonomous Runtime Testing](docs/WINDOWS-AUTONOMOUS-RUNTIME-TESTING.md). Never deploy by directly replacing the live `Mods` tree.
 
-```text
-C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner
-```
-
-Read before substantive work:
-
-```text
-AGENTS.md
-planning/CODEX-KINGMAKER-BUFF-PLANNER-AUTONOMOUS-MISSION.md
-docs/KINGMAKER-BUFF-PLANNER-DESKTOP-SETUP.md
-```
-
-## Public repository versus private transfer
-
-This repository contains only public-safe project instructions, templates, and transfer tooling.
-
-Do **not** commit:
-
-- installed game or Unity DLLs;
-- Unity Mod Manager binaries;
-- third-party mod packages or compiled mod DLLs;
-- saves;
-- credentials or Codex authentication data;
-- machine-local paths and environment fingerprints;
-- runtime evidence or backups.
-
-Use these scripts instead:
-
-```text
-scripts/New-KingmakerBuffPlannerPrivateTransfer.ps1
-scripts/Import-KingmakerBuffPlannerPrivateTransfer.ps1
-scripts/Initialize-KingmakerBuffPlannerDesktopCheckout.ps1
-```
-
-The laptop exporter creates a SHA-256-manifested private ZIP. The desktop importer verifies every file before placing immutable references beneath the standalone lab.
-
-## Development branch
-
-Codex development belongs on:
-
-```text
-codex/kingmaker-buff-planner
-```
-
-No merge to `main` and no public release should occur autonomously.
+Development remains on `codex/kingmaker-buff-planner`. Do not merge to `main` or publish a public release without separate authorization.

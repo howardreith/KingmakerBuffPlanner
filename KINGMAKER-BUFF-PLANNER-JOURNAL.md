@@ -290,3 +290,16 @@ Status: PASS for every locally available no-save profile; unavailable and save-b
 - Tabletop Added Rules and combined profiles: `UNAVAILABLE-LOCAL-REFERENCE`; Shield Other: `FEATURE-NOT-PRESENT-IN-SNAPSHOT`; no external download or unrelated-project mutation
 - Save-backed optional planning/execution remains `DEFER — EVIDENCED`, not PASS, because no authorized `KBP_` fixture exists
 - Exact next action: commit reports and proceed through Phase 12 hardening, deterministic final packaging, final core repetitions, guarded branch publication, and handoff
+
+## 2026-08-11 — Phase 12 release and publication tooling
+
+Status: implementation/source PASS; clean-head execution pending checkpoint commit
+
+- Added lab-local `codex-policy/Push-KingmakerBuffPlanner.ps1` with exact root, branch, clean-tree, unresolved-operation, single expected origin, prohibited payload, potential secret, size, current-branch-only push, and post-push SHA equality guards
+- Added repository test `scripts/Test-GuardedPush.ps1`; its real WhatIf requires a clean tree and will run after this checkpoint
+- Added `scripts/Build-Release.ps1`: clean-tree requirement, two deterministic local builds, package/DLL equality, release copy, allowlist validation, local-only manifest, and draft-notes copy
+- Replaced future-tense README and added installation/use plus local-only draft release notes; no public release action is authorized or implemented
+- PowerShell parser: 3/3 scripts zero errors; source suite: validation 15/15, behavior/protocol 51/51, transaction 6/6, package 4/4, deployment purity 5/5
+- Rejected shortcut: direct `git push`; all publication must pass the lab-local project-specific helper
+- External state: no game or deployment lock; no save accessed; no live mod mutation
+- Exact next action: commit tooling/docs, run guarded-push WhatIf, produce and validate the deterministic clean-head release ZIP, then audit and execute final runtime gates
