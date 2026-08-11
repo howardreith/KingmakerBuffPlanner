@@ -41,8 +41,11 @@ namespace KingmakerBuffPlanner.GameAdapters
                 AbilityEffectStickyTouch sticky = ability.GetComponent<AbilityEffectStickyTouch>();
                 if (sticky != null && sticky.TouchDeliveryAbility != null)
                     children.Add(Reference(sticky.TouchDeliveryAbility, "AbilityEffectStickyTouch"));
-                AbilityEffectRunAction run = ability.GetComponent<AbilityEffectRunAction>();
-                if (run != null) children.Add(AdaptList(run.Actions));
+                else
+                {
+                    AbilityEffectRunAction run = ability.GetComponent<AbilityEffectRunAction>();
+                    if (run != null) children.Add(AdaptList(run.Actions));
+                }
                 BlueprintAbility[] variants = ability.Variants;
                 if (variants != null)
                 {
