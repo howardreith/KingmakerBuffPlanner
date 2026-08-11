@@ -97,12 +97,15 @@ function New-KbpRuntimeRequest {
     param(
         [string]$RunId, [string]$EvidenceDirectory, $BuildManifest,
         [int]$TimeoutSeconds, [bool]$ExitAfterCompletion,
+        [ValidateSet('native-only', 'call-of-the-wild')][string]$ProfileId = 'native-only',
+        [object[]]$ExpectedOptionalMods = @(), [string[]]$ExpectedBlueprintGuids = @(),
         [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke')][string]$Scenario = 'mod-load-smoke')
     return [ordered]@{
         schemaVersion = 1
         enabled = $true
         runId = $RunId
         scenario = $Scenario
+        profileId = $ProfileId
         expectedModVersion = [string]$BuildManifest.version
         expectedCommit = [string]$BuildManifest.commit
         evidenceDirectory = $EvidenceDirectory
@@ -110,6 +113,8 @@ function New-KbpRuntimeRequest {
         expectedDllSha256 = [string]$BuildManifest.dllSha256
         timeoutSeconds = $TimeoutSeconds
         exitAfterCompletion = $ExitAfterCompletion
+        expectedOptionalMods = @($ExpectedOptionalMods)
+        expectedBlueprintGuids = @($ExpectedBlueprintGuids)
         parameters = [ordered]@{}
     }
 }
@@ -133,6 +138,7 @@ function Assert-KbpRuntimeResult {
         schemaVersion = [pscustomobject]@{ expected = 1; observed = $Result.schemaVersion }
         runId = [pscustomobject]@{ expected = $Request.runId; observed = $Result.runId }
         scenario = [pscustomobject]@{ expected = $Request.scenario; observed = $Result.scenario }
+        profileId = [pscustomobject]@{ expected = $Request.profileId; observed = $Result.profileId }
         loadedModId = [pscustomobject]@{ expected = 'KingmakerBuffPlanner'; observed = $Result.loadedModId }
         loadedModVersion = [pscustomobject]@{ expected = $BuildManifest.version; observed = $Result.loadedModVersion }
         commit = [pscustomobject]@{ expected = $BuildManifest.commit; observed = $Result.commit }
@@ -154,6 +160,9 @@ function Assert-KbpRuntimeResult {
     if ($mismatches.Count -ne 0) { throw "Runtime result identity/hash mismatch: $($mismatches -join '; ')" }
     if ($Result.status -notin @('PASS', 'FAIL', 'BLOCKED')) { throw 'Runtime result status is invalid.' }
     if (@($Result.assertions).Count -lt 5) { throw 'Runtime result assertion list is incomplete.' }
+    if ([int]$Result.optionalLoadedAssemblyCount -ne @($Request.expectedOptionalMods).Count) {
+        throw 'Loaded optional assembly count does not match the requested profile.'
+    }
     if ($Request.scenario -ceq 'native-buff-catalog') {
         $catalogPath = Join-Path $Request.evidenceDirectory 'native-buff-catalog.json'
         if (-not (Test-Path -LiteralPath $catalogPath -PathType Leaf)) { throw 'Native catalog evidence is missing.' }
@@ -161,6 +170,7 @@ function Assert-KbpRuntimeResult {
         if ([int]$Result.catalogAbilityCount -le 0) { throw 'Native catalog is empty.' }
         $catalog = Read-KbpJson $catalogPath
         if ([int]$catalog.schemaVersion -ne 4 -or
+            [string]$catalog.profile -cne [string]$Request.profileId -or
             [int]$catalog.abilityCount -ne [int]$Result.catalogAbilityCount -or
             @($catalog.abilities).Count -ne [int]$catalog.abilityCount) {
             throw 'Native catalog JSON contract does not reconcile with the runtime result.'
@@ -169,6 +179,25 @@ function Assert-KbpRuntimeResult {
             [string]::IsNullOrWhiteSpace([string]$_.expression.expressionType)
         })
         if ($missingExpressions.Count -ne 0) { throw 'Native catalog contains expressions without discriminators.' }
+        if ($Request.profileId -ceq 'call-of-the-wild') {
+            if ([int]$Result.catalogOptionalAbilityCount -le 0 -or
+                [int]$Result.catalogOptionalCandidateCount -le 0 -or
+                [int]$Result.catalogOptionalIncludedCount -le 0 -or
+                [int]$Result.catalogOptionalUnsupportedCount -ne 0 -or
+                [int]$catalog.optionalAbilityCount -ne [int]$Result.catalogOptionalAbilityCount -or
+                [int]$catalog.optionalCandidateCount -ne [int]$Result.catalogOptionalCandidateCount -or
+                [int]$catalog.optionalIncludedCount -ne [int]$Result.catalogOptionalIncludedCount -or
+                [int]$catalog.optionalUnsupportedCount -ne [int]$Result.catalogOptionalUnsupportedCount) {
+                throw 'Call of the Wild catalog ownership/support counts are invalid.'
+            }
+            foreach ($guid in @($Request.expectedBlueprintGuids)) {
+                $matches = @($catalog.abilities | Where-Object {
+                    $_.abilityGuid -ceq $guid -and $_.ownership -ceq 'call-of-the-wild' -and
+                    $_.disposition -ceq 'include'
+                })
+                if ($matches.Count -ne 1) { throw "Expected optional blueprint is not uniquely included: $guid" }
+            }
+        }
     }
     if ($Request.scenario -ceq 'ui-root-smoke') {
         if ([int]$Result.uiRootCount -ne 1 -or [int]$Result.uiRenderedOpenFrames -le 0 -or

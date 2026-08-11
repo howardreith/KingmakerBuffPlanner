@@ -74,3 +74,12 @@ Phase 10 executable routine workflow and first no-save HUD smoke PASS; final Pha
 - transaction: `Restored`, `restorationVerified=true`, no save selected or mutated.
 
 This proves the no-save HUD controls render and fit at one representative resolution. It is smoke 1/2, not the Phase 10 gate: remaining setup polish, common scale/resolution rows, transition/reload subscription evidence, and configured campaign execution require further work or the authorized `KBP_` fixture.
+
+Phase 10 final no-save HUD gate PASS twice:
+
+| Run ID | Assertions | Root/reconstruction | Layout profiles | Blockers/subscriptions | Restoration |
+|---|---:|---|---:|---|---|
+| `20260811T2201533093853Z-ui-root-smoke` | 15/15 | 1 / 1 | 3/3 | 0 / 0 | exact PASS |
+| `20260811T2202528930958Z-ui-root-smoke` | 15/15 | 1 / 1 | 3/3 | 0 / 0 | exact PASS |
+
+Both runs used commit `cfce05c921735c33617342e9b409eeae556a16f9`, package SHA-256 `c2aaac56568366e275302650dbaecd15d984158b5af4f98a670bd90b478937ba`, and DLL SHA-256 `961ac1a3b2c5f9194fb67413e12ba0c5e034ff2d11f2e240f16d1d02cf4e75f6`. Each rendered 12 frames across two cycles, destroyed/reconstructed the owned root once, ended with one root, exposed all three routines, and validated layout bounds for 1920x1080 at 1.0, 2560x1440 at 1.25, and 3840x2160 at 1.5. Actual process resolution was 2560x1440. No save was selected. Configured campaign execution remains `DEFER — EVIDENCED`, not PASS.

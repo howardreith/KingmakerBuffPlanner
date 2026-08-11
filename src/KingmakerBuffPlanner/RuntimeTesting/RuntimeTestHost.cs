@@ -89,8 +89,12 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 if (dllMatches && string.Equals(
                     _request.Scenario, "native-buff-catalog", StringComparison.Ordinal))
                 {
+                    string modsPath = Path.GetDirectoryName(_modEntry.Path.TrimEnd(
+                        Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
                     catalog = new NativeCatalogExporter(EffectOverrideRegistry.Load(
-                        Path.Combine(_modEntry.Path, "NativeEffectOverrides.json"))).Export();
+                        Path.Combine(_modEntry.Path, "NativeEffectOverrides.json")),
+                        _request.ProfileId,
+                        BlueprintOwnershipIndex.Load(modsPath, _request.ProfileId)).Export();
                     catalogPath = Path.Combine(_request.EvidenceDirectory, "native-buff-catalog.json");
                     string catalogJson = Serialize(catalog);
                     JObject catalogDocument = JObject.Parse(catalogJson);
@@ -115,6 +119,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     SchemaVersion = 1,
                     RunId = _request.RunId,
                     Scenario = _request.Scenario,
+                    ProfileId = _request.ProfileId,
                     Status = dllMatches ? "PASS" : "FAIL",
                     Stage = dllMatches ? "completed" : "identity-validation",
                     LoadedModId = _modEntry.Info.Id,
@@ -137,6 +142,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     CatalogCandidateCount = catalog == null ? 0 : catalog.CandidateCount,
                     CatalogDetectedEffectCount = catalog == null ? 0 : catalog.DetectedEffectCount,
                     CatalogDiagnosticAbilityCount = catalog == null ? 0 : catalog.DiagnosticAbilityCount,
+                    CatalogOptionalAbilityCount = catalog == null ? 0 : catalog.OptionalAbilityCount,
+                    CatalogOptionalCandidateCount = catalog == null ? 0 : catalog.OptionalCandidateCount,
+                    CatalogOptionalIncludedCount = catalog == null ? 0 : catalog.OptionalIncludedCount,
+                    CatalogOptionalUnsupportedCount = catalog == null ? 0 : catalog.OptionalUnsupportedCount,
                     UiRootCount = ui == null ? 0 : ui.RootCount,
                     UiRenderedOpenFrames = ui == null ? 0 : ui.RenderedOpenFrames,
                     UiOpenCloseCycles = ui == null ? 0 : ui.OpenCloseCycles,
@@ -159,6 +168,43 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                             : RuntimeTestAssertion.Fail("dll-sha256", _request.ExpectedDllSha256, dllHash)
                     }
                 };
+                int loadedOptionalAssemblies = 0;
+                bool optionalIdentityFailed = false;
+                foreach (RuntimeExpectedOptionalMod expected in _request.ExpectedOptionalMods)
+                {
+                    string expectedAssemblyName = Path.GetFileNameWithoutExtension(expected.AssemblyName);
+                    Assembly loaded = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(a =>
+                        string.Equals(a.GetName().Name, expectedAssemblyName, StringComparison.Ordinal));
+                    if (loaded == null)
+                    {
+                        optionalIdentityFailed = true;
+                        result.Assertions.Add(RuntimeTestAssertion.Fail(
+                            "optional-assembly-loaded:" + expected.UmmId, expectedAssemblyName, "missing"));
+                        continue;
+                    }
+                    loadedOptionalAssemblies++;
+                    string loadedHash = Hashing.Sha256(loaded.Location);
+                    result.Assertions.Add(RuntimeTestAssertion.Pass(
+                        "optional-assembly-loaded:" + expected.UmmId, expectedAssemblyName,
+                        loaded.GetName().Name));
+                    if (string.Equals(loadedHash, expected.AssemblySha256, StringComparison.Ordinal))
+                        result.Assertions.Add(RuntimeTestAssertion.Pass(
+                            "optional-assembly-sha256:" + expected.UmmId,
+                            expected.AssemblySha256, loadedHash));
+                    else
+                    {
+                        optionalIdentityFailed = true;
+                        result.Assertions.Add(RuntimeTestAssertion.Fail(
+                            "optional-assembly-sha256:" + expected.UmmId,
+                            expected.AssemblySha256, loadedHash));
+                    }
+                }
+                result.OptionalLoadedAssemblyCount = loadedOptionalAssemblies;
+                if (optionalIdentityFailed)
+                {
+                    result.Status = "FAIL";
+                    result.Stage = "optional-identity-validation";
+                }
                 if (catalog != null)
                 {
                     result.Assertions.Add(RuntimeTestAssertion.Pass(
@@ -174,6 +220,36 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     {
                         result.Status = "FAIL";
                         result.Stage = "catalog-validation";
+                    }
+                    if (_request.ProfileId == "call-of-the-wild")
+                    {
+                        AddPositiveAssertion(result, "optional-abilities", catalog.OptionalAbilityCount);
+                        AddPositiveAssertion(result, "optional-candidates", catalog.OptionalCandidateCount);
+                        AddPositiveAssertion(result, "optional-included", catalog.OptionalIncludedCount);
+                        result.Assertions.Add(catalog.OptionalUnsupportedCount == 0
+                            ? RuntimeTestAssertion.Pass("optional-unsupported", "0", "0")
+                            : RuntimeTestAssertion.Fail("optional-unsupported", "0",
+                                catalog.OptionalUnsupportedCount.ToString()));
+                        bool expectedMissing = false;
+                        foreach (string guid in _request.ExpectedBlueprintGuids)
+                        {
+                            NativeCatalogEntry entry = catalog.Abilities.FirstOrDefault(a =>
+                                a.AbilityGuid == guid && a.Ownership == "call-of-the-wild" &&
+                                a.Disposition == "include");
+                            if (entry == null) expectedMissing = true;
+                            result.Assertions.Add(entry == null
+                                ? RuntimeTestAssertion.Fail("optional-blueprint:" + guid,
+                                    "owned-and-included", "missing-or-not-included")
+                                : RuntimeTestAssertion.Pass("optional-blueprint:" + guid,
+                                    "owned-and-included", entry.InternalName));
+                        }
+                        if (catalog.OptionalAbilityCount == 0 || catalog.OptionalCandidateCount == 0 ||
+                            catalog.OptionalIncludedCount == 0 || catalog.OptionalUnsupportedCount != 0 ||
+                            expectedMissing)
+                        {
+                            result.Status = "FAIL";
+                            result.Stage = "optional-catalog-validation";
+                        }
                     }
                 }
                 if (ui != null)
@@ -290,6 +366,14 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     Converters = new List<JsonConverter> { new Newtonsoft.Json.Converters.StringEnumConverter() }
                 }) + Environment.NewLine;
         }
+
+        private static void AddPositiveAssertion(
+            RuntimeTestResult result, string id, int value)
+        {
+            result.Assertions.Add(value > 0
+                ? RuntimeTestAssertion.Pass(id, ">0", value.ToString())
+                : RuntimeTestAssertion.Fail(id, ">0", "0"));
+        }
     }
 
     internal sealed class RuntimeTestResult
@@ -297,6 +381,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         [JsonProperty("schemaVersion", Order = 1)] public int SchemaVersion { get; set; }
         [JsonProperty("runId", Order = 2)] public string RunId { get; set; }
         [JsonProperty("scenario", Order = 3)] public string Scenario { get; set; }
+        [JsonProperty("profileId", Order = 100)] public string ProfileId { get; set; }
         [JsonProperty("status", Order = 4)] public string Status { get; set; }
         [JsonProperty("stage", Order = 5)] public string Stage { get; set; }
         [JsonProperty("loadedModId", Order = 6)] public string LoadedModId { get; set; }
@@ -332,6 +417,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         [JsonProperty("uiFullScreenBlockerCount", Order = 36)] public int UiFullScreenBlockerCount { get; set; }
         [JsonProperty("uiEventSubscriptionCount", Order = 37)] public int UiEventSubscriptionCount { get; set; }
         [JsonProperty("uiReconstructionCount", Order = 38)] public int UiReconstructionCount { get; set; }
+        [JsonProperty("catalogOptionalAbilityCount", Order = 39)] public int CatalogOptionalAbilityCount { get; set; }
+        [JsonProperty("catalogOptionalCandidateCount", Order = 40)] public int CatalogOptionalCandidateCount { get; set; }
+        [JsonProperty("catalogOptionalIncludedCount", Order = 41)] public int CatalogOptionalIncludedCount { get; set; }
+        [JsonProperty("catalogOptionalUnsupportedCount", Order = 42)] public int CatalogOptionalUnsupportedCount { get; set; }
+        [JsonProperty("optionalLoadedAssemblyCount", Order = 43)] public int OptionalLoadedAssemblyCount { get; set; }
     }
 
     internal sealed class RuntimeTestAssertion

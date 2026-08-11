@@ -3,13 +3,15 @@
 Status: IN PROGRESS
 
 - Repository/branch: standalone Kingmaker Buff Planner / `codex/kingmaker-buff-planner`
-- Current commit: `420d7a1f1f20f49706a34d953df5f0d39f67e4a8` (`Assert routine HUD controls in runtime smoke`)
+- Current commit: `cfce05c921735c33617342e9b409eeae556a16f9` (`Exercise UI reconstruction in runtime smoke`)
 - Active version: 0.0.1
 - Last fully runtime-qualified no-save gate: Phase 9 deterministic native classification catalog
-- Additional runtime proof: Phase 10 HUD smoke 1/2 PASS at 2560x1440, run `20260811T2144351145396Z-ui-root-smoke`, 11/11 assertions
-- Last source-qualified checkpoint: executable routine workflow and HUD composition, 45/45 tests
-- Current worktree: durable-record edits pending after clean runtime commit `420d7a1`
-- Current hypothesis/failure: save-backed provider/planner/persistence/executor/UI gates need a project-owned `KBP_` fixture; Phase 10 HUD/runtime composition and Call of the Wild compatibility remain independently actionable
+- Additional runtime proof: Phase 10 HUD gate PASS twice, runs `20260811T2201533093853Z-ui-root-smoke` and `20260811T2202528930958Z-ui-root-smoke`, each 15/15
+- Last source-qualified checkpoint: polished UI, shared routine planning, and hybrid fallback execution, 46/46 tests
+- Current worktree: Phase 11 exact compatibility-profile, transactional staging, request/result identity, and blueprint-ownership checkpoint pending after clean runtime commit `cfce05c`
+- Current hypothesis/failure: save-backed provider/planner/persistence/executor/UI gates need a project-owned `KBP_` fixture; Call of the Wild generic discovery is independently actionable and its representative blueprint expectations must be derived from guarded runtime evidence
 - Runtime state: no game or lock; HUD transaction restored exactly; no save accessed
 - Unrestored external state: none
-- Exact next command: finish Phase 10 setup filters/sorting/provider-resource detail/unsupported-fallback/reset behavior, run source gates, then rebuild and repeat guarded no-save HUD qualification
+- Source checkpoint: validation 15/15, behavior/protocol 48/48, runtime transaction 6/6, deployment WhatIf 5/5, package 4/4; build DLL SHA-256 `cca60485e0dc4d93467def15aef43eafe23140bcd1a73a79fce726aa49a3096c`
+- Exact local Call of the Wild fixture: `1.14.4c-2.1`, 266 files, 66,201,967 bytes, directory manifest SHA-256 `26ce134fda9a6421519959d9cc9c3f8c5d4cf3288f48ba7f768df47c7704541a`
+- Exact next command: commit the Phase 11 compatibility foundation, rebuild/package the exact commit, then run `scripts/Invoke-KingmakerRuntimeTest.ps1 -Scenario native-buff-catalog -CompatibilityProfileId call-of-the-wild -TimeoutSeconds 300`

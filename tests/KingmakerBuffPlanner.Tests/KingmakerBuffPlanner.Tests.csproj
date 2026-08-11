@@ -31,6 +31,7 @@
     <Compile Include="Program.cs" />
     <Compile Include="TestBuildInfo.cs" />
     <Compile Include="..\..\src\KingmakerBuffPlanner\Discovery\ActionGraphScanner.cs"><Link>Discovery\ActionGraphScanner.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Discovery\BlueprintOwnershipIndex.cs"><Link>Discovery\BlueprintOwnershipIndex.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Discovery\DiscoveryNode.cs"><Link>Discovery\DiscoveryNode.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Discovery\EffectOverrideRegistry.cs"><Link>Discovery\EffectOverrideRegistry.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Discovery\NativeCandidateClassifier.cs"><Link>Discovery\NativeCandidateClassifier.cs</Link></Compile>

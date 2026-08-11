@@ -196,3 +196,34 @@ Status: source behavior PASS; no-save HUD smoke 1/2 PASS; full Phase 10 gate IN 
 - Transaction: `Restored`, `restorationVerified=true`; exact original whole `Mods` manifest restored; no save selected or modified
 - Qualification boundary: this is the first of two required HUD smokes and one resolution. Campaign interaction, other required resolutions/scales, setup polish gaps, and save-backed routine execution remain open
 - Exact next action: complete setup filters/sorting/provider-resource/unsupported-fallback detail and reset affordance, then repeat clean no-save HUD smokes
+
+## 2026-08-11 — Phase 10 final no-save HUD qualification
+
+Status: PASS for the mission-defined no-save gate; configured save-backed execution DEFER — EVIDENCED
+
+- Branch/runtime source: `codex/kingmaker-buff-planner` at `cfce05c921735c33617342e9b409eeae556a16f9`
+- Source suite: validation 15/15, behavior 46/46, harness 5/5, WhatIf purity 5/5, package 4/4
+- UI completion: configured/unconfigured, duration, hidden, and source-category filters; name/level sorting; localized description/duration; unsupported saved-source display; provider caster level, remaining casts, pool and rejection reason; unfulfilled target states; bounded clear confirmation; pre/post result panels
+- Instant fallback completion: sticky-touch providers are marked per step; hybrid executor uses animated fallback when allowed and fails before fire/spend when blocked
+- Runtime PASS 1: `20260811T2201533093853Z-ui-root-smoke`, 15/15 assertions
+- Runtime PASS 2: `20260811T2202528930958Z-ui-root-smoke`, 15/15 assertions
+- Both: one final root after one forced reconstruction, two open cycles, 12 rendered frames, 3 HUD routines, 3 layout profiles (1920x1080@1.0, 2560x1440@1.25, 3840x2160@1.5), zero full-screen blockers, zero event subscriptions, actual 2560x1440 process
+- Package/DLL: `c2aaac56568366e275302650dbaecd15d984158b5af4f98a670bd90b478937ba` / `961ac1a3b2c5f9194fb67413e12ba0c5e034ff2d11f2e240f16d1d02cf4e75f6`
+- Both transactions: `Restored`, `restorationVerified=true`; no save selected or modified
+- Qualification boundary: source behavior and no-save Phase 10 gate PASS. Configured routine firing/effects/resources remain deferred to the missing project-owned `KBP_` fixture
+- Exact next action: Phase 11 exact optional-mod manifests and generic discovery profiling, beginning with locally installed Call of the Wild
+
+## 2026-08-11 — Phase 11 compatibility foundation
+
+Status: source and guarded-staging contracts PASS; Call of the Wild runtime catalog pending
+
+- Branch/base HEAD: `codex/kingmaker-buff-planner` at `cfce05c921735c33617342e9b409eeae556a16f9`
+- Added strict schema-1 profiles for native-only, Call of the Wild, Tabletop Added Rules, and combined configurations; unavailable local references fail closed instead of fabricating support
+- Exact Call of the Wild fixture: version `1.14.4c-2.1`; 266 files; 66,201,967 bytes; full directory manifest SHA-256 `26ce134fda9a6421519959d9cc9c3f8c5d4cf3288f48ba7f768df47c7704541a`; DLL SHA-256 `4ebf8e1ed3e66ffed72ea33ea325595629423dacd5bffa23e3c9109144b26915`
+- Transactional harness now verifies the read-only fixture, copies it into transaction-owned staging, re-verifies the staged copy, activates the complete staged tree, and restores the original whole `Mods` tree exactly in `finally`
+- Runtime protocol binds profile ID, exact optional assembly expectations, and representative blueprint GUID expectations; results expose profile, assembly, and optional catalog counts
+- Blueprint ownership is derived from the exact staged Call of the Wild `loaded_blueprints.txt` inventory without a compile-time gameplay-mod dependency
+- Gates: source validation 15/15; protocol/domain 48/48; runtime transaction 6/6; deployment WhatIf 5/5; package validation 4/4; production build 1/1
+- Rejected shortcut: treating the optional assembly loading as proof that its abilities were discovered or classified
+- External state: no game, lock, transaction, live mod, or save mutation
+- Exact next action: commit this foundation, build/package that commit, and run the guarded Call of the Wild structural catalog to derive representative blueprint assertions and audit every optional unsupported row

@@ -15,7 +15,7 @@ Status: TODO
 | 7 | animated-execution | KBP working fixture | real command/effect/spend | DEFER — EVIDENCED |
 | 8 | instant prepared/spontaneous | KBP working fixture | effect and exact spend | DEFER — EVIDENCED |
 | 8 | mass-single-cost | KBP working fixture | one source cost, multi-target effects | DEFER — EVIDENCED |
-| 10 | ui-routine-buttons-smoke (two fresh processes) | NO-SAVE | three HUD controls, fit, lifecycle | PASS 1/2 at 2560x1440 (`20260811T2144351145396Z`) |
+| 10 | ui-routine-buttons-smoke (two fresh processes) | NO-SAVE | three HUD controls, fit, reconstruction lifecycle | PASS twice (`20260811T2201533093853Z`, `20260811T2202528930958Z`) |
 | 10 | configured-routine execution | KBP working fixture | preview, real execution, result panel | DEFER — EVIDENCED |
 | 11 | native-only profile | KBP working fixture | full core suite | DEFER — EVIDENCED |
 | 11 | Call of the Wild profile | KBP working fixture | exact fixture hash and dynamic discovery | DEFER — EVIDENCED |

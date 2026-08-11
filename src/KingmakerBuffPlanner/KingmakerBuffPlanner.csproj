@@ -65,6 +65,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Discovery\ActionGraphScanner.cs" />
+    <Compile Include="Discovery\BlueprintOwnershipIndex.cs" />
     <Compile Include="Discovery\DiscoveryNode.cs" />
     <Compile Include="Discovery\EffectOverrideRegistry.cs" />
     <Compile Include="Discovery\NativeAccessibilityIndex.cs" />

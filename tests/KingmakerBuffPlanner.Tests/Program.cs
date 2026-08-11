@@ -41,6 +41,7 @@ namespace KingmakerBuffPlanner.Tests
                 Run("unknown-member-rejected", () => TestMutation(root, "unknown-member", AddUnknownMember));
                 Run("duplicate-member-rejected", () => TestDuplicateMember(root));
                 Run("wrong-scenario-rejected", () => TestMutation(root, "wrong-scenario", o => o["scenario"] = "unknown"));
+                Run("wrong-profile-rejected", () => TestMutation(root, "wrong-profile", o => o["profileId"] = "unknown"));
                 Run("wrong-version-rejected", () => TestMutation(root, "wrong-version", o => o["expectedModVersion"] = "9.9.9"));
                 Run("wrong-commit-rejected", () => TestMutation(root, "wrong-commit", o => o["expectedCommit"] = "WRONG"));
                 Run("invalid-hash-rejected", () => TestMutation(root, "invalid-hash", o => o["expectedDllSha256"] = "not-a-hash"));
@@ -54,6 +55,7 @@ namespace KingmakerBuffPlanner.Tests
                 Run("scanner-reports-unknown-node", TestScannerUnknown);
                 Run("scanner-expression-wire-contract", TestScannerExpressionWireContract);
                 Run("native-candidate-classification-is-structural", TestNativeCandidateClassification);
+                Run("optional-blueprint-ownership-is-exact", TestBlueprintOwnership);
                 Run("effect-overrides-are-versioned-and-branch-preserving", TestEffectOverrides);
                 Run("stable-keys-distinguish-variants-and-metamagic", TestStableKeys);
                 Run("spontaneous-providers-share-one-pool", TestSpontaneousSharedPool);
@@ -170,6 +172,26 @@ namespace KingmakerBuffPlanner.Tests
                 !json.Contains("\"effectId\":\"wire-buff\"") ||
                 !json.Contains("\"actionPath\":\"wire-buff\""))
                 throw new InvalidOperationException("Effect expression JSON contract is incomplete: " + json);
+        }
+
+        private static void TestBlueprintOwnership()
+        {
+            const string optionalGuid = "0123456789abcdef0123456789abcdef";
+            BlueprintOwnershipIndex index = BlueprintOwnershipIndex.Parse(new[]
+            {
+                "OptionalAbility\t" + optionalGuid + "\tKingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility",
+                "malformed",
+                "Uppercase\t0123456789ABCDEF0123456789ABCDEF\tType"
+            });
+            if (index.GetOwnership(optionalGuid) != "call-of-the-wild" ||
+                index.GetOwnership("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") != "native")
+                throw new InvalidOperationException("Optional ownership inventory lost exact GUID identity.");
+            try
+            {
+                BlueprintOwnershipIndex.Parse(new[] { "malformed" });
+                throw new InvalidOperationException("Empty optional ownership inventory was accepted.");
+            }
+            catch (InvalidDataException) { }
         }
 
         private static void TestNativeCandidateClassification()
@@ -1164,6 +1186,7 @@ namespace KingmakerBuffPlanner.Tests
                 { "enabled", true },
                 { "runId", runId },
                 { "scenario", "mod-load-smoke" },
+                { "profileId", "native-only" },
                 { "expectedModVersion", "0.0.1" },
                 { "expectedCommit", "TEST-COMMIT" },
                 { "evidenceDirectory", root },
@@ -1171,6 +1194,8 @@ namespace KingmakerBuffPlanner.Tests
                 { "expectedDllSha256", new string('b', 64) },
                 { "timeoutSeconds", 30 },
                 { "exitAfterCompletion", false },
+                { "expectedOptionalMods", new object[0] },
+                { "expectedBlueprintGuids", new string[0] },
                 { "parameters", new Dictionary<string, object>() }
             };
         }

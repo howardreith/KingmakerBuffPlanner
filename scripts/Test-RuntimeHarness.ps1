@@ -90,6 +90,45 @@ try {
     }
     Remove-Item -LiteralPath (Join-Path $stateRoot 'deployment.lock') -Force
     $passed++
+
+    $game = Join-Path $root 'game-compatibility'
+    $fixtureMod = Join-Path $game 'Mods\FixtureOptional'
+    New-Item -ItemType Directory -Path (Join-Path $fixtureMod 'data') -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $game 'Kingmaker.exe') -Value 'fixture' -Encoding Ascii
+    Set-Content -LiteralPath (Join-Path $fixtureMod 'info.json') `
+        -Value '{"Id":"FixtureOptional","Version":"1.0"}' -Encoding Ascii
+    Set-Content -LiteralPath (Join-Path $fixtureMod 'FixtureOptional.dll') -Value 'assembly' -Encoding Ascii
+    Set-Content -LiteralPath (Join-Path $fixtureMod 'data\value.txt') -Value 'exact' -Encoding Ascii
+    $identity = Get-KbpDirectoryContentIdentity $fixtureMod
+    $profile = [pscustomobject]@{
+        profileId = 'fixture-compatibility'
+        mods = @([pscustomobject]@{
+            ummId = 'FixtureOptional'; directoryName = 'FixtureOptional'; version = '1.0'
+            assemblyName = 'FixtureOptional.dll'
+            infoSha256 = Get-KbpSha256 (Join-Path $fixtureMod 'info.json')
+            assemblySha256 = Get-KbpSha256 (Join-Path $fixtureMod 'FixtureOptional.dll')
+            directoryManifestSha256 = $identity.directoryManifestSha256
+            fileCount = $identity.fileCount; totalBytes = $identity.totalBytes
+        })
+    }
+    $before = @(Get-KbpDirectoryManifest (Join-Path $game 'Mods'))
+    $statePath = Enter-KbpRuntimeTransaction -PackagePath $package -KingmakerInstallDir $game `
+        -StateRoot $stateRoot -StagingRoot $stagingRoot -BackupRoot $backupRoot `
+        -RunId 'compatibility' -FixtureMode -KnownKingmakerProcessIds @() `
+        -CompatibilityProfile $profile
+    $active = Read-KbpJson $statePath
+    if (-not (Test-Path -LiteralPath (Join-Path $game 'Mods\FixtureOptional\data\value.txt')) -or
+        $active.compatibilityProfileId -cne 'fixture-compatibility' -or
+        @($active.compatibilityMods).Count -ne 1) {
+        throw 'Exact optional fixture was not staged or recorded.'
+    }
+    $restored = Restore-KbpRuntimeTransaction -RunId 'compatibility' -StateRoot $stateRoot `
+        -FixtureMode -KnownKingmakerProcessIds @()
+    if (-not $restored.restorationVerified -or
+        -not (Test-KbpManifestEqual $before @(Get-KbpDirectoryManifest (Join-Path $game 'Mods')))) {
+        throw 'Compatibility transaction did not restore the exact original manifest.'
+    }
+    $passed++
 }
 finally {
     if (Test-Path -LiteralPath $root) {

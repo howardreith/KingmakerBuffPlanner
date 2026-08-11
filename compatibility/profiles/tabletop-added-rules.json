@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "profileId": "tabletop-added-rules",
+  "status": "unavailable-local-reference",
+  "reason": "No Tabletop Added Rules package or immutable runtime fixture exists on this desktop.",
+  "mods": [],
+  "expectedBlueprints": []
+}

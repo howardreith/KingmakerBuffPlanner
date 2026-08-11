@@ -63,6 +63,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (request.SchemaVersion != 1) throw new InvalidDataException("schema-version");
             if (!request.Enabled) throw new InvalidDataException("not-enabled");
             if (!IsSafeIdentifier(request.RunId)) throw new InvalidDataException("run-id");
+            if (!IsSafeIdentifier(request.ProfileId) ||
+                (request.ProfileId != "native-only" && request.ProfileId != "call-of-the-wild"))
+                throw new InvalidDataException("profile-id");
             if (!string.Equals(request.Scenario, "mod-load-smoke", StringComparison.Ordinal) &&
                 !string.Equals(request.Scenario, "native-buff-catalog", StringComparison.Ordinal) &&
                 !string.Equals(request.Scenario, "ui-root-smoke", StringComparison.Ordinal))
@@ -77,6 +80,17 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 throw new InvalidDataException("timeout");
             if (request.Parameters == null || request.Parameters.Count != 0)
                 throw new InvalidDataException("parameters");
+            if (request.ExpectedOptionalMods == null || request.ExpectedBlueprintGuids == null)
+                throw new InvalidDataException("compatibility-expectations");
+            foreach (RuntimeExpectedOptionalMod mod in request.ExpectedOptionalMods)
+                if (mod == null || !IsSafeIdentifier(mod.UmmId) || !IsSafeIdentifier(mod.AssemblyName) ||
+                    !IsSha256(mod.AssemblySha256) || string.IsNullOrWhiteSpace(mod.Version))
+                    throw new InvalidDataException("optional-mod-expectation");
+            foreach (string guid in request.ExpectedBlueprintGuids)
+                if (!IsBlueprintGuid(guid)) throw new InvalidDataException("expected-blueprint-guid");
+            if ((request.ProfileId == "native-only" && request.ExpectedOptionalMods.Count != 0) ||
+                (request.ProfileId == "call-of-the-wild" && request.ExpectedOptionalMods.Count != 1))
+                throw new InvalidDataException("profile-mod-expectation");
 
             string evidence = RequireDescendant(request.EvidenceDirectory, EvidenceRoot);
             if (!Directory.Exists(evidence)) throw new InvalidDataException("evidence-directory-missing");
@@ -122,6 +136,14 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             return true;
         }
 
+        private static bool IsBlueprintGuid(string value)
+        {
+            if (string.IsNullOrEmpty(value) || value.Length != 32) return false;
+            foreach (char c in value)
+                if (!(c >= '0' && c <= '9') && !(c >= 'a' && c <= 'f')) return false;
+            return true;
+        }
+
         private static void RejectDuplicateProperties(string json)
         {
             var objectProperties = new Stack<HashSet<string>>();
@@ -163,28 +185,45 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         [JsonProperty("scenario", Required = Required.Always, Order = 4)]
         public string Scenario { get; set; }
 
-        [JsonProperty("expectedModVersion", Required = Required.Always, Order = 5)]
+        [JsonProperty("profileId", Required = Required.Always, Order = 5)]
+        public string ProfileId { get; set; }
+
+        [JsonProperty("expectedModVersion", Required = Required.Always, Order = 6)]
         public string ExpectedModVersion { get; set; }
 
-        [JsonProperty("expectedCommit", Required = Required.Always, Order = 6)]
+        [JsonProperty("expectedCommit", Required = Required.Always, Order = 7)]
         public string ExpectedCommit { get; set; }
 
-        [JsonProperty("evidenceDirectory", Required = Required.Always, Order = 7)]
+        [JsonProperty("evidenceDirectory", Required = Required.Always, Order = 8)]
         public string EvidenceDirectory { get; set; }
 
-        [JsonProperty("expectedPackageSha256", Required = Required.Always, Order = 8)]
+        [JsonProperty("expectedPackageSha256", Required = Required.Always, Order = 9)]
         public string ExpectedPackageSha256 { get; set; }
 
-        [JsonProperty("expectedDllSha256", Required = Required.Always, Order = 9)]
+        [JsonProperty("expectedDllSha256", Required = Required.Always, Order = 10)]
         public string ExpectedDllSha256 { get; set; }
 
-        [JsonProperty("timeoutSeconds", Required = Required.Always, Order = 10)]
+        [JsonProperty("timeoutSeconds", Required = Required.Always, Order = 11)]
         public int TimeoutSeconds { get; set; }
 
-        [JsonProperty("exitAfterCompletion", Required = Required.Always, Order = 11)]
+        [JsonProperty("exitAfterCompletion", Required = Required.Always, Order = 12)]
         public bool ExitAfterCompletion { get; set; }
 
-        [JsonProperty("parameters", Required = Required.Always, Order = 12)]
+        [JsonProperty("expectedOptionalMods", Required = Required.Always, Order = 13)]
+        public List<RuntimeExpectedOptionalMod> ExpectedOptionalMods { get; set; }
+
+        [JsonProperty("expectedBlueprintGuids", Required = Required.Always, Order = 14)]
+        public List<string> ExpectedBlueprintGuids { get; set; }
+
+        [JsonProperty("parameters", Required = Required.Always, Order = 15)]
         public Dictionary<string, object> Parameters { get; set; }
+    }
+
+    internal sealed class RuntimeExpectedOptionalMod
+    {
+        [JsonProperty("ummId", Required = Required.Always, Order = 1)] public string UmmId { get; set; }
+        [JsonProperty("version", Required = Required.Always, Order = 2)] public string Version { get; set; }
+        [JsonProperty("assemblyName", Required = Required.Always, Order = 3)] public string AssemblyName { get; set; }
+        [JsonProperty("assemblySha256", Required = Required.Always, Order = 4)] public string AssemblySha256 { get; set; }
     }
 }

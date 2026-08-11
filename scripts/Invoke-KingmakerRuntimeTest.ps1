@@ -1,6 +1,7 @@
 [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
 param(
     [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke')][string]$Scenario = 'mod-load-smoke',
+    [ValidateSet('native-only', 'call-of-the-wild')][string]$CompatibilityProfileId = 'native-only',
     [ValidateRange(5, 1800)][int]$TimeoutSeconds = 180,
     [ValidateRange(5, 300)][int]$LaunchTimeoutSeconds = 60,
     [bool]$ExitAfterCompletion = $true,
@@ -10,6 +11,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'RuntimeAutomation.Common.ps1')
+. (Join-Path $PSScriptRoot 'compatibility\CompatibilityProfile.Common.ps1')
 
 $requestedWhatIf = [bool]$WhatIfPreference
 $WhatIfPreference = $false
@@ -21,9 +23,15 @@ $package = (Resolve-Path -LiteralPath (Join-Path $root "artifacts\local-runtime\
 $gitStatus = @(& git -C $root status --porcelain)
 if ($LASTEXITCODE -ne 0 -or @($gitStatus).Count -ne 0) { throw 'Runtime qualification requires a clean Git worktree.' }
 $buildManifest = Read-KbpBuildManifest $package
+$compatibilityProfile = Get-KbpCompatibilityProfile $CompatibilityProfileId
+Assert-KbpCompatibilityProfileFixtures -Profile $compatibilityProfile
+$expectedOptionalMods = @($compatibilityProfile.mods | ForEach-Object {
+    [ordered]@{ ummId = $_.ummId; version = $_.version; assemblyName = $_.assemblyName; assemblySha256 = $_.assemblySha256 }
+})
 $steamSafety = Assert-KbpSteamSafety -SteamPath $SteamPath
 & (Join-Path $PSScriptRoot 'Deploy-Local.ps1') -PackagePath $package `
-    -RunId 'runtime-whatif-preflight' -WhatIf -Confirm:$false
+    -RunId 'runtime-whatif-preflight' -CompatibilityProfileId $CompatibilityProfileId `
+    -WhatIf -Confirm:$false
 $WhatIfPreference = $requestedWhatIf
 if (-not $PSCmdlet.ShouldProcess(
     'Steam App ID 640820 and exact live Mods transaction',
@@ -41,15 +49,18 @@ $process = $null
 New-Item -ItemType Directory -Path $evidence | Out-Null
 try {
     $statePath = & (Join-Path $PSScriptRoot 'Deploy-Local.ps1') -PackagePath $package `
-        -RunId $runId -Confirm:$false | Select-Object -Last 1
+        -RunId $runId -CompatibilityProfileId $CompatibilityProfileId `
+        -Confirm:$false | Select-Object -Last 1
     $transactionEntered = $true
     $request = New-KbpRuntimeRequest -RunId $runId -EvidenceDirectory $evidence `
         -BuildManifest $buildManifest -TimeoutSeconds $TimeoutSeconds `
-        -ExitAfterCompletion $ExitAfterCompletion -Scenario $Scenario
+        -ExitAfterCompletion $ExitAfterCompletion -Scenario $Scenario `
+        -ProfileId $CompatibilityProfileId -ExpectedOptionalMods $expectedOptionalMods `
+        -ExpectedBlueprintGuids @($compatibilityProfile.expectedBlueprints)
     $requestPath = Join-Path $evidence 'runtime-request.json'
     Write-KbpJsonAtomic $requestPath $request
     $orchestration = [ordered]@{
-        schemaVersion = 1; runId = $runId; scenario = $Scenario
+        schemaVersion = 1; runId = $runId; scenario = $Scenario; profileId = $CompatibilityProfileId
         status = 'IN PROGRESS'; stage = 'request-written'; steamSafety = $steamSafety
         packagePath = $package; packageSha256 = $buildManifest.packageSha256
         transactionStatePath = $statePath; startedAtUtc = [DateTime]::UtcNow.ToString('o')

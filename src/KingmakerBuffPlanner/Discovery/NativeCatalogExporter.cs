@@ -14,10 +14,17 @@ namespace KingmakerBuffPlanner.Discovery
     internal sealed class NativeCatalogExporter
     {
         private readonly EffectOverrideRegistry _overrides;
+        private readonly string _profileId;
+        private readonly BlueprintOwnershipIndex _ownership;
 
-        internal NativeCatalogExporter(EffectOverrideRegistry overrides = null)
+        internal NativeCatalogExporter(
+            EffectOverrideRegistry overrides = null,
+            string profileId = "native-only",
+            BlueprintOwnershipIndex ownership = null)
         {
             _overrides = overrides ?? EffectOverrideRegistry.Empty();
+            _profileId = profileId ?? "native-only";
+            _ownership = ownership ?? BlueprintOwnershipIndex.NativeOnly();
         }
 
         internal NativeCatalogExport Export()
@@ -53,7 +60,7 @@ namespace KingmakerBuffPlanner.Discovery
                         InternalName = ability.name ?? string.Empty,
                         DisplayName = ability.Name ?? string.Empty,
                         SourceAssembly = ability.GetType().Assembly.FullName,
-                        Ownership = "native",
+                        Ownership = _ownership.GetOwnership(ability.AssetGuid),
                         IsSpell = ability.IsSpell,
                         IsCandidate = candidate,
                         HasDetectedEffect = detected,
@@ -144,6 +151,7 @@ namespace KingmakerBuffPlanner.Discovery
                         InternalName = ability.name ?? string.Empty,
                         DisplayName = ability.Name ?? string.Empty,
                         SourceAssembly = ability.GetType().Assembly.FullName,
+                        Ownership = _ownership.GetOwnership(ability.AssetGuid),
                         VariantGuids = new string[0],
                         ResourceIds = new string[0],
                         Expression = new EmptyEffectExpression(),
@@ -160,7 +168,7 @@ namespace KingmakerBuffPlanner.Discovery
             return new NativeCatalogExport
             {
                 SchemaVersion = 4,
-                Profile = "native-only",
+                Profile = _profileId,
                 GeneratorCommit = BuildInfo.Commit,
                 AbilityCount = entries.Count,
                 CandidateCount = entries.Count(e => e.IsCandidate),
@@ -179,6 +187,11 @@ namespace KingmakerBuffPlanner.Discovery
                     e.Disposition == "unsupported-with-reason"),
                 RuntimeQualifiedDirectCount = 0,
                 RuntimeQualifiedEquivalenceClassCount = 0,
+                OptionalAbilityCount = entries.Count(e => e.Ownership != "native"),
+                OptionalCandidateCount = entries.Count(e => e.Ownership != "native" && e.IsCandidate),
+                OptionalIncludedCount = entries.Count(e => e.Ownership != "native" && e.Disposition == "include"),
+                OptionalUnsupportedCount = entries.Count(e => e.Ownership != "native" &&
+                    e.Disposition == "unsupported-with-reason"),
                 Abilities = entries.ToArray()
             };
         }
@@ -291,7 +304,11 @@ namespace KingmakerBuffPlanner.Discovery
         [JsonProperty("unsupportedCount", Order = 13)] public int UnsupportedCount { get; set; }
         [JsonProperty("runtimeQualifiedDirectCount", Order = 14)] public int RuntimeQualifiedDirectCount { get; set; }
         [JsonProperty("runtimeQualifiedEquivalenceClassCount", Order = 15)] public int RuntimeQualifiedEquivalenceClassCount { get; set; }
-        [JsonProperty("abilities", Order = 16)]
+        [JsonProperty("optionalAbilityCount", Order = 16)] public int OptionalAbilityCount { get; set; }
+        [JsonProperty("optionalCandidateCount", Order = 17)] public int OptionalCandidateCount { get; set; }
+        [JsonProperty("optionalIncludedCount", Order = 18)] public int OptionalIncludedCount { get; set; }
+        [JsonProperty("optionalUnsupportedCount", Order = 19)] public int OptionalUnsupportedCount { get; set; }
+        [JsonProperty("abilities", Order = 20)]
         public NativeCatalogEntry[] Abilities { get; set; }
     }
 

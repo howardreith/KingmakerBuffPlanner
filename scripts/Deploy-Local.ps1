@@ -2,17 +2,22 @@
 param(
     [Parameter(Mandatory = $true)][string]$PackagePath,
     [Parameter(Mandatory = $true)][ValidatePattern('^[A-Za-z0-9._-]{1,100}$')][string]$RunId,
+    [ValidatePattern('^[a-z0-9-]{1,100}$')][string]$CompatibilityProfileId = 'native-only',
     [string]$KingmakerInstallDir
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'RuntimeHarness.Common.ps1')
+. (Join-Path $PSScriptRoot 'compatibility\CompatibilityProfile.Common.ps1')
 
 $requestedWhatIf = [bool]$WhatIfPreference
 $WhatIfPreference = $false
 if (-not $KingmakerInstallDir) { $KingmakerInstallDir = Get-KbpGamePath }
 & (Join-Path $PSScriptRoot 'validate-package.ps1') -PackagePath $PackagePath
+$compatibilityProfile = Get-KbpCompatibilityProfile $CompatibilityProfileId
+Assert-KbpCompatibilityProfileFixtures -Profile $compatibilityProfile `
+    -KingmakerInstallDir $KingmakerInstallDir
 Assert-KbpNotRunning
 Assert-KbpNoUnresolvedTransaction $script:KbpRuntimeStateRoot
 $WhatIfPreference = $requestedWhatIf
@@ -25,4 +30,5 @@ if (-not $PSCmdlet.ShouldProcess(
 
 Enter-KbpRuntimeTransaction -PackagePath $PackagePath -KingmakerInstallDir $KingmakerInstallDir `
     -StateRoot $script:KbpRuntimeStateRoot -StagingRoot $script:KbpRuntimeStagingRoot `
-    -BackupRoot $script:KbpRuntimeBackupRoot -RunId $RunId
+    -BackupRoot $script:KbpRuntimeBackupRoot -RunId $RunId `
+    -CompatibilityProfile $compatibilityProfile

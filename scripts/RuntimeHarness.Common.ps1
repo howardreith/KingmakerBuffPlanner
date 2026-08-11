@@ -50,6 +50,48 @@ function Test-KbpManifestEqual($Expected, $Actual) {
         ($Actual | ConvertTo-Json -Depth 8 -Compress))
 }
 
+function Get-KbpDirectoryContentIdentity([string]$Path) {
+    $manifest = @(Get-KbpDirectoryManifest $Path)
+    $lines = foreach ($entry in $manifest) {
+        if ($entry.kind -ceq 'directory') { "D|$($entry.path)" }
+        else { "F|$($entry.path)|$($entry.length)|$($entry.sha256)" }
+    }
+    $bytes = [Text.UTF8Encoding]::new($false).GetBytes(($lines -join "`n") + "`n")
+    $hasher = [Security.Cryptography.SHA256]::Create()
+    try { $digest = ([BitConverter]::ToString($hasher.ComputeHash($bytes))).Replace('-', '').ToLowerInvariant() }
+    finally { $hasher.Dispose() }
+    $files = @($manifest | Where-Object kind -ceq 'file')
+    return [pscustomobject]@{
+        directoryManifestSha256 = $digest
+        fileCount = $files.Count
+        totalBytes = [long](($files | ForEach-Object { [long]$_['length'] } |
+            Measure-Object -Sum).Sum)
+        manifest = $manifest
+    }
+}
+
+function Assert-KbpCompatibilityModIdentity($Expected, [string]$Path) {
+    if ($Expected.directoryName -notmatch '^[A-Za-z0-9._-]{1,100}$') {
+        throw 'Compatibility mod directory name is unsafe.'
+    }
+    $identity = Get-KbpDirectoryContentIdentity $Path
+    if ($identity.directoryManifestSha256 -cne [string]$Expected.directoryManifestSha256 -or
+        $identity.fileCount -ne [int]$Expected.fileCount -or
+        $identity.totalBytes -ne [long]$Expected.totalBytes) {
+        throw "Compatibility fixture identity mismatch: $($Expected.directoryName)"
+    }
+    $info = Join-Path $Path 'info.json'
+    if (-not (Test-Path -LiteralPath $info -PathType Leaf)) { $info = Join-Path $Path 'Info.json' }
+    $assembly = Join-Path $Path ([string]$Expected.assemblyName)
+    if (-not (Test-Path -LiteralPath $info -PathType Leaf) -or
+        -not (Test-Path -LiteralPath $assembly -PathType Leaf) -or
+        (Get-KbpSha256 $info) -cne [string]$Expected.infoSha256 -or
+        (Get-KbpSha256 $assembly) -cne [string]$Expected.assemblySha256) {
+        throw "Compatibility fixture primary-file mismatch: $($Expected.directoryName)"
+    }
+    return $identity
+}
+
 function Write-KbpJsonAtomic([string]$Path, $Value) {
     $directory = Split-Path -Parent $Path
     if (-not (Test-Path -LiteralPath $directory -PathType Container)) {
@@ -134,7 +176,8 @@ function Enter-KbpRuntimeTransaction {
         [Parameter(Mandatory = $true)][string]$BackupRoot,
         [Parameter(Mandatory = $true)][ValidatePattern('^[A-Za-z0-9._-]{1,100}$')][string]$RunId,
         [switch]$FixtureMode,
-        [int[]]$KnownKingmakerProcessIds
+        [int[]]$KnownKingmakerProcessIds,
+        $CompatibilityProfile
     )
     if ($PSBoundParameters.ContainsKey('KnownKingmakerProcessIds')) {
         Assert-KbpNotRunning -KnownProcessIds $KnownKingmakerProcessIds
@@ -167,8 +210,13 @@ function Enter-KbpRuntimeTransaction {
     New-Item -ItemType Directory -Path $backupRunRoot | Out-Null
     $statePath = Join-Path $transactionRoot 'transaction.json'
     $mods = Join-Path $game 'Mods'
+    $profileMods = if ($null -eq $CompatibilityProfile) { @() } else { @($CompatibilityProfile.mods) }
     $originalExisted = Test-Path -LiteralPath $mods -PathType Container
     $originalManifest = if ($originalExisted) { @(Get-KbpDirectoryManifest $mods) } else { @() }
+    if ($null -ne $CompatibilityProfile -and -not $originalExisted -and
+        $profileMods.Count -ne 0) {
+        throw 'Compatibility profile requires an existing exact fixture tree.'
+    }
     $originalBackup = Join-Path $backupRunRoot 'Mods.original'
     $stagedQuarantine = Join-Path $backupRunRoot 'Mods.staged'
     $state = [ordered]@{
@@ -180,6 +228,8 @@ function Enter-KbpRuntimeTransaction {
         stagingRunRoot = $stagingRunRoot; lockPath = $lockPath
         restorationVerified = $false; stagedMutationObserved = $false
         observedStagedManifest = @()
+        compatibilityProfileId = if ($null -eq $CompatibilityProfile) { 'native-only' } else { [string]$CompatibilityProfile.profileId }
+        compatibilityMods = @()
         activatedAtUtc = $null; restoredAtUtc = $null; restorationFailure = $null
     }
     Write-KbpJsonAtomic $statePath $state
@@ -188,6 +238,24 @@ function Enter-KbpRuntimeTransaction {
         $stagedMods = Join-Path $stagingRunRoot 'Mods'
         New-Item -ItemType Directory -Path $stagedMods | Out-Null
         Move-Item -LiteralPath $mod -Destination (Join-Path $stagedMods 'KingmakerBuffPlanner')
+        foreach ($expectedMod in $profileMods) {
+            if ($expectedMod.directoryName -ceq 'KingmakerBuffPlanner') {
+                throw 'Compatibility profile cannot replace the project-owned mod.'
+            }
+            $sourceMod = Join-Path $mods ([string]$expectedMod.directoryName)
+            $sourceIdentity = Assert-KbpCompatibilityModIdentity $expectedMod $sourceMod
+            Copy-Item -LiteralPath $sourceMod -Destination $stagedMods -Recurse
+            $stagedMod = Join-Path $stagedMods ([string]$expectedMod.directoryName)
+            [void](Assert-KbpCompatibilityModIdentity $expectedMod $stagedMod)
+            $state.compatibilityMods += @([ordered]@{
+                directoryName = [string]$expectedMod.directoryName
+                ummId = [string]$expectedMod.ummId
+                version = [string]$expectedMod.version
+                directoryManifestSha256 = [string]$sourceIdentity.directoryManifestSha256
+                fileCount = [int]$sourceIdentity.fileCount
+                totalBytes = [long]$sourceIdentity.totalBytes
+            })
+        }
         $sentinel = [ordered]@{ schemaVersion = 1; runId = $RunId; token = $token; statePath = $statePath }
         Write-KbpJsonAtomic (Join-Path $stagedMods '.kbp-runtime-sentinel.json') $sentinel
         $state.status = 'Prepared'
