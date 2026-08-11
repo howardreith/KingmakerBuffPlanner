@@ -224,8 +224,20 @@ namespace KingmakerBuffPlanner.Tests
                 Effects = new[] { CandidateEffect("Buff", "CurrentTarget", false, "ContextActionApplyBuff", "root") },
                 DiagnosticContracts = new[] { "ContextActionWeaponEnchantPool|unsupported-action" }
             });
-            if (pool.Disposition != "unsupported-with-reason" || pool.QualificationStatus != "FAIL-unsupported")
-                throw new InvalidOperationException("Dynamic enchant-pool uncertainty was hidden.");
+            if (pool.Disposition != "include" || pool.SupportClass != "explicit-adapter" ||
+                !pool.Reason.Contains("signal buff"))
+                throw new InvalidOperationException("Dynamic enchant-pool signal semantics were not explicit.");
+
+            NativeCandidateAuditDecision container = classifier.Classify(new NativeCandidateAuditFacts
+            {
+                IsPlayerAccessible = true,
+                HasVariants = true,
+                Effects = new[] { CandidateEffect("Buff", "CurrentTarget", false, "ContextActionApplyBuff", "root") },
+                DiagnosticContracts = new string[0]
+            });
+            if (container.Disposition != "exclude" ||
+                !container.Reason.StartsWith("non-castable-variant-container:", StringComparison.Ordinal))
+                throw new InvalidOperationException("A non-castable variant parent was treated as a provider.");
         }
 
         private static NativeCandidateEffectFacts CandidateEffect(

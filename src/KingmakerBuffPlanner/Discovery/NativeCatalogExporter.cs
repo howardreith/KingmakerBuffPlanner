@@ -85,7 +85,9 @@ namespace KingmakerBuffPlanner.Discovery
                             CanTargetFriends = entry.CanTargetFriends,
                             CanTargetEnemies = entry.CanTargetEnemies,
                             CanTargetPoint = entry.CanTargetPoint,
+                            HasVariants = entry.VariantGuids.Length != 0,
                             EffectOnAlly = entry.EffectOnAlly,
+                            EffectOnEnemy = entry.EffectOnEnemy,
                             Effects = effects.Select(e => new NativeCandidateEffectFacts
                             {
                                 Kind = e.Kind,

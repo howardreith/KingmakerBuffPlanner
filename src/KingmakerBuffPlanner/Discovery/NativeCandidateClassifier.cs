@@ -11,7 +11,9 @@ namespace KingmakerBuffPlanner.Discovery
         public bool CanTargetFriends { get; set; }
         public bool CanTargetEnemies { get; set; }
         public bool CanTargetPoint { get; set; }
+        public bool HasVariants { get; set; }
         public string EffectOnAlly { get; set; }
+        public string EffectOnEnemy { get; set; }
         public IReadOnlyList<NativeCandidateEffectFacts> Effects { get; set; }
         public IReadOnlyList<string> DiagnosticContracts { get; set; }
     }
@@ -64,11 +66,18 @@ namespace KingmakerBuffPlanner.Discovery
                 return Exclude("no-persistent-effect",
                     "No persistent unit buff, area buff, or safely resolvable worn-item enchantment was detected.");
 
+            if (facts.HasVariants && !facts.CanTargetSelf && !facts.CanTargetFriends &&
+                !facts.CanTargetEnemies && !facts.CanTargetPoint)
+                return Exclude("non-castable-variant-container",
+                    "The parent groups castable variants but is not itself a targetable source.");
+
             bool controlledTransform = effects.Any(e =>
                 e.Target == "Caster" || e.Target == "Pet" || e.Target == "Party");
-            bool hostileOnly = facts.CanTargetEnemies && !facts.CanTargetFriends &&
+            bool hostileOnly = facts.CanTargetEnemies &&
                 !string.Equals(facts.EffectOnAlly, "Helpful", StringComparison.Ordinal) &&
-                !controlledTransform;
+                !controlledTransform &&
+                (!facts.CanTargetFriends ||
+                    string.Equals(facts.EffectOnEnemy, "Harmful", StringComparison.Ordinal));
             if (hostileOnly)
                 return Exclude("hostile-only",
                     "The ability targets enemies and has no structurally controlled caster, pet, or party effect.");
@@ -87,24 +96,22 @@ namespace KingmakerBuffPlanner.Discovery
                     "No deterministic controllable-unit target can be selected for the persistent effect.",
                     "FAIL-unsupported");
 
-            if (diagnostics.Any(d => Contains(d, "ContextActionWeaponEnchantPool")))
-                return new NativeCandidateAuditDecision(
-                    "unsupported-with-reason", "none",
-                    "The selected enchant-pool action has dynamic multi-enchantment semantics not represented by the signal buff.",
-                    "FAIL-unsupported");
-
-            bool explicitAdapter = effects.Any(e =>
+            bool dynamicEnchantPool = diagnostics.Any(d =>
+                Contains(d, "ContextActionWeaponEnchantPool"));
+            bool explicitAdapter = dynamicEnchantPool || effects.Any(e =>
                 e.SourceContract == "MagicFang" ||
                 e.SourceContract == "ContextActionEnchantWornItem" ||
                 e.SourceContract == "ContextActionSpawnAreaEffect+AbilityAreaEffectBuff" ||
                 e.SourceContract == "ContextActionsOnPet" ||
                 e.SourceContract == "ContextActionPartyMembers");
-            bool reflectionWrapper = effects.Any(e => Contains(e.ActionPath, "/reflected:"));
+            bool reflectionWrapper = effects.Any(e => Contains(e.ActionPath, "reflected:"));
             string supportClass = explicitAdapter ? "explicit-adapter" :
                 reflectionWrapper ? "generic-reflection-wrapper" : "automatic";
             return new NativeCandidateAuditDecision(
                 "include", supportClass,
-                diagnostics.Count == 0
+                dynamicEnchantPool
+                    ? "The exact native signal buff supplies duration/presence semantics; native RuleCastSpell execution applies the currently selected enchant pool."
+                    : diagnostics.Count == 0
                     ? "Player-accessible graph has a persistent beneficial effect and deterministic target semantics."
                     : "Persistent beneficial semantics are recognized; remaining diagnostics are non-persistent native adjunct actions.",
                 "DEFER-runtime-qualification");
