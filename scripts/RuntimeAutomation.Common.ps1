@@ -163,6 +163,9 @@ function Assert-KbpRuntimeResult {
     if ([int]$Result.optionalLoadedAssemblyCount -ne @($Request.expectedOptionalMods).Count) {
         throw 'Loaded optional assembly count does not match the requested profile.'
     }
+    if ([int]$Result.optionalLoadedUmmEntryCount -ne @($Request.expectedOptionalMods).Count) {
+        throw 'Loaded optional UMM entry count does not match the requested profile.'
+    }
     if ($Request.scenario -ceq 'native-buff-catalog') {
         $catalogPath = Join-Path $Request.evidenceDirectory 'native-buff-catalog.json'
         if (-not (Test-Path -LiteralPath $catalogPath -PathType Leaf)) { throw 'Native catalog evidence is missing.' }

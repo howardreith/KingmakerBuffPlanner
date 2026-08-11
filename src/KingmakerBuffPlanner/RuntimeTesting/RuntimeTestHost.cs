@@ -182,19 +182,35 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     }
                 };
                 int loadedOptionalAssemblies = 0;
+                int loadedOptionalUmmEntries = 0;
                 bool optionalIdentityFailed = false;
+                int plannerAssemblyCount = AppDomain.CurrentDomain.GetAssemblies().Count(a =>
+                    string.Equals(a.GetName().Name, "KingmakerBuffPlanner", StringComparison.Ordinal));
+                result.Assertions.Add(plannerAssemblyCount == 1
+                    ? RuntimeTestAssertion.Pass("buff-planner-assembly-unique", "1", "1")
+                    : RuntimeTestAssertion.Fail("buff-planner-assembly-unique", "1", plannerAssemblyCount.ToString()));
+                int plannerEntryCount = UnityModManager.modEntries.Count(e =>
+                    e != null && e.Info != null &&
+                    string.Equals(e.Info.Id, "KingmakerBuffPlanner", StringComparison.Ordinal));
+                result.Assertions.Add(plannerEntryCount == 1
+                    ? RuntimeTestAssertion.Pass("buff-planner-umm-entry-unique", "1", "1")
+                    : RuntimeTestAssertion.Fail("buff-planner-umm-entry-unique", "1", plannerEntryCount.ToString()));
+                if (plannerAssemblyCount != 1 || plannerEntryCount != 1) optionalIdentityFailed = true;
                 foreach (RuntimeExpectedOptionalMod expected in _request.ExpectedOptionalMods)
                 {
                     string expectedAssemblyName = Path.GetFileNameWithoutExtension(expected.AssemblyName);
-                    Assembly loaded = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(a =>
-                        string.Equals(a.GetName().Name, expectedAssemblyName, StringComparison.Ordinal));
-                    if (loaded == null)
+                    List<Assembly> loadedAssemblies = AppDomain.CurrentDomain.GetAssemblies().Where(a =>
+                        string.Equals(a.GetName().Name, expectedAssemblyName, StringComparison.Ordinal)).ToList();
+                    result.Assertions.Add(loadedAssemblies.Count == 1
+                        ? RuntimeTestAssertion.Pass("optional-assembly-unique:" + expected.UmmId, "1", "1")
+                        : RuntimeTestAssertion.Fail("optional-assembly-unique:" + expected.UmmId, "1",
+                            loadedAssemblies.Count.ToString()));
+                    if (loadedAssemblies.Count != 1)
                     {
                         optionalIdentityFailed = true;
-                        result.Assertions.Add(RuntimeTestAssertion.Fail(
-                            "optional-assembly-loaded:" + expected.UmmId, expectedAssemblyName, "missing"));
                         continue;
                     }
+                    Assembly loaded = loadedAssemblies[0];
                     loadedOptionalAssemblies++;
                     string loadedHash = Hashing.Sha256(loaded.Location);
                     result.Assertions.Add(RuntimeTestAssertion.Pass(
@@ -211,8 +227,32 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                             "optional-assembly-sha256:" + expected.UmmId,
                             expected.AssemblySha256, loadedHash));
                     }
+                    List<UnityModManager.ModEntry> optionalEntries = UnityModManager.modEntries.Where(e =>
+                        e != null && e.Info != null &&
+                        string.Equals(e.Info.Id, expected.UmmId, StringComparison.Ordinal)).ToList();
+                    result.Assertions.Add(optionalEntries.Count == 1
+                        ? RuntimeTestAssertion.Pass("optional-umm-entry-unique:" + expected.UmmId, "1", "1")
+                        : RuntimeTestAssertion.Fail("optional-umm-entry-unique:" + expected.UmmId, "1",
+                            optionalEntries.Count.ToString()));
+                    if (optionalEntries.Count != 1)
+                    {
+                        optionalIdentityFailed = true;
+                        continue;
+                    }
+                    loadedOptionalUmmEntries++;
+                    string loadedVersion = optionalEntries[0].Info.Version;
+                    if (string.Equals(loadedVersion, expected.Version, StringComparison.Ordinal))
+                        result.Assertions.Add(RuntimeTestAssertion.Pass(
+                            "optional-umm-version:" + expected.UmmId, expected.Version, loadedVersion));
+                    else
+                    {
+                        optionalIdentityFailed = true;
+                        result.Assertions.Add(RuntimeTestAssertion.Fail(
+                            "optional-umm-version:" + expected.UmmId, expected.Version, loadedVersion));
+                    }
                 }
                 result.OptionalLoadedAssemblyCount = loadedOptionalAssemblies;
+                result.OptionalLoadedUmmEntryCount = loadedOptionalUmmEntries;
                 if (optionalIdentityFailed)
                 {
                     result.Status = "FAIL";
@@ -453,6 +493,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         [JsonProperty("harmonyPatchRecordCount", Order = 46)] public int HarmonyPatchRecordCount { get; set; }
         [JsonProperty("harmonyMultiOwnerTargetCount", Order = 47)] public int HarmonyMultiOwnerTargetCount { get; set; }
         [JsonProperty("harmonyBuffPlannerOverlapTargetCount", Order = 48)] public int HarmonyBuffPlannerOverlapTargetCount { get; set; }
+        [JsonProperty("optionalLoadedUmmEntryCount", Order = 49)] public int OptionalLoadedUmmEntryCount { get; set; }
     }
 
     internal sealed class RuntimeTestAssertion

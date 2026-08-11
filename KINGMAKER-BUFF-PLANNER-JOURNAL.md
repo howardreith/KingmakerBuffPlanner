@@ -265,3 +265,15 @@ Status: Call of the Wild PASS twice; native-only runtime defect repaired
 - Repair: the inventory exporter now loads only the exact installed `0Harmony12.dll` path when the assembly is absent, validates its assembly identity, and then inventories the valid zero-or-more patch state
 - Failed native transaction restored exactly; no save selected; game and lock absent
 - Exact next action: commit, rebuild, and repeat the native-only profile twice
+
+## 2026-08-11 — Native profile repetition and UMM identity audit
+
+Status: native-only PASS twice; compatibility identity gate strengthened before final report
+
+- Native runs `20260811T2236376737183Z-native-buff-catalog` and `20260811T2237377143159Z-native-buff-catalog` each passed 10/10 and restored exactly
+- Both emitted byte-identical catalog SHA-256 `0b758785ef211fcaf50ae481ea48b5da278aa0a6410ab1b034edf5edf8f3d869` and Harmony inventory SHA-256 `b5605e22bde458a238d63c6ffe33a99eb712bd22bf3cbc74c42d443ad479efb4`
+- Native counts remained 1,722 abilities / 974 candidates / 413 included / 561 excluded / 0 unsupported; Harmony recorded three UMM-owned patches and zero multi-owner or Buff Planner overlaps
+- Final report audit found that staged exact hashes plus assembly load did not independently prove the optional UMM entry ID/version or reject duplicate entries/assemblies
+- Runtime identity validation now requires exactly one Buff Planner assembly and UMM entry, exactly one expected optional assembly and UMM entry, exact optional UMM version, exact optional assembly hash, and matching loaded counts
+- Rejected shortcut: describing an assembly hash match as full proof of the UMM identity/version requirement
+- Exact next action: commit the strengthened gate and repeat native-only and Call of the Wild twice on one exact commit
