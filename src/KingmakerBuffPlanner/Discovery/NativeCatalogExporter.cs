@@ -24,7 +24,7 @@ namespace KingmakerBuffPlanner.Discovery
                 try
                 {
                     DiscoveryScanResult scan = scanner.Scan(adapter.Adapt(ability));
-                    bool detected = ContainsLeaf(scan.Expression);
+                    bool detected = EffectExpressionAnalysis.ContainsLeaf(scan.Expression);
                     bool candidate = ability.IsSpell || detected;
                     entries.Add(new NativeCatalogEntry
                     {
@@ -87,19 +87,6 @@ namespace KingmakerBuffPlanner.Discovery
             };
         }
 
-        private static bool ContainsLeaf(EffectExpression expression)
-        {
-            if (expression is EffectLeafExpression) return true;
-            var sequence = expression as SequenceEffectExpression;
-            if (sequence != null) return sequence.Children.Any(ContainsLeaf);
-            var conditional = expression as ConditionalEffectExpression;
-            if (conditional != null)
-                return ContainsLeaf(conditional.WhenTrue) || ContainsLeaf(conditional.WhenFalse);
-            var targeted = expression as TargetedEffectExpression;
-            if (targeted != null) return ContainsLeaf(targeted.Child);
-            var referenced = expression as ReferencedAbilityExpression;
-            return referenced != null && ContainsLeaf(referenced.Child);
-        }
     }
 
     internal sealed class NativeCatalogExport

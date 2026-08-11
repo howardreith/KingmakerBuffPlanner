@@ -5,6 +5,9 @@ using System.Reflection;
 using KingmakerBuffPlanner.RuntimeTesting;
 using KingmakerBuffPlanner.Discovery;
 using KingmakerBuffPlanner.Domain.Effects;
+using KingmakerBuffPlanner.Domain.Identity;
+using KingmakerBuffPlanner.Domain.Providers;
+using KingmakerBuffPlanner.Planning;
 using Newtonsoft.Json;
 
 namespace KingmakerBuffPlanner.Tests
@@ -43,6 +46,12 @@ namespace KingmakerBuffPlanner.Tests
                 Run("scanner-reports-cycle", TestScannerCycle);
                 Run("scanner-reports-unknown-node", TestScannerUnknown);
                 Run("scanner-expression-wire-contract", TestScannerExpressionWireContract);
+                Run("stable-keys-distinguish-variants-and-metamagic", TestStableKeys);
+                Run("spontaneous-providers-share-one-pool", TestSpontaneousSharedPool);
+                Run("prepared-opposition-consumes-linked-slots", TestPreparedLinkedSlots);
+                Run("prepared-domain-slot-eligibility-is-preserved", TestPreparedDomainEligibility);
+                Run("unlimited-pool-is-explicit", TestUnlimitedPool);
+                Run("party-snapshot-orders-by-stable-id", TestPartySnapshotOrdering);
             }
             finally
             {
@@ -135,6 +144,125 @@ namespace KingmakerBuffPlanner.Tests
                 !json.Contains("\"effectId\":\"wire-buff\"") ||
                 !json.Contains("\"actionPath\":\"wire-buff\""))
                 throw new InvalidOperationException("Effect expression JSON contract is incomplete: " + json);
+        }
+
+        private static void TestStableKeys()
+        {
+            var baseKey = Ability("base", string.Empty, 0);
+            var variant = Ability("base", "variant", 0);
+            var metamagic = Ability("base", string.Empty, 4);
+            if (baseKey.Equals(variant) || baseKey.Equals(metamagic) || variant.Equals(metamagic))
+                throw new InvalidOperationException("Mechanically distinct ability keys collided.");
+            var first = new ProviderKey("unit-a", "book-a", baseKey, string.Empty);
+            var second = new ProviderKey("unit-a", "book-b", baseKey, string.Empty);
+            if (first.Equals(second)) throw new InvalidOperationException("Spellbook identity was lost from provider key.");
+        }
+
+        private static void TestSpontaneousSharedPool()
+        {
+            const string poolKey = "unit-a|book-a|level-2";
+            var pool = new ResourcePoolSnapshot(poolKey, ResourcePoolKind.SpontaneousLevel, 2, 2, null);
+            ProviderSnapshot first = Provider("spell-a", poolKey, 1, null);
+            ProviderSnapshot second = Provider("spell-b", poolKey, 1, null);
+            var snapshot = Snapshot(new[] { first, second }, new[] { pool });
+            var ledger = new ResourceLedger(snapshot.ResourcePools);
+            ResourceReservation reservation;
+            string reason;
+            if (!ledger.TryReserve(first, out reservation, out reason) ||
+                !ledger.TryReserve(second, out reservation, out reason) ||
+                ledger.TryReserve(first, out reservation, out reason) ||
+                reason != "insufficient-shared-resource" || ledger.GetRemaining(poolKey) != 0)
+                throw new InvalidOperationException("Known spells multiplied or bypassed the shared spontaneous pool.");
+        }
+
+        private static void TestPreparedLinkedSlots()
+        {
+            const string poolKey = "unit-a|book-a|prepared";
+            var main = new ResourceTokenSnapshot("slot-0", Ability("opposed", string.Empty, 0), 3,
+                PreparedSlotKind.Opposition, true, true, new[] { "slot-1" });
+            var linked = new ResourceTokenSnapshot("slot-1", Ability("opposed", string.Empty, 0), 3,
+                PreparedSlotKind.Opposition, true, false, new string[0]);
+            var pool = new ResourcePoolSnapshot(poolKey, ResourcePoolKind.PreparedSlots, 2, 2,
+                new[] { main, linked });
+            ProviderSnapshot provider = Provider("opposed", poolKey, 1, new[] { "slot-0" });
+            var ledger = new ResourceLedger(Snapshot(new[] { provider }, new[] { pool }).ResourcePools);
+            ResourceReservation reservation;
+            string reason;
+            if (!ledger.TryReserve(provider, out reservation, out reason) ||
+                reservation.TokenIds.Count != 2 || reservation.Units != 2 ||
+                ledger.GetRemaining(poolKey) != 0 || ledger.TryReserve(provider, out reservation, out reason))
+                throw new InvalidOperationException("Linked opposition slots were not consumed exactly once.");
+        }
+
+        private static void TestPreparedDomainEligibility()
+        {
+            const string poolKey = "unit-a|book-a|prepared-domain";
+            var common = new ResourceTokenSnapshot("common", Ability("spell", string.Empty, 0), 2,
+                PreparedSlotKind.Common, false, true, null);
+            var domain = new ResourceTokenSnapshot("domain", Ability("domain-spell", string.Empty, 0), 2,
+                PreparedSlotKind.Domain, true, true, null);
+            var pool = new ResourcePoolSnapshot(poolKey, ResourcePoolKind.PreparedSlots, 2, 1,
+                new[] { common, domain });
+            ProviderSnapshot ordinary = Provider("spell", poolKey, 1, new[] { "common" });
+            var ledger = new ResourceLedger(Snapshot(new[] { ordinary }, new[] { pool }).ResourcePools);
+            ResourceReservation reservation;
+            string reason;
+            if (ledger.TryReserve(ordinary, out reservation, out reason) ||
+                reason != "no-eligible-prepared-token" || ledger.GetRemaining(poolKey) != 1)
+                throw new InvalidOperationException("An ordinary spell consumed a domain-only slot.");
+        }
+
+        private static void TestUnlimitedPool()
+        {
+            const string poolKey = "unit-a|book-a|cantrip";
+            var pool = new ResourcePoolSnapshot(poolKey, ResourcePoolKind.Unlimited, 0, 0, null);
+            ProviderSnapshot provider = Provider("cantrip", poolKey, 0, null);
+            var ledger = new ResourceLedger(Snapshot(new[] { provider }, new[] { pool }).ResourcePools);
+            ResourceReservation reservation;
+            string reason;
+            for (int i = 0; i < 100; i++)
+                if (!ledger.TryReserve(provider, out reservation, out reason) || reservation.Units != 0)
+                    throw new InvalidOperationException("Explicit unlimited resource was exhausted or assigned fake credits.");
+        }
+
+        private static void TestPartySnapshotOrdering()
+        {
+            var validation = new TargetValidationSnapshot(true, true, true, true);
+            var units = new[]
+            {
+                new UnitSnapshot("unit-z", "Zed", true, "unit-a", validation),
+                new UnitSnapshot("unit-a", "Alpha", false, string.Empty, validation)
+            };
+            var snapshot = new PartyProviderSnapshot(units, new ProviderSnapshot[0], new ResourcePoolSnapshot[0]);
+            if (snapshot.Units[0].UnitId != "unit-a" || snapshot.Units[1].UnitId != "unit-z" ||
+                snapshot.Units[1].MasterUnitId != "unit-a")
+                throw new InvalidOperationException("Party order or pet linkage depended on transient indexes.");
+        }
+
+        private static AbilityKey Ability(string baseGuid, string variantGuid, int metamagic)
+        {
+            return new AbilityKey(baseGuid, variantGuid, metamagic, SourceKind.Spellbook, string.Empty);
+        }
+
+        private static ProviderSnapshot Provider(
+            string abilityGuid,
+            string poolKey,
+            int unitsPerCast,
+            IEnumerable<string> tokenIds)
+        {
+            var key = new ProviderKey("unit-a", "book-a", Ability(abilityGuid, string.Empty, 0), string.Empty);
+            return new ProviderSnapshot(key, abilityGuid, 2, poolKey, unitsPerCast, tokenIds);
+        }
+
+        private static PartyProviderSnapshot Snapshot(
+            IEnumerable<ProviderSnapshot> providers,
+            IEnumerable<ResourcePoolSnapshot> pools)
+        {
+            return new PartyProviderSnapshot(
+                new[] { new UnitSnapshot("unit-a", "Caster", false, string.Empty,
+                    new TargetValidationSnapshot(true, true, true, true)) },
+                providers,
+                pools);
         }
 
         private static DiscoveryNode EffectNode(string id)

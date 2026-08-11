@@ -33,6 +33,9 @@
     <Compile Include="..\..\src\KingmakerBuffPlanner\Discovery\ActionGraphScanner.cs"><Link>Discovery\ActionGraphScanner.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Discovery\DiscoveryNode.cs"><Link>Discovery\DiscoveryNode.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Domain\Effects\EffectExpression.cs"><Link>Domain\Effects\EffectExpression.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Domain\Identity\StableKeys.cs"><Link>Domain\Identity\StableKeys.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Domain\Providers\ProviderSnapshots.cs"><Link>Domain\Providers\ProviderSnapshots.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\ResourceLedger.cs"><Link>Planning\ResourceLedger.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\RuntimeTesting\RuntimePaths.cs">
       <Link>RuntimeTesting\RuntimePaths.cs</Link>
     </Compile>

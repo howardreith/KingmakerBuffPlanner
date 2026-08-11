@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
 using Newtonsoft.Json;
 
 namespace KingmakerBuffPlanner.Domain.Effects
@@ -117,5 +118,22 @@ namespace KingmakerBuffPlanner.Domain.Effects
 
         [JsonProperty("abilityId", Order = 2)] public string AbilityId { get; private set; }
         [JsonProperty("child", Order = 3)] public EffectExpression Child { get; private set; }
+    }
+
+    public static class EffectExpressionAnalysis
+    {
+        public static bool ContainsLeaf(EffectExpression expression)
+        {
+            if (expression is EffectLeafExpression) return true;
+            var sequence = expression as SequenceEffectExpression;
+            if (sequence != null) return sequence.Children.Any(ContainsLeaf);
+            var conditional = expression as ConditionalEffectExpression;
+            if (conditional != null)
+                return ContainsLeaf(conditional.WhenTrue) || ContainsLeaf(conditional.WhenFalse);
+            var targeted = expression as TargetedEffectExpression;
+            if (targeted != null) return ContainsLeaf(targeted.Child);
+            var referenced = expression as ReferencedAbilityExpression;
+            return referenced != null && ContainsLeaf(referenced.Child);
+        }
     }
 }
