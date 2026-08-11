@@ -1,6 +1,6 @@
 # Qualification
 
-Status: TODO
+Status: PASS for all applicable no-save gates; save-backed core remains `DEFER — EVIDENCED`
 
 Current source-only Phase 1 evidence (pre-checkpoint build from HEAD `4ca6008d873577e8e6263b54658620b649f81cd1`):
 
@@ -92,3 +92,12 @@ Phase 11 exact compatibility qualification PASS for all locally available no-sav
 | `native-only` | `20260811T2244134771182Z`, `20260811T2245180617144Z` | 12/12 each | `50f66299912bef24a50984d9d8398ba2bb340a4f85b551a0ad6ff97c41393f3d` | 3 / 3 / 0 | exact PASS twice |
 
 All four used commit `57ed740d6fd6bbdf68dcdfe8c26368c744a3c91f`, package SHA-256 `29ee2ddb86f6ace36d9b9ec1cc7e75a2468f81721956836e39dbdae26752deb2`, DLL SHA-256 `2c79eefe2afc9a93ec0574a0056c7c9331ebb1add170561f6da4c72468687b13`, and MVID `18be2ec9-702a-4ba1-ae15-306765e4231d`. The optional runs proved exactly one UMM entry and assembly for both products, exact Call of the Wild version/hash, four representative owned/included abilities, 2,096 optional inclusions, and zero optional unsupported candidates. Catalog and Harmony inventory hashes repeated byte-for-byte per profile. No save was selected or written. Tabletop and combined profiles are unavailable locally; save-backed native/optional execution remains `DEFER — EVIDENCED`. See `docs/CALL-OF-THE-WILD-COMPATIBILITY.md` and `docs/TABLETOP-ADDED-RULES-COMPATIBILITY.md`.
+
+Phase 12 composed no-save core qualification PASS twice:
+
+| Run ID | Assertions | Catalog / Harmony SHA-256 | UI proof | Restoration |
+|---|---:|---|---|---|
+| `phase12-no-save-core-1` | 22/22 | `df2a48e61677723d1687b828d261ba4c103d4351b0f393d1e97276b84d7b8cb6` / `b5605e22bde458a238d63c6ffe33a99eb712bd22bf3cbc74c42d443ad479efb4` | root 1, reconstruction 1, frames 12, cycles 2, layouts 3, blockers/subscriptions 0/0 | exact PASS |
+| `phase12-no-save-core-2` | 22/22 | same byte-for-byte | same | exact PASS |
+
+Both fresh processes used clean commit `3af45f3329df300dc0616da9393480abee8547ce`, package SHA-256 `c2ea8a3dbbfb1cbe670be422b33e11a8afddfeaac4ae27902d69f8c5f6febc19`, DLL SHA-256 `a4b56a59104f5ddcac8a4184ebc4f779216f83aaeb4c0b7e199da9dcfa650413`, and MVID `193901f8-0863-4622-8885-f35880e5daf9`. Each composed identity, full catalog/expression reconciliation, ordered Harmony inventory, and UI lifecycle/layout checks in one process. This is the applicable NO-SAVE core, not executor equivalence; the save-backed core remains unmet.

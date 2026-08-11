@@ -315,3 +315,15 @@ Status: release tooling PASS; composed scenario source PASS; runtime pending che
 - Added optional unique `-RunId`; evidence/transaction reuse is rejected before mutation. Source suite now passes validation 15/15, behavior/protocol 52/52, transaction 6/6, package 4/4, deployment purity 5/5
 - Qualification boundary remains: the composed scenario is NO-SAVE and cannot prove the mandatory save-backed resource/effect/executor scenarios
 - Exact next action: commit, build exact package, pass compatibility-specific WhatIf, and run the composed native core twice from fresh processes
+
+## 2026-08-11 — Phase 12 composed core repetition and final audit
+
+Status: all applicable no-save gates PASS; save-backed core remains unmet
+
+- Exact clean commit `3af45f3329df300dc0616da9393480abee8547ce`, package `c2ea8a3dbbfb1cbe670be422b33e11a8afddfeaac4ae27902d69f8c5f6febc19`, DLL `a4b56a59104f5ddcac8a4184ebc4f779216f83aaeb4c0b7e199da9dcfa650413`, MVID `193901f8-0863-4622-8885-f35880e5daf9`
+- `phase12-no-save-core-1` and `phase12-no-save-core-2` each passed 22/22 in fresh processes: identity/uniqueness, 1,722-ability/974-candidate catalog, zero exceptions, Harmony inventory, UI root/reconstruction, 12 frames, 2 cycles, 3 layout profiles, 0 blockers, 0 subscriptions
+- Catalog hash `df2a48e61677723d1687b828d261ba4c103d4351b0f393d1e97276b84d7b8cb6` and Harmony hash `b5605e22bde458a238d63c6ffe33a99eb712bd22bf3cbc74c42d443ad479efb4` repeated byte-for-byte
+- Both transactions restored exactly; final game process count 0; deployment lock absent; no save selected or written
+- Added exhaustive `planning/DEFINITION-OF-DONE-MATRIX.md`. All save-backed planning/resource/effect/execution/persistence rows remain core and unmet, with source evidence separated from runtime proof
+- The exact remaining safety condition is absence of a distinct `KBP_AUTOMATION_BASELINE` / `KBP_AUTOMATION_WORKING` pair; every present save is protected
+- Exact next action: commit the audit, rebuild and rerun the composed core twice on final HEAD, push only the feature branch through the guarded helper, then record the section 26.2 hard stop

@@ -21,5 +21,6 @@ Status: PASS for every applicable no-save scenario; save-backed rows are `DEFER 
 | 11 | Call of the Wild profile (two fresh processes) | NO-SAVE | exact UMM/assembly/fixture identities, representative dynamic discovery, ordered Harmony inventory, restoration | PASS twice (`20260811T2241040368066Z`, `20260811T2242392501436Z`) |
 | 11 | Tabletop Added Rules profile | KBP working fixture | exact fixture hash and dynamic discovery | UNAVAILABLE-LOCAL-REFERENCE |
 | 11 | native/COTW save-backed planning and execution | KBP working fixture | provider/resource/effect/execution equivalence | DEFER — EVIDENCED |
+| 12 | final-no-save-core (two fresh processes) | NO-SAVE | identity, catalog, Harmony, UI, deterministic hashes, restoration | PASS twice (`phase12-no-save-core-1`, `phase12-no-save-core-2`) |
 
 The save-backed rows are evidentially deferred while source-only work and NO-SAVE runtime work remain independently actionable. They must not be relabeled PASS without a project-owned `KBP_` fixture.

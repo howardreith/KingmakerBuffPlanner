@@ -1,6 +1,6 @@
 # Manual Acceptance
 
-Status: TODO
+Status: DEFER — EVIDENCED pending an authorized `KBP_AUTOMATION_WORKING` fixture
 
 Manual acceptance is not a substitute for automated evidence. When an authorized `KBP_AUTOMATION_WORKING` fixture is available, verify:
 
