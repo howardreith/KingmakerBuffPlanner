@@ -1,24 +1,30 @@
 # Native Buff Coverage
 
-Status: IN PROGRESS — deterministic structural catalog generated; provider/resource and runtime disposition audit pending
+Status: PHASE 9 STRUCTURAL AUDIT PASS; INCLUDED-SOURCE RUNTIME QUALIFICATION DEFERRED — EVIDENCED
 
-The authoritative preliminary catalog is generated structurally from the exact installed native blueprint cache by the guarded `native-buff-catalog` scenario. Static name/GUID lists are not the primary discovery mechanism. The generated file is `planning/NATIVE-BUFF-CATALOG.json`, SHA-256 `bcacbe69bc71c85c5299b8fe8254c18baa33d66e9e3ecf53f6d4aa6b37094878`.
+The authoritative row-level audit is generated from the exact initialized native blueprint cache. Player accessibility is derived from `BlueprintRoot` player classes/races/feats, class and archetype progressions, native spellbooks/special lists, feature fact grants, and variants. Names are recorded for review but are not the primary classifier.
+
+Generated catalog: `planning/NATIVE-BUFF-CATALOG.json`, schema 4, SHA-256 `1c2881de5c600c430709fac075e0f4fb223d0e050ba52d07bfa7451cf97be0fa`.
 
 | Classification | Count | Evidence |
 |---|---:|---|
-| all native ability blueprints inventoried | 1,722 | exact `ResourcesLibrary.GetBlueprints<BlueprintAbility>()` export |
-| preliminary candidates | 1,353 | spell or structurally detected effect |
-| effect-bearing graphs | 1,095 | branch-preserving expression contains a leaf |
-| preliminary candidates without a detected effect | 258 | requires scope/exclusion audit |
-| candidates with structured unknown-action diagnostics | 455 | explicit diagnostic, not silently discarded |
-| candidates without scanner diagnostics | 898 | exact generated catalog |
-| spells among preliminary candidates | 1,060 | exact blueprint flag |
-| non-spell effect candidates | 293 | structural discovery |
-| variant parents / sticky-touch candidates | 78 / 54 | exact blueprint components/properties |
-| final PASS | 0 | final execution/resource qualification not yet run |
-| final FAIL | 0 | audit remains open rather than misclassifying candidates |
-| DEFER — EVIDENCED | 1,353 | final candidate disposition requires Phases 3–10 |
+| all native ability blueprints inventoried | 1,722 | `ResourcesLibrary.GetBlueprints<BlueprintAbility>()` |
+| audited player-accessible candidates | 974 | exact player class/race/feat reachability graph |
+| supported automatically | 396 | structural persistent effect and safe target semantics |
+| supported by generic reflection wrapper | 1 | exact `ActionList` wrapper with retained provenance |
+| supported by explicit adapter | 13 | area/pet/party/enchantment/Magic Fang/dynamic-pool contracts |
+| supported by override | 3 | exact friendly exceptions with misleading target metadata |
+| excluded by definition | 561 | exact row reason in generated catalog |
+| unsupported with reason | 0 | count reconciles; none hidden |
+| runtime-qualified direct cases | 0 | no authorized `KBP_` save exists |
+| runtime-qualified equivalence classes | 0 | no authorized `KBP_` save exists |
 
-Current catalog fields cover source/parent/variant GUIDs, names, assembly, spell/candidate flags, targeting, sticky-touch, resource IDs, branch-preserving effect expressions, provenance paths, diagnostics, and preliminary disposition. Provider class, exact spell-list level, normalized resource/slot semantics, planner eligibility, and final runtime disposition are Phase 3+ obligations and are not claimed complete.
+The candidate equation reconciles exactly: `396 + 1 + 13 + 3 + 561 + 0 = 974`. The 413 included sources are `DEFER-runtime-qualification`; the 561 exclusions are `PASS-excluded-by-definition`.
 
-Determinism proof: runs `20260811T1958580589645Z-native-buff-catalog` and `20260811T2000040593873Z-native-buff-catalog`, both from commit `07dc2380abbac74228eed88ce73113aeeabe61db`, produced the same catalog hash and counts. Both transactions restored the original whole `Mods` tree with `restorationVerified=true`; no save was selected.
+Exclusion reasons reconcile to 561: point target without safe placement 159; hostile-only 147; no persistent effect 126; summoning 113; sticky-touch delivery carrier only 11; hostile weapon carrier 2; direct healing cooldown overrides 2; non-castable variant container 1. Three otherwise-hostile structural rows are separately re-included by exact friendly-effect overrides.
+
+Catalog fields include source/parent/variant GUIDs, spell lists and levels, native ownership, ability/effect component contracts, target flags, sticky/mass/area shape, resource and material facts, action paths, branch-preserving expressions, exact diagnostics, disposition, support class, override, runtime evidence, and qualification status.
+
+Determinism proof: guarded native-only runs `20260811T2126328544602Z-native-buff-catalog` and `20260811T2127318144905Z-native-buff-catalog`, from commit `fba6e24`, produced byte-identical catalogs with the hash above. Both passed runtime validation and restored the whole original `Mods` tree exactly; no save was selected.
+
+Phase 9's classification/reconciliation gate is PASS. Candidate-level final PASS remains deferred because the mission also requires resource/effect/executor runtime equivalence, which cannot be inferred from a no-save catalog run.

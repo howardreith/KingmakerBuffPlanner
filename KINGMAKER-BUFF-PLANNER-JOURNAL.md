@@ -164,3 +164,20 @@ Status: Phase 6 partial PASS; executor source PASS; save-backed executor gates D
 - Uncertainty retained: exact resource/effect equivalence, invalid/no-spend, material spend, sticky touch, scene transitions, and campaign UI require an authorized save fixture
 - External state: restored; no game, lock, or save mutation
 - Exact next action: add compatibility profile automation and Call of the Wild generic-discovery qualification, then continue native candidate classification without hiding unknowns
+
+## 2026-08-11 — Phase 9 complete native structural audit
+
+Status: PASS for classification/reconciliation; runtime equivalence DEFER — EVIDENCED
+
+- Branch/runtime source: `codex/kingmaker-buff-planner` at `fba6e24`
+- Source gates: validation 15/15, behavior 43/43, runtime transaction 5/5, deployment WhatIf 5/5, package 4/4
+- Exact player-accessible inventory: 974 candidates from player class/race/feat roots out of 1,722 native abilities
+- Reconciled disposition: automatic 396; generic reflection 1; explicit adapters 13; overrides 3; excluded 561; unsupported/unclassified 0
+- Generated schema-4 catalog SHA-256: `1c2881de5c600c430709fac075e0f4fb223d0e050ba52d07bfa7451cf97be0fa`
+- Deterministic guarded runs: `20260811T2126328544602Z-native-buff-catalog` and `20260811T2127318144905Z-native-buff-catalog`; byte-identical, exact restoration, no save
+- Package/DLL: `766514afc64d96cd719b2237d3435156987f05ba46d6f10b0f09f0806647ca79` / `0e0423f4d33f733421a9181299b661b608b8a328e16ba479661c66c82318cb35`
+- Repaired theories: broad spell/effect candidacy; summon after-buffs as source effects; sticky carrier buffs; hostile self/current-target markers; cooldown-only healing markers; flattened selected/random alternatives
+- Exception layer: strict packaged schema-1 registry, three friendly include overrides and two direct-healing cooldown exclusions; structural discovery remains primary
+- Qualification boundary: all 413 included rows await save-backed resource/effect/executor equivalence; no runtime PASS inferred
+- External state: game absent, lock absent, whole original `Mods` tree restored exactly
+- Exact next action: checkpoint generated audit/docs, then Phase 10 HUD routine execution and service composition

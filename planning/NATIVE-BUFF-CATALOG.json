@@ -1,16 +1,16 @@
 {
   "schemaVersion": 4,
   "profile": "native-only",
-  "generatorCommit": "9fe9a42c2aaa4a4c25ff69e7ed8a24c4736b18c3",
+  "generatorCommit": "fba6e24faf2f98dc2375d6336e7657263b39d0ed",
   "abilityCount": 1722,
   "candidateCount": 974,
   "detectedEffectCount": 952,
   "diagnosticAbilityCount": 885,
-  "supportedAutomaticallyCount": 403,
-  "supportedGenericReflectionCount": 8,
+  "supportedAutomaticallyCount": 396,
+  "supportedGenericReflectionCount": 1,
   "supportedExplicitAdapterCount": 13,
-  "supportedOverrideCount": 0,
-  "excludedByDefinitionCount": 550,
+  "supportedOverrideCount": 3,
+  "excludedByDefinitionCount": 561,
   "unsupportedCount": 0,
   "runtimeQualifiedDirectCount": 0,
   "runtimeQualifiedEquivalenceClassCount": 0,
@@ -810,7 +810,7 @@
       "materialItemGuid": "",
       "materialCount": 0,
       "recognizedActionContracts": [
-        "ContextActionApplyBuff"
+        "EffectOverrideRegistry"
       ],
       "effects": [
         {
@@ -828,55 +828,28 @@
             "Kingmaker.UnitLogic.FactLogic.AddConditionImmunity",
             "Kingmaker.UnitLogic.FactLogic.BuffDescriptorImmunity"
           ],
-          "sourceContract": "ContextActionApplyBuff",
-          "actionPath": "0087fc2d64b6095478bc7b8d7d512caf/0:4c349361d720e844e846ad8c19959b1e/0:4c349361d720e844e846ad8c19959b1e/0:ActionList/0:ContextActionApplyBuff"
+          "sourceContract": "EffectOverrideRegistry",
+          "actionPath": "override:0087fc2d64b6095478bc7b8d7d512caf"
         }
       ],
       "expression": {
-        "expressionType": "ability-reference",
-        "abilityId": "0087fc2d64b6095478bc7b8d7d512caf",
-        "child": {
-          "expressionType": "sequence",
-          "children": [
-            {
-              "expressionType": "ability-reference",
-              "abilityId": "4c349361d720e844e846ad8c19959b1e",
-              "child": {
-                "expressionType": "sequence",
-                "children": [
-                  {
-                    "expressionType": "ability-reference",
-                    "abilityId": "4c349361d720e844e846ad8c19959b1e",
-                    "child": {
-                      "expressionType": "sequence",
-                      "children": [
-                        {
-                          "expressionType": "sequence",
-                          "children": [
-                            {
-                              "expressionType": "leaf",
-                              "kind": "Buff",
-                              "effectId": "1533e782fca42b84ea370fc1dcbf4fc1",
-                              "target": "CurrentTarget",
-                              "sourceContract": "ContextActionApplyBuff",
-                              "actionPath": "0087fc2d64b6095478bc7b8d7d512caf/0:4c349361d720e844e846ad8c19959b1e/0:4c349361d720e844e846ad8c19959b1e/0:ActionList/0:ContextActionApplyBuff"
-                            }
-                          ]
-                        }
-                      ]
-                    }
-                  }
-                ]
-              }
-            }
-          ]
-        }
+        "expressionType": "sequence",
+        "children": [
+          {
+            "expressionType": "leaf",
+            "kind": "Buff",
+            "effectId": "1533e782fca42b84ea370fc1dcbf4fc1",
+            "target": "CurrentTarget",
+            "sourceContract": "EffectOverrideRegistry",
+            "actionPath": "override:0087fc2d64b6095478bc7b8d7d512caf"
+          }
+        ]
       },
       "diagnostics": [],
       "disposition": "include",
-      "supportClass": "automatic",
-      "dispositionReason": "Player-accessible graph has a persistent beneficial effect and deterministic target semantics.",
-      "manualOverride": "",
+      "supportClass": "override",
+      "dispositionReason": "Freedom of Movement has a proven friendly persistent delivery buff despite misleading harmful-enemy target metadata.",
+      "manualOverride": "include: Freedom of Movement has a proven friendly persistent delivery buff despite misleading harmful-enemy target metadata.",
       "runtimeEvidence": [],
       "qualificationStatus": "DEFER-runtime-qualification"
     },
@@ -7089,12 +7062,12 @@
         }
       },
       "diagnostics": [],
-      "disposition": "include",
-      "supportClass": "generic-reflection-wrapper",
-      "dispositionReason": "Player-accessible graph has a persistent beneficial effect and deterministic target semantics.",
+      "disposition": "exclude",
+      "supportClass": "excluded-by-definition",
+      "dispositionReason": "hostile-only: The ability targets enemies and has no structurally controlled caster, pet, or party effect.",
       "manualOverride": "",
       "runtimeEvidence": [],
-      "qualificationStatus": "DEFER-runtime-qualification"
+      "qualificationStatus": "PASS-excluded-by-definition"
     },
     {
       "abilityGuid": "07dccc8e4c4489c4d9de721dddaf12cc",
@@ -14334,12 +14307,12 @@
         }
       },
       "diagnostics": [],
-      "disposition": "include",
-      "supportClass": "automatic",
-      "dispositionReason": "Player-accessible graph has a persistent beneficial effect and deterministic target semantics.",
+      "disposition": "exclude",
+      "supportClass": "excluded-by-definition",
+      "dispositionReason": "hostile-only: The ability targets enemies and has no structurally controlled caster, pet, or party effect.",
       "manualOverride": "",
       "runtimeEvidence": [],
-      "qualificationStatus": "DEFER-runtime-qualification"
+      "qualificationStatus": "PASS-excluded-by-definition"
     },
     {
       "abilityGuid": "0e0668a703fbfcf499d9aa9d918b71ea",
@@ -27886,7 +27859,7 @@
       "materialItemGuid": "",
       "materialCount": 0,
       "recognizedActionContracts": [
-        "ContextActionApplyBuff"
+        "EffectOverrideRegistry"
       ],
       "effects": [
         {
@@ -27904,37 +27877,28 @@
             "Kingmaker.Designers.Mechanics.Facts.AttackTypeAttackBonus",
             "Kingmaker.UnitLogic.Mechanics.Components.ContextRankConfig"
           ],
-          "sourceContract": "ContextActionApplyBuff",
-          "actionPath": "1d6364123e1f6a04c88313d83d3b70ee/0:ActionList/0:ContextActionApplyBuff"
+          "sourceContract": "EffectOverrideRegistry",
+          "actionPath": "override:1d6364123e1f6a04c88313d83d3b70ee"
         }
       ],
       "expression": {
-        "expressionType": "ability-reference",
-        "abilityId": "1d6364123e1f6a04c88313d83d3b70ee",
-        "child": {
-          "expressionType": "sequence",
-          "children": [
-            {
-              "expressionType": "sequence",
-              "children": [
-                {
-                  "expressionType": "leaf",
-                  "kind": "Buff",
-                  "effectId": "94dfcf5f3a72ce8478c8de5db69e752b",
-                  "target": "CurrentTarget",
-                  "sourceContract": "ContextActionApplyBuff",
-                  "actionPath": "1d6364123e1f6a04c88313d83d3b70ee/0:ActionList/0:ContextActionApplyBuff"
-                }
-              ]
-            }
-          ]
-        }
+        "expressionType": "sequence",
+        "children": [
+          {
+            "expressionType": "leaf",
+            "kind": "Buff",
+            "effectId": "94dfcf5f3a72ce8478c8de5db69e752b",
+            "target": "CurrentTarget",
+            "sourceContract": "EffectOverrideRegistry",
+            "actionPath": "override:1d6364123e1f6a04c88313d83d3b70ee"
+          }
+        ]
       },
       "diagnostics": [],
       "disposition": "include",
-      "supportClass": "automatic",
-      "dispositionReason": "Player-accessible graph has a persistent beneficial effect and deterministic target semantics.",
-      "manualOverride": "",
+      "supportClass": "override",
+      "dispositionReason": "Strength Surge has a proven friendly persistent buff despite allowing hostile targets and carrying harmful-enemy metadata.",
+      "manualOverride": "include: Strength Surge has a proven friendly persistent buff despite allowing hostile targets and carrying harmful-enemy metadata.",
       "runtimeEvidence": [],
       "qualificationStatus": "DEFER-runtime-qualification"
     },
@@ -44335,12 +44299,12 @@
         }
       },
       "diagnostics": [],
-      "disposition": "include",
-      "supportClass": "generic-reflection-wrapper",
-      "dispositionReason": "Player-accessible graph has a persistent beneficial effect and deterministic target semantics.",
+      "disposition": "exclude",
+      "supportClass": "excluded-by-definition",
+      "dispositionReason": "hostile-only: The ability targets enemies and has no structurally controlled caster, pet, or party effect.",
       "manualOverride": "",
       "runtimeEvidence": [],
-      "qualificationStatus": "DEFER-runtime-qualification"
+      "qualificationStatus": "PASS-excluded-by-definition"
     },
     {
       "abilityGuid": "2dc03fae8128c84479f5c4bebae97001",
@@ -46721,12 +46685,12 @@
           "detail": "unsupported-action"
         }
       ],
-      "disposition": "include",
-      "supportClass": "generic-reflection-wrapper",
-      "dispositionReason": "Persistent beneficial semantics are recognized; remaining diagnostics are non-persistent native adjunct actions.",
+      "disposition": "exclude",
+      "supportClass": "excluded-by-definition",
+      "dispositionReason": "hostile-only: The ability targets enemies and has no structurally controlled caster, pet, or party effect.",
       "manualOverride": "",
       "runtimeEvidence": [],
-      "qualificationStatus": "DEFER-runtime-qualification"
+      "qualificationStatus": "PASS-excluded-by-definition"
     },
     {
       "abilityGuid": "3167d30dd3c622c46b0c0cb242061642",
@@ -61572,12 +61536,12 @@
           "detail": "unsupported-action"
         }
       ],
-      "disposition": "include",
-      "supportClass": "automatic",
-      "dispositionReason": "Persistent beneficial semantics are recognized; remaining diagnostics are non-persistent native adjunct actions.",
+      "disposition": "exclude",
+      "supportClass": "excluded-by-definition",
+      "dispositionReason": "hostile-only: The ability targets enemies and has no structurally controlled caster, pet, or party effect.",
       "manualOverride": "",
       "runtimeEvidence": [],
-      "qualificationStatus": "DEFER-runtime-qualification"
+      "qualificationStatus": "PASS-excluded-by-definition"
     },
     {
       "abilityGuid": "42aa71adc7343714fa92e471baa98d42",
@@ -74322,7 +74286,7 @@
       "materialItemGuid": "",
       "materialCount": 0,
       "recognizedActionContracts": [
-        "ContextActionApplyBuff"
+        "EffectOverrideRegistry"
       ],
       "effects": [
         {
@@ -74338,55 +74302,28 @@
           "componentTypes": [
             "Kingmaker.UnitLogic.FactLogic.AddCondition"
           ],
-          "sourceContract": "ContextActionApplyBuff",
-          "actionPath": "4cf3d0fae3239ec478f51e86f49161cb/0:b3da3fbee6a751d4197e446c7e852bcb/0:b3da3fbee6a751d4197e446c7e852bcb/0:ActionList/0:ContextActionApplyBuff"
+          "sourceContract": "EffectOverrideRegistry",
+          "actionPath": "override:4cf3d0fae3239ec478f51e86f49161cb"
         }
       ],
       "expression": {
-        "expressionType": "ability-reference",
-        "abilityId": "4cf3d0fae3239ec478f51e86f49161cb",
-        "child": {
-          "expressionType": "sequence",
-          "children": [
-            {
-              "expressionType": "ability-reference",
-              "abilityId": "b3da3fbee6a751d4197e446c7e852bcb",
-              "child": {
-                "expressionType": "sequence",
-                "children": [
-                  {
-                    "expressionType": "ability-reference",
-                    "abilityId": "b3da3fbee6a751d4197e446c7e852bcb",
-                    "child": {
-                      "expressionType": "sequence",
-                      "children": [
-                        {
-                          "expressionType": "sequence",
-                          "children": [
-                            {
-                              "expressionType": "leaf",
-                              "kind": "Buff",
-                              "effectId": "09b4b69169304474296484c74aa12027",
-                              "target": "CurrentTarget",
-                              "sourceContract": "ContextActionApplyBuff",
-                              "actionPath": "4cf3d0fae3239ec478f51e86f49161cb/0:b3da3fbee6a751d4197e446c7e852bcb/0:b3da3fbee6a751d4197e446c7e852bcb/0:ActionList/0:ContextActionApplyBuff"
-                            }
-                          ]
-                        }
-                      ]
-                    }
-                  }
-                ]
-              }
-            }
-          ]
-        }
+        "expressionType": "sequence",
+        "children": [
+          {
+            "expressionType": "leaf",
+            "kind": "Buff",
+            "effectId": "09b4b69169304474296484c74aa12027",
+            "target": "CurrentTarget",
+            "sourceContract": "EffectOverrideRegistry",
+            "actionPath": "override:4cf3d0fae3239ec478f51e86f49161cb"
+          }
+        ]
       },
       "diagnostics": [],
       "disposition": "include",
-      "supportClass": "automatic",
-      "dispositionReason": "Player-accessible graph has a persistent beneficial effect and deterministic target semantics.",
-      "manualOverride": "",
+      "supportClass": "override",
+      "dispositionReason": "True Seeing has a proven friendly persistent delivery buff despite misleading harmful-enemy target metadata.",
+      "manualOverride": "include: True Seeing has a proven friendly persistent delivery buff despite misleading harmful-enemy target metadata.",
       "runtimeEvidence": [],
       "qualificationStatus": "DEFER-runtime-qualification"
     },
@@ -93594,12 +93531,12 @@
           "detail": "unsupported-action"
         }
       ],
-      "disposition": "include",
-      "supportClass": "automatic",
-      "dispositionReason": "Persistent beneficial semantics are recognized; remaining diagnostics are non-persistent native adjunct actions.",
+      "disposition": "exclude",
+      "supportClass": "excluded-by-definition",
+      "dispositionReason": "hostile-only: The ability targets enemies and has no structurally controlled caster, pet, or party effect.",
       "manualOverride": "",
       "runtimeEvidence": [],
-      "qualificationStatus": "DEFER-runtime-qualification"
+      "qualificationStatus": "PASS-excluded-by-definition"
     },
     {
       "abilityGuid": "630c8b85d9f07a64f917d79cb5905741",
@@ -106322,12 +106259,12 @@
         }
       },
       "diagnostics": [],
-      "disposition": "include",
-      "supportClass": "generic-reflection-wrapper",
-      "dispositionReason": "Player-accessible graph has a persistent beneficial effect and deterministic target semantics.",
+      "disposition": "exclude",
+      "supportClass": "excluded-by-definition",
+      "dispositionReason": "hostile-only: The ability targets enemies and has no structurally controlled caster, pet, or party effect.",
       "manualOverride": "",
       "runtimeEvidence": [],
-      "qualificationStatus": "DEFER-runtime-qualification"
+      "qualificationStatus": "PASS-excluded-by-definition"
     },
     {
       "abilityGuid": "71dfb899a04db614e9db458ed4e43f56",
@@ -120649,12 +120586,12 @@
         }
       },
       "diagnostics": [],
-      "disposition": "include",
-      "supportClass": "generic-reflection-wrapper",
-      "dispositionReason": "Player-accessible graph has a persistent beneficial effect and deterministic target semantics.",
+      "disposition": "exclude",
+      "supportClass": "excluded-by-definition",
+      "dispositionReason": "hostile-only: The ability targets enemies and has no structurally controlled caster, pet, or party effect.",
       "manualOverride": "",
       "runtimeEvidence": [],
-      "qualificationStatus": "DEFER-runtime-qualification"
+      "qualificationStatus": "PASS-excluded-by-definition"
     },
     {
       "abilityGuid": "808ab74c12df8784ab4eeaf6a107dbea",
@@ -177874,12 +177811,12 @@
           "detail": "unsupported-action"
         }
       ],
-      "disposition": "include",
-      "supportClass": "generic-reflection-wrapper",
-      "dispositionReason": "Persistent beneficial semantics are recognized; remaining diagnostics are non-persistent native adjunct actions.",
+      "disposition": "exclude",
+      "supportClass": "excluded-by-definition",
+      "dispositionReason": "hostile-only: The ability targets enemies and has no structurally controlled caster, pet, or party effect.",
       "manualOverride": "",
       "runtimeEvidence": [],
-      "qualificationStatus": "DEFER-runtime-qualification"
+      "qualificationStatus": "PASS-excluded-by-definition"
     },
     {
       "abilityGuid": "c1e46599fcade78418ef1ada71c1f487",
@@ -210626,12 +210563,12 @@
           "detail": "unsupported-action"
         }
       ],
-      "disposition": "include",
-      "supportClass": "automatic",
-      "dispositionReason": "Persistent beneficial semantics are recognized; remaining diagnostics are non-persistent native adjunct actions.",
+      "disposition": "exclude",
+      "supportClass": "excluded-by-definition",
+      "dispositionReason": "hostile-only: The ability targets enemies and has no structurally controlled caster, pet, or party effect.",
       "manualOverride": "",
       "runtimeEvidence": [],
-      "qualificationStatus": "DEFER-runtime-qualification"
+      "qualificationStatus": "PASS-excluded-by-definition"
     },
     {
       "abilityGuid": "e53f34fb268a7964caf1566afb82dadd",
@@ -211819,12 +211756,12 @@
         }
       },
       "diagnostics": [],
-      "disposition": "include",
-      "supportClass": "generic-reflection-wrapper",
-      "dispositionReason": "Player-accessible graph has a persistent beneficial effect and deterministic target semantics.",
+      "disposition": "exclude",
+      "supportClass": "excluded-by-definition",
+      "dispositionReason": "hostile-only: The ability targets enemies and has no structurally controlled caster, pet, or party effect.",
       "manualOverride": "",
       "runtimeEvidence": [],
-      "qualificationStatus": "DEFER-runtime-qualification"
+      "qualificationStatus": "PASS-excluded-by-definition"
     },
     {
       "abilityGuid": "e648e7e21975e1843b6b56c9cfea9d6f",

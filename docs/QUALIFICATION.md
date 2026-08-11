@@ -54,3 +54,12 @@ Phase 6 no-save UI root qualification PASS:
 - transaction: `Restored`, `restorationVerified=true`; no save selected.
 
 This proves exact UI module load, repeated lifecycle, IMGUI render, singleton behavior, and one representative resolution. It does not prove campaign configuration interaction, scene transition, 1920x1080, or 3840x2160.
+
+Phase 9 native classification qualification PASS; included-source runtime equivalence DEFER — EVIDENCED:
+
+| Run ID | Commit | Catalog SHA-256 | Audited/support/exclude/unsupported | Restoration |
+|---|---|---|---|---|
+| `20260811T2126328544602Z-native-buff-catalog` | `fba6e24` | `1c2881de5c600c430709fac075e0f4fb223d0e050ba52d07bfa7451cf97be0fa` | 974 / 413 / 561 / 0 | PASS exact |
+| `20260811T2127318144905Z-native-buff-catalog` | `fba6e24` | `1c2881de5c600c430709fac075e0f4fb223d0e050ba52d07bfa7451cf97be0fa` | 974 / 413 / 561 / 0 | PASS exact |
+
+Both runs were byte-identical. Support classes are 396 automatic, 1 generic reflection wrapper, 13 explicit adapters, and 3 overrides. The package/DLL hashes were `766514afc64d96cd719b2237d3435156987f05ba46d6f10b0f09f0806647ca79` / `0e0423f4d33f733421a9181299b661b608b8a328e16ba479661c66c82318cb35`. Source gates were validation 15/15, behavior 43/43, harness 5/5, deployment purity 5/5, package 4/4. No save was selected. The 413 included rows remain runtime-deferred because provider/resource/effect/executor equivalence needs an authorized project-owned save.
