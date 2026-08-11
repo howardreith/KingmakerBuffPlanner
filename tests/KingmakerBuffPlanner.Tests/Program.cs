@@ -10,7 +10,9 @@ using KingmakerBuffPlanner.Domain.Identity;
 using KingmakerBuffPlanner.Domain.Providers;
 using KingmakerBuffPlanner.Domain.Planning;
 using KingmakerBuffPlanner.Planning;
+using KingmakerBuffPlanner.Persistence;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace KingmakerBuffPlanner.Tests
 {
@@ -61,6 +63,10 @@ namespace KingmakerBuffPlanner.Tests
                 Run("planner-reports-active-skip-marker", TestPlannerActiveSkip);
                 Run("planner-honors-ban-and-material-availability", TestPlannerBanAndMaterial);
                 Run("planner-reserves-material-once-per-cast", TestPlannerMaterialReservation);
+                Run("profile-round-trip-preserves-stable-ids", () => TestProfileRoundTrip(root));
+                Run("profile-recovers-valid-bounded-backup", () => TestProfileBackupRecovery(root));
+                Run("profile-migrates-schema-one", () => TestProfileMigration(root));
+                Run("profile-malformed-json-recovers-default", () => TestProfileMalformed(root));
             }
             finally
             {
@@ -409,6 +415,110 @@ namespace KingmakerBuffPlanner.Tests
                 plan.Steps[0].MaterialReservation.ItemGuid != "pearl" ||
                 plan.Outcomes.Count(o => o.Kind == TargetOutcomeKind.Unfulfilled) != 1)
                 throw new InvalidOperationException("One material component was scheduled for multiple casts.");
+        }
+
+        private static void TestProfileRoundTrip(string root)
+        {
+            string modPath = Path.Combine(root, "profile-roundtrip");
+            Directory.CreateDirectory(modPath);
+            var repository = new ProfileRepository(modPath);
+            BuffPlannerProfile profile = ProfileFixture("campaign:alpha");
+            repository.Save(profile);
+            ProfileLoadResult loaded = repository.Load("campaign:alpha");
+            SourceAssignmentProfile assignment = loaded.Profile.Routines[0].Assignments[0];
+            if (loaded.RecoveredFromBackup || loaded.Migrated || loaded.Warning.Length != 0 ||
+                assignment.WantedTargetUnitIds[0] != "unit-z" ||
+                assignment.WantedTargetUnitIds[1] != "unit-a" ||
+                assignment.Ability.ToKey().Canonical != Ability("persisted", "variant", 8).Canonical)
+                throw new InvalidOperationException("Stable IDs or exact profile values changed during round trip.");
+            if (Directory.GetFiles(Path.GetDirectoryName(repository.GetProfilePath("campaign:alpha")), "*.tmp").Length != 0)
+                throw new InvalidOperationException("Atomic profile write left a temporary file.");
+        }
+
+        private static void TestProfileBackupRecovery(string root)
+        {
+            string modPath = Path.Combine(root, "profile-backup");
+            Directory.CreateDirectory(modPath);
+            var repository = new ProfileRepository(modPath);
+            BuffPlannerProfile profile = ProfileFixture("campaign:backup");
+            profile.Routines[0].Name = "First";
+            repository.Save(profile);
+            profile.Routines[0].Name = "Second";
+            repository.Save(profile);
+            File.WriteAllText(repository.GetProfilePath("campaign:backup"), "{ malformed");
+            ProfileLoadResult recovered = repository.Load("campaign:backup");
+            if (!recovered.RecoveredFromBackup || recovered.Profile.Routines[0].Name != "First" ||
+                string.IsNullOrWhiteSpace(recovered.Warning))
+                throw new InvalidOperationException("Malformed primary did not recover the prior valid profile.");
+            for (int i = 0; i < 5; i++)
+            {
+                recovered.Profile.Routines[0].Name = "Revision " + i;
+                repository.Save(recovered.Profile);
+            }
+            if (File.Exists(repository.GetProfilePath("campaign:backup") + ".bak4"))
+                throw new InvalidOperationException("Profile backup retention exceeded its bound.");
+        }
+
+        private static void TestProfileMigration(string root)
+        {
+            string modPath = Path.Combine(root, "profile-migration");
+            Directory.CreateDirectory(modPath);
+            var repository = new ProfileRepository(modPath);
+            JObject document = JObject.FromObject(ProfileFixture("campaign:migration"));
+            document["schemaVersion"] = 1;
+            document.Remove("ui");
+            document.Remove("execution");
+            string path = repository.GetProfilePath("campaign:migration");
+            Directory.CreateDirectory(Path.GetDirectoryName(path));
+            File.WriteAllText(path, document.ToString());
+            ProfileLoadResult migrated = repository.Load("campaign:migration");
+            if (!migrated.Migrated || migrated.Profile.SchemaVersion != 2 ||
+                migrated.Profile.Ui.Scale != 1.0f || migrated.Profile.Execution.Mode != "animated")
+                throw new InvalidOperationException("Schema-one profile was not migrated with safe defaults.");
+        }
+
+        private static void TestProfileMalformed(string root)
+        {
+            string modPath = Path.Combine(root, "profile-malformed");
+            Directory.CreateDirectory(modPath);
+            var repository = new ProfileRepository(modPath);
+            string path = repository.GetProfilePath("campaign:malformed");
+            Directory.CreateDirectory(Path.GetDirectoryName(path));
+            File.WriteAllText(path, "not-json");
+            ProfileLoadResult loaded = repository.Load("campaign:malformed");
+            if (loaded.Profile.CampaignId != "campaign:malformed" || loaded.Profile.Routines.Count != 3 ||
+                string.IsNullOrWhiteSpace(loaded.Warning))
+                throw new InvalidOperationException("Malformed JSON did not recover to an explicit safe default.");
+            BuffPlannerProfile duplicate = ProfileFixture("campaign:duplicate");
+            repository.Save(duplicate);
+            string duplicatePath = repository.GetProfilePath("campaign:duplicate");
+            string duplicateJson = File.ReadAllText(duplicatePath).Replace(
+                "\"schemaVersion\": 2,", "\"schemaVersion\": 2,\r\n  \"schemaVersion\": 2,");
+            File.WriteAllText(duplicatePath, duplicateJson);
+            ProfileLoadResult rejected = repository.Load("campaign:duplicate");
+            if (!rejected.Warning.Contains("duplicate-property"))
+                throw new InvalidOperationException("Duplicate JSON property was not rejected.");
+        }
+
+        private static BuffPlannerProfile ProfileFixture(string campaignId)
+        {
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault(campaignId);
+            profile.Routines[0].Assignments.Add(new SourceAssignmentProfile
+            {
+                SourceId = "source-persisted",
+                Ability = AbilityKeyProfile.FromKey(Ability("persisted", "variant", 8)),
+                WantedTargetUnitIds = new List<string> { "unit-z", "unit-a" },
+                ExistingEffectPolicy = ExistingEffectPolicy.SkipAlreadyActive,
+                IgnoredPresenceMarkers = new List<string> { "shared-marker" }
+            });
+            profile.ProviderPreferences.Add(new ProviderPreferenceProfile
+            {
+                ProviderKey = "unit-a|book|provider",
+                Banned = false,
+                Priority = 2,
+                MaximumCasts = 3
+            });
+            return profile;
         }
 
         private static EffectLeafExpression Leaf(string id)

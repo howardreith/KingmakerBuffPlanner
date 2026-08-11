@@ -76,6 +76,8 @@
     <Compile Include="Planning\ResourceLedger.cs" />
     <Compile Include="Planning\EffectPresenceEvaluator.cs" />
     <Compile Include="Planning\CastPlanner.cs" />
+    <Compile Include="Persistence\ProfileModels.cs" />
+    <Compile Include="Persistence\ProfileRepository.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="RuntimeTesting\RuntimeTestHost.cs" />
     <Compile Include="RuntimeTesting\RuntimePaths.cs" />
