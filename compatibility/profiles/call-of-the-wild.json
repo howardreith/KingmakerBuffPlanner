@@ -15,5 +15,10 @@
       "totalBytes": 66201967
     }
   ],
-  "expectedBlueprints": []
+  "expectedBlueprints": [
+    "0027cbfe0a484380ab76df1ad3d7326a",
+    "03963bcf8dd64abea3757311c1e8a79c",
+    "151b1f365c4217e5062a1fe50f7a63d3",
+    "4421fff35fed4afb9ea20cbd6e6a7c0d"
+  ]
 }

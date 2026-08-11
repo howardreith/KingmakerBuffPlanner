@@ -35,6 +35,7 @@ namespace KingmakerBuffPlanner.Tests
                 Run("absent-activation-is-inert", TestAbsentActivation);
                 Run("valid-request-is-accepted", () => TestValidRequest(root));
                 Run("valid-catalog-request-is-accepted", () => TestValidCatalogRequest(root));
+                Run("valid-call-of-the-wild-request-is-accepted", () => TestValidCallOfTheWildRequest(root));
                 Run("valid-ui-request-is-accepted", () => TestValidUiRequest(root));
                 Run("duplicate-flag-rejected", () => TestDuplicateFlag(root));
                 Run("outside-path-rejected", TestOutsidePath);
@@ -56,6 +57,7 @@ namespace KingmakerBuffPlanner.Tests
                 Run("scanner-expression-wire-contract", TestScannerExpressionWireContract);
                 Run("native-candidate-classification-is-structural", TestNativeCandidateClassification);
                 Run("optional-blueprint-ownership-is-exact", TestBlueprintOwnership);
+                Run("harmony-target-identities-are-stable", TestHarmonyTargetIdentity);
                 Run("effect-overrides-are-versioned-and-branch-preserving", TestEffectOverrides);
                 Run("stable-keys-distinguish-variants-and-metamagic", TestStableKeys);
                 Run("spontaneous-providers-share-one-pool", TestSpontaneousSharedPool);
@@ -192,6 +194,14 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("Empty optional ownership inventory was accepted.");
             }
             catch (InvalidDataException) { }
+        }
+
+        private static void TestHarmonyTargetIdentity()
+        {
+            MethodInfo method = typeof(string).GetMethod("StartsWith", new[] { typeof(string) });
+            string identity = HarmonyPatchInventoryExporter.GetMethodIdentity(method);
+            if (identity != "mscorlib|System.String|StartsWith(System.String)")
+                throw new InvalidOperationException("Harmony target identity is not stable: " + identity);
         }
 
         private static void TestNativeCandidateClassification()
@@ -1091,6 +1101,37 @@ namespace KingmakerBuffPlanner.Tests
                 new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path }, out rejection);
             if (request == null || rejection.Length != 0 || request.Scenario != "native-buff-catalog")
                 throw new InvalidOperationException("Valid catalog request was rejected: " + rejection);
+        }
+
+        private static void TestValidCallOfTheWildRequest(string root)
+        {
+            string path = WriteRequest(root, "valid-cotw", o =>
+            {
+                o["scenario"] = "native-buff-catalog";
+                o["profileId"] = "call-of-the-wild";
+                o["expectedOptionalMods"] = new object[]
+                {
+                    new Dictionary<string, object>
+                    {
+                        { "ummId", "CallOfTheWild" },
+                        { "version", "1.14.4c-2.1" },
+                        { "assemblyName", "CallOfTheWild.dll" },
+                        { "assemblySha256", new string('c', 64) }
+                    }
+                };
+                o["expectedBlueprintGuids"] = new[]
+                {
+                    "0027cbfe0a484380ab76df1ad3d7326a",
+                    "03963bcf8dd64abea3757311c1e8a79c",
+                    "151b1f365c4217e5062a1fe50f7a63d3"
+                };
+            });
+            string rejection;
+            RuntimeTestRequest request = RuntimeTestProtocol.TryRead(
+                new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path }, out rejection);
+            if (request == null || rejection.Length != 0 || request.ProfileId != "call-of-the-wild" ||
+                request.ExpectedOptionalMods.Count != 1 || request.ExpectedBlueprintGuids.Count != 3)
+                throw new InvalidOperationException("Valid Call of the Wild request was rejected: " + rejection);
         }
 
         private static void TestValidUiRequest(string root)

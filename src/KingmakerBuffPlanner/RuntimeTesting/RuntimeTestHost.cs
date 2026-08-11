@@ -85,6 +85,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 NativeCatalogExport catalog = null;
                 string catalogPath = null;
                 string catalogHash = null;
+                HarmonyPatchInventory harmonyInventory = null;
+                string harmonyInventoryHash = null;
                 UiRootDiagnostics ui = null;
                 if (dllMatches && string.Equals(
                     _request.Scenario, "native-buff-catalog", StringComparison.Ordinal))
@@ -111,6 +113,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     }
                     AtomicFile.WriteUtf8(catalogPath, catalogJson);
                     catalogHash = Hashing.Sha256(catalogPath);
+                    harmonyInventory = new HarmonyPatchInventoryExporter().Export(_request.ProfileId);
+                    string harmonyInventoryPath = Path.Combine(
+                        _request.EvidenceDirectory, "harmony-patch-inventory.json");
+                    AtomicFile.WriteUtf8(harmonyInventoryPath, Serialize(harmonyInventory));
+                    harmonyInventoryHash = Hashing.Sha256(harmonyInventoryPath);
                 }
                 if (dllMatches && string.Equals(_request.Scenario, "ui-root-smoke", StringComparison.Ordinal))
                     ui = BuffPlannerUiRoot.EndRuntimeSmoke();
@@ -146,6 +153,12 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     CatalogOptionalCandidateCount = catalog == null ? 0 : catalog.OptionalCandidateCount,
                     CatalogOptionalIncludedCount = catalog == null ? 0 : catalog.OptionalIncludedCount,
                     CatalogOptionalUnsupportedCount = catalog == null ? 0 : catalog.OptionalUnsupportedCount,
+                    HarmonyPatchInventorySha256 = harmonyInventoryHash,
+                    HarmonyPatchTargetCount = harmonyInventory == null ? 0 : harmonyInventory.TargetCount,
+                    HarmonyPatchRecordCount = harmonyInventory == null ? 0 : harmonyInventory.PatchCount,
+                    HarmonyMultiOwnerTargetCount = harmonyInventory == null ? 0 : harmonyInventory.MultiOwnerTargetCount,
+                    HarmonyBuffPlannerOverlapTargetCount = harmonyInventory == null
+                        ? 0 : harmonyInventory.BuffPlannerOverlapTargetCount,
                     UiRootCount = ui == null ? 0 : ui.RootCount,
                     UiRenderedOpenFrames = ui == null ? 0 : ui.RenderedOpenFrames,
                     UiOpenCloseCycles = ui == null ? 0 : ui.OpenCloseCycles,
@@ -221,8 +234,21 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         result.Status = "FAIL";
                         result.Stage = "catalog-validation";
                     }
+                    result.Assertions.Add(harmonyInventory != null
+                        ? RuntimeTestAssertion.Pass("harmony-patch-inventory", "written", harmonyInventory.TargetCount.ToString())
+                        : RuntimeTestAssertion.Fail("harmony-patch-inventory", "written", "missing"));
+                    result.Assertions.Add(harmonyInventory != null && harmonyInventory.BuffPlannerOverlapTargetCount == 0
+                        ? RuntimeTestAssertion.Pass("harmony-buff-planner-overlap", "0", "0")
+                        : RuntimeTestAssertion.Fail("harmony-buff-planner-overlap", "0",
+                            harmonyInventory == null ? "missing" : harmonyInventory.BuffPlannerOverlapTargetCount.ToString()));
+                    if (harmonyInventory == null || harmonyInventory.BuffPlannerOverlapTargetCount != 0)
+                    {
+                        result.Status = "FAIL";
+                        result.Stage = "harmony-inventory-validation";
+                    }
                     if (_request.ProfileId == "call-of-the-wild")
                     {
+                        AddPositiveAssertion(result, "optional-harmony-patches", harmonyInventory.PatchCount);
                         AddPositiveAssertion(result, "optional-abilities", catalog.OptionalAbilityCount);
                         AddPositiveAssertion(result, "optional-candidates", catalog.OptionalCandidateCount);
                         AddPositiveAssertion(result, "optional-included", catalog.OptionalIncludedCount);
@@ -422,6 +448,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         [JsonProperty("catalogOptionalIncludedCount", Order = 41)] public int CatalogOptionalIncludedCount { get; set; }
         [JsonProperty("catalogOptionalUnsupportedCount", Order = 42)] public int CatalogOptionalUnsupportedCount { get; set; }
         [JsonProperty("optionalLoadedAssemblyCount", Order = 43)] public int OptionalLoadedAssemblyCount { get; set; }
+        [JsonProperty("harmonyPatchInventorySha256", Order = 44)] public string HarmonyPatchInventorySha256 { get; set; }
+        [JsonProperty("harmonyPatchTargetCount", Order = 45)] public int HarmonyPatchTargetCount { get; set; }
+        [JsonProperty("harmonyPatchRecordCount", Order = 46)] public int HarmonyPatchRecordCount { get; set; }
+        [JsonProperty("harmonyMultiOwnerTargetCount", Order = 47)] public int HarmonyMultiOwnerTargetCount { get; set; }
+        [JsonProperty("harmonyBuffPlannerOverlapTargetCount", Order = 48)] public int HarmonyBuffPlannerOverlapTargetCount { get; set; }
     }
 
     internal sealed class RuntimeTestAssertion

@@ -179,6 +179,22 @@ function Assert-KbpRuntimeResult {
             [string]::IsNullOrWhiteSpace([string]$_.expression.expressionType)
         })
         if ($missingExpressions.Count -ne 0) { throw 'Native catalog contains expressions without discriminators.' }
+        $harmonyPath = Join-Path $Request.evidenceDirectory 'harmony-patch-inventory.json'
+        if (-not (Test-Path -LiteralPath $harmonyPath -PathType Leaf)) { throw 'Harmony patch inventory evidence is missing.' }
+        if ($Result.harmonyPatchInventorySha256 -cne (Get-KbpSha256 $harmonyPath)) {
+            throw 'Harmony patch inventory hash mismatch.'
+        }
+        $harmonyInventory = Read-KbpJson $harmonyPath
+        if ([int]$harmonyInventory.schemaVersion -ne 1 -or
+            [string]$harmonyInventory.profileId -cne [string]$Request.profileId -or
+            @($harmonyInventory.targets).Count -ne [int]$harmonyInventory.targetCount -or
+            [int]$harmonyInventory.targetCount -ne [int]$Result.harmonyPatchTargetCount -or
+            [int]$harmonyInventory.patchCount -ne [int]$Result.harmonyPatchRecordCount -or
+            [int]$harmonyInventory.multiOwnerTargetCount -ne [int]$Result.harmonyMultiOwnerTargetCount -or
+            [int]$harmonyInventory.buffPlannerOverlapTargetCount -ne 0 -or
+            [int]$Result.harmonyBuffPlannerOverlapTargetCount -ne 0) {
+            throw 'Harmony patch inventory contract does not reconcile with the runtime result.'
+        }
         if ($Request.profileId -ceq 'call-of-the-wild') {
             if ([int]$Result.catalogOptionalAbilityCount -le 0 -or
                 [int]$Result.catalogOptionalCandidateCount -le 0 -or
@@ -187,7 +203,8 @@ function Assert-KbpRuntimeResult {
                 [int]$catalog.optionalAbilityCount -ne [int]$Result.catalogOptionalAbilityCount -or
                 [int]$catalog.optionalCandidateCount -ne [int]$Result.catalogOptionalCandidateCount -or
                 [int]$catalog.optionalIncludedCount -ne [int]$Result.catalogOptionalIncludedCount -or
-                [int]$catalog.optionalUnsupportedCount -ne [int]$Result.catalogOptionalUnsupportedCount) {
+                [int]$catalog.optionalUnsupportedCount -ne [int]$Result.catalogOptionalUnsupportedCount -or
+                [int]$Result.harmonyPatchRecordCount -le 0) {
                 throw 'Call of the Wild catalog ownership/support counts are invalid.'
             }
             foreach ($guid in @($Request.expectedBlueprintGuids)) {

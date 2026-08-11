@@ -227,3 +227,16 @@ Status: source and guarded-staging contracts PASS; Call of the Wild runtime cata
 - Rejected shortcut: treating the optional assembly loading as proof that its abilities were discovered or classified
 - External state: no game, lock, transaction, live mod, or save mutation
 - Exact next action: commit this foundation, build/package that commit, and run the guarded Call of the Wild structural catalog to derive representative blueprint assertions and audit every optional unsupported row
+
+## 2026-08-11 — Call of the Wild diagnostic catalog
+
+Status: PASS as diagnostic evidence; final exact-profile repetition pending
+
+- Run `20260811T2218236669629Z-native-buff-catalog` loaded exact Call of the Wild `1.14.4c-2.1` and exact Kingmaker Buff Planner commit `0a5dd4a85ba0e58dc8b9425ced90f76829df18d3`
+- Catalog SHA-256 `b943093a8edbfa9c62187a5f795ea1263291adbdc8853212c8d80676bcec9951`; 9,064 abilities, 5,907 candidates, 7,342 Call of the Wild-owned abilities, 4,937 optional candidates, 2,096 optional included, 0 optional unsupported
+- Optional support classes: 2,008 automatic, 61 bounded generic-reflection wrappers, 27 explicit adapters; 5,246 excluded by definition
+- Evidence-derived representatives: Dazzling Blade `0027cbfe0a484380ab76df1ad3d7326a` (automatic apply buff), Regenerative Sinew `03963bcf8dd64abea3757311c1e8a79c` (bounded wrapper), Bless Weapon `151b1f365c4217e5062a1fe50f7a63d3` (worn-item enchantment), Globe of Invulnerability `4421fff35fed4afb9ea20cbd6e6a7c0d` (area-effect buff)
+- No optional adapter was added: the existing structural contracts and bounded wrapper policy classified every in-scope optional candidate
+- Transaction restored exact original `Mods`; no save was selected or written; game and lock absent afterward
+- The run did not yet enforce representative GUIDs or emit the required Harmony owner/order inventory, so it is retained as diagnostic rather than final Phase 11 qualification
+- Exact next action: checkpoint strict representatives plus Harmony inventory instrumentation, then repeat the exact Call of the Wild profile twice from fresh processes

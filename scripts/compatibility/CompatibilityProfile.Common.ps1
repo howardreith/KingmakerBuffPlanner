@@ -36,6 +36,15 @@ function Get-KbpCompatibilityProfile {
             }
         }
     }
+    $blueprints = @($profile.expectedBlueprints)
+    if (@($blueprints | Where-Object { [string]$_ -cnotmatch '^[0-9a-f]{32}$' }).Count -ne 0 -or
+        @($blueprints | Sort-Object -Unique).Count -ne $blueprints.Count) {
+        throw "Compatibility blueprint expectations are invalid: $ProfileId"
+    }
+    if (($ProfileId -ceq 'call-of-the-wild' -and $blueprints.Count -lt 3) -or
+        ($ProfileId -cne 'call-of-the-wild' -and $blueprints.Count -ne 0)) {
+        throw "Compatibility blueprint expectation count is invalid: $ProfileId"
+    }
     return $profile
 }
 

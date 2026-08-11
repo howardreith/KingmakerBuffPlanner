@@ -98,6 +98,7 @@
     <Compile Include="Persistence\ProfileRepository.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="RuntimeTesting\RuntimeTestHost.cs" />
+    <Compile Include="RuntimeTesting\HarmonyPatchInventoryExporter.cs" />
     <Compile Include="RuntimeTesting\RuntimePaths.cs" />
     <Compile Include="RuntimeTesting\RuntimeTestProtocol.cs" />
     <Compile Include="UI\PlannerSetupModel.cs" />

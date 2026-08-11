@@ -88,9 +88,15 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     throw new InvalidDataException("optional-mod-expectation");
             foreach (string guid in request.ExpectedBlueprintGuids)
                 if (!IsBlueprintGuid(guid)) throw new InvalidDataException("expected-blueprint-guid");
+            if (new HashSet<string>(request.ExpectedBlueprintGuids, StringComparer.Ordinal).Count !=
+                request.ExpectedBlueprintGuids.Count)
+                throw new InvalidDataException("duplicate-expected-blueprint-guid");
             if ((request.ProfileId == "native-only" && request.ExpectedOptionalMods.Count != 0) ||
                 (request.ProfileId == "call-of-the-wild" && request.ExpectedOptionalMods.Count != 1))
                 throw new InvalidDataException("profile-mod-expectation");
+            if ((request.ProfileId == "native-only" && request.ExpectedBlueprintGuids.Count != 0) ||
+                (request.ProfileId == "call-of-the-wild" && request.ExpectedBlueprintGuids.Count < 3))
+                throw new InvalidDataException("profile-blueprint-expectation");
 
             string evidence = RequireDescendant(request.EvidenceDirectory, EvidenceRoot);
             if (!Directory.Exists(evidence)) throw new InvalidDataException("evidence-directory-missing");
