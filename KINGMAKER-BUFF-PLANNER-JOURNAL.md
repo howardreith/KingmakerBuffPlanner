@@ -130,3 +130,20 @@ Status: PASS
 - Qualification boundary: Phase 2 structural catalog is PASS; no candidate is yet claimed fully supported until provider/resource/planning/execution audits complete
 - External state: game absent, runtime lock absent, original whole `Mods` tree exactly restored; no save selected or accessed
 - Exact next action: implement Phase 3 normalized party/provider/resource snapshot domain and pure snapshot tests, then add the guarded save-backed scenario only when a project-owned fixture exists
+
+## 2026-08-11 — Phases 3–5 source implementation checkpoint
+
+Status: PASS for source/pure behavior; runtime gates DEFER — EVIDENCED
+
+- Branch/HEAD: `codex/kingmaker-buff-planner` at `40b233a52aebf1f87d9fc671ae24d9cf86f7150e`
+- Active version: 0.0.1
+- Provider/resource commit: `18776f1a650e311c4400c22d0f2764665cc6b046`
+- Planner/effect detector commit: `5cbc9bb86fe9fcb79c16f8297c5a8754f34eda05`
+- Persistence commit: `40b233a52aebf1f87d9fc671ae24d9cf86f7150e`
+- Source gates: validation 15/15, protocol/domain/persistence 37/37, runtime transaction 5/5, deployment WhatIf 5/5, package validation 4/4
+- Proven pure behaviors: stable variant/metamagic/provider identities; no spontaneous pool multiplication; primary/linked opposition spend; domain isolation; explicit unlimited casts; deterministic priorities/bans/caps; prepared-before-flexible tie-break; mass one-cast cost; typed AllOf/conditional-AnyOf presence; exact skip marker; material availability/count reservation
+- Persistence: schema 2 external profile keyed by hash of exact `Player.GameId`; three bounded prior-valid backups; atomic fsync/replace; schema-1 migration; malformed, duplicate, unknown, and campaign-mismatch validation; no campaign save facts
+- Runtime boundary: `party-provider-scan`, prepared/spontaneous plans, active-effect policy, profile reorder/reload remain deferred because the live inventory contains no authorized `KBP_` save
+- External state: no game process, no runtime lock, no transaction; no live mod or save mutation
+- Rejected shortcut: treating compilation/pure fixtures as save-backed party/resource/execution qualification
+- Exact next action: implement Phase 6 standalone diagnostic setup UI and source-level lifecycle/controller tests, while retaining runtime UI gates as deferred until an authorized fixture exists

@@ -18,5 +18,15 @@ These contracts were established from the exact installed Kingmaker assembly, no
 | `RuleCastSpell.OnTrigger()` | executes cast/event semantics but does not spend or call `CanTarget` | PASS |
 | `UnitUseAbility.OnAction()` | final availability/target/charge validation, trigger rule, spend once when not UMD-failed | PASS |
 | `UnitUseAbility.CreateCastCommand()` | native command selection including touch/magus cases | PASS |
+| `UnitEntityData.UniqueId` / `Player.GameId` | stable unit and exact campaign identity used in snapshots/profiles | PASS |
+| `Player.Party` / `UnitDescriptor.Pet` | active party plus master-linked controllable pet intake | PASS — adapter compiled; save-backed runtime pending |
+| `Spellbook.GetAllMemorizedSpells()` / `SpellSlot` | discrete primary tokens, availability, domain type, opposition and linked slots | PASS — pure allocation fixtures |
+| `Spellbook.GetSpontaneousSlots(level)` | one shared remaining pool per caster/spellbook/level | PASS — no-double-count fixture |
+| `BlueprintSpellbook.CantripsType` / spell level 0 | explicit unlimited pool, never arbitrary large credits | PASS — pure fixture |
+| `Player.Inventory.Count(material.Item)` | exact component inventory count reserved once per planned cast | PASS — pure fixture; runtime spend pending |
+| `UnitDescriptor.Buffs` / `Buff.SourceAreaEffectId` | distinguish direct unit buffs from area-applied buffs | PASS — adapter compiled; runtime pending |
+| `UnitBody.CurrentEquipmentSlots` / item enchantments | worn-item enchantment presence remains distinct from unit buffs | PASS — adapter compiled; runtime pending |
 
 Instant execution must mirror the native ordering: final validation, one `RuleCastSpell`, then one native `AbilityData.Spend()` when the rule is not UMD-failed. It must never directly decrement inferred pools or directly apply buffs.
+
+Pure planning status at commit `5cbc9bb86fe9fcb79c16f8297c5a8754f34eda05`: deterministic provider order, bans/priorities/caps, prepared-before-flexible tie-break, shared pools, linked slots, domain eligibility, mass single-cost grouping, material reservation, target outcomes, and typed AllOf/conditional-AnyOf presence behavior are covered. Runtime rows remain deferred rather than inferred from these fixtures.
