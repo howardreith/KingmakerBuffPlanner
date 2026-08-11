@@ -96,3 +96,20 @@ Status: FAIL
 - Fix: validator now requires `0.28.2.0` and reports exact field mismatches
 - Qualification decision: not counted as one of the required two orchestration PASS runs
 - Exact next action: checkpoint validator/evidence improvement, rebuild clean package, run WhatIf and two fresh-process PASS attempts
+
+## 2026-08-11 — Phase 1 fresh-process qualification
+
+Status: PASS
+
+- Source commit: `d3f4dc1fec9970b1c3c8eed5100052edd996c870`
+- Active version: 0.0.1
+- Package/DLL SHA-256: `885113c4f8e1bb3a271579188823ceb3704a3b1f531ddce32efe26fa5f295764` / `1470d6f3bc45d7612f7668e87ce862ff7d89aa415e5634581e8b23924a4ba235`
+- MVID: `e268ff99-af2e-4def-8511-746cbd1b5106`
+- Source gates: validation 15/15, protocol 14/14, transaction 5/5, deployment WhatIf 5/5, package 4/4
+- Runtime PASS 1: `20260811T1938252394711Z-mod-load-smoke`, assertions 5/5, restoration exact
+- Runtime PASS 2: `20260811T1939275269790Z-mod-load-smoke`, assertions 5/5, restoration exact
+- Runtime platform: Kingmaker 2.1.7/2.1.7b executable identity, UMM 0.28.2.0, Harmony12 1.2.0.1
+- Staged UMM cache mutation recorded on each run; original live tree restored without it
+- Final external state: no Kingmaker process, no deployment lock, live/original manifest equality true, no save accessed
+- Last successful gate: Phase 1 minimal loadable standalone mod complete
+- Exact next action: Phase 2 normalized effect-expression domain and generic action-graph scanner with realistic pure fixtures
