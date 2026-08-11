@@ -179,6 +179,7 @@ function Enter-KbpRuntimeTransaction {
         originalBackup = $originalBackup; stagedQuarantine = $stagedQuarantine
         stagingRunRoot = $stagingRunRoot; lockPath = $lockPath
         restorationVerified = $false; stagedMutationObserved = $false
+        observedStagedManifest = @()
         activatedAtUtc = $null; restoredAtUtc = $null; restorationFailure = $null
     }
     Write-KbpJsonAtomic $statePath $state
@@ -246,6 +247,7 @@ function Restore-KbpRuntimeTransaction {
             if (Test-Path -LiteralPath $state.stagedQuarantine) { throw 'Staged quarantine already exists.' }
             $currentStaged = @(Get-KbpDirectoryManifest $mods)
             $state.stagedMutationObserved = -not (Test-KbpManifestEqual @($state.stagedManifest) $currentStaged)
+            if ($state.stagedMutationObserved) { $state.observedStagedManifest = $currentStaged }
             Move-Item -LiteralPath $mods -Destination $state.stagedQuarantine
         }
 

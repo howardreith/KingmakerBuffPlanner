@@ -81,3 +81,18 @@ Status: FAIL
 - No save was selected, loaded, or written
 - Regression: explicit path helper tests trailing and non-trailing paths; protocol suite now PASS 14/14; orchestrator waits up to 30 seconds for its process in `finally`
 - Exact next action: checkpoint fix, rebuild exact package, repeat top-level WhatIf, then run fresh-process mod-load qualification again
+
+## 2026-08-11 — Second mod-load attempt, validator mismatch
+
+Status: FAIL
+
+- Source commit: `c0423d3068506b50a255cc264e93b5e1c5e48708`
+- Evidence ID: `20260811T1935262721216Z-mod-load-smoke`
+- Package/DLL SHA-256: `108ae1b8c8f702729759f35c6e422a1390c576455d7ca1370199fd048aabea60` / `491447f43c748fd2e091d7dc474eebc135aa7d4d0a5c4ea1f9485eddd821e2cb`
+- In-game result: PASS, 5 assertions, MVID `16d7db94-a319-4242-b036-e303d8ca9ddf`; exact game executable, UMM, Harmony, DLL, package, version, and commit hashes recorded
+- Orchestration failure: expected UMM display version `0.28.2`, observed exact runtime API version `0.28.2.0`
+- Restoration: PASS in `finally`, original manifest verified; no lock and no game process remain
+- Staged mutation observed: true, consistent with UMM runtime cache behavior; future states retain the observed staged manifest before quarantine disposal
+- Fix: validator now requires `0.28.2.0` and reports exact field mismatches
+- Qualification decision: not counted as one of the required two orchestration PASS runs
+- Exact next action: checkpoint validator/evidence improvement, rebuild clean package, run WhatIf and two fresh-process PASS attempts

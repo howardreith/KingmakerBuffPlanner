@@ -128,22 +128,29 @@ function Wait-KbpNewKingmakerProcess {
 
 function Assert-KbpRuntimeResult {
     param($Result, $Request, $BuildManifest)
-    if ($Result.schemaVersion -ne 1 -or
-        $Result.runId -cne $Request.runId -or
-        $Result.scenario -cne 'mod-load-smoke' -or
-        $Result.loadedModId -cne 'KingmakerBuffPlanner' -or
-        $Result.loadedModVersion -cne $BuildManifest.version -or
-        $Result.commit -cne $BuildManifest.commit -or
-        $Result.packageSha256 -cne $BuildManifest.packageSha256 -or
-        $Result.assemblySha256 -cne $BuildManifest.dllSha256 -or
-        $Result.gameVersion -cne '2.1.7' -or
-        $Result.gameExecutableSha256 -cne '94a779c5423199fcb0470bd89884a3b3875dee2072eb1a7b1d7bc8e67accb1a1' -or
-        $Result.ummVersion -cne '0.28.2' -or
-        $Result.ummSha256 -cne '75b96e25a3a9fbadb47dd14a4ab490cb8c98143a6242aff3bba6145cd3047f39' -or
-        $Result.harmonyVersion -cne '1.2.0.1' -or
-        $Result.harmonySha256 -cne 'aa1cd48317254985d8b700cc74953477d1b40c3022ce9aa4c95ed2b8327e1292') {
-        throw 'Runtime result identity/hash contract failed.'
+    $checks = [ordered]@{
+        schemaVersion = [pscustomobject]@{ expected = 1; observed = $Result.schemaVersion }
+        runId = [pscustomobject]@{ expected = $Request.runId; observed = $Result.runId }
+        scenario = [pscustomobject]@{ expected = 'mod-load-smoke'; observed = $Result.scenario }
+        loadedModId = [pscustomobject]@{ expected = 'KingmakerBuffPlanner'; observed = $Result.loadedModId }
+        loadedModVersion = [pscustomobject]@{ expected = $BuildManifest.version; observed = $Result.loadedModVersion }
+        commit = [pscustomobject]@{ expected = $BuildManifest.commit; observed = $Result.commit }
+        packageSha256 = [pscustomobject]@{ expected = $BuildManifest.packageSha256; observed = $Result.packageSha256 }
+        assemblySha256 = [pscustomobject]@{ expected = $BuildManifest.dllSha256; observed = $Result.assemblySha256 }
+        gameVersion = [pscustomobject]@{ expected = '2.1.7'; observed = $Result.gameVersion }
+        gameExecutableSha256 = [pscustomobject]@{ expected = '94a779c5423199fcb0470bd89884a3b3875dee2072eb1a7b1d7bc8e67accb1a1'; observed = $Result.gameExecutableSha256 }
+        ummVersion = [pscustomobject]@{ expected = '0.28.2.0'; observed = $Result.ummVersion }
+        ummSha256 = [pscustomobject]@{ expected = '75b96e25a3a9fbadb47dd14a4ab490cb8c98143a6242aff3bba6145cd3047f39'; observed = $Result.ummSha256 }
+        harmonyVersion = [pscustomobject]@{ expected = '1.2.0.1'; observed = $Result.harmonyVersion }
+        harmonySha256 = [pscustomobject]@{ expected = 'aa1cd48317254985d8b700cc74953477d1b40c3022ce9aa4c95ed2b8327e1292'; observed = $Result.harmonySha256 }
     }
+    $mismatches = @()
+    foreach ($name in $checks.Keys) {
+        if ([string]$checks[$name].observed -cne [string]$checks[$name].expected) {
+            $mismatches += @("$name expected=$($checks[$name].expected) observed=$($checks[$name].observed)")
+        }
+    }
+    if ($mismatches.Count -ne 0) { throw "Runtime result identity/hash mismatch: $($mismatches -join '; ')" }
     if ($Result.status -notin @('PASS', 'FAIL', 'BLOCKED')) { throw 'Runtime result status is invalid.' }
     if (@($Result.assertions).Count -lt 5) { throw 'Runtime result assertion list is incomplete.' }
 }
