@@ -96,12 +96,13 @@ function Assert-KbpSteamSafety {
 function New-KbpRuntimeRequest {
     param(
         [string]$RunId, [string]$EvidenceDirectory, $BuildManifest,
-        [int]$TimeoutSeconds, [bool]$ExitAfterCompletion)
+        [int]$TimeoutSeconds, [bool]$ExitAfterCompletion,
+        [ValidateSet('mod-load-smoke', 'native-buff-catalog')][string]$Scenario = 'mod-load-smoke')
     return [ordered]@{
         schemaVersion = 1
         enabled = $true
         runId = $RunId
-        scenario = 'mod-load-smoke'
+        scenario = $Scenario
         expectedModVersion = [string]$BuildManifest.version
         expectedCommit = [string]$BuildManifest.commit
         evidenceDirectory = $EvidenceDirectory
@@ -131,7 +132,7 @@ function Assert-KbpRuntimeResult {
     $checks = [ordered]@{
         schemaVersion = [pscustomobject]@{ expected = 1; observed = $Result.schemaVersion }
         runId = [pscustomobject]@{ expected = $Request.runId; observed = $Result.runId }
-        scenario = [pscustomobject]@{ expected = 'mod-load-smoke'; observed = $Result.scenario }
+        scenario = [pscustomobject]@{ expected = $Request.scenario; observed = $Result.scenario }
         loadedModId = [pscustomobject]@{ expected = 'KingmakerBuffPlanner'; observed = $Result.loadedModId }
         loadedModVersion = [pscustomobject]@{ expected = $BuildManifest.version; observed = $Result.loadedModVersion }
         commit = [pscustomobject]@{ expected = $BuildManifest.commit; observed = $Result.commit }
@@ -153,4 +154,10 @@ function Assert-KbpRuntimeResult {
     if ($mismatches.Count -ne 0) { throw "Runtime result identity/hash mismatch: $($mismatches -join '; ')" }
     if ($Result.status -notin @('PASS', 'FAIL', 'BLOCKED')) { throw 'Runtime result status is invalid.' }
     if (@($Result.assertions).Count -lt 5) { throw 'Runtime result assertion list is incomplete.' }
+    if ($Request.scenario -ceq 'native-buff-catalog') {
+        $catalogPath = Join-Path $Request.evidenceDirectory 'native-buff-catalog.json'
+        if (-not (Test-Path -LiteralPath $catalogPath -PathType Leaf)) { throw 'Native catalog evidence is missing.' }
+        if ($Result.catalogSha256 -cne (Get-KbpSha256 $catalogPath)) { throw 'Native catalog hash mismatch.' }
+        if ([int]$Result.catalogAbilityCount -le 0) { throw 'Native catalog is empty.' }
+    }
 }

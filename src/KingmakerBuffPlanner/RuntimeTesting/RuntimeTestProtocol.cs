@@ -63,7 +63,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (request.SchemaVersion != 1) throw new InvalidDataException("schema-version");
             if (!request.Enabled) throw new InvalidDataException("not-enabled");
             if (!IsSafeIdentifier(request.RunId)) throw new InvalidDataException("run-id");
-            if (!string.Equals(request.Scenario, "mod-load-smoke", StringComparison.Ordinal))
+            if (!string.Equals(request.Scenario, "mod-load-smoke", StringComparison.Ordinal) &&
+                !string.Equals(request.Scenario, "native-buff-catalog", StringComparison.Ordinal))
                 throw new InvalidDataException("scenario");
             if (!string.Equals(request.ExpectedModVersion, BuildInfo.Version, StringComparison.Ordinal))
                 throw new InvalidDataException("version-mismatch");

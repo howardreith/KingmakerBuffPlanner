@@ -30,6 +30,9 @@
   <ItemGroup>
     <Compile Include="Program.cs" />
     <Compile Include="TestBuildInfo.cs" />
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Discovery\ActionGraphScanner.cs"><Link>Discovery\ActionGraphScanner.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Discovery\DiscoveryNode.cs"><Link>Discovery\DiscoveryNode.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Domain\Effects\EffectExpression.cs"><Link>Domain\Effects\EffectExpression.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\RuntimeTesting\RuntimePaths.cs">
       <Link>RuntimeTesting\RuntimePaths.cs</Link>
     </Compile>

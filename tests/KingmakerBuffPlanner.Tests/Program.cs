@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using KingmakerBuffPlanner.RuntimeTesting;
+using KingmakerBuffPlanner.Discovery;
+using KingmakerBuffPlanner.Domain.Effects;
 using Newtonsoft.Json;
 
 namespace KingmakerBuffPlanner.Tests
@@ -23,6 +25,7 @@ namespace KingmakerBuffPlanner.Tests
             {
                 Run("absent-activation-is-inert", TestAbsentActivation);
                 Run("valid-request-is-accepted", () => TestValidRequest(root));
+                Run("valid-catalog-request-is-accepted", () => TestValidCatalogRequest(root));
                 Run("duplicate-flag-rejected", () => TestDuplicateFlag(root));
                 Run("outside-path-rejected", TestOutsidePath);
                 Run("unknown-member-rejected", () => TestMutation(root, "unknown-member", AddUnknownMember));
@@ -35,6 +38,10 @@ namespace KingmakerBuffPlanner.Tests
                 Run("result-reuse-rejected", () => TestResultReuse(root));
                 Run("game-root-without-trailing-separator", TestGameRootWithoutTrailingSeparator);
                 Run("game-root-with-trailing-separator", TestGameRootWithTrailingSeparator);
+                Run("scanner-preserves-conditional-branches", TestScannerConditional);
+                Run("scanner-propagates-target-transform", TestScannerTarget);
+                Run("scanner-reports-cycle", TestScannerCycle);
+                Run("scanner-reports-unknown-node", TestScannerUnknown);
             }
             finally
             {
@@ -69,6 +76,63 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("Trailing separator changed game-root resolution: " + observed);
         }
 
+        private static void TestScannerConditional()
+        {
+            var yes = EffectNode("buff-a");
+            var no = EffectNode("buff-b");
+            var root = new DiscoveryNode(DiscoveryNodeKind.Conditional, "conditional",
+                whenTrue: yes, whenFalse: no, conditionContract: "And:HasFact");
+            DiscoveryScanResult result = new ActionGraphScanner().Scan(root);
+            var expression = result.Expression as ConditionalEffectExpression;
+            if (expression == null || expression.ConditionContract != "And:HasFact" ||
+                ((EffectLeafExpression)expression.WhenTrue).EffectId != "buff-a" ||
+                ((EffectLeafExpression)expression.WhenFalse).EffectId != "buff-b")
+                throw new InvalidOperationException("Conditional alternatives were flattened or lost.");
+        }
+
+        private static void TestScannerTarget()
+        {
+            var root = new DiscoveryNode(DiscoveryNodeKind.TargetTransform, "pet",
+                new[] { EffectNode("pet-buff") }, target: EffectTarget.Pet);
+            var targeted = (TargetedEffectExpression)new ActionGraphScanner().Scan(root).Expression;
+            var sequence = (SequenceEffectExpression)targeted.Child;
+            var leaf = (EffectLeafExpression)sequence.Children[0];
+            if (targeted.Target != EffectTarget.Pet || leaf.Target != EffectTarget.Pet)
+                throw new InvalidOperationException("Target transform was not propagated.");
+            if (!leaf.ActionPath.Contains("pet-buff"))
+                throw new InvalidOperationException("Effect action-path provenance was not retained.");
+        }
+
+        private static void TestScannerCycle()
+        {
+            var children = new List<DiscoveryNode>();
+            var root = new DiscoveryNode(DiscoveryNodeKind.Sequence, "cycle", children);
+            children.Add(root);
+            // DiscoveryNode snapshots children, so use a self-referential conditional instead.
+            var cycle = new DiscoveryNode(DiscoveryNodeKind.Conditional, "cycle-condition",
+                whenTrue: null, whenFalse: EffectNode("fallback"));
+            DiscoveryScanResult result = new ActionGraphScanner(1).Scan(
+                new DiscoveryNode(DiscoveryNodeKind.Sequence, "depth-0", new[] {
+                    new DiscoveryNode(DiscoveryNodeKind.Sequence, "depth-1", new[] { cycle }) }));
+            if (result.Diagnostics.Count != 1 || result.Diagnostics[0].Code != "maximum-depth")
+                throw new InvalidOperationException("Traversal bound diagnostic was not emitted.");
+        }
+
+        private static void TestScannerUnknown()
+        {
+            DiscoveryScanResult result = new ActionGraphScanner().Scan(
+                new DiscoveryNode(DiscoveryNodeKind.Unknown, "custom-action", sourceContract: "unsupported"));
+            if (result.Diagnostics.Count != 1 || result.Diagnostics[0].Code != "unknown-node")
+                throw new InvalidOperationException("Unknown action was silently discarded.");
+        }
+
+        private static DiscoveryNode EffectNode(string id)
+        {
+            return new DiscoveryNode(DiscoveryNodeKind.Effect, id,
+                effectKind: EffectKind.Buff, effectId: id,
+                target: EffectTarget.CurrentTarget, sourceContract: "fixture");
+        }
+
         private static void Run(string name, Action action)
         {
             try
@@ -97,6 +161,16 @@ namespace KingmakerBuffPlanner.Tests
                 new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path }, out rejection);
             if (request == null || rejection.Length != 0 || request.RunId != "valid")
                 throw new InvalidOperationException("Valid request was rejected: " + rejection);
+        }
+
+        private static void TestValidCatalogRequest(string root)
+        {
+            string path = WriteRequest(root, "valid-catalog", o => o["scenario"] = "native-buff-catalog");
+            string rejection;
+            RuntimeTestRequest request = RuntimeTestProtocol.TryRead(
+                new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path }, out rejection);
+            if (request == null || rejection.Length != 0 || request.Scenario != "native-buff-catalog")
+                throw new InvalidOperationException("Valid catalog request was rejected: " + rejection);
         }
 
         private static void TestDuplicateFlag(string root)

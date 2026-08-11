@@ -43,12 +43,27 @@
       <HintPath>$(KingmakerInstallDir)\Kingmaker_Data\Managed\Newtonsoft.Json.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>$(KingmakerInstallDir)\Kingmaker_Data\Managed\Assembly-CSharp.dll</HintPath>
+      <Private>False</Private>
+      <ExternallyResolved>True</ExternallyResolved>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>$(KingmakerInstallDir)\Kingmaker_Data\Managed\UnityEngine.dll</HintPath>
+      <Private>False</Private>
+      <ExternallyResolved>True</ExternallyResolved>
+    </Reference>
     <Reference Include="UnityEngine.CoreModule">
       <HintPath>$(KingmakerInstallDir)\Kingmaker_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
       <Private>False</Private>
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Discovery\ActionGraphScanner.cs" />
+    <Compile Include="Discovery\DiscoveryNode.cs" />
+    <Compile Include="Discovery\NativeCatalogExporter.cs" />
+    <Compile Include="Domain\Effects\EffectExpression.cs" />
+    <Compile Include="GameAdapters\KingmakerActionGraphAdapter.cs" />
     <Compile Include="Infrastructure\AtomicFile.cs" />
     <Compile Include="Infrastructure\Hashing.cs" />
     <Compile Include="Infrastructure\ModLog.cs" />
