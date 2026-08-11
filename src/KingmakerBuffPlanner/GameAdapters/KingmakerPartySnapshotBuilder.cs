@@ -16,6 +16,13 @@ namespace KingmakerBuffPlanner.GameAdapters
 {
     internal sealed class KingmakerPartySnapshotBuilder
     {
+        private readonly KingmakerBuffSourceDiscovery _sourceDiscovery;
+
+        internal KingmakerPartySnapshotBuilder(EffectOverrideRegistry overrides = null)
+        {
+            _sourceDiscovery = new KingmakerBuffSourceDiscovery(overrides);
+        }
+
         internal PartyProviderSnapshot Build()
         {
             if (Game.Instance == null || Game.Instance.Player == null)
@@ -60,7 +67,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                 new TargetValidationSnapshot(alive, conscious, unit.IsPlayerFaction, targetable));
         }
 
-        private static void ScanSpellbooks(
+        private void ScanSpellbooks(
             UnitEntityData unit,
             List<ProviderSnapshot> providers,
             List<ResourcePoolSnapshot> pools)
@@ -76,7 +83,7 @@ namespace KingmakerBuffPlanner.GameAdapters
             }
         }
 
-        private static void ScanSpontaneousSpellbook(
+        private void ScanSpontaneousSpellbook(
             UnitEntityData unit,
             Spellbook spellbook,
             List<ProviderSnapshot> providers,
@@ -104,7 +111,7 @@ namespace KingmakerBuffPlanner.GameAdapters
             }
         }
 
-        private static void ScanPreparedSpellbook(
+        private void ScanPreparedSpellbook(
             UnitEntityData unit,
             Spellbook spellbook,
             List<ProviderSnapshot> providers,
@@ -148,7 +155,7 @@ namespace KingmakerBuffPlanner.GameAdapters
             }
         }
 
-        private static void ScanResourceAndFreeAbilities(
+        private void ScanResourceAndFreeAbilities(
             UnitEntityData unit,
             List<ProviderSnapshot> providers,
             List<ResourcePoolSnapshot> pools)
@@ -159,7 +166,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                 .OrderBy(a => a.Blueprint.AssetGuid, StringComparer.Ordinal))
             {
                 AbilityData data = fact.Data;
-                if (data.Spellbook != null || !HasDetectedEffect(data.Blueprint)) continue;
+                if (data.Spellbook != null || !IsSupportedSource(data.Blueprint)) continue;
                 ResourcePoolSnapshot pool;
                 int cost;
                 SourceKind sourceKind;
@@ -184,11 +191,11 @@ namespace KingmakerBuffPlanner.GameAdapters
                 var ability = ToAbilityKey(data, sourceKind);
                 var keyForProvider = new ProviderKey(unit.UniqueId, string.Empty, ability, string.Empty);
                 providers.Add(new ProviderSnapshot(keyForProvider, data.Name, 0,
-                    pool.PoolKey, cost, null, ToMaterialRequirement(data)));
+                    pool.PoolKey, cost, null, ToMaterialRequirement(data), CasterLevel(data), 0));
             }
         }
 
-        private static void AddSpellProvider(
+        private void AddSpellProvider(
             UnitEntityData unit,
             Spellbook spellbook,
             AbilityData data,
@@ -197,14 +204,20 @@ namespace KingmakerBuffPlanner.GameAdapters
             IEnumerable<string> tokens,
             List<ProviderSnapshot> providers)
         {
-            if (data == null || data.Blueprint == null || !HasDetectedEffect(data.Blueprint)) return;
+            if (data == null || data.Blueprint == null || !IsSupportedSource(data.Blueprint)) return;
             var ability = ToAbilityKey(data, SourceKind.Spellbook);
             int heighten = data.MetamagicData == null ? 0 : data.MetamagicData.HeightenLevel;
             string sourceInstance = "level-" + data.SpellLevel + "|heighten-" + heighten;
             var key = new ProviderKey(unit.UniqueId, spellbook.Blueprint.AssetGuid, ability, sourceInstance);
             if (providers.Any(p => p.Key.Equals(key))) return;
             providers.Add(new ProviderSnapshot(key, data.Name, data.SpellLevel,
-                poolKey, cost, tokens, ToMaterialRequirement(data)));
+                poolKey, cost, tokens, ToMaterialRequirement(data), CasterLevel(data), 0));
+        }
+
+        private static int CasterLevel(AbilityData data)
+        {
+            try { return Math.Max(0, data.CalculateParams().CasterLevel); }
+            catch (Exception) { return 0; }
         }
 
         private static IEnumerable<AbilityData> ExpandVariants(IEnumerable<AbilityData> source)
@@ -218,10 +231,11 @@ namespace KingmakerBuffPlanner.GameAdapters
             }
         }
 
-        private static bool HasDetectedEffect(BlueprintAbility ability)
+        private bool IsSupportedSource(BlueprintAbility ability)
         {
-            return EffectExpressionAnalysis.ContainsLeaf(
-                new ActionGraphScanner().Scan(new KingmakerActionGraphAdapter().Adapt(ability)).Expression);
+            EffectExpression expression;
+            string reason;
+            return _sourceDiscovery.TryDiscover(ability, out expression, out reason);
         }
 
         private static AbilityKey ToAbilityKey(AbilityData data, SourceKind sourceKind)

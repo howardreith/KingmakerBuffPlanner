@@ -179,6 +179,18 @@ namespace KingmakerBuffPlanner.UI
             _save(Profile);
         }
 
+        public void ToggleExecutionMode()
+        {
+            Profile.Execution.Mode = Profile.Execution.Mode == "instant" ? "animated" : "instant";
+            _save(Profile);
+        }
+
+        public void ToggleOutOfCombatOnly()
+        {
+            Profile.Execution.OutOfCombatOnly = !Profile.Execution.OutOfCombatOnly;
+            _save(Profile);
+        }
+
         public void ToggleHidden()
         {
             SetupSourceRow source = RequireSelected();

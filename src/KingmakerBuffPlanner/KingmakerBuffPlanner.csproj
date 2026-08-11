@@ -80,13 +80,16 @@
     <Compile Include="GameAdapters\KingmakerActionGraphAdapter.cs" />
     <Compile Include="GameAdapters\KingmakerActiveEffectSnapshotBuilder.cs" />
     <Compile Include="GameAdapters\KingmakerAnimatedCastAdapter.cs" />
+    <Compile Include="GameAdapters\KingmakerBuffSourceDiscovery.cs" />
     <Compile Include="GameAdapters\KingmakerInstantCastAdapter.cs" />
     <Compile Include="GameAdapters\KingmakerPartySnapshotBuilder.cs" />
+    <Compile Include="GameAdapters\KingmakerProviderOptionBuilder.cs" />
     <Compile Include="Infrastructure\AtomicFile.cs" />
     <Compile Include="Infrastructure\Hashing.cs" />
     <Compile Include="Infrastructure\ModLog.cs" />
     <Compile Include="Main.cs" />
     <Compile Include="Planning\ResourceLedger.cs" />
+    <Compile Include="Planning\RoutinePlanService.cs" />
     <Compile Include="Planning\EffectPresenceEvaluator.cs" />
     <Compile Include="Planning\CastPlanner.cs" />
     <Compile Include="Persistence\ProfileModels.cs" />

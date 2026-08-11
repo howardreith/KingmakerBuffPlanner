@@ -183,7 +183,7 @@ namespace KingmakerBuffPlanner.Discovery
             };
         }
 
-        private static NativeEffectRecord[] GetEffects(EffectExpression expression)
+        internal static NativeEffectRecord[] GetEffects(EffectExpression expression)
         {
             var leaves = new List<EffectLeafExpression>();
             CollectLeaves(expression, leaves);

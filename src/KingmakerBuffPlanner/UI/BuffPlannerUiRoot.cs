@@ -27,6 +27,7 @@ namespace KingmakerBuffPlanner.UI
         private string _uiError = string.Empty;
         private int _renderedOpenFrames;
         private int _runtimeOpenCycles;
+        private string _previewRoutineId = string.Empty;
 
         internal static void Ensure(string modPath, ModLog log)
         {
@@ -71,7 +72,9 @@ namespace KingmakerBuffPlanner.UI
                 RenderedOpenFrames = _instance._renderedOpenFrames,
                 OpenCloseCycles = _instance._runtimeOpenCycles,
                 ScreenWidth = Screen.width,
-                ScreenHeight = Screen.height
+                ScreenHeight = Screen.height,
+                RoutineButtonCount = 3,
+                CriticalControlsOnScreen = Screen.width >= 512 && Screen.height >= 240
             };
         }
 
@@ -96,6 +99,7 @@ namespace KingmakerBuffPlanner.UI
                 float logicalWidth = Screen.width / scale;
                 float logicalHeight = Screen.height / scale;
                 if (GUI.Button(new Rect(18, logicalHeight - 54, 150, 36), "Buff Planner (F10)")) ToggleOpen();
+                DrawRoutineHud(logicalHeight);
                 if (!_open) return;
                 _window.width = Mathf.Min(_window.width, logicalWidth - 24);
                 _window.height = Mathf.Min(_window.height, logicalHeight - 24);
@@ -139,6 +143,8 @@ namespace KingmakerBuffPlanner.UI
                 return;
             }
 
+            DrawRoutineControls(model);
+
             GUILayout.BeginHorizontal();
             GUILayout.Label("Search", GUILayout.Width(50));
             _search = GUILayout.TextField(_search ?? string.Empty, GUILayout.Width(260));
@@ -174,6 +180,100 @@ namespace KingmakerBuffPlanner.UI
             }
             GUILayout.EndScrollView();
             GUILayout.EndVertical();
+        }
+
+        private void DrawRoutineHud(float logicalHeight)
+        {
+            PlannerSetupModel model = _session.Model;
+            bool oldEnabled = GUI.enabled;
+            GUI.enabled = model != null && !_session.IsExecuting;
+            float x = 176;
+            foreach (string routineId in new[] { "long", "important", "short" })
+            {
+                RoutineProfile routine = model == null ? null : model.Profile.Routines
+                    .FirstOrDefault(r => r.RoutineId == routineId);
+                string name = routine == null
+                    ? routineId.Substring(0, 1).ToUpperInvariant() + routineId.Substring(1)
+                    : routine.Name;
+                if (GUI.Button(new Rect(x, logicalHeight - 54, 104, 36),
+                    new GUIContent(name, routine == null
+                        ? "Load a campaign to run this routine."
+                        : RoutineTooltip(routine))))
+                {
+                    _previewRoutineId = routineId;
+                    StartCoroutine(_session.ExecuteRoutine(routineId));
+                }
+                x += 110;
+            }
+            GUI.enabled = oldEnabled;
+            if (!string.IsNullOrEmpty(GUI.tooltip))
+                GUI.Label(new Rect(18, logicalHeight - 80, 700, 22), GUI.tooltip, GUI.skin.box);
+        }
+
+        private void DrawRoutineControls(PlannerSetupModel model)
+        {
+            GUILayout.BeginHorizontal(GUI.skin.box);
+            GUILayout.Label("Routines", GUILayout.Width(55));
+            foreach (RoutineProfile routine in model.Profile.Routines.OrderBy(r => RoutineOrder(r.RoutineId)))
+            {
+                GUI.enabled = !_session.IsExecuting;
+                if (GUILayout.Button("Preview " + routine.Name, GUILayout.Width(105)))
+                    Safe(() => { _session.PreviewRoutine(routine.RoutineId); _previewRoutineId = routine.RoutineId; });
+                if (GUILayout.Button("Run " + routine.Name, GUILayout.Width(85)))
+                {
+                    _previewRoutineId = routine.RoutineId;
+                    StartCoroutine(_session.ExecuteRoutine(routine.RoutineId));
+                }
+            }
+            GUI.enabled = true;
+            GUILayout.FlexibleSpace();
+            if (GUILayout.Button("Mode: " + model.Profile.Execution.Mode, GUILayout.Width(120)))
+                Safe(model.ToggleExecutionMode);
+            if (GUILayout.Button(model.Profile.Execution.OutOfCombatOnly
+                ? "Combat: blocked" : "Combat: allowed", GUILayout.Width(120)))
+                Safe(model.ToggleOutOfCombatOnly);
+            GUILayout.EndHorizontal();
+            if (_session.LastPreview != null && !string.IsNullOrEmpty(_previewRoutineId))
+                GUILayout.Label("Preview " + _previewRoutineId + ": " +
+                    PlanSummary(_session.LastPreview));
+            if (_session.LastExecutionReport != null)
+            {
+                var report = _session.LastExecutionReport;
+                GUILayout.Label("Last execution: planned=" + report.Planned +
+                    "; fired=" + report.Fired + "; observed=" + report.SuccessfullyObserved +
+                    "; resources spent=" + report.ResourcesSpent + "; failed=" + report.Failed +
+                    "; skipped=" + report.Skipped + "; unfulfilled=" + report.Unfulfilled + ".");
+            }
+        }
+
+        private string RoutineTooltip(RoutineProfile routine)
+        {
+            int targets = routine.Assignments.Sum(a => a.WantedTargetUnitIds.Count);
+            return routine.Name + ": sources=" + routine.Assignments.Count +
+                "; requested targets=" + targets + "; mode=" +
+                (_session.Model == null ? "unavailable" : _session.Model.Profile.Execution.Mode) + ".";
+        }
+
+        private static string PlanSummary(RoutinePlanResult preview)
+        {
+            int fulfilled = preview.Plan.Outcomes.Count(o => o.Kind == TargetOutcomeKind.Fulfilled);
+            int skipped = preview.Plan.Outcomes.Count(o => o.Kind == TargetOutcomeKind.SkippedAlreadyActive);
+            int unfulfilled = preview.Plan.Outcomes.Count(o => o.Kind == TargetOutcomeKind.Unfulfilled);
+            int resources = preview.Plan.Steps.Sum(s => s.Reservation.Units);
+            int materials = preview.Plan.Steps.Sum(s => s.MaterialReservation == null
+                ? 0 : s.MaterialReservation.Count);
+            return "planned casts=" + preview.Plan.Steps.Count + "; fulfilled=" + fulfilled +
+                "; skipped=" + skipped + "; unfulfilled=" + unfulfilled +
+                "; unsupported=" + preview.UnsupportedSourceIds.Count +
+                "; resource units=" + resources + "; material units=" + materials + ".";
+        }
+
+        private static int RoutineOrder(string routineId)
+        {
+            if (routineId == "long") return 0;
+            if (routineId == "important") return 1;
+            if (routineId == "short") return 2;
+            return 3;
         }
 
         private bool MatchesFilter(SetupSourceRow source)
@@ -290,5 +390,7 @@ namespace KingmakerBuffPlanner.UI
         internal int OpenCloseCycles;
         internal int ScreenWidth;
         internal int ScreenHeight;
+        internal int RoutineButtonCount;
+        internal bool CriticalControlsOnScreen;
     }
 }

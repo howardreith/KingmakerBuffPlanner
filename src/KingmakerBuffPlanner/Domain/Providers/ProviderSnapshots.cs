@@ -146,13 +146,17 @@ namespace KingmakerBuffPlanner.Domain.Providers
             string resourcePoolKey,
             int unitsPerCast,
             IEnumerable<string> eligibleTokenIds,
-            MaterialRequirementSnapshot materialComponent = null)
+            MaterialRequirementSnapshot materialComponent = null,
+            int effectiveCasterLevel = 0,
+            int expectedDurationRounds = 0)
         {
             Key = key ?? throw new ArgumentNullException("key");
             if (spellLevel < 0) throw new ArgumentOutOfRangeException("spellLevel");
             if (string.IsNullOrWhiteSpace(resourcePoolKey))
                 throw new ArgumentException("Resource pool key is required.", "resourcePoolKey");
             if (unitsPerCast < 0) throw new ArgumentOutOfRangeException("unitsPerCast");
+            if (effectiveCasterLevel < 0) throw new ArgumentOutOfRangeException("effectiveCasterLevel");
+            if (expectedDurationRounds < 0) throw new ArgumentOutOfRangeException("expectedDurationRounds");
             DisplayName = displayName ?? string.Empty;
             SpellLevel = spellLevel;
             ResourcePoolKey = resourcePoolKey;
@@ -161,6 +165,8 @@ namespace KingmakerBuffPlanner.Domain.Providers
                 .Where(v => !string.IsNullOrWhiteSpace(v)).Distinct(StringComparer.Ordinal)
                 .OrderBy(v => v, StringComparer.Ordinal).ToList());
             MaterialComponent = materialComponent;
+            EffectiveCasterLevel = effectiveCasterLevel;
+            ExpectedDurationRounds = expectedDurationRounds;
         }
 
         public ProviderKey Key { get; private set; }
@@ -170,6 +176,8 @@ namespace KingmakerBuffPlanner.Domain.Providers
         public int UnitsPerCast { get; private set; }
         public IReadOnlyList<string> EligibleTokenIds { get; private set; }
         public MaterialRequirementSnapshot MaterialComponent { get; private set; }
+        public int EffectiveCasterLevel { get; private set; }
+        public int ExpectedDurationRounds { get; private set; }
     }
 
     public sealed class MaterialRequirementSnapshot

@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using Kingmaker;
@@ -6,10 +7,13 @@ using Kingmaker.Blueprints;
 using Kingmaker.UnitLogic.Abilities.Blueprints;
 using KingmakerBuffPlanner.Discovery;
 using KingmakerBuffPlanner.Domain.Effects;
+using KingmakerBuffPlanner.Domain.Planning;
 using KingmakerBuffPlanner.Domain.Providers;
+using KingmakerBuffPlanner.Execution;
 using KingmakerBuffPlanner.GameAdapters;
 using KingmakerBuffPlanner.Infrastructure;
 using KingmakerBuffPlanner.Persistence;
+using KingmakerBuffPlanner.Planning;
 
 namespace KingmakerBuffPlanner.UI
 {
@@ -18,6 +22,10 @@ namespace KingmakerBuffPlanner.UI
         private readonly ProfileRepository _profiles;
         private readonly ModLog _log;
         private readonly EffectOverrideRegistry _overrides;
+        private PartyProviderSnapshot _snapshot;
+        private ActiveEffectSnapshot _activeEffects;
+        private Dictionary<string, EffectExpression> _effects;
+        private ProviderPlanningOption[] _providerOptions;
 
         internal PlannerUiSession(string modPath, ModLog log)
         {
@@ -30,6 +38,9 @@ namespace KingmakerBuffPlanner.UI
 
         internal PlannerSetupModel Model { get; private set; }
         internal string Status { get; private set; }
+        internal bool IsExecuting { get; private set; }
+        internal RoutinePlanResult LastPreview { get; private set; }
+        internal ExecutionReport LastExecutionReport { get; private set; }
 
         internal void Refresh()
         {
@@ -39,11 +50,15 @@ namespace KingmakerBuffPlanner.UI
                     string.IsNullOrWhiteSpace(Game.Instance.Player.GameId))
                 {
                     Model = null;
+                    _snapshot = null;
+                    _activeEffects = null;
+                    _effects = null;
+                    _providerOptions = null;
                     Status = "No campaign is loaded. Profiles are external and are not created at the main menu.";
                     return;
                 }
                 string campaignId = Game.Instance.Player.GameId;
-                PartyProviderSnapshot snapshot = new KingmakerPartySnapshotBuilder().Build();
+                PartyProviderSnapshot snapshot = new KingmakerPartySnapshotBuilder(_overrides).Build();
                 var active = new KingmakerActiveEffectSnapshotBuilder().Build();
                 var effects = new Dictionary<string, EffectExpression>(StringComparer.Ordinal);
                 var adapter = new KingmakerActionGraphAdapter();
@@ -63,6 +78,10 @@ namespace KingmakerBuffPlanner.UI
                 if (!string.IsNullOrEmpty(loaded.Warning))
                     _log.Info("Profile recovery warning: " + loaded.Warning);
                 Model = new PlannerSetupModel(loaded.Profile, snapshot, active, effects, _profiles.Save);
+                _snapshot = snapshot;
+                _activeEffects = active;
+                _effects = effects;
+                _providerOptions = new KingmakerProviderOptionBuilder().Build(snapshot, effects);
                 Status = snapshot.Units.Count + " party/pet targets; " +
                     Model.Sources.Count + " discovered buff sources; " +
                     snapshot.Providers.Count + " providers.";
@@ -73,6 +92,71 @@ namespace KingmakerBuffPlanner.UI
                 Status = "Setup refresh failed: " + exception.Message;
                 _log.Error("Planner UI refresh failed.", exception);
             }
+        }
+
+        internal RoutinePlanResult PreviewRoutine(string routineId)
+        {
+            if (Model == null || _snapshot == null || _activeEffects == null ||
+                _effects == null || _providerOptions == null)
+                throw new InvalidOperationException("A campaign planner snapshot is required.");
+            LastPreview = new RoutinePlanService().Plan(Model.Profile, routineId, _snapshot,
+                _activeEffects, _effects, _providerOptions);
+            return LastPreview;
+        }
+
+        internal IEnumerator ExecuteRoutine(string routineId)
+        {
+            if (IsExecuting) yield break;
+            RoutinePlanResult preview;
+            try
+            {
+                preview = PreviewRoutine(routineId);
+            }
+            catch (Exception exception)
+            {
+                Status = "Routine preview failed: " + exception.Message;
+                _log.Error("Routine preview failed.", exception);
+                yield break;
+            }
+            LastExecutionReport = new ExecutionReport(preview.Plan);
+            ICastExecutor executor = Model.Profile.Execution.Mode == "instant"
+                ? (ICastExecutor)new InstantCastExecutor(new KingmakerInstantCastAdapter(),
+                    Model.Profile.Execution.OutOfCombatOnly)
+                : new AnimatedCastExecutor(new KingmakerAnimatedCastAdapter(),
+                    Model.Profile.Execution.OutOfCombatOnly);
+            IsExecuting = true;
+            Status = "Executing " + routineId + " routine: " + preview.Plan.Steps.Count + " planned casts.";
+            IEnumerator work = executor.Execute(preview.Plan, LastExecutionReport);
+            Exception failure = null;
+            while (true)
+            {
+                bool moved = false;
+                object current = null;
+                try
+                {
+                    moved = work.MoveNext();
+                    if (moved) current = work.Current;
+                }
+                catch (Exception exception)
+                {
+                    failure = exception;
+                }
+                if (!moved || failure != null) break;
+                yield return current;
+            }
+            IsExecuting = false;
+            if (failure != null)
+            {
+                Status = "Routine execution failed: " + failure.Message;
+                _log.Error("Routine execution failed.", failure);
+                yield break;
+            }
+            ExecutionReport report = LastExecutionReport;
+            Refresh();
+            Status = "Routine complete: planned=" + report.Planned +
+                "; fired=" + report.Fired + "; observed=" + report.SuccessfullyObserved +
+                "; spent=" + report.ResourcesSpent + "; failed=" + report.Failed +
+                "; skipped=" + report.Skipped + "; unfulfilled=" + report.Unfulfilled + ".";
         }
     }
 }

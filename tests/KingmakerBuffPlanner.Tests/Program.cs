@@ -68,6 +68,8 @@ namespace KingmakerBuffPlanner.Tests
                 Run("planner-reports-active-skip-marker", TestPlannerActiveSkip);
                 Run("planner-honors-ban-and-material-availability", TestPlannerBanAndMaterial);
                 Run("planner-reserves-material-once-per-cast", TestPlannerMaterialReservation);
+                Run("planner-routine-shares-resource-ledger", TestPlannerRoutineSharedLedger);
+                Run("routine-service-reports-unsupported-sources", TestRoutineServiceUnsupportedSources);
                 Run("profile-round-trip-preserves-stable-ids", () => TestProfileRoundTrip(root));
                 Run("profile-recovers-valid-bounded-backup", () => TestProfileBackupRecovery(root));
                 Run("profile-migrates-schema-one", () => TestProfileMigration(root));
@@ -563,6 +565,69 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("One material component was scheduled for multiple casts.");
         }
 
+        private static void TestPlannerRoutineSharedLedger()
+        {
+            AbilityKey firstAbility = Ability("routine-a", string.Empty, 0);
+            AbilityKey secondAbility = Ability("routine-b", string.Empty, 0);
+            const string poolKey = "shared-routine-pool";
+            var pool = new ResourcePoolSnapshot(poolKey, ResourcePoolKind.SpontaneousLevel, 1, 1, null);
+            ProviderSnapshot first = PlannerProvider("unit-a", "book", firstAbility, poolKey, 1);
+            ProviderSnapshot second = PlannerProvider("unit-a", "book", secondAbility, poolKey, 1);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(new[] { first, second }, new[] { pool }, "unit-a");
+            var requests = new[]
+            {
+                new BuffCastRequest(new BuffSourceDefinition("a", firstAbility, Leaf("effect-a"),
+                    CastGroupingKind.PerTarget), new[] { "unit-a" }, ExistingEffectPolicy.Overwrite, null),
+                new BuffCastRequest(new BuffSourceDefinition("b", secondAbility, Leaf("effect-b"),
+                    CastGroupingKind.PerTarget), new[] { "unit-a" }, ExistingEffectPolicy.Overwrite, null)
+            };
+            var options = new[]
+            {
+                new ProviderPlanningOption(first, new[] { "unit-a" }, new[] { "unit-a" }, 1, 10),
+                new ProviderPlanningOption(second, new[] { "unit-a" }, new[] { "unit-a" }, 1, 10)
+            };
+            CastPlan plan = new CastPlanner().PlanRoutine(snapshot, requests, options,
+                new ProviderSelectionPolicy(null, null, null), new ActiveEffectSnapshot(null));
+            if (plan.Steps.Count != 1 ||
+                plan.Outcomes.Count(o => o.Kind == TargetOutcomeKind.Unfulfilled) != 1)
+                throw new InvalidOperationException("Routine planning overbooked a shared resource pool.");
+        }
+
+        private static void TestRoutineServiceUnsupportedSources()
+        {
+            AbilityKey supported = Ability("routine-supported", string.Empty, 0);
+            AbilityKey unsupported = Ability("routine-unsupported", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("routine-free", ResourcePoolKind.Unlimited, 0, 0, null);
+            ProviderSnapshot provider = PlannerProvider("unit-a", "book", supported, "routine-free", 0);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(new[] { provider }, new[] { pool }, "unit-a");
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault("routine-campaign");
+            profile.Routines[0].Assignments.Add(new SourceAssignmentProfile
+            {
+                SourceId = supported.Canonical,
+                Ability = AbilityKeyProfile.FromKey(supported),
+                WantedTargetUnitIds = new List<string> { "unit-a" },
+                ExistingEffectPolicy = ExistingEffectPolicy.Overwrite,
+                IgnoredPresenceMarkers = new List<string>()
+            });
+            profile.Routines[0].Assignments.Add(new SourceAssignmentProfile
+            {
+                SourceId = unsupported.Canonical,
+                Ability = AbilityKeyProfile.FromKey(unsupported),
+                WantedTargetUnitIds = new List<string> { "unit-a" },
+                ExistingEffectPolicy = ExistingEffectPolicy.Overwrite,
+                IgnoredPresenceMarkers = new List<string>()
+            });
+            var option = new ProviderPlanningOption(provider, new[] { "unit-a" },
+                new[] { "unit-a" }, 1, 10);
+            RoutinePlanResult result = new RoutinePlanService().Plan(profile, "long", snapshot,
+                new ActiveEffectSnapshot(null),
+                new Dictionary<string, EffectExpression> { { supported.Canonical, Leaf("supported-effect") } },
+                new[] { option });
+            if (result.Plan.Steps.Count != 1 || result.UnsupportedSourceIds.Count != 1 ||
+                result.UnsupportedSourceIds[0] != unsupported.Canonical)
+                throw new InvalidOperationException("Routine service did not isolate an unsupported saved source.");
+        }
+
         private static void TestProfileRoundTrip(string root)
         {
             string modPath = Path.Combine(root, "profile-roundtrip");
@@ -706,6 +771,8 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("Provider preference did not reset to automatic.");
             model.AdjustProviderCap(provider.Key.Canonical, 1);
             model.SetScale(1.25f);
+            model.ToggleExecutionMode();
+            model.ToggleOutOfCombatOnly();
             model.ToggleExistingEffectPolicy("long");
             model.ToggleHidden();
             var reordered = new PartyProviderSnapshot(units.Reverse(), new[] { provider }, new[] { pool });
@@ -714,8 +781,10 @@ namespace KingmakerBuffPlanner.Tests
             if (!reloaded.IsTargetWanted("long", "unit-a") || !reloaded.IsTargetWanted("long", "unit-b") ||
                 reloaded.GetProviderPreference(provider.Key.Canonical).MaximumCasts != 1 ||
                 reloaded.Profile.Ui.Scale != 1.25f ||
+                reloaded.Profile.Execution.Mode != "instant" ||
+                reloaded.Profile.Execution.OutOfCombatOnly ||
                 reloaded.GetExistingEffectPolicy("long") != ExistingEffectPolicy.Overwrite ||
-                !reloaded.Profile.HiddenSourceIds.Contains(ability.Canonical) || saves < 9)
+                !reloaded.Profile.HiddenSourceIds.Contains(ability.Canonical) || saves < 11)
                 throw new InvalidOperationException("Setup state did not survive party reorder/persistence mutations.");
         }
 

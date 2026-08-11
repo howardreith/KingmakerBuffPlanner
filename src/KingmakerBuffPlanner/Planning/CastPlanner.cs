@@ -18,45 +18,27 @@ namespace KingmakerBuffPlanner.Planning
             ProviderSelectionPolicy selectionPolicy,
             ActiveEffectSnapshot activeEffects)
         {
-            if (snapshot == null) throw new ArgumentNullException("snapshot");
             if (request == null) throw new ArgumentNullException("request");
+            return PlanRoutine(snapshot, new[] { request }, providerOptions,
+                selectionPolicy, activeEffects);
+        }
+
+        public CastPlan PlanRoutine(
+            PartyProviderSnapshot snapshot,
+            IEnumerable<BuffCastRequest> requests,
+            IEnumerable<ProviderPlanningOption> providerOptions,
+            ProviderSelectionPolicy selectionPolicy,
+            ActiveEffectSnapshot activeEffects)
+        {
+            if (snapshot == null) throw new ArgumentNullException("snapshot");
             if (selectionPolicy == null) throw new ArgumentNullException("selectionPolicy");
             if (activeEffects == null) throw new ArgumentNullException("activeEffects");
+            var requestList = (requests ?? throw new ArgumentNullException("requests")).ToList();
+            if (requestList.Any(r => r == null)) throw new ArgumentException("Routine request is null.", "requests");
             var options = (providerOptions ?? throw new ArgumentNullException("providerOptions")).ToList();
             ValidateOptions(snapshot, options);
-            options = options.Where(o => o.Provider.Key.Ability.Equals(request.Source.Ability)).ToList();
             var units = snapshot.Units.ToDictionary(u => u.UnitId, StringComparer.Ordinal);
             var outcomes = new List<TargetPlanOutcome>();
-            var pending = new List<string>();
-            var ignored = new HashSet<string>(request.IgnoredEffectIds, StringComparer.Ordinal);
-            foreach (string targetId in request.TargetUnitIds)
-            {
-                UnitSnapshot unit;
-                if (!units.TryGetValue(targetId, out unit))
-                {
-                    outcomes.Add(Unfulfilled(targetId, "target-not-in-party"));
-                    continue;
-                }
-                if (!unit.TargetValidation.Alive || !unit.TargetValidation.Friendly ||
-                    !unit.TargetValidation.Targetable)
-                {
-                    outcomes.Add(Unfulfilled(targetId, "target-currently-invalid"));
-                    continue;
-                }
-                if (request.ExistingEffectPolicy == ExistingEffectPolicy.SkipAlreadyActive)
-                {
-                    EffectPresenceResult presence = _presence.EvaluateTyped(request.Source.Effects,
-                        activeEffects.GetEffects(targetId), ignored);
-                    if (presence.Kind == EffectPresenceKind.Complete)
-                    {
-                        outcomes.Add(new TargetPlanOutcome(targetId,
-                            TargetOutcomeKind.SkippedAlreadyActive, "already-active", presence.PresentMarkers));
-                        continue;
-                    }
-                }
-                pending.Add(targetId);
-            }
-
             var steps = new List<CastStep>();
             var diagnostics = new List<string>();
             var ledger = new ResourceLedger(snapshot.ResourcePools);
@@ -65,12 +47,48 @@ namespace KingmakerBuffPlanner.Planning
                 .GroupBy(p => p.MaterialComponent.ItemGuid, StringComparer.Ordinal)
                 .ToDictionary(g => g.Key, g => g.Max(p => p.MaterialComponent.AvailableCount), StringComparer.Ordinal);
             var poolKinds = snapshot.ResourcePools.ToDictionary(p => p.PoolKey, p => p.Kind, StringComparer.Ordinal);
-            if (request.Source.Grouping == CastGroupingKind.MassConfiguredTargets)
-                PlanMass(request, pending, options, selectionPolicy, ledger, castsByProvider,
-                    poolKinds, materials, steps, outcomes, diagnostics);
-            else
-                PlanPerTarget(request, pending, options, selectionPolicy, ledger, castsByProvider,
-                    poolKinds, materials, steps, outcomes, diagnostics);
+            foreach (BuffCastRequest request in requestList
+                .OrderBy(r => r.Source.SourceId, StringComparer.Ordinal))
+            {
+                var pending = new List<string>();
+                var ignored = new HashSet<string>(request.IgnoredEffectIds, StringComparer.Ordinal);
+                foreach (string targetId in request.TargetUnitIds)
+                {
+                    UnitSnapshot unit;
+                    if (!units.TryGetValue(targetId, out unit))
+                    {
+                        outcomes.Add(Unfulfilled(targetId, request.Source.SourceId + ":target-not-in-party"));
+                        continue;
+                    }
+                    if (!unit.TargetValidation.Alive || !unit.TargetValidation.Friendly ||
+                        !unit.TargetValidation.Targetable)
+                    {
+                        outcomes.Add(Unfulfilled(targetId, request.Source.SourceId + ":target-currently-invalid"));
+                        continue;
+                    }
+                    if (request.ExistingEffectPolicy == ExistingEffectPolicy.SkipAlreadyActive)
+                    {
+                        EffectPresenceResult presence = _presence.EvaluateTyped(request.Source.Effects,
+                            activeEffects.GetEffects(targetId), ignored);
+                        if (presence.Kind == EffectPresenceKind.Complete)
+                        {
+                            outcomes.Add(new TargetPlanOutcome(targetId,
+                                TargetOutcomeKind.SkippedAlreadyActive,
+                                request.Source.SourceId + ":already-active", presence.PresentMarkers));
+                            continue;
+                        }
+                    }
+                    pending.Add(targetId);
+                }
+                List<ProviderPlanningOption> sourceOptions = options.Where(o =>
+                    o.Provider.Key.Ability.Equals(request.Source.Ability)).ToList();
+                if (request.Source.Grouping == CastGroupingKind.MassConfiguredTargets)
+                    PlanMass(request, pending, sourceOptions, selectionPolicy, ledger, castsByProvider,
+                        poolKinds, materials, steps, outcomes, diagnostics);
+                else
+                    PlanPerTarget(request, pending, sourceOptions, selectionPolicy, ledger, castsByProvider,
+                        poolKinds, materials, steps, outcomes, diagnostics);
+            }
             return new CastPlan(steps, outcomes, diagnostics);
         }
 
