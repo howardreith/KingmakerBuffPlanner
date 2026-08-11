@@ -17,6 +17,7 @@ namespace KingmakerBuffPlanner.Discovery
         {
             var entries = new List<NativeCatalogEntry>();
             NativeAccessibilityIndex accessibility = NativeAccessibilityIndex.Build();
+            var classifier = new NativeCandidateClassifier();
             var adapter = new KingmakerActionGraphAdapter();
             var scanner = new ActionGraphScanner();
             foreach (BlueprintAbility ability in ResourcesLibrary.GetBlueprints<BlueprintAbility>()
@@ -32,7 +33,7 @@ namespace KingmakerBuffPlanner.Discovery
                     NativeSpellListRecord[] spellLists = accessibility.GetSpellLists(ability.AssetGuid);
                     bool candidate = accessibilitySources.Length != 0;
                     NativeEffectRecord[] effects = GetEffects(scan.Expression);
-                    entries.Add(new NativeCatalogEntry
+                    var entry = new NativeCatalogEntry
                     {
                         AbilityGuid = ability.AssetGuid,
                         ParentGuid = ability.Parent == null ? string.Empty : ability.Parent.AssetGuid,
@@ -73,9 +74,34 @@ namespace KingmakerBuffPlanner.Discovery
                         Effects = effects,
                         Expression = scan.Expression,
                         Diagnostics = scan.Diagnostics.ToArray(),
-                        Disposition = GetPreliminaryDisposition(candidate, effects, scan.Diagnostics.Count),
-                        DispositionReason = GetPreliminaryReason(candidate, effects, scan.Diagnostics.Count)
-                    });
+                        ManualOverride = string.Empty,
+                        RuntimeEvidence = new string[0]
+                    };
+                    NativeCandidateAuditDecision decision = classifier.Classify(
+                        new NativeCandidateAuditFacts
+                        {
+                            IsPlayerAccessible = candidate,
+                            CanTargetSelf = entry.CanTargetSelf,
+                            CanTargetFriends = entry.CanTargetFriends,
+                            CanTargetEnemies = entry.CanTargetEnemies,
+                            CanTargetPoint = entry.CanTargetPoint,
+                            EffectOnAlly = entry.EffectOnAlly,
+                            Effects = effects.Select(e => new NativeCandidateEffectFacts
+                            {
+                                Kind = e.Kind,
+                                Target = e.Target,
+                                Harmful = e.Harmful,
+                                SourceContract = e.SourceContract,
+                                ActionPath = e.ActionPath
+                            }).ToArray(),
+                            DiagnosticContracts = scan.Diagnostics.Select(d =>
+                                d.NodeIdentity + "|" + d.Detail).ToArray()
+                        });
+                    entry.Disposition = decision.Disposition;
+                    entry.SupportClass = decision.SupportClass;
+                    entry.DispositionReason = decision.Reason;
+                    entry.QualificationStatus = decision.QualificationStatus;
+                    entries.Add(entry);
                 }
                 catch (Exception exception)
                 {
@@ -100,13 +126,26 @@ namespace KingmakerBuffPlanner.Discovery
 
             return new NativeCatalogExport
             {
-                SchemaVersion = 2,
+                SchemaVersion = 3,
                 Profile = "native-only",
                 GeneratorCommit = BuildInfo.Commit,
                 AbilityCount = entries.Count,
                 CandidateCount = entries.Count(e => e.IsCandidate),
                 DetectedEffectCount = entries.Count(e => e.HasDetectedEffect),
                 DiagnosticAbilityCount = entries.Count(e => e.Diagnostics.Length != 0),
+                SupportedAutomaticallyCount = entries.Count(e => e.IsCandidate &&
+                    e.Disposition == "include" && e.SupportClass == "automatic"),
+                SupportedGenericReflectionCount = entries.Count(e => e.IsCandidate &&
+                    e.Disposition == "include" && e.SupportClass == "generic-reflection-wrapper"),
+                SupportedExplicitAdapterCount = entries.Count(e => e.IsCandidate &&
+                    e.Disposition == "include" && e.SupportClass == "explicit-adapter"),
+                SupportedOverrideCount = entries.Count(e => e.IsCandidate &&
+                    e.Disposition == "include" && e.SupportClass == "override"),
+                ExcludedByDefinitionCount = entries.Count(e => e.IsCandidate && e.Disposition == "exclude"),
+                UnsupportedCount = entries.Count(e => e.IsCandidate &&
+                    e.Disposition == "unsupported-with-reason"),
+                RuntimeQualifiedDirectCount = 0,
+                RuntimeQualifiedEquivalenceClassCount = 0,
                 Abilities = entries.ToArray()
             };
         }
@@ -170,38 +209,6 @@ namespace KingmakerBuffPlanner.Discovery
             if (referenced != null) CollectLeaves(referenced.Child, leaves);
         }
 
-        private static string GetPreliminaryDisposition(
-            bool candidate, NativeEffectRecord[] effects, int diagnosticCount)
-        {
-            if (!candidate) return "not-player-accessible";
-            if (effects.Length == 0)
-                return diagnosticCount == 0 ? "exclude" : "audit-unknown-action-no-effect";
-            if (effects.All(e => e.Harmful == true)) return "exclude";
-            if (effects.Any(e => e.Harmful == null) ||
-                (effects.Any(e => e.Harmful == true) && effects.Any(e => e.Harmful == false)))
-                return "audit-mixed-or-unresolved";
-            return diagnosticCount == 0 ? "include-structural" : "audit-diagnostic-adjunct";
-        }
-
-        private static string GetPreliminaryReason(
-            bool candidate, NativeEffectRecord[] effects, int diagnosticCount)
-        {
-            if (!candidate) return "Not reachable from native player class spellbooks, class/archetype progression, race features, or feat progression.";
-            if (effects.Length == 0)
-                return diagnosticCount == 0
-                    ? "No persistent buff, area-buff, or worn-item enchantment effect was detected."
-                    : "No persistent effect was detected, but unsupported action nodes require exception audit.";
-            if (effects.All(e => e.Harmful == true))
-                return "All detected persistent unit/area buffs are marked harmful by the exact native blueprint contract.";
-            if (effects.Any(e => e.Harmful == null))
-                return "At least one persistent effect has no BlueprintBuff harmful-polarity contract.";
-            if (effects.Any(e => e.Harmful == true))
-                return "The graph contains both harmful and beneficial persistent effects; safe branch semantics require audit.";
-            return diagnosticCount == 0
-                ? "Player-accessible graph contains only resolved non-harmful persistent buff effects."
-                : "Resolved non-harmful persistent effects coexist with unsupported action nodes; adjunct semantics require audit.";
-        }
-
     }
 
     internal sealed class NativeCatalogExport
@@ -220,7 +227,15 @@ namespace KingmakerBuffPlanner.Discovery
         public int DetectedEffectCount { get; set; }
         [JsonProperty("diagnosticAbilityCount", Order = 7)]
         public int DiagnosticAbilityCount { get; set; }
-        [JsonProperty("abilities", Order = 8)]
+        [JsonProperty("supportedAutomaticallyCount", Order = 8)] public int SupportedAutomaticallyCount { get; set; }
+        [JsonProperty("supportedGenericReflectionCount", Order = 9)] public int SupportedGenericReflectionCount { get; set; }
+        [JsonProperty("supportedExplicitAdapterCount", Order = 10)] public int SupportedExplicitAdapterCount { get; set; }
+        [JsonProperty("supportedOverrideCount", Order = 11)] public int SupportedOverrideCount { get; set; }
+        [JsonProperty("excludedByDefinitionCount", Order = 12)] public int ExcludedByDefinitionCount { get; set; }
+        [JsonProperty("unsupportedCount", Order = 13)] public int UnsupportedCount { get; set; }
+        [JsonProperty("runtimeQualifiedDirectCount", Order = 14)] public int RuntimeQualifiedDirectCount { get; set; }
+        [JsonProperty("runtimeQualifiedEquivalenceClassCount", Order = 15)] public int RuntimeQualifiedEquivalenceClassCount { get; set; }
+        [JsonProperty("abilities", Order = 16)]
         public NativeCatalogEntry[] Abilities { get; set; }
     }
 
@@ -277,7 +292,11 @@ namespace KingmakerBuffPlanner.Discovery
         public DiscoveryDiagnostic[] Diagnostics { get; set; }
         [JsonProperty("disposition", Order = 32)]
         public string Disposition { get; set; }
-        [JsonProperty("dispositionReason", Order = 33)] public string DispositionReason { get; set; }
+        [JsonProperty("supportClass", Order = 33)] public string SupportClass { get; set; }
+        [JsonProperty("dispositionReason", Order = 34)] public string DispositionReason { get; set; }
+        [JsonProperty("manualOverride", Order = 35)] public string ManualOverride { get; set; }
+        [JsonProperty("runtimeEvidence", Order = 36)] public string[] RuntimeEvidence { get; set; }
+        [JsonProperty("qualificationStatus", Order = 37)] public string QualificationStatus { get; set; }
     }
 
     internal sealed class NativeEffectRecord

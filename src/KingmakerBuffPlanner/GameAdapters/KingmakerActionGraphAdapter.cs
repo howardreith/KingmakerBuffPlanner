@@ -99,6 +99,23 @@ namespace KingmakerBuffPlanner.GameAdapters
                 return Effect(EffectKind.WornItemEnchantment, enchant.Enchantment.AssetGuid,
                     enchant.ToCaster ? EffectTarget.Caster : EffectTarget.CurrentTarget,
                     "ContextActionEnchantWornItem");
+            var magicFang = action as MagicFang;
+            if (magicFang != null)
+                return new DiscoveryNode(DiscoveryNodeKind.Sequence, "MagicFang.Enchantment",
+                    (magicFang.Enchantment ?? new Kingmaker.Blueprints.Items.Ecnchantments.BlueprintItemEnchantment[0])
+                        .Where(e => e != null).OrderBy(e => e.AssetGuid, StringComparer.Ordinal)
+                        .Select(e => Effect(EffectKind.WornItemEnchantment, e.AssetGuid,
+                            EffectTarget.CurrentTarget, "MagicFang")).ToArray(),
+                    sourceContract: "MagicFang");
+            if (action is ContextActionSpawnMonster)
+                return new DiscoveryNode(DiscoveryNodeKind.Unknown,
+                    DescribeType(action.GetType()), sourceContract: "excluded-summoning-action");
+            if (action is ContextActionSelectByValue)
+                return AdaptExactActionListAlternatives(action, "m_Variants", "Action",
+                    "ContextActionSelectByValue");
+            if (action is ContextActionRandomize)
+                return AdaptExactActionListAlternatives(action, "m_Actions", "Action",
+                    "ContextActionRandomize");
             var area = action as ContextActionSpawnAreaEffect;
             if (area != null && area.AreaEffect != null)
             {
@@ -110,6 +127,44 @@ namespace KingmakerBuffPlanner.GameAdapters
             DiscoveryNode reflected = AdaptProvenActionLists(action);
             return reflected ?? new DiscoveryNode(DiscoveryNodeKind.Unknown,
                 DescribeType(action.GetType()), sourceContract: "unsupported-action");
+        }
+
+        private DiscoveryNode AdaptExactActionListAlternatives(
+            GameAction action, string arrayFieldName, string actionFieldName, string contract)
+        {
+            const BindingFlags flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+            FieldInfo arrayField = action.GetType().GetField(arrayFieldName, flags);
+            if (arrayField == null || !arrayField.FieldType.IsArray)
+                return new DiscoveryNode(DiscoveryNodeKind.Unknown, DescribeType(action.GetType()),
+                    sourceContract: contract + ":array-contract-missing");
+            Array wrappers = arrayField.GetValue(action) as Array;
+            if (wrappers == null || wrappers.Length == 0)
+                return new DiscoveryNode(DiscoveryNodeKind.Empty, contract, sourceContract: contract);
+            var alternatives = new List<DiscoveryNode>();
+            foreach (object wrapper in wrappers)
+            {
+                if (wrapper == null) continue;
+                FieldInfo actionField = wrapper.GetType().GetField(actionFieldName, flags);
+                if (actionField == null || actionField.FieldType != typeof(ActionList))
+                    return new DiscoveryNode(DiscoveryNodeKind.Unknown, DescribeType(wrapper.GetType()),
+                        sourceContract: contract + ":ActionList-contract-missing");
+                alternatives.Add(AdaptList((ActionList)actionField.GetValue(wrapper)));
+            }
+            return BuildAlternatives(alternatives, 0, contract);
+        }
+
+        private static DiscoveryNode BuildAlternatives(
+            IReadOnlyList<DiscoveryNode> alternatives, int index, string contract)
+        {
+            if (index >= alternatives.Count)
+                return new DiscoveryNode(DiscoveryNodeKind.Empty, contract + ":none");
+            if (index == alternatives.Count - 1) return alternatives[index];
+            return new DiscoveryNode(DiscoveryNodeKind.Conditional,
+                contract + ":alternative:" + index,
+                whenTrue: alternatives[index],
+                whenFalse: BuildAlternatives(alternatives, index + 1, contract),
+                conditionContract: contract + ":runtime-selected-alternative",
+                sourceContract: contract);
         }
 
         private DiscoveryNode AdaptProvenActionLists(GameAction action)
@@ -133,7 +188,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                 }
             }
             return lists.Count == 0 ? null : new DiscoveryNode(
-                DiscoveryNodeKind.Sequence, DescribeType(action.GetType()), lists,
+                DiscoveryNodeKind.Sequence, "reflected:" + DescribeType(action.GetType()), lists,
                 sourceContract: "reflected-exact-ActionList-wrapper");
         }
 

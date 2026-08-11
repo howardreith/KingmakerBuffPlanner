@@ -53,6 +53,7 @@ namespace KingmakerBuffPlanner.Tests
                 Run("scanner-reports-cycle", TestScannerCycle);
                 Run("scanner-reports-unknown-node", TestScannerUnknown);
                 Run("scanner-expression-wire-contract", TestScannerExpressionWireContract);
+                Run("native-candidate-classification-is-structural", TestNativeCandidateClassification);
                 Run("stable-keys-distinguish-variants-and-metamagic", TestStableKeys);
                 Run("spontaneous-providers-share-one-pool", TestSpontaneousSharedPool);
                 Run("prepared-opposition-consumes-linked-slots", TestPreparedLinkedSlots);
@@ -165,6 +166,79 @@ namespace KingmakerBuffPlanner.Tests
                 !json.Contains("\"effectId\":\"wire-buff\"") ||
                 !json.Contains("\"actionPath\":\"wire-buff\""))
                 throw new InvalidOperationException("Effect expression JSON contract is incomplete: " + json);
+        }
+
+        private static void TestNativeCandidateClassification()
+        {
+            var classifier = new NativeCandidateClassifier();
+            NativeCandidateAuditDecision supported = classifier.Classify(new NativeCandidateAuditFacts
+            {
+                IsPlayerAccessible = true,
+                CanTargetSelf = true,
+                Effects = new[] { CandidateEffect("Buff", "CurrentTarget", false, "ContextActionApplyBuff", "root") },
+                DiagnosticContracts = new string[0]
+            });
+            if (supported.Disposition != "include" || supported.SupportClass != "automatic" ||
+                supported.QualificationStatus != "DEFER-runtime-qualification")
+                throw new InvalidOperationException("Ordinary persistent self buff was not classified as supported.");
+
+            NativeCandidateAuditDecision summon = classifier.Classify(new NativeCandidateAuditFacts
+            {
+                IsPlayerAccessible = true,
+                CanTargetSelf = true,
+                Effects = new[] { CandidateEffect("Buff", "CurrentTarget", false,
+                    "ContextActionApplyBuff", "root/ContextActionSpawnMonster/AfterSpawn") },
+                DiagnosticContracts = new string[0]
+            });
+            if (summon.Disposition != "exclude" || !summon.Reason.StartsWith("summoning:", StringComparison.Ordinal))
+                throw new InvalidOperationException("After-spawn buffs escaped the summoning exclusion.");
+
+            NativeCandidateAuditDecision hostile = classifier.Classify(new NativeCandidateAuditFacts
+            {
+                IsPlayerAccessible = true,
+                CanTargetSelf = true,
+                CanTargetEnemies = true,
+                EffectOnAlly = "None",
+                Effects = new[] { CandidateEffect("Buff", "CurrentTarget", false, "ContextActionApplyBuff", "root") },
+                DiagnosticContracts = new string[0]
+            });
+            if (hostile.Disposition != "exclude" || !hostile.Reason.StartsWith("hostile-only:", StringComparison.Ordinal))
+                throw new InvalidOperationException("Hostile current-target effect was mistaken for a self buff.");
+
+            NativeCandidateAuditDecision point = classifier.Classify(new NativeCandidateAuditFacts
+            {
+                IsPlayerAccessible = true,
+                CanTargetFriends = true,
+                CanTargetPoint = true,
+                Effects = new[] { CandidateEffect("Buff", "CurrentTarget", false, "ContextActionApplyBuff", "root") },
+                DiagnosticContracts = new string[0]
+            });
+            if (point.Disposition != "exclude" ||
+                !point.Reason.StartsWith("point-target-without-placement:", StringComparison.Ordinal))
+                throw new InvalidOperationException("Unsafe point targeting was not excluded.");
+
+            NativeCandidateAuditDecision pool = classifier.Classify(new NativeCandidateAuditFacts
+            {
+                IsPlayerAccessible = true,
+                CanTargetSelf = true,
+                Effects = new[] { CandidateEffect("Buff", "CurrentTarget", false, "ContextActionApplyBuff", "root") },
+                DiagnosticContracts = new[] { "ContextActionWeaponEnchantPool|unsupported-action" }
+            });
+            if (pool.Disposition != "unsupported-with-reason" || pool.QualificationStatus != "FAIL-unsupported")
+                throw new InvalidOperationException("Dynamic enchant-pool uncertainty was hidden.");
+        }
+
+        private static NativeCandidateEffectFacts CandidateEffect(
+            string kind, string target, bool? harmful, string source, string path)
+        {
+            return new NativeCandidateEffectFacts
+            {
+                Kind = kind,
+                Target = target,
+                Harmful = harmful,
+                SourceContract = source,
+                ActionPath = path
+            };
         }
 
         private static void TestStableKeys()
