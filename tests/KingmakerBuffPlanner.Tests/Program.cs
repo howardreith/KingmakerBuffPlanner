@@ -12,6 +12,7 @@ using KingmakerBuffPlanner.Domain.Planning;
 using KingmakerBuffPlanner.Planning;
 using KingmakerBuffPlanner.Persistence;
 using KingmakerBuffPlanner.UI;
+using KingmakerBuffPlanner.Execution;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -70,6 +71,7 @@ namespace KingmakerBuffPlanner.Tests
                 Run("profile-migrates-schema-one", () => TestProfileMigration(root));
                 Run("profile-malformed-json-recovers-default", () => TestProfileMalformed(root));
                 Run("setup-model-persists-stable-targets-and-provider-controls", TestSetupModel);
+                Run("animated-executor-validates-before-queue-and-reports", TestAnimatedExecutor);
             }
             finally
             {
@@ -576,6 +578,29 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("Setup state did not survive party reorder/persistence mutations.");
         }
 
+        private static void TestAnimatedExecutor()
+        {
+            AbilityKey ability = Ability("animated", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("animated-free", ResourcePoolKind.Unlimited, 0, 0, null);
+            ProviderSnapshot provider = PlannerProvider("unit-a", "book-a", ability, "animated-free", 0);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(new[] { provider }, new[] { pool }, "unit-a", "unit-b");
+            var option = new ProviderPlanningOption(provider, new[] { "unit-a", "unit-b" },
+                new[] { "unit-a" }, 1, 1);
+            CastPlan plan = PlannerPlan(snapshot, ability, CastGroupingKind.PerTarget,
+                new[] { "unit-a", "unit-b" }, new[] { option }, EmptyPolicy(), new ActiveEffectSnapshot(null));
+            var runtime = new FakeAnimatedRuntime();
+            var report = new ExecutionReport(plan);
+            var enumerator = new AnimatedCastExecutor(runtime, true).Execute(plan, report);
+            int moves = 0;
+            while (enumerator.MoveNext())
+                if (++moves > 20) throw new InvalidOperationException("Animated executor did not terminate.");
+            if (runtime.StartCount != 1 || report.Planned != 2 || report.Fired != 1 ||
+                report.Succeeded != 1 || report.Failed != 1 ||
+                report.SuccessfullyObserved != 1 ||
+                report.Records.First(r => r.Status == CastExecutionStatus.Failed).Detail != "target-invalid")
+                throw new InvalidOperationException("Animated executor queued an invalid cast or misreported completion.");
+        }
+
         private static EffectLeafExpression Leaf(string id)
         {
             return new EffectLeafExpression(EffectKind.Buff, id, EffectTarget.CurrentTarget, "fixture", "fixture/" + id);
@@ -644,6 +669,34 @@ namespace KingmakerBuffPlanner.Tests
                     new TargetValidationSnapshot(true, true, true, true)) },
                 providers,
                 pools);
+        }
+
+        private sealed class FakeAnimatedRuntime : ICastRuntimeAdapter
+        {
+            private int _validations;
+            internal int StartCount;
+            public bool IsInCombat { get { return false; } }
+            public CastRuntimeValidation Validate(CastStep step)
+            {
+                _validations++;
+                return _validations == 1
+                    ? CastRuntimeValidation.Fail("target-invalid")
+                    : CastRuntimeValidation.Pass();
+            }
+            public IAnimatedCastOperation StartAnimated(CastStep step)
+            {
+                StartCount++;
+                return new FakeAnimatedOperation();
+            }
+        }
+
+        private sealed class FakeAnimatedOperation : IAnimatedCastOperation
+        {
+            private int _checks;
+            public bool IsCompleted { get { return ++_checks >= 2; } }
+            public bool Succeeded { get { return true; } }
+            public bool EffectsObserved { get { return true; } }
+            public string Detail { get { return "command-success"; } }
         }
 
         private static DiscoveryNode EffectNode(string id)
