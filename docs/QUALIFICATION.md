@@ -28,3 +28,14 @@ Phase 1 fresh-process qualification PASS:
 | `20260811T1939275269790Z-mod-load-smoke` | 5/5 PASS | `d3f4dc1fec9970b1c3c8eed5100052edd996c870` | `e268ff99-af2e-4def-8511-746cbd1b5106` | PASS, exact manifest |
 
 Both runs used package SHA-256 `885113c4f8e1bb3a271579188823ceb3704a3b1f531ddce32efe26fa5f295764` and DLL SHA-256 `1470d6f3bc45d7612f7668e87ce862ff7d89aa415e5634581e8b23924a4ba235`. Runtime identities were Kingmaker 2.1.7 (displayed 2.1.7b; executable hash already fingerprinted), UMM 0.28.2.0 with exact hash, and Harmony12 1.2.0.1 with exact hash. UMM created its normal generated DLL cache only in the transaction-owned staged tree; both states recorded the mutation and discarded it before exact restoration. Final checks: game process count 0, deployment lock absent, live/original manifest equality true.
+
+Phase 2 structural catalog qualification PASS:
+
+| Run ID | Assertions | Catalog SHA-256 | Counts (abilities/candidates/effects/diagnostic abilities) | Restoration |
+|---|---:|---|---|---|
+| `20260811T1958580589645Z-native-buff-catalog` | 8/8 PASS | `bcacbe69bc71c85c5299b8fe8254c18baa33d66e9e3ecf53f6d4aa6b37094878` | 1,722 / 1,353 / 1,095 / 755 | PASS, exact manifest |
+| `20260811T2000040593873Z-native-buff-catalog` | 8/8 PASS | `bcacbe69bc71c85c5299b8fe8254c18baa33d66e9e3ecf53f6d4aa6b37094878` | 1,722 / 1,353 / 1,095 / 755 | PASS, exact manifest |
+
+Both runs used commit `07dc2380abbac74228eed88ce73113aeeabe61db`, DLL SHA-256 `61b63cfa352ae9bc9e15b8aa10a08ff9f2fe2ac3ff2c5ee059f38d2f4e0df975`, MVID `7f7ba872-03ce-4554-ae1d-3a5942e62e8d`, and package SHA-256 `b128386d8d6b6715a4d51190faf1d971304bd0fb748c7c0d4f57d6293ec9b20c`. Source-only gates were validation 15/15, protocol/domain 20/20, harness 5/5, package 4/4, deployment WhatIf purity 5/5. No save was selected or accessed.
+
+Rejected evidence: run `20260811T1952280447102Z-native-buff-catalog` exposed an internal-type JSON opt-in defect (`native-buff-catalog.json` was `{}`); later runs before the full expression contract showed `{}` expressions. These are defects found and repaired, not qualification passes. Runtime and PowerShell validators now reconcile the root array/counts and require an expression discriminator on every row.

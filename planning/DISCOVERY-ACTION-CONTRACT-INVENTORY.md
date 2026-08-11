@@ -19,4 +19,6 @@ Exact target: installed Kingmaker 2.1.7b `Assembly-CSharp.dll` SHA-256 `3b6450ff
 | `AbilityVariants` | `Variants: BlueprintAbility[]` | variant family with shared provider/resource identity | PASS |
 | `ActionList` | `Actions: GameAction[]` | ordered structural traversal | PASS |
 | `ConditionsChecker` | operation and condition array | retain conjunction/disjunction metadata | PASS |
-| Unknown ActionList wrapper | bounded reflected instance fields/properties | diagnostic-only unless safe traversal contract is proven | TODO |
+| Unknown ActionList wrapper | cached, deterministic, bounded exact-`ActionList` fields/properties; getter failures become diagnostics | recurse safely while preserving exact type/assembly/path | PASS |
+
+Runtime evidence: native-only export commit `07dc2380abbac74228eed88ce73113aeeabe61db`, two byte-identical catalogs (SHA-256 `bcacbe69bc71c85c5299b8fe8254c18baa33d66e9e3ecf53f6d4aa6b37094878`), 0 scanner exceptions. Unknown non-wrapper actions remain explicit audit inputs rather than being silently treated as supported effects.

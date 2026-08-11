@@ -5,7 +5,7 @@ Status: TODO
 | Phase | Scenario | Save policy | Required proof | Current status |
 |---|---|---|---|---|
 | 1 | mod-load-smoke (two fresh processes) | NO-SAVE | identity, hashes, clean load/unload | PASS |
-| 2 | native-catalog-export | NO-SAVE | exact candidate/effect export | TODO |
+| 2 | native-buff-catalog (two identical fresh processes) | NO-SAVE | exact candidate/effect export and deterministic hash | PASS |
 | 3 | party-provider-scan | KBP working fixture | providers/sources/resources | DEFER — EVIDENCED |
 | 4 | prepared-resource-plan | KBP working fixture | exact prepared allocation | DEFER — EVIDENCED |
 | 4 | spontaneous-resource-plan | KBP working fixture | shared pool allocation | DEFER — EVIDENCED |

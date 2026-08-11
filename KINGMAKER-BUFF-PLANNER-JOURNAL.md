@@ -113,3 +113,20 @@ Status: PASS
 - Final external state: no Kingmaker process, no deployment lock, live/original manifest equality true, no save accessed
 - Last successful gate: Phase 1 minimal loadable standalone mod complete
 - Exact next action: Phase 2 normalized effect-expression domain and generic action-graph scanner with realistic pure fixtures
+
+## 2026-08-11 — Phase 2 structural discovery and deterministic catalog
+
+Status: PASS
+
+- Branch/source commit: `codex/kingmaker-buff-planner` / `07dc2380abbac74228eed88ce73113aeeabe61db`
+- Active version: 0.0.1
+- Source gates: validation 15/15, protocol/domain 20/20, runtime transaction 5/5, deployment WhatIf 5/5, package 4/4, warning-free Release build
+- Package/DLL/MVID: `b128386d8d6b6715a4d51190faf1d971304bd0fb748c7c0d4f57d6293ec9b20c` / `61b63cfa352ae9bc9e15b8aa10a08ff9f2fe2ac3ff2c5ee059f38d2f4e0df975` / `7f7ba872-03ce-4554-ae1d-3a5942e62e8d`
+- Runtime PASS runs: `20260811T1958580589645Z-native-buff-catalog` and `20260811T2000040593873Z-native-buff-catalog`, each 8/8 assertions and `restorationVerified=true`
+- Determinism: both native-only processes produced catalog SHA-256 `bcacbe69bc71c85c5299b8fe8254c18baa33d66e9e3ecf53f6d4aa6b37094878`
+- Catalog: 1,722 abilities; 1,353 preliminary candidates; 1,095 effect-bearing graphs; 755 abilities/455 candidates with explicit unknown-action diagnostics; zero scanner exceptions
+- Failure repaired: the first exporter root serialized as `{}` under the game's Json.NET defaults; explicit DTO wire contracts and root reconciliation added
+- Failure repaired: a later inspection showed nested expressions serialized as `{}`; explicit expression contracts, per-row discriminator validation, and a regression test added
+- Qualification boundary: Phase 2 structural catalog is PASS; no candidate is yet claimed fully supported until provider/resource/planning/execution audits complete
+- External state: game absent, runtime lock absent, original whole `Mods` tree exactly restored; no save selected or accessed
+- Exact next action: implement Phase 3 normalized party/provider/resource snapshot domain and pure snapshot tests, then add the guarded save-backed scenario only when a project-owned fixture exists

@@ -4,12 +4,12 @@ Status: IN PROGRESS
 
 - Repository: standalone Kingmaker Buff Planner
 - Branch: `codex/kingmaker-buff-planner`
-- Current commit: `4ca6008d873577e8e6263b54658620b649f81cd1` (`docs: complete phase zero control records`)
+- Current commit: `07dc2380abbac74228eed88ce73113aeeabe61db` (`fix: preserve catalog effect expressions`)
 - Active version: 0.0.1
-- Last successful gate: Phase 1 complete, including two fresh-process mod-load PASS runs and exact restoration
-- Current worktree: durable Phase 1 qualification updates only
-- Current hypothesis/failure: UMM 0.28.2 differs from laptop reference but exact local/runtime contracts are coherent and qualified; save-backed runtime proof still lacks a `KBP_` fixture
-- Runtime/profile state: runs `20260811T1931581708021Z-mod-load-smoke` and `20260811T1935262721216Z-mod-load-smoke` are Restored and verified; no deployment lock; game not running; Steam remains offline/cloud-disabled
+- Last successful gate: Phase 2 complete, including two byte-identical native catalog PASS runs and exact restoration
+- Current worktree: generated catalog and Phase 2 durable qualification updates
+- Current hypothesis/failure: 455 preliminary candidates have explicit unknown-action diagnostics that must be dispositioned during the coverage audit; save-backed runtime proof still lacks a `KBP_` fixture
+- Runtime/profile state: runs `20260811T1958580589645Z-native-buff-catalog` and `20260811T2000040593873Z-native-buff-catalog` are Restored and verified; no deployment lock; game not running; Steam remained offline/cloud-disabled at each preflight
 - Unrestored external state: none
-- Files being changed: Phase 1 qualification matrix/docs/journal/resume
-- Exact next command: checkpoint Phase 1 qualification, then implement Phase 2 domain expression and structural scanner tests
+- Files being changed: generated native catalog, coverage/exception/runtime matrices, qualification/report, journal, and resume
+- Exact next command: checkpoint Phase 2 qualification, then implement Phase 3 provider/resource snapshot domain and pure tests
