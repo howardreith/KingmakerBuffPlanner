@@ -20,3 +20,15 @@ Status: IN PROGRESS
 - Known constraint: no `KBP_` disposable save; save-backed scenarios cannot truthfully run
 - Current files being changed: governance, architecture, contract inventories, matrices, journal, blockers, and resume state
 - Exact next action: finish read-only harness intake, create redacted fingerprint schema/exact private fingerprint, then scaffold Phase 1
+
+## 2026-08-11 — Phase 0 checkpoint
+
+Status: PASS
+
+- Branch: `codex/kingmaker-buff-planner`
+- Commit: `ff54df0c06b4a366f715a4cac2654e358cc84c66` (`docs: record autonomous mission intake`)
+- Work completed: first coherent intake commit; exact mission copy, environment/reference fingerprint, architecture/source matrix, discovery/resource contracts, coverage/runtime/compatibility matrices, blockers, journal, and resume records
+- Validation: `git diff --cached --check` PASS (0 defects); prohibited payload review PASS (0 payloads)
+- External state: none altered; no deployment/runtime transaction
+- Current uncertainty: desktop UMM deviation and missing `KBP_` save remain recorded, not concealed
+- Exact next action: commit the four remaining mission-required architecture/runtime documents before production scaffold
