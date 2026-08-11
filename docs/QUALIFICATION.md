@@ -39,3 +39,18 @@ Phase 2 structural catalog qualification PASS:
 Both runs used commit `07dc2380abbac74228eed88ce73113aeeabe61db`, DLL SHA-256 `61b63cfa352ae9bc9e15b8aa10a08ff9f2fe2ac3ff2c5ee059f38d2f4e0df975`, MVID `7f7ba872-03ce-4554-ae1d-3a5942e62e8d`, and package SHA-256 `b128386d8d6b6715a4d51190faf1d971304bd0fb748c7c0d4f57d6293ec9b20c`. Source-only gates were validation 15/15, protocol/domain 20/20, harness 5/5, package 4/4, deployment WhatIf purity 5/5. No save was selected or accessed.
 
 Rejected evidence: run `20260811T1952280447102Z-native-buff-catalog` exposed an internal-type JSON opt-in defect (`native-buff-catalog.json` was `{}`); later runs before the full expression contract showed `{}` expressions. These are defects found and repaired, not qualification passes. Runtime and PowerShell validators now reconcile the root array/counts and require an expression discriminator on every row.
+
+Phase 6 no-save UI root qualification PASS:
+
+- run: `20260811T2036033407315Z-ui-root-smoke`;
+- commit: `c65fec1c83dd9bdae3ea5dd0b445436eff933102`;
+- assertions: 9/9;
+- singleton roots: 1;
+- repeated open/close cycles: 2;
+- rendered open frames: 12;
+- observed resolution: 2560x1440;
+- DLL / MVID: `ae459a27720feec946bb29efb12b3dd742b15291f835efbf575db022785032d9` / `c488303c-b96e-4346-a3fb-31ee28ddd5cc`;
+- package: `ed21469ffe335f6111a477ef3bda0d4690a82ae1bf446882662726b769f6ca9f`;
+- transaction: `Restored`, `restorationVerified=true`; no save selected.
+
+This proves exact UI module load, repeated lifecycle, IMGUI render, singleton behavior, and one representative resolution. It does not prove campaign configuration interaction, scene transition, 1920x1080, or 3840x2160.

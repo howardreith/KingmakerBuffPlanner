@@ -6,6 +6,7 @@ Status: TODO
 |---|---|---|---|---|
 | 1 | mod-load-smoke (two fresh processes) | NO-SAVE | identity, hashes, clean load/unload | PASS |
 | 2 | native-buff-catalog (two identical fresh processes) | NO-SAVE | exact candidate/effect export and deterministic hash | PASS |
+| 6 | ui-root-smoke | NO-SAVE | singleton root, repeated open/close, rendered frames, exact resolution | PASS at 2560x1440 |
 | 3 | party-provider-scan | KBP working fixture | providers/sources/resources | DEFER — EVIDENCED |
 | 4 | prepared-resource-plan | KBP working fixture | exact prepared allocation | DEFER — EVIDENCED |
 | 4 | spontaneous-resource-plan | KBP working fixture | shared pool allocation | DEFER — EVIDENCED |

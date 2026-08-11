@@ -147,3 +147,20 @@ Status: PASS for source/pure behavior; runtime gates DEFER — EVIDENCED
 - External state: no game process, no runtime lock, no transaction; no live mod or save mutation
 - Rejected shortcut: treating compilation/pure fixtures as save-backed party/resource/execution qualification
 - Exact next action: implement Phase 6 standalone diagnostic setup UI and source-level lifecycle/controller tests, while retaining runtime UI gates as deferred until an authorized fixture exists
+
+## 2026-08-11 — Phase 6 runtime UI and Phase 7–8 source engines
+
+Status: Phase 6 partial PASS; executor source PASS; save-backed executor gates DEFER — EVIDENCED
+
+- UI source commit: `4eca8b2894e9451398d2046ea8f74d70efe365f8`
+- Strengthened UI runtime commit: `c65fec1c83dd9bdae3ea5dd0b445436eff933102`
+- Animated executor commit: `41174bb61c72d2f6246460afaada71086ec24385`
+- Instant executor commit/current HEAD: `ebca55bab80eb2dc54cb1a725fff7b853101daa1`
+- Source gates: validation 15/15, protocol/domain/UI/execution 41/41, transaction 5/5, deployment WhatIf 5/5, package 4/4
+- UI runtime: `20260811T2036033407315Z-ui-root-smoke`, 9/9 assertions, 2 cycles, 12 open render frames, 1 root, 2560x1440, exact restoration
+- Runtime package/DLL/MVID for UI proof: `ed21469ffe335f6111a477ef3bda0d4690a82ae1bf446882662726b769f6ca9f` / `ae459a27720feec946bb29efb12b3dd742b15291f835efbf575db022785032d9` / `c488303c-b96e-4346-a3fb-31ee28ddd5cc`
+- Animated engine: no global command patch; native command queued without interrupting unrelated commands; final validation, scoped polling, effects/reporting
+- Instant engine: final revalidation; one `RuleCastSpell`; one `AbilityData.Spend()` iff not UMD-failed; batches default to 8; no direct buff/enchantment application
+- Uncertainty retained: exact resource/effect equivalence, invalid/no-spend, material spend, sticky touch, scene transitions, and campaign UI require an authorized save fixture
+- External state: restored; no game, lock, or save mutation
+- Exact next action: add compatibility profile automation and Call of the Wild generic-discovery qualification, then continue native candidate classification without hiding unknowns
