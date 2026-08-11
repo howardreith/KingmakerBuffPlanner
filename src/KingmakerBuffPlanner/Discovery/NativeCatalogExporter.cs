@@ -58,6 +58,9 @@ namespace KingmakerBuffPlanner.Discovery
                         IsCandidate = candidate,
                         HasDetectedEffect = detected,
                         AbilityType = ability.Type.ToString(),
+                        AbilityComponentTypes = (ability.ComponentsArray ?? new BlueprintComponent[0])
+                            .Where(c => c != null).Select(c => c.GetType().FullName)
+                            .Distinct(StringComparer.Ordinal).OrderBy(v => v, StringComparer.Ordinal).ToArray(),
                         ActionType = ability.ActionType.ToString(),
                         Range = ability.Range.ToString(),
                         EffectOnAlly = ability.EffectOnAlly.ToString(),
@@ -155,7 +158,7 @@ namespace KingmakerBuffPlanner.Discovery
 
             return new NativeCatalogExport
             {
-                SchemaVersion = 3,
+                SchemaVersion = 4,
                 Profile = "native-only",
                 GeneratorCommit = BuildInfo.Commit,
                 AbilityCount = entries.Count,
@@ -187,6 +190,11 @@ namespace KingmakerBuffPlanner.Discovery
             {
                 bool? harmful = null;
                 string name = string.Empty;
+                string[] componentTypes = new string[0];
+                bool hidden = false;
+                bool classFeature = false;
+                bool removeOnRest = false;
+                bool stayOnDeath = false;
                 if (leaf.Kind == EffectKind.Buff || leaf.Kind == EffectKind.AreaBuff)
                 {
                     var buff = ResourcesLibrary.TryGetBlueprint<BlueprintBuff>(leaf.EffectId);
@@ -194,12 +202,25 @@ namespace KingmakerBuffPlanner.Discovery
                     {
                         harmful = buff.Harmful;
                         name = buff.name ?? string.Empty;
+                        componentTypes = (buff.ComponentsArray ?? new BlueprintComponent[0])
+                            .Where(c => c != null).Select(c => c.GetType().FullName)
+                            .Distinct(StringComparer.Ordinal).OrderBy(v => v, StringComparer.Ordinal).ToArray();
+                        hidden = buff.IsHiddenInUI;
+                        classFeature = buff.IsClassFeature;
+                        removeOnRest = buff.RemoveOnRest;
+                        stayOnDeath = buff.StayOnDeath;
                     }
                 }
                 else if (leaf.Kind == EffectKind.WornItemEnchantment)
                 {
                     var enchantment = ResourcesLibrary.TryGetBlueprint<BlueprintItemEnchantment>(leaf.EffectId);
-                    if (enchantment != null) name = enchantment.name ?? string.Empty;
+                    if (enchantment != null)
+                    {
+                        name = enchantment.name ?? string.Empty;
+                        componentTypes = (enchantment.ComponentsArray ?? new BlueprintComponent[0])
+                            .Where(c => c != null).Select(c => c.GetType().FullName)
+                            .Distinct(StringComparer.Ordinal).OrderBy(v => v, StringComparer.Ordinal).ToArray();
+                    }
                 }
                 return new NativeEffectRecord
                 {
@@ -208,6 +229,11 @@ namespace KingmakerBuffPlanner.Discovery
                     EffectName = name,
                     Target = leaf.Target.ToString(),
                     Harmful = harmful,
+                    IsHiddenInUi = hidden,
+                    IsClassFeature = classFeature,
+                    RemoveOnRest = removeOnRest,
+                    StayOnDeath = stayOnDeath,
+                    ComponentTypes = componentTypes,
                     SourceContract = leaf.SourceContract,
                     ActionPath = leaf.ActionPath
                 };
@@ -291,10 +317,11 @@ namespace KingmakerBuffPlanner.Discovery
         [JsonProperty("hasDetectedEffect", Order = 10)]
         public bool HasDetectedEffect { get; set; }
         [JsonProperty("abilityType", Order = 11)] public string AbilityType { get; set; }
-        [JsonProperty("actionType", Order = 12)] public string ActionType { get; set; }
-        [JsonProperty("range", Order = 13)] public string Range { get; set; }
-        [JsonProperty("effectOnAlly", Order = 14)] public string EffectOnAlly { get; set; }
-        [JsonProperty("effectOnEnemy", Order = 15)] public string EffectOnEnemy { get; set; }
+        [JsonProperty("abilityComponentTypes", Order = 12)] public string[] AbilityComponentTypes { get; set; }
+        [JsonProperty("actionType", Order = 13)] public string ActionType { get; set; }
+        [JsonProperty("range", Order = 14)] public string Range { get; set; }
+        [JsonProperty("effectOnAlly", Order = 15)] public string EffectOnAlly { get; set; }
+        [JsonProperty("effectOnEnemy", Order = 16)] public string EffectOnEnemy { get; set; }
         [JsonProperty("canTargetSelf", Order = 16)]
         public bool CanTargetSelf { get; set; }
         [JsonProperty("canTargetFriends", Order = 17)]
@@ -335,7 +362,12 @@ namespace KingmakerBuffPlanner.Discovery
         [JsonProperty("effectName", Order = 3)] public string EffectName { get; set; }
         [JsonProperty("target", Order = 4)] public string Target { get; set; }
         [JsonProperty("harmful", Order = 5)] public bool? Harmful { get; set; }
-        [JsonProperty("sourceContract", Order = 6)] public string SourceContract { get; set; }
-        [JsonProperty("actionPath", Order = 7)] public string ActionPath { get; set; }
+        [JsonProperty("isHiddenInUi", Order = 6)] public bool IsHiddenInUi { get; set; }
+        [JsonProperty("isClassFeature", Order = 7)] public bool IsClassFeature { get; set; }
+        [JsonProperty("removeOnRest", Order = 8)] public bool RemoveOnRest { get; set; }
+        [JsonProperty("stayOnDeath", Order = 9)] public bool StayOnDeath { get; set; }
+        [JsonProperty("componentTypes", Order = 10)] public string[] ComponentTypes { get; set; }
+        [JsonProperty("sourceContract", Order = 11)] public string SourceContract { get; set; }
+        [JsonProperty("actionPath", Order = 12)] public string ActionPath { get; set; }
     }
 }

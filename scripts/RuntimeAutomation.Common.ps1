@@ -160,7 +160,7 @@ function Assert-KbpRuntimeResult {
         if ($Result.catalogSha256 -cne (Get-KbpSha256 $catalogPath)) { throw 'Native catalog hash mismatch.' }
         if ([int]$Result.catalogAbilityCount -le 0) { throw 'Native catalog is empty.' }
         $catalog = Read-KbpJson $catalogPath
-        if ([int]$catalog.schemaVersion -ne 3 -or
+        if ([int]$catalog.schemaVersion -ne 4 -or
             [int]$catalog.abilityCount -ne [int]$Result.catalogAbilityCount -or
             @($catalog.abilities).Count -ne [int]$catalog.abilityCount) {
             throw 'Native catalog JSON contract does not reconcile with the runtime result.'
