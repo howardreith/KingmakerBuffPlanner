@@ -57,6 +57,11 @@
       <HintPath>$(KingmakerInstallDir)\Kingmaker_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="UnityEngine.IMGUIModule">
+      <HintPath>$(KingmakerInstallDir)\Kingmaker_Data\Managed\UnityEngine.IMGUIModule.dll</HintPath>
+      <Private>False</Private>
+      <ExternallyResolved>True</ExternallyResolved>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Discovery\ActionGraphScanner.cs" />
@@ -82,6 +87,9 @@
     <Compile Include="RuntimeTesting\RuntimeTestHost.cs" />
     <Compile Include="RuntimeTesting\RuntimePaths.cs" />
     <Compile Include="RuntimeTesting\RuntimeTestProtocol.cs" />
+    <Compile Include="UI\PlannerSetupModel.cs" />
+    <Compile Include="UI\PlannerUiSession.cs" />
+    <Compile Include="UI\BuffPlannerUiRoot.cs" />
     <Compile Include="$(IntermediateOutputPath)BuildInfo.Generated.cs" />
   </ItemGroup>
   <ItemGroup>

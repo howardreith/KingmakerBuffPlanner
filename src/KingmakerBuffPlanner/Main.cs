@@ -2,6 +2,7 @@ using System;
 using KingmakerBuffPlanner.Infrastructure;
 using KingmakerBuffPlanner.RuntimeTesting;
 using UnityModManagerNet;
+using KingmakerBuffPlanner.UI;
 
 namespace KingmakerBuffPlanner
 {
@@ -9,12 +10,14 @@ namespace KingmakerBuffPlanner
     {
         private static ModLog _log;
         private static RuntimeTestHost _runtimeTest;
+        private static string _modPath;
 
         public static bool Load(UnityModManager.ModEntry modEntry)
         {
             if (modEntry == null) throw new ArgumentNullException("modEntry");
 
             _log = new ModLog(modEntry.Logger);
+            _modPath = modEntry.Path;
             modEntry.OnToggle = OnToggle;
             modEntry.OnUnload = OnUnload;
             modEntry.OnUpdate = OnUpdate;
@@ -30,14 +33,17 @@ namespace KingmakerBuffPlanner
         private static bool OnToggle(UnityModManager.ModEntry modEntry, bool value)
         {
             _log.Info(value ? "Enabled." : "Disabled.");
+            BuffPlannerUiRoot.SetEnabled(value);
             return true;
         }
 
         private static void OnUpdate(UnityModManager.ModEntry modEntry, float deltaTime)
         {
+            BuffPlannerUiRoot.Ensure(_modPath, _log);
             RuntimeTestHost runtime = _runtimeTest;
             if (runtime == null || !runtime.Update()) return;
             _runtimeTest = null;
+            BuffPlannerUiRoot.DestroyOwned();
         }
 
         private static bool OnUnload(UnityModManager.ModEntry modEntry)

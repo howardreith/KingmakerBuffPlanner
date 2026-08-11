@@ -11,6 +11,7 @@ using KingmakerBuffPlanner.Domain.Providers;
 using KingmakerBuffPlanner.Domain.Planning;
 using KingmakerBuffPlanner.Planning;
 using KingmakerBuffPlanner.Persistence;
+using KingmakerBuffPlanner.UI;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -67,6 +68,7 @@ namespace KingmakerBuffPlanner.Tests
                 Run("profile-recovers-valid-bounded-backup", () => TestProfileBackupRecovery(root));
                 Run("profile-migrates-schema-one", () => TestProfileMigration(root));
                 Run("profile-malformed-json-recovers-default", () => TestProfileMalformed(root));
+                Run("setup-model-persists-stable-targets-and-provider-controls", TestSetupModel);
             }
             finally
             {
@@ -519,6 +521,58 @@ namespace KingmakerBuffPlanner.Tests
                 MaximumCasts = 3
             });
             return profile;
+        }
+
+        private static void TestSetupModel()
+        {
+            AbilityKey ability = Ability("ui-source", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("ui-free", ResourcePoolKind.Unlimited, 0, 0, null);
+            ProviderSnapshot provider = PlannerProvider("unit-a", "book-ui", ability, "ui-free", 0);
+            var validation = new TargetValidationSnapshot(true, true, true, true);
+            var units = new[]
+            {
+                new UnitSnapshot("unit-b", "Duplicate", false, string.Empty, validation),
+                new UnitSnapshot("unit-a", "Duplicate", false, string.Empty, validation)
+            };
+            var snapshot = new PartyProviderSnapshot(units, new[] { provider }, new[] { pool });
+            var active = ActiveEffectSnapshot.FromTypedEffects(
+                new Dictionary<string, IEnumerable<ActiveEffectMarker>>
+                {
+                    { "unit-b", new[] { new ActiveEffectMarker(EffectKind.Buff, "ui-effect") } }
+                });
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault("campaign:ui");
+            int saves = 0;
+            var model = new PlannerSetupModel(profile, snapshot, active,
+                new Dictionary<string, EffectExpression> { { ability.Canonical, Leaf("ui-effect") } },
+                p => saves++);
+            model.ToggleRoutine("long");
+            model.ToggleTarget("long", "unit-b");
+            model.ToggleTarget("long", "unit-a");
+            if (!model.IsTargetWanted("long", "unit-a") || !model.IsTargetWanted("long", "unit-b") ||
+                model.GetPresence("unit-b") != EffectPresenceKind.Complete)
+                throw new InvalidOperationException("Setup target matrix lost stable IDs or active state.");
+            model.CycleProviderPreference(provider.Key.Canonical);
+            if (model.GetProviderPreference(provider.Key.Canonical).Priority != 0)
+                throw new InvalidOperationException("Automatic provider did not enter explicit-priority state.");
+            model.CycleProviderPreference(provider.Key.Canonical);
+            if (!model.GetProviderPreference(provider.Key.Canonical).Banned)
+                throw new InvalidOperationException("Provider preference did not enter banned state.");
+            model.CycleProviderPreference(provider.Key.Canonical);
+            if (model.GetProviderPreference(provider.Key.Canonical) != null)
+                throw new InvalidOperationException("Provider preference did not reset to automatic.");
+            model.AdjustProviderCap(provider.Key.Canonical, 1);
+            model.SetScale(1.25f);
+            model.ToggleExistingEffectPolicy("long");
+            model.ToggleHidden();
+            var reordered = new PartyProviderSnapshot(units.Reverse(), new[] { provider }, new[] { pool });
+            var reloaded = new PlannerSetupModel(profile, reordered, active,
+                new Dictionary<string, EffectExpression> { { ability.Canonical, Leaf("ui-effect") } }, p => saves++);
+            if (!reloaded.IsTargetWanted("long", "unit-a") || !reloaded.IsTargetWanted("long", "unit-b") ||
+                reloaded.GetProviderPreference(provider.Key.Canonical).MaximumCasts != 1 ||
+                reloaded.Profile.Ui.Scale != 1.25f ||
+                reloaded.GetExistingEffectPolicy("long") != ExistingEffectPolicy.Overwrite ||
+                !reloaded.Profile.HiddenSourceIds.Contains(ability.Canonical) || saves < 9)
+                throw new InvalidOperationException("Setup state did not survive party reorder/persistence mutations.");
         }
 
         private static EffectLeafExpression Leaf(string id)

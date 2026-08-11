@@ -42,6 +42,7 @@
     <Compile Include="..\..\src\KingmakerBuffPlanner\Persistence\ProfileModels.cs"><Link>Persistence\ProfileModels.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Persistence\ProfileRepository.cs"><Link>Persistence\ProfileRepository.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Infrastructure\AtomicFile.cs"><Link>Infrastructure\AtomicFile.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\PlannerSetupModel.cs"><Link>UI\PlannerSetupModel.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\RuntimeTesting\RuntimePaths.cs">
       <Link>RuntimeTesting\RuntimePaths.cs</Link>
     </Compile>
