@@ -420,7 +420,7 @@ namespace KingmakerBuffPlanner.UI
             RectTransform region = index < 0 || index >= _buttons.Length ||
                 _buttons[index] == null ? null : (RectTransform)_buttons[index].transform;
             bool contains = region != null && RectTransformUtility.RectangleContainsScreenPoint(
-                region, actual, ResolveEventCamera(region));
+                region, actual, _nativeRaycaster == null ? null : _nativeRaycaster.eventCamera);
             string top = "none";
             if (EventSystem.current != null)
             {
