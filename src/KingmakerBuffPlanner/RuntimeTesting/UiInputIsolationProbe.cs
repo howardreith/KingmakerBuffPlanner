@@ -74,6 +74,15 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             bool cancelHandled = ExecuteEvents.Execute(root, cancel, ExecuteEvents.cancelHandler) && cancel.used;
             bool groupChanged = view.DispatchRoutineTabForRuntime("important") &&
                 view.ActiveRoutineId == "important";
+            UiInputIsolationProbeResult result = Snapshot();
+            result.ScrollConsumed = scrollHandled;
+            result.CancelConsumed = cancelHandled;
+            result.GroupSelectorChanged = groupChanged;
+            return result;
+        }
+
+        internal UiInputIsolationProbeResult Snapshot()
+        {
             string selectionAfter = string.Join("|", SelectedUnitIds().OrderBy(value => value).ToArray());
             Vector3 cameraAfter = Camera.main == null ? Vector3.zero : Camera.main.transform.position;
             return new UiInputIsolationProbeResult
@@ -84,10 +93,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 SelectionEventCount = _selectionEventCount,
                 AbilityTargetEventCount = _abilityTargetEventCount,
                 SelectionUnchanged = string.Equals(_selectionBefore, selectionAfter, StringComparison.Ordinal),
-                CameraUnchanged = _cameraBefore == cameraAfter,
-                ScrollConsumed = scrollHandled,
-                CancelConsumed = cancelHandled,
-                GroupSelectorChanged = groupChanged
+                CameraUnchanged = _cameraBefore == cameraAfter
             };
         }
 

@@ -30,6 +30,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private bool _liveCycleOpening;
         private bool _liveF10MarkerWritten;
         private bool _liveUmmDismissMarkerWritten;
+        private int _liveTooltipStableFrames;
+        private bool _liveTooltipStable;
+        private string _liveTooltipEvidence = string.Empty;
+        private string _liveInitialCatalogEvidence = string.Empty;
+        private bool _liveBlessSelectedAndConfigured;
 
         private RuntimeTestHost(
             RuntimeTestRequest request,
@@ -287,6 +292,34 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     WorkingSaveDescriptor = _liveSaveLoader == null ? null : _liveSaveLoader.WorkingDescriptor,
                     BaselineSaveDescriptor = _liveSaveLoader == null ? null : _liveSaveLoader.BaselineDescriptor,
                     WorkingSaveLoadActionCount = _liveSaveLoader == null ? 0 : _liveSaveLoader.LoadActionCount,
+                    UiInitialCatalogEvidence = _liveInitialCatalogEvidence,
+                    UiCatalogEvidence = ui == null ? null : ui.CatalogEvidence,
+                    UiCatalogVisibleViewModels = ui == null ? 0 : ui.CatalogVisibleViewModels,
+                    UiCatalogInstantiatedRows = ui == null ? 0 : ui.CatalogInstantiatedRows,
+                    UiCatalogActiveRows = ui == null ? 0 : ui.CatalogActiveRows,
+                    UiCatalogVisibleRows = ui == null ? 0 : ui.CatalogVisibleRows,
+                    UiCatalogSelectedDetailsBound = ui != null && ui.CatalogSelectedDetailsBound,
+                    UiCatalogBlessEvidence = ui == null ? null : ui.CatalogBlessEvidence,
+                    UiBlessSelectedAndConfigured = _liveBlessSelectedAndConfigured,
+                    UiTooltipStable = _liveTooltipStable,
+                    UiTooltipEvidence = _liveTooltipEvidence,
+                    UiTooltipListenerCount = ui == null ? 0 : ui.TooltipListenerCount,
+                    UiTooltipRaycastGraphicCount = ui == null ? -1 : ui.TooltipRaycastGraphicCount,
+                    UiTooltipBlocksRaycasts = ui != null && ui.TooltipBlocksRaycasts,
+                    UiPhysicalInputPlayerCommandCount = ui == null ? -1 : ui.PhysicalInputPlayerCommandCount,
+                    UiPhysicalInputMovementCommandCount = ui == null ? -1 : ui.PhysicalInputMovementCommandCount,
+                    UiPhysicalInputAbilityCommandCount = ui == null ? -1 : ui.PhysicalInputAbilityCommandCount,
+                    UiPhysicalInputSelectionEventCount = ui == null ? -1 : ui.PhysicalInputSelectionEventCount,
+                    UiPhysicalInputAbilityTargetEventCount = ui == null ? -1 : ui.PhysicalInputAbilityTargetEventCount,
+                    UiPhysicalInputSelectionUnchanged = ui != null && ui.PhysicalInputSelectionUnchanged,
+                    UiPhysicalInputCameraUnchanged = ui != null && ui.PhysicalInputCameraUnchanged,
+                    UiImportantResultMessage = ui == null ? null : ui.ImportantResultMessage,
+                    UiShortResultMessage = ui == null ? null : ui.ShortResultMessage,
+                    UiConfiguredLongResultMessage = ui == null ? null : ui.ConfiguredLongResultMessage,
+                    UiConfiguredLongDisposition = ui == null ? null : ui.ConfiguredLongDisposition,
+                    UiConfiguredLongPlanned = ui == null ? 0 : ui.ConfiguredLongPlanned,
+                    UiConfiguredLongSubmitted = ui == null ? 0 : ui.ConfiguredLongSubmitted,
+                    UiConfiguredLongConfirmed = ui == null ? 0 : ui.ConfiguredLongConfirmed,
                     NativeUiContractSha256 = nativeUiContractHash,
                     NativeUiButtonCount = nativeUiContract == null ? 0 : nativeUiContract.Buttons.Count,
                     NativeUiCandidateAnchorCount = nativeUiContract == null
@@ -518,12 +551,16 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     AddUiAssertion(result, "ui-pointer-events-consumed", ui.PointerEventCount >= 2 &&
                         ui.ScrollEventCount >= 1 && ui.DragEventCount >= 2, ">=2/1/2",
                         ui.PointerEventCount + "/" + ui.ScrollEventCount + "/" + ui.DragEventCount);
-                    AddUiAssertion(result, "ui-long-flow-once", ui.LongPointerEnterCount == 1 &&
-                        ui.LongPointerEventCount == 1 &&
-                        ui.LongListenerCount == 1 && ui.LongGroupResolvedCount == 1 &&
-                        ui.LongPlanRevalidatedCount == 1 && ui.LongExecutionInvokedCount == 0 &&
-                        ui.LongRefusalCount == 1 && ui.LongResultPresentedCount == 1,
-                        "1/1/1/1/1/0/1/1", ui.LongPointerEnterCount + "/" +
+                    bool longFlowValid = liveUi
+                        ? ui.LongPointerEnterCount >= 2 && ui.LongPointerEventCount == 2 &&
+                            ui.LongListenerCount == 2 && ui.LongGroupResolvedCount == 2 &&
+                            ui.LongPlanRevalidatedCount == 2 && ui.LongResultPresentedCount == 2
+                        : ui.LongPointerEnterCount == 1 && ui.LongPointerEventCount == 1 &&
+                            ui.LongListenerCount == 1 && ui.LongGroupResolvedCount == 1 &&
+                            ui.LongPlanRevalidatedCount == 1 && ui.LongExecutionInvokedCount == 0 &&
+                            ui.LongRefusalCount == 1 && ui.LongResultPresentedCount == 1;
+                    AddUiAssertion(result, "ui-long-flow-once", longFlowValid,
+                        liveUi ? ">=2/2/2/2/2/*/*/2" : "1/1/1/1/1/0/1/1", ui.LongPointerEnterCount + "/" +
                         ui.LongPointerEventCount + "/" + ui.LongListenerCount + "/" +
                         ui.LongGroupResolvedCount + "/" + ui.LongPlanRevalidatedCount + "/" +
                         ui.LongExecutionInvokedCount + "/" + ui.LongRefusalCount + "/" +
@@ -557,6 +594,49 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                             expectedReconstructions.ToString(), ui.ReconstructionCount.ToString()));
                     if (liveUi)
                     {
+                        AddUiAssertion(result, "ui-live-catalog-visible",
+                            ui.CatalogVisibleViewModels > 0 && ui.CatalogInstantiatedRows ==
+                            ui.CatalogVisibleViewModels && ui.CatalogActiveRows > 0 &&
+                            ui.CatalogVisibleRows > 0 && ui.CatalogSelectedDetailsBound &&
+                            !string.IsNullOrWhiteSpace(_liveInitialCatalogEvidence) &&
+                            ui.CatalogBlessEvidence.Contains("rowVisible=True"),
+                            "visible VMs=rows; active/visible/details/Bless", ui.CatalogEvidence ?? "missing");
+                        AddUiAssertion(result, "ui-physical-tooltip-stable",
+                            _liveTooltipStable && !string.IsNullOrWhiteSpace(_liveTooltipEvidence) &&
+                            ui.TooltipListenerCount == 4 && ui.TooltipRaycastGraphicCount == 0 &&
+                            !ui.TooltipBlocksRaycasts,
+                            "60 frames/inside/4 listeners/0 raycast/blocks=false",
+                            _liveTooltipEvidence + ";finalListeners=" + ui.TooltipListenerCount);
+                        AddUiAssertion(result, "ui-physical-pointer-isolation",
+                            ui.PhysicalInputPlayerCommandCount == 0 &&
+                            ui.PhysicalInputMovementCommandCount == 0 &&
+                            ui.PhysicalInputAbilityCommandCount == 0 &&
+                            ui.PhysicalInputSelectionEventCount == 0 &&
+                            ui.PhysicalInputAbilityTargetEventCount == 0 &&
+                            ui.PhysicalInputSelectionUnchanged && ui.PhysicalInputCameraUnchanged &&
+                            ui.HudUnderlyingNativeActivationCount == 0,
+                            "0/0/0/0/0/unchanged/unchanged/native=0",
+                            ui.PhysicalInputPlayerCommandCount + "/" +
+                            ui.PhysicalInputMovementCommandCount + "/" +
+                            ui.PhysicalInputAbilityCommandCount + "/" +
+                            ui.PhysicalInputSelectionEventCount + "/" +
+                            ui.PhysicalInputAbilityTargetEventCount + "/" +
+                            ui.PhysicalInputSelectionUnchanged + "/" +
+                            ui.PhysicalInputCameraUnchanged + "/" +
+                            ui.HudUnderlyingNativeActivationCount);
+                        bool configuredOutcome = !string.IsNullOrWhiteSpace(
+                            ui.ConfiguredLongResultMessage) &&
+                            (ui.ConfiguredLongDisposition != "Completed" ||
+                                ui.ConfiguredLongConfirmed > 0);
+                        AddUiAssertion(result, "ui-quick-visible-results",
+                            ui.LongResultMessage == "No Long buffs are configured." &&
+                            ui.ImportantResultMessage == "No Important buffs are configured." &&
+                            ui.ShortResultMessage == "No Short buffs are configured." &&
+                            _liveBlessSelectedAndConfigured && configuredOutcome,
+                            "three explicit empty outcomes + configured exact outcome",
+                            ui.LongResultMessage + " | " + ui.ImportantResultMessage + " | " +
+                            ui.ShortResultMessage + " | " + ui.ConfiguredLongDisposition + ": " +
+                            ui.ConfiguredLongResultMessage);
                         AddUiAssertion(result, "ui-f10-armed-and-observed",
                             ui.F10Armed && ui.F10KeydownCount >= 1, "true/>=1",
                             ui.F10Armed + "/" + ui.F10KeydownCount);
@@ -600,11 +680,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         ui.SelectionDisabledAfterClose != ui.SelectionDisabledBeforeOpen ||
                         ui.PausedAfterClose != ui.PausedBeforeOpen || ui.ModeAfterClose != ui.ModeBeforeOpen ||
                         ui.PointerEventCount < 2 || ui.ScrollEventCount < 1 || ui.DragEventCount < 2 ||
-                        ui.LongPointerEnterCount != 1 || ui.LongPointerEventCount != 1 ||
-                        ui.LongListenerCount != 1 ||
-                        ui.LongGroupResolvedCount != 1 || ui.LongPlanRevalidatedCount != 1 ||
-                        ui.LongExecutionInvokedCount != 0 || ui.LongRefusalCount != 1 ||
-                        ui.LongResultPresentedCount != 1 ||
+                        !longFlowValid ||
                         ui.LongResultMessage != "No Long buffs are configured." ||
                         string.IsNullOrWhiteSpace(ui.SetupTooltip) || !ui.SetupTooltip.Contains("F10") ||
                         string.IsNullOrWhiteSpace(ui.LongTooltip) || !ui.LongTooltip.Contains("Long") ||
@@ -615,6 +691,26 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         !ui.GroupSelectorChanged ||
                         ui.ReconstructionCount != expectedReconstructions ||
                         (liveUi && (!ui.F10Armed || ui.F10KeydownCount < 1 ||
+                            ui.CatalogVisibleViewModels <= 0 ||
+                            ui.CatalogInstantiatedRows != ui.CatalogVisibleViewModels ||
+                            ui.CatalogActiveRows <= 0 || ui.CatalogVisibleRows <= 0 ||
+                            !ui.CatalogSelectedDetailsBound ||
+                            string.IsNullOrWhiteSpace(ui.CatalogBlessEvidence) ||
+                            !ui.CatalogBlessEvidence.Contains("rowVisible=True") ||
+                            !_liveTooltipStable || ui.TooltipListenerCount != 4 ||
+                            ui.TooltipRaycastGraphicCount != 0 || ui.TooltipBlocksRaycasts ||
+                            ui.PhysicalInputPlayerCommandCount != 0 ||
+                            ui.PhysicalInputMovementCommandCount != 0 ||
+                            ui.PhysicalInputAbilityCommandCount != 0 ||
+                            ui.PhysicalInputSelectionEventCount != 0 ||
+                            ui.PhysicalInputAbilityTargetEventCount != 0 ||
+                            !ui.PhysicalInputSelectionUnchanged || !ui.PhysicalInputCameraUnchanged ||
+                            ui.ImportantResultMessage != "No Important buffs are configured." ||
+                            ui.ShortResultMessage != "No Short buffs are configured." ||
+                            !_liveBlessSelectedAndConfigured ||
+                            string.IsNullOrWhiteSpace(ui.ConfiguredLongResultMessage) ||
+                            (ui.ConfiguredLongDisposition == "Completed" &&
+                                ui.ConfiguredLongConfirmed <= 0) ||
                             ui.ScreenCreateCount != ui.ScreenDestroyCount + 1 ||
                             ui.ScreenCreateCount != ui.ScreenDestroyCountAfterClose ||
                             string.IsNullOrWhiteSpace(ui.HudObjectEvidence) ||
@@ -687,19 +783,133 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (_liveUiPhase == 1)
             {
                 if (!BuffPlannerUiRoot.IsScreenOpen) return false;
+                CatalogLayoutDiagnostics catalog = BuffPlannerUiRoot.CatalogDiagnosticsForRuntime();
+                if (catalog == null || catalog.Filters == null ||
+                    catalog.Filters.VisibleViewModels < 1 || catalog.InstantiatedRows < 1 ||
+                    catalog.ActiveRows < 1 || catalog.VisibleRows < 1 ||
+                    !catalog.SelectedDetailsBound || !catalog.BlessEvidence.Contains("rowVisible=True"))
+                    throw new InvalidOperationException("Live catalog is not visibly bound: " +
+                        (catalog == null ? "missing" : catalog.ToString()));
+                _liveInitialCatalogEvidence = catalog.ToString();
                 BuffPlannerUiRoot.BeginRuntimeSmoke();
                 BuffPlannerUiRoot.DispatchRuntimeInputSmoke();
+                BuffPlannerUiRoot.CloseRuntimeSmoke();
+                BuffPlannerUiRoot.BeginPhysicalInputProbe();
+                WritePhysicalInputRequest("hover-long", "hover",
+                    BuffPlannerUiRoot.HudButtonCenterForRuntime("long"));
                 _liveUiPhase = 2;
                 return false;
             }
             if (_liveUiPhase == 2)
             {
-                BuffPlannerUiRoot.CloseRuntimeSmoke();
-                BuffPlannerUiRoot.DispatchRuntimeHudLong();
+                if (!PhysicalInputAcknowledged("hover-long")) return false;
+                HudTooltipRuntimeDiagnostics tooltip =
+                    BuffPlannerUiRoot.TooltipDiagnosticsForRuntime();
+                QuickFlowDiagnostics flow = BuffPlannerUiRoot.QuickFlowForRuntime("long");
+                if (tooltip == null || !tooltip.Active)
+                {
+                    _liveTooltipStableFrames = 0;
+                    return false;
+                }
+                if (!tooltip.InsideScreen || tooltip.ListenerCount != 4 ||
+                    tooltip.RaycastGraphicCount != 0 || tooltip.BlocksRaycasts ||
+                    flow == null || flow.PointerEnters != 1)
+                    throw new InvalidOperationException("Tooltip ownership is invalid: active=" +
+                        tooltip.Active + ";inside=" + tooltip.InsideScreen + ";listeners=" +
+                        tooltip.ListenerCount + ";raycastGraphics=" + tooltip.RaycastGraphicCount +
+                        ";blocks=" + tooltip.BlocksRaycasts + ";enters=" +
+                        (flow == null ? -1 : flow.PointerEnters) + ";bounds=" + tooltip.Bounds);
+                _liveTooltipStableFrames++;
+                if (_liveTooltipStableFrames < 60) return false;
+                _liveTooltipStable = true;
+                _liveTooltipEvidence = "frames=" + _liveTooltipStableFrames + ";bounds=" +
+                    tooltip.Bounds + ";listeners=" + tooltip.ListenerCount +
+                    ";raycastGraphics=" + tooltip.RaycastGraphicCount + ";blocks=" +
+                    tooltip.BlocksRaycasts + ";pointerEnters=" + flow.PointerEnters;
+                WritePhysicalInputRequest("click-long-empty", "click",
+                    BuffPlannerUiRoot.HudButtonCenterForRuntime("long"));
                 _liveUiPhase = 3;
                 return false;
             }
             if (_liveUiPhase == 3)
+            {
+                if (!PhysicalInputAcknowledged("click-long-empty")) return false;
+                QuickExecutionResult result = BuffPlannerUiRoot.QuickResultForRuntime("long");
+                if (result == null || result.Message != "No Long buffs are configured.") return false;
+                WritePhysicalInputRequest("click-important-empty", "click",
+                    BuffPlannerUiRoot.HudButtonCenterForRuntime("important"));
+                _liveUiPhase = 4;
+                return false;
+            }
+            if (_liveUiPhase == 4)
+            {
+                if (!PhysicalInputAcknowledged("click-important-empty")) return false;
+                QuickExecutionResult result = BuffPlannerUiRoot.QuickResultForRuntime("important");
+                if (result == null || result.Message != "No Important buffs are configured.") return false;
+                WritePhysicalInputRequest("click-short-empty", "click",
+                    BuffPlannerUiRoot.HudButtonCenterForRuntime("short"));
+                _liveUiPhase = 5;
+                return false;
+            }
+            if (_liveUiPhase == 5)
+            {
+                if (!PhysicalInputAcknowledged("click-short-empty")) return false;
+                QuickExecutionResult result = BuffPlannerUiRoot.QuickResultForRuntime("short");
+                if (result == null || result.Message != "No Short buffs are configured.") return false;
+                WritePhysicalInputRequest("click-setup", "click",
+                    BuffPlannerUiRoot.HudButtonCenterForRuntime("setup"));
+                _liveUiPhase = 6;
+                return false;
+            }
+            if (_liveUiPhase == 6)
+            {
+                if (!PhysicalInputAcknowledged("click-setup") ||
+                    !BuffPlannerUiRoot.IsScreenOpen) return false;
+                WritePhysicalInputRequest("click-modal", "click",
+                    BuffPlannerUiRoot.ScreenCenterForRuntime());
+                _liveUiPhase = 7;
+                return false;
+            }
+            if (_liveUiPhase == 7)
+            {
+                if (!PhysicalInputAcknowledged("click-modal")) return false;
+                UiInputIsolationProbeResult physical = BuffPlannerUiRoot.EndPhysicalInputProbe();
+                if (physical == null || physical.PlayerCommandCount != 0 ||
+                    physical.MovementCommandCount != 0 || physical.AbilityCommandCount != 0 ||
+                    physical.SelectionEventCount != 0 || physical.AbilityTargetEventCount != 0 ||
+                    !physical.SelectionUnchanged || !physical.CameraUnchanged)
+                    throw new InvalidOperationException("Physical planner clicks reached world input.");
+                _liveBlessSelectedAndConfigured =
+                    BuffPlannerUiRoot.SelectAndConfigureBlessForRuntime();
+                if (!_liveBlessSelectedAndConfigured)
+                    throw new InvalidOperationException("Visible spellbook Bless row could not be selected/configured.");
+                WritePhysicalInputRequest("escape-configured-modal", "key-escape", Vector2.zero);
+                _liveUiPhase = 8;
+                return false;
+            }
+            if (_liveUiPhase == 8)
+            {
+                if (!PhysicalInputAcknowledged("escape-configured-modal") ||
+                    BuffPlannerUiRoot.IsScreenOpen) return false;
+                WritePhysicalInputRequest("click-long-configured", "click",
+                    BuffPlannerUiRoot.HudButtonCenterForRuntime("long"));
+                _liveUiPhase = 9;
+                return false;
+            }
+            if (_liveUiPhase == 9)
+            {
+                if (!PhysicalInputAcknowledged("click-long-configured") ||
+                    BuffPlannerUiRoot.IsExecutingForRuntime) return false;
+                QuickFlowDiagnostics flow = BuffPlannerUiRoot.QuickFlowForRuntime("long");
+                QuickExecutionResult result = BuffPlannerUiRoot.QuickResultForRuntime("long");
+                if (flow == null || flow.ResultsPresented < 2 || result == null) return false;
+                if (result.Disposition == QuickExecutionDisposition.Completed &&
+                    result.Confirmed < 1)
+                    throw new InvalidOperationException("Configured Long reported completion without confirmation.");
+                _liveUiPhase = 10;
+                return false;
+            }
+            if (_liveUiPhase == 10)
             {
                 if (!_liveCycleOpening)
                 {
@@ -712,13 +922,37 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 _liveCycleOpening = false;
                 if (_liveCycleCount >= 20)
                 {
-                    _liveUiPhase = 4;
+                    _liveUiPhase = 11;
                     return true;
                 }
                 BuffPlannerUiRoot.CloseRuntimeSmoke();
                 return false;
             }
-            return _liveUiPhase >= 4;
+            return _liveUiPhase >= 11;
+        }
+
+        private void WritePhysicalInputRequest(string id, string kind, Vector2 position)
+        {
+            string path = Path.Combine(_request.EvidenceDirectory,
+                "physical-input-" + id + ".json");
+            AtomicFile.WriteUtf8(path, JsonConvert.SerializeObject(new
+            {
+                schemaVersion = 1,
+                runId = _request.RunId,
+                actionId = id,
+                action = kind,
+                x = position.x,
+                y = position.y
+            }) + Environment.NewLine);
+            _log.Info("[KBP-INPUT] physical action requested;id=" + id + ";action=" +
+                kind + ";x=" + position.x.ToString("F1") + ";y=" +
+                position.y.ToString("F1") + ".");
+        }
+
+        private bool PhysicalInputAcknowledged(string id)
+        {
+            return File.Exists(Path.Combine(_request.EvidenceDirectory,
+                "physical-input-" + id + ".ack.json"));
         }
 
         private void TryWriteFailure(DateTime started, Exception exception)
@@ -933,6 +1167,34 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         [JsonProperty("workingSaveDescriptor", Order = 116)] public string WorkingSaveDescriptor { get; set; }
         [JsonProperty("baselineSaveDescriptor", Order = 117)] public string BaselineSaveDescriptor { get; set; }
         [JsonProperty("workingSaveLoadActionCount", Order = 118)] public int WorkingSaveLoadActionCount { get; set; }
+        [JsonProperty("uiInitialCatalogEvidence", Order = 119)] public string UiInitialCatalogEvidence { get; set; }
+        [JsonProperty("uiCatalogEvidence", Order = 120)] public string UiCatalogEvidence { get; set; }
+        [JsonProperty("uiCatalogVisibleViewModels", Order = 121)] public int UiCatalogVisibleViewModels { get; set; }
+        [JsonProperty("uiCatalogInstantiatedRows", Order = 122)] public int UiCatalogInstantiatedRows { get; set; }
+        [JsonProperty("uiCatalogActiveRows", Order = 123)] public int UiCatalogActiveRows { get; set; }
+        [JsonProperty("uiCatalogVisibleRows", Order = 124)] public int UiCatalogVisibleRows { get; set; }
+        [JsonProperty("uiCatalogSelectedDetailsBound", Order = 125)] public bool UiCatalogSelectedDetailsBound { get; set; }
+        [JsonProperty("uiCatalogBlessEvidence", Order = 126)] public string UiCatalogBlessEvidence { get; set; }
+        [JsonProperty("uiBlessSelectedAndConfigured", Order = 127)] public bool UiBlessSelectedAndConfigured { get; set; }
+        [JsonProperty("uiTooltipStable", Order = 128)] public bool UiTooltipStable { get; set; }
+        [JsonProperty("uiTooltipEvidence", Order = 129)] public string UiTooltipEvidence { get; set; }
+        [JsonProperty("uiTooltipListenerCount", Order = 130)] public int UiTooltipListenerCount { get; set; }
+        [JsonProperty("uiTooltipRaycastGraphicCount", Order = 131)] public int UiTooltipRaycastGraphicCount { get; set; }
+        [JsonProperty("uiTooltipBlocksRaycasts", Order = 132)] public bool UiTooltipBlocksRaycasts { get; set; }
+        [JsonProperty("uiPhysicalInputPlayerCommandCount", Order = 133)] public int UiPhysicalInputPlayerCommandCount { get; set; }
+        [JsonProperty("uiPhysicalInputMovementCommandCount", Order = 134)] public int UiPhysicalInputMovementCommandCount { get; set; }
+        [JsonProperty("uiPhysicalInputAbilityCommandCount", Order = 135)] public int UiPhysicalInputAbilityCommandCount { get; set; }
+        [JsonProperty("uiPhysicalInputSelectionEventCount", Order = 136)] public int UiPhysicalInputSelectionEventCount { get; set; }
+        [JsonProperty("uiPhysicalInputAbilityTargetEventCount", Order = 137)] public int UiPhysicalInputAbilityTargetEventCount { get; set; }
+        [JsonProperty("uiPhysicalInputSelectionUnchanged", Order = 138)] public bool UiPhysicalInputSelectionUnchanged { get; set; }
+        [JsonProperty("uiPhysicalInputCameraUnchanged", Order = 139)] public bool UiPhysicalInputCameraUnchanged { get; set; }
+        [JsonProperty("uiImportantResultMessage", Order = 140)] public string UiImportantResultMessage { get; set; }
+        [JsonProperty("uiShortResultMessage", Order = 141)] public string UiShortResultMessage { get; set; }
+        [JsonProperty("uiConfiguredLongResultMessage", Order = 142)] public string UiConfiguredLongResultMessage { get; set; }
+        [JsonProperty("uiConfiguredLongDisposition", Order = 143)] public string UiConfiguredLongDisposition { get; set; }
+        [JsonProperty("uiConfiguredLongPlanned", Order = 144)] public int UiConfiguredLongPlanned { get; set; }
+        [JsonProperty("uiConfiguredLongSubmitted", Order = 145)] public int UiConfiguredLongSubmitted { get; set; }
+        [JsonProperty("uiConfiguredLongConfirmed", Order = 146)] public int UiConfiguredLongConfirmed { get; set; }
     }
 
     internal sealed class RuntimeTestAssertion

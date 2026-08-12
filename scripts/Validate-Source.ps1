@@ -181,10 +181,21 @@ $assertions++
 
 $runtimeScriptSource = Get-Content -LiteralPath (Join-Path $root 'scripts\Invoke-KingmakerRuntimeTest.ps1') -Raw
 foreach ($physicalContract in @('umm-overlay-ready.json',
-        'physical-umm-dismiss-sent', '[byte]0x1B', '[byte]0x79')) {
+        'physical-umm-dismiss-sent', '[byte]0x1B', '[byte]0x79',
+        'physical-input-*.json', 'ClientToScreen', 'SetCursorPos',
+        '[KbpPhysicalInput]::Click()')) {
     if (-not $runtimeHostSource.Contains($physicalContract) -and
         -not $runtimeScriptSource.Contains($physicalContract)) {
         throw "Live qualification must physically dismiss ShowOnStart UMM and then deliver F10: $physicalContract"
+    }
+}
+foreach ($livePhysicalContract in @('ui-physical-tooltip-stable',
+        'ui-physical-pointer-isolation', 'ui-live-catalog-visible',
+        'ui-quick-visible-results', 'SelectAndConfigureBlessForRuntime',
+        'CatalogVisibleViewModels', 'PhysicalInputMovementCommandCount')) {
+    if (-not $runtimeHostSource.Contains($livePhysicalContract) -and
+        -not $uiRootSource.Contains($livePhysicalContract)) {
+        throw "Live catalog/physical input qualification is missing: $livePhysicalContract"
     }
 }
 $assertions++

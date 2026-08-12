@@ -40,6 +40,8 @@ namespace KingmakerBuffPlanner.UI
         private bool _installed;
         private int _validationFailures;
         private int _installAttempts;
+        private readonly List<Tuple<Button, UnityAction>> _runtimeNativeListeners =
+            new List<Tuple<Button, UnityAction>>();
         private string _lastFailure = "not-attempted";
 
         internal BuffPlannerHudButtonController(
@@ -253,6 +255,7 @@ namespace KingmakerBuffPlanner.UI
 
         private void DisposeOwnedRoot()
         {
+            EndRuntimePhysicalObservation();
             if (_root != null)
             {
                 foreach (Button button in _buttons)
@@ -324,6 +327,26 @@ namespace KingmakerBuffPlanner.UI
             return true;
         }
 
+        internal void BeginRuntimePhysicalObservation()
+        {
+            EndRuntimePhysicalObservation();
+            if (_nativeCluster == null) return;
+            foreach (Button native in _nativeCluster.GetComponentsInChildren<Button>(true))
+            {
+                if (native == null || native.transform.IsChildOf(_root)) continue;
+                UnityAction listener = () => RuntimeUnderlyingNativeActivationCount++;
+                native.onClick.AddListener(listener);
+                _runtimeNativeListeners.Add(Tuple.Create(native, listener));
+            }
+        }
+
+        internal void EndRuntimePhysicalObservation()
+        {
+            foreach (Tuple<Button, UnityAction> item in _runtimeNativeListeners)
+                if (item.Item1 != null) item.Item1.onClick.RemoveListener(item.Item2);
+            _runtimeNativeListeners.Clear();
+        }
+
         private static PointerEventData Pointer(Vector2 position)
         {
             return new PointerEventData(EventSystem.current)
@@ -339,6 +362,53 @@ namespace KingmakerBuffPlanner.UI
                 routineId == "important" ? 2 : routineId == "short" ? 3 : -1;
             return index < 0 || index >= _tooltips.Length || _tooltips[index] == null
                 ? string.Empty : _tooltips[index]();
+        }
+
+        internal Vector2 ButtonCenterForRuntime(string routineId)
+        {
+            int index = routineId == "setup" ? 0 : routineId == "long" ? 1 :
+                routineId == "important" ? 2 : routineId == "short" ? 3 : -1;
+            if (index < 0 || index >= _buttons.Length || _buttons[index] == null)
+                throw new InvalidOperationException("HUD button is unavailable: " + routineId);
+            return ScreenCenter((RectTransform)_buttons[index].transform);
+        }
+
+        internal HudTooltipRuntimeDiagnostics GetTooltipDiagnostics()
+        {
+            bool inside = false;
+            string bounds = "absent";
+            if (_tooltipRoot != null && _tooltipRoot.gameObject.activeInHierarchy)
+            {
+                Canvas canvas = _tooltipRoot.GetComponentInParent<Canvas>();
+                Camera camera = canvas == null || canvas.renderMode == RenderMode.ScreenSpaceOverlay
+                    ? null : canvas.worldCamera;
+                var corners = new Vector3[4];
+                _tooltipRoot.GetWorldCorners(corners);
+                Vector2[] screen = corners.Select(value =>
+                    RectTransformUtility.WorldToScreenPoint(camera, value)).ToArray();
+                float minX = screen.Min(value => value.x);
+                float maxX = screen.Max(value => value.x);
+                float minY = screen.Min(value => value.y);
+                float maxY = screen.Max(value => value.y);
+                inside = minX >= 5f && maxX <= Screen.width - 5f &&
+                    minY >= 5f && maxY <= Screen.height - 5f;
+                bounds = minX.ToString("F1") + "," + minY.ToString("F1") + "-" +
+                    maxX.ToString("F1") + "," + maxY.ToString("F1");
+            }
+            CanvasGroup group = _tooltipRoot == null ? null :
+                _tooltipRoot.GetComponent<CanvasGroup>();
+            return new HudTooltipRuntimeDiagnostics
+            {
+                Active = _tooltipRoot != null && _tooltipRoot.gameObject.activeInHierarchy,
+                InsideScreen = inside,
+                Bounds = bounds,
+                ListenerCount = _buttons.Sum(button => button == null ? 0 :
+                    button.GetComponents<HudTooltipTarget>().Length),
+                RaycastGraphicCount = _tooltipRoot == null ? 0 :
+                    _tooltipRoot.GetComponentsInChildren<Graphic>(true)
+                        .Count(graphic => graphic.raycastTarget),
+                BlocksRaycasts = group != null && group.blocksRaycasts
+            };
         }
 
         private Text CreateHudMessage(
@@ -688,5 +758,15 @@ namespace KingmakerBuffPlanner.UI
         {
             if (Show != null) Show(Owner, string.Empty);
         }
+    }
+
+    internal sealed class HudTooltipRuntimeDiagnostics
+    {
+        internal bool Active;
+        internal bool InsideScreen;
+        internal string Bounds;
+        internal int ListenerCount;
+        internal int RaycastGraphicCount;
+        internal bool BlocksRaycasts;
     }
 }

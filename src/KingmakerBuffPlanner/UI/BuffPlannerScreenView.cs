@@ -4,6 +4,7 @@ using System.Linq;
 using Kingmaker;
 using Kingmaker.EntitySystem.Entities;
 using Kingmaker.UI;
+using KingmakerBuffPlanner.Domain.Identity;
 using KingmakerBuffPlanner.Domain.Planning;
 using KingmakerBuffPlanner.Domain.Providers;
 using KingmakerBuffPlanner.Persistence;
@@ -191,6 +192,34 @@ namespace KingmakerBuffPlanner.UI
             else if (!string.IsNullOrWhiteSpace(_session.ProfileStatus))
                 _result.text = _session.ProfileStatus;
             RefreshTabs();
+            RefreshCatalog();
+        }
+
+        internal bool DispatchBlessRowForRuntime()
+        {
+            if (_session.Model == null || EventSystem.current == null) return false;
+            const string bless = "90e59f4a4ada87243b7b3535a06d0638";
+            SetupSourceRow source = _session.Model.Sources
+                .Where(item => item.Ability.BaseAbilityGuid == bless ||
+                    item.Ability.VariantGuid == bless)
+                .OrderBy(item => item.Ability.SourceKind == SourceKind.Spellbook ? 0 : 1)
+                .FirstOrDefault();
+            Button row = source == null ? null : _sourceRows.FirstOrDefault(item =>
+                item != null && item.name == "Source." + source.SourceId);
+            if (row == null || !row.gameObject.activeInHierarchy) return false;
+            var click = new PointerEventData(EventSystem.current)
+            {
+                button = PointerEventData.InputButton.Left,
+                position = RectTransformUtility.WorldToScreenPoint(null,
+                    ((RectTransform)row.transform).TransformPoint(row.transform.localPosition))
+            };
+            ExecuteEvents.Execute(row.gameObject, click, ExecuteEvents.pointerClickHandler);
+            return _session.Model.SelectedSourceId == source.SourceId &&
+                GetCatalogDiagnostics().SelectedDetailsBound;
+        }
+
+        internal void RefreshCatalogForRuntime()
+        {
             RefreshCatalog();
         }
 
@@ -906,8 +935,11 @@ namespace KingmakerBuffPlanner.UI
         private string BuildBlessEvidence(PlannerSetupModel model)
         {
             const string bless = "90e59f4a4ada87243b7b3535a06d0638";
-            SetupSourceRow source = model == null ? null : model.Sources.FirstOrDefault(item =>
-                item.Ability.BaseAbilityGuid == bless || item.Ability.VariantGuid == bless);
+            SetupSourceRow source = model == null ? null : model.Sources
+                .Where(item => item.Ability.BaseAbilityGuid == bless ||
+                    item.Ability.VariantGuid == bless)
+                .OrderBy(item => item.Ability.SourceKind == SourceKind.Spellbook ? 0 : 1)
+                .FirstOrDefault();
             if (source == null) return "absent";
             Button row = _sourceRows.FirstOrDefault(item => item != null &&
                 item.name == "Source." + source.SourceId);

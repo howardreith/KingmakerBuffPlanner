@@ -105,11 +105,28 @@ using System.Runtime.InteropServices;
 public static class KbpPhysicalInput {
   [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr hWnd);
   [DllImport("user32.dll")] static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);
+  [DllImport("user32.dll")] static extern bool SetCursorPos(int x, int y);
+  [DllImport("user32.dll")] static extern void mouse_event(uint flags, uint dx, uint dy, uint data, UIntPtr extra);
+  [DllImport("user32.dll")] static extern bool ClientToScreen(IntPtr hWnd, ref Point point);
+  [DllImport("user32.dll")] static extern bool GetClientRect(IntPtr hWnd, out Rect rect);
+  [StructLayout(LayoutKind.Sequential)] public struct Point { public int X; public int Y; }
+  [StructLayout(LayoutKind.Sequential)] public struct Rect { public int Left; public int Top; public int Right; public int Bottom; }
   public static void KeyDown(IntPtr window, byte key) {
     if (window == IntPtr.Zero || !SetForegroundWindow(window)) throw new InvalidOperationException("Kingmaker foreground activation failed.");
     keybd_event(key, 0, 0, UIntPtr.Zero);
   }
   public static void KeyUp(byte key) { keybd_event(key, 0, 2, UIntPtr.Zero); }
+  public static void Move(IntPtr window, int x, int y) {
+    if (window == IntPtr.Zero || !SetForegroundWindow(window)) throw new InvalidOperationException("Kingmaker foreground activation failed.");
+    Rect rect;
+    if (!GetClientRect(window, out rect)) throw new InvalidOperationException("Kingmaker client bounds lookup failed.");
+    Point point = new Point { X = x, Y = Math.Max(0, rect.Bottom - y) };
+    if (!ClientToScreen(window, ref point) || !SetCursorPos(point.X, point.Y)) throw new InvalidOperationException("Kingmaker cursor movement failed.");
+  }
+  public static void Click() {
+    mouse_event(0x0002, 0, 0, 0, UIntPtr.Zero);
+    mouse_event(0x0004, 0, 0, 0, UIntPtr.Zero);
+  }
 }
 '@
     }
@@ -141,6 +158,39 @@ public static class KbpPhysicalInput {
             $orchestration.stage = 'physical-f10-sent'
             $orchestration.f10SentAtUtc = [DateTime]::UtcNow.ToString('o')
             Write-KbpJsonAtomic (Join-Path $evidence 'orchestration.json') $orchestration
+        }
+        if ($Scenario -ceq 'live-ui-bootstrap') {
+            $physicalRequests = @(Get-ChildItem -LiteralPath $evidence -Filter 'physical-input-*.json' `
+                -File -ErrorAction SilentlyContinue | Where-Object Name -NotLike '*.ack.json' |
+                Sort-Object Name)
+            foreach ($physicalFile in $physicalRequests) {
+                $physical = Read-KbpJson $physicalFile.FullName
+                $ackPath = Join-Path $evidence ("physical-input-{0}.ack.json" -f $physical.actionId)
+                if (Test-Path -LiteralPath $ackPath -PathType Leaf) { continue }
+                $process.Refresh()
+                if ([string]$physical.action -eq 'key-escape') {
+                    [KbpPhysicalInput]::KeyDown($process.MainWindowHandle, [byte]0x1B)
+                    Start-Sleep -Milliseconds 100
+                    [KbpPhysicalInput]::KeyUp([byte]0x1B)
+                } else {
+                    [KbpPhysicalInput]::Move($process.MainWindowHandle,
+                        [int][Math]::Round([double]$physical.x),
+                        [int][Math]::Round([double]$physical.y))
+                    Start-Sleep -Milliseconds 250
+                    if ([string]$physical.action -eq 'click') {
+                        [KbpPhysicalInput]::Click()
+                    } elseif ([string]$physical.action -ne 'hover') {
+                        throw "Unknown physical input action: $($physical.action)"
+                    }
+                }
+                Write-KbpJsonAtomic $ackPath ([ordered]@{
+                    schemaVersion = 1; runId = $runId; actionId = [string]$physical.actionId
+                    action = [string]$physical.action; sentAtUtc = [DateTime]::UtcNow.ToString('o')
+                    processId = $process.Id
+                })
+                $orchestration.stage = "physical-$($physical.actionId)-sent"
+                Write-KbpJsonAtomic (Join-Path $evidence 'orchestration.json') $orchestration
+            }
         }
         Start-Sleep -Milliseconds 250
     }

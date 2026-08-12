@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Linq;
+using System.Collections.Generic;
 using Kingmaker;
 using Kingmaker.GameModes;
 using Kingmaker.UI;
@@ -31,6 +32,11 @@ namespace KingmakerBuffPlanner.UI
         private int _runtimeReconstructionCount;
         private int _runtimeObservedFrames;
         private UiInputIsolationProbeResult _runtimeInputProbe;
+        private UiInputIsolationProbe _runtimePhysicalProbe;
+        private UiInputIsolationProbeResult _runtimePhysicalInput;
+        private readonly Dictionary<string, QuickExecutionResult> _runtimeQuickResults =
+            new Dictionary<string, QuickExecutionResult>(StringComparer.Ordinal);
+        private QuickExecutionResult _runtimeFirstLongResult;
         private QuickExecutionResult _lastQuickResult;
         private bool _runtimeBaselineCaptured;
         private bool _runtimePausedBefore;
@@ -190,6 +196,96 @@ namespace KingmakerBuffPlanner.UI
                 throw new InvalidOperationException("Runtime Long HUD click could not be dispatched.");
         }
 
+        internal static Vector2 HudButtonCenterForRuntime(string routineId)
+        {
+            if (_instance == null || _instance._hud == null)
+                throw new InvalidOperationException("Runtime HUD is unavailable.");
+            return _instance._hud.ButtonCenterForRuntime(routineId);
+        }
+
+        internal static Vector2 ScreenCenterForRuntime()
+        {
+            return new Vector2(Screen.width / 2f, Screen.height / 2f);
+        }
+
+        internal static void BeginPhysicalInputProbe()
+        {
+            if (_instance == null) throw new InvalidOperationException("UI root is absent.");
+            if (_instance._runtimePhysicalProbe != null) return;
+            _instance._runtimePhysicalProbe = new UiInputIsolationProbe();
+            _instance._hud.BeginRuntimePhysicalObservation();
+        }
+
+        internal static UiInputIsolationProbeResult PhysicalInputSnapshotForRuntime()
+        {
+            if (_instance == null) return null;
+            if (_instance._runtimePhysicalProbe == null)
+                return _instance._runtimePhysicalInput;
+            _instance._runtimePhysicalInput = _instance._runtimePhysicalProbe.Snapshot();
+            return _instance._runtimePhysicalInput;
+        }
+
+        internal static UiInputIsolationProbeResult EndPhysicalInputProbe()
+        {
+            if (_instance == null || _instance._runtimePhysicalProbe == null)
+                return null;
+            _instance._runtimePhysicalInput = _instance._runtimePhysicalProbe.Snapshot();
+            _instance._runtimePhysicalProbe.Dispose();
+            _instance._runtimePhysicalProbe = null;
+            _instance._hud.EndRuntimePhysicalObservation();
+            return _instance._runtimePhysicalInput;
+        }
+
+        internal static bool IsExecutingForRuntime
+        {
+            get { return _instance != null && _instance._session != null &&
+                _instance._session.IsExecuting; }
+        }
+
+        internal static HudTooltipRuntimeDiagnostics TooltipDiagnosticsForRuntime()
+        {
+            return _instance == null || _instance._hud == null ? null :
+                _instance._hud.GetTooltipDiagnostics();
+        }
+
+        internal static QuickFlowDiagnostics QuickFlowForRuntime(string routineId)
+        {
+            return _instance == null ? null : _instance._diagnostics.GetFlow(routineId);
+        }
+
+        internal static QuickExecutionResult QuickResultForRuntime(string routineId)
+        {
+            QuickExecutionResult result;
+            return _instance != null && _instance._runtimeQuickResults.TryGetValue(
+                routineId, out result) ? result : null;
+        }
+
+        internal static CatalogLayoutDiagnostics CatalogDiagnosticsForRuntime()
+        {
+            return _instance == null || _instance._screen == null ||
+                _instance._screen.View == null ? null :
+                _instance._screen.View.GetCatalogDiagnostics();
+        }
+
+        internal static bool SelectAndConfigureBlessForRuntime()
+        {
+            if (_instance == null || _instance._screen.View == null ||
+                !_instance._screen.View.DispatchBlessRowForRuntime()) return false;
+            PlannerSetupModel model = _instance._session.Model;
+            if (!model.IsAssigned("long")) model.ToggleRoutine("long");
+            string target = model.Snapshot.Units.Where(unit =>
+                    unit.TargetValidation.Alive && unit.TargetValidation.Conscious &&
+                    unit.TargetValidation.Friendly && unit.TargetValidation.Targetable)
+                .Select(unit => unit.UnitId).FirstOrDefault();
+            if (string.IsNullOrEmpty(target)) return false;
+            if (!model.IsTargetWanted("long", target)) model.ToggleTarget("long", target);
+            if (model.GetExistingEffectPolicy("long") ==
+                KingmakerBuffPlanner.Domain.Planning.ExistingEffectPolicy.SkipAlreadyActive)
+                model.ToggleExistingEffectPolicy("long");
+            _instance._screen.View.RefreshCatalogForRuntime();
+            return model.IsAssigned("long") && model.IsTargetWanted("long", target);
+        }
+
         internal static void DispatchRuntimeInputSmoke()
         {
             if (_instance == null || !_instance._screen.IsOpen)
@@ -261,8 +357,8 @@ namespace KingmakerBuffPlanner.UI
                 LongExecutionInvokedCount = longFlow.ExecutionsInvoked,
                 LongRefusalCount = longFlow.Refusals,
                 LongResultPresentedCount = longFlow.ResultsPresented,
-                LongResultMessage = _instance._lastQuickResult == null
-                    ? string.Empty : _instance._lastQuickResult.Message,
+                LongResultMessage = _instance._runtimeFirstLongResult == null
+                    ? string.Empty : _instance._runtimeFirstLongResult.Message,
                 SetupTooltip = _instance._hud.TooltipForRuntime("setup"),
                 LongTooltip = _instance._hud.TooltipForRuntime("long"),
                 InputPlayerCommandCount = input == null ? -1 : input.PlayerCommandCount,
@@ -279,6 +375,42 @@ namespace KingmakerBuffPlanner.UI
                 SelectionDisabledBeforeOpen = _instance._runtimeSelectionDisabledBefore,
                 ModeBeforeOpen = _instance._runtimeModeBefore.ToString()
             };
+            CatalogLayoutDiagnostics catalog = view == null ? null : view.GetCatalogDiagnostics();
+            HudTooltipRuntimeDiagnostics tooltip = _instance._hud.GetTooltipDiagnostics();
+            UiInputIsolationProbeResult physical = PhysicalInputSnapshotForRuntime();
+            result.CatalogEvidence = catalog == null ? "missing" : catalog.ToString();
+            result.CatalogVisibleViewModels = catalog == null || catalog.Filters == null ? 0 :
+                catalog.Filters.VisibleViewModels;
+            result.CatalogInstantiatedRows = catalog == null ? 0 : catalog.InstantiatedRows;
+            result.CatalogActiveRows = catalog == null ? 0 : catalog.ActiveRows;
+            result.CatalogVisibleRows = catalog == null ? 0 : catalog.VisibleRows;
+            result.CatalogSelectedDetailsBound = catalog != null && catalog.SelectedDetailsBound;
+            result.CatalogBlessEvidence = catalog == null ? "missing" : catalog.BlessEvidence;
+            result.TooltipActive = tooltip != null && tooltip.Active;
+            result.TooltipInsideScreen = tooltip != null && tooltip.InsideScreen;
+            result.TooltipBounds = tooltip == null ? "missing" : tooltip.Bounds;
+            result.TooltipListenerCount = tooltip == null ? 0 : tooltip.ListenerCount;
+            result.TooltipRaycastGraphicCount = tooltip == null ? -1 : tooltip.RaycastGraphicCount;
+            result.TooltipBlocksRaycasts = tooltip != null && tooltip.BlocksRaycasts;
+            result.PhysicalInputPlayerCommandCount = physical == null ? -1 : physical.PlayerCommandCount;
+            result.PhysicalInputMovementCommandCount = physical == null ? -1 : physical.MovementCommandCount;
+            result.PhysicalInputAbilityCommandCount = physical == null ? -1 : physical.AbilityCommandCount;
+            result.PhysicalInputSelectionEventCount = physical == null ? -1 : physical.SelectionEventCount;
+            result.PhysicalInputAbilityTargetEventCount = physical == null ? -1 : physical.AbilityTargetEventCount;
+            result.PhysicalInputSelectionUnchanged = physical != null && physical.SelectionUnchanged;
+            result.PhysicalInputCameraUnchanged = physical != null && physical.CameraUnchanged;
+            QuickExecutionResult importantResult = QuickResultForRuntime("important");
+            QuickExecutionResult shortResult = QuickResultForRuntime("short");
+            QuickExecutionResult longResult = QuickResultForRuntime("long");
+            result.ImportantResultMessage = importantResult == null ? string.Empty :
+                importantResult.Message;
+            result.ShortResultMessage = shortResult == null ? string.Empty : shortResult.Message;
+            result.ConfiguredLongResultMessage = longResult == null ? string.Empty : longResult.Message;
+            result.ConfiguredLongDisposition = longResult == null ? string.Empty :
+                longResult.Disposition.ToString();
+            result.ConfiguredLongPlanned = longResult == null ? 0 : longResult.Planned;
+            result.ConfiguredLongSubmitted = longResult == null ? 0 : longResult.Submitted;
+            result.ConfiguredLongConfirmed = longResult == null ? 0 : longResult.Confirmed;
             _instance._screen.Close();
             result.InputLeaseReleaseCountAfterClose = _instance._diagnostics.InputLeaseReleaseCount;
             result.ScreenDestroyCountAfterClose = _instance._diagnostics.ScreenDestroyCount;
@@ -408,6 +540,9 @@ namespace KingmakerBuffPlanner.UI
         private void PresentQuickResult(QuickExecutionResult result)
         {
             _lastQuickResult = result;
+            if (result.RoutineId == "long" && _runtimeFirstLongResult == null)
+                _runtimeFirstLongResult = result;
+            _runtimeQuickResults[result.RoutineId] = result;
             _hud.Present(result);
             _screen.Present(result);
             _log.Info("Routine UI result: " + result.RoutineId + " " +
@@ -436,6 +571,8 @@ namespace KingmakerBuffPlanner.UI
             if (_disposed) return;
             _disposed = true;
             StopAllCoroutines();
+            if (_runtimePhysicalProbe != null) _runtimePhysicalProbe.Dispose();
+            _runtimePhysicalProbe = null;
             if (_eventSubscription != null)
             {
                 _eventSubscription.Dispose();
@@ -530,5 +667,32 @@ namespace KingmakerBuffPlanner.UI
         internal bool SelectionDisabledBeforeOpen;
         internal string ModeBeforeOpen;
         internal string ModeAfterClose;
+        internal string CatalogEvidence;
+        internal int CatalogVisibleViewModels;
+        internal int CatalogInstantiatedRows;
+        internal int CatalogActiveRows;
+        internal int CatalogVisibleRows;
+        internal bool CatalogSelectedDetailsBound;
+        internal string CatalogBlessEvidence;
+        internal bool TooltipActive;
+        internal bool TooltipInsideScreen;
+        internal string TooltipBounds;
+        internal int TooltipListenerCount;
+        internal int TooltipRaycastGraphicCount;
+        internal bool TooltipBlocksRaycasts;
+        internal int PhysicalInputPlayerCommandCount;
+        internal int PhysicalInputMovementCommandCount;
+        internal int PhysicalInputAbilityCommandCount;
+        internal int PhysicalInputSelectionEventCount;
+        internal int PhysicalInputAbilityTargetEventCount;
+        internal bool PhysicalInputSelectionUnchanged;
+        internal bool PhysicalInputCameraUnchanged;
+        internal string ImportantResultMessage;
+        internal string ShortResultMessage;
+        internal string ConfiguredLongResultMessage;
+        internal string ConfiguredLongDisposition;
+        internal int ConfiguredLongPlanned;
+        internal int ConfiguredLongSubmitted;
+        internal int ConfiguredLongConfirmed;
     }
 }
