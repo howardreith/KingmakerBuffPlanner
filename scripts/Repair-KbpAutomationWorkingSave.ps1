@@ -13,7 +13,7 @@ if ($pair.baseline.sha256 -cne $requiredBaseline) {
     throw 'Immutable KBP_AUTOMATION_BASELINE hash does not match the authorized fixture.'
 }
 $root = Get-KbpRepositoryRoot
-$lab = Split-Path -Parent $root
+$lab = Split-Path -Parent (Split-Path -Parent $root)
 $staging = Join-Path $lab "runtime-staging\save-repair-$RunId"
 $backupRoot = Join-Path $lab "runtime-backups\save-repair-$RunId"
 $evidenceRoot = Join-Path $lab "runtime-evidence\save-repair-$RunId"
