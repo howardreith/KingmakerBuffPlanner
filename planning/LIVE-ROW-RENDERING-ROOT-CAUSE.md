@@ -3,7 +3,7 @@
 Date: 2026-08-12  
 Branch: `codex/kingmaker-buff-planner`  
 Forensic HEAD: `94cbca8810d908d320eec0a2ca89533c7d4e0e05`  
-Status: ROOT CAUSE PROVEN — first live canary absent; mask repair pending recheck
+Status: ROOT CAUSE PROVEN — repaired canary and production pixels confirmed live
 
 ## Exact rejected identity and external state
 
@@ -44,10 +44,18 @@ The same run recorded the exact renderer chain. The viewport Mask material is `U
 
 This explains both blank panes and reconciles the misleading internal evidence: object state and geometry were real, but the stencil rejected their pixels. The bounded repair keeps the existing hierarchy and production renderer and makes only the hidden viewport mask source opaque.
 
+## Independent canary recheck
+
+Guarded fresh-process run `row-render-0.0.6-canary-fixed-1` used source `ac5c384af29e4540c2e5eb07a13b54d37add37b2`, package SHA-256 `01bb64eb70426a1565c15e0130ab50d011eac29598eab69bb70a529d7f078b28`, and DLL SHA-256 `d019235f52b9f685a83b6f1e3e5ed92c32ed9ee3ff1abfb7949fc0cc90a2d4fa`. It passed 69/69 existing runtime assertions and restored the Mods transaction exactly.
+
+Its 1280x720 screenshot SHA-256 `71a6bbf6ddafd3c5eb25903c223d4052e9a8b63bb5e0e07651c5d18bf12496dd` visibly contains the high-contrast magenta canary, four production rows with readable names, and the selected Bless details pane. The viewport source is alpha 1 with `ColorMask:0`; child graphics are non-culled, alpha 1, `UI/Default`, stencil `Comp:Equal`, and Arial text. This A/B result isolates the alpha-clipped mask source as the cause. The temporary canary is now removed from production source.
+
+The production renderer remains a fresh programmatic Unity `Button`/`Image`/`Text`/`LayoutElement` row, so replacement is neither necessary nor justified. The repair also makes the layout group control child height and sets each requested height on the `RectTransform`, eliminating the prior mismatch between a preferred height of 42 and an actual height of 100.
+
 ## Invalidated prior claims
 
 `activeSelf`, `activeInHierarchy`, non-zero `RectTransform` bounds, rectangle intersection, `detailsBound`, and the code-authored `rowVisible=True` value do not establish player-visible output. The two 0.0.5 physical runs remain valid for their input/tooltips/lifecycle evidence but are invalid as row/details rendering evidence.
 
 ## Exact next action
 
-Run the same guarded live canary package with the opaque mask source. Require a screenshot-visible canary, production rows, and details; then remove the canary before final production qualification.
+Commit the canary removal, explicit production row sizing, screenshot-pixel gate, and generic material-component correction; then perform final clean-build native/Call of the Wild and two fresh-process production screenshot runs.

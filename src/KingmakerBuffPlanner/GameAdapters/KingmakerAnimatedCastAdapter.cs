@@ -33,7 +33,9 @@ namespace KingmakerBuffPlanner.GameAdapters
                 resolved.Caster.Descriptor.State.IsDead || !resolved.Caster.Descriptor.State.IsConscious)
                 return CastRuntimeValidation.Fail("caster-incapacitated");
             if (!resolved.Ability.IsAvailableForCast) return CastRuntimeValidation.Fail("ability-unavailable");
-            if (!resolved.Ability.HasEnoughMaterialComponent)
+            if (!MaterialComponentAvailability.IsSatisfied(
+                resolved.Ability.RequireMaterialComponent,
+                () => resolved.Ability.HasEnoughMaterialComponent))
                 return CastRuntimeValidation.Fail("material-component-unavailable");
             if (!resolved.Ability.CanTarget(resolved.Target)) return CastRuntimeValidation.Fail("target-invalid");
             return CastRuntimeValidation.Pass();
@@ -291,4 +293,5 @@ namespace KingmakerBuffPlanner.GameAdapters
             }
         }
     }
+
 }

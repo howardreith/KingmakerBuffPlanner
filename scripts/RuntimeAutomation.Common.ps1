@@ -227,6 +227,91 @@ function Assert-KbpRuntimeResult {
         }
         return
     }
+    if ($Request.scenario -ceq 'live-ui-bootstrap') {
+        $screenshotPath = Join-Path $Request.evidenceDirectory 'planner-render.png'
+        if (-not (Test-Path -LiteralPath $screenshotPath -PathType Leaf) -or
+            [string]$Result.uiRenderScreenshotSha256 -cne (Get-KbpSha256 $screenshotPath) -or
+            @($Result.uiRenderExpectedNames).Count -ne 5 -or
+            @($Result.uiRenderRowScreenRectangles).Count -ne 5 -or
+            @($Result.uiRenderRowEvidence).Count -ne 5 -or
+            @($Result.uiRenderDetailsEvidence).Count -lt 1 -or
+            [int]$Result.uiRenderBoundRowCount -lt 5 -or
+            [string]::IsNullOrWhiteSpace([string]$Result.uiRenderSelectedRowName) -or
+            [string]$Result.uiRenderSelectedRowName -cne [string]$Result.uiRenderDetailsTitleText -or
+            [string]$Result.uiRenderCanaryEvidence -cne 'absent' -or
+            -not ([string]$Result.uiRenderMaskEvidence).Contains('color=RGBA(1.000, 1.000, 1.000, 1.000)') -or
+            -not ([string]$Result.uiRenderMaskEvidence).Contains('ColorMask:0')) {
+            throw 'Live production screenshot/render evidence is incomplete or inconsistent.'
+        }
+        foreach ($rowEvidence in @($Result.uiRenderRowEvidence)) {
+            if (-not ([string]$rowEvidence).Contains('rendererCull=False') -or
+                -not ([string]$rowEvidence).Contains('inheritedAlpha=1') -or
+                -not ([string]$rowEvidence).Contains('shader=UI/Default') -or
+                -not ([string]$rowEvidence).Contains('font=Arial')) {
+                throw 'A production row failed the CanvasRenderer/font/alpha/material evidence contract.'
+            }
+        }
+
+        Add-Type -AssemblyName System.Drawing
+        $bitmap = [Drawing.Bitmap]::new($screenshotPath)
+        try {
+            $measure = {
+                param([string]$EvidenceRectangle)
+                $match = [regex]::Match($EvidenceRectangle,
+                    '(?:^|screen=)(?<x1>-?[0-9.]+),(?<y1>-?[0-9.]+)-(?<x2>-?[0-9.]+),(?<y2>-?[0-9.]+)')
+                if (-not $match.Success) { throw "Invalid Unity screen rectangle: $EvidenceRectangle" }
+                $culture = [Globalization.CultureInfo]::InvariantCulture
+                $x1 = [Math]::Max(0, [int][Math]::Ceiling([double]::Parse($match.Groups['x1'].Value, $culture)) + 3)
+                $x2 = [Math]::Min($bitmap.Width - 1, [int][Math]::Floor([double]::Parse($match.Groups['x2'].Value, $culture)) - 3)
+                $unityY1 = [double]::Parse($match.Groups['y1'].Value, $culture)
+                $unityY2 = [double]::Parse($match.Groups['y2'].Value, $culture)
+                $y1 = [Math]::Max(0, $bitmap.Height - [int][Math]::Floor($unityY2) + 3)
+                $y2 = [Math]::Min($bitmap.Height - 1, $bitmap.Height - [int][Math]::Ceiling($unityY1) - 3)
+                if ($x2 -le $x1 -or $y2 -le $y1) { throw 'Screenshot rectangle has no measurable pixels.' }
+                $colors = [Collections.Generic.HashSet[int]]::new()
+                $minimum = 255
+                $maximum = 0
+                $samples = 0
+                for ($y = $y1; $y -le $y2; $y += 2) {
+                    for ($x = $x1; $x -le $x2; $x += 2) {
+                        $pixel = $bitmap.GetPixel($x, $y)
+                        [void]$colors.Add($pixel.ToArgb())
+                        $luminance = [int][Math]::Round(0.2126 * $pixel.R + 0.7152 * $pixel.G + 0.0722 * $pixel.B)
+                        $minimum = [Math]::Min($minimum, $luminance)
+                        $maximum = [Math]::Max($maximum, $luminance)
+                        $samples++
+                    }
+                }
+                [pscustomobject]@{
+                    rectangle = $EvidenceRectangle
+                    sampleCount = $samples
+                    distinctArgb = $colors.Count
+                    minimumLuminance = $minimum
+                    maximumLuminance = $maximum
+                    luminanceRange = $maximum - $minimum
+                }
+            }
+            $rowPixels = @($Result.uiRenderRowScreenRectangles | ForEach-Object { & $measure ([string]$_) })
+            $detailsHeading = [string](@($Result.uiRenderDetailsEvidence)[0])
+            $detailsPixels = & $measure $detailsHeading
+            if (@($rowPixels | Where-Object { $_.distinctArgb -lt 4 -or $_.luminanceRange -lt 12 }).Count -ne 0 -or
+                $detailsPixels.distinctArgb -lt 4 -or $detailsPixels.luminanceRange -lt 12) {
+                throw 'Actual screenshot pixels do not show readable production row/details contrast.'
+            }
+            Write-KbpJsonAtomic (Join-Path $Request.evidenceDirectory 'live-row-pixel-evidence.json') ([ordered]@{
+                schemaVersion = 1
+                screenshotSha256 = [string]$Result.uiRenderScreenshotSha256
+                expectedNames = @($Result.uiRenderExpectedNames)
+                rowScreenRectangles = @($Result.uiRenderRowScreenRectangles)
+                selectedRowName = [string]$Result.uiRenderSelectedRowName
+                detailsTitleText = [string]$Result.uiRenderDetailsTitleText
+                productionCanary = [string]$Result.uiRenderCanaryEvidence
+                rowPixels = $rowPixels
+                detailsTitlePixels = $detailsPixels
+            })
+        }
+        finally { $bitmap.Dispose() }
+    }
     if ($Request.scenario -in @('native-buff-catalog', 'final-no-save-core')) {
         $catalogPath = Join-Path $Request.evidenceDirectory 'native-buff-catalog.json'
         if (-not (Test-Path -LiteralPath $catalogPath -PathType Leaf)) { throw 'Native catalog evidence is missing.' }

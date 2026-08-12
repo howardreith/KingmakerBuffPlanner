@@ -145,7 +145,9 @@ namespace KingmakerBuffPlanner.UI
                 ";durationRounds=" + provider.ExpectedDurationRounds + ";legalTargets=" +
                 (option == null ? 0 : option.ReachableTargetIds.Count) + ";assigned=" +
                 (assignment != null) + ";savedTargets=" +
-                (assignment == null ? 0 : assignment.WantedTargetUnitIds.Count) + ".");
+                (assignment == null ? 0 : assignment.WantedTargetUnitIds.Count) +
+                ";material=" + (CatalogDiscovery == null ? "missing" :
+                    CatalogDiscovery.BlessMaterialEvidence) + ".");
         }
 
         internal RoutinePlanResult PreviewRoutine(string routineId)

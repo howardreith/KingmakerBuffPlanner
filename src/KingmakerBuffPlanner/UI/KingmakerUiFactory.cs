@@ -167,7 +167,7 @@ namespace KingmakerBuffPlanner.UI
             layout.spacing = 4;
             layout.childControlWidth = true;
             layout.childForceExpandWidth = true;
-            layout.childControlHeight = false;
+            layout.childControlHeight = true;
             layout.childForceExpandHeight = false;
             scroll.viewport = viewport;
             scroll.content = content;
@@ -194,6 +194,7 @@ namespace KingmakerBuffPlanner.UI
 
         internal static LayoutElement AddLayout(RectTransform rect, float height)
         {
+            rect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, height);
             LayoutElement layout = rect.gameObject.AddComponent<LayoutElement>();
             layout.preferredHeight = height;
             layout.minHeight = height;

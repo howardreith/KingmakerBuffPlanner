@@ -24,6 +24,7 @@ namespace KingmakerBuffPlanner.GameAdapters
         private int _rawCandidateCount;
         private int _beneficialCandidateCount;
         private int _spellbookCount;
+        private string _blessMaterialEvidence = string.Empty;
 
         internal KingmakerPartySnapshotBuilder(EffectOverrideRegistry overrides = null)
         {
@@ -45,6 +46,7 @@ namespace KingmakerBuffPlanner.GameAdapters
             _rawCandidateCount = 0;
             _beneficialCandidateCount = 0;
             _spellbookCount = 0;
+            _blessMaterialEvidence = string.Empty;
             var units = CollectUnits(Game.Instance.Player.Party);
             var unitSnapshots = new List<UnitSnapshot>();
             var providers = new List<ProviderSnapshot>();
@@ -58,7 +60,8 @@ namespace KingmakerBuffPlanner.GameAdapters
             var snapshot = new PartyProviderSnapshot(unitSnapshots, providers, pools);
             Diagnostics = new PartyCatalogDiscoveryDiagnostics(
                 units.Count, _spellbookCount, _rawCandidateCount, _beneficialCandidateCount,
-                _effectsBySource.Count, providers.Count, _sourceTraces);
+                _effectsBySource.Count, providers.Count, _sourceTraces,
+                _blessMaterialEvidence);
             return snapshot;
         }
 
@@ -244,6 +247,8 @@ namespace KingmakerBuffPlanner.GameAdapters
             List<ProviderSnapshot> providers)
         {
             if (data == null || data.Blueprint == null) return;
+            if (data.Blueprint.AssetGuid == "90e59f4a4ada87243b7b3535a06d0638")
+                _blessMaterialEvidence = DescribeMaterialComponent(data);
             var ability = ToAbilityKey(data, SourceKind.Spellbook);
             _rawCandidateCount++;
             EffectExpression expression;
@@ -315,6 +320,27 @@ namespace KingmakerBuffPlanner.GameAdapters
                 Game.Instance.Player.Inventory.Count(material.Item));
         }
 
+        private static string DescribeMaterialComponent(AbilityData data)
+        {
+            BlueprintAbility.MaterialComponentData material = data.Blueprint.MaterialComponent;
+            string item = material == null || material.Item == null
+                ? "none" : material.Item.AssetGuid;
+            int count = material == null ? 0 : material.Count;
+            bool hasEnough;
+            try { hasEnough = data.HasEnoughMaterialComponent; }
+            catch (Exception exception)
+            {
+                return "blueprint=" + data.Blueprint.AssetGuid + ",require=" +
+                    data.RequireMaterialComponent + ",item=" + item + ",count=" + count +
+                    ",hasEnough=threw:" + exception.GetType().Name;
+            }
+            return "blueprint=" + data.Blueprint.AssetGuid + ",require=" +
+                data.RequireMaterialComponent + ",item=" + item + ",count=" + count +
+                ",hasEnough=" + hasEnough + ",consumableRequired=" +
+                (data.RequireMaterialComponent && material != null &&
+                    material.Item != null && material.Count > 0);
+        }
+
         private static string PoolKey(string unitId, string spellbookGuid, string suffix)
         {
             return unitId + "|spellbook|" + spellbookGuid + "|" + suffix;
@@ -346,7 +372,8 @@ namespace KingmakerBuffPlanner.GameAdapters
             int beneficialCandidateCount,
             int normalizedEntryCount,
             int providerCount,
-            IEnumerable<PartySourceDiscoveryTrace> sources)
+            IEnumerable<PartySourceDiscoveryTrace> sources,
+            string blessMaterialEvidence)
         {
             PartyUnitCount = partyUnitCount;
             SpellbookCount = spellbookCount;
@@ -355,6 +382,7 @@ namespace KingmakerBuffPlanner.GameAdapters
             NormalizedEntryCount = normalizedEntryCount;
             ProviderCount = providerCount;
             Sources = (sources ?? new PartySourceDiscoveryTrace[0]).ToArray();
+            BlessMaterialEvidence = blessMaterialEvidence ?? string.Empty;
         }
 
         internal int PartyUnitCount { get; private set; }
@@ -364,6 +392,7 @@ namespace KingmakerBuffPlanner.GameAdapters
         internal int NormalizedEntryCount { get; private set; }
         internal int ProviderCount { get; private set; }
         internal IReadOnlyList<PartySourceDiscoveryTrace> Sources { get; private set; }
+        internal string BlessMaterialEvidence { get; private set; }
 
         public override string ToString()
         {

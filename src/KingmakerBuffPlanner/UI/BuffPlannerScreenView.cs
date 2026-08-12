@@ -41,7 +41,6 @@ namespace KingmakerBuffPlanner.UI
         private Button[] _routineTabs;
         private Text[] _filterLabels;
         private readonly List<Button> _sourceRows = new List<Button>();
-        private RectTransform _renderCanary;
         private string _routineId = "long";
         private readonly CatalogFilterState _filters = new CatalogFilterState();
         private bool _resettingFilters;
@@ -247,11 +246,12 @@ namespace KingmakerBuffPlanner.UI
                 SelectedRowName = model == null || model.SelectedSource == null ? string.Empty :
                     model.SelectedSource.DisplayName,
                 DetailsTitleText = detailsTitle == null ? string.Empty : detailsTitle.text,
+                BoundRowCount = _sourceRows.Count,
                 SourceViewport = RectEvidence(_sourceViewport),
                 SourceContent = RectEvidence(_sourceContent),
                 MaskEvidence = BuildMaskEvidence(),
-                CanaryEvidence = _renderCanary == null ? "absent" :
-                    BuildGraphicEvidence(_renderCanary.gameObject),
+                CanaryEvidence = _sourceContent == null ||
+                    _sourceContent.Find("KBP.RenderCanary") == null ? "absent" : "present",
                 RowEvidence = rows.Select(item => BuildGraphicEvidence(item.gameObject)).ToArray(),
                 DetailsEvidence = _detailContent == null ? new string[0] :
                     _detailContent.GetComponentsInChildren<Graphic>(true).Take(8)
@@ -555,7 +555,6 @@ namespace KingmakerBuffPlanner.UI
                 FinalizeScrollContent(_sourceContent, _sourceViewport);
                 return;
             }
-            CreateDiagnosticRenderCanary(model);
             CatalogFilterDiagnostics filters;
             List<SetupSourceRow> sources = ApplyFilters(model, out filters);
             sources = _filters.SortByLevel
@@ -622,8 +621,13 @@ namespace KingmakerBuffPlanner.UI
                     }) : ResetFilters);
             }
             if (_catalogSummary != null)
-                _catalogSummary.text = filters.VisibleViewModels + " of " + filters.TotalEntries +
-                    " shown | " + filters.ActiveFilters;
+            {
+                _catalogSummary.text = _sourceRows.Count == sources.Count
+                    ? sources.Count + " matched | " + _sourceRows.Count + " rows bound | " +
+                        filters.ActiveFilters
+                    : sources.Count + " buffs matched, but only " + _sourceRows.Count +
+                        " rows bound. See KBP diagnostics.";
+            }
             FinalizeScrollContent(_sourceContent, _sourceViewport);
             LastCatalogDiagnostics = new CatalogLayoutDiagnostics { Filters = filters };
         }
@@ -884,34 +888,6 @@ namespace KingmakerBuffPlanner.UI
             KingmakerUiFactory.AddLayout((RectTransform)button.transform, 42);
         }
 
-        // TEMPORARY DIAGNOSTIC ONLY. This is removed after the live canary run.
-        private void CreateDiagnosticRenderCanary(PlannerSetupModel model)
-        {
-            string firstName = model.Sources.OrderBy(item => item.DisplayName,
-                StringComparer.OrdinalIgnoreCase).Select(item => item.DisplayName)
-                .FirstOrDefault() ?? "NO CATALOG ENTRY";
-            _renderCanary = KingmakerUiFactory.CreateRect("KBP.RenderCanary", _sourceContent);
-            _renderCanary.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, 64f);
-            Image background = _renderCanary.gameObject.AddComponent<Image>();
-            background.color = new Color(0.92f, 0.02f, 0.72f, 1f);
-            background.raycastTarget = false;
-            LayoutElement layout = _renderCanary.gameObject.AddComponent<LayoutElement>();
-            layout.minHeight = 64f;
-            layout.preferredHeight = 64f;
-            RectTransform textRect = KingmakerUiFactory.CreateRect("CanaryText", _renderCanary);
-            KingmakerUiFactory.Stretch(textRect, 8, 8, 4, 4);
-            Text text = textRect.gameObject.AddComponent<Text>();
-            text.font = Resources.GetBuiltinResource<Font>("Arial.ttf") ?? _theme.Font;
-            text.fontSize = 22;
-            text.fontStyle = FontStyle.Bold;
-            text.alignment = TextAnchor.MiddleLeft;
-            text.horizontalOverflow = HorizontalWrapMode.Wrap;
-            text.verticalOverflow = VerticalWrapMode.Truncate;
-            text.color = Color.white;
-            text.raycastTarget = false;
-            text.text = "KBP RENDER CANARY - " + firstName;
-        }
-
         private string BuildMaskEvidence()
         {
             Mask mask = _sourceViewport == null ? null : _sourceViewport.GetComponent<Mask>();
@@ -1072,7 +1048,9 @@ namespace KingmakerBuffPlanner.UI
                 ",providers=" + source.Providers.Count + ",row=" + (row != null) +
                 ",rowActive=" + (row != null && row.gameObject.activeInHierarchy) +
                 ",rowVisible=" + (row != null && RectanglesOverlap(
-                    (RectTransform)row.transform, _sourceViewport)) + ",bounds=" + bounds;
+                    (RectTransform)row.transform, _sourceViewport)) + ",bounds=" + bounds +
+                ",material=" + (_session.CatalogDiscovery == null ? "missing" :
+                    _session.CatalogDiscovery.BlessMaterialEvidence);
         }
 
         private static bool RectanglesOverlap(RectTransform first, RectTransform second)

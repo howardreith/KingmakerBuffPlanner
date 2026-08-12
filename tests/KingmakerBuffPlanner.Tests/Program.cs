@@ -77,6 +77,7 @@ namespace KingmakerBuffPlanner.Tests
                 Run("planner-reports-active-skip-marker", TestPlannerActiveSkip);
                 Run("planner-honors-ban-and-material-availability", TestPlannerBanAndMaterial);
                 Run("planner-reserves-material-once-per-cast", TestPlannerMaterialReservation);
+                Run("nonrequired-material-check-is-not-evaluated", TestNonrequiredMaterialCheck);
                 Run("planner-routine-shares-resource-ledger", TestPlannerRoutineSharedLedger);
                 Run("routine-service-reports-unsupported-sources", TestRoutineServiceUnsupportedSources);
                 Run("profile-round-trip-preserves-stable-ids", () => TestProfileRoundTrip(root));
@@ -602,6 +603,20 @@ namespace KingmakerBuffPlanner.Tests
                 new ActiveEffectSnapshot(null));
             if (plan.Steps.Count != 1 || !plan.Steps[0].Provider.Equals(valid.Key))
                 throw new InvalidOperationException("Banned or material-invalid provider was scheduled.");
+        }
+
+        private static void TestNonrequiredMaterialCheck()
+        {
+            bool evaluated = false;
+            bool noRequirement = MaterialComponentAvailability.IsSatisfied(false, () =>
+            {
+                evaluated = true;
+                throw new InvalidOperationException("A non-required component was evaluated.");
+            });
+            bool missingRequired = MaterialComponentAvailability.IsSatisfied(true, () => false);
+            bool presentRequired = MaterialComponentAvailability.IsSatisfied(true, () => true);
+            if (!noRequirement || evaluated || missingRequired || !presentRequired)
+                throw new InvalidOperationException("Material-component requirement gating changed.");
         }
 
         private static void TestPlannerMaterialReservation()

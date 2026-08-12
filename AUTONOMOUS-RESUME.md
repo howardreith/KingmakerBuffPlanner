@@ -1,5 +1,13 @@
 # Autonomous Resume
 
+## Live row production qualification checkpoint — 2026-08-12
+
+- Status: IN PROGRESS. The A/B canary has proved and rechecked the shared viewport-stencil root cause. `row-render-0.0.6-canary-fixed-1` passed 69/69 and restored exactly; visible screenshot SHA-256 is `71a6bbf6ddafd3c5eb25903c223d4052e9a8b63bb5e0e07651c5d18bf12496dd`.
+- Current committed HEAD before this worktree checkpoint is `ac5c384af29e4540c2e5eb07a13b54d37add37b2`. Worktree removes the canary, enforces actual requested row/detail heights, records production renderer/screenshot evidence in the runtime result, adds an independent screenshot pixel-contrast gate, and corrects material validation to short-circuit unless `RequireMaterialComponent` is true.
+- Exact local result: source 30/30, protocol/behavior 62/62, runtime filesystem 7/7, package 4/4, deployment WhatIf 5/5, source-only 1/1; production build SHA-256 `731489e683b50d78b1f82c74f54ce812608d6463623ffc2f961f394915aa6ea1` (interim build from pre-checkpoint HEAD).
+- External state: no retained canary package is installed; the canary run transaction is `Restored` with `restorationVerified=true`; immutable baseline remains `afca8ac5e42219bc50f428eb334a657cbcc2e31e8f2eb39c6ab53691cbb076d3`.
+- Exact next command: commit this checkpoint, run `./scripts/Build-Local.ps1`, then guarded `live-ui-bootstrap` with run ID `row-render-0.0.6-production-1`.
+
 ## Live row rendering recovery intake — 2026-08-12
 
 - Status: IN PROGRESS. Human evidence invalidates 0.0.5 row/details visibility while preserving HUD icons, tooltips, pointer isolation, F10, opaque modal, and close/input/HUD restoration.

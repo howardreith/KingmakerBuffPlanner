@@ -112,18 +112,34 @@ $assertions++
 
 $screenSource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\UI\BuffPlannerScreenView.cs') -Raw
 foreach ($requiredScreenContract in @('CanvasGroup', 'GraphicRaycaster', 'raycastTarget = true',
-        'blocksRaycasts = true', 'interactable = true', 'BUFF PLANNER')) {
+        'blocksRaycasts = true', 'interactable = true', 'BUFF PLANNER',
+        'rows bound', 'CanaryEvidence')) {
     if (-not $screenSource.Contains($requiredScreenContract)) {
         throw "Full-screen raycast/visual contract is missing: $requiredScreenContract"
     }
+}
+if ($screenSource.Contains('CreateDiagnosticRenderCanary') -or
+    $screenSource.Contains('KBP RENDER CANARY')) {
+    throw 'The temporary live render canary must not remain in production UI.'
 }
 $assertions++
 
 $factorySource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\UI\KingmakerUiFactory.cs') -Raw
 if (-not $factorySource.Contains('viewportImage.color = Color.white') -or
     -not $factorySource.Contains('showMaskGraphic = false') -or
+    -not $factorySource.Contains('layout.childControlHeight = true') -or
+    -not $factorySource.Contains('SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, height)') -or
     $factorySource.Contains('new Color(1, 1, 1, 0.001f)')) {
-    throw 'Scroll viewport masks must use an opaque stencil source while hiding the mask graphic.'
+    throw 'Scroll viewports must use an opaque hidden stencil source and explicit controlled child heights.'
+}
+$assertions++
+
+$animatedAdapterSource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\GameAdapters\KingmakerAnimatedCastAdapter.cs') -Raw
+$materialPolicySource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\Execution\MaterialComponentAvailability.cs') -Raw
+if (-not $animatedAdapterSource.Contains('MaterialComponentAvailability.IsSatisfied(') -or
+    -not $materialPolicySource.Contains('if (!required) return true;') -or
+    -not $animatedAdapterSource.Contains('() => resolved.Ability.HasEnoughMaterialComponent')) {
+    throw 'Material sufficiency must be checked only when Kingmaker requires a consumable component.'
 }
 $assertions++
 

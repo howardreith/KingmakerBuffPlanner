@@ -1,5 +1,17 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-08-12 — repaired canary proves viewport stencil root cause
+
+Status: CANARY PASS; PRODUCTION QUALIFICATION IN PROGRESS
+
+- Guarded run `row-render-0.0.6-canary-fixed-1` used exact source `ac5c384af29e4540c2e5eb07a13b54d37add37b2`, package `01bb64eb...`, and DLL `d019235f...`; it passed 69/69 and restored exactly.
+- Screenshot `planner-render-canary.png` SHA-256 `71a6bbf6ddafd3c5eb25903c223d4052e9a8b63bb5e0e07651c5d18bf12496dd` visibly shows the magenta same-Content canary, production Bless/Channel/Guidance rows, and selected Bless details. This is the positive half of the A/B test against the pixel-empty `4b3f7e05...` screenshot.
+- Root cause is confirmed: opaque hidden Mask source writes stencil; alpha `0.001` source did not. The production row renderer is already the mission fallback shape (fresh Unity Button/Image/Text/LayoutElement, Arial, explicit colors, default shader), so it is retained.
+- Canary construction is removed. Production scroll layout now enforces explicit child heights. The summary reports matched and bound rows instead of calling internal view models “shown.” Final runtime evidence carries five names/rectangles, selection/title, renderer/font/material/alpha state, screenshot hash, and independently measured row/details pixel contrast.
+- The Bless refusal was independently audited: execution incorrectly evaluated `HasEnoughMaterialComponent` even when Kingmaker reported no material requirement. The generic adapter now short-circuits on `RequireMaterialComponent`, matching exact native/Call of the Wild call sites; a deterministic callback test proves a non-required check is not evaluated. The next live run records exact native Bless fields and requires a confirmed effect or an exact different failure.
+- Local gates at this checkpoint: source 30/30, behavior 62/62, runtime filesystem 7/7, package 4/4, deployment WhatIf 5/5, source suite 1/1; production assembly compiles cleanly.
+- Exact next action: commit, clean-build the package, and run the first canary-free physical campaign screenshot qualification.
+
 ## 2026-08-12 — live row-rendering human rejection and independent intake
 
 Status: 0.0.5 PARTIAL HUMAN PASS; ACTUAL ROW/DETAIL PIXELS FAIL; RECOVERY IN PROGRESS

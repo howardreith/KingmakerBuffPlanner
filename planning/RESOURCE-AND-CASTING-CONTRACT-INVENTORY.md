@@ -14,7 +14,7 @@ These contracts were established from the exact installed Kingmaker assembly, no
 | `Spellbook.CalcSlotsCost()` | opposition costs two, otherwise one | PASS |
 | `AbilityResourceLogic.CalculateCost()` | custom calculator or base amount plus increasing facts | PASS |
 | `UnitAbilityResourceCollection` | current amount, availability and native spend | PASS |
-| `AbilityData.HasEnoughMaterialComponent` | validates inventory item/count | PASS |
+| `AbilityData.RequireMaterialComponent` then `HasEnoughMaterialComponent` | native callers short-circuit inventory sufficiency unless a consumable component is actually required; evaluating sufficiency alone is not a valid cast gate | PASS — corrected generic adapter and callback short-circuit test |
 | `RuleCastSpell.OnTrigger()` | executes cast/event semantics but does not spend or call `CanTarget` | PASS |
 | `UnitUseAbility.OnAction()` | final availability/target/charge validation, trigger rule, spend once when not UMD-failed | PASS |
 | `UnitUseAbility.CreateCastCommand()` | native command selection including touch/magus cases | PASS |
@@ -28,5 +28,7 @@ These contracts were established from the exact installed Kingmaker assembly, no
 | `UnitBody.CurrentEquipmentSlots` / item enchantments | worn-item enchantment presence remains distinct from unit buffs | PASS — adapter compiled; runtime pending |
 
 Instant execution must mirror the native ordering: final validation, one `RuleCastSpell`, then one native `AbilityData.Spend()` when the rule is not UMD-failed. It must never directly decrement inferred pools or directly apply buffs.
+
+Live 0.0.5 evidence exposed an invalid unconditional `HasEnoughMaterialComponent` check for native Bless. The planner snapshot already creates a material reservation only when `RequireMaterialComponent` is true and the blueprint has a positive-count item. Execution now uses the same native short-circuit contract. Final live evidence records the exact Bless `RequireMaterialComponent`, item, count, standalone `HasEnoughMaterialComponent`, and derived consumable-required values before cast.
 
 Pure planning status at commit `5cbc9bb86fe9fcb79c16f8297c5a8754f34eda05`: deterministic provider order, bans/priorities/caps, prepared-before-flexible tie-break, shared pools, linked slots, domain eligibility, mass single-cost grouping, material reservation, target outcomes, and typed AllOf/conditional-AnyOf presence behavior are covered. Runtime rows remain deferred rather than inferred from these fixtures.

@@ -41,6 +41,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private int _liveHoverEnterBaseline;
         private int _liveRenderWaitFrames;
         private string _liveRenderScreenshotPath;
+        private string _liveRenderScreenshotSha256 = string.Empty;
+        private LiveRowRenderDiagnostics _liveRenderDiagnostics;
 
         private RuntimeTestHost(
             RuntimeTestRequest request,
@@ -326,6 +328,25 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     UiConfiguredLongPlanned = ui == null ? 0 : ui.ConfiguredLongPlanned,
                     UiConfiguredLongSubmitted = ui == null ? 0 : ui.ConfiguredLongSubmitted,
                     UiConfiguredLongConfirmed = ui == null ? 0 : ui.ConfiguredLongConfirmed,
+                    UiRenderExpectedNames = _liveRenderDiagnostics == null ? null :
+                        _liveRenderDiagnostics.ExpectedNames,
+                    UiRenderRowScreenRectangles = _liveRenderDiagnostics == null ? null :
+                        _liveRenderDiagnostics.RowScreenRectangles,
+                    UiRenderSelectedRowName = _liveRenderDiagnostics == null ? null :
+                        _liveRenderDiagnostics.SelectedRowName,
+                    UiRenderDetailsTitleText = _liveRenderDiagnostics == null ? null :
+                        _liveRenderDiagnostics.DetailsTitleText,
+                    UiRenderBoundRowCount = _liveRenderDiagnostics == null ? 0 :
+                        _liveRenderDiagnostics.BoundRowCount,
+                    UiRenderMaskEvidence = _liveRenderDiagnostics == null ? null :
+                        _liveRenderDiagnostics.MaskEvidence,
+                    UiRenderCanaryEvidence = _liveRenderDiagnostics == null ? null :
+                        _liveRenderDiagnostics.CanaryEvidence,
+                    UiRenderRowEvidence = _liveRenderDiagnostics == null ? null :
+                        _liveRenderDiagnostics.RowEvidence,
+                    UiRenderDetailsEvidence = _liveRenderDiagnostics == null ? null :
+                        _liveRenderDiagnostics.DetailsEvidence,
+                    UiRenderScreenshotSha256 = _liveRenderScreenshotSha256,
                     NativeUiContractSha256 = nativeUiContractHash,
                     NativeUiButtonCount = nativeUiContract == null ? 0 : nativeUiContract.Buttons.Count,
                     NativeUiCandidateAnchorCount = nativeUiContract == null
@@ -806,14 +827,22 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             {
                 _liveRenderWaitFrames++;
                 if (_liveRenderWaitFrames < 2) return false;
-                LiveRowRenderDiagnostics rendering =
-                    BuffPlannerUiRoot.LiveRowRenderDiagnosticsForRuntime();
-                if (rendering == null)
+                _liveRenderDiagnostics = BuffPlannerUiRoot.LiveRowRenderDiagnosticsForRuntime();
+                if (_liveRenderDiagnostics == null)
                     throw new InvalidOperationException("Live row render diagnostics are absent.");
+                if (_liveRenderDiagnostics.ExpectedNames == null ||
+                    _liveRenderDiagnostics.ExpectedNames.Length != 5 ||
+                    _liveRenderDiagnostics.RowScreenRectangles == null ||
+                    _liveRenderDiagnostics.RowScreenRectangles.Length != 5 ||
+                    _liveRenderDiagnostics.BoundRowCount < 5 ||
+                    string.IsNullOrWhiteSpace(_liveRenderDiagnostics.SelectedRowName) ||
+                    _liveRenderDiagnostics.SelectedRowName != _liveRenderDiagnostics.DetailsTitleText ||
+                    _liveRenderDiagnostics.CanaryEvidence != "absent")
+                    throw new InvalidOperationException("Live production render evidence is incomplete.");
                 AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory,
-                    "live-row-render-diagnostics.json"), Serialize(rendering));
+                    "live-row-render-diagnostics.json"), Serialize(_liveRenderDiagnostics));
                 _liveRenderScreenshotPath = Path.Combine(_request.EvidenceDirectory,
-                    "planner-render-canary.png");
+                    "planner-render.png");
                 Type screenCapture = Type.GetType(
                     "UnityEngine.ScreenCapture, UnityEngine.ScreenCaptureModule", false);
                 MethodInfo capture = screenCapture == null ? null : screenCapture.GetMethod(
@@ -830,8 +859,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 if (string.IsNullOrEmpty(_liveRenderScreenshotPath) ||
                     !File.Exists(_liveRenderScreenshotPath) ||
                     new FileInfo(_liveRenderScreenshotPath).Length < 1000) return false;
+                _liveRenderScreenshotSha256 = Hashing.Sha256(_liveRenderScreenshotPath);
                 _log.Info("[KBP-RENDER] screenshot=" + _liveRenderScreenshotPath +
-                    ";sha256=" + Hashing.Sha256(_liveRenderScreenshotPath) + ".");
+                    ";sha256=" + _liveRenderScreenshotSha256 + ".");
                 BuffPlannerUiRoot.BeginRuntimeSmoke();
                 BuffPlannerUiRoot.DispatchRuntimeInputSmoke();
                 BuffPlannerUiRoot.CloseRuntimeSmoke();
@@ -1263,6 +1293,16 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         [JsonProperty("uiConfiguredLongPlanned", Order = 144)] public int UiConfiguredLongPlanned { get; set; }
         [JsonProperty("uiConfiguredLongSubmitted", Order = 145)] public int UiConfiguredLongSubmitted { get; set; }
         [JsonProperty("uiConfiguredLongConfirmed", Order = 146)] public int UiConfiguredLongConfirmed { get; set; }
+        [JsonProperty("uiRenderExpectedNames", Order = 147)] public string[] UiRenderExpectedNames { get; set; }
+        [JsonProperty("uiRenderRowScreenRectangles", Order = 148)] public string[] UiRenderRowScreenRectangles { get; set; }
+        [JsonProperty("uiRenderSelectedRowName", Order = 149)] public string UiRenderSelectedRowName { get; set; }
+        [JsonProperty("uiRenderDetailsTitleText", Order = 150)] public string UiRenderDetailsTitleText { get; set; }
+        [JsonProperty("uiRenderBoundRowCount", Order = 151)] public int UiRenderBoundRowCount { get; set; }
+        [JsonProperty("uiRenderMaskEvidence", Order = 152)] public string UiRenderMaskEvidence { get; set; }
+        [JsonProperty("uiRenderCanaryEvidence", Order = 153)] public string UiRenderCanaryEvidence { get; set; }
+        [JsonProperty("uiRenderRowEvidence", Order = 154)] public string[] UiRenderRowEvidence { get; set; }
+        [JsonProperty("uiRenderDetailsEvidence", Order = 155)] public string[] UiRenderDetailsEvidence { get; set; }
+        [JsonProperty("uiRenderScreenshotSha256", Order = 156)] public string UiRenderScreenshotSha256 { get; set; }
     }
 
     internal sealed class RuntimeTestAssertion

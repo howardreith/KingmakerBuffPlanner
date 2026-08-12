@@ -9,12 +9,13 @@ namespace KingmakerBuffPlanner.UI
         [JsonProperty("rowScreenRectangles", Order = 2)] public string[] RowScreenRectangles { get; set; }
         [JsonProperty("selectedRowName", Order = 3)] public string SelectedRowName { get; set; }
         [JsonProperty("detailsTitleText", Order = 4)] public string DetailsTitleText { get; set; }
-        [JsonProperty("sourceViewport", Order = 5)] public string SourceViewport { get; set; }
-        [JsonProperty("sourceContent", Order = 6)] public string SourceContent { get; set; }
-        [JsonProperty("maskEvidence", Order = 7)] public string MaskEvidence { get; set; }
-        [JsonProperty("canaryEvidence", Order = 8)] public string CanaryEvidence { get; set; }
-        [JsonProperty("rowEvidence", Order = 9)] public string[] RowEvidence { get; set; }
-        [JsonProperty("detailsEvidence", Order = 10)] public string[] DetailsEvidence { get; set; }
+        [JsonProperty("boundRowCount", Order = 5)] public int BoundRowCount { get; set; }
+        [JsonProperty("sourceViewport", Order = 6)] public string SourceViewport { get; set; }
+        [JsonProperty("sourceContent", Order = 7)] public string SourceContent { get; set; }
+        [JsonProperty("maskEvidence", Order = 8)] public string MaskEvidence { get; set; }
+        [JsonProperty("canaryEvidence", Order = 9)] public string CanaryEvidence { get; set; }
+        [JsonProperty("rowEvidence", Order = 10)] public string[] RowEvidence { get; set; }
+        [JsonProperty("detailsEvidence", Order = 11)] public string[] DetailsEvidence { get; set; }
     }
 
     internal sealed class CatalogLayoutDiagnostics
