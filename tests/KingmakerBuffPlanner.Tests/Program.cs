@@ -37,6 +37,7 @@ namespace KingmakerBuffPlanner.Tests
                 Run("valid-catalog-request-is-accepted", () => TestValidCatalogRequest(root));
                 Run("valid-call-of-the-wild-request-is-accepted", () => TestValidCallOfTheWildRequest(root));
                 Run("valid-ui-request-is-accepted", () => TestValidUiRequest(root));
+                Run("valid-native-ui-probe-request-is-accepted", () => TestValidNativeUiProbeRequest(root));
                 Run("valid-final-core-request-is-accepted", () => TestValidFinalCoreRequest(root));
                 Run("duplicate-flag-rejected", () => TestDuplicateFlag(root));
                 Run("outside-path-rejected", TestOutsidePath);
@@ -1157,6 +1158,18 @@ namespace KingmakerBuffPlanner.Tests
                 new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path }, out rejection);
             if (request == null || rejection.Length != 0 || request.Scenario != "ui-root-smoke")
                 throw new InvalidOperationException("Valid UI request was rejected: " + rejection);
+        }
+
+        private static void TestValidNativeUiProbeRequest(string root)
+        {
+            string path = WriteRequest(root, "valid-ui-probe", o =>
+                o["scenario"] = "ui-native-contract-probe");
+            string rejection;
+            RuntimeTestRequest request = RuntimeTestProtocol.TryRead(
+                new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path }, out rejection);
+            if (request == null || rejection.Length != 0 ||
+                !RuntimeTestProtocol.IsNativeUiProbeScenario(request.Scenario))
+                throw new InvalidOperationException("Valid native UI probe request was rejected: " + rejection);
         }
 
         private static void TestValidFinalCoreRequest(string root)

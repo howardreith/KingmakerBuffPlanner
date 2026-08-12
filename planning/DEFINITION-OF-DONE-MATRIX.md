@@ -1,6 +1,6 @@
 # Definition of Done Matrix
 
-Status: IN PROGRESS — all safe independent work complete; final clean-head repetition/publication pending; save-backed core rows remain `DEFER — EVIDENCED`
+Status: IN PROGRESS — human playtesting invalidated the 0.0.1 UI gate; full-screen UI/input repair is active; save-backed core rows remain `DEFER — EVIDENCED`
 
 This matrix follows section 27 of the authoritative mission. A core row marked `DEFER — EVIDENCED` is still unmet and prevents `COMPLETE`; it is not being reclassified as optional.
 
@@ -48,8 +48,8 @@ The source behaviors use realistic immutable provider/resource/effect fixtures a
 | Atomic write, bounded valid backups, malformed recovery, migration | PASS | Behavior suite |
 | Party reorder pure proof | PASS | Stable-ID model/profile behavior |
 | Save/reload and live party reorder proof | DEFER — EVIDENCED | No authorized `KBP_` save |
-| Complete setup, target matrix, provider controls, search/filter/sort, routines, preview/results | PASS | Source behavior plus Phase 10 UI rendering |
-| Three HUD executions; resolution/scale; no stale subscriptions | PASS for no-save UI | Two UI gates plus two composed core gates; save-backed click/execution deferred |
+| Complete setup, target matrix, provider controls, search/filter/sort, routines, preview/results | FAIL — REPAIR ACTIVE | Human playtesting found a floating prototype rather than an opaque full-screen service window |
+| Three HUD executions; resolution/scale; no stale subscriptions | FAIL — REPAIR ACTIVE | Prior gate required zero blockers/subscriptions and did not dispatch pointer input; click-through and silent Long were observed |
 
 ## Execution
 

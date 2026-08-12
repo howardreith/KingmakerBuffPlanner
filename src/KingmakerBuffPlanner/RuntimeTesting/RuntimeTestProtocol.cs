@@ -160,10 +160,16 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 string.Equals(scenario, "final-no-save-core", StringComparison.Ordinal);
         }
 
+        internal static bool IsNativeUiProbeScenario(string scenario)
+        {
+            return string.Equals(scenario, "ui-native-contract-probe", StringComparison.Ordinal);
+        }
+
         private static bool IsKnownScenario(string scenario)
         {
             return string.Equals(scenario, "mod-load-smoke", StringComparison.Ordinal) ||
-                IsCatalogScenario(scenario) || IsUiScenario(scenario);
+                IsCatalogScenario(scenario) || IsUiScenario(scenario) ||
+                IsNativeUiProbeScenario(scenario);
         }
 
         private static void RejectDuplicateProperties(string json)

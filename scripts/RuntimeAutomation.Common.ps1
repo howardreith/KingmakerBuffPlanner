@@ -232,4 +232,22 @@ function Assert-KbpRuntimeResult {
             throw 'UI root smoke result is incomplete or invalid.'
         }
     }
+    if ($Request.scenario -ceq 'ui-native-contract-probe') {
+        $contractPath = Join-Path $Request.evidenceDirectory 'native-ui-contract.json'
+        if (-not (Test-Path -LiteralPath $contractPath -PathType Leaf)) {
+            throw 'Native UI contract evidence is missing.'
+        }
+        if ($Result.nativeUiContractSha256 -cne (Get-KbpSha256 $contractPath)) {
+            throw 'Native UI contract hash mismatch.'
+        }
+        $contract = Read-KbpJson $contractPath
+        if ([int]$contract.schemaVersion -ne 1 -or
+            [string]::IsNullOrWhiteSpace([string]$contract.eventSystemPath) -or
+            [string]::IsNullOrWhiteSpace([string]$contract.staticCanvasPath) -or
+            [string]::IsNullOrWhiteSpace([string]$contract.serviceWindowTabsPath) -or
+            @($contract.buttons).Count -ne [int]$Result.nativeUiButtonCount -or
+            @($contract.buttons).Count -le 0 -or @($contract.raycasters).Count -le 0) {
+            throw 'Native UI contract is incomplete or does not reconcile.'
+        }
+    }
 }

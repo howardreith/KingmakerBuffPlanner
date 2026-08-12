@@ -68,6 +68,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 }
                 if (_uiSmokeUpdates < 7) return false;
             }
+            if (RuntimeTestProtocol.IsNativeUiProbeScenario(_request.Scenario))
+            {
+                _uiSmokeUpdates++;
+                if (!NativeUiContractProbe.IsReady && _uiSmokeUpdates < 600) return false;
+            }
             _completed = true;
             DateTime started = _startedAtUtc;
             try
@@ -88,6 +93,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 HarmonyPatchInventory harmonyInventory = null;
                 string harmonyInventoryHash = null;
                 UiRootDiagnostics ui = null;
+                NativeUiContract nativeUiContract = null;
+                string nativeUiContractHash = null;
                 if (dllMatches && RuntimeTestProtocol.IsCatalogScenario(_request.Scenario))
                 {
                     string modsPath = Path.GetDirectoryName(_modEntry.Path.TrimEnd(
@@ -120,6 +127,14 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 }
                 if (dllMatches && RuntimeTestProtocol.IsUiScenario(_request.Scenario))
                     ui = BuffPlannerUiRoot.EndRuntimeSmoke();
+                if (dllMatches && RuntimeTestProtocol.IsNativeUiProbeScenario(_request.Scenario))
+                {
+                    nativeUiContract = NativeUiContractProbe.Capture();
+                    string nativeUiContractPath = Path.Combine(
+                        _request.EvidenceDirectory, "native-ui-contract.json");
+                    AtomicFile.WriteUtf8(nativeUiContractPath, Serialize(nativeUiContract));
+                    nativeUiContractHash = Hashing.Sha256(nativeUiContractPath);
+                }
                 var result = new RuntimeTestResult
                 {
                     SchemaVersion = 1,
@@ -169,6 +184,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     UiFullScreenBlockerCount = ui == null ? 0 : ui.FullScreenBlockerCount,
                     UiEventSubscriptionCount = ui == null ? 0 : ui.EventSubscriptionCount,
                     UiReconstructionCount = ui == null ? 0 : ui.ReconstructionCount,
+                    NativeUiContractSha256 = nativeUiContractHash,
+                    NativeUiButtonCount = nativeUiContract == null ? 0 : nativeUiContract.Buttons.Count,
+                    NativeUiCandidateAnchorCount = nativeUiContract == null
+                        ? 0 : nativeUiContract.CandidateAnchors.Count,
                     Assertions = new List<RuntimeTestAssertion>
                     {
                         RuntimeTestAssertion.Pass("entry-point-loaded", "true", "true"),
@@ -180,6 +199,22 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                             : RuntimeTestAssertion.Fail("dll-sha256", _request.ExpectedDllSha256, dllHash)
                     }
                 };
+                if (RuntimeTestProtocol.IsNativeUiProbeScenario(_request.Scenario))
+                {
+                    bool validProbe = nativeUiContract != null &&
+                        !string.IsNullOrEmpty(nativeUiContract.EventSystemPath) &&
+                        !string.IsNullOrEmpty(nativeUiContract.StaticCanvasPath) &&
+                        !string.IsNullOrEmpty(nativeUiContract.ServiceWindowTabsPath) &&
+                        nativeUiContract.Buttons.Count > 0 && nativeUiContract.Raycasters.Count > 0;
+                    result.Assertions.Add(validProbe
+                        ? RuntimeTestAssertion.Pass("native-ui-contract", "complete", nativeUiContractHash)
+                        : RuntimeTestAssertion.Fail("native-ui-contract", "complete", "incomplete"));
+                    if (!validProbe)
+                    {
+                        result.Status = "FAIL";
+                        result.Stage = "native-ui-contract-validation";
+                    }
+                }
                 int loadedOptionalAssemblies = 0;
                 int loadedOptionalUmmEntries = 0;
                 bool optionalIdentityFailed = false;
@@ -493,6 +528,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         [JsonProperty("harmonyMultiOwnerTargetCount", Order = 47)] public int HarmonyMultiOwnerTargetCount { get; set; }
         [JsonProperty("harmonyBuffPlannerOverlapTargetCount", Order = 48)] public int HarmonyBuffPlannerOverlapTargetCount { get; set; }
         [JsonProperty("optionalLoadedUmmEntryCount", Order = 49)] public int OptionalLoadedUmmEntryCount { get; set; }
+        [JsonProperty("nativeUiContractSha256", Order = 50)] public string NativeUiContractSha256 { get; set; }
+        [JsonProperty("nativeUiButtonCount", Order = 51)] public int NativeUiButtonCount { get; set; }
+        [JsonProperty("nativeUiCandidateAnchorCount", Order = 52)] public int NativeUiCandidateAnchorCount { get; set; }
     }
 
     internal sealed class RuntimeTestAssertion

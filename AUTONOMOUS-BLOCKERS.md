@@ -2,6 +2,12 @@
 
 Status: IN PROGRESS
 
+## Full-screen UI and input isolation
+
+Current classification: ACTIVE REPAIR — not a hard stop.
+
+Evidence: human playtesting of installed 0.0.1 proved the floating IMGUI strip is unacceptable, clicks reach world movement, and Long has no visible result. Static exact-assembly inspection confirmed the old IMGUI surface cannot satisfy `PointerController.InGui`, and the old gate incorrectly required zero blockers. Safe investigation, implementation, tests, no-save runtime scenarios, packaging, and guarded replacement installation remain independently actionable.
+
 ## Save-backed runtime qualification
 
 Current classification: DEFER — EVIDENCED while independent work remains.

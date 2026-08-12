@@ -1,5 +1,21 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-08-12 — Human UI rejection and repair intake
+
+Status: prior UI gate INVALIDATED; repair investigation IN PROGRESS
+
+- Starting branch/HEAD/version: `codex/kingmaker-buff-planner` / `ec153837401c8815b1909cb15e85ab658a1ee26a` / `0.0.1`; worktree initially contained only the user-supplied repair mission.
+- Human evidence: installed overlay screenshot `6a1b6de2d98e68731ef6d695d69facb52497c77fcdfb16cefff82905e44000ba`; BubbleBuffs HUD/full-screen UX references `c3c55e9ad0b295094c78d547410e4f808baba16ea9f95e2b554261ecbbfc7ea8` / `cec431dbe2ca1809b37ce1e7d2e5dcd72bcbfe9cd8658d6a40c8d76adbadaf2a` (read-only UX references, no assets/code reusable).
+- Authoritative defects: debug-style text strip, world click-through/movement, apparently silent Long, non-opaque non-service setup, and F10 overemphasis.
+- Exact source cause: `BuffPlannerUiRoot` uses fixed `OnGUI` rectangles and `GUI.Window`; it creates no EventSystem raycast target and acquires no native UI mode.
+- Exact assembly cause: installed `Assembly-CSharp.dll` SHA-256 `3b6450ffec440e296e586f71c711b195aed144b28d53e1cbb29406d18fef5afb`, MVID `07fa1e4d-8618-41b3-9b8d-faa17d3b26f7`; `PointerController.InGui` calls `EventSystem.current.IsPointerOverGameObject()`. Native `FullScreenTabsWindow` raises the full-screen event; `StaticCanvas` starts/stops `GameModeType.FullScreenUi`, hides/restores HUD, and native service canvas raycasts are enabled only while shown.
+- Gate defect: former smoke returned a hardcoded routine count, arithmetic fit, and explicitly asserted zero blockers/subscriptions. It never dispatched pointer events or observed world command/selection/camera boundaries.
+- Long defect: the quick coroutine has no HUD-visible feedback channel; zero-step execution status exists only inside the closed window, with no stage instrumentation.
+- Tools: added `scripts/Inspect-KingmakerUiContracts.ps1`, a read-only exact-assembly IL contract inspector; no external dependency added.
+- Runtime/save state: game closed; 0.0.1 installation unchanged; no save touched; no deployment lock.
+- Rejected theory: click-through is not adequately explained or repaired as an isolated raycast omission. Native mode/controller deactivation plus a raycast/event surface and scoped restoration are both required, and silent execution needs independent instrumentation/feedback.
+- Exact next action: guarded no-save hierarchy/input-contract probe, then production HUD/screen/input lease implementation and corrected deterministic/runtime gates.
+
 ## 2026-08-11 — Phase 0 intake
 
 Status: IN PROGRESS
