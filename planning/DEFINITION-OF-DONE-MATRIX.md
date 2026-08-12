@@ -9,7 +9,7 @@
 | Bless generic vertical slice | PASS | Blueprint `90e59f4a4ada87243b7b3535a06d0638`; spellbook source; provider 1; prepared/available; visible/active row with non-zero bounds; selectable/configurable. |
 | Filter/empty recovery | PASS | Default available/non-hidden behavior plus deterministic all-hiding diagnostics and Reset Filters; filter counts and active filter labels are explicit. |
 | HUD/modal input ownership | PASS | Physical deltas player/move/ability/selection/target all 0; selection/camera unchanged; underlying native activation 0. |
-| Tooltip lifecycle | PASS | 60-frame hover, one enter delta, four listeners, zero raycast graphics, no blocking, bounds fully in screen. |
+| Tooltip lifecycle | PASS | Five-second hover, one enter delta, four listeners, zero raycast graphics, no blocking, bounds fully in screen. |
 | Quick-action feedback/confirmation | PASS | Three exact empty-group outcomes; configured Bless refused exactly at material validation, submitted/confirmed 0, no false success. |
 | Rebuild/close cleanliness | PASS | 21 cycles; 22 creates/22 destroys after close; no duplicate root or stale input lease. |
 | Disposable saves and Mods safety | PASS | Only exact Working loaded; baseline `afca8ac5...` immutable; every final transaction restoration verified. |

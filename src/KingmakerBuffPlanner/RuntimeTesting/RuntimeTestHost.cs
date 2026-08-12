@@ -32,6 +32,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private bool _liveF10MarkerWritten;
         private bool _liveUmmDismissMarkerWritten;
         private int _liveTooltipStableFrames;
+        private DateTime _liveTooltipStableStartedAtUtc;
         private bool _liveTooltipStable;
         private string _liveTooltipEvidence = string.Empty;
         private string _liveInitialCatalogEvidence = string.Empty;
@@ -608,7 +609,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                             _liveTooltipStable && !string.IsNullOrWhiteSpace(_liveTooltipEvidence) &&
                             ui.TooltipListenerCount == 4 && ui.TooltipRaycastGraphicCount == 0 &&
                             !ui.TooltipBlocksRaycasts,
-                            "60 frames/inside/4 listeners/0 raycast/blocks=false",
+                            ">=5 seconds/inside/4 listeners/0 raycast/blocks=false",
                             _liveTooltipEvidence + ";finalListeners=" + ui.TooltipListenerCount);
                         AddUiAssertion(result, "ui-physical-pointer-isolation",
                             ui.PhysicalInputPlayerCommandCount == 0 &&
@@ -826,6 +827,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 if (tooltip == null || !tooltip.Active)
                 {
                     _liveTooltipStableFrames = 0;
+                    _liveTooltipStableStartedAtUtc = default(DateTime);
                     if ((_uiSmokeUpdates % 120) == 0)
                         _log.Info("[KBP-INPUT] physical hover waiting;" +
                             BuffPlannerUiRoot.PhysicalHoverSnapshotForRuntime("long") + ".");
@@ -841,9 +843,14 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         (flow == null ? -1 : flow.PointerEnters) + ";baseline=" +
                         _liveHoverEnterBaseline + ";bounds=" + tooltip.Bounds);
                 _liveTooltipStableFrames++;
-                if (_liveTooltipStableFrames < 60) return false;
+                if (_liveTooltipStableStartedAtUtc == default(DateTime))
+                    _liveTooltipStableStartedAtUtc = DateTime.UtcNow;
+                TimeSpan stableElapsed = DateTime.UtcNow - _liveTooltipStableStartedAtUtc;
+                if (stableElapsed < TimeSpan.FromSeconds(5)) return false;
                 _liveTooltipStable = true;
-                _liveTooltipEvidence = "frames=" + _liveTooltipStableFrames + ";bounds=" +
+                _liveTooltipEvidence = "elapsedMs=" +
+                    ((long)stableElapsed.TotalMilliseconds) + ";frames=" +
+                    _liveTooltipStableFrames + ";bounds=" +
                     tooltip.Bounds + ";listeners=" + tooltip.ListenerCount +
                     ";raycastGraphics=" + tooltip.RaycastGraphicCount + ";blocks=" +
                     tooltip.BlocksRaycasts + ";pointerEnterDelta=" +

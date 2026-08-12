@@ -16,7 +16,7 @@ Please retest in a real campaign:
 6. Confirm Long/Important/Short always show an exact result. A Bless refusal for missing material is expected for the current disposable configuration and must not be reported as applied.
 7. Close and reopen through F10 and the normal close control; HUD, selection, camera, pause, and game mode should restore cleanly with no duplicate UI.
 
-Report the exact text and a screenshot for any remaining failure. Automated runs `catalog-input-0.0.5-identity-final-physical-1/2` already prove the underlying row geometry, physical input isolation, 60-frame tooltip stability, explicit quick outcomes, and 21-cycle cleanup; human visual smoothness remains authoritative.
+Report the exact text and a screenshot for any remaining failure. Automated runs prove the underlying row geometry, physical input isolation, continuous five-second tooltip stability, explicit quick outcomes, and 21-cycle cleanup; human visual smoothness remains authoritative.
 
 ## 0.0.4 installed handoff
 

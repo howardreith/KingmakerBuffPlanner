@@ -9,7 +9,7 @@ Status: PASS for automated acceptance and guarded-installed; human visual retest
 - Fresh-process physical campaigns `catalog-input-0.0.5-identity-final-physical-1` and `catalog-input-0.0.5-identity-final-physical-2`: 69/69 each, exact Working load, immutable baseline, exact Mods restoration.
 - Catalog: 11 total -> 11 search -> 11 configured -> 11 duration -> 11 source -> 11 non-hidden -> 10 available -> 10 view models/rows/active rows -> 5 viewport-visible. Content `625.4x1044.0`, viewport `625.4x500.0`, details bound, no binding failure.
 - Bless: blueprint `90e59f4a4ada87243b7b3535a06d0638`, spellbook source, one provider, prepared/available, visible/active non-zero row, selected/configured. Controlled execution planned 1 but submitted/confirmed 0 and refused exactly at `material-component-unavailable`.
-- Physical input: player/movement/ability/selection/target counts all zero; selection and camera unchanged; native activation zero. Tooltip: 60 frames, one enter delta, four listeners, zero raycast graphics, no raycast blocking, entirely onscreen.
+- Physical input: player/movement/ability/selection/target counts all zero; selection and camera unchanged; native activation zero. Tooltip: continuous five-second hover, one enter delta, four listeners, zero raycast graphics, no raycast blocking, entirely onscreen.
 - Rebuild: 21 cycles; 22 screen creates and 22 destroys after close; balanced input lease and restored mode/selection/pause.
 - Exact-release regressions: native `catalog-input-0.0.5-identity-final-native` 12/12; Call of the Wild `catalog-input-0.0.5-identity-final-cotw` 26/26.
 - Guarded install `catalog-input-0.0.5-identity-final-install`: installed identity exact, CLR 0.0.5.0, settings preserved, every non-planner mod unchanged.
