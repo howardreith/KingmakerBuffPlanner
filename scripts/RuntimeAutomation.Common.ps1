@@ -99,7 +99,7 @@ function New-KbpRuntimeRequest {
         [int]$TimeoutSeconds, [bool]$ExitAfterCompletion,
         [ValidateSet('native-only', 'call-of-the-wild')][string]$ProfileId = 'native-only',
         [object[]]$ExpectedOptionalMods = @(), [string[]]$ExpectedBlueprintGuids = @(),
-        [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'final-no-save-core')][string]$Scenario = 'mod-load-smoke')
+        [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'ui-native-contract-probe', 'final-no-save-core')][string]$Scenario = 'mod-load-smoke')
     return [ordered]@{
         schemaVersion = 1
         enabled = $true

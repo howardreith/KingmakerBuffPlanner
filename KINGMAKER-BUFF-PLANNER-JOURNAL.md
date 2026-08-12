@@ -15,6 +15,7 @@ Status: prior UI gate INVALIDATED; repair investigation IN PROGRESS
 - Runtime/save state: game closed; 0.0.1 installation unchanged; no save touched; no deployment lock.
 - Rejected theory: click-through is not adequately explained or repaired as an isolated raycast omission. Native mode/controller deactivation plus a raycast/event surface and scoped restoration are both required, and silent execution needs independent instrumentation/feedback.
 - Exact next action: guarded no-save hierarchy/input-contract probe, then production HUD/screen/input lease implementation and corrected deterministic/runtime gates.
+- First probe attempt `20260812-ui-native-contract-probe` did not launch: `New-KbpRuntimeRequest` retained the old scenario `ValidateSet`. The transaction restored exactly. The inner allowlist was corrected before retry; this was orchestration validation, not game/runtime behavior.
 
 ## 2026-08-11 — Phase 0 intake
 
