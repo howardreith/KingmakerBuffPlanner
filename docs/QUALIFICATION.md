@@ -15,6 +15,16 @@ Human playtesting invalidated every earlier 0.0.1 UI-complete entry below. Those
 
 The campaign gate structurally requires four HUD buttons/listeners, a stable native anchor, one opaque/raycasting full-screen root, `FullScreenUi` mode, selection suppression, consumed click/drag/scroll/cancel, no observed movement/ability/selection command, an actual group-tab change, exactly-once Long flow, explicit empty-Long feedback, 20 open/close cycles, reconstruction uniqueness, and exact pause/mode/selection restoration. It remains pending an authorized campaign fixture and the human visual/input verdict.
 
+Final local-only release/install evidence:
+
+- release commit `447bbd288c803a4aec609db84a4c6076cbfe94f3`;
+- package `1f328e26fdf2524fc85e8482077e5330bc5f7a48ce0d8841bd372997685d652f`;
+- DLL `c2598e0d31e464eaf8446e15280cbe13b3eeb4e56b0de92e20cc8f29fb458e84`;
+- MVID `e43f060b-a2b7-48db-b19f-b45704ef77c4`;
+- deterministic build repetition 2/2 and package validation 4/4;
+- installer WhatIf 5/5;
+- guarded local install `ui-repair-0.0.2-local-install`: `Installed`, settings preserved, all non-planner mods byte-identical, exact DLL verified, lock absent.
+
 Current source-only Phase 1 evidence (pre-checkpoint build from HEAD `4ca6008d873577e8e6263b54658620b649f81cd1`):
 
 - source validation: PASS 14, FAIL 0;

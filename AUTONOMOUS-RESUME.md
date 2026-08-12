@@ -1,18 +1,19 @@
 # Autonomous Resume
 
-Status: IN PROGRESS — 0.0.1 UI acceptance invalidated by human playtesting
+Status: INSTALLED FOR HUMAN UI RETEST — campaign UI and save-backed qualification pending
 
 - Repository/branch: standalone Kingmaker Buff Planner / `codex/kingmaker-buff-planner`
-- Starting repair HEAD: `ec153837401c8815b1909cb15e85ab658a1ee26a`; current committed HEAD: `3bd519b000f3126b19462888aefeabe29374873d`
-- Development version: `0.0.2`; installed version remains `0.0.1` with DLL SHA-256 `3d356e6b1dbf422b4aa8e721fb4d71051dc10c2097547473bbfdd135b8c11be8`
-- Worktree: documentation truth correction plus failure-envelope BLOCKED classification; final checkpoint pending
+- Starting repair HEAD: `ec153837401c8815b1909cb15e85ab658a1ee26a`; release commit: `447bbd288c803a4aec609db84a4c6076cbfe94f3`; final records checkpoint pending
+- Development/installed version: `0.0.2`; installed DLL SHA-256 `c2598e0d31e464eaf8446e15280cbe13b3eeb4e56b0de92e20cc8f29fb458e84`
+- Worktree: final install/release records only
 - Authoritative repair mission: `planning/FULLSCREEN-UI-INPUT-ISOLATION-REPAIR-MISSION.md`
 - Confirmed root cause: the production UI is fixed-coordinate IMGUI, while exact Kingmaker `PointerController.InGui` only recognizes EventSystem pointer-over-GameObject state. No native full-screen mode or raycast surface is acquired.
 - Exact native evidence: `Assembly-CSharp.dll` SHA-256 `3b6450ffec440e296e586f71c711b195aed144b28d53e1cbb29406d18fef5afb`, MVID `07fa1e4d-8618-41b3-9b8d-faa17d3b26f7`; full-screen event enters/stops `GameModeType.FullScreenUi`; native service canvas blocks raycasts and hides/restores HUD.
 - Invalid prior gate: it hardcoded routine count/layout and required zero blockers/subscriptions without dispatching real UI/world input.
 - Long finding: an empty/zero-step routine reports only inside the closed setup window, so HUD execution can appear silent even if its coroutine ran.
-- Runtime state: Kingmaker closed; no deployment lock; live `Mods\KingmakerBuffPlanner` remains validated 0.0.1; guarded native probe proved `StaticCanvas` unavailable at the main menu and restored `Mods` exactly; no save accessed.
+- Runtime state: Kingmaker/UMM closed; no deployment lock; live `Mods\KingmakerBuffPlanner` is guarded-installed validated 0.0.2; all non-planner mods verified byte-identical; no save accessed.
 - Separate existing hard stop: no authorized `KBP_AUTOMATION_BASELINE` / `KBP_AUTOMATION_WORKING` pair; this does not block UI-only no-save repair qualification.
 - Last runtime gates: native `ui-repair-0.0.2-final-native-1/2` 12/12 each and Call of the Wild `ui-repair-0.0.2-cotw-1/2` 26/26 each, exact restoration. Corrected UI gate rejected main-menu-only evidence and restored exactly.
-- Current exact local package (will change after final commit): package `651d9ce3f92649f86d6e619e46fe3293ace1019e10e3b086c2a8c3617452b68f`, DLL `f039f436fb948c7acb203e60979dec3bb500e03e85ff8f6a73ae6753b293b850`, MVID `5f57af25-8876-400a-99b9-5971d8bfd8f4`.
-- Exact next command: commit the short-lived MVID inspection fix, rerun `scripts\Build-Release.ps1` from clean HEAD, validate/install via `scripts\Install-Local.ps1`, then guarded push and handoff.
+- Exact release: package `1f328e26fdf2524fc85e8482077e5330bc5f7a48ce0d8841bd372997685d652f`, DLL `c2598e0d31e464eaf8446e15280cbe13b3eeb4e56b0de92e20cc8f29fb458e84`, MVID `e43f060b-a2b7-48db-b19f-b45704ef77c4`, commit `447bbd288c803a4aec609db84a4c6076cbfe94f3`.
+- Install evidence: `C:\Dev\KingmakerBuffPlannerLab\runtime-evidence\install-ui-repair-0.0.2-local-install\install-result.json`.
+- Exact next command: commit final records, run `scripts\Test-SourceOnly.ps1`, `scripts\validate-package.ps1` on the release ZIP, `scripts\Test-GuardedPush.ps1`, then guarded push and human handoff.

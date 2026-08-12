@@ -72,7 +72,7 @@ The source behaviors use realistic immutable provider/resource/effect fixtures a
 | Applicable core suite twice in fresh processes | PASS | `phase12-no-save-core-1/2`, 22/22 each |
 | Clean source/deterministic build/package | PASS at checkpoint | 15/15; 52/52; two identical builds; package 4/4 |
 | Install/use/architecture/discovery/execution/qualification docs | PASS | `docs/` set and reports |
-| Release ZIP from clean HEAD | PASS at checkpoint; final-head rerun pending | `scripts/Build-Release.ps1` |
+| Release ZIP from clean HEAD | PASS | 0.0.2 deterministic 2/2; package `1f328e26...`; guarded installed |
 | Coherent local history | PASS | Dedicated feature branch and checkpoint commits |
 | Remote branch equals local | IN PROGRESS | Guarded push WhatIf 6/6; actual helper push pending final commit |
 
