@@ -115,3 +115,21 @@ On 2026-08-12 before source edits:
 - guarded installer WhatIf with actual installed prior version 0.0.6: PASS and no mutation.
 
 `scripts/Test-InstallWhatIf.ps1` itself still passes `-ExpectedPriorVersion 0.0.2`, so it fails against the correctly installed 0.0.6 before reaching its purity assertion. That is a stale test-helper parameter, not live identity drift: installed Info is 0.0.6 and installed DLL SHA-256 is exactly `6144256c...`. The production installer and transaction framework are unchanged.
+
+## Incremental implementation record
+
+### Phase A — theme shell
+
+`PlannerUiTheme` now owns parchment, raised-panel, brown-text, burgundy, antique-gold, green, amber, red, and disabled tokens plus optional native sprites/fonts. It resolves the exact inventory candidates at runtime and records a concise resolution summary; all native objects remain game-owned and every token has a programmatic fallback. The full unchanged suite passed before Phase B.
+
+### Phase B — icon-first cards
+
+Catalog entries now bind the actual `BlueprintAbility.Icon` when present, use one stable neutral `?` fallback when absent, and display name, routine badge, player-facing availability, selected ornament, and deterministic configuration/fulfillment accent. `BuffCardViewModel` is presentation-only and consumes existing setup/planning state. The full unchanged suite passed before Phase C.
+
+### Phase C — portraits and selected details
+
+Actual party/pet portraits are now the primary target editor. Neutral, green, amber, red, and indirect-beneficiary states derive from existing target legality, request, presence, and plan semantics. Hover preview changes only visual state; `Select All Valid` and `Clear Targets` use existing assignment commands and save exactly once. The selected detail now starts with the ability icon and player terminology. The full unchanged suite passed before Phase D.
+
+### Phase D — ordinary setup language and disclosure
+
+The primary controls are Search, Configured only, Show hidden, Reset, and Advanced Filters. Default ordering is alphabetical with all supported non-hidden buffs regardless of current availability. Duration/source/availability categories live in a closed drawer. The footer contains actions only; Settings owns the sole `Casting mode` control. `CASTING SOURCE` shows an automatic/caster/availability summary and keeps preference, enable/disable, spellbook identity, and cap controls under `Advanced Casting Source`. Raw primary labels and `CAP ANY` are rejected by source validation. The full mechanical suite remains required before this phase is committed.

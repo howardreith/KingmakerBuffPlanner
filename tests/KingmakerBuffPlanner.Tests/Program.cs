@@ -911,19 +911,15 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("All-hiding filters did not preserve an explicit diagnostic cause.");
 
             state.ConfiguredOnly = true;
-            state.RequestedOnly = true;
-            state.UnconfiguredOnly = true;
             state.ShowHidden = true;
-            state.ShowUnavailable = true;
-            state.SortByLevel = true;
-            state.DurationFilter = 3;
-            state.SourceKindFilter = 2;
+            state.DurationFilter = 2;
+            state.SourceCategoryFilter = 2;
+            state.AvailabilityFilter = 2;
             state.Reset();
             visible = state.Apply(model, "long", out diagnostics);
             if (visible.Count != 1 || state.Search.Length != 0 || state.ConfiguredOnly ||
-                state.RequestedOnly || state.UnconfiguredOnly || state.ShowHidden ||
-                state.ShowUnavailable || state.SortByLevel || state.DurationFilter != 0 ||
-                state.SourceKindFilter != -1)
+                state.ShowHidden || state.DurationFilter != 0 ||
+                state.SourceCategoryFilter != 0 || state.AvailabilityFilter != 0)
                 throw new InvalidOperationException("Reset Filters did not restore the default visible catalog.");
         }
 

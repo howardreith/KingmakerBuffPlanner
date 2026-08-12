@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using Kingmaker;
 using Kingmaker.Blueprints;
+using Kingmaker.Blueprints.Classes.Spells;
 using Kingmaker.EntitySystem.Entities;
 using Kingmaker.UI;
 using Kingmaker.UnitLogic.Abilities.Blueprints;
@@ -41,11 +42,16 @@ namespace KingmakerBuffPlanner.UI
         private Text _catalogSummary;
         private InputField _search;
         private Button[] _routineTabs;
-        private Text[] _filterLabels;
+        private Text _configuredFilterLabel;
+        private Text _hiddenFilterLabel;
+        private Text[] _advancedFilterLabels;
+        private RectTransform _advancedFilters;
+        private RectTransform _catalogScrollRoot;
         private readonly List<Button> _sourceRows = new List<Button>();
         private readonly Dictionary<string, TargetPortraitVisual> _targetVisuals =
             new Dictionary<string, TargetPortraitVisual>(StringComparer.Ordinal);
-        private string _previewSourceId;
+        private bool _advancedFiltersExpanded;
+        private bool _advancedCastingExpanded;
         private string _routineId = "long";
         private readonly CatalogFilterState _filters = new CatalogFilterState();
         private bool _resettingFilters;
@@ -405,7 +411,7 @@ namespace KingmakerBuffPlanner.UI
             });
 
             RectTransform filters = KingmakerUiFactory.CreateRect("Filters", panel);
-            KingmakerUiFactory.SetAnchors(filters, 0.02f, 0.82f, 0.98f, 0.91f);
+            KingmakerUiFactory.SetAnchors(filters, 0.02f, 0.84f, 0.98f, 0.91f);
             HorizontalLayoutGroup filterLayout = filters.gameObject.AddComponent<HorizontalLayoutGroup>();
             filterLayout.spacing = 5;
             filterLayout.childControlWidth = true;
@@ -413,61 +419,74 @@ namespace KingmakerBuffPlanner.UI
             filterLayout.childControlHeight = true;
             filterLayout.childForceExpandHeight = true;
             Button configuredFilter = KingmakerUiFactory.CreateButton("Configured", filters, _theme,
-                "CONFIG: ALL", CycleConfigurationFilter);
-            Button durationFilter = KingmakerUiFactory.CreateButton("Duration", filters, _theme,
-                "DURATION: ALL", () =>
+                "Configured only", () =>
             {
-                _filters.DurationFilter = (_filters.DurationFilter + 1) % 4;
-                RefreshCatalog();
-            });
-            Button sourceFilter = KingmakerUiFactory.CreateButton("Kind", filters, _theme,
-                "SOURCE: ALL", () =>
-            {
-                _filters.SourceKindFilter++;
-                if (_filters.SourceKindFilter > 3) _filters.SourceKindFilter = -1;
-                RefreshCatalog();
-            });
-            Button sortFilter = KingmakerUiFactory.CreateButton("Sort", filters, _theme,
-                "SORT: NAME", () =>
-            {
-                _filters.SortByLevel = !_filters.SortByLevel;
+                _filters.ConfiguredOnly = !_filters.ConfiguredOnly;
                 RefreshCatalog();
             });
             Button hiddenFilter = KingmakerUiFactory.CreateButton("Hidden", filters, _theme,
-                "HIDDEN: OFF", () =>
+                "Show hidden", () =>
             {
                 _filters.ShowHidden = !_filters.ShowHidden;
                 RefreshCatalog();
             });
-            Button availabilityFilter = KingmakerUiFactory.CreateButton("Availability", filters, _theme,
-                "AVAIL: ONLY", () =>
+            KingmakerUiFactory.CreateButton("ResetFilters", filters, _theme,
+                "Reset", ResetFilters);
+            KingmakerUiFactory.CreateButton("AdvancedFilters", filters, _theme,
+                "Advanced Filters", () =>
             {
-                _filters.ShowUnavailable = !_filters.ShowUnavailable;
+                _advancedFiltersExpanded = !_advancedFiltersExpanded;
+                UpdateAdvancedFiltersVisibility();
                 RefreshCatalog();
             });
-            _filterLabels = new[]
+            _configuredFilterLabel = configuredFilter.GetComponentInChildren<Text>();
+            _hiddenFilterLabel = hiddenFilter.GetComponentInChildren<Text>();
+
+            _advancedFilters = KingmakerUiFactory.CreateRect("AdvancedFilterDrawer", panel);
+            KingmakerUiFactory.SetAnchors(_advancedFilters, 0.02f, 0.71f, 0.98f, 0.78f);
+            HorizontalLayoutGroup advancedLayout =
+                _advancedFilters.gameObject.AddComponent<HorizontalLayoutGroup>();
+            advancedLayout.spacing = 5;
+            advancedLayout.childControlWidth = true;
+            advancedLayout.childForceExpandWidth = true;
+            advancedLayout.childControlHeight = true;
+            advancedLayout.childForceExpandHeight = true;
+            Button sourceFilter = KingmakerUiFactory.CreateButton("SourceCategory",
+                _advancedFilters, _theme, "All sources", () =>
             {
-                configuredFilter.GetComponentInChildren<Text>(),
-                durationFilter.GetComponentInChildren<Text>(),
+                _filters.SourceCategoryFilter = (_filters.SourceCategoryFilter + 1) % 3;
+                RefreshCatalog();
+            });
+            Button durationFilter = KingmakerUiFactory.CreateButton("DurationCategory",
+                _advancedFilters, _theme, "Any duration", () =>
+            {
+                _filters.DurationFilter = (_filters.DurationFilter + 1) % 3;
+                RefreshCatalog();
+            });
+            Button availabilityFilter = KingmakerUiFactory.CreateButton("AvailabilityCategory",
+                _advancedFilters, _theme, "All availability", () =>
+            {
+                _filters.AvailabilityFilter = (_filters.AvailabilityFilter + 1) % 3;
+                RefreshCatalog();
+            });
+            _advancedFilterLabels = new[]
+            {
                 sourceFilter.GetComponentInChildren<Text>(),
-                sortFilter.GetComponentInChildren<Text>(),
-                hiddenFilter.GetComponentInChildren<Text>(),
+                durationFilter.GetComponentInChildren<Text>(),
                 availabilityFilter.GetComponentInChildren<Text>()
             };
 
             RectTransform filterStatus = KingmakerUiFactory.CreateRect("FilterStatus", panel);
-            KingmakerUiFactory.SetAnchors(filterStatus, 0.02f, 0.75f, 0.98f, 0.81f);
+            KingmakerUiFactory.SetAnchors(filterStatus, 0.02f, 0.78f, 0.98f, 0.835f);
             _catalogSummary = KingmakerUiFactory.CreateText("Summary", filterStatus, _theme,
                 string.Empty, 14, TextAnchor.MiddleLeft);
-            KingmakerUiFactory.SetAnchors(_catalogSummary.rectTransform, 0, 0, 0.76f, 1);
-            Button reset = KingmakerUiFactory.CreateButton("ResetFilters", filterStatus, _theme,
-                "RESET FILTERS", ResetFilters);
-            KingmakerUiFactory.SetAnchors((RectTransform)reset.transform, 0.77f, 0, 1, 1);
+            KingmakerUiFactory.Stretch(_catalogSummary.rectTransform);
 
             ScrollRect scroll = KingmakerUiFactory.CreateScrollView(
                 "BuffCatalog", panel, _theme, out _sourceContent);
+            _catalogScrollRoot = (RectTransform)scroll.transform;
             _sourceViewport = scroll.viewport;
-            KingmakerUiFactory.SetAnchors((RectTransform)scroll.transform, 0.02f, 0.02f, 0.98f, 0.74f);
+            UpdateAdvancedFiltersVisibility();
         }
 
         private void BuildDetailPanel(RectTransform frame)
@@ -492,13 +511,9 @@ namespace KingmakerBuffPlanner.UI
             Button refresh = KingmakerUiFactory.CreateButton("Refresh", footer, _theme,
                 "REFRESH", () => { _session.Refresh(); RefreshAll(); });
             KingmakerUiFactory.SetAnchors((RectTransform)refresh.transform, 0.69f, 0.20f, 0.78f, 0.80f);
-            Button settings = KingmakerUiFactory.CreateButton("Mode", footer, _theme,
-                "MODE", () =>
-                {
-                    if (_session.Model != null) _session.Model.ToggleExecutionMode();
-                    RefreshAll();
-                });
-            KingmakerUiFactory.SetAnchors((RectTransform)settings.transform, 0.79f, 0.20f, 0.87f, 0.80f);
+            Button close = KingmakerUiFactory.CreateButton("Close", footer, _theme,
+                "CLOSE", () => _close());
+            KingmakerUiFactory.SetAnchors((RectTransform)close.transform, 0.79f, 0.20f, 0.87f, 0.80f);
             Button execute = KingmakerUiFactory.CreateButton("Execute", footer, _theme,
                 "APPLY " + _routineId.ToUpperInvariant(), () => _execute(_routineId));
             KingmakerUiFactory.SetAnchors((RectTransform)execute.transform, 0.88f, 0.14f, 0.985f, 0.86f);
@@ -514,7 +529,12 @@ namespace KingmakerBuffPlanner.UI
                 Image image = tab == null ? null : tab.targetGraphic as Image;
                 if (image != null) image.color = ids[index] == _routineId
                     ? _theme.BurgundyPrimary : _theme.ParchmentRaised;
-                if (tab != null) tab.interactable = !_session.IsExecuting;
+                if (tab != null)
+                {
+                    tab.interactable = !_session.IsExecuting;
+                    Text label = tab.GetComponentInChildren<Text>(true);
+                    if (label != null) label.text = BuildRoutineSummary(ids[index]).Label;
+                }
             }
             Button execute = _root == null ? null : _root.GetComponentsInChildren<Button>(true)
                 .FirstOrDefault(button => button.name == "Execute");
@@ -526,9 +546,29 @@ namespace KingmakerBuffPlanner.UI
             }
         }
 
+        private RoutineSummaryViewModel BuildRoutineSummary(string routineId)
+        {
+            string name = char.ToUpperInvariant(routineId[0]) + routineId.Substring(1);
+            PlannerSetupModel model = _session.Model;
+            if (model == null) return new RoutineSummaryViewModel(routineId, name, 0, 0);
+            int requested = model.Profile.Routines.First(item => item.RoutineId == routineId)
+                .Assignments.Sum(item => item.WantedTargetUnitIds.Count);
+            try
+            {
+                RoutinePlanResult preview = _session.PreviewRoutine(routineId);
+                int covered = preview.Plan.Outcomes.Count(item =>
+                    item.Kind == TargetOutcomeKind.Fulfilled ||
+                    item.Kind == TargetOutcomeKind.SkippedAlreadyActive);
+                return new RoutineSummaryViewModel(routineId, name, covered, requested);
+            }
+            catch
+            {
+                return new RoutineSummaryViewModel(routineId, name, 0, requested);
+            }
+        }
+
         private void RefreshCatalog()
         {
-            _previewSourceId = null;
             RefreshSourceList();
             try { RefreshDetails(); }
             catch (Exception exception)
@@ -563,11 +603,9 @@ namespace KingmakerBuffPlanner.UI
             }
             CatalogFilterDiagnostics filters;
             List<SetupSourceRow> sources = ApplyFilters(model, out filters);
-            sources = _filters.SortByLevel
-                ? sources.OrderBy(source => source.SpellLevel)
-                    .ThenBy(source => source.DisplayName, StringComparer.OrdinalIgnoreCase).ToList()
-                : sources.OrderBy(source => source.DisplayName, StringComparer.OrdinalIgnoreCase)
-                    .ThenBy(source => source.SpellLevel).ToList();
+            sources = sources.OrderBy(source => source.DisplayName,
+                    StringComparer.OrdinalIgnoreCase)
+                .ThenBy(source => source.SpellLevel).ToList();
             if (sources.Count != 0 && !sources.Any(source =>
                 source.SourceId == model.SelectedSourceId))
                 model.SelectSource(sources[0].SourceId);
@@ -579,6 +617,7 @@ namespace KingmakerBuffPlanner.UI
                         source.SourceId == model.SelectedSourceId);
                     Button row = CreateBuffCard(_sourceContent, source, cardModel, () =>
                     {
+                        _advancedCastingExpanded = false;
                         model.SelectSource(source.SourceId);
                         RefreshCatalog();
                     });
@@ -617,10 +656,8 @@ namespace KingmakerBuffPlanner.UI
             if (_catalogSummary != null)
             {
                 _catalogSummary.text = _sourceRows.Count == sources.Count
-                    ? sources.Count + " matched | " + _sourceRows.Count + " rows bound | " +
-                        filters.ActiveFilters
-                    : sources.Count + " buffs matched, but only " + _sourceRows.Count +
-                        " rows bound. See KBP diagnostics.";
+                    ? sources.Count + (sources.Count == 1 ? " buff shown" : " buffs shown")
+                    : "Some matching buffs could not be shown. Refresh or check the log.";
             }
             FinalizeScrollContent(_sourceContent, _sourceViewport);
             LastCatalogDiagnostics = new CatalogLayoutDiagnostics { Filters = filters };
@@ -735,7 +772,6 @@ namespace KingmakerBuffPlanner.UI
             if (model == null || _targetVisuals.Count == 0) return;
             SetupSourceRow preview = source ?? model.SelectedSource;
             if (preview == null) return;
-            _previewSourceId = source == null ? null : source.SourceId;
             foreach (UnitSnapshot unit in model.Snapshot.Units)
             {
                 TargetPortraitVisual visual;
@@ -777,12 +813,8 @@ namespace KingmakerBuffPlanner.UI
             Button hidden = KingmakerUiFactory.CreateButton("Hide", assignmentRow, _theme,
                 model.Profile.HiddenSourceIds.Contains(source.SourceId) ? "UNHIDE" : "HIDE",
                 () => { model.ToggleHidden(); RefreshCatalog(); });
-            Button policy = KingmakerUiFactory.CreateButton("Policy", assignmentRow, _theme,
-                "ACTIVE: " + model.GetExistingEffectPolicy(_routineId),
-                () => { model.ToggleExistingEffectPolicy(_routineId); RefreshDetails(); });
             assign.interactable = !_session.IsExecuting;
             hidden.interactable = !_session.IsExecuting;
-            policy.interactable = model.IsAssigned(_routineId) && !_session.IsExecuting;
 
             AddHeading(_detailContent, "TARGETS - PARTY AND PETS");
             RectTransform targetActions = AddHorizontalRow(_detailContent, 38);
@@ -813,9 +845,24 @@ namespace KingmakerBuffPlanner.UI
             foreach (UnitSnapshot unit in model.Snapshot.Units)
                 CreateTargetCard(targets, source, model, unit);
 
-            AddHeading(_detailContent, "PROVIDERS AND RESOURCES");
-            foreach (ProviderSnapshot provider in source.Providers)
-                CreateProviderRow(_detailContent, model, provider);
+            AddHeading(_detailContent, "CASTING SOURCE");
+            var castingSource = new CastingSourceSummaryViewModel(source, model);
+            AddBodyText(_detailContent, castingSource.Summary, 36);
+            if (source.Providers.Count != 0)
+            {
+                Button advancedCasting = KingmakerUiFactory.CreateButton(
+                    "AdvancedCastingSource", _detailContent, _theme,
+                    (_advancedCastingExpanded ? "Hide " : string.Empty) +
+                        "Advanced Casting Source", () =>
+                    {
+                        _advancedCastingExpanded = !_advancedCastingExpanded;
+                        RefreshDetails();
+                    });
+                KingmakerUiFactory.AddLayout((RectTransform)advancedCasting.transform, 38);
+                if (_advancedCastingExpanded)
+                    foreach (ProviderSnapshot provider in source.Providers)
+                        CreateProviderRow(_detailContent, model, provider);
+            }
 
             AddHeading(_detailContent, "PLAN SUMMARY");
             try
@@ -844,14 +891,21 @@ namespace KingmakerBuffPlanner.UI
 
             AddHeading(_detailContent, "SETTINGS");
             RectTransform settings = AddHorizontalRow(_detailContent, 44);
+            var settingsModel = new PlannerSettingsViewModel(model.Profile);
             KingmakerUiFactory.CreateButton("ExecutionMode", settings, _theme,
-                "MODE: " + model.Profile.Execution.Mode.ToUpperInvariant(),
+                "Casting mode: " + settingsModel.CastingMode,
                 () => { model.ToggleExecutionMode(); RefreshDetails(); });
             KingmakerUiFactory.CreateButton("Combat", settings, _theme,
-                model.Profile.Execution.OutOfCombatOnly ? "COMBAT: BLOCKED" : "COMBAT: ALLOWED",
+                "Combat use: " + settingsModel.CombatUse,
                 () => { model.ToggleOutOfCombatOnly(); RefreshDetails(); });
+            Button existing = KingmakerUiFactory.CreateButton("ExistingBuffs", settings, _theme,
+                "Existing buffs: " +
+                    (model.GetExistingEffectPolicy(_routineId) == ExistingEffectPolicy.SkipAlreadyActive
+                        ? "Skip active" : "Recast"),
+                () => { model.ToggleExistingEffectPolicy(_routineId); RefreshDetails(); });
+            existing.interactable = model.IsAssigned(_routineId) && !_session.IsExecuting;
             KingmakerUiFactory.CreateButton("Fallback", settings, _theme,
-                model.Profile.Execution.AllowAnimatedFallback ? "FALLBACK: ALLOWED" : "FALLBACK: BLOCKED",
+                "Fallback: " + settingsModel.Fallback,
                 () => { model.ToggleAnimatedFallback(); RefreshDetails(); });
             FinalizeScrollContent(_detailContent, _detailViewport);
         }
@@ -956,19 +1010,23 @@ namespace KingmakerBuffPlanner.UI
         private void CreateProviderRow(RectTransform parent, PlannerSetupModel model, ProviderSnapshot provider)
         {
             RectTransform row = AddHorizontalRow(parent, 48);
-            ResourcePoolSnapshot pool = model.GetResourcePool(provider);
-            int? remaining = model.GetRemainingCasts(provider);
             string rejection = model.GetProviderRejectionReason(provider);
+            BlueprintSpellbook spellbook = string.IsNullOrEmpty(provider.Key.SpellbookGuid)
+                ? null : ResourcesLibrary.TryGetBlueprint<BlueprintSpellbook>(provider.Key.SpellbookGuid);
+            string spellbookName = spellbook == null || string.IsNullOrWhiteSpace(spellbook.Name)
+                ? (provider.Key.Ability.SourceKind == SourceKind.Spellbook ? "Spellbook" : "Ability")
+                : spellbook.Name;
             Text label = KingmakerUiFactory.CreateText("Provider", row, _theme,
-                model.GetCasterDisplayName(provider) + " - " + provider.DisplayName +
-                "  CL " + provider.EffectiveCasterLevel + "  " + pool.Kind +
-                "  remaining " + (remaining == null ? "unlimited" : remaining.Value.ToString()) +
-                (string.IsNullOrEmpty(rejection) ? string.Empty : "  |  " + rejection),
+                model.GetCasterDisplayName(provider) + " — " + spellbookName + " — " +
+                BuffCardViewModel.BuildAvailabilityForProvider(provider, model) +
+                (string.IsNullOrEmpty(rejection) ? string.Empty : " — " +
+                    BuffCardViewModel.PlayerReason(rejection)),
                 15, TextAnchor.MiddleLeft);
             LayoutElement labelLayout = label.gameObject.AddComponent<LayoutElement>();
             labelLayout.flexibleWidth = 1;
             ProviderPreferenceProfile preference = model.GetProviderPreference(provider.Key.Canonical);
-            string state = preference == null ? "AUTO" : preference.Banned ? "BANNED" : "PRIORITY";
+            string state = preference == null ? "Automatic priority" :
+                preference.Banned ? "Disabled" : "Preferred";
             Button stateButton = KingmakerUiFactory.CreateButton("ProviderState", row, _theme,
                 state, () => { model.CycleProviderPreference(provider.Key.Canonical); RefreshDetails(); });
             LayoutElement stateLayout = stateButton.gameObject.AddComponent<LayoutElement>();
@@ -986,9 +1044,10 @@ namespace KingmakerBuffPlanner.UI
             });
             plus.gameObject.AddComponent<LayoutElement>().preferredWidth = 38;
             Text cap = KingmakerUiFactory.CreateText("Cap", row, _theme,
-                "CAP " + (preference == null || preference.MaximumCasts == null
-                    ? "ANY" : preference.MaximumCasts.Value.ToString()), 14, TextAnchor.MiddleCenter);
-            cap.gameObject.AddComponent<LayoutElement>().preferredWidth = 60;
+                preference == null || preference.MaximumCasts == null
+                    ? "No limit" : "Maximum " + preference.MaximumCasts.Value + " casts",
+                14, TextAnchor.MiddleCenter);
+            cap.gameObject.AddComponent<LayoutElement>().preferredWidth = 130;
         }
 
         private RectTransform AddHorizontalRow(RectTransform parent, float height)
@@ -1026,24 +1085,6 @@ namespace KingmakerBuffPlanner.UI
             return LastCatalogDiagnostics;
         }
 
-        private void CycleConfigurationFilter()
-        {
-            if (!_filters.ConfiguredOnly && !_filters.RequestedOnly && !_filters.UnconfiguredOnly)
-                _filters.ConfiguredOnly = true;
-            else if (_filters.ConfiguredOnly)
-            {
-                _filters.ConfiguredOnly = false;
-                _filters.RequestedOnly = true;
-            }
-            else if (_filters.RequestedOnly)
-            {
-                _filters.RequestedOnly = false;
-                _filters.UnconfiguredOnly = true;
-            }
-            else _filters.UnconfiguredOnly = false;
-            RefreshCatalog();
-        }
-
         private List<SetupSourceRow> ApplyFilters(
             PlannerSetupModel model,
             out CatalogFilterDiagnostics diagnostics)
@@ -1066,21 +1107,28 @@ namespace KingmakerBuffPlanner.UI
 
         private void UpdateFilterLabels()
         {
-            if (_filterLabels == null || _filterLabels.Length != 6) return;
-            string configured = _filters.ConfiguredOnly ? "CONFIGURED" :
-                _filters.RequestedOnly ? "REQUESTED" :
-                _filters.UnconfiguredOnly ? "UNCONFIGURED" : "ALL";
-            string duration = _filters.DurationFilter == 1 ? "SHORT" :
-                _filters.DurationFilter == 2 ? "LONG" :
-                _filters.DurationFilter == 3 ? "UNKNOWN" : "ALL";
-            string source = _filters.SourceKindFilter < 0 ? "ALL" :
-                _filters.SourceKindFilter.ToString();
-            _filterLabels[0].text = "CONFIG: " + configured;
-            _filterLabels[1].text = "DURATION: " + duration;
-            _filterLabels[2].text = "SOURCE: " + source;
-            _filterLabels[3].text = "SORT: " + (_filters.SortByLevel ? "LEVEL" : "NAME");
-            _filterLabels[4].text = "HIDDEN: " + (_filters.ShowHidden ? "ON" : "OFF");
-            _filterLabels[5].text = "AVAIL: " + (_filters.ShowUnavailable ? "ALL" : "ONLY");
+            if (_configuredFilterLabel != null)
+                _configuredFilterLabel.text = (_filters.ConfiguredOnly ? "✓ " : string.Empty) +
+                    "Configured only";
+            if (_hiddenFilterLabel != null)
+                _hiddenFilterLabel.text = (_filters.ShowHidden ? "✓ " : string.Empty) +
+                    "Show hidden";
+            if (_advancedFilterLabels == null || _advancedFilterLabels.Length != 3) return;
+            _advancedFilterLabels[0].text = _filters.SourceCategoryFilter == 1 ? "Spells" :
+                _filters.SourceCategoryFilter == 2 ? "Abilities" : "All sources";
+            _advancedFilterLabels[1].text = _filters.DurationFilter == 1 ? "Long duration" :
+                _filters.DurationFilter == 2 ? "Short duration" : "Any duration";
+            _advancedFilterLabels[2].text = _filters.AvailabilityFilter == 1 ? "Available now" :
+                _filters.AvailabilityFilter == 2 ? "Unavailable" : "All availability";
+        }
+
+        private void UpdateAdvancedFiltersVisibility()
+        {
+            if (_advancedFilters != null)
+                _advancedFilters.gameObject.SetActive(_advancedFiltersExpanded);
+            if (_catalogScrollRoot != null)
+                KingmakerUiFactory.SetAnchors(_catalogScrollRoot, 0.02f, 0.02f, 0.98f,
+                    _advancedFiltersExpanded ? 0.70f : 0.77f);
         }
 
         private void AddCatalogAction(RectTransform parent, string label, Action action)

@@ -1,5 +1,13 @@
 # Autonomous Resume
 
+## Parchment/BubbleBuffs presentation checkpoint — 2026-08-12
+
+- Status: UI-only Phases A-D are implemented on `codex/ui-parchment-bubblebuffs`; committed Phase C HEAD is `7439e53`, and the Phase D filter/settings/Casting Source refinement is the current four-file worktree change awaiting its checkpoint commit.
+- Frozen mechanics remain green after every phase: source `30/30`, protocol/behavior `63/63`, runtime-harness filesystem `7/7`, deployment WhatIf `5/5`, source-only aggregate `1/1`, and package `4/4` where applicable. The latest Phase D development DLL SHA-256 is `079abcaeb2091bb1d7cf57b2583c01adc7940ea18d5d2df1782891649044e241`; package SHA-256 is `727191be376e75e92385b0cd43bb07deddef42d7acb6a979502fcba68c605c6f`.
+- Preserved MVP: source `e656812572adea8bc312419372b61ee8c4834e5a`, version `0.0.6`, package `ce7492b262f01a9afb5a7666fe7e4bda9be1821395eb00244f5898b6882208e9`, DLL `6144256c6a0623e908c3d9e821a1b87ee5800195759fbfabb1e587eaf9be1d9b`, MVID `bff11809-aa53-42c2-8ab7-ef3564450e61`.
+- Native UI inventory run `ui-polish-0.0.6-native-inventory-2` captured exact 2.1.7b theme candidates and then stopped behind the UMM startup overlay before planner phases. Its guarded transaction was explicitly restored and verified; no Kingmaker process, deployment lock, or unresolved transaction remains.
+- Exact next command: rerun the complete Phase D mechanical suite, commit `feat: simplify planner setup controls`, then add presentation-focused live diagnostics/screenshots and begin guarded native campaign qualification.
+
 ## Live row-rendering recovery complete — 2026-08-12
 
 - Status: COMPLETE and guarded-installed for human handoff. Qualified release source is `e656812572adea8bc312419372b61ee8c4834e5a`; package `ce7492b262f01a9afb5a7666fe7e4bda9be1821395eb00244f5898b6882208e9`; DLL `6144256c6a0623e908c3d9e821a1b87ee5800195759fbfabb1e587eaf9be1d9b`; MVID `bff11809-aa53-42c2-8ab7-ef3564450e61`.

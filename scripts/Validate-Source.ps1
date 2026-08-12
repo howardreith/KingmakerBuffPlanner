@@ -84,6 +84,9 @@ $assertions++
 $identityFiles = Get-ChildItem -LiteralPath (Join-Path $root 'src') -Recurse -File
 $foreignIdentity = @($identityFiles | Select-String -Pattern 'KingmakerGunslinger|TabletopAddedRules')
 if ($foreignIdentity.Count -ne 0) { throw 'Foreign product identity was found in production source.' }
+$wrathUi = @($identityFiles | Select-String -Pattern `
+    'ServiceWindowsPCView|SpellbookPCView|OwlcatButton|bubbly_overlay|bubble_overlay_full|BubbleBuffs')
+if ($wrathUi.Count -ne 0) { throw 'Wrath/BubbleBuffs UI types, paths, or assets entered production source.' }
 $assertions++
 
 $uiRootSource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\UI\BuffPlannerUiRoot.cs') -Raw
@@ -113,10 +116,21 @@ $assertions++
 $screenSource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\UI\BuffPlannerScreenView.cs') -Raw
 foreach ($requiredScreenContract in @('CanvasGroup', 'GraphicRaycaster', 'raycastTarget = true',
         'blocksRaycasts = true', 'interactable = true', 'BUFF PLANNER',
-        'rows bound', 'CanaryEvidence')) {
+        'CanaryEvidence', 'Configured only', 'Show hidden',
+        'Advanced Filters', 'CASTING SOURCE', 'Advanced Casting Source',
+        'SelectAllValid', 'ClearTargets', 'Casting mode: ')) {
     if (-not $screenSource.Contains($requiredScreenContract)) {
         throw "Full-screen raycast/visual contract is missing: $requiredScreenContract"
     }
+}
+foreach ($retiredPrimaryLabel in @('CONFIG: ', 'DURATION: ', 'SOURCE: ', 'SORT: ',
+        'HIDDEN: ', 'AVAIL: ', 'PROVIDERS AND RESOURCES', 'CAP ANY', '"MODE"')) {
+    if ($screenSource.Contains($retiredPrimaryLabel)) {
+        throw "Retired technical/duplicate UI label remains: $retiredPrimaryLabel"
+    }
+}
+if ([regex]::Matches($screenSource, [regex]::Escape('Casting mode: ')).Count -ne 1) {
+    throw 'Exactly one player-facing Casting mode control must remain.'
 }
 if ($screenSource.Contains('CreateDiagnosticRenderCanary') -or
     $screenSource.Contains('KBP RENDER CANARY')) {
