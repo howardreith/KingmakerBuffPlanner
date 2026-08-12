@@ -76,7 +76,7 @@ The source behaviors use realistic immutable provider/resource/effect fixtures a
 | Install/use/architecture/discovery/execution/qualification docs | PASS | `docs/` set and reports |
 | Release ZIP from clean HEAD | PASS | 0.0.3 deterministic 2/2; package `42f823d6...`; guarded installed |
 | Coherent local history | PASS | Dedicated feature branch and checkpoint commits |
-| Remote branch equals local | IN PROGRESS | Guarded push WhatIf 6/6; actual helper push pending final commit |
+| Feature branch publication | PASS at evidence checkpoint | Guarded helper verified local/remote `fc94060a861db6356a5bdb8d2520f377ec52b0c5`; no main merge or public release |
 
 ## Optional rows
 
