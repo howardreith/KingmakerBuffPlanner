@@ -118,11 +118,14 @@ public static class KbpPhysicalInput {
     keybd_event(key, 0, 0, UIntPtr.Zero);
   }
   public static void KeyUp(byte key) { keybd_event(key, 0, 2, UIntPtr.Zero); }
-  public static void Move(IntPtr window, int x, int y) {
+  public static void Move(IntPtr window, double x, double y, int unityWidth, int unityHeight) {
     if (window == IntPtr.Zero || !SetForegroundWindow(window)) throw new InvalidOperationException("Kingmaker foreground activation failed.");
     Rect rect;
     if (!GetClientRect(window, out rect)) throw new InvalidOperationException("Kingmaker client bounds lookup failed.");
-    Point point = new Point { X = x, Y = Math.Max(0, rect.Bottom - y) };
+    if (unityWidth <= 0 || unityHeight <= 0) throw new InvalidOperationException("Unity screen bounds are invalid.");
+    int scaledX = (int)Math.Round(x * rect.Right / unityWidth);
+    int scaledY = (int)Math.Round(y * rect.Bottom / unityHeight);
+    Point point = new Point { X = scaledX, Y = Math.Max(0, rect.Bottom - scaledY) };
     if (!ClientToScreen(window, ref point) || !SetCursorPos(point.X, point.Y)) throw new InvalidOperationException("Kingmaker cursor movement failed.");
   }
   public static void Click() {
@@ -181,8 +184,8 @@ public static class KbpPhysicalInput {
                     [KbpPhysicalInput]::KeyUp([byte]0x1B)
                 } else {
                     [KbpPhysicalInput]::Move($process.MainWindowHandle,
-                        [int][Math]::Round([double]$physical.x),
-                        [int][Math]::Round([double]$physical.y))
+                        [double]$physical.x, [double]$physical.y,
+                        [int]$physical.unityScreenWidth, [int]$physical.unityScreenHeight)
                     Start-Sleep -Milliseconds 250
                     if ([string]$physical.action -eq 'click') {
                         [KbpPhysicalInput]::Click()

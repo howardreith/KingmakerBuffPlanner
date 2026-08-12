@@ -945,7 +945,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 JsonConvert.ToString(_request.RunId) + ",\"actionId\":" +
                 JsonConvert.ToString(id) + ",\"action\":" + JsonConvert.ToString(kind) +
                 ",\"x\":" + position.x.ToString("R", CultureInfo.InvariantCulture) +
-                ",\"y\":" + position.y.ToString("R", CultureInfo.InvariantCulture) + "}";
+                ",\"y\":" + position.y.ToString("R", CultureInfo.InvariantCulture) +
+                ",\"unityScreenWidth\":" + Screen.width +
+                ",\"unityScreenHeight\":" + Screen.height + "}";
             AtomicFile.WriteUtf8(path, json + Environment.NewLine);
             _log.Info("[KBP-INPUT] physical action requested;id=" + id + ";action=" +
                 kind + ";x=" + position.x.ToString("F1") + ";y=" +
