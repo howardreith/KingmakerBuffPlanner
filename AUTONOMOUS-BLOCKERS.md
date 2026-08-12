@@ -51,3 +51,6 @@ Evidence: transfer inventory and local examples contain no Tabletop Added Rules 
 Current classification: PASS for current-session NO-SAVE preflight; revalidation required immediately before every launch.
 
 Evidence: the current Steam session briefly attempted an App 640820 cloud download at startup, then logged off. Later App 640820 records establish `Sync Disabled` and `offlineMode=true`, after the last successful transfer; the app manifest remains fully installed at build ID 6757524. The harness derives sanitized timestamps and policy state from current-session logs and refuses launch if a later login or transfer supersedes them. It also refuses while the UMM installer or Kingmaker is running. No dialog or account state was manipulated.
+# Parchment UI polish blockers — 2026-08-12
+
+No critical blocker exists at intake. The exact Kingmaker 2.1.7b native theme inventory is an actionable diagnostic prerequisite, not a blocker. The stale `Test-InstallWhatIf.ps1` prior-version argument is recorded evidence and does not indicate an unresolved live transaction or invalid installation.

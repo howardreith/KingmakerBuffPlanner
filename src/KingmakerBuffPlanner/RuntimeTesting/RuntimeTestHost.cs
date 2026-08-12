@@ -43,6 +43,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private string _liveRenderScreenshotPath;
         private string _liveRenderScreenshotSha256 = string.Empty;
         private LiveRowRenderDiagnostics _liveRenderDiagnostics;
+        private NativeUiContract _nativeUiContract;
 
         private RuntimeTestHost(
             RuntimeTestRequest request,
@@ -143,8 +144,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 HarmonyPatchInventory harmonyInventory = null;
                 string harmonyInventoryHash = null;
                 UiRootDiagnostics ui = null;
-                NativeUiContract nativeUiContract = null;
-                string nativeUiContractHash = null;
+                NativeUiContract nativeUiContract = _nativeUiContract;
+                string nativeUiContractPath = Path.Combine(
+                    _request.EvidenceDirectory, "native-ui-contract.json");
+                string nativeUiContractHash = nativeUiContract != null && File.Exists(nativeUiContractPath)
+                    ? Hashing.Sha256(nativeUiContractPath) : null;
                 if (dllMatches && RuntimeTestProtocol.IsCatalogScenario(_request.Scenario))
                 {
                     string modsPath = Path.GetDirectoryName(_modEntry.Path.TrimEnd(
@@ -180,8 +184,6 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 if (dllMatches && RuntimeTestProtocol.IsNativeUiProbeScenario(_request.Scenario))
                 {
                     nativeUiContract = NativeUiContractProbe.Capture();
-                    string nativeUiContractPath = Path.Combine(
-                        _request.EvidenceDirectory, "native-ui-contract.json");
                     AtomicFile.WriteUtf8(nativeUiContractPath, Serialize(nativeUiContract));
                     nativeUiContractHash = Hashing.Sha256(nativeUiContractPath);
                 }
@@ -834,6 +836,16 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 if (StaticCanvas.Instance == null ||
                     UnityEngine.EventSystems.EventSystem.current == null ||
                     !BuffPlannerUiRoot.IsHudInstalled) return false;
+                if (_nativeUiContract == null)
+                {
+                    _nativeUiContract = NativeUiContractProbe.Capture();
+                    AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory,
+                        "native-ui-contract.json"), Serialize(_nativeUiContract));
+                    _log.Info("[KBP-UI-THEME] captured exact native campaign visual contract;" +
+                        "visuals=" + _nativeUiContract.Visuals.Count + ";fonts=" +
+                        _nativeUiContract.Fonts.Count + ";portraits=" +
+                        _nativeUiContract.Portraits.Count + ".");
+                }
                 BuffPlannerUiRoot.CaptureRuntimeBaseline();
                 if (!_liveF10MarkerWritten)
                 {

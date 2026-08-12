@@ -534,3 +534,12 @@ Status: ROOT CAUSE PROVEN; 0.0.4 SOURCE PASS; LIVE QUALIFICATION PENDING
 - Gates: validation 23/23; behavior/protocol 59/59; filesystem harness 6/6; package 4/4; deployment WhatIf 5/5; warning-free exact-reference build 1/1.
 - Rejected: moving icons, changing opacity, stale-DLL theory, absent UMM callback theory, and treating another detached UI build as qualification.
 - Exact next action: commit this source checkpoint, rebuild from clean HEAD, then execute `bootstrap-0.0.4-native-live-1` in a fresh process.
+# UI parchment/BubbleBuffs polish intake — 2026-08-12
+
+- Created `codex/ui-parchment-bubblebuffs` from exact MVP checkpoint `21c4dd702868e5cfc89963ba50bb64420f18915d`; qualified 0.0.6 release source remains `e656812572adea8bc312419372b61ee8c4834e5a`.
+- Preserved package `ce7492b...`, DLL `6144256c...`, MVID `bff11809-aa53-42c2-8ab7-ef3564450e61`, release manifest, and draft notes under `artifacts/release-candidate-backups/mvp-0.0.6-21c4dd702868e5cfc89963ba50bb64420f18915d/`.
+- Preflight found no Kingmaker process, runtime lock, or unresolved transaction. Installed 0.0.6 Info and DLL match the qualified package exactly.
+- Unchanged baseline: source 30/30, behavior 62/62, runtime filesystem 7/7, deployment WhatIf 5/5, source-only 1/1, package 4/4. Installer WhatIf passes when given actual prior version 0.0.6; its wrapper's stale hardcoded 0.0.2 produces the recorded preflight-only failure and no mutation.
+- Human screenshots and BubbleBuffs commit `f4871f763a23251284422ef0945a85e9f3fb788e` were studied. Findings and explicit non-copy boundary are in `planning/PARCHMENT-BUBBLEBUFFS-UI-FORENSICS.md`.
+- Frozen contracts: discovery/classification, identities/schema, resource/planning/execution/effect semantics, HUD input behavior, modal lease, and guarded runtime transactions.
+- Exact next action: extend the diagnostic-only native UI contract probe, build a clean diagnostic package, and run the guarded disposable campaign to inventory exact 2.1.7b theme candidates before Phase A presentation edits.

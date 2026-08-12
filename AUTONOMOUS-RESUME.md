@@ -165,3 +165,12 @@ Status: INSTALLED FOR HUMAN UI RETEST — campaign UI and save-backed qualificat
 - Install evidence: `C:\Dev\KingmakerBuffPlannerLab\runtime-evidence\install-ui-repair-0.0.2-local-install\install-result.json`.
 - Exact-release runtime: native `ui-repair-0.0.2-release-native-1/2` 12/12; Call of the Wild `ui-repair-0.0.2-release-cotw-1/2` 26/26; UI boundary `ui-repair-0.0.2-release-ui-boundary` structured `BLOCKED` because no campaign fixture; all restored exactly.
 - Exact next command: commit these final evidence records, rerun guarded push, then hand off the installed build for authoritative human playtesting.
+# Parchment UI polish intake checkpoint — 2026-08-12
+
+- Branch/HEAD: `codex/ui-parchment-bubblebuffs` / `21c4dd702868e5cfc89963ba50bb64420f18915d`; source version 0.0.6; presentation source is not yet changed.
+- Qualified MVP: release source `e656812572adea8bc312419372b61ee8c4834e5a`; package `ce7492b262f01a9afb5a7666fe7e4bda9be1821395eb00244f5898b6882208e9`; DLL `6144256c6a0623e908c3d9e821a1b87ee5800195759fbfabb1e587eaf9be1d9b`; MVID `bff11809-aa53-42c2-8ab7-ef3564450e61`. Backup is under `artifacts/release-candidate-backups/mvp-0.0.6-21c4dd702868e5cfc89963ba50bb64420f18915d/`.
+- Intake gates: source 30/30, behavior 62/62, runtime filesystem 7/7, deployment WhatIf 5/5, package 4/4; actual-version installer WhatIf passed without mutation. The wrapper's stale expected prior version 0.0.2 is the only baseline command failure.
+- External state: installed 0.0.6 DLL is exact; Kingmaker is closed; no deployment lock or unresolved transaction exists; no live file was changed.
+- Forensics: `planning/PARCHMENT-BUBBLEBUFFS-UI-FORENSICS.md` records human screenshots, BubbleBuffs commit/source/provenance, adapted concepts, prohibited assets/code, and the pending exact Kingmaker inventory.
+- Frozen MVP behaviors and guarded runtime boundaries remain authoritative.
+- Exact next command: implement and test a diagnostic-only expansion of `NativeUiContractProbe`, then clean-build/package and run one guarded `live-ui-bootstrap` inventory capture against `KBP_AUTOMATION_WORKING` before changing the presentation.
