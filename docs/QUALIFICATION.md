@@ -24,6 +24,9 @@ Final local-only release/install evidence:
 - deterministic build repetition 2/2 and package validation 4/4;
 - installer WhatIf 5/5;
 - guarded local install `ui-repair-0.0.2-local-install`: `Installed`, settings preserved, all non-planner mods byte-identical, exact DLL verified, lock absent.
+- exact installed-release native runs `ui-repair-0.0.2-release-native-1/2`: 12/12 each, exact restoration;
+- exact installed-release Call of the Wild runs `ui-repair-0.0.2-release-cotw-1/2`: 26/26 each, exact restoration;
+- exact installed-release UI boundary `ui-repair-0.0.2-release-ui-boundary`: structured `BLOCKED` at `campaign-ui-unavailable`, five identity/precondition assertions, exact restoration.
 
 Current source-only Phase 1 evidence (pre-checkpoint build from HEAD `4ca6008d873577e8e6263b54658620b649f81cd1`):
 
