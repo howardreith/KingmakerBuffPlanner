@@ -411,6 +411,31 @@ namespace KingmakerBuffPlanner.UI
             };
         }
 
+        internal string PhysicalHoverSnapshotForRuntime(string routineId)
+        {
+            Vector2 expected = ButtonCenterForRuntime(routineId);
+            Vector2 actual = Input.mousePosition;
+            int index = routineId == "setup" ? 0 : routineId == "long" ? 1 :
+                routineId == "important" ? 2 : routineId == "short" ? 3 : -1;
+            RectTransform region = index < 0 || index >= _buttons.Length ||
+                _buttons[index] == null ? null : (RectTransform)_buttons[index].transform;
+            bool contains = region != null && RectTransformUtility.RectangleContainsScreenPoint(
+                region, actual, ResolveEventCamera(region));
+            string top = "none";
+            if (EventSystem.current != null)
+            {
+                var data = new PointerEventData(EventSystem.current) { position = actual };
+                var hits = new List<RaycastResult>();
+                EventSystem.current.RaycastAll(data, hits);
+                if (hits.Count != 0 && hits[0].gameObject != null)
+                    top = GetPath(hits[0].gameObject.transform);
+            }
+            return "expected=" + expected + ";actual=" + actual + ";contains=" + contains +
+                ";plannerContains=" + PlannerPointerOwnership.Contains(actual) +
+                ";top=" + top + ";tooltip=" +
+                (_tooltipRoot != null && _tooltipRoot.gameObject.activeInHierarchy);
+        }
+
         private Text CreateHudMessage(
             string name,
             PlannerUiTheme theme,

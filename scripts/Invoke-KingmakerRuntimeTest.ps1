@@ -109,6 +109,8 @@ public static class KbpPhysicalInput {
   [DllImport("user32.dll")] static extern void mouse_event(uint flags, uint dx, uint dy, uint data, UIntPtr extra);
   [DllImport("user32.dll")] static extern bool ClientToScreen(IntPtr hWnd, ref Point point);
   [DllImport("user32.dll")] static extern bool GetClientRect(IntPtr hWnd, out Rect rect);
+  [DllImport("user32.dll")] static extern bool GetCursorPos(out Point point);
+  [DllImport("user32.dll")] static extern bool ScreenToClient(IntPtr hWnd, ref Point point);
   [StructLayout(LayoutKind.Sequential)] public struct Point { public int X; public int Y; }
   [StructLayout(LayoutKind.Sequential)] public struct Rect { public int Left; public int Top; public int Right; public int Bottom; }
   public static void KeyDown(IntPtr window, byte key) {
@@ -126,6 +128,11 @@ public static class KbpPhysicalInput {
   public static void Click() {
     mouse_event(0x0002, 0, 0, 0, UIntPtr.Zero);
     mouse_event(0x0004, 0, 0, 0, UIntPtr.Zero);
+  }
+  public static string ClientCursor(IntPtr window) {
+    Point point;
+    if (!GetCursorPos(out point) || !ScreenToClient(window, ref point)) return "unavailable";
+    return point.X.ToString() + "," + point.Y.ToString();
   }
 }
 '@
@@ -187,6 +194,7 @@ public static class KbpPhysicalInput {
                     schemaVersion = 1; runId = $runId; actionId = [string]$physical.actionId
                     action = [string]$physical.action; sentAtUtc = [DateTime]::UtcNow.ToString('o')
                     processId = $process.Id
+                    windowsClientCursor = [KbpPhysicalInput]::ClientCursor($process.MainWindowHandle)
                 })
                 $orchestration.stage = "physical-$($physical.actionId)-sent"
                 Write-KbpJsonAtomic (Join-Path $evidence 'orchestration.json') $orchestration

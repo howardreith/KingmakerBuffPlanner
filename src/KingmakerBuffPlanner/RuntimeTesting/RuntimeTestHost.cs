@@ -810,6 +810,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 if (tooltip == null || !tooltip.Active)
                 {
                     _liveTooltipStableFrames = 0;
+                    if ((_uiSmokeUpdates % 120) == 0)
+                        _log.Info("[KBP-INPUT] physical hover waiting;" +
+                            BuffPlannerUiRoot.PhysicalHoverSnapshotForRuntime("long") + ".");
                     return false;
                 }
                 if (!tooltip.InsideScreen || tooltip.ListenerCount != 4 ||

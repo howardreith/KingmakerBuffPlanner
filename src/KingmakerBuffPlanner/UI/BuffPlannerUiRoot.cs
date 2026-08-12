@@ -248,6 +248,12 @@ namespace KingmakerBuffPlanner.UI
                 _instance._hud.GetTooltipDiagnostics();
         }
 
+        internal static string PhysicalHoverSnapshotForRuntime(string routineId)
+        {
+            return _instance == null || _instance._hud == null ? "hud=missing" :
+                _instance._hud.PhysicalHoverSnapshotForRuntime(routineId);
+        }
+
         internal static QuickFlowDiagnostics QuickFlowForRuntime(string routineId)
         {
             return _instance == null ? null : _instance._diagnostics.GetFlow(routineId);
