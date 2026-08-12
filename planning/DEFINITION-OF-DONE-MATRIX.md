@@ -1,6 +1,6 @@
 # Definition of Done Matrix
 
-R2 correction notice: direct human testing invalidated both 0.0.2 UI rows. Their current status is `IN PROGRESS`: fresh retained-mode HUD and transactional modal/confirmed-execution source behavior are implemented in 0.0.3, while guarded campaign/human acceptance and final installation remain pending. Historical 0.0.2 PASS/implemented text below is superseded where it conflicts.
+R2 correction notice: direct human testing invalidated both 0.0.2 UI rows. Fresh retained-mode HUD, transactional modal, and confirmed-execution behavior are implemented and guarded-installed in 0.0.3. The campaign gate is honestly `BLOCKED` without an authorized `KBP_` campaign, so direct human HUD/modal/input/Bless acceptance remains pending. Historical 0.0.2 PASS/implemented text below is superseded where it conflicts.
 
 Status: IN PROGRESS — human playtesting invalidated the 0.0.1 UI gate; full-screen UI/input repair is active; save-backed core rows remain `DEFER — EVIDENCED`
 
@@ -50,8 +50,8 @@ The source behaviors use realistic immutable provider/resource/effect fixtures a
 | Atomic write, bounded valid backups, malformed recovery, migration | PASS | Behavior suite |
 | Party reorder pure proof | PASS | Stable-ID model/profile behavior |
 | Save/reload and live party reorder proof | DEFER — EVIDENCED | No authorized `KBP_` save |
-| Complete setup, target matrix, provider controls, search/filter/sort, routines, preview/results | IMPLEMENTED — HUMAN PASS PENDING | 0.0.2 full-screen uGUI service view; human verdict required after guarded install |
-| Three HUD executions; resolution/scale; no stale subscriptions | IMPLEMENTED — CAMPAIGN/HUMAN PASS PENDING | Native-anchored icons, scoped input lease, corrected structured gate; no authorized campaign fixture |
+| Complete setup, target matrix, provider controls, search/filter/sort, routines, preview/results | IMPLEMENTED — HUMAN PASS PENDING | 0.0.3 retained-mode full-screen uGUI service view is installed; human verdict required |
+| Three HUD executions; resolution/scale; no stale subscriptions | IMPLEMENTED — CAMPAIGN/HUMAN PASS PENDING | Fresh buttons/top-hit proof, transactional input lease, corrected structured gate; no authorized campaign fixture |
 
 ## Execution
 
@@ -69,12 +69,12 @@ The source behaviors use realistic immutable provider/resource/effect fixtures a
 |---|---|---|
 | Request/result runner and transactional profile staging | PASS | Protocol 52/52; transaction 6/6 |
 | Exact restore and protected-save policy | PASS for every executed run | All transactions restored; no protected save accessed |
-| Mandatory no-save scenarios | PASS except campaign UI | 0.0.2 native 12/12 twice; Call of the Wild 26/26 twice; corrected UI gate blocks at main menu |
+| Mandatory no-save scenarios | PASS except campaign UI | 0.0.3 native 12/12 twice; Call of the Wild 26/26 twice; corrected UI gate blocks at main menu |
 | Mandatory save-backed scenarios | DEFER — EVIDENCED | Scenario execution cannot be safely bound without baseline/working fixture |
 | Applicable core suite twice in fresh processes | PASS | `phase12-no-save-core-1/2`, 22/22 each |
 | Clean source/deterministic build/package | PASS at checkpoint | 15/15; 52/52; two identical builds; package 4/4 |
 | Install/use/architecture/discovery/execution/qualification docs | PASS | `docs/` set and reports |
-| Release ZIP from clean HEAD | PASS | 0.0.2 deterministic 2/2; package `1f328e26...`; guarded installed |
+| Release ZIP from clean HEAD | PASS | 0.0.3 deterministic 2/2; package `42f823d6...`; guarded installed |
 | Coherent local history | PASS | Dedicated feature branch and checkpoint commits |
 | Remote branch equals local | IN PROGRESS | Guarded push WhatIf 6/6; actual helper push pending final commit |
 

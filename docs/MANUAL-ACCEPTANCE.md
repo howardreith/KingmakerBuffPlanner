@@ -1,6 +1,8 @@
 # Manual Acceptance
 
-Status: REQUIRED FOR 0.0.3 R2 VERDICT; the installed 0.0.2 verdict is FAIL.
+Status: 0.0.3 IS INSTALLED; REQUIRED FOR R2 VERDICT. The installed 0.0.2 verdict is FAIL.
+
+Installed identity: DLL SHA-256 `5d95368ee237e658e06b4948209f805568a417ea150eb36c3023df9b155f0950`, MVID `f3f691a4-d691-4112-90a4-7beb9f06aad2`. The preserved profile contains Long → Bless and one target; no provider preference was stored, so the result must identify the provider selected from the live party.
 
 With validated 0.0.3 installed, load the same campaign and verify:
 

@@ -10,7 +10,7 @@
 
 1. Exit Kingmaker.
 2. Extract the release ZIP into Kingmaker's `Mods` directory. The resulting path must be `Mods\KingmakerBuffPlanner\Info.json`.
-3. Start Kingmaker through Steam in the normal way and confirm Unity Mod Manager lists `KingmakerBuffPlanner` version 0.0.2 once.
+3. Start Kingmaker through Steam in the normal way and confirm Unity Mod Manager lists `KingmakerBuffPlanner` version 0.0.3 once.
 4. Load a campaign. Use the lower-left setup icon; F10 is the fallback open/close shortcut.
 
 Do not copy game DLLs, Harmony, Unity Mod Manager, Call of the Wild, or another mod into the Kingmaker Buff Planner folder.
@@ -23,7 +23,7 @@ Profiles are external JSON under `Mods\KingmakerBuffPlanner\UserSettings`. They 
 
 ## Execute
 
-Use the adjacent Long, Important, or Short HUD icon after configuration. Every quick action displays a result or an exact unavailable reason. Animated mode queues native Kingmaker cast commands. Instant mode uses native cast rules and native spend semantics in bounded batches; sticky-touch sources use animated fallback when enabled or fail before firing when fallback is disabled. The result panel reports cast, failed, skipped, resource, component, and effect outcomes.
+Use the adjacent Long, Important, or Short HUD icon after configuration. Every quick action displays a result or an exact unavailable reason. Animated mode queues native Kingmaker cast commands. Instant mode uses native cast rules and native spend semantics in bounded batches; sticky-touch sources use animated fallback when enabled or fail before submission when fallback is disabled. Queued or submitted is not success: the result panel reports success only after expected effects are confirmed on intended targets, alongside command, resource, component, and exact failure outcomes.
 
 The default combat policy is conservative. Review preview diagnostics and save normally before using any gameplay mod.
 

@@ -1,5 +1,20 @@
 # Qualification
 
+## 0.0.3 HUD/modal/execution R2 correction
+
+Status: installed for authoritative human campaign retest; no automated campaign UI or Bless success is claimed.
+
+- release source commit `d5a20aa7ddbb2ec7d131a4bed44f1ca65ecaaa65`;
+- package/DLL/MVID: `42f823d6b8454ffe4497f4f652752a07d50738d5990c5a5243d091ba92d363e0` / `5d95368ee237e658e06b4948209f805568a417ea150eb36c3023df9b155f0950` / `f3f691a4-d691-4112-90a4-7beb9f06aad2`;
+- deterministic build 2/2, source validation 21/21, behavior/protocol 57/57, runtime-harness filesystem 6/6, package 4/4, deployment WhatIf 5/5, installer WhatIf 5/5;
+- native exact-release runs `r2-0.0.3-release-native-1/2`: 12/12 each, identical catalog/Harmony hashes, exact restoration;
+- Call of the Wild exact-release runs `r2-0.0.3-release-cotw-1/2`: 26/26 each, identical catalog/Harmony hashes, exact restoration;
+- campaign gate `r2-0.0.3-release-ui-boundary`: exact identity 4/4, then structured `BLOCKED` at `campaign-ui-unavailable`; exact restoration, no save accessed;
+- guarded install `r2-0.0.3-local-install`: `Installed`, installed DLL/MVID exact, `settingsPreserved=true`, `otherModsVerified=true`, lock absent;
+- installed profile SHA-256 remained `3723e3181c56bff6427a15b2ba85ffd76fd40e98f3f482253b15910f038d6b48` and retains Long → Bless/target with no migration.
+
+The blocked campaign gate intentionally does not assert retained-button hit ownership, modal visibility, world-input isolation, Long resolution, or Bless application from a main-menu object graph. Those 11 acceptance rows remain pending the human checklist.
+
 Status: PASS for all applicable no-save gates; save-backed core remains `DEFER — EVIDENCED`
 
 ## 0.0.2 full-screen UI/input repair

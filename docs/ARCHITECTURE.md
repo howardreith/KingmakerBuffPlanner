@@ -1,6 +1,6 @@
 # Architecture
 
-Status: IN PROGRESS
+Status: R2 implementation installed; authoritative campaign UI and save-backed acceptance pending
 
 Kingmaker Buff Planner is one standalone Unity Mod Manager mod. The assembly, namespace, UMM ID, persistence, package, runtime runner, and compatibility profiles are all owned by this repository.
 

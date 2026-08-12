@@ -1,5 +1,18 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-08-12 — R2 correction qualification and guarded installation
+
+Status: 0.0.3 INSTALLED FOR AUTHORITATIVE HUMAN RETEST; campaign/save-backed mechanics remain blocked by the protected-save boundary.
+
+- Implementation checkpoints: `79e13b5a1e75485ff1df27d55fdd278b47dd1f8d` (retained HUD, transactional modal, confirmed execution), `31c86b6417a5ab15d7bc0031c05e4a402f2a16ef` (invalidated acceptance records), and release-source commit `d5a20aa7ddbb2ec7d131a4bed44f1ca65ecaaa65` (0.0.2 replacement preflight).
+- Exact 0.0.3 release: package SHA-256 `42f823d6b8454ffe4497f4f652752a07d50738d5990c5a5243d091ba92d363e0`, DLL SHA-256 `5d95368ee237e658e06b4948209f805568a417ea150eb36c3023df9b155f0950`, MVID `f3f691a4-d691-4112-90a4-7beb9f06aad2`; deterministic builds 2/2 and package validation 4/4.
+- Source gates: source validation 21/21, behavior/protocol 57/57, runtime-harness filesystem 6/6, deployment WhatIf 5/5, installer WhatIf 5/5, warning-free exact-reference Release build, and `git diff --check` PASS.
+- Exact-release native runs `r2-0.0.3-release-native-1/2` passed 12/12 each with identical catalog `50d091a3f17499885b483723ca69acb357e8ae153b301ccb672aa1425e5d4f2d` and Harmony `b5605e22bde458a238d63c6ffe33a99eb712bd22bf3cbc74c42d443ad479efb4` hashes. Exact Call of the Wild runs `r2-0.0.3-release-cotw-1/2` passed 26/26 each with identical catalog `cdc8d34c8f90f746f18dc278dcadf1580ed3d66700b71d54258ab26a6d80d3e2` and Harmony `a883dd60218a1f9e989a4e6b03d99318242d401d33f914cd6c068f767b308427` hashes. Every transaction restored exactly.
+- Campaign-only UI run `r2-0.0.3-release-ui-boundary` loaded the exact 0.0.3 identity and returned structured `BLOCKED` at `campaign-ui-unavailable` (4/5 precondition assertions), then restored exactly. It did not certify HUD geometry, modal visibility, click ownership, Long, or Bless from the main menu.
+- Guarded install `r2-0.0.3-local-install` replaced only validated 0.0.2 with 0.0.3. Installed Info/assembly versions are `0.0.3`/`0.0.3.0`; installed DLL/MVID match the release; `otherModsVerified=true`, `settingsPreserved=true`, lock absent, game/UMM closed. Evidence: `C:\Dev\KingmakerBuffPlannerLab\runtime-evidence\install-r2-0.0.3-local-install\install-result.json`.
+- The external profile remained byte-identical at SHA-256 `3723e3181c56bff6427a15b2ba85ffd76fd40e98f3f482253b15910f038d6b48`. It still contains Long → Bless (`90e59f4a4ada87243b7b3535a06d0638`) targeting `8d7086b2-a4d5-43d5-aed6-51c789971b53`; no schema migration, discard, or remap occurred. No provider was persisted by 0.0.2, so the prior provider cannot be reconstructed; 0.0.3 reports the live resolved provider, resource lifecycle, expected `BlessBuff` `87b8c6270ea85c743afc734dfe99afee`, targets, and confirmed/failure outcome on retest.
+- Exact next action: guarded-push the final documentation checkpoint, then hand off the installed 0.0.3 build for the mission's mandatory 11-point human campaign retest. Do not claim R2 UI or Bless PASS until that verdict exists.
+
 ## 2026-08-12 — R2 human rejection, exact intake, and confirmed causes
 
 Status: 0.0.2 HUD/modal/execution acceptance INVALIDATED; R2 correction IN PROGRESS

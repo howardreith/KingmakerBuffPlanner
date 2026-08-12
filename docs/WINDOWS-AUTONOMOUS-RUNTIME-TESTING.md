@@ -28,6 +28,6 @@ Unexpected dialogs, account state, cloud conflict, updates, credentials, purchas
 
 The Steam preflight requires exactly one already-running client at the exact expected path, a current-session logoff occurring no earlier than the last login, an App 640820 `Sync Disabled`/`offlineMode=true` record after the last successful transfer, and the exact fully-installed app manifest/build. Raw account IDs, tokens, and log lines are not copied into evidence. The state is re-evaluated before every launch.
 
-`final-no-save-core` composes the identity, full structural catalog, Harmony owner/order inventory, and UI lifecycle/layout gates in one fresh process. It remains a NO-SAVE scenario and does not substitute for the save-backed resource/execution scenarios. A caller may supply a unique safe `-RunId`; evidence and transaction IDs are immutable and reuse is rejected.
+`final-no-save-core` composes exact identity, the full structural catalog, and Harmony owner/order inventory in one fresh process. Campaign UI/input qualification is intentionally separate in `ui-root-smoke`, which requires a real campaign `StaticCanvas` and returns `BLOCKED` at the main menu. Neither NO-SAVE scenario substitutes for save-backed resource/execution proof. A caller may supply a unique safe `-RunId`; evidence and transaction IDs are immutable and reuse is rejected.
 
 Statuses are `PASS`, `FAIL`, or `BLOCKED`, with assertion IDs and exact package/DLL/MVID/commit/platform identities. Compilation or main-menu load is never substituted for a gameplay assertion.

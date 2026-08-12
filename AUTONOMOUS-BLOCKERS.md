@@ -1,12 +1,18 @@
 # Autonomous Blockers
 
+## Current R2 handoff
+
+Current classification: INSTALLED — 0.0.2 human verdict FAIL; authoritative 0.0.3 human verdict pending.
+
+Evidence: 0.0.3 replaces cloned native HUD objects with fresh retained-mode controls, makes modal opening presentation-first, and counts only confirmed expected effects as successful execution. It passes 21/21 source and 57/57 behavior gates plus two native 12/12 and two Call of the Wild 26/26 exact-release runs. The guarded install preserved settings and changed no non-planner mod. The campaign-only UI gate correctly returned `BLOCKED` because no authorized `KBP_` campaign exists; direct HUD/modal/input/Bless acceptance therefore remains the mandatory human boundary.
+
 Status: IN PROGRESS
 
 ## R2 human rejection
 
-Current classification: IN PROGRESS — 0.0.2 human verdict FAIL; 0.0.3 correction qualification pending.
+Historical classification before installation: 0.0.2 human verdict FAIL; 0.0.3 qualification was pending.
 
-Evidence: direct human playtesting proves cloned HUD controls overlap and activate native turn-based/pause controls, and proves F10 can acquire full-screen input suppression without a rendered planner. 0.0.3 replaces both structures and strengthens the gate, but campaign/human qualification and guarded replacement installation are not yet complete. The older 0.0.2 classification below is historical and superseded.
+Evidence: direct human playtesting proved cloned HUD controls overlap and activate native turn-based/pause controls, and proved F10 could acquire full-screen input suppression without a rendered planner. The current handoff section above supersedes this pre-install checkpoint.
 
 ## Full-screen UI and input isolation
 

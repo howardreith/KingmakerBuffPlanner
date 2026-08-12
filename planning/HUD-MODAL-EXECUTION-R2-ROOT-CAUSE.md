@@ -1,5 +1,7 @@
 # HUD, Modal, and Execution R2 Root Cause
 
+Current handoff: validated 0.0.3 is installed for authoritative human retest. The status line below records the earlier implementation checkpoint.
+
 Status: CONFIRMED — 0.0.2 human acceptance invalidated; 0.0.3 correction implemented and awaiting guarded runtime/package qualification
 
 ## Exact rejected installation

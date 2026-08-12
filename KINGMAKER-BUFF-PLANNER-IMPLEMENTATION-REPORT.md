@@ -2,9 +2,9 @@
 
 ## 0.0.3 R2 correction
 
-The installed 0.0.2 UI verdict is FAIL by direct human playtesting. Version 0.0.3 replaces cloned native HUD hierarchies with fresh bounded retained-mode buttons, makes visible presentation validation precede the full-screen input lease, and requires expected-effect confirmation for execution success. The installed schema-2 profile was audited read-only and preserves one Long Bless assignment and its target; no migration ran or discarded data. Applicable runtime/package/install gates and the next authoritative human verdict remain pending.
+The installed 0.0.2 UI verdict is FAIL by direct human playtesting. Version 0.0.3 replaces cloned native HUD hierarchies with fresh bounded retained-mode buttons, makes visible presentation validation precede the full-screen input lease, and requires expected-effect confirmation for execution success. The installed schema-2 profile was audited read-only and preserves one Long Bless assignment and its target; no migration ran or discarded data. Source 21/21, behavior 57/57, two native 12/12, and two Call of the Wild 26/26 gates passed. Exact 0.0.3 is guarded-installed with settings preserved and non-planner mods unchanged; the campaign-only gate is correctly blocked without an authorized fixture, so the next authoritative human verdict remains pending.
 
-Status: IN PROGRESS — 0.0.2 UI repair implemented; human/campaign UI acceptance and save-backed core remain open
+Status: 0.0.3 INSTALLED FOR HUMAN R2 RETEST; campaign UI and save-backed core remain open
 
 Version 0.0.2 is a standalone .NET Framework 4.7 / C# 7.3 Unity Mod Manager mod for exact Kingmaker 2.1.7b. It replaces the rejected 0.0.1 IMGUI text strip with native-anchored icon controls and an opaque full-screen planner using Kingmaker's full-screen mode plus a scoped input lease and raycast/pointer isolation.
 
