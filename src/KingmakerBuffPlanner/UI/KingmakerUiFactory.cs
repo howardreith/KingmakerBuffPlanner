@@ -45,6 +45,7 @@ namespace KingmakerBuffPlanner.UI
         internal Color ParchmentRaised = new Color(0.96f, 0.89f, 0.72f, 1f);
         internal Color DarkBrownText = new Color(0.235f, 0.22f, 0.188f, 1f);
         internal Color MutedBrownText = new Color(0.541f, 0.392f, 0.271f, 1f);
+        internal Color ButtonText = new Color(0.965f, 0.894f, 0.710f, 1f);
         internal Color BurgundyPrimary = new Color(0.493f, 0.168f, 0.098f, 1f);
         internal Color GoldAccent = new Color(0.588f, 0.243f, 0.106f, 1f);
         internal Color GreenSuccess = new Color(0.329f, 0.569f, 0.357f, 1f);
@@ -123,6 +124,20 @@ namespace KingmakerBuffPlanner.UI
             return image;
         }
 
+        internal static Image AddFramedPanel(
+            RectTransform rect,
+            Color color,
+            Color border,
+            float thickness = 1f)
+        {
+            Image image = AddPanel(rect, color);
+            Outline outline = rect.gameObject.AddComponent<Outline>();
+            outline.effectColor = border;
+            outline.effectDistance = new Vector2(thickness, -thickness);
+            outline.useGraphicAlpha = true;
+            return image;
+        }
+
         internal static Text CreateText(
             string name,
             Transform parent,
@@ -170,6 +185,8 @@ namespace KingmakerBuffPlanner.UI
             }
             if (action != null) button.onClick.AddListener(action);
             Text text = CreateText("Label", rect, theme, label, 17, TextAnchor.MiddleCenter);
+            text.color = theme.ButtonText;
+            text.fontStyle = FontStyle.Bold;
             Stretch(text.rectTransform, 5, 5, 3, 3);
             return button;
         }
@@ -181,7 +198,7 @@ namespace KingmakerBuffPlanner.UI
             string placeholder)
         {
             RectTransform rect = CreateRect(name, parent);
-            AddPanel(rect, theme.ParchmentRaised, theme.NativeCardNameSprite);
+            AddFramedPanel(rect, theme.ParchmentRaised, theme.GoldAccent);
             Text inputText = CreateText("Text", rect, theme, string.Empty, 17, TextAnchor.MiddleLeft);
             inputText.supportRichText = false;
             Stretch(inputText.rectTransform, 10, 8, 5, 5);
@@ -203,7 +220,7 @@ namespace KingmakerBuffPlanner.UI
             out RectTransform content)
         {
             RectTransform root = CreateRect(name, parent);
-            AddPanel(root, theme.ParchmentPanel, theme.NativeFrameSprite);
+            AddFramedPanel(root, theme.ParchmentPanel, theme.GoldAccent);
             ScrollRect scroll = root.gameObject.AddComponent<ScrollRect>();
             scroll.horizontal = false;
             scroll.vertical = true;

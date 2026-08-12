@@ -318,9 +318,9 @@ namespace KingmakerBuffPlanner.UI
             _canvasGroup.alpha = 1f;
             _canvasGroup.interactable = true;
             _canvasGroup.blocksRaycasts = true;
-            _blocker = KingmakerUiFactory.AddPanel(_root, _theme.ParchmentBackground,
+            _blocker = KingmakerUiFactory.AddPanel(_root,
+                _theme.ParchmentBackgroundSprite == null ? _theme.ParchmentBackground : Color.white,
                 _theme.ParchmentBackgroundSprite);
-            _blocker.color = _theme.ParchmentBackground;
             _blocker.raycastTarget = true;
             PlannerPointerSink sink = _root.gameObject.AddComponent<PlannerPointerSink>();
             sink.Diagnostics = _diagnostics;
@@ -330,7 +330,8 @@ namespace KingmakerBuffPlanner.UI
 
             RectTransform frame = KingmakerUiFactory.CreateRect("ServiceFrame", _root);
             KingmakerUiFactory.SetAnchors(frame, 0.025f, 0.025f, 0.975f, 0.975f);
-            KingmakerUiFactory.AddPanel(frame, _theme.ParchmentPanel, _theme.NativeFrameSprite);
+            KingmakerUiFactory.AddFramedPanel(frame, _theme.ParchmentPanel,
+                _theme.BurgundyPrimary, 2f);
 
             BuildHeader(frame);
             BuildRoutineTabs(frame);
@@ -359,7 +360,8 @@ namespace KingmakerBuffPlanner.UI
         {
             RectTransform header = KingmakerUiFactory.CreateRect("Header", frame);
             KingmakerUiFactory.SetAnchors(header, 0, 0.92f, 1, 1, 14, 14, 5, 5);
-            KingmakerUiFactory.AddPanel(header, _theme.ParchmentRaised, _theme.NativeFrameSprite);
+            KingmakerUiFactory.AddFramedPanel(header, _theme.ParchmentRaised,
+                _theme.GoldAccent);
             Text title = KingmakerUiFactory.CreateText("Title", header, _theme,
                 "BUFF PLANNER", 30, TextAnchor.MiddleCenter);
             KingmakerUiFactory.Stretch(title.rectTransform, 80, 80, 4, 4);
@@ -402,7 +404,8 @@ namespace KingmakerBuffPlanner.UI
         {
             RectTransform panel = KingmakerUiFactory.CreateRect("CatalogPanel", frame);
             KingmakerUiFactory.SetAnchors(panel, 0.015f, 0.16f, 0.38f, 0.845f, 0, 8, 0, 0);
-            KingmakerUiFactory.AddPanel(panel, _theme.ParchmentPanel, _theme.NativeFrameSprite);
+            KingmakerUiFactory.AddFramedPanel(panel, _theme.ParchmentPanel,
+                _theme.GoldAccent);
             _search = KingmakerUiFactory.CreateInputField("Search", panel, _theme, "Search buffs...");
             KingmakerUiFactory.SetAnchors((RectTransform)_search.transform, 0.02f, 0.92f, 0.98f, 0.985f);
             _search.onValueChanged.AddListener(value =>
@@ -493,7 +496,8 @@ namespace KingmakerBuffPlanner.UI
         {
             RectTransform panel = KingmakerUiFactory.CreateRect("DetailsPanel", frame);
             KingmakerUiFactory.SetAnchors(panel, 0.38f, 0.16f, 0.985f, 0.845f, 8, 0, 0, 0);
-            KingmakerUiFactory.AddPanel(panel, _theme.ParchmentPanel, _theme.NativeFrameSprite);
+            KingmakerUiFactory.AddFramedPanel(panel, _theme.ParchmentPanel,
+                _theme.GoldAccent);
             ScrollRect scroll = KingmakerUiFactory.CreateScrollView(
                 "Details", panel, _theme, out _detailContent);
             _detailViewport = scroll.viewport;
@@ -504,7 +508,8 @@ namespace KingmakerBuffPlanner.UI
         {
             RectTransform footer = KingmakerUiFactory.CreateRect("Footer", frame);
             KingmakerUiFactory.SetAnchors(footer, 0.015f, 0.015f, 0.985f, 0.15f);
-            KingmakerUiFactory.AddPanel(footer, _theme.ParchmentRaised, _theme.NativeFrameSprite);
+            KingmakerUiFactory.AddFramedPanel(footer, _theme.ParchmentRaised,
+                _theme.GoldAccent);
             _result = KingmakerUiFactory.CreateText("Result", footer, _theme,
                 string.Empty, 16, TextAnchor.MiddleLeft);
             KingmakerUiFactory.SetAnchors(_result.rectTransform, 0.015f, 0.10f, 0.67f, 0.90f);
@@ -656,7 +661,8 @@ namespace KingmakerBuffPlanner.UI
             if (_catalogSummary != null)
             {
                 _catalogSummary.text = _sourceRows.Count == sources.Count
-                    ? sources.Count + (sources.Count == 1 ? " buff shown" : " buffs shown")
+                    ? sources.Count + (sources.Count == 1 ? " buff shown" : " buffs shown") +
+                        "     " + StatusLegend()
                     : "Some matching buffs could not be shown. Refresh or check the log.";
             }
             FinalizeScrollContent(_sourceContent, _sourceViewport);
@@ -667,8 +673,10 @@ namespace KingmakerBuffPlanner.UI
             BuffCardViewModel card, Action select)
         {
             RectTransform rect = KingmakerUiFactory.CreateRect("Source." + source.SourceId, parent);
-            Image background = KingmakerUiFactory.AddPanel(rect, _theme.ParchmentRaised,
-                _theme.NativeCardSprite);
+            Image background = KingmakerUiFactory.AddFramedPanel(rect,
+                _theme.ParchmentRaised,
+                card.Selected ? _theme.GoldAccent : _theme.MutedBrownText,
+                card.Selected ? 2f : 1f);
             Button button = rect.gameObject.AddComponent<Button>();
             button.targetGraphic = background;
             button.onClick.AddListener(() => select());
@@ -684,8 +692,8 @@ namespace KingmakerBuffPlanner.UI
 
             RectTransform iconFrame = KingmakerUiFactory.CreateRect("IconFrame", rect);
             KingmakerUiFactory.SetAnchors(iconFrame, 0.025f, 0.10f, 0.145f, 0.90f);
-            Image iconBackground = KingmakerUiFactory.AddPanel(iconFrame, Color.white,
-                _theme.NativeCardNameSprite);
+            Image iconBackground = KingmakerUiFactory.AddFramedPanel(iconFrame,
+                new Color(0.20f, 0.14f, 0.10f, 1f), _theme.GoldAccent);
             iconBackground.raycastTarget = false;
             Sprite icon = ResolveAbilityIcon(source);
             if (icon != null)
@@ -722,18 +730,6 @@ namespace KingmakerBuffPlanner.UI
             configured.color = StatusColor(card.Status);
             KingmakerUiFactory.SetAnchors(configured.rectTransform, 0.54f, 0.08f, 0.97f, 0.48f);
 
-            if (card.Selected)
-            {
-                RectTransform selected = KingmakerUiFactory.CreateRect("Selected", rect);
-                KingmakerUiFactory.Stretch(selected, 1, 1, 1, 1);
-                Image selectedImage = KingmakerUiFactory.AddPanel(selected,
-                    _theme.NativeSelectedOrnament == null
-                        ? new Color(_theme.BurgundyPrimary.r, _theme.BurgundyPrimary.g,
-                            _theme.BurgundyPrimary.b, 0.18f)
-                        : Color.white,
-                    _theme.NativeSelectedOrnament);
-                selectedImage.raycastTarget = false;
-            }
             return button;
         }
 
@@ -755,6 +751,15 @@ namespace KingmakerBuffPlanner.UI
                 case PlannerPresentationStatus.Disabled: return _theme.DisabledGray;
                 default: return _theme.MutedBrownText;
             }
+        }
+
+        private string StatusLegend()
+        {
+            return "<color=#" + ColorUtility.ToHtmlStringRGB(_theme.MutedBrownText) +
+                ">Neutral</color>  <color=#" + ColorUtility.ToHtmlStringRGB(_theme.GreenSuccess) +
+                ">Ready</color>  <color=#" + ColorUtility.ToHtmlStringRGB(_theme.AmberWarning) +
+                ">Partial</color>  <color=#" + ColorUtility.ToHtmlStringRGB(_theme.RedFailure) +
+                ">Blocked</color>";
         }
 
         private static void AddTrigger(EventTrigger trigger, EventTriggerType type,
@@ -917,8 +922,8 @@ namespace KingmakerBuffPlanner.UI
             LayoutElement iconLayout = iconFrame.gameObject.AddComponent<LayoutElement>();
             iconLayout.preferredWidth = 76;
             iconLayout.minWidth = 76;
-            Image frame = KingmakerUiFactory.AddPanel(iconFrame, Color.white,
-                _theme.NativeCardSprite);
+            Image frame = KingmakerUiFactory.AddFramedPanel(iconFrame,
+                new Color(0.20f, 0.14f, 0.10f, 1f), _theme.GoldAccent);
             frame.raycastTarget = false;
             Sprite icon = ResolveAbilityIcon(source);
             if (icon != null)
