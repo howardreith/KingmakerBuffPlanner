@@ -57,6 +57,8 @@ Evidence is preserved under `C:\Dev\KingmakerBuffPlannerLab\runtime-evidence\boo
 
 Run `bootstrap-0.0.4-human-live-3` verified that `ignoreLayout` clears the row-above-cluster failure. It then exposed a coordinate-space error in the next predicate: the HUD passed a world-space button center such as `(-845.1,-505.2)` directly to `PointerEventData.position`, which is screen-space. This made every top-hit list empty even after deferred graphic registration. Both the ownership validator and runtime pointer dispatcher now derive screen centers with `RectTransformUtility.WorldToScreenPoint` and the native `GraphicRaycaster.eventCamera`. The run committed one atomic timeout result and restored exactly; it remains diagnostic evidence, not qualification.
 
+Run `bootstrap-0.0.4-human-live-4` then reached valid screen-space hit lists. Their top entry was consistently `UMM blocking UI/Image`. Exact installed UMM 0.28.2 parameters set `ShowOnStart` to `1` and define no manager hotkey, so an unattended fresh process retains the manager's deliberate blocking overlay even after programmatic campaign load. This is not a KBP graphic-registration failure: the UMM surface correctly owns the pointer while open. The qualification harness now uses a runtime-authored exact blocker marker to send a physical Escape to the foreground process, then waits for KBP top-hit ownership before requesting physical F10. It does not modify UMM parameters or third-party files.
+
 ## Rejected theories
 
 - Wrong or stale installed DLL: rejected by exact SHA-256 and MVID agreement.

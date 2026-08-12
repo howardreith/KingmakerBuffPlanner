@@ -9,6 +9,7 @@
 - Converted native HUD world centers through the raycaster event camera before EventSystem hit tests and synthetic pointer dispatch.
 - Made live-scenario failures commit one atomic diagnostic result instead of escaping into every UMM update frame.
 - Corrected guarded restoration to ignore a bound null process ID instead of falsely reporting an unnamed running Kingmaker process.
+- Made fresh-process live qualification physically dismiss UMM's configured ShowOnStart blocking overlay before proving HUD ownership and delivering physical F10.
 - Added an exact disposable-save live-campaign scenario that delivers a physical F10 key, exercises 20 open/close cycles, and checks object uniqueness and save hashes.
 
 ## 0.0.3 — 2026-08-12

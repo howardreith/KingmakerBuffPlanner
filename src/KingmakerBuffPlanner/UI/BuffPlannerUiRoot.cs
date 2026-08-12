@@ -96,6 +96,12 @@ namespace KingmakerBuffPlanner.UI
             get { return _instance != null && _instance._hud != null && _instance._hud.IsInstalled; }
         }
 
+        internal static string HudFailure
+        {
+            get { return _instance == null || _instance._hud == null
+                ? string.Empty : _instance._hud.LastFailure; }
+        }
+
         internal static bool IsScreenOpen
         {
             get { return _instance != null && _instance._screen != null && _instance._screen.IsOpen; }

@@ -90,31 +90,46 @@ try {
     Write-KbpJsonAtomic (Join-Path $evidence 'orchestration.json') $orchestration
     $resultPath = Join-Path $evidence 'runtime-result.json'
     $f10Sent = $false
-    $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds + 15)
-    while (-not (Test-Path -LiteralPath $resultPath -PathType Leaf)) {
-        $process.Refresh()
-        if ($process.HasExited) { throw 'Kingmaker exited before committing the atomic runtime result.' }
-        if ([DateTime]::UtcNow -ge $deadline) { throw 'Runtime result timed out; launched Kingmaker was left running and restoration is blocked.' }
-        $f10Marker = Join-Path $evidence 'f10-ready.json'
-        if ($Scenario -ceq 'live-ui-bootstrap' -and -not $f10Sent -and
-            (Test-Path -LiteralPath $f10Marker -PathType Leaf)) {
-            Add-Type @'
+    $ummDismissSent = $false
+    if ($Scenario -ceq 'live-ui-bootstrap') {
+        Add-Type @'
 using System;
 using System.Runtime.InteropServices;
 public static class KbpPhysicalInput {
   [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr hWnd);
   [DllImport("user32.dll")] static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);
-  public static void F10Down(IntPtr window) {
+  public static void KeyDown(IntPtr window, byte key) {
     if (window == IntPtr.Zero || !SetForegroundWindow(window)) throw new InvalidOperationException("Kingmaker foreground activation failed.");
-    keybd_event(0x79, 0, 0, UIntPtr.Zero);
+    keybd_event(key, 0, 0, UIntPtr.Zero);
   }
-  public static void F10Up() { keybd_event(0x79, 0, 2, UIntPtr.Zero); }
+  public static void KeyUp(byte key) { keybd_event(key, 0, 2, UIntPtr.Zero); }
 }
 '@
+    }
+    $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds + 15)
+    while (-not (Test-Path -LiteralPath $resultPath -PathType Leaf)) {
+        $process.Refresh()
+        if ($process.HasExited) { throw 'Kingmaker exited before committing the atomic runtime result.' }
+        if ([DateTime]::UtcNow -ge $deadline) { throw 'Runtime result timed out; launched Kingmaker was left running and restoration is blocked.' }
+        $ummMarker = Join-Path $evidence 'umm-overlay-ready.json'
+        if ($Scenario -ceq 'live-ui-bootstrap' -and -not $ummDismissSent -and
+            (Test-Path -LiteralPath $ummMarker -PathType Leaf)) {
             $process.Refresh()
-            [KbpPhysicalInput]::F10Down($process.MainWindowHandle)
+            [KbpPhysicalInput]::KeyDown($process.MainWindowHandle, [byte]0x1B)
             Start-Sleep -Milliseconds 100
-            [KbpPhysicalInput]::F10Up()
+            [KbpPhysicalInput]::KeyUp([byte]0x1B)
+            $ummDismissSent = $true
+            $orchestration.stage = 'physical-umm-dismiss-sent'
+            $orchestration.ummDismissSentAtUtc = [DateTime]::UtcNow.ToString('o')
+            Write-KbpJsonAtomic (Join-Path $evidence 'orchestration.json') $orchestration
+        }
+        $f10Marker = Join-Path $evidence 'f10-ready.json'
+        if ($Scenario -ceq 'live-ui-bootstrap' -and -not $f10Sent -and
+            (Test-Path -LiteralPath $f10Marker -PathType Leaf)) {
+            $process.Refresh()
+            [KbpPhysicalInput]::KeyDown($process.MainWindowHandle, [byte]0x79)
+            Start-Sleep -Milliseconds 100
+            [KbpPhysicalInput]::KeyUp([byte]0x79)
             $f10Sent = $true
             $orchestration.stage = 'physical-f10-sent'
             $orchestration.f10SentAtUtc = [DateTime]::UtcNow.ToString('o')

@@ -29,6 +29,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private int _liveCycleCount;
         private bool _liveCycleOpening;
         private bool _liveF10MarkerWritten;
+        private bool _liveUmmDismissMarkerWritten;
 
         private RuntimeTestHost(
             RuntimeTestRequest request,
@@ -656,6 +657,16 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     ";snapshot=" + BuffPlannerUiRoot.GetSnapshot());
             if (_liveUiPhase == 0)
             {
+                if (!_liveUmmDismissMarkerWritten &&
+                    BuffPlannerUiRoot.HudFailure.Contains("top=UMM blocking UI/"))
+                {
+                    AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory,
+                        "umm-overlay-ready.json"), "{\"runId\":\"" + _request.RunId +
+                        "\",\"topHit\":\"UMM blocking UI\"}" + Environment.NewLine);
+                    _liveUmmDismissMarkerWritten = true;
+                    _log.Info("[KBP-BOOT] runtime requests physical Escape to dismiss " +
+                        "ShowOnStart UMM overlay;marker=umm-overlay-ready.json.");
+                }
                 if (StaticCanvas.Instance == null ||
                     UnityEngine.EventSystems.EventSystem.current == null ||
                     !BuffPlannerUiRoot.IsHudInstalled) return false;

@@ -146,6 +146,16 @@ foreach ($failureContract in @('_completed = true;',
 }
 $assertions++
 
+$runtimeScriptSource = Get-Content -LiteralPath (Join-Path $root 'scripts\Invoke-KingmakerRuntimeTest.ps1') -Raw
+foreach ($physicalContract in @('umm-overlay-ready.json',
+        'physical-umm-dismiss-sent', '[byte]0x1B', '[byte]0x79')) {
+    if (-not $runtimeHostSource.Contains($physicalContract) -and
+        -not $runtimeScriptSource.Contains($physicalContract)) {
+        throw "Live qualification must physically dismiss ShowOnStart UMM and then deliver F10: $physicalContract"
+    }
+}
+$assertions++
+
 $executionSource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\Execution\ExecutionModels.cs') -Raw
 $sessionSource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\UI\PlannerUiSession.cs') -Raw
 if ($executionSource.Contains('CastExecutionStatus.Fired') -or $sessionSource.Contains('; fired=') -or
