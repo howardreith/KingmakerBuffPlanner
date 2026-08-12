@@ -882,7 +882,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     physical.MovementCommandCount != 0 || physical.AbilityCommandCount != 0 ||
                     physical.SelectionEventCount != 0 || physical.AbilityTargetEventCount != 0 ||
                     !physical.SelectionUnchanged || !physical.CameraUnchanged)
-                    throw new InvalidOperationException("Physical planner clicks reached world input.");
+                    throw new InvalidOperationException("Physical planner clicks reached world input;" +
+                        "player=" + physical.PlayerCommandCount + ";movement=" +
+                        physical.MovementCommandCount + ";ability=" + physical.AbilityCommandCount +
+                        ";selectionEvents=" + physical.SelectionEventCount +
+                        ";abilityTargetEvents=" + physical.AbilityTargetEventCount +
+                        ";selectionUnchanged=" + physical.SelectionUnchanged +
+                        ";cameraUnchanged=" + physical.CameraUnchanged + ".");
                 _liveBlessSelectedAndConfigured =
                     BuffPlannerUiRoot.SelectAndConfigureBlessForRuntime();
                 if (!_liveBlessSelectedAndConfigured)
