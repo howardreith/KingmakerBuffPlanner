@@ -1,5 +1,21 @@
 # Qualification
 
+## 0.0.4 live UI bootstrap recovery
+
+Status: PASS and guarded-installed for human visual confirmation.
+
+- Release source: `5b96f3b4e713489ce677db3ac5acb83a10f80f01` on `codex/kingmaker-buff-planner`.
+- Release identity: package `cb3799e799f641b1a9f7d79eb71942025b5df71a8de956e17369b24fe2f14d16`; DLL `6f72c38ef7e445121291ff2f17f207d49210ea30a2e07fe1105595133b706f1c`; MVID `305a8a6c-2b49-4e3b-a365-286638cbfafa`; deterministic builds 2/2; publication `local-only`.
+- Local gates: source 26/26; behavior/protocol 60/60; transaction harness 7/7; deployment WhatIf 5/5; package 4/4; warning-free exact-reference Release build 1/1.
+- Fresh real-campaign runs `bootstrap-0.0.4-human-live-6` and `bootstrap-0.0.4-human-live-7`: 65/65 each. Both loaded only `KBP_AUTOMATION_WORKING` through `SaveSlot.OnButtonSaveLoad`, physically dismissed UMM's configured ShowOnStart overlay, and physically delivered F10.
+- Each campaign run proved one retained UI root; one active four-button row with four listeners in Setup/Long/Important/Short order; row above the native cluster; top-hit ownership; one observed F10 keydown; one opaque/raycast-owning planner; 21 opens; 21 destroys after final close; balanced input leases; Default mode and selection restored; no duplicate objects, native activation, world command, selection/ability target, movement, ability, player, or camera input.
+- Authoritative object evidence is embedded in each result as `uiHudObjectEvidence`, including `StaticCanvas/HUDLayout/Menu_Buttons48px`, root/button instance IDs, active/interactable flags, screen centers, and world corners.
+- Baseline remained immutable at `afca8ac5e42219bc50f428eb334a657cbcc2e31e8f2eb39c6ab53691cbb076d3`; Working changed only through permitted load bookkeeping. Both Mods transactions report `Restored` and `restorationVerified=true`.
+- Exact-release regressions: `bootstrap-0.0.4-release-native-regression` 12/12 and `bootstrap-0.0.4-release-cotw-regression` 26/26; both restored exactly.
+- Guarded install `bootstrap-0.0.4-local-install`: installed DLL/MVID exact, `settingsPreserved=true`, `otherModsVerified=true`, no process or lock afterward.
+
+Earlier 0.0.3 no-save/UI-complete implications are invalidated by the direct human failure and must not be used as live-bootstrap evidence.
+
 ## 0.0.3 HUD/modal/execution R2 correction
 
 Status: installed for authoritative human campaign retest; no automated campaign UI or Bless success is claimed.

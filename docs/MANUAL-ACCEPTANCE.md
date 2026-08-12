@@ -1,5 +1,20 @@
 # Manual Acceptance
 
+## 0.0.4 installed handoff
+
+Status: automated live-bootstrap acceptance PASS twice; 0.0.4 is guarded-installed for optional human visual confirmation.
+
+Installed identity: source `5b96f3b4e713489ce677db3ac5acb83a10f80f01`; package `cb3799e799f641b1a9f7d79eb71942025b5df71a8de956e17369b24fe2f14d16`; DLL `6f72c38ef7e445121291ff2f17f207d49210ea30a2e07fe1105595133b706f1c`; MVID `305a8a6c-2b49-4e3b-a365-286638cbfafa`.
+
+Runs `bootstrap-0.0.4-human-live-6` and `bootstrap-0.0.4-human-live-7` already prove, in distinct fresh processes, the exact four-button row, physical F10, visible/opaque planner, clean close/input restoration, no duplicates after 21 total cycles, and no click-through/world input. A human check should now focus on appearance and ordinary use, not re-prove bootstrap existence:
+
+- load the same campaign and confirm one readable Setup/Long/Important/Short row above the native lower-left cluster;
+- confirm Setup and F10 show the opaque planner and Escape/F10/close return cleanly to gameplay;
+- confirm no visible overlap or unexpected native activation;
+- report any visual scaling or content issue with the installed identity above.
+
+Do not treat older 0.0.3 instructions or results as current acceptance evidence.
+
 Status: 0.0.3 IS INSTALLED; REQUIRED FOR R2 VERDICT. The installed 0.0.2 verdict is FAIL.
 
 Installed identity: DLL SHA-256 `5d95368ee237e658e06b4948209f805568a417ea150eb36c3023df9b155f0950`, MVID `f3f691a4-d691-4112-90a4-7beb9f06aad2`. The preserved profile contains Long → Bless and one target; no provider preference was stored, so the result must identify the provider selected from the live party.
@@ -50,6 +65,3 @@ When an authorized `KBP_AUTOMATION_WORKING` fixture is available, also verify:
 - native-only and optional-mod source visibility without duplicate or foreign dependencies.
 
 The no-save native-only and exact Call of the Wild load/catalog/Harmony portions above are already automated and passed twice. Manual acceptance remains limited to the save-backed rows requiring an authorized `KBP_AUTOMATION_WORKING` fixture; Tabletop Added Rules is unavailable locally.
-## 0.0.4 recovery acceptance status
-
-Do not manually accept or distribute 0.0.4 yet. Automation must first prove two fresh-process loads of the exact `KBP_AUTOMATION_WORKING` save with one active Setup/Long/Important/Short row, physical F10 observation, visible planner presentation before input acquisition, clean close restoration, and no duplicate objects after 20 cycles. Version 0.0.3 failed this live-campaign boundary.

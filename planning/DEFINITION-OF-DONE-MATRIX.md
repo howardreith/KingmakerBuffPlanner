@@ -1,5 +1,11 @@
 # Definition of Done Matrix
 
+## 0.0.4 live-bootstrap recovery correction
+
+The live-bootstrap recovery rows are complete and supersede stale “no authorized save” or “campaign pending” text retained below as project history. The explicit baseline/working pair exists. Runs `bootstrap-0.0.4-human-live-6` and `bootstrap-0.0.4-human-live-7` passed 65/65 each in fresh processes and proved one four-button HUD row, independently observed physical F10, visible planner presentation before input acquisition, 21 balanced open/close cycles, no duplicates/click-through/world input, immutable baseline, and exact Mods restoration. Native 12/12 and Call of the Wild 26/26 exact-release regressions also pass. Release `5b96f3b` is deterministic, local-only, and guarded-installed with settings preserved and other mods unchanged.
+
+Broader prepared/spontaneous resource/effect/executor combinations remain under their existing `DEFER — EVIDENCED` rows; they do not reopen this bounded recovery mission.
+
 R2 correction notice: direct human testing invalidated both 0.0.2 UI rows. Fresh retained-mode HUD, transactional modal, and confirmed-execution behavior are implemented and guarded-installed in 0.0.3. The campaign gate is honestly `BLOCKED` without an authorized `KBP_` campaign, so direct human HUD/modal/input/Bless acceptance remains pending. Historical 0.0.2 PASS/implemented text below is superseded where it conflicts.
 
 Status: IN PROGRESS — human playtesting invalidated the 0.0.1 UI gate; full-screen UI/input repair is active; save-backed core rows remain `DEFER — EVIDENCED`

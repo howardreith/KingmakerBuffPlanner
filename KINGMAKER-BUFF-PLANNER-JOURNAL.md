@@ -1,5 +1,17 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-08-12 — live UI bootstrap recovery complete
+
+Status: PASS TWICE; 0.0.4 GUARDED-INSTALLED; NO PUBLIC RELEASE
+
+- Exact release source `5b96f3b4e713489ce677db3ac5acb83a10f80f01`; package `cb3799e799f641b1a9f7d79eb71942025b5df71a8de956e17369b24fe2f14d16`; DLL `6f72c38ef7e445121291ff2f17f207d49210ea30a2e07fe1105595133b706f1c`; MVID `305a8a6c-2b49-4e3b-a365-286638cbfafa`; deterministic 2/2, local-only.
+- `bootstrap-0.0.4-human-live-6` and `bootstrap-0.0.4-human-live-7` passed 65/65 each in distinct fresh processes. Both used the exact human-reproduction mod set and normal Working save-slot load, physically dismissed UMM ShowOnStart, then physically delivered F10.
+- Each proved one retained controller and HUD row, four ordered active controls/listeners, owned hitboxes above the native cluster, one F10 keydown, opaque/raycast-owning planner, 21 opens and 21 post-close destroys, balanced input leases, Default/selection restoration, zero duplicate objects, zero native activation, and zero world input.
+- Immutable baseline remained `afca8ac5e42219bc50f428eb334a657cbcc2e31e8f2eb39c6ab53691cbb076d3`; every transaction restored exactly. Run result hashes are `cd1d2281...` and `4ad411a5...`.
+- Exact-release native regression `bootstrap-0.0.4-release-native-regression` passed 12/12; Call of the Wild `bootstrap-0.0.4-release-cotw-regression` passed 26/26; both restored exactly.
+- Install WhatIf passed without mutation. Guarded install `bootstrap-0.0.4-local-install` replaced only 0.0.3; installed identity matches release, `settingsPreserved=true`, `otherModsVerified=true`, and no process/lock remains.
+- No main merge, direct push, or public release was performed.
+
 ## 2026-08-12 — exact campaign load and HUD layout diagnosis
 
 Status: DIAGNOSTIC FAIL REPAIRED IN SOURCE; REQUALIFICATION PENDING

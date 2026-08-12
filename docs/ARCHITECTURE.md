@@ -1,6 +1,6 @@
 # Architecture
 
-Status: R2 implementation installed; authoritative campaign UI and save-backed acceptance pending
+Status: 0.0.4 live-bootstrap architecture qualified twice in real campaigns and guarded-installed
 
 Kingmaker Buff Planner is one standalone Unity Mod Manager mod. The assembly, namespace, UMM ID, persistence, package, runtime runner, and compatibility profiles are all owned by this repository.
 
@@ -31,3 +31,5 @@ The four icons are original textures generated in memory by project code and are
 `Main.OnUpdate` owns the minimal fallback path: it logs its first tick, arms and polls F10, ensures exactly one strongly referenced `DontDestroyOnLoad` controller, and only then advances UI installation. F10 therefore remains observable when no HUD host exists or a HUD candidate fails readiness. The controller subscribes once to Kingmaker scene, area-loading, and area-activation events; startup, late load, area transitions, and polling converge on the same idempotent installation path.
 
 New Unity graphics remain candidates for at least two update frames before EventSystem ownership is required. HUD candidates are noninteractive during this interval. A full-screen candidate acquires the native input lease only after deferred visible-presentation validation, then validates again. Any failure logs its exact predicate and complete stack, disposes only owned objects, releases only an acquired lease, and remains retryable.
+
+The HUD root is marked `LayoutElement.ignoreLayout` so the native cluster may host it without overriding its explicitly above-cluster anchor; the KBP root's own horizontal child layout remains active. EventSystem probes and dispatched pointer events convert button world centers to screen coordinates through the native `GraphicRaycaster.eventCamera`. These are integration boundaries, not domain/UI layout policy leaks.

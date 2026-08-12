@@ -1,5 +1,15 @@
 # Autonomous Resume
 
+## Live UI bootstrap recovery complete — 2026-08-12
+
+- Status: COMPLETE for the authoritative recovery mission; 0.0.4 is guarded-installed for human visual confirmation. No merge or public release occurred.
+- Release source: `5b96f3b4e713489ce677db3ac5acb83a10f80f01`; deterministic package `cb3799e799f641b1a9f7d79eb71942025b5df71a8de956e17369b24fe2f14d16`; DLL `6f72c38ef7e445121291ff2f17f207d49210ea30a2e07fe1105595133b706f1c`; MVID `305a8a6c-2b49-4e3b-a365-286638cbfafa`.
+- Real-campaign PASS twice: `bootstrap-0.0.4-human-live-6` and `bootstrap-0.0.4-human-live-7`, 65/65 each. Both prove one active Setup/Long/Important/Short row, F10 armed and physically observed once, visible planner root, 21 balanced open/close cycles, no duplicates, no native/world click-through, restored mode/selection, exact Working load, and immutable baseline `afca8ac5...`.
+- Exact HUD object paths/instance IDs/active states/screen centers/world corners are in each `runtime-result.json` under `uiHudObjectEvidence`. Result hashes: run 6 `cd1d22813a7f6a3131b9074b851e13d5a8a2feba7965c8fcc609274d81a05378`; run 7 `4ad411a5536ec25f1fba99138db18ea6fbb5279134d7c2f771e3c46551d6f918`.
+- Release regressions: native `bootstrap-0.0.4-release-native-regression` 12/12; Call of the Wild `bootstrap-0.0.4-release-cotw-regression` 26/26; exact restoration for both.
+- Guarded install `bootstrap-0.0.4-local-install`: `Installed`; installed DLL/MVID exact; settings preserved; other mods verified unchanged; no Kingmaker process or deployment lock.
+- Final records commit is documentation-only and follows the exact installed release-source commit above. No further command is required for this recovery mission.
+
 ## Live UI bootstrap campaign checkpoint — 2026-08-12 12:08Z
 
 - End-to-end diagnostic `bootstrap-0.0.4-human-live-5` proved the requested behavior: 1 UI root, 4 HUD buttons/listeners in Setup/Long/Important/Short order, row above native cluster, owned hitboxes, physical F10 armed/observed once, 21 open cycles, 21 balanced closes, opaque 100% planner coverage, zero duplicate roots after close, zero native activation/world input, and exact Working load. Its result is still FAIL because the test captured mode/selection after F10 opened the planner and expected Cheat Menu's primary DLL while UMM loaded its exact `.cache` file. Pre-F10 baseline capture and distinct exact loaded-assembly hash are now fixed; UI behavior itself needs fresh repetition before PASS.
