@@ -1,5 +1,23 @@
 # Manual Acceptance
 
+## 0.0.7 parchment UI visual gate
+
+Status: automated mechanics/presentation evidence PASS; human visual acceptance REQUIRED. Do not treat installation as cosmetic acceptance.
+
+Load a campaign and inspect Setup/F10 against the final automated screenshots under `runtime-evidence/ui-polish-0.0.7-instant-1/`:
+
+1. The screen reads as a Kingmaker service window rather than a debug tool: warm parchment, burgundy rules, antique gold, brown text, restrained borders, and readable contrast.
+2. Every buff card has a recognizable spell/ability icon; the name, availability, routine badge, selected state, and neutral/ready/partial/blocked state are legible without crowding.
+3. Portrait targeting is immediately understandable: neutral means unselected, green/check means selected and fulfillable, amber means partial/unavailable, red/cross means illegal, and the lighter secondary mark means indirect benefit.
+4. Search, Configured only, Show hidden, Reset, and Advanced Filters require no guessing; the old CONFIG/DURATION/SOURCE/SORT/HIDDEN/AVAIL row is absent.
+5. Long/Important/Short readiness means fulfilled requested targets / all requested targets.
+6. Casting Source is understandable while collapsed. Advanced Casting Source exposes priority, disablement, spellbook, availability, and caps without dominating normal setup.
+7. Settings contains the only Animated/Instant control. Footer actions are Refresh, Close, and Apply Current Routine.
+8. No text is clipped, cramped, blurred, or too low-contrast at the actual resolution; card and portrait clicks feel responsive.
+9. Animated and Instant still produce the already-confirmed result; HUD icons/tooltips, click isolation, F10, close, and restored input remain unchanged.
+
+Human verdict is authoritative. Report a screenshot and exact resolution for any failed item. No merge or public release is authorized.
+
 ## 0.0.6 installed handoff
 
 Status: automated production screenshot/runtime acceptance PASS twice; 0.0.6 is guarded-installed for final human confirmation.

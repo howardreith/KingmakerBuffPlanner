@@ -1,6 +1,14 @@
 # Architecture
 
-Status: 0.0.6 live row-rendering architecture qualified twice with screenshots and guarded-installed
+Status: 0.0.7 presentation architecture qualified in exact Kingmaker 2.1.7b; human visual verdict pending
+
+## 0.0.7 presentation boundary
+
+Presentation remains a consumer of `PlannerUiSession` and `PlannerSetupModel`; it does not own discovery, identities, allocation, resource accounting, persistence, or execution. `BuffCardViewModel`, `TargetPortraitViewModel`, `CastingSourceSummaryViewModel`, `RoutineSummaryViewModel`, and `PlannerSettingsViewModel` translate existing state into player-facing text and deterministic neutral/success/warning/failure states.
+
+`PlannerUiTheme` is the only native visual adapter. It inventories exact 2.1.7b sprites/fonts, records resolution or fallback, and centralizes every parchment, brown, burgundy, gold, green, amber, red, and disabled token. Native objects remain game-owned. Proportion-sensitive large frame/card sprites are inventoried but deliberately not stretched; safe programmatic parchment surfaces and borders are used instead. Native button and portrait treatments remain optional, bounded references.
+
+`BuffPlannerScreenView` renders alphabetical icon cards and portrait targets. All callbacks invoke existing model commands. Hover preview is transient, target bulk operations save once, filters are non-persistent view state, Casting Source is disclosure over existing provider preferences, and Settings is the sole mode editor. Runtime presentation diagnostics are opt-in test code: they count real/fallback icons and mode controls, reject retired labels, capture five hashed views, and never become mechanics state.
 
 ## 0.0.6 masked scroll rendering and visual evidence
 

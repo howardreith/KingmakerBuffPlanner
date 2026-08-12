@@ -1,5 +1,13 @@
 # Implementation Report
 
+## 0.0.7 Kingmaker-native presentation refinement — automation complete, human verdict pending
+
+The successful 0.0.6 mechanics were frozen. Four independently regressed UI phases added: a centralized parchment theme; actual blueprint-icon cards; portrait-first target editing; and simplified filters, Settings, and Casting Source disclosure. No persistence schema/identity, discovery/classification, planning/resource, Animated/Instant, confirmed-effect, HUD isolation, modal lease, or live transaction behavior was redesigned.
+
+The first campaign screenshot exposed unsafe stretching of otherwise correct native sprites. Large panels/cards now use centralized translucent parchment fills and restrained borders, while exact native buttons, portrait chrome, background, and font remain resolved with fallbacks. The corrected run shows 11/11 real icons, no fallback icons, one Casting mode control, no retired primary labels, readable Bless target/plan state, and advanced provider controls only after disclosure.
+
+Versioned physical runs `ui-polish-0.0.7-animated-1` and `ui-polish-0.0.7-instant-1` each passed 71/71 in fresh processes, planned/submitted/confirmed Bless `1/1/1`, captured all five presentation states, preserved the profile assignment across reload, completed 20 reopen cycles, and restored Mods exactly. Native `ui-polish-0.0.7-native-final` passed 12/12; Call of the Wild `ui-polish-0.0.7-cotw-final` passed 26/26 with no planner Harmony overlap. Human visual acceptance remains authoritative.
+
 ## 0.0.6 live row rendering and Bless material correction — complete
 
 The human-tested 0.0.5 screen proved discovery was populated but showed no list or details pixels. An independent same-Content canary also disappeared despite a live CanvasRenderer, valid geometry, alpha 1, Arial, the default UI shader, and correct canvas/sibling state. Both panes shared a `Mask` whose hidden source Image used alpha 0.001 with alpha clipping enabled; it did not reliably write the stencil required by child graphics. Keeping `showMaskGraphic=false` while making the source opaque restores the stencil without drawing the mask itself.

@@ -1,5 +1,17 @@
 # Qualification
 
+## 0.0.7 presentation qualification
+
+Status: automated functional, compatibility, and screenshot acceptance PASS; human visual verdict and guarded installation pending this release checkpoint.
+
+- Branch `codex/ui-parchment-bubblebuffs`; preserved MVP source `e656812572adea8bc312419372b61ee8c4834e5a`, package `ce7492b262f01a9afb5a7666fe7e4bda9be1821395eb00244f5898b6882208e9`, DLL `6144256c6a0623e908c3d9e821a1b87ee5800195759fbfabb1e587eaf9be1d9b`, MVID `bff11809-aa53-42c2-8ab7-ef3564450e61`.
+- Mechanical gates after all four phases: source 30/30, behavior/protocol 63/63, runtime filesystem 8/8, deployment WhatIf 5/5, package validation 4/4.
+- Exact native resolution: `Inventory_Book_Clear`, `WeaponSets_Header`, `spellbook_frame`, `spellbook_frame_back`, `button_normal`, `button_pressed`, inventory toggle sprites, `Group_Char_Frame_Select`, Arial. Unsafe stretched frame/card use was rejected by the first screenshot and replaced by centralized fallbacks.
+- `ui-polish-0.0.7-animated-1` and `ui-polish-0.0.7-instant-1`: 71/71 each, fresh processes, explicit requested engine, Bless planned/submitted/confirmed 1/1/1, five screenshots, 11 real icons/0 fallbacks, one mode control, zero retired labels, physical HUD/modal/input/lifecycle checks, immutable baseline, exact Mods restoration.
+- `ui-polish-0.0.7-native-final`: 12/12. `ui-polish-0.0.7-cotw-final`: 26/26 with exact optional ownership and no planner Harmony overlap. Both restored exactly.
+- Final source/package/DLL/MVID and guarded-install identity are recorded in the documentation-only handoff checkpoint after deterministic release packaging.
+- Human inspection remains required for native feel, clipping, contrast, responsiveness, and workflow clarity. No merge, push, or public release is authorized.
+
 ## 0.0.6 live row-rendering recovery
 
 Status: PASS for automated visual/runtime acceptance; guarded-installed for human handoff; local-only.

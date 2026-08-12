@@ -1,5 +1,17 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-08-12 — 0.0.7 presentation qualification
+
+Status: AUTOMATION PASS; RELEASE PACKAGING/INSTALL NEXT; HUMAN VISUAL VERDICT REQUIRED
+
+- Created `codex/ui-parchment-bubblebuffs` from successful MVP branch HEAD `21c4dd702868e5cfc89963ba50bb64420f18915d`; preserved qualified 0.0.6 source/package/DLL/MVID and package contents before editing.
+- Studied BubbleBuffs at `f4871f763a23251284422ef0945a85e9f3fb788e` and adapted information hierarchy only. No Wrath path, shader, icon, texture, binary, or source excerpt entered production/package.
+- Completed and separately regressed theme, icon-card, portrait-target, and simplified-disclosure phases. Final protocol counts are source 30/30, behavior 63/63, runtime filesystem 8/8, deployment WhatIf 5/5, package 4/4.
+- The initial screenshot correctly invalidated stretched native decorative sprites. The fallback-policy correction uses centralized parchment surfaces/borders while retaining safe exact native background, button, portrait, toggle, and Arial candidates.
+- Versioned fresh-process physical runs `ui-polish-0.0.7-animated-1` and `ui-polish-0.0.7-instant-1` passed 71/71 each, confirmed Bless 1/1/1, captured five hashed views each, preserved HUD/input/modal/profile contracts, and restored Mods exactly.
+- Native `ui-polish-0.0.7-native-final` passed 12/12; Call of the Wild `ui-polish-0.0.7-cotw-final` passed 26/26. Immutable baseline remains `afca8ac5e42219bc50f428eb334a657cbcc2e31e8f2eb39c6ab53691cbb076d3`.
+- A launcher timeout interrupted one transaction during `Preparing`. Exact manifest equality proved no activation occurred; guarded recovery now recognizes only that exact pre-activation no-op state and is covered by runtime filesystem test 8/8.
+
 ## 2026-08-12 — 0.0.6 live row recovery qualified, packaged, and installed
 
 Status: COMPLETE; HUMAN HANDOFF READY; LOCAL-ONLY

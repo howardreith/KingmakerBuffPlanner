@@ -1,5 +1,20 @@
 # Definition of Done Matrix
 
+## 0.0.7 parchment/BubbleBuffs-inspired presentation
+
+| Criterion | Result | Exact evidence |
+|---|---|---|
+| Preserve frozen MVP mechanics | PASS | Source 30/30; behavior/protocol 63/63; harness 8/8; deployment WhatIf 5/5 after every phase. |
+| Native theme inventory/fallbacks | PASS | `planning/PARCHMENT-BUBBLEBUFFS-UI-FORENSICS.md`; runtime theme resolution names exact background/button/toggle/portrait/font candidates. |
+| Icon-first alphabetical catalog | PASS | Final live diagnostics: 11 bound cards, 11 blueprint icons, 0 fallbacks; default all supported non-hidden, alphabetical. |
+| Portrait target editor | PASS | Bless screenshot shows selected green portrait/check; preview and bulk-save behavior have deterministic tests. |
+| Simplified controls/disclosure | PASS | 1 Casting mode control, 0 retired technical labels; Casting Source collapsed and advanced controls separately captured. |
+| Five visual evidence states | PASS | Catalog, selected details, target colors, collapsed Casting Source, and advanced settings PNGs in both final physical run directories. |
+| Animated and Instant | PASS | `ui-polish-0.0.7-animated-1` and `ui-polish-0.0.7-instant-1`: 71/71 each; planned/submitted/confirmed 1/1/1. |
+| Native and Call of the Wild | PASS | `ui-polish-0.0.7-native-final` 12/12; `ui-polish-0.0.7-cotw-final` 26/26; exact restoration. |
+| Human visual acceptance | PENDING HUMAN | Automation cannot decide native feel, clipping, responsiveness, or subjective legibility. |
+| Merge/public release | NOT AUTHORIZED | Feature branch and local package only. |
+
 ## 0.0.6 live row-rendering recovery
 
 | Criterion | Result | Exact evidence |

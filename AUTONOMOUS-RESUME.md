@@ -1,5 +1,12 @@
 # Autonomous Resume
 
+## 0.0.7 presentation release checkpoint — 2026-08-12
+
+- Branch `codex/ui-parchment-bubblebuffs`; current implementation/version HEAD before documentation checkpoint is `bec2addaf302ce6977be7c59c17d3c064feed978`, version 0.0.7.
+- Physical final runs `ui-polish-0.0.7-animated-1` and `ui-polish-0.0.7-instant-1` pass 71/71 each and restore. Native final passes 12/12; Call of the Wild final passes 26/26. Baseline remains `afca8ac5e42219bc50f428eb334a657cbcc2e31e8f2eb39c6ab53691cbb076d3`.
+- No Kingmaker process, unresolved deployment lock, or unrestored transaction remains. Package is not yet installed and human visual acceptance is intentionally pending.
+- Exact next command: commit the release-source documentation, run `scripts/Build-Release.ps1`, record its package/DLL/MVID, guarded-install only 0.0.7 over 0.0.6, verify identity/settings/other mods, then create the documentation-only handoff commit.
+
 ## Parchment/BubbleBuffs presentation checkpoint — 2026-08-12
 
 - Status: UI-only Phases A-D are implemented on `codex/ui-parchment-bubblebuffs`; committed Phase C HEAD is `7439e53`, and the Phase D filter/settings/Casting Source refinement is the current four-file worktree change awaiting its checkpoint commit.
