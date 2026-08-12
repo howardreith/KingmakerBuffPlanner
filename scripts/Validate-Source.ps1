@@ -41,6 +41,14 @@ if (-not $logSource.Contains('Environment.NewLine + exception')) {
 $assertions++
 
 $version = Get-KbpVersion
+$assemblyInfo = Get-Content -LiteralPath (Join-Path $root `
+    'src\KingmakerBuffPlanner\Properties\AssemblyInfo.cs') -Raw
+if (-not $assemblyInfo.Contains('[assembly: AssemblyVersion("' + $version + '.0")]') -or
+    -not $assemblyInfo.Contains('[assembly: AssemblyFileVersion("' + $version + '.0")]') -or
+    -not $assemblyInfo.Contains('[assembly: AssemblyInformationalVersion("' + $version + '")]')) {
+    throw 'CLR assembly versions do not match Version.props.'
+}
+$assertions++
 $info = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\Info.json') -Raw | ConvertFrom-Json
 if ($info.Id -cne 'KingmakerBuffPlanner' -or
     $info.AssemblyName -cne 'KingmakerBuffPlanner.dll' -or
