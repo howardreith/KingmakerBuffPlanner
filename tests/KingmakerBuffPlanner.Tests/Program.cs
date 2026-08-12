@@ -84,6 +84,7 @@ namespace KingmakerBuffPlanner.Tests
                 Run("profile-migrates-schema-one", () => TestProfileMigration(root));
                 Run("profile-malformed-json-recovers-default", () => TestProfileMalformed(root));
                 Run("setup-model-persists-stable-targets-and-provider-controls", TestSetupModel);
+                Run("catalog-filter-default-empty-and-reset-contract", TestCatalogFilterState);
                 Run("input-lease-restores-on-close-and-acquire-failure", TestInputLease);
                 Run("screen-state-machine-is-idempotent", TestScreenStateMachine);
                 Run("ui-readiness-is-deferred-across-frames", TestDeferredUiReadiness);
@@ -859,6 +860,55 @@ namespace KingmakerBuffPlanner.Tests
             reloaded.ClearRoutine("short");
             if (reloaded.Profile.Routines.First(r => r.RoutineId == "short").Assignments.Count != 0)
                 throw new InvalidOperationException("Routine clear changed or retained the wrong assignment set.");
+        }
+
+        private static void TestCatalogFilterState()
+        {
+            AbilityKey ability = Ability("ui-filter-source", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("ui-filter-free", ResourcePoolKind.Unlimited, 0, 0, null);
+            ProviderSnapshot provider = PlannerProvider("unit-a", "book-ui-filter", ability,
+                "ui-filter-free", 0);
+            var validation = new TargetValidationSnapshot(true, true, true, true);
+            var snapshot = new PartyProviderSnapshot(
+                new[] { new UnitSnapshot("unit-a", "Cleric", false, string.Empty, validation) },
+                new[] { provider }, new[] { pool });
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault("campaign:ui-filter");
+            var options = new[]
+            {
+                new ProviderPlanningOption(provider, new[] { "unit-a" }, new[] { "unit-a" }, 1, 10)
+            };
+            var model = new PlannerSetupModel(profile, snapshot,
+                new ActiveEffectSnapshot(new Dictionary<string, IEnumerable<string>>()),
+                new Dictionary<string, EffectExpression> { { ability.Canonical, Leaf("ui-filter-effect") } },
+                options, ignored => { });
+            var state = new CatalogFilterState();
+            CatalogFilterDiagnostics diagnostics;
+            List<SetupSourceRow> visible = state.Apply(model, "long", out diagnostics);
+            if (visible.Count != 1 || diagnostics.VisibleViewModels != 1 ||
+                diagnostics.AfterHidden != 1 || diagnostics.AfterAvailability != 1)
+                throw new InvalidOperationException("Default filters did not expose all available non-hidden entries.");
+
+            state.Search = "does-not-exist";
+            visible = state.Apply(model, "long", out diagnostics);
+            if (visible.Count != 0 || diagnostics.TotalEntries != 1 ||
+                diagnostics.AfterSearch != 0 || !diagnostics.ActiveFilters.Contains("does-not-exist"))
+                throw new InvalidOperationException("All-hiding filters did not preserve an explicit diagnostic cause.");
+
+            state.ConfiguredOnly = true;
+            state.RequestedOnly = true;
+            state.UnconfiguredOnly = true;
+            state.ShowHidden = true;
+            state.ShowUnavailable = true;
+            state.SortByLevel = true;
+            state.DurationFilter = 3;
+            state.SourceKindFilter = 2;
+            state.Reset();
+            visible = state.Apply(model, "long", out diagnostics);
+            if (visible.Count != 1 || state.Search.Length != 0 || state.ConfiguredOnly ||
+                state.RequestedOnly || state.UnconfiguredOnly || state.ShowHidden ||
+                state.ShowUnavailable || state.SortByLevel || state.DurationFilter != 0 ||
+                state.SourceKindFilter != -1)
+                throw new InvalidOperationException("Reset Filters did not restore the default visible catalog.");
         }
 
         private static void TestAnimatedExecutor()

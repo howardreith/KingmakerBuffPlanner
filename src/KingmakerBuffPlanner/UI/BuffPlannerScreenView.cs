@@ -37,16 +37,10 @@ namespace KingmakerBuffPlanner.UI
         private Text _catalogSummary;
         private InputField _search;
         private Button[] _routineTabs;
+        private Text[] _filterLabels;
         private readonly List<Button> _sourceRows = new List<Button>();
         private string _routineId = "long";
-        private bool _configuredOnly;
-        private bool _requestedOnly;
-        private bool _unconfiguredOnly;
-        private bool _showHidden;
-        private bool _sortByLevel;
-        private int _durationFilter;
-        private int _sourceKindFilter = -1;
-        private bool _showUnavailable;
+        private readonly CatalogFilterState _filters = new CatalogFilterState();
         private bool _resettingFilters;
         private bool _disposed;
 
@@ -366,33 +360,48 @@ namespace KingmakerBuffPlanner.UI
             filterLayout.childForceExpandWidth = true;
             filterLayout.childControlHeight = true;
             filterLayout.childForceExpandHeight = true;
-            KingmakerUiFactory.CreateButton("Configured", filters, _theme, "CONFIG", CycleConfigurationFilter);
-            KingmakerUiFactory.CreateButton("Duration", filters, _theme, "DURATION", () =>
+            Button configuredFilter = KingmakerUiFactory.CreateButton("Configured", filters, _theme,
+                "CONFIG: ALL", CycleConfigurationFilter);
+            Button durationFilter = KingmakerUiFactory.CreateButton("Duration", filters, _theme,
+                "DURATION: ALL", () =>
             {
-                _durationFilter = (_durationFilter + 1) % 4;
+                _filters.DurationFilter = (_filters.DurationFilter + 1) % 4;
                 RefreshCatalog();
             });
-            KingmakerUiFactory.CreateButton("Kind", filters, _theme, "SOURCE", () =>
+            Button sourceFilter = KingmakerUiFactory.CreateButton("Kind", filters, _theme,
+                "SOURCE: ALL", () =>
             {
-                _sourceKindFilter++;
-                if (_sourceKindFilter > 3) _sourceKindFilter = -1;
+                _filters.SourceKindFilter++;
+                if (_filters.SourceKindFilter > 3) _filters.SourceKindFilter = -1;
                 RefreshCatalog();
             });
-            KingmakerUiFactory.CreateButton("Sort", filters, _theme, "SORT", () =>
+            Button sortFilter = KingmakerUiFactory.CreateButton("Sort", filters, _theme,
+                "SORT: NAME", () =>
             {
-                _sortByLevel = !_sortByLevel;
+                _filters.SortByLevel = !_filters.SortByLevel;
                 RefreshCatalog();
             });
-            KingmakerUiFactory.CreateButton("Hidden", filters, _theme, "HIDDEN", () =>
+            Button hiddenFilter = KingmakerUiFactory.CreateButton("Hidden", filters, _theme,
+                "HIDDEN: OFF", () =>
             {
-                _showHidden = !_showHidden;
+                _filters.ShowHidden = !_filters.ShowHidden;
                 RefreshCatalog();
             });
-            KingmakerUiFactory.CreateButton("Availability", filters, _theme, "AVAIL", () =>
+            Button availabilityFilter = KingmakerUiFactory.CreateButton("Availability", filters, _theme,
+                "AVAIL: ONLY", () =>
             {
-                _showUnavailable = !_showUnavailable;
+                _filters.ShowUnavailable = !_filters.ShowUnavailable;
                 RefreshCatalog();
             });
+            _filterLabels = new[]
+            {
+                configuredFilter.GetComponentInChildren<Text>(),
+                durationFilter.GetComponentInChildren<Text>(),
+                sourceFilter.GetComponentInChildren<Text>(),
+                sortFilter.GetComponentInChildren<Text>(),
+                hiddenFilter.GetComponentInChildren<Text>(),
+                availabilityFilter.GetComponentInChildren<Text>()
+            };
 
             RectTransform filterStatus = KingmakerUiFactory.CreateRect("FilterStatus", panel);
             KingmakerUiFactory.SetAnchors(filterStatus, 0.02f, 0.75f, 0.98f, 0.81f);
@@ -484,6 +493,7 @@ namespace KingmakerBuffPlanner.UI
         private void RefreshSourceList()
         {
             if (_sourceContent == null) return;
+            UpdateFilterLabels();
             KingmakerUiFactory.DestroyChildren(_sourceContent);
             _sourceRows.Clear();
             PlannerSetupModel model = _session.Model;
@@ -500,7 +510,7 @@ namespace KingmakerBuffPlanner.UI
             }
             CatalogFilterDiagnostics filters;
             List<SetupSourceRow> sources = ApplyFilters(model, out filters);
-            sources = _sortByLevel
+            sources = _filters.SortByLevel
                 ? sources.OrderBy(source => source.SpellLevel)
                     .ThenBy(source => source.DisplayName, StringComparer.OrdinalIgnoreCase).ToList()
                 : sources.OrderBy(source => source.DisplayName, StringComparer.OrdinalIgnoreCase)
@@ -764,18 +774,19 @@ namespace KingmakerBuffPlanner.UI
 
         private void CycleConfigurationFilter()
         {
-            if (!_configuredOnly && !_requestedOnly && !_unconfiguredOnly) _configuredOnly = true;
-            else if (_configuredOnly)
+            if (!_filters.ConfiguredOnly && !_filters.RequestedOnly && !_filters.UnconfiguredOnly)
+                _filters.ConfiguredOnly = true;
+            else if (_filters.ConfiguredOnly)
             {
-                _configuredOnly = false;
-                _requestedOnly = true;
+                _filters.ConfiguredOnly = false;
+                _filters.RequestedOnly = true;
             }
-            else if (_requestedOnly)
+            else if (_filters.RequestedOnly)
             {
-                _requestedOnly = false;
-                _unconfiguredOnly = true;
+                _filters.RequestedOnly = false;
+                _filters.UnconfiguredOnly = true;
             }
-            else _unconfiguredOnly = false;
+            else _filters.UnconfiguredOnly = false;
             RefreshCatalog();
         }
 
@@ -783,100 +794,13 @@ namespace KingmakerBuffPlanner.UI
             PlannerSetupModel model,
             out CatalogFilterDiagnostics diagnostics)
         {
-            diagnostics = new CatalogFilterDiagnostics();
-            var active = new List<string>();
-            List<SetupSourceRow> values = model.Sources.ToList();
-            diagnostics.TotalEntries = values.Count;
-            RoutineProfile routine = model.Profile.Routines.First(item => item.RoutineId == _routineId);
-            diagnostics.AssignedToActiveGroup = routine.Assignments.Count;
-
-            string search = _search == null ? string.Empty : _search.text;
-            if (!string.IsNullOrWhiteSpace(search))
-            {
-                values = values.Where(source => source.DisplayName.IndexOf(
-                    search, StringComparison.OrdinalIgnoreCase) >= 0).ToList();
-                active.Add("search='" + search + "'");
-            }
-            diagnostics.AfterSearch = values.Count;
-
-            if (_configuredOnly)
-            {
-                values = values.Where(source => model.Profile.Routines.Any(group =>
-                    group.Assignments.Any(item => item.SourceId == source.SourceId))).ToList();
-                active.Add("configured only");
-            }
-            else if (_requestedOnly)
-            {
-                values = values.Where(source => model.Profile.Routines.Any(group =>
-                    group.Assignments.Any(item => item.SourceId == source.SourceId &&
-                        item.WantedTargetUnitIds.Count != 0))).ToList();
-                active.Add("requested only");
-            }
-            else if (_unconfiguredOnly)
-            {
-                values = values.Where(source => !model.Profile.Routines.Any(group =>
-                    group.Assignments.Any(item => item.SourceId == source.SourceId))).ToList();
-                active.Add("unconfigured only");
-            }
-            diagnostics.AfterConfigured = values.Count;
-
-            if (_durationFilter == 1)
-            {
-                values = values.Where(source => source.ExpectedDurationRounds > 0 &&
-                    source.ExpectedDurationRounds < 10).ToList();
-                active.Add("short duration");
-            }
-            else if (_durationFilter == 2)
-            {
-                values = values.Where(source => source.ExpectedDurationRounds >= 10).ToList();
-                active.Add("long duration");
-            }
-            else if (_durationFilter == 3)
-            {
-                values = values.Where(source => source.ExpectedDurationRounds == 0).ToList();
-                active.Add("unknown duration");
-            }
-            diagnostics.AfterDuration = values.Count;
-
-            if (_sourceKindFilter >= 0)
-            {
-                values = values.Where(source =>
-                    (int)source.Ability.SourceKind == _sourceKindFilter).ToList();
-                active.Add("source kind " + _sourceKindFilter);
-            }
-            diagnostics.AfterSource = values.Count;
-
-            if (!_showHidden)
-            {
-                values = values.Where(source =>
-                    !model.Profile.HiddenSourceIds.Contains(source.SourceId)).ToList();
-                active.Add("hidden excluded");
-            }
-            else active.Add("hidden included");
-            diagnostics.AfterHidden = values.Count;
-
-            if (!_showUnavailable)
-            {
-                values = values.Where(model.IsSourceAvailable).ToList();
-                active.Add("available only");
-            }
-            else active.Add("unavailable included");
-            diagnostics.AfterAvailability = values.Count;
-            diagnostics.VisibleViewModels = values.Count;
-            diagnostics.ActiveFilters = active.Count == 0 ? "none" : string.Join(", ", active.ToArray());
-            return values;
+            _filters.Search = _search == null ? string.Empty : _search.text;
+            return _filters.Apply(model, _routineId, out diagnostics);
         }
 
         private void ResetFilters()
         {
-            _configuredOnly = false;
-            _requestedOnly = false;
-            _unconfiguredOnly = false;
-            _showHidden = false;
-            _showUnavailable = false;
-            _sortByLevel = false;
-            _durationFilter = 0;
-            _sourceKindFilter = -1;
+            _filters.Reset();
             if (_search != null)
             {
                 _resettingFilters = true;
@@ -884,6 +808,25 @@ namespace KingmakerBuffPlanner.UI
                 _resettingFilters = false;
             }
             RefreshCatalog();
+        }
+
+        private void UpdateFilterLabels()
+        {
+            if (_filterLabels == null || _filterLabels.Length != 6) return;
+            string configured = _filters.ConfiguredOnly ? "CONFIGURED" :
+                _filters.RequestedOnly ? "REQUESTED" :
+                _filters.UnconfiguredOnly ? "UNCONFIGURED" : "ALL";
+            string duration = _filters.DurationFilter == 1 ? "SHORT" :
+                _filters.DurationFilter == 2 ? "LONG" :
+                _filters.DurationFilter == 3 ? "UNKNOWN" : "ALL";
+            string source = _filters.SourceKindFilter < 0 ? "ALL" :
+                _filters.SourceKindFilter.ToString();
+            _filterLabels[0].text = "CONFIG: " + configured;
+            _filterLabels[1].text = "DURATION: " + duration;
+            _filterLabels[2].text = "SOURCE: " + source;
+            _filterLabels[3].text = "SORT: " + (_filters.SortByLevel ? "LEVEL" : "NAME");
+            _filterLabels[4].text = "HIDDEN: " + (_filters.ShowHidden ? "ON" : "OFF");
+            _filterLabels[5].text = "AVAIL: " + (_filters.ShowUnavailable ? "ALL" : "ONLY");
         }
 
         private void AddCatalogAction(RectTransform parent, string label, Action action)
