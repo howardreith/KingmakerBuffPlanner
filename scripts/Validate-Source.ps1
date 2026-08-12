@@ -138,15 +138,17 @@ foreach ($lifecycleContract in @('ISceneHandler', 'IAreaLoadingStagesHandler',
 $assertions++
 
 $pointerOwnershipSource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\UI\PlannerPointerOwnership.cs') -Raw
-foreach ($pointerContract in @('PointerController', 'GetMethod("get_InGui"',
+foreach ($pointerContract in @('PointerController', 'GetMethod("Tick"',
         'RectangleContainsScreenPoint', 'scope=active-planner-regions-only',
-        'HarmonyPatchType.Postfix')) {
+        'HarmonyPatchType.Prefix', 'm_MouseDown', 'm_MouseDrag',
+        'return false')) {
     if (-not $pointerOwnershipSource.Contains($pointerContract)) {
         throw "Conditional physical pointer ownership is missing: $pointerContract"
     }
 }
-if ($pointerOwnershipSource.Contains('GetProperty("InGui"')) {
-    throw 'Exact 2.1.7b pointer ownership must not require a nonexistent PropertyInfo metadata row.'
+if ($pointerOwnershipSource.Contains('GetProperty("InGui"') -or
+    $pointerOwnershipSource.Contains('GetMethod("get_InGui"')) {
+    throw 'Exact 2.1.7b pointer ownership must not patch the metadata-less InGui getter.'
 }
 $mainSource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\Main.cs') -Raw
 foreach ($failSoftPatchContract in @('callbacks assigned;OnToggle=true',

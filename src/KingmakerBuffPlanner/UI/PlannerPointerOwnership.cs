@@ -15,6 +15,10 @@ namespace KingmakerBuffPlanner.UI
         private static readonly List<RectTransform> Regions = new List<RectTransform>();
         private static HarmonyInstance _harmony;
         private static MethodInfo _target;
+        private static FieldInfo _mouseDown;
+        private static FieldInfo _mouseDrag;
+        private static FieldInfo _mouseDownOn;
+        private static FieldInfo _mouseDownHandler;
         private static ModLog _log;
 
         internal static bool IsInstalled { get { return _harmony != null && _target != null; } }
@@ -23,18 +27,20 @@ namespace KingmakerBuffPlanner.UI
         {
             if (IsInstalled) return;
             _log = log ?? throw new ArgumentNullException("log");
-            // The exact 2.1.7b assembly exposes get_InGui as a method without a
-            // corresponding Property metadata row, so PropertyInfo lookup is invalid.
-            _target = typeof(PointerController).GetMethod("get_InGui",
+            _target = typeof(PointerController).GetMethod("Tick",
                 BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
                 null, Type.EmptyTypes, null);
             if (_target == null) throw new MissingMethodException(
-                typeof(PointerController).FullName, "get_InGui");
-            MethodInfo postfix = typeof(PlannerPointerOwnership).GetMethod("Postfix",
+                typeof(PointerController).FullName, "Tick");
+            _mouseDown = Field("m_MouseDown");
+            _mouseDrag = Field("m_MouseDrag");
+            _mouseDownOn = Field("m_MouseDownOn");
+            _mouseDownHandler = Field("m_MouseDownHandler");
+            MethodInfo prefix = typeof(PlannerPointerOwnership).GetMethod("Prefix",
                 BindingFlags.Static | BindingFlags.NonPublic);
             _harmony = HarmonyInstance.Create(HarmonyId);
-            _harmony.Patch(_target, null, new HarmonyMethod(postfix), null);
-            _log.Info("[KBP-INPUT] conditional PointerController.InGui ownership installed;" +
+            _harmony.Patch(_target, new HarmonyMethod(prefix), null, null);
+            _log.Info("[KBP-INPUT] conditional PointerController.Tick ownership installed;" +
                 "target=" + _target.DeclaringType.FullName + "." + _target.Name +
                 ";scope=active-planner-regions-only.");
         }
@@ -44,10 +50,14 @@ namespace KingmakerBuffPlanner.UI
             Regions.Clear();
             if (_harmony != null && _target != null)
             {
-                _harmony.Unpatch(_target, HarmonyPatchType.Postfix, HarmonyId);
+                _harmony.Unpatch(_target, HarmonyPatchType.Prefix, HarmonyId);
                 if (_log != null) _log.Info("[KBP-INPUT] conditional pointer ownership removed.");
             }
             _target = null;
+            _mouseDown = null;
+            _mouseDrag = null;
+            _mouseDownOn = null;
+            _mouseDownHandler = null;
             _harmony = null;
         }
 
@@ -72,9 +82,26 @@ namespace KingmakerBuffPlanner.UI
                     ResolveEventCamera(region)));
         }
 
-        private static void Postfix(ref bool __result)
+        private static bool Prefix(PointerController __instance)
         {
-            if (!__result && Contains(Input.mousePosition)) __result = true;
+            if (!Contains(Input.mousePosition)) return true;
+            if (__instance != null)
+            {
+                _mouseDown.SetValue(__instance, false);
+                _mouseDrag.SetValue(__instance, false);
+                _mouseDownOn.SetValue(__instance, null);
+                _mouseDownHandler.SetValue(__instance, null);
+            }
+            return false;
+        }
+
+        private static FieldInfo Field(string name)
+        {
+            FieldInfo field = typeof(PointerController).GetField(name,
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            if (field == null) throw new MissingFieldException(
+                typeof(PointerController).FullName, name);
+            return field;
         }
 
         private static Camera ResolveEventCamera(RectTransform region)

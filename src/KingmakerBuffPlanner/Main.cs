@@ -39,7 +39,7 @@ namespace KingmakerBuffPlanner
             {
                 PlannerPointerOwnership.Install(_log);
                 _log.Info("[KBP-BOOT] Harmony patch result;required=true;patchCount=1;" +
-                    "target=PointerController.get_InGui;scope=planner-pointer-regions.");
+                    "target=PointerController.Tick;scope=planner-pointer-regions.");
             }
             catch (Exception exception)
             {
