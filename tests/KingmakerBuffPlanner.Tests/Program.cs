@@ -86,6 +86,7 @@ namespace KingmakerBuffPlanner.Tests
                 Run("profile-malformed-json-recovers-default", () => TestProfileMalformed(root));
                 Run("setup-model-persists-stable-targets-and-provider-controls", TestSetupModel);
                 Run("catalog-filter-default-empty-and-reset-contract", TestCatalogFilterState);
+                Run("presentation-view-models-use-player-facing-deterministic-state", TestPresentationModels);
                 Run("input-lease-restores-on-close-and-acquire-failure", TestInputLease);
                 Run("screen-state-machine-is-idempotent", TestScreenStateMachine);
                 Run("ui-readiness-is-deferred-across-frames", TestDeferredUiReadiness);
@@ -924,6 +925,58 @@ namespace KingmakerBuffPlanner.Tests
                 state.ShowUnavailable || state.SortByLevel || state.DurationFilter != 0 ||
                 state.SourceKindFilter != -1)
                 throw new InvalidOperationException("Reset Filters did not restore the default visible catalog.");
+        }
+
+        private static void TestPresentationModels()
+        {
+            AbilityKey ability = Ability("ui-presentation-source", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("ui-presentation-free",
+                ResourcePoolKind.Unlimited, 0, 0, null);
+            ProviderSnapshot provider = PlannerProvider("unit-a", "book-ui-presentation",
+                ability, "ui-presentation-free", 0);
+            var validation = new TargetValidationSnapshot(true, true, true, true);
+            var unit = new UnitSnapshot("unit-a", "Ret", false, string.Empty, validation);
+            var snapshot = new PartyProviderSnapshot(new[] { unit }, new[] { provider }, new[] { pool });
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault("campaign:ui-presentation");
+            var options = new[]
+            {
+                new ProviderPlanningOption(provider, new[] { "unit-a" },
+                    new[] { "unit-a" }, 1, 10)
+            };
+            var model = new PlannerSetupModel(profile, snapshot,
+                new ActiveEffectSnapshot(new Dictionary<string, IEnumerable<string>>()),
+                new Dictionary<string, EffectExpression>
+                {
+                    { ability.Canonical, Leaf("ui-presentation-effect") }
+                }, options, ignored => { });
+            BuffCardViewModel card = new BuffCardViewModel(model.Sources[0], model, true);
+            if (card.Name.Length == 0 || card.Availability != "At will" ||
+                card.Status != PlannerPresentationStatus.Neutral || !card.Selected ||
+                card.SourceType != "Spell" || card.RoutineBadge.Length != 0)
+                throw new InvalidOperationException("Neutral card presentation is invalid.");
+            model.ToggleRoutine("long");
+            card = new BuffCardViewModel(model.Sources[0], model, false);
+            if (card.Status != PlannerPresentationStatus.Warning || card.RoutineBadge != "L" ||
+                card.Configuration != "Choose targets")
+                throw new InvalidOperationException("Configured no-target warning is invalid.");
+            model.ToggleTarget("long", "unit-a");
+            card = new BuffCardViewModel(model.Sources[0], model, false);
+            if (card.Status != PlannerPresentationStatus.Success ||
+                card.Configuration != "1 target configured")
+                throw new InvalidOperationException("Fulfillable card state is invalid.");
+            var casting = new CastingSourceSummaryViewModel(model.Sources[0], model);
+            var target = new TargetPortraitViewModel(unit, true, true, true, false);
+            var warningTarget = new TargetPortraitViewModel(unit, true, true, false, false);
+            var invalidTarget = new TargetPortraitViewModel(unit, false, false, false, false);
+            var routine = new RoutineSummaryViewModel("long", "Long", 1, 1);
+            var settings = new PlannerSettingsViewModel(profile);
+            if (!casting.Summary.StartsWith("Automatic", StringComparison.Ordinal) ||
+                casting.Summary.Contains(provider.Key.Canonical) ||
+                target.Status != PlannerPresentationStatus.Success ||
+                warningTarget.Status != PlannerPresentationStatus.Warning ||
+                invalidTarget.Status != PlannerPresentationStatus.Failure ||
+                routine.Label != "Long     1/1 ready" || settings.CastingMode != "Animated")
+                throw new InvalidOperationException("Player-facing presentation summaries are invalid.");
         }
 
         private static void TestAnimatedExecutor()

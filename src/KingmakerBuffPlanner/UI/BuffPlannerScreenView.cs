@@ -4,8 +4,10 @@ using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using Kingmaker;
+using Kingmaker.Blueprints;
 using Kingmaker.EntitySystem.Entities;
 using Kingmaker.UI;
+using Kingmaker.UnitLogic.Abilities.Blueprints;
 using KingmakerBuffPlanner.Domain.Identity;
 using KingmakerBuffPlanner.Domain.Planning;
 using KingmakerBuffPlanner.Domain.Providers;
@@ -569,25 +571,13 @@ namespace KingmakerBuffPlanner.UI
             {
                 try
                 {
-                    bool selected = source.SourceId == model.SelectedSourceId;
-                    bool assigned = model.Profile.Routines.Any(routine =>
-                        routine.Assignments.Any(assignment => assignment.SourceId == source.SourceId));
-                    bool available = model.IsSourceAvailable(source);
-                    string label = (assigned ? "[+] " : "[ ] ") + source.DisplayName +
-                        "   L" + source.SpellLevel + "   " + source.Providers.Count + " providers" +
-                        (available ? string.Empty : "   UNAVAILABLE: " +
-                            model.GetSourceUnavailableReason(source));
-                    Button row = KingmakerUiFactory.CreateButton("Source." + source.SourceId,
-                        _sourceContent, _theme, label, () =>
-                        {
-                            model.SelectSource(source.SourceId);
-                            RefreshCatalog();
-                        });
-                    KingmakerUiFactory.AddLayout((RectTransform)row.transform, 42);
-                    Text rowText = row.GetComponentInChildren<Text>();
-                    if (rowText != null) rowText.alignment = TextAnchor.MiddleLeft;
-                    Image rowImage = row.targetGraphic as Image;
-                    if (selected && rowImage != null) rowImage.color = _theme.BurgundyPrimary;
+                    var cardModel = new BuffCardViewModel(source, model,
+                        source.SourceId == model.SelectedSourceId);
+                    Button row = CreateBuffCard(_sourceContent, source, cardModel, () =>
+                    {
+                        model.SelectSource(source.SourceId);
+                        RefreshCatalog();
+                    });
                     _sourceRows.Add(row);
                 }
                 catch (Exception exception)
@@ -630,6 +620,97 @@ namespace KingmakerBuffPlanner.UI
             }
             FinalizeScrollContent(_sourceContent, _sourceViewport);
             LastCatalogDiagnostics = new CatalogLayoutDiagnostics { Filters = filters };
+        }
+
+        private Button CreateBuffCard(RectTransform parent, SetupSourceRow source,
+            BuffCardViewModel card, Action select)
+        {
+            RectTransform rect = KingmakerUiFactory.CreateRect("Source." + source.SourceId, parent);
+            Image background = KingmakerUiFactory.AddPanel(rect, _theme.ParchmentRaised,
+                _theme.NativeCardSprite);
+            Button button = rect.gameObject.AddComponent<Button>();
+            button.targetGraphic = background;
+            button.onClick.AddListener(() => select());
+            KingmakerUiFactory.AddLayout(rect, 76);
+
+            RectTransform status = KingmakerUiFactory.CreateRect("Status", rect);
+            KingmakerUiFactory.SetAnchors(status, 0, 0, 0.018f, 1, 2, 0, 3, 3);
+            Image statusImage = KingmakerUiFactory.AddPanel(status, StatusColor(card.Status));
+            statusImage.raycastTarget = false;
+
+            RectTransform iconFrame = KingmakerUiFactory.CreateRect("IconFrame", rect);
+            KingmakerUiFactory.SetAnchors(iconFrame, 0.025f, 0.10f, 0.145f, 0.90f);
+            Image iconBackground = KingmakerUiFactory.AddPanel(iconFrame, Color.white,
+                _theme.NativeCardNameSprite);
+            iconBackground.raycastTarget = false;
+            Sprite icon = ResolveAbilityIcon(source);
+            if (icon != null)
+            {
+                RectTransform iconRect = KingmakerUiFactory.CreateRect("AbilityIcon", iconFrame);
+                KingmakerUiFactory.Stretch(iconRect, 4, 4, 4, 4);
+                Image iconImage = iconRect.gameObject.AddComponent<Image>();
+                iconImage.sprite = icon;
+                iconImage.preserveAspect = true;
+                iconImage.raycastTarget = false;
+            }
+            else
+            {
+                Text fallback = KingmakerUiFactory.CreateText("MissingIcon", iconFrame, _theme,
+                    "?", 26, TextAnchor.MiddleCenter);
+                fallback.color = _theme.MutedBrownText;
+                KingmakerUiFactory.Stretch(fallback.rectTransform);
+            }
+
+            Text name = KingmakerUiFactory.CreateText("Name", rect, _theme,
+                card.Name, 17, TextAnchor.MiddleLeft);
+            name.fontStyle = FontStyle.Bold;
+            KingmakerUiFactory.SetAnchors(name.rectTransform, 0.16f, 0.47f, 0.78f, 0.94f);
+            Text badge = KingmakerUiFactory.CreateText("RoutineBadge", rect, _theme,
+                card.RoutineBadge, 14, TextAnchor.MiddleCenter);
+            badge.color = _theme.BurgundyPrimary;
+            KingmakerUiFactory.SetAnchors(badge.rectTransform, 0.80f, 0.53f, 0.97f, 0.92f);
+            Text availability = KingmakerUiFactory.CreateText("Availability", rect, _theme,
+                card.Availability, 14, TextAnchor.MiddleLeft);
+            availability.color = _theme.MutedBrownText;
+            KingmakerUiFactory.SetAnchors(availability.rectTransform, 0.16f, 0.08f, 0.55f, 0.48f);
+            Text configured = KingmakerUiFactory.CreateText("Configuration", rect, _theme,
+                card.Configuration, 13, TextAnchor.MiddleRight);
+            configured.color = StatusColor(card.Status);
+            KingmakerUiFactory.SetAnchors(configured.rectTransform, 0.54f, 0.08f, 0.97f, 0.48f);
+
+            if (card.Selected)
+            {
+                RectTransform selected = KingmakerUiFactory.CreateRect("Selected", rect);
+                KingmakerUiFactory.Stretch(selected, 1, 1, 1, 1);
+                Image selectedImage = KingmakerUiFactory.AddPanel(selected,
+                    _theme.NativeSelectedOrnament == null
+                        ? new Color(_theme.BurgundyPrimary.r, _theme.BurgundyPrimary.g,
+                            _theme.BurgundyPrimary.b, 0.18f)
+                        : Color.white,
+                    _theme.NativeSelectedOrnament);
+                selectedImage.raycastTarget = false;
+            }
+            return button;
+        }
+
+        private Sprite ResolveAbilityIcon(SetupSourceRow source)
+        {
+            string guid = string.IsNullOrEmpty(source.Ability.VariantGuid)
+                ? source.Ability.BaseAbilityGuid : source.Ability.VariantGuid;
+            BlueprintAbility ability = ResourcesLibrary.TryGetBlueprint<BlueprintAbility>(guid);
+            return ability == null ? null : ability.Icon;
+        }
+
+        private Color StatusColor(PlannerPresentationStatus status)
+        {
+            switch (status)
+            {
+                case PlannerPresentationStatus.Success: return _theme.GreenSuccess;
+                case PlannerPresentationStatus.Warning: return _theme.AmberWarning;
+                case PlannerPresentationStatus.Failure: return _theme.RedFailure;
+                case PlannerPresentationStatus.Disabled: return _theme.DisabledGray;
+                default: return _theme.MutedBrownText;
+            }
         }
 
         private void RefreshDetails()

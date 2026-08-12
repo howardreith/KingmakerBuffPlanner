@@ -125,6 +125,7 @@
     <Compile Include="RuntimeTesting\RuntimePaths.cs" />
     <Compile Include="RuntimeTesting\RuntimeTestProtocol.cs" />
     <Compile Include="UI\PlannerSetupModel.cs" />
+    <Compile Include="UI\PlannerPresentationModels.cs" />
     <Compile Include="UI\CatalogUiDiagnostics.cs" />
     <Compile Include="UI\CatalogLayoutDiagnostics.cs" />
     <Compile Include="UI\BuffPlannerUiContracts.cs" />

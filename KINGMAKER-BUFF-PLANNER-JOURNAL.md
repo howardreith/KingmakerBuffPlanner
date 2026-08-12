@@ -550,3 +550,11 @@ Status: ROOT CAUSE PROVEN; 0.0.4 SOURCE PASS; LIVE QUALIFICATION PENDING
 - Centralized exact optional paths and every fallback in `PlannerUiTheme`: parchment, header/card chrome, normal/pressed buttons, toggles, portrait frame, selected ornament, body/header fonts, brown text, burgundy, antique gold, green, amber, red, and disabled gray.
 - `BuffPlannerScreenView` keeps the existing overlay/layout/callback/input lifecycle while consuming the new theme roles. No mechanics or HUD source changed.
 - Full post-phase mechanical suite: source 30/30, behavior 62/62, runtime filesystem 7/7, deployment WhatIf 5/5, source-only 1/1. Exact next action: checkpoint Phase A, then introduce UI-only card/status view models and blueprint-icon resolution for Phase B.
+
+## Phase B icon-first buff cards — 2026-08-12
+
+- Added explicit presentation-only models for buff cards, target portraits, casting-source summaries, routine summaries, and settings. They format player language and deterministic neutral/green/amber/red state without altering stored identities or planner decisions.
+- Replaced text-only catalog button content with a 76px Kingmaker card: real `BlueprintAbility.Icon` when present, stable neutral `?` fallback, name, L/I/S badge, availability, configured target summary, status ribbon, and selected ornament/fallback overlay.
+- Raw provider keys and `Fact` no longer appear in card presentation. Source kinds map to Spell/Ability/Item, resource state maps to At will/prepared/available or direct player-facing failure text.
+- Added behavior coverage for neutral/warning/success cards, source summary privacy, target-state mapping, readiness text, and settings language. Full post-phase mechanical suite: source 30/30, behavior 63/63, runtime filesystem 7/7, deployment WhatIf 5/5, source-only 1/1, Release build 1/1, package 4/4.
+- Exact next action: checkpoint Phase B, then add legal/fulfilled portrait view construction, selected-buff icon hierarchy, bulk target actions, hover-only preview, and concise plan status for Phase C.

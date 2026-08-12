@@ -181,3 +181,10 @@ Status: INSTALLED FOR HUMAN UI RETEST — campaign UI and save-backed qualificat
 - `ui-polish-0.0.6-native-inventory-2/native-ui-contract.json` is the exact Kingmaker 2.1.7b campaign inventory. Its run timed out at the UMM overlay before HUD readiness, then restored exactly. No lock/process remains.
 - The theme shell now uses role tokens and exact optional Kingmaker paths with centralized fallbacks; presentation hierarchy and behavior are unchanged. Mechanical regression is fully green.
 - Exact next command: commit Phase A, add/test `BuffCardViewModel` and icon resolver, render icon-first cards, then rerun `./scripts/Test-SourceOnly.ps1` before Phase C.
+
+## Phase B checkpoint — 2026-08-12
+
+- Phase A commit: `1e0b5ed`. Phase B icon-first card/view-model source is uncommitted and passes source 30/30, behavior 63/63, harness 7/7, deployment WhatIf 5/5, Release build 1/1, package 4/4.
+- Catalog cards resolve actual blueprint icons without changing discovery data and use a stable centralized neutral fallback. Player-facing state is derived from the existing model/profile only.
+- External state is restored and idle; installed qualified MVP 0.0.6 remains unchanged.
+- Exact next command: commit Phase B, implement Phase C portrait legality/fulfillment/hover and selected detail hierarchy, then run the complete mechanical suite.
