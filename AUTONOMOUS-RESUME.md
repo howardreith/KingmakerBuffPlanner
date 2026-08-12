@@ -1,5 +1,13 @@
 # Autonomous Resume
 
+## Catalog/HUD input/tooltip R3 implementation checkpoint — 2026-08-12
+
+- Status: IN PROGRESS. Root cause evidence is committed at `f99f0b1`; the first repair implementation is committed at `06ac7177d0b63e4f77ea7e25347c035bc4342cf5` on `codex/kingmaker-buff-planner`; version is `0.0.5`.
+- Implemented: end-to-end catalog/filter/layout diagnostics, explicit nonblank catalog states, manual scroll-content sizing, selection/details binding checks, generic provider availability, Bless vertical-slice logging, one cached non-layout/non-raycast/clamped tooltip, independently refreshed quick actions with exact refusal/result logs, and a Harmony12 postfix limited to `PointerController.InGui` while the pointer is inside registered planner rectangles.
+- Local gates: source `27/27`, protocol `60/60`, runtime-harness filesystem `7/7`, package `4/4`, deployment WhatIf `5/5`, source-only suite `1/1`; `git diff --check` has no errors.
+- External state remains unchanged: Kingmaker/UMM closed; installed 0.0.4 remains exact; no deployment lock or unresolved transaction; immutable baseline remains protected.
+- Exact next action: commit this checkpoint record, build the clean 0.0.5 package, then run `./scripts/Invoke-KingmakerRuntimeTest.ps1 -Scenario live-ui-bootstrap -CompatibilityProfileId human-reproduction -RunId catalog-input-0.0.5-live-diag-1 -Confirm:$false` to obtain real-campaign catalog geometry and Bless evidence before strengthening the physical mouse scenario.
+
 ## Catalog/HUD input/tooltip R3 intake — 2026-08-12
 
 - Status: IN PROGRESS. Human verdict partially passes 0.0.4 bootstrap/presentation but blocks release on blank catalog/details, tooltip flicker/width, HUD click-to-move, and unhelpful quick actions.
