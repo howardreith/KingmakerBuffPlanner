@@ -141,7 +141,8 @@ $pointerOwnershipSource = Get-Content -LiteralPath (Join-Path $root 'src\Kingmak
 foreach ($pointerContract in @('PointerController', 'GetMethod("Tick"',
         'RectangleContainsScreenPoint', 'scope=active-planner-regions-only',
         'HarmonyPatchType.Prefix', 'm_MouseDown', 'm_MouseDrag',
-        'return false')) {
+        'return false', 'GetCameraScrollShiftByMouse', 'CameraPostfix',
+        '__result = Vector2.zero')) {
     if (-not $pointerOwnershipSource.Contains($pointerContract)) {
         throw "Conditional physical pointer ownership is missing: $pointerContract"
     }

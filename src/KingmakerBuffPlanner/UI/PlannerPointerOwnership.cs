@@ -4,6 +4,7 @@ using System.Linq;
 using System.Reflection;
 using Harmony12;
 using Kingmaker.Controllers.Clicks;
+using Kingmaker.View;
 using KingmakerBuffPlanner.Infrastructure;
 using UnityEngine;
 
@@ -15,6 +16,7 @@ namespace KingmakerBuffPlanner.UI
         private static readonly List<RectTransform> Regions = new List<RectTransform>();
         private static HarmonyInstance _harmony;
         private static MethodInfo _target;
+        private static MethodInfo _cameraTarget;
         private static FieldInfo _mouseDown;
         private static FieldInfo _mouseDrag;
         private static FieldInfo _mouseDownOn;
@@ -38,11 +40,29 @@ namespace KingmakerBuffPlanner.UI
             _mouseDownHandler = Field("m_MouseDownHandler");
             MethodInfo prefix = typeof(PlannerPointerOwnership).GetMethod("Prefix",
                 BindingFlags.Static | BindingFlags.NonPublic);
+            _cameraTarget = typeof(CameraRig).GetMethod("GetCameraScrollShiftByMouse",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                null, Type.EmptyTypes, null);
+            if (_cameraTarget == null) throw new MissingMethodException(
+                typeof(CameraRig).FullName, "GetCameraScrollShiftByMouse");
+            MethodInfo cameraPostfix = typeof(PlannerPointerOwnership).GetMethod(
+                "CameraPostfix", BindingFlags.Static | BindingFlags.NonPublic);
             _harmony = HarmonyInstance.Create(HarmonyId);
             _harmony.Patch(_target, new HarmonyMethod(prefix), null, null);
+            try
+            {
+                _harmony.Patch(_cameraTarget, null, new HarmonyMethod(cameraPostfix), null);
+            }
+            catch
+            {
+                _harmony.Unpatch(_target, HarmonyPatchType.Prefix, HarmonyId);
+                _harmony = null;
+                throw;
+            }
             _log.Info("[KBP-INPUT] conditional PointerController.Tick ownership installed;" +
                 "target=" + _target.DeclaringType.FullName + "." + _target.Name +
-                ";scope=active-planner-regions-only.");
+                ";cameraTarget=" + _cameraTarget.DeclaringType.FullName + "." +
+                _cameraTarget.Name + ";scope=active-planner-regions-only.");
         }
 
         internal static void Uninstall()
@@ -51,9 +71,12 @@ namespace KingmakerBuffPlanner.UI
             if (_harmony != null && _target != null)
             {
                 _harmony.Unpatch(_target, HarmonyPatchType.Prefix, HarmonyId);
+                if (_cameraTarget != null)
+                    _harmony.Unpatch(_cameraTarget, HarmonyPatchType.Postfix, HarmonyId);
                 if (_log != null) _log.Info("[KBP-INPUT] conditional pointer ownership removed.");
             }
             _target = null;
+            _cameraTarget = null;
             _mouseDown = null;
             _mouseDrag = null;
             _mouseDownOn = null;
@@ -93,6 +116,11 @@ namespace KingmakerBuffPlanner.UI
                 _mouseDownHandler.SetValue(__instance, null);
             }
             return false;
+        }
+
+        private static void CameraPostfix(ref Vector2 __result)
+        {
+            if (Contains(Input.mousePosition)) __result = Vector2.zero;
         }
 
         private static FieldInfo Field(string name)

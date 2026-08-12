@@ -120,7 +120,8 @@ $contracts = [ordered]@{
         'OnGameModeStart', 'OnGameModeStop', 'HandleFullScreenUiChanged', 'SetHUDVisible')
     'Kingmaker.GameModes.GameModesFactory' = @('Create', 'Initialize')
     'Kingmaker.Controllers.Clicks.PointerController' = @('get_InGui', 'Tick', 'Activate', 'Deactivate')
-    'Kingmaker.View.CameraRig' = @('OnGameModeStart', 'OnGameModeStop', 'UpdateInternal')
+    'Kingmaker.View.CameraRig' = @('OnGameModeStart', 'OnGameModeStop', 'UpdateInternal',
+        'TickScroll', 'GetCameraScrollShiftByMouse', 'IsScrollActive', 'get_AnyMoveCameraKeyIsDown')
     'Kingmaker.View.CameraZoom' = @('UpdateInputFromMouse')
 }
 

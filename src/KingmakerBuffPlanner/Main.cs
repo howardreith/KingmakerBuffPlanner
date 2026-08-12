@@ -38,8 +38,9 @@ namespace KingmakerBuffPlanner
             try
             {
                 PlannerPointerOwnership.Install(_log);
-                _log.Info("[KBP-BOOT] Harmony patch result;required=true;patchCount=1;" +
-                    "target=PointerController.Tick;scope=planner-pointer-regions.");
+                _log.Info("[KBP-BOOT] Harmony patch result;required=true;patchCount=2;" +
+                    "targets=PointerController.Tick,CameraRig.GetCameraScrollShiftByMouse;" +
+                    "scope=planner-pointer-regions.");
             }
             catch (Exception exception)
             {
