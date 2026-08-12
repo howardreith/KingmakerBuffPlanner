@@ -1,5 +1,17 @@
 # Implementation Report
 
+## 0.0.5 catalog, HUD input, quick action, and tooltip repair — complete
+
+The authoritative human verdict was a partial pass: live bootstrap and the opaque F10 planner worked, but no catalog rows/details rendered, HUD clicks leaked into world input, quick actions lacked useful outcomes, and the tooltip flickered/offscreen. The repair preserved the bootstrap/modal and changed the four bounded failure paths only.
+
+The populated live model was not stale: 18 raw sources produced 11 beneficial normalized entries and 11 providers. The earliest missing stage was post-binding scroll geometry. Explicit layout/content sizing plus separate filter/view-model/GameObject/active/visible diagnostics now prove 10 available rows, non-zero content and row bounds, and bound details. Binding failures are visible and logged; filtered and genuine empty states have distinct reasons and recovery actions.
+
+The tooltip and feedback labels had participated in the HUD `HorizontalLayoutGroup`, shifting the hovered controls and causing enter/exit oscillation. They now ignore layout; the single tooltip is non-raycastable, bounded, wrapped, inward placed, and clamped. Exact 2.1.7b inspection showed world click and edge scrolling bypass Unity UI raycast consumption, so scoped pointer ownership intercepts only native pointer ticks and mouse-edge camera shift while the cursor is over registered KBP regions.
+
+Quick actions now prove pointer receipt, one listener invocation, group/profile/configuration resolution, plan refresh, validation, execution/refusal, confirmation, and visible presentation. An unexpected coroutine boundary clears executing state and displays the full failure. The final controlled Bless run correctly reported `material-component-unavailable` before submission; it did not claim application.
+
+Final gates: source 28/28; behavior/protocol 61/61; harness 7/7; package 4/4; deployment WhatIf 5/5; two physical campaign runs 69/69; native 12/12; Call of the Wild 26/26; deterministic release builds 2/2. Qualified source `c2e7eb4`; package `bf64559b...`; DLL `c17af569...`; MVID `33d87046-...`. Guarded install preserved settings and every non-planner mod.
+
 ## 0.0.4 live bootstrap recovery — complete
 
 The installed 0.0.3 DLL was byte-identical to its release and UMM did invoke `Main.Load`, `OnToggle(true)`, and `OnUpdate`; production used zero Harmony patches. The earliest shared defect was same-frame EventSystem ownership validation immediately after constructing HUD/modal graphics. Real-campaign qualification then exposed two additional exact HUD boundaries: native layout participation overrode the row anchor, and world coordinates were supplied to a screen-space pointer hit test. Version 0.0.4 defers readiness, excludes only the KBP row from native layout, converts centers through the native raycaster event camera, and keeps failed candidates retryable with exact diagnostics.

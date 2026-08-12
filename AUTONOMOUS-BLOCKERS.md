@@ -1,5 +1,7 @@
 # Autonomous Blockers
 
+Catalog/HUD/input/tooltip repair final status, 2026-08-12: COMPLETE; no critical blocker. Exact 0.0.5 passed two fresh-process physical campaign runs (69/69 each), native (12/12), and Call of the Wild (26/26), with every transaction restored. Guarded install preserved settings and all non-planner mods. Human visual retest is the remaining handoff, not an automated qualification blocker. Historical blocker sections below remain records only.
+
 Live-bootstrap recovery final status, 2026-08-12: COMPLETE; no critical blocker. Two exact disposable-save fresh-process runs pass 65/65, native and Call of the Wild regressions pass, all runtime transactions restored, and guarded 0.0.4 installation preserved settings and every non-planner mod. Older pending/blocker sections below are historical project records and do not reopen this bounded recovery mission.
 
 Live-bootstrap update, 2026-08-12 12:10Z: no critical safety blocker exists. The guarded human-reproduction profile loads the exact disposable campaign. Its first diagnostic run restored exactly and exposed native layout participation as the earliest HUD failure; the source repair and local gates pass. A later pre-launch transaction entry fault was recovered through its exact owned state: original Mods manifest equality is true, restoration is verified, and no lock/staging/process remains. Two fresh-process live qualification passes, final packaging, and guarded installation remain pending.

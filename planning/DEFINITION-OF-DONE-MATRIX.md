@@ -1,5 +1,24 @@
 # Definition of Done Matrix
 
+## 0.0.5 catalog/HUD/input/tooltip repair
+
+| Criterion | Result | Exact evidence |
+|---|---|---|
+| Preserve live bootstrap/modal | PASS | Both final physical runs: four ordered HUD buttons, physical F10 armed/observed, opaque 100% screen coverage, balanced close/restoration. |
+| Populate live catalog/details | PASS | 11 entries -> 10 available VMs -> 10 instantiated/active rows -> 5 viewport-visible; details bound; no binding failure. |
+| Bless generic vertical slice | PASS | Blueprint `90e59f4a4ada87243b7b3535a06d0638`; spellbook source; provider 1; prepared/available; visible/active row with non-zero bounds; selectable/configurable. |
+| Filter/empty recovery | PASS | Default available/non-hidden behavior plus deterministic all-hiding diagnostics and Reset Filters; filter counts and active filter labels are explicit. |
+| HUD/modal input ownership | PASS | Physical deltas player/move/ability/selection/target all 0; selection/camera unchanged; underlying native activation 0. |
+| Tooltip lifecycle | PASS | 60-frame hover, one enter delta, four listeners, zero raycast graphics, no blocking, bounds fully in screen. |
+| Quick-action feedback/confirmation | PASS | Three exact empty-group outcomes; configured Bless refused exactly at material validation, submitted/confirmed 0, no false success. |
+| Rebuild/close cleanliness | PASS | 21 cycles; 22 creates/22 destroys after close; no duplicate root or stale input lease. |
+| Disposable saves and Mods safety | PASS | Only exact Working loaded; baseline `afca8ac5...` immutable; every final transaction restoration verified. |
+| Compatibility | PASS | Final native 12/12; Call of the Wild 26/26. |
+| Package/install | PASS | Deterministic 2/2 local-only ZIP; guarded install exact; settings preserved; other mods unchanged. |
+| Human visual confirmation | PENDING HUMAN | Installed 0.0.5 awaits authoritative check for smooth tooltip appearance and ordinary interaction. |
+
+Qualified source: `c2e7eb4266c4202f2406173018d249f338efb796`. Package: `bf64559b7980a3c0ee68dfa27a27839976fbbf3521610c0f74dc44eece39a26d`. DLL: `c17af5699af3b2d099a5859b018d9d3ac6e1ee9568da76caa8f1b0313c7a86cc`. MVID: `33d87046-720a-4e90-8259-27e283b10ba2`.
+
 ## 0.0.4 live-bootstrap recovery correction
 
 The live-bootstrap recovery rows are complete and supersede stale “no authorized save” or “campaign pending” text retained below as project history. The explicit baseline/working pair exists. Runs `bootstrap-0.0.4-human-live-6` and `bootstrap-0.0.4-human-live-7` passed 65/65 each in fresh processes and proved one four-button HUD row, independently observed physical F10, visible planner presentation before input acquisition, 21 balanced open/close cycles, no duplicates/click-through/world input, immutable baseline, and exact Mods restoration. Native 12/12 and Call of the Wild 26/26 exact-release regressions also pass. Release `5b96f3b` is deterministic, local-only, and guarded-installed with settings preserved and other mods unchanged.

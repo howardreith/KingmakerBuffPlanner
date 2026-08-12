@@ -1,5 +1,16 @@
 # Autonomous Resume
 
+## Catalog/HUD R3 complete and installed — 2026-08-12
+
+- Status: COMPLETE for automated acceptance; installed 0.0.5 is ready for authoritative human visual retest. Branch `codex/kingmaker-buff-planner`; qualified release source `c2e7eb4266c4202f2406173018d249f338efb796`; documentation-only checkpoint follows it.
+- Release identity: package `bf64559b7980a3c0ee68dfa27a27839976fbbf3521610c0f74dc44eece39a26d`; DLL `c17af5699af3b2d099a5859b018d9d3ac6e1ee9568da76caa8f1b0313c7a86cc`; MVID `33d87046-720a-4e90-8259-27e283b10ba2`; CLR version 0.0.5.0; deterministic builds 2/2; local-only.
+- Exact final campaign runs: `catalog-input-0.0.5-identity-final-physical-1` and `catalog-input-0.0.5-identity-final-physical-2`, 69/69 each. Both show 11 total entries, 10 available view models, 10 instantiated/active rows, 5 viewport-visible rows after final layout, selected details bound, and a visible/active/available spellbook Bless row.
+- Physical input evidence is `0/0/0/0/0/True/True/0` for player/movement/ability/selection/target deltas, unchanged selection/camera, and native activation. Tooltip held for 60 frames with one new enter, four listeners, zero raycast graphics, `blocksRaycasts=false`, and in-screen bounds.
+- Empty Long/Important/Short outcomes are explicit. Configured Bless produced exact refusal `FailedValidation ... material-component-unavailable`, with planned 1, submitted 0, confirmed 0; no success was claimed.
+- Native run `catalog-input-0.0.5-identity-final-native` passed 12/12; Call of the Wild `catalog-input-0.0.5-identity-final-cotw` passed 26/26. All Mods restorations verified. Immutable baseline remains `afca8ac5e42219bc50f428eb334a657cbcc2e31e8f2eb39c6ab53691cbb076d3`; only Working changed through permitted game loads.
+- Install `catalog-input-0.0.5-identity-final-install` is `Installed`; external settings preserved and every non-planner mod unchanged. No Kingmaker process or unresolved transaction remains.
+- Exact next action: human retest installed 0.0.5 using the checklist in `docs/MANUAL-ACCEPTANCE.md`; do not rebuild, merge, or publish this qualified binary.
+
 ## Catalog/HUD R3 physical qualification checkpoint — 2026-08-12
 
 - Current HEAD `122e560` on `codex/kingmaker-buff-planner`; version 0.0.5. `catalog-input-0.0.5-live-diag-2` passed/restored and proved 10 live active rows, 4 viewport-visible rows, bound details, and visible/prepared/available Bless, but used the prior synthetic HUD click gate.

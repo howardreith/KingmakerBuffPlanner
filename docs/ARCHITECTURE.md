@@ -1,6 +1,16 @@
 # Architecture
 
-Status: 0.0.4 live-bootstrap architecture qualified twice in real campaigns and guarded-installed
+Status: 0.0.5 catalog/HUD/input/tooltip architecture qualified twice in real campaigns and guarded-installed
+
+## 0.0.5 catalog presentation and pointer ownership
+
+`KingmakerPartySnapshotBuilder` emits structural source/provider/effect data and bounded discovery counts. `PlannerUiSession` owns refresh, profile/plan orchestration, quick-result state, and full exception reporting. `PlannerSetupModel` exposes stable source/provider/availability state. `CatalogFilterState` is the non-Unity policy for ordered search/configuration/duration/source/hidden/availability filtering; the retained view consumes its values and diagnostics, then measures instantiated, active, and viewport-visible rows separately.
+
+The retained screen explicitly rebuilds scroll content, binds the first visible source when needed, surfaces row/details exceptions, and distinguishes filtered-empty from genuinely unavailable catalogs. Filter controls display their current mode and Reset Filters restores the available/non-hidden default.
+
+`PlannerPointerOwnership` registers only live KBP rectangles. Legacy Harmony prefixes `PointerController.Tick` only while the pointer is inside one of those rectangles, and the narrow camera postfix zeros edge-scroll shift under the same condition. Outside planner regions native input is untouched. Full-screen input remains controlled by the existing validated input lease.
+
+The HUD owns one cached tooltip outside horizontal-layout participation. Its `CanvasGroup` and all graphics are non-raycastable, it is width-bounded/wrapped and clamped into the active screen, and its listeners are installed once per button. Quick execution remains session/service orchestration and reports only confirmed effects as applied.
 
 Kingmaker Buff Planner is one standalone Unity Mod Manager mod. The assembly, namespace, UMM ID, persistence, package, runtime runner, and compatibility profiles are all owned by this repository.
 

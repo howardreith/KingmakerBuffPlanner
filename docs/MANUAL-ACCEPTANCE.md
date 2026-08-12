@@ -1,5 +1,23 @@
 # Manual Acceptance
 
+## 0.0.5 installed handoff
+
+Status: automated catalog/HUD/input/tooltip acceptance PASS twice; 0.0.5 is guarded-installed for authoritative human visual confirmation.
+
+Installed identity: source `c2e7eb4266c4202f2406173018d249f338efb796`; package `bf64559b7980a3c0ee68dfa27a27839976fbbf3521610c0f74dc44eece39a26d`; DLL `c17af5699af3b2d099a5859b018d9d3ac6e1ee9568da76caa8f1b0313c7a86cc`; MVID `33d87046-720a-4e90-8259-27e283b10ba2`; CLR 0.0.5.0.
+
+Please retest in a real campaign:
+
+1. Confirm exactly one visible Setup/Long/Important/Short row remains in the accepted position.
+2. Hover every icon for at least five seconds. Tooltip text should remain steady, wrapped, entirely onscreen, and should not move the row.
+3. Click each HUD icon. The party must not move, selection/camera must not change, and no underlying native control should activate.
+4. Open Setup and confirm the default catalog contains rows and selected details. Bless should be visible for the tested prepared Cleric state.
+5. Exercise search/filter controls, confirm their labels show active state, force an empty result, then use Reset Filters.
+6. Confirm Long/Important/Short always show an exact result. A Bless refusal for missing material is expected for the current disposable configuration and must not be reported as applied.
+7. Close and reopen through F10 and the normal close control; HUD, selection, camera, pause, and game mode should restore cleanly with no duplicate UI.
+
+Report the exact text and a screenshot for any remaining failure. Automated runs `catalog-input-0.0.5-identity-final-physical-1/2` already prove the underlying row geometry, physical input isolation, 60-frame tooltip stability, explicit quick outcomes, and 21-cycle cleanup; human visual smoothness remains authoritative.
+
 ## 0.0.4 installed handoff
 
 Status: automated live-bootstrap acceptance PASS twice; 0.0.4 is guarded-installed for optional human visual confirmation.

@@ -1,21 +1,22 @@
-# Kingmaker Buff Planner 0.0.4 — Draft Release Notes
+# Kingmaker Buff Planner 0.0.5 — Draft Release Notes
 
 Publication status: local qualification build only. Not a public release.
 
-Kingmaker Buff Planner is a standalone Unity Mod Manager mod for Pathfinder: Kingmaker 2.1.7b. Version 0.0.4 recovers the live campaign UI bootstrap after direct human evidence invalidated 0.0.3.
+Version 0.0.5 preserves the recovered campaign bootstrap and repairs the live catalog, HUD pointer ownership, quick-action feedback, and tooltip lifecycle after the authoritative 0.0.4 human partial pass.
 
 Highlights:
 
-- independently armed F10 polling in the UMM update callback, unaffected by HUD installation failure;
-- one retained scene/area lifecycle observer with retryable, exact HUD/modal readiness diagnostics;
-- deferred Unity graphic readiness, an out-of-native-layout HUD root, and correct world-to-screen hit testing;
-- one Setup/Long/Important/Short row above the native cluster with explicit top-hit ownership;
-- presentation-first transactional modal opening and balanced native input isolation;
-- physical F10 and 21-cycle real-campaign qualification twice with no duplicate objects or world-input leakage;
-- structural native and optional-mod buff discovery with branch-preserving effect expressions;
-- prepared, spontaneous, resource, material, provider-priority, ban, and cap planning;
-- animated execution plus bounded instant execution with safe sticky-touch fallback;
-- exact Call of the Wild 1.14.4c-2.1 regression qualification without a compile-time dependency;
-- transactional runtime staging, immutable baseline protection, exact restoration, and deterministic packaging.
+- live filter-stage and row/layout diagnostics with visible binding failures and explicit empty-state recovery;
+- default available/non-hidden catalog behavior, active filter labels, and Reset Filters;
+- populated retained scroll content with selectable rows and bound details;
+- a single cached, wrapped, clamped, non-raycastable HUD tooltip;
+- narrowly scoped Kingmaker world-click and edge-scroll suppression only over active planner-owned regions;
+- exact Long/Important/Short outcomes without treating queued, submitted, or cast-started actions as applied;
+- independently armed F10 and the existing opaque, presentation-first full-screen input lease;
+- deterministic filter-policy tests plus two fresh-process physical campaign passes;
+- exact native and Call of the Wild compatibility regressions;
+- CLR/UMM version-identity consistency, deterministic packaging, and guarded install with settings preserved and every other mod unchanged.
 
-The live UI/bootstrap lifecycle is qualified twice against the explicit project-owned disposable save pair. Broader prepared/spontaneous resource-spend and effect-confirmation scenarios remain outside this recovery release's new evidence. Tabletop Added Rules was unavailable locally. Publication requires separate authorization.
+Qualified source: `c2e7eb4266c4202f2406173018d249f338efb796`. Package SHA-256: `bf64559b7980a3c0ee68dfa27a27839976fbbf3521610c0f74dc44eece39a26d`. DLL SHA-256: `c17af5699af3b2d099a5859b018d9d3ac6e1ee9568da76caa8f1b0313c7a86cc`. MVID: `33d87046-720a-4e90-8259-27e283b10ba2`.
+
+Automated campaign evidence shows 10 active catalog rows from 11 discovered entries, visible/available spellbook Bless, zero world/selection/camera input from physical planner clicks, stable in-screen tooltip behavior, explicit quick-action outcomes, and no duplicate objects after 21 reopen cycles. The controlled Bless execution was refused exactly at `material-component-unavailable`; it was not reported applied. Human visual confirmation remains authoritative. Publication requires separate authorization.

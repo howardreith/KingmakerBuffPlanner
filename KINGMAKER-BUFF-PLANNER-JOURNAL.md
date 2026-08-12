@@ -1,5 +1,16 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-08-12 — 0.0.5 catalog/HUD/input/tooltip repair complete
+
+- Authoritative intake was a human PARTIAL PASS: the four-button row and opaque F10 planner worked; the catalog/details were blank despite 11 sources/providers, HUD clicks reached the world, quick actions were silent, and the tooltip flickered/offscreen.
+- Earliest catalog defect was after the populated 11-source model: rows were bound without reliable scroll-content geometry. Production now records every filter count, forces bounded content layout, reports row/details binding exceptions, selects a visible row, and provides explicit filtered/genuine-empty recovery. The production filter policy is covered by default, all-hiding, and reset tests.
+- Tooltip flicker was caused by tooltip/feedback objects participating in the HUD horizontal layout and moving the hovered source. One cached `ignoreLayout` tooltip is non-raycastable, wrapped, inward-placed, and canvas-clamped. World/camera suppression is a narrow Harmony boundary on `PointerController.Tick` and `CameraRig.GetCameraScrollShiftByMouse`, active only over registered planner rectangles.
+- Quick actions now trace receipt through confirmed result presentation, never equate queue/submission with success, and surface unexpected coroutine failures. The controlled live Bless plan was deliberately refused with exact `material-component-unavailable`; it was not called applied.
+- Exact release source is `c2e7eb4266c4202f2406173018d249f338efb796`; 0.0.5 package `bf64559b7980a3c0ee68dfa27a27839976fbbf3521610c0f74dc44eece39a26d`; DLL `c17af5699af3b2d099a5859b018d9d3ac6e1ee9568da76caa8f1b0313c7a86cc`; MVID `33d87046-720a-4e90-8259-27e283b10ba2`.
+- Fresh-process physical runs `catalog-input-0.0.5-identity-final-physical-1` and `catalog-input-0.0.5-identity-final-physical-2` passed 69/69 each. Native `catalog-input-0.0.5-identity-final-native` passed 12/12; Call of the Wild `catalog-input-0.0.5-identity-final-cotw` passed 26/26. Every transaction restored exactly; baseline stayed `afca8ac5...`.
+- The first final transaction was denied by managed staging permissions; its owned backup was restored and verified. One later run correctly refused HUD ownership while UMM's blocker remained after synthetic Escape; it restored exactly. The first install attempt then caught stale CLR 0.0.4.0 metadata before activation and verified rollback. Assembly metadata and its validation gate were corrected, and every exact-package gate was rerun.
+- Guarded install `catalog-input-0.0.5-identity-final-install` is `Installed`: CLR 0.0.5.0, exact DLL/MVID, `settingsPreserved=true`, and `otherModsVerified=true`. No merge or public release occurred.
+
 ## 2026-08-12 — first 0.0.5 campaign diagnostic and exact contract correction
 
 - `catalog-input-0.0.5-live-diag-1` failed before callback registration: exact 2.1.7b IL has `PointerController.get_InGui`, but reflection exposes no `PropertyInfo` for `InGui`. The first repair incorrectly required that metadata row.

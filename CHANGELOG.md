@@ -4,10 +4,12 @@
 
 - Trace every live catalog/filter/layout stage and surface binding or empty-state reasons instead of a blank pane.
 - Show available non-hidden beneficial entries on first open, with Reset Filters and Refresh recovery actions.
+- Display each filter's active mode and cover default, all-hiding, and Reset Filters behavior in the deterministic suite.
 - Size scroll content explicitly and validate visible row/detail geometry in the actual campaign.
 - Stabilize one clamped, wrapped, non-raycastable HUD tooltip outside button layout participation.
 - Suppress Kingmaker world clicks only while the pointer is inside an active planner-owned HUD or full-screen region.
 - Refresh quick actions independently and report exact refusal, validation, execution, and confirmed-effect outcomes.
+- Align CLR assembly/file/informational versions with 0.0.5 and validate them against `Version.props` before packaging.
 
 ## 0.0.4 — 2026-08-12 (recovery in progress)
 
