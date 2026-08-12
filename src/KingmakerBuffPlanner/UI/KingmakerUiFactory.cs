@@ -7,38 +7,95 @@ namespace KingmakerBuffPlanner.UI
 {
     internal sealed class PlannerUiTheme
     {
-        internal Font Font;
-        internal Sprite PanelSprite;
-        internal Color Background = new Color(0.075f, 0.055f, 0.035f, 1f);
-        internal Color Panel = new Color(0.16f, 0.115f, 0.07f, 1f);
-        internal Color PanelLight = new Color(0.25f, 0.18f, 0.11f, 1f);
-        internal Color Accent = new Color(0.72f, 0.52f, 0.22f, 1f);
-        internal Color AccentSelected = new Color(0.45f, 0.20f, 0.08f, 1f);
-        internal Color Text = new Color(0.94f, 0.86f, 0.68f, 1f);
-        internal Color MutedText = new Color(0.72f, 0.66f, 0.55f, 1f);
-        internal Color Disabled = new Color(0.22f, 0.20f, 0.18f, 0.9f);
+        internal const string ParchmentPath = "ServiceWindow/CharacterScreen/BookBackground";
+        internal const string HeaderFramePath =
+            "ServiceWindow/CharacterScreen/BuffsAndConditions/Label/Background";
+        internal const string CardFramePath =
+            "ServiceWindow/SpellBook/Container_Book/Book/Image_Book/Container_SpellsLeft/" +
+            "Spells_Container/SpellBookItem/Item/BakgroundBorder";
+        internal const string CardNamePath =
+            "ServiceWindow/SpellBook/Container_Book/Book/Image_Book/Container_SpellsLeft/" +
+            "Spells_Container/SpellBookItem/Item/BakgroundFillSpellName";
+        internal const string ButtonNormalPath =
+            "ServiceWindow/CharacterScreen/LevelBox/Button_LevelUp";
+        internal const string ButtonPressedPath =
+            "ServiceWindow/SpellBook/Container_Book/BookDescription/SpellBookToggles/" +
+            "ClassBookmark/BackgroundMark";
+        internal const string ToggleNormalPath =
+            "ServiceWindow/Inventory/Stash/Filters/SwitchBar/All";
+        internal const string ToggleOnPath =
+            "ServiceWindow/Inventory/Stash/Filters/SwitchBar/All/Selected";
+        internal const string PortraitFramePath = "Party/Character/Frame";
+        internal const string SelectedOrnamentPath = "Party/Character/Highlight";
+
+        internal Font BodyFont;
+        internal Font HeaderFont;
+        internal Sprite ParchmentBackgroundSprite;
+        internal Sprite NativeFrameSprite;
+        internal Sprite NativeCardSprite;
+        internal Sprite NativeCardNameSprite;
+        internal Sprite NativeButtonNormal;
+        internal Sprite NativeButtonPressed;
+        internal Sprite NativeToggleOff;
+        internal Sprite NativeToggleOn;
+        internal Sprite NativePortraitFrame;
+        internal Sprite NativeSelectedOrnament;
+        internal Color ParchmentBackground = new Color(0.922f, 0.871f, 0.765f, 1f);
+        internal Color ParchmentPanel = new Color(0.898f, 0.776f, 0.522f, 0.96f);
+        internal Color ParchmentRaised = new Color(0.96f, 0.89f, 0.72f, 1f);
+        internal Color DarkBrownText = new Color(0.235f, 0.22f, 0.188f, 1f);
+        internal Color MutedBrownText = new Color(0.541f, 0.392f, 0.271f, 1f);
+        internal Color BurgundyPrimary = new Color(0.493f, 0.168f, 0.098f, 1f);
+        internal Color GoldAccent = new Color(0.588f, 0.243f, 0.106f, 1f);
+        internal Color GreenSuccess = new Color(0.329f, 0.569f, 0.357f, 1f);
+        internal Color AmberWarning = new Color(0.82f, 0.62f, 0.20f, 1f);
+        internal Color RedFailure = new Color(0.843f, 0.475f, 0.412f, 1f);
+        internal Color DisabledGray = new Color(0.547f, 0.547f, 0.547f, 0.8f);
+        internal string ResolutionSummary;
 
         internal static PlannerUiTheme Resolve(Component nativeRoot)
         {
             var theme = new PlannerUiTheme();
             Text nativeText = nativeRoot == null ? null : nativeRoot.GetComponentInChildren<Text>(true);
-            theme.Font = nativeText == null || nativeText.font == null
+            theme.BodyFont = nativeText == null || nativeText.font == null
                 ? Resources.GetBuiltinResource<Font>("Arial.ttf") : nativeText.font;
+            theme.HeaderFont = theme.BodyFont;
             if (nativeRoot != null)
             {
-                Image[] images = nativeRoot.GetComponentsInChildren<Image>(true);
-                foreach (Image image in images)
-                {
-                    RectTransform rect = image == null ? null : image.rectTransform;
-                    if (image != null && image.sprite != null && rect != null &&
-                        rect.rect.width >= 600 && rect.rect.height >= 400)
-                    {
-                        theme.PanelSprite = image.sprite;
-                        break;
-                    }
-                }
+                Transform root = nativeRoot.transform;
+                theme.ParchmentBackgroundSprite = SpriteAt(root, ParchmentPath);
+                theme.NativeFrameSprite = SpriteAt(root, HeaderFramePath);
+                theme.NativeCardSprite = SpriteAt(root, CardFramePath);
+                theme.NativeCardNameSprite = SpriteAt(root, CardNamePath);
+                theme.NativeButtonNormal = SpriteAt(root, ButtonNormalPath);
+                theme.NativeButtonPressed = SpriteAt(root, ButtonPressedPath);
+                theme.NativeToggleOff = SpriteAt(root, ToggleNormalPath);
+                theme.NativeToggleOn = SpriteAt(root, ToggleOnPath);
+                theme.NativePortraitFrame = SpriteAt(root, PortraitFramePath);
+                theme.NativeSelectedOrnament = SpriteAt(root, SelectedOrnamentPath);
             }
+            theme.ResolutionSummary = "parchment=" + Name(theme.ParchmentBackgroundSprite) +
+                ";frame=" + Name(theme.NativeFrameSprite) + ";card=" +
+                Name(theme.NativeCardSprite) + ";cardName=" + Name(theme.NativeCardNameSprite) +
+                ";button=" + Name(theme.NativeButtonNormal) + ";pressed=" +
+                Name(theme.NativeButtonPressed) + ";toggleOff=" + Name(theme.NativeToggleOff) +
+                ";toggleOn=" + Name(theme.NativeToggleOn) + ";portrait=" +
+                Name(theme.NativePortraitFrame) + ";selected=" +
+                Name(theme.NativeSelectedOrnament) + ";font=" +
+                (theme.BodyFont == null ? "missing" : theme.BodyFont.name);
             return theme;
+        }
+
+        private static Sprite SpriteAt(Transform root, string path)
+        {
+            Transform transform = root == null ? null : root.Find(path);
+            Image image = transform == null ? null : transform.GetComponent<Image>();
+            return image == null ? null : image.sprite;
+        }
+
+        private static string Name(Sprite sprite)
+        {
+            return sprite == null ? "fallback" : sprite.name;
         }
     }
 
@@ -61,7 +118,7 @@ namespace KingmakerBuffPlanner.UI
             if (sprite != null)
             {
                 image.sprite = sprite;
-                image.type = Image.Type.Sliced;
+                image.type = sprite.border.sqrMagnitude > 0 ? Image.Type.Sliced : Image.Type.Simple;
             }
             return image;
         }
@@ -76,9 +133,9 @@ namespace KingmakerBuffPlanner.UI
         {
             RectTransform rect = CreateRect(name, parent);
             Text text = rect.gameObject.AddComponent<Text>();
-            text.font = theme.Font;
+            text.font = theme.BodyFont;
             text.fontSize = size;
-            text.color = theme.Text;
+            text.color = theme.DarkBrownText;
             text.alignment = alignment;
             text.text = value ?? string.Empty;
             text.raycastTarget = false;
@@ -95,16 +152,22 @@ namespace KingmakerBuffPlanner.UI
             UnityAction action)
         {
             RectTransform rect = CreateRect(name, parent);
-            Image image = AddPanel(rect, theme.PanelLight, theme.PanelSprite);
+            Image image = AddPanel(rect, theme.ParchmentRaised, theme.NativeButtonNormal);
             Button button = rect.gameObject.AddComponent<Button>();
             button.targetGraphic = image;
             ColorBlock colors = button.colors;
             colors.normalColor = Color.white;
-            colors.highlightedColor = new Color(1.15f, 1.10f, 0.95f, 1f);
-            colors.pressedColor = new Color(0.72f, 0.62f, 0.48f, 1f);
-            colors.disabledColor = new Color(0.45f, 0.45f, 0.45f, 0.65f);
+            colors.highlightedColor = new Color(1f, 0.92f, 0.72f, 1f);
+            colors.pressedColor = new Color(0.76f, 0.60f, 0.43f, 1f);
+            colors.disabledColor = theme.DisabledGray;
             colors.fadeDuration = 0.08f;
             button.colors = colors;
+            if (theme.NativeButtonPressed != null)
+            {
+                SpriteState sprites = button.spriteState;
+                sprites.pressedSprite = theme.NativeButtonPressed;
+                button.spriteState = sprites;
+            }
             if (action != null) button.onClick.AddListener(action);
             Text text = CreateText("Label", rect, theme, label, 17, TextAnchor.MiddleCenter);
             Stretch(text.rectTransform, 5, 5, 3, 3);
@@ -118,12 +181,12 @@ namespace KingmakerBuffPlanner.UI
             string placeholder)
         {
             RectTransform rect = CreateRect(name, parent);
-            AddPanel(rect, new Color(0.07f, 0.06f, 0.05f, 1f));
+            AddPanel(rect, theme.ParchmentRaised, theme.NativeCardNameSprite);
             Text inputText = CreateText("Text", rect, theme, string.Empty, 17, TextAnchor.MiddleLeft);
             inputText.supportRichText = false;
             Stretch(inputText.rectTransform, 10, 8, 5, 5);
             Text hint = CreateText("Placeholder", rect, theme, placeholder, 17, TextAnchor.MiddleLeft);
-            hint.color = theme.MutedText;
+            hint.color = theme.MutedBrownText;
             hint.fontStyle = FontStyle.Italic;
             Stretch(hint.rectTransform, 10, 8, 5, 5);
             InputField field = rect.gameObject.AddComponent<InputField>();
@@ -140,7 +203,7 @@ namespace KingmakerBuffPlanner.UI
             out RectTransform content)
         {
             RectTransform root = CreateRect(name, parent);
-            AddPanel(root, new Color(0.055f, 0.045f, 0.035f, 1f));
+            AddPanel(root, theme.ParchmentPanel, theme.NativeFrameSprite);
             ScrollRect scroll = root.gameObject.AddComponent<ScrollRect>();
             scroll.horizontal = false;
             scroll.vertical = true;

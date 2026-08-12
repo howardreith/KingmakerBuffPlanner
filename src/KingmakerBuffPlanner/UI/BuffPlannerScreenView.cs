@@ -58,8 +58,7 @@ namespace KingmakerBuffPlanner.UI
             _diagnostics = diagnostics ?? throw new ArgumentNullException("diagnostics");
             _close = close ?? throw new ArgumentNullException("close");
             _execute = execute ?? throw new ArgumentNullException("execute");
-            _theme = PlannerUiTheme.Resolve(nativeCanvas.ServiceWindow == null
-                ? (Component)nativeCanvas : nativeCanvas.ServiceWindow.WindowTabs);
+            _theme = PlannerUiTheme.Resolve(nativeCanvas);
             try
             {
                 Build(nativeCanvas);
@@ -308,8 +307,9 @@ namespace KingmakerBuffPlanner.UI
             _canvasGroup.alpha = 1f;
             _canvasGroup.interactable = true;
             _canvasGroup.blocksRaycasts = true;
-            _blocker = KingmakerUiFactory.AddPanel(_root, _theme.Background, _theme.PanelSprite);
-            _blocker.color = _theme.Background;
+            _blocker = KingmakerUiFactory.AddPanel(_root, _theme.ParchmentBackground,
+                _theme.ParchmentBackgroundSprite);
+            _blocker.color = _theme.ParchmentBackground;
             _blocker.raycastTarget = true;
             PlannerPointerSink sink = _root.gameObject.AddComponent<PlannerPointerSink>();
             sink.Diagnostics = _diagnostics;
@@ -319,7 +319,7 @@ namespace KingmakerBuffPlanner.UI
 
             RectTransform frame = KingmakerUiFactory.CreateRect("ServiceFrame", _root);
             KingmakerUiFactory.SetAnchors(frame, 0.025f, 0.025f, 0.975f, 0.975f);
-            KingmakerUiFactory.AddPanel(frame, _theme.Panel, _theme.PanelSprite);
+            KingmakerUiFactory.AddPanel(frame, _theme.ParchmentPanel, _theme.NativeFrameSprite);
 
             BuildHeader(frame);
             BuildRoutineTabs(frame);
@@ -348,13 +348,13 @@ namespace KingmakerBuffPlanner.UI
         {
             RectTransform header = KingmakerUiFactory.CreateRect("Header", frame);
             KingmakerUiFactory.SetAnchors(header, 0, 0.92f, 1, 1, 14, 14, 5, 5);
-            KingmakerUiFactory.AddPanel(header, new Color(0.10f, 0.07f, 0.04f, 1f));
+            KingmakerUiFactory.AddPanel(header, _theme.ParchmentRaised, _theme.NativeFrameSprite);
             Text title = KingmakerUiFactory.CreateText("Title", header, _theme,
                 "BUFF PLANNER", 30, TextAnchor.MiddleCenter);
             KingmakerUiFactory.Stretch(title.rectTransform, 80, 80, 4, 4);
             _status = KingmakerUiFactory.CreateText("Status", header, _theme,
                 string.Empty, 15, TextAnchor.LowerLeft);
-            _status.color = _theme.MutedText;
+            _status.color = _theme.MutedBrownText;
             KingmakerUiFactory.SetAnchors(_status.rectTransform, 0, 0, 0.72f, 0.45f, 12, 0, 2, 0);
             Button close = KingmakerUiFactory.CreateButton("Close", header, _theme, "X", () => _close());
             KingmakerUiFactory.SetAnchors((RectTransform)close.transform, 0.94f, 0.12f, 0.99f, 0.88f);
@@ -391,7 +391,7 @@ namespace KingmakerBuffPlanner.UI
         {
             RectTransform panel = KingmakerUiFactory.CreateRect("CatalogPanel", frame);
             KingmakerUiFactory.SetAnchors(panel, 0.015f, 0.16f, 0.38f, 0.845f, 0, 8, 0, 0);
-            KingmakerUiFactory.AddPanel(panel, new Color(0.11f, 0.08f, 0.05f, 1f));
+            KingmakerUiFactory.AddPanel(panel, _theme.ParchmentPanel, _theme.NativeFrameSprite);
             _search = KingmakerUiFactory.CreateInputField("Search", panel, _theme, "Search buffs...");
             KingmakerUiFactory.SetAnchors((RectTransform)_search.transform, 0.02f, 0.92f, 0.98f, 0.985f);
             _search.onValueChanged.AddListener(value =>
@@ -469,7 +469,7 @@ namespace KingmakerBuffPlanner.UI
         {
             RectTransform panel = KingmakerUiFactory.CreateRect("DetailsPanel", frame);
             KingmakerUiFactory.SetAnchors(panel, 0.38f, 0.16f, 0.985f, 0.845f, 8, 0, 0, 0);
-            KingmakerUiFactory.AddPanel(panel, new Color(0.12f, 0.085f, 0.052f, 1f));
+            KingmakerUiFactory.AddPanel(panel, _theme.ParchmentPanel, _theme.NativeFrameSprite);
             ScrollRect scroll = KingmakerUiFactory.CreateScrollView(
                 "Details", panel, _theme, out _detailContent);
             _detailViewport = scroll.viewport;
@@ -480,7 +480,7 @@ namespace KingmakerBuffPlanner.UI
         {
             RectTransform footer = KingmakerUiFactory.CreateRect("Footer", frame);
             KingmakerUiFactory.SetAnchors(footer, 0.015f, 0.015f, 0.985f, 0.15f);
-            KingmakerUiFactory.AddPanel(footer, new Color(0.09f, 0.065f, 0.04f, 1f));
+            KingmakerUiFactory.AddPanel(footer, _theme.ParchmentRaised, _theme.NativeFrameSprite);
             _result = KingmakerUiFactory.CreateText("Result", footer, _theme,
                 string.Empty, 16, TextAnchor.MiddleLeft);
             KingmakerUiFactory.SetAnchors(_result.rectTransform, 0.015f, 0.10f, 0.67f, 0.90f);
@@ -508,7 +508,7 @@ namespace KingmakerBuffPlanner.UI
                 Button tab = _routineTabs[index];
                 Image image = tab == null ? null : tab.targetGraphic as Image;
                 if (image != null) image.color = ids[index] == _routineId
-                    ? _theme.AccentSelected : _theme.PanelLight;
+                    ? _theme.BurgundyPrimary : _theme.ParchmentRaised;
                 if (tab != null) tab.interactable = !_session.IsExecuting;
             }
             Button execute = _root == null ? null : _root.GetComponentsInChildren<Button>(true)
@@ -587,7 +587,7 @@ namespace KingmakerBuffPlanner.UI
                     Text rowText = row.GetComponentInChildren<Text>();
                     if (rowText != null) rowText.alignment = TextAnchor.MiddleLeft;
                     Image rowImage = row.targetGraphic as Image;
-                    if (selected && rowImage != null) rowImage.color = _theme.AccentSelected;
+                    if (selected && rowImage != null) rowImage.color = _theme.BurgundyPrimary;
                     _sourceRows.Add(row);
                 }
                 catch (Exception exception)
@@ -747,7 +747,8 @@ namespace KingmakerBuffPlanner.UI
             }
             bool wanted = model.IsTargetWanted(_routineId, unit.UnitId);
             Image background = card.targetGraphic as Image;
-            if (background != null) background.color = wanted ? _theme.AccentSelected : _theme.PanelLight;
+            if (background != null) background.color = wanted
+                ? _theme.BurgundyPrimary : _theme.ParchmentRaised;
             card.interactable = model.IsAssigned(_routineId) && !_session.IsExecuting;
         }
 
@@ -807,7 +808,7 @@ namespace KingmakerBuffPlanner.UI
             Text text = KingmakerUiFactory.CreateText("Heading", parent, _theme,
                 value, 20, TextAnchor.MiddleLeft);
             text.fontStyle = FontStyle.Bold;
-            text.color = _theme.Accent;
+            text.color = _theme.GoldAccent;
             KingmakerUiFactory.AddLayout(text.rectTransform, 34);
         }
 

@@ -84,6 +84,24 @@ The current safe standalone overlay and input lifecycle stay intact. Presentatio
 
 The existing runtime probe records the exact service-window root, buttons, canvas, raycasters, sprite names, and candidate anchors, but its earlier main-menu attempt could not reach campaign UI. The UI-polish branch will first extend this diagnostic-only probe to capture fonts and safe frame/panel/button/toggle/portrait candidates from the exact installed 2.1.7b campaign hierarchy, then run it through the guarded disposable working-save scenario. No presentation implementation begins until the resulting exact paths, required components, fallback, cleanup owner, and validation policy are appended here.
 
+### Exact installed 2.1.7b inventory
+
+Guarded capture `ui-polish-0.0.6-native-inventory-2` produced `native-ui-contract.json` (2,260,508 bytes): 1,967 service-window visuals, 455 buttons, 150 party portrait visuals, and the available legacy `UnityEngine.UI.Text` font family. The run subsequently timed out behind UMM's `ShowOnStart` overlay before HUD installation; it did not exercise planner behavior. Its transaction is `Restored` with `restorationVerified=true`. The inventory itself was captured after campaign `StaticCanvas` and `EventSystem` became ready.
+
+| Token | Exact runtime source path | Required component / observed asset | Fallback and ownership |
+|---|---|---|---|
+| Parchment background | `StaticCanvas/ServiceWindow/CharacterScreen/BookBackground` | `Image`; `Inventory_Book_Clear`; Simple; 1920x1080 | Central warm parchment color. Sprite is referenced, never cloned or destroyed; Kingmaker owns it. |
+| Header frame | `StaticCanvas/ServiceWindow/CharacterScreen/BuffsAndConditions/Label/Background` | `Image`; `WeaponSets_Header`; Simple | Central parchment-raised color and thin burgundy rule. |
+| Card frame | `StaticCanvas/ServiceWindow/SpellBook/Container_Book/Book/Image_Book/Container_SpellsLeft/Spells_Container/SpellBookItem/Item/BakgroundBorder` | `Image`; `spellbook_frame`; Simple; 256x90 | Central parchment card with burgundy/gold outline. |
+| Card name fill | same item, `Item/BakgroundFillSpellName` | `Image`; `spellbook_frame_back`; Simple; 179x50 | Central raised parchment fill. |
+| Button normal | `StaticCanvas/ServiceWindow/CharacterScreen/LevelBox/Button_LevelUp` | `Image`; `button_normal`; Sliced | Central raised parchment button. |
+| Button pressed | `StaticCanvas/ServiceWindow/SpellBook/Container_Book/BookDescription/SpellBookToggles/ClassBookmark/BackgroundMark` | `Image`; `button_pressed`; Sliced | Burgundy tint fallback. |
+| Toggle off/on | `StaticCanvas/ServiceWindow/Inventory/Stash/Filters/SwitchBar/All` and `/Selected` | `Toggle` + `Image`; `Inventory_Filter_Icon_Background_Normal/Selected` | Text button/tint fallback; no native listener/controller cloned. |
+| Portrait frame/selection | `StaticCanvas/Party/Character/Frame` and `/Highlight` | `Image`; `Group_Char_Frame_Normal/Select`; Simple | Central brown frame and burgundy/gold border fallback. Actual unit portrait still comes from `UnitEntityData.Portrait.SmallPortrait`. |
+| Body/header font | first campaign `UnityEngine.UI.Text` below `StaticCanvas` | `Font` named `Arial` in the exact legacy UI tree | Built-in `Arial.ttf`. Kingmaker's service-window display copy is predominantly TMP, so its TMP asset is not forced into the existing legacy Text renderer. |
+
+Runtime resolution uses these exact paths only as optional sprite/font lookups. A missing object cannot block the planner: each token has a centralized color or built-in-font fallback, and the existing programmatic overlay hierarchy remains the lifecycle owner. Runtime validation records every resolved sprite name or `fallback` in `PlannerUiTheme.ResolutionSummary`.
+
 ## Baseline regression record
 
 On 2026-08-12 before source edits:

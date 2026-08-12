@@ -174,3 +174,10 @@ Status: INSTALLED FOR HUMAN UI RETEST — campaign UI and save-backed qualificat
 - Forensics: `planning/PARCHMENT-BUBBLEBUFFS-UI-FORENSICS.md` records human screenshots, BubbleBuffs commit/source/provenance, adapted concepts, prohibited assets/code, and the pending exact Kingmaker inventory.
 - Frozen MVP behaviors and guarded runtime boundaries remain authoritative.
 - Exact next command: implement and test a diagnostic-only expansion of `NativeUiContractProbe`, then clean-build/package and run one guarded `live-ui-bootstrap` inventory capture against `KBP_AUTOMATION_WORKING` before changing the presentation.
+
+## Phase A checkpoint — 2026-08-12
+
+- Current branch is `codex/ui-parchment-bubblebuffs`; inventory commits are `2b3e281` and `28b79c8`; Phase A source is currently uncommitted.
+- `ui-polish-0.0.6-native-inventory-2/native-ui-contract.json` is the exact Kingmaker 2.1.7b campaign inventory. Its run timed out at the UMM overlay before HUD readiness, then restored exactly. No lock/process remains.
+- The theme shell now uses role tokens and exact optional Kingmaker paths with centralized fallbacks; presentation hierarchy and behavior are unchanged. Mechanical regression is fully green.
+- Exact next command: commit Phase A, add/test `BuffCardViewModel` and icon resolver, render icon-first cards, then rerun `./scripts/Test-SourceOnly.ps1` before Phase C.

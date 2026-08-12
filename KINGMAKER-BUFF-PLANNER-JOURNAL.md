@@ -543,3 +543,10 @@ Status: ROOT CAUSE PROVEN; 0.0.4 SOURCE PASS; LIVE QUALIFICATION PENDING
 - Human screenshots and BubbleBuffs commit `f4871f763a23251284422ef0945a85e9f3fb788e` were studied. Findings and explicit non-copy boundary are in `planning/PARCHMENT-BUBBLEBUFFS-UI-FORENSICS.md`.
 - Frozen contracts: discovery/classification, identities/schema, resource/planning/execution/effect semantics, HUD input behavior, modal lease, and guarded runtime transactions.
 - Exact next action: extend the diagnostic-only native UI contract probe, build a clean diagnostic package, and run the guarded disposable campaign to inventory exact 2.1.7b theme candidates before Phase A presentation edits.
+
+## Phase A native theme shell — 2026-08-12
+
+- Exact inventory capture `ui-polish-0.0.6-native-inventory-2` recorded 1,967 service visuals, 455 buttons, 150 portrait visuals, and the legacy Text font. Its UMM-overlay timeout was pre-HUD and non-behavioral; the owned process exited and exact guarded restoration passed.
+- Centralized exact optional paths and every fallback in `PlannerUiTheme`: parchment, header/card chrome, normal/pressed buttons, toggles, portrait frame, selected ornament, body/header fonts, brown text, burgundy, antique gold, green, amber, red, and disabled gray.
+- `BuffPlannerScreenView` keeps the existing overlay/layout/callback/input lifecycle while consuming the new theme roles. No mechanics or HUD source changed.
+- Full post-phase mechanical suite: source 30/30, behavior 62/62, runtime filesystem 7/7, deployment WhatIf 5/5, source-only 1/1. Exact next action: checkpoint Phase A, then introduce UI-only card/status view models and blueprint-icon resolution for Phase B.
