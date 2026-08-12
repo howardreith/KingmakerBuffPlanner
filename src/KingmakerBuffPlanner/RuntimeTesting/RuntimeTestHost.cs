@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using Kingmaker.Blueprints;
@@ -935,15 +936,14 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         {
             string path = Path.Combine(_request.EvidenceDirectory,
                 "physical-input-" + id + ".json");
-            AtomicFile.WriteUtf8(path, JsonConvert.SerializeObject(new
-            {
-                schemaVersion = 1,
-                runId = _request.RunId,
-                actionId = id,
-                action = kind,
-                x = position.x,
-                y = position.y
-            }) + Environment.NewLine);
+            // Kingmaker changes JsonConvert.DefaultSettings to preserve object
+            // references; anonymous marker serialization would collapse to {$id:1}.
+            string json = "{\"schemaVersion\":1,\"runId\":" +
+                JsonConvert.ToString(_request.RunId) + ",\"actionId\":" +
+                JsonConvert.ToString(id) + ",\"action\":" + JsonConvert.ToString(kind) +
+                ",\"x\":" + position.x.ToString("R", CultureInfo.InvariantCulture) +
+                ",\"y\":" + position.y.ToString("R", CultureInfo.InvariantCulture) + "}";
+            AtomicFile.WriteUtf8(path, json + Environment.NewLine);
             _log.Info("[KBP-INPUT] physical action requested;id=" + id + ";action=" +
                 kind + ";x=" + position.x.ToString("F1") + ";y=" +
                 position.y.ToString("F1") + ".");
