@@ -12,7 +12,7 @@ namespace KingmakerBuffPlanner.UI
         private const string HarmonyId = "KingmakerBuffPlanner.PlannerHotkey";
         private static HarmonyInstance _harmony;
         private static MethodInfo _inputMatched;
-        private static string _binding = "Ctrl+Shift+B";
+        private static string _binding = PlannerHotkeyBinding.Default;
 
         internal static string Binding { get { return _binding; } }
         internal static bool IsInstalled { get { return _harmony != null; } }
@@ -37,7 +37,7 @@ namespace KingmakerBuffPlanner.UI
 
         internal static void SetBinding(string value)
         {
-            _binding = value == "Ctrl+Shift+P" ? value : "Ctrl+Shift+B";
+            _binding = PlannerHotkeyBinding.Normalize(value);
         }
 
         internal static bool GetKeyDown()
@@ -48,8 +48,8 @@ namespace KingmakerBuffPlanner.UI
         internal static bool ShouldSuppressNativeBinding(
             KeyCode nativeKey, string nativeName, bool ctrl, bool shift, bool alt)
         {
-            return ctrl && shift && !alt && nativeKey == PrimaryKey() &&
-                !string.Equals(nativeName, "KingmakerBuffPlanner.Open", StringComparison.Ordinal);
+            return PlannerHotkeyBinding.ShouldSuppress(_binding, nativeKey.ToString(), nativeName,
+                ctrl, shift, alt);
         }
 
         internal static void Uninstall()
@@ -58,7 +58,7 @@ namespace KingmakerBuffPlanner.UI
                 _harmony.Unpatch(_inputMatched, HarmonyPatchType.Prefix, HarmonyId);
             _harmony = null;
             _inputMatched = null;
-            _binding = "Ctrl+Shift+B";
+            _binding = PlannerHotkeyBinding.Default;
         }
 
         private static bool InputMatchedPrefix(object __instance, ref bool __result)
@@ -89,7 +89,7 @@ namespace KingmakerBuffPlanner.UI
 
         private static KeyCode PrimaryKey()
         {
-            return _binding == "Ctrl+Shift+P" ? KeyCode.P : KeyCode.B;
+            return PlannerHotkeyBinding.PrimaryKey(_binding) == "P" ? KeyCode.P : KeyCode.B;
         }
     }
 }

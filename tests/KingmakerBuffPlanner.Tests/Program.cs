@@ -89,6 +89,7 @@ namespace KingmakerBuffPlanner.Tests
                 Run("catalog-filter-selected-category-and-reset-contract", TestCatalogFilterState);
                 Run("presentation-view-models-use-player-facing-deterministic-state", TestPresentationModels);
                 Run("four-column-grid-metrics-have-no-horizontal-scroll", TestGridMetrics);
+                Run("planner-hotkey-chord-consumes-native-primary-key", TestPlannerHotkeyBinding);
                 Run("input-lease-restores-on-close-and-acquire-failure", TestInputLease);
                 Run("screen-state-machine-is-idempotent", TestScreenStateMachine);
                 Run("ui-readiness-is-deferred-across-frames", TestDeferredUiReadiness);
@@ -1021,6 +1022,21 @@ namespace KingmakerBuffPlanner.Tests
                 fullHd.HorizontalScrolling || compact.HorizontalScrolling ||
                 fullHd.CellWidth <= 0 || compact.CellWidth <= 0)
                 throw new InvalidOperationException("Grid metrics did not preserve four columns without horizontal scrolling.");
+        }
+
+        private static void TestPlannerHotkeyBinding()
+        {
+            if (!PlannerHotkeyBinding.ShouldSuppress("Ctrl+Shift+B", "B", "OpenSpellbook",
+                    true, true, false) ||
+                PlannerHotkeyBinding.ShouldSuppress("Ctrl+Shift+B", "B", "OpenSpellbook",
+                    true, false, false) ||
+                PlannerHotkeyBinding.ShouldSuppress("Ctrl+Shift+B", "B", "OpenSpellbook",
+                    true, true, true) ||
+                PlannerHotkeyBinding.ShouldSuppress("Ctrl+Shift+B", "F10", "Console",
+                    true, true, false) ||
+                !PlannerHotkeyBinding.ShouldSuppress("Ctrl+Shift+P", "P", "Pause",
+                    true, true, false))
+                throw new InvalidOperationException("Planner chord isolation or fallback key is invalid.");
         }
 
         private static void TestAnimatedExecutor()

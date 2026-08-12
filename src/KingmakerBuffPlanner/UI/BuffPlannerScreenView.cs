@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using Kingmaker;
 using Kingmaker.Blueprints;
@@ -411,7 +410,7 @@ namespace KingmakerBuffPlanner.UI
             _status.color = _theme.MutedBrownText;
             KingmakerUiFactory.SetAnchors(_status.rectTransform, 0.01f, 0.02f, 0.40f, 0.44f);
             Button settings = KingmakerUiFactory.CreateButton("Settings", header, _theme,
-                "⚙ Settings", () => _settings.Show(!_settings.IsOpen));
+                "Settings", () => _settings.Show(!_settings.IsOpen));
             KingmakerUiFactory.SetAnchors((RectTransform)settings.transform,
                 0.82f, 0.14f, 0.93f, 0.86f);
             Button close = KingmakerUiFactory.CreateButton("Close", header, _theme,

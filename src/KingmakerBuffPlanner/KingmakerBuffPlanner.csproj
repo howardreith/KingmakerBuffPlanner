@@ -130,6 +130,7 @@
     <Compile Include="UI\BuffGridMetrics.cs" />
     <Compile Include="UI\PlannerViews.cs" />
     <Compile Include="UI\PlannerHotkey.cs" />
+    <Compile Include="UI\PlannerHotkeyBinding.cs" />
     <Compile Include="UI\CatalogUiDiagnostics.cs" />
     <Compile Include="UI\CatalogLayoutDiagnostics.cs" />
     <Compile Include="UI\BuffPlannerUiContracts.cs" />

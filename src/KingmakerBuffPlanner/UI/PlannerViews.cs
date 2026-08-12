@@ -393,7 +393,7 @@ namespace KingmakerBuffPlanner.UI
                     target.Name, 12, TextAnchor.MiddleCenter);
                 KingmakerUiFactory.SetAnchors(name.rectTransform, 0, 0.01f, 1, 0.25f);
                 Text mark = KingmakerUiFactory.CreateText("State", rect, _theme,
-                    target.Indirect ? "◌" : target.Wanted ? "✓" : string.Empty,
+                    target.Indirect ? "IND" : target.Wanted ? "YES" : string.Empty,
                     18, TextAnchor.UpperRight);
                 mark.color = statusColor(target.Status);
                 KingmakerUiFactory.SetAnchors(mark.rectTransform, 0.62f, 0.63f, 0.96f, 0.97f);
@@ -483,9 +483,9 @@ namespace KingmakerBuffPlanner.UI
             _fallback.gameObject.SetActive(available && icon == null);
             _name.text = available ? source.DisplayName : "Select a buff";
             _meta.text = available ? BuffCardViewModel.PlayerSourceType(source.Ability.SourceKind) +
-                (source.SpellLevel > 0 ? " • Level " + source.SpellLevel : string.Empty) +
+                (source.SpellLevel > 0 ? " | Level " + source.SpellLevel : string.Empty) +
                 (string.IsNullOrWhiteSpace(source.DurationText) ? string.Empty :
-                    " • " + source.DurationText) : string.Empty;
+                    " | " + source.DurationText) : string.Empty;
             _description.text = available ? Compact(source.Description, 260) :
                 "Choose a card, then click portraits to edit the active routine.";
             _targetsLabel.text = "Targets for " + char.ToUpperInvariant(routineId[0]) +
@@ -500,7 +500,7 @@ namespace KingmakerBuffPlanner.UI
         {
             string normalized = string.IsNullOrWhiteSpace(value) ?
                 "No description is available." : value.Replace("\r", " ").Replace("\n", " ").Trim();
-            return normalized.Length <= limit ? normalized : normalized.Substring(0, limit - 1) + "…";
+            return normalized.Length <= limit ? normalized : normalized.Substring(0, limit - 3) + "...";
         }
     }
 
