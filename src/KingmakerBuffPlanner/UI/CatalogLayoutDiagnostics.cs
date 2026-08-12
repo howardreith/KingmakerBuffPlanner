@@ -1,17 +1,20 @@
+using Newtonsoft.Json;
+
 namespace KingmakerBuffPlanner.UI
 {
+    [JsonObject(MemberSerialization.OptIn)]
     internal sealed class LiveRowRenderDiagnostics
     {
-        public string[] ExpectedNames { get; set; }
-        public string[] RowScreenRectangles { get; set; }
-        public string SelectedRowName { get; set; }
-        public string DetailsTitleText { get; set; }
-        public string SourceViewport { get; set; }
-        public string SourceContent { get; set; }
-        public string MaskEvidence { get; set; }
-        public string CanaryEvidence { get; set; }
-        public string[] RowEvidence { get; set; }
-        public string[] DetailsEvidence { get; set; }
+        [JsonProperty("expectedNames", Order = 1)] public string[] ExpectedNames { get; set; }
+        [JsonProperty("rowScreenRectangles", Order = 2)] public string[] RowScreenRectangles { get; set; }
+        [JsonProperty("selectedRowName", Order = 3)] public string SelectedRowName { get; set; }
+        [JsonProperty("detailsTitleText", Order = 4)] public string DetailsTitleText { get; set; }
+        [JsonProperty("sourceViewport", Order = 5)] public string SourceViewport { get; set; }
+        [JsonProperty("sourceContent", Order = 6)] public string SourceContent { get; set; }
+        [JsonProperty("maskEvidence", Order = 7)] public string MaskEvidence { get; set; }
+        [JsonProperty("canaryEvidence", Order = 8)] public string CanaryEvidence { get; set; }
+        [JsonProperty("rowEvidence", Order = 9)] public string[] RowEvidence { get; set; }
+        [JsonProperty("detailsEvidence", Order = 10)] public string[] DetailsEvidence { get; set; }
     }
 
     internal sealed class CatalogLayoutDiagnostics

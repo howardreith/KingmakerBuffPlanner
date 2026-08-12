@@ -814,8 +814,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     "live-row-render-diagnostics.json"), Serialize(rendering));
                 _liveRenderScreenshotPath = Path.Combine(_request.EvidenceDirectory,
                     "planner-render-canary.png");
-                MethodInfo capture = typeof(Application).GetMethod("CaptureScreenshot",
-                    BindingFlags.Static | BindingFlags.Public, null,
+                Type screenCapture = Type.GetType(
+                    "UnityEngine.ScreenCapture, UnityEngine.ScreenCaptureModule", false);
+                MethodInfo capture = screenCapture == null ? null : screenCapture.GetMethod(
+                    "CaptureScreenshot", BindingFlags.Static | BindingFlags.Public, null,
                     new[] { typeof(string) }, null);
                 if (capture == null)
                     throw new MissingMethodException("Unity screenshot capture API is unavailable.");
