@@ -47,6 +47,14 @@ The real campaign log proves that the full-screen candidate had correct nonzero 
 
 `Canvas.ForceUpdateCanvases()` updates layout/canvases but does not prove that a newly added `Graphic` is already present in the EventSystem's raycast registry during that same Unity frame. The implementation made that unproven timing assumption in both paths.
 
+## First repaired-campaign diagnostic
+
+Guarded run `bootstrap-0.0.4-human-live-1` loaded the exact Working campaign with the four-mod human-reproduction profile and independently confirmed every loader/lifecycle stage: `Main.Load`, `OnToggle(true)`, UMM `OnUpdate`, F10 arming, retained controller construction, EventBus subscription, five scene/area signals, and the normal exact-save action.
+
+After the same-frame readiness defect was removed, this run exposed the next and now-earliest HUD-specific failure. The new root was parented under `StaticCanvas/HUDLayout/Menu_Buttons48px`, but it was also treated as a child by that native layout. The layout therefore overrode the requested above-cluster anchored position. Deferred validation recorded `rootBottom=-579.0969` and `clusterTop=-534.0093`, expired each failed candidate, and retried 77 times while F10 remained armed. The bounded correction is to mark only the KBP row's root `LayoutElement.ignoreLayout = true`; its own horizontal child layout remains active.
+
+Evidence is preserved under `C:\Dev\KingmakerBuffPlannerLab\runtime-evidence\bootstrap-0.0.4-human-live-1`; its Mods transaction is `Restored` with exact verification. This diagnostic is not a UI qualification pass.
+
 ## Rejected theories
 
 - Wrong or stale installed DLL: rejected by exact SHA-256 and MVID agreement.
@@ -66,4 +74,3 @@ The real campaign log proves that the full-screen candidate had correct nonzero 
 5. Keep candidates noninteractive until validation. On failure, log the exact predicate, dispose without acquiring input, and remain retryable with bounded backoff.
 6. Acquire the modal input lease only after deferred visible-presentation validation succeeds, and validate again afterward.
 7. Add behavior/source regressions and qualify only in two fresh processes loading the exact authorized `KBP_AUTOMATION_WORKING` save while proving the immutable baseline hash.
-

@@ -131,6 +131,8 @@ namespace KingmakerBuffPlanner.UI
             float height = Mathf.Max(42f, reference.rect.height);
             _root.anchoredPosition = new Vector2(0, 8f);
             _root.sizeDelta = new Vector2(width * 4f + 18f, height);
+            LayoutElement rootLayout = _root.gameObject.AddComponent<LayoutElement>();
+            rootLayout.ignoreLayout = true;
             HorizontalLayoutGroup layout = _root.gameObject.AddComponent<HorizontalLayoutGroup>();
             layout.spacing = 6;
             layout.childControlWidth = false;

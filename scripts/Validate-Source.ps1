@@ -94,9 +94,10 @@ foreach ($requiredHudContract in @('m_FormationButton', '"Setup"', '"Long"', '"I
 if ($hudSource -match 'Instantiate\s*\(\s*template\.gameObject' -or
     $hudSource -match 'CreateNativeButton' -or
     -not $hudSource.Contains('icon.raycastTarget = true') -or
+    -not $hudSource.Contains('rootLayout.ignoreLayout = true') -or
     -not $hudSource.Contains('Setup|Long|Important|Short') -or
     -not $hudSource.Contains('ValidateHitOwnership')) {
-    throw 'The HUD must use fresh bounded retained-mode buttons with explicit top-hit ownership.'
+    throw 'The HUD must use an out-of-layout retained row with fresh bounded buttons and explicit top-hit ownership.'
 }
 $assertions++
 
@@ -131,6 +132,15 @@ foreach ($lifecycleContract in @('ISceneHandler', 'IAreaLoadingStagesHandler',
         'IAreaActivationHandler', 'EventBus.Subscribe')) {
     if (-not $uiRootSource.Contains($lifecycleContract)) {
         throw "Live lifecycle observer is missing: $lifecycleContract"
+    }
+}
+$assertions++
+
+$runtimeHostSource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\RuntimeTesting\RuntimeTestHost.cs') -Raw
+foreach ($failureContract in @('_completed = true;',
+        'Live UI runtime scenario failed.', 'TryWriteFailure(_startedAtUtc, exception)')) {
+    if (-not $runtimeHostSource.Contains($failureContract)) {
+        throw "Live UI failures must be committed once instead of escaping into the per-frame update loop: $failureContract"
     }
 }
 $assertions++

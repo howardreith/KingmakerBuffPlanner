@@ -1,5 +1,17 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-08-12 — exact campaign load and HUD layout diagnosis
+
+Status: DIAGNOSTIC FAIL REPAIRED IN SOURCE; REQUALIFICATION PENDING
+
+- Three initial save attempts (`bootstrap-0.0.4-native-live-1`, `bootstrap-0.0.4-cotw-live-1`, and `bootstrap-0.0.4-cotw-live-normalized-1`) failed in `Player.PostLoad`; each exact transaction restored. Archive evidence showed the human save depends on the same Bag of Tricks, Call of the Wild, Cheat Menu, and Craft Magic Items set used by the clean reproduction.
+- Added and exact-hash-bound the `human-reproduction` compatibility profile. Run `bootstrap-0.0.4-human-live-1` then loaded `KBP_AUTOMATION_WORKING` through the normal save-slot action. Baseline remained SHA-256 `afca8ac5e42219bc50f428eb334a657cbcc2e31e8f2eb39c6ab53691cbb076d3`.
+- Live evidence proves `Main.Load`, `OnToggle(true)`, UMM `OnUpdate`, zero required Harmony patches, independent F10 arming, retained controller construction, EventBus subscription, five lifecycle callbacks, and campaign UI readiness all occurred.
+- Earliest failure moved to HUD placement: native layout participation overrode the row anchor, producing `rootBottom=-579.0969;clusterTop=-534.0093`. The row remained absent after 77 retry attempts, so the run is diagnostic FAIL.
+- The guarded process was stopped by exact PID after the internal timeout; transaction status is `Restored` and `restorationVerified=true`. Evidence: `runtime-evidence/bootstrap-0.0.4-human-live-1`; output-log SHA-256 `afd2513c3667802b05ea035ded08d2cab3313bffe8fc9213d032e1745bfb11db`.
+- Repair sets `ignoreLayout=true` only on the KBP HUD root and commits runtime failures once. Gates now pass source 24/24, behavior/protocol 60/60, harness 6/6, package 4/4, deployment WhatIf 5/5, and build 1/1.
+- Exact next action: commit, clean-build, and repeat the human-reproduction live scenario from a fresh process.
+
 ## 2026-08-12 — R2 correction qualification and guarded installation
 
 Status: 0.0.3 INSTALLED FOR AUTHORITATIVE HUMAN RETEST; campaign/save-backed mechanics remain blocked by the protected-save boundary.

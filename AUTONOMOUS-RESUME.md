@@ -1,5 +1,17 @@
 # Autonomous Resume
 
+## Live UI bootstrap campaign checkpoint — 2026-08-12 12:08Z
+
+- Status: the exact human-reproduction campaign now loads successfully under the guarded harness. The first real-campaign 0.0.4 attempt is a diagnostic failure, not qualification.
+- Branch/HEAD before the current repair: `codex/kingmaker-buff-planner` at `db48cd50fb809b7606b6f46b76b4e9f178840c8e`; the three current source edits are intentionally uncommitted until their gates pass.
+- Run `bootstrap-0.0.4-human-live-1` proved `Main.Load`, `OnToggle(true)`, first `OnUpdate`, independent F10 arming, retained controller construction, EventBus subscription, five scene/area lifecycle callbacks, exact Working save selection, and campaign load.
+- Earliest live failure: the HUD candidate participated in the native `Menu_Buttons48px` layout, which overrode its above-cluster anchor. Exact predicate: `row-not-above-native-cluster:rootBottom=-579.0969;clusterTop=-534.0093`; 77 bounded install attempts remained retryable while F10 stayed armed.
+- Current repair: set the HUD root `LayoutElement.ignoreLayout = true`; latch live-scenario exceptions and atomically write one failure result instead of throwing on every UMM update.
+- Diagnostic evidence: `C:\Dev\KingmakerBuffPlannerLab\runtime-evidence\bootstrap-0.0.4-human-live-1`; transaction status `Restored`, `restorationVerified=true`; full output log SHA-256 `afd2513c3667802b05ea035ded08d2cab3313bffe8fc9213d032e1745bfb11db`.
+- Save safety: baseline remains immutable at `afca8ac5e42219bc50f428eb334a657cbcc2e31e8f2eb39c6ab53691cbb076d3`; mutable Working is now `75519ac954f8cf7a010366af24c03666ae911fb29d57902c1a1c7b0f7cd75414` after the permitted load/write.
+- Current local gates: source 24/24, protocol/behavior 60/60, filesystem harness 6/6, package 4/4, deployment WhatIf 5/5, build 1/1.
+- Exact next action: commit the out-of-layout HUD repair, rebuild the clean commit, and run `bootstrap-0.0.4-human-live-2` from a fresh process.
+
 ## Live UI bootstrap recovery checkpoint — 2026-08-12
 
 - Status: 0.0.3 is human-failed (`UMM active, but live campaign HUD controls absent and F10 unregistered/nonfunctional` from the user's perspective); 0.0.4 repair is source-complete and awaiting clean-commit live qualification.

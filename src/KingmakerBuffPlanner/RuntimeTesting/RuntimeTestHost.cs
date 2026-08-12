@@ -56,8 +56,21 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         internal bool Update()
         {
             if (_completed) return true;
-            if (RuntimeTestProtocol.IsLiveUiScenario(_request.Scenario) && !UpdateLiveUiScenario())
-                return false;
+            if (RuntimeTestProtocol.IsLiveUiScenario(_request.Scenario))
+            {
+                try
+                {
+                    if (!UpdateLiveUiScenario()) return false;
+                }
+                catch (Exception exception)
+                {
+                    _completed = true;
+                    _log.Error("Live UI runtime scenario failed.", exception);
+                    TryWriteFailure(_startedAtUtc, exception);
+                    if (_request.ExitAfterCompletion) Application.Quit();
+                    return true;
+                }
+            }
             if (RuntimeTestProtocol.IsCatalogScenario(_request.Scenario) &&
                 ResourcesLibrary.LibraryObject == null)
                 return false;
