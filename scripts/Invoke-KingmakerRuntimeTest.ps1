@@ -1,6 +1,6 @@
 [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
 param(
-    [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'ui-native-contract-probe', 'final-no-save-core')][string]$Scenario = 'mod-load-smoke',
+    [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'live-ui-bootstrap', 'ui-native-contract-probe', 'final-no-save-core')][string]$Scenario = 'mod-load-smoke',
     [ValidateSet('native-only', 'call-of-the-wild')][string]$CompatibilityProfileId = 'native-only',
     [ValidateRange(5, 1800)][int]$TimeoutSeconds = 180,
     [ValidateRange(5, 300)][int]$LaunchTimeoutSeconds = 60,
@@ -29,6 +29,7 @@ Assert-KbpCompatibilityProfileFixtures -Profile $compatibilityProfile
 $expectedOptionalMods = @($compatibilityProfile.mods | ForEach-Object {
     [ordered]@{ ummId = $_.ummId; version = $_.version; assemblyName = $_.assemblyName; assemblySha256 = $_.assemblySha256 }
 })
+$savePair = if ($Scenario -ceq 'live-ui-bootstrap') { Get-KbpDisposableSavePair } else { $null }
 $steamSafety = Assert-KbpSteamSafety -SteamPath $SteamPath
 & (Join-Path $PSScriptRoot 'Deploy-Local.ps1') -PackagePath $package `
     -RunId 'runtime-whatif-preflight' -CompatibilityProfileId $CompatibilityProfileId `
@@ -63,7 +64,13 @@ try {
         -BuildManifest $buildManifest -TimeoutSeconds $TimeoutSeconds `
         -ExitAfterCompletion $ExitAfterCompletion -Scenario $Scenario `
         -ProfileId $CompatibilityProfileId -ExpectedOptionalMods $expectedOptionalMods `
-        -ExpectedBlueprintGuids @($compatibilityProfile.expectedBlueprints)
+        -ExpectedBlueprintGuids @($compatibilityProfile.expectedBlueprints) `
+        -Parameters $(if ($null -eq $savePair) { @{} } else { @{
+            workingSaveName = $savePair.working.name; workingFileName = $savePair.working.fileName
+            workingSha256 = $savePair.working.sha256; baselineSaveName = $savePair.baseline.name
+            baselineFileName = $savePair.baseline.fileName; baselineSha256 = $savePair.baseline.sha256
+            expectedGameName = $savePair.working.gameName; expectedGameId = $savePair.working.gameId
+        } })
     $requestPath = Join-Path $evidence 'runtime-request.json'
     Write-KbpJsonAtomic $requestPath $request
     $orchestration = [ordered]@{
@@ -82,11 +89,37 @@ try {
     $orchestration.kingmakerStartedAtUtc = $process.StartTime.ToUniversalTime().ToString('o')
     Write-KbpJsonAtomic (Join-Path $evidence 'orchestration.json') $orchestration
     $resultPath = Join-Path $evidence 'runtime-result.json'
+    $f10Sent = $false
     $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds + 15)
     while (-not (Test-Path -LiteralPath $resultPath -PathType Leaf)) {
         $process.Refresh()
         if ($process.HasExited) { throw 'Kingmaker exited before committing the atomic runtime result.' }
         if ([DateTime]::UtcNow -ge $deadline) { throw 'Runtime result timed out; launched Kingmaker was left running and restoration is blocked.' }
+        $f10Marker = Join-Path $evidence 'f10-ready.json'
+        if ($Scenario -ceq 'live-ui-bootstrap' -and -not $f10Sent -and
+            (Test-Path -LiteralPath $f10Marker -PathType Leaf)) {
+            Add-Type @'
+using System;
+using System.Runtime.InteropServices;
+public static class KbpPhysicalInput {
+  [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr hWnd);
+  [DllImport("user32.dll")] static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);
+  public static void F10Down(IntPtr window) {
+    if (window == IntPtr.Zero || !SetForegroundWindow(window)) throw new InvalidOperationException("Kingmaker foreground activation failed.");
+    keybd_event(0x79, 0, 0, UIntPtr.Zero);
+  }
+  public static void F10Up() { keybd_event(0x79, 0, 2, UIntPtr.Zero); }
+}
+'@
+            $process.Refresh()
+            [KbpPhysicalInput]::F10Down($process.MainWindowHandle)
+            Start-Sleep -Milliseconds 100
+            [KbpPhysicalInput]::F10Up()
+            $f10Sent = $true
+            $orchestration.stage = 'physical-f10-sent'
+            $orchestration.f10SentAtUtc = [DateTime]::UtcNow.ToString('o')
+            Write-KbpJsonAtomic (Join-Path $evidence 'orchestration.json') $orchestration
+        }
         Start-Sleep -Milliseconds 250
     }
     $result = Read-KbpJson $resultPath
@@ -97,6 +130,15 @@ try {
     $orchestration.completedAtUtc = [DateTime]::UtcNow.ToString('o')
     Write-KbpJsonAtomic (Join-Path $evidence 'orchestration.json') $orchestration
     if ($result.status -cne 'PASS') { throw "Runtime scenario returned $($result.status)." }
+    if ($Scenario -ceq 'live-ui-bootstrap') {
+        $afterPair = Get-KbpDisposableSavePair
+        if ($afterPair.baseline.sha256 -cne $savePair.baseline.sha256) {
+            throw 'Immutable KBP_AUTOMATION_BASELINE changed during the live scenario.'
+        }
+        if ($afterPair.working.sha256 -cne $savePair.working.sha256) {
+            throw 'The UI-only scenario unexpectedly wrote KBP_AUTOMATION_WORKING.'
+        }
+    }
     Write-Host "Runtime result PASS: $resultPath"
 }
 finally {

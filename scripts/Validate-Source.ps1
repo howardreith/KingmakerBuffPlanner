@@ -27,6 +27,19 @@ if ((Get-KbpSha256 $missionSource) -cne (Get-KbpSha256 $missionCopy)) {
 }
 $assertions++
 
+$mainSource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\Main.cs') -Raw
+$logSource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\Infrastructure\ModLog.cs') -Raw
+foreach ($bootstrapContract in @('[KBP-BOOT]', 'OnGUI = OnGui', 'Input.GetKeyDown(KeyCode.F10)',
+        'F10 handler armed', 'BuffPlannerUiRoot.HandleF10')) {
+    if (-not $mainSource.Contains($bootstrapContract)) {
+        throw "Live bootstrap instrumentation is missing: $bootstrapContract"
+    }
+}
+if (-not $logSource.Contains('Environment.NewLine + exception')) {
+    throw 'Bootstrap exceptions must preserve complete exception text and stack traces.'
+}
+$assertions++
+
 $version = Get-KbpVersion
 $info = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\Info.json') -Raw | ConvertFrom-Json
 if ($info.Id -cne 'KingmakerBuffPlanner' -or
@@ -105,6 +118,20 @@ if (-not $screenControllerSource.Contains('ValidatePresentation()') -or
     -not $stateSource.Contains('OpeningPresentation') -or
     -not $stateSource.Contains('FaultedRollback')) {
     throw 'Planner presentation validation must precede the transactional input lease.'
+}
+$assertions++
+
+foreach ($deferredContract in @('DeferredUiReadinessGate(2)', 'candidate-awaiting-deferred-readiness')) {
+    if (-not $screenControllerSource.Contains($deferredContract) -or
+        -not $hudSource.Contains($deferredContract)) {
+        throw "Both retained UI paths must defer readiness: $deferredContract"
+    }
+}
+foreach ($lifecycleContract in @('ISceneHandler', 'IAreaLoadingStagesHandler',
+        'IAreaActivationHandler', 'EventBus.Subscribe')) {
+    if (-not $uiRootSource.Contains($lifecycleContract)) {
+        throw "Live lifecycle observer is missing: $lifecycleContract"
+    }
 }
 $assertions++
 

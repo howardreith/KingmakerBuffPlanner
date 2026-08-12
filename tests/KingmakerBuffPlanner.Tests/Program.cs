@@ -37,6 +37,7 @@ namespace KingmakerBuffPlanner.Tests
                 Run("valid-catalog-request-is-accepted", () => TestValidCatalogRequest(root));
                 Run("valid-call-of-the-wild-request-is-accepted", () => TestValidCallOfTheWildRequest(root));
                 Run("valid-ui-request-is-accepted", () => TestValidUiRequest(root));
+                Run("valid-live-ui-request-is-accepted", () => TestValidLiveUiRequest(root));
                 Run("valid-native-ui-probe-request-is-accepted", () => TestValidNativeUiProbeRequest(root));
                 Run("valid-final-core-request-is-accepted", () => TestValidFinalCoreRequest(root));
                 Run("duplicate-flag-rejected", () => TestDuplicateFlag(root));
@@ -84,6 +85,7 @@ namespace KingmakerBuffPlanner.Tests
                 Run("setup-model-persists-stable-targets-and-provider-controls", TestSetupModel);
                 Run("input-lease-restores-on-close-and-acquire-failure", TestInputLease);
                 Run("screen-state-machine-is-idempotent", TestScreenStateMachine);
+                Run("ui-readiness-is-deferred-across-frames", TestDeferredUiReadiness);
                 Run("quick-execution-instruments-and-presents-empty-group", TestQuickExecutionFlow);
                 Run("animated-executor-validates-before-queue-and-reports", TestAnimatedExecutor);
                 Run("instant-executor-revalidates-batches-and-reports", TestInstantExecutor);
@@ -892,6 +894,22 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("Input lease did not restore after acquisition failure.");
         }
 
+        private static void TestDeferredUiReadiness()
+        {
+            var gate = new DeferredUiReadinessGate(2);
+            if (gate.IsReady || gate.ObservedFrames != 0)
+                throw new InvalidOperationException("A new readiness gate was already ready.");
+            if (gate.ObserveFrame() || gate.IsReady || gate.ObservedFrames != 1)
+                throw new InvalidOperationException("Same/first-frame validation was permitted.");
+            if (!gate.ObserveFrame() || !gate.IsReady || gate.ObservedFrames != 2)
+                throw new InvalidOperationException("Deferred readiness did not open on the later frame.");
+            if (!gate.ObserveFrame() || gate.ObservedFrames != 2)
+                throw new InvalidOperationException("Readiness was not stable and bounded.");
+            gate.Reset();
+            if (gate.IsReady || gate.ObservedFrames != 0)
+                throw new InvalidOperationException("Readiness reset did not require a new frame sequence.");
+        }
+
         private static void TestScreenStateMachine()
         {
             var boundary = new FakeInputBoundary();
@@ -1309,6 +1327,32 @@ namespace KingmakerBuffPlanner.Tests
                 new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path }, out rejection);
             if (request == null || rejection.Length != 0 || request.Scenario != "ui-root-smoke")
                 throw new InvalidOperationException("Valid UI request was rejected: " + rejection);
+        }
+
+        private static void TestValidLiveUiRequest(string root)
+        {
+            string path = WriteRequest(root, "valid-live-ui", o =>
+            {
+                o["scenario"] = "live-ui-bootstrap";
+                o["parameters"] = new Dictionary<string, object>
+                {
+                    { "workingSaveName", "KBP_AUTOMATION_WORKING" },
+                    { "workingFileName", "Manual_297_KBP_AUTOMATION_WORKING.zks" },
+                    { "workingSha256", new string('a', 64) },
+                    { "baselineSaveName", "KBP_AUTOMATION_BASELINE" },
+                    { "baselineFileName", "Manual_296_KBP_AUTOMATION_BASELINE.zks" },
+                    { "baselineSha256", new string('b', 64) },
+                    { "expectedGameName", "Yadmila" },
+                    { "expectedGameId", "3d556254-8ba9-4e9f-8d11-755eecd0b661" }
+                };
+            });
+            string rejection;
+            RuntimeTestRequest request = RuntimeTestProtocol.TryRead(
+                new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path }, out rejection);
+            if (request == null || rejection.Length != 0 ||
+                !RuntimeTestProtocol.IsLiveUiScenario(request.Scenario) ||
+                request.Parameters.Count != 8)
+                throw new InvalidOperationException("Valid live UI request was rejected: " + rejection);
         }
 
         private static void TestValidNativeUiProbeRequest(string root)

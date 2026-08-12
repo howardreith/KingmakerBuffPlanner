@@ -1,5 +1,11 @@
 # Autonomous Blockers
 
+## Live UI bootstrap recovery
+
+Current classification: IN PROGRESS — no critical safety blocker.
+
+The formerly missing save boundary is resolved by the exact project-owned `KBP_AUTOMATION_BASELINE` / `KBP_AUTOMATION_WORKING` pair. Baseline is immutable and the new scenario rejects descriptor ambiguity, loads only Working through the normal save-slot action, and verifies both hashes after the process. Live qualification, packaging, and guarded installation remain pending; 0.0.3 is human-failed and must not be presented as UI-complete.
+
 ## Current R2 handoff
 
 Current classification: INSTALLED — 0.0.2 human verdict FAIL; authoritative 0.0.3 human verdict pending.

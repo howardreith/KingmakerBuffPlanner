@@ -99,7 +99,8 @@ function New-KbpRuntimeRequest {
         [int]$TimeoutSeconds, [bool]$ExitAfterCompletion,
         [ValidateSet('native-only', 'call-of-the-wild')][string]$ProfileId = 'native-only',
         [object[]]$ExpectedOptionalMods = @(), [string[]]$ExpectedBlueprintGuids = @(),
-        [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'ui-native-contract-probe', 'final-no-save-core')][string]$Scenario = 'mod-load-smoke')
+        [hashtable]$Parameters = @{},
+        [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'live-ui-bootstrap', 'ui-native-contract-probe', 'final-no-save-core')][string]$Scenario = 'mod-load-smoke')
     return [ordered]@{
         schemaVersion = 1
         enabled = $true
@@ -115,8 +116,54 @@ function New-KbpRuntimeRequest {
         exitAfterCompletion = $ExitAfterCompletion
         expectedOptionalMods = @($ExpectedOptionalMods)
         expectedBlueprintGuids = @($ExpectedBlueprintGuids)
-        parameters = [ordered]@{}
+        parameters = $Parameters
     }
+}
+
+function Get-KbpDisposableSavePair {
+    $saveRoot = 'C:\Users\Howie\AppData\LocalLow\Owlcat Games\Pathfinder Kingmaker\Saved Games'
+    if (-not (Test-Path -LiteralPath $saveRoot -PathType Container)) {
+        throw 'The exact Kingmaker save root is unavailable.'
+    }
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $matches = @()
+    foreach ($file in @(Get-ChildItem -LiteralPath $saveRoot -Filter '*.zks' -File)) {
+        $archive = $null
+        $reader = $null
+        try {
+            $archive = [IO.Compression.ZipFile]::OpenRead($file.FullName)
+            $entry = $archive.GetEntry('header.json')
+            if ($null -eq $entry) { continue }
+            $reader = [IO.StreamReader]::new($entry.Open())
+            $header = ($reader.ReadToEnd() | ConvertFrom-Json)
+            if ($header.Name -in @('KBP_AUTOMATION_BASELINE', 'KBP_AUTOMATION_WORKING')) {
+                $matches += [pscustomobject]@{
+                    name = [string]$header.Name; fileName = $file.Name; path = $file.FullName
+                    sha256 = Get-KbpSha256 $file.FullName; gameName = [string]$header.GameName
+                    gameId = [string]$header.GameId; area = [string]$header.Area
+                    length = $file.Length
+                }
+            }
+        }
+        finally {
+            if ($null -ne $reader) { $reader.Dispose() }
+            if ($null -ne $archive) { $archive.Dispose() }
+        }
+    }
+    $baseline = @($matches | Where-Object name -ceq 'KBP_AUTOMATION_BASELINE')
+    $working = @($matches | Where-Object name -ceq 'KBP_AUTOMATION_WORKING')
+    if ($baseline.Count -ne 1 -or $working.Count -ne 1) {
+        throw "Disposable save ambiguity: baseline=$($baseline.Count); working=$($working.Count)."
+    }
+    if ($baseline[0].fileName -notmatch '^Manual_[0-9]+_KBP_AUTOMATION_BASELINE\.zks$' -or
+        $working[0].fileName -notmatch '^Manual_[0-9]+_KBP_AUTOMATION_WORKING\.zks$' -or
+        $baseline[0].path -ceq $working[0].path -or
+        $baseline[0].gameId -cne $working[0].gameId -or
+        $baseline[0].gameName -cne $working[0].gameName -or
+        $baseline[0].area -cne $working[0].area) {
+        throw 'Disposable save pair descriptors are not exact, distinct, and campaign-correlated.'
+    }
+    return [pscustomobject]@{ baseline = $baseline[0]; working = $working[0] }
 }
 
 function Wait-KbpNewKingmakerProcess {

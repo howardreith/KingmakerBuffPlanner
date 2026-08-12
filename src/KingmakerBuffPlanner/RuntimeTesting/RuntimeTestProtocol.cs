@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using Newtonsoft.Json;
 
 namespace KingmakerBuffPlanner.RuntimeTesting
@@ -76,8 +77,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 throw new InvalidDataException("expected-hash");
             if (request.TimeoutSeconds < 5 || request.TimeoutSeconds > 1800)
                 throw new InvalidDataException("timeout");
-            if (request.Parameters == null || request.Parameters.Count != 0)
-                throw new InvalidDataException("parameters");
+            ValidateParameters(request);
             if (request.ExpectedOptionalMods == null || request.ExpectedBlueprintGuids == null)
                 throw new InvalidDataException("compatibility-expectations");
             foreach (RuntimeExpectedOptionalMod mod in request.ExpectedOptionalMods)
@@ -156,7 +156,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
 
         internal static bool IsUiScenario(string scenario)
         {
-            return string.Equals(scenario, "ui-root-smoke", StringComparison.Ordinal);
+            return string.Equals(scenario, "ui-root-smoke", StringComparison.Ordinal) ||
+                string.Equals(scenario, "live-ui-bootstrap", StringComparison.Ordinal);
+        }
+
+        internal static bool IsLiveUiScenario(string scenario)
+        {
+            return string.Equals(scenario, "live-ui-bootstrap", StringComparison.Ordinal);
         }
 
         internal static bool IsNativeUiProbeScenario(string scenario)
@@ -169,6 +175,39 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             return string.Equals(scenario, "mod-load-smoke", StringComparison.Ordinal) ||
                 IsCatalogScenario(scenario) || IsUiScenario(scenario) ||
                 IsNativeUiProbeScenario(scenario);
+        }
+
+        private static void ValidateParameters(RuntimeTestRequest request)
+        {
+            if (request.Parameters == null) throw new InvalidDataException("parameters");
+            if (!IsLiveUiScenario(request.Scenario))
+            {
+                if (request.Parameters.Count != 0) throw new InvalidDataException("parameters");
+                return;
+            }
+            string[] exact =
+            {
+                "workingSaveName", "workingFileName", "workingSha256",
+                "baselineSaveName", "baselineFileName", "baselineSha256",
+                "expectedGameName", "expectedGameId"
+            };
+            if (request.Parameters.Count != exact.Length ||
+                exact.Any(name => !request.Parameters.ContainsKey(name)))
+                throw new InvalidDataException("live-save-parameters");
+            foreach (string name in exact)
+            {
+                object raw = request.Parameters[name];
+                string value = raw as string;
+                if (string.IsNullOrWhiteSpace(value)) throw new InvalidDataException("live-save-parameter:" + name);
+                if (name.EndsWith("Sha256", StringComparison.Ordinal) && !IsSha256(value))
+                    throw new InvalidDataException("live-save-hash:" + name);
+            }
+            if ((string)request.Parameters["workingSaveName"] != "KBP_AUTOMATION_WORKING" ||
+                (string)request.Parameters["baselineSaveName"] != "KBP_AUTOMATION_BASELINE")
+                throw new InvalidDataException("live-save-names");
+            if (string.Equals((string)request.Parameters["workingFileName"],
+                (string)request.Parameters["baselineFileName"], StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("live-save-files-not-distinct");
         }
 
         private static void RejectDuplicateProperties(string json)

@@ -14,6 +14,7 @@ namespace KingmakerBuffPlanner.UI
         private BuffPlannerScreenView _view;
         private bool _disposed;
         private int _validationTick;
+        private readonly DeferredUiReadinessGate _readiness = new DeferredUiReadinessGate(2);
 
         internal BuffPlannerScreenController(
             PlannerUiSession session,
@@ -33,43 +34,28 @@ namespace KingmakerBuffPlanner.UI
         internal PlannerScreenLifecycleState LifecycleState { get { return _state.State; } }
         internal BuffPlannerScreenView View { get { return _view; } }
         internal PlannerPresentationValidation LastValidation { get; private set; }
+        internal string LastFailure { get; private set; }
 
         internal bool Open()
         {
             if (_disposed || !_state.BeginPresentation()) return false;
-            BuffPlannerScreenView candidate = null;
             try
             {
                 _session.Refresh();
                 if (StaticCanvas.Instance == null)
                     throw new InvalidOperationException("Kingmaker campaign UI is not available.");
-                candidate = new BuffPlannerScreenView(StaticCanvas.Instance, _session,
+                _view = new BuffPlannerScreenView(StaticCanvas.Instance, _session,
                     _diagnostics, () => Close(), _quickExecute);
-                LastValidation = candidate.ValidatePresentation();
-                _log.Info("Buff Planner presentation phase A: " + LastValidation);
-                if (!LastValidation.Valid)
-                    throw new InvalidOperationException("Planner presentation validation failed: " +
-                        LastValidation.Failure);
-                _diagnostics.RecordPresentationValidated();
-                _view = candidate;
+                _readiness.Reset();
                 _validationTick = 0;
-                _state.AcquireInputLease();
-                _diagnostics.RecordInputLeaseAcquired();
-                LastValidation = candidate.ValidatePresentation();
-                _log.Info("Buff Planner presentation phase B: " + LastValidation);
-                if (!LastValidation.Valid)
-                    throw new InvalidOperationException("Planner presentation became invalid after input lease: " +
-                        LastValidation.Failure);
+                LastFailure = "candidate-awaiting-deferred-readiness";
+                _log.Info("[KBP-BOOT] full-screen install attempted;root=" +
+                    _view.RootObject.GetInstanceID() + ";deferredFrames=2;inputLease=false.");
                 return true;
             }
             catch (Exception exception)
             {
-                bool hadLease = _state.HasInputLease;
-                if (candidate != null) candidate.Dispose();
-                _view = null;
-                _state.Rollback();
-                if (hadLease) _diagnostics.RecordInputLeaseReleased();
-                _log.Error("Buff Planner screen open failed.", exception);
+                FailOpen("construction:" + exception.Message, exception);
                 return false;
             }
         }
@@ -82,6 +68,7 @@ namespace KingmakerBuffPlanner.UI
             {
                 if (_view != null) _view.Dispose();
                 _view = null;
+                _readiness.Reset();
             }
             finally
             {
@@ -98,6 +85,42 @@ namespace KingmakerBuffPlanner.UI
 
         internal void Tick()
         {
+            if (_state.State == PlannerScreenLifecycleState.OpeningPresentation)
+            {
+                if (_view == null || !_view.IsAlive || StaticCanvas.Instance == null)
+                {
+                    FailOpen("candidate-or-campaign-ui-lost-before-validation", null);
+                    return;
+                }
+                if (!_readiness.ObserveFrame()) return;
+                try
+                {
+                    LastValidation = _view.ValidatePresentation();
+                    _log.Info("[KBP-BOOT] full-screen presentation phase A;" + LastValidation);
+                    if (!LastValidation.Valid)
+                        throw new InvalidOperationException("Planner presentation validation failed: " +
+                            LastValidation.Failure);
+                    _diagnostics.RecordPresentationValidated();
+                    _state.AcquireInputLease();
+                    _diagnostics.RecordInputLeaseAcquired();
+                    LastValidation = _view.ValidatePresentation();
+                    _log.Info("[KBP-BOOT] full-screen presentation phase B;" + LastValidation);
+                    if (!LastValidation.Valid)
+                        throw new InvalidOperationException(
+                            "Planner presentation became invalid after input lease: " +
+                            LastValidation.Failure);
+                    LastFailure = string.Empty;
+                    _log.Info("[KBP-BOOT] full-screen install succeeded;root=" +
+                        _view.RootObject.GetInstanceID() + ";inputLease=true;active=" +
+                        _view.RootObject.activeInHierarchy + ".");
+                }
+                catch (Exception exception)
+                {
+                    FailOpen(LastValidation == null ? exception.Message : LastValidation.Failure,
+                        exception);
+                }
+                return;
+            }
             if (_state.IsOpen)
             {
                 if (_view == null || !_view.IsAlive || StaticCanvas.Instance == null)
@@ -116,6 +139,21 @@ namespace KingmakerBuffPlanner.UI
                     }
                 }
             }
+        }
+
+        private void FailOpen(string reason, Exception exception)
+        {
+            bool hadLease = _state.HasInputLease;
+            LastFailure = string.IsNullOrEmpty(reason) ? "unknown" : reason;
+            if (_view != null) _view.Dispose();
+            _view = null;
+            _readiness.Reset();
+            _state.Rollback();
+            if (hadLease) _diagnostics.RecordInputLeaseReleased();
+            var failure = exception ?? new InvalidOperationException(LastFailure);
+            _log.Error("[KBP-BOOT] full-screen install failed;reason=" + LastFailure +
+                ";retryable=true;inputLease=" + hadLease + ".", failure);
+            _log.Info("Buff Planner UI is unavailable: " + LastFailure);
         }
 
         public void Dispose()

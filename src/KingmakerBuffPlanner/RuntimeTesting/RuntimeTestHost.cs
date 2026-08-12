@@ -24,6 +24,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private readonly DateTime _startedAtUtc;
         private bool _completed;
         private int _uiSmokeUpdates;
+        private LiveCampaignSaveLoader _liveSaveLoader;
+        private int _liveUiPhase;
+        private int _liveCycleCount;
+        private bool _liveCycleOpening;
+        private bool _liveF10MarkerWritten;
 
         private RuntimeTestHost(
             RuntimeTestRequest request,
@@ -51,10 +56,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         internal bool Update()
         {
             if (_completed) return true;
+            if (RuntimeTestProtocol.IsLiveUiScenario(_request.Scenario) && !UpdateLiveUiScenario())
+                return false;
             if (RuntimeTestProtocol.IsCatalogScenario(_request.Scenario) &&
                 ResourcesLibrary.LibraryObject == null)
                 return false;
-            if (RuntimeTestProtocol.IsUiScenario(_request.Scenario))
+            if (RuntimeTestProtocol.IsUiScenario(_request.Scenario) &&
+                !RuntimeTestProtocol.IsLiveUiScenario(_request.Scenario))
             {
                 _uiSmokeUpdates++;
                 if (StaticCanvas.Instance == null || UnityEngine.EventSystems.EventSystem.current == null)
@@ -258,6 +266,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     UiSelectionDisabledBeforeOpen = ui != null && ui.SelectionDisabledBeforeOpen,
                     UiModeBeforeOpen = ui == null ? null : ui.ModeBeforeOpen,
                     UiModeAfterClose = ui == null ? null : ui.ModeAfterClose,
+                    UiF10Armed = ui != null && ui.F10Armed,
+                    UiF10KeydownCount = ui == null ? 0 : ui.F10KeydownCount,
+                    UiHudObjectEvidence = ui == null ? null : ui.HudObjectEvidence,
+                    UiScreenDestroyCountAfterClose = ui == null ? 0 : ui.ScreenDestroyCountAfterClose,
+                    WorkingSaveDescriptor = _liveSaveLoader == null ? null : _liveSaveLoader.WorkingDescriptor,
+                    BaselineSaveDescriptor = _liveSaveLoader == null ? null : _liveSaveLoader.BaselineDescriptor,
+                    WorkingSaveLoadActionCount = _liveSaveLoader == null ? 0 : _liveSaveLoader.LoadActionCount,
                     NativeUiContractSha256 = nativeUiContractHash,
                     NativeUiButtonCount = nativeUiContract == null ? 0 : nativeUiContract.Buttons.Count,
                     NativeUiCandidateAnchorCount = nativeUiContract == null
@@ -428,6 +443,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 }
                 if (ui != null)
                 {
+                    bool liveUi = RuntimeTestProtocol.IsLiveUiScenario(_request.Scenario);
                     result.Assertions.Add(ui.RootCount == 1
                         ? RuntimeTestAssertion.Pass("ui-singleton-root", "1", "1")
                         : RuntimeTestAssertion.Fail("ui-singleton-root", "1", ui.RootCount.ToString()));
@@ -519,10 +535,35 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         ui.InputCancelConsumed);
                     AddUiAssertion(result, "ui-group-selector", ui.GroupSelectorChanged,
                         "important-selected", ui.GroupSelectorChanged ? "important-selected" : "unchanged");
-                    result.Assertions.Add(ui.ReconstructionCount == 1
-                        ? RuntimeTestAssertion.Pass("ui-root-reconstruction", "1", "1")
-                        : RuntimeTestAssertion.Fail("ui-root-reconstruction", "1",
-                            ui.ReconstructionCount.ToString()));
+                    int expectedReconstructions = liveUi ? 0 : 1;
+                    result.Assertions.Add(ui.ReconstructionCount == expectedReconstructions
+                        ? RuntimeTestAssertion.Pass("ui-root-reconstruction",
+                            expectedReconstructions.ToString(), ui.ReconstructionCount.ToString())
+                        : RuntimeTestAssertion.Fail("ui-root-reconstruction",
+                            expectedReconstructions.ToString(), ui.ReconstructionCount.ToString()));
+                    if (liveUi)
+                    {
+                        AddUiAssertion(result, "ui-f10-armed-and-observed",
+                            ui.F10Armed && ui.F10KeydownCount >= 1, "true/>=1",
+                            ui.F10Armed + "/" + ui.F10KeydownCount);
+                        AddUiAssertion(result, "ui-no-duplicate-full-screen-objects",
+                            ui.ScreenCreateCount == ui.ScreenDestroyCount + 1 &&
+                            ui.ScreenCreateCount == ui.ScreenDestroyCountAfterClose,
+                            "one-open-before-close/zero-after-close", ui.ScreenCreateCount + "/" +
+                            ui.ScreenDestroyCount + "/" + ui.ScreenDestroyCountAfterClose);
+                        AddUiAssertion(result, "ui-hud-object-evidence",
+                            !string.IsNullOrWhiteSpace(ui.HudObjectEvidence) &&
+                            ui.HudObjectEvidence.Contains("corners=") &&
+                            ui.HudObjectEvidence.Contains("active=True"),
+                            "paths/ids/active/corners", ui.HudObjectEvidence ?? "missing");
+                        AddUiAssertion(result, "exact-working-save-load",
+                            _liveSaveLoader != null && _liveSaveLoader.LoadActionCount == 1 &&
+                            !string.IsNullOrWhiteSpace(_liveSaveLoader.WorkingDescriptor) &&
+                            !string.IsNullOrWhiteSpace(_liveSaveLoader.BaselineDescriptor),
+                            "one/distinct working+baseline", _liveSaveLoader == null ? "missing" :
+                            _liveSaveLoader.LoadActionCount + "/" + _liveSaveLoader.WorkingDescriptor +
+                            "/" + _liveSaveLoader.BaselineDescriptor);
+                    }
                     if (ui.RootCount != 1 || ui.RenderedOpenFrames == 0 || ui.OpenCloseCycles < 21 ||
                         ui.ScreenWidth <= 0 || ui.ScreenHeight <= 0 ||
                         ui.HudButtonCount != 4 || ui.HudListenerCount != 4 ||
@@ -558,7 +599,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         ui.InputAbilityTargetEventCount != 0 || !ui.InputSelectionUnchanged ||
                         !ui.InputCameraUnchanged || !ui.InputScrollConsumed || !ui.InputCancelConsumed ||
                         !ui.GroupSelectorChanged ||
-                        ui.ReconstructionCount != 1)
+                        ui.ReconstructionCount != expectedReconstructions ||
+                        (liveUi && (!ui.F10Armed || ui.F10KeydownCount < 1 ||
+                            ui.ScreenCreateCount != ui.ScreenDestroyCount + 1 ||
+                            ui.ScreenCreateCount != ui.ScreenDestroyCountAfterClose ||
+                            string.IsNullOrWhiteSpace(ui.HudObjectEvidence) ||
+                            !ui.HudObjectEvidence.Contains("corners=") ||
+                            _liveSaveLoader == null || _liveSaveLoader.LoadActionCount != 1)))
                     {
                         result.Status = "FAIL";
                         result.Stage = "ui-validation";
@@ -579,6 +626,74 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             }
 
             return true;
+        }
+
+        private bool UpdateLiveUiScenario()
+        {
+            if (_liveSaveLoader == null)
+                _liveSaveLoader = new LiveCampaignSaveLoader(_request, _log);
+            if (!_liveSaveLoader.IsComplete)
+            {
+                _liveSaveLoader.Update();
+                return false;
+            }
+            _uiSmokeUpdates++;
+            if (_uiSmokeUpdates > 1800)
+                throw new TimeoutException("Live UI scenario timed out;phase=" + _liveUiPhase +
+                    ";snapshot=" + BuffPlannerUiRoot.GetSnapshot());
+            if (_liveUiPhase == 0)
+            {
+                if (StaticCanvas.Instance == null ||
+                    UnityEngine.EventSystems.EventSystem.current == null ||
+                    !BuffPlannerUiRoot.IsHudInstalled) return false;
+                if (!_liveF10MarkerWritten)
+                {
+                    AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory, "f10-ready.json"),
+                        "{\"runId\":\"" + _request.RunId + "\",\"armed\":" +
+                        (Main.F10Armed ? "true" : "false") + ",\"snapshot\":" +
+                        JsonConvert.ToString(BuffPlannerUiRoot.GetSnapshot()) + "}" + Environment.NewLine);
+                    _liveF10MarkerWritten = true;
+                    _log.Info("[KBP-BOOT] runtime requests physical F10;marker=f10-ready.json.");
+                }
+                if (!Main.F10Armed || Main.F10KeydownCount < 1) return false;
+                _liveUiPhase = 1;
+                return false;
+            }
+            if (_liveUiPhase == 1)
+            {
+                if (!BuffPlannerUiRoot.IsScreenOpen) return false;
+                BuffPlannerUiRoot.BeginRuntimeSmoke();
+                BuffPlannerUiRoot.DispatchRuntimeInputSmoke();
+                _liveUiPhase = 2;
+                return false;
+            }
+            if (_liveUiPhase == 2)
+            {
+                BuffPlannerUiRoot.CloseRuntimeSmoke();
+                BuffPlannerUiRoot.DispatchRuntimeHudLong();
+                _liveUiPhase = 3;
+                return false;
+            }
+            if (_liveUiPhase == 3)
+            {
+                if (!_liveCycleOpening)
+                {
+                    BuffPlannerUiRoot.BeginRuntimeSmoke();
+                    _liveCycleOpening = true;
+                    return false;
+                }
+                if (!BuffPlannerUiRoot.IsScreenOpen) return false;
+                _liveCycleCount++;
+                _liveCycleOpening = false;
+                if (_liveCycleCount >= 20)
+                {
+                    _liveUiPhase = 4;
+                    return true;
+                }
+                BuffPlannerUiRoot.CloseRuntimeSmoke();
+                return false;
+            }
+            return _liveUiPhase >= 4;
         }
 
         private void TryWriteFailure(DateTime started, Exception exception)
@@ -786,6 +901,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         [JsonProperty("uiInputLeaseAcquiredOrder", Order = 109)] public int UiInputLeaseAcquiredOrder { get; set; }
         [JsonProperty("uiLifecycleState", Order = 110)] public string UiLifecycleState { get; set; }
         [JsonProperty("uiLongPointerEnterCount", Order = 111)] public int UiLongPointerEnterCount { get; set; }
+        [JsonProperty("uiF10Armed", Order = 112)] public bool UiF10Armed { get; set; }
+        [JsonProperty("uiF10KeydownCount", Order = 113)] public int UiF10KeydownCount { get; set; }
+        [JsonProperty("uiHudObjectEvidence", Order = 114)] public string UiHudObjectEvidence { get; set; }
+        [JsonProperty("uiScreenDestroyCountAfterClose", Order = 115)] public int UiScreenDestroyCountAfterClose { get; set; }
+        [JsonProperty("workingSaveDescriptor", Order = 116)] public string WorkingSaveDescriptor { get; set; }
+        [JsonProperty("baselineSaveDescriptor", Order = 117)] public string BaselineSaveDescriptor { get; set; }
+        [JsonProperty("workingSaveLoadActionCount", Order = 118)] public int WorkingSaveLoadActionCount { get; set; }
     }
 
     internal sealed class RuntimeTestAssertion

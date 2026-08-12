@@ -4,6 +4,7 @@ using System.Linq;
 using System.Reflection;
 using Kingmaker.UI.Constructor;
 using Kingmaker.UI.IngameMenu;
+using KingmakerBuffPlanner.Infrastructure;
 using KingmakerBuffPlanner.Persistence;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -17,6 +18,7 @@ namespace KingmakerBuffPlanner.UI
         internal const string RootName = "KingmakerBuffPlanner.HudButtons";
         private readonly PlannerUiSession _session;
         private readonly BuffPlannerUiLifecycleDiagnostics _diagnostics;
+        private readonly ModLog _log;
         private readonly Action _openSetup;
         private readonly Action<string> _quickExecute;
         private readonly List<Sprite> _ownedSprites = new List<Sprite>();
@@ -31,20 +33,27 @@ namespace KingmakerBuffPlanner.UI
         private int _listenerCount;
         private float _feedbackUntil;
         private IngameMenuController _anchorController;
+        private DeferredUiReadinessGate _readiness = new DeferredUiReadinessGate(2);
+        private bool _installed;
+        private int _validationFailures;
+        private int _installAttempts;
+        private string _lastFailure = "not-attempted";
 
         internal BuffPlannerHudButtonController(
             PlannerUiSession session,
             BuffPlannerUiLifecycleDiagnostics diagnostics,
+            ModLog log,
             Action openSetup,
             Action<string> quickExecute)
         {
             _session = session ?? throw new ArgumentNullException("session");
             _diagnostics = diagnostics ?? throw new ArgumentNullException("diagnostics");
+            _log = log ?? throw new ArgumentNullException("log");
             _openSetup = openSetup ?? throw new ArgumentNullException("openSetup");
             _quickExecute = quickExecute ?? throw new ArgumentNullException("quickExecute");
         }
 
-        internal bool IsInstalled { get { return _root != null; } }
+        internal bool IsInstalled { get { return _installed && _root != null; } }
         internal int ButtonCount { get { return _buttons.Count(button => button != null); } }
         internal int ListenerCount { get { return _listenerCount; } }
         internal string AnchorPath { get; private set; }
@@ -53,26 +62,59 @@ namespace KingmakerBuffPlanner.UI
         internal bool VisibleHitboxesOwnRaycasts { get; private set; }
         internal string ButtonOrder { get { return "Setup|Long|Important|Short"; } }
         internal int RuntimeUnderlyingNativeActivationCount { get; private set; }
+        internal string LastFailure { get { return _lastFailure; } }
+        internal int InstallAttempts { get { return _installAttempts; } }
+        internal int RootInstanceId { get { return _root == null ? 0 : _root.gameObject.GetInstanceID(); } }
+        internal string ObjectEvidence
+        {
+            get
+            {
+                if (_root == null) return "root=absent";
+                var entries = new List<string>();
+                for (int index = 0; index < _buttons.Length; index++)
+                {
+                    Button button = _buttons[index];
+                    if (button == null) { entries.Add(index + ":null"); continue; }
+                    var corners = new Vector3[4];
+                    ((RectTransform)button.transform).GetWorldCorners(corners);
+                    entries.Add(index + ":name=" + button.name +
+                        ",id=" + button.gameObject.GetInstanceID() +
+                        ",active=" + button.gameObject.activeInHierarchy +
+                        ",interactable=" + button.interactable +
+                        ",corners=" + string.Join("|", corners.Select(value => value.ToString()).ToArray()));
+                }
+                return "root=" + RootInstanceId + ";host=" + AnchorPath +
+                    ";raycaster=" + RaycastCanvasPath + ";" + string.Join(";", entries.ToArray());
+            }
+        }
 
         internal bool TryInstall()
         {
             if (_root != null)
             {
-                if (_anchorController != null && _root.parent != null) return true;
+                if (_anchorController != null && _root.parent != null) return _installed;
+                LogFailure("candidate-host-destroyed");
                 DisposeOwnedRoot();
             }
             IngameMenuController controller = UnityEngine.Object.FindObjectOfType<IngameMenuController>();
-            if (controller == null || !controller.gameObject.activeInHierarchy) return false;
+            if (controller == null) return RejectHost("ingame-menu-controller-not-found");
+            if (!controller.gameObject.activeInHierarchy)
+                return RejectHost("ingame-menu-controller-inactive:" + GetPath(controller.transform));
             ButtonPF formation = ResolveFormationButton(controller);
-            if (formation == null || formation.transform.parent == null) return false;
+            if (formation == null) return RejectHost("formation-button-field-null");
+            if (formation.transform.parent == null) return RejectHost("formation-button-parent-null");
             RectTransform reference = formation.transform as RectTransform;
             RectTransform parent = formation.transform.parent as RectTransform;
-            if (reference == null || parent == null) return false;
+            if (reference == null) return RejectHost("formation-button-not-rect-transform");
+            if (parent == null) return RejectHost("formation-parent-not-rect-transform");
             GraphicRaycaster raycaster = parent.GetComponentInParent<GraphicRaycaster>();
-            if (raycaster == null || !raycaster.isActiveAndEnabled || EventSystem.current == null)
-                return false;
+            if (raycaster == null) return RejectHost("native-graphic-raycaster-not-found:" + GetPath(parent));
+            if (!raycaster.isActiveAndEnabled)
+                return RejectHost("native-graphic-raycaster-inactive:" + GetPath(raycaster.transform));
+            if (EventSystem.current == null) return RejectHost("event-system-not-ready");
             if (parent.GetComponentsInParent<CanvasGroup>(true).Any(group =>
-                group != null && (!group.interactable || !group.blocksRaycasts))) return false;
+                group != null && (!group.interactable || !group.blocksRaycasts)))
+                return RejectHost("native-canvas-group-blocked:" + GetPath(parent));
 
             Transform duplicate = parent.Find(RootName);
             if (duplicate != null) UnityEngine.Object.Destroy(duplicate.gameObject);
@@ -111,6 +153,7 @@ namespace KingmakerBuffPlanner.UI
                 CreatePlannerButton("Short", "short", width, height,
                     () => _quickExecute("short"), () => RoutineTooltip("short"))
             };
+            foreach (Button button in _buttons) button.interactable = false;
             _tooltips = new Func<string>[]
             {
                 () => "Open Buff Planner setup. F10 is the fallback shortcut.",
@@ -119,17 +162,15 @@ namespace KingmakerBuffPlanner.UI
                 () => RoutineTooltip("short")
             };
             _root.SetAsLastSibling();
-            Canvas.ForceUpdateCanvases();
-            RowAboveNativeCluster = ValidateRowAboveCluster();
-            VisibleHitboxesOwnRaycasts = ValidateHitOwnership();
-            if (!RowAboveNativeCluster || !VisibleHitboxesOwnRaycasts)
-            {
-                DisposeOwnedRoot();
-                return false;
-            }
-            _diagnostics.RecordHudInstalled();
-            RefreshAvailability();
-            return true;
+            _installed = false;
+            _validationFailures = 0;
+            _readiness.Reset();
+            _installAttempts++;
+            _lastFailure = "candidate-awaiting-deferred-readiness";
+            _log.Info("[KBP-BOOT] HUD install attempted;attempt=" + _installAttempts +
+                ";candidate=" + RootInstanceId + ";host=" + AnchorPath +
+                ";raycastCanvas=" + RaycastCanvasPath + ";deferredFrames=2.");
+            return false;
         }
 
         internal void RefreshAvailability()
@@ -151,6 +192,35 @@ namespace KingmakerBuffPlanner.UI
 
         internal void Tick()
         {
+            if (_root != null && !_installed)
+            {
+                if (!_readiness.ObserveFrame()) return;
+                Canvas.ForceUpdateCanvases();
+                string rowFailure;
+                string hitFailure;
+                RowAboveNativeCluster = ValidateRowAboveCluster(out rowFailure);
+                VisibleHitboxesOwnRaycasts = ValidateHitOwnership(out hitFailure);
+                if (!RowAboveNativeCluster || !VisibleHitboxesOwnRaycasts)
+                {
+                    _validationFailures++;
+                    LogFailure(!RowAboveNativeCluster ? rowFailure : hitFailure);
+                    if (_validationFailures >= 120)
+                    {
+                        _log.Info("[KBP-BOOT] HUD candidate expired;candidate=" +
+                            RootInstanceId + ";validationFrames=" + _validationFailures + ".");
+                        DisposeOwnedRoot();
+                    }
+                    return;
+                }
+                _installed = true;
+                _lastFailure = string.Empty;
+                _diagnostics.RecordHudInstalled();
+                RefreshAvailability();
+                _log.Info("[KBP-BOOT] HUD install succeeded;attempt=" + _installAttempts +
+                    ";candidate=" + RootInstanceId + ";host=" + AnchorPath +
+                    ";buttons=" + ButtonCount + ";listeners=" + ListenerCount +
+                    ";active=" + _root.gameObject.activeInHierarchy + ".");
+            }
             if (_feedback != null && _feedback.transform.parent.gameObject.activeSelf &&
                 Time.unscaledTime >= _feedbackUntil)
                 _feedback.transform.parent.gameObject.SetActive(false);
@@ -174,6 +244,9 @@ namespace KingmakerBuffPlanner.UI
                 _diagnostics.RecordHudDestroyed();
             }
             _root = null;
+            _installed = false;
+            _readiness.Reset();
+            _validationFailures = 0;
             _feedback = null;
             _tooltip = null;
             _buttons = new Button[0];
@@ -310,26 +383,45 @@ namespace KingmakerBuffPlanner.UI
             return button;
         }
 
-        private bool ValidateRowAboveCluster()
+        private bool ValidateRowAboveCluster(out string failure)
         {
-            if (_root == null || _nativeCluster == null) return false;
+            failure = string.Empty;
+            if (_root == null || _nativeCluster == null)
+            {
+                failure = "row-or-native-cluster-null";
+                return false;
+            }
             Vector3[] rootCorners = new Vector3[4];
             Vector3[] clusterCorners = new Vector3[4];
             _root.GetWorldCorners(rootCorners);
             _nativeCluster.GetWorldCorners(clusterCorners);
             float rootBottom = rootCorners.Min(value => value.y);
             float clusterTop = clusterCorners.Max(value => value.y);
-            return rootBottom >= clusterTop + 0.5f;
+            bool valid = rootBottom >= clusterTop + 0.5f;
+            if (!valid) failure = "row-not-above-native-cluster:rootBottom=" + rootBottom +
+                ";clusterTop=" + clusterTop;
+            return valid;
         }
 
-        private bool ValidateHitOwnership()
+        private bool ValidateHitOwnership(out string failure)
         {
+            failure = string.Empty;
             if (_buttons.Length != 4 || EventSystem.current == null || _nativeRaycaster == null)
-                return false;
-            foreach (Button button in _buttons)
             {
+                failure = "hit-prerequisite-missing:buttons=" + _buttons.Length +
+                    ";eventSystem=" + (EventSystem.current == null ? "null" : EventSystem.current.name) +
+                    ";raycaster=" + (_nativeRaycaster == null ? "null" : GetPath(_nativeRaycaster.transform));
+                return false;
+            }
+            for (int index = 0; index < _buttons.Length; index++)
+            {
+                Button button = _buttons[index];
                 if (button == null || !button.gameObject.activeInHierarchy ||
-                    button.targetGraphic == null || !button.targetGraphic.raycastTarget) return false;
+                    button.targetGraphic == null || !button.targetGraphic.raycastTarget)
+                {
+                    failure = "button-not-raycast-ready:index=" + index;
+                    return false;
+                }
                 Vector3[] corners = new Vector3[4];
                 ((RectTransform)button.transform).GetWorldCorners(corners);
                 var eventData = new PointerEventData(EventSystem.current)
@@ -339,11 +431,36 @@ namespace KingmakerBuffPlanner.UI
                 };
                 var hits = new List<RaycastResult>();
                 EventSystem.current.RaycastAll(eventData, hits);
-                if (hits.Count == 0 || hits[0].gameObject == null) return false;
+                if (hits.Count == 0 || hits[0].gameObject == null)
+                {
+                    failure = "button-raycast-empty:index=" + index + ";center=" + eventData.position;
+                    return false;
+                }
                 Transform hit = hits[0].gameObject.transform;
-                if (hit != button.transform && !hit.IsChildOf(button.transform)) return false;
+                if (hit != button.transform && !hit.IsChildOf(button.transform))
+                {
+                    failure = "button-raycast-not-owned:index=" + index + ";top=" + GetPath(hit);
+                    return false;
+                }
             }
             return true;
+        }
+
+        private bool RejectHost(string reason)
+        {
+            LogFailure(reason);
+            return false;
+        }
+
+        private void LogFailure(string reason)
+        {
+            reason = string.IsNullOrEmpty(reason) ? "unknown" : reason;
+            if (string.Equals(_lastFailure, reason, StringComparison.Ordinal) &&
+                _validationFailures != 30 && _validationFailures != 120) return;
+            _lastFailure = reason;
+            _log.Info("[KBP-BOOT] HUD install failed;reason=" + reason +
+                ";retryable=true;attempt=" + _installAttempts +
+                ";candidate=" + RootInstanceId + ".");
         }
 
         private void ShowTooltip(string value)

@@ -50,3 +50,6 @@ When an authorized `KBP_AUTOMATION_WORKING` fixture is available, also verify:
 - native-only and optional-mod source visibility without duplicate or foreign dependencies.
 
 The no-save native-only and exact Call of the Wild load/catalog/Harmony portions above are already automated and passed twice. Manual acceptance remains limited to the save-backed rows requiring an authorized `KBP_AUTOMATION_WORKING` fixture; Tabletop Added Rules is unavailable locally.
+## 0.0.4 recovery acceptance status
+
+Do not manually accept or distribute 0.0.4 yet. Automation must first prove two fresh-process loads of the exact `KBP_AUTOMATION_WORKING` save with one active Setup/Long/Important/Short row, physical F10 observation, visible planner presentation before input acquisition, clean close restoration, and no duplicate objects after 20 cycles. Version 0.0.3 failed this live-campaign boundary.

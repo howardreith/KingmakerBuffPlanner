@@ -1,5 +1,17 @@
 # Autonomous Resume
 
+## Live UI bootstrap recovery checkpoint — 2026-08-12
+
+- Status: 0.0.3 is human-failed (`UMM active, but live campaign HUD controls absent and F10 unregistered/nonfunctional` from the user's perspective); 0.0.4 repair is source-complete and awaiting clean-commit live qualification.
+- Branch/intake: `codex/kingmaker-buff-planner`; forensic HEAD `d069fffb788147de3c76f2bd0d752f7b2db20f3d`; release source `d5a20aa7ddbb2ec7d131a4bed44f1ca65ecaaa65`.
+- Exact failed identity: installed/release DLL `5d95368ee237e658e06b4948209f805568a417ea150eb36c3023df9b155f0950`, MVID `f3f691a4-d691-4112-90a4-7beb9f06aad2`, package `42f823d6b8454ffe4497f4f652752a07d50738d5990c5a5243d091ba92d363e0`.
+- Root cause: both retained UI paths synchronously demanded EventSystem top-hit ownership in their graphics-creation frame. The live modal was active, opaque, 1280x720, and raycaster-backed, but its same-frame hit list was empty. The screen rolled back and the HUD silently destroyed its row through the identical timing assumption.
+- Rejected loader theories: logs and UMM 0.28.2 IL prove `Main.Load`, callback assignment, `OnToggle(true)`, `OnUpdate`, retained controller construction, and the F10-originated screen attempt occurred. Production applies zero Harmony patches; 0.0.3 had no persistent scene/area observer.
+- Repair: `[KBP-BOOT]` lifecycle/exception diagnostics; F10 polling directly in `Main.OnUpdate`; UMM diagnostics panel; EventBus scene/area observer; two-frame readiness gates; retryable exact HUD/modal failures; one retained/disposed controller; save-backed `live-ui-bootstrap` scenario with physical F10 delivery.
+- Authorized saves proven present: baseline `Manual_296_KBP_AUTOMATION_BASELINE.zks` SHA-256 `afca8ac5e42219bc50f428eb334a657cbcc2e31e8f2eb39c6ab53691cbb076d3`; working `Manual_297_KBP_AUTOMATION_WORKING.zks` SHA-256 `961c4721d31de5740416ae3c864e63351f6916cf61a0b4327094701f5579e1b2`; game ID `3d556254-8ba9-4e9f-8d11-755eecd0b661`.
+- Current gates: source validation 23/23, behavior/protocol 59/59, runtime harness 6/6, package 4/4, deployment WhatIf 5/5. No live claim yet.
+- Exact next command after checkpoint commit and clean build: `./scripts/Invoke-KingmakerRuntimeTest.ps1 -Scenario live-ui-bootstrap -CompatibilityProfileId native-only -RunId bootstrap-0.0.4-native-live-1 -Confirm:$false`.
+
 ## R2 installed handoff — 2026-08-12
 
 - Status: validated 0.0.3 is guarded-installed for authoritative human campaign retest; automated campaign UI and save-backed execution are not claimed.

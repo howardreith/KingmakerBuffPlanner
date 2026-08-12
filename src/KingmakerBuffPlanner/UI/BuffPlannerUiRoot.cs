@@ -5,6 +5,7 @@ using Kingmaker;
 using Kingmaker.GameModes;
 using Kingmaker.UI;
 using Kingmaker.UI.Selection;
+using Kingmaker.PubSubSystem;
 using KingmakerBuffPlanner.Infrastructure;
 using KingmakerBuffPlanner.RuntimeTesting;
 using UnityEngine;
@@ -12,7 +13,8 @@ using UnityEngine.EventSystems;
 
 namespace KingmakerBuffPlanner.UI
 {
-    internal sealed class BuffPlannerUiRoot : MonoBehaviour, IPlannerRoutineRunner
+    internal sealed class BuffPlannerUiRoot : MonoBehaviour, IPlannerRoutineRunner,
+        ISceneHandler, IAreaLoadingStagesHandler, IAreaActivationHandler
     {
         private const string ObjectName = "KingmakerBuffPlanner.UiRoot";
         private static BuffPlannerUiRoot _instance;
@@ -33,6 +35,13 @@ namespace KingmakerBuffPlanner.UI
         private bool _runtimePausedBefore;
         private bool _runtimeSelectionDisabledBefore;
         private GameModeType _runtimeModeBefore;
+        private IDisposable _eventSubscription;
+        private bool _disposed;
+        private bool _installRequested = true;
+        private int _tickCount;
+        private int _lifecycleSignalCount;
+
+        public int Priority { get { return 400; } }
 
         internal static void Ensure(string modPath, ModLog log)
         {
@@ -41,6 +50,8 @@ namespace KingmakerBuffPlanner.UI
             DontDestroyOnLoad(gameObject);
             _instance = gameObject.AddComponent<BuffPlannerUiRoot>();
             _instance.Initialize(modPath, log);
+            log.Info("[KBP-BOOT] controller constructed;instance=" +
+                gameObject.GetInstanceID() + ";retained=static;dontDestroyOnLoad=true.");
         }
 
         internal static void SetEnabled(bool enabled)
@@ -56,6 +67,61 @@ namespace KingmakerBuffPlanner.UI
             _instance.ReleaseAll();
             Destroy(_instance.gameObject);
             _instance = null;
+        }
+
+        internal static void HandleF10()
+        {
+            if (_instance == null)
+            {
+                return;
+            }
+            _instance._installRequested = true;
+            if (_instance._screen.LifecycleState != PlannerScreenLifecycleState.Closed)
+            {
+                _instance._screen.Close();
+                _instance._log.Info("[KBP-BOOT] full-screen close requested;source=F10.");
+                return;
+            }
+            if (!_instance._screen.Open())
+                _instance.LogUiUnavailable(_instance._screen.LastFailure);
+        }
+
+        internal static void TickOwned(float deltaTime)
+        {
+            if (_instance != null) _instance.Tick(deltaTime);
+        }
+
+        internal static bool IsHudInstalled
+        {
+            get { return _instance != null && _instance._hud != null && _instance._hud.IsInstalled; }
+        }
+
+        internal static bool IsScreenOpen
+        {
+            get { return _instance != null && _instance._screen != null && _instance._screen.IsOpen; }
+        }
+
+        internal static string GetSnapshot()
+        {
+            if (_instance == null) return "controller=absent;F10=polling-owned-by-Main";
+            BuffPlannerUiRoot root = _instance;
+            string mode = Game.Instance == null ? "game-null" : Game.Instance.CurrentMode.ToString();
+            return "controller=" + root.gameObject.GetInstanceID() +
+                ";enabled=" + root._enabled +
+                ";disposed=" + root._disposed +
+                ";ticks=" + root._tickCount +
+                ";eventBusSubscribed=" + (root._eventSubscription != null) +
+                ";lifecycleSignals=" + root._lifecycleSignalCount +
+                ";mode=" + mode +
+                ";staticCanvas=" + (StaticCanvas.Instance != null) +
+                ";eventSystem=" + (EventSystem.current == null ? "null" : EventSystem.current.name) +
+                ";hudInstalled=" + (root._hud != null && root._hud.IsInstalled) +
+                ";hudCandidate=" + (root._hud == null ? 0 : root._hud.RootInstanceId) +
+                ";hudAttempts=" + (root._hud == null ? 0 : root._hud.InstallAttempts) +
+                ";hudFailure=" + (root._hud == null ? "controller-null" : root._hud.LastFailure) +
+                ";screenState=" + (root._screen == null ? "controller-null" : root._screen.LifecycleState.ToString()) +
+                ";screenFailure=" + (root._screen == null ? "controller-null" : root._screen.LastFailure) +
+                ";F10=armed-in-Main.OnUpdate";
         }
 
         internal static void BeginRuntimeSmoke()
@@ -104,6 +170,13 @@ namespace KingmakerBuffPlanner.UI
             _instance._screen.Close();
         }
 
+        internal static void DispatchRuntimeHudLong()
+        {
+            if (_instance == null || _instance._hud == null ||
+                !_instance._hud.DispatchRuntimeClick("long"))
+                throw new InvalidOperationException("Runtime Long HUD click could not be dispatched.");
+        }
+
         internal static void DispatchRuntimeInputSmoke()
         {
             if (_instance == null || !_instance._screen.IsOpen)
@@ -134,6 +207,9 @@ namespace KingmakerBuffPlanner.UI
                 HudRowAboveNativeCluster = _instance._hud.RowAboveNativeCluster,
                 HudHitboxesOwnRaycasts = _instance._hud.VisibleHitboxesOwnRaycasts,
                 HudUnderlyingNativeActivationCount = _instance._hud.RuntimeUnderlyingNativeActivationCount,
+                F10Armed = Main.F10Armed,
+                F10KeydownCount = Main.F10KeydownCount,
+                HudObjectEvidence = _instance._hud.ObjectEvidence,
                 FullScreenRootCount = view == null ? 0 : view.RootCount,
                 FullScreenOpaque = view != null && view.IsOpaque,
                 FullScreenBlocksRaycasts = view != null && view.BlocksRaycasts,
@@ -192,6 +268,7 @@ namespace KingmakerBuffPlanner.UI
             };
             _instance._screen.Close();
             result.InputLeaseReleaseCountAfterClose = _instance._diagnostics.InputLeaseReleaseCount;
+            result.ScreenDestroyCountAfterClose = _instance._diagnostics.ScreenDestroyCount;
             result.FullScreenModeActiveAfterClose = Game.Instance != null &&
                 Game.Instance.IsModeActive(GameModeType.FullScreenUi);
             result.SelectionDisabledAfterClose = SelectionManager.Instance != null &&
@@ -218,24 +295,33 @@ namespace KingmakerBuffPlanner.UI
             _quick = new BuffPlannerQuickExecuteController(this, _diagnostics, PresentQuickResult);
             _screen = new BuffPlannerScreenController(_session, _diagnostics, log,
                 routineId => _quick.Execute(routineId));
-            _hud = new BuffPlannerHudButtonController(_session, _diagnostics,
+            _hud = new BuffPlannerHudButtonController(_session, _diagnostics, log,
                 () => _screen.Open(), routineId => _quick.Execute(routineId));
-        }
-
-        private void Update()
-        {
-            if (!_enabled) return;
             try
             {
-                if (Input.GetKeyDown(KeyCode.F10))
-                {
-                    if (_screen.IsOpen) _screen.Close();
-                    else _screen.Open();
-                }
-                else if (_screen.IsOpen && Input.GetKeyDown(KeyCode.Escape)) _screen.Close();
+                _eventSubscription = EventBus.Subscribe((object)this);
+                _log.Info("[KBP-BOOT] EventBus subscribed;scene=true;areaStages=true;" +
+                    "areaActivation=true;controller=" + gameObject.GetInstanceID() + ".");
+            }
+            catch (Exception exception)
+            {
+                _log.Error("[KBP-BOOT] EventBus subscription failed;polling retry remains active.",
+                    exception);
+            }
+        }
+
+        private void Tick(float deltaTime)
+        {
+            if (!_enabled) return;
+            _tickCount++;
+            try
+            {
+                if (_screen.LifecycleState != PlannerScreenLifecycleState.Closed &&
+                    Input.GetKeyDown(KeyCode.Escape)) _screen.Close();
                 _screen.Tick();
                 _hud.TryInstall();
                 _hud.Tick();
+                _installRequested = !_hud.IsInstalled;
                 if (_screen.IsOpen) _runtimeObservedFrames++;
             }
             catch (Exception exception)
@@ -243,6 +329,50 @@ namespace KingmakerBuffPlanner.UI
                 _log.Error("Buff Planner UI update failed.", exception);
                 _screen.Close();
             }
+        }
+
+        public void OnAreaBeginUnloading()
+        {
+            SignalLifecycle("OnAreaBeginUnloading", true);
+            ReleasePlayerUi();
+        }
+
+        public void OnAreaDidLoad()
+        {
+            SignalLifecycle("OnAreaDidLoad", false);
+        }
+
+        public void OnAreaScenesLoaded()
+        {
+            SignalLifecycle("OnAreaScenesLoaded", false);
+        }
+
+        public void OnAreaLoadingComplete()
+        {
+            SignalLifecycle("OnAreaLoadingComplete", false);
+        }
+
+        public void OnAreaActivated()
+        {
+            SignalLifecycle("OnAreaActivated", false);
+        }
+
+        private void SignalLifecycle(string name, bool unloading)
+        {
+            _lifecycleSignalCount++;
+            _installRequested = !unloading;
+            _log.Info("[KBP-BOOT] lifecycle callback;name=" + name +
+                ";count=" + _lifecycleSignalCount + ";installRequested=" +
+                _installRequested + ";mode=" +
+                (Game.Instance == null ? "game-null" : Game.Instance.CurrentMode.ToString()) + ".");
+        }
+
+        private void LogUiUnavailable(string reason)
+        {
+            string exact = string.IsNullOrEmpty(reason) ? "unknown-readiness-failure" : reason;
+            _log.Info("Buff Planner UI is unavailable: " + exact);
+            _log.Info("[KBP-BOOT] full-screen install failed;reason=" + exact +
+                ";retryable=true;F10Armed=true.");
         }
 
         private void PresentQuickResult(QuickExecutionResult result)
@@ -273,12 +403,24 @@ namespace KingmakerBuffPlanner.UI
 
         private void ReleaseAll()
         {
+            if (_disposed) return;
+            _disposed = true;
             StopAllCoroutines();
+            if (_eventSubscription != null)
+            {
+                _eventSubscription.Dispose();
+                _eventSubscription = null;
+                _log.Info("[KBP-BOOT] EventBus unsubscribed;controller=" +
+                    gameObject.GetInstanceID() + ".");
+            }
+            else EventBus.Unsubscribe((object)this);
             if (_screen != null) _screen.Dispose();
             if (_hud != null) _hud.Dispose();
             _screen = null;
             _hud = null;
             _quick = null;
+            _log.Info("[KBP-BOOT] controller disposed;instance=" +
+                gameObject.GetInstanceID() + ".");
         }
     }
 
@@ -297,6 +439,9 @@ namespace KingmakerBuffPlanner.UI
         internal bool HudRowAboveNativeCluster;
         internal bool HudHitboxesOwnRaycasts;
         internal int HudUnderlyingNativeActivationCount;
+        internal bool F10Armed;
+        internal int F10KeydownCount;
+        internal string HudObjectEvidence;
         internal int FullScreenRootCount;
         internal bool FullScreenOpaque;
         internal bool FullScreenBlocksRaycasts;
@@ -319,6 +464,7 @@ namespace KingmakerBuffPlanner.UI
         internal int InputLeaseReleaseCountAfterClose;
         internal int ScreenCreateCount;
         internal int ScreenDestroyCount;
+        internal int ScreenDestroyCountAfterClose;
         internal int HudInstallCount;
         internal int HudDestroyCount;
         internal int ReconstructionCount;

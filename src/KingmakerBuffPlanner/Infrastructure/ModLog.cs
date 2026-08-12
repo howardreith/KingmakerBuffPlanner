@@ -21,7 +21,7 @@ namespace KingmakerBuffPlanner.Infrastructure
         {
             _logger.Error((message ?? string.Empty) + (exception == null
                 ? string.Empty
-                : " " + exception.GetType().FullName + ": " + exception.Message));
+                : Environment.NewLine + exception));
         }
     }
 }

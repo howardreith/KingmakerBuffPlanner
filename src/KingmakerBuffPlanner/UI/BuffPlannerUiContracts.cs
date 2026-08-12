@@ -5,6 +5,31 @@ using System.Linq;
 
 namespace KingmakerBuffPlanner.UI
 {
+    public sealed class DeferredUiReadinessGate
+    {
+        private readonly int _minimumFrames;
+
+        public DeferredUiReadinessGate(int minimumFrames)
+        {
+            if (minimumFrames < 1) throw new ArgumentOutOfRangeException("minimumFrames");
+            _minimumFrames = minimumFrames;
+        }
+
+        public int ObservedFrames { get; private set; }
+        public bool IsReady { get { return ObservedFrames >= _minimumFrames; } }
+
+        public bool ObserveFrame()
+        {
+            if (ObservedFrames < _minimumFrames) ObservedFrames++;
+            return IsReady;
+        }
+
+        public void Reset()
+        {
+            ObservedFrames = 0;
+        }
+    }
+
     public interface IPlannerInputBoundary
     {
         object CaptureState();

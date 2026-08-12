@@ -89,3 +89,4 @@ The source behaviors use realistic immutable provider/resource/effect fixtures a
 ## Remaining hard-stop condition
 
 No project-owned `KBP_AUTOMATION_BASELINE` / `KBP_AUTOMATION_WORKING` pair exists. Every present save is protected. Once final clean-head packaging, no-save repetition, and guarded branch publication finish, section 26.2 applies: baseline identity cannot be distinguished from working because neither authorized fixture exists. The mission cannot truthfully reach `COMPLETE` without importing or creating that guarded pair under future explicit authority.
+Live-bootstrap correction (2026-08-12): 0.0.3 is HUMAN FAIL, not UI complete. UMM load and no-save/catalog passes do not prove campaign HUD or F10 initialization. The 0.0.4 source repair passes 23/23 validation and 59/59 behavior/protocol tests; all live UI rows remain PENDING until two exact disposable-save fresh-process runs pass.

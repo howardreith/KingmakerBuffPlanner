@@ -1,6 +1,15 @@
 # Changelog
 
+## 0.0.4 — 2026-08-12 (recovery in progress)
+
+- Moved the F10 fallback into the UMM update callback so HUD construction cannot disable hotkey diagnostics.
+- Added structured `[KBP-BOOT]` load/toggle/update/EventBus/scene/area/HUD/modal/F10 diagnostics, full exception stacks, and a UMM bootstrap snapshot.
+- Deferred HUD and modal raycast-ownership validation across Unity frames and kept transient failures retryable without acquiring gameplay input.
+- Added an exact disposable-save live-campaign scenario that delivers a physical F10 key, exercises 20 open/close cycles, and checks object uniqueness and save hashes.
+
 ## 0.0.3 — 2026-08-12
+
+Human verdict: **FAILED** — UMM showed the assembly active, but the loaded campaign had no Setup/Long/Important/Short row and F10 produced no visible planner. Its earlier no-save and synthetic results did not qualify live campaign initialization.
 
 - Replaced cloned native HUD objects with four fresh retained-mode buttons in the exact Setup/Long/Important/Short row, anchored above the native cluster with top-raycast ownership validation.
 - Made full-screen opening presentation-first and transactional; an invisible/zero-size/non-raycast root now aborts before input acquisition, and every later validation failure rolls back.

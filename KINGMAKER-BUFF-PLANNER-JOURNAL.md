@@ -393,3 +393,16 @@ Status: all applicable no-save gates PASS; save-backed core remains unmet
 - Added exhaustive `planning/DEFINITION-OF-DONE-MATRIX.md`. All save-backed planning/resource/effect/execution/persistence rows remain core and unmet, with source evidence separated from runtime proof
 - The exact remaining safety condition is absence of a distinct `KBP_AUTOMATION_BASELINE` / `KBP_AUTOMATION_WORKING` pair; every present save is protected
 - Exact next action: commit the audit, rebuild and rerun the composed core twice on final HEAD, push only the feature branch through the guarded helper, then record the section 26.2 hard stop
+## 2026-08-12 — live UI bootstrap recovery diagnosis and source checkpoint
+
+Status: ROOT CAUSE PROVEN; 0.0.4 SOURCE PASS; LIVE QUALIFICATION PENDING
+
+- Human intake superseded the prior 0.0.3 handoff: green UMM status did not correspond to a usable live campaign UI.
+- Newest clean diagnostic capture: `incoming/ui-bootstrap-0.0.3-failure/diagnostics-20260812T111644855Z`; installed/release identity is exact, with DLL `5d95368e...`, MVID `f3f691a4-d691-4112-90a4-7beb9f06aad2`, and source commit `d5a20aa7...`.
+- Exact UMM 0.28.2 IL and logs prove Load, toggle, active update, retained root, and an F10 screen attempt. The live phase-A record proves a fully sized/opaque/raycaster-backed root whose same-creation-frame EventSystem hit list was empty.
+- Earliest common fault: immediate raycast-ownership validation after graphic construction. The screen destroyed itself with an error; the HUD used the same sequence and destroyed itself silently.
+- Implemented 0.0.4 lifecycle diagnostics, full stack traces, independent update-path F10, EventBus area/scene callbacks, deferred readiness and bounded retry, and a UMM snapshot.
+- Added guarded exact-save loading and physical-F10 live scenario. Baseline `afca8ac...` is immutable; Working `961c4721...` is the only selectable save.
+- Gates: validation 23/23; behavior/protocol 59/59; filesystem harness 6/6; package 4/4; deployment WhatIf 5/5; warning-free exact-reference build 1/1.
+- Rejected: moving icons, changing opacity, stale-DLL theory, absent UMM callback theory, and treating another detached UI build as qualification.
+- Exact next action: commit this source checkpoint, rebuild from clean HEAD, then execute `bootstrap-0.0.4-native-live-1` in a fresh process.
