@@ -449,10 +449,39 @@ namespace KingmakerBuffPlanner.UI
             string routineId,
             Action<QuickExecutionResult> completed)
         {
+            bool completedCalled = false;
+            Action<QuickExecutionResult> observedCompletion = result =>
+            {
+                completedCalled = true;
+                if (completed != null) completed(result);
+            };
             try
             {
-                IEnumerator routine = _session.ExecuteRoutine(routineId, completed);
-                while (routine.MoveNext()) yield return routine.Current;
+                IEnumerator routine = _session.ExecuteRoutine(routineId, observedCompletion);
+                while (true)
+                {
+                    bool moved = false;
+                    object current = null;
+                    Exception failure = null;
+                    try
+                    {
+                        moved = routine.MoveNext();
+                        if (moved) current = routine.Current;
+                    }
+                    catch (Exception exception)
+                    {
+                        failure = exception;
+                    }
+                    if (failure != null)
+                    {
+                        if (!completedCalled)
+                            observedCompletion(_session.AbortUnexpectedExecution(
+                                routineId, failure));
+                        yield break;
+                    }
+                    if (!moved) yield break;
+                    yield return current;
+                }
             }
             finally
             {

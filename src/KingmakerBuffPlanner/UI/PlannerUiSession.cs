@@ -323,9 +323,29 @@ namespace KingmakerBuffPlanner.UI
                 step.Provider.Canonical + ";targets=" + string.Join(",", step.TargetUnitIds.ToArray()) +
                 ";pool=" + step.Reservation.PoolKey + ";tokens=" +
                 string.Join(",", step.Reservation.TokenIds.ToArray()) + ";units=" +
-                step.Reservation.Units + ";material=" + step.MaterialReservation.ItemGuid + "x" +
-                step.MaterialReservation.Count + ";expected=" +
+                step.Reservation.Units + ";material=" +
+                (step.MaterialReservation == null ? "none" :
+                    step.MaterialReservation.ItemGuid + "x" + step.MaterialReservation.Count) +
+                ";expected=" +
                 KingmakerAnimatedCastAdapter.ExpectedEffectIds(step.ExpectedEffects)).ToArray());
+        }
+
+        internal QuickExecutionResult AbortUnexpectedExecution(
+            string routineId,
+            Exception exception)
+        {
+            IsExecuting = false;
+            string name = RoutineDisplayName(routineId);
+            Status = name + " failed before a confirmed result: " +
+                (exception == null ? "unknown execution error" : exception.Message);
+            _log.Error("[KBP-QUICK] unexpected execution-stage failure;group=" +
+                routineId + ";visibleResult=true.", exception ??
+                new InvalidOperationException(Status));
+            return new QuickExecutionResult(routineId, name,
+                QuickExecutionDisposition.Failed, Status,
+                LastExecutionReport == null ? 0 : LastExecutionReport.Planned,
+                LastExecutionReport == null ? 0 : LastExecutionReport.Submitted,
+                LastExecutionReport == null ? 0 : LastExecutionReport.Confirmed);
         }
 
         private string RoutineDisplayName(string routineId)

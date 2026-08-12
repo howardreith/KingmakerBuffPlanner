@@ -171,6 +171,15 @@ foreach ($catalogContract in @('ResetFilters', 'ApplyFilters', 'FinalizeScrollCo
         throw "Catalog visibility/empty-state contract is missing: $catalogContract"
     }
 }
+$sessionSource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\UI\PlannerUiSession.cs') -Raw
+foreach ($quickFailureContract in @('MaterialReservation == null',
+        'AbortUnexpectedExecution', 'unexpected execution-stage failure',
+        'completedCalled')) {
+    if (-not $sessionSource.Contains($quickFailureContract) -and
+        -not $uiRootSource.Contains($quickFailureContract)) {
+        throw "Quick execution must fail visibly and clear state: $quickFailureContract"
+    }
+}
 $assertions++
 
 $runtimeHostSource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\RuntimeTesting\RuntimeTestHost.cs') -Raw
