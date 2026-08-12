@@ -9,6 +9,8 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'RuntimeHarness.Common.ps1')
+$requestedWhatIf = [bool]$WhatIfPreference
+$WhatIfPreference = $false
 
 function Get-KbpNonPlannerManifest([string]$ModsPath) {
     return @(Get-KbpDirectoryManifest $ModsPath | Where-Object {
@@ -65,6 +67,7 @@ $planner = Join-Path $mods 'KingmakerBuffPlanner'
 $priorExists = Test-Path -LiteralPath $planner -PathType Container
 if ($priorExists) { Assert-KbpPlannerPrimaryIdentity $planner $ExpectedPriorVersion }
 
+$WhatIfPreference = $requestedWhatIf
 if (-not $PSCmdlet.ShouldProcess($planner,
     "replace the validated $ExpectedPriorVersion planner with validated $version for local testing")) {
     Write-Host 'Local install preflight PASS; WhatIf made no install, state, evidence, staging, backup, game, or mod mutation.'
