@@ -1,5 +1,12 @@
 # Autonomous Resume
 
+## Catalog/HUD R3 physical qualification checkpoint — 2026-08-12
+
+- Current HEAD `122e560` on `codex/kingmaker-buff-planner`; version 0.0.5. `catalog-input-0.0.5-live-diag-2` passed/restored and proved 10 live active rows, 4 viewport-visible rows, bound details, and visible/prepared/available Bless, but used the prior synthetic HUD click gate.
+- The committed harness now sends OS cursor hover/click events to exact native-canvas HUD centers, monitors tooltip stability for 60 frames, probes world/selection/camera/native control effects, exercises all four HUD controls, selects/configures the live spellbook Bless row, records the confirmed or exact configured outcome, and runs 20 rebuild cycles.
+- No process, active lock, or unrestored transaction exists. Installed 0.0.4 remains unchanged.
+- Exact next action: build the clean 0.0.5 package, then run `./scripts/Invoke-KingmakerRuntimeTest.ps1 -Scenario live-ui-bootstrap -CompatibilityProfileId human-reproduction -RunId catalog-input-0.0.5-physical-1 -TimeoutSeconds 420 -Confirm:$false`.
+
 ## Catalog/HUD R3 first live correction — 2026-08-12
 
 - Current implementation HEAD is `157b1d8`; the first 0.0.5 run `catalog-input-0.0.5-live-diag-1` failed in `Main.Load` because exact `get_InGui` has no `PropertyInfo` metadata row. The direct `GetMethod` correction and callback-first fail-soft ordering pass all local gates.
