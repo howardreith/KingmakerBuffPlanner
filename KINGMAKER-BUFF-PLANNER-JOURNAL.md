@@ -4,6 +4,7 @@
 
 Status: DIAGNOSTIC FAIL REPAIRED IN SOURCE; REQUALIFICATION PENDING
 
+- Safety recovery: a pre-launch attempt for `bootstrap-0.0.4-human-live-2` moved original Mods to its owned backup but could not activate staging. Automatic restoration then treated a bound null PID as a running game. Audit proved no process, absent live destination, exact owned backup, and matching transaction lock/token. The project-owned restore was invoked without the null parameter and verified the complete original manifest; status is `Restored`, with no lock or staging residue. The harness now filters null/nonpositive IDs and has a regression test.
 - Three initial save attempts (`bootstrap-0.0.4-native-live-1`, `bootstrap-0.0.4-cotw-live-1`, and `bootstrap-0.0.4-cotw-live-normalized-1`) failed in `Player.PostLoad`; each exact transaction restored. Archive evidence showed the human save depends on the same Bag of Tricks, Call of the Wild, Cheat Menu, and Craft Magic Items set used by the clean reproduction.
 - Added and exact-hash-bound the `human-reproduction` compatibility profile. Run `bootstrap-0.0.4-human-live-1` then loaded `KBP_AUTOMATION_WORKING` through the normal save-slot action. Baseline remained SHA-256 `afca8ac5e42219bc50f428eb334a657cbcc2e31e8f2eb39c6ab53691cbb076d3`.
 - Live evidence proves `Main.Load`, `OnToggle(true)`, UMM `OnUpdate`, zero required Harmony patches, independent F10 arming, retained controller construction, EventBus subscription, five lifecycle callbacks, and campaign UI readiness all occurred.

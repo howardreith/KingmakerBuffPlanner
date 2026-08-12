@@ -15,6 +15,9 @@ $backupRoot = Join-Path $root 'backups'
 foreach ($path in @($stateRoot, $stagingRoot, $backupRoot)) { New-Item -ItemType Directory -Path $path -Force | Out-Null }
 $passed = 0
 try {
+    Assert-KbpNotRunning -KnownProcessIds $null
+    $passed++
+
     $game = Join-Path $root 'game-existing'
     New-Item -ItemType Directory -Path (Join-Path $game 'Mods\Existing\settings') -Force | Out-Null
     Set-Content -LiteralPath (Join-Path $game 'Kingmaker.exe') -Value 'fixture' -Encoding Ascii

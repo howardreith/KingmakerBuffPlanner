@@ -7,6 +7,7 @@
 - Deferred HUD and modal raycast-ownership validation across Unity frames and kept transient failures retryable without acquiring gameplay input.
 - Excluded the planner row from the native menu layout after real-campaign evidence proved that layout participation overrode its above-cluster anchor.
 - Made live-scenario failures commit one atomic diagnostic result instead of escaping into every UMM update frame.
+- Corrected guarded restoration to ignore a bound null process ID instead of falsely reporting an unnamed running Kingmaker process.
 - Added an exact disposable-save live-campaign scenario that delivers a physical F10 key, exercises 20 open/close cycles, and checks object uniqueness and save hashes.
 
 ## 0.0.3 — 2026-08-12

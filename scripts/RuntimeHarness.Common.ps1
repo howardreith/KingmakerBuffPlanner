@@ -15,7 +15,7 @@ function Assert-KbpNotRunning {
     } else {
         @(Get-Process -Name Kingmaker -ErrorAction SilentlyContinue | ForEach-Object Id)
     }
-    $ids = @($ids)
+    $ids = @($ids | Where-Object { $null -ne $_ -and [int]$_ -gt 0 })
     if (@($ids).Count -ne 0) { throw "Pathfinder: Kingmaker is running (PID(s): $($ids -join ', '))." }
 }
 

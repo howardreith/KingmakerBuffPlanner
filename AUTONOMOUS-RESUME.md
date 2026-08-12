@@ -2,6 +2,7 @@
 
 ## Live UI bootstrap campaign checkpoint — 2026-08-12 12:08Z
 
+- Transaction recovery update: the first attempt to start `bootstrap-0.0.4-human-live-2` failed before game launch while moving staged Mods into Program Files. Its automatic restore misclassified a bound null PID as a running process. Read-only audit proved live Mods absent, the exact original parked at the owned backup, no process, and matching lock/token; the guarded restore then returned `Restored`, `restorationVerified=true`, exact manifest equality, no lock, and no staging residue. The null-PID filter and regression are now implemented.
 - Status: the exact human-reproduction campaign now loads successfully under the guarded harness. The first real-campaign 0.0.4 attempt is a diagnostic failure, not qualification.
 - Branch/HEAD before the current repair: `codex/kingmaker-buff-planner` at `db48cd50fb809b7606b6f46b76b4e9f178840c8e`; the three current source edits are intentionally uncommitted until their gates pass.
 - Run `bootstrap-0.0.4-human-live-1` proved `Main.Load`, `OnToggle(true)`, first `OnUpdate`, independent F10 arming, retained controller construction, EventBus subscription, five scene/area lifecycle callbacks, exact Working save selection, and campaign load.
