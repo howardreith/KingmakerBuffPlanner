@@ -2,7 +2,11 @@
 
 ## 2026-08-12 — 0.0.7 presentation qualification
 
-Status: AUTOMATION PASS; RELEASE PACKAGING/INSTALL NEXT; HUMAN VISUAL VERDICT REQUIRED
+Status: AUTOMATION PASS; GUARDED-INSTALLED; HUMAN VISUAL VERDICT REQUIRED
+
+- Final release source `2f125f9f1024692d83a1b2570209d1858d62eff1`; deterministic package `9feed6dffa668812ed826c75b743d72892e6e8371b0f81585fb557aea8fcf453`; DLL `bf8c72874377d56f91bcdb6daedaa8b28b340a948aee06583a32954d61b38927`; MVID `966b7d8f-bd5f-46b9-beda-62774f82ccac`.
+- Exact-release physical runs `ui-polish-0.0.7-release-animated` and `ui-polish-0.0.7-release-instant` passed 71/71 each. Animated recorded queued/started/confirmed/spent 1/1/1/1; Instant recorded submitted/confirmed/spent 1/1/1. Exact-release native and Call of the Wild passed 12/12 and 26/26.
+- Guarded install `ui-polish-0.0.7-install` is `Installed`; settings preserved, all other mods verified unchanged, installed DLL exact, no process or deployment lock remains.
 
 - Created `codex/ui-parchment-bubblebuffs` from successful MVP branch HEAD `21c4dd702868e5cfc89963ba50bb64420f18915d`; preserved qualified 0.0.6 source/package/DLL/MVID and package contents before editing.
 - Studied BubbleBuffs at `f4871f763a23251284422ef0945a85e9f3fb788e` and adapted information hierarchy only. No Wrath path, shader, icon, texture, binary, or source excerpt entered production/package.

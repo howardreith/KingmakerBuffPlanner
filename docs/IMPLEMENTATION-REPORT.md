@@ -2,6 +2,8 @@
 
 ## 0.0.7 Kingmaker-native presentation refinement — automation complete, human verdict pending
 
+Final release source is `2f125f9f1024692d83a1b2570209d1858d62eff1`; deterministic package/DLL/MVID are `9feed6dffa668812ed826c75b743d72892e6e8371b0f81585fb557aea8fcf453` / `bf8c72874377d56f91bcdb6daedaa8b28b340a948aee06583a32954d61b38927` / `966b7d8f-bd5f-46b9-beda-62774f82ccac`. The guarded 0.0.6-to-0.0.7 replacement preserved settings and verified every other mod unchanged. No merge, push, or public release occurred.
+
 The successful 0.0.6 mechanics were frozen. Four independently regressed UI phases added: a centralized parchment theme; actual blueprint-icon cards; portrait-first target editing; and simplified filters, Settings, and Casting Source disclosure. No persistence schema/identity, discovery/classification, planning/resource, Animated/Instant, confirmed-effect, HUD isolation, modal lease, or live transaction behavior was redesigned.
 
 The first campaign screenshot exposed unsafe stretching of otherwise correct native sprites. Large panels/cards now use centralized translucent parchment fills and restrained borders, while exact native buttons, portrait chrome, background, and font remain resolved with fallbacks. The corrected run shows 11/11 real icons, no fallback icons, one Casting mode control, no retired primary labels, readable Bless target/plan state, and advanced provider controls only after disclosure.
