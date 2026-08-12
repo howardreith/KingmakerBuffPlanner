@@ -219,17 +219,51 @@ function Assert-KbpRuntimeResult {
             }
         }
     }
-    if ($Request.scenario -in @('ui-root-smoke', 'final-no-save-core')) {
+    if ($Request.scenario -ceq 'ui-root-smoke') {
         if ([int]$Result.uiRootCount -ne 1 -or [int]$Result.uiRenderedOpenFrames -le 0 -or
-            [int]$Result.uiOpenCloseCycles -lt 2 -or
+            [int]$Result.uiOpenCloseCycles -lt 21 -or
             [int]$Result.uiScreenWidth -le 0 -or [int]$Result.uiScreenHeight -le 0 -or
-            [int]$Result.uiRoutineButtonCount -ne 3 -or
-            -not [bool]$Result.uiCriticalControlsOnScreen -or
-            [int]$Result.uiLayoutProfilesPassed -ne 3 -or
-            [int]$Result.uiFullScreenBlockerCount -ne 0 -or
-            [int]$Result.uiEventSubscriptionCount -ne 0 -or
+            [int]$Result.uiHudButtonCount -ne 4 -or
+            [int]$Result.uiHudListenerCount -ne 4 -or
+            [string]::IsNullOrWhiteSpace([string]$Result.uiHudAnchorPath) -or
+            [int]$Result.uiFullScreenRootCount -ne 1 -or
+            -not [bool]$Result.uiFullScreenOpaque -or
+            -not [bool]$Result.uiFullScreenBlocksRaycasts -or
+            -not [bool]$Result.uiGraphicRaycasterPresent -or
+            -not [bool]$Result.uiPlannerOpen -or
+            -not [bool]$Result.uiFullScreenModeActive -or
+            -not [bool]$Result.uiSelectionDisabled -or
+            -not [bool]$Result.uiEventSystemPresent -or
+            [int]$Result.uiInputLeaseAcquireCount -le 0 -or
+            [int]$Result.uiInputLeaseReleaseCountAfterClose -ne [int]$Result.uiInputLeaseAcquireCount -or
+            [bool]$Result.uiFullScreenModeActiveAfterClose -or
+            [bool]$Result.uiSelectionDisabledAfterClose -ne [bool]$Result.uiSelectionDisabledBeforeOpen -or
+            [bool]$Result.uiPausedAfterClose -ne [bool]$Result.uiPausedBeforeOpen -or
+            [string]$Result.uiModeAfterClose -cne [string]$Result.uiModeBeforeOpen -or
+            [int]$Result.uiPointerEventCount -lt 2 -or
+            [int]$Result.uiScrollEventCount -lt 1 -or [int]$Result.uiDragEventCount -lt 2 -or
+            [int]$Result.uiLongPointerEventCount -ne 1 -or
+            [int]$Result.uiLongListenerCount -ne 1 -or
+            [int]$Result.uiLongGroupResolvedCount -ne 1 -or
+            [int]$Result.uiLongPlanRevalidatedCount -ne 1 -or
+            [int]$Result.uiLongExecutionInvokedCount -ne 0 -or
+            [int]$Result.uiLongRefusalCount -ne 1 -or
+            [int]$Result.uiLongResultPresentedCount -ne 1 -or
+            [string]$Result.uiLongResultMessage -cne 'No Long buffs are configured.' -or
+            -not ([string]$Result.uiSetupTooltip).Contains('F10') -or
+            -not ([string]$Result.uiLongTooltip).Contains('Long') -or
+            [int]$Result.uiInputPlayerCommandCount -ne 0 -or
+            [int]$Result.uiInputMovementCommandCount -ne 0 -or
+            [int]$Result.uiInputAbilityCommandCount -ne 0 -or
+            [int]$Result.uiInputSelectionEventCount -ne 0 -or
+            [int]$Result.uiInputAbilityTargetEventCount -ne 0 -or
+            -not [bool]$Result.uiInputSelectionUnchanged -or
+            -not [bool]$Result.uiInputCameraUnchanged -or
+            -not [bool]$Result.uiInputScrollConsumed -or
+            -not [bool]$Result.uiInputCancelConsumed -or
+            -not [bool]$Result.uiGroupSelectorChanged -or
             [int]$Result.uiReconstructionCount -ne 1) {
-            throw 'UI root smoke result is incomplete or invalid.'
+            throw 'Full-screen UI/input-isolation result is incomplete or invalid.'
         }
     }
     if ($Request.scenario -ceq 'ui-native-contract-probe') {

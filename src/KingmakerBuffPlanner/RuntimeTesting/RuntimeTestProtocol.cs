@@ -156,8 +156,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
 
         internal static bool IsUiScenario(string scenario)
         {
-            return string.Equals(scenario, "ui-root-smoke", StringComparison.Ordinal) ||
-                string.Equals(scenario, "final-no-save-core", StringComparison.Ordinal);
+            return string.Equals(scenario, "ui-root-smoke", StringComparison.Ordinal);
         }
 
         internal static bool IsNativeUiProbeScenario(string scenario)

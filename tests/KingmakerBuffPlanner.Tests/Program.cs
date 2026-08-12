@@ -82,6 +82,9 @@ namespace KingmakerBuffPlanner.Tests
                 Run("profile-migrates-schema-one", () => TestProfileMigration(root));
                 Run("profile-malformed-json-recovers-default", () => TestProfileMalformed(root));
                 Run("setup-model-persists-stable-targets-and-provider-controls", TestSetupModel);
+                Run("input-lease-restores-on-close-and-acquire-failure", TestInputLease);
+                Run("screen-state-machine-is-idempotent", TestScreenStateMachine);
+                Run("quick-execution-instruments-and-presents-empty-group", TestQuickExecutionFlow);
                 Run("animated-executor-validates-before-queue-and-reports", TestAnimatedExecutor);
                 Run("instant-executor-revalidates-batches-and-reports", TestInstantExecutor);
                 Run("hybrid-executor-routes-and-blocks-fallbacks", TestHybridExecutor);
@@ -869,6 +872,59 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("Animated executor queued an invalid cast or misreported completion.");
         }
 
+        private static void TestInputLease()
+        {
+            var boundary = new FakeInputBoundary();
+            BuffPlannerInputLease lease = BuffPlannerInputLease.Acquire(boundary);
+            if (boundary.CaptureCount != 1 || boundary.EnterCount != 1 || boundary.RestoreCount != 0)
+                throw new InvalidOperationException("Input lease did not acquire exactly once.");
+            lease.Dispose();
+            lease.Dispose();
+            if (boundary.RestoreCount != 1 || !lease.IsReleased)
+                throw new InvalidOperationException("Input lease did not release idempotently.");
+
+            boundary = new FakeInputBoundary { FailEnter = true };
+            bool failed = false;
+            try { BuffPlannerInputLease.Acquire(boundary); }
+            catch (InvalidOperationException) { failed = true; }
+            if (!failed || boundary.RestoreCount != 1)
+                throw new InvalidOperationException("Input lease did not restore after acquisition failure.");
+        }
+
+        private static void TestScreenStateMachine()
+        {
+            var boundary = new FakeInputBoundary();
+            var machine = new PlannerScreenStateMachine(() => BuffPlannerInputLease.Acquire(boundary));
+            if (!machine.Open() || machine.Open() || !machine.IsOpen || machine.OpenTransitions != 1)
+                throw new InvalidOperationException("Screen open transition was not idempotent.");
+            if (!machine.Close() || machine.Close() || machine.IsOpen || machine.CloseTransitions != 1 ||
+                boundary.RestoreCount != 1)
+                throw new InvalidOperationException("Screen close transition was not idempotent.");
+            machine.Open();
+            machine.Dispose();
+            if (machine.IsOpen || boundary.RestoreCount != 2)
+                throw new InvalidOperationException("Screen disposal leaked the input lease.");
+        }
+
+        private static void TestQuickExecutionFlow()
+        {
+            var diagnostics = new BuffPlannerUiLifecycleDiagnostics();
+            QuickExecutionResult presented = null;
+            var runner = new FakeRoutineRunner(new QuickExecutionResult("long", "Long",
+                QuickExecutionDisposition.Refused, "No Long buffs are configured.", 0, 0));
+            var controller = new BuffPlannerQuickExecuteController(runner, diagnostics,
+                result => presented = result);
+            diagnostics.RecordPointer("long");
+            if (!controller.Execute("long") || presented == null ||
+                presented.Message != "No Long buffs are configured.")
+                throw new InvalidOperationException("Empty Long routine was silent.");
+            QuickFlowDiagnostics flow = diagnostics.GetFlow("long");
+            if (flow.PointerEvents != 1 || flow.Listeners != 1 || flow.GroupsResolved != 1 ||
+                flow.PlansRevalidated != 1 || flow.ExecutionsInvoked != 0 || flow.Refusals != 1 ||
+                flow.ResultsPresented != 1 || runner.StartCount != 1)
+                throw new InvalidOperationException("Quick execution stages did not reconcile exactly once.");
+        }
+
         private static void TestInstantExecutor()
         {
             AbilityKey ability = Ability("instant", string.Empty, 0);
@@ -1016,6 +1072,42 @@ namespace KingmakerBuffPlanner.Tests
             {
                 StartCount++;
                 return new FakeAnimatedOperation();
+            }
+        }
+
+        private sealed class FakeInputBoundary : IPlannerInputBoundary
+        {
+            internal int CaptureCount;
+            internal int EnterCount;
+            internal int RestoreCount;
+            internal bool FailEnter;
+            public bool PlannerModeRequested { get; private set; }
+            public object CaptureState() { CaptureCount++; return "state"; }
+            public void EnterPlannerMode()
+            {
+                EnterCount++;
+                if (FailEnter) throw new InvalidOperationException("fixture-enter-failure");
+                PlannerModeRequested = true;
+            }
+            public void RestoreState(object state)
+            {
+                RestoreCount++;
+                PlannerModeRequested = false;
+                if (!object.Equals(state, "state"))
+                    throw new InvalidOperationException("Wrong input state restored.");
+            }
+        }
+
+        private sealed class FakeRoutineRunner : IPlannerRoutineRunner
+        {
+            private readonly QuickExecutionResult _result;
+            internal int StartCount;
+            internal FakeRoutineRunner(QuickExecutionResult result) { _result = result; }
+            public bool TryStart(string routineId, Action<QuickExecutionResult> completed)
+            {
+                StartCount++;
+                completed(_result);
+                return true;
             }
         }
 
@@ -1180,7 +1272,7 @@ namespace KingmakerBuffPlanner.Tests
                 new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path }, out rejection);
             if (request == null || rejection.Length != 0 ||
                 !RuntimeTestProtocol.IsCatalogScenario(request.Scenario) ||
-                !RuntimeTestProtocol.IsUiScenario(request.Scenario))
+                RuntimeTestProtocol.IsUiScenario(request.Scenario))
                 throw new InvalidOperationException("Valid final core request was rejected: " + rejection);
         }
 
@@ -1268,7 +1360,7 @@ namespace KingmakerBuffPlanner.Tests
                 { "runId", runId },
                 { "scenario", "mod-load-smoke" },
                 { "profileId", "native-only" },
-                { "expectedModVersion", "0.0.1" },
+                { "expectedModVersion", BuildInfo.Version },
                 { "expectedCommit", "TEST-COMMIT" },
                 { "evidenceDirectory", root },
                 { "expectedPackageSha256", new string('a', 64) },

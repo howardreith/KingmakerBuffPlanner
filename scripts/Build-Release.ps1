@@ -42,6 +42,7 @@ $releaseManifest = [ordered]@{
     packagePath = $releasePackage
     packageSha256 = Get-KbpSha256 $releasePackage
     dllSha256 = [string]$secondManifest.dllSha256
+    assemblyMvid = [string]$secondManifest.assemblyMvid
     deterministicBuilds = 2
     validated = $true
     publicationStatus = 'local-only'

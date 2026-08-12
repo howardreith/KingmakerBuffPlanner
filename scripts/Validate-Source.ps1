@@ -65,6 +65,38 @@ $foreignIdentity = @($identityFiles | Select-String -Pattern 'KingmakerGunslinge
 if ($foreignIdentity.Count -ne 0) { throw 'Foreign product identity was found in production source.' }
 $assertions++
 
+$uiRootSource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\UI\BuffPlannerUiRoot.cs') -Raw
+if ($uiRootSource -match '\bOnGUI\s*\(' -or $uiRootSource -match '\bGUILayout\b' -or
+    $uiRootSource -match 'Buff Planner \(F10\)') {
+    throw 'The retired floating IMGUI/text-strip HUD returned to the production UI root.'
+}
+$assertions++
+
+$hudSource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\UI\BuffPlannerHudButtonController.cs') -Raw
+foreach ($requiredHudContract in @('m_FormationButton', '"Setup"', '"Long"', '"Important"', '"Short"')) {
+    if (-not $hudSource.Contains($requiredHudContract)) {
+        throw "Native HUD control contract is missing: $requiredHudContract"
+    }
+}
+$assertions++
+
+$screenSource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\UI\BuffPlannerScreenView.cs') -Raw
+foreach ($requiredScreenContract in @('CanvasGroup', 'GraphicRaycaster', 'raycastTarget = true',
+        'blocksRaycasts = true', 'interactable = true', 'BUFF PLANNER')) {
+    if (-not $screenSource.Contains($requiredScreenContract)) {
+        throw "Full-screen raycast/visual contract is missing: $requiredScreenContract"
+    }
+}
+$assertions++
+
+$inputSource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\UI\KingmakerPlannerInputBoundary.cs') -Raw
+if (-not $inputSource.Contains('IFullScreenUIHandler') -or
+    -not $inputSource.Contains('GameModeType.FullScreenUi') -or
+    -not $inputSource.Contains('SelectionManager')) {
+    throw 'Native full-screen input isolation contract is incomplete.'
+}
+$assertions++
+
 $ignored = (& git -C $root check-ignore 'GamePath.props').Trim()
 if ($LASTEXITCODE -ne 0 -or $ignored -cne 'GamePath.props') {
     throw 'Machine-local GamePath.props must remain ignored.'

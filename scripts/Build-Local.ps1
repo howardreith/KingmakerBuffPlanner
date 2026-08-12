@@ -49,6 +49,7 @@ $manifest = [ordered]@{
     packagePath = $package
     packageSha256 = Get-KbpSha256 $package
     dllSha256 = Get-KbpSha256 $dllOutput
+    assemblyMvid = [Reflection.Assembly]::ReflectionOnlyLoadFrom($dllOutput).ManifestModule.ModuleVersionId.ToString('D')
     validated = $true
 }
 $manifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath ($package + '.build-local.json') -Encoding UTF8

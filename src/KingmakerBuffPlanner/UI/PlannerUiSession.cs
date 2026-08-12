@@ -106,7 +106,19 @@ namespace KingmakerBuffPlanner.UI
 
         internal IEnumerator ExecuteRoutine(string routineId)
         {
-            if (IsExecuting) yield break;
+            return ExecuteRoutine(routineId, null);
+        }
+
+        internal IEnumerator ExecuteRoutine(string routineId, Action<QuickExecutionResult> completed)
+        {
+            string routineName = RoutineDisplayName(routineId);
+            if (IsExecuting)
+            {
+                Complete(completed, new QuickExecutionResult(routineId, routineName,
+                    QuickExecutionDisposition.Refused,
+                    "Another buff routine is already executing.", 0, 0));
+                yield break;
+            }
             RoutinePlanResult preview;
             try
             {
@@ -116,6 +128,30 @@ namespace KingmakerBuffPlanner.UI
             {
                 Status = "Routine preview failed: " + exception.Message;
                 _log.Error("Routine preview failed.", exception);
+                Complete(completed, new QuickExecutionResult(routineId, routineName,
+                    QuickExecutionDisposition.Failed, Status, 0, 0));
+                yield break;
+            }
+            RoutineProfile routine = Model.Profile.Routines.First(r => r.RoutineId == routineId);
+            if (routine.Assignments.Count == 0)
+            {
+                Status = "No " + routineName + " buffs are configured.";
+                LastExecutionReport = new ExecutionReport(preview.Plan);
+                Complete(completed, new QuickExecutionResult(routineId, routineName,
+                    QuickExecutionDisposition.Refused, Status, 0, 0));
+                yield break;
+            }
+            if (preview.Plan.Steps.Count == 0)
+            {
+                LastExecutionReport = new ExecutionReport(preview.Plan);
+                int skipped = preview.Plan.Outcomes.Count(outcome =>
+                    outcome.Kind == TargetOutcomeKind.SkippedAlreadyActive);
+                int unfulfilled = preview.Plan.Outcomes.Count(outcome =>
+                    outcome.Kind == TargetOutcomeKind.Unfulfilled);
+                Status = "No " + routineName + " casts can run: skipped active=" + skipped +
+                    "; unfulfilled=" + unfulfilled + ".";
+                Complete(completed, new QuickExecutionResult(routineId, routineName,
+                    QuickExecutionDisposition.Refused, Status, 0, 0));
                 yield break;
             }
             LastExecutionReport = new ExecutionReport(preview.Plan);
@@ -158,6 +194,9 @@ namespace KingmakerBuffPlanner.UI
             {
                 Status = "Routine execution failed: " + failure.Message;
                 _log.Error("Routine execution failed.", failure);
+                Complete(completed, new QuickExecutionResult(routineId, routineName,
+                    QuickExecutionDisposition.Failed, Status,
+                    LastExecutionReport.Planned, LastExecutionReport.Fired));
                 yield break;
             }
             ExecutionReport report = LastExecutionReport;
@@ -166,6 +205,23 @@ namespace KingmakerBuffPlanner.UI
                 "; fired=" + report.Fired + "; observed=" + report.SuccessfullyObserved +
                 "; spent=" + report.ResourcesSpent + "; failed=" + report.Failed +
                 "; skipped=" + report.Skipped + "; unfulfilled=" + report.Unfulfilled + ".";
+            Complete(completed, new QuickExecutionResult(routineId, routineName,
+                report.Failed == 0 ? QuickExecutionDisposition.Completed : QuickExecutionDisposition.Failed,
+                Status, report.Planned, report.Fired));
+        }
+
+        private string RoutineDisplayName(string routineId)
+        {
+            RoutineProfile routine = Model == null ? null : Model.Profile.Routines
+                .FirstOrDefault(item => item.RoutineId == routineId);
+            if (routine != null && !string.IsNullOrWhiteSpace(routine.Name)) return routine.Name;
+            if (string.IsNullOrWhiteSpace(routineId)) return "Routine";
+            return char.ToUpperInvariant(routineId[0]) + routineId.Substring(1);
+        }
+
+        private static void Complete(Action<QuickExecutionResult> completed, QuickExecutionResult result)
+        {
+            if (completed != null) completed(result);
         }
     }
 }

@@ -72,6 +72,11 @@
       <Private>False</Private>
       <ExternallyResolved>True</ExternallyResolved>
     </Reference>
+    <Reference Include="UnityEngine.TextRenderingModule">
+      <HintPath>$(KingmakerInstallDir)\Kingmaker_Data\Managed\UnityEngine.TextRenderingModule.dll</HintPath>
+      <Private>False</Private>
+      <ExternallyResolved>True</ExternallyResolved>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Discovery\ActionGraphScanner.cs" />
@@ -108,11 +113,19 @@
     <Compile Include="Persistence\ProfileRepository.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="RuntimeTesting\RuntimeTestHost.cs" />
+    <Compile Include="RuntimeTesting\UiInputIsolationProbe.cs" />
     <Compile Include="RuntimeTesting\HarmonyPatchInventoryExporter.cs" />
     <Compile Include="RuntimeTesting\NativeUiContractProbe.cs" />
     <Compile Include="RuntimeTesting\RuntimePaths.cs" />
     <Compile Include="RuntimeTesting\RuntimeTestProtocol.cs" />
     <Compile Include="UI\PlannerSetupModel.cs" />
+    <Compile Include="UI\BuffPlannerUiContracts.cs" />
+    <Compile Include="UI\BuffPlannerHudButtonController.cs" />
+    <Compile Include="UI\BuffPlannerScreenController.cs" />
+    <Compile Include="UI\BuffPlannerScreenView.cs" />
+    <Compile Include="UI\KingmakerPlannerInputBoundary.cs" />
+    <Compile Include="UI\KingmakerUiFactory.cs" />
+    <Compile Include="UI\PlannerPointerSink.cs" />
     <Compile Include="UI\PlannerUiSession.cs" />
     <Compile Include="UI\BuffPlannerUiRoot.cs" />
     <Compile Include="$(IntermediateOutputPath)BuildInfo.Generated.cs" />

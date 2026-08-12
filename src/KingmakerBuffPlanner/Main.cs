@@ -49,6 +49,7 @@ namespace KingmakerBuffPlanner
         private static bool OnUnload(UnityModManager.ModEntry modEntry)
         {
             _runtimeTest = null;
+            BuffPlannerUiRoot.DestroyOwned();
             _log.Info("Unloaded.");
             return true;
         }
