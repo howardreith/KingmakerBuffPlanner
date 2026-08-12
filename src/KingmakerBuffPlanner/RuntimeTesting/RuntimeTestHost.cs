@@ -834,8 +834,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         "ShowOnStart UMM overlay;marker=umm-overlay-ready.json.");
                 }
                 if (StaticCanvas.Instance == null ||
-                    UnityEngine.EventSystems.EventSystem.current == null ||
-                    !BuffPlannerUiRoot.IsHudInstalled) return false;
+                    UnityEngine.EventSystems.EventSystem.current == null) return false;
                 if (_nativeUiContract == null)
                 {
                     _nativeUiContract = NativeUiContractProbe.Capture();
@@ -846,6 +845,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         _nativeUiContract.Fonts.Count + ";portraits=" +
                         _nativeUiContract.Portraits.Count + ".");
                 }
+                if (!BuffPlannerUiRoot.IsHudInstalled) return false;
                 BuffPlannerUiRoot.CaptureRuntimeBaseline();
                 if (!_liveF10MarkerWritten)
                 {
