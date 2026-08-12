@@ -28,6 +28,7 @@ Status: prior UI gate INVALIDATED; repair investigation IN PROGRESS
 - Guarded runs passed with exact restoration: native `ui-repair-0.0.2-final-native-1/2` 12/12 each; Call of the Wild `ui-repair-0.0.2-cotw-1/2` 26/26 each. Per-profile catalog and Harmony evidence repeated byte-for-byte.
 - Corrected UI run `ui-repair-0.0.2-ui-main-menu-boundary` reached only the main menu, recorded `Campaign UI is required for the full-screen input-isolation scenario`, exited, and restored `Mods` exactly. This is the required rejection of the former false acceptance pattern, not a mechanics PASS.
 - Exact next action: commit documentation/failure-envelope changes, rebuild final clean HEAD, repeat applicable tests, create deterministic release package, run installer WhatIf, guarded-install 0.0.2, verify installed/non-planner identities, push feature branch, and hand off human checklist.
+- First final `Build-Release.ps1` attempt failed on its required second rebuild because the newly added in-process reflection-only MVID read held the first DLL open. The deterministic gate was preserved; `Build-Local.ps1` now performs MVID inspection in a short-lived child PowerShell process so the assembly lock terminates before repetition.
 
 ## 2026-08-11 — Phase 0 intake
 

@@ -40,6 +40,12 @@ try {
 }
 finally { $stream.Dispose() }
 
+$escapedDllOutput = $dllOutput.Replace("'", "''")
+$assemblyMvid = (& powershell.exe -NoProfile -NonInteractive -Command `
+    "[Reflection.Assembly]::ReflectionOnlyLoadFrom('$escapedDllOutput').ManifestModule.ModuleVersionId.ToString('D')").Trim()
+if ($LASTEXITCODE -ne 0 -or $assemblyMvid -notmatch '^[0-9a-f-]{36}$') {
+    throw 'Short-lived MVID inspection failed.'
+}
 & (Join-Path $PSScriptRoot 'validate-package.ps1') -PackagePath $package
 $manifest = [ordered]@{
     schemaVersion = 1
@@ -49,7 +55,7 @@ $manifest = [ordered]@{
     packagePath = $package
     packageSha256 = Get-KbpSha256 $package
     dllSha256 = Get-KbpSha256 $dllOutput
-    assemblyMvid = [Reflection.Assembly]::ReflectionOnlyLoadFrom($dllOutput).ManifestModule.ModuleVersionId.ToString('D')
+    assemblyMvid = $assemblyMvid
     validated = $true
 }
 $manifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath ($package + '.build-local.json') -Encoding UTF8

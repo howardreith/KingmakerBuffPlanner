@@ -15,4 +15,4 @@ Status: IN PROGRESS — 0.0.1 UI acceptance invalidated by human playtesting
 - Separate existing hard stop: no authorized `KBP_AUTOMATION_BASELINE` / `KBP_AUTOMATION_WORKING` pair; this does not block UI-only no-save repair qualification.
 - Last runtime gates: native `ui-repair-0.0.2-final-native-1/2` 12/12 each and Call of the Wild `ui-repair-0.0.2-cotw-1/2` 26/26 each, exact restoration. Corrected UI gate rejected main-menu-only evidence and restored exactly.
 - Current exact local package (will change after final commit): package `651d9ce3f92649f86d6e619e46fe3293ace1019e10e3b086c2a8c3617452b68f`, DLL `f039f436fb948c7acb203e60979dec3bb500e03e85ff8f6a73ae6753b293b850`, MVID `5f57af25-8876-400a-99b9-5971d8bfd8f4`.
-- Exact next command: `scripts\Test-SourceOnly.ps1`, commit docs/failure-envelope changes, build clean final release, validate/install via `scripts\Install-Local.ps1`, then guarded push and handoff.
+- Exact next command: commit the short-lived MVID inspection fix, rerun `scripts\Build-Release.ps1` from clean HEAD, validate/install via `scripts\Install-Local.ps1`, then guarded push and handoff.
