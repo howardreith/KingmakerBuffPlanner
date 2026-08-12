@@ -23,15 +23,18 @@ function Get-KbpCompatibilityProfile {
         foreach ($mod in @($profile.mods)) {
             $modRequired = @('ummId', 'directoryName', 'version', 'assemblyName', 'infoSha256',
                 'assemblySha256', 'directoryManifestSha256', 'fileCount', 'totalBytes')
+            $modAllowed = $modRequired + @('fixtureRelativePath')
             $modNames = @($mod.PSObject.Properties.Name)
             if (@($modRequired | Where-Object { $_ -notin $modNames }).Count -ne 0 -or
-                @($modNames | Where-Object { $_ -notin $modRequired }).Count -ne 0 -or
+                @($modNames | Where-Object { $_ -notin $modAllowed }).Count -ne 0 -or
                 [string]$mod.ummId -notmatch '^[A-Za-z0-9._-]{1,100}$' -or
                 [string]$mod.directoryName -notmatch '^[A-Za-z0-9._-]{1,100}$' -or
                 [string]$mod.infoSha256 -notmatch '^[0-9a-f]{64}$' -or
                 [string]$mod.assemblySha256 -notmatch '^[0-9a-f]{64}$' -or
                 [string]$mod.directoryManifestSha256 -notmatch '^[0-9a-f]{64}$' -or
-                [int]$mod.fileCount -lt 2 -or [long]$mod.totalBytes -le 0) {
+                [int]$mod.fileCount -lt 2 -or [long]$mod.totalBytes -le 0 -or
+                (($modNames -contains 'fixtureRelativePath') -and
+                    [string]$mod.fixtureRelativePath -notmatch '^[A-Za-z0-9._-]{1,100}$')) {
                 throw "Compatibility mod contract is invalid: $($mod.ummId)"
             }
         }
@@ -56,6 +59,6 @@ function Assert-KbpCompatibilityProfileFixtures {
     if (-not $KingmakerInstallDir) { $KingmakerInstallDir = Get-KbpGamePath }
     $mods = Join-Path $KingmakerInstallDir 'Mods'
     foreach ($mod in @($Profile.mods)) {
-        [void](Assert-KbpCompatibilityModIdentity $mod (Join-Path $mods ([string]$mod.directoryName)))
+        [void](Assert-KbpCompatibilityModIdentity $mod (Get-KbpCompatibilitySourcePath $mod $mods))
     }
 }

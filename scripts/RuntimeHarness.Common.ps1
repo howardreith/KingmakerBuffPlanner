@@ -92,6 +92,16 @@ function Assert-KbpCompatibilityModIdentity($Expected, [string]$Path) {
     return $identity
 }
 
+function Get-KbpCompatibilitySourcePath($Expected, [string]$LiveModsPath) {
+    if ($Expected.PSObject.Properties.Name -contains 'fixtureRelativePath') {
+        $fixtureRoot = Join-Path $script:KbpLabRoot 'examples'
+        $candidate = [IO.Path]::GetFullPath((Join-Path $fixtureRoot ([string]$Expected.fixtureRelativePath)))
+        [void](Assert-KbpPathWithin -Path $candidate -Root $fixtureRoot)
+        return $candidate
+    }
+    return Join-Path $LiveModsPath ([string]$Expected.directoryName)
+}
+
 function Write-KbpJsonAtomic([string]$Path, $Value) {
     $directory = Split-Path -Parent $Path
     if (-not (Test-Path -LiteralPath $directory -PathType Container)) {
@@ -242,7 +252,7 @@ function Enter-KbpRuntimeTransaction {
             if ($expectedMod.directoryName -ceq 'KingmakerBuffPlanner') {
                 throw 'Compatibility profile cannot replace the project-owned mod.'
             }
-            $sourceMod = Join-Path $mods ([string]$expectedMod.directoryName)
+            $sourceMod = Get-KbpCompatibilitySourcePath $expectedMod $mods
             $sourceIdentity = Assert-KbpCompatibilityModIdentity $expectedMod $sourceMod
             Copy-Item -LiteralPath $sourceMod -Destination $stagedMods -Recurse
             $stagedMod = Join-Path $stagedMods ([string]$expectedMod.directoryName)
