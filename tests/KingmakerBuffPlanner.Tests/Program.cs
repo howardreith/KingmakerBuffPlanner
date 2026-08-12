@@ -36,6 +36,7 @@ namespace KingmakerBuffPlanner.Tests
                 Run("valid-request-is-accepted", () => TestValidRequest(root));
                 Run("valid-catalog-request-is-accepted", () => TestValidCatalogRequest(root));
                 Run("valid-call-of-the-wild-request-is-accepted", () => TestValidCallOfTheWildRequest(root));
+                Run("valid-human-reproduction-request-is-accepted", () => TestValidHumanReproductionRequest(root));
                 Run("valid-ui-request-is-accepted", () => TestValidUiRequest(root));
                 Run("valid-live-ui-request-is-accepted", () => TestValidLiveUiRequest(root));
                 Run("valid-native-ui-probe-request-is-accepted", () => TestValidNativeUiProbeRequest(root));
@@ -1317,6 +1318,27 @@ namespace KingmakerBuffPlanner.Tests
             if (request == null || rejection.Length != 0 || request.ProfileId != "call-of-the-wild" ||
                 request.ExpectedOptionalMods.Count != 1 || request.ExpectedBlueprintGuids.Count != 3)
                 throw new InvalidOperationException("Valid Call of the Wild request was rejected: " + rejection);
+        }
+
+        private static void TestValidHumanReproductionRequest(string root)
+        {
+            string path = WriteRequest(root, "valid-human-reproduction", o =>
+            {
+                o["profileId"] = "human-reproduction";
+                o["expectedOptionalMods"] = Enumerable.Range(0, 4).Select(index =>
+                    (object)new Dictionary<string, object>
+                    {
+                        { "ummId", "Fixture" + index }, { "version", "1.0" },
+                        { "assemblyName", "Fixture" + index + ".dll" },
+                        { "assemblySha256", new string((char)('a' + index), 64) }
+                    }).ToArray();
+            });
+            string rejection;
+            RuntimeTestRequest request = RuntimeTestProtocol.TryRead(
+                new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path }, out rejection);
+            if (request == null || rejection.Length != 0 ||
+                request.ProfileId != "human-reproduction" || request.ExpectedOptionalMods.Count != 4)
+                throw new InvalidOperationException("Valid human reproduction request was rejected: " + rejection);
         }
 
         private static void TestValidUiRequest(string root)

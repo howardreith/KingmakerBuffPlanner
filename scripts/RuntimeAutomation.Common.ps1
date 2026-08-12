@@ -97,7 +97,7 @@ function New-KbpRuntimeRequest {
     param(
         [string]$RunId, [string]$EvidenceDirectory, $BuildManifest,
         [int]$TimeoutSeconds, [bool]$ExitAfterCompletion,
-        [ValidateSet('native-only', 'call-of-the-wild')][string]$ProfileId = 'native-only',
+        [ValidateSet('native-only', 'call-of-the-wild', 'human-reproduction')][string]$ProfileId = 'native-only',
         [object[]]$ExpectedOptionalMods = @(), [string[]]$ExpectedBlueprintGuids = @(),
         [hashtable]$Parameters = @{},
         [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'live-ui-bootstrap', 'ui-native-contract-probe', 'final-no-save-core')][string]$Scenario = 'mod-load-smoke')

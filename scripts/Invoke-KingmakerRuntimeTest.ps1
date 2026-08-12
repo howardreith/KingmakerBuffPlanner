@@ -1,7 +1,7 @@
 [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
 param(
     [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'live-ui-bootstrap', 'ui-native-contract-probe', 'final-no-save-core')][string]$Scenario = 'mod-load-smoke',
-    [ValidateSet('native-only', 'call-of-the-wild')][string]$CompatibilityProfileId = 'native-only',
+    [ValidateSet('native-only', 'call-of-the-wild', 'human-reproduction')][string]$CompatibilityProfileId = 'native-only',
     [ValidateRange(5, 1800)][int]$TimeoutSeconds = 180,
     [ValidateRange(5, 300)][int]$LaunchTimeoutSeconds = 60,
     [bool]$ExitAfterCompletion = $true,

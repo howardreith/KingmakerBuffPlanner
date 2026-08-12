@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "profileId": "human-reproduction",
+  "status": "available",
+  "mods": [
+    {
+      "ummId": "BagOfTricks",
+      "directoryName": "BagOfTricks",
+      "version": "1.16.4",
+      "assemblyName": "BagOfTricks.dll",
+      "infoSha256": "891c4a7864d2dd556a4628bcb19a8f6239a2bfbec9399f81e2414badc6de2974",
+      "assemblySha256": "d03626594ece0f339aeef03ec7259684af7ddeb8b2edf41936f144848059a0e6",
+      "directoryManifestSha256": "cc59e94ed6c34d782424630c9a5cd962bca1f73962f14a090bef501e80fba7eb",
+      "fileCount": 41,
+      "totalBytes": 1806279
+    },
+    {
+      "ummId": "CallOfTheWild",
+      "directoryName": "CallOfTheWild",
+      "version": "1.14.4c-2.1",
+      "assemblyName": "CallOfTheWild.dll",
+      "infoSha256": "32c0bc48c26eb22787e99fb1eb86d074df2cd7dcfe4804ce8eb381a3a589d44d",
+      "assemblySha256": "4ebf8e1ed3e66ffed72ea33ea325595629423dacd5bffa23e3c9109144b26915",
+      "directoryManifestSha256": "32b2f632d44b5c1bb20b4be70841e0fe7d511b01346c06ba4e0c336e788afcfe",
+      "fileCount": 266,
+      "totalBytes": 66181501
+    },
+    {
+      "ummId": "CheatMenu",
+      "directoryName": "CheatMenu",
+      "version": "1.2.3",
+      "assemblyName": "CheatMenu.dll",
+      "infoSha256": "c53e29e5ec0d221be4dfea1228f27cacd99660e75124b61f4f81afa3ef2a0274",
+      "assemblySha256": "7d659eb092073ab9e059414f8bfbdfe46991cede56b394f58f7ea2bcc1ff0845",
+      "directoryManifestSha256": "784e33400f595e72b6f78db620f564ba9e9dfe66749e79d19acc0eaca9fc6bad",
+      "fileCount": 3,
+      "totalBytes": 30594
+    },
+    {
+      "ummId": "CraftMagicItems",
+      "directoryName": "CraftMagicItems",
+      "version": "2.1.0",
+      "assemblyName": "CraftMagicItems.dll",
+      "infoSha256": "55c5a948f0f0afdcd45c81a5c528d667aec0dd5af166b1761b72b44b67ae533b",
+      "assemblySha256": "f7c06f32f18932e67bd8e36fa380bf593ec1e88a262c9f9ddb0812bc1d8b209a",
+      "directoryManifestSha256": "70936e5099c833a97b2607d3b3e68b8f76b05045c2e73a677d3c1337624a4e8e",
+      "fileCount": 21,
+      "totalBytes": 675775
+    }
+  ],
+  "expectedBlueprints": []
+}
