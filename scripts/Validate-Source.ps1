@@ -95,6 +95,7 @@ if ($hudSource -match 'Instantiate\s*\(\s*template\.gameObject' -or
     $hudSource -match 'CreateNativeButton' -or
     -not $hudSource.Contains('icon.raycastTarget = true') -or
     -not $hudSource.Contains('rootLayout.ignoreLayout = true') -or
+    -not $hudSource.Contains('RectTransformUtility.WorldToScreenPoint') -or
     -not $hudSource.Contains('Setup|Long|Important|Short') -or
     -not $hudSource.Contains('ValidateHitOwnership')) {
     throw 'The HUD must use an out-of-layout retained row with fresh bounded buttons and explicit top-hit ownership.'

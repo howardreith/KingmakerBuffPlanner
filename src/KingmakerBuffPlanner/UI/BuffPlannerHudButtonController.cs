@@ -81,6 +81,7 @@ namespace KingmakerBuffPlanner.UI
                         ",id=" + button.gameObject.GetInstanceID() +
                         ",active=" + button.gameObject.activeInHierarchy +
                         ",interactable=" + button.interactable +
+                        ",screenCenter=" + ScreenCenter((RectTransform)button.transform) +
                         ",corners=" + string.Join("|", corners.Select(value => value.ToString()).ToArray()));
                 }
                 return "root=" + RootInstanceId + ";host=" + AnchorPath +
@@ -270,10 +271,7 @@ namespace KingmakerBuffPlanner.UI
             if (index < 0 || index >= _buttons.Length || _buttons[index] == null ||
                 EventSystem.current == null) return false;
             Button plannerButton = _buttons[index];
-            Vector3[] corners = new Vector3[4];
-            ((RectTransform)plannerButton.transform).GetWorldCorners(corners);
-            Vector2 center = new Vector2((corners[0].x + corners[2].x) * 0.5f,
-                (corners[0].y + corners[2].y) * 0.5f);
+            Vector2 center = ScreenCenter((RectTransform)plannerButton.transform);
             var raycast = new PointerEventData(EventSystem.current) { position = center };
             var hits = new List<RaycastResult>();
             EventSystem.current.RaycastAll(raycast, hits);
@@ -424,12 +422,9 @@ namespace KingmakerBuffPlanner.UI
                     failure = "button-not-raycast-ready:index=" + index;
                     return false;
                 }
-                Vector3[] corners = new Vector3[4];
-                ((RectTransform)button.transform).GetWorldCorners(corners);
                 var eventData = new PointerEventData(EventSystem.current)
                 {
-                    position = new Vector2((corners[0].x + corners[2].x) * 0.5f,
-                        (corners[0].y + corners[2].y) * 0.5f)
+                    position = ScreenCenter((RectTransform)button.transform)
                 };
                 var hits = new List<RaycastResult>();
                 EventSystem.current.RaycastAll(eventData, hits);
@@ -446,6 +441,15 @@ namespace KingmakerBuffPlanner.UI
                 }
             }
             return true;
+        }
+
+        private Vector2 ScreenCenter(RectTransform rect)
+        {
+            Vector3[] corners = new Vector3[4];
+            rect.GetWorldCorners(corners);
+            Vector3 worldCenter = (corners[0] + corners[2]) * 0.5f;
+            Camera eventCamera = _nativeRaycaster == null ? null : _nativeRaycaster.eventCamera;
+            return RectTransformUtility.WorldToScreenPoint(eventCamera, worldCenter);
         }
 
         private bool RejectHost(string reason)

@@ -55,6 +55,8 @@ After the same-frame readiness defect was removed, this run exposed the next and
 
 Evidence is preserved under `C:\Dev\KingmakerBuffPlannerLab\runtime-evidence\bootstrap-0.0.4-human-live-1`; its Mods transaction is `Restored` with exact verification. This diagnostic is not a UI qualification pass.
 
+Run `bootstrap-0.0.4-human-live-3` verified that `ignoreLayout` clears the row-above-cluster failure. It then exposed a coordinate-space error in the next predicate: the HUD passed a world-space button center such as `(-845.1,-505.2)` directly to `PointerEventData.position`, which is screen-space. This made every top-hit list empty even after deferred graphic registration. Both the ownership validator and runtime pointer dispatcher now derive screen centers with `RectTransformUtility.WorldToScreenPoint` and the native `GraphicRaycaster.eventCamera`. The run committed one atomic timeout result and restored exactly; it remains diagnostic evidence, not qualification.
+
 ## Rejected theories
 
 - Wrong or stale installed DLL: rejected by exact SHA-256 and MVID agreement.
