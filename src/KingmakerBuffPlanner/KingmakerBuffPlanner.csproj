@@ -48,6 +48,10 @@
       <Private>False</Private>
       <ExternallyResolved>True</ExternallyResolved>
     </Reference>
+    <Reference Include="0Harmony12">
+      <HintPath>$(KingmakerInstallDir)\Kingmaker_Data\Managed\UnityModManager\0Harmony12.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="UnityEngine">
       <HintPath>$(KingmakerInstallDir)\Kingmaker_Data\Managed\UnityEngine.dll</HintPath>
       <Private>False</Private>
@@ -120,6 +124,7 @@
     <Compile Include="RuntimeTesting\RuntimePaths.cs" />
     <Compile Include="RuntimeTesting\RuntimeTestProtocol.cs" />
     <Compile Include="UI\PlannerSetupModel.cs" />
+    <Compile Include="UI\CatalogUiDiagnostics.cs" />
     <Compile Include="UI\BuffPlannerUiContracts.cs" />
     <Compile Include="UI\BuffPlannerHudButtonController.cs" />
     <Compile Include="UI\BuffPlannerScreenController.cs" />
@@ -127,6 +132,7 @@
     <Compile Include="UI\KingmakerPlannerInputBoundary.cs" />
     <Compile Include="UI\KingmakerUiFactory.cs" />
     <Compile Include="UI\PlannerPointerSink.cs" />
+    <Compile Include="UI\PlannerPointerOwnership.cs" />
     <Compile Include="UI\PlannerUiSession.cs" />
     <Compile Include="UI\BuffPlannerUiRoot.cs" />
     <Compile Include="$(IntermediateOutputPath)BuildInfo.Generated.cs" />

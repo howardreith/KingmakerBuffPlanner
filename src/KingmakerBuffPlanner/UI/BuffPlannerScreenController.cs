@@ -100,6 +100,18 @@ namespace KingmakerBuffPlanner.UI
                     if (!LastValidation.Valid)
                         throw new InvalidOperationException("Planner presentation validation failed: " +
                             LastValidation.Failure);
+                    CatalogLayoutDiagnostics catalog = _view.GetCatalogDiagnostics();
+                    _log.Info("[KBP-CATALOG] presentation phase A;" + catalog + ".");
+                    if (catalog == null || catalog.Filters == null)
+                        throw new InvalidOperationException("Catalog diagnostics are absent.");
+                    if (catalog.Filters.VisibleViewModels > 0 &&
+                        (catalog.InstantiatedRows != catalog.Filters.VisibleViewModels ||
+                        catalog.ActiveRows != catalog.InstantiatedRows || catalog.VisibleRows < 1 ||
+                        catalog.ContentHeight <= 1 || !catalog.SelectedDetailsBound))
+                        throw new InvalidOperationException("Catalog layout validation failed: " + catalog);
+                    if (!string.IsNullOrEmpty(catalog.BindingFailure))
+                        throw new InvalidOperationException("Catalog binding failed: " +
+                            catalog.BindingFailure);
                     _diagnostics.RecordPresentationValidated();
                     _state.AcquireInputLease();
                     _diagnostics.RecordInputLeaseAcquired();
@@ -109,6 +121,8 @@ namespace KingmakerBuffPlanner.UI
                         throw new InvalidOperationException(
                             "Planner presentation became invalid after input lease: " +
                             LastValidation.Failure);
+                    catalog = _view.GetCatalogDiagnostics();
+                    _log.Info("[KBP-CATALOG] presentation phase B;" + catalog + ".");
                     LastFailure = string.Empty;
                     _log.Info("[KBP-BOOT] full-screen install succeeded;root=" +
                         _view.RootObject.GetInstanceID() + ";inputLease=true;active=" +

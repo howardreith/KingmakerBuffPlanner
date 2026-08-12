@@ -22,6 +22,7 @@ namespace KingmakerBuffPlanner.UI
         private ModLog _log;
         private string _modPath;
         private bool _enabled = true;
+        private bool _quickStartPending;
         private BuffPlannerUiLifecycleDiagnostics _diagnostics;
         private BuffPlannerHudButtonController _hud;
         private BuffPlannerScreenController _screen;
@@ -293,9 +294,26 @@ namespace KingmakerBuffPlanner.UI
 
         public bool TryStart(string routineId, Action<QuickExecutionResult> completed)
         {
-            if (!_enabled || _session == null || _session.IsExecuting) return false;
-            StartCoroutine(_session.ExecuteRoutine(routineId, completed));
+            if (!_enabled || _session == null || _session.IsExecuting || _quickStartPending)
+                return false;
+            _quickStartPending = true;
+            StartCoroutine(ExecuteQuickRoutine(routineId, completed));
             return true;
+        }
+
+        private IEnumerator ExecuteQuickRoutine(
+            string routineId,
+            Action<QuickExecutionResult> completed)
+        {
+            try
+            {
+                IEnumerator routine = _session.ExecuteRoutine(routineId, completed);
+                while (routine.MoveNext()) yield return routine.Current;
+            }
+            finally
+            {
+                _quickStartPending = false;
+            }
         }
 
         private void Initialize(string modPath, ModLog log)

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.0.5 - catalog, HUD input, quick-action, and tooltip repair
+
+- Trace every live catalog/filter/layout stage and surface binding or empty-state reasons instead of a blank pane.
+- Show available non-hidden beneficial entries on first open, with Reset Filters and Refresh recovery actions.
+- Size scroll content explicitly and validate visible row/detail geometry in the actual campaign.
+- Stabilize one clamped, wrapped, non-raycastable HUD tooltip outside button layout participation.
+- Suppress Kingmaker world clicks only while the pointer is inside an active planner-owned HUD or full-screen region.
+- Refresh quick actions independently and report exact refusal, validation, execution, and confirmed-effect outcomes.
+
 ## 0.0.4 — 2026-08-12 (recovery in progress)
 
 - Moved the F10 fallback into the UMM update callback so HUD construction cannot disable hotkey diagnostics.

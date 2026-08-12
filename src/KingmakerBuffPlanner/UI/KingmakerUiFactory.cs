@@ -166,8 +166,6 @@ namespace KingmakerBuffPlanner.UI
             layout.childForceExpandWidth = true;
             layout.childControlHeight = false;
             layout.childForceExpandHeight = false;
-            ContentSizeFitter fitter = content.gameObject.AddComponent<ContentSizeFitter>();
-            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
             scroll.viewport = viewport;
             scroll.content = content;
             return scroll;
@@ -202,7 +200,11 @@ namespace KingmakerBuffPlanner.UI
         internal static void DestroyChildren(RectTransform parent)
         {
             for (int index = parent.childCount - 1; index >= 0; index--)
-                UnityEngine.Object.Destroy(parent.GetChild(index).gameObject);
+            {
+                GameObject child = parent.GetChild(index).gameObject;
+                child.SetActive(false);
+                UnityEngine.Object.Destroy(child);
+            }
         }
     }
 }

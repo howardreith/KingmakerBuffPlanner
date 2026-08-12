@@ -137,6 +137,28 @@ foreach ($lifecycleContract in @('ISceneHandler', 'IAreaLoadingStagesHandler',
 }
 $assertions++
 
+$pointerOwnershipSource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\UI\PlannerPointerOwnership.cs') -Raw
+foreach ($pointerContract in @('PointerController', 'GetProperty("InGui"',
+        'RectangleContainsScreenPoint', 'scope=active-planner-regions-only',
+        'HarmonyPatchType.Postfix')) {
+    if (-not $pointerOwnershipSource.Contains($pointerContract)) {
+        throw "Conditional physical pointer ownership is missing: $pointerContract"
+    }
+}
+foreach ($tooltipContract in @('layout.ignoreLayout = true', 'group.blocksRaycasts = false',
+        'group.interactable = false', 'ClampToScreen', '360f')) {
+    if (-not $hudSource.Contains($tooltipContract)) {
+        throw "Stable cached tooltip contract is missing: $tooltipContract"
+    }
+}
+foreach ($catalogContract in @('ResetFilters', 'ApplyFilters', 'FinalizeScrollContent',
+        'VisibleRows', 'SelectedDetailsBound', 'No available beneficial buffs')) {
+    if (-not $screenSource.Contains($catalogContract)) {
+        throw "Catalog visibility/empty-state contract is missing: $catalogContract"
+    }
+}
+$assertions++
+
 $runtimeHostSource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\RuntimeTesting\RuntimeTestHost.cs') -Raw
 foreach ($failureContract in @('_completed = true;',
         'Live UI runtime scenario failed.', 'TryWriteFailure(_startedAtUtc, exception)')) {

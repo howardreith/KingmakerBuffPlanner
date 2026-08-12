@@ -40,12 +40,14 @@ namespace KingmakerBuffPlanner.UI
         private readonly Action<BuffPlannerProfile> _save;
         private readonly ActiveEffectSnapshot _activeEffects;
         private readonly IReadOnlyDictionary<string, EffectExpression> _effects;
+        private readonly IReadOnlyList<ProviderPlanningOption> _providerOptions;
 
         public PlannerSetupModel(
             BuffPlannerProfile profile,
             PartyProviderSnapshot snapshot,
             ActiveEffectSnapshot activeEffects,
             IDictionary<string, EffectExpression> effectsByAbilityKey,
+            IEnumerable<ProviderPlanningOption> providerOptions,
             Action<BuffPlannerProfile> save)
         {
             Profile = profile ?? throw new ArgumentNullException("profile");
@@ -54,6 +56,9 @@ namespace KingmakerBuffPlanner.UI
             _effects = new ReadOnlyDictionary<string, EffectExpression>(
                 new Dictionary<string, EffectExpression>(effectsByAbilityKey ??
                     new Dictionary<string, EffectExpression>(), StringComparer.Ordinal));
+            _providerOptions = new ReadOnlyCollection<ProviderPlanningOption>(
+                (providerOptions ?? new ProviderPlanningOption[0])
+                    .OrderBy(item => item.Provider.Key.Canonical, StringComparer.Ordinal).ToList());
             _save = save ?? throw new ArgumentNullException("save");
             Sources = new ReadOnlyCollection<SetupSourceRow>(snapshot.Providers
                 .GroupBy(p => p.Key.Ability.Canonical, StringComparer.Ordinal)
@@ -258,6 +263,30 @@ namespace KingmakerBuffPlanner.UI
             if (caster == null || !caster.TargetValidation.Alive || !caster.TargetValidation.Conscious)
                 return "caster unavailable";
             return string.Empty;
+        }
+
+        public bool IsSourceAvailable(SetupSourceRow source)
+        {
+            if (source == null) return false;
+            return source.Providers.Any(provider =>
+                string.IsNullOrEmpty(GetProviderRejectionReason(provider)) &&
+                _providerOptions.Any(option => option.Provider.Key.Equals(provider.Key) &&
+                    option.ReachableTargetIds.Count != 0));
+        }
+
+        public string GetSourceUnavailableReason(SetupSourceRow source)
+        {
+            if (source == null) return "source is absent";
+            if (IsSourceAvailable(source)) return string.Empty;
+            string rejection = source.Providers.Select(GetProviderRejectionReason)
+                .FirstOrDefault(value => !string.IsNullOrEmpty(value));
+            if (!string.IsNullOrEmpty(rejection)) return rejection;
+            if (!_providerOptions.Any(option => source.Providers.Any(provider =>
+                option.Provider.Key.Equals(provider.Key)))) return "no provider option was normalized";
+            if (!_providerOptions.Any(option => source.Providers.Any(provider =>
+                option.Provider.Key.Equals(provider.Key)) && option.ReachableTargetIds.Count != 0))
+                return "no legal party or pet target";
+            return "no available provider";
         }
 
         public void ToggleHidden()

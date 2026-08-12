@@ -28,6 +28,9 @@ namespace KingmakerBuffPlanner.UI
         private GraphicRaycaster _nativeRaycaster;
         private Text _feedback;
         private Text _tooltip;
+        private RectTransform _feedbackRoot;
+        private RectTransform _tooltipRoot;
+        private RectTransform _tooltipOwner;
         private Button[] _buttons = new Button[0];
         private Func<string>[] _tooltips = new Func<string>[0];
         private int _listenerCount;
@@ -142,8 +145,8 @@ namespace KingmakerBuffPlanner.UI
             layout.childForceExpandHeight = false;
 
             PlannerUiTheme theme = PlannerUiTheme.Resolve(controller);
-            _tooltip = CreateHudMessage("Tooltip", theme, height + 6f);
-            _feedback = CreateHudMessage("Feedback", theme, height + 34f);
+            _tooltip = CreateHudMessage("Tooltip", theme, height + 8f, 360f, out _tooltipRoot);
+            _feedback = CreateHudMessage("Feedback", theme, height + 42f, 480f, out _feedbackRoot);
             _feedback.color = new Color(1f, 0.84f, 0.42f, 1f);
             _buttons = new[]
             {
@@ -179,9 +182,9 @@ namespace KingmakerBuffPlanner.UI
         internal void RefreshAvailability()
         {
             if (_buttons.Length != 4) return;
-            bool ready = _session.Model != null && !_session.IsExecuting;
             _buttons[0].interactable = !_session.IsExecuting;
-            for (int index = 1; index < 4; index++) _buttons[index].interactable = ready;
+            for (int index = 1; index < 4; index++)
+                _buttons[index].interactable = !_session.IsExecuting;
         }
 
         internal void Present(QuickExecutionResult result)
@@ -189,6 +192,13 @@ namespace KingmakerBuffPlanner.UI
             if (_feedback == null) return;
             _feedback.text = result == null ? "Buff routine finished." : result.Message;
             _feedback.transform.parent.gameObject.SetActive(true);
+            Canvas.ForceUpdateCanvases();
+            if (_feedbackRoot != null)
+            {
+                _feedbackRoot.sizeDelta = new Vector2(480f,
+                    Mathf.Clamp(_feedback.preferredHeight + 8f, 30f, 96f));
+                ClampToScreen(_feedbackRoot);
+            }
             _feedbackUntil = Time.unscaledTime + 8f;
             RefreshAvailability();
         }
@@ -217,6 +227,8 @@ namespace KingmakerBuffPlanner.UI
                 }
                 _installed = true;
                 _lastFailure = string.Empty;
+                foreach (Button button in _buttons)
+                    PlannerPointerOwnership.Register((RectTransform)button.transform);
                 _diagnostics.RecordHudInstalled();
                 RefreshAvailability();
                 _log.Info("[KBP-BOOT] HUD install succeeded;attempt=" + _installAttempts +
@@ -243,6 +255,9 @@ namespace KingmakerBuffPlanner.UI
         {
             if (_root != null)
             {
+                foreach (Button button in _buttons)
+                    if (button != null) PlannerPointerOwnership.Unregister(
+                        (RectTransform)button.transform);
                 UnityEngine.Object.Destroy(_root.gameObject);
                 _diagnostics.RecordHudDestroyed();
             }
@@ -252,6 +267,9 @@ namespace KingmakerBuffPlanner.UI
             _validationFailures = 0;
             _feedback = null;
             _tooltip = null;
+            _feedbackRoot = null;
+            _tooltipRoot = null;
+            _tooltipOwner = null;
             _buttons = new Button[0];
             _tooltips = new Func<string>[0];
             _listenerCount = 0;
@@ -323,17 +341,28 @@ namespace KingmakerBuffPlanner.UI
                 ? string.Empty : _tooltips[index]();
         }
 
-        private Text CreateHudMessage(string name, PlannerUiTheme theme, float y)
+        private Text CreateHudMessage(
+            string name,
+            PlannerUiTheme theme,
+            float y,
+            float width,
+            out RectTransform rect)
         {
-            RectTransform rect = KingmakerUiFactory.CreateRect(name, _root);
+            rect = KingmakerUiFactory.CreateRect(name, _root);
             rect.anchorMin = new Vector2(0, 1);
             rect.anchorMax = new Vector2(0, 1);
             rect.pivot = new Vector2(0, 0);
             rect.anchoredPosition = new Vector2(0, y);
-            rect.sizeDelta = new Vector2(620, 26);
+            rect.sizeDelta = new Vector2(width, 30);
+            LayoutElement layout = rect.gameObject.AddComponent<LayoutElement>();
+            layout.ignoreLayout = true;
             Image background = KingmakerUiFactory.AddPanel(rect,
                 new Color(0.04f, 0.03f, 0.02f, 0.96f));
             background.raycastTarget = false;
+            CanvasGroup group = rect.gameObject.AddComponent<CanvasGroup>();
+            group.alpha = 1f;
+            group.interactable = false;
+            group.blocksRaycasts = false;
             Text text = KingmakerUiFactory.CreateText("Label", rect, theme, string.Empty, 16,
                 TextAnchor.MiddleLeft);
             KingmakerUiFactory.Stretch(text.rectTransform, 8, 8, 2, 2);
@@ -371,6 +400,7 @@ namespace KingmakerBuffPlanner.UI
             HudTooltipTarget hover = button.gameObject.AddComponent<HudTooltipTarget>();
             hover.Text = tooltip;
             hover.Show = ShowTooltip;
+            hover.Owner = rect;
             hover.Diagnostics = _diagnostics;
             hover.RoutineId = iconKind;
 
@@ -469,11 +499,60 @@ namespace KingmakerBuffPlanner.UI
                 ";candidate=" + RootInstanceId + ".");
         }
 
-        private void ShowTooltip(string value)
+        private void ShowTooltip(RectTransform owner, string value)
         {
-            if (_tooltip == null) return;
+            if (_tooltip == null || _tooltipRoot == null) return;
+            if (string.IsNullOrEmpty(value))
+            {
+                if (_tooltipOwner == owner || owner == null)
+                {
+                    _tooltipOwner = null;
+                    _tooltipRoot.gameObject.SetActive(false);
+                }
+                return;
+            }
+            _tooltipOwner = owner;
             _tooltip.text = value ?? string.Empty;
-            _tooltip.transform.parent.gameObject.SetActive(!string.IsNullOrEmpty(value));
+            _tooltipRoot.gameObject.SetActive(true);
+            Canvas.ForceUpdateCanvases();
+            float height = Mathf.Clamp(_tooltip.preferredHeight + 8f, 30f, 96f);
+            _tooltipRoot.sizeDelta = new Vector2(360f, height);
+            float ownerTop = owner == null ? 0 : owner.anchoredPosition.y + owner.rect.height;
+            _tooltipRoot.anchoredPosition = new Vector2(0, ownerTop + 8f);
+            ClampToScreen(_tooltipRoot);
+        }
+
+        private static void ClampToScreen(RectTransform rect)
+        {
+            if (rect == null) return;
+            Canvas.ForceUpdateCanvases();
+            var corners = new Vector3[4];
+            rect.GetWorldCorners(corners);
+            Canvas canvas = rect.GetComponentInParent<Canvas>();
+            Camera eventCamera = canvas == null || canvas.renderMode == RenderMode.ScreenSpaceOverlay
+                ? null : canvas.worldCamera;
+            Vector2[] screenCorners = corners.Select(value =>
+                RectTransformUtility.WorldToScreenPoint(eventCamera, value)).ToArray();
+            float minX = screenCorners.Min(value => value.x);
+            float maxX = screenCorners.Max(value => value.x);
+            float minY = screenCorners.Min(value => value.y);
+            float maxY = screenCorners.Max(value => value.y);
+            Vector2 shift = Vector2.zero;
+            if (minX < 6f) shift.x += 6f - minX;
+            if (maxX > Screen.width - 6f) shift.x -= maxX - (Screen.width - 6f);
+            if (minY < 6f) shift.y += 6f - minY;
+            if (maxY > Screen.height - 6f) shift.y -= maxY - (Screen.height - 6f);
+            RectTransform parent = rect.parent as RectTransform;
+            Vector2 localOrigin;
+            Vector2 localShifted;
+            if (parent != null &&
+                RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                    parent, Vector2.zero, eventCamera, out localOrigin) &&
+                RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                    parent, shift, eventCamera, out localShifted))
+            {
+                rect.anchoredPosition += localShifted - localOrigin;
+            }
         }
 
         private string RoutineTooltip(string routineId)
@@ -596,17 +675,18 @@ namespace KingmakerBuffPlanner.UI
     internal sealed class HudTooltipTarget : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
     {
         internal Func<string> Text;
-        internal Action<string> Show;
+        internal Action<RectTransform, string> Show;
+        internal RectTransform Owner;
         internal BuffPlannerUiLifecycleDiagnostics Diagnostics;
         internal string RoutineId;
         public void OnPointerEnter(PointerEventData eventData)
         {
             if (Diagnostics != null) Diagnostics.RecordPointerEnter(RoutineId);
-            if (Show != null) Show(Text == null ? string.Empty : Text());
+            if (Show != null) Show(Owner, Text == null ? string.Empty : Text());
         }
         public void OnPointerExit(PointerEventData eventData)
         {
-            if (Show != null) Show(string.Empty);
+            if (Show != null) Show(Owner, string.Empty);
         }
     }
 }

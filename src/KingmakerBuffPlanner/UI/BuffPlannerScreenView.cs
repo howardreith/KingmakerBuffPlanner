@@ -28,18 +28,25 @@ namespace KingmakerBuffPlanner.UI
         private GraphicRaycaster _raycaster;
         private Image _blocker;
         private RectTransform _sourceContent;
+        private RectTransform _sourceViewport;
         private RectTransform _detailContent;
+        private RectTransform _detailViewport;
         private Text _status;
         private Text _result;
+        private Text _catalogSummary;
         private InputField _search;
         private Button[] _routineTabs;
+        private readonly List<Button> _sourceRows = new List<Button>();
         private string _routineId = "long";
         private bool _configuredOnly;
+        private bool _requestedOnly;
         private bool _unconfiguredOnly;
         private bool _showHidden;
         private bool _sortByLevel;
         private int _durationFilter;
         private int _sourceKindFilter = -1;
+        private bool _showUnavailable;
+        private bool _resettingFilters;
         private bool _disposed;
 
         internal BuffPlannerScreenView(
@@ -83,6 +90,7 @@ namespace KingmakerBuffPlanner.UI
         }
         internal string ActiveRoutineId { get { return _routineId; } }
         internal PlannerPresentationValidation LastValidation { get; private set; }
+        internal CatalogLayoutDiagnostics LastCatalogDiagnostics { get; private set; }
 
         internal PlannerPresentationValidation ValidatePresentation()
         {
@@ -183,8 +191,7 @@ namespace KingmakerBuffPlanner.UI
             else if (!string.IsNullOrWhiteSpace(_session.ProfileStatus))
                 _result.text = _session.ProfileStatus;
             RefreshTabs();
-            RefreshSourceList();
-            RefreshDetails();
+            RefreshCatalog();
         }
 
         internal void ShowResult(QuickExecutionResult result)
@@ -201,6 +208,7 @@ namespace KingmakerBuffPlanner.UI
             _disposed = true;
             if (_root != null)
             {
+                PlannerPointerOwnership.Unregister(_root);
                 UnityEngine.Object.Destroy(_root.gameObject);
                 _diagnostics.RecordScreenDestroyed();
             }
@@ -250,6 +258,7 @@ namespace KingmakerBuffPlanner.UI
             BuildFooter(frame);
             _root.SetAsLastSibling();
             _root.gameObject.SetActive(true);
+            PlannerPointerOwnership.Register(_root);
             _diagnostics.RecordScreenCreated();
         }
 
@@ -314,11 +323,14 @@ namespace KingmakerBuffPlanner.UI
             KingmakerUiFactory.SetAnchors(panel, 0.015f, 0.16f, 0.38f, 0.845f, 0, 8, 0, 0);
             KingmakerUiFactory.AddPanel(panel, new Color(0.11f, 0.08f, 0.05f, 1f));
             _search = KingmakerUiFactory.CreateInputField("Search", panel, _theme, "Search buffs...");
-            KingmakerUiFactory.SetAnchors((RectTransform)_search.transform, 0.02f, 0.91f, 0.98f, 0.985f);
-            _search.onValueChanged.AddListener(value => RefreshSourceList());
+            KingmakerUiFactory.SetAnchors((RectTransform)_search.transform, 0.02f, 0.92f, 0.98f, 0.985f);
+            _search.onValueChanged.AddListener(value =>
+            {
+                if (!_resettingFilters) RefreshCatalog();
+            });
 
             RectTransform filters = KingmakerUiFactory.CreateRect("Filters", panel);
-            KingmakerUiFactory.SetAnchors(filters, 0.02f, 0.79f, 0.98f, 0.90f);
+            KingmakerUiFactory.SetAnchors(filters, 0.02f, 0.82f, 0.98f, 0.91f);
             HorizontalLayoutGroup filterLayout = filters.gameObject.AddComponent<HorizontalLayoutGroup>();
             filterLayout.spacing = 5;
             filterLayout.childControlWidth = true;
@@ -329,28 +341,43 @@ namespace KingmakerBuffPlanner.UI
             KingmakerUiFactory.CreateButton("Duration", filters, _theme, "DURATION", () =>
             {
                 _durationFilter = (_durationFilter + 1) % 4;
-                RefreshSourceList();
+                RefreshCatalog();
             });
             KingmakerUiFactory.CreateButton("Kind", filters, _theme, "SOURCE", () =>
             {
                 _sourceKindFilter++;
                 if (_sourceKindFilter > 3) _sourceKindFilter = -1;
-                RefreshSourceList();
+                RefreshCatalog();
             });
             KingmakerUiFactory.CreateButton("Sort", filters, _theme, "SORT", () =>
             {
                 _sortByLevel = !_sortByLevel;
-                RefreshSourceList();
+                RefreshCatalog();
             });
             KingmakerUiFactory.CreateButton("Hidden", filters, _theme, "HIDDEN", () =>
             {
                 _showHidden = !_showHidden;
-                RefreshSourceList();
+                RefreshCatalog();
             });
+            KingmakerUiFactory.CreateButton("Availability", filters, _theme, "AVAIL", () =>
+            {
+                _showUnavailable = !_showUnavailable;
+                RefreshCatalog();
+            });
+
+            RectTransform filterStatus = KingmakerUiFactory.CreateRect("FilterStatus", panel);
+            KingmakerUiFactory.SetAnchors(filterStatus, 0.02f, 0.75f, 0.98f, 0.81f);
+            _catalogSummary = KingmakerUiFactory.CreateText("Summary", filterStatus, _theme,
+                string.Empty, 14, TextAnchor.MiddleLeft);
+            KingmakerUiFactory.SetAnchors(_catalogSummary.rectTransform, 0, 0, 0.76f, 1);
+            Button reset = KingmakerUiFactory.CreateButton("ResetFilters", filterStatus, _theme,
+                "RESET FILTERS", ResetFilters);
+            KingmakerUiFactory.SetAnchors((RectTransform)reset.transform, 0.77f, 0, 1, 1);
 
             ScrollRect scroll = KingmakerUiFactory.CreateScrollView(
                 "BuffCatalog", panel, _theme, out _sourceContent);
-            KingmakerUiFactory.SetAnchors((RectTransform)scroll.transform, 0.02f, 0.02f, 0.98f, 0.78f);
+            _sourceViewport = scroll.viewport;
+            KingmakerUiFactory.SetAnchors((RectTransform)scroll.transform, 0.02f, 0.02f, 0.98f, 0.74f);
         }
 
         private void BuildDetailPanel(RectTransform frame)
@@ -360,6 +387,7 @@ namespace KingmakerBuffPlanner.UI
             KingmakerUiFactory.AddPanel(panel, new Color(0.12f, 0.085f, 0.052f, 1f));
             ScrollRect scroll = KingmakerUiFactory.CreateScrollView(
                 "Details", panel, _theme, out _detailContent);
+            _detailViewport = scroll.viewport;
             KingmakerUiFactory.SetAnchors((RectTransform)scroll.transform, 0.015f, 0.02f, 0.985f, 0.985f);
         }
 
@@ -408,43 +436,109 @@ namespace KingmakerBuffPlanner.UI
             }
         }
 
+        private void RefreshCatalog()
+        {
+            RefreshSourceList();
+            try { RefreshDetails(); }
+            catch (Exception exception)
+            {
+                _session.RecordBindingFailure("selected-details", exception);
+                KingmakerUiFactory.DestroyChildren(_detailContent);
+                AddHeading(_detailContent, "BUFF DETAILS ERROR");
+                AddBodyText(_detailContent, "Selected-buff binding failed: " +
+                    exception.Message, 72);
+                FinalizeScrollContent(_detailContent, _detailViewport);
+            }
+            UpdateCatalogDiagnostics();
+        }
+
         private void RefreshSourceList()
         {
             if (_sourceContent == null) return;
             KingmakerUiFactory.DestroyChildren(_sourceContent);
+            _sourceRows.Clear();
             PlannerSetupModel model = _session.Model;
             if (model == null)
             {
                 AddBodyText(_sourceContent, "No campaign catalog is available.", 54);
+                AddCatalogAction(_sourceContent, "REFRESH", () =>
+                {
+                    _session.Refresh();
+                    RefreshAll();
+                });
+                FinalizeScrollContent(_sourceContent, _sourceViewport);
                 return;
             }
-            IEnumerable<SetupSourceRow> sources = model.Sources.Where(MatchesFilter);
+            CatalogFilterDiagnostics filters;
+            List<SetupSourceRow> sources = ApplyFilters(model, out filters);
             sources = _sortByLevel
                 ? sources.OrderBy(source => source.SpellLevel)
-                    .ThenBy(source => source.DisplayName, StringComparer.OrdinalIgnoreCase)
+                    .ThenBy(source => source.DisplayName, StringComparer.OrdinalIgnoreCase).ToList()
                 : sources.OrderBy(source => source.DisplayName, StringComparer.OrdinalIgnoreCase)
-                    .ThenBy(source => source.SpellLevel);
+                    .ThenBy(source => source.SpellLevel).ToList();
+            if (sources.Count != 0 && !sources.Any(source =>
+                source.SourceId == model.SelectedSourceId))
+                model.SelectSource(sources[0].SourceId);
             foreach (SetupSourceRow source in sources)
             {
-                bool selected = source.SourceId == model.SelectedSourceId;
-                bool assigned = model.Profile.Routines.Any(routine =>
-                    routine.Assignments.Any(assignment => assignment.SourceId == source.SourceId));
-                string label = (assigned ? "[+] " : "[ ] ") + source.DisplayName +
-                    "   L" + source.SpellLevel + "   " + source.Providers.Count + " providers";
-                Button row = KingmakerUiFactory.CreateButton("Source." + source.SourceId,
-                    _sourceContent, _theme, label, () =>
-                    {
-                        model.SelectSource(source.SourceId);
-                        RefreshSourceList();
-                        RefreshDetails();
-                    });
-                KingmakerUiFactory.AddLayout((RectTransform)row.transform, 42);
-                Text rowText = row.GetComponentInChildren<Text>();
-                if (rowText != null) rowText.alignment = TextAnchor.MiddleLeft;
-                Image rowImage = row.targetGraphic as Image;
-                if (selected && rowImage != null) rowImage.color = _theme.AccentSelected;
+                try
+                {
+                    bool selected = source.SourceId == model.SelectedSourceId;
+                    bool assigned = model.Profile.Routines.Any(routine =>
+                        routine.Assignments.Any(assignment => assignment.SourceId == source.SourceId));
+                    bool available = model.IsSourceAvailable(source);
+                    string label = (assigned ? "[+] " : "[ ] ") + source.DisplayName +
+                        "   L" + source.SpellLevel + "   " + source.Providers.Count + " providers" +
+                        (available ? string.Empty : "   UNAVAILABLE: " +
+                            model.GetSourceUnavailableReason(source));
+                    Button row = KingmakerUiFactory.CreateButton("Source." + source.SourceId,
+                        _sourceContent, _theme, label, () =>
+                        {
+                            model.SelectSource(source.SourceId);
+                            RefreshCatalog();
+                        });
+                    KingmakerUiFactory.AddLayout((RectTransform)row.transform, 42);
+                    Text rowText = row.GetComponentInChildren<Text>();
+                    if (rowText != null) rowText.alignment = TextAnchor.MiddleLeft;
+                    Image rowImage = row.targetGraphic as Image;
+                    if (selected && rowImage != null) rowImage.color = _theme.AccentSelected;
+                    _sourceRows.Add(row);
+                }
+                catch (Exception exception)
+                {
+                    _session.RecordBindingFailure("source-row:" + source.SourceId, exception);
+                    AddBodyText(_sourceContent, "Could not bind " + source.DisplayName +
+                        ": " + exception.Message, 54);
+                }
             }
-            if (_sourceContent.childCount == 0) AddBodyText(_sourceContent, "No buffs match the filters.", 54);
+            if (_sourceRows.Count == 0)
+            {
+                int availableCount = model.Sources.Count(model.IsSourceAvailable);
+                if (model.Sources.Count == 0)
+                    AddBodyText(_sourceContent, "No beneficial buff entries were normalized from " +
+                        (_session.CatalogDiscovery == null ? 0 :
+                            _session.CatalogDiscovery.RawCandidateCount) + " raw sources.", 72);
+                else if (availableCount == 0)
+                {
+                    string reasons = string.Join(", ", model.Sources
+                        .Select(model.GetSourceUnavailableReason).Distinct().Take(4).ToArray());
+                    AddBodyText(_sourceContent, "No available beneficial buffs. " + reasons, 72);
+                }
+                else AddBodyText(_sourceContent, "0 of " + availableCount +
+                    " buffs shown because of filters. Active filters: " +
+                    filters.ActiveFilters + ".", 72);
+                AddCatalogAction(_sourceContent, availableCount == 0 ? "REFRESH" : "RESET FILTERS",
+                    availableCount == 0 ? (Action)(() =>
+                    {
+                        _session.Refresh();
+                        RefreshAll();
+                    }) : ResetFilters);
+            }
+            if (_catalogSummary != null)
+                _catalogSummary.text = filters.VisibleViewModels + " of " + filters.TotalEntries +
+                    " shown | " + filters.ActiveFilters;
+            FinalizeScrollContent(_sourceContent, _sourceViewport);
+            LastCatalogDiagnostics = new CatalogLayoutDiagnostics { Filters = filters };
         }
 
         private void RefreshDetails()
@@ -459,6 +553,7 @@ namespace KingmakerBuffPlanner.UI
                 AddBodyText(_detailContent,
                     "Choose a discovered buff after loading a campaign. Search, filters, routine tabs, " +
                     "provider controls, targets, plan feedback, and settings remain external to saves.", 96);
+                FinalizeScrollContent(_detailContent, _detailViewport);
                 return;
             }
 
@@ -472,10 +567,10 @@ namespace KingmakerBuffPlanner.UI
             Button assign = KingmakerUiFactory.CreateButton("Assign", assignmentRow, _theme,
                 model.IsAssigned(_routineId) ? "REMOVE FROM " + _routineId.ToUpperInvariant()
                     : "ADD TO " + _routineId.ToUpperInvariant(),
-                () => { model.ToggleRoutine(_routineId); RefreshDetails(); RefreshSourceList(); });
+                () => { model.ToggleRoutine(_routineId); RefreshCatalog(); });
             Button hidden = KingmakerUiFactory.CreateButton("Hide", assignmentRow, _theme,
                 model.Profile.HiddenSourceIds.Contains(source.SourceId) ? "UNHIDE" : "HIDE",
-                () => { model.ToggleHidden(); RefreshDetails(); RefreshSourceList(); });
+                () => { model.ToggleHidden(); RefreshCatalog(); });
             Button policy = KingmakerUiFactory.CreateButton("Policy", assignmentRow, _theme,
                 "ACTIVE: " + model.GetExistingEffectPolicy(_routineId),
                 () => { model.ToggleExistingEffectPolicy(_routineId); RefreshDetails(); });
@@ -528,6 +623,7 @@ namespace KingmakerBuffPlanner.UI
             KingmakerUiFactory.CreateButton("Fallback", settings, _theme,
                 model.Profile.Execution.AllowAnimatedFallback ? "FALLBACK: ALLOWED" : "FALLBACK: BLOCKED",
                 () => { model.ToggleAnimatedFallback(); RefreshDetails(); });
+            FinalizeScrollContent(_detailContent, _detailViewport);
         }
 
         private void CreateTargetCard(RectTransform parent, PlannerSetupModel model, UnitSnapshot unit)
@@ -631,31 +727,217 @@ namespace KingmakerBuffPlanner.UI
             KingmakerUiFactory.AddLayout(text.rectTransform, height);
         }
 
-        private bool MatchesFilter(SetupSourceRow source)
+        internal CatalogLayoutDiagnostics GetCatalogDiagnostics()
         {
-            PlannerSetupModel model = _session.Model;
-            string search = _search == null ? string.Empty : _search.text;
-            if (!string.IsNullOrWhiteSpace(search) &&
-                source.DisplayName.IndexOf(search, StringComparison.OrdinalIgnoreCase) < 0) return false;
-            bool configured = model.Profile.Routines.Any(routine =>
-                routine.Assignments.Any(assignment => assignment.SourceId == source.SourceId));
-            if (_configuredOnly && !configured) return false;
-            if (_unconfiguredOnly && configured) return false;
-            if (!_showHidden && model.Profile.HiddenSourceIds.Contains(source.SourceId)) return false;
-            if (_durationFilter == 1 &&
-                (source.ExpectedDurationRounds == 0 || source.ExpectedDurationRounds >= 10)) return false;
-            if (_durationFilter == 2 && source.ExpectedDurationRounds < 10) return false;
-            if (_durationFilter == 3 && source.ExpectedDurationRounds != 0) return false;
-            if (_sourceKindFilter >= 0 && (int)source.Ability.SourceKind != _sourceKindFilter) return false;
-            return true;
+            UpdateCatalogDiagnostics();
+            return LastCatalogDiagnostics;
         }
 
         private void CycleConfigurationFilter()
         {
-            if (!_configuredOnly && !_unconfiguredOnly) _configuredOnly = true;
-            else if (_configuredOnly) { _configuredOnly = false; _unconfiguredOnly = true; }
+            if (!_configuredOnly && !_requestedOnly && !_unconfiguredOnly) _configuredOnly = true;
+            else if (_configuredOnly)
+            {
+                _configuredOnly = false;
+                _requestedOnly = true;
+            }
+            else if (_requestedOnly)
+            {
+                _requestedOnly = false;
+                _unconfiguredOnly = true;
+            }
             else _unconfiguredOnly = false;
-            RefreshSourceList();
+            RefreshCatalog();
+        }
+
+        private List<SetupSourceRow> ApplyFilters(
+            PlannerSetupModel model,
+            out CatalogFilterDiagnostics diagnostics)
+        {
+            diagnostics = new CatalogFilterDiagnostics();
+            var active = new List<string>();
+            List<SetupSourceRow> values = model.Sources.ToList();
+            diagnostics.TotalEntries = values.Count;
+            RoutineProfile routine = model.Profile.Routines.First(item => item.RoutineId == _routineId);
+            diagnostics.AssignedToActiveGroup = routine.Assignments.Count;
+
+            string search = _search == null ? string.Empty : _search.text;
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                values = values.Where(source => source.DisplayName.IndexOf(
+                    search, StringComparison.OrdinalIgnoreCase) >= 0).ToList();
+                active.Add("search='" + search + "'");
+            }
+            diagnostics.AfterSearch = values.Count;
+
+            if (_configuredOnly)
+            {
+                values = values.Where(source => model.Profile.Routines.Any(group =>
+                    group.Assignments.Any(item => item.SourceId == source.SourceId))).ToList();
+                active.Add("configured only");
+            }
+            else if (_requestedOnly)
+            {
+                values = values.Where(source => model.Profile.Routines.Any(group =>
+                    group.Assignments.Any(item => item.SourceId == source.SourceId &&
+                        item.WantedTargetUnitIds.Count != 0))).ToList();
+                active.Add("requested only");
+            }
+            else if (_unconfiguredOnly)
+            {
+                values = values.Where(source => !model.Profile.Routines.Any(group =>
+                    group.Assignments.Any(item => item.SourceId == source.SourceId))).ToList();
+                active.Add("unconfigured only");
+            }
+            diagnostics.AfterConfigured = values.Count;
+
+            if (_durationFilter == 1)
+            {
+                values = values.Where(source => source.ExpectedDurationRounds > 0 &&
+                    source.ExpectedDurationRounds < 10).ToList();
+                active.Add("short duration");
+            }
+            else if (_durationFilter == 2)
+            {
+                values = values.Where(source => source.ExpectedDurationRounds >= 10).ToList();
+                active.Add("long duration");
+            }
+            else if (_durationFilter == 3)
+            {
+                values = values.Where(source => source.ExpectedDurationRounds == 0).ToList();
+                active.Add("unknown duration");
+            }
+            diagnostics.AfterDuration = values.Count;
+
+            if (_sourceKindFilter >= 0)
+            {
+                values = values.Where(source =>
+                    (int)source.Ability.SourceKind == _sourceKindFilter).ToList();
+                active.Add("source kind " + _sourceKindFilter);
+            }
+            diagnostics.AfterSource = values.Count;
+
+            if (!_showHidden)
+            {
+                values = values.Where(source =>
+                    !model.Profile.HiddenSourceIds.Contains(source.SourceId)).ToList();
+                active.Add("hidden excluded");
+            }
+            else active.Add("hidden included");
+            diagnostics.AfterHidden = values.Count;
+
+            if (!_showUnavailable)
+            {
+                values = values.Where(model.IsSourceAvailable).ToList();
+                active.Add("available only");
+            }
+            else active.Add("unavailable included");
+            diagnostics.AfterAvailability = values.Count;
+            diagnostics.VisibleViewModels = values.Count;
+            diagnostics.ActiveFilters = active.Count == 0 ? "none" : string.Join(", ", active.ToArray());
+            return values;
+        }
+
+        private void ResetFilters()
+        {
+            _configuredOnly = false;
+            _requestedOnly = false;
+            _unconfiguredOnly = false;
+            _showHidden = false;
+            _showUnavailable = false;
+            _sortByLevel = false;
+            _durationFilter = 0;
+            _sourceKindFilter = -1;
+            if (_search != null)
+            {
+                _resettingFilters = true;
+                _search.text = string.Empty;
+                _resettingFilters = false;
+            }
+            RefreshCatalog();
+        }
+
+        private void AddCatalogAction(RectTransform parent, string label, Action action)
+        {
+            Button button = KingmakerUiFactory.CreateButton("CatalogAction", parent, _theme,
+                label, () => action());
+            KingmakerUiFactory.AddLayout((RectTransform)button.transform, 42);
+        }
+
+        private static void FinalizeScrollContent(RectTransform content, RectTransform viewport)
+        {
+            if (content == null || viewport == null) return;
+            Canvas.ForceUpdateCanvases();
+            LayoutRebuilder.ForceRebuildLayoutImmediate(content);
+            float preferred = Mathf.Max(1f, LayoutUtility.GetPreferredHeight(content));
+            float viewportHeight = Mathf.Max(1f, viewport.rect.height);
+            content.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical,
+                Mathf.Max(preferred, viewportHeight));
+            content.anchoredPosition = new Vector2(0, Mathf.Max(0, content.anchoredPosition.y));
+            LayoutRebuilder.ForceRebuildLayoutImmediate(content);
+            Canvas.ForceUpdateCanvases();
+        }
+
+        private void UpdateCatalogDiagnostics()
+        {
+            if (_sourceContent == null || _sourceViewport == null) return;
+            Canvas.ForceUpdateCanvases();
+            LayoutRebuilder.ForceRebuildLayoutImmediate(_sourceContent);
+            CatalogLayoutDiagnostics value = LastCatalogDiagnostics ?? new CatalogLayoutDiagnostics();
+            value.InstantiatedRows = _sourceRows.Count;
+            value.ActiveRows = _sourceRows.Count(row => row != null && row.gameObject.activeInHierarchy);
+            value.VisibleRows = _sourceRows.Count(row => row != null &&
+                row.gameObject.activeInHierarchy && RectanglesOverlap(
+                    (RectTransform)row.transform, _sourceViewport));
+            value.ContentWidth = _sourceContent.rect.width;
+            value.ContentHeight = _sourceContent.rect.height;
+            value.ViewportWidth = _sourceViewport.rect.width;
+            value.ViewportHeight = _sourceViewport.rect.height;
+            value.DetailChildren = _detailContent == null ? 0 : _detailContent.childCount;
+            PlannerSetupModel model = _session.Model;
+            value.SelectedSourceId = model == null ? string.Empty : model.SelectedSourceId;
+            value.SelectedDetailsBound = model != null && model.SelectedSource != null &&
+                _detailContent != null && _detailContent.childCount >= 3;
+            value.BindingFailure = _session.LastBindingFailure ?? string.Empty;
+            value.BlessEvidence = BuildBlessEvidence(model);
+            LastCatalogDiagnostics = value;
+        }
+
+        private string BuildBlessEvidence(PlannerSetupModel model)
+        {
+            const string bless = "90e59f4a4ada87243b7b3535a06d0638";
+            SetupSourceRow source = model == null ? null : model.Sources.FirstOrDefault(item =>
+                item.Ability.BaseAbilityGuid == bless || item.Ability.VariantGuid == bless);
+            if (source == null) return "absent";
+            Button row = _sourceRows.FirstOrDefault(item => item != null &&
+                item.name == "Source." + source.SourceId);
+            bool assigned = model.Profile.Routines.SelectMany(item => item.Assignments)
+                .Any(item => item.SourceId == source.SourceId);
+            string bounds = row == null ? "none" : ((RectTransform)row.transform).rect.size.ToString();
+            return "source=" + source.SourceId + ",available=" + model.IsSourceAvailable(source) +
+                ",reason=" + model.GetSourceUnavailableReason(source) + ",assigned=" + assigned +
+                ",providers=" + source.Providers.Count + ",row=" + (row != null) +
+                ",rowActive=" + (row != null && row.gameObject.activeInHierarchy) +
+                ",rowVisible=" + (row != null && RectanglesOverlap(
+                    (RectTransform)row.transform, _sourceViewport)) + ",bounds=" + bounds;
+        }
+
+        private static bool RectanglesOverlap(RectTransform first, RectTransform second)
+        {
+            if (first == null || second == null) return false;
+            var a = new Vector3[4];
+            var b = new Vector3[4];
+            first.GetWorldCorners(a);
+            second.GetWorldCorners(b);
+            float aMinX = a.Min(value => value.x);
+            float aMaxX = a.Max(value => value.x);
+            float aMinY = a.Min(value => value.y);
+            float aMaxY = a.Max(value => value.y);
+            float bMinX = b.Min(value => value.x);
+            float bMaxX = b.Max(value => value.x);
+            float bMinY = b.Min(value => value.y);
+            float bMaxY = b.Max(value => value.y);
+            return aMaxX > bMinX && aMinX < bMaxX && aMaxY > bMinY && aMinY < bMaxY;
         }
 
         private static Sprite ResolvePortrait(string unitId)

@@ -809,9 +809,17 @@ namespace KingmakerBuffPlanner.Tests
                 });
             BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault("campaign:ui");
             int saves = 0;
+            var providerOptions = new[]
+            {
+                new ProviderPlanningOption(provider, new[] { "unit-a", "unit-b" },
+                    new[] { "unit-a", "unit-b" }, 1, 10)
+            };
             var model = new PlannerSetupModel(profile, snapshot, active,
                 new Dictionary<string, EffectExpression> { { ability.Canonical, Leaf("ui-effect") } },
-                p => saves++);
+                providerOptions, p => saves++);
+            if (!model.IsSourceAvailable(model.Sources[0]) ||
+                model.GetSourceUnavailableReason(model.Sources[0]).Length != 0)
+                throw new InvalidOperationException("Default catalog availability hid a legal source.");
             model.ToggleRoutine("long");
             model.ToggleTarget("long", "unit-b");
             model.ToggleTarget("long", "unit-a");
@@ -836,7 +844,8 @@ namespace KingmakerBuffPlanner.Tests
             model.ToggleHidden();
             var reordered = new PartyProviderSnapshot(units.Reverse(), new[] { provider }, new[] { pool });
             var reloaded = new PlannerSetupModel(profile, reordered, active,
-                new Dictionary<string, EffectExpression> { { ability.Canonical, Leaf("ui-effect") } }, p => saves++);
+                new Dictionary<string, EffectExpression> { { ability.Canonical, Leaf("ui-effect") } },
+                providerOptions, p => saves++);
             if (!reloaded.IsTargetWanted("long", "unit-a") || !reloaded.IsTargetWanted("long", "unit-b") ||
                 reloaded.GetProviderPreference(provider.Key.Canonical).MaximumCasts != 1 ||
                 reloaded.Profile.Ui.Scale != 1.25f ||
