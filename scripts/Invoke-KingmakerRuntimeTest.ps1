@@ -4,6 +4,7 @@ param(
     [ValidateSet('native-only', 'call-of-the-wild', 'human-reproduction')][string]$CompatibilityProfileId = 'native-only',
     [ValidateRange(5, 1800)][int]$TimeoutSeconds = 180,
     [ValidateRange(5, 300)][int]$LaunchTimeoutSeconds = 60,
+    [ValidateSet('animated', 'instant')][string]$ExecutionMode = 'instant',
     [bool]$ExitAfterCompletion = $true,
     [string]$SteamPath = 'C:\Program Files (x86)\Steam\steam.exe',
     [ValidatePattern('^[A-Za-z0-9._-]{1,100}$')][string]$RunId
@@ -77,6 +78,7 @@ try {
             workingSha256 = $savePair.working.sha256; baselineSaveName = $savePair.baseline.name
             baselineFileName = $savePair.baseline.fileName; baselineSha256 = $savePair.baseline.sha256
             expectedGameName = $savePair.working.gameName; expectedGameId = $savePair.working.gameId
+            executionMode = $ExecutionMode
         } })
     $requestPath = Join-Path $evidence 'runtime-request.json'
     Write-KbpJsonAtomic $requestPath $request

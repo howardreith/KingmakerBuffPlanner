@@ -299,7 +299,7 @@ namespace KingmakerBuffPlanner.UI
                 _instance._screen.View.PrepareVisualEvidenceForRuntime(view);
         }
 
-        internal static bool SelectAndConfigureBlessForRuntime()
+        internal static bool SelectAndConfigureBlessForRuntime(string executionMode)
         {
             if (_instance == null || _instance._screen.View == null ||
                 !_instance._screen.View.DispatchBlessRowForRuntime()) return false;
@@ -314,7 +314,7 @@ namespace KingmakerBuffPlanner.UI
             if (model.GetExistingEffectPolicy("long") ==
                 KingmakerBuffPlanner.Domain.Planning.ExistingEffectPolicy.SkipAlreadyActive)
                 model.ToggleExistingEffectPolicy("long");
-            if (model.Profile.Execution.Mode != "instant") model.ToggleExecutionMode();
+            if (model.Profile.Execution.Mode != executionMode) model.ToggleExecutionMode();
             _instance._screen.View.RefreshCatalogForRuntime();
             return model.IsAssigned("long") && model.IsTargetWanted("long", target);
         }

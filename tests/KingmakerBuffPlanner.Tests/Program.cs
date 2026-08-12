@@ -1498,7 +1498,8 @@ namespace KingmakerBuffPlanner.Tests
                     { "baselineFileName", "Manual_296_KBP_AUTOMATION_BASELINE.zks" },
                     { "baselineSha256", new string('b', 64) },
                     { "expectedGameName", "Yadmila" },
-                    { "expectedGameId", "3d556254-8ba9-4e9f-8d11-755eecd0b661" }
+                    { "expectedGameId", "3d556254-8ba9-4e9f-8d11-755eecd0b661" },
+                    { "executionMode", "animated" }
                 };
             });
             string rejection;
@@ -1506,7 +1507,8 @@ namespace KingmakerBuffPlanner.Tests
                 new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path }, out rejection);
             if (request == null || rejection.Length != 0 ||
                 !RuntimeTestProtocol.IsLiveUiScenario(request.Scenario) ||
-                request.Parameters.Count != 8)
+                request.Parameters.Count != 9 ||
+                (string)request.Parameters["executionMode"] != "animated")
                 throw new InvalidOperationException("Valid live UI request was rejected: " + rejection);
         }
 

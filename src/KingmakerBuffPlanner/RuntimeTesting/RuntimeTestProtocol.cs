@@ -191,7 +191,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             {
                 "workingSaveName", "workingFileName", "workingSha256",
                 "baselineSaveName", "baselineFileName", "baselineSha256",
-                "expectedGameName", "expectedGameId"
+                "expectedGameName", "expectedGameId", "executionMode"
             };
             if (request.Parameters.Count != exact.Length ||
                 exact.Any(name => !request.Parameters.ContainsKey(name)))
@@ -210,6 +210,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (string.Equals((string)request.Parameters["workingFileName"],
                 (string)request.Parameters["baselineFileName"], StringComparison.OrdinalIgnoreCase))
                 throw new InvalidDataException("live-save-files-not-distinct");
+            string executionMode = (string)request.Parameters["executionMode"];
+            if (executionMode != "animated" && executionMode != "instant")
+                throw new InvalidDataException("live-execution-mode");
         }
 
         private static void RejectDuplicateProperties(string json)

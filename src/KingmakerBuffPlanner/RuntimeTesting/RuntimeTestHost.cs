@@ -1074,7 +1074,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         ";selectionUnchanged=" + physical.SelectionUnchanged +
                         ";cameraUnchanged=" + physical.CameraUnchanged + ".");
                 _liveBlessSelectedAndConfigured =
-                    BuffPlannerUiRoot.SelectAndConfigureBlessForRuntime();
+                    BuffPlannerUiRoot.SelectAndConfigureBlessForRuntime(
+                        (string)_request.Parameters["executionMode"]);
                 if (!_liveBlessSelectedAndConfigured)
                     throw new InvalidOperationException("Visible spellbook Bless row could not be selected/configured.");
                 if (!BuffPlannerUiRoot.PrepareVisualEvidenceForRuntime("target-colors"))
