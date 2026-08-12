@@ -9,17 +9,18 @@ namespace KingmakerBuffPlanner
 {
     public static class Main
     {
+        private const string DefaultPlannerHotkey = "Ctrl+Shift+B";
         private static ModLog _log;
         private static RuntimeTestHost _runtimeTest;
         private static string _modPath;
         private static bool _enabled;
         private static bool _firstUpdateLogged;
-        private static bool _f10ArmedLogged;
+        private static bool _hotkeyArmedLogged;
         private static string _lastSnapshot = "bootstrap-not-loaded";
-        private static int _f10KeydownCount;
+        private static int _hotkeyKeydownCount;
 
-        internal static bool F10Armed { get { return _f10ArmedLogged && _enabled; } }
-        internal static int F10KeydownCount { get { return _f10KeydownCount; } }
+        internal static bool HotkeyArmed { get { return _hotkeyArmedLogged && _enabled; } }
+        internal static int HotkeyKeydownCount { get { return _hotkeyKeydownCount; } }
 
         public static bool Load(UnityModManager.ModEntry modEntry)
         {
@@ -38,14 +39,25 @@ namespace KingmakerBuffPlanner
             try
             {
                 PlannerPointerOwnership.Install(_log);
-                _log.Info("[KBP-BOOT] Harmony patch result;required=true;patchCount=2;" +
+                _log.Info("[KBP-BOOT] Harmony patch result;required=true;pointerPatchCount=2;" +
                     "targets=PointerController.Tick,CameraRig.GetCameraScrollShiftByMouse;" +
                     "scope=planner-pointer-regions.");
             }
             catch (Exception exception)
             {
                 _log.Error("[KBP-BOOT] Harmony pointer ownership install failed;" +
-                    "F10ArmedByOnUpdate=true;HUDRetryable=true.", exception);
+                    "HotkeyArmedByOnUpdate=true;HUDRetryable=true.", exception);
+            }
+            try
+            {
+                PlannerHotkey.Install(_log);
+                _log.Info("[KBP-HOTKEY] isolation patch result;required=true;" +
+                    "plannerHotkey=" + DefaultPlannerHotkey + ".");
+            }
+            catch (Exception exception)
+            {
+                _log.Error("[KBP-HOTKEY] native binding isolation install failed;" +
+                    "planner opening remains available from the HUD.", exception);
             }
             _runtimeTest = RuntimeTestHost.TryCreate(
                 Environment.GetCommandLineArgs(),
@@ -74,19 +86,20 @@ namespace KingmakerBuffPlanner
                     ";modEntry.Active=" + (modEntry != null && modEntry.Active) + ".");
             }
 
-            bool f10Down = false;
+            bool hotkeyDown = false;
             try
             {
-                f10Down = _enabled && Input.GetKeyDown(KeyCode.F10);
-                if (_enabled && !_f10ArmedLogged)
+                hotkeyDown = _enabled && PlannerHotkey.GetKeyDown();
+                if (_enabled && !_hotkeyArmedLogged)
                 {
-                    _f10ArmedLogged = true;
-                    _log.Info("[KBP-BOOT] F10 handler armed;source=UMM.OnUpdate.");
+                    _hotkeyArmedLogged = true;
+                    _log.Info("[KBP-BOOT] PlannerHotkey handler armed;binding=" +
+                        PlannerHotkey.Binding + ";source=UMM.OnUpdate.");
                 }
             }
             catch (Exception exception)
             {
-                _log.Error("[KBP-BOOT] F10 polling failed.", exception);
+                _log.Error("[KBP-BOOT] Planner hotkey polling failed.", exception);
             }
 
             if (_enabled)
@@ -94,17 +107,18 @@ namespace KingmakerBuffPlanner
                 try
                 {
                     BuffPlannerUiRoot.Ensure(_modPath, _log);
-                    if (f10Down)
+                    if (hotkeyDown)
                     {
-                        _f10KeydownCount++;
-                        _log.Info("[KBP-BOOT] F10 keydown observed;source=UMM.OnUpdate.");
-                        BuffPlannerUiRoot.HandleF10();
+                        _hotkeyKeydownCount++;
+                        _log.Info("[KBP-BOOT] PlannerHotkey keydown observed;binding=" +
+                            PlannerHotkey.Binding + ";source=UMM.OnUpdate.");
+                        BuffPlannerUiRoot.HandlePlannerHotkey();
                     }
                     BuffPlannerUiRoot.TickOwned(deltaTime);
                 }
                 catch (Exception exception)
                 {
-                    _log.Error("[KBP-BOOT] root update failed;F10 remains armed.", exception);
+                    _log.Error("[KBP-BOOT] root update failed;planner hotkey remains armed.", exception);
                 }
             }
 
@@ -113,6 +127,7 @@ namespace KingmakerBuffPlanner
             _runtimeTest = null;
             BuffPlannerUiRoot.DestroyOwned();
             PlannerPointerOwnership.Uninstall();
+            PlannerHotkey.Uninstall();
         }
 
         private static void OnGui(UnityModManager.ModEntry modEntry)
@@ -137,6 +152,7 @@ namespace KingmakerBuffPlanner
             _runtimeTest = null;
             BuffPlannerUiRoot.DestroyOwned();
             PlannerPointerOwnership.Uninstall();
+            PlannerHotkey.Uninstall();
             _log.Info("[KBP-BOOT] unloaded;disposed=true.");
             return true;
         }

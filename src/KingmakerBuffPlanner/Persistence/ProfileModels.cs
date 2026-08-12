@@ -8,7 +8,7 @@ namespace KingmakerBuffPlanner.Persistence
 {
     public sealed class BuffPlannerProfile
     {
-        internal const int CurrentSchemaVersion = 2;
+        internal const int CurrentSchemaVersion = 3;
 
         [JsonProperty("schemaVersion", Required = Required.Always, Order = 1)]
         public int SchemaVersion { get; set; }
@@ -110,7 +110,10 @@ namespace KingmakerBuffPlanner.Persistence
         [JsonProperty("scale", Required = Required.Always, Order = 1)] public float Scale { get; set; }
         [JsonProperty("hotkey", Required = Required.Always, Order = 2)] public string Hotkey { get; set; }
 
-        internal static UiProfile Default() { return new UiProfile { Scale = 1.0f, Hotkey = "" }; }
+        internal static UiProfile Default()
+        {
+            return new UiProfile { Scale = 1.0f, Hotkey = "Ctrl+Shift+B" };
+        }
     }
 
     public sealed class ExecutionProfile
@@ -118,10 +121,17 @@ namespace KingmakerBuffPlanner.Persistence
         [JsonProperty("mode", Required = Required.Always, Order = 1)] public string Mode { get; set; }
         [JsonProperty("allowAnimatedFallback", Required = Required.Always, Order = 2)] public bool AllowAnimatedFallback { get; set; }
         [JsonProperty("outOfCombatOnly", Required = Required.Always, Order = 3)] public bool OutOfCombatOnly { get; set; }
+        [JsonProperty("recastExisting", Required = Required.Always, Order = 4)] public bool RecastExisting { get; set; }
 
         internal static ExecutionProfile Default()
         {
-            return new ExecutionProfile { Mode = "animated", AllowAnimatedFallback = true, OutOfCombatOnly = true };
+            return new ExecutionProfile
+            {
+                Mode = "animated",
+                AllowAnimatedFallback = true,
+                OutOfCombatOnly = true,
+                RecastExisting = false
+            };
         }
     }
 }

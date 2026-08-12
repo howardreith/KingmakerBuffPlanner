@@ -86,12 +86,22 @@ namespace KingmakerBuffPlanner.UI
                         ",id=" + button.gameObject.GetInstanceID() +
                         ",active=" + button.gameObject.activeInHierarchy +
                         ",interactable=" + button.interactable +
+                        ",tile=" + ColorEvidence((button.targetGraphic as Image) == null
+                            ? Color.clear : ((Image)button.targetGraphic).color) +
+                        ",icon=" + ColorEvidence(button.transform.Find("KBP.Icon") == null
+                            ? Color.clear : button.transform.Find("KBP.Icon").GetComponent<Image>().color) +
                         ",screenCenter=" + ScreenCenter((RectTransform)button.transform) +
                         ",corners=" + string.Join("|", corners.Select(value => value.ToString()).ToArray()));
                 }
                 return "root=" + RootInstanceId + ";host=" + AnchorPath +
                     ";raycaster=" + RaycastCanvasPath + ";" + string.Join(";", entries.ToArray());
             }
+        }
+
+        private static string ColorEvidence(Color color)
+        {
+            return color.r.ToString("0.000") + "," + color.g.ToString("0.000") + "," +
+                color.b.ToString("0.000") + "," + color.a.ToString("0.000");
         }
 
         internal bool TryInstall()
@@ -153,7 +163,7 @@ namespace KingmakerBuffPlanner.UI
             _buttons = new[]
             {
                 CreatePlannerButton("Setup", "setup", width, height, _openSetup,
-                    () => "Open Buff Planner setup. F10 is the fallback shortcut."),
+                    () => "Open Buff Planner setup. Shortcut: " + PlannerHotkey.Binding + "."),
                 CreatePlannerButton("Long", "long", width, height,
                     () => _quickExecute("long"), () => RoutineTooltip("long")),
                 CreatePlannerButton("Important", "important", width, height,
@@ -164,7 +174,7 @@ namespace KingmakerBuffPlanner.UI
             foreach (Button button in _buttons) button.interactable = false;
             _tooltips = new Func<string>[]
             {
-                () => "Open Buff Planner setup. F10 is the fallback shortcut.",
+                () => "Open Buff Planner setup. Shortcut: " + PlannerHotkey.Binding + ".",
                 () => RoutineTooltip("long"),
                 () => RoutineTooltip("important"),
                 () => RoutineTooltip("short")
@@ -476,6 +486,18 @@ namespace KingmakerBuffPlanner.UI
             PlannerUiTheme theme = PlannerUiTheme.Resolve(_anchorController);
             Button button = KingmakerUiFactory.CreateButton("KBP." + displayName, _root,
                 theme, string.Empty, null);
+            Image tile = button.targetGraphic as Image;
+            if (tile != null)
+            {
+                tile.sprite = null;
+                tile.color = new Color(0.055f, 0.043f, 0.03f, 0.97f);
+            }
+            ColorBlock colors = button.colors;
+            colors.normalColor = Color.white;
+            colors.highlightedColor = new Color(1f, 0.86f, 0.54f, 1f);
+            colors.pressedColor = new Color(0.65f, 0.45f, 0.20f, 1f);
+            colors.disabledColor = new Color(0.34f, 0.30f, 0.24f, 0.75f);
+            button.colors = colors;
             RectTransform rect = button.transform as RectTransform;
             rect.sizeDelta = new Vector2(width, height);
             LayoutElement element = button.gameObject.GetComponent<LayoutElement>() ??

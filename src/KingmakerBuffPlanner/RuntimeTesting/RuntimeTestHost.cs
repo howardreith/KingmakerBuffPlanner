@@ -29,7 +29,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private int _liveUiPhase;
         private int _liveCycleCount;
         private bool _liveCycleOpening;
-        private bool _liveF10MarkerWritten;
+        private bool _liveHotkeyMarkerWritten;
         private bool _liveUmmDismissMarkerWritten;
         private int _liveTooltipStableFrames;
         private DateTime _liveTooltipStableStartedAtUtc;
@@ -299,8 +299,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     UiSelectionDisabledBeforeOpen = ui != null && ui.SelectionDisabledBeforeOpen,
                     UiModeBeforeOpen = ui == null ? null : ui.ModeBeforeOpen,
                     UiModeAfterClose = ui == null ? null : ui.ModeAfterClose,
-                    UiF10Armed = ui != null && ui.F10Armed,
-                    UiF10KeydownCount = ui == null ? 0 : ui.F10KeydownCount,
+                    UiHotkeyArmed = ui != null && ui.HotkeyArmed,
+                    UiHotkeyKeydownCount = ui == null ? 0 : ui.HotkeyKeydownCount,
                     UiHudObjectEvidence = ui == null ? null : ui.HudObjectEvidence,
                     UiScreenDestroyCountAfterClose = ui == null ? 0 : ui.ScreenDestroyCountAfterClose,
                     WorkingSaveDescriptor = _liveSaveLoader == null ? null : _liveSaveLoader.WorkingDescriptor,
@@ -616,9 +616,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         ui.LongResultMessage == "No Long buffs are configured.",
                         "No Long buffs are configured.", ui.LongResultMessage ?? "missing");
                     AddUiAssertion(result, "ui-tooltip-identities",
-                        !string.IsNullOrWhiteSpace(ui.SetupTooltip) && ui.SetupTooltip.Contains("F10") &&
+                        !string.IsNullOrWhiteSpace(ui.SetupTooltip) && ui.SetupTooltip.Contains("Ctrl+Shift+B") &&
                         !string.IsNullOrWhiteSpace(ui.LongTooltip) && ui.LongTooltip.Contains("Long"),
-                        "setup/F10 and Long", (ui.SetupTooltip ?? "missing") + " | " + (ui.LongTooltip ?? "missing"));
+                        "setup/Ctrl+Shift+B and Long", (ui.SetupTooltip ?? "missing") + " | " + (ui.LongTooltip ?? "missing"));
                     AddUiAssertion(result, "ui-no-world-command", ui.InputPlayerCommandCount == 0 &&
                         ui.InputMovementCommandCount == 0 && ui.InputAbilityCommandCount == 0,
                         "0/0/0", ui.InputPlayerCommandCount + "/" + ui.InputMovementCommandCount + "/" +
@@ -642,11 +642,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     if (liveUi)
                     {
                         AddUiAssertion(result, "ui-live-catalog-visible",
-                            ui.CatalogVisibleViewModels > 0 && ui.CatalogInstantiatedRows ==
-                            ui.CatalogVisibleViewModels && ui.CatalogActiveRows > 0 &&
+                            ui.CatalogVisibleViewModels > 0 && ui.CatalogInstantiatedRows == 32 &&
+                            ui.CatalogActiveRows > 0 && ui.CatalogActiveRows <= 32 &&
                             ui.CatalogVisibleRows > 0 && ui.CatalogSelectedDetailsBound &&
                             !string.IsNullOrWhiteSpace(_liveInitialCatalogEvidence),
-                            "post-cast VMs=rows; active/visible/details", ui.CatalogEvidence ?? "missing");
+                            "post-cast VMs>0; pool=32; active/visible/details", ui.CatalogEvidence ?? "missing");
                         bool liveRenderValid = _liveRenderDiagnostics != null &&
                             _liveRenderDiagnostics.ExpectedNames != null &&
                             _liveRenderDiagnostics.ExpectedNames.Length == 5 &&
@@ -710,9 +710,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                             ui.LongResultMessage + " | " + ui.ImportantResultMessage + " | " +
                             ui.ShortResultMessage + " | " + ui.ConfiguredLongDisposition + ": " +
                             ui.ConfiguredLongResultMessage);
-                        AddUiAssertion(result, "ui-f10-armed-and-observed",
-                            ui.F10Armed && ui.F10KeydownCount >= 1, "true/>=1",
-                            ui.F10Armed + "/" + ui.F10KeydownCount);
+                        AddUiAssertion(result, "ui-hotkey-armed-and-observed",
+                            ui.HotkeyArmed && ui.HotkeyKeydownCount >= 1, "true/>=1",
+                            ui.HotkeyArmed + "/" + ui.HotkeyKeydownCount);
                         AddUiAssertion(result, "ui-no-duplicate-full-screen-objects",
                             ui.ScreenCreateCount == ui.ScreenDestroyCount + 1 &&
                             ui.ScreenCreateCount == ui.ScreenDestroyCountAfterClose,
@@ -755,7 +755,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         ui.PointerEventCount < 2 || ui.ScrollEventCount < 1 || ui.DragEventCount < 2 ||
                         !longFlowValid ||
                         ui.LongResultMessage != "No Long buffs are configured." ||
-                        string.IsNullOrWhiteSpace(ui.SetupTooltip) || !ui.SetupTooltip.Contains("F10") ||
+                        string.IsNullOrWhiteSpace(ui.SetupTooltip) || !ui.SetupTooltip.Contains("Ctrl+Shift+B") ||
                         string.IsNullOrWhiteSpace(ui.LongTooltip) || !ui.LongTooltip.Contains("Long") ||
                         ui.InputPlayerCommandCount != 0 || ui.InputMovementCommandCount != 0 ||
                         ui.InputAbilityCommandCount != 0 || ui.InputSelectionEventCount != 0 ||
@@ -763,9 +763,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         !ui.InputCameraUnchanged || !ui.InputScrollConsumed || !ui.InputCancelConsumed ||
                         !ui.GroupSelectorChanged ||
                         ui.ReconstructionCount != expectedReconstructions ||
-                        (liveUi && (!ui.F10Armed || ui.F10KeydownCount < 1 ||
+                        (liveUi && (!ui.HotkeyArmed || ui.HotkeyKeydownCount < 1 ||
                             ui.CatalogVisibleViewModels <= 0 ||
-                            ui.CatalogInstantiatedRows != ui.CatalogVisibleViewModels ||
+                            ui.CatalogInstantiatedRows != 32 || ui.CatalogActiveRows > 32 ||
                             ui.CatalogActiveRows <= 0 || ui.CatalogVisibleRows <= 0 ||
                             !ui.CatalogSelectedDetailsBound ||
                             string.IsNullOrWhiteSpace(ui.CatalogBlessEvidence) ||
@@ -865,16 +865,16 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 }
                 if (!BuffPlannerUiRoot.IsHudInstalled) return false;
                 BuffPlannerUiRoot.CaptureRuntimeBaseline();
-                if (!_liveF10MarkerWritten)
+                if (!_liveHotkeyMarkerWritten)
                 {
-                    AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory, "f10-ready.json"),
+                    AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory, "hotkey-ready.json"),
                         "{\"runId\":\"" + _request.RunId + "\",\"armed\":" +
-                        (Main.F10Armed ? "true" : "false") + ",\"snapshot\":" +
+                        (Main.HotkeyArmed ? "true" : "false") + ",\"binding\":\"Ctrl+Shift+B\",\"snapshot\":" +
                         JsonConvert.ToString(BuffPlannerUiRoot.GetSnapshot()) + "}" + Environment.NewLine);
-                    _liveF10MarkerWritten = true;
-                    _log.Info("[KBP-BOOT] runtime requests physical F10;marker=f10-ready.json.");
+                    _liveHotkeyMarkerWritten = true;
+                    _log.Info("[KBP-BOOT] runtime requests physical planner hotkey;binding=Ctrl+Shift+B;marker=hotkey-ready.json.");
                 }
-                if (!Main.F10Armed || Main.F10KeydownCount < 1) return false;
+                if (!Main.HotkeyArmed || Main.HotkeyKeydownCount < 1) return false;
                 _liveUiPhase = 1;
                 return false;
             }
@@ -1396,8 +1396,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         [JsonProperty("uiInputLeaseAcquiredOrder", Order = 109)] public int UiInputLeaseAcquiredOrder { get; set; }
         [JsonProperty("uiLifecycleState", Order = 110)] public string UiLifecycleState { get; set; }
         [JsonProperty("uiLongPointerEnterCount", Order = 111)] public int UiLongPointerEnterCount { get; set; }
-        [JsonProperty("uiF10Armed", Order = 112)] public bool UiF10Armed { get; set; }
-        [JsonProperty("uiF10KeydownCount", Order = 113)] public int UiF10KeydownCount { get; set; }
+        [JsonProperty("uiHotkeyArmed", Order = 112)] public bool UiHotkeyArmed { get; set; }
+        [JsonProperty("uiHotkeyKeydownCount", Order = 113)] public int UiHotkeyKeydownCount { get; set; }
         [JsonProperty("uiHudObjectEvidence", Order = 114)] public string UiHudObjectEvidence { get; set; }
         [JsonProperty("uiScreenDestroyCountAfterClose", Order = 115)] public int UiScreenDestroyCountAfterClose { get; set; }
         [JsonProperty("workingSaveDescriptor", Order = 116)] public string WorkingSaveDescriptor { get; set; }

@@ -156,6 +156,7 @@ namespace KingmakerBuffPlanner.Persistence
                 throw new InvalidDataException("ui-scale");
             if (profile.Execution.Mode != "animated" && profile.Execution.Mode != "instant")
                 throw new InvalidDataException("execution-mode");
+            PlannerHotkeyText.Validate(profile.Ui.Hotkey);
         }
 
         private static void RequireUnique(IEnumerable<string> values, string label)
@@ -242,9 +243,42 @@ namespace KingmakerBuffPlanner.Persistence
                 version = 2;
                 migrated = true;
             }
+            if (version == 2)
+            {
+                JObject ui = document["ui"] as JObject;
+                if (ui == null) throw new InvalidDataException("ui-missing");
+                string hotkey = (string)ui["hotkey"];
+                if (string.IsNullOrWhiteSpace(hotkey) ||
+                    string.Equals(hotkey, "F10", StringComparison.OrdinalIgnoreCase))
+                    ui["hotkey"] = PlannerHotkeyText.Default;
+                JObject execution = document["execution"] as JObject;
+                if (execution == null) throw new InvalidDataException("execution-missing");
+                if (execution["recastExisting"] == null) execution["recastExisting"] = false;
+                document["hiddenSourceIds"] = new JArray();
+                document["schemaVersion"] = 3;
+                version = 3;
+                migrated = true;
+            }
             if (version != BuffPlannerProfile.CurrentSchemaVersion)
                 throw new InvalidDataException("unsupported-schema-version:" + version);
+            JArray hidden = document["hiddenSourceIds"] as JArray;
+            if (hidden != null && hidden.Count != 0)
+            {
+                hidden.RemoveAll();
+                migrated = true;
+            }
             return migrated;
+        }
+    }
+
+    internal static class PlannerHotkeyText
+    {
+        internal const string Default = "Ctrl+Shift+B";
+
+        internal static void Validate(string value)
+        {
+            if (value != "Ctrl+Shift+B" && value != "Ctrl+Shift+P")
+                throw new InvalidDataException("planner-hotkey");
         }
     }
 }

@@ -105,8 +105,8 @@ namespace KingmakerBuffPlanner.UI
                     if (catalog == null || catalog.Filters == null)
                         throw new InvalidOperationException("Catalog diagnostics are absent.");
                     if (catalog.Filters.VisibleViewModels > 0 &&
-                        (catalog.InstantiatedRows != catalog.Filters.VisibleViewModels ||
-                        catalog.ActiveRows != catalog.InstantiatedRows || catalog.VisibleRows < 1 ||
+                        (catalog.InstantiatedRows < catalog.ActiveRows ||
+                        catalog.ActiveRows < 1 || catalog.VisibleRows < 1 ||
                         catalog.ContentHeight <= 1 || !catalog.SelectedDetailsBound))
                         throw new InvalidOperationException("Catalog layout validation failed: " + catalog);
                     if (!string.IsNullOrEmpty(catalog.BindingFailure))

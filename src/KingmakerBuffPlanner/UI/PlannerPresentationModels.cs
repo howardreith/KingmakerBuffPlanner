@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Linq;
 using KingmakerBuffPlanner.Domain.Identity;
 using KingmakerBuffPlanner.Domain.Providers;
@@ -19,7 +18,8 @@ namespace KingmakerBuffPlanner.UI
 
     public sealed class BuffCardViewModel
     {
-        internal BuffCardViewModel(SetupSourceRow source, PlannerSetupModel model, bool selected)
+        internal BuffCardViewModel(SetupSourceRow source, PlannerSetupModel model,
+            string activeRoutineId, bool selected)
         {
             if (source == null) throw new ArgumentNullException("source");
             if (model == null) throw new ArgumentNullException("model");
@@ -27,19 +27,19 @@ namespace KingmakerBuffPlanner.UI
             Name = string.IsNullOrWhiteSpace(source.DisplayName) ? "Unnamed buff" : source.DisplayName;
             Selected = selected;
             RoutineBadge = BuildRoutineBadge(model.Profile, source.SourceId);
-            int requested = model.Profile.Routines.SelectMany(routine => routine.Assignments)
-                .Where(assignment => assignment.SourceId == source.SourceId)
-                .SelectMany(assignment => assignment.WantedTargetUnitIds)
-                .Distinct(StringComparer.Ordinal).Count();
-            Configured = RoutineBadge.Length != 0;
+            RoutineProfile activeRoutine = model.Profile.Routines.First(routine =>
+                routine.RoutineId == activeRoutineId);
+            SourceAssignmentProfile activeAssignment = activeRoutine.Assignments
+                .FirstOrDefault(assignment => assignment.SourceId == source.SourceId);
+            int requested = activeAssignment == null ? 0 : activeAssignment
+                .WantedTargetUnitIds.Distinct(StringComparer.Ordinal).Count();
+            Configured = requested != 0;
             bool available = model.IsSourceAvailable(source);
             Availability = BuildAvailability(source, model);
-            Configuration = requested == 0
-                ? (Configured ? "Choose targets" : "Not configured")
-                : requested == 1 ? "1 target configured" : requested + " targets configured";
-            Status = !Configured ? PlannerPresentationStatus.Neutral :
-                requested == 0 ? PlannerPresentationStatus.Warning :
-                available ? PlannerPresentationStatus.Success : PlannerPresentationStatus.Failure;
+            Configuration = requested == 0 ? "No targets selected" : requested == 1
+                ? "1 target selected" : requested + " targets selected";
+            Status = requested == 0 ? PlannerPresentationStatus.Neutral :
+                BuildStatus(source, model, activeRoutineId, requested, available);
             SourceType = PlayerSourceType(source.Ability.SourceKind);
         }
 
@@ -53,6 +53,18 @@ namespace KingmakerBuffPlanner.UI
         public bool Configured { get; private set; }
         public PlannerPresentationStatus Status { get; private set; }
 
+        private static PlannerPresentationStatus BuildStatus(SetupSourceRow source,
+            PlannerSetupModel model, string routineId, int requested, bool available)
+        {
+            if (!available) return PlannerPresentationStatus.Failure;
+            int legal = model.Profile.Routines.First(routine => routine.RoutineId == routineId)
+                .Assignments.Where(assignment => assignment.SourceId == source.SourceId)
+                .SelectMany(assignment => assignment.WantedTargetUnitIds)
+                .Count(unitId => model.IsTargetLegal(source, unitId));
+            if (legal == requested) return PlannerPresentationStatus.Success;
+            return legal == 0 ? PlannerPresentationStatus.Failure : PlannerPresentationStatus.Warning;
+        }
+
         private static string BuildRoutineBadge(BuffPlannerProfile profile, string sourceId)
         {
             var labels = new List<string>();
@@ -65,7 +77,8 @@ namespace KingmakerBuffPlanner.UI
         private static bool Assigned(BuffPlannerProfile profile, string routineId, string sourceId)
         {
             RoutineProfile routine = profile.Routines.First(item => item.RoutineId == routineId);
-            return routine.Assignments.Any(item => item.SourceId == sourceId);
+            return routine.Assignments.Any(item => item.SourceId == sourceId &&
+                item.WantedTargetUnitIds.Count != 0);
         }
 
         private static string BuildAvailability(SetupSourceRow source, PlannerSetupModel model)
@@ -85,37 +98,28 @@ namespace KingmakerBuffPlanner.UI
             return remaining + (prepared ? " prepared" : " available");
         }
 
-        internal static string BuildAvailabilityForProvider(
-            ProviderSnapshot provider, PlannerSetupModel model)
-        {
-            string rejection = model.GetProviderRejectionReason(provider);
-            if (!string.IsNullOrEmpty(rejection)) return PlayerReason(rejection);
-            int? remaining = model.GetRemainingCasts(provider);
-            if (remaining == null) return "At will";
-            bool prepared = model.GetResourcePool(provider).Kind == ResourcePoolKind.PreparedSlots;
-            if (remaining.Value == 1) return prepared ? "1 prepared" : "1 available";
-            return remaining.Value + (prepared ? " prepared" : " available");
-        }
-
         internal static string PlayerSourceType(SourceKind kind)
         {
             switch (kind)
             {
                 case SourceKind.Spellbook: return "Spell";
-                case SourceKind.AbilityResource: return "Ability";
-                case SourceKind.Item: return "Item";
-                default: return "Ability";
+                case SourceKind.AbilityResource:
+                case SourceKind.Fact: return "Ability";
+                case SourceKind.Item: return "Other";
+                default: return "Other";
             }
         }
 
         internal static string PlayerReason(string reason)
         {
             if (string.IsNullOrWhiteSpace(reason)) return string.Empty;
-            if (reason == "resource pool exhausted") return "No casts remain";
-            if (reason == "missing material component") return "Required item missing";
-            if (reason == "caster unavailable") return "Caster unavailable";
-            if (reason == "no legal party or pet target") return "No legal target";
-            if (reason == "banned by profile") return "Casting source disabled";
+            if (reason == "resource pool exhausted") return "No prepared slot remains.";
+            if (reason == "missing material component") return "Required item missing.";
+            if (reason == "caster unavailable" || reason == "no available provider" ||
+                reason == "no provider option was normalized")
+                return "No eligible caster is currently available.";
+            if (reason == "no legal party or pet target") return "No legal target.";
+            if (reason == "banned by profile") return "No eligible caster is currently available.";
             return "Unavailable now";
         }
     }
@@ -157,23 +161,6 @@ namespace KingmakerBuffPlanner.UI
         }
     }
 
-    public sealed class CastingSourceSummaryViewModel
-    {
-        internal CastingSourceSummaryViewModel(SetupSourceRow source, PlannerSetupModel model)
-        {
-            var parts = source.Providers.Take(2).Select(provider =>
-                model.GetCasterDisplayName(provider) + " — " +
-                BuffCardViewModel.BuildAvailabilityForProvider(provider, model)).ToArray();
-            Summary = source.Providers.Count == 0 ? "Automatic — no casting source" :
-                source.Providers.Count == 1 ? "Automatic  " + parts[0] :
-                "Automatic — best available caster";
-            ProviderCount = source.Providers.Count;
-        }
-
-        public string Summary { get; private set; }
-        public int ProviderCount { get; private set; }
-    }
-
     public sealed class RoutineSummaryViewModel
     {
         internal RoutineSummaryViewModel(string id, string name, int fulfilled, int requested)
@@ -200,11 +187,15 @@ namespace KingmakerBuffPlanner.UI
             CastingMode = profile.Execution.Mode == "instant" ? "Instant" : "Animated";
             CombatUse = profile.Execution.OutOfCombatOnly ? "Blocked" : "Allowed";
             Fallback = profile.Execution.AllowAnimatedFallback ? "Allowed" : "Disabled";
+            ExistingBuffs = profile.Execution.RecastExisting ? "Recast" : "Skip active";
+            Hotkey = string.IsNullOrWhiteSpace(profile.Ui.Hotkey)
+                ? PlannerHotkeyText.Default : profile.Ui.Hotkey;
         }
 
         public string CastingMode { get; private set; }
         public string CombatUse { get; private set; }
         public string Fallback { get; private set; }
+        public string ExistingBuffs { get; private set; }
+        public string Hotkey { get; private set; }
     }
-
 }

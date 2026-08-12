@@ -126,6 +126,10 @@
     <Compile Include="RuntimeTesting\RuntimeTestProtocol.cs" />
     <Compile Include="UI\PlannerSetupModel.cs" />
     <Compile Include="UI\PlannerPresentationModels.cs" />
+    <Compile Include="UI\PlannerScreenViewModel.cs" />
+    <Compile Include="UI\BuffGridMetrics.cs" />
+    <Compile Include="UI\PlannerViews.cs" />
+    <Compile Include="UI\PlannerHotkey.cs" />
     <Compile Include="UI\CatalogUiDiagnostics.cs" />
     <Compile Include="UI\CatalogLayoutDiagnostics.cs" />
     <Compile Include="UI\BuffPlannerUiContracts.cs" />

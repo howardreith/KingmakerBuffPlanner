@@ -76,7 +76,7 @@ namespace KingmakerBuffPlanner.UI
             _instance = null;
         }
 
-        internal static void HandleF10()
+        internal static void HandlePlannerHotkey()
         {
             if (_instance == null)
             {
@@ -86,7 +86,7 @@ namespace KingmakerBuffPlanner.UI
             if (_instance._screen.LifecycleState != PlannerScreenLifecycleState.Closed)
             {
                 _instance._screen.Close();
-                _instance._log.Info("[KBP-BOOT] full-screen close requested;source=F10.");
+                _instance._log.Info("[KBP-BOOT] full-screen close requested;source=PlannerHotkey.");
                 return;
             }
             if (!_instance._screen.Open())
@@ -116,7 +116,7 @@ namespace KingmakerBuffPlanner.UI
 
         internal static string GetSnapshot()
         {
-            if (_instance == null) return "controller=absent;F10=polling-owned-by-Main";
+            if (_instance == null) return "controller=absent;plannerHotkey=polling-owned-by-Main";
             BuffPlannerUiRoot root = _instance;
             string mode = Game.Instance == null ? "game-null" : Game.Instance.CurrentMode.ToString();
             return "controller=" + root.gameObject.GetInstanceID() +
@@ -134,7 +134,7 @@ namespace KingmakerBuffPlanner.UI
                 ";hudFailure=" + (root._hud == null ? "controller-null" : root._hud.LastFailure) +
                 ";screenState=" + (root._screen == null ? "controller-null" : root._screen.LifecycleState.ToString()) +
                 ";screenFailure=" + (root._screen == null ? "controller-null" : root._screen.LastFailure) +
-                ";F10=armed-in-Main.OnUpdate";
+                ";plannerHotkey=" + PlannerHotkey.Binding + ";armed-in-Main.OnUpdate";
         }
 
         internal static void BeginRuntimeSmoke()
@@ -304,16 +304,13 @@ namespace KingmakerBuffPlanner.UI
             if (_instance == null || _instance._screen.View == null ||
                 !_instance._screen.View.DispatchBlessRowForRuntime()) return false;
             PlannerSetupModel model = _instance._session.Model;
-            if (!model.IsAssigned("long")) model.ToggleRoutine("long");
             string target = model.Snapshot.Units.Where(unit =>
                     unit.TargetValidation.Alive && unit.TargetValidation.Conscious &&
                     unit.TargetValidation.Friendly && unit.TargetValidation.Targetable)
                 .Select(unit => unit.UnitId).FirstOrDefault();
             if (string.IsNullOrEmpty(target)) return false;
             if (!model.IsTargetWanted("long", target)) model.ToggleTarget("long", target);
-            if (model.GetExistingEffectPolicy("long") ==
-                KingmakerBuffPlanner.Domain.Planning.ExistingEffectPolicy.SkipAlreadyActive)
-                model.ToggleExistingEffectPolicy("long");
+            if (!model.Profile.Execution.RecastExisting) model.ToggleRecastExisting();
             if (model.Profile.Execution.Mode != executionMode) model.ToggleExecutionMode();
             _instance._screen.View.RefreshCatalogForRuntime();
             return model.IsAssigned("long") && model.IsTargetWanted("long", target);
@@ -349,8 +346,8 @@ namespace KingmakerBuffPlanner.UI
                 HudRowAboveNativeCluster = _instance._hud.RowAboveNativeCluster,
                 HudHitboxesOwnRaycasts = _instance._hud.VisibleHitboxesOwnRaycasts,
                 HudUnderlyingNativeActivationCount = _instance._hud.RuntimeUnderlyingNativeActivationCount,
-                F10Armed = Main.F10Armed,
-                F10KeydownCount = Main.F10KeydownCount,
+                HotkeyArmed = Main.HotkeyArmed,
+                HotkeyKeydownCount = Main.HotkeyKeydownCount,
                 HudObjectEvidence = _instance._hud.ObjectEvidence,
                 FullScreenRootCount = view == null ? 0 : view.RootCount,
                 FullScreenOpaque = view != null && view.IsOpaque,
@@ -596,7 +593,7 @@ namespace KingmakerBuffPlanner.UI
             string exact = string.IsNullOrEmpty(reason) ? "unknown-readiness-failure" : reason;
             _log.Info("Buff Planner UI is unavailable: " + exact);
             _log.Info("[KBP-BOOT] full-screen install failed;reason=" + exact +
-                ";retryable=true;F10Armed=true.");
+                ";retryable=true;plannerHotkeyArmed=true.");
         }
 
         private void PresentQuickResult(QuickExecutionResult result)
@@ -668,8 +665,8 @@ namespace KingmakerBuffPlanner.UI
         internal bool HudRowAboveNativeCluster;
         internal bool HudHitboxesOwnRaycasts;
         internal int HudUnderlyingNativeActivationCount;
-        internal bool F10Armed;
-        internal int F10KeydownCount;
+        internal bool HotkeyArmed;
+        internal int HotkeyKeydownCount;
         internal string HudObjectEvidence;
         internal int FullScreenRootCount;
         internal bool FullScreenOpaque;

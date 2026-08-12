@@ -83,10 +83,12 @@ namespace KingmakerBuffPlanner.Tests
                 Run("profile-round-trip-preserves-stable-ids", () => TestProfileRoundTrip(root));
                 Run("profile-recovers-valid-bounded-backup", () => TestProfileBackupRecovery(root));
                 Run("profile-migrates-schema-one", () => TestProfileMigration(root));
+                Run("profile-migrates-hidden-and-f10-state", () => TestGridProfileMigration(root));
                 Run("profile-malformed-json-recovers-default", () => TestProfileMalformed(root));
-                Run("setup-model-persists-stable-targets-and-provider-controls", TestSetupModel);
-                Run("catalog-filter-default-empty-and-reset-contract", TestCatalogFilterState);
+                Run("setup-model-direct-targets-are-routine-local", TestSetupModel);
+                Run("catalog-filter-selected-category-and-reset-contract", TestCatalogFilterState);
                 Run("presentation-view-models-use-player-facing-deterministic-state", TestPresentationModels);
+                Run("four-column-grid-metrics-have-no-horizontal-scroll", TestGridMetrics);
                 Run("input-lease-restores-on-close-and-acquire-failure", TestInputLease);
                 Run("screen-state-machine-is-idempotent", TestScreenStateMachine);
                 Run("ui-readiness-is-deferred-across-frames", TestDeferredUiReadiness);
@@ -758,9 +760,33 @@ namespace KingmakerBuffPlanner.Tests
             Directory.CreateDirectory(Path.GetDirectoryName(path));
             File.WriteAllText(path, document.ToString());
             ProfileLoadResult migrated = repository.Load("campaign:migration");
-            if (!migrated.Migrated || migrated.Profile.SchemaVersion != 2 ||
-                migrated.Profile.Ui.Scale != 1.0f || migrated.Profile.Execution.Mode != "animated")
+            if (!migrated.Migrated || migrated.Profile.SchemaVersion != 3 ||
+                migrated.Profile.Ui.Scale != 1.0f || migrated.Profile.Execution.Mode != "animated" ||
+                migrated.Profile.Ui.Hotkey != "Ctrl+Shift+B")
                 throw new InvalidOperationException("Schema-one profile was not migrated with safe defaults.");
+        }
+
+        private static void TestGridProfileMigration(string root)
+        {
+            string modPath = Path.Combine(root, "profile-grid-migration");
+            Directory.CreateDirectory(modPath);
+            var repository = new ProfileRepository(modPath);
+            JObject document = JObject.FromObject(ProfileFixture("campaign:grid-migration"));
+            document["schemaVersion"] = 2;
+            document["hiddenSourceIds"] = new JArray("hidden-a", "hidden-b");
+            ((JObject)document["ui"])["hotkey"] = "F10";
+            ((JObject)document["execution"]).Remove("recastExisting");
+            string path = repository.GetProfilePath("campaign:grid-migration");
+            Directory.CreateDirectory(Path.GetDirectoryName(path));
+            File.WriteAllText(path, document.ToString());
+            ProfileLoadResult migrated = repository.Load("campaign:grid-migration");
+            if (!migrated.Migrated || migrated.Profile.SchemaVersion != 3 ||
+                migrated.Profile.Ui.Hotkey != "Ctrl+Shift+B" ||
+                migrated.Profile.HiddenSourceIds.Count != 0 || migrated.Profile.Execution.RecastExisting)
+                throw new InvalidOperationException("Grid UI migration did not reveal hidden entries or replace F10.");
+            if (migrated.Profile.Routines[0].Assignments.Count != 1 ||
+                migrated.Profile.Routines[0].Assignments[0].WantedTargetUnitIds.Count != 2)
+                throw new InvalidOperationException("Grid UI migration did not preserve routine targets.");
         }
 
         private static void TestProfileMalformed(string root)
@@ -779,7 +805,7 @@ namespace KingmakerBuffPlanner.Tests
             repository.Save(duplicate);
             string duplicatePath = repository.GetProfilePath("campaign:duplicate");
             string duplicateJson = File.ReadAllText(duplicatePath).Replace(
-                "\"schemaVersion\": 2,", "\"schemaVersion\": 2,\r\n  \"schemaVersion\": 2,");
+                "\"schemaVersion\": 3,", "\"schemaVersion\": 3,\r\n  \"schemaVersion\": 3,");
             File.WriteAllText(duplicatePath, duplicateJson);
             ProfileLoadResult rejected = repository.Load("campaign:duplicate");
             if (!rejected.Warning.Contains("duplicate-property"))
@@ -837,7 +863,6 @@ namespace KingmakerBuffPlanner.Tests
             if (!model.IsSourceAvailable(model.Sources[0]) ||
                 model.GetSourceUnavailableReason(model.Sources[0]).Length != 0)
                 throw new InvalidOperationException("Default catalog availability hid a legal source.");
-            model.ToggleRoutine("long");
             model.ToggleTarget("long", "unit-b");
             model.ToggleTarget("long", "unit-a");
             if (!model.IsTargetWanted("long", "unit-a") || !model.IsTargetWanted("long", "unit-b") ||
@@ -857,8 +882,8 @@ namespace KingmakerBuffPlanner.Tests
             model.ToggleExecutionMode();
             model.ToggleOutOfCombatOnly();
             model.ToggleAnimatedFallback();
-            model.ToggleExistingEffectPolicy("long");
-            model.ToggleHidden();
+            model.ToggleRecastExisting();
+            model.TogglePlannerHotkey();
             var reordered = new PartyProviderSnapshot(units.Reverse(), new[] { provider }, new[] { pool });
             var reloaded = new PlannerSetupModel(profile, reordered, active,
                 new Dictionary<string, EffectExpression> { { ability.Canonical, Leaf("ui-effect") } },
@@ -869,10 +894,14 @@ namespace KingmakerBuffPlanner.Tests
                 reloaded.Profile.Execution.Mode != "instant" ||
                 reloaded.Profile.Execution.OutOfCombatOnly ||
                 reloaded.Profile.Execution.AllowAnimatedFallback ||
-                reloaded.GetExistingEffectPolicy("long") != ExistingEffectPolicy.Overwrite ||
-                !reloaded.Profile.HiddenSourceIds.Contains(ability.Canonical) || saves < 12)
+                !reloaded.Profile.Execution.RecastExisting ||
+                reloaded.Profile.Ui.Hotkey != "Ctrl+Shift+P" ||
+                reloaded.Profile.HiddenSourceIds.Count != 0 || saves < 11)
                 throw new InvalidOperationException("Setup state did not survive party reorder/persistence mutations.");
-            reloaded.ToggleRoutine("short");
+            reloaded.ToggleTarget("short", "unit-a");
+            if (!reloaded.IsTargetWanted("short", "unit-a") ||
+                !reloaded.IsTargetWanted("long", "unit-a"))
+                throw new InvalidOperationException("Direct assignment did not stay local to the active routine.");
             reloaded.ClearRoutine("short");
             if (reloaded.Profile.Routines.First(r => r.RoutineId == "short").Assignments.Count != 0)
                 throw new InvalidOperationException("Routine clear changed or retained the wrong assignment set.");
@@ -910,16 +939,23 @@ namespace KingmakerBuffPlanner.Tests
                 diagnostics.AfterSearch != 0 || !diagnostics.ActiveFilters.Contains("does-not-exist"))
                 throw new InvalidOperationException("All-hiding filters did not preserve an explicit diagnostic cause.");
 
-            state.ConfiguredOnly = true;
-            state.ShowHidden = true;
-            state.DurationFilter = 2;
-            state.SourceCategoryFilter = 2;
-            state.AvailabilityFilter = 2;
+            state.Search = string.Empty;
+            state.SelectedOnly = true;
+            visible = state.Apply(model, "long", out diagnostics);
+            if (visible.Count != 0)
+                throw new InvalidOperationException("Selected only included a buff with no active-routine targets.");
+            model.ToggleTarget("long", "unit-a");
+            visible = state.Apply(model, "long", out diagnostics);
+            if (visible.Count != 1 || diagnostics.AssignedToActiveGroup != 1)
+                throw new InvalidOperationException("Selected only did not follow direct active-routine targets.");
+            state.SourceCategory = PlannerSourceCategory.Abilities;
+            visible = state.Apply(model, "long", out diagnostics);
+            if (visible.Count != 0)
+                throw new InvalidOperationException("Ability category included a spellbook source.");
             state.Reset();
             visible = state.Apply(model, "long", out diagnostics);
-            if (visible.Count != 1 || state.Search.Length != 0 || state.ConfiguredOnly ||
-                state.ShowHidden || state.DurationFilter != 0 ||
-                state.SourceCategoryFilter != 0 || state.AvailabilityFilter != 0)
+            if (visible.Count != 1 || state.Search.Length != 0 || state.SelectedOnly ||
+                state.SourceCategory != PlannerSourceCategory.All)
                 throw new InvalidOperationException("Reset Filters did not restore the default visible catalog.");
         }
 
@@ -948,22 +984,16 @@ namespace KingmakerBuffPlanner.Tests
                 {
                     { ability.Canonical, Leaf("ui-presentation-effect") }
                 }, options, ignored => saves++);
-            BuffCardViewModel card = new BuffCardViewModel(model.Sources[0], model, true);
+            BuffCardViewModel card = new BuffCardViewModel(model.Sources[0], model, "long", true);
             if (card.Name.Length == 0 || card.Availability != "At will" ||
                 card.Status != PlannerPresentationStatus.Neutral || !card.Selected ||
                 card.SourceType != "Spell" || card.RoutineBadge.Length != 0)
                 throw new InvalidOperationException("Neutral card presentation is invalid.");
-            model.ToggleRoutine("long");
-            card = new BuffCardViewModel(model.Sources[0], model, false);
-            if (card.Status != PlannerPresentationStatus.Warning || card.RoutineBadge != "L" ||
-                card.Configuration != "Choose targets")
-                throw new InvalidOperationException("Configured no-target warning is invalid.");
             model.ToggleTarget("long", "unit-a");
-            card = new BuffCardViewModel(model.Sources[0], model, false);
+            card = new BuffCardViewModel(model.Sources[0], model, "long", false);
             if (card.Status != PlannerPresentationStatus.Success ||
-                card.Configuration != "1 target configured")
+                card.RoutineBadge != "L" || card.Configuration != "1 target selected")
                 throw new InvalidOperationException("Fulfillable card state is invalid.");
-            var casting = new CastingSourceSummaryViewModel(model.Sources[0], model);
             int beforePreview = saves;
             TargetPortraitViewModel target = TargetPortraitViewModel.Create(
                 model.Sources[0], model, "long", unit);
@@ -972,9 +1002,7 @@ namespace KingmakerBuffPlanner.Tests
             var warningTarget = new TargetPortraitViewModel(unit, true, true, false, false);
             var routine = new RoutineSummaryViewModel("long", "Long", 1, 1);
             var settings = new PlannerSettingsViewModel(profile);
-            if (!casting.Summary.StartsWith("Automatic", StringComparison.Ordinal) ||
-                casting.Summary.Contains(provider.Key.Canonical) ||
-                target.Status != PlannerPresentationStatus.Success ||
+            if (target.Status != PlannerPresentationStatus.Success ||
                 warningTarget.Status != PlannerPresentationStatus.Warning ||
                 invalidTarget.Status != PlannerPresentationStatus.Failure ||
                 routine.Label != "Long     1/1 ready" || settings.CastingMode != "Animated" ||
@@ -983,6 +1011,16 @@ namespace KingmakerBuffPlanner.Tests
             model.SetAllValidTargets("long", false);
             if (model.IsTargetWanted("long", "unit-a") || saves != beforePreview + 1)
                 throw new InvalidOperationException("Bulk target edit did not save once.");
+        }
+
+        private static void TestGridMetrics()
+        {
+            BuffGridMetrics fullHd = BuffGridMetrics.Calculate(1740f, 610f);
+            BuffGridMetrics compact = BuffGridMetrics.Calculate(1420f, 500f);
+            if (fullHd.Columns != 4 || compact.Columns != 4 ||
+                fullHd.HorizontalScrolling || compact.HorizontalScrolling ||
+                fullHd.CellWidth <= 0 || compact.CellWidth <= 0)
+                throw new InvalidOperationException("Grid metrics did not preserve four columns without horizontal scrolling.");
         }
 
         private static void TestAnimatedExecutor()

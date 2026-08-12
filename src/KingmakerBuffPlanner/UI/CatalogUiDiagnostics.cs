@@ -6,23 +6,25 @@ using KingmakerBuffPlanner.Persistence;
 
 namespace KingmakerBuffPlanner.UI
 {
+    internal enum PlannerSourceCategory
+    {
+        All,
+        Spells,
+        Abilities,
+        Other
+    }
+
     internal sealed class CatalogFilterState
     {
         internal string Search = string.Empty;
-        internal bool ConfiguredOnly;
-        internal bool ShowHidden;
-        internal int DurationFilter;
-        internal int SourceCategoryFilter;
-        internal int AvailabilityFilter;
+        internal bool SelectedOnly;
+        internal PlannerSourceCategory SourceCategory;
 
         internal void Reset()
         {
             Search = string.Empty;
-            ConfiguredOnly = false;
-            ShowHidden = false;
-            DurationFilter = 0;
-            SourceCategoryFilter = 0;
-            AvailabilityFilter = 0;
+            SelectedOnly = false;
+            SourceCategory = PlannerSourceCategory.All;
         }
 
         internal List<SetupSourceRow> Apply(
@@ -36,7 +38,8 @@ namespace KingmakerBuffPlanner.UI
             List<SetupSourceRow> values = model.Sources.ToList();
             diagnostics.TotalEntries = values.Count;
             RoutineProfile routine = model.Profile.Routines.First(item => item.RoutineId == routineId);
-            diagnostics.AssignedToActiveGroup = routine.Assignments.Count;
+            diagnostics.AssignedToActiveGroup = routine.Assignments.Count(item =>
+                item.WantedTargetUnitIds.Count != 0);
 
             if (!string.IsNullOrWhiteSpace(Search))
             {
@@ -46,63 +49,44 @@ namespace KingmakerBuffPlanner.UI
             }
             diagnostics.AfterSearch = values.Count;
 
-            if (ConfiguredOnly)
+            if (SelectedOnly)
             {
-                values = values.Where(source => model.Profile.Routines.Any(group =>
-                    group.Assignments.Any(item => item.SourceId == source.SourceId))).ToList();
-                active.Add("configured only");
+                values = values.Where(source => routine.Assignments.Any(item =>
+                    item.SourceId == source.SourceId &&
+                    item.WantedTargetUnitIds.Count != 0)).ToList();
+                active.Add("selected only in " + routineId);
             }
             diagnostics.AfterConfigured = values.Count;
-
-            if (DurationFilter == 1)
-            {
-                values = values.Where(source => source.ExpectedDurationRounds >= 10).ToList();
-                active.Add("long duration");
-            }
-            else if (DurationFilter == 2)
-            {
-                values = values.Where(source => source.ExpectedDurationRounds > 0 &&
-                    source.ExpectedDurationRounds < 10).ToList();
-                active.Add("short duration");
-            }
             diagnostics.AfterDuration = values.Count;
 
-            if (SourceCategoryFilter == 1)
+            if (SourceCategory == PlannerSourceCategory.Spells)
             {
                 values = values.Where(source =>
                     source.Ability.SourceKind == SourceKind.Spellbook).ToList();
                 active.Add("spells");
             }
-            else if (SourceCategoryFilter == 2)
+            else if (SourceCategory == PlannerSourceCategory.Abilities)
             {
                 values = values.Where(source =>
                     source.Ability.SourceKind == SourceKind.AbilityResource ||
                     source.Ability.SourceKind == SourceKind.Fact).ToList();
                 active.Add("abilities");
             }
-            diagnostics.AfterSource = values.Count;
-
-            if (!ShowHidden)
+            else if (SourceCategory == PlannerSourceCategory.Other)
             {
                 values = values.Where(source =>
-                    !model.Profile.HiddenSourceIds.Contains(source.SourceId)).ToList();
-                active.Add("hidden excluded");
+                    source.Ability.SourceKind != SourceKind.Spellbook &&
+                    source.Ability.SourceKind != SourceKind.AbilityResource &&
+                    source.Ability.SourceKind != SourceKind.Fact).ToList();
+                active.Add("other");
             }
-            else active.Add("hidden included");
+            diagnostics.AfterSource = values.Count;
             diagnostics.AfterHidden = values.Count;
-
-            if (AvailabilityFilter == 1)
-            {
-                values = values.Where(model.IsSourceAvailable).ToList();
-                active.Add("available only");
-            }
-            else if (AvailabilityFilter == 2)
-            {
-                values = values.Where(source => !model.IsSourceAvailable(source)).ToList();
-                active.Add("unavailable only");
-            }
-            else active.Add("all availability");
             diagnostics.AfterAvailability = values.Count;
+            values = values.OrderBy(source => source.DisplayName,
+                    StringComparer.OrdinalIgnoreCase)
+                .ThenBy(source => source.SpellLevel)
+                .ThenBy(source => source.SourceId, StringComparer.Ordinal).ToList();
             diagnostics.VisibleViewModels = values.Count;
             diagnostics.ActiveFilters = active.Count == 0 ? "none" :
                 string.Join(", ", active.ToArray());
@@ -126,11 +110,9 @@ namespace KingmakerBuffPlanner.UI
         public override string ToString()
         {
             return "total=" + TotalEntries + ";groupAssigned=" + AssignedToActiveGroup +
-                ";search=" + AfterSearch + ";configured=" + AfterConfigured +
-                ";duration=" + AfterDuration + ";source=" + AfterSource +
-                ";hidden=" + AfterHidden + ";availability=" + AfterAvailability +
-                ";viewModels=" + VisibleViewModels + ";activeFilters=" + ActiveFilters;
+                ";search=" + AfterSearch + ";selected=" + AfterConfigured +
+                ";source=" + AfterSource + ";viewModels=" + VisibleViewModels +
+                ";activeFilters=" + ActiveFilters;
         }
     }
-
 }

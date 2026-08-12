@@ -29,8 +29,8 @@ $assertions++
 
 $mainSource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\Main.cs') -Raw
 $logSource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\Infrastructure\ModLog.cs') -Raw
-foreach ($bootstrapContract in @('[KBP-BOOT]', 'OnGUI = OnGui', 'Input.GetKeyDown(KeyCode.F10)',
-        'F10 handler armed', 'BuffPlannerUiRoot.HandleF10')) {
+foreach ($bootstrapContract in @('[KBP-BOOT]', 'OnGUI = OnGui', 'PlannerHotkey',
+        'Ctrl+Shift+B', 'BuffPlannerUiRoot.HandlePlannerHotkey')) {
     if (-not $mainSource.Contains($bootstrapContract)) {
         throw "Live bootstrap instrumentation is missing: $bootstrapContract"
     }
@@ -116,11 +116,16 @@ $assertions++
 $screenSource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\UI\BuffPlannerScreenView.cs') -Raw
 foreach ($requiredScreenContract in @('CanvasGroup', 'GraphicRaycaster', 'raycastTarget = true',
         'blocksRaycasts = true', 'interactable = true', 'BUFF PLANNER',
-        'CanaryEvidence', 'Configured only', 'Show hidden',
-        'Advanced Filters', 'CASTING SOURCE', 'Advanced Casting Source',
-        'SelectAllValid', 'ClearTargets', 'Casting mode: ')) {
+        'CanaryEvidence', 'BuffGridView', 'PlannerSelectedBuffView')) {
     if (-not $screenSource.Contains($requiredScreenContract)) {
         throw "Full-screen raycast/visual contract is missing: $requiredScreenContract"
+    }
+}
+foreach ($obsoleteScreenContract in @('Configured only', 'Show hidden', 'Advanced Filters',
+        'CASTING SOURCE', 'Advanced Casting Source', 'Add to Long', 'Add to Important',
+        'Add to Short', 'ToggleHidden', 'CycleProviderPreference', 'AdjustProviderCap')) {
+    if ($screenSource.Contains($obsoleteScreenContract)) {
+        throw "Obsolete planner UI remains in production: $obsoleteScreenContract"
     }
 }
 foreach ($retiredPrimaryLabel in @('CONFIG: ', 'DURATION: ', 'SOURCE: ', 'SORT: ',
@@ -129,9 +134,26 @@ foreach ($retiredPrimaryLabel in @('CONFIG: ', 'DURATION: ', 'SOURCE: ', 'SORT: 
         throw "Retired technical/duplicate UI label remains: $retiredPrimaryLabel"
     }
 }
-if ([regex]::Matches($screenSource,
-        [regex]::Escape('"Casting mode: " + settingsModel.CastingMode')).Count -ne 1) {
+$viewSource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\UI\PlannerViews.cs') -Raw
+$viewModelSource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\UI\PlannerScreenViewModel.cs') -Raw
+$gridMetricsSource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\UI\BuffGridMetrics.cs') -Raw
+foreach ($workflowContract in @('PlannerSourceCategory', 'SelectedOnly',
+        'SelectAllValid', 'ClearTargets')) {
+    if (-not ($viewSource.Contains($workflowContract) -or $viewModelSource.Contains($workflowContract))) {
+        throw "Direct assignment workflow contract is missing: $workflowContract"
+    }
+}
+if ([regex]::Matches($viewSource, [regex]::Escape('"Casting mode: "')).Count -ne 1) {
     throw 'Exactly one player-facing Casting mode control must remain.'
+}
+foreach ($gridContract in @('ColumnCount = 4', 'PoolCapacity = 32',
+        'HorizontalScrolling = false', 'Selected only',
+        'Show buffs with one or more selected targets in the active routine.',
+        'BuffCardGridScrollSink')) {
+    if (-not ($viewSource.Contains($gridContract) -or $viewModelSource.Contains($gridContract) -or
+        $gridMetricsSource.Contains($gridContract))) {
+        throw "Four-column grid contract is missing: $gridContract"
+    }
 }
 if ($screenSource.Contains('CreateDiagnosticRenderCanary') -or
     $screenSource.Contains('KBP RENDER CANARY')) {
@@ -200,10 +222,10 @@ if ($pointerOwnershipSource.Contains('GetProperty("InGui"') -or
 }
 $mainSource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\Main.cs') -Raw
 foreach ($failSoftPatchContract in @('callbacks assigned;OnToggle=true',
-        'Harmony pointer ownership install failed', 'F10ArmedByOnUpdate=true',
+        'Harmony pointer ownership install failed', 'HotkeyArmedByOnUpdate=true',
         'PlannerPointerOwnership.Uninstall()')) {
     if (-not $mainSource.Contains($failSoftPatchContract)) {
-        throw "Pointer patch failures must preserve callback/F10 registration and unload cleanly: $failSoftPatchContract"
+        throw "Pointer patch failures must preserve callback/hotkey registration and unload cleanly: $failSoftPatchContract"
     }
 }
 foreach ($tooltipContract in @('layout.ignoreLayout = true', 'group.blocksRaycasts = false',
@@ -212,8 +234,8 @@ foreach ($tooltipContract in @('layout.ignoreLayout = true', 'group.blocksRaycas
         throw "Stable cached tooltip contract is missing: $tooltipContract"
     }
 }
-foreach ($catalogContract in @('ResetFilters', 'ApplyFilters', 'FinalizeScrollContent',
-        'VisibleRows', 'SelectedDetailsBound', 'No available beneficial buffs')) {
+foreach ($catalogContract in @('RefreshCatalog', 'BuffGridView',
+        'VisibleRows', 'SelectedDetailsBound', 'CatalogFilterDiagnostics')) {
     if (-not $screenSource.Contains($catalogContract)) {
         throw "Catalog visibility/empty-state contract is missing: $catalogContract"
     }
@@ -240,12 +262,13 @@ $assertions++
 
 $runtimeScriptSource = Get-Content -LiteralPath (Join-Path $root 'scripts\Invoke-KingmakerRuntimeTest.ps1') -Raw
 foreach ($physicalContract in @('umm-overlay-ready.json',
-        'physical-umm-dismiss-sent', '[byte]0x1B', '[byte]0x79',
+        'physical-umm-dismiss-sent', '[byte]0x1B', 'hotkey-ready.json',
+        '[byte]0x11', '[byte]0x10', '[byte]0x42',
         'physical-input-*.json', 'ClientToScreen', 'SetCursorPos',
         '[KbpPhysicalInput]::Click()')) {
     if (-not $runtimeHostSource.Contains($physicalContract) -and
         -not $runtimeScriptSource.Contains($physicalContract)) {
-        throw "Live qualification must physically dismiss ShowOnStart UMM and then deliver F10: $physicalContract"
+        throw "Live qualification must physically dismiss ShowOnStart UMM and then deliver the planner hotkey: $physicalContract"
     }
 }
 foreach ($livePhysicalContract in @('ui-physical-tooltip-stable',
@@ -261,7 +284,7 @@ $assertions++
 
 if (-not $runtimeHostSource.Contains('CaptureRuntimeBaseline();') -or
     -not $runtimeScriptSource.Contains('loadedAssemblySha256')) {
-    throw 'Live qualification must capture pre-F10 state and distinguish an exact UMM cache assembly from its primary fixture file.'
+    throw 'Live qualification must capture pre-hotkey state and distinguish an exact UMM cache assembly from its primary fixture file.'
 }
 $assertions++
 

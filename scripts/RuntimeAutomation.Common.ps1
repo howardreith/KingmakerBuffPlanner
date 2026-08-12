@@ -432,7 +432,7 @@ function Assert-KbpRuntimeResult {
             [int]$Result.uiLongRefusalCount -ne 1 -or
             [int]$Result.uiLongResultPresentedCount -ne 1 -or
             [string]$Result.uiLongResultMessage -cne 'No Long buffs are configured.' -or
-            -not ([string]$Result.uiSetupTooltip).Contains('F10') -or
+            -not ([string]$Result.uiSetupTooltip).Contains('Ctrl+Shift+B') -or
             -not ([string]$Result.uiLongTooltip).Contains('Long') -or
             [int]$Result.uiInputPlayerCommandCount -ne 0 -or
             [int]$Result.uiInputMovementCommandCount -ne 0 -or

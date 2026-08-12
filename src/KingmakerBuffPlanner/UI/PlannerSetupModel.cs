@@ -99,32 +99,25 @@ namespace KingmakerBuffPlanner.UI
             return routine.Assignments.Any(a => a.SourceId == SelectedSourceId);
         }
 
-        public void ToggleRoutine(string routineId)
-        {
-            SetupSourceRow source = RequireSelected();
-            RoutineProfile routine = FindRoutine(routineId);
-            SourceAssignmentProfile existing = routine.Assignments.FirstOrDefault(a => a.SourceId == source.SourceId);
-            if (existing == null)
-            {
-                routine.Assignments.Add(new SourceAssignmentProfile
-                {
-                    SourceId = source.SourceId,
-                    Ability = AbilityKeyProfile.FromKey(source.Ability),
-                    WantedTargetUnitIds = new List<string>(),
-                    ExistingEffectPolicy = ExistingEffectPolicy.SkipAlreadyActive,
-                    IgnoredPresenceMarkers = new List<string>()
-                });
-            }
-            else routine.Assignments.Remove(existing);
-            _save(Profile);
-        }
-
         public void ToggleTarget(string routineId, string unitId)
         {
-            if (!Snapshot.Units.Any(u => u.UnitId == unitId)) throw new ArgumentException("Unknown unit.", "unitId");
-            SourceAssignmentProfile assignment = RequireAssignment(routineId);
-            if (assignment.WantedTargetUnitIds.Contains(unitId)) assignment.WantedTargetUnitIds.Remove(unitId);
+            SetupSourceRow source = RequireSelected();
+            if (!Snapshot.Units.Any(u => u.UnitId == unitId))
+                throw new ArgumentException("Unknown unit.", "unitId");
+            if (!IsTargetLegal(source, unitId))
+                throw new InvalidOperationException("The selected buff cannot target this character.");
+            RoutineProfile routine = FindRoutine(routineId);
+            SourceAssignmentProfile assignment = routine.Assignments
+                .FirstOrDefault(item => item.SourceId == source.SourceId);
+            if (assignment == null)
+            {
+                assignment = CreateAssignment(source);
+                routine.Assignments.Add(assignment);
+            }
+            if (assignment.WantedTargetUnitIds.Contains(unitId))
+                assignment.WantedTargetUnitIds.Remove(unitId);
             else assignment.WantedTargetUnitIds.Add(unitId);
+            if (assignment.WantedTargetUnitIds.Count == 0) routine.Assignments.Remove(assignment);
             _save(Profile);
         }
 
@@ -175,11 +168,25 @@ namespace KingmakerBuffPlanner.UI
         public void SetAllValidTargets(string routineId, bool selected)
         {
             SetupSourceRow source = RequireSelected();
-            SourceAssignmentProfile assignment = RequireAssignment(routineId);
+            RoutineProfile routine = FindRoutine(routineId);
+            SourceAssignmentProfile assignment = routine.Assignments
+                .FirstOrDefault(item => item.SourceId == source.SourceId);
             List<string> next = selected ? Snapshot.Units
                 .Where(unit => IsTargetLegal(source, unit.UnitId))
                 .Select(unit => unit.UnitId).Distinct(StringComparer.Ordinal)
                 .OrderBy(id => id, StringComparer.Ordinal).ToList() : new List<string>();
+            if (next.Count == 0)
+            {
+                if (assignment == null) return;
+                routine.Assignments.Remove(assignment);
+                _save(Profile);
+                return;
+            }
+            if (assignment == null)
+            {
+                assignment = CreateAssignment(source);
+                routine.Assignments.Add(assignment);
+            }
             if (assignment.WantedTargetUnitIds.SequenceEqual(next, StringComparer.Ordinal)) return;
             assignment.WantedTargetUnitIds = next;
             _save(Profile);
@@ -260,6 +267,24 @@ namespace KingmakerBuffPlanner.UI
             _save(Profile);
         }
 
+        public void ToggleRecastExisting()
+        {
+            Profile.Execution.RecastExisting = !Profile.Execution.RecastExisting;
+            ExistingEffectPolicy policy = Profile.Execution.RecastExisting
+                ? ExistingEffectPolicy.Overwrite : ExistingEffectPolicy.SkipAlreadyActive;
+            foreach (SourceAssignmentProfile assignment in Profile.Routines
+                .SelectMany(routine => routine.Assignments))
+                assignment.ExistingEffectPolicy = policy;
+            _save(Profile);
+        }
+
+        public void TogglePlannerHotkey()
+        {
+            Profile.Ui.Hotkey = Profile.Ui.Hotkey == "Ctrl+Shift+P"
+                ? PlannerHotkeyText.Default : "Ctrl+Shift+P";
+            _save(Profile);
+        }
+
         public void ClearRoutine(string routineId)
         {
             RoutineProfile routine = FindRoutine(routineId);
@@ -331,32 +356,6 @@ namespace KingmakerBuffPlanner.UI
             return "no available provider";
         }
 
-        public void ToggleHidden()
-        {
-            SetupSourceRow source = RequireSelected();
-            if (Profile.HiddenSourceIds.Contains(source.SourceId)) Profile.HiddenSourceIds.Remove(source.SourceId);
-            else Profile.HiddenSourceIds.Add(source.SourceId);
-            _save(Profile);
-        }
-
-        public void ToggleExistingEffectPolicy(string routineId)
-        {
-            SourceAssignmentProfile assignment = RequireAssignment(routineId);
-            assignment.ExistingEffectPolicy = assignment.ExistingEffectPolicy == ExistingEffectPolicy.SkipAlreadyActive
-                ? ExistingEffectPolicy.Overwrite
-                : ExistingEffectPolicy.SkipAlreadyActive;
-            _save(Profile);
-        }
-
-        public ExistingEffectPolicy GetExistingEffectPolicy(string routineId)
-        {
-            SourceAssignmentProfile assignment = FindRoutine(routineId).Assignments
-                .FirstOrDefault(a => a.SourceId == SelectedSourceId);
-            return assignment == null
-                ? ExistingEffectPolicy.SkipAlreadyActive
-                : assignment.ExistingEffectPolicy;
-        }
-
         private SetupSourceRow RequireSelected()
         {
             SetupSourceRow source = SelectedSource;
@@ -371,16 +370,17 @@ namespace KingmakerBuffPlanner.UI
             return routine;
         }
 
-        private SourceAssignmentProfile RequireAssignment(string routineId)
+        private SourceAssignmentProfile CreateAssignment(SetupSourceRow source)
         {
-            RoutineProfile routine = FindRoutine(routineId);
-            SourceAssignmentProfile assignment = routine.Assignments.FirstOrDefault(a => a.SourceId == SelectedSourceId);
-            if (assignment == null)
+            return new SourceAssignmentProfile
             {
-                ToggleRoutine(routineId);
-                assignment = routine.Assignments.First(a => a.SourceId == SelectedSourceId);
-            }
-            return assignment;
+                SourceId = source.SourceId,
+                Ability = AbilityKeyProfile.FromKey(source.Ability),
+                WantedTargetUnitIds = new List<string>(),
+                ExistingEffectPolicy = Profile.Execution.RecastExisting
+                    ? ExistingEffectPolicy.Overwrite : ExistingEffectPolicy.SkipAlreadyActive,
+                IgnoredPresenceMarkers = new List<string>()
+            };
         }
 
         private void RequireProvider(string providerKey)

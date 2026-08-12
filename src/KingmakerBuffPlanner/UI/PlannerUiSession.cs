@@ -72,6 +72,7 @@ namespace KingmakerBuffPlanner.UI
                 var effects = new Dictionary<string, EffectExpression>(
                     snapshotBuilder.EffectsBySource, StringComparer.Ordinal);
                 ProfileLoadResult loaded = _profiles.Load(campaignId);
+                PlannerHotkey.SetBinding(loaded.Profile.Ui.Hotkey);
                 ProfileStatus = string.IsNullOrEmpty(loaded.SourcePath)
                     ? "No prior profile was found; using a new schema " +
                         BuffPlannerProfile.CurrentSchemaVersion + " profile."

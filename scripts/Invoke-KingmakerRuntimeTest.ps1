@@ -98,7 +98,7 @@ try {
     $orchestration.kingmakerStartedAtUtc = $process.StartTime.ToUniversalTime().ToString('o')
     Write-KbpJsonAtomic (Join-Path $evidence 'orchestration.json') $orchestration
     $resultPath = Join-Path $evidence 'runtime-result.json'
-    $f10Sent = $false
+    $plannerHotkeySent = $false
     $ummDismissSent = $false
     if ($Scenario -ceq 'live-ui-bootstrap') {
         Add-Type @'
@@ -159,16 +159,20 @@ public static class KbpPhysicalInput {
             $orchestration.ummDismissSentAtUtc = [DateTime]::UtcNow.ToString('o')
             Write-KbpJsonAtomic (Join-Path $evidence 'orchestration.json') $orchestration
         }
-        $f10Marker = Join-Path $evidence 'f10-ready.json'
-        if ($Scenario -ceq 'live-ui-bootstrap' -and -not $f10Sent -and
-            (Test-Path -LiteralPath $f10Marker -PathType Leaf)) {
+        $hotkeyMarker = Join-Path $evidence 'hotkey-ready.json'
+        if ($Scenario -ceq 'live-ui-bootstrap' -and -not $plannerHotkeySent -and
+            (Test-Path -LiteralPath $hotkeyMarker -PathType Leaf)) {
             $process.Refresh()
-            [KbpPhysicalInput]::KeyDown($process.MainWindowHandle, [byte]0x79)
+            [KbpPhysicalInput]::KeyDown($process.MainWindowHandle, [byte]0x11)
+            [KbpPhysicalInput]::KeyDown($process.MainWindowHandle, [byte]0x10)
+            [KbpPhysicalInput]::KeyDown($process.MainWindowHandle, [byte]0x42)
             Start-Sleep -Milliseconds 100
-            [KbpPhysicalInput]::KeyUp([byte]0x79)
-            $f10Sent = $true
-            $orchestration.stage = 'physical-f10-sent'
-            $orchestration.f10SentAtUtc = [DateTime]::UtcNow.ToString('o')
+            [KbpPhysicalInput]::KeyUp([byte]0x42)
+            [KbpPhysicalInput]::KeyUp([byte]0x10)
+            [KbpPhysicalInput]::KeyUp([byte]0x11)
+            $plannerHotkeySent = $true
+            $orchestration.stage = 'physical-planner-hotkey-sent'
+            $orchestration.plannerHotkeySentAtUtc = [DateTime]::UtcNow.ToString('o')
             Write-KbpJsonAtomic (Join-Path $evidence 'orchestration.json') $orchestration
         }
         if ($Scenario -ceq 'live-ui-bootstrap') {

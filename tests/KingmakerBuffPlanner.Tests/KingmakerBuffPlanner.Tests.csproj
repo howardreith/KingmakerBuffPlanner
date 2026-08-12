@@ -55,6 +55,7 @@
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\PlannerPresentationModels.cs"><Link>UI\PlannerPresentationModels.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\BuffPlannerUiContracts.cs"><Link>UI\BuffPlannerUiContracts.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CatalogUiDiagnostics.cs"><Link>UI\CatalogUiDiagnostics.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\BuffGridMetrics.cs"><Link>UI\BuffGridMetrics.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\RuntimeTesting\RuntimePaths.cs">
       <Link>RuntimeTesting\RuntimePaths.cs</Link>
     </Compile>
