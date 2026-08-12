@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.0.7 — Kingmaker-native planner presentation
+
+- Replaced the diagnostic-looking setup screen with a centralized Kingmaker parchment, burgundy, antique-gold, and brown-text theme using exact 2.1.7b native candidates with safe fallbacks.
+- Replaced text rows with alphabetical icon-first buff cards showing routine, availability, selection, and neutral/ready/partial/blocked status.
+- Made party and pet portraits the primary target editor with legal, requested, fulfilled, blocked, and indirect-beneficiary overlays plus Select All Valid and Clear Targets.
+- Simplified primary filters to Search, Configured only, Show hidden, Reset, and a closed Advanced Filters drawer.
+- Renamed provider/resource presentation to Casting Source, collapsed it by default, and moved priorities, disablement, spellbook identity, and caps under Advanced Casting Source.
+- Removed the duplicate footer Mode button; Settings now contains the only Animated/Instant control alongside combat, existing-buff, and fallback choices.
+- Added exact native-theme inventory, icon/control diagnostics, five hashed visual-acceptance screenshots, and an explicit physical Animated/Instant runtime parameter.
+- Preserved discovery, planning, resource accounting, persistence schema/identities, confirmed-effect execution, HUD input isolation, modal lifecycle, and guarded staging contracts.
+
 ## 0.0.6 — live row-rendering recovery
 
 - Repaired both empty scroll panes by keeping their visually hidden Unity Mask source opaque so it writes the stencil consumed by row/detail graphics.
