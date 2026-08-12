@@ -36,6 +36,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private string _liveTooltipEvidence = string.Empty;
         private string _liveInitialCatalogEvidence = string.Empty;
         private bool _liveBlessSelectedAndConfigured;
+        private int _liveCameraSettleFrames;
 
         private RuntimeTestHost(
             RuntimeTestRequest request,
@@ -795,6 +796,16 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 BuffPlannerUiRoot.BeginRuntimeSmoke();
                 BuffPlannerUiRoot.DispatchRuntimeInputSmoke();
                 BuffPlannerUiRoot.CloseRuntimeSmoke();
+                WritePhysicalInputRequest("settle-center", "hover",
+                    BuffPlannerUiRoot.ScreenCenterForRuntime());
+                _liveUiPhase = 12;
+                return false;
+            }
+            if (_liveUiPhase == 12)
+            {
+                if (!PhysicalInputAcknowledged("settle-center")) return false;
+                _liveCameraSettleFrames++;
+                if (_liveCameraSettleFrames < 120) return false;
                 BuffPlannerUiRoot.BeginPhysicalInputProbe();
                 WritePhysicalInputRequest("hover-long", "hover",
                     BuffPlannerUiRoot.HudButtonCenterForRuntime("long"));
@@ -938,7 +949,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 BuffPlannerUiRoot.CloseRuntimeSmoke();
                 return false;
             }
-            return _liveUiPhase >= 11;
+            return _liveUiPhase == 11;
         }
 
         private void WritePhysicalInputRequest(string id, string kind, Vector2 position)
