@@ -35,6 +35,41 @@ try {
     }
     $passed++
 
+    $game = Join-Path $root 'game-pre-activation-interruption'
+    $mods = Join-Path $game 'Mods'
+    New-Item -ItemType Directory -Path (Join-Path $mods 'Existing') -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $game 'Kingmaker.exe') -Value 'fixture' -Encoding Ascii
+    Set-Content -LiteralPath (Join-Path $mods 'Existing\Info.json') -Value '{"Id":"Existing"}' -Encoding Ascii
+    $runId = 'pre-activation-interruption'
+    $token = [Guid]::NewGuid().ToString('N')
+    $lockPath = Join-Path $stateRoot 'deployment.lock'
+    $transactionRoot = Join-Path $stateRoot ('transactions\' + $runId)
+    $stagingRunRoot = Join-Path $stagingRoot $runId
+    $backupRunRoot = Join-Path $backupRoot $runId
+    New-Item -ItemType Directory -Path $transactionRoot -Force | Out-Null
+    New-Item -ItemType Directory -Path $stagingRunRoot -Force | Out-Null
+    New-Item -ItemType Directory -Path $backupRunRoot -Force | Out-Null
+    New-KbpOwnedLock $lockPath $runId $token
+    $before = @(Get-KbpDirectoryManifest $mods)
+    $statePath = Join-Path $transactionRoot 'transaction.json'
+    Write-KbpJsonAtomic $statePath ([ordered]@{
+        schemaVersion = 1; runId = $runId; token = $token; status = 'Preparing'
+        modsPath = $mods; originalExisted = $true; originalManifest = $before
+        originalBackup = Join-Path $backupRunRoot 'Mods.original'
+        stagedQuarantine = Join-Path $backupRunRoot 'Mods.staged'
+        stagingRunRoot = $stagingRunRoot; lockPath = $lockPath
+        restorationVerified = $false; stagedMutationObserved = $false
+        observedStagedManifest = @(); restoredAtUtc = $null; restorationFailure = $null
+    })
+    $restored = Restore-KbpRuntimeTransaction -RunId $runId -StateRoot $stateRoot `
+        -FixtureMode -KnownKingmakerProcessIds @()
+    if (-not $restored.restorationVerified -or
+        -not (Test-KbpManifestEqual $before @(Get-KbpDirectoryManifest $mods)) -or
+        (Test-Path -LiteralPath $stagingRunRoot) -or (Test-Path -LiteralPath $lockPath)) {
+        throw 'Pre-activation interruption did not recover as an exact no-op.'
+    }
+    $passed++
+
     $game = Join-Path $root 'game-mutation'
     New-Item -ItemType Directory -Path (Join-Path $game 'Mods\Existing') -Force | Out-Null
     Set-Content -LiteralPath (Join-Path $game 'Kingmaker.exe') -Value 'fixture' -Encoding Ascii

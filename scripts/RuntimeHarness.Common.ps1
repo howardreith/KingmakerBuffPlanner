@@ -309,35 +309,48 @@ function Restore-KbpRuntimeTransaction {
     if ($state.status -ceq 'Restored') { return $state }
     Assert-KbpOwnedLock $state.lockPath $RunId $state.token
     $mods = [string]$state.modsPath
+    $preActivationNoOp = $false
     try {
         if (Test-Path -LiteralPath $mods -PathType Container) {
             $sentinelPath = Join-Path $mods '.kbp-runtime-sentinel.json'
             if (-not (Test-Path -LiteralPath $sentinelPath -PathType Leaf)) {
-                if (-not $state.originalExisted -and $state.status -ceq 'Prepared') {
+                $liveManifest = @(Get-KbpDirectoryManifest $mods)
+                $interruptedBeforeActivation = $state.originalExisted -and
+                    -not (Test-Path -LiteralPath $state.originalBackup) -and
+                    $state.status -in @('Preparing', 'RestorationFailed') -and
+                    (Test-KbpManifestEqual @($state.originalManifest) $liveManifest)
+                if ($interruptedBeforeActivation) {
+                    $preActivationNoOp = $true
+                }
+                elseif (-not $state.originalExisted -and $state.status -ceq 'Prepared') {
                     throw 'Prepared state contradicts an unexpected live Mods directory.'
                 }
-                throw 'Live Mods ownership sentinel is missing; restoration refuses ambiguous state.'
+                else { throw 'Live Mods ownership sentinel is missing; restoration refuses ambiguous state.' }
             }
-            $sentinel = Read-KbpJson $sentinelPath
-            if ($sentinel.runId -cne $RunId -or $sentinel.token -cne $state.token -or $sentinel.statePath -cne $statePath) {
-                throw 'Live Mods ownership sentinel does not match transaction state.'
+            if (-not $preActivationNoOp) {
+                $sentinel = Read-KbpJson $sentinelPath
+                if ($sentinel.runId -cne $RunId -or $sentinel.token -cne $state.token -or $sentinel.statePath -cne $statePath) {
+                    throw 'Live Mods ownership sentinel does not match transaction state.'
+                }
+                if (Test-Path -LiteralPath $state.stagedQuarantine) { throw 'Staged quarantine already exists.' }
+                $currentStaged = @(Get-KbpDirectoryManifest $mods)
+                $state.stagedMutationObserved = -not (Test-KbpManifestEqual @($state.stagedManifest) $currentStaged)
+                if ($state.stagedMutationObserved) { $state.observedStagedManifest = $currentStaged }
+                Move-Item -LiteralPath $mods -Destination $state.stagedQuarantine
             }
-            if (Test-Path -LiteralPath $state.stagedQuarantine) { throw 'Staged quarantine already exists.' }
-            $currentStaged = @(Get-KbpDirectoryManifest $mods)
-            $state.stagedMutationObserved = -not (Test-KbpManifestEqual @($state.stagedManifest) $currentStaged)
-            if ($state.stagedMutationObserved) { $state.observedStagedManifest = $currentStaged }
-            Move-Item -LiteralPath $mods -Destination $state.stagedQuarantine
         }
 
         if ($state.originalExisted) {
-            if (-not (Test-Path -LiteralPath $state.originalBackup -PathType Container)) {
-                throw 'Original Mods backup is missing.'
-            }
-            if (Test-Path -LiteralPath $mods) { throw 'Mods destination is occupied during restore.' }
-            Move-Item -LiteralPath $state.originalBackup -Destination $mods
-            $restoredManifest = @(Get-KbpDirectoryManifest $mods)
-            if (-not (Test-KbpManifestEqual @($state.originalManifest) $restoredManifest)) {
-                throw 'Restored Mods manifest/hash mismatch.'
+            if (-not $preActivationNoOp) {
+                if (-not (Test-Path -LiteralPath $state.originalBackup -PathType Container)) {
+                    throw 'Original Mods backup is missing.'
+                }
+                if (Test-Path -LiteralPath $mods) { throw 'Mods destination is occupied during restore.' }
+                Move-Item -LiteralPath $state.originalBackup -Destination $mods
+                $restoredManifest = @(Get-KbpDirectoryManifest $mods)
+                if (-not (Test-KbpManifestEqual @($state.originalManifest) $restoredManifest)) {
+                    throw 'Restored Mods manifest/hash mismatch.'
+                }
             }
         }
         elseif (Test-Path -LiteralPath $mods) { throw 'Mods must remain absent because it was absent before entry.' }
