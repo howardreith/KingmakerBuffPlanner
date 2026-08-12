@@ -138,11 +138,22 @@ foreach ($lifecycleContract in @('ISceneHandler', 'IAreaLoadingStagesHandler',
 $assertions++
 
 $pointerOwnershipSource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\UI\PlannerPointerOwnership.cs') -Raw
-foreach ($pointerContract in @('PointerController', 'GetProperty("InGui"',
+foreach ($pointerContract in @('PointerController', 'GetMethod("get_InGui"',
         'RectangleContainsScreenPoint', 'scope=active-planner-regions-only',
         'HarmonyPatchType.Postfix')) {
     if (-not $pointerOwnershipSource.Contains($pointerContract)) {
         throw "Conditional physical pointer ownership is missing: $pointerContract"
+    }
+}
+if ($pointerOwnershipSource.Contains('GetProperty("InGui"')) {
+    throw 'Exact 2.1.7b pointer ownership must not require a nonexistent PropertyInfo metadata row.'
+}
+$mainSource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\Main.cs') -Raw
+foreach ($failSoftPatchContract in @('callbacks assigned;OnToggle=true',
+        'Harmony pointer ownership install failed', 'F10ArmedByOnUpdate=true',
+        'PlannerPointerOwnership.Uninstall()')) {
+    if (-not $mainSource.Contains($failSoftPatchContract)) {
+        throw "Pointer patch failures must preserve callback/F10 registration and unload cleanly: $failSoftPatchContract"
     }
 }
 foreach ($tooltipContract in @('layout.ignoreLayout = true', 'group.blocksRaycasts = false',

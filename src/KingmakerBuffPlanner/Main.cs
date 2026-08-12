@@ -28,7 +28,6 @@ namespace KingmakerBuffPlanner
             _log = new ModLog(modEntry.Logger);
             _log.Info("[KBP-BOOT] Main.Load entered; assembly=" +
                 typeof(Main).Assembly.FullName + ";modEntry.Enabled=" + modEntry.Enabled + ".");
-            PlannerPointerOwnership.Install(_log);
             _modPath = modEntry.Path;
             modEntry.OnToggle = OnToggle;
             modEntry.OnUnload = OnUnload;
@@ -36,12 +35,21 @@ namespace KingmakerBuffPlanner
             modEntry.OnGUI = OnGui;
             _log.Info("[KBP-BOOT] callbacks assigned;OnToggle=true;OnUpdate=true;" +
                 "OnUnload=true;OnGUI=true.");
+            try
+            {
+                PlannerPointerOwnership.Install(_log);
+                _log.Info("[KBP-BOOT] Harmony patch result;required=true;patchCount=1;" +
+                    "target=PointerController.get_InGui;scope=planner-pointer-regions.");
+            }
+            catch (Exception exception)
+            {
+                _log.Error("[KBP-BOOT] Harmony pointer ownership install failed;" +
+                    "F10ArmedByOnUpdate=true;HUDRetryable=true.", exception);
+            }
             _runtimeTest = RuntimeTestHost.TryCreate(
                 Environment.GetCommandLineArgs(),
                 modEntry,
                 _log);
-            _log.Info("[KBP-BOOT] Harmony patch result;required=true;patchCount=1;" +
-                "target=PointerController.get_InGui;scope=planner-pointer-regions.");
             _log.Info("[KBP-BOOT] Main.Load exited;version=" + BuildInfo.Version +
                 ";commit=" + BuildInfo.Commit + ";result=true.");
             return true;
@@ -127,6 +135,7 @@ namespace KingmakerBuffPlanner
             _enabled = false;
             _runtimeTest = null;
             BuffPlannerUiRoot.DestroyOwned();
+            PlannerPointerOwnership.Uninstall();
             _log.Info("[KBP-BOOT] unloaded;disposed=true.");
             return true;
         }

@@ -23,9 +23,11 @@ namespace KingmakerBuffPlanner.UI
         {
             if (IsInstalled) return;
             _log = log ?? throw new ArgumentNullException("log");
-            PropertyInfo property = typeof(PointerController).GetProperty("InGui",
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            _target = property == null ? null : property.GetGetMethod(true);
+            // The exact 2.1.7b assembly exposes get_InGui as a method without a
+            // corresponding Property metadata row, so PropertyInfo lookup is invalid.
+            _target = typeof(PointerController).GetMethod("get_InGui",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                null, Type.EmptyTypes, null);
             if (_target == null) throw new MissingMethodException(
                 typeof(PointerController).FullName, "get_InGui");
             MethodInfo postfix = typeof(PlannerPointerOwnership).GetMethod("Postfix",
