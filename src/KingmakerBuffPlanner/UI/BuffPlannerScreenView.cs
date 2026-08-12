@@ -43,6 +43,9 @@ namespace KingmakerBuffPlanner.UI
         private Button[] _routineTabs;
         private Text[] _filterLabels;
         private readonly List<Button> _sourceRows = new List<Button>();
+        private readonly Dictionary<string, TargetPortraitVisual> _targetVisuals =
+            new Dictionary<string, TargetPortraitVisual>(StringComparer.Ordinal);
+        private string _previewSourceId;
         private string _routineId = "long";
         private readonly CatalogFilterState _filters = new CatalogFilterState();
         private bool _resettingFilters;
@@ -525,6 +528,7 @@ namespace KingmakerBuffPlanner.UI
 
         private void RefreshCatalog()
         {
+            _previewSourceId = null;
             RefreshSourceList();
             try { RefreshDetails(); }
             catch (Exception exception)
@@ -631,6 +635,9 @@ namespace KingmakerBuffPlanner.UI
             Button button = rect.gameObject.AddComponent<Button>();
             button.targetGraphic = background;
             button.onClick.AddListener(() => select());
+            EventTrigger trigger = rect.gameObject.AddComponent<EventTrigger>();
+            AddTrigger(trigger, EventTriggerType.PointerEnter, ignored => PreviewTargets(source));
+            AddTrigger(trigger, EventTriggerType.PointerExit, ignored => PreviewTargets(null));
             KingmakerUiFactory.AddLayout(rect, 76);
 
             RectTransform status = KingmakerUiFactory.CreateRect("Status", rect);
@@ -713,6 +720,31 @@ namespace KingmakerBuffPlanner.UI
             }
         }
 
+        private static void AddTrigger(EventTrigger trigger, EventTriggerType type,
+            UnityEngine.Events.UnityAction<BaseEventData> action)
+        {
+            if (trigger.triggers == null) trigger.triggers = new List<EventTrigger.Entry>();
+            var entry = new EventTrigger.Entry { eventID = type };
+            entry.callback.AddListener(action);
+            trigger.triggers.Add(entry);
+        }
+
+        private void PreviewTargets(SetupSourceRow source)
+        {
+            PlannerSetupModel model = _session.Model;
+            if (model == null || _targetVisuals.Count == 0) return;
+            SetupSourceRow preview = source ?? model.SelectedSource;
+            if (preview == null) return;
+            _previewSourceId = source == null ? null : source.SourceId;
+            foreach (UnitSnapshot unit in model.Snapshot.Units)
+            {
+                TargetPortraitVisual visual;
+                if (!_targetVisuals.TryGetValue(unit.UnitId, out visual)) continue;
+                ApplyTargetVisual(visual,
+                    TargetPortraitViewModel.Create(preview, model, _routineId, unit));
+            }
+        }
+
         private void RefreshDetails()
         {
             if (_detailContent == null) return;
@@ -729,9 +761,11 @@ namespace KingmakerBuffPlanner.UI
                 return;
             }
 
-            AddHeading(_detailContent, source.DisplayName);
-            AddBodyText(_detailContent, "Spell level " + source.SpellLevel + "  |  " +
-                source.Ability.SourceKind + "  |  " + source.DurationText, 34);
+            CreateSelectedBuffHeader(_detailContent, source);
+            AddBodyText(_detailContent, BuffCardViewModel.PlayerSourceType(source.Ability.SourceKind) +
+                (source.Ability.SourceKind == SourceKind.Spellbook
+                    ? " level " + source.SpellLevel : string.Empty) + "  |  " +
+                source.DurationText, 34);
             AddBodyText(_detailContent, string.IsNullOrWhiteSpace(source.Description)
                 ? "No localized description is available." : source.Description, 82);
 
@@ -751,6 +785,21 @@ namespace KingmakerBuffPlanner.UI
             policy.interactable = model.IsAssigned(_routineId) && !_session.IsExecuting;
 
             AddHeading(_detailContent, "TARGETS - PARTY AND PETS");
+            RectTransform targetActions = AddHorizontalRow(_detailContent, 38);
+            Button selectAll = KingmakerUiFactory.CreateButton("SelectAllValid", targetActions,
+                _theme, "SELECT ALL VALID", () =>
+                {
+                    model.SetAllValidTargets(_routineId, true);
+                    RefreshDetails();
+                });
+            Button clearTargets = KingmakerUiFactory.CreateButton("ClearTargets", targetActions,
+                _theme, "CLEAR TARGETS", () =>
+                {
+                    model.SetAllValidTargets(_routineId, false);
+                    RefreshDetails();
+                });
+            selectAll.interactable = !_session.IsExecuting;
+            clearTargets.interactable = !_session.IsExecuting;
             int targetRows = Math.Max(1, (model.Snapshot.Units.Count + 5) / 6);
             RectTransform targets = KingmakerUiFactory.CreateRect("TargetGrid", _detailContent);
             KingmakerUiFactory.AddLayout(targets, targetRows * 116);
@@ -760,8 +809,9 @@ namespace KingmakerBuffPlanner.UI
             targetLayout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
             targetLayout.constraintCount = 6;
             targetLayout.childAlignment = TextAnchor.UpperLeft;
+            _targetVisuals.Clear();
             foreach (UnitSnapshot unit in model.Snapshot.Units)
-                CreateTargetCard(targets, model, unit);
+                CreateTargetCard(targets, source, model, unit);
 
             AddHeading(_detailContent, "PROVIDERS AND RESOURCES");
             foreach (ProviderSnapshot provider in source.Providers)
@@ -774,10 +824,18 @@ namespace KingmakerBuffPlanner.UI
                 int fulfilled = preview.Plan.Outcomes.Count(item => item.Kind == TargetOutcomeKind.Fulfilled);
                 int skipped = preview.Plan.Outcomes.Count(item => item.Kind == TargetOutcomeKind.SkippedAlreadyActive);
                 int unfulfilled = preview.Plan.Outcomes.Count(item => item.Kind == TargetOutcomeKind.Unfulfilled);
-                AddBodyText(_detailContent, "Planned casts: " + preview.Plan.Steps.Count +
-                    "  |  fulfilled: " + fulfilled + "  |  active skipped: " + skipped +
-                    "  |  unfulfilled: " + unfulfilled + "  |  unsupported saved sources: " +
-                    preview.UnsupportedSourceIds.Count, 54);
+                int covered = fulfilled + skipped;
+                int requested = covered + unfulfilled;
+                string planText = preview.Plan.Steps.Count +
+                    (preview.Plan.Steps.Count == 1 ? " cast planned" : " casts planned") +
+                    "\n" + covered + " of " + requested + " targets covered" +
+                    (skipped == 0 ? string.Empty : "\n" + skipped +
+                        (skipped == 1 ? " existing buff will be skipped" :
+                            " existing buffs will be skipped")) +
+                    (unfulfilled == 0 ? string.Empty : "\n" + unfulfilled +
+                        (unfulfilled == 1 ? " target needs attention" :
+                            " targets need attention"));
+                AddBodyText(_detailContent, planText, 72);
             }
             catch (Exception exception)
             {
@@ -798,7 +856,42 @@ namespace KingmakerBuffPlanner.UI
             FinalizeScrollContent(_detailContent, _detailViewport);
         }
 
-        private void CreateTargetCard(RectTransform parent, PlannerSetupModel model, UnitSnapshot unit)
+        private void CreateSelectedBuffHeader(RectTransform parent, SetupSourceRow source)
+        {
+            RectTransform row = AddHorizontalRow(parent, 76);
+            RectTransform iconFrame = KingmakerUiFactory.CreateRect("SelectedIconFrame", row);
+            LayoutElement iconLayout = iconFrame.gameObject.AddComponent<LayoutElement>();
+            iconLayout.preferredWidth = 76;
+            iconLayout.minWidth = 76;
+            Image frame = KingmakerUiFactory.AddPanel(iconFrame, Color.white,
+                _theme.NativeCardSprite);
+            frame.raycastTarget = false;
+            Sprite icon = ResolveAbilityIcon(source);
+            if (icon != null)
+            {
+                RectTransform iconRect = KingmakerUiFactory.CreateRect("AbilityIcon", iconFrame);
+                KingmakerUiFactory.Stretch(iconRect, 7, 7, 7, 7);
+                Image image = iconRect.gameObject.AddComponent<Image>();
+                image.sprite = icon;
+                image.preserveAspect = true;
+                image.raycastTarget = false;
+            }
+            else
+            {
+                Text fallback = KingmakerUiFactory.CreateText("MissingIcon", iconFrame,
+                    _theme, "?", 30, TextAnchor.MiddleCenter);
+                fallback.color = _theme.MutedBrownText;
+                KingmakerUiFactory.Stretch(fallback.rectTransform);
+            }
+            Text title = KingmakerUiFactory.CreateText("Heading", row, _theme,
+                source.DisplayName, 24, TextAnchor.MiddleLeft);
+            title.fontStyle = FontStyle.Bold;
+            title.color = _theme.BurgundyPrimary;
+            title.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1;
+        }
+
+        private void CreateTargetCard(RectTransform parent, SetupSourceRow source,
+            PlannerSetupModel model, UnitSnapshot unit)
         {
             Button card = KingmakerUiFactory.CreateButton("Target." + unit.UnitId, parent, _theme,
                 unit.DisplayName + (unit.IsPet ? "\nPET" : string.Empty), () =>
@@ -826,11 +919,38 @@ namespace KingmakerBuffPlanner.UI
                 image.preserveAspect = true;
                 image.raycastTarget = false;
             }
-            bool wanted = model.IsTargetWanted(_routineId, unit.UnitId);
-            Image background = card.targetGraphic as Image;
-            if (background != null) background.color = wanted
-                ? _theme.BurgundyPrimary : _theme.ParchmentRaised;
-            card.interactable = model.IsAssigned(_routineId) && !_session.IsExecuting;
+            RectTransform overlayRect = KingmakerUiFactory.CreateRect("StateOverlay", rect);
+            KingmakerUiFactory.SetAnchors(overlayRect, 0.10f, 0.30f, 0.90f, 0.97f);
+            Image overlay = KingmakerUiFactory.AddPanel(overlayRect, Color.clear,
+                _theme.NativeSelectedOrnament);
+            overlay.raycastTarget = false;
+            Text mark = KingmakerUiFactory.CreateText("StateMark", overlayRect, _theme,
+                string.Empty, 25, TextAnchor.MiddleCenter);
+            mark.fontStyle = FontStyle.Bold;
+            KingmakerUiFactory.Stretch(mark.rectTransform);
+            var visual = new TargetPortraitVisual(card, overlay, mark);
+            _targetVisuals[unit.UnitId] = visual;
+            TargetPortraitViewModel target = TargetPortraitViewModel.Create(
+                source, model, _routineId, unit);
+            ApplyTargetVisual(visual, target);
+            card.interactable = target.Legal && model.IsAssigned(_routineId) &&
+                !_session.IsExecuting;
+        }
+
+        private void ApplyTargetVisual(TargetPortraitVisual visual, TargetPortraitViewModel target)
+        {
+            Color color = StatusColor(target.Status);
+            visual.Overlay.color = target.Status == PlannerPresentationStatus.Neutral
+                ? Color.clear : new Color(color.r, color.g, color.b,
+                    target.Indirect ? 0.28f : 0.58f);
+            visual.Mark.text = target.Indirect ? "•" : target.Wanted
+                ? (target.Status == PlannerPresentationStatus.Success ? "✓" : "!") :
+                target.Legal ? string.Empty : "×";
+            visual.Mark.color = target.Status == PlannerPresentationStatus.Neutral
+                ? _theme.MutedBrownText : color;
+            Image background = visual.Button.targetGraphic as Image;
+            if (background != null) background.color = target.Status == PlannerPresentationStatus.Neutral
+                ? _theme.ParchmentRaised : new Color(color.r, color.g, color.b, 0.48f);
         }
 
         private void CreateProviderRow(RectTransform parent, PlannerSetupModel model, ProviderSnapshot provider)
@@ -1166,6 +1286,20 @@ namespace KingmakerBuffPlanner.UI
                     return pet.Portrait == null ? null : pet.Portrait.SmallPortrait;
             }
             return null;
+        }
+
+        private sealed class TargetPortraitVisual
+        {
+            internal TargetPortraitVisual(Button button, Image overlay, Text mark)
+            {
+                Button = button;
+                Overlay = overlay;
+                Mark = mark;
+            }
+
+            internal Button Button { get; private set; }
+            internal Image Overlay { get; private set; }
+            internal Text Mark { get; private set; }
         }
     }
 

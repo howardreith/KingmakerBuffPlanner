@@ -143,6 +143,18 @@ namespace KingmakerBuffPlanner.UI
         public bool Legal { get; private set; }
         public bool Indirect { get; private set; }
         public PlannerPresentationStatus Status { get; private set; }
+
+        internal static TargetPortraitViewModel Create(SetupSourceRow source,
+            PlannerSetupModel model, string routineId, UnitSnapshot unit)
+        {
+            bool wanted = model.IsTargetWanted(routineId, source.SourceId, unit.UnitId);
+            bool legal = model.IsTargetLegal(source, unit.UnitId);
+            bool active = model.GetPresence(source.SourceId, unit.UnitId) ==
+                Planning.EffectPresenceKind.Complete;
+            bool fulfilled = active || (legal && model.IsSourceAvailable(source));
+            return new TargetPortraitViewModel(unit, wanted, legal, fulfilled,
+                model.IsIndirectBeneficiary(source, routineId, unit.UnitId));
+        }
     }
 
     public sealed class CastingSourceSummaryViewModel

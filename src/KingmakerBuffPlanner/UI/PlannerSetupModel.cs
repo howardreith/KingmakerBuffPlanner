@@ -130,17 +130,59 @@ namespace KingmakerBuffPlanner.UI
 
         public bool IsTargetWanted(string routineId, string unitId)
         {
+            return IsTargetWanted(routineId, SelectedSourceId, unitId);
+        }
+
+        public bool IsTargetWanted(string routineId, string sourceId, string unitId)
+        {
             SourceAssignmentProfile assignment = FindRoutine(routineId).Assignments
-                .FirstOrDefault(a => a.SourceId == SelectedSourceId);
+                .FirstOrDefault(a => a.SourceId == sourceId);
             return assignment != null && assignment.WantedTargetUnitIds.Contains(unitId);
         }
 
         public EffectPresenceKind GetPresence(string unitId)
         {
+            return GetPresence(SelectedSourceId, unitId);
+        }
+
+        public EffectPresenceKind GetPresence(string sourceId, string unitId)
+        {
             EffectExpression expression;
-            if (!_effects.TryGetValue(SelectedSourceId, out expression)) return EffectPresenceKind.Absent;
+            if (!_effects.TryGetValue(sourceId, out expression)) return EffectPresenceKind.Absent;
             return new EffectPresenceEvaluator().EvaluateTyped(expression,
                 _activeEffects.GetEffects(unitId), new HashSet<string>(StringComparer.Ordinal)).Kind;
+        }
+
+        public bool IsTargetLegal(SetupSourceRow source, string unitId)
+        {
+            if (source == null || !Snapshot.Units.Any(unit => unit.UnitId == unitId)) return false;
+            return _providerOptions.Any(option => source.Providers.Any(provider =>
+                option.Provider.Key.Equals(provider.Key)) && option.ReachableTargetIds.Contains(unitId));
+        }
+
+        public bool IsIndirectBeneficiary(SetupSourceRow source, string routineId, string unitId)
+        {
+            if (source == null || IsTargetWanted(routineId, source.SourceId, unitId)) return false;
+            EffectExpression expression;
+            if (!_effects.TryGetValue(source.SourceId, out expression) ||
+                !EffectExpressionTargetAnalysis.Contains(expression, EffectTarget.Party)) return false;
+            SourceAssignmentProfile assignment = FindRoutine(routineId).Assignments
+                .FirstOrDefault(item => item.SourceId == source.SourceId);
+            return assignment != null && assignment.WantedTargetUnitIds.Count != 0 &&
+                IsTargetLegal(source, unitId);
+        }
+
+        public void SetAllValidTargets(string routineId, bool selected)
+        {
+            SetupSourceRow source = RequireSelected();
+            SourceAssignmentProfile assignment = RequireAssignment(routineId);
+            List<string> next = selected ? Snapshot.Units
+                .Where(unit => IsTargetLegal(source, unit.UnitId))
+                .Select(unit => unit.UnitId).Distinct(StringComparer.Ordinal)
+                .OrderBy(id => id, StringComparer.Ordinal).ToList() : new List<string>();
+            if (assignment.WantedTargetUnitIds.SequenceEqual(next, StringComparer.Ordinal)) return;
+            assignment.WantedTargetUnitIds = next;
+            _save(Profile);
         }
 
         public ProviderPreferenceProfile GetProviderPreference(string providerKey)

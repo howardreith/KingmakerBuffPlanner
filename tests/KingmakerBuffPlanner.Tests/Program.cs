@@ -936,8 +936,11 @@ namespace KingmakerBuffPlanner.Tests
                 ability, "ui-presentation-free", 0);
             var validation = new TargetValidationSnapshot(true, true, true, true);
             var unit = new UnitSnapshot("unit-a", "Ret", false, string.Empty, validation);
-            var snapshot = new PartyProviderSnapshot(new[] { unit }, new[] { provider }, new[] { pool });
+            var invalidUnit = new UnitSnapshot("unit-b", "Pet", true, "unit-a", validation);
+            var snapshot = new PartyProviderSnapshot(new[] { unit, invalidUnit },
+                new[] { provider }, new[] { pool });
             BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault("campaign:ui-presentation");
+            int saves = 0;
             var options = new[]
             {
                 new ProviderPlanningOption(provider, new[] { "unit-a" },
@@ -948,7 +951,7 @@ namespace KingmakerBuffPlanner.Tests
                 new Dictionary<string, EffectExpression>
                 {
                     { ability.Canonical, Leaf("ui-presentation-effect") }
-                }, options, ignored => { });
+                }, options, ignored => saves++);
             BuffCardViewModel card = new BuffCardViewModel(model.Sources[0], model, true);
             if (card.Name.Length == 0 || card.Availability != "At will" ||
                 card.Status != PlannerPresentationStatus.Neutral || !card.Selected ||
@@ -965,9 +968,12 @@ namespace KingmakerBuffPlanner.Tests
                 card.Configuration != "1 target configured")
                 throw new InvalidOperationException("Fulfillable card state is invalid.");
             var casting = new CastingSourceSummaryViewModel(model.Sources[0], model);
-            var target = new TargetPortraitViewModel(unit, true, true, true, false);
+            int beforePreview = saves;
+            TargetPortraitViewModel target = TargetPortraitViewModel.Create(
+                model.Sources[0], model, "long", unit);
+            TargetPortraitViewModel invalidTarget = TargetPortraitViewModel.Create(
+                model.Sources[0], model, "long", invalidUnit);
             var warningTarget = new TargetPortraitViewModel(unit, true, true, false, false);
-            var invalidTarget = new TargetPortraitViewModel(unit, false, false, false, false);
             var routine = new RoutineSummaryViewModel("long", "Long", 1, 1);
             var settings = new PlannerSettingsViewModel(profile);
             if (!casting.Summary.StartsWith("Automatic", StringComparison.Ordinal) ||
@@ -975,8 +981,12 @@ namespace KingmakerBuffPlanner.Tests
                 target.Status != PlannerPresentationStatus.Success ||
                 warningTarget.Status != PlannerPresentationStatus.Warning ||
                 invalidTarget.Status != PlannerPresentationStatus.Failure ||
-                routine.Label != "Long     1/1 ready" || settings.CastingMode != "Animated")
+                routine.Label != "Long     1/1 ready" || settings.CastingMode != "Animated" ||
+                saves != beforePreview)
                 throw new InvalidOperationException("Player-facing presentation summaries are invalid.");
+            model.SetAllValidTargets("long", false);
+            if (model.IsTargetWanted("long", "unit-a") || saves != beforePreview + 1)
+                throw new InvalidOperationException("Bulk target edit did not save once.");
         }
 
         private static void TestAnimatedExecutor()

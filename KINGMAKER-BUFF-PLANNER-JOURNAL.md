@@ -558,3 +558,12 @@ Status: ROOT CAUSE PROVEN; 0.0.4 SOURCE PASS; LIVE QUALIFICATION PENDING
 - Raw provider keys and `Fact` no longer appear in card presentation. Source kinds map to Spell/Ability/Item, resource state maps to At will/prepared/available or direct player-facing failure text.
 - Added behavior coverage for neutral/warning/success cards, source summary privacy, target-state mapping, readiness text, and settings language. Full post-phase mechanical suite: source 30/30, behavior 63/63, runtime filesystem 7/7, deployment WhatIf 5/5, source-only 1/1, Release build 1/1, package 4/4.
 - Exact next action: checkpoint Phase B, then add legal/fulfilled portrait view construction, selected-buff icon hierarchy, bulk target actions, hover-only preview, and concise plan status for Phase C.
+
+## Phase C portrait target editor and details hierarchy — 2026-08-12
+
+- Added read-only presentation accessors over existing provider reachability and typed active-effect snapshots. Target legality, wanted state, fulfillability color, and indirect party-beneficiary preview do not alter requests or planner state.
+- Portrait cards now lead target editing with actual small portraits, native optional portrait selection chrome, green/amber/red/neutral overlays and ✓/!/×/indirect markers. `Select All Valid` and `Clear Targets` update the existing assignment list and save once.
+- Catalog pointer enter/exit previews target colors for the hovered source without selecting it or saving. Deterministic tests prove target view construction is mutation-free.
+- Selected details now lead with the actual spell/ability icon, player-facing source type/level/duration, description, portrait editor, and concise casts/coverage/active-skip/attention plan language.
+- Full post-phase mechanical suite: source 30/30, behavior 63/63, runtime filesystem 7/7, deployment WhatIf 5/5, source-only 1/1, Release build 1/1, package 4/4.
+- Exact next action: checkpoint Phase C, then simplify filters, routine readiness, Settings, and Casting Source disclosure while retaining all existing commands.

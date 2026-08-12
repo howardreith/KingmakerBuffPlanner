@@ -188,3 +188,10 @@ Status: INSTALLED FOR HUMAN UI RETEST — campaign UI and save-backed qualificat
 - Catalog cards resolve actual blueprint icons without changing discovery data and use a stable centralized neutral fallback. Player-facing state is derived from the existing model/profile only.
 - External state is restored and idle; installed qualified MVP 0.0.6 remains unchanged.
 - Exact next command: commit Phase B, implement Phase C portrait legality/fulfillment/hover and selected detail hierarchy, then run the complete mechanical suite.
+
+## Phase C checkpoint — 2026-08-12
+
+- Phase B commit: `c51b6c0`. Phase C source is uncommitted and mechanically green: source 30/30, behavior 63/63, harness 7/7, deployment WhatIf 5/5, build 1/1, package 4/4.
+- Portrait status/hover is presentation-only; bulk changes use the existing assignment identity/list and save once. Selected details and plans use player language.
+- External runtime remains restored and idle; installed qualified MVP is unchanged.
+- Exact next command: commit Phase C, implement Phase D primary/advanced filters, one Settings mode control, readiness summaries, collapsed Casting Source, then rerun all mechanical gates.
