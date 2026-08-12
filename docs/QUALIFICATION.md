@@ -4,15 +4,15 @@
 
 Status: PASS for automated acceptance and guarded-installed; human visual retest pending.
 
-- Release source `c2e7eb4266c4202f2406173018d249f338efb796`; package `bf64559b7980a3c0ee68dfa27a27839976fbbf3521610c0f74dc44eece39a26d`; DLL `c17af5699af3b2d099a5859b018d9d3ac6e1ee9568da76caa8f1b0313c7a86cc`; MVID `33d87046-720a-4e90-8259-27e283b10ba2`; deterministic 2/2; local-only.
+- Release source `390bb8b5f514a38edf1c553962813e29a1b526fd`; package `3eba3158aa92a6b66e249ec35aa297500eb4c5decdf73974c26992219922349c`; DLL `6999284085bd6898f6bd871900783f6f81343a6f801b2d2c95acd208c6513b56`; MVID `d2fed415-bfa2-47a7-90ba-f50fa8d1c7de`; deterministic 2/2; local-only.
 - Source validation 28/28; behavior/protocol 61/61; filesystem harness 7/7; package validation 4/4; deployment WhatIf 5/5.
-- Fresh-process physical campaigns `catalog-input-0.0.5-identity-final-physical-1` and `catalog-input-0.0.5-identity-final-physical-2`: 69/69 each, exact Working load, immutable baseline, exact Mods restoration.
+- Fresh-process physical campaigns `catalog-input-0.0.5-five-second-physical-1` and `catalog-input-0.0.5-five-second-physical-2`: 69/69 each, exact Working load, immutable baseline, exact Mods restoration. The second held a stable tooltip for 5,010 ms across 344 frames.
 - Catalog: 11 total -> 11 search -> 11 configured -> 11 duration -> 11 source -> 11 non-hidden -> 10 available -> 10 view models/rows/active rows -> 5 viewport-visible. Content `625.4x1044.0`, viewport `625.4x500.0`, details bound, no binding failure.
 - Bless: blueprint `90e59f4a4ada87243b7b3535a06d0638`, spellbook source, one provider, prepared/available, visible/active non-zero row, selected/configured. Controlled execution planned 1 but submitted/confirmed 0 and refused exactly at `material-component-unavailable`.
 - Physical input: player/movement/ability/selection/target counts all zero; selection and camera unchanged; native activation zero. Tooltip: continuous five-second hover, one enter delta, four listeners, zero raycast graphics, no raycast blocking, entirely onscreen.
 - Rebuild: 21 cycles; 22 screen creates and 22 destroys after close; balanced input lease and restored mode/selection/pause.
-- Exact-release regressions: native `catalog-input-0.0.5-identity-final-native` 12/12; Call of the Wild `catalog-input-0.0.5-identity-final-cotw` 26/26.
-- Guarded install `catalog-input-0.0.5-identity-final-install`: installed identity exact, CLR 0.0.5.0, settings preserved, every non-planner mod unchanged.
+- Exact-release regressions: native `catalog-input-0.0.5-five-second-native` 12/12; Call of the Wild `catalog-input-0.0.5-five-second-cotw` 26/26.
+- Guarded install `catalog-input-0.0.5-five-second-install`: installed identity exact, CLR 0.0.5.0, settings preserved, every non-planner mod unchanged.
 
 Failed experiments remain evidence, not passes: one managed-authority staging denial was guarded-restored; one UMM overlay-dismissal flake timed out and restored; one pre-activation install caught stale CLR 0.0.4.0 and rolled back exactly. The final candidate was rebuilt and every exact-package gate above rerun.
 

@@ -10,7 +10,7 @@ The tooltip and feedback labels had participated in the HUD `HorizontalLayoutGro
 
 Quick actions now prove pointer receipt, one listener invocation, group/profile/configuration resolution, plan refresh, validation, execution/refusal, confirmation, and visible presentation. An unexpected coroutine boundary clears executing state and displays the full failure. The final controlled Bless run correctly reported `material-component-unavailable` before submission; it did not claim application.
 
-Final gates: source 28/28; behavior/protocol 61/61; harness 7/7; package 4/4; deployment WhatIf 5/5; two physical campaign runs 69/69; native 12/12; Call of the Wild 26/26; deterministic release builds 2/2. Qualified source `c2e7eb4`; package `bf64559b...`; DLL `c17af569...`; MVID `33d87046-...`. Guarded install preserved settings and every non-planner mod.
+Final gates: source 28/28; behavior/protocol 61/61; harness 7/7; package 4/4; deployment WhatIf 5/5; two physical campaign runs 69/69; native 12/12; Call of the Wild 26/26; deterministic release builds 2/2. Qualified source `390bb8b`; package `3eba3158...`; DLL `69992840...`; MVID `d2fed415-...`. Guarded install preserved settings and every non-planner mod.
 
 ## 0.0.4 live bootstrap recovery — complete
 

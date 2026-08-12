@@ -17,6 +17,6 @@ Highlights:
 - exact native and Call of the Wild compatibility regressions;
 - CLR/UMM version-identity consistency, deterministic packaging, and guarded install with settings preserved and every other mod unchanged.
 
-Qualified source: `c2e7eb4266c4202f2406173018d249f338efb796`. Package SHA-256: `bf64559b7980a3c0ee68dfa27a27839976fbbf3521610c0f74dc44eece39a26d`. DLL SHA-256: `c17af5699af3b2d099a5859b018d9d3ac6e1ee9568da76caa8f1b0313c7a86cc`. MVID: `33d87046-720a-4e90-8259-27e283b10ba2`.
+Qualified source: `390bb8b5f514a38edf1c553962813e29a1b526fd`. Package SHA-256: `3eba3158aa92a6b66e249ec35aa297500eb4c5decdf73974c26992219922349c`. DLL SHA-256: `6999284085bd6898f6bd871900783f6f81343a6f801b2d2c95acd208c6513b56`. MVID: `d2fed415-bfa2-47a7-90ba-f50fa8d1c7de`.
 
 Automated campaign evidence shows 10 active catalog rows from 11 discovered entries, visible/available spellbook Bless, zero world/selection/camera input from physical planner clicks, stable in-screen tooltip behavior, explicit quick-action outcomes, and no duplicate objects after 21 reopen cycles. The controlled Bless execution was refused exactly at `material-component-unavailable`; it was not reported applied. Human visual confirmation remains authoritative. Publication requires separate authorization.

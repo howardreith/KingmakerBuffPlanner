@@ -2,13 +2,13 @@
 
 ## Catalog/HUD R3 complete and installed — 2026-08-12
 
-- Status: COMPLETE for automated acceptance; installed 0.0.5 is ready for authoritative human visual retest. Branch `codex/kingmaker-buff-planner`; qualified release source `c2e7eb4266c4202f2406173018d249f338efb796`; documentation-only checkpoint follows it.
-- Release identity: package `bf64559b7980a3c0ee68dfa27a27839976fbbf3521610c0f74dc44eece39a26d`; DLL `c17af5699af3b2d099a5859b018d9d3ac6e1ee9568da76caa8f1b0313c7a86cc`; MVID `33d87046-720a-4e90-8259-27e283b10ba2`; CLR version 0.0.5.0; deterministic builds 2/2; local-only.
-- Exact final campaign runs: `catalog-input-0.0.5-identity-final-physical-1` and `catalog-input-0.0.5-identity-final-physical-2`, 69/69 each. Both show 11 total entries, 10 available view models, 10 instantiated/active rows, 5 viewport-visible rows after final layout, selected details bound, and a visible/active/available spellbook Bless row.
-- Physical input evidence is `0/0/0/0/0/True/True/0` for player/movement/ability/selection/target deltas, unchanged selection/camera, and native activation. Tooltip held for 60 frames with one new enter, four listeners, zero raycast graphics, `blocksRaycasts=false`, and in-screen bounds.
+- Status: COMPLETE for automated acceptance; installed 0.0.5 is ready for authoritative human visual retest. Branch `codex/kingmaker-buff-planner`; qualified release source `390bb8b5f514a38edf1c553962813e29a1b526fd`; documentation-only checkpoint follows it.
+- Release identity: package `3eba3158aa92a6b66e249ec35aa297500eb4c5decdf73974c26992219922349c`; DLL `6999284085bd6898f6bd871900783f6f81343a6f801b2d2c95acd208c6513b56`; MVID `d2fed415-bfa2-47a7-90ba-f50fa8d1c7de`; CLR version 0.0.5.0; deterministic builds 2/2; local-only.
+- Exact final campaign runs: `catalog-input-0.0.5-five-second-physical-1` and `catalog-input-0.0.5-five-second-physical-2`, 69/69 each. Both show 11 total entries, 10 available view models, 10 instantiated/active rows, 5 viewport-visible rows after final layout, selected details bound, and a visible/active/available spellbook Bless row.
+- Physical input evidence is `0/0/0/0/0/True/True/0` for player/movement/ability/selection/target deltas, unchanged selection/camera, and native activation. Tooltip held continuously for 5,010 ms across 344 frames with one new enter, four listeners, zero raycast graphics, `blocksRaycasts=false`, and in-screen bounds.
 - Empty Long/Important/Short outcomes are explicit. Configured Bless produced exact refusal `FailedValidation ... material-component-unavailable`, with planned 1, submitted 0, confirmed 0; no success was claimed.
-- Native run `catalog-input-0.0.5-identity-final-native` passed 12/12; Call of the Wild `catalog-input-0.0.5-identity-final-cotw` passed 26/26. All Mods restorations verified. Immutable baseline remains `afca8ac5e42219bc50f428eb334a657cbcc2e31e8f2eb39c6ab53691cbb076d3`; only Working changed through permitted game loads.
-- Install `catalog-input-0.0.5-identity-final-install` is `Installed`; external settings preserved and every non-planner mod unchanged. No Kingmaker process or unresolved transaction remains.
+- Native run `catalog-input-0.0.5-five-second-native` passed 12/12; Call of the Wild `catalog-input-0.0.5-five-second-cotw` passed 26/26. All Mods restorations verified. Immutable baseline remains `afca8ac5e42219bc50f428eb334a657cbcc2e31e8f2eb39c6ab53691cbb076d3`; only Working changed through permitted game loads.
+- Install `catalog-input-0.0.5-five-second-install` is `Installed`; external settings preserved and every non-planner mod unchanged. No Kingmaker process or unresolved transaction remains.
 - Exact next action: human retest installed 0.0.5 using the checklist in `docs/MANUAL-ACCEPTANCE.md`; do not rebuild, merge, or publish this qualified binary.
 
 ## Catalog/HUD R3 physical qualification checkpoint — 2026-08-12

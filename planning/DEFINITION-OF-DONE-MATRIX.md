@@ -17,7 +17,7 @@
 | Package/install | PASS | Deterministic 2/2 local-only ZIP; guarded install exact; settings preserved; other mods unchanged. |
 | Human visual confirmation | PENDING HUMAN | Installed 0.0.5 awaits authoritative check for smooth tooltip appearance and ordinary interaction. |
 
-Qualified source: `c2e7eb4266c4202f2406173018d249f338efb796`. Package: `bf64559b7980a3c0ee68dfa27a27839976fbbf3521610c0f74dc44eece39a26d`. DLL: `c17af5699af3b2d099a5859b018d9d3ac6e1ee9568da76caa8f1b0313c7a86cc`. MVID: `33d87046-720a-4e90-8259-27e283b10ba2`.
+Qualified source: `390bb8b5f514a38edf1c553962813e29a1b526fd`. Package: `3eba3158aa92a6b66e249ec35aa297500eb4c5decdf73974c26992219922349c`. DLL: `6999284085bd6898f6bd871900783f6f81343a6f801b2d2c95acd208c6513b56`. MVID: `d2fed415-bfa2-47a7-90ba-f50fa8d1c7de`.
 
 ## 0.0.4 live-bootstrap recovery correction
 
