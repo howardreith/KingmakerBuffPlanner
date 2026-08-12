@@ -27,7 +27,14 @@ $buildManifest = Read-KbpBuildManifest $package
 $compatibilityProfile = Get-KbpCompatibilityProfile $CompatibilityProfileId
 Assert-KbpCompatibilityProfileFixtures -Profile $compatibilityProfile
 $expectedOptionalMods = @($compatibilityProfile.mods | ForEach-Object {
-    [ordered]@{ ummId = $_.ummId; version = $_.version; assemblyName = $_.assemblyName; assemblySha256 = $_.assemblySha256 }
+    [ordered]@{
+        ummId = $_.ummId
+        version = $_.version
+        assemblyName = $_.assemblyName
+        assemblySha256 = if ($_.PSObject.Properties.Name -contains 'loadedAssemblySha256') {
+            $_.loadedAssemblySha256
+        } else { $_.assemblySha256 }
+    }
 })
 $savePair = if ($Scenario -ceq 'live-ui-bootstrap') { Get-KbpDisposableSavePair } else { $null }
 $steamSafety = Assert-KbpSteamSafety -SteamPath $SteamPath

@@ -133,6 +133,14 @@ namespace KingmakerBuffPlanner.UI
         internal static void BeginRuntimeSmoke()
         {
             if (_instance == null) throw new InvalidOperationException("UI root is absent.");
+            CaptureRuntimeBaseline();
+            _instance._runtimeOpenCycles++;
+            if (StaticCanvas.Instance != null) _instance._screen.Open();
+        }
+
+        internal static void CaptureRuntimeBaseline()
+        {
+            if (_instance == null) throw new InvalidOperationException("UI root is absent.");
             if (!_instance._runtimeBaselineCaptured)
             {
                 _instance._runtimeBaselineCaptured = true;
@@ -142,8 +150,6 @@ namespace KingmakerBuffPlanner.UI
                 _instance._runtimeSelectionDisabledBefore = SelectionManager.Instance != null &&
                     SelectionManager.Instance.IsDisabled;
             }
-            _instance._runtimeOpenCycles++;
-            if (StaticCanvas.Instance != null) _instance._screen.Open();
         }
 
         internal static void ReconstructRuntimeSmoke()

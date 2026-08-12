@@ -156,6 +156,12 @@ foreach ($physicalContract in @('umm-overlay-ready.json',
 }
 $assertions++
 
+if (-not $runtimeHostSource.Contains('CaptureRuntimeBaseline();') -or
+    -not $runtimeScriptSource.Contains('loadedAssemblySha256')) {
+    throw 'Live qualification must capture pre-F10 state and distinguish an exact UMM cache assembly from its primary fixture file.'
+}
+$assertions++
+
 $executionSource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\Execution\ExecutionModels.cs') -Raw
 $sessionSource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\UI\PlannerUiSession.cs') -Raw
 if ($executionSource.Contains('CastExecutionStatus.Fired') -or $sessionSource.Contains('; fired=') -or

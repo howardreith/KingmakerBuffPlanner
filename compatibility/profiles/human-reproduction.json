@@ -32,6 +32,7 @@
       "assemblyName": "CheatMenu.dll",
       "infoSha256": "c53e29e5ec0d221be4dfea1228f27cacd99660e75124b61f4f81afa3ef2a0274",
       "assemblySha256": "7d659eb092073ab9e059414f8bfbdfe46991cede56b394f58f7ea2bcc1ff0845",
+      "loadedAssemblySha256": "8a7525e061cbe4ad83ec2720e9ee97f9b536a6cd8e7dadee3a44ef2ea9343b84",
       "directoryManifestSha256": "784e33400f595e72b6f78db620f564ba9e9dfe66749e79d19acc0eaca9fc6bad",
       "fileCount": 3,
       "totalBytes": 30594

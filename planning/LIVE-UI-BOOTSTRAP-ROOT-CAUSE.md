@@ -59,6 +59,8 @@ Run `bootstrap-0.0.4-human-live-3` verified that `ignoreLayout` clears the row-a
 
 Run `bootstrap-0.0.4-human-live-4` then reached valid screen-space hit lists. Their top entry was consistently `UMM blocking UI/Image`. Exact installed UMM 0.28.2 parameters set `ShowOnStart` to `1` and define no manager hotkey, so an unattended fresh process retains the manager's deliberate blocking overlay even after programmatic campaign load. This is not a KBP graphic-registration failure: the UMM surface correctly owns the pointer while open. The qualification harness now uses a runtime-authored exact blocker marker to send a physical Escape to the foreground process, then waits for KBP top-hit ownership before requesting physical F10. It does not modify UMM parameters or third-party files.
 
+Run `bootstrap-0.0.4-human-live-5` completed the full UI exercise. It proved one active four-button row, an independently armed and physically observed F10 handler, a visible/opaque/raycast-owning planner, 21 open/close cycles with balanced destruction and input-lease release, no duplicate full-screen object, no click-through or world command, and one exact Working-save load. The result remained FAIL only on evidence accounting: mode/selection baseline was sampled after physical F10 had already acquired the planner lease, and exact UMM loaded Cheat Menu's `CheatMenu.dll.62154.cache` SHA-256 `8a7525e0...` while the profile expected the primary `CheatMenu.dll` SHA-256 `7d659eb0...`. The harness now captures baseline before writing the F10 marker and separately binds the exact loaded cache hash without weakening primary-file or directory-manifest fixture checks.
+
 ## Rejected theories
 
 - Wrong or stale installed DLL: rejected by exact SHA-256 and MVID agreement.

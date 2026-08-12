@@ -670,6 +670,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 if (StaticCanvas.Instance == null ||
                     UnityEngine.EventSystems.EventSystem.current == null ||
                     !BuffPlannerUiRoot.IsHudInstalled) return false;
+                BuffPlannerUiRoot.CaptureRuntimeBaseline();
                 if (!_liveF10MarkerWritten)
                 {
                     AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory, "f10-ready.json"),
