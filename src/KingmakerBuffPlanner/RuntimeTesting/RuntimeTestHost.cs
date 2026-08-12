@@ -37,6 +37,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private string _liveInitialCatalogEvidence = string.Empty;
         private bool _liveBlessSelectedAndConfigured;
         private int _liveCameraSettleFrames;
+        private int _liveHoverEnterBaseline;
 
         private RuntimeTestHost(
             RuntimeTestRequest request,
@@ -807,6 +808,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 _liveCameraSettleFrames++;
                 if (_liveCameraSettleFrames < 120) return false;
                 BuffPlannerUiRoot.BeginPhysicalInputProbe();
+                QuickFlowDiagnostics baselineFlow =
+                    BuffPlannerUiRoot.QuickFlowForRuntime("long");
+                _liveHoverEnterBaseline = baselineFlow == null ? 0 :
+                    baselineFlow.PointerEnters;
                 WritePhysicalInputRequest("hover-long", "hover",
                     BuffPlannerUiRoot.HudButtonCenterForRuntime("long"));
                 _liveUiPhase = 2;
@@ -828,19 +833,21 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 }
                 if (!tooltip.InsideScreen || tooltip.ListenerCount != 4 ||
                     tooltip.RaycastGraphicCount != 0 || tooltip.BlocksRaycasts ||
-                    flow == null || flow.PointerEnters != 1)
+                    flow == null || flow.PointerEnters != _liveHoverEnterBaseline + 1)
                     throw new InvalidOperationException("Tooltip ownership is invalid: active=" +
                         tooltip.Active + ";inside=" + tooltip.InsideScreen + ";listeners=" +
                         tooltip.ListenerCount + ";raycastGraphics=" + tooltip.RaycastGraphicCount +
                         ";blocks=" + tooltip.BlocksRaycasts + ";enters=" +
-                        (flow == null ? -1 : flow.PointerEnters) + ";bounds=" + tooltip.Bounds);
+                        (flow == null ? -1 : flow.PointerEnters) + ";baseline=" +
+                        _liveHoverEnterBaseline + ";bounds=" + tooltip.Bounds);
                 _liveTooltipStableFrames++;
                 if (_liveTooltipStableFrames < 60) return false;
                 _liveTooltipStable = true;
                 _liveTooltipEvidence = "frames=" + _liveTooltipStableFrames + ";bounds=" +
                     tooltip.Bounds + ";listeners=" + tooltip.ListenerCount +
                     ";raycastGraphics=" + tooltip.RaycastGraphicCount + ";blocks=" +
-                    tooltip.BlocksRaycasts + ";pointerEnters=" + flow.PointerEnters;
+                    tooltip.BlocksRaycasts + ";pointerEnterDelta=" +
+                    (flow.PointerEnters - _liveHoverEnterBaseline);
                 WritePhysicalInputRequest("click-long-empty", "click",
                     BuffPlannerUiRoot.HudButtonCenterForRuntime("long"));
                 _liveUiPhase = 3;
