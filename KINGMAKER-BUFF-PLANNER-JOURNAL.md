@@ -1,5 +1,12 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-08-12 — first 0.0.5 campaign diagnostic and exact contract correction
+
+- `catalog-input-0.0.5-live-diag-1` failed before callback registration: exact 2.1.7b IL has `PointerController.get_InGui`, but reflection exposes no `PropertyInfo` for `InGui`. The first repair incorrectly required that metadata row.
+- The timed-out harness left only its owned PID 4148 running and restoration blocked by design. After reading the exact exception, that PID alone was terminated and guarded restoration returned `verified=True`; installed 0.0.4 and every other mod were restored.
+- Commit `157b1d8` resolves the exact method directly and assigns UMM callbacks before the fail-soft Harmony attempt, preserving independently armed F10 even if the scoped patch fails.
+- Corrected local gates remain source `27/27`, protocol `60/60`, harness filesystem `7/7`, package `4/4`, deployment WhatIf `5/5`.
+
 ## 2026-08-12 — catalog/HUD input/tooltip R3 human rejection and read-only intake
 
 Status: 0.0.4 PARTIAL HUMAN PASS; FOUR RELEASE BLOCKERS CONFIRMED; SOURCE REPAIR PENDING

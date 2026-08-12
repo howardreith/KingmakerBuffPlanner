@@ -1,5 +1,11 @@
 # Autonomous Resume
 
+## Catalog/HUD R3 first live correction — 2026-08-12
+
+- Current implementation HEAD is `157b1d8`; the first 0.0.5 run `catalog-input-0.0.5-live-diag-1` failed in `Main.Load` because exact `get_InGui` has no `PropertyInfo` metadata row. The direct `GetMethod` correction and callback-first fail-soft ordering pass all local gates.
+- Transaction `catalog-input-0.0.5-live-diag-1` is restored and verified after terminating only its owned PID 4148. No Kingmaker process, active lock, or unrestored state remains.
+- Exact next action: commit these evidence records, rebuild the clean 0.0.5 package from that commit, and run fresh `catalog-input-0.0.5-live-diag-2`.
+
 ## Catalog/HUD input/tooltip R3 implementation checkpoint — 2026-08-12
 
 - Status: IN PROGRESS. Root cause evidence is committed at `f99f0b1`; the first repair implementation is committed at `06ac7177d0b63e4f77ea7e25347c035bc4342cf5` on `codex/kingmaker-buff-planner`; version is `0.0.5`.

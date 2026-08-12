@@ -78,3 +78,16 @@ The narrow repair boundary is the exact `PointerController.InGui` decision, cond
 5. Add planner-owned pointer-region capture at the exact Kingmaker `InGui` boundary, conditional only inside KBP regions.
 6. Refresh the campaign session independently for quick actions and emit exact ordered stage/result feedback.
 7. Replace synthetic-only acceptance with physical hover/click evidence plus command, selection, camera, row, details, Bless, duplicate, and save-safety assertions in fresh disposable campaigns.
+
+## First 0.0.5 campaign diagnostic correction
+
+Run `catalog-input-0.0.5-live-diag-1` never reached campaign UI because `Main.Load`
+failed at the new pointer patch. Exact runtime exception:
+`MissingMethodException: Kingmaker.Controllers.Clicks.PointerController.get_InGui`.
+The inspected 2.1.7b IL did contain that method, but reflection proved there is no
+corresponding `PropertyInfo` metadata row. The repair now resolves the method directly
+with `GetMethod("get_InGui", ..., Type.EmptyTypes, ...)`. Callback assignment precedes
+the fail-soft Harmony attempt so an unexpected patch failure cannot disable F10 again.
+Only the owned PID 4148 was terminated after the bounded timeout; guarded restoration
+reported `verified=True` for the exact transaction. No catalog conclusion is drawn from
+this pre-bootstrap failure.
