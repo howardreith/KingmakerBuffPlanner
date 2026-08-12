@@ -1,5 +1,14 @@
 # Autonomous Resume
 
+## Live row rendering recovery intake — 2026-08-12
+
+- Status: IN PROGRESS. Human evidence invalidates 0.0.5 row/details visibility while preserving HUD icons, tooltips, pointer isolation, F10, opaque modal, and close/input/HUD restoration.
+- Branch/HEAD: `codex/kingmaker-buff-planner` / `94cbca8810d908d320eec0a2ca89533c7d4e0e05`; source/installed version remains 0.0.5 at intake. Worktree contains the user-supplied live-row mission and the independent intake record.
+- Exact installed identity: package `3eba3158aa92a6b66e249ec35aa297500eb4c5decdf73974c26992219922349c`; DLL `6999284085bd6898f6bd871900783f6f81343a6f801b2d2c95acd208c6513b56`; MVID `d2fed415-bfa2-47a7-90ba-f50fa8d1c7de`.
+- Earliest unproven stage: both blank panes share `ScrollRect/Viewport/Mask/Content`; no prior CanvasRenderer, stencil/clip, or pixel evidence exists. Internal active/geometry/intersection values are invalidated as visibility proof.
+- External state: Kingmaker/UMM closed; latest runtime transactions restored and verified; no top-level lock; installed 0.0.5 unchanged.
+- Exact next command: implement the temporary same-Content render canary plus screenshot/render-chain diagnostics, build an exact diagnostic package, and run one guarded `live-ui-bootstrap` pass against `KBP_AUTOMATION_WORKING`.
+
 ## Catalog/HUD R3 complete and installed — 2026-08-12
 
 - Status: COMPLETE for automated acceptance; installed 0.0.5 is ready for authoritative human visual retest. Branch `codex/kingmaker-buff-planner`; qualified release source `390bb8b5f514a38edf1c553962813e29a1b526fd`; documentation-only checkpoint follows it.

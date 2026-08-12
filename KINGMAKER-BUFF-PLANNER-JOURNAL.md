@@ -1,5 +1,18 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-08-12 — live row-rendering human rejection and independent intake
+
+Status: 0.0.5 PARTIAL HUMAN PASS; ACTUAL ROW/DETAIL PIXELS FAIL; RECOVERY IN PROGRESS
+
+- Starting branch/HEAD/version: `codex/kingmaker-buff-planner` / `94cbca8810d908d320eec0a2ca89533c7d4e0e05` / 0.0.5. The only initial worktree entry was the user-supplied live-row recovery mission.
+- Preserved human PASS: four HUD icons, stable tooltips, HUD pointer isolation, F10, opaque modal, and close/input/HUD restoration. Native/Call of the Wild discovery and persistence remain frozen.
+- Human screenshots `c47c383...` and `e01d40ee...` visibly show the catalog summary `10 of 11 shown` while both scrollable content panes contain no row or details pixels.
+- The prior 10 instantiated/active, five viewport-overlapping, details-bound, and `rowVisible=True` evidence is reclassified as internal object/geometry state, not rendering proof. The old runs remain valid only for mechanics they directly observed.
+- Exact shared hierarchy is `ScrollRect -> Viewport(Image alpha 0.001 + Mask) -> Content(VerticalLayoutGroup)` for both blank panes. The earliest unproven stage is CanvasRenderer/material/stencil/clip/pixel output beneath those masks. Theme text outside the masks renders.
+- Installed identity remains exact: package `3eba3158...`; DLL `69992840...`; MVID `d2fed415-bfa2-47a7-90ba-f50fa8d1c7de`. No process, lock, or unrestored transaction exists.
+- Rejected theories: missing discovery, default filters, or a hardcoded Bless gap. The live header proves the catalog exists and both blank panes share a later rendering boundary.
+- Exact next action: add the temporary mission-defined canary under the live source Content, emit full CanvasRenderer/font/material/mask/canvas diagnostics, and capture a real disposable-campaign screenshot before changing production rows.
+
 ## 2026-08-12 — 0.0.5 catalog/HUD/input/tooltip repair complete
 
 - Authoritative intake was a human PARTIAL PASS: the four-button row and opaque F10 planner worked; the catalog/details were blank despite 11 sources/providers, HUD clicks reached the world, quick actions were silent, and the tooltip flickered/offscreen.
