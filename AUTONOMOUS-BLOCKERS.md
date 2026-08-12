@@ -1,5 +1,7 @@
 # Autonomous Blockers
 
+Live row-rendering recovery final status, 2026-08-12: COMPLETE; no critical blocker. Exact 0.0.6 passed two fresh-process screenshot/physical campaigns (71/71 each), native 12/12, and Call of the Wild 26/26. Bless confirmed and spent under the corrected native material contract. Every transaction restored, the guarded install preserved settings and all non-planner mods, and no process/lock remains. Final human visual confirmation is the handoff, not an automated blocker.
+
 Catalog/HUD/input/tooltip repair final status, 2026-08-12: COMPLETE; no critical blocker. Exact 0.0.5 passed two fresh-process physical campaign runs (69/69 each), native (12/12), and Call of the Wild (26/26), with every transaction restored. Guarded install preserved settings and all non-planner mods. Human visual retest is the remaining handoff, not an automated qualification blocker. Historical blocker sections below remain records only.
 
 Live-bootstrap recovery final status, 2026-08-12: COMPLETE; no critical blocker. Two exact disposable-save fresh-process runs pass 65/65, native and Call of the Wild regressions pass, all runtime transactions restored, and guarded 0.0.4 installation preserved settings and every non-planner mod. Older pending/blocker sections below are historical project records and do not reopen this bounded recovery mission.

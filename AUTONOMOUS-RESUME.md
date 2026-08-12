@@ -1,5 +1,13 @@
 # Autonomous Resume
 
+## Live row-rendering recovery complete — 2026-08-12
+
+- Status: COMPLETE and guarded-installed for human handoff. Qualified release source is `e656812572adea8bc312419372b61ee8c4834e5a`; package `ce7492b262f01a9afb5a7666fe7e4bda9be1821395eb00244f5898b6882208e9`; DLL `6144256c6a0623e908c3d9e821a1b87ee5800195759fbfabb1e587eaf9be1d9b`; MVID `bff11809-aa53-42c2-8ab7-ef3564450e61`.
+- Two exact-package fresh processes (`production-3`, `production-4`) passed 71/71 and restored. Screenshot `cb234368...` visibly shows ten production rows and selected Bless details; canary absent; first-five row luminance ranges `162,159,184,163,157`, title `125`.
+- Native 12/12 and Call of the Wild 26/26 passed/restored. Deterministic release 2/2 and package 4/4 passed. Guarded install `row-render-0.0.6-install` reports settings preserved and all other mods unchanged; installed CLR is 0.0.6.0; no process or lock remains.
+- Final documentation-only checkpoint follows the release source and must not be mistaken for a rebuilt binary. No merge/push/publication is authorized or performed.
+- Exact next action: human opens installed 0.0.6 and follows `docs/MANUAL-ACCEPTANCE.md`; report only a visual difference from screenshot hash `cb234368...` or a regression in the preserved HUD/input lifecycle.
+
 ## Production run 2 duplicate-gate checkpoint — 2026-08-12
 
 - Run `row-render-0.0.6-production-2` (`877c618`, package `674733b8...`, DLL `642d4df9...`) has 71/71 named assertions PASS, confirmed Bless `1/1/1/1/1`, and production screenshot SHA-256 `cb2343683ebc4d3dfbb066de4b030c1745c518063354a6357a331a6d53d75c19`, but overall status FAIL because a duplicated aggregate condition still required the spent Bless row to remain visible.

@@ -1,5 +1,21 @@
 # Qualification
 
+## 0.0.6 live row-rendering recovery
+
+Status: PASS for automated visual/runtime acceptance; guarded-installed for human handoff; local-only.
+
+- Release source `e656812572adea8bc312419372b61ee8c4834e5a`; package `ce7492b262f01a9afb5a7666fe7e4bda9be1821395eb00244f5898b6882208e9`; DLL `6144256c6a0623e908c3d9e821a1b87ee5800195759fbfabb1e587eaf9be1d9b`; MVID `bff11809-aa53-42c2-8ab7-ef3564450e61`; CLR 0.0.6.0; deterministic builds 2/2; publication `local-only`.
+- Root cause A/B: `row-render-0.0.6-canary-3` screenshot `4b3f7e05...` showed neither the same-Content canary nor real rows while their renderers were non-culled; `row-render-0.0.6-canary-fixed-1` screenshot `71a6bbf...` showed the magenta canary, real rows, and details after making the hidden Mask source opaque. The alpha-clipped 0.001 Mask source had failed to write the stencil consumed by both panes.
+- The canary is absent from production. The existing programmatic Unity `Button`/`Image`/`Text`/`LayoutElement` rows use Arial, explicit readable colors/heights, and `UI/Default`; actual row height is 42 pixels. Summary text distinguishes matched view models from bound rows.
+- Fresh-process physical campaign runs `row-render-0.0.6-production-3` and `row-render-0.0.6-production-4`: 71/71 each, exact Working load, physical F10/mouse input, 21 reopen cycles, and exact Mods restoration. Both captured screenshot SHA-256 `cb2343683ebc4d3dfbb066de4b030c1745c518063354a6357a331a6d53d75c19` with ten readable rows and selected Bless details.
+- First five names/rectangles: Bless `63.7,441.5-475.3,469.5`; Bless `63.7,410.8-475.3,438.8`; Channel Positive Energy — Heal Living `63.7,380.2-475.3,408.2`; Guidance `63.7,349.5-475.3,377.5`; Light `63.7,318.8-475.3,346.8`. Selected row and details title are both Bless.
+- Independent screenshot measurements: row luminance ranges `162,159,184,163,157`, with `190–360` distinct ARGB values; details-title range `125` with 53 colors. Runtime evidence separately records alpha 1, inherited alpha 1, `rendererCull=False`, Arial, `UI/Default`, stencil equality, opaque hidden mask source, canvas, hierarchy, sibling order, and rectangles.
+- Exact native Bless contract is `require=False,item=none,count=1,hasEnough=False,consumableRequired=False`. The old unconditional sufficiency check was invalid. Both final runs planned/submitted/started/confirmed/spent `1/1/1/1/1`, observed the expected Bless effect, and then correctly reported the prepared slot exhausted.
+- Local gates: source 30/30; behavior/protocol 62/62; runtime filesystem 7/7; deployment WhatIf 5/5; package 4/4. Exact-release regressions: native `row-render-0.0.6-native-final` 12/12; Call of the Wild `row-render-0.0.6-cotw-final` 26/26, 2,096 optional inclusions, zero unsupported, zero planner Harmony overlap. Every runtime transaction restored exactly; immutable baseline stayed `afca8ac5...`.
+- Guarded install `row-render-0.0.6-install`: `Installed`; exact DLL/MVID/CLR; `settingsPreserved=true`; `otherModsVerified=true`; no lock or process remains.
+
+The diagnostic attempts `production-1` and `production-2` are not counted as final passes: they exposed two copies of a stale assertion requiring spent Bless to remain available. Their transactions restored exactly, and the final exact binary passed twice after the gate was corrected.
+
 ## 0.0.5 catalog/HUD/input/tooltip repair
 
 Status: PASS for automated acceptance and guarded-installed; human visual retest pending.

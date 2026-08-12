@@ -1,5 +1,22 @@
 # Manual Acceptance
 
+## 0.0.6 installed handoff
+
+Status: automated production screenshot/runtime acceptance PASS twice; 0.0.6 is guarded-installed for final human confirmation.
+
+Installed identity: source `e656812572adea8bc312419372b61ee8c4834e5a`; package `ce7492b262f01a9afb5a7666fe7e4bda9be1821395eb00244f5898b6882208e9`; DLL `6144256c6a0623e908c3d9e821a1b87ee5800195759fbfabb1e587eaf9be1d9b`; MVID `bff11809-aa53-42c2-8ab7-ef3564450e61`; CLR 0.0.6.0.
+
+Please load the same campaign and confirm:
+
+1. The accepted four HUD icons/tooltips/pointer isolation remain unchanged.
+2. Setup or F10 opens the opaque planner with ten readable list rows and selected Bless details, matching screenshot SHA-256 `cb234368...` in both final automated runs.
+3. Search/filter/reset and row selection update the visible list/details normally; the header says `10 matched | 10 rows bound`, not that internal models were “shown.”
+4. No magenta diagnostic canary appears.
+5. Long applies the configured prepared Bless and reports a confirmed effect; it must not refuse for a material component. A later attempt may correctly report the spent resource pool exhausted.
+6. Close/Escape/F10 restores HUD, selection, camera, pause, and mode without duplicates.
+
+If anything differs, provide a screenshot plus the exact installed identity above. No public release has been made.
+
 ## 0.0.5 installed handoff
 
 Status: automated catalog/HUD/input/tooltip acceptance PASS twice; 0.0.5 is guarded-installed for authoritative human visual confirmation.

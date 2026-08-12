@@ -1,6 +1,14 @@
 # Architecture
 
-Status: 0.0.5 catalog/HUD/input/tooltip architecture qualified twice in real campaigns and guarded-installed
+Status: 0.0.6 live row-rendering architecture qualified twice with screenshots and guarded-installed
+
+## 0.0.6 masked scroll rendering and visual evidence
+
+Both catalog panes use `ScrollRect -> Viewport(Image + Mask) -> Content`. `Mask.showMaskGraphic=false` suppresses viewport color through the UI stencil material's color mask; the source Image remains opaque so alpha clipping cannot prevent the stencil write. Child rows/details use the standard `UI/Default` material and stencil equality. Layout elements set a positive RectTransform height and the vertical group controls child height.
+
+Runtime visual qualification is intentionally outside production-domain logic. The campaign host selects the first real row, waits for rendered frames, captures a PNG, and exports names, screen rectangles, selected/details text, CanvasRenderer, alpha, font, material, mask, canvas, parent, sibling, and layout evidence. The external guarded harness verifies the screenshot hash and independently samples every first-five row rectangle plus the details title for non-uniform, high-contrast pixels. Active objects, geometry, intersection flags, and code-authored visibility booleans are never sufficient by themselves.
+
+Material-component planning and execution share Kingmaker's requirement boundary. A consumable reservation exists only for a positive-count item when `RequireMaterialComponent` is true. Runtime sufficiency is evaluated lazily under the same flag; native `AbilityData.Spend()` remains responsible for actual spending.
 
 ## 0.0.5 catalog presentation and pointer ownership
 

@@ -58,4 +58,4 @@ The production renderer remains a fresh programmatic Unity `Button`/`Image`/`Tex
 
 ## Exact next action
 
-Commit the canary removal, explicit production row sizing, screenshot-pixel gate, and generic material-component correction; then perform final clean-build native/Call of the Wild and two fresh-process production screenshot runs.
+Recovery is complete. Qualified source `e656812572adea8bc312419372b61ee8c4834e5a` passed two canary-free screenshot campaigns, native and Call of the Wild regressions, deterministic packaging, and guarded installation. The remaining action is the installed 0.0.6 human handoff; no merge or publication is authorized.

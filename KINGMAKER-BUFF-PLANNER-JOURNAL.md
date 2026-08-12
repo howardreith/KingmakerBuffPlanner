@@ -1,5 +1,17 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-08-12 — 0.0.6 live row recovery qualified, packaged, and installed
+
+Status: COMPLETE; HUMAN HANDOFF READY; LOCAL-ONLY
+
+- Qualified release source is `e656812572adea8bc312419372b61ee8c4834e5a`; deterministic package `ce7492b262f01a9afb5a7666fe7e4bda9be1821395eb00244f5898b6882208e9`; DLL `6144256c6a0623e908c3d9e821a1b87ee5800195759fbfabb1e587eaf9be1d9b`; MVID `bff11809-aa53-42c2-8ab7-ef3564450e61`; CLR 0.0.6.0.
+- Final fresh-process campaigns `row-render-0.0.6-production-3` and `row-render-0.0.6-production-4` passed 71/71 each against that exact package. Both captured canary-free screenshot SHA-256 `cb2343683ebc4d3dfbb066de4b030c1745c518063354a6357a331a6d53d75c19`, with ten readable rows, selected Bless details, first-five rectangles, and independent pixel contrast.
+- Exact Bless material data is `require=False,item=none,count=1,hasEnough=False,consumableRequired=False`. Both runs confirmed planned/submitted/started/effect/spent `1/1/1/1/1`; the expected Bless fact appeared and the spent prepared pool then became unavailable normally.
+- Accepted mechanics remained intact: four HUD controls, physical F10, five-second stable tooltip, zero player/movement/ability/selection/target/native click leakage, unchanged selection/camera, 21 reopen cycles, balanced input/mode/pause restoration, persistence, and 11-source/11-provider discovery.
+- Exact-release native `row-render-0.0.6-native-final` passed 12/12. Call of the Wild `row-render-0.0.6-cotw-final` passed 26/26 with 2,096 optional inclusions, zero unsupported, and zero planner Harmony overlap. All four final transactions restored exactly; baseline remained `afca8ac5...`.
+- Local gates are source 30/30, behavior 62/62, harness 7/7, deployment WhatIf 5/5, package 4/4, deterministic build 2/2. Guarded install `row-render-0.0.6-install` is `Installed`, settings preserved, every non-planner mod verified unchanged, lock absent, processes zero.
+- No merge, push, or public release occurred. Exact next action is the short 0.0.6 human checklist in `docs/MANUAL-ACCEPTANCE.md`.
+
 ## 2026-08-12 — production run 2 exposes duplicated aggregate gate
 
 Status: ALL 71 ASSERTIONS PASS; OVERALL FAIL FROM STALE DUPLICATED CONDITION; RESTORED

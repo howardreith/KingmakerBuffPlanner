@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.0.6 — live row-rendering recovery
+
+- Repaired both empty scroll panes by keeping their visually hidden Unity Mask source opaque so it writes the stencil consumed by row/detail graphics.
+- Added and removed a high-contrast same-Content diagnostic canary after an actual live screenshot A/B isolated the viewport path.
+- Enforced explicit positive row/detail heights and report matched versus actually bound rows.
+- Capture real campaign screenshots with five expected names/rectangles, selected details, CanvasRenderer/font/material/mask evidence, hash, and independent pixel contrast.
+- Corrected generic material validation to check inventory sufficiency only when Kingmaker reports a consumable component requirement; native Bless now confirms and spends normally.
+- Preserved HUD icons, stable tooltips, pointer isolation, F10, opaque modal, lifecycle restoration, persistence, native discovery, and Call of the Wild support.
+
 ## 0.0.5 - catalog, HUD input, quick-action, and tooltip repair
 
 - Trace every live catalog/filter/layout stage and surface binding or empty-state reasons instead of a blank pane.

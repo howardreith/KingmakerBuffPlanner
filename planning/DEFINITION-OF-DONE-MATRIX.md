@@ -1,5 +1,19 @@
 # Definition of Done Matrix
 
+## 0.0.6 live row-rendering recovery
+
+| Criterion | Result | Exact evidence |
+|---|---|---|
+| Independent renderer-path audit | PASS | A/B canary screenshots `4b3f7e05...` absent and `71a6bbf...` visible; full mask/stencil/renderer/font/material/canvas evidence. |
+| Production rows and details visible | PASS | `production-3` and `production-4`, 71/71 each; screenshot `cb234368...`; ten named rows and Bless details visibly rendered. |
+| Pixel proof independent of UI booleans | PASS | Five row luminance ranges `162,159,184,163,157`; details title `125`; exact rectangles/hash in `live-row-pixel-evidence.json`. |
+| Canary removed | PASS | Production diagnostics `canary=absent`; source validator rejects canary construction; final screenshots contain none. |
+| Bless generic accounting | PASS | Native data `require=False,item=none,count=1,hasEnough=False`; lazy gate test; live confirmed/spent `1/1` twice. |
+| Preserve accepted UI/input/lifecycle | PASS | Both final physical runs retain four HUD controls, five-second tooltip, zero world/selection/camera/native leakage, 21 cycles, balanced close/restoration. |
+| Discovery and compatibility | PASS | Counts remain 11/11; native 12/12; Call of the Wild 26/26, zero unsupported/overlap. |
+| Package/install | PASS | Source `e656812`; deterministic package `ce7492b2...`; DLL `6144256c...`; MVID `bff11809-...`; guarded install preserves settings/other mods. |
+| Public release | NOT AUTHORIZED | Package is local-only; no merge or publication performed. |
+
 ## 0.0.5 catalog/HUD/input/tooltip repair
 
 | Criterion | Result | Exact evidence |

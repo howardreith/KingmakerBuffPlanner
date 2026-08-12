@@ -1,5 +1,15 @@
 # Implementation Report
 
+## 0.0.6 live row rendering and Bless material correction — complete
+
+The human-tested 0.0.5 screen proved discovery was populated but showed no list or details pixels. An independent same-Content canary also disappeared despite a live CanvasRenderer, valid geometry, alpha 1, Arial, the default UI shader, and correct canvas/sibling state. Both panes shared a `Mask` whose hidden source Image used alpha 0.001 with alpha clipping enabled; it did not reliably write the stencil required by child graphics. Keeping `showMaskGraphic=false` while making the source opaque restores the stencil without drawing the mask itself.
+
+The existing row renderer already matched the mission fallback: fresh programmatic Unity `Button`, `Image`, `Text`, and `LayoutElement` components, a proven Arial font, readable opaque colors, and no custom shader. It was retained. Layout now applies the preferred height to the RectTransform and lets the vertical group control child height, yielding ten compact readable rows. The temporary canary was removed. Runtime qualification captures a real PNG and records the first five names and rectangles, selection/title, renderer cull/alpha/font/material/mask evidence, screenshot hash, and independent pixel-region measurements.
+
+Bless exposed an unrelated generic validation bug. Kingmaker's native contract short-circuits `HasEnoughMaterialComponent` unless `RequireMaterialComponent` is true; the planner evaluated sufficiency unconditionally. Exact live Bless data is `require=False,item=none,count=1,hasEnough=False`. The new policy does not evaluate a non-required component and is covered by a deterministic callback test. In both final live runs Bless submitted, started, spent one prepared slot, and confirmed the expected effect.
+
+Final identity and gates: source `e656812572adea8bc312419372b61ee8c4834e5a`; package `ce7492b2...`; DLL `6144256c...`; MVID `bff11809-aa53-42c2-8ab7-ef3564450e61`; source 30/30; behavior 62/62; two physical visual campaigns 71/71 each; native 12/12; Call of the Wild 26/26; deterministic release 2/2; package 4/4. Guarded installation preserved settings and all non-planner mods. No merge or public release occurred.
+
 ## 0.0.5 catalog, HUD input, quick action, and tooltip repair — complete
 
 The authoritative human verdict was a partial pass: live bootstrap and the opaque F10 planner worked, but no catalog rows/details rendered, HUD clicks leaked into world input, quick actions lacked useful outcomes, and the tooltip flickered/offscreen. The repair preserved the bootstrap/modal and changed the four bounded failure paths only.
