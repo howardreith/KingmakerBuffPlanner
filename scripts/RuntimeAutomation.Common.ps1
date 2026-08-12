@@ -145,6 +145,12 @@ function Get-KbpDisposableSavePair {
                 }
             }
         }
+        catch [IO.InvalidDataException] {
+            if ($file.Name -like '*KBP_AUTOMATION_*') {
+                throw "Authorized disposable save archive is unreadable: $($file.Name)"
+            }
+            continue
+        }
         finally {
             if ($null -ne $reader) { $reader.Dispose() }
             if ($null -ne $archive) { $archive.Dispose() }
