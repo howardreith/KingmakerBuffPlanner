@@ -1,5 +1,13 @@
 # Autonomous Resume
 
+## Canary-free production run 1 checkpoint — 2026-08-12
+
+- Source/package/DLL: `3a4b503` / `9591b25c...` / `78263b64...`. Run `row-render-0.0.6-production-1` restored exactly but overall status is FAIL because one stale final-state assertion required a spent prepared Bless to remain in the available-only list.
+- Production visual evidence itself passed: screenshot SHA-256 `d3f271a09152663e1db0bd650706e903c9fd69b2a297433d4b7d819dc78712e2`; ten readable rows; Bless title/details; canary absent; five row pixel ranges 157–184 and title range 125.
+- Exact Bless evidence is `require=False,item=none,count=1,hasEnough=False,consumableRequired=False`. Corrected execution outcome is confirmed success with planned/submitted/started/confirmed/spent `1/1/1/1/1`; post-cast spellbook Bless is correctly unavailable as `resource pool exhausted`.
+- Worktree changes only the runtime assertion to accept post-cast catalog availability while adding explicit pre-cast screenshot and Bless material-contract assertions. Local source-only suite remains source 30/30, behavior 62/62, harness 7/7, package 4/4, deployment WhatIf 5/5.
+- Exact next command: commit, rebuild `0.0.6`, and run `row-render-0.0.6-production-2`.
+
 ## Live row production qualification checkpoint — 2026-08-12
 
 - Status: IN PROGRESS. The A/B canary has proved and rechecked the shared viewport-stencil root cause. `row-render-0.0.6-canary-fixed-1` passed 69/69 and restored exactly; visible screenshot SHA-256 is `71a6bbf6ddafd3c5eb25903c223d4052e9a8b63bb5e0e07651c5d18bf12496dd`.

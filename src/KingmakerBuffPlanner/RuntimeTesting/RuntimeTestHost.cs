@@ -625,9 +625,35 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                             ui.CatalogVisibleViewModels > 0 && ui.CatalogInstantiatedRows ==
                             ui.CatalogVisibleViewModels && ui.CatalogActiveRows > 0 &&
                             ui.CatalogVisibleRows > 0 && ui.CatalogSelectedDetailsBound &&
-                            !string.IsNullOrWhiteSpace(_liveInitialCatalogEvidence) &&
-                            ui.CatalogBlessEvidence.Contains("rowVisible=True"),
-                            "visible VMs=rows; active/visible/details/Bless", ui.CatalogEvidence ?? "missing");
+                            !string.IsNullOrWhiteSpace(_liveInitialCatalogEvidence),
+                            "post-cast VMs=rows; active/visible/details", ui.CatalogEvidence ?? "missing");
+                        bool liveRenderValid = _liveRenderDiagnostics != null &&
+                            _liveRenderDiagnostics.ExpectedNames != null &&
+                            _liveRenderDiagnostics.ExpectedNames.Length == 5 &&
+                            _liveRenderDiagnostics.RowScreenRectangles != null &&
+                            _liveRenderDiagnostics.RowScreenRectangles.Length == 5 &&
+                            _liveRenderDiagnostics.BoundRowCount >= 5 &&
+                            _liveRenderDiagnostics.CanaryEvidence == "absent" &&
+                            _liveRenderDiagnostics.SelectedRowName ==
+                                _liveRenderDiagnostics.DetailsTitleText &&
+                            !string.IsNullOrWhiteSpace(_liveRenderScreenshotSha256);
+                        AddUiAssertion(result, "ui-live-production-render-evidence", liveRenderValid,
+                            "five rows/rectangles; selected=details; canary absent; screenshot hash",
+                            _liveRenderDiagnostics == null ? "missing" :
+                                string.Join("|", _liveRenderDiagnostics.ExpectedNames) + ";selected=" +
+                                _liveRenderDiagnostics.SelectedRowName + ";details=" +
+                                _liveRenderDiagnostics.DetailsTitleText + ";canary=" +
+                                _liveRenderDiagnostics.CanaryEvidence + ";sha256=" +
+                                _liveRenderScreenshotSha256);
+                        bool blessMaterialContract = _liveInitialCatalogEvidence.Contains(
+                            "material=blueprint=90e59f4a4ada87243b7b3535a06d0638") &&
+                            _liveInitialCatalogEvidence.Contains("require=False") &&
+                            _liveInitialCatalogEvidence.Contains("item=none") &&
+                            _liveInitialCatalogEvidence.Contains("hasEnough=False") &&
+                            _liveInitialCatalogEvidence.Contains("consumableRequired=False");
+                        AddUiAssertion(result, "ui-bless-material-contract", blessMaterialContract,
+                            "require=false/item=none/hasEnough=false/consumable=false",
+                            _liveInitialCatalogEvidence);
                         AddUiAssertion(result, "ui-physical-tooltip-stable",
                             _liveTooltipStable && !string.IsNullOrWhiteSpace(_liveTooltipEvidence) &&
                             ui.TooltipListenerCount == 4 && ui.TooltipRaycastGraphicCount == 0 &&

@@ -1,5 +1,15 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-08-12 — first canary-free screenshot and Bless contract result
+
+Status: PRODUCTION PIXELS PASS; RUN FAIL ONLY ON STALE POST-CAST BLESS-VISIBILITY ASSERTION
+
+- Clean source `3a4b503` built package `9591b25c...` and DLL `78263b64...`. Guarded fresh-process run `row-render-0.0.6-production-1` restored exactly and committed a 1280x720 canary-free screenshot SHA-256 `d3f271a09152663e1db0bd650706e903c9fd69b2a297433d4b7d819dc78712e2`.
+- The screenshot visibly shows ten named production rows and selected Bless details. Independent screenshot analysis passed all five rows (distinct ARGB 190–360; luminance range 157–184) and the Bless details title (53 colors; luminance range 125). `live-row-pixel-evidence.json` records the exact rectangles and hash.
+- Exact live native Bless contract: `require=False,item=none,count=1,hasEnough=False,consumableRequired=False`. This proves standalone `HasEnoughMaterialComponent=False` was not a valid refusal. The corrected adapter submitted and started Bless, spent exactly one slot, and confirmed the expected effect: planned 1, submitted 1, started 1, confirmed 1, spent 1, failed 0.
+- The run's only failed assertion inspected the post-cast filtered catalog and still required the now-exhausted prepared Bless row to remain visible. Final state correctly reported `resource pool exhausted`; nine other rows remained visible. The assertion now separates pre-cast screenshot/Bless proof from valid post-cast availability.
+- Exact next action: commit the assertion correction, rebuild the exact package, then obtain two fresh-process PASS runs.
+
 ## 2026-08-12 — repaired canary proves viewport stencil root cause
 
 Status: CANARY PASS; PRODUCTION QUALIFICATION IN PROGRESS
