@@ -37,6 +37,7 @@ namespace KingmakerBuffPlanner.UI
         private RectTransform _sourceViewport;
         private RectTransform _detailContent;
         private RectTransform _detailViewport;
+        private ScrollRect _detailScroll;
         private Text _status;
         private Text _result;
         private Text _catalogSummary;
@@ -188,15 +189,25 @@ namespace KingmakerBuffPlanner.UI
         internal void RefreshAll()
         {
             if (!IsAlive) return;
-            _status.text = _session.Status;
             PlannerSetupModel model = _session.Model;
             if (model == null)
             {
+                _status.text = "Load a campaign to begin.";
                 _result.text = "Load a campaign to configure and execute buff routines. " +
                     "The planner never writes to a Kingmaker save.";
             }
-            else if (!string.IsNullOrWhiteSpace(_session.ProfileStatus))
-                _result.text = _session.ProfileStatus;
+            else
+            {
+                int targets = model.Snapshot.Units.Count;
+                _status.text = targets + (targets == 1 ? " target" : " targets") + "  •  " +
+                    model.Sources.Count + (model.Sources.Count == 1 ? " buff found" : " buffs found");
+                if (!string.IsNullOrWhiteSpace(_session.ProfileStatus))
+                    _result.text = _session.ProfileStatus.StartsWith("No prior profile", StringComparison.Ordinal)
+                        ? "New planner setup created for this campaign."
+                        : _session.ProfileStatus.StartsWith("Loaded profile", StringComparison.Ordinal)
+                            ? "Saved planner setup loaded for this campaign."
+                            : "Planner setup is ready.";
+            }
             RefreshTabs();
             RefreshCatalog();
         }
@@ -265,13 +276,47 @@ namespace KingmakerBuffPlanner.UI
                 RowEvidence = rows.Select(item => BuildGraphicEvidence(item.gameObject)).ToArray(),
                 DetailsEvidence = _detailContent == null ? new string[0] :
                     _detailContent.GetComponentsInChildren<Graphic>(true).Take(8)
-                        .Select(item => BuildGraphicEvidence(item.gameObject)).ToArray()
+                        .Select(item => BuildGraphicEvidence(item.gameObject)).ToArray(),
+                AbilityIconCount = _sourceRows.Sum(item => item == null ? 0 :
+                    item.GetComponentsInChildren<Image>(true).Count(image =>
+                        image.name == "AbilityIcon")),
+                MissingIconCount = _sourceRows.Sum(item => item == null ? 0 :
+                    item.GetComponentsInChildren<Text>(true).Count(text =>
+                        text.name == "MissingIcon")),
+                CastingModeControlCount = _root == null ? 0 :
+                    _root.GetComponentsInChildren<Text>(true).Count(text =>
+                        text.text.StartsWith("Casting mode: ", StringComparison.Ordinal)),
+                RetiredPrimaryLabelCount = _root == null ? 0 :
+                    _root.GetComponentsInChildren<Text>(true).Count(text =>
+                        text.text.StartsWith("CONFIG:", StringComparison.Ordinal) ||
+                        text.text.StartsWith("DURATION:", StringComparison.Ordinal) ||
+                        text.text.StartsWith("SOURCE:", StringComparison.Ordinal) ||
+                        text.text.StartsWith("SORT:", StringComparison.Ordinal) ||
+                        text.text.StartsWith("HIDDEN:", StringComparison.Ordinal) ||
+                        text.text.StartsWith("AVAIL:", StringComparison.Ordinal)),
+                ThemeResolution = _theme.ResolutionSummary
             };
         }
 
         internal void RefreshCatalogForRuntime()
         {
             RefreshCatalog();
+        }
+
+        internal bool PrepareVisualEvidenceForRuntime(string view)
+        {
+            if (_detailScroll == null || _detailContent == null) return false;
+            if (view == "advanced-settings") _advancedCastingExpanded = true;
+            else _advancedCastingExpanded = false;
+            RefreshDetails();
+            Canvas.ForceUpdateCanvases();
+            LayoutRebuilder.ForceRebuildLayoutImmediate(_detailContent);
+            LayoutRebuilder.ForceRebuildLayoutImmediate(_detailViewport);
+            Canvas.ForceUpdateCanvases();
+            _detailScroll.verticalNormalizedPosition = view == "selected-details" ? 1f :
+                view == "target-colors" ? 0.72f : view == "casting-source" ? 0.46f : 0f;
+            Canvas.ForceUpdateCanvases();
+            return true;
         }
 
         internal void ShowResult(QuickExecutionResult result)
@@ -330,7 +375,7 @@ namespace KingmakerBuffPlanner.UI
 
             RectTransform frame = KingmakerUiFactory.CreateRect("ServiceFrame", _root);
             KingmakerUiFactory.SetAnchors(frame, 0.025f, 0.025f, 0.975f, 0.975f);
-            KingmakerUiFactory.AddFramedPanel(frame, _theme.ParchmentPanel,
+            KingmakerUiFactory.AddFramedPanel(frame, _theme.ServiceSurface,
                 _theme.BurgundyPrimary, 2f);
 
             BuildHeader(frame);
@@ -500,6 +545,7 @@ namespace KingmakerBuffPlanner.UI
                 _theme.GoldAccent);
             ScrollRect scroll = KingmakerUiFactory.CreateScrollView(
                 "Details", panel, _theme, out _detailContent);
+            _detailScroll = scroll;
             _detailViewport = scroll.viewport;
             KingmakerUiFactory.SetAnchors((RectTransform)scroll.transform, 0.015f, 0.02f, 0.985f, 0.985f);
         }
@@ -918,6 +964,8 @@ namespace KingmakerBuffPlanner.UI
         private void CreateSelectedBuffHeader(RectTransform parent, SetupSourceRow source)
         {
             RectTransform row = AddHorizontalRow(parent, 76);
+            HorizontalLayoutGroup layout = row.GetComponent<HorizontalLayoutGroup>();
+            if (layout != null) layout.childForceExpandWidth = false;
             RectTransform iconFrame = KingmakerUiFactory.CreateRect("SelectedIconFrame", row);
             LayoutElement iconLayout = iconFrame.gameObject.AddComponent<LayoutElement>();
             iconLayout.preferredWidth = 76;

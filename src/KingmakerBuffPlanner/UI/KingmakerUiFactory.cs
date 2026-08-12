@@ -41,8 +41,9 @@ namespace KingmakerBuffPlanner.UI
         internal Sprite NativePortraitFrame;
         internal Sprite NativeSelectedOrnament;
         internal Color ParchmentBackground = new Color(0.922f, 0.871f, 0.765f, 1f);
-        internal Color ParchmentPanel = new Color(0.898f, 0.776f, 0.522f, 0.96f);
-        internal Color ParchmentRaised = new Color(0.96f, 0.89f, 0.72f, 1f);
+        internal Color ParchmentPanel = new Color(0.965f, 0.890f, 0.725f, 0.88f);
+        internal Color ParchmentRaised = new Color(0.985f, 0.925f, 0.795f, 0.96f);
+        internal Color ServiceSurface = new Color(0.965f, 0.865f, 0.665f, 0.70f);
         internal Color DarkBrownText = new Color(0.235f, 0.22f, 0.188f, 1f);
         internal Color MutedBrownText = new Color(0.541f, 0.392f, 0.271f, 1f);
         internal Color ButtonText = new Color(0.965f, 0.894f, 0.710f, 1f);

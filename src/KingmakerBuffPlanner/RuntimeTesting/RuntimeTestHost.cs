@@ -42,6 +42,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private int _liveRenderWaitFrames;
         private string _liveRenderScreenshotPath;
         private string _liveRenderScreenshotSha256 = string.Empty;
+        private string _liveSelectedDetailsScreenshotSha256 = string.Empty;
+        private string _liveCastingSourceScreenshotSha256 = string.Empty;
+        private string _liveTargetColorsScreenshotSha256 = string.Empty;
+        private string _liveAdvancedSettingsScreenshotSha256 = string.Empty;
         private LiveRowRenderDiagnostics _liveRenderDiagnostics;
         private NativeUiContract _nativeUiContract;
 
@@ -349,6 +353,20 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     UiRenderDetailsEvidence = _liveRenderDiagnostics == null ? null :
                         _liveRenderDiagnostics.DetailsEvidence,
                     UiRenderScreenshotSha256 = _liveRenderScreenshotSha256,
+                    UiSelectedDetailsScreenshotSha256 = _liveSelectedDetailsScreenshotSha256,
+                    UiCastingSourceScreenshotSha256 = _liveCastingSourceScreenshotSha256,
+                    UiTargetColorsScreenshotSha256 = _liveTargetColorsScreenshotSha256,
+                    UiAdvancedSettingsScreenshotSha256 = _liveAdvancedSettingsScreenshotSha256,
+                    UiRenderAbilityIconCount = _liveRenderDiagnostics == null ? 0 :
+                        _liveRenderDiagnostics.AbilityIconCount,
+                    UiRenderMissingIconCount = _liveRenderDiagnostics == null ? 0 :
+                        _liveRenderDiagnostics.MissingIconCount,
+                    UiCastingModeControlCount = _liveRenderDiagnostics == null ? 0 :
+                        _liveRenderDiagnostics.CastingModeControlCount,
+                    UiRetiredPrimaryLabelCount = _liveRenderDiagnostics == null ? 0 :
+                        _liveRenderDiagnostics.RetiredPrimaryLabelCount,
+                    UiThemeResolution = _liveRenderDiagnostics == null ? null :
+                        _liveRenderDiagnostics.ThemeResolution,
                     NativeUiContractSha256 = nativeUiContractHash,
                     NativeUiButtonCount = nativeUiContract == null ? 0 : nativeUiContract.Buttons.Count,
                     NativeUiCandidateAnchorCount = nativeUiContract == null
@@ -890,31 +908,52 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     _liveRenderDiagnostics.BoundRowCount < 5 ||
                     string.IsNullOrWhiteSpace(_liveRenderDiagnostics.SelectedRowName) ||
                     _liveRenderDiagnostics.SelectedRowName != _liveRenderDiagnostics.DetailsTitleText ||
-                    _liveRenderDiagnostics.CanaryEvidence != "absent")
+                    _liveRenderDiagnostics.CanaryEvidence != "absent" ||
+                    _liveRenderDiagnostics.AbilityIconCount +
+                        _liveRenderDiagnostics.MissingIconCount !=
+                        _liveRenderDiagnostics.BoundRowCount ||
+                    _liveRenderDiagnostics.CastingModeControlCount != 1 ||
+                    _liveRenderDiagnostics.RetiredPrimaryLabelCount != 0 ||
+                    string.IsNullOrWhiteSpace(_liveRenderDiagnostics.ThemeResolution))
                     throw new InvalidOperationException("Live production render evidence is incomplete.");
                 AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory,
                     "live-row-render-diagnostics.json"), Serialize(_liveRenderDiagnostics));
                 _liveRenderScreenshotPath = Path.Combine(_request.EvidenceDirectory,
                     "planner-render.png");
-                Type screenCapture = Type.GetType(
-                    "UnityEngine.ScreenCapture, UnityEngine.ScreenCaptureModule", false);
-                MethodInfo capture = screenCapture == null ? null : screenCapture.GetMethod(
-                    "CaptureScreenshot", BindingFlags.Static | BindingFlags.Public, null,
-                    new[] { typeof(string) }, null);
-                if (capture == null)
-                    throw new MissingMethodException("Unity screenshot capture API is unavailable.");
-                capture.Invoke(null, new object[] { _liveRenderScreenshotPath });
+                CaptureScreenshot(_liveRenderScreenshotPath);
                 _liveUiPhase = 14;
                 return false;
             }
             if (_liveUiPhase == 14)
             {
-                if (string.IsNullOrEmpty(_liveRenderScreenshotPath) ||
-                    !File.Exists(_liveRenderScreenshotPath) ||
-                    new FileInfo(_liveRenderScreenshotPath).Length < 1000) return false;
-                _liveRenderScreenshotSha256 = Hashing.Sha256(_liveRenderScreenshotPath);
+                if (!TryHashScreenshot(_liveRenderScreenshotPath,
+                    out _liveRenderScreenshotSha256)) return false;
                 _log.Info("[KBP-RENDER] screenshot=" + _liveRenderScreenshotPath +
                     ";sha256=" + _liveRenderScreenshotSha256 + ".");
+                if (!BuffPlannerUiRoot.PrepareVisualEvidenceForRuntime("selected-details"))
+                    throw new InvalidOperationException("Selected-details evidence view is unavailable.");
+                CaptureScreenshot(Path.Combine(_request.EvidenceDirectory,
+                    "planner-selected-details.png"));
+                _liveUiPhase = 15;
+                return false;
+            }
+            if (_liveUiPhase == 15)
+            {
+                if (!TryHashScreenshot(Path.Combine(_request.EvidenceDirectory,
+                    "planner-selected-details.png"), out _liveSelectedDetailsScreenshotSha256))
+                    return false;
+                if (!BuffPlannerUiRoot.PrepareVisualEvidenceForRuntime("casting-source"))
+                    throw new InvalidOperationException("Casting-source evidence view is unavailable.");
+                CaptureScreenshot(Path.Combine(_request.EvidenceDirectory,
+                    "planner-casting-source.png"));
+                _liveUiPhase = 16;
+                return false;
+            }
+            if (_liveUiPhase == 16)
+            {
+                if (!TryHashScreenshot(Path.Combine(_request.EvidenceDirectory,
+                    "planner-casting-source.png"), out _liveCastingSourceScreenshotSha256))
+                    return false;
                 BuffPlannerUiRoot.BeginRuntimeSmoke();
                 BuffPlannerUiRoot.DispatchRuntimeInputSmoke();
                 BuffPlannerUiRoot.CloseRuntimeSmoke();
@@ -1038,6 +1077,30 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     BuffPlannerUiRoot.SelectAndConfigureBlessForRuntime();
                 if (!_liveBlessSelectedAndConfigured)
                     throw new InvalidOperationException("Visible spellbook Bless row could not be selected/configured.");
+                if (!BuffPlannerUiRoot.PrepareVisualEvidenceForRuntime("target-colors"))
+                    throw new InvalidOperationException("Target-color evidence view is unavailable.");
+                CaptureScreenshot(Path.Combine(_request.EvidenceDirectory,
+                    "planner-target-colors.png"));
+                _liveUiPhase = 70;
+                return false;
+            }
+            if (_liveUiPhase == 70)
+            {
+                if (!TryHashScreenshot(Path.Combine(_request.EvidenceDirectory,
+                    "planner-target-colors.png"), out _liveTargetColorsScreenshotSha256))
+                    return false;
+                if (!BuffPlannerUiRoot.PrepareVisualEvidenceForRuntime("advanced-settings"))
+                    throw new InvalidOperationException("Advanced-settings evidence view is unavailable.");
+                CaptureScreenshot(Path.Combine(_request.EvidenceDirectory,
+                    "planner-advanced-settings.png"));
+                _liveUiPhase = 71;
+                return false;
+            }
+            if (_liveUiPhase == 71)
+            {
+                if (!TryHashScreenshot(Path.Combine(_request.EvidenceDirectory,
+                    "planner-advanced-settings.png"), out _liveAdvancedSettingsScreenshotSha256))
+                    return false;
                 BuffPlannerUiRoot.CloseRuntimeSmoke();
                 if (BuffPlannerUiRoot.IsScreenOpen)
                     throw new InvalidOperationException("Planner did not close cleanly after configuration.");
@@ -1098,6 +1161,27 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             _log.Info("[KBP-INPUT] physical action requested;id=" + id + ";action=" +
                 kind + ";x=" + position.x.ToString("F1") + ";y=" +
                 position.y.ToString("F1") + ".");
+        }
+
+        private static void CaptureScreenshot(string path)
+        {
+            Type screenCapture = Type.GetType(
+                "UnityEngine.ScreenCapture, UnityEngine.ScreenCaptureModule", false);
+            MethodInfo capture = screenCapture == null ? null : screenCapture.GetMethod(
+                "CaptureScreenshot", BindingFlags.Static | BindingFlags.Public, null,
+                new[] { typeof(string) }, null);
+            if (capture == null)
+                throw new MissingMethodException("Unity screenshot capture API is unavailable.");
+            capture.Invoke(null, new object[] { path });
+        }
+
+        private static bool TryHashScreenshot(string path, out string sha256)
+        {
+            sha256 = string.Empty;
+            if (string.IsNullOrEmpty(path) || !File.Exists(path) ||
+                new FileInfo(path).Length < 1000) return false;
+            sha256 = Hashing.Sha256(path);
+            return true;
         }
 
         private bool PhysicalInputAcknowledged(string id)
@@ -1356,6 +1440,15 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         [JsonProperty("uiRenderRowEvidence", Order = 154)] public string[] UiRenderRowEvidence { get; set; }
         [JsonProperty("uiRenderDetailsEvidence", Order = 155)] public string[] UiRenderDetailsEvidence { get; set; }
         [JsonProperty("uiRenderScreenshotSha256", Order = 156)] public string UiRenderScreenshotSha256 { get; set; }
+        [JsonProperty("uiSelectedDetailsScreenshotSha256", Order = 157)] public string UiSelectedDetailsScreenshotSha256 { get; set; }
+        [JsonProperty("uiCastingSourceScreenshotSha256", Order = 158)] public string UiCastingSourceScreenshotSha256 { get; set; }
+        [JsonProperty("uiTargetColorsScreenshotSha256", Order = 159)] public string UiTargetColorsScreenshotSha256 { get; set; }
+        [JsonProperty("uiAdvancedSettingsScreenshotSha256", Order = 160)] public string UiAdvancedSettingsScreenshotSha256 { get; set; }
+        [JsonProperty("uiRenderAbilityIconCount", Order = 161)] public int UiRenderAbilityIconCount { get; set; }
+        [JsonProperty("uiRenderMissingIconCount", Order = 162)] public int UiRenderMissingIconCount { get; set; }
+        [JsonProperty("uiCastingModeControlCount", Order = 163)] public int UiCastingModeControlCount { get; set; }
+        [JsonProperty("uiRetiredPrimaryLabelCount", Order = 164)] public int UiRetiredPrimaryLabelCount { get; set; }
+        [JsonProperty("uiThemeResolution", Order = 165)] public string UiThemeResolution { get; set; }
     }
 
     internal sealed class RuntimeTestAssertion

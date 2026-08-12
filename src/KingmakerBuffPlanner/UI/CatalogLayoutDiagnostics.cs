@@ -16,6 +16,11 @@ namespace KingmakerBuffPlanner.UI
         [JsonProperty("canaryEvidence", Order = 9)] public string CanaryEvidence { get; set; }
         [JsonProperty("rowEvidence", Order = 10)] public string[] RowEvidence { get; set; }
         [JsonProperty("detailsEvidence", Order = 11)] public string[] DetailsEvidence { get; set; }
+        [JsonProperty("abilityIconCount", Order = 12)] public int AbilityIconCount { get; set; }
+        [JsonProperty("missingIconCount", Order = 13)] public int MissingIconCount { get; set; }
+        [JsonProperty("castingModeControlCount", Order = 14)] public int CastingModeControlCount { get; set; }
+        [JsonProperty("retiredPrimaryLabelCount", Order = 15)] public int RetiredPrimaryLabelCount { get; set; }
+        [JsonProperty("themeResolution", Order = 16)] public string ThemeResolution { get; set; }
     }
 
     internal sealed class CatalogLayoutDiagnostics

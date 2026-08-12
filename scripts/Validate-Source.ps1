@@ -129,7 +129,8 @@ foreach ($retiredPrimaryLabel in @('CONFIG: ', 'DURATION: ', 'SOURCE: ', 'SORT: 
         throw "Retired technical/duplicate UI label remains: $retiredPrimaryLabel"
     }
 }
-if ([regex]::Matches($screenSource, [regex]::Escape('Casting mode: ')).Count -ne 1) {
+if ([regex]::Matches($screenSource,
+        [regex]::Escape('"Casting mode: " + settingsModel.CastingMode')).Count -ne 1) {
     throw 'Exactly one player-facing Casting mode control must remain.'
 }
 if ($screenSource.Contains('CreateDiagnosticRenderCanary') -or

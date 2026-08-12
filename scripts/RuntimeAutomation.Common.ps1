@@ -243,6 +243,28 @@ function Assert-KbpRuntimeResult {
             -not ([string]$Result.uiRenderMaskEvidence).Contains('ColorMask:0')) {
             throw 'Live production screenshot/render evidence is incomplete or inconsistent.'
         }
+        $presentationScreenshots = [ordered]@{
+            'planner-selected-details.png' = [string]$Result.uiSelectedDetailsScreenshotSha256
+            'planner-casting-source.png' = [string]$Result.uiCastingSourceScreenshotSha256
+            'planner-target-colors.png' = [string]$Result.uiTargetColorsScreenshotSha256
+            'planner-advanced-settings.png' = [string]$Result.uiAdvancedSettingsScreenshotSha256
+        }
+        foreach ($name in $presentationScreenshots.Keys) {
+            $path = Join-Path $Request.evidenceDirectory $name
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf) -or
+                [string]::IsNullOrWhiteSpace([string]$presentationScreenshots[$name]) -or
+                [string]$presentationScreenshots[$name] -cne (Get-KbpSha256 $path)) {
+                throw "Presentation screenshot evidence is missing or inconsistent: $name"
+            }
+        }
+        if ([int]$Result.uiRenderAbilityIconCount + [int]$Result.uiRenderMissingIconCount -ne
+                [int]$Result.uiRenderBoundRowCount -or
+            [int]$Result.uiCastingModeControlCount -ne 1 -or
+            [int]$Result.uiRetiredPrimaryLabelCount -ne 0 -or
+            -not ([string]$Result.uiThemeResolution).Contains('parchment=') -or
+            -not ([string]$Result.uiThemeResolution).Contains('font=')) {
+            throw 'Live presentation icon, single-mode, filter-removal, or theme evidence is invalid.'
+        }
         foreach ($rowEvidence in @($Result.uiRenderRowEvidence)) {
             if (-not ([string]$rowEvidence).Contains('rendererCull=False') -or
                 -not ([string]$rowEvidence).Contains('inheritedAlpha=1') -or

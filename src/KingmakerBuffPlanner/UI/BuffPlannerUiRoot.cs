@@ -292,6 +292,13 @@ namespace KingmakerBuffPlanner.UI
                 _instance._screen.View.GetLiveRowRenderDiagnostics();
         }
 
+        internal static bool PrepareVisualEvidenceForRuntime(string view)
+        {
+            return _instance != null && _instance._screen != null &&
+                _instance._screen.View != null &&
+                _instance._screen.View.PrepareVisualEvidenceForRuntime(view);
+        }
+
         internal static bool SelectAndConfigureBlessForRuntime()
         {
             if (_instance == null || _instance._screen.View == null ||
