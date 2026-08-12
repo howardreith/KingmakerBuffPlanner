@@ -1,5 +1,7 @@
 # Definition of Done Matrix
 
+R2 correction notice: direct human testing invalidated both 0.0.2 UI rows. Their current status is `IN PROGRESS`: fresh retained-mode HUD and transactional modal/confirmed-execution source behavior are implemented in 0.0.3, while guarded campaign/human acceptance and final installation remain pending. Historical 0.0.2 PASS/implemented text below is superseded where it conflicts.
+
 Status: IN PROGRESS — human playtesting invalidated the 0.0.1 UI gate; full-screen UI/input repair is active; save-backed core rows remain `DEFER — EVIDENCED`
 
 This matrix follows section 27 of the authoritative mission. A core row marked `DEFER — EVIDENCED` is still unmet and prevents `COMPLETE`; it is not being reclassified as optional.
