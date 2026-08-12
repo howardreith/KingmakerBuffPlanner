@@ -1,5 +1,20 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-08-12 — catalog/HUD input/tooltip R3 human rejection and read-only intake
+
+Status: 0.0.4 PARTIAL HUMAN PASS; FOUR RELEASE BLOCKERS CONFIRMED; SOURCE REPAIR PENDING
+
+- Starting branch/HEAD/version: `codex/kingmaker-buff-planner` / `d2aecb00e02a63b5ea33976e34ff1eefc9765a1a` / `0.0.4`; the only initial worktree entry was the user-supplied R3 mission.
+- Installed DLL, UMM cache, release DLL, and manifest reconcile exactly: DLL `6f72c38ef7e445121291ff2f17f207d49210ea30a2e07fe1105595133b706f1c`; MVID `305a8a6c-2b49-4e3b-a365-286638cbfafa`; package `cb3799e799f641b1a9f7d79eb71942025b5df71a8de956e17369b24fe2f14d16`; release source `5b96f3b4e713489ce677db3ac5acb83a10f80f01`.
+- Preserved human PASS: visible/acceptable four-button row, visible opaque F10 planner, and actual campaign bootstrap.
+- Earliest catalog failure is after the 11-source model and bind loops, at unmeasured scroll-content/row/detail layout visibility. Neutral defaults and zero hidden IDs cannot filter the list to zero; a bind exception would have rolled the full screen back.
+- Tooltip root cause: activating a 620-pixel tooltip child inside the four-button `HorizontalLayoutGroup` moves the source button, causing enter/exit oscillation; feedback has the same defect.
+- Input proof defect: the gate invoked synthetic `ExecuteEvents`, while exact Kingmaker `PointerController.Tick` samples raw mouse state through `InGui`; human physical click-through supersedes the synthetic PASS.
+- Quick-action defects: quick buttons are disabled until setup refresh creates a model, layout-moving feedback is unstable, and current counters do not prove ordered plan/execution stages.
+- Exact Bless/profile slice retained: Long -> Bless `90e59f4a4ada87243b7b3535a06d0638`, target `8d7086b2-a4d5-43d5-aed6-51c789971b53`, expected fact `87b8c6270ea85c743afc734dfe99afee`, zero hidden sources.
+- External state: no Kingmaker/UMM process, active lock, non-restored transaction, or mutation.
+- Exact next action: implement reconciled catalog/layout diagnostics first, then repair explicit content sizing, cached non-layout tooltip, conditional planner pointer capture, and quick-action session/feedback stages.
+
 ## 2026-08-12 — live UI bootstrap recovery complete
 
 Status: PASS TWICE; 0.0.4 GUARDED-INSTALLED; NO PUBLIC RELEASE

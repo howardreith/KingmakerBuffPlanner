@@ -1,5 +1,14 @@
 # Autonomous Resume
 
+## Catalog/HUD input/tooltip R3 intake — 2026-08-12
+
+- Status: IN PROGRESS. Human verdict partially passes 0.0.4 bootstrap/presentation but blocks release on blank catalog/details, tooltip flicker/width, HUD click-to-move, and unhelpful quick actions.
+- Starting branch/HEAD: `codex/kingmaker-buff-planner` / `d2aecb00e02a63b5ea33976e34ff1eefc9765a1a`; current version `0.0.4`; user mission plus intake/root-cause records are the intended worktree changes.
+- Exact installed/release identity: source `5b96f3b4e713489ce677db3ac5acb83a10f80f01`; package `cb3799e799f641b1a9f7d79eb71942025b5df71a8de956e17369b24fe2f14d16`; DLL `6f72c38ef7e445121291ff2f17f207d49210ea30a2e07fe1105595133b706f1c`; MVID `305a8a6c-2b49-4e3b-a365-286638cbfafa`.
+- Earliest catalog failure: after the 11-source normalized model and source/detail bind loops, at unmeasured content/row geometry or clipping. Tooltip and physical-input causes are exact in `planning/CATALOG-HUD-INPUT-TOOLTIP-ROOT-CAUSE.md`.
+- Runtime/external state: Kingmaker/UMM closed; no active/non-restored transaction or lock; installed 0.0.4 and protected human profile unchanged.
+- Exact next action: add catalog trace and layout evidence, explicit scroll content sizing, single non-layout tooltip, conditional `PointerController.InGui` planner-region capture, ordered quick flow, and physical-input live scenario coverage.
+
 ## Live UI bootstrap recovery complete — 2026-08-12
 
 - Status: COMPLETE for the authoritative recovery mission; 0.0.4 is guarded-installed for human visual confirmation. No merge or public release occurred.
