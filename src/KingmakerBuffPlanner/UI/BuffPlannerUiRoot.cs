@@ -208,6 +208,11 @@ namespace KingmakerBuffPlanner.UI
             return new Vector2(Screen.width / 2f, Screen.height / 2f);
         }
 
+        internal static Vector2 ModalBackgroundPointForRuntime()
+        {
+            return new Vector2(Screen.width / 2f, Screen.height - 4f);
+        }
+
         internal static void BeginPhysicalInputProbe()
         {
             if (_instance == null) throw new InvalidOperationException("UI root is absent.");
@@ -288,6 +293,7 @@ namespace KingmakerBuffPlanner.UI
             if (model.GetExistingEffectPolicy("long") ==
                 KingmakerBuffPlanner.Domain.Planning.ExistingEffectPolicy.SkipAlreadyActive)
                 model.ToggleExistingEffectPolicy("long");
+            if (model.Profile.Execution.Mode != "instant") model.ToggleExecutionMode();
             _instance._screen.View.RefreshCatalogForRuntime();
             return model.IsAssigned("long") && model.IsTargetWanted("long", target);
         }

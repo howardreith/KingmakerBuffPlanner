@@ -888,7 +888,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 if (!PhysicalInputAcknowledged("click-setup") ||
                     !BuffPlannerUiRoot.IsScreenOpen) return false;
                 WritePhysicalInputRequest("click-modal", "click",
-                    BuffPlannerUiRoot.ScreenCenterForRuntime());
+                    BuffPlannerUiRoot.ModalBackgroundPointForRuntime());
                 _liveUiPhase = 7;
                 return false;
             }
