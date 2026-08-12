@@ -53,6 +53,16 @@ namespace KingmakerBuffPlanner.UI
         }
     }
 
+    public enum PlannerScreenLifecycleState
+    {
+        Closed,
+        OpeningPresentation,
+        AcquiringInputLease,
+        Open,
+        Closing,
+        FaultedRollback
+    }
+
     public sealed class PlannerScreenStateMachine : IDisposable
     {
         private readonly Func<BuffPlannerInputLease> _acquire;
@@ -63,28 +73,84 @@ namespace KingmakerBuffPlanner.UI
             _acquire = acquire ?? throw new ArgumentNullException("acquire");
         }
 
-        public bool IsOpen { get { return _lease != null; } }
+        public PlannerScreenLifecycleState State { get; private set; }
+        public bool IsOpen { get { return State == PlannerScreenLifecycleState.Open; } }
+        public bool HasInputLease { get { return _lease != null; } }
         public int OpenTransitions { get; private set; }
         public int CloseTransitions { get; private set; }
+        public int RollbackTransitions { get; private set; }
 
-        public bool Open()
+        public bool BeginPresentation()
         {
-            if (_lease != null) return false;
-            BuffPlannerInputLease lease = _acquire();
-            if (lease == null) throw new InvalidOperationException("Input lease factory returned null.");
-            _lease = lease;
-            OpenTransitions++;
+            if (State != PlannerScreenLifecycleState.Closed) return false;
+            State = PlannerScreenLifecycleState.OpeningPresentation;
             return true;
+        }
+
+        public void AcquireInputLease()
+        {
+            if (State != PlannerScreenLifecycleState.OpeningPresentation)
+                throw new InvalidOperationException("Presentation must be validated before acquiring input.");
+            State = PlannerScreenLifecycleState.AcquiringInputLease;
+            try
+            {
+                BuffPlannerInputLease lease = _acquire();
+                if (lease == null) throw new InvalidOperationException("Input lease factory returned null.");
+                _lease = lease;
+                State = PlannerScreenLifecycleState.Open;
+                OpenTransitions++;
+            }
+            catch
+            {
+                RollbackInternal();
+                throw;
+            }
         }
 
         public bool Close()
         {
-            if (_lease == null) return false;
+            if (State == PlannerScreenLifecycleState.Closed) return false;
+            if (State != PlannerScreenLifecycleState.Open)
+            {
+                RollbackInternal();
+                return true;
+            }
+            State = PlannerScreenLifecycleState.Closing;
             BuffPlannerInputLease lease = _lease;
             _lease = null;
-            try { lease.Dispose(); }
-            finally { CloseTransitions++; }
+            try
+            {
+                if (lease != null) lease.Dispose();
+            }
+            finally
+            {
+                CloseTransitions++;
+                State = PlannerScreenLifecycleState.Closed;
+            }
             return true;
+        }
+
+        public bool Rollback()
+        {
+            if (State == PlannerScreenLifecycleState.Closed) return false;
+            RollbackInternal();
+            return true;
+        }
+
+        private void RollbackInternal()
+        {
+            State = PlannerScreenLifecycleState.FaultedRollback;
+            BuffPlannerInputLease lease = _lease;
+            _lease = null;
+            try
+            {
+                if (lease != null) lease.Dispose();
+            }
+            finally
+            {
+                RollbackTransitions++;
+                State = PlannerScreenLifecycleState.Closed;
+            }
         }
 
         public void Dispose()
@@ -108,14 +174,16 @@ namespace KingmakerBuffPlanner.UI
             QuickExecutionDisposition disposition,
             string message,
             int planned,
-            int fired)
+            int submitted,
+            int confirmed)
         {
             RoutineId = routineId ?? string.Empty;
             RoutineName = routineName ?? string.Empty;
             Disposition = disposition;
             Message = message ?? string.Empty;
             Planned = planned;
-            Fired = fired;
+            Submitted = submitted;
+            Confirmed = confirmed;
         }
 
         public string RoutineId { get; private set; }
@@ -123,7 +191,8 @@ namespace KingmakerBuffPlanner.UI
         public QuickExecutionDisposition Disposition { get; private set; }
         public string Message { get; private set; }
         public int Planned { get; private set; }
-        public int Fired { get; private set; }
+        public int Submitted { get; private set; }
+        public int Confirmed { get; private set; }
     }
 
     public interface IPlannerRoutineRunner
@@ -165,7 +234,7 @@ namespace KingmakerBuffPlanner.UI
             {
                 var result = new QuickExecutionResult(normalized, DisplayName(normalized),
                     QuickExecutionDisposition.Refused,
-                    "Another buff routine is already executing.", 0, 0);
+                    "Another buff routine is already executing.", 0, 0, 0);
                 _diagnostics.RecordRefused(normalized);
                 _present(result);
                 _diagnostics.RecordResultPresented(normalized);
@@ -200,17 +269,34 @@ namespace KingmakerBuffPlanner.UI
         public int PointerEventCount { get; private set; }
         public int ScrollEventCount { get; private set; }
         public int DragEventCount { get; private set; }
+        public int PresentationValidatedCount { get; private set; }
+        public int PresentationValidatedOrder { get; private set; }
+        public int InputLeaseAcquiredOrder { get; private set; }
+        private int _eventOrder;
 
         public void RecordHudInstalled() { HudInstallCount++; }
         public void RecordHudDestroyed() { HudDestroyCount++; }
         public void RecordScreenCreated() { ScreenCreateCount++; }
         public void RecordScreenDestroyed() { ScreenDestroyCount++; }
-        public void RecordInputLeaseAcquired() { InputLeaseAcquireCount++; }
+        public void RecordPresentationValidated()
+        {
+            PresentationValidatedCount++;
+            PresentationValidatedOrder = ++_eventOrder;
+        }
+        public void RecordInputLeaseAcquired()
+        {
+            InputLeaseAcquireCount++;
+            InputLeaseAcquiredOrder = ++_eventOrder;
+        }
         public void RecordInputLeaseReleased() { InputLeaseReleaseCount++; }
         public void RecordPointer(string routineId)
         {
             PointerEventCount++;
             if (!string.IsNullOrEmpty(routineId)) Flow(routineId).PointerEvents++;
+        }
+        public void RecordPointerEnter(string routineId)
+        {
+            if (!string.IsNullOrEmpty(routineId)) Flow(routineId).PointerEnters++;
         }
         public void RecordScroll() { ScrollEventCount++; }
         public void RecordDrag() { DragEventCount++; }
@@ -225,7 +311,7 @@ namespace KingmakerBuffPlanner.UI
         {
             MutableQuickFlowDiagnostics flow;
             if (!_flows.TryGetValue(routineId, out flow)) flow = new MutableQuickFlowDiagnostics();
-            return new QuickFlowDiagnostics(flow.PointerEvents, flow.Listeners, flow.GroupsResolved,
+            return new QuickFlowDiagnostics(flow.PointerEnters, flow.PointerEvents, flow.Listeners, flow.GroupsResolved,
                 flow.PlansRevalidated, flow.ExecutionsInvoked, flow.Refusals, flow.ResultsPresented);
         }
 
@@ -249,6 +335,7 @@ namespace KingmakerBuffPlanner.UI
         private sealed class MutableQuickFlowDiagnostics
         {
             internal int PointerEvents;
+            internal int PointerEnters;
             internal int Listeners;
             internal int GroupsResolved;
             internal int PlansRevalidated;
@@ -260,9 +347,10 @@ namespace KingmakerBuffPlanner.UI
 
     public sealed class QuickFlowDiagnostics
     {
-        internal QuickFlowDiagnostics(int pointerEvents, int listeners, int groupsResolved,
+        internal QuickFlowDiagnostics(int pointerEnters, int pointerEvents, int listeners, int groupsResolved,
             int plansRevalidated, int executionsInvoked, int refusals, int resultsPresented)
         {
+            PointerEnters = pointerEnters;
             PointerEvents = pointerEvents;
             Listeners = listeners;
             GroupsResolved = groupsResolved;
@@ -272,6 +360,7 @@ namespace KingmakerBuffPlanner.UI
             ResultsPresented = resultsPresented;
         }
 
+        public int PointerEnters { get; private set; }
         public int PointerEvents { get; private set; }
         public int Listeners { get; private set; }
         public int GroupsResolved { get; private set; }

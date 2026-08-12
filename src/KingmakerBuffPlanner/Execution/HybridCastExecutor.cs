@@ -36,7 +36,7 @@ namespace KingmakerBuffPlanner.Execution
                 bool fallback = _requiresAnimated(step);
                 if (fallback && !_allowAnimatedFallback)
                 {
-                    report.Add(index, step, CastExecutionStatus.Failed,
+                    report.Add(index, step, CastExecutionStatus.FailedValidation,
                         "animated-fallback-disabled");
                     continue;
                 }

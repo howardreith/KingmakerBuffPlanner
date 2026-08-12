@@ -93,9 +93,9 @@ namespace KingmakerBuffPlanner.UI
             _instance._runtimePausedBefore = pausedBefore;
             _instance._runtimeSelectionDisabledBefore = selectionDisabledBefore;
             _instance._runtimeModeBefore = modeBefore;
-            BeginRuntimeSmoke();
-            if (!_instance._hud.DispatchRuntimeClick("long"))
+            if (!_instance._hud.TryInstall() || !_instance._hud.DispatchRuntimeClick("long"))
                 throw new InvalidOperationException("Runtime Long HUD click could not be dispatched.");
+            BeginRuntimeSmoke();
         }
 
         internal static void CloseRuntimeSmoke()
@@ -118,6 +118,7 @@ namespace KingmakerBuffPlanner.UI
             BuffPlannerScreenView view = _instance._screen.View;
             UiInputIsolationProbeResult input = _instance._runtimeInputProbe;
             QuickFlowDiagnostics longFlow = _instance._diagnostics.GetFlow("long");
+            PlannerPresentationValidation presentation = view == null ? null : view.LastValidation;
             UiRootDiagnostics result = new UiRootDiagnostics
             {
                 RootCount = FindObjectsOfType<BuffPlannerUiRoot>().Length,
@@ -128,10 +129,24 @@ namespace KingmakerBuffPlanner.UI
                 HudButtonCount = _instance._hud.ButtonCount,
                 HudListenerCount = _instance._hud.ListenerCount,
                 HudAnchorPath = _instance._hud.AnchorPath,
+                HudRaycastCanvasPath = _instance._hud.RaycastCanvasPath,
+                HudButtonOrder = _instance._hud.ButtonOrder,
+                HudRowAboveNativeCluster = _instance._hud.RowAboveNativeCluster,
+                HudHitboxesOwnRaycasts = _instance._hud.VisibleHitboxesOwnRaycasts,
+                HudUnderlyingNativeActivationCount = _instance._hud.RuntimeUnderlyingNativeActivationCount,
                 FullScreenRootCount = view == null ? 0 : view.RootCount,
                 FullScreenOpaque = view != null && view.IsOpaque,
                 FullScreenBlocksRaycasts = view != null && view.BlocksRaycasts,
                 GraphicRaycasterPresent = view != null && view.HasGraphicRaycaster,
+                PresentationValid = presentation != null && presentation.Valid,
+                PresentationFailure = presentation == null ? "missing" : presentation.Failure,
+                PresentationCoverage = presentation == null ? 0 : presentation.Coverage,
+                PresentationOwnsCenterRaycast = presentation != null && presentation.OwnsCenterRaycast,
+                PresentationDiagnostic = presentation == null ? "missing" : presentation.ToString(),
+                PresentationValidatedCount = _instance._diagnostics.PresentationValidatedCount,
+                PresentationValidatedOrder = _instance._diagnostics.PresentationValidatedOrder,
+                InputLeaseAcquiredOrder = _instance._diagnostics.InputLeaseAcquiredOrder,
+                LifecycleState = _instance._screen.LifecycleState.ToString(),
                 PlannerOpen = _instance._screen.IsOpen,
                 FullScreenModeActive = Game.Instance != null &&
                     Game.Instance.IsModeActive(GameModeType.FullScreenUi),
@@ -150,6 +165,7 @@ namespace KingmakerBuffPlanner.UI
                 ScrollEventCount = _instance._diagnostics.ScrollEventCount,
                 DragEventCount = _instance._diagnostics.DragEventCount,
                 LongPointerEventCount = longFlow.PointerEvents,
+                LongPointerEnterCount = longFlow.PointerEnters,
                 LongListenerCount = longFlow.Listeners,
                 LongGroupResolvedCount = longFlow.GroupsResolved,
                 LongPlanRevalidatedCount = longFlow.PlansRevalidated,
@@ -276,10 +292,24 @@ namespace KingmakerBuffPlanner.UI
         internal int HudButtonCount;
         internal int HudListenerCount;
         internal string HudAnchorPath;
+        internal string HudRaycastCanvasPath;
+        internal string HudButtonOrder;
+        internal bool HudRowAboveNativeCluster;
+        internal bool HudHitboxesOwnRaycasts;
+        internal int HudUnderlyingNativeActivationCount;
         internal int FullScreenRootCount;
         internal bool FullScreenOpaque;
         internal bool FullScreenBlocksRaycasts;
         internal bool GraphicRaycasterPresent;
+        internal bool PresentationValid;
+        internal string PresentationFailure;
+        internal float PresentationCoverage;
+        internal bool PresentationOwnsCenterRaycast;
+        internal string PresentationDiagnostic;
+        internal int PresentationValidatedCount;
+        internal int PresentationValidatedOrder;
+        internal int InputLeaseAcquiredOrder;
+        internal string LifecycleState;
         internal bool PlannerOpen;
         internal bool FullScreenModeActive;
         internal bool SelectionDisabled;
@@ -299,6 +329,7 @@ namespace KingmakerBuffPlanner.UI
         internal int ScrollEventCount;
         internal int DragEventCount;
         internal int LongPointerEventCount;
+        internal int LongPointerEnterCount;
         internal int LongListenerCount;
         internal int LongGroupResolvedCount;
         internal int LongPlanRevalidatedCount;

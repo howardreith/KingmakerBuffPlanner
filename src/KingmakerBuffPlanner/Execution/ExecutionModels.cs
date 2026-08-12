@@ -9,25 +9,41 @@ namespace KingmakerBuffPlanner.Execution
 {
     public enum CastExecutionStatus
     {
-        Fired,
-        Succeeded,
-        Observed,
+        Selected,
+        Planned,
+        Queued,
+        Submitted,
+        CastStarted,
         ResourceSpent,
-        Failed
+        EffectConfirmed,
+        SkippedExisting,
+        FailedValidation,
+        FailedSubmission,
+        FailedExecution,
+        TimedOutUnconfirmed
     }
 
     public sealed class CastExecutionRecord
     {
-        internal CastExecutionRecord(int stepIndex, string providerKey, CastExecutionStatus status, string detail)
+        internal CastExecutionRecord(int stepIndex, CastStep step, CastExecutionStatus status, string detail)
         {
             StepIndex = stepIndex;
-            ProviderKey = providerKey;
+            ProviderKey = step.Provider.Canonical;
+            AbilityKey = step.Provider.Ability.Canonical;
+            TargetUnitIds = new ReadOnlyCollection<string>(step.TargetUnitIds.ToList());
+            ResourcePoolKey = step.Reservation == null ? string.Empty : step.Reservation.PoolKey;
+            ResourceTokenIds = new ReadOnlyCollection<string>(step.Reservation == null
+                ? new List<string>() : step.Reservation.TokenIds.ToList());
             Status = status;
             Detail = detail ?? string.Empty;
         }
 
         public int StepIndex { get; private set; }
         public string ProviderKey { get; private set; }
+        public string AbilityKey { get; private set; }
+        public IReadOnlyList<string> TargetUnitIds { get; private set; }
+        public string ResourcePoolKey { get; private set; }
+        public IReadOnlyList<string> ResourceTokenIds { get; private set; }
         public CastExecutionStatus Status { get; private set; }
         public string Detail { get; private set; }
     }
@@ -51,15 +67,20 @@ namespace KingmakerBuffPlanner.Execution
         {
             get { return new ReadOnlyCollection<CastExecutionRecord>(_records); }
         }
-        public int Fired { get { return _records.Count(r => r.Status == CastExecutionStatus.Fired); } }
-        public int Succeeded { get { return _records.Count(r => r.Status == CastExecutionStatus.Succeeded); } }
-        public int SuccessfullyObserved { get { return _records.Count(r => r.Status == CastExecutionStatus.Observed); } }
+        public int Queued { get { return _records.Count(r => r.Status == CastExecutionStatus.Queued); } }
+        public int Submitted { get { return _records.Count(r => r.Status == CastExecutionStatus.Submitted); } }
+        public int CastStarted { get { return _records.Count(r => r.Status == CastExecutionStatus.CastStarted); } }
+        public int Confirmed { get { return _records.Count(r => r.Status == CastExecutionStatus.EffectConfirmed); } }
+        public int SuccessfullyObserved { get { return Confirmed; } }
         public int ResourcesSpent { get { return _records.Count(r => r.Status == CastExecutionStatus.ResourceSpent); } }
-        public int Failed { get { return _records.Count(r => r.Status == CastExecutionStatus.Failed); } }
+        public int Failed { get { return _records.Count(r => r.Status == CastExecutionStatus.FailedValidation ||
+            r.Status == CastExecutionStatus.FailedSubmission ||
+            r.Status == CastExecutionStatus.FailedExecution ||
+            r.Status == CastExecutionStatus.TimedOutUnconfirmed); } }
 
         internal void Add(int stepIndex, CastStep step, CastExecutionStatus status, string detail)
         {
-            _records.Add(new CastExecutionRecord(stepIndex, step.Provider.Canonical, status, detail));
+            _records.Add(new CastExecutionRecord(stepIndex, step, status, detail));
         }
     }
 
@@ -80,6 +101,8 @@ namespace KingmakerBuffPlanner.Execution
     public interface IAnimatedCastOperation
     {
         bool IsCompleted { get; }
+        bool IsStarted { get; }
+        bool TimedOut { get; }
         bool Succeeded { get; }
         bool EffectsObserved { get; }
         bool ResourceSpent { get; }
@@ -100,15 +123,15 @@ namespace KingmakerBuffPlanner.Execution
 
     public sealed class InstantCastResult
     {
-        public InstantCastResult(bool fired, bool succeeded, bool effectsObserved, bool resourceSpent, string detail)
+        public InstantCastResult(bool submitted, bool succeeded, bool effectsObserved, bool resourceSpent, string detail)
         {
-            Fired = fired;
+            Submitted = submitted;
             Succeeded = succeeded;
             EffectsObserved = effectsObserved;
             ResourceSpent = resourceSpent;
             Detail = detail ?? string.Empty;
         }
-        public bool Fired { get; private set; }
+        public bool Submitted { get; private set; }
         public bool Succeeded { get; private set; }
         public bool EffectsObserved { get; private set; }
         public bool ResourceSpent { get; private set; }
@@ -120,5 +143,6 @@ namespace KingmakerBuffPlanner.Execution
         bool IsInCombat { get; }
         CastRuntimeValidation Validate(CastStep step);
         InstantCastResult Fire(CastStep step);
+        bool EffectsObserved(CastStep step);
     }
 }

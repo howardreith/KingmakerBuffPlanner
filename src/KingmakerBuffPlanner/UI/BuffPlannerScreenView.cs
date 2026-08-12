@@ -23,6 +23,10 @@ namespace KingmakerBuffPlanner.UI
         private readonly Action<string> _execute;
         private readonly PlannerUiTheme _theme;
         private RectTransform _root;
+        private Canvas _canvas;
+        private CanvasGroup _canvasGroup;
+        private GraphicRaycaster _raycaster;
+        private Image _blocker;
         private RectTransform _sourceContent;
         private RectTransform _detailContent;
         private Text _status;
@@ -52,8 +56,16 @@ namespace KingmakerBuffPlanner.UI
             _execute = execute ?? throw new ArgumentNullException("execute");
             _theme = PlannerUiTheme.Resolve(nativeCanvas.ServiceWindow == null
                 ? (Component)nativeCanvas : nativeCanvas.ServiceWindow.WindowTabs);
-            Build(nativeCanvas);
-            RefreshAll();
+            try
+            {
+                Build(nativeCanvas);
+                RefreshAll();
+            }
+            catch
+            {
+                Dispose();
+                throw;
+            }
         }
 
         internal bool IsAlive { get { return !_disposed && _root != null; } }
@@ -70,6 +82,78 @@ namespace KingmakerBuffPlanner.UI
             }
         }
         internal string ActiveRoutineId { get { return _routineId; } }
+        internal PlannerPresentationValidation LastValidation { get; private set; }
+
+        internal PlannerPresentationValidation ValidatePresentation()
+        {
+            if (_root == null)
+                return LastValidation = PlannerPresentationValidation.Failed("root-null");
+            Canvas.ForceUpdateCanvases();
+            LayoutRebuilder.ForceRebuildLayoutImmediate(_root);
+            Canvas.ForceUpdateCanvases();
+            Vector3[] corners = new Vector3[4];
+            _root.GetWorldCorners(corners);
+            float minX = corners.Min(corner => corner.x);
+            float maxX = corners.Max(corner => corner.x);
+            float minY = corners.Min(corner => corner.y);
+            float maxY = corners.Max(corner => corner.y);
+            float coveredWidth = Mathf.Max(0, Mathf.Min(Screen.width, maxX) - Mathf.Max(0, minX));
+            float coveredHeight = Mathf.Max(0, Mathf.Min(Screen.height, maxY) - Mathf.Max(0, minY));
+            float coverage = Screen.width <= 0 || Screen.height <= 0 ? 0 :
+                (coveredWidth * coveredHeight) / (Screen.width * (float)Screen.height);
+            EventSystem eventSystem = EventSystem.current;
+            bool ownsCenterRaycast = false;
+            string topRaycast = string.Empty;
+            if (eventSystem != null)
+            {
+                var eventData = new PointerEventData(eventSystem)
+                {
+                    position = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f)
+                };
+                var hits = new List<RaycastResult>();
+                eventSystem.RaycastAll(eventData, hits);
+                if (hits.Count != 0 && hits[0].gameObject != null)
+                {
+                    topRaycast = GetPath(hits[0].gameObject.transform);
+                    ownsCenterRaycast = hits[0].gameObject.transform == _root ||
+                        hits[0].gameObject.transform.IsChildOf(_root);
+                }
+            }
+            bool controls = _root.Find("ServiceFrame/Header/Close") != null &&
+                _root.Find("ServiceFrame/RoutineTabs") != null &&
+                _root.Find("ServiceFrame/Footer/Execute") != null;
+            string failure = !_root.gameObject.activeSelf ? "root-inactive-self" :
+                !_root.gameObject.activeInHierarchy ? "root-inactive-hierarchy" :
+                _canvas == null || !_canvas.isActiveAndEnabled ? "canvas-inactive" :
+                _canvas.rootCanvas != _canvas ? "canvas-not-root" :
+                _canvasGroup == null || _canvasGroup.alpha < 0.999f ? "canvas-transparent" :
+                !_canvasGroup.interactable || !_canvasGroup.blocksRaycasts ? "canvas-group-not-interactive" :
+                _blocker == null || !_blocker.raycastTarget || _blocker.color.a < 0.999f ? "blocker-invalid" :
+                _raycaster == null || !_raycaster.isActiveAndEnabled ? "raycaster-inactive" :
+                eventSystem == null ? "event-system-absent" :
+                _root.rect.width <= 1 || _root.rect.height <= 1 ? "root-zero-size" :
+                coverage < 0.98f ? "screen-coverage:" + coverage.ToString("F4") :
+                !controls ? "required-controls-absent" :
+                !ownsCenterRaycast ? "center-raycast-not-owned:" + topRaycast : string.Empty;
+            LastValidation = new PlannerPresentationValidation(
+                string.IsNullOrEmpty(failure), failure, _root.GetInstanceID(),
+                _root.gameObject.activeSelf, _root.gameObject.activeInHierarchy,
+                GetPath(_root), _canvas == null ? string.Empty : _canvas.name,
+                _canvas == null ? string.Empty : _canvas.renderMode.ToString(),
+                _canvas == null ? 0 : _canvas.sortingOrder,
+                _canvas != null && _canvas.overrideSorting,
+                _root.anchorMin, _root.anchorMax, _root.pivot, _root.sizeDelta,
+                _root.rect.size, corners, Screen.width, Screen.height, coverage,
+                _canvasGroup == null ? 0 : _canvasGroup.alpha,
+                _canvasGroup != null && _canvasGroup.interactable,
+                _canvasGroup != null && _canvasGroup.blocksRaycasts,
+                _blocker != null && _blocker.raycastTarget,
+                _blocker == null ? 0 : _blocker.color.a,
+                _raycaster == null ? string.Empty : GetPath(_raycaster.transform),
+                eventSystem == null ? string.Empty : GetPath(eventSystem.transform),
+                ownsCenterRaycast, topRaycast);
+            return LastValidation;
+        }
 
         internal bool DispatchRoutineTabForRuntime(string routineId)
         {
@@ -96,6 +180,8 @@ namespace KingmakerBuffPlanner.UI
                 _result.text = "Load a campaign to configure and execute buff routines. " +
                     "The planner never writes to a Kingmaker save.";
             }
+            else if (!string.IsNullOrWhiteSpace(_session.ProfileStatus))
+                _result.text = _session.ProfileStatus;
             RefreshTabs();
             RefreshSourceList();
             RefreshDetails();
@@ -123,29 +209,35 @@ namespace KingmakerBuffPlanner.UI
 
         private void Build(StaticCanvas nativeCanvas)
         {
-            Transform existing = nativeCanvas.RectTransform.Find(RootName);
-            if (existing != null) UnityEngine.Object.Destroy(existing.gameObject);
-            _root = KingmakerUiFactory.CreateRect(RootName, nativeCanvas.RectTransform);
+            foreach (PlannerScreenMarker existing in Resources.FindObjectsOfTypeAll<PlannerScreenMarker>())
+                if (existing != null && existing.gameObject.name == RootName)
+                    UnityEngine.Object.Destroy(existing.gameObject);
+            _root = KingmakerUiFactory.CreateRect(RootName, null);
             KingmakerUiFactory.Stretch(_root);
             _root.gameObject.AddComponent<PlannerScreenMarker>();
-            Canvas canvas = _root.gameObject.AddComponent<Canvas>();
-            canvas.overrideSorting = true;
-            Canvas nativeUnityCanvas = nativeCanvas.GetComponentInParent<Canvas>();
-            canvas.sortingOrder = (nativeUnityCanvas == null ? 0 : nativeUnityCanvas.sortingOrder) + 80;
-            GraphicRaycaster raycaster = _root.gameObject.AddComponent<GraphicRaycaster>();
-            raycaster.ignoreReversedGraphics = true;
-            CanvasGroup canvasGroup = _root.gameObject.AddComponent<CanvasGroup>();
-            canvasGroup.alpha = 1f;
-            canvasGroup.interactable = true;
-            canvasGroup.blocksRaycasts = true;
-            Image blocker = KingmakerUiFactory.AddPanel(_root, _theme.Background, _theme.PanelSprite);
-            blocker.color = _theme.Background;
-            blocker.raycastTarget = true;
+            _canvas = _root.gameObject.AddComponent<Canvas>();
+            _canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            _canvas.overrideSorting = true;
+            _canvas.sortingOrder = 32000;
+            CanvasScaler scaler = _root.gameObject.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920, 1080);
+            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+            scaler.matchWidthOrHeight = 0.5f;
+            _raycaster = _root.gameObject.AddComponent<GraphicRaycaster>();
+            _raycaster.ignoreReversedGraphics = true;
+            _canvasGroup = _root.gameObject.AddComponent<CanvasGroup>();
+            _canvasGroup.alpha = 1f;
+            _canvasGroup.interactable = true;
+            _canvasGroup.blocksRaycasts = true;
+            _blocker = KingmakerUiFactory.AddPanel(_root, _theme.Background, _theme.PanelSprite);
+            _blocker.color = _theme.Background;
+            _blocker.raycastTarget = true;
             PlannerPointerSink sink = _root.gameObject.AddComponent<PlannerPointerSink>();
             sink.Diagnostics = _diagnostics;
-            IsOpaque = blocker.color.a >= 0.999f;
-            BlocksRaycasts = blocker.raycastTarget && canvasGroup.blocksRaycasts && canvasGroup.interactable;
-            HasGraphicRaycaster = raycaster.isActiveAndEnabled;
+            IsOpaque = _blocker.color.a >= 0.999f;
+            BlocksRaycasts = _blocker.raycastTarget && _canvasGroup.blocksRaycasts && _canvasGroup.interactable;
+            HasGraphicRaycaster = _raycaster.isActiveAndEnabled;
 
             RectTransform frame = KingmakerUiFactory.CreateRect("ServiceFrame", _root);
             KingmakerUiFactory.SetAnchors(frame, 0.025f, 0.025f, 0.975f, 0.975f);
@@ -157,7 +249,20 @@ namespace KingmakerBuffPlanner.UI
             BuildDetailPanel(frame);
             BuildFooter(frame);
             _root.SetAsLastSibling();
+            _root.gameObject.SetActive(true);
             _diagnostics.RecordScreenCreated();
+        }
+
+        private static string GetPath(Transform transform)
+        {
+            var names = new List<string>();
+            while (transform != null)
+            {
+                names.Add(transform.name);
+                transform = transform.parent;
+            }
+            names.Reverse();
+            return string.Join("/", names.ToArray());
         }
 
         private void BuildHeader(RectTransform frame)
@@ -570,4 +675,84 @@ namespace KingmakerBuffPlanner.UI
     }
 
     internal sealed class PlannerScreenMarker : MonoBehaviour { }
+
+    internal sealed class PlannerPresentationValidation
+    {
+        internal PlannerPresentationValidation(bool valid, string failure, int rootInstanceId,
+            bool activeSelf, bool activeInHierarchy, string hierarchy, string canvasIdentity,
+            string renderMode, int sortingOrder, bool overrideSorting, Vector2 anchorMin,
+            Vector2 anchorMax, Vector2 pivot, Vector2 sizeDelta, Vector2 rectSize,
+            Vector3[] worldCorners, int screenWidth, int screenHeight, float coverage,
+            float alpha, bool interactable, bool blocksRaycasts, bool backgroundRaycastTarget,
+            float backgroundOpacity, string raycasterIdentity, string eventSystemIdentity,
+            bool ownsCenterRaycast, string topRaycast)
+        {
+            Valid = valid; Failure = failure ?? string.Empty; RootInstanceId = rootInstanceId;
+            ActiveSelf = activeSelf; ActiveInHierarchy = activeInHierarchy; Hierarchy = hierarchy ?? string.Empty;
+            CanvasIdentity = canvasIdentity ?? string.Empty; RenderMode = renderMode ?? string.Empty;
+            SortingOrder = sortingOrder; OverrideSorting = overrideSorting; AnchorMin = anchorMin;
+            AnchorMax = anchorMax; Pivot = pivot; SizeDelta = sizeDelta; RectSize = rectSize;
+            WorldCorners = worldCorners ?? new Vector3[0]; ScreenWidth = screenWidth;
+            ScreenHeight = screenHeight; Coverage = coverage; Alpha = alpha;
+            Interactable = interactable; BlocksRaycasts = blocksRaycasts;
+            BackgroundRaycastTarget = backgroundRaycastTarget; BackgroundOpacity = backgroundOpacity;
+            RaycasterIdentity = raycasterIdentity ?? string.Empty;
+            EventSystemIdentity = eventSystemIdentity ?? string.Empty;
+            OwnsCenterRaycast = ownsCenterRaycast; TopRaycast = topRaycast ?? string.Empty;
+        }
+
+        internal static PlannerPresentationValidation Failed(string failure)
+        {
+            return new PlannerPresentationValidation(false, failure, 0, false, false,
+                string.Empty, string.Empty, string.Empty, 0, false, Vector2.zero, Vector2.zero,
+                Vector2.zero, Vector2.zero, Vector2.zero, new Vector3[0], Screen.width,
+                Screen.height, 0, 0, false, false, false, 0, string.Empty, string.Empty,
+                false, string.Empty);
+        }
+
+        internal bool Valid { get; private set; }
+        internal string Failure { get; private set; }
+        internal int RootInstanceId { get; private set; }
+        internal bool ActiveSelf { get; private set; }
+        internal bool ActiveInHierarchy { get; private set; }
+        internal string Hierarchy { get; private set; }
+        internal string CanvasIdentity { get; private set; }
+        internal string RenderMode { get; private set; }
+        internal int SortingOrder { get; private set; }
+        internal bool OverrideSorting { get; private set; }
+        internal Vector2 AnchorMin { get; private set; }
+        internal Vector2 AnchorMax { get; private set; }
+        internal Vector2 Pivot { get; private set; }
+        internal Vector2 SizeDelta { get; private set; }
+        internal Vector2 RectSize { get; private set; }
+        internal Vector3[] WorldCorners { get; private set; }
+        internal int ScreenWidth { get; private set; }
+        internal int ScreenHeight { get; private set; }
+        internal float Coverage { get; private set; }
+        internal float Alpha { get; private set; }
+        internal bool Interactable { get; private set; }
+        internal bool BlocksRaycasts { get; private set; }
+        internal bool BackgroundRaycastTarget { get; private set; }
+        internal float BackgroundOpacity { get; private set; }
+        internal string RaycasterIdentity { get; private set; }
+        internal string EventSystemIdentity { get; private set; }
+        internal bool OwnsCenterRaycast { get; private set; }
+        internal string TopRaycast { get; private set; }
+
+        public override string ToString()
+        {
+            string corners = string.Join(";", WorldCorners.Select(value => value.ToString()).ToArray());
+            return "valid=" + Valid + ";failure=" + Failure + ";root=" + RootInstanceId +
+                ";activeSelf=" + ActiveSelf + ";activeHierarchy=" + ActiveInHierarchy +
+                ";hierarchy=" + Hierarchy + ";canvas=" + CanvasIdentity + ";mode=" + RenderMode +
+                ";sort=" + SortingOrder + ";override=" + OverrideSorting + ";anchors=" +
+                AnchorMin + ".." + AnchorMax + ";pivot=" + Pivot + ";sizeDelta=" + SizeDelta +
+                ";rect=" + RectSize + ";corners=" + corners + ";screen=" + ScreenWidth + "x" +
+                ScreenHeight + ";coverage=" + Coverage.ToString("F4") + ";alpha=" + Alpha +
+                ";interactable=" + Interactable + ";blocks=" + BlocksRaycasts +
+                ";backgroundRaycast=" + BackgroundRaycastTarget + ";backgroundAlpha=" +
+                BackgroundOpacity + ";raycaster=" + RaycasterIdentity + ";eventSystem=" +
+                EventSystemIdentity + ";ownsCenter=" + OwnsCenterRaycast + ";top=" + TopRaycast;
+        }
+    }
 }

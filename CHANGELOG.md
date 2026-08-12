@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.0.3 — 2026-08-12
+
+- Replaced cloned native HUD objects with four fresh retained-mode buttons in the exact Setup/Long/Important/Short row, anchored above the native cluster with top-raycast ownership validation.
+- Made full-screen opening presentation-first and transactional; an invisible/zero-size/non-raycast root now aborts before input acquisition, and every later validation failure rolls back.
+- Replaced “fired” success accounting with queued/submitted/started/spent/effect-confirmed terminal outcomes. Missing expected facts now report `TimedOutUnconfirmed` and fail the routine.
+- Audited the installed schema-2 profile: the Long Bless assignment and target were preserved without migration; the next execution records the automatically resolved provider and exact Bless fact result.
+- Strengthened deterministic and guarded runtime contracts to reject HUD overlap/click-through, invisible modal state, input-before-presentation ordering, and unconfirmed casts.
+
 ## 0.0.2 — 2026-08-12
 
 - Replaced the rejected floating IMGUI text strip with one native-anchored setup icon and Long, Important, and Short quick-action icons.

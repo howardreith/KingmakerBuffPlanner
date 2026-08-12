@@ -27,36 +27,54 @@ namespace KingmakerBuffPlanner.Execution
             {
                 CastStep step = plan.Steps[index];
                 if (_outOfCombatOnly && _runtime.IsInCombat)
-                    report.Add(index, step, CastExecutionStatus.Failed, "combat-policy");
+                    report.Add(index, step, CastExecutionStatus.FailedValidation, "combat-policy");
                 else
                 {
                     CastRuntimeValidation validation = _runtime.Validate(step);
                     if (!validation.Valid)
-                        report.Add(index, step, CastExecutionStatus.Failed, validation.Reason);
+                        report.Add(index, step, CastExecutionStatus.FailedValidation, validation.Reason);
                     else
                     {
-                        try
+                        InstantCastResult result = null;
+                        Exception submissionFailure = null;
+                        try { result = _runtime.Fire(step); }
+                        catch (Exception exception) { submissionFailure = exception; }
+                        if (submissionFailure != null)
                         {
-                            InstantCastResult result = _runtime.Fire(step);
-                            if (result == null)
-                                report.Add(index, step, CastExecutionStatus.Failed, "instant-result-null");
+                            report.Add(index, step, CastExecutionStatus.FailedSubmission,
+                                "instant-exception:" + submissionFailure.GetType().FullName + ":" +
+                                submissionFailure.Message);
+                        }
+                        else if (result == null)
+                            report.Add(index, step, CastExecutionStatus.FailedSubmission, "instant-result-null");
+                        else
+                        {
+                            if (result.Submitted)
+                            {
+                                report.Add(index, step, CastExecutionStatus.Submitted, "rule-cast-submitted");
+                                report.Add(index, step, CastExecutionStatus.CastStarted, "rule-cast-started");
+                            }
+                            if (result.ResourceSpent)
+                                report.Add(index, step, CastExecutionStatus.ResourceSpent, "ability-data-spend-completed");
+                            if (!result.Submitted)
+                                report.Add(index, step, CastExecutionStatus.FailedSubmission, result.Detail);
+                            else if (!result.Succeeded)
+                                report.Add(index, step, CastExecutionStatus.FailedExecution, result.Detail);
                             else
                             {
-                                if (result.Fired)
-                                    report.Add(index, step, CastExecutionStatus.Fired, "rule-cast-triggered");
-                                report.Add(index, step,
-                                    result.Succeeded ? CastExecutionStatus.Succeeded : CastExecutionStatus.Failed,
-                                    result.Detail);
-                                if (result.Succeeded && result.EffectsObserved)
-                                    report.Add(index, step, CastExecutionStatus.Observed, "expected-effects-observed");
-                                if (result.ResourceSpent)
-                                    report.Add(index, step, CastExecutionStatus.ResourceSpent, "ability-data-spend-completed");
+                                bool observed = result.EffectsObserved;
+                                for (int confirmationFrame = 0;
+                                    !observed && confirmationFrame < 12; confirmationFrame++)
+                                {
+                                    yield return null;
+                                    observed = _runtime.EffectsObserved(step);
+                                }
+                                report.Add(index, step, observed
+                                    ? CastExecutionStatus.EffectConfirmed
+                                    : CastExecutionStatus.TimedOutUnconfirmed,
+                                    (observed ? "expected-effects-observed;" :
+                                        "expected-effects-absent-after-confirmation-window;") + result.Detail);
                             }
-                        }
-                        catch (Exception exception)
-                        {
-                            report.Add(index, step, CastExecutionStatus.Failed,
-                                "instant-exception:" + exception.GetType().FullName + ":" + exception.Message);
                         }
                     }
                 }

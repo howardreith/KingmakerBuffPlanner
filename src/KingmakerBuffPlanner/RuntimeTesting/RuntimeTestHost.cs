@@ -196,10 +196,24 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     UiHudButtonCount = ui == null ? 0 : ui.HudButtonCount,
                     UiHudListenerCount = ui == null ? 0 : ui.HudListenerCount,
                     UiHudAnchorPath = ui == null ? null : ui.HudAnchorPath,
+                    UiHudRaycastCanvasPath = ui == null ? null : ui.HudRaycastCanvasPath,
+                    UiHudButtonOrder = ui == null ? null : ui.HudButtonOrder,
+                    UiHudRowAboveNativeCluster = ui != null && ui.HudRowAboveNativeCluster,
+                    UiHudHitboxesOwnRaycasts = ui != null && ui.HudHitboxesOwnRaycasts,
+                    UiHudUnderlyingNativeActivationCount = ui == null ? -1 : ui.HudUnderlyingNativeActivationCount,
                     UiFullScreenRootCount = ui == null ? 0 : ui.FullScreenRootCount,
                     UiFullScreenOpaque = ui != null && ui.FullScreenOpaque,
                     UiFullScreenBlocksRaycasts = ui != null && ui.FullScreenBlocksRaycasts,
                     UiGraphicRaycasterPresent = ui != null && ui.GraphicRaycasterPresent,
+                    UiPresentationValid = ui != null && ui.PresentationValid,
+                    UiPresentationFailure = ui == null ? null : ui.PresentationFailure,
+                    UiPresentationCoverage = ui == null ? 0 : ui.PresentationCoverage,
+                    UiPresentationOwnsCenterRaycast = ui != null && ui.PresentationOwnsCenterRaycast,
+                    UiPresentationDiagnostic = ui == null ? null : ui.PresentationDiagnostic,
+                    UiPresentationValidatedCount = ui == null ? 0 : ui.PresentationValidatedCount,
+                    UiPresentationValidatedOrder = ui == null ? 0 : ui.PresentationValidatedOrder,
+                    UiInputLeaseAcquiredOrder = ui == null ? 0 : ui.InputLeaseAcquiredOrder,
+                    UiLifecycleState = ui == null ? null : ui.LifecycleState,
                     UiPlannerOpen = ui != null && ui.PlannerOpen,
                     UiFullScreenModeActive = ui != null && ui.FullScreenModeActive,
                     UiSelectionDisabled = ui != null && ui.SelectionDisabled,
@@ -219,6 +233,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     UiScrollEventCount = ui == null ? 0 : ui.ScrollEventCount,
                     UiDragEventCount = ui == null ? 0 : ui.DragEventCount,
                     UiLongPointerEventCount = ui == null ? 0 : ui.LongPointerEventCount,
+                    UiLongPointerEnterCount = ui == null ? 0 : ui.LongPointerEnterCount,
                     UiLongListenerCount = ui == null ? 0 : ui.LongListenerCount,
                     UiLongGroupResolvedCount = ui == null ? 0 : ui.LongGroupResolvedCount,
                     UiLongPlanRevalidatedCount = ui == null ? 0 : ui.LongPlanRevalidatedCount,
@@ -430,10 +445,33 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     AddUiAssertion(result, "ui-hud-buttons", ui.HudButtonCount == 4, "4", ui.HudButtonCount.ToString());
                     AddUiAssertion(result, "ui-hud-listeners", ui.HudListenerCount == 4, "4", ui.HudListenerCount.ToString());
                     AddUiAssertion(result, "ui-native-anchor", !string.IsNullOrWhiteSpace(ui.HudAnchorPath), "nonempty", ui.HudAnchorPath ?? "missing");
+                    AddUiAssertion(result, "ui-hud-order", ui.HudButtonOrder == "Setup|Long|Important|Short",
+                        "Setup|Long|Important|Short", ui.HudButtonOrder ?? "missing");
+                    AddUiAssertion(result, "ui-hud-row-above-native", ui.HudRowAboveNativeCluster,
+                        "true", ui.HudRowAboveNativeCluster.ToString());
+                    AddUiAssertion(result, "ui-hud-visible-hitboxes-own-raycasts",
+                        ui.HudHitboxesOwnRaycasts && !string.IsNullOrWhiteSpace(ui.HudRaycastCanvasPath),
+                        "true/nonempty", ui.HudHitboxesOwnRaycasts + "/" + (ui.HudRaycastCanvasPath ?? "missing"));
+                    AddUiAssertion(result, "ui-hud-native-controls-unchanged",
+                        ui.HudUnderlyingNativeActivationCount == 0, "0",
+                        ui.HudUnderlyingNativeActivationCount.ToString());
                     AddUiAssertion(result, "ui-full-screen-root", ui.FullScreenRootCount == 1, "1", ui.FullScreenRootCount.ToString());
                     AddUiAssertion(result, "ui-opaque", ui.FullScreenOpaque, "true", ui.FullScreenOpaque.ToString());
                     AddUiAssertion(result, "ui-blocks-raycasts", ui.FullScreenBlocksRaycasts, "true", ui.FullScreenBlocksRaycasts.ToString());
                     AddUiAssertion(result, "ui-graphic-raycaster", ui.GraphicRaycasterPresent, "true", ui.GraphicRaycasterPresent.ToString());
+                    AddUiAssertion(result, "ui-presentation-visible-coverage",
+                        ui.PresentationValid && ui.PresentationCoverage >= 0.98f &&
+                        ui.PresentationOwnsCenterRaycast && string.IsNullOrEmpty(ui.PresentationFailure),
+                        "valid/>=0.98/center-owned/no-failure", ui.PresentationValid + "/" +
+                        ui.PresentationCoverage + "/" + ui.PresentationOwnsCenterRaycast + "/" +
+                        (ui.PresentationFailure ?? "missing"));
+                    AddUiAssertion(result, "ui-presentation-before-input-lease",
+                        ui.PresentationValidatedCount > 0 && ui.PresentationValidatedOrder > 0 &&
+                        ui.InputLeaseAcquiredOrder > ui.PresentationValidatedOrder,
+                        "validated-order < lease-order", ui.PresentationValidatedCount + "/" +
+                        ui.PresentationValidatedOrder + "/" + ui.InputLeaseAcquiredOrder);
+                    AddUiAssertion(result, "ui-lifecycle-open", ui.LifecycleState == "Open",
+                        "Open", ui.LifecycleState ?? "missing");
                     AddUiAssertion(result, "ui-native-full-screen-mode", ui.FullScreenModeActive, "true", ui.FullScreenModeActive.ToString());
                     AddUiAssertion(result, "ui-selection-disabled", ui.SelectionDisabled, "true", ui.SelectionDisabled.ToString());
                     AddUiAssertion(result, "ui-event-system", ui.EventSystemPresent, "true", ui.EventSystemPresent.ToString());
@@ -450,11 +488,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     AddUiAssertion(result, "ui-pointer-events-consumed", ui.PointerEventCount >= 2 &&
                         ui.ScrollEventCount >= 1 && ui.DragEventCount >= 2, ">=2/1/2",
                         ui.PointerEventCount + "/" + ui.ScrollEventCount + "/" + ui.DragEventCount);
-                    AddUiAssertion(result, "ui-long-flow-once", ui.LongPointerEventCount == 1 &&
+                    AddUiAssertion(result, "ui-long-flow-once", ui.LongPointerEnterCount == 1 &&
+                        ui.LongPointerEventCount == 1 &&
                         ui.LongListenerCount == 1 && ui.LongGroupResolvedCount == 1 &&
                         ui.LongPlanRevalidatedCount == 1 && ui.LongExecutionInvokedCount == 0 &&
                         ui.LongRefusalCount == 1 && ui.LongResultPresentedCount == 1,
-                        "1/1/1/1/0/1/1", ui.LongPointerEventCount + "/" + ui.LongListenerCount + "/" +
+                        "1/1/1/1/1/0/1/1", ui.LongPointerEnterCount + "/" +
+                        ui.LongPointerEventCount + "/" + ui.LongListenerCount + "/" +
                         ui.LongGroupResolvedCount + "/" + ui.LongPlanRevalidatedCount + "/" +
                         ui.LongExecutionInvokedCount + "/" + ui.LongRefusalCount + "/" +
                         ui.LongResultPresentedCount);
@@ -486,9 +526,18 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     if (ui.RootCount != 1 || ui.RenderedOpenFrames == 0 || ui.OpenCloseCycles < 21 ||
                         ui.ScreenWidth <= 0 || ui.ScreenHeight <= 0 ||
                         ui.HudButtonCount != 4 || ui.HudListenerCount != 4 ||
-                        string.IsNullOrWhiteSpace(ui.HudAnchorPath) || ui.FullScreenRootCount != 1 ||
+                        string.IsNullOrWhiteSpace(ui.HudAnchorPath) ||
+                        string.IsNullOrWhiteSpace(ui.HudRaycastCanvasPath) ||
+                        ui.HudButtonOrder != "Setup|Long|Important|Short" ||
+                        !ui.HudRowAboveNativeCluster || !ui.HudHitboxesOwnRaycasts ||
+                        ui.HudUnderlyingNativeActivationCount != 0 || ui.FullScreenRootCount != 1 ||
                         !ui.FullScreenOpaque || !ui.FullScreenBlocksRaycasts ||
-                        !ui.GraphicRaycasterPresent || !ui.FullScreenModeActive ||
+                        !ui.GraphicRaycasterPresent || !ui.PresentationValid ||
+                        ui.PresentationCoverage < 0.98f || !ui.PresentationOwnsCenterRaycast ||
+                        !string.IsNullOrEmpty(ui.PresentationFailure) ||
+                        ui.PresentationValidatedCount <= 0 || ui.PresentationValidatedOrder <= 0 ||
+                        ui.InputLeaseAcquiredOrder <= ui.PresentationValidatedOrder ||
+                        ui.LifecycleState != "Open" || !ui.FullScreenModeActive ||
                         !ui.SelectionDisabled || !ui.EventSystemPresent ||
                         ui.InputLeaseAcquireCount <= 0 ||
                         ui.InputLeaseReleaseCountAfterClose != ui.InputLeaseAcquireCount ||
@@ -496,7 +545,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         ui.SelectionDisabledAfterClose != ui.SelectionDisabledBeforeOpen ||
                         ui.PausedAfterClose != ui.PausedBeforeOpen || ui.ModeAfterClose != ui.ModeBeforeOpen ||
                         ui.PointerEventCount < 2 || ui.ScrollEventCount < 1 || ui.DragEventCount < 2 ||
-                        ui.LongPointerEventCount != 1 || ui.LongListenerCount != 1 ||
+                        ui.LongPointerEnterCount != 1 || ui.LongPointerEventCount != 1 ||
+                        ui.LongListenerCount != 1 ||
                         ui.LongGroupResolvedCount != 1 || ui.LongPlanRevalidatedCount != 1 ||
                         ui.LongExecutionInvokedCount != 0 || ui.LongRefusalCount != 1 ||
                         ui.LongResultPresentedCount != 1 ||
@@ -721,6 +771,21 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         [JsonProperty("uiSelectionDisabledBeforeOpen", Order = 94)] public bool UiSelectionDisabledBeforeOpen { get; set; }
         [JsonProperty("uiModeBeforeOpen", Order = 95)] public string UiModeBeforeOpen { get; set; }
         [JsonProperty("uiModeAfterClose", Order = 96)] public string UiModeAfterClose { get; set; }
+        [JsonProperty("uiHudRaycastCanvasPath", Order = 97)] public string UiHudRaycastCanvasPath { get; set; }
+        [JsonProperty("uiHudButtonOrder", Order = 98)] public string UiHudButtonOrder { get; set; }
+        [JsonProperty("uiHudRowAboveNativeCluster", Order = 99)] public bool UiHudRowAboveNativeCluster { get; set; }
+        [JsonProperty("uiHudHitboxesOwnRaycasts", Order = 100)] public bool UiHudHitboxesOwnRaycasts { get; set; }
+        [JsonProperty("uiHudUnderlyingNativeActivationCount", Order = 101)] public int UiHudUnderlyingNativeActivationCount { get; set; }
+        [JsonProperty("uiPresentationValid", Order = 102)] public bool UiPresentationValid { get; set; }
+        [JsonProperty("uiPresentationFailure", Order = 103)] public string UiPresentationFailure { get; set; }
+        [JsonProperty("uiPresentationCoverage", Order = 104)] public float UiPresentationCoverage { get; set; }
+        [JsonProperty("uiPresentationOwnsCenterRaycast", Order = 105)] public bool UiPresentationOwnsCenterRaycast { get; set; }
+        [JsonProperty("uiPresentationDiagnostic", Order = 106)] public string UiPresentationDiagnostic { get; set; }
+        [JsonProperty("uiPresentationValidatedCount", Order = 107)] public int UiPresentationValidatedCount { get; set; }
+        [JsonProperty("uiPresentationValidatedOrder", Order = 108)] public int UiPresentationValidatedOrder { get; set; }
+        [JsonProperty("uiInputLeaseAcquiredOrder", Order = 109)] public int UiInputLeaseAcquiredOrder { get; set; }
+        [JsonProperty("uiLifecycleState", Order = 110)] public string UiLifecycleState { get; set; }
+        [JsonProperty("uiLongPointerEnterCount", Order = 111)] public int UiLongPointerEnterCount { get; set; }
     }
 
     internal sealed class RuntimeTestAssertion

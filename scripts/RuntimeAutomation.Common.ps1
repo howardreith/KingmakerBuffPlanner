@@ -234,10 +234,23 @@ function Assert-KbpRuntimeResult {
             [int]$Result.uiHudButtonCount -ne 4 -or
             [int]$Result.uiHudListenerCount -ne 4 -or
             [string]::IsNullOrWhiteSpace([string]$Result.uiHudAnchorPath) -or
+            [string]::IsNullOrWhiteSpace([string]$Result.uiHudRaycastCanvasPath) -or
+            [string]$Result.uiHudButtonOrder -cne 'Setup|Long|Important|Short' -or
+            -not [bool]$Result.uiHudRowAboveNativeCluster -or
+            -not [bool]$Result.uiHudHitboxesOwnRaycasts -or
+            [int]$Result.uiHudUnderlyingNativeActivationCount -ne 0 -or
             [int]$Result.uiFullScreenRootCount -ne 1 -or
             -not [bool]$Result.uiFullScreenOpaque -or
             -not [bool]$Result.uiFullScreenBlocksRaycasts -or
             -not [bool]$Result.uiGraphicRaycasterPresent -or
+            -not [bool]$Result.uiPresentationValid -or
+            [double]$Result.uiPresentationCoverage -lt 0.98 -or
+            -not [bool]$Result.uiPresentationOwnsCenterRaycast -or
+            -not [string]::IsNullOrEmpty([string]$Result.uiPresentationFailure) -or
+            [int]$Result.uiPresentationValidatedCount -le 0 -or
+            [int]$Result.uiPresentationValidatedOrder -le 0 -or
+            [int]$Result.uiInputLeaseAcquiredOrder -le [int]$Result.uiPresentationValidatedOrder -or
+            [string]$Result.uiLifecycleState -cne 'Open' -or
             -not [bool]$Result.uiPlannerOpen -or
             -not [bool]$Result.uiFullScreenModeActive -or
             -not [bool]$Result.uiSelectionDisabled -or
@@ -250,6 +263,7 @@ function Assert-KbpRuntimeResult {
             [string]$Result.uiModeAfterClose -cne [string]$Result.uiModeBeforeOpen -or
             [int]$Result.uiPointerEventCount -lt 2 -or
             [int]$Result.uiScrollEventCount -lt 1 -or [int]$Result.uiDragEventCount -lt 2 -or
+            [int]$Result.uiLongPointerEnterCount -ne 1 -or
             [int]$Result.uiLongPointerEventCount -ne 1 -or
             [int]$Result.uiLongListenerCount -ne 1 -or
             [int]$Result.uiLongGroupResolvedCount -ne 1 -or

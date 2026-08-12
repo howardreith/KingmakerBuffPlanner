@@ -31,29 +31,37 @@ namespace KingmakerBuffPlanner.GameAdapters
             string reason;
             if (!KingmakerAnimatedCastAdapter.TryResolve(step, out resolved, out reason))
                 return new InstantCastResult(false, false, false, false, "final-resolution:" + reason);
+            int availableBefore = KingmakerAnimatedCastAdapter.SafeAvailableCount(resolved.Ability);
             var rule = Rulebook.Trigger(new RuleCastSpell(resolved.Ability, resolved.Target));
-            bool spent = false;
+            bool spendInvoked = false;
             if (!rule.IsUMDFailed)
             {
                 resolved.Ability.Spend();
-                spent = true;
+                spendInvoked = true;
             }
-            bool observed = false;
-            if (rule.Success)
-            {
-                try
-                {
-                    var active = new KingmakerActiveEffectSnapshotBuilder().Build();
-                    var evaluator = new EffectPresenceEvaluator();
-                    observed = step.TargetUnitIds.All(targetId =>
-                        evaluator.EvaluateTyped(step.ExpectedEffects, active.GetEffects(targetId), null).Kind ==
-                            EffectPresenceKind.Complete);
-                }
-                catch (Exception) { observed = false; }
-            }
+            int availableAfter = KingmakerAnimatedCastAdapter.SafeAvailableCount(resolved.Ability);
+            bool spent = availableBefore >= 0 && availableAfter >= 0 && availableAfter < availableBefore;
+            bool observed = rule.Success && EffectsObserved(step);
             return new InstantCastResult(true, rule.Success, observed, spent,
                 "rule-success:" + rule.Success + ";umd-failed:" + rule.IsUMDFailed +
-                ";spell-failed:" + rule.IsSpellFailed + ";effects-observed:" + observed);
+                ";spell-failed:" + rule.IsSpellFailed + ";spend-invoked:" + spendInvoked +
+                ";available-before:" + availableBefore +
+                ";available-after:" + availableAfter + ";expected-effects:" +
+                KingmakerAnimatedCastAdapter.ExpectedEffectIds(step.ExpectedEffects) + ";targets:" +
+                string.Join(",", step.TargetUnitIds.ToArray()) + ";effects-observed:" + observed);
+        }
+
+        public bool EffectsObserved(CastStep step)
+        {
+            try
+            {
+                var active = new KingmakerActiveEffectSnapshotBuilder().Build();
+                var evaluator = new EffectPresenceEvaluator();
+                return step.TargetUnitIds.All(targetId =>
+                    evaluator.EvaluateTyped(step.ExpectedEffects, active.GetEffects(targetId), null).Kind ==
+                        EffectPresenceKind.Complete);
+            }
+            catch (Exception) { return false; }
         }
     }
 }

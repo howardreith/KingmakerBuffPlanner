@@ -4,7 +4,6 @@ using System.Linq;
 using System.Reflection;
 using Kingmaker.UI.Constructor;
 using Kingmaker.UI.IngameMenu;
-using Kingmaker.UI.Tooltip;
 using KingmakerBuffPlanner.Persistence;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -23,6 +22,8 @@ namespace KingmakerBuffPlanner.UI
         private readonly List<Sprite> _ownedSprites = new List<Sprite>();
         private readonly List<Texture2D> _ownedTextures = new List<Texture2D>();
         private RectTransform _root;
+        private RectTransform _nativeCluster;
+        private GraphicRaycaster _nativeRaycaster;
         private Text _feedback;
         private Text _tooltip;
         private Button[] _buttons = new Button[0];
@@ -47,6 +48,11 @@ namespace KingmakerBuffPlanner.UI
         internal int ButtonCount { get { return _buttons.Count(button => button != null); } }
         internal int ListenerCount { get { return _listenerCount; } }
         internal string AnchorPath { get; private set; }
+        internal string RaycastCanvasPath { get; private set; }
+        internal bool RowAboveNativeCluster { get; private set; }
+        internal bool VisibleHitboxesOwnRaycasts { get; private set; }
+        internal string ButtonOrder { get { return "Setup|Long|Important|Short"; } }
+        internal int RuntimeUnderlyingNativeActivationCount { get; private set; }
 
         internal bool TryInstall()
         {
@@ -62,18 +68,26 @@ namespace KingmakerBuffPlanner.UI
             RectTransform reference = formation.transform as RectTransform;
             RectTransform parent = formation.transform.parent as RectTransform;
             if (reference == null || parent == null) return false;
+            GraphicRaycaster raycaster = parent.GetComponentInParent<GraphicRaycaster>();
+            if (raycaster == null || !raycaster.isActiveAndEnabled || EventSystem.current == null)
+                return false;
+            if (parent.GetComponentsInParent<CanvasGroup>(true).Any(group =>
+                group != null && (!group.interactable || !group.blocksRaycasts))) return false;
 
             Transform duplicate = parent.Find(RootName);
             if (duplicate != null) UnityEngine.Object.Destroy(duplicate.gameObject);
             _anchorController = controller;
+            _nativeCluster = parent;
+            _nativeRaycaster = raycaster;
             AnchorPath = GetPath(parent);
+            RaycastCanvasPath = GetPath(raycaster.transform);
             _root = KingmakerUiFactory.CreateRect(RootName, parent);
-            _root.anchorMin = reference.anchorMin;
-            _root.anchorMax = reference.anchorMax;
-            _root.pivot = reference.pivot;
+            _root.anchorMin = new Vector2(0, 1);
+            _root.anchorMax = new Vector2(0, 1);
+            _root.pivot = new Vector2(0, 0);
             float width = Mathf.Max(42f, reference.rect.width);
             float height = Mathf.Max(42f, reference.rect.height);
-            _root.anchoredPosition = reference.anchoredPosition + new Vector2(0, height + 8f);
+            _root.anchoredPosition = new Vector2(0, 8f);
             _root.sizeDelta = new Vector2(width * 4f + 18f, height);
             HorizontalLayoutGroup layout = _root.gameObject.AddComponent<HorizontalLayoutGroup>();
             layout.spacing = 6;
@@ -88,13 +102,13 @@ namespace KingmakerBuffPlanner.UI
             _feedback.color = new Color(1f, 0.84f, 0.42f, 1f);
             _buttons = new[]
             {
-                CreateNativeButton(formation, "Setup", "setup", width, height, _openSetup,
+                CreatePlannerButton("Setup", "setup", width, height, _openSetup,
                     () => "Open Buff Planner setup. F10 is the fallback shortcut."),
-                CreateNativeButton(formation, "Long", "long", width, height,
+                CreatePlannerButton("Long", "long", width, height,
                     () => _quickExecute("long"), () => RoutineTooltip("long")),
-                CreateNativeButton(formation, "Important", "important", width, height,
+                CreatePlannerButton("Important", "important", width, height,
                     () => _quickExecute("important"), () => RoutineTooltip("important")),
-                CreateNativeButton(formation, "Short", "short", width, height,
+                CreatePlannerButton("Short", "short", width, height,
                     () => _quickExecute("short"), () => RoutineTooltip("short"))
             };
             _tooltips = new Func<string>[]
@@ -105,6 +119,14 @@ namespace KingmakerBuffPlanner.UI
                 () => RoutineTooltip("short")
             };
             _root.SetAsLastSibling();
+            Canvas.ForceUpdateCanvases();
+            RowAboveNativeCluster = ValidateRowAboveCluster();
+            VisibleHitboxesOwnRaycasts = ValidateHitOwnership();
+            if (!RowAboveNativeCluster || !VisibleHitboxesOwnRaycasts)
+            {
+                DisposeOwnedRoot();
+                return false;
+            }
             _diagnostics.RecordHudInstalled();
             RefreshAvailability();
             return true;
@@ -158,7 +180,12 @@ namespace KingmakerBuffPlanner.UI
             _tooltips = new Func<string>[0];
             _listenerCount = 0;
             _anchorController = null;
+            _nativeCluster = null;
+            _nativeRaycaster = null;
             AnchorPath = string.Empty;
+            RaycastCanvasPath = string.Empty;
+            RowAboveNativeCluster = false;
+            VisibleHitboxesOwnRaycasts = false;
         }
 
         internal bool DispatchRuntimeClick(string routineId)
@@ -167,13 +194,52 @@ namespace KingmakerBuffPlanner.UI
                 routineId == "short" ? 3 : -1;
             if (index < 0 || index >= _buttons.Length || _buttons[index] == null ||
                 EventSystem.current == null) return false;
-            var down = new PointerEventData(EventSystem.current) { button = PointerEventData.InputButton.Left };
-            ExecuteEvents.Execute(_buttons[index].gameObject, down, ExecuteEvents.pointerDownHandler);
-            var up = new PointerEventData(EventSystem.current) { button = PointerEventData.InputButton.Left };
-            ExecuteEvents.Execute(_buttons[index].gameObject, up, ExecuteEvents.pointerUpHandler);
-            var click = new PointerEventData(EventSystem.current) { button = PointerEventData.InputButton.Left };
-            ExecuteEvents.Execute(_buttons[index].gameObject, click, ExecuteEvents.pointerClickHandler);
+            Button plannerButton = _buttons[index];
+            Vector3[] corners = new Vector3[4];
+            ((RectTransform)plannerButton.transform).GetWorldCorners(corners);
+            Vector2 center = new Vector2((corners[0].x + corners[2].x) * 0.5f,
+                (corners[0].y + corners[2].y) * 0.5f);
+            var raycast = new PointerEventData(EventSystem.current) { position = center };
+            var hits = new List<RaycastResult>();
+            EventSystem.current.RaycastAll(raycast, hits);
+            if (hits.Count == 0 || hits[0].gameObject == null) return false;
+            Transform top = hits[0].gameObject.transform;
+            if (top != plannerButton.transform && !top.IsChildOf(plannerButton.transform)) return false;
+            var nativeListeners = new List<Tuple<Button, UnityAction>>();
+            foreach (Button native in _nativeCluster.GetComponentsInChildren<Button>(true))
+            {
+                if (native == null || native.transform == plannerButton.transform ||
+                    native.transform.IsChildOf(_root)) continue;
+                UnityAction listener = () => RuntimeUnderlyingNativeActivationCount++;
+                native.onClick.AddListener(listener);
+                nativeListeners.Add(Tuple.Create(native, listener));
+            }
+            try
+            {
+                ExecuteEvents.ExecuteHierarchy(hits[0].gameObject,
+                    Pointer(center), ExecuteEvents.pointerEnterHandler);
+                ExecuteEvents.ExecuteHierarchy(hits[0].gameObject,
+                    Pointer(center), ExecuteEvents.pointerDownHandler);
+                ExecuteEvents.ExecuteHierarchy(hits[0].gameObject,
+                    Pointer(center), ExecuteEvents.pointerUpHandler);
+                ExecuteEvents.ExecuteHierarchy(hits[0].gameObject,
+                    Pointer(center), ExecuteEvents.pointerClickHandler);
+            }
+            finally
+            {
+                foreach (Tuple<Button, UnityAction> item in nativeListeners)
+                    if (item.Item1 != null) item.Item1.onClick.RemoveListener(item.Item2);
+            }
             return true;
+        }
+
+        private static PointerEventData Pointer(Vector2 position)
+        {
+            return new PointerEventData(EventSystem.current)
+            {
+                button = PointerEventData.InputButton.Left,
+                position = position
+            };
         }
 
         internal string TooltipForRuntime(string routineId)
@@ -202,8 +268,7 @@ namespace KingmakerBuffPlanner.UI
             return text;
         }
 
-        private Button CreateNativeButton(
-            ButtonPF template,
+        private Button CreatePlannerButton(
             string displayName,
             string iconKind,
             float width,
@@ -211,54 +276,74 @@ namespace KingmakerBuffPlanner.UI
             Action action,
             Func<string> tooltip)
         {
-            GameObject clone = UnityEngine.Object.Instantiate(template.gameObject);
-            clone.name = "KBP." + displayName;
-            clone.transform.SetParent(_root, false);
-            clone.transform.localScale = Vector3.one;
-            clone.SetActive(true);
-            RectTransform rect = clone.transform as RectTransform;
+            PlannerUiTheme theme = PlannerUiTheme.Resolve(_anchorController);
+            Button button = KingmakerUiFactory.CreateButton("KBP." + displayName, _root,
+                theme, string.Empty, null);
+            RectTransform rect = button.transform as RectTransform;
             rect.sizeDelta = new Vector2(width, height);
-            LayoutElement element = clone.GetComponent<LayoutElement>() ?? clone.AddComponent<LayoutElement>();
+            LayoutElement element = button.gameObject.GetComponent<LayoutElement>() ??
+                button.gameObject.AddComponent<LayoutElement>();
             element.preferredWidth = width;
             element.preferredHeight = height;
             element.minWidth = width;
             element.minHeight = height;
 
-            foreach (TooltipTrigger trigger in clone.GetComponentsInChildren<TooltipTrigger>(true))
-            {
-                trigger.enabled = false;
-                UnityEngine.Object.Destroy(trigger);
-            }
-            foreach (Text text in clone.GetComponentsInChildren<Text>(true)) text.gameObject.SetActive(false);
-            ButtonPF nativeButton = clone.GetComponent<ButtonPF>();
-            if (nativeButton != null)
-            {
-                nativeButton.OnRightClick = new Button.ButtonClickedEvent();
-                nativeButton.OnEnter = new UnityEvent();
-                nativeButton.OnExit = new UnityEvent();
-                nativeButton.DisableWarningMessage = string.Empty;
-            }
-            Button button = nativeButton ?? clone.GetComponent<Button>();
-            if (button == null) button = clone.AddComponent<Button>();
-            button.onClick = new Button.ButtonClickedEvent();
+            foreach (Text text in button.GetComponentsInChildren<Text>(true))
+                UnityEngine.Object.Destroy(text.gameObject);
             button.onClick.AddListener(() => action());
             _listenerCount++;
-            PlannerPointerSink sink = clone.GetComponent<PlannerPointerSink>() ??
-                clone.AddComponent<PlannerPointerSink>();
+            PlannerPointerSink sink = button.gameObject.AddComponent<PlannerPointerSink>();
             sink.Diagnostics = _diagnostics;
             sink.RoutineId = iconKind == "setup" ? string.Empty : iconKind;
-            HudTooltipTarget hover = clone.GetComponent<HudTooltipTarget>() ??
-                clone.AddComponent<HudTooltipTarget>();
+            HudTooltipTarget hover = button.gameObject.AddComponent<HudTooltipTarget>();
             hover.Text = tooltip;
             hover.Show = ShowTooltip;
+            hover.Diagnostics = _diagnostics;
+            hover.RoutineId = iconKind;
 
-            RectTransform iconRect = KingmakerUiFactory.CreateRect("KBP.Icon", clone.transform);
+            RectTransform iconRect = KingmakerUiFactory.CreateRect("KBP.Icon", button.transform);
             KingmakerUiFactory.Stretch(iconRect, 7, 7, 7, 7);
             Image icon = iconRect.gameObject.AddComponent<Image>();
             icon.sprite = CreateIcon(iconKind);
             icon.preserveAspect = true;
-            icon.raycastTarget = false;
+            icon.raycastTarget = true;
             return button;
+        }
+
+        private bool ValidateRowAboveCluster()
+        {
+            if (_root == null || _nativeCluster == null) return false;
+            Vector3[] rootCorners = new Vector3[4];
+            Vector3[] clusterCorners = new Vector3[4];
+            _root.GetWorldCorners(rootCorners);
+            _nativeCluster.GetWorldCorners(clusterCorners);
+            float rootBottom = rootCorners.Min(value => value.y);
+            float clusterTop = clusterCorners.Max(value => value.y);
+            return rootBottom >= clusterTop + 0.5f;
+        }
+
+        private bool ValidateHitOwnership()
+        {
+            if (_buttons.Length != 4 || EventSystem.current == null || _nativeRaycaster == null)
+                return false;
+            foreach (Button button in _buttons)
+            {
+                if (button == null || !button.gameObject.activeInHierarchy ||
+                    button.targetGraphic == null || !button.targetGraphic.raycastTarget) return false;
+                Vector3[] corners = new Vector3[4];
+                ((RectTransform)button.transform).GetWorldCorners(corners);
+                var eventData = new PointerEventData(EventSystem.current)
+                {
+                    position = new Vector2((corners[0].x + corners[2].x) * 0.5f,
+                        (corners[0].y + corners[2].y) * 0.5f)
+                };
+                var hits = new List<RaycastResult>();
+                EventSystem.current.RaycastAll(eventData, hits);
+                if (hits.Count == 0 || hits[0].gameObject == null) return false;
+                Transform hit = hits[0].gameObject.transform;
+                if (hit != button.transform && !hit.IsChildOf(button.transform)) return false;
+            }
+            return true;
         }
 
         private void ShowTooltip(string value)
@@ -389,8 +474,11 @@ namespace KingmakerBuffPlanner.UI
     {
         internal Func<string> Text;
         internal Action<string> Show;
+        internal BuffPlannerUiLifecycleDiagnostics Diagnostics;
+        internal string RoutineId;
         public void OnPointerEnter(PointerEventData eventData)
         {
+            if (Diagnostics != null) Diagnostics.RecordPointerEnter(RoutineId);
             if (Show != null) Show(Text == null ? string.Empty : Text());
         }
         public void OnPointerExit(PointerEventData eventData)

@@ -78,6 +78,13 @@ foreach ($requiredHudContract in @('m_FormationButton', '"Setup"', '"Long"', '"I
         throw "Native HUD control contract is missing: $requiredHudContract"
     }
 }
+if ($hudSource -match 'Instantiate\s*\(\s*template\.gameObject' -or
+    $hudSource -match 'CreateNativeButton' -or
+    -not $hudSource.Contains('icon.raycastTarget = true') -or
+    -not $hudSource.Contains('Setup|Long|Important|Short') -or
+    -not $hudSource.Contains('ValidateHitOwnership')) {
+    throw 'The HUD must use fresh bounded retained-mode buttons with explicit top-hit ownership.'
+}
 $assertions++
 
 $screenSource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\UI\BuffPlannerScreenView.cs') -Raw
@@ -86,6 +93,27 @@ foreach ($requiredScreenContract in @('CanvasGroup', 'GraphicRaycaster', 'raycas
     if (-not $screenSource.Contains($requiredScreenContract)) {
         throw "Full-screen raycast/visual contract is missing: $requiredScreenContract"
     }
+}
+$assertions++
+
+$screenControllerSource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\UI\BuffPlannerScreenController.cs') -Raw
+$stateSource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\UI\BuffPlannerUiContracts.cs') -Raw
+if (-not $screenControllerSource.Contains('ValidatePresentation()') -or
+    -not $screenControllerSource.Contains('AcquireInputLease()') -or
+    $screenControllerSource.IndexOf('ValidatePresentation()', [StringComparison]::Ordinal) -gt
+        $screenControllerSource.IndexOf('AcquireInputLease()', [StringComparison]::Ordinal) -or
+    -not $stateSource.Contains('OpeningPresentation') -or
+    -not $stateSource.Contains('FaultedRollback')) {
+    throw 'Planner presentation validation must precede the transactional input lease.'
+}
+$assertions++
+
+$executionSource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\Execution\ExecutionModels.cs') -Raw
+$sessionSource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\UI\PlannerUiSession.cs') -Raw
+if ($executionSource.Contains('CastExecutionStatus.Fired') -or $sessionSource.Contains('; fired=') -or
+    -not $executionSource.Contains('EffectConfirmed') -or
+    -not $executionSource.Contains('TimedOutUnconfirmed')) {
+    throw 'Queued/submitted casts must not be reported as applied without effect confirmation.'
 }
 $assertions++
 

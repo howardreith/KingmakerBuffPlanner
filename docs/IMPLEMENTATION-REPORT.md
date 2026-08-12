@@ -1,5 +1,11 @@
 # Implementation Report
 
+## 0.0.3 R2 correction
+
+Direct human testing invalidated the 0.0.2 HUD and modal result. The current correction removes native `ButtonPF` cloning, requires fresh retained-mode button hitboxes to own the top EventSystem raycast, anchors the exact Setup/Long/Important/Short row above the native cluster, and validates that native sentinel listeners remain unchanged. Modal opening now constructs, lays out, renders, and validates a dedicated opaque screen before `FullScreenUi` acquisition, with complete rollback on every failure path. Execution no longer exposes “fired” as success: only confirmed expected facts count, while queued/submitted/started/resource and terminal failure states remain distinct. The exact installed profile preserved Long → Bless and its target without migration; provider choice is automatic and will be recorded from the next live party plan.
+
+Current focused gates: source validation 21/21, behavior/protocol 57/57, runtime harness 6/6, package allowlist 4/4, deployment WhatIf 5/5, warning-free exact-reference build. Guarded runtime repetition, final package identity, guarded installation, and authoritative human retest remain pending.
+
 Status: IN PROGRESS
 
 The 0.0.1 Phase 6/10/12 UI claims below are historical and invalidated by human playtesting: that fixed-coordinate IMGUI text strip clicked through to the world and could make Long appear silent. Version 0.0.2 removes it and implements native-anchored icon controls, an opaque full-screen uGUI service window, scoped native full-screen/selection input isolation, pointer consumption, quick-flow diagnostics, and visible results. The corrected campaign UI runtime gate no longer runs as part of `final-no-save-core` and reports `BLOCKED` when only the main menu is available. Source gates pass 19/19 and 56/56; final human visual/input acceptance is pending installation and playtest.

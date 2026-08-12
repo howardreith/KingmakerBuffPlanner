@@ -9,6 +9,7 @@ using Kingmaker.UnitLogic.Commands;
 using Kingmaker.UnitLogic.Commands.Base;
 using Kingmaker.Utility;
 using KingmakerBuffPlanner.Domain.Identity;
+using KingmakerBuffPlanner.Domain.Effects;
 using KingmakerBuffPlanner.Domain.Planning;
 using KingmakerBuffPlanner.Execution;
 using KingmakerBuffPlanner.Planning;
@@ -46,8 +47,9 @@ namespace KingmakerBuffPlanner.GameAdapters
                 throw new InvalidOperationException(reason);
             UnitCommand command = UnitUseAbility.CreateCastCommand(resolved.Ability, resolved.Target);
             if (command == null) throw new InvalidOperationException("Kingmaker returned no cast command.");
+            int availableBefore = SafeAvailableCount(resolved.Ability);
             resolved.Caster.Commands.AddToQueue(command);
-            return new KingmakerAnimatedOperation(command, step);
+            return new KingmakerAnimatedOperation(command, step, resolved.Ability, availableBefore);
         }
 
         internal static bool TryResolve(CastStep step, out ResolvedCast resolved, out string reason)
@@ -161,6 +163,42 @@ namespace KingmakerBuffPlanner.GameAdapters
             return false;
         }
 
+        internal static int SafeAvailableCount(AbilityData ability)
+        {
+            try { return ability == null ? -1 : ability.GetAvailableForCastCount(); }
+            catch (Exception) { return -1; }
+        }
+
+        internal static string ExpectedEffectIds(EffectExpression expression)
+        {
+            var ids = new SortedSet<string>(StringComparer.Ordinal);
+            CollectEffectIds(expression, ids);
+            return string.Join(",", ids.ToArray());
+        }
+
+        private static void CollectEffectIds(EffectExpression expression, ISet<string> ids)
+        {
+            var leaf = expression as EffectLeafExpression;
+            if (leaf != null) { ids.Add(leaf.EffectId); return; }
+            var sequence = expression as SequenceEffectExpression;
+            if (sequence != null)
+            {
+                foreach (EffectExpression child in sequence.Children) CollectEffectIds(child, ids);
+                return;
+            }
+            var conditional = expression as ConditionalEffectExpression;
+            if (conditional != null)
+            {
+                CollectEffectIds(conditional.WhenTrue, ids);
+                CollectEffectIds(conditional.WhenFalse, ids);
+                return;
+            }
+            var targeted = expression as TargetedEffectExpression;
+            if (targeted != null) { CollectEffectIds(targeted.Child, ids); return; }
+            var referenced = expression as ReferencedAbilityExpression;
+            if (referenced != null) CollectEffectIds(referenced.Child, ids);
+        }
+
         internal sealed class ResolvedCast
         {
             internal ResolvedCast(UnitEntityData caster, AbilityData ability, TargetWrapper target)
@@ -178,47 +216,78 @@ namespace KingmakerBuffPlanner.GameAdapters
         {
             private readonly UnitCommand _command;
             private readonly CastStep _step;
+            private readonly AbilityData _ability;
+            private readonly int _availableBefore;
             private int _postCompletionFrames;
+            private int _pollFrames;
             private bool? _observed;
+            private bool _timedOut;
 
-            internal KingmakerAnimatedOperation(UnitCommand command, CastStep step)
+            internal KingmakerAnimatedOperation(UnitCommand command, CastStep step,
+                AbilityData ability, int availableBefore)
             {
                 _command = command;
                 _step = step;
+                _ability = ability;
+                _availableBefore = availableBefore;
             }
 
             public bool IsCompleted
             {
                 get
                 {
+                    if (++_pollFrames >= 3600 && !_command.IsFinished)
+                    {
+                        _timedOut = true;
+                        return true;
+                    }
                     if (!_command.IsFinished) return false;
                     if (_command.Result != UnitCommand.ResultType.Success) return true;
-                    return ++_postCompletionFrames >= 2;
+                    if (EffectsObserved) return true;
+                    return ++_postCompletionFrames >= 12;
                 }
             }
 
+            public bool IsStarted { get { return _command.IsStarted; } }
+            public bool TimedOut { get { return _timedOut; } }
             public bool Succeeded { get { return _command.Result == UnitCommand.ResultType.Success; } }
-            public bool ResourceSpent { get { return Succeeded; } }
+            public bool ResourceSpent
+            {
+                get
+                {
+                    int after = SafeAvailableCount(_ability);
+                    return _availableBefore >= 0 && after >= 0 && after < _availableBefore;
+                }
+            }
             public bool EffectsObserved
             {
                 get
                 {
-                    if (_observed.HasValue) return _observed.Value;
+                    if (_observed == true) return true;
                     try
                     {
                         var active = new KingmakerActiveEffectSnapshotBuilder().Build();
                         var evaluator = new EffectPresenceEvaluator();
-                        _observed = _step.TargetUnitIds.All(targetId =>
+                        bool observed = _step.TargetUnitIds.All(targetId =>
                             evaluator.EvaluateTyped(_step.ExpectedEffects, active.GetEffects(targetId), null).Kind ==
                                 EffectPresenceKind.Complete);
+                        if (observed) _observed = true;
+                        return observed;
                     }
-                    catch (Exception) { _observed = false; }
-                    return _observed.Value;
+                    catch (Exception) { return false; }
                 }
             }
             public string Detail
             {
-                get { return "command-result:" + _command.Result + ";effects-observed:" + EffectsObserved; }
+                get
+                {
+                    return "command-started:" + _command.IsStarted + ";command-result:" +
+                        _command.Result + ";timed-out:" + _timedOut + ";available-before:" +
+                        _availableBefore + ";available-after:" + SafeAvailableCount(_ability) +
+                        ";expected-effects:" + ExpectedEffectIds(_step.ExpectedEffects) +
+                        ";targets:" + string.Join(",", _step.TargetUnitIds.ToArray()) +
+                        ";effects-observed:" + EffectsObserved;
+                }
             }
         }
     }

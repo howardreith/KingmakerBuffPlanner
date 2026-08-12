@@ -1,5 +1,22 @@
 # Manual Acceptance
 
+Status: REQUIRED FOR 0.0.3 R2 VERDICT; the installed 0.0.2 verdict is FAIL.
+
+With validated 0.0.3 installed, load the same campaign and verify:
+
+- one horizontal row appears directly above the native bottom-left cluster in exact order: Setup, Long, Important, Short;
+- no planner icon or tooltip overlaps a native control/tooltip region;
+- clicking any planner icon never activates turn-based mode, pause/hourglass, a world command, selection, ability, camera drag, or camera zoom;
+- Setup and F10 both open the same visible, opaque, full-screen `BUFF PLANNER` root;
+- F10 never hides the HUD or locks gameplay unless that visible root was constructed and validated first;
+- Escape, close, and F10 restore the prior gameplay/HUD/input state;
+- Long visibly resolves the preserved Bless assignment, reports the chosen caster/spellbook/target and queued/submitted/started state, and only reports success if `BlessBuff` is confirmed;
+- if Bless cannot apply, the visible result names the exact validation, submission, execution, resource, or unconfirmed-effect failure;
+- Important and Short visibly report their configured/empty state;
+- 20 close/reopen cycles leave one HUD row, no hidden modal root, and no retained input lock.
+
+The historical 0.0.2 checklist below is superseded by this R2 checklist.
+
 Status: REQUIRED FOR 0.0.2 UI VERDICT; save-backed execution remains deferred pending an authorized `KBP_AUTOMATION_WORKING` fixture
 
 Human playtesting is authoritative for the visual and interaction repair. With 0.0.2 installed, load a campaign and verify:

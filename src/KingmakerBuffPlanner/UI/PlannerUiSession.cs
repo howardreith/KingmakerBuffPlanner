@@ -41,6 +41,7 @@ namespace KingmakerBuffPlanner.UI
         internal bool IsExecuting { get; private set; }
         internal RoutinePlanResult LastPreview { get; private set; }
         internal ExecutionReport LastExecutionReport { get; private set; }
+        internal string ProfileStatus { get; private set; }
 
         internal void Refresh()
         {
@@ -75,6 +76,13 @@ namespace KingmakerBuffPlanner.UI
                             guid, scanner.Scan(adapter.Adapt(ability)).Expression).Expression;
                 }
                 ProfileLoadResult loaded = _profiles.Load(campaignId);
+                ProfileStatus = string.IsNullOrEmpty(loaded.SourcePath)
+                    ? "No prior profile was found; using a new schema " +
+                        BuffPlannerProfile.CurrentSchemaVersion + " profile."
+                    : "Loaded profile " + loaded.SourcePath + "; schema=" +
+                        loaded.Profile.SchemaVersion + "; migrated=" + loaded.Migrated +
+                        "; recoveredFromBackup=" + loaded.RecoveredFromBackup + ".";
+                _log.Info("Profile load: " + ProfileStatus);
                 if (!string.IsNullOrEmpty(loaded.Warning))
                     _log.Info("Profile recovery warning: " + loaded.Warning);
                 Model = new PlannerSetupModel(loaded.Profile, snapshot, active, effects, _profiles.Save);
@@ -116,7 +124,7 @@ namespace KingmakerBuffPlanner.UI
             {
                 Complete(completed, new QuickExecutionResult(routineId, routineName,
                     QuickExecutionDisposition.Refused,
-                    "Another buff routine is already executing.", 0, 0));
+                    "Another buff routine is already executing.", 0, 0, 0));
                 yield break;
             }
             RoutinePlanResult preview;
@@ -129,7 +137,7 @@ namespace KingmakerBuffPlanner.UI
                 Status = "Routine preview failed: " + exception.Message;
                 _log.Error("Routine preview failed.", exception);
                 Complete(completed, new QuickExecutionResult(routineId, routineName,
-                    QuickExecutionDisposition.Failed, Status, 0, 0));
+                    QuickExecutionDisposition.Failed, Status, 0, 0, 0));
                 yield break;
             }
             RoutineProfile routine = Model.Profile.Routines.First(r => r.RoutineId == routineId);
@@ -138,7 +146,7 @@ namespace KingmakerBuffPlanner.UI
                 Status = "No " + routineName + " buffs are configured.";
                 LastExecutionReport = new ExecutionReport(preview.Plan);
                 Complete(completed, new QuickExecutionResult(routineId, routineName,
-                    QuickExecutionDisposition.Refused, Status, 0, 0));
+                    QuickExecutionDisposition.Refused, Status, 0, 0, 0));
                 yield break;
             }
             if (preview.Plan.Steps.Count == 0)
@@ -151,7 +159,7 @@ namespace KingmakerBuffPlanner.UI
                 Status = "No " + routineName + " casts can run: skipped active=" + skipped +
                     "; unfulfilled=" + unfulfilled + ".";
                 Complete(completed, new QuickExecutionResult(routineId, routineName,
-                    QuickExecutionDisposition.Refused, Status, 0, 0));
+                    QuickExecutionDisposition.Refused, Status, 0, 0, 0));
                 yield break;
             }
             LastExecutionReport = new ExecutionReport(preview.Plan);
@@ -171,6 +179,7 @@ namespace KingmakerBuffPlanner.UI
                 Model.Profile.Execution.OutOfCombatOnly);
             IsExecuting = true;
             Status = "Executing " + routineId + " routine: " + preview.Plan.Steps.Count + " planned casts.";
+            _log.Info("Routine plan: " + DescribePlan(preview.Plan));
             IEnumerator work = executor.Execute(preview.Plan, LastExecutionReport);
             Exception failure = null;
             while (true)
@@ -196,18 +205,50 @@ namespace KingmakerBuffPlanner.UI
                 _log.Error("Routine execution failed.", failure);
                 Complete(completed, new QuickExecutionResult(routineId, routineName,
                     QuickExecutionDisposition.Failed, Status,
-                    LastExecutionReport.Planned, LastExecutionReport.Fired));
+                    LastExecutionReport.Planned, LastExecutionReport.Submitted,
+                    LastExecutionReport.Confirmed));
                 yield break;
             }
             ExecutionReport report = LastExecutionReport;
             Refresh();
-            Status = "Routine complete: planned=" + report.Planned +
-                "; fired=" + report.Fired + "; observed=" + report.SuccessfullyObserved +
+            bool confirmed = report.Failed == 0 && report.Confirmed == report.Planned;
+            Status = (confirmed ? "Routine confirmed: " : "Routine not confirmed: ") +
+                "planned=" + report.Planned + "; queued=" + report.Queued +
+                "; submitted=" + report.Submitted + "; cast-started=" + report.CastStarted +
+                "; effect-confirmed=" + report.Confirmed +
                 "; spent=" + report.ResourcesSpent + "; failed=" + report.Failed +
                 "; skipped=" + report.Skipped + "; unfulfilled=" + report.Unfulfilled + ".";
+            CastExecutionRecord firstFailure = report.Records.FirstOrDefault(record =>
+                record.Status == CastExecutionStatus.FailedValidation ||
+                record.Status == CastExecutionStatus.FailedSubmission ||
+                record.Status == CastExecutionStatus.FailedExecution ||
+                record.Status == CastExecutionStatus.TimedOutUnconfirmed);
+            if (firstFailure != null)
+                Status += " Failure: " + firstFailure.Status + "; provider=" +
+                    firstFailure.ProviderKey + "; targets=" +
+                    string.Join(",", firstFailure.TargetUnitIds.ToArray()) + "; " +
+                    firstFailure.Detail;
+            foreach (CastExecutionRecord record in report.Records)
+                _log.Info("Routine outcome: step=" + record.StepIndex + ";status=" + record.Status +
+                    ";ability=" + record.AbilityKey + ";provider=" + record.ProviderKey +
+                    ";targets=" + string.Join(",", record.TargetUnitIds.ToArray()) +
+                    ";pool=" + record.ResourcePoolKey + ";tokens=" +
+                    string.Join(",", record.ResourceTokenIds.ToArray()) + ";detail=" + record.Detail);
             Complete(completed, new QuickExecutionResult(routineId, routineName,
-                report.Failed == 0 ? QuickExecutionDisposition.Completed : QuickExecutionDisposition.Failed,
-                Status, report.Planned, report.Fired));
+                confirmed ? QuickExecutionDisposition.Completed : QuickExecutionDisposition.Failed,
+                Status, report.Planned, report.Submitted, report.Confirmed));
+        }
+
+        private static string DescribePlan(CastPlan plan)
+        {
+            return string.Join(" | ", plan.Steps.Select((step, index) => "step=" + index +
+                ";ability=" + step.Provider.Ability.Canonical + ";provider=" +
+                step.Provider.Canonical + ";targets=" + string.Join(",", step.TargetUnitIds.ToArray()) +
+                ";pool=" + step.Reservation.PoolKey + ";tokens=" +
+                string.Join(",", step.Reservation.TokenIds.ToArray()) + ";units=" +
+                step.Reservation.Units + ";material=" + step.MaterialReservation.ItemGuid + "x" +
+                step.MaterialReservation.Count + ";expected=" +
+                KingmakerAnimatedCastAdapter.ExpectedEffectIds(step.ExpectedEffects)).ToArray());
         }
 
         private string RoutineDisplayName(string routineId)

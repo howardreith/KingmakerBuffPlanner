@@ -24,35 +24,56 @@ namespace KingmakerBuffPlanner.Execution
                 CastStep step = plan.Steps[index];
                 if (_outOfCombatOnly && _runtime.IsInCombat)
                 {
-                    report.Add(index, step, CastExecutionStatus.Failed, "combat-policy");
+                    report.Add(index, step, CastExecutionStatus.FailedValidation, "combat-policy");
                     continue;
                 }
                 CastRuntimeValidation validation = _runtime.Validate(step);
                 if (!validation.Valid)
                 {
-                    report.Add(index, step, CastExecutionStatus.Failed, validation.Reason);
+                    report.Add(index, step, CastExecutionStatus.FailedValidation, validation.Reason);
                     continue;
                 }
                 IAnimatedCastOperation operation;
                 try { operation = _runtime.StartAnimated(step); }
                 catch (Exception exception)
                 {
-                    report.Add(index, step, CastExecutionStatus.Failed,
+                    report.Add(index, step, CastExecutionStatus.FailedSubmission,
                         "start-exception:" + exception.GetType().FullName + ":" + exception.Message);
                     continue;
                 }
                 if (operation == null)
                 {
-                    report.Add(index, step, CastExecutionStatus.Failed, "operation-null");
+                    report.Add(index, step, CastExecutionStatus.FailedSubmission, "operation-null");
                     continue;
                 }
-                report.Add(index, step, CastExecutionStatus.Fired, "animated-command-queued");
-                while (!operation.IsCompleted) yield return null;
-                report.Add(index, step,
-                    operation.Succeeded ? CastExecutionStatus.Succeeded : CastExecutionStatus.Failed,
-                    operation.Detail);
-                if (operation.Succeeded && operation.EffectsObserved)
-                    report.Add(index, step, CastExecutionStatus.Observed, "expected-effects-observed");
+                report.Add(index, step, CastExecutionStatus.Queued, "animated-command-queued");
+                bool startedRecorded = false;
+                while (!operation.IsCompleted)
+                {
+                    if (!startedRecorded && operation.IsStarted)
+                    {
+                        report.Add(index, step, CastExecutionStatus.CastStarted,
+                            "animated-command-started");
+                        startedRecorded = true;
+                    }
+                    yield return null;
+                }
+                if (!startedRecorded && operation.IsStarted)
+                {
+                    report.Add(index, step, CastExecutionStatus.CastStarted,
+                        "animated-command-started");
+                    startedRecorded = true;
+                }
+                if (operation.TimedOut)
+                    report.Add(index, step, CastExecutionStatus.TimedOutUnconfirmed, operation.Detail);
+                else if (!operation.Succeeded)
+                    report.Add(index, step, CastExecutionStatus.FailedExecution, operation.Detail);
+                else if (operation.EffectsObserved)
+                    report.Add(index, step, CastExecutionStatus.EffectConfirmed,
+                        "expected-effects-observed;" + operation.Detail);
+                else
+                    report.Add(index, step, CastExecutionStatus.TimedOutUnconfirmed,
+                        "expected-effects-absent;" + operation.Detail);
                 if (operation.Succeeded && operation.ResourceSpent)
                     report.Add(index, step, CastExecutionStatus.ResourceSpent, "native-command-spend-completed");
                 yield return null;

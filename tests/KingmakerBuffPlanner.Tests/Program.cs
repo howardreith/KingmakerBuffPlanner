@@ -87,6 +87,7 @@ namespace KingmakerBuffPlanner.Tests
                 Run("quick-execution-instruments-and-presents-empty-group", TestQuickExecutionFlow);
                 Run("animated-executor-validates-before-queue-and-reports", TestAnimatedExecutor);
                 Run("instant-executor-revalidates-batches-and-reports", TestInstantExecutor);
+                Run("submitted-without-effect-is-not-success", TestUnconfirmedExecution);
                 Run("hybrid-executor-routes-and-blocks-fallbacks", TestHybridExecutor);
             }
             finally
@@ -864,11 +865,11 @@ namespace KingmakerBuffPlanner.Tests
             int moves = 0;
             while (enumerator.MoveNext())
                 if (++moves > 20) throw new InvalidOperationException("Animated executor did not terminate.");
-            if (runtime.StartCount != 1 || report.Planned != 2 || report.Fired != 1 ||
-                report.Succeeded != 1 || report.Failed != 1 ||
-                report.SuccessfullyObserved != 1 ||
+            if (runtime.StartCount != 1 || report.Planned != 2 || report.Queued != 1 ||
+                report.CastStarted != 1 || report.Failed != 1 ||
+                report.Confirmed != 1 ||
                 report.ResourcesSpent != 1 ||
-                report.Records.First(r => r.Status == CastExecutionStatus.Failed).Detail != "target-invalid")
+                report.Records.First(r => r.Status == CastExecutionStatus.FailedValidation).Detail != "target-invalid")
                 throw new InvalidOperationException("Animated executor queued an invalid cast or misreported completion.");
         }
 
@@ -895,15 +896,38 @@ namespace KingmakerBuffPlanner.Tests
         {
             var boundary = new FakeInputBoundary();
             var machine = new PlannerScreenStateMachine(() => BuffPlannerInputLease.Acquire(boundary));
-            if (!machine.Open() || machine.Open() || !machine.IsOpen || machine.OpenTransitions != 1)
+            if (!machine.BeginPresentation() || machine.State != PlannerScreenLifecycleState.OpeningPresentation ||
+                boundary.CaptureCount != 0)
+                throw new InvalidOperationException("Screen acquired input before presentation validation.");
+            machine.AcquireInputLease();
+            if (machine.BeginPresentation() || !machine.IsOpen || machine.OpenTransitions != 1)
                 throw new InvalidOperationException("Screen open transition was not idempotent.");
             if (!machine.Close() || machine.Close() || machine.IsOpen || machine.CloseTransitions != 1 ||
                 boundary.RestoreCount != 1)
                 throw new InvalidOperationException("Screen close transition was not idempotent.");
-            machine.Open();
+            machine.BeginPresentation();
+            machine.AcquireInputLease();
             machine.Dispose();
             if (machine.IsOpen || boundary.RestoreCount != 2)
                 throw new InvalidOperationException("Screen disposal leaked the input lease.");
+
+            boundary = new FakeInputBoundary { FailEnter = true };
+            machine = new PlannerScreenStateMachine(() => BuffPlannerInputLease.Acquire(boundary));
+            machine.BeginPresentation();
+            bool failed = false;
+            try { machine.AcquireInputLease(); }
+            catch (InvalidOperationException) { failed = true; }
+            if (!failed || machine.State != PlannerScreenLifecycleState.Closed ||
+                machine.HasInputLease || boundary.RestoreCount != 1 || machine.RollbackTransitions != 1)
+                throw new InvalidOperationException("Screen acquisition failure did not roll back to gameplay.");
+
+            boundary = new FakeInputBoundary();
+            machine = new PlannerScreenStateMachine(() => BuffPlannerInputLease.Acquire(boundary));
+            machine.BeginPresentation();
+            machine.Rollback();
+            if (machine.State != PlannerScreenLifecycleState.Closed || boundary.CaptureCount != 0 ||
+                boundary.EnterCount != 0 || boundary.RestoreCount != 0 || machine.RollbackTransitions != 1)
+                throw new InvalidOperationException("Invalid presentation acquired or restored a lease it never owned.");
         }
 
         private static void TestQuickExecutionFlow()
@@ -911,7 +935,7 @@ namespace KingmakerBuffPlanner.Tests
             var diagnostics = new BuffPlannerUiLifecycleDiagnostics();
             QuickExecutionResult presented = null;
             var runner = new FakeRoutineRunner(new QuickExecutionResult("long", "Long",
-                QuickExecutionDisposition.Refused, "No Long buffs are configured.", 0, 0));
+                QuickExecutionDisposition.Refused, "No Long buffs are configured.", 0, 0, 0));
             var controller = new BuffPlannerQuickExecuteController(runner, diagnostics,
                 result => presented = result);
             diagnostics.RecordPointer("long");
@@ -940,8 +964,8 @@ namespace KingmakerBuffPlanner.Tests
             var enumerator = new InstantCastExecutor(runtime, true, 4).Execute(plan, report);
             int yieldedFrames = 0;
             while (enumerator.MoveNext()) yieldedFrames++;
-            if (yieldedFrames != 2 || runtime.FireCount != 8 || report.Fired != 8 ||
-                report.Succeeded != 8 || report.Failed != 1 || report.SuccessfullyObserved != 8 ||
+            if (yieldedFrames != 2 || runtime.FireCount != 8 || report.Submitted != 8 ||
+                report.CastStarted != 8 || report.Failed != 1 || report.Confirmed != 8 ||
                 report.ResourcesSpent != 8)
                 throw new InvalidOperationException("Instant executor bypassed validation, batching, or reporting.");
         }
@@ -964,8 +988,8 @@ namespace KingmakerBuffPlanner.Tests
             var executor = new HybridCastExecutor(instant, animated,
                 step => step.TargetUnitIds.Contains("unit-a"), true, true);
             Drain(executor.Execute(plan, report));
-            if (animated.StartCount != 1 || instant.FireCount != 1 || report.Fired != 2 ||
-                report.SuccessfullyObserved != 2 || report.Failed != 0)
+            if (animated.StartCount != 1 || instant.FireCount != 1 || report.Queued != 1 ||
+                report.Submitted != 1 || report.Confirmed != 2 || report.Failed != 0)
                 throw new InvalidOperationException("Hybrid executor did not route exact per-step execution modes.");
 
             animated = new AlwaysAnimatedRuntime();
@@ -977,6 +1001,26 @@ namespace KingmakerBuffPlanner.Tests
             if (animated.StartCount != 0 || instant.FireCount != 1 || report.Failed != 1 ||
                 !report.Records.Any(r => r.Detail == "animated-fallback-disabled"))
                 throw new InvalidOperationException("Disabled animated fallback was not blocked before firing.");
+        }
+
+        private static void TestUnconfirmedExecution()
+        {
+            AbilityKey ability = Ability("unconfirmed", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("unconfirmed-free", ResourcePoolKind.Unlimited, 0, 0, null);
+            ProviderSnapshot provider = PlannerProvider("unit-a", "book-u", ability, "unconfirmed-free", 0);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(new[] { provider }, new[] { pool }, "unit-a");
+            var option = new ProviderPlanningOption(provider, new[] { "unit-a" },
+                new[] { "unit-a" }, 1, 1);
+            CastPlan plan = PlannerPlan(snapshot, ability, CastGroupingKind.PerTarget,
+                new[] { "unit-a" }, new[] { option }, EmptyPolicy(), new ActiveEffectSnapshot(null));
+            var report = new ExecutionReport(plan);
+            Drain(new InstantCastExecutor(new NeverObservedInstantRuntime(), true, 8)
+                .Execute(plan, report));
+            if (report.Submitted != 1 || report.CastStarted != 1 || report.Confirmed != 0 ||
+                report.Failed != 1 || !report.Records.Any(record =>
+                    record.Status == CastExecutionStatus.TimedOutUnconfirmed &&
+                    record.Detail.Contains("expected-effects-absent")))
+                throw new InvalidOperationException("A submitted cast without its expected fact was counted as success.");
         }
 
         private static void Drain(System.Collections.IEnumerator enumerator)
@@ -1115,6 +1159,8 @@ namespace KingmakerBuffPlanner.Tests
         {
             private int _checks;
             public bool IsCompleted { get { return ++_checks >= 2; } }
+            public bool IsStarted { get { return true; } }
+            public bool TimedOut { get { return false; } }
             public bool Succeeded { get { return true; } }
             public bool EffectsObserved { get { return true; } }
             public bool ResourceSpent { get { return true; } }
@@ -1138,6 +1184,7 @@ namespace KingmakerBuffPlanner.Tests
                 FireCount++;
                 return new InstantCastResult(true, true, true, true, "rule-success");
             }
+            public bool EffectsObserved(CastStep step) { return true; }
         }
 
         private sealed class AlwaysAnimatedRuntime : ICastRuntimeAdapter
@@ -1162,6 +1209,18 @@ namespace KingmakerBuffPlanner.Tests
                 FireCount++;
                 return new InstantCastResult(true, true, true, true, "rule-success");
             }
+            public bool EffectsObserved(CastStep step) { return true; }
+        }
+
+        private sealed class NeverObservedInstantRuntime : IInstantCastRuntimeAdapter
+        {
+            public bool IsInCombat { get { return false; } }
+            public CastRuntimeValidation Validate(CastStep step) { return CastRuntimeValidation.Pass(); }
+            public InstantCastResult Fire(CastStep step)
+            {
+                return new InstantCastResult(true, true, false, true, "rule-success-no-effect");
+            }
+            public bool EffectsObserved(CastStep step) { return false; }
         }
 
         private static DiscoveryNode EffectNode(string id)

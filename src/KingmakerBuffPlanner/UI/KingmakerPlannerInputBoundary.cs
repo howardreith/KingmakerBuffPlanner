@@ -12,7 +12,15 @@ namespace KingmakerBuffPlanner.UI
     {
         private bool _requested;
 
-        public bool PlannerModeRequested { get { return _requested; } }
+        public bool PlannerModeRequested
+        {
+            get
+            {
+                return _requested && Game.Instance != null &&
+                    Game.Instance.IsModeActive(GameModeType.FullScreenUi) &&
+                    (SelectionManager.Instance == null || SelectionManager.Instance.IsDisabled);
+            }
+        }
 
         public object CaptureState()
         {

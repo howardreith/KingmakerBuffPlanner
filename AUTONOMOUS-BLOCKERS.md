@@ -2,6 +2,12 @@
 
 Status: IN PROGRESS
 
+## R2 human rejection
+
+Current classification: IN PROGRESS — 0.0.2 human verdict FAIL; 0.0.3 correction qualification pending.
+
+Evidence: direct human playtesting proves cloned HUD controls overlap and activate native turn-based/pause controls, and proves F10 can acquire full-screen input suppression without a rendered planner. 0.0.3 replaces both structures and strengthens the gate, but campaign/human qualification and guarded replacement installation are not yet complete. The older 0.0.2 classification below is historical and superseded.
+
 ## Full-screen UI and input isolation
 
 Current classification: IMPLEMENTED — guarded campaign runtime/human verdict pending.
