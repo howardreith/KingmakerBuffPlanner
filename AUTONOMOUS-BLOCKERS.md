@@ -4,9 +4,9 @@ Status: IN PROGRESS
 
 ## Full-screen UI and input isolation
 
-Current classification: ACTIVE REPAIR — not a hard stop.
+Current classification: IMPLEMENTED — guarded campaign runtime/human verdict pending.
 
-Evidence: human playtesting of installed 0.0.1 proved the floating IMGUI strip is unacceptable, clicks reach world movement, and Long has no visible result. Static exact-assembly inspection confirmed the old IMGUI surface cannot satisfy `PointerController.InGui`, and the old gate incorrectly required zero blockers. Safe investigation, implementation, tests, no-save runtime scenarios, packaging, and guarded replacement installation remain independently actionable.
+Evidence: 0.0.2 removes the IMGUI strip and implements the required native HUD/full-screen/input lifecycle. Source validation is 19/19 and behavior/protocol is 56/56. The corrected runtime gate requires a campaign `StaticCanvas` and returned the explicit campaign-UI precondition at the main menu; it does not re-certify the defect. Guarded replacement installation and human playtesting remain actionable.
 
 ## Save-backed runtime qualification
 

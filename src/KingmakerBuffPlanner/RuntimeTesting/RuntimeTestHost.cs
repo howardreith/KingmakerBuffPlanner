@@ -535,6 +535,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         {
             try
             {
+                bool campaignUiUnavailable = RuntimeTestProtocol.IsUiScenario(_request.Scenario) &&
+                    exception.Message == "Campaign UI is required for the full-screen input-isolation scenario.";
                 Assembly assembly = typeof(Main).Assembly;
                 string gameRoot = RuntimePaths.GetGameRoot(_modEntry.Path);
                 string managed = Path.Combine(gameRoot, "Kingmaker_Data", "Managed");
@@ -547,8 +549,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     RunId = _request.RunId,
                     Scenario = _request.Scenario,
                     ProfileId = _request.ProfileId,
-                    Status = "FAIL",
-                    Stage = "unhandled-exception",
+                    Status = campaignUiUnavailable ? "BLOCKED" : "FAIL",
+                    Stage = campaignUiUnavailable ? "campaign-ui-unavailable" : "unhandled-exception",
                     LoadedModId = _modEntry.Info.Id,
                     LoadedModVersion = _modEntry.Info.Version,
                     Commit = BuildInfo.Commit,
@@ -565,7 +567,14 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     StartedAtUtc = started.ToString("o"),
                     EndedAtUtc = DateTime.UtcNow.ToString("o"),
                     ExceptionSummary = exception.GetType().FullName + ": " + exception.Message,
-                    Assertions = new List<RuntimeTestAssertion>()
+                    Assertions = new List<RuntimeTestAssertion>
+                    {
+                        RuntimeTestAssertion.Pass("entry-point-loaded", "true", "true"),
+                        RuntimeTestAssertion.Pass("standalone-id", "KingmakerBuffPlanner", _modEntry.Info.Id),
+                        RuntimeTestAssertion.Pass("version", BuildInfo.Version, _modEntry.Info.Version),
+                        RuntimeTestAssertion.Pass("commit", _request.ExpectedCommit, BuildInfo.Commit),
+                        RuntimeTestAssertion.Fail("scenario-precondition", "available", exception.Message)
+                    }
                 };
                 AtomicFile.WriteUtf8(
                     Path.Combine(_request.EvidenceDirectory, "runtime-result.json"),

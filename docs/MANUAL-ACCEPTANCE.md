@@ -1,8 +1,24 @@
 # Manual Acceptance
 
-Status: DEFER — EVIDENCED pending an authorized `KBP_AUTOMATION_WORKING` fixture
+Status: REQUIRED FOR 0.0.2 UI VERDICT; save-backed execution remains deferred pending an authorized `KBP_AUTOMATION_WORKING` fixture
 
-Manual acceptance is not a substitute for automated evidence. When an authorized `KBP_AUTOMATION_WORKING` fixture is available, verify:
+Human playtesting is authoritative for the visual and interaction repair. With 0.0.2 installed, load a campaign and verify:
+
+- the lower-left HUD has one native-looking setup icon and adjacent Long, Important, and Short icons;
+- no floating `Buff Planner (F10)`/routine text strip remains;
+- the setup icon opens a distinct, fully opaque full-screen `BUFF PLANNER` window;
+- the world is not readable or interactive behind it;
+- empty-background and control clicks never move a character, change world selection, interact, or activate an ability;
+- list scrolling does not zoom the world and dragging does not drag the camera;
+- Long, Important, and Short group tabs visibly change selection;
+- each HUD quick icon visibly reports success, refusal, or its exact unavailable reason;
+- an empty Long routine reports `No Long buffs are configured.` instead of doing nothing;
+- the close button, Escape, and F10 all close through the same clean lifecycle;
+- repeated close/reopen works without duplicate buttons or roots;
+- the layout is readable at the actual resolution and target portraits/provider controls are legible;
+- tooltips identify setup/F10 and each quick routine clearly.
+
+When an authorized `KBP_AUTOMATION_WORKING` fixture is available, also verify:
 
 - standalone install/load and clean uninstall;
 - F10/setup/HUD lifecycle through an area transition;

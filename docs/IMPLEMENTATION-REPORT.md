@@ -2,9 +2,11 @@
 
 Status: IN PROGRESS
 
+The 0.0.1 Phase 6/10/12 UI claims below are historical and invalidated by human playtesting: that fixed-coordinate IMGUI text strip clicked through to the world and could make Long appear silent. Version 0.0.2 removes it and implements native-anchored icon controls, an opaque full-screen uGUI service window, scoped native full-screen/selection input isolation, pointer consumption, quick-flow diagnostics, and visible results. The corrected campaign UI runtime gate no longer runs as part of `final-no-save-core` and reports `BLOCKED` when only the main menu is available. Source gates pass 19/19 and 56/56; final human visual/input acceptance is pending installation and playtest.
+
 Phase 9 now has an exact player-accessibility index, schema-4 generated audit, component/polarity evidence, branch-preserving exact-array adapters, explicit summoning exclusion, Magic Fang/enchantment handling, structural classifier, and strict packaged override registry. The 974 candidates reconcile to 413 included, 561 excluded, and zero unsupported/unclassified; the behavior suite is 43/43. Two guarded native-only runs from `fba6e24` produced byte-identical catalog SHA-256 `1c2881de5c600c430709fac075e0f4fb223d0e050ba52d07bfa7451cf97be0fa`. Structural classification is complete; included-source runtime equivalence remains deferred for lack of an authorized `KBP_` save.
 
-Phase 0 intake is complete. Phase 1 now has a standalone net47/C# 7.3 classic project, UMM 0.28.2 entry point, version 0.0.1 metadata, strict opt-in runtime request/result skeleton, atomic evidence writer, deterministic build metadata, source validator, project-owned protocol test runner, build script, deterministic package builder, and package allowlist validator.
+Phase 0 intake is complete. Phase 1 now has a standalone net47/C# 7.3 classic project, UMM 0.28.2 entry point, versioned metadata, strict opt-in runtime request/result skeleton, atomic evidence writer, deterministic build metadata, source validator, project-owned protocol test runner, build script, deterministic package builder, and package allowlist validator.
 
 The first source-only qualification produced 14/14 source assertions, 11/11 protocol tests, a warning-free Release build, and 4/4 package assertions. Two consecutive local package builds produced identical SHA-256 `f109c51b8afcd0af931c556ad5999ea62c1b88f951178da8d563253c18de4d21`. Runtime load qualification has not yet been claimed.
 

@@ -1,4 +1,4 @@
-# Kingmaker Buff Planner 0.0.1 — Draft Release Notes
+# Kingmaker Buff Planner 0.0.2 — Draft Release Notes
 
 Publication status: local qualification build only. Not a public release.
 
@@ -8,7 +8,9 @@ Highlights:
 
 - structural native and optional-mod buff discovery with branch-preserving effect expressions;
 - prepared, spontaneous, special-slot, resource, material, mass, provider-priority, ban, and cap planning;
-- complete F10 setup window and three persistent routine buttons;
+- native-styled lower-left setup plus Long/Important/Short quick-action icons;
+- a distinct fully opaque full-screen planner with native full-screen input isolation;
+- HUD-visible quick-action results, including explicit empty-routine feedback;
 - animated execution plus bounded instant execution with safe sticky-touch fallback;
 - exact Call of the Wild 1.14.4c-2.1 discovery qualification without a compile-time dependency;
 - transactional runtime harness, exact restoration, protected-save policy, and deterministic package validation.

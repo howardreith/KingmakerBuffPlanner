@@ -2,6 +2,19 @@
 
 Status: PASS for all applicable no-save gates; save-backed core remains `DEFER — EVIDENCED`
 
+## 0.0.2 full-screen UI/input repair
+
+Human playtesting invalidated every earlier 0.0.1 UI-complete entry below. Those entries are retained as history, not current evidence. The corrected `final-no-save-core` no longer bundles a fake main-menu UI check.
+
+- commit: `3bd519b000f3126b19462888aefeabe29374873d`;
+- package/DLL/MVID: `651d9ce3f92649f86d6e619e46fe3293ace1019e10e3b086c2a8c3617452b68f` / `f039f436fb948c7acb203e60979dec3bb500e03e85ff8f6a73ae6753b293b850` / `5f57af25-8876-400a-99b9-5971d8bfd8f4`;
+- source validation 19/19, behavior/protocol 56/56, runtime-harness filesystem 6/6, deployment WhatIf 5/5, package 4/4;
+- native no-save runs `ui-repair-0.0.2-final-native-1/2`: 12/12 each, identical catalog/Harmony hashes, exact restoration;
+- Call of the Wild runs `ui-repair-0.0.2-cotw-1/2`: 26/26 each, identical catalog/Harmony hashes, exact restoration;
+- `ui-repair-0.0.2-ui-main-menu-boundary`: main-menu `StaticCanvas` absent, so corrected UI gate failed/blocked instead of manufacturing a PASS; exact Mods restoration succeeded and no save was accessed.
+
+The campaign gate structurally requires four HUD buttons/listeners, a stable native anchor, one opaque/raycasting full-screen root, `FullScreenUi` mode, selection suppression, consumed click/drag/scroll/cancel, no observed movement/ability/selection command, an actual group-tab change, exactly-once Long flow, explicit empty-Long feedback, 20 open/close cycles, reconstruction uniqueness, and exact pause/mode/selection restoration. It remains pending an authorized campaign fixture and the human visual/input verdict.
+
 Current source-only Phase 1 evidence (pre-checkpoint build from HEAD `4ca6008d873577e8e6263b54658620b649f81cd1`):
 
 - source validation: PASS 14, FAIL 0;

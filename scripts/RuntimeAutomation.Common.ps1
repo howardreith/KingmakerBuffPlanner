@@ -166,6 +166,14 @@ function Assert-KbpRuntimeResult {
     if ([int]$Result.optionalLoadedUmmEntryCount -ne @($Request.expectedOptionalMods).Count) {
         throw 'Loaded optional UMM entry count does not match the requested profile.'
     }
+    if ($Result.status -ceq 'BLOCKED') {
+        if ($Request.scenario -cne 'ui-root-smoke' -or
+            $Result.stage -cne 'campaign-ui-unavailable' -or
+            -not ([string]$Result.exceptionSummary).Contains('Campaign UI is required')) {
+            throw 'Runtime BLOCKED result does not match an authorized campaign-UI precondition.'
+        }
+        return
+    }
     if ($Request.scenario -in @('native-buff-catalog', 'final-no-save-core')) {
         $catalogPath = Join-Path $Request.evidenceDirectory 'native-buff-catalog.json'
         if (-not (Test-Path -LiteralPath $catalogPath -PathType Leaf)) { throw 'Native catalog evidence is missing.' }
