@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
+using System.Reflection;
 using Kingmaker;
 using Kingmaker.EntitySystem.Entities;
 using Kingmaker.UI;
@@ -39,6 +41,7 @@ namespace KingmakerBuffPlanner.UI
         private Button[] _routineTabs;
         private Text[] _filterLabels;
         private readonly List<Button> _sourceRows = new List<Button>();
+        private RectTransform _renderCanary;
         private string _routineId = "long";
         private readonly CatalogFilterState _filters = new CatalogFilterState();
         private bool _resettingFilters;
@@ -210,6 +213,50 @@ namespace KingmakerBuffPlanner.UI
             ExecuteEvents.Execute(row.gameObject, click, ExecuteEvents.pointerClickHandler);
             return _session.Model.SelectedSourceId == source.SourceId &&
                 GetCatalogDiagnostics().SelectedDetailsBound;
+        }
+
+        internal bool SelectFirstRowForRuntime()
+        {
+            Button row = _sourceRows.FirstOrDefault(item => item != null &&
+                item.gameObject.activeInHierarchy);
+            if (row == null || _session.Model == null) return false;
+            SetupSourceRow source = _session.Model.Sources.FirstOrDefault(item =>
+                row.name == "Source." + item.SourceId);
+            if (source == null) return false;
+            _session.Model.SelectSource(source.SourceId);
+            RefreshCatalog();
+            return _session.Model.SelectedSourceId == source.SourceId;
+        }
+
+        internal LiveRowRenderDiagnostics GetLiveRowRenderDiagnostics()
+        {
+            Canvas.ForceUpdateCanvases();
+            LayoutRebuilder.ForceRebuildLayoutImmediate(_sourceContent);
+            LayoutRebuilder.ForceRebuildLayoutImmediate(_sourceViewport);
+            Canvas.ForceUpdateCanvases();
+            PlannerSetupModel model = _session.Model;
+            var rows = _sourceRows.Where(item => item != null).Take(5).ToList();
+            Text detailsTitle = _detailContent == null ? null :
+                _detailContent.GetComponentsInChildren<Text>(true)
+                    .FirstOrDefault(item => item.name == "Heading");
+            return new LiveRowRenderDiagnostics
+            {
+                ExpectedNames = rows.Select(item => RowDisplayName(model, item)).ToArray(),
+                RowScreenRectangles = rows.Select(item =>
+                    ScreenRectangle((RectTransform)item.transform)).ToArray(),
+                SelectedRowName = model == null || model.SelectedSource == null ? string.Empty :
+                    model.SelectedSource.DisplayName,
+                DetailsTitleText = detailsTitle == null ? string.Empty : detailsTitle.text,
+                SourceViewport = RectEvidence(_sourceViewport),
+                SourceContent = RectEvidence(_sourceContent),
+                MaskEvidence = BuildMaskEvidence(),
+                CanaryEvidence = _renderCanary == null ? "absent" :
+                    BuildGraphicEvidence(_renderCanary.gameObject),
+                RowEvidence = rows.Select(item => BuildGraphicEvidence(item.gameObject)).ToArray(),
+                DetailsEvidence = _detailContent == null ? new string[0] :
+                    _detailContent.GetComponentsInChildren<Graphic>(true).Take(8)
+                        .Select(item => BuildGraphicEvidence(item.gameObject)).ToArray()
+            };
         }
 
         internal void RefreshCatalogForRuntime()
@@ -508,6 +555,7 @@ namespace KingmakerBuffPlanner.UI
                 FinalizeScrollContent(_sourceContent, _sourceViewport);
                 return;
             }
+            CreateDiagnosticRenderCanary(model);
             CatalogFilterDiagnostics filters;
             List<SetupSourceRow> sources = ApplyFilters(model, out filters);
             sources = _filters.SortByLevel
@@ -834,6 +882,136 @@ namespace KingmakerBuffPlanner.UI
             Button button = KingmakerUiFactory.CreateButton("CatalogAction", parent, _theme,
                 label, () => action());
             KingmakerUiFactory.AddLayout((RectTransform)button.transform, 42);
+        }
+
+        // TEMPORARY DIAGNOSTIC ONLY. This is removed after the live canary run.
+        private void CreateDiagnosticRenderCanary(PlannerSetupModel model)
+        {
+            string firstName = model.Sources.OrderBy(item => item.DisplayName,
+                StringComparer.OrdinalIgnoreCase).Select(item => item.DisplayName)
+                .FirstOrDefault() ?? "NO CATALOG ENTRY";
+            _renderCanary = KingmakerUiFactory.CreateRect("KBP.RenderCanary", _sourceContent);
+            _renderCanary.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, 64f);
+            Image background = _renderCanary.gameObject.AddComponent<Image>();
+            background.color = new Color(0.92f, 0.02f, 0.72f, 1f);
+            background.raycastTarget = false;
+            LayoutElement layout = _renderCanary.gameObject.AddComponent<LayoutElement>();
+            layout.minHeight = 64f;
+            layout.preferredHeight = 64f;
+            RectTransform textRect = KingmakerUiFactory.CreateRect("CanaryText", _renderCanary);
+            KingmakerUiFactory.Stretch(textRect, 8, 8, 4, 4);
+            Text text = textRect.gameObject.AddComponent<Text>();
+            text.font = Resources.GetBuiltinResource<Font>("Arial.ttf") ?? _theme.Font;
+            text.fontSize = 22;
+            text.fontStyle = FontStyle.Bold;
+            text.alignment = TextAnchor.MiddleLeft;
+            text.horizontalOverflow = HorizontalWrapMode.Wrap;
+            text.verticalOverflow = VerticalWrapMode.Truncate;
+            text.color = Color.white;
+            text.raycastTarget = false;
+            text.text = "KBP RENDER CANARY - " + firstName;
+        }
+
+        private string BuildMaskEvidence()
+        {
+            Mask mask = _sourceViewport == null ? null : _sourceViewport.GetComponent<Mask>();
+            RectMask2D rectMask = _sourceViewport == null ? null :
+                _sourceViewport.GetComponent<RectMask2D>();
+            Image image = _sourceViewport == null ? null : _sourceViewport.GetComponent<Image>();
+            return "mask=" + (mask != null) + ",enabled=" + (mask != null && mask.enabled) +
+                ",showGraphic=" + (mask != null && mask.showMaskGraphic) +
+                ",rectMask=" + (rectMask != null) + ",viewportImage=" +
+                GraphicEvidence(image) + ",viewport=" + RectEvidence(_sourceViewport);
+        }
+
+        private static string RowDisplayName(PlannerSetupModel model, Button row)
+        {
+            if (model == null || row == null) return string.Empty;
+            SetupSourceRow source = model.Sources.FirstOrDefault(item =>
+                row.name == "Source." + item.SourceId);
+            return source == null ? string.Empty : source.DisplayName;
+        }
+
+        private static string BuildGraphicEvidence(GameObject root)
+        {
+            if (root == null) return "missing";
+            RectTransform rect = root.transform as RectTransform;
+            Canvas canvas = root.GetComponentInParent<Canvas>();
+            CanvasGroup[] groups = root.GetComponentsInParent<CanvasGroup>(true);
+            float inheritedGroupAlpha = 1f;
+            foreach (CanvasGroup group in groups)
+            {
+                inheritedGroupAlpha *= group.alpha;
+                if (group.ignoreParentGroups) break;
+            }
+            string components = string.Join(",", root.GetComponents<Component>()
+                .Where(item => item != null).Select(item => item.GetType().FullName).ToArray());
+            string graphics = string.Join("|", root.GetComponentsInChildren<Graphic>(true)
+                .Select(GraphicEvidence).ToArray());
+            return "path=" + GetPath(root.transform) + ";id=" + root.GetInstanceID() +
+                ";components=" + components + ";activeSelf=" + root.activeSelf +
+                ";activeHierarchy=" + root.activeInHierarchy + ";parent=" +
+                (root.transform.parent == null ? string.Empty : GetPath(root.transform.parent)) +
+                ";sibling=" + root.transform.GetSiblingIndex() + ";layer=" + root.layer +
+                ";canvas=" + (canvas == null ? "missing" : GetPath(canvas.transform) +
+                    ",mode=" + canvas.renderMode + ",sort=" + canvas.sortingOrder +
+                    ",override=" + canvas.overrideSorting) +
+                ";groupAlpha=" + inheritedGroupAlpha.ToString("R") +
+                ";rect=" + RectEvidence(rect) + ";layout=min:" +
+                LayoutUtility.GetMinHeight(rect).ToString("R") + ",preferred:" +
+                LayoutUtility.GetPreferredHeight(rect).ToString("R") + ",flex:" +
+                LayoutUtility.GetFlexibleHeight(rect).ToString("R") +
+                ";graphics=" + graphics;
+        }
+
+        private static string GraphicEvidence(Graphic graphic)
+        {
+            if (graphic == null) return "missing";
+            CanvasRenderer renderer = graphic.canvasRenderer;
+            Material material = graphic.materialForRendering;
+            Text text = graphic as Text;
+            string font = text == null || text.font == null ? string.Empty : text.font.name;
+            string value = text == null ? string.Empty : text.text;
+            string inheritedAlpha = "unknown";
+            try
+            {
+                MethodInfo method = typeof(CanvasRenderer).GetMethod("GetInheritedAlpha",
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                if (method != null) inheritedAlpha = Convert.ToSingle(method.Invoke(renderer,
+                    null), CultureInfo.InvariantCulture).ToString("R");
+            }
+            catch { }
+            return graphic.GetType().Name + "(path=" + GetPath(graphic.transform) +
+                ",enabled=" + graphic.enabled + ",raycast=" + graphic.raycastTarget +
+                ",color=" + graphic.color + ",rendererCull=" + renderer.cull +
+                ",depth=" + renderer.absoluteDepth + ",materials=" + renderer.materialCount +
+                ",alpha=" + renderer.GetAlpha().ToString("R") +
+                ",inheritedAlpha=" + inheritedAlpha + ",material=" +
+                (material == null ? "null" : material.name) + ",shader=" +
+                (material == null || material.shader == null ? "null" : material.shader.name) +
+                ",font=" + font + ",fontSize=" + (text == null ? 0 : text.fontSize) +
+                ",text=" + value.Replace("\r", " ").Replace("\n", " ") + ")";
+        }
+
+        private static string RectEvidence(RectTransform rect)
+        {
+            if (rect == null) return "missing";
+            return "anchors=" + rect.anchorMin + ".." + rect.anchorMax + ",pivot=" +
+                rect.pivot + ",anchored=" + rect.anchoredPosition + ",sizeDelta=" +
+                rect.sizeDelta + ",rect=" + rect.rect + ",screen=" + ScreenRectangle(rect);
+        }
+
+        private static string ScreenRectangle(RectTransform rect)
+        {
+            if (rect == null) return "missing";
+            var corners = new Vector3[4];
+            rect.GetWorldCorners(corners);
+            float minX = corners.Min(item => item.x);
+            float maxX = corners.Max(item => item.x);
+            float minY = corners.Min(item => item.y);
+            float maxY = corners.Max(item => item.y);
+            return minX.ToString("F1") + "," + minY.ToString("F1") + "-" +
+                maxX.ToString("F1") + "," + maxY.ToString("F1");
         }
 
         private static void FinalizeScrollContent(RectTransform content, RectTransform viewport)

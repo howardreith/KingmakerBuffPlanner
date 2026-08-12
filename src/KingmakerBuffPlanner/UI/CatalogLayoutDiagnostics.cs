@@ -1,5 +1,19 @@
 namespace KingmakerBuffPlanner.UI
 {
+    internal sealed class LiveRowRenderDiagnostics
+    {
+        public string[] ExpectedNames { get; set; }
+        public string[] RowScreenRectangles { get; set; }
+        public string SelectedRowName { get; set; }
+        public string DetailsTitleText { get; set; }
+        public string SourceViewport { get; set; }
+        public string SourceContent { get; set; }
+        public string MaskEvidence { get; set; }
+        public string CanaryEvidence { get; set; }
+        public string[] RowEvidence { get; set; }
+        public string[] DetailsEvidence { get; set; }
+    }
+
     internal sealed class CatalogLayoutDiagnostics
     {
         internal CatalogFilterDiagnostics Filters;

@@ -278,6 +278,20 @@ namespace KingmakerBuffPlanner.UI
                 _instance._screen.View.GetCatalogDiagnostics();
         }
 
+        internal static bool SelectFirstRowForRuntime()
+        {
+            return _instance != null && _instance._screen != null &&
+                _instance._screen.View != null &&
+                _instance._screen.View.SelectFirstRowForRuntime();
+        }
+
+        internal static LiveRowRenderDiagnostics LiveRowRenderDiagnosticsForRuntime()
+        {
+            return _instance == null || _instance._screen == null ||
+                _instance._screen.View == null ? null :
+                _instance._screen.View.GetLiveRowRenderDiagnostics();
+        }
+
         internal static bool SelectAndConfigureBlessForRuntime()
         {
             if (_instance == null || _instance._screen.View == null ||

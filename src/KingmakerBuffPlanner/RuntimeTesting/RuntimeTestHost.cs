@@ -39,6 +39,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private bool _liveBlessSelectedAndConfigured;
         private int _liveCameraSettleFrames;
         private int _liveHoverEnterBaseline;
+        private int _liveRenderWaitFrames;
+        private string _liveRenderScreenshotPath;
 
         private RuntimeTestHost(
             RuntimeTestRequest request,
@@ -795,6 +797,39 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     throw new InvalidOperationException("Live catalog is not visibly bound: " +
                         (catalog == null ? "missing" : catalog.ToString()));
                 _liveInitialCatalogEvidence = catalog.ToString();
+                if (!BuffPlannerUiRoot.SelectFirstRowForRuntime())
+                    throw new InvalidOperationException("First live row could not be selected.");
+                _liveUiPhase = 13;
+                return false;
+            }
+            if (_liveUiPhase == 13)
+            {
+                _liveRenderWaitFrames++;
+                if (_liveRenderWaitFrames < 2) return false;
+                LiveRowRenderDiagnostics rendering =
+                    BuffPlannerUiRoot.LiveRowRenderDiagnosticsForRuntime();
+                if (rendering == null)
+                    throw new InvalidOperationException("Live row render diagnostics are absent.");
+                AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory,
+                    "live-row-render-diagnostics.json"), Serialize(rendering));
+                _liveRenderScreenshotPath = Path.Combine(_request.EvidenceDirectory,
+                    "planner-render-canary.png");
+                MethodInfo capture = typeof(Application).GetMethod("CaptureScreenshot",
+                    BindingFlags.Static | BindingFlags.Public, null,
+                    new[] { typeof(string) }, null);
+                if (capture == null)
+                    throw new MissingMethodException("Unity screenshot capture API is unavailable.");
+                capture.Invoke(null, new object[] { _liveRenderScreenshotPath });
+                _liveUiPhase = 14;
+                return false;
+            }
+            if (_liveUiPhase == 14)
+            {
+                if (string.IsNullOrEmpty(_liveRenderScreenshotPath) ||
+                    !File.Exists(_liveRenderScreenshotPath) ||
+                    new FileInfo(_liveRenderScreenshotPath).Length < 1000) return false;
+                _log.Info("[KBP-RENDER] screenshot=" + _liveRenderScreenshotPath +
+                    ";sha256=" + Hashing.Sha256(_liveRenderScreenshotPath) + ".");
                 BuffPlannerUiRoot.BeginRuntimeSmoke();
                 BuffPlannerUiRoot.DispatchRuntimeInputSmoke();
                 BuffPlannerUiRoot.CloseRuntimeSmoke();
