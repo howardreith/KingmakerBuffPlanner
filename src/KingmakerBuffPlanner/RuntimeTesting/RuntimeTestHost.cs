@@ -749,7 +749,22 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                             ui.CatalogActiveRows <= 0 || ui.CatalogVisibleRows <= 0 ||
                             !ui.CatalogSelectedDetailsBound ||
                             string.IsNullOrWhiteSpace(ui.CatalogBlessEvidence) ||
-                            !ui.CatalogBlessEvidence.Contains("rowVisible=True") ||
+                            string.IsNullOrWhiteSpace(_liveInitialCatalogEvidence) ||
+                            !_liveInitialCatalogEvidence.Contains("rowVisible=True") ||
+                            !_liveInitialCatalogEvidence.Contains("require=False") ||
+                            !_liveInitialCatalogEvidence.Contains("item=none") ||
+                            !_liveInitialCatalogEvidence.Contains("hasEnough=False") ||
+                            !_liveInitialCatalogEvidence.Contains("consumableRequired=False") ||
+                            _liveRenderDiagnostics == null ||
+                            _liveRenderDiagnostics.ExpectedNames == null ||
+                            _liveRenderDiagnostics.ExpectedNames.Length != 5 ||
+                            _liveRenderDiagnostics.RowScreenRectangles == null ||
+                            _liveRenderDiagnostics.RowScreenRectangles.Length != 5 ||
+                            _liveRenderDiagnostics.BoundRowCount < 5 ||
+                            _liveRenderDiagnostics.CanaryEvidence != "absent" ||
+                            _liveRenderDiagnostics.SelectedRowName !=
+                                _liveRenderDiagnostics.DetailsTitleText ||
+                            string.IsNullOrWhiteSpace(_liveRenderScreenshotSha256) ||
                             !_liveTooltipStable || ui.TooltipListenerCount != 4 ||
                             ui.TooltipRaycastGraphicCount != 0 || ui.TooltipBlocksRaycasts ||
                             ui.PhysicalInputPlayerCommandCount != 0 ||

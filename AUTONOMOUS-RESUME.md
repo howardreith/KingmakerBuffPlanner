@@ -1,5 +1,11 @@
 # Autonomous Resume
 
+## Production run 2 duplicate-gate checkpoint — 2026-08-12
+
+- Run `row-render-0.0.6-production-2` (`877c618`, package `674733b8...`, DLL `642d4df9...`) has 71/71 named assertions PASS, confirmed Bless `1/1/1/1/1`, and production screenshot SHA-256 `cb2343683ebc4d3dfbb066de4b030c1745c518063354a6357a331a6d53d75c19`, but overall status FAIL because a duplicated aggregate condition still required the spent Bless row to remain visible.
+- Transaction is restored/verified. The worktree replaces that duplicate with pre-cast Bless row/material evidence and the captured five-row/selection/no-canary/screenshot contract.
+- Exact next command: commit, rebuild local 0.0.6, run `row-render-0.0.6-production-3`, then a second fresh-process PASS.
+
 ## Canary-free production run 1 checkpoint — 2026-08-12
 
 - Source/package/DLL: `3a4b503` / `9591b25c...` / `78263b64...`. Run `row-render-0.0.6-production-1` restored exactly but overall status is FAIL because one stale final-state assertion required a spent prepared Bless to remain in the available-only list.

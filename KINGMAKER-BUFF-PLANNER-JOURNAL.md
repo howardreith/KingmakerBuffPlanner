@@ -1,5 +1,14 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-08-12 — production run 2 exposes duplicated aggregate gate
+
+Status: ALL 71 ASSERTIONS PASS; OVERALL FAIL FROM STALE DUPLICATED CONDITION; RESTORED
+
+- Run `row-render-0.0.6-production-2` used source `877c618`, package `674733b8...`, and DLL `642d4df9...`. All 71 structured assertions are PASS and screenshot SHA-256 is `cb2343683ebc4d3dfbb066de4b030c1745c518063354a6357a331a6d53d75c19`; the transaction restored exactly.
+- A second legacy aggregate condition, separate from the named assertion corrected after run 1, still changed overall status to FAIL when post-cast Bless became resource-exhausted. It is now tied to the pre-cast initial catalog, exact material contract, five-row diagnostics, selected details, absent canary, and screenshot hash.
+- This run is strong supporting evidence but is not counted as either required final PASS run because its overall status is FAIL.
+- Exact next action: commit the duplicate-gate repair, rebuild, and obtain two overall PASS fresh-process runs.
+
 ## 2026-08-12 — first canary-free screenshot and Bless contract result
 
 Status: PRODUCTION PIXELS PASS; RUN FAIL ONLY ON STALE POST-CAST BLESS-VISIBILITY ASSERTION
