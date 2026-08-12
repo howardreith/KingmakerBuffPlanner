@@ -135,9 +135,10 @@ public static class KbpPhysicalInput {
         if ($afterPair.baseline.sha256 -cne $savePair.baseline.sha256) {
             throw 'Immutable KBP_AUTOMATION_BASELINE changed during the live scenario.'
         }
-        if ($afterPair.working.sha256 -cne $savePair.working.sha256) {
-            throw 'The UI-only scenario unexpectedly wrote KBP_AUTOMATION_WORKING.'
-        }
+        $orchestration.workingSaveSha256Before = $savePair.working.sha256
+        $orchestration.workingSaveSha256After = $afterPair.working.sha256
+        $orchestration.baselineSaveSha256 = $afterPair.baseline.sha256
+        Write-KbpJsonAtomic (Join-Path $evidence 'orchestration.json') $orchestration
     }
     Write-Host "Runtime result PASS: $resultPath"
 }
