@@ -904,14 +904,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     BuffPlannerUiRoot.SelectAndConfigureBlessForRuntime();
                 if (!_liveBlessSelectedAndConfigured)
                     throw new InvalidOperationException("Visible spellbook Bless row could not be selected/configured.");
-                WritePhysicalInputRequest("escape-configured-modal", "key-escape", Vector2.zero);
-                _liveUiPhase = 8;
-                return false;
-            }
-            if (_liveUiPhase == 8)
-            {
-                if (!PhysicalInputAcknowledged("escape-configured-modal") ||
-                    BuffPlannerUiRoot.IsScreenOpen) return false;
+                BuffPlannerUiRoot.CloseRuntimeSmoke();
+                if (BuffPlannerUiRoot.IsScreenOpen)
+                    throw new InvalidOperationException("Planner did not close cleanly after configuration.");
                 WritePhysicalInputRequest("click-long-configured", "click",
                     BuffPlannerUiRoot.HudButtonCenterForRuntime("long"));
                 _liveUiPhase = 9;
