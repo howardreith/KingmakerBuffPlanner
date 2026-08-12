@@ -1,5 +1,14 @@
 # Autonomous Resume
 
+## Four-column UI rebuild intake checkpoint — 2026-08-12
+
+- Mission branch: `codex/ui-grid-rebuild`, created from exact starting HEAD `c2bc534827997fb75c1839a5cee5d1342a860369`; source version remains 0.0.7.
+- Preserved qualified release source/package/DLL/MVID: `2f125f9f1024692d83a1b2570209d1858d62eff1` / `9feed6dffa668812ed826c75b743d72892e6e8371b0f81585fb557aea8fcf453` / `bf8c72874377d56f91bcdb6daedaa8b28b340a948aee06583a32954d61b38927` / `966b7d8f-bd5f-46b9-beda-62774f82ccac`.
+- Backup directory: `artifacts/release-candidate-backups/ui-grid-rebuild-start-0.0.7-c2bc534`; installed 0.0.7 matches the preserved DLL/MVID.
+- Intake safety: Kingmaker/UMM closed; deployment lock absent; unresolved transactions zero. Unchanged baseline passes source 30/30, protocol 63/63, harness 8/8, package 4/4, deployment WhatIf 5/5, aggregate 1/1.
+- Human evidence and BubbleBuffs `f4871f763a23251284422ef0945a85e9f3fb788e` were inspected. The authorized delete/retain map and replacement component boundaries are in `planning/FOUR-COLUMN-UI-REBUILD-ARCHITECTURE.md`.
+- Exact next action: checkpoint the intake records, then replace the planner presentation from the shell outward with the four-column grid, active-routine direct portrait commands, simplified filters/settings, v3 hidden migration, Ctrl+Shift+B input binding, and HUD-only dark/gold tint specialization.
+
 ## 0.0.7 presentation release checkpoint — 2026-08-12
 
 - Final state: qualified release source `2f125f9f1024692d83a1b2570209d1858d62eff1`; package `9feed6dffa668812ed826c75b743d72892e6e8371b0f81585fb557aea8fcf453`; DLL `bf8c72874377d56f91bcdb6daedaa8b28b340a948aee06583a32954d61b38927`; MVID `966b7d8f-bd5f-46b9-beda-62774f82ccac`; installed 0.0.7 exact.

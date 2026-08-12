@@ -1,5 +1,7 @@
 # Autonomous Blockers
 
+Four-column UI rebuild intake, 2026-08-12: no critical engineering or runtime-safety blocker. The 0.0.7 package and installed identity are preserved, the complete unchanged baseline is green, the runtime transaction set is restored, and the mission supplies every material interaction decision. Human visual acceptance remains a mandatory final gate, not a blocker to implementation or automated/runtime qualification.
+
 Parchment UI mission status, 2026-08-12: no critical engineering or runtime-safety blocker. Exact release-source 0.0.7 Animated and Instant physical runs pass 71/71 each; native passes 12/12; Call of the Wild passes 26/26; all transactions restore exactly; guarded install preserves settings/other mods. Remaining boundary is intentionally human: visual acceptance is authoritative. No merge or public release is authorized.
 
 Live row-rendering recovery final status, 2026-08-12: COMPLETE; no critical blocker. Exact 0.0.6 passed two fresh-process screenshot/physical campaigns (71/71 each), native 12/12, and Call of the Wild 26/26. Bless confirmed and spent under the corrected native material contract. Every transaction restored, the guarded install preserved settings and all non-planner mods, and no process/lock remains. Final human visual confirmation is the handoff, not an automated blocker.

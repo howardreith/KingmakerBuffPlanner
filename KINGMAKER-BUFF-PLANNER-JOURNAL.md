@@ -1,5 +1,16 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-08-12 — four-column UI rebuild intake
+
+Status: IN PROGRESS; FULL PRESENTATION REPLACEMENT EXPLICITLY AUTHORIZED
+
+- Created `codex/ui-grid-rebuild` from exact HEAD `c2bc534827997fb75c1839a5cee5d1342a860369`. Starting source version is 0.0.7; qualified release source is `2f125f9f1024692d83a1b2570209d1858d62eff1`.
+- Preserved package `9feed6dffa668812ed826c75b743d72892e6e8371b0f81585fb557aea8fcf453`, DLL `bf8c72874377d56f91bcdb6daedaa8b28b340a948aee06583a32954d61b38927`, and MVID `966b7d8f-bd5f-46b9-beda-62774f82ccac` under `artifacts/release-candidate-backups/ui-grid-rebuild-start-0.0.7-c2bc534`. Installed identity matches exactly.
+- Verified zero Kingmaker/UMM processes, no deployment lock, and no unresolved runtime transaction. The unchanged baseline passes source 30/30, protocol 63/63, runtime harness 8/8, package 4/4, deployment WhatIf 5/5, and aggregate 1/1.
+- Inspected all four human-reference screenshots. Accepted direction: parchment/burgundy/gold planner; rejected narrow catalog/technical-detail layout and bright parchment HUD tiles; preferred HUD is dark/brown with antique-gold glyphs.
+- Studied BubbleBuffs at `f4871f763a23251284422ef0945a85e9f3fb788e`, including grid construction/cache, icon binding, portrait receiver state, group summaries, search, persistence, and HUD actions. Only information design is adapted; no source or asset is copied.
+- Wrote the explicit delete/retain map and component architecture in `planning/FOUR-COLUMN-UI-REBUILD-ARCHITECTURE.md`. Frozen discovery, planning, profile identity, automatic providers, execution, confirmation, HUD input/lifecycle, modal lease, compatibility, and guarded runtime systems remain outside the replacement boundary.
+
 ## 2026-08-12 — 0.0.7 presentation qualification
 
 Status: AUTOMATION PASS; GUARDED-INSTALLED; HUMAN VISUAL VERDICT REQUIRED
