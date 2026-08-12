@@ -13,6 +13,17 @@ Status: 0.0.5 PARTIAL HUMAN PASS; ACTUAL ROW/DETAIL PIXELS FAIL; RECOVERY IN PRO
 - Rejected theories: missing discovery, default filters, or a hardcoded Bless gap. The live header proves the catalog exists and both blank panes share a later rendering boundary.
 - Exact next action: add the temporary mission-defined canary under the live source Content, emit full CanvasRenderer/font/material/mask/canvas diagnostics, and capture a real disposable-campaign screenshot before changing production rows.
 
+## 2026-08-12 — live visual canary proves shared mask failure
+
+Status: ROOT CAUSE PROVEN; MINIMAL MASK REPAIR IN PROGRESS
+
+- Exact diagnostic source is `a5e551f4899f3680fc9aa5fbd59283704a8ef121`; package `ad8b26bcc6b7622a1e5002f102e2d33b8d1bc98db5ebecb1a44911a841e64007`; DLL `a3bc89b6be2cdfb7256dd0c9aadddddf6df154865a340606f62fa8561a1e2b5f`.
+- First launch `row-render-0.0.6-canary-1` hit the managed staging boundary after parking Mods. The exact owned backup/token was audited; guarded restore returned `verified=True`. Run 2 exposed only the obsolete Unity screenshot shim and restored exactly. Neither is visual evidence.
+- Guarded run `row-render-0.0.6-canary-3` passed and restored exactly. Its 1280x720 screenshot SHA-256 `4b3f7e05...` visibly shows neither the opaque magenta same-Content canary nor production rows/details.
+- Renderer evidence is exact: canary and rows are on the active overlay canvas, alpha 1, non-culled, default UI shader, valid Arial font/text, correct sibling depth and viewport geometry. Their materials require stencil equality. The Mask source material has `AlphaClip=True`, while the viewport Image is only alpha `0.001`, so it fails to write a reliable stencil and all children are rejected.
+- Rejected theory: the production row prefab/binding is the earliest defect. The plain canary failed identically before any production-row specialization mattered.
+- Exact next action: keep the mask graphic visually hidden but opaque for stencil generation, rerun the same live screenshot, then remove the diagnostic canary before final package work.
+
 ## 2026-08-12 — 0.0.5 catalog/HUD/input/tooltip repair complete
 
 - Authoritative intake was a human PARTIAL PASS: the four-button row and opaque F10 planner worked; the catalog/details were blank despite 11 sources/providers, HUD clicks reached the world, quick actions were silent, and the tooltip flickered/offscreen.

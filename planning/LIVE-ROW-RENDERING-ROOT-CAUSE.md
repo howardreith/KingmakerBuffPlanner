@@ -3,7 +3,7 @@
 Date: 2026-08-12  
 Branch: `codex/kingmaker-buff-planner`  
 Forensic HEAD: `94cbca8810d908d320eec0a2ca89533c7d4e0e05`  
-Status: IN PROGRESS — human-visible rendering failure confirmed; canary pending
+Status: ROOT CAUSE PROVEN — first live canary absent; mask repair pending recheck
 
 ## Exact rejected identity and external state
 
@@ -38,7 +38,11 @@ The four HUD icons, stable tooltips, HUD pointer isolation, F10 bootstrap, opaqu
 
 Both failed regions are constructed by `KingmakerUiFactory.CreateScrollView` as `ScrollRect -> Viewport(Image alpha 0.001 + Mask(showMaskGraphic=false)) -> Content(VerticalLayoutGroup)`. Header, tabs, filters, summary, footer, and opaque pane backgrounds outside those masked Content subtrees render correctly. Source rows and every details child share the masked Content path and are simultaneously absent in the screenshots. The same theme/font renders visible text elsewhere, so a catalog or global font failure is not the leading explanation.
 
-The earliest common stage at which output stops being demonstrated is therefore the viewport mask/stencil/content render path. This is a hypothesis, not yet a root-cause claim. The required high-contrast plain Unity UI canary will be inserted under the exact active source `Content` transform without changing discovery. Its screenshot will decide whether that shared path works before the production renderer is changed.
+The earliest common stage at which output stops is the viewport mask/stencil/content render path. Guarded run `row-render-0.0.6-canary-3` placed an opaque magenta Image and plain Arial Text directly under the live source `Content`; neither canary nor production rows appeared in screenshot `planner-render-canary.png` SHA-256 `4b3f7e05a47d830831582c1d2ff0e99ad14fbdeff51f6b42325784b31a08d886`.
+
+The same run recorded the exact renderer chain. The viewport Mask material is `UI/Default`, `AlphaClip:True`, stencil `Op:Replace`, but its source Image color alpha is `0.001`. Every canary/row/details graphic is non-culled, alpha 1, uses the same canvas, and has a stencil material with `Comp:Equal, ReadMask:1`. Because the alpha-clipped mask source does not write a reliable stencil at that threshold, all masked child pixels fail the stencil comparison even though their CanvasRenderers and geometry look valid. `Mask.showMaskGraphic=false` already prevents visible mask color through `ColorMask:0`; lowering the source alpha was unnecessary and broke stencil generation.
+
+This explains both blank panes and reconciles the misleading internal evidence: object state and geometry were real, but the stencil rejected their pixels. The bounded repair keeps the existing hierarchy and production renderer and makes only the hidden viewport mask source opaque.
 
 ## Invalidated prior claims
 
@@ -46,4 +50,4 @@ The earliest common stage at which output stops being demonstrated is therefore 
 
 ## Exact next action
 
-Add the temporary diagnostic canary, complete per-row CanvasRenderer/font/material/alpha/mask/canvas diagnostics, capture an actual live screenshot from `KBP_AUTOMATION_WORKING`, and inspect the pixels before selecting a production repair.
+Run the same guarded live canary package with the opaque mask source. Require a screenshot-visible canary, production rows, and details; then remove the canary before final production qualification.

@@ -150,7 +150,10 @@ namespace KingmakerBuffPlanner.UI
             RectTransform viewport = CreateRect("Viewport", root);
             Stretch(viewport, 3, 3, 3, 3);
             Image viewportImage = AddPanel(viewport, Color.white);
-            viewportImage.color = new Color(1, 1, 1, 0.001f);
+            // Mask uses the graphic's alpha-clipped pixels to write its stencil.
+            // showMaskGraphic=false already suppresses the visible color, so the
+            // stencil source itself must remain opaque.
+            viewportImage.color = Color.white;
             viewport.gameObject.AddComponent<Mask>().showMaskGraphic = false;
 
             content = CreateRect("Content", viewport);

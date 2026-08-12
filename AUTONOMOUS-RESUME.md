@@ -9,6 +9,14 @@
 - External state: Kingmaker/UMM closed; latest runtime transactions restored and verified; no top-level lock; installed 0.0.5 unchanged.
 - Exact next command: implement the temporary same-Content render canary plus screenshot/render-chain diagnostics, build an exact diagnostic package, and run one guarded `live-ui-bootstrap` pass against `KBP_AUTOMATION_WORKING`.
 
+## Live row canary root cause — 2026-08-12
+
+- Diagnostic commit/package: `a5e551f4899f3680fc9aa5fbd59283704a8ef121`; package `ad8b26bcc6b7622a1e5002f102e2d33b8d1bc98db5ebecb1a44911a841e64007`; DLL `a3bc89b6be2cdfb7256dd0c9aadddddf6df154865a340606f62fa8561a1e2b5f`.
+- Guarded run `row-render-0.0.6-canary-3` passed its existing mechanics and restored exactly. Screenshot `planner-render-canary.png` SHA-256 `4b3f7e05a47d830831582c1d2ff0e99ad14fbdeff51f6b42325784b31a08d886` visibly contains neither canary nor rows/details.
+- Exact cause: viewport `Mask` uses `UI/Default` with `AlphaClip=True`, but code sets its source Image alpha to `0.001`; masked children use stencil `Comp:Equal` and therefore render no pixels despite non-culled alpha-1 CanvasRenderers. Both blank panes share this contract.
+- External state: canary run and the earlier permission-denied transaction are both restored/verified; installed 0.0.5 remains exact; no process or deployment lock.
+- Exact next command: retain the canary temporarily, make the hidden mask source opaque, rebuild, and repeat the guarded canary screenshot to prove rows/details pixels before removing the canary.
+
 ## Catalog/HUD R3 complete and installed — 2026-08-12
 
 - Status: COMPLETE for automated acceptance; installed 0.0.5 is ready for authoritative human visual retest. Branch `codex/kingmaker-buff-planner`; qualified release source `390bb8b5f514a38edf1c553962813e29a1b526fd`; documentation-only checkpoint follows it.

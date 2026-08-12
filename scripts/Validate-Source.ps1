@@ -119,6 +119,14 @@ foreach ($requiredScreenContract in @('CanvasGroup', 'GraphicRaycaster', 'raycas
 }
 $assertions++
 
+$factorySource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\UI\KingmakerUiFactory.cs') -Raw
+if (-not $factorySource.Contains('viewportImage.color = Color.white') -or
+    -not $factorySource.Contains('showMaskGraphic = false') -or
+    $factorySource.Contains('new Color(1, 1, 1, 0.001f)')) {
+    throw 'Scroll viewport masks must use an opaque stencil source while hiding the mask graphic.'
+}
+$assertions++
+
 $screenControllerSource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\UI\BuffPlannerScreenController.cs') -Raw
 $stateSource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\UI\BuffPlannerUiContracts.cs') -Raw
 if (-not $screenControllerSource.Contains('ValidatePresentation()') -or
