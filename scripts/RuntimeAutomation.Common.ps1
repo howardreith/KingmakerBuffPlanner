@@ -248,6 +248,7 @@ function Assert-KbpRuntimeResult {
             'planner-grid-overview.png' = [string]$Result.uiGridOverviewScreenshotSha256
             'planner-target-colors.png' = [string]$Result.uiTargetColorsScreenshotSha256
             'planner-settings.png' = [string]$Result.uiSettingsScreenshotSha256
+            'hud-integration.png' = [string]$Result.uiHudScreenshotSha256
         }
         foreach ($name in $presentationScreenshots.Keys) {
             $path = Join-Path $Request.evidenceDirectory $name

@@ -46,6 +46,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private string _liveGridOverviewScreenshotSha256 = string.Empty;
         private string _liveTargetColorsScreenshotSha256 = string.Empty;
         private string _liveSettingsScreenshotSha256 = string.Empty;
+        private string _liveHudScreenshotSha256 = string.Empty;
         private string _liveCatalogControlEvidence = string.Empty;
         private int _liveDirectSelectedTargetCount;
         private int _liveIndirectCoveredTargetCount;
@@ -366,6 +367,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     UiGridOverviewScreenshotSha256 = _liveGridOverviewScreenshotSha256,
                     UiTargetColorsScreenshotSha256 = _liveTargetColorsScreenshotSha256,
                     UiSettingsScreenshotSha256 = _liveSettingsScreenshotSha256,
+                    UiHudScreenshotSha256 = _liveHudScreenshotSha256,
                     UiRenderAbilityIconCount = _liveRenderDiagnostics == null ? 0 :
                         _liveRenderDiagnostics.AbilityIconCount,
                     UiRenderMissingIconCount = _liveRenderDiagnostics == null ? 0 :
@@ -749,7 +751,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                             ui.HudObjectEvidence ?? "missing");
                         AddUiAssertion(result, "ui-card-aggregation-evidence",
                             ui.CatalogAggregateAbilityCount >= ui.CatalogVisibleViewModels &&
-                            ui.CatalogProviderCount >= ui.CatalogAggregateAbilityCount,
+                            ui.CatalogProviderCount >= ui.CatalogAggregateAbilityCount &&
+                            ui.CatalogConsolidatedCardCount >= 1 &&
+                            ui.CatalogBlessEvidence.Contains("providers=2,abilities=2"),
                             "providers>=abilities>=cards", ui.CatalogProviderCount + "/" +
                             ui.CatalogAggregateAbilityCount + "/" + ui.CatalogVisibleViewModels +
                             ";consolidated=" + ui.CatalogConsolidatedCardCount);
@@ -1145,6 +1149,14 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 BuffPlannerUiRoot.CloseRuntimeSmoke();
                 if (BuffPlannerUiRoot.IsScreenOpen)
                     throw new InvalidOperationException("Planner did not close cleanly after configuration.");
+                CaptureScreenshot(Path.Combine(_request.EvidenceDirectory, "hud-integration.png"));
+                _liveUiPhase = 72;
+                return false;
+            }
+            if (_liveUiPhase == 72)
+            {
+                if (!TryHashScreenshot(Path.Combine(_request.EvidenceDirectory,
+                    "hud-integration.png"), out _liveHudScreenshotSha256)) return false;
                 WritePhysicalInputRequest("click-long-configured", "click",
                     BuffPlannerUiRoot.HudButtonCenterForRuntime("long"));
                 _liveUiPhase = 9;
@@ -1491,6 +1503,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         [JsonProperty("uiGridOverviewScreenshotSha256", Order = 158)] public string UiGridOverviewScreenshotSha256 { get; set; }
         [JsonProperty("uiTargetColorsScreenshotSha256", Order = 159)] public string UiTargetColorsScreenshotSha256 { get; set; }
         [JsonProperty("uiSettingsScreenshotSha256", Order = 160)] public string UiSettingsScreenshotSha256 { get; set; }
+        [JsonProperty("uiHudScreenshotSha256", Order = 161)] public string UiHudScreenshotSha256 { get; set; }
         [JsonProperty("uiRenderAbilityIconCount", Order = 161)] public int UiRenderAbilityIconCount { get; set; }
         [JsonProperty("uiRenderMissingIconCount", Order = 162)] public int UiRenderMissingIconCount { get; set; }
         [JsonProperty("uiCastingModeControlCount", Order = 163)] public int UiCastingModeControlCount { get; set; }
