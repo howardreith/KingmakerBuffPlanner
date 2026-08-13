@@ -236,11 +236,13 @@ namespace KingmakerBuffPlanner.UI
 
         internal LiveRowRenderDiagnostics GetLiveRowRenderDiagnostics()
         {
-            Canvas.ForceUpdateCanvases();
+            KingmakerUiFactory.ForceLayoutAndSnap(_root);
             PlannerSetupModel model = _session.Model;
             List<BuffCardView> cards = _grid.Cards.Where(card =>
                 card.Rect.gameObject.activeInHierarchy).Take(5).ToList();
             Text[] allText = _root.GetComponentsInChildren<Text>(true);
+            RectTransform[] pixelSnapRects = allText.Select(text => text.rectTransform)
+                .Concat(cards.Select(card => card.Rect)).Distinct().ToArray();
             return new LiveRowRenderDiagnostics
             {
                 ExpectedNames = cards.Select(card => card.Rect.GetComponentsInChildren<Text>(true)
@@ -267,8 +269,9 @@ namespace KingmakerBuffPlanner.UI
                 ThemeResolution = _theme.ResolutionSummary,
                 TextRenderingEvidence = BuildTextRenderingEvidence(),
                 NestedCanvasScalerCount = _root.GetComponentsInChildren<CanvasScaler>(true).Length,
-                FractionalRectCount = _root.GetComponentsInChildren<RectTransform>(true)
-                    .Count(HasFractionalGeometry)
+                FractionalRectCount = pixelSnapRects.Count(HasFractionalGeometry),
+                PixelSnapEvidence = "scope=text+active-cards;rects=" + pixelSnapRects.Length +
+                    ";fractional=" + pixelSnapRects.Count(HasFractionalGeometry)
             };
         }
 

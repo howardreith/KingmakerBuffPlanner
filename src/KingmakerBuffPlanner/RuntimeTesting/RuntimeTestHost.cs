@@ -981,7 +981,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     string.IsNullOrWhiteSpace(_liveRenderDiagnostics.TextRenderingEvidence) ||
                     _liveRenderDiagnostics.NestedCanvasScalerCount != 0 ||
                     _liveRenderDiagnostics.FractionalRectCount != 0)
-                    throw new InvalidOperationException("Live production render evidence is incomplete.");
+                    throw new InvalidOperationException("Live production render evidence is incomplete: " +
+                        Serialize(_liveRenderDiagnostics));
                 AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory,
                     "live-row-render-diagnostics.json"), Serialize(_liveRenderDiagnostics));
                 _liveRenderScreenshotPath = Path.Combine(_request.EvidenceDirectory,
