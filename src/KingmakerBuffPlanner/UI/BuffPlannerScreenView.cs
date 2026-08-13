@@ -541,7 +541,7 @@ namespace KingmakerBuffPlanner.UI
                 ",assigned=" + model.Profile.Routines.Any(routine => routine.Assignments.Any(
                     assignment => assignment.SourceId == source.SourceId &&
                     assignment.WantedTargetUnitIds.Count != 0)) + ",providers=" +
-                source.Providers.Count + ",card=" + (card != null) + ",visible=" +
+                source.Providers.Count + ",card=" + (card != null) + ",rowVisible=" +
                 (card != null && RectanglesOverlap(card.Rect, _grid.Viewport));
         }
 
