@@ -1,5 +1,12 @@
 # Autonomous Resume
 
+## 0.0.8 four-column release handoff — 2026-08-12
+
+- Final qualified release source: `6e5d02b21e587db84f2c7e7d2a34a63bace3e942`; version 0.0.8; package `22ce0c0e44c6f6b1f895199e58fe1afe5f639e6b38443e062fd6f4204ec8dbb2`; DLL `593db3bb0ce76316840f94e52d4698c7cd2353bc2aa31610608368478bcdda4b`; MVID `a8265c4e-e37d-4f54-a3e4-ee6578fdefa6`.
+- Exact final runs: `ui-grid-0.0.8-final-animated` 72/72, `ui-grid-0.0.8-final-instant` 72/72, `ui-grid-0.0.8-final-native` 12/12, `ui-grid-0.0.8-final-cotw` 26/26. Every runtime transaction restored exactly.
+- Final guarded install `ui-grid-0.0.8-final-install` is Installed; settings preserved; all non-planner mods verified unchanged. No merge, push, or publication occurred.
+- Final screenshot review caught and fixed stale category/Selected-only visual state before this package. Human visual acceptance remains authoritative; next action is the checklist at the top of `docs/MANUAL-ACCEPTANCE.md`.
+
 ## 0.0.8 release-source preparation — 2026-08-12
 
 - Branch `codex/ui-grid-rebuild`; current implementation HEAD before this documentation checkpoint is `8e94b1e3777c072d9069c5fbed18555805a8d87c`; version 0.0.8.

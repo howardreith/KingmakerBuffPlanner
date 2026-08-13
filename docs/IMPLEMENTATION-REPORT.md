@@ -2,6 +2,8 @@
 
 ## 0.0.8 four-column routine planner — implementation complete, human verdict pending
 
+Final release source/package/DLL/MVID are `6e5d02b21e587db84f2c7e7d2a34a63bace3e942` / `22ce0c0e44c6f6b1f895199e58fe1afe5f639e6b38443e062fd6f4204ec8dbb2` / `593db3bb0ce76316840f94e52d4698c7cd2353bc2aa31610608368478bcdda4b` / `a8265c4e-e37d-4f54-a3e4-ee6578fdefa6`. Exact final Animated and Instant runs passed 72/72 each; native passed 12/12; Call of the Wild passed 26/26; all restored. The guarded final install preserved settings and every other mod.
+
 The full-screen presentation was replaced rather than layered over 0.0.7. The production hierarchy now has top Long/Important/Short tabs, the allowed search/category/Selected only controls, a broad pooled four-column icon grid, a compact selected-buff/portrait/plan panel, one Settings surface, and one Apply action. Target portraits directly create or remove the selected buff assignment in the active routine; removing the last target removes that routine assignment. No alternate old layout, Add-to-routine listener, hidden-entry control, provider editor, technical filter, or duplicate mode control remains.
 
 The automatic provider/planning and Animated/Instant engines were not redesigned. Schema 3 reveals legacy hidden entries and migrates F10 to configurable Ctrl+Shift+B. Exact Kingmaker input inspection identified `KeyboardAccess.Binding.InputMatched()`; the planner chord is polled by the existing update path and its B primary is suppressed from native bindings only for the exact Ctrl+Shift chord. HUD visuals return to the earlier dark tile/antique-gold treatment without geometry or lifecycle changes.

@@ -2,6 +2,8 @@
 
 ## 0.0.8 four-column routine planner
 
+Final release identity: source `6e5d02b21e587db84f2c7e7d2a34a63bace3e942`; package `22ce0c0e44c6f6b1f895199e58fe1afe5f639e6b38443e062fd6f4204ec8dbb2`; DLL `593db3bb0ce76316840f94e52d4698c7cd2353bc2aa31610608368478bcdda4b`; MVID `a8265c4e-e37d-4f54-a3e4-ee6578fdefa6`. Exact final runs are Animated 72/72, Instant 72/72, native 12/12, and Call of the Wild 26/26; guarded install passed.
+
 | Criterion | Result | Exact evidence |
 |---|---|---|
 | Replace old layout | PASS | New component shell only; validator rejects old labels/callbacks and alternate controls. |

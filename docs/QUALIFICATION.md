@@ -4,6 +4,8 @@
 
 Status: implementation and deterministic qualification PASS; exact release packaging/runtime/install checkpoint follows; human visual acceptance remains required.
 
+Final release source is `6e5d02b21e587db84f2c7e7d2a34a63bace3e942`; package `22ce0c0e44c6f6b1f895199e58fe1afe5f639e6b38443e062fd6f4204ec8dbb2`; DLL `593db3bb0ce76316840f94e52d4698c7cd2353bc2aa31610608368478bcdda4b`; MVID `a8265c4e-e37d-4f54-a3e4-ee6578fdefa6`. Final Animated/Instant are 72/72 each, native 12/12, and Call of the Wild 26/26; all transactions restored. Guarded install `ui-grid-0.0.8-final-install` preserved settings and all other mods. Publication remains local-only.
+
 - Deterministic gates: source 30/30; behavior/protocol 67/67; runtime filesystem 8/8; package 4/4; deployment WhatIf 5/5; aggregate 1/1.
 - Grid gate: four columns at the 1920x1080 content width and compact 1600x900 width, no horizontal scrolling, 2,500 entries map to 625 rows while allocation remains capped at 32 cards.
 - Candidate physical UI: actual four-column cards/icons, direct Bless portrait assignment, routine independence, all four category listeners, Selected only Long=1/Important=0/Long=1, one settings mode, zero retired labels, physical Ctrl+Shift+B, 21 open/close cycles, zero world/selection/camera/native leakage, confirmed execution, and exact restoration.

@@ -4,6 +4,8 @@
 
 Status: REQUIRED after guarded installation. Automation has not granted cosmetic acceptance.
 
+Installed final identity: source `6e5d02b21e587db84f2c7e7d2a34a63bace3e942`; package `22ce0c0e44c6f6b1f895199e58fe1afe5f639e6b38443e062fd6f4204ec8dbb2`; DLL `593db3bb0ce76316840f94e52d4698c7cd2353bc2aa31610608368478bcdda4b`; MVID `a8265c4e-e37d-4f54-a3e4-ee6578fdefa6`. Compare against screenshots under `runtime-evidence/ui-grid-0.0.8-final-animated/`.
+
 1. The four HUD buttons retain their established anchors/hitboxes/tooltips but use dark brown tiles with antique-gold glyphs; no bright white HUD treatment remains.
 2. Ctrl+Shift+B opens/closes the planner without triggering native B. F10 does nothing for the planner. Settings can toggle the hotkey to Ctrl+Shift+P and back.
 3. Long, Important, and Short clearly define edit context. The broad catalog is exactly four cards across at 1920x1080, vertically scrolls, and has readable actual icons, names, availability, badges, and restrained status accents.

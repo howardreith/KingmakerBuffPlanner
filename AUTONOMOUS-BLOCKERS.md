@@ -1,5 +1,7 @@
 # Autonomous Blockers
 
+0.0.8 final status, 2026-08-12: COMPLETE for engineering/runtime/package/install qualification; no critical blocker. The remaining boundary is explicitly human visual acceptance. No merge, push, or public release is authorized.
+
 0.0.8 four-column rebuild, 2026-08-12: no critical engineering or runtime-safety blocker. The architecture replacement, migration, hotkey isolation, dark/gold HUD treatment, deterministic gates, and candidate physical matrix are complete. Exact release-source packaging/runtime/install remain actionable. Human visual acceptance is the intentional final gate, not an engineering blocker.
 
 Four-column UI rebuild intake, 2026-08-12: no critical engineering or runtime-safety blocker. The 0.0.7 package and installed identity are preserved, the complete unchanged baseline is green, the runtime transaction set is restored, and the mission supplies every material interaction decision. Human visual acceptance remains a mandatory final gate, not a blocker to implementation or automated/runtime qualification.

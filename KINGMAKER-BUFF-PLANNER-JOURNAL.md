@@ -1,5 +1,16 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-08-12 — 0.0.8 qualified, packaged, and guarded-installed
+
+Status: AUTOMATION PASS; HUMAN VISUAL VERDICT REQUIRED; LOCAL-ONLY
+
+- Final release source `6e5d02b21e587db84f2c7e7d2a34a63bace3e942`; deterministic package `22ce0c0e44c6f6b1f895199e58fe1afe5f639e6b38443e062fd6f4204ec8dbb2`; DLL `593db3bb0ce76316840f94e52d4698c7cd2353bc2aa31610608368478bcdda4b`; MVID `a8265c4e-e37d-4f54-a3e4-ee6578fdefa6`.
+- Exact final physical runs `ui-grid-0.0.8-final-animated` and `ui-grid-0.0.8-final-instant` passed 72/72 each, confirmed Bless, exercised every catalog category and routine-local Selected only, sampled dark/gold HUD pixels, captured five screenshots, and restored exactly.
+- `ui-grid-0.0.8-final-native` passed 12/12. `ui-grid-0.0.8-final-cotw` passed 26/26 with 9,064 abilities, 5,907 candidates, 2,096 optional inclusions, zero unsupported, and zero planner Harmony overlap. Both restored.
+- Deterministic release build passed 2/2 and package validation 4/4. Guarded install `ui-grid-0.0.8-final-install` preserved settings and verified every non-planner mod unchanged.
+- Final screenshot review invalidated one earlier candidate because Selected only's checkmark stayed visually stale after runtime control dispatch. Commit `6e5d02b` refreshes the complete selected-control state; its screenshots were re-inspected before final packaging.
+- Human acceptance remains authoritative for native feel, contrast, clipping, density, and workflow clarity. No merge, push, or publication occurred.
+
 ## 2026-08-12 — four-column UI rebuild implementation and candidate qualification
 
 Status: RELEASE-SOURCE PREPARATION; HUMAN VISUAL VERDICT REMAINS REQUIRED
