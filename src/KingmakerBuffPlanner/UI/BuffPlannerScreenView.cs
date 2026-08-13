@@ -542,7 +542,9 @@ namespace KingmakerBuffPlanner.UI
                     assignment => assignment.SourceId == source.SourceId &&
                     assignment.WantedTargetUnitIds.Count != 0)) + ",providers=" +
                 source.Providers.Count + ",card=" + (card != null) + ",rowVisible=" +
-                (card != null && RectanglesOverlap(card.Rect, _grid.Viewport));
+                (card != null && RectanglesOverlap(card.Rect, _grid.Viewport)) + ",material=" +
+                (_session.CatalogDiscovery == null ? "missing" :
+                    _session.CatalogDiscovery.BlessMaterialEvidence);
         }
 
         private string BuildMaskEvidence()

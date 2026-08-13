@@ -240,7 +240,7 @@ function Assert-KbpRuntimeResult {
             [string]$Result.uiRenderSelectedRowName -cne [string]$Result.uiRenderDetailsTitleText -or
             [string]$Result.uiRenderCanaryEvidence -cne 'absent' -or
             -not ([string]$Result.uiRenderMaskEvidence).Contains('color=RGBA(1.000, 1.000, 1.000, 1.000)') -or
-            -not ([string]$Result.uiRenderMaskEvidence).Contains('ColorMask:0')) {
+            -not ([string]$Result.uiRenderMaskEvidence).Contains('showGraphic=False')) {
             throw 'Live production screenshot/render evidence is incomplete or inconsistent.'
         }
         $presentationScreenshots = [ordered]@{
