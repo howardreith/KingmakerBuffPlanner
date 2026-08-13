@@ -13,9 +13,22 @@ namespace KingmakerBuffPlanner.UI
 {
     public sealed class SetupSourceRow
     {
-        internal SetupSourceRow(AbilityKey ability, string displayName, int spellLevel, IEnumerable<ProviderSnapshot> providers)
+        private readonly AbilityKey _ability;
+
+        internal SetupSourceRow(string sourceId, IEnumerable<AbilityKey> abilities,
+            AbilityKey representativeAbility, string displayName, int spellLevel,
+            IEnumerable<ProviderSnapshot> providers)
         {
-            Ability = ability;
+            if (string.IsNullOrWhiteSpace(sourceId)) throw new ArgumentException("Source ID is required.", "sourceId");
+            SourceId = sourceId;
+            var abilityList = (abilities ?? throw new ArgumentNullException("abilities"))
+                .Where(item => item != null).GroupBy(item => item.Canonical, StringComparer.Ordinal)
+                .Select(group => group.First()).OrderBy(item => item.Canonical, StringComparer.Ordinal).ToList();
+            if (abilityList.Count == 0) throw new ArgumentException("At least one ability is required.", "abilities");
+            Abilities = new ReadOnlyCollection<AbilityKey>(abilityList);
+            _ability = representativeAbility ?? throw new ArgumentNullException("representativeAbility");
+            if (!Abilities.Any(item => item.Equals(_ability)))
+                throw new ArgumentException("Representative ability must belong to the aggregate.", "representativeAbility");
             DisplayName = displayName;
             SpellLevel = spellLevel;
             var ordered = providers.OrderBy(p => p.Key.Canonical, StringComparer.Ordinal).ToList();
@@ -25,14 +38,20 @@ namespace KingmakerBuffPlanner.UI
             ExpectedDurationRounds = ordered.Count == 0 ? 0 : ordered.Max(p => p.ExpectedDurationRounds);
         }
 
-        public AbilityKey Ability { get; private set; }
+        public AbilityKey Ability { get { return _ability; } }
+        public IReadOnlyList<AbilityKey> Abilities { get; private set; }
         public string DisplayName { get; private set; }
         public int SpellLevel { get; private set; }
         public IReadOnlyList<ProviderSnapshot> Providers { get; private set; }
         public string Description { get; private set; }
         public string DurationText { get; private set; }
         public int ExpectedDurationRounds { get; private set; }
-        public string SourceId { get { return Ability.Canonical; } }
+        public string SourceId { get; private set; }
+
+        internal bool HasSourceKind(SourceKind kind)
+        {
+            return Abilities.Any(ability => ability.SourceKind == kind);
+        }
     }
 
     public sealed class PlannerSetupModel
@@ -53,27 +72,34 @@ namespace KingmakerBuffPlanner.UI
             Profile = profile ?? throw new ArgumentNullException("profile");
             Snapshot = snapshot ?? throw new ArgumentNullException("snapshot");
             _activeEffects = activeEffects ?? throw new ArgumentNullException("activeEffects");
-            _effects = new ReadOnlyDictionary<string, EffectExpression>(
-                new Dictionary<string, EffectExpression>(effectsByAbilityKey ??
-                    new Dictionary<string, EffectExpression>(), StringComparer.Ordinal));
+            var effects = new Dictionary<string, EffectExpression>(effectsByAbilityKey ??
+                new Dictionary<string, EffectExpression>(), StringComparer.Ordinal);
             _providerOptions = new ReadOnlyCollection<ProviderPlanningOption>(
                 (providerOptions ?? new ProviderPlanningOption[0])
                     .OrderBy(item => item.Provider.Key.Canonical, StringComparer.Ordinal).ToList());
             _save = save ?? throw new ArgumentNullException("save");
             Sources = new ReadOnlyCollection<SetupSourceRow>(snapshot.Providers
-                .GroupBy(p => p.Key.Ability.Canonical, StringComparer.Ordinal)
-                .Select(g => new SetupSourceRow(g.First().Key.Ability,
-                    g.OrderBy(p => p.DisplayName, StringComparer.Ordinal).First().DisplayName,
-                    g.Min(p => p.SpellLevel), g))
+                .GroupBy(provider => AggregateId(provider.Key.Ability, effects), StringComparer.Ordinal)
+                .Select(group => CreateSourceRow(group.Key, group))
                 .OrderBy(s => s.DisplayName, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(s => s.SpellLevel)
                 .ThenBy(s => s.SourceId, StringComparer.Ordinal).ToList());
+            foreach (SetupSourceRow source in Sources)
+            {
+                EffectExpression expression;
+                if (effects.TryGetValue(source.Ability.Canonical, out expression))
+                    effects[source.SourceId] = expression;
+            }
+            _effects = new ReadOnlyDictionary<string, EffectExpression>(effects);
+            AssignmentMigrationApplied = RebindLegacyAssignments();
+            if (AssignmentMigrationApplied) _save(Profile);
             SelectedSourceId = Sources.Count == 0 ? string.Empty : Sources[0].SourceId;
         }
 
         public BuffPlannerProfile Profile { get; private set; }
         public PartyProviderSnapshot Snapshot { get; private set; }
         public IReadOnlyList<SetupSourceRow> Sources { get; private set; }
+        public bool AssignmentMigrationApplied { get; private set; }
         public string SelectedSourceId { get; private set; }
         public SetupSourceRow SelectedSource { get { return Sources.FirstOrDefault(s => s.SourceId == SelectedSourceId); } }
         public IReadOnlyList<string> UnsupportedSavedSourceIds
@@ -158,7 +184,8 @@ namespace KingmakerBuffPlanner.UI
             if (source == null || IsTargetWanted(routineId, source.SourceId, unitId)) return false;
             EffectExpression expression;
             if (!_effects.TryGetValue(source.SourceId, out expression) ||
-                !EffectExpressionTargetAnalysis.Contains(expression, EffectTarget.Party)) return false;
+                (!EffectExpressionTargetAnalysis.Contains(expression, EffectTarget.Party) &&
+                 !EffectExpressionTargetAnalysis.Contains(expression, EffectTarget.AreaRecipients))) return false;
             SourceAssignmentProfile assignment = FindRoutine(routineId).Assignments
                 .FirstOrDefault(item => item.SourceId == source.SourceId);
             return assignment != null && assignment.WantedTargetUnitIds.Count != 0 &&
@@ -381,6 +408,74 @@ namespace KingmakerBuffPlanner.UI
                     ? ExistingEffectPolicy.Overwrite : ExistingEffectPolicy.SkipAlreadyActive,
                 IgnoredPresenceMarkers = new List<string>()
             };
+        }
+
+        private static string AggregateId(AbilityKey ability,
+            IDictionary<string, EffectExpression> effects)
+        {
+            EffectExpression expression;
+            effects.TryGetValue(ability.Canonical, out expression);
+            return EffectAggregateIdentity.For(expression, ability.Canonical);
+        }
+
+        private static SetupSourceRow CreateSourceRow(string sourceId,
+            IEnumerable<ProviderSnapshot> providers)
+        {
+            List<ProviderSnapshot> values = providers.OrderBy(provider => provider.DisplayName,
+                    StringComparer.OrdinalIgnoreCase)
+                .ThenBy(provider => provider.SpellLevel)
+                .ThenBy(provider => provider.Key.Canonical, StringComparer.Ordinal).ToList();
+            ProviderSnapshot representative = values[0];
+            return new SetupSourceRow(sourceId, values.Select(provider => provider.Key.Ability),
+                representative.Key.Ability, representative.DisplayName,
+                values.Min(provider => provider.SpellLevel), values);
+        }
+
+        private bool RebindLegacyAssignments()
+        {
+            var sourceByLegacyId = Sources.SelectMany(source => source.Abilities.Select(ability =>
+                    new { LegacyId = ability.Canonical, Source = source }))
+                .ToDictionary(item => item.LegacyId, item => item.Source, StringComparer.Ordinal);
+            bool changed = false;
+            foreach (RoutineProfile routine in Profile.Routines)
+            {
+                var rebound = new List<SourceAssignmentProfile>();
+                var aggregateAssignments = new Dictionary<string, SourceAssignmentProfile>(StringComparer.Ordinal);
+                foreach (SourceAssignmentProfile assignment in routine.Assignments)
+                {
+                    SetupSourceRow source;
+                    if (!sourceByLegacyId.TryGetValue(assignment.SourceId, out source))
+                        source = Sources.FirstOrDefault(item => item.SourceId == assignment.SourceId);
+                    if (source == null)
+                    {
+                        rebound.Add(assignment);
+                        continue;
+                    }
+                    SourceAssignmentProfile existing;
+                    if (!aggregateAssignments.TryGetValue(source.SourceId, out existing))
+                    {
+                        if (assignment.SourceId != source.SourceId ||
+                            assignment.Ability.ToKey().Canonical != source.Ability.Canonical)
+                            changed = true;
+                        assignment.SourceId = source.SourceId;
+                        assignment.Ability = AbilityKeyProfile.FromKey(source.Ability);
+                        aggregateAssignments.Add(source.SourceId, assignment);
+                        rebound.Add(assignment);
+                        continue;
+                    }
+                    existing.WantedTargetUnitIds = existing.WantedTargetUnitIds
+                        .Concat(assignment.WantedTargetUnitIds).Distinct(StringComparer.Ordinal)
+                        .OrderBy(item => item, StringComparer.Ordinal).ToList();
+                    existing.IgnoredPresenceMarkers = existing.IgnoredPresenceMarkers
+                        .Concat(assignment.IgnoredPresenceMarkers).Distinct(StringComparer.Ordinal)
+                        .OrderBy(item => item, StringComparer.Ordinal).ToList();
+                    if (assignment.ExistingEffectPolicy == ExistingEffectPolicy.Overwrite)
+                        existing.ExistingEffectPolicy = ExistingEffectPolicy.Overwrite;
+                    changed = true;
+                }
+                if (changed) routine.Assignments = rebound;
+            }
+            return changed;
         }
 
         private void RequireProvider(string providerKey)

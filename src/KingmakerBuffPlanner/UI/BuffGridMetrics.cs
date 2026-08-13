@@ -25,13 +25,16 @@ namespace KingmakerBuffPlanner.UI
         {
             if (viewportWidth <= 0) throw new ArgumentOutOfRangeException("viewportWidth");
             if (viewportHeight <= 0) throw new ArgumentOutOfRangeException("viewportHeight");
-            const float spacing = 10f;
-            float cellWidth = (viewportWidth - spacing * (ColumnCount - 1) - 12f) / ColumnCount;
+            const float spacing = 14f;
+            const float sideInset = 20f;
+            float cellWidth = (viewportWidth - spacing * (ColumnCount - 1) - sideInset * 2f) / ColumnCount;
             return new BuffGridMetrics
             {
                 Columns = ColumnCount,
                 CellWidth = Math.Max(220f, cellWidth),
                 CellHeight = viewportHeight < 500f ? 92f : 104f,
+                HorizontalSpacing = spacing,
+                SideInset = sideInset,
                 HorizontalScrolling = false
             };
         }
@@ -39,6 +42,8 @@ namespace KingmakerBuffPlanner.UI
         internal int Columns { get; private set; }
         internal float CellWidth { get; private set; }
         internal float CellHeight { get; private set; }
+        internal float HorizontalSpacing { get; private set; }
+        internal float SideInset { get; private set; }
         internal bool HorizontalScrolling { get; private set; }
     }
 }

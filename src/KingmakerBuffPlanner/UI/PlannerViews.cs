@@ -326,7 +326,7 @@ namespace KingmakerBuffPlanner.UI
             if (!force && row == _firstRow) return;
             _firstRow = row;
             _pool.HideAll();
-            float spacing = 10f;
+            float spacing = _metrics.HorizontalSpacing;
             for (int poolIndex = 0; poolIndex < _pool.Capacity; poolIndex++)
             {
                 int modelIndex = BuffGridMetrics.ModelIndex(row, poolIndex);
@@ -338,7 +338,7 @@ namespace KingmakerBuffPlanner.UI
                 card.Rect.anchorMax = new Vector2(0, 1);
                 card.Rect.pivot = new Vector2(0, 1);
                 card.Rect.sizeDelta = new Vector2(_metrics.CellWidth, _metrics.CellHeight);
-                card.Rect.anchoredPosition = new Vector2(6f + column *
+                card.Rect.anchoredPosition = new Vector2(_metrics.SideInset + column *
                     (_metrics.CellWidth + spacing), -6f - absoluteRow *
                     (_metrics.CellHeight + spacing));
                 BuffCardViewModel model = _models[modelIndex];
@@ -380,9 +380,27 @@ namespace KingmakerBuffPlanner.UI
                 LayoutElement element = rect.gameObject.AddComponent<LayoutElement>();
                 element.preferredWidth = 78f;
                 element.minWidth = 78f;
-                Image background = KingmakerUiFactory.AddFramedPanel(rect,
-                    new Color(0.16f, 0.10f, 0.07f, 1f), statusColor(target.Status),
-                    target.Wanted ? 2f : 1f);
+                Color frame = statusColor(target.Status);
+                Color surface = new Color(0.16f, 0.10f, 0.07f, 1f);
+                float thickness = 1f;
+                if (target.State == TargetPortraitState.DirectSelected)
+                {
+                    surface = new Color(0.12f, 0.31f, 0.15f, 1f);
+                    frame = new Color(0.38f, 0.88f, 0.43f, 1f);
+                    thickness = 4f;
+                }
+                else if (target.State == TargetPortraitState.IndirectCovered)
+                {
+                    surface = new Color(0.15f, 0.25f, 0.14f, 1f);
+                    frame = new Color(0.48f, 0.72f, 0.42f, 1f);
+                    thickness = 2f;
+                }
+                else if (target.State == TargetPortraitState.SelectedButUnfulfillable)
+                {
+                    surface = new Color(0.36f, 0.27f, 0.08f, 1f);
+                    thickness = 3f;
+                }
+                Image background = KingmakerUiFactory.AddFramedPanel(rect, surface, frame, thickness);
                 Button button = rect.gameObject.AddComponent<Button>();
                 button.targetGraphic = background;
                 button.interactable = target.Legal;
@@ -393,16 +411,38 @@ namespace KingmakerBuffPlanner.UI
                 Image image = imageRect.gameObject.AddComponent<Image>();
                 image.sprite = portrait(target.UnitId);
                 image.preserveAspect = true;
-                image.color = target.Legal ? Color.white : new Color(0.45f, 0.32f, 0.28f, 0.8f);
+                image.color = target.State == TargetPortraitState.DirectSelected
+                    ? new Color(0.74f, 1f, 0.76f, 1f)
+                    : target.State == TargetPortraitState.IndirectCovered
+                        ? new Color(0.86f, 1f, 0.84f, 1f)
+                        : target.State == TargetPortraitState.SelectedButUnfulfillable
+                            ? new Color(1f, 0.86f, 0.55f, 0.88f)
+                            : target.Legal ? Color.white : new Color(0.45f, 0.32f, 0.28f, 0.8f);
                 image.raycastTarget = false;
+                RectTransform overlayRect = KingmakerUiFactory.CreateRect("StateOverlay", imageRect);
+                KingmakerUiFactory.Stretch(overlayRect);
+                Image overlay = KingmakerUiFactory.AddPanel(overlayRect,
+                    target.State == TargetPortraitState.DirectSelected
+                        ? new Color(0.12f, 0.65f, 0.20f, 0.32f)
+                        : target.State == TargetPortraitState.IndirectCovered
+                            ? new Color(0.22f, 0.58f, 0.24f, 0.16f)
+                            : target.State == TargetPortraitState.SelectedButUnfulfillable
+                                ? new Color(0.82f, 0.55f, 0.08f, 0.25f)
+                                : target.State == TargetPortraitState.Invalid
+                                    ? new Color(0.55f, 0.08f, 0.06f, 0.18f) : Color.clear);
+                overlay.raycastTarget = false;
                 Text name = KingmakerUiFactory.CreateText("Name", rect, _theme,
                     target.Name, 12, TextAnchor.MiddleCenter);
                 KingmakerUiFactory.SetAnchors(name.rectTransform, 0, 0.01f, 1, 0.25f);
                 Text mark = KingmakerUiFactory.CreateText("State", rect, _theme,
-                    target.Indirect ? "IND" : target.Wanted ? "YES" : string.Empty,
-                    18, TextAnchor.UpperRight);
-                mark.color = statusColor(target.Status);
-                KingmakerUiFactory.SetAnchors(mark.rectTransform, 0.62f, 0.63f, 0.96f, 0.97f);
+                    target.State == TargetPortraitState.DirectSelected ? "SELECTED" :
+                    target.State == TargetPortraitState.IndirectCovered ? "COVERED" :
+                    target.State == TargetPortraitState.SelectedButUnfulfillable ? "SELECTED !" :
+                    string.Empty, 11, TextAnchor.UpperCenter);
+                mark.fontStyle = FontStyle.Bold;
+                mark.color = target.State == TargetPortraitState.DirectSelected
+                    ? new Color(0.82f, 1f, 0.78f, 1f) : frame;
+                KingmakerUiFactory.SetAnchors(mark.rectTransform, 0.03f, 0.67f, 0.97f, 0.97f);
             }
         }
 
@@ -468,15 +508,15 @@ namespace KingmakerBuffPlanner.UI
             _targetsLabel.fontStyle = FontStyle.Bold;
             KingmakerUiFactory.SetAnchors(_targetsLabel.rectTransform, 0.435f, 0.78f, 0.98f, 0.95f);
             _targets = new PlannerTargetStripView(Root, theme);
-            KingmakerUiFactory.SetAnchors(_targets.Root, 0.435f, 0.25f, 0.82f, 0.77f);
+            KingmakerUiFactory.SetAnchors(_targets.Root, 0.435f, 0.25f, 0.84f, 0.77f);
             _selectAll = KingmakerUiFactory.CreateButton("SelectAllValid", Root, theme,
                 "Select All Valid", () => selectAll());
             KingmakerUiFactory.SetAnchors((RectTransform)_selectAll.transform,
-                0.83f, 0.52f, 0.975f, 0.73f);
+                0.85f, 0.52f, 0.975f, 0.73f);
             _clear = KingmakerUiFactory.CreateButton("ClearTargets", Root, theme,
                 "Clear Targets", () => clear());
             KingmakerUiFactory.SetAnchors((RectTransform)_clear.transform,
-                0.83f, 0.27f, 0.975f, 0.48f);
+                0.85f, 0.27f, 0.975f, 0.48f);
             _plan = KingmakerUiFactory.CreateText("PlanSummary", Root, theme,
                 string.Empty, 15, TextAnchor.MiddleLeft);
             _plan.color = theme.BurgundyPrimary;
@@ -498,7 +538,9 @@ namespace KingmakerBuffPlanner.UI
             _icon.gameObject.SetActive(icon != null);
             _fallback.gameObject.SetActive(available && icon == null);
             _name.text = available ? source.DisplayName : "Select a buff";
-            _meta.text = available ? BuffCardViewModel.PlayerSourceType(source.Ability.SourceKind) +
+            _meta.text = available ? (source.Abilities.Select(ability => ability.SourceKind)
+                .Distinct().Count() > 1 ? "Multiple sources" :
+                BuffCardViewModel.PlayerSourceType(source.Ability.SourceKind)) +
                 (source.SpellLevel > 0 ? " | Level " + source.SpellLevel : string.Empty) +
                 (string.IsNullOrWhiteSpace(source.DurationText) ? string.Empty :
                     " | " + source.DurationText) : string.Empty;

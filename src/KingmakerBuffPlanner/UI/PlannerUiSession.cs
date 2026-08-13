@@ -94,7 +94,7 @@ namespace KingmakerBuffPlanner.UI
                     Model.Sources.Count + " discovered buff sources; " +
                     snapshot.Providers.Count + " providers.";
                 _log.Info("[KBP-CATALOG] discovery;" + CatalogDiscovery + ".");
-                LogBlessSlice(loaded.Profile, snapshot, _providerOptions);
+                LogBlessSlice(loaded.Profile, snapshot, _providerOptions, Model);
             }
             catch (Exception exception)
             {
@@ -117,7 +117,8 @@ namespace KingmakerBuffPlanner.UI
         private void LogBlessSlice(
             BuffPlannerProfile profile,
             PartyProviderSnapshot snapshot,
-            IEnumerable<ProviderPlanningOption> options)
+            IEnumerable<ProviderPlanningOption> options,
+            PlannerSetupModel model)
         {
             const string bless = "90e59f4a4ada87243b7b3535a06d0638";
             ProviderSnapshot provider = snapshot.Providers.FirstOrDefault(item =>
@@ -134,8 +135,11 @@ namespace KingmakerBuffPlanner.UI
                 item.PoolKey == provider.ResourcePoolKey);
             ProviderPlanningOption option = (options ?? new ProviderPlanningOption[0])
                 .FirstOrDefault(item => item.Provider.Key.Equals(provider.Key));
+            SetupSourceRow source = model == null ? null : model.Sources.FirstOrDefault(item =>
+                item.Abilities.Any(ability => ability.Equals(provider.Key.Ability)));
+            string assignmentId = source == null ? provider.Key.Ability.Canonical : source.SourceId;
             SourceAssignmentProfile assignment = profile.Routines.SelectMany(item => item.Assignments)
-                .FirstOrDefault(item => item.SourceId == provider.Key.Ability.Canonical);
+                .FirstOrDefault(item => item.SourceId == assignmentId);
             int availableTokens = pool.Tokens.Count(item => item.Available && item.IsPrimary &&
                 provider.EligibleTokenIds.Contains(item.TokenId));
             _log.Info("[KBP-CATALOG] Bless;present=true;source=" +

@@ -174,6 +174,15 @@ namespace KingmakerBuffPlanner.UI
             layout.childForceExpandHeight = false;
 
             PlannerUiTheme theme = PlannerUiTheme.Resolve(controller);
+            RectTransform clusterBacking = KingmakerUiFactory.CreateRect("KBP.ClusterBacking", _root);
+            KingmakerUiFactory.Stretch(clusterBacking, -5, -5, -5, -5);
+            LayoutElement backingLayout = clusterBacking.gameObject.AddComponent<LayoutElement>();
+            backingLayout.ignoreLayout = true;
+            Image clusterSurface = KingmakerUiFactory.AddFramedPanel(clusterBacking,
+                new Color(0.035f, 0.026f, 0.018f, 0.82f),
+                new Color(0.42f, 0.30f, 0.15f, 0.88f), 1f);
+            clusterSurface.raycastTarget = false;
+            clusterBacking.SetAsFirstSibling();
             _tooltip = CreateHudMessage("Tooltip", theme, height + 8f, 360f, out _tooltipRoot);
             _feedback = CreateHudMessage("Feedback", theme, height + 42f, 480f, out _feedbackRoot);
             _feedback.color = new Color(1f, 0.84f, 0.42f, 1f);
@@ -506,8 +515,10 @@ namespace KingmakerBuffPlanner.UI
             Image tile = button.targetGraphic as Image;
             if (tile != null)
             {
-                tile.sprite = null;
-                tile.color = new Color(0.055f, 0.043f, 0.03f, 0.97f);
+                tile.sprite = theme.NativeButtonNormal;
+                tile.type = tile.sprite != null && tile.sprite.border.sqrMagnitude > 0
+                    ? Image.Type.Sliced : Image.Type.Simple;
+                tile.color = new Color(0.10f, 0.075f, 0.045f, 0.97f);
             }
             ColorBlock colors = button.colors;
             colors.normalColor = Color.white;
@@ -524,6 +535,18 @@ namespace KingmakerBuffPlanner.UI
             element.minWidth = width;
             element.minHeight = height;
 
+            RectTransform innerFrame = KingmakerUiFactory.CreateRect("KBP.InnerFrame", button.transform);
+            KingmakerUiFactory.Stretch(innerFrame, 4, 4, 4, 4);
+            Image inner = KingmakerUiFactory.AddFramedPanel(innerFrame,
+                new Color(0.025f, 0.02f, 0.015f, 0.56f),
+                new Color(0.55f, 0.38f, 0.17f, 0.92f), 1f);
+            inner.raycastTarget = false;
+            RectTransform lowerAccent = KingmakerUiFactory.CreateRect("KBP.LowerAccent", button.transform);
+            KingmakerUiFactory.SetAnchors(lowerAccent, 0.20f, 0.08f, 0.80f, 0.105f);
+            Image accent = KingmakerUiFactory.AddPanel(lowerAccent,
+                new Color(0.72f, 0.48f, 0.18f, 0.90f));
+            accent.raycastTarget = false;
+
             foreach (Text text in button.GetComponentsInChildren<Text>(true))
                 UnityEngine.Object.Destroy(text.gameObject);
             button.onClick.AddListener(() => action());
@@ -539,7 +562,7 @@ namespace KingmakerBuffPlanner.UI
             hover.RoutineId = iconKind;
 
             RectTransform iconRect = KingmakerUiFactory.CreateRect("KBP.Icon", button.transform);
-            KingmakerUiFactory.Stretch(iconRect, 7, 7, 7, 7);
+            KingmakerUiFactory.Stretch(iconRect, 10, 10, 10, 10);
             Image icon = iconRect.gameObject.AddComponent<Image>();
             icon.sprite = CreateIcon(iconKind);
             icon.preserveAspect = true;

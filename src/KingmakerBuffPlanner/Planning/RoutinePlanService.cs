@@ -48,11 +48,14 @@ namespace KingmakerBuffPlanner.Planning
             if (routine == null) throw new ArgumentException("Unknown routine.", "routineId");
             var requests = new List<BuffCastRequest>();
             var unsupported = new List<string>();
+            var abilitiesBySource = new Dictionary<string, IReadOnlyList<Domain.Identity.AbilityKey>>(StringComparer.Ordinal);
             foreach (SourceAssignmentProfile assignment in routine.Assignments
                 .OrderBy(a => a.SourceId, StringComparer.Ordinal))
             {
                 EffectExpression expression;
-                if (!effectsBySource.TryGetValue(assignment.SourceId, out expression) ||
+                IReadOnlyList<Domain.Identity.AbilityKey> abilities = ResolveAbilities(
+                    assignment, snapshot, effectsBySource, out expression);
+                if (abilities.Count == 0 || expression == null ||
                     !EffectExpressionAnalysis.ContainsLeaf(expression))
                 {
                     unsupported.Add(assignment.SourceId);
@@ -63,9 +66,10 @@ namespace KingmakerBuffPlanner.Planning
                     ? CastGroupingKind.MassConfiguredTargets
                     : CastGroupingKind.PerTarget;
                 requests.Add(new BuffCastRequest(
-                    new BuffSourceDefinition(assignment.SourceId, assignment.Ability.ToKey(), expression, grouping),
+                    new BuffSourceDefinition(assignment.SourceId, abilities, expression, grouping),
                     assignment.WantedTargetUnitIds, assignment.ExistingEffectPolicy,
                     assignment.IgnoredPresenceMarkers));
+                abilitiesBySource[assignment.SourceId] = abilities;
             }
             ProviderSelectionPolicy policy = BuildPolicy(profile.ProviderPreferences);
             CastPlan plan = new CastPlanner().PlanRoutine(snapshot, requests,
@@ -74,8 +78,39 @@ namespace KingmakerBuffPlanner.Planning
                 .Where(o => o.RequiresAnimatedExecution)
                 .Select(o => o.Provider.Key.Ability.Canonical), StringComparer.Ordinal);
             return new RoutinePlanResult(plan, unsupported, routine.Assignments
-                .Where(a => fallbackProviderAbilities.Contains(a.Ability.ToKey().Canonical))
+                .Where(a => abilitiesBySource.ContainsKey(a.SourceId) &&
+                    abilitiesBySource[a.SourceId].Any(ability =>
+                        fallbackProviderAbilities.Contains(ability.Canonical)))
                 .Select(a => a.SourceId));
+        }
+
+        private static IReadOnlyList<Domain.Identity.AbilityKey> ResolveAbilities(
+            SourceAssignmentProfile assignment,
+            PartyProviderSnapshot snapshot,
+            IDictionary<string, EffectExpression> effectsBySource,
+            out EffectExpression expression)
+        {
+            expression = null;
+            if (EffectAggregateIdentity.IsAggregate(assignment.SourceId))
+            {
+                var matches = snapshot.Providers.Select(provider => provider.Key.Ability)
+                    .GroupBy(ability => ability.Canonical, StringComparer.Ordinal)
+                    .Select(group => group.First()).Where(ability =>
+                    {
+                        EffectExpression candidate;
+                        return effectsBySource.TryGetValue(ability.Canonical, out candidate) &&
+                            EffectAggregateIdentity.For(candidate, ability.Canonical) == assignment.SourceId;
+                    }).OrderBy(ability => ability.Canonical, StringComparer.Ordinal).ToList();
+                if (matches.Count != 0)
+                    effectsBySource.TryGetValue(matches[0].Canonical, out expression);
+                return new ReadOnlyCollection<Domain.Identity.AbilityKey>(matches);
+            }
+            Domain.Identity.AbilityKey exact = assignment.Ability.ToKey();
+            if (!effectsBySource.TryGetValue(assignment.SourceId, out expression))
+                effectsBySource.TryGetValue(exact.Canonical, out expression);
+            return expression == null
+                ? new ReadOnlyCollection<Domain.Identity.AbilityKey>(new List<Domain.Identity.AbilityKey>())
+                : new ReadOnlyCollection<Domain.Identity.AbilityKey>(new List<Domain.Identity.AbilityKey> { exact });
         }
 
         private static ProviderSelectionPolicy BuildPolicy(

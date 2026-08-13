@@ -80,8 +80,10 @@ namespace KingmakerBuffPlanner.Planning
                     }
                     pending.Add(targetId);
                 }
+                var eligibleAbilities = new HashSet<string>(request.Source.Abilities
+                    .Select(ability => ability.Canonical), StringComparer.Ordinal);
                 List<ProviderPlanningOption> sourceOptions = options.Where(o =>
-                    o.Provider.Key.Ability.Equals(request.Source.Ability)).ToList();
+                    eligibleAbilities.Contains(o.Provider.Key.Ability.Canonical)).ToList();
                 if (request.Source.Grouping == CastGroupingKind.MassConfiguredTargets)
                     PlanMass(request, pending, sourceOptions, selectionPolicy, ledger, castsByProvider,
                         poolKinds, materials, steps, outcomes, diagnostics);

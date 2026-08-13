@@ -79,6 +79,9 @@ namespace KingmakerBuffPlanner.Tests
                 Run("planner-reserves-material-once-per-cast", TestPlannerMaterialReservation);
                 Run("nonrequired-material-check-is-not-evaluated", TestNonrequiredMaterialCheck);
                 Run("planner-routine-shares-resource-ledger", TestPlannerRoutineSharedLedger);
+                Run("effect-fingerprint-is-semantic-and-provider-independent", TestEffectFingerprint);
+                Run("duplicate-provider-effects-consolidate-and-auto-select", TestAggregateCardAndPlanning);
+                Run("aggregate-assignment-round-trip-preserves-targets", () => TestAggregateRoundTrip(root));
                 Run("routine-service-reports-unsupported-sources", TestRoutineServiceUnsupportedSources);
                 Run("profile-round-trip-preserves-stable-ids", () => TestProfileRoundTrip(root));
                 Run("profile-recovers-valid-bounded-backup", () => TestProfileBackupRecovery(root));
@@ -88,6 +91,7 @@ namespace KingmakerBuffPlanner.Tests
                 Run("setup-model-direct-targets-are-routine-local", TestSetupModel);
                 Run("catalog-filter-selected-category-and-reset-contract", TestCatalogFilterState);
                 Run("presentation-view-models-use-player-facing-deterministic-state", TestPresentationModels);
+                Run("area-coverage-preview-distinguishes-direct-and-indirect", TestAreaCoveragePresentation);
                 Run("four-column-grid-metrics-have-no-horizontal-scroll", TestGridMetrics);
                 Run("large-catalog-grid-window-remains-bounded", TestLargeCatalogGridWindow);
                 Run("planner-hotkey-chord-consumes-native-primary-key", TestPlannerHotkeyBinding);
@@ -670,6 +674,108 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("Routine planning overbooked a shared resource pool.");
         }
 
+        private static void TestEffectFingerprint()
+        {
+            EffectExpression first = new ReferencedAbilityExpression("wrapper-a",
+                new EffectLeafExpression(EffectKind.Buff, "shared-effect", EffectTarget.CurrentTarget,
+                    "contract-a", "path-a"));
+            EffectExpression second = new ReferencedAbilityExpression("wrapper-b",
+                new EffectLeafExpression(EffectKind.Buff, "shared-effect", EffectTarget.CurrentTarget,
+                    "contract-b", "path-b"));
+            EffectExpression distinct = new EffectLeafExpression(EffectKind.Buff, "shared-effect",
+                EffectTarget.Party, "contract-a", "path-a");
+            string firstId = EffectAggregateIdentity.For(first, "fallback-a");
+            string secondId = EffectAggregateIdentity.For(second, "fallback-b");
+            if (firstId != secondId || firstId == EffectAggregateIdentity.For(distinct, "fallback-c") ||
+                EffectAggregateIdentity.For(new EmptyEffectExpression(), "exact") != "exact")
+                throw new InvalidOperationException("Effect aggregation used provider metadata or merged distinct mechanics.");
+        }
+
+        private static void TestAggregateCardAndPlanning()
+        {
+            AbilityKey firstAbility = Ability("resistance-a", string.Empty, 0);
+            AbilityKey secondAbility = Ability("resistance-b", string.Empty, 0);
+            var firstPool = new ResourcePoolSnapshot("aggregate-empty", ResourcePoolKind.SpontaneousLevel, 1, 0, null);
+            var secondPool = new ResourcePoolSnapshot("aggregate-ready", ResourcePoolKind.Unlimited, 0, 0, null);
+            ProviderSnapshot first = PlannerProvider("unit-a", "book-a", firstAbility, "aggregate-empty", 1);
+            ProviderSnapshot second = PlannerProvider("unit-b", "book-b", secondAbility, "aggregate-ready", 0);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(new[] { first, second },
+                new[] { firstPool, secondPool }, "unit-a", "unit-b", "target");
+            var expressionA = new EffectLeafExpression(EffectKind.Buff, "resistance-effect",
+                EffectTarget.CurrentTarget, "first", "first/path");
+            var expressionB = new EffectLeafExpression(EffectKind.Buff, "resistance-effect",
+                EffectTarget.CurrentTarget, "second", "second/path");
+            var effects = new Dictionary<string, EffectExpression>
+            {
+                { firstAbility.Canonical, expressionA }, { secondAbility.Canonical, expressionB }
+            };
+            var options = new[]
+            {
+                new ProviderPlanningOption(first, new[] { "target" }, new[] { "unit-a" }, 3, 10),
+                new ProviderPlanningOption(second, new[] { "target" }, new[] { "unit-b" }, 5, 20)
+            };
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault("aggregate-campaign");
+            int saves = 0;
+            var model = new PlannerSetupModel(profile, snapshot, new ActiveEffectSnapshot(null),
+                effects, options, ignored => saves++);
+            if (model.Sources.Count != 1 || model.Sources[0].Abilities.Count != 2 ||
+                model.Sources[0].Providers.Count != 2)
+                throw new InvalidOperationException("Equivalent provider-backed effects did not consolidate to one card.");
+            model.ToggleTarget("long", "target");
+            RoutinePlanResult plan = new RoutinePlanService().Plan(profile, "long", snapshot,
+                new ActiveEffectSnapshot(null), effects, options);
+            if (plan.Plan.Steps.Count != 1 ||
+                !plan.Plan.Steps[0].Provider.Ability.Equals(secondAbility) || saves != 1)
+                throw new InvalidOperationException("Consolidated card did not preserve automatic valid provider selection.");
+        }
+
+        private static void TestAggregateRoundTrip(string root)
+        {
+            AbilityKey firstAbility = Ability("roundtrip-a", string.Empty, 0);
+            AbilityKey secondAbility = Ability("roundtrip-b", string.Empty, 0);
+            var firstPool = new ResourcePoolSnapshot("roundtrip-one", ResourcePoolKind.Unlimited, 0, 0, null);
+            var secondPool = new ResourcePoolSnapshot("roundtrip-two", ResourcePoolKind.Unlimited, 0, 0, null);
+            ProviderSnapshot first = PlannerProvider("unit-a", "book-a", firstAbility, "roundtrip-one", 0);
+            ProviderSnapshot second = PlannerProvider("unit-b", "book-b", secondAbility, "roundtrip-two", 0);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(new[] { first, second },
+                new[] { firstPool, secondPool }, "unit-a", "unit-b");
+            var effects = new Dictionary<string, EffectExpression>
+            {
+                { firstAbility.Canonical, Leaf("roundtrip-effect") },
+                { secondAbility.Canonical, Leaf("roundtrip-effect") }
+            };
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault("aggregate-roundtrip");
+            profile.Routines[0].Assignments.Add(Assignment(firstAbility, "unit-a"));
+            profile.Routines[0].Assignments.Add(Assignment(secondAbility, "unit-b"));
+            string modPath = Path.Combine(root, "aggregate-roundtrip");
+            Directory.CreateDirectory(modPath);
+            var repository = new ProfileRepository(modPath);
+            var options = new[]
+            {
+                new ProviderPlanningOption(first, new[] { "unit-a", "unit-b" }, new[] { "unit-a" }, 1, 10),
+                new ProviderPlanningOption(second, new[] { "unit-a", "unit-b" }, new[] { "unit-b" }, 1, 10)
+            };
+            var model = new PlannerSetupModel(profile, snapshot, new ActiveEffectSnapshot(null),
+                effects, options, repository.Save);
+            ProfileLoadResult loaded = repository.Load("aggregate-roundtrip");
+            SourceAssignmentProfile assignment = loaded.Profile.Routines[0].Assignments.Single();
+            if (assignment.SourceId != model.Sources[0].SourceId ||
+                !assignment.WantedTargetUnitIds.SequenceEqual(new[] { "unit-a", "unit-b" }))
+                throw new InvalidOperationException("Legacy assignments did not merge and survive aggregate round trip.");
+        }
+
+        private static SourceAssignmentProfile Assignment(AbilityKey ability, string target)
+        {
+            return new SourceAssignmentProfile
+            {
+                SourceId = ability.Canonical,
+                Ability = AbilityKeyProfile.FromKey(ability),
+                WantedTargetUnitIds = new List<string> { target },
+                ExistingEffectPolicy = ExistingEffectPolicy.SkipAlreadyActive,
+                IgnoredPresenceMarkers = new List<string>()
+            };
+        }
+
         private static void TestRoutineServiceUnsupportedSources()
         {
             AbilityKey supported = Ability("routine-supported", string.Empty, 0);
@@ -1005,8 +1111,11 @@ namespace KingmakerBuffPlanner.Tests
             var routine = new RoutineSummaryViewModel("long", "Long", 1, 1);
             var settings = new PlannerSettingsViewModel(profile);
             if (target.Status != PlannerPresentationStatus.Success ||
+                target.State != TargetPortraitState.DirectSelected ||
                 warningTarget.Status != PlannerPresentationStatus.Warning ||
+                warningTarget.State != TargetPortraitState.SelectedButUnfulfillable ||
                 invalidTarget.Status != PlannerPresentationStatus.Failure ||
+                invalidTarget.State != TargetPortraitState.Invalid ||
                 routine.Label != "Long     1/1 ready" || settings.CastingMode != "Animated" ||
                 saves != beforePreview)
                 throw new InvalidOperationException("Player-facing presentation summaries are invalid.");
@@ -1015,13 +1124,41 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("Bulk target edit did not save once.");
         }
 
+        private static void TestAreaCoveragePresentation()
+        {
+            AbilityKey ability = Ability("area-presentation", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("area-free", ResourcePoolKind.Unlimited, 0, 0, null);
+            ProviderSnapshot provider = PlannerProvider("unit-a", "book-area", ability, "area-free", 0);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(new[] { provider }, new[] { pool },
+                "unit-a", "unit-b");
+            var option = new ProviderPlanningOption(provider, new[] { "unit-a", "unit-b" },
+                new[] { "unit-a" }, 1, 10);
+            var area = new EffectLeafExpression(EffectKind.AreaBuff, "area-effect",
+                EffectTarget.AreaRecipients, "area-contract", "area/path");
+            var model = new PlannerSetupModel(BuffPlannerProfile.CreateDefault("area-preview"),
+                snapshot, new ActiveEffectSnapshot(null),
+                new Dictionary<string, EffectExpression> { { ability.Canonical, area } },
+                new[] { option }, ignored => { });
+            model.ToggleTarget("long", "unit-a");
+            TargetPortraitViewModel direct = TargetPortraitViewModel.Create(model.Sources[0], model,
+                "long", snapshot.Units.First(unit => unit.UnitId == "unit-a"));
+            TargetPortraitViewModel indirect = TargetPortraitViewModel.Create(model.Sources[0], model,
+                "long", snapshot.Units.First(unit => unit.UnitId == "unit-b"));
+            if (direct.State != TargetPortraitState.DirectSelected || direct.Indirect ||
+                indirect.State != TargetPortraitState.IndirectCovered || !indirect.Indirect || indirect.Wanted)
+                throw new InvalidOperationException("Area coverage preview did not distinguish direct and indirect targets.");
+        }
+
         private static void TestGridMetrics()
         {
             BuffGridMetrics fullHd = BuffGridMetrics.Calculate(1824f, 610f);
             BuffGridMetrics compact = BuffGridMetrics.Calculate(1420f, 500f);
             if (fullHd.Columns != 4 || compact.Columns != 4 ||
                 fullHd.HorizontalScrolling || compact.HorizontalScrolling ||
-                fullHd.CellWidth <= 0 || compact.CellWidth <= 0)
+                fullHd.CellWidth <= 0 || compact.CellWidth <= 0 ||
+                Math.Abs(fullHd.SideInset * 2f + fullHd.CellWidth * 4f +
+                    fullHd.HorizontalSpacing * 3f - 1824f) > 0.01f ||
+                fullHd.SideInset < fullHd.HorizontalSpacing)
                 throw new InvalidOperationException("Grid metrics did not preserve four columns without horizontal scrolling.");
         }
 

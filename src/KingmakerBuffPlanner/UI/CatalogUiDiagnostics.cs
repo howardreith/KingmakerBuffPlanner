@@ -62,22 +62,22 @@ namespace KingmakerBuffPlanner.UI
             if (SourceCategory == PlannerSourceCategory.Spells)
             {
                 values = values.Where(source =>
-                    source.Ability.SourceKind == SourceKind.Spellbook).ToList();
+                    source.HasSourceKind(SourceKind.Spellbook)).ToList();
                 active.Add("spells");
             }
             else if (SourceCategory == PlannerSourceCategory.Abilities)
             {
                 values = values.Where(source =>
-                    source.Ability.SourceKind == SourceKind.AbilityResource ||
-                    source.Ability.SourceKind == SourceKind.Fact).ToList();
+                    source.HasSourceKind(SourceKind.AbilityResource) ||
+                    source.HasSourceKind(SourceKind.Fact)).ToList();
                 active.Add("abilities");
             }
             else if (SourceCategory == PlannerSourceCategory.Other)
             {
                 values = values.Where(source =>
-                    source.Ability.SourceKind != SourceKind.Spellbook &&
-                    source.Ability.SourceKind != SourceKind.AbilityResource &&
-                    source.Ability.SourceKind != SourceKind.Fact).ToList();
+                    source.Abilities.Any(ability => ability.SourceKind != SourceKind.Spellbook &&
+                    ability.SourceKind != SourceKind.AbilityResource &&
+                    ability.SourceKind != SourceKind.Fact)).ToList();
                 active.Add("other");
             }
             diagnostics.AfterSource = values.Count;

@@ -1,5 +1,15 @@
 # Autonomous Resume
 
+## 0.0.9 polish intake — 2026-08-12
+
+- Branch `codex/ui-source-consolidation` starts from clean documentation HEAD `47d1777`; qualified installed/release 0.0.8 source remains `6e5d02b21e587db84f2c7e7d2a34a63bace3e942`.
+- Preserved rollback package SHA-256 `22ce0c0e44c6f6b1f895199e58fe1afe5f639e6b38443e062fd6f4204ec8dbb2` under `artifacts/release-candidate-backups/ui-polish-start-0.0.8-47d1777/`.
+- Exact consolidation and migration rule is documented in `planning/UI-POLISH-AND-SOURCE-CONSOLIDATION.md`; this is an effect-semantic aggregate, never a display-name merge.
+- Frozen: discovery, planning ranking/resources, Animated/Instant execution, persistence durability, hotkey, HUD hitboxes/listeners/actions/tooltips/pointer ownership, modal lease, and guarded runtime transactions.
+- Exact next action: implement the fingerprint/aggregate domain adapter, multi-ability planning request, and legacy assignment rebinding with deterministic tests before visual edits.
+- Implementation checkpoint: aggregate cards, multi-ability automatic provider planning, legacy assignment union/round trip, explicit five-state portrait presentation, centered four-column metrics, and styling-only HUD integration are implemented. Tests pass source 30/30, behavior 71/71, filesystem 8/8, package 4/4, deployment WhatIf 5/5.
+- Exact next action: commit the bounded implementation, bump to 0.0.9, extend runtime evidence for aggregate counts and portrait/HUD style, then run native, Call of the Wild, Animated, Instant, persistence, input/modal, catalog, package, install, and screenshot qualification.
+
 ## 0.0.8 four-column release handoff — 2026-08-12
 
 - Final qualified release source: `6e5d02b21e587db84f2c7e7d2a34a63bace3e942`; version 0.0.8; package `22ce0c0e44c6f6b1f895199e58fe1afe5f639e6b38443e062fd6f4204ec8dbb2`; DLL `593db3bb0ce76316840f94e52d4698c7cd2353bc2aa31610608368478bcdda4b`; MVID `a8265c4e-e37d-4f54-a3e4-ee6578fdefa6`.

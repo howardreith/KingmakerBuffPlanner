@@ -1,5 +1,11 @@
 # Architecture
 
+## 0.0.9 effect-semantic card aggregation and polish boundary
+
+The four-column planner now groups provider-backed catalog rows by a deterministic normalized-effect fingerprint described in `planning/UI-POLISH-AND-SOURCE-CONSOLIDATION.md`. The key includes stable effect identity, kind, target semantics, sequence/conditional structure, and branch contracts. It excludes caster, provider, spellbook/resource state, discovery paths, and wrapper ability IDs. It never falls back to display-name matching, and unresolved effects retain exact ability identities. Each aggregate retains all member ability keys, so the unchanged provider ranking and resource ledger choose among every eligible source implicitly during planning and execution.
+
+Legacy exact-ability assignments are rebound to aggregate source IDs at catalog binding and colliding assignments are unioned without discarding targets. `TargetPortraitState` is the presentation boundary for direct selection, indirect party/area coverage, valid-neutral, invalid, and selected-but-unfulfillable states. HUD changes remain styling-only: native anchor discovery, hit rectangles, listeners, tooltip behavior, pointer ownership, actions, and lifecycle are frozen.
+
 ## 0.0.8 four-column presentation boundary
 
 `BuffPlannerScreenView` is a new shell over the unchanged `PlannerUiSession` and `PlannerSetupModel`. `PlannerRoutineTabsView`, `PlannerCategoryTabsView`, `BuffGridView`, `BuffCardView`, `BuffCardPool`, `PlannerTargetStripView`, `PlannerSelectedBuffView`, and `PlannerSettingsView` own rendering only. `PlannerScreenViewModel` formats alphabetical cards, routine-local target state, readiness, and concise plan summaries; callbacks invoke existing model commands.

@@ -35,16 +35,30 @@ namespace KingmakerBuffPlanner.Domain.Planning
             AbilityKey ability,
             EffectExpression effects,
             CastGroupingKind grouping)
+            : this(sourceId, new[] { ability }, effects, grouping)
+        {
+        }
+
+        public BuffSourceDefinition(
+            string sourceId,
+            IEnumerable<AbilityKey> abilities,
+            EffectExpression effects,
+            CastGroupingKind grouping)
         {
             if (string.IsNullOrWhiteSpace(sourceId)) throw new ArgumentException("Source ID is required.", "sourceId");
             SourceId = sourceId;
-            Ability = ability ?? throw new ArgumentNullException("ability");
+            var values = (abilities ?? throw new ArgumentNullException("abilities"))
+                .Where(item => item != null).GroupBy(item => item.Canonical, StringComparer.Ordinal)
+                .Select(group => group.First()).OrderBy(item => item.Canonical, StringComparer.Ordinal).ToList();
+            if (values.Count == 0) throw new ArgumentException("At least one ability is required.", "abilities");
+            Abilities = new ReadOnlyCollection<AbilityKey>(values);
             Effects = effects ?? throw new ArgumentNullException("effects");
             Grouping = grouping;
         }
 
         public string SourceId { get; private set; }
-        public AbilityKey Ability { get; private set; }
+        public AbilityKey Ability { get { return Abilities[0]; } }
+        public IReadOnlyList<AbilityKey> Abilities { get; private set; }
         public EffectExpression Effects { get; private set; }
         public CastGroupingKind Grouping { get; private set; }
     }

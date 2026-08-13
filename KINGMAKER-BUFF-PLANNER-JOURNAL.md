@@ -616,3 +616,10 @@ Status: ROOT CAUSE PROVEN; 0.0.4 SOURCE PASS; LIVE QUALIFICATION PENDING
 - Selected details now lead with the actual spell/ability icon, player-facing source type/level/duration, description, portrait editor, and concise casts/coverage/active-skip/attention plan language.
 - Full post-phase mechanical suite: source 30/30, behavior 63/63, runtime filesystem 7/7, deployment WhatIf 5/5, source-only 1/1, Release build 1/1, package 4/4.
 - Exact next action: checkpoint Phase C, then simplify filters, routine readiness, Settings, and Casting Source disclosure while retaining all existing commands.
+# UI polish and source consolidation — 2026-08-12
+
+- Created `codex/ui-source-consolidation` from clean `47d1777`; preserved qualified 0.0.8 package SHA-256 `22ce0c0e44c6f6b1f895199e58fe1afe5f639e6b38443e062fd6f4204ec8dbb2` under `artifacts/release-candidate-backups/ui-polish-start-0.0.8-47d1777/`.
+- Documented a display-name-independent normalized-effect fingerprint. It includes effect GUID/kind/target and expression/branch semantics; it excludes caster/provider/resource/path/reference wrapper identity. Unresolved effects remain exact-source entries.
+- Implemented aggregate catalog rows, legacy assignment rebinding/union, all-member provider planning, and unchanged automatic provider ranking/resource selection. Added direct/indirect/neutral/invalid/unfulfillable portrait tokens and stronger full-state visuals; centered grid geometry; added non-raycast HUD cluster/native frame styling without changing root/button geometry or actions.
+- Deterministic checkpoint passes source validation 30/30, behavior 71/71, runtime filesystem 8/8, package 4/4, deployment WhatIf 5/5. Rejected display-name grouping as mechanically unsafe and provider-row persistence as incompatible with one-card UX.
+- Exact next action: commit, bump 0.0.9, add physical evidence fields/assertions, then perform the full guarded qualification and install.

@@ -1,5 +1,13 @@
 # Implementation Report
 
+## 0.0.9 UI polish and duplicate-source consolidation — in progress
+
+The accepted 0.0.8 screen and all execution/input contracts are frozen. The implementation begins with an effect-semantic aggregate card model: normalized effect GUID/kind/target/branch structure defines visible identity, while provider/caster/spellbook/resource and wrapper ability identity do not. Empty effects never merge and display names are not treated as mechanical identity. Earlier exact-source assignments will be rebound and unioned at catalog binding; the existing provider ranking will receive all member ability keys without adding provider UI.
+
+The aggregate implementation retains every eligible ability key per card and extends only the request-to-provider match; the established provider order and shared resource ledger are unchanged. Catalog binding rekeys and unions legacy assignments once, while unsupported assignments survive untouched. Deterministic coverage proves one card for two provider-backed Resistance-style abilities, valid implicit alternate-provider choice, merged-target persistence round trip, and semantic non-merging of distinct mechanics.
+
+Portraits now use explicit direct/indirect/neutral/invalid/unfulfillable tokens. Direct selections receive a dark-green surface, bright 4px green frame, portrait tint, full overlay, and `SELECTED` label; indirect party/area recipients use a lighter green surface/overlay and `COVERED` label. The grid uses symmetric 20px inner margins and 14px gaps. The HUD retains exact root/button geometry and actions while adding one non-raycast native-framed cluster backing, native button skins, inset antique-gold frames/accents, and more icon breathing room. Current deterministic gates: source validation 30/30, behavior 71/71, filesystem 8/8, package 4/4, deployment WhatIf 5/5. Physical qualification and human visual acceptance remain pending.
+
 ## 0.0.8 four-column routine planner — implementation complete, human verdict pending
 
 Final release source/package/DLL/MVID are `6e5d02b21e587db84f2c7e7d2a34a63bace3e942` / `22ce0c0e44c6f6b1f895199e58fe1afe5f639e6b38443e062fd6f4204ec8dbb2` / `593db3bb0ce76316840f94e52d4698c7cd2353bc2aa31610608368478bcdda4b` / `a8265c4e-e37d-4f54-a3e4-ee6578fdefa6`. Exact final Animated and Instant runs passed 72/72 each; native passed 12/12; Call of the Wild passed 26/26; all restored. The guarded final install preserved settings and every other mod.

@@ -16,6 +16,15 @@ namespace KingmakerBuffPlanner.UI
         Disabled
     }
 
+    public enum TargetPortraitState
+    {
+        DirectSelected,
+        IndirectCovered,
+        ValidUnselected,
+        Invalid,
+        SelectedButUnfulfillable
+    }
+
     public sealed class BuffCardViewModel
     {
         internal BuffCardViewModel(SetupSourceRow source, PlannerSetupModel model,
@@ -40,7 +49,8 @@ namespace KingmakerBuffPlanner.UI
                 ? "1 target selected" : requested + " targets selected";
             Status = requested == 0 ? PlannerPresentationStatus.Neutral :
                 BuildStatus(source, model, activeRoutineId, requested, available);
-            SourceType = PlayerSourceType(source.Ability.SourceKind);
+            SourceType = source.Abilities.Select(ability => ability.SourceKind).Distinct().Count() > 1
+                ? "Multiple sources" : PlayerSourceType(source.Ability.SourceKind);
         }
 
         public string SourceId { get; private set; }
@@ -135,9 +145,15 @@ namespace KingmakerBuffPlanner.UI
             Wanted = wanted;
             Legal = legal;
             Indirect = indirect;
-            Status = !legal ? PlannerPresentationStatus.Failure : !wanted
-                ? PlannerPresentationStatus.Neutral : fulfilled
-                    ? PlannerPresentationStatus.Success : PlannerPresentationStatus.Warning;
+            State = !legal ? TargetPortraitState.Invalid : wanted
+                ? (fulfilled ? TargetPortraitState.DirectSelected :
+                    TargetPortraitState.SelectedButUnfulfillable)
+                : indirect ? TargetPortraitState.IndirectCovered : TargetPortraitState.ValidUnselected;
+            Status = State == TargetPortraitState.Invalid ? PlannerPresentationStatus.Failure :
+                State == TargetPortraitState.DirectSelected || State == TargetPortraitState.IndirectCovered
+                    ? PlannerPresentationStatus.Success :
+                State == TargetPortraitState.SelectedButUnfulfillable
+                    ? PlannerPresentationStatus.Warning : PlannerPresentationStatus.Neutral;
         }
 
         public string UnitId { get; private set; }
@@ -146,6 +162,7 @@ namespace KingmakerBuffPlanner.UI
         public bool Wanted { get; private set; }
         public bool Legal { get; private set; }
         public bool Indirect { get; private set; }
+        public TargetPortraitState State { get; private set; }
         public PlannerPresentationStatus Status { get; private set; }
 
         internal static TargetPortraitViewModel Create(SetupSourceRow source,
