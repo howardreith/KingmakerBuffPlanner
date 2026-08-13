@@ -1,5 +1,11 @@
 # Autonomous Resume
 
+## 0.0.9 runtime fixture checkpoint — 2026-08-12
+
+- Runtime preflight found BagOfTricks `Settings.xml` had grown by one byte since the 0.0.8 qualified inventory; every other manifest entry and the primary DLL/Info hashes are unchanged. The human-reproduction profile inventory hash/byte count was refreshed read-only; no third-party file was edited.
+- `ui-polish-0.0.9-animated-native-1` used native-only, which intentionally omits mods required by the disposable save; it stopped at campaign-load timeout and restored exactly.
+- Exact next action: commit the verified fixture-inventory refresh, rebuild clean, then repeat Animated with `human-reproduction`.
+
 ## 0.0.9 polish intake — 2026-08-12
 
 - Branch `codex/ui-source-consolidation` starts from clean documentation HEAD `47d1777`; qualified installed/release 0.0.8 source remains `6e5d02b21e587db84f2c7e7d2a34a63bace3e942`.

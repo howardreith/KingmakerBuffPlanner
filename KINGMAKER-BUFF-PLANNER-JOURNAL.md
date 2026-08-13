@@ -623,3 +623,7 @@ Status: ROOT CAUSE PROVEN; 0.0.4 SOURCE PASS; LIVE QUALIFICATION PENDING
 - Implemented aggregate catalog rows, legacy assignment rebinding/union, all-member provider planning, and unchanged automatic provider ranking/resource selection. Added direct/indirect/neutral/invalid/unfulfillable portrait tokens and stronger full-state visuals; centered grid geometry; added non-raycast HUD cluster/native frame styling without changing root/button geometry or actions.
 - Deterministic checkpoint passes source validation 30/30, behavior 71/71, runtime filesystem 8/8, package 4/4, deployment WhatIf 5/5. Rejected display-name grouping as mechanically unsafe and provider-row persistence as incompatible with one-card UX.
 - Exact next action: commit, bump 0.0.9, add physical evidence fields/assertions, then perform the full guarded qualification and install.
+# 0.0.9 runtime fixture audit — 2026-08-12
+
+- First runtime preflight rejected human-reproduction because BagOfTricks `Settings.xml` differs from the prior inventory by exactly one byte; all other 40 entries and DLL/Info identities match. Native-only then proved inappropriate for this save and timed out at campaign load, with verified restoration.
+- Refreshed only the compatibility profile's manifest hash and total bytes to describe the already-live read-only fixture; no third-party mutation occurred. Next: clean build and human-reproduction Animated rerun.
