@@ -371,11 +371,11 @@ namespace KingmakerBuffPlanner.UI
             _categoryTabs = new PlannerCategoryTabsView(categories, _theme, category =>
             {
                 _viewModel.SetCategory(category);
-                RefreshCatalog(false);
+                RefreshAll(false);
             }, () =>
             {
                 _viewModel.ToggleSelectedOnly();
-                RefreshCatalog(false);
+                RefreshAll(false);
             }, ShowTooltip);
             _catalogSummary = KingmakerUiFactory.CreateText("CatalogSummary", frame, _theme,
                 string.Empty, 13, TextAnchor.MiddleLeft);

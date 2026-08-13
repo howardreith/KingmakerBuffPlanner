@@ -145,6 +145,12 @@ foreach ($workflowContract in @('PlannerSourceCategory', 'SelectedOnly',
         throw "Direct assignment workflow contract is missing: $workflowContract"
     }
 }
+if ($screenSource.Contains('_viewModel.SetCategory(category);' + [Environment]::NewLine +
+        '                RefreshCatalog(false);') -or
+    $screenSource.Contains('_viewModel.ToggleSelectedOnly();' + [Environment]::NewLine +
+        '                RefreshCatalog(false);')) {
+    throw 'Category and Selected only callbacks must rebind their selected visual state.'
+}
 if ([regex]::Matches($viewSource, [regex]::Escape('"Casting mode: "')).Count -ne 1) {
     throw 'Exactly one player-facing Casting mode control must remain.'
 }
