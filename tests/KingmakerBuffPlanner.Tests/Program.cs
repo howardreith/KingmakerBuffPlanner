@@ -82,6 +82,7 @@ namespace KingmakerBuffPlanner.Tests
                 Run("effect-fingerprint-is-semantic-and-provider-independent", TestEffectFingerprint);
                 Run("duplicate-provider-effects-consolidate-and-auto-select", TestAggregateCardAndPlanning);
                 Run("aggregate-availability-does-not-double-count-shared-pool", TestAggregateAvailability);
+                Run("selected-buff-summary-is-resource-specific-and-unambiguous", TestSelectedBuffSummary);
                 Run("aggregate-assignment-round-trip-preserves-targets", () => TestAggregateRoundTrip(root));
                 Run("routine-service-reports-unsupported-sources", TestRoutineServiceUnsupportedSources);
                 Run("profile-round-trip-preserves-stable-ids", () => TestProfileRoundTrip(root));
@@ -93,6 +94,8 @@ namespace KingmakerBuffPlanner.Tests
                 Run("catalog-filter-selected-category-and-reset-contract", TestCatalogFilterState);
                 Run("presentation-view-models-use-player-facing-deterministic-state", TestPresentationModels);
                 Run("area-coverage-preview-distinguishes-direct-and-indirect", TestAreaCoveragePresentation);
+                Run("single-target-plan-does-not-create-indirect-coverage", TestSingleTargetCoveragePresentation);
+                Run("caster-centered-plan-does-not-invent-direct-receiver", TestCasterCenteredCoveragePresentation);
                 Run("four-column-grid-metrics-have-no-horizontal-scroll", TestGridMetrics);
                 Run("large-catalog-grid-window-remains-bounded", TestLargeCatalogGridWindow);
                 Run("planner-hotkey-chord-consumes-native-primary-key", TestPlannerHotkeyBinding);
@@ -795,6 +798,38 @@ namespace KingmakerBuffPlanner.Tests
                     card.Availability);
         }
 
+        private static void TestSelectedBuffSummary()
+        {
+            AbilityKey ability = Ability("summary-ability", string.Empty, 1);
+            var token = new ResourceTokenSnapshot("summary-slot", ability, 1,
+                PreparedSlotKind.Common, true, true, null);
+            var pool = new ResourcePoolSnapshot("summary-pool", ResourcePoolKind.PreparedSlots,
+                1, 1, new[] { token });
+            ProviderSnapshot provider = new ProviderSnapshot(
+                new ProviderKey("unit-a", "summary-book", ability, "level-1"),
+                "summary", 1, "summary-pool", 1, new[] { "summary-slot" });
+            PartyProviderSnapshot snapshot = PlannerSnapshot(new[] { provider }, new[] { pool },
+                "unit-a");
+            EffectExpression effect = Leaf("summary-effect");
+            var option = new ProviderPlanningOption(provider, new[] { "unit-a" },
+                new[] { "unit-a" }, 1, 10);
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault("summary-campaign");
+            var model = new PlannerSetupModel(profile, snapshot, new ActiveEffectSnapshot(null),
+                new Dictionary<string, EffectExpression> { { ability.Canonical, effect } },
+                new[] { option }, ignored => { });
+            model.ToggleTarget("long", "unit-a");
+            RoutinePlanResult preview = new RoutinePlanService().Plan(profile, "long", snapshot,
+                new ActiveEffectSnapshot(null), new Dictionary<string, EffectExpression>
+                { { ability.Canonical, effect } }, new[] { option });
+            var summary = new SelectedBuffPlanSummaryViewModel(model.Sources.Single(), model,
+                "long", preview);
+            if (summary.Availability != "1 prepared" || summary.PlannedCasts != 1 ||
+                !summary.Text.Contains("Available: 1 prepared") ||
+                !summary.Text.Contains("Planned: 1 cast") ||
+                summary.Text.Contains("targets covered") || summary.Text.Contains("blocked"))
+                throw new InvalidOperationException("Selected-buff plan summary is ambiguous: " + summary.Text);
+        }
+
         private static SourceAssignmentProfile Assignment(AbilityKey ability, string target)
         {
             return new SourceAssignmentProfile
@@ -1134,20 +1169,26 @@ namespace KingmakerBuffPlanner.Tests
                 card.RoutineBadge != "L" || card.Configuration != "1 target selected")
                 throw new InvalidOperationException("Fulfillable card state is invalid.");
             int beforePreview = saves;
+            RoutinePlanResult preview = new RoutinePlanService().Plan(profile, "long", snapshot,
+                new ActiveEffectSnapshot(new Dictionary<string, IEnumerable<string>>()),
+                new Dictionary<string, EffectExpression> { { ability.Canonical,
+                    Leaf("ui-presentation-effect") } }, options);
             TargetPortraitViewModel target = TargetPortraitViewModel.Create(
-                model.Sources[0], model, "long", unit);
+                model.Sources[0], model, "long", unit, preview);
             TargetPortraitViewModel invalidTarget = TargetPortraitViewModel.Create(
-                model.Sources[0], model, "long", invalidUnit);
-            var warningTarget = new TargetPortraitViewModel(unit, true, true, false, false);
+                model.Sources[0], model, "long", invalidUnit, preview);
+            var warningTarget = new TargetPortraitViewModel(unit,
+                TargetPortraitState.DirectSelectedButUnavailable, true, false, false,
+                false, "No prepared slot remains.");
             var routine = new RoutineSummaryViewModel("long", "Long", 1, 1);
             var settings = new PlannerSettingsViewModel(profile);
             if (target.Status != PlannerPresentationStatus.Success ||
-                target.State != TargetPortraitState.DirectSelected ||
+                target.State != TargetPortraitState.DirectSelectedAndCovered ||
                 warningTarget.Status != PlannerPresentationStatus.Warning ||
-                warningTarget.State != TargetPortraitState.SelectedButUnfulfillable ||
+                warningTarget.State != TargetPortraitState.DirectSelectedButUnavailable ||
                 invalidTarget.Status != PlannerPresentationStatus.Failure ||
-                invalidTarget.State != TargetPortraitState.Invalid ||
-                routine.Label != "Long     1/1 ready" || settings.CastingMode != "Animated" ||
+                invalidTarget.State != TargetPortraitState.InvalidTarget ||
+                routine.Label != "Long  1 ready" || settings.CastingMode != "Animated" ||
                 saves != beforePreview)
                 throw new InvalidOperationException("Player-facing presentation summaries are invalid.");
             model.SetAllValidTargets("long", false);
@@ -1171,13 +1212,62 @@ namespace KingmakerBuffPlanner.Tests
                 new Dictionary<string, EffectExpression> { { ability.Canonical, area } },
                 new[] { option }, ignored => { });
             model.ToggleTarget("long", "unit-a");
+            RoutinePlanResult preview = new RoutinePlanService().Plan(model.Profile, "long", snapshot,
+                new ActiveEffectSnapshot(null), new Dictionary<string, EffectExpression>
+                { { ability.Canonical, area } }, new[] { option });
             TargetPortraitViewModel direct = TargetPortraitViewModel.Create(model.Sources[0], model,
-                "long", snapshot.Units.First(unit => unit.UnitId == "unit-a"));
+                "long", snapshot.Units.First(unit => unit.UnitId == "unit-a"), preview);
             TargetPortraitViewModel indirect = TargetPortraitViewModel.Create(model.Sources[0], model,
-                "long", snapshot.Units.First(unit => unit.UnitId == "unit-b"));
-            if (direct.State != TargetPortraitState.DirectSelected || direct.Indirect ||
-                indirect.State != TargetPortraitState.IndirectCovered || !indirect.Indirect || indirect.Wanted)
+                "long", snapshot.Units.First(unit => unit.UnitId == "unit-b"), preview);
+            if (direct.State != TargetPortraitState.DirectSelectedAndCovered || direct.Indirect ||
+                indirect.State != TargetPortraitState.IndirectlyCovered || !indirect.Indirect ||
+                indirect.Wanted || indirect.Tooltip != "Also affected by the planned cast.")
                 throw new InvalidOperationException("Area coverage preview did not distinguish direct and indirect targets.");
+        }
+
+        private static void TestSingleTargetCoveragePresentation()
+        {
+            AbilityKey ability = Ability("single-presentation", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("single-free", ResourcePoolKind.Unlimited, 0, 0, null);
+            ProviderSnapshot provider = PlannerProvider("unit-a", "book-single", ability, "single-free", 0);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(new[] { provider }, new[] { pool },
+                "unit-a", "unit-b");
+            var option = new ProviderPlanningOption(provider, new[] { "unit-a", "unit-b" },
+                new[] { "unit-a", "unit-b" }, 1, 10);
+            EffectExpression effect = Leaf("single-effect");
+            var model = new PlannerSetupModel(BuffPlannerProfile.CreateDefault("single-preview"),
+                snapshot, new ActiveEffectSnapshot(null),
+                new Dictionary<string, EffectExpression> { { ability.Canonical, effect } },
+                new[] { option }, ignored => { });
+            model.ToggleTarget("long", "unit-a");
+            RoutinePlanResult preview = new RoutinePlanService().Plan(model.Profile, "long", snapshot,
+                new ActiveEffectSnapshot(null), new Dictionary<string, EffectExpression>
+                { { ability.Canonical, effect } }, new[] { option });
+            TargetPortraitViewModel other = TargetPortraitViewModel.Create(model.Sources[0], model,
+                "long", snapshot.Units.First(unit => unit.UnitId == "unit-b"), preview);
+            if (other.State != TargetPortraitState.Neutral || other.IsExpectedRecipient)
+                throw new InvalidOperationException("Single-target plan created false indirect coverage.");
+        }
+
+        private static void TestCasterCenteredCoveragePresentation()
+        {
+            AbilityKey ability = Ability("caster-presentation", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("caster-free", ResourcePoolKind.Unlimited, 0, 0, null);
+            ProviderSnapshot provider = PlannerProvider("unit-a", "book-caster", ability, "caster-free", 0);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(new[] { provider }, new[] { pool },
+                "unit-a", "unit-b");
+            var option = new ProviderPlanningOption(provider, new[] { "unit-a" },
+                new[] { "unit-a" }, 1, 10);
+            var effect = new EffectLeafExpression(EffectKind.Buff, "caster-effect", EffectTarget.Caster,
+                "caster-contract", "caster/path");
+            var model = new PlannerSetupModel(BuffPlannerProfile.CreateDefault("caster-preview"),
+                snapshot, new ActiveEffectSnapshot(null),
+                new Dictionary<string, EffectExpression> { { ability.Canonical, effect } },
+                new[] { option }, ignored => { });
+            TargetPortraitViewModel caster = TargetPortraitViewModel.Create(model.Sources[0], model,
+                "long", snapshot.Units.First(unit => unit.UnitId == "unit-a"), null);
+            if (caster.State != TargetPortraitState.Neutral || caster.IsExplicitlyRequested)
+                throw new InvalidOperationException("Caster-centered preview invented a direct receiver.");
         }
 
         private static void TestGridMetrics()

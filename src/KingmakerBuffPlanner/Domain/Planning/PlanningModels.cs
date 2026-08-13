@@ -203,14 +203,17 @@ namespace KingmakerBuffPlanner.Domain.Planning
 
     public sealed class TargetPlanOutcome
     {
-        internal TargetPlanOutcome(string unitId, TargetOutcomeKind kind, string reason, IEnumerable<string> markers)
+        internal TargetPlanOutcome(string sourceId, string unitId, TargetOutcomeKind kind,
+            string reason, IEnumerable<string> markers)
         {
+            SourceId = sourceId ?? string.Empty;
             UnitId = unitId;
             Kind = kind;
             Reason = reason ?? string.Empty;
             Markers = new ReadOnlyCollection<string>((markers ?? new string[0]).OrderBy(v => v, StringComparer.Ordinal).ToList());
         }
 
+        public string SourceId { get; private set; }
         public string UnitId { get; private set; }
         public TargetOutcomeKind Kind { get; private set; }
         public string Reason { get; private set; }
@@ -220,26 +223,34 @@ namespace KingmakerBuffPlanner.Domain.Planning
     public sealed class CastStep
     {
         internal CastStep(
+            string sourceId,
             ProviderKey provider,
             string anchorUnitId,
             IEnumerable<string> targetUnitIds,
+            IEnumerable<string> expectedRecipientUnitIds,
             ResourceReservation reservation,
             MaterialReservation materialReservation,
             EffectExpression expectedEffects,
             bool massCast)
         {
+            SourceId = sourceId ?? string.Empty;
             Provider = provider;
             AnchorUnitId = anchorUnitId;
             TargetUnitIds = new ReadOnlyCollection<string>(targetUnitIds.OrderBy(v => v, StringComparer.Ordinal).ToList());
+            ExpectedRecipientUnitIds = new ReadOnlyCollection<string>(
+                (expectedRecipientUnitIds ?? targetUnitIds).Where(v => !string.IsNullOrWhiteSpace(v))
+                    .Distinct(StringComparer.Ordinal).OrderBy(v => v, StringComparer.Ordinal).ToList());
             Reservation = reservation;
             MaterialReservation = materialReservation;
             ExpectedEffects = expectedEffects;
             MassCast = massCast;
         }
 
+        public string SourceId { get; private set; }
         public ProviderKey Provider { get; private set; }
         public string AnchorUnitId { get; private set; }
         public IReadOnlyList<string> TargetUnitIds { get; private set; }
+        public IReadOnlyList<string> ExpectedRecipientUnitIds { get; private set; }
         public ResourceReservation Reservation { get; private set; }
         public MaterialReservation MaterialReservation { get; private set; }
         public EffectExpression ExpectedEffects { get; private set; }

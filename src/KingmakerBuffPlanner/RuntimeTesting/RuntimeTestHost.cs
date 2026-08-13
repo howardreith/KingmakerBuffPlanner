@@ -245,6 +245,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     UiHudRaycastCanvasPath = ui == null ? null : ui.HudRaycastCanvasPath,
                     UiHudButtonOrder = ui == null ? null : ui.HudButtonOrder,
                     UiHudRowAboveNativeCluster = ui != null && ui.HudRowAboveNativeCluster,
+                    UiHudRowLeftAlignedWithNativeCluster = ui != null &&
+                        ui.HudRowLeftAlignedWithNativeCluster,
+                    UiHudGlyphsCentered = ui != null && ui.HudGlyphsCentered,
                     UiHudHitboxesOwnRaycasts = ui != null && ui.HudHitboxesOwnRaycasts,
                     UiHudUnderlyingNativeActivationCount = ui == null ? -1 : ui.HudUnderlyingNativeActivationCount,
                     UiFullScreenRootCount = ui == null ? 0 : ui.FullScreenRootCount,
@@ -379,6 +382,12 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         _liveRenderDiagnostics.RetiredPrimaryLabelCount,
                     UiThemeResolution = _liveRenderDiagnostics == null ? null :
                         _liveRenderDiagnostics.ThemeResolution,
+                    UiTextRenderingEvidence = _liveRenderDiagnostics == null ? null :
+                        _liveRenderDiagnostics.TextRenderingEvidence,
+                    UiNestedPlannerCanvasScalerCount = _liveRenderDiagnostics == null ? -1 :
+                        _liveRenderDiagnostics.NestedCanvasScalerCount,
+                    UiFractionalRectCount = _liveRenderDiagnostics == null ? -1 :
+                        _liveRenderDiagnostics.FractionalRectCount,
                     NativeUiContractSha256 = nativeUiContractHash,
                     NativeUiButtonCount = nativeUiContract == null ? 0 : nativeUiContract.Buttons.Count,
                     NativeUiCandidateAnchorCount = nativeUiContract == null
@@ -571,6 +580,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         "Setup|Long|Important|Short", ui.HudButtonOrder ?? "missing");
                     AddUiAssertion(result, "ui-hud-row-above-native", ui.HudRowAboveNativeCluster,
                         "true", ui.HudRowAboveNativeCluster.ToString());
+                    AddUiAssertion(result, "ui-hud-row-left-aligned-native",
+                        ui.HudRowLeftAlignedWithNativeCluster, "true",
+                        ui.HudRowLeftAlignedWithNativeCluster.ToString());
+                    AddUiAssertion(result, "ui-hud-glyphs-centered", ui.HudGlyphsCentered,
+                        "true", ui.HudGlyphsCentered.ToString());
                     AddUiAssertion(result, "ui-hud-visible-hitboxes-own-raycasts",
                         ui.HudHitboxesOwnRaycasts && !string.IsNullOrWhiteSpace(ui.HudRaycastCanvasPath),
                         "true/nonempty", ui.HudHitboxesOwnRaycasts + "/" + (ui.HudRaycastCanvasPath ?? "missing"));
@@ -750,6 +764,17 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                                 StringSplitOptions.None).Length == 5,
                             "paths/ids/active/corners + four antique-gold sprite inks",
                             ui.HudObjectEvidence ?? "missing");
+                        AddUiAssertion(result, "ui-text-native-pixel-path",
+                            _liveRenderDiagnostics != null &&
+                            _liveRenderDiagnostics.NestedCanvasScalerCount == 0 &&
+                            _liveRenderDiagnostics.FractionalRectCount == 0 &&
+                            _liveRenderDiagnostics.TextRenderingEvidence.Contains("font=Arial") &&
+                            _liveRenderDiagnostics.TextRenderingEvidence.Contains("bestFit=False") &&
+                            _liveRenderDiagnostics.TextRenderingEvidence.Contains("shader=UI/Default"),
+                            "no-scaler/no-fractional/Arial/fixed/UI-Default",
+                            _liveRenderDiagnostics == null ? "missing" :
+                                _liveRenderDiagnostics.TextRenderingEvidence + ";fractional=" +
+                                _liveRenderDiagnostics.FractionalRectCount);
                         AddUiAssertion(result, "ui-card-aggregation-evidence",
                             ui.CatalogAggregateAbilityCount >= ui.CatalogVisibleViewModels &&
                             ui.CatalogProviderCount >= ui.CatalogAggregateAbilityCount &&
@@ -952,7 +977,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         _liveRenderDiagnostics.BoundRowCount ||
                     _liveRenderDiagnostics.CastingModeControlCount != 1 ||
                     _liveRenderDiagnostics.RetiredPrimaryLabelCount != 0 ||
-                    string.IsNullOrWhiteSpace(_liveRenderDiagnostics.ThemeResolution))
+                    string.IsNullOrWhiteSpace(_liveRenderDiagnostics.ThemeResolution) ||
+                    string.IsNullOrWhiteSpace(_liveRenderDiagnostics.TextRenderingEvidence) ||
+                    _liveRenderDiagnostics.NestedCanvasScalerCount != 0 ||
+                    _liveRenderDiagnostics.FractionalRectCount != 0)
                     throw new InvalidOperationException("Live production render evidence is incomplete.");
                 AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory,
                     "live-row-render-diagnostics.json"), Serialize(_liveRenderDiagnostics));
@@ -1445,6 +1473,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         [JsonProperty("uiHudRaycastCanvasPath", Order = 97)] public string UiHudRaycastCanvasPath { get; set; }
         [JsonProperty("uiHudButtonOrder", Order = 98)] public string UiHudButtonOrder { get; set; }
         [JsonProperty("uiHudRowAboveNativeCluster", Order = 99)] public bool UiHudRowAboveNativeCluster { get; set; }
+        [JsonProperty("uiHudRowLeftAlignedWithNativeCluster", Order = 99)]
+        public bool UiHudRowLeftAlignedWithNativeCluster { get; set; }
+        [JsonProperty("uiHudGlyphsCentered", Order = 99)] public bool UiHudGlyphsCentered { get; set; }
         [JsonProperty("uiHudHitboxesOwnRaycasts", Order = 100)] public bool UiHudHitboxesOwnRaycasts { get; set; }
         [JsonProperty("uiHudUnderlyingNativeActivationCount", Order = 101)] public int UiHudUnderlyingNativeActivationCount { get; set; }
         [JsonProperty("uiPresentationValid", Order = 102)] public bool UiPresentationValid { get; set; }
@@ -1518,6 +1549,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         [JsonProperty("uiCastingModeControlCount", Order = 163)] public int UiCastingModeControlCount { get; set; }
         [JsonProperty("uiRetiredPrimaryLabelCount", Order = 164)] public int UiRetiredPrimaryLabelCount { get; set; }
         [JsonProperty("uiThemeResolution", Order = 165)] public string UiThemeResolution { get; set; }
+        [JsonProperty("uiTextRenderingEvidence", Order = 166)] public string UiTextRenderingEvidence { get; set; }
+        [JsonProperty("uiNestedPlannerCanvasScalerCount", Order = 167)]
+        public int UiNestedPlannerCanvasScalerCount { get; set; }
+        [JsonProperty("uiFractionalRectCount", Order = 168)] public int UiFractionalRectCount { get; set; }
     }
 
     internal sealed class RuntimeTestAssertion

@@ -2,8 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using KingmakerBuffPlanner.Domain.Identity;
+using KingmakerBuffPlanner.Domain.Planning;
 using KingmakerBuffPlanner.Domain.Providers;
 using KingmakerBuffPlanner.Persistence;
+using KingmakerBuffPlanner.Planning;
 
 namespace KingmakerBuffPlanner.UI
 {
@@ -18,11 +20,11 @@ namespace KingmakerBuffPlanner.UI
 
     public enum TargetPortraitState
     {
-        DirectSelected,
-        IndirectCovered,
-        ValidUnselected,
-        Invalid,
-        SelectedButUnfulfillable
+        Neutral,
+        DirectSelectedAndCovered,
+        DirectSelectedButUnavailable,
+        IndirectlyCovered,
+        InvalidTarget
     }
 
     public sealed class BuffCardViewModel
@@ -90,7 +92,7 @@ namespace KingmakerBuffPlanner.UI
                 item.WantedTargetUnitIds.Count != 0);
         }
 
-        private static string BuildAvailability(SetupSourceRow source, PlannerSetupModel model)
+        internal static string BuildAvailability(SetupSourceRow source, PlannerSetupModel model)
         {
             var usable = source.Providers.Where(provider =>
                 string.IsNullOrEmpty(model.GetProviderRejectionReason(provider))).ToList();
@@ -101,8 +103,7 @@ namespace KingmakerBuffPlanner.UI
             }
             if (usable.Any(provider => model.GetRemainingCasts(provider) == null))
                 return usable.Count > 1 ? "At will · multiple sources" : "At will";
-            int remaining = usable.GroupBy(provider => provider.ResourcePoolKey,
-                    StringComparer.Ordinal).Sum(group => RemainingForPool(group, model));
+            int remaining = AvailableCastCount(usable, model);
             bool prepared = usable.Any(provider =>
                 model.GetResourcePool(provider).Kind == ResourcePoolKind.PreparedSlots);
             if (remaining == 1) return prepared ? "1 prepared" : "1 available";
@@ -122,6 +123,14 @@ namespace KingmakerBuffPlanner.UI
                 eligible.Contains(token.TokenId));
             int cost = Math.Max(1, values.Min(provider => provider.UnitsPerCast));
             return available / cost;
+        }
+
+        internal static int AvailableCastCount(IEnumerable<ProviderSnapshot> providers,
+            PlannerSetupModel model)
+        {
+            return (providers ?? new ProviderSnapshot[0])
+                .GroupBy(provider => provider.ResourcePoolKey, StringComparer.Ordinal)
+                .Sum(group => RemainingForPool(group, model));
         }
 
         internal static string SourceSummary(SetupSourceRow source)
@@ -162,23 +171,31 @@ namespace KingmakerBuffPlanner.UI
 
     public sealed class TargetPortraitViewModel
     {
-        internal TargetPortraitViewModel(UnitSnapshot unit, bool wanted, bool legal, bool fulfilled,
-            bool indirect)
+        internal TargetPortraitViewModel(UnitSnapshot unit, TargetPortraitState state,
+            bool explicitlyRequested, bool castAnchor, bool expectedRecipient, bool fulfilled,
+            string failureReason)
         {
             UnitId = unit.UnitId;
             Name = string.IsNullOrWhiteSpace(unit.DisplayName) ? "Party member" : unit.DisplayName;
             IsPet = unit.IsPet;
-            Wanted = wanted;
-            Legal = legal;
-            Indirect = indirect;
-            State = !legal ? TargetPortraitState.Invalid : wanted
-                ? (fulfilled ? TargetPortraitState.DirectSelected :
-                    TargetPortraitState.SelectedButUnfulfillable)
-                : indirect ? TargetPortraitState.IndirectCovered : TargetPortraitState.ValidUnselected;
-            Status = State == TargetPortraitState.Invalid ? PlannerPresentationStatus.Failure :
-                State == TargetPortraitState.DirectSelected || State == TargetPortraitState.IndirectCovered
+            Wanted = explicitlyRequested;
+            Legal = state != TargetPortraitState.InvalidTarget;
+            Indirect = state == TargetPortraitState.IndirectlyCovered;
+            IsExplicitlyRequested = explicitlyRequested;
+            IsCastAnchor = castAnchor;
+            IsExpectedRecipient = expectedRecipient;
+            IsFulfilled = fulfilled;
+            FailureReason = failureReason ?? string.Empty;
+            State = state;
+            DisplayLabel = state == TargetPortraitState.DirectSelectedAndCovered ? "SELECTED" :
+                state == TargetPortraitState.DirectSelectedButUnavailable ? "SELECTED !" :
+                state == TargetPortraitState.IndirectlyCovered ? "COVERED" : string.Empty;
+            Tooltip = BuildTooltip(state, FailureReason, castAnchor);
+            Status = State == TargetPortraitState.InvalidTarget ? PlannerPresentationStatus.Failure :
+                State == TargetPortraitState.DirectSelectedAndCovered ||
+                State == TargetPortraitState.IndirectlyCovered
                     ? PlannerPresentationStatus.Success :
-                State == TargetPortraitState.SelectedButUnfulfillable
+                State == TargetPortraitState.DirectSelectedButUnavailable
                     ? PlannerPresentationStatus.Warning : PlannerPresentationStatus.Neutral;
         }
 
@@ -188,19 +205,80 @@ namespace KingmakerBuffPlanner.UI
         public bool Wanted { get; private set; }
         public bool Legal { get; private set; }
         public bool Indirect { get; private set; }
+        public bool IsExplicitlyRequested { get; private set; }
+        public bool IsCastAnchor { get; private set; }
+        public bool IsExpectedRecipient { get; private set; }
+        public bool IsFulfilled { get; private set; }
+        public string FailureReason { get; private set; }
+        public string DisplayLabel { get; private set; }
+        public string Tooltip { get; private set; }
         public TargetPortraitState State { get; private set; }
         public PlannerPresentationStatus Status { get; private set; }
 
         internal static TargetPortraitViewModel Create(SetupSourceRow source,
-            PlannerSetupModel model, string routineId, UnitSnapshot unit)
+            PlannerSetupModel model, string routineId, UnitSnapshot unit,
+            RoutinePlanResult preview)
         {
             bool wanted = model.IsTargetWanted(routineId, source.SourceId, unit.UnitId);
             bool legal = model.IsTargetLegal(source, unit.UnitId);
-            bool active = model.GetPresence(source.SourceId, unit.UnitId) ==
-                Planning.EffectPresenceKind.Complete;
-            bool fulfilled = active || (legal && model.IsSourceAvailable(source));
-            return new TargetPortraitViewModel(unit, wanted, legal, fulfilled,
-                model.IsIndirectBeneficiary(source, routineId, unit.UnitId));
+            List<TargetPlanOutcome> outcomes = preview == null ? new List<TargetPlanOutcome>() :
+                preview.Plan.Outcomes.Where(item => item.SourceId == source.SourceId &&
+                    item.UnitId == unit.UnitId).ToList();
+            List<CastStep> steps = preview == null ? new List<CastStep>() : preview.Plan.Steps
+                .Where(item => item.SourceId == source.SourceId).ToList();
+            bool expected = steps.Any(step => step.ExpectedRecipientUnitIds.Contains(unit.UnitId));
+            bool anchor = steps.Any(step => step.AnchorUnitId == unit.UnitId);
+            bool fulfilled = outcomes.Any(item => item.Kind == TargetOutcomeKind.Fulfilled ||
+                item.Kind == TargetOutcomeKind.SkippedAlreadyActive);
+            TargetPlanOutcome failure = outcomes.FirstOrDefault(item =>
+                item.Kind == TargetOutcomeKind.Unfulfilled);
+            TargetPortraitState state = !legal ? TargetPortraitState.InvalidTarget :
+                wanted && fulfilled ? TargetPortraitState.DirectSelectedAndCovered :
+                wanted ? TargetPortraitState.DirectSelectedButUnavailable :
+                expected ? TargetPortraitState.IndirectlyCovered : TargetPortraitState.Neutral;
+            string reason = failure == null ? string.Empty : PlayerFailureReason(failure.Reason);
+            if (state == TargetPortraitState.InvalidTarget && string.IsNullOrEmpty(reason))
+                reason = InvalidReason(unit);
+            if (state == TargetPortraitState.DirectSelectedButUnavailable && string.IsNullOrEmpty(reason))
+                reason = BuffCardViewModel.PlayerReason(model.GetSourceUnavailableReason(source));
+            return new TargetPortraitViewModel(unit, state, wanted, anchor, expected, fulfilled, reason);
+        }
+
+        private static string BuildTooltip(TargetPortraitState state, string reason, bool anchor)
+        {
+            if (state == TargetPortraitState.DirectSelectedAndCovered)
+                return anchor ? "Selected target and cast anchor. Covered by the planned cast." :
+                    "Selected target. Covered by the planned cast.";
+            if (state == TargetPortraitState.IndirectlyCovered)
+                return anchor ? "Cast anchor. Also affected by the planned cast." :
+                    "Also affected by the planned cast.";
+            if (state == TargetPortraitState.DirectSelectedButUnavailable)
+                return string.IsNullOrWhiteSpace(reason) ?
+                    "Selected, but not covered by the current plan." : reason;
+            if (state == TargetPortraitState.InvalidTarget)
+                return string.IsNullOrWhiteSpace(reason) ? "This is not a legal target." : reason;
+            return "Valid target. Click to select.";
+        }
+
+        private static string PlayerFailureReason(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return string.Empty;
+            if (value.EndsWith(":target-not-in-party", StringComparison.Ordinal))
+                return "This target is outside the supported cast plan.";
+            if (value.EndsWith(":target-currently-invalid", StringComparison.Ordinal))
+                return "This target cannot currently receive the effect.";
+            if (value.EndsWith(":no-valid-provider-or-resource", StringComparison.Ordinal) ||
+                value.EndsWith(":no-valid-mass-provider-or-resource", StringComparison.Ordinal))
+                return "No eligible caster or cast resource is currently available.";
+            return "This target is not covered by the current plan.";
+        }
+
+        private static string InvalidReason(UnitSnapshot unit)
+        {
+            if (!unit.TargetValidation.Alive) return "This target is not alive.";
+            if (!unit.TargetValidation.Friendly) return "This effect requires a friendly target.";
+            if (!unit.TargetValidation.Targetable) return "This target cannot currently be targeted.";
+            return "This target is not legal for the selected effect.";
         }
     }
 
@@ -212,8 +290,9 @@ namespace KingmakerBuffPlanner.UI
             Name = name;
             Fulfilled = fulfilled;
             Requested = requested;
-            Label = name + "     " + fulfilled + "/" + requested +
-                (requested == 0 || fulfilled == requested ? " ready" : string.Empty);
+            int issues = Math.Max(0, requested - fulfilled);
+            Label = name + "  " + fulfilled + " ready" +
+                (issues == 0 ? string.Empty : "  " + issues + (issues == 1 ? " issue" : " issues"));
         }
 
         public string Id { get; private set; }
@@ -221,6 +300,57 @@ namespace KingmakerBuffPlanner.UI
         public int Fulfilled { get; private set; }
         public int Requested { get; private set; }
         public string Label { get; private set; }
+    }
+
+    public sealed class SelectedBuffPlanSummaryViewModel
+    {
+        internal SelectedBuffPlanSummaryViewModel(SetupSourceRow source, PlannerSetupModel model,
+            string routineId, RoutinePlanResult preview)
+        {
+            if (source == null) throw new ArgumentNullException("source");
+            if (model == null) throw new ArgumentNullException("model");
+            if (preview == null) throw new ArgumentNullException("preview");
+            SourceId = source.SourceId;
+            PlannedCasts = preview.Plan.Steps.Count(item => item.SourceId == source.SourceId);
+            var explicitIds = new HashSet<string>(model.Profile.Routines.First(item =>
+                item.RoutineId == routineId).Assignments
+                .Where(item => item.SourceId == source.SourceId)
+                .SelectMany(item => item.WantedTargetUnitIds), StringComparer.Ordinal);
+            SelectedTargets = explicitIds.Count;
+            AdditionalRecipients = preview.Plan.Steps.Where(item => item.SourceId == source.SourceId)
+                .SelectMany(item => item.ExpectedRecipientUnitIds).Distinct(StringComparer.Ordinal)
+                .Count(id => !explicitIds.Contains(id));
+            Availability = BuildAvailability(source, model);
+            Text = "Available: " + Availability + "\nPlanned: " + PlannedCasts +
+                (PlannedCasts == 1 ? " cast" : " casts");
+            if (SelectedTargets != 0 || AdditionalRecipients != 0)
+                Text += "   " + SelectedTargets + (SelectedTargets == 1 ? " selected target" :
+                    " selected targets") + (AdditionalRecipients == 0 ? string.Empty : "   " +
+                    AdditionalRecipients + (AdditionalRecipients == 1 ?
+                        " additional ally covered" : " additional allies covered"));
+        }
+
+        public string SourceId { get; private set; }
+        public string Availability { get; private set; }
+        public int PlannedCasts { get; private set; }
+        public int SelectedTargets { get; private set; }
+        public int AdditionalRecipients { get; private set; }
+        public string Text { get; private set; }
+
+        private static string BuildAvailability(SetupSourceRow source, PlannerSetupModel model)
+        {
+            var usable = source.Providers.Where(provider =>
+                string.IsNullOrEmpty(model.GetProviderRejectionReason(provider))).ToList();
+            if (usable.Count == 0) return "0";
+            if (usable.Any(provider => model.GetRemainingCasts(provider) == null)) return "At will";
+            int casts = BuffCardViewModel.AvailableCastCount(usable, model);
+            int casters = usable.Select(provider => provider.Key.CasterUnitId)
+                .Distinct(StringComparer.Ordinal).Count();
+            bool allPrepared = usable.All(provider =>
+                model.GetResourcePool(provider).Kind == ResourcePoolKind.PreparedSlots);
+            if (casters > 1) return casts + " casts across " + casters + " casters";
+            return casts + (allPrepared ? " prepared" : casts == 1 ? " cast" : " casts");
+        }
     }
 
     public sealed class PlannerSettingsViewModel

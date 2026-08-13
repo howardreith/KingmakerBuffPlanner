@@ -352,6 +352,8 @@ namespace KingmakerBuffPlanner.UI
                 HudRaycastCanvasPath = _instance._hud.RaycastCanvasPath,
                 HudButtonOrder = _instance._hud.ButtonOrder,
                 HudRowAboveNativeCluster = _instance._hud.RowAboveNativeCluster,
+                HudRowLeftAlignedWithNativeCluster = _instance._hud.RowLeftAlignedWithNativeCluster,
+                HudGlyphsCentered = _instance._hud.GlyphsCentered,
                 HudHitboxesOwnRaycasts = _instance._hud.VisibleHitboxesOwnRaycasts,
                 HudUnderlyingNativeActivationCount = _instance._hud.RuntimeUnderlyingNativeActivationCount,
                 HotkeyArmed = Main.HotkeyArmed,
@@ -676,6 +678,8 @@ namespace KingmakerBuffPlanner.UI
         internal string HudRaycastCanvasPath;
         internal string HudButtonOrder;
         internal bool HudRowAboveNativeCluster;
+        internal bool HudRowLeftAlignedWithNativeCluster;
+        internal bool HudGlyphsCentered;
         internal bool HudHitboxesOwnRaycasts;
         internal int HudUnderlyingNativeActivationCount;
         internal bool HotkeyArmed;

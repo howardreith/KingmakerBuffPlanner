@@ -353,10 +353,13 @@ namespace KingmakerBuffPlanner.UI
         private readonly PlannerUiTheme _theme;
         private readonly Dictionary<string, Button> _buttons =
             new Dictionary<string, Button>(StringComparer.Ordinal);
+        private readonly Action<string> _showTooltip;
 
-        internal PlannerTargetStripView(RectTransform parent, PlannerUiTheme theme)
+        internal PlannerTargetStripView(RectTransform parent, PlannerUiTheme theme,
+            Action<string> showTooltip)
         {
             _theme = theme;
+            _showTooltip = showTooltip;
             _root = KingmakerUiFactory.CreateRect("TargetPortraits", parent);
             HorizontalLayoutGroup layout = _root.gameObject.AddComponent<HorizontalLayoutGroup>();
             layout.spacing = 8f;
@@ -383,19 +386,19 @@ namespace KingmakerBuffPlanner.UI
                 Color frame = statusColor(target.Status);
                 Color surface = new Color(0.16f, 0.10f, 0.07f, 1f);
                 float thickness = 1f;
-                if (target.State == TargetPortraitState.DirectSelected)
+                if (target.State == TargetPortraitState.DirectSelectedAndCovered)
                 {
                     surface = new Color(0.12f, 0.31f, 0.15f, 1f);
                     frame = new Color(0.38f, 0.88f, 0.43f, 1f);
                     thickness = 4f;
                 }
-                else if (target.State == TargetPortraitState.IndirectCovered)
+                else if (target.State == TargetPortraitState.IndirectlyCovered)
                 {
                     surface = new Color(0.15f, 0.25f, 0.14f, 1f);
                     frame = new Color(0.48f, 0.72f, 0.42f, 1f);
                     thickness = 2f;
                 }
-                else if (target.State == TargetPortraitState.SelectedButUnfulfillable)
+                else if (target.State == TargetPortraitState.DirectSelectedButUnavailable)
                 {
                     surface = new Color(0.36f, 0.27f, 0.08f, 1f);
                     thickness = 3f;
@@ -403,44 +406,44 @@ namespace KingmakerBuffPlanner.UI
                 Image background = KingmakerUiFactory.AddFramedPanel(rect, surface, frame, thickness);
                 Button button = rect.gameObject.AddComponent<Button>();
                 button.targetGraphic = background;
-                button.interactable = target.Legal;
+                button.interactable = target.State != TargetPortraitState.InvalidTarget;
                 button.onClick.AddListener(() => toggle(target.UnitId));
+                PlannerHoverTooltip hover = button.gameObject.AddComponent<PlannerHoverTooltip>();
+                hover.Text = target.Tooltip;
+                hover.Show = _showTooltip;
                 _buttons[target.UnitId] = button;
                 RectTransform imageRect = KingmakerUiFactory.CreateRect("Portrait", rect);
                 KingmakerUiFactory.SetAnchors(imageRect, 0.08f, 0.25f, 0.92f, 0.94f);
                 Image image = imageRect.gameObject.AddComponent<Image>();
                 image.sprite = portrait(target.UnitId);
                 image.preserveAspect = true;
-                image.color = target.State == TargetPortraitState.DirectSelected
+                image.color = target.State == TargetPortraitState.DirectSelectedAndCovered
                     ? new Color(0.74f, 1f, 0.76f, 1f)
-                    : target.State == TargetPortraitState.IndirectCovered
+                    : target.State == TargetPortraitState.IndirectlyCovered
                         ? new Color(0.86f, 1f, 0.84f, 1f)
-                        : target.State == TargetPortraitState.SelectedButUnfulfillable
+                        : target.State == TargetPortraitState.DirectSelectedButUnavailable
                             ? new Color(1f, 0.86f, 0.55f, 0.88f)
                             : target.Legal ? Color.white : new Color(0.45f, 0.32f, 0.28f, 0.8f);
                 image.raycastTarget = false;
                 RectTransform overlayRect = KingmakerUiFactory.CreateRect("StateOverlay", imageRect);
                 KingmakerUiFactory.Stretch(overlayRect);
                 Image overlay = KingmakerUiFactory.AddPanel(overlayRect,
-                    target.State == TargetPortraitState.DirectSelected
+                    target.State == TargetPortraitState.DirectSelectedAndCovered
                         ? new Color(0.12f, 0.65f, 0.20f, 0.32f)
-                        : target.State == TargetPortraitState.IndirectCovered
+                        : target.State == TargetPortraitState.IndirectlyCovered
                             ? new Color(0.22f, 0.58f, 0.24f, 0.16f)
-                            : target.State == TargetPortraitState.SelectedButUnfulfillable
+                            : target.State == TargetPortraitState.DirectSelectedButUnavailable
                                 ? new Color(0.82f, 0.55f, 0.08f, 0.25f)
-                                : target.State == TargetPortraitState.Invalid
+                                : target.State == TargetPortraitState.InvalidTarget
                                     ? new Color(0.55f, 0.08f, 0.06f, 0.18f) : Color.clear);
                 overlay.raycastTarget = false;
                 Text name = KingmakerUiFactory.CreateText("Name", rect, _theme,
                     target.Name, 12, TextAnchor.MiddleCenter);
                 KingmakerUiFactory.SetAnchors(name.rectTransform, 0, 0.01f, 1, 0.25f);
                 Text mark = KingmakerUiFactory.CreateText("State", rect, _theme,
-                    target.State == TargetPortraitState.DirectSelected ? "SELECTED" :
-                    target.State == TargetPortraitState.IndirectCovered ? "COVERED" :
-                    target.State == TargetPortraitState.SelectedButUnfulfillable ? "SELECTED !" :
-                    string.Empty, 11, TextAnchor.UpperCenter);
+                    target.DisplayLabel, 11, TextAnchor.UpperCenter);
                 mark.fontStyle = FontStyle.Bold;
-                mark.color = target.State == TargetPortraitState.DirectSelected
+                mark.color = target.State == TargetPortraitState.DirectSelectedAndCovered
                     ? new Color(0.82f, 1f, 0.78f, 1f) : frame;
                 KingmakerUiFactory.SetAnchors(mark.rectTransform, 0.03f, 0.67f, 0.97f, 0.97f);
             }
@@ -471,7 +474,7 @@ namespace KingmakerBuffPlanner.UI
         private readonly Button _clear;
 
         internal PlannerSelectedBuffView(RectTransform parent, PlannerUiTheme theme,
-            Action selectAll, Action clear)
+            Action selectAll, Action clear, Action<string> showTooltip)
         {
             _theme = theme;
             Root = KingmakerUiFactory.CreateRect("SelectedBuff", parent);
@@ -507,7 +510,7 @@ namespace KingmakerBuffPlanner.UI
             _targetsLabel.color = theme.BurgundyPrimary;
             _targetsLabel.fontStyle = FontStyle.Bold;
             KingmakerUiFactory.SetAnchors(_targetsLabel.rectTransform, 0.435f, 0.78f, 0.98f, 0.95f);
-            _targets = new PlannerTargetStripView(Root, theme);
+            _targets = new PlannerTargetStripView(Root, theme, showTooltip);
             KingmakerUiFactory.SetAnchors(_targets.Root, 0.435f, 0.25f, 0.84f, 0.77f);
             _selectAll = KingmakerUiFactory.CreateButton("SelectAllValid", Root, theme,
                 "Select All Valid", () => selectAll());

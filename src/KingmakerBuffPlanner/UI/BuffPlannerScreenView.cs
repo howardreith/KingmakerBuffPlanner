@@ -178,6 +178,7 @@ namespace KingmakerBuffPlanner.UI
             _executeButton.interactable = ready;
             Text executeLabel = _executeButton.GetComponentInChildren<Text>(true);
             if (executeLabel != null) executeLabel.text = "APPLY " + ActiveRoutineId.ToUpperInvariant();
+            KingmakerUiFactory.ForceLayoutAndSnap(_root);
         }
 
         private void RefreshCatalog(bool preserveScroll)
@@ -191,6 +192,7 @@ namespace KingmakerBuffPlanner.UI
             _catalogSummary.text = cards.Count + (cards.Count == 1 ? " buff" : " buffs") +
                 " • alphabetical • " + filters.ActiveFilters;
             RefreshSelected();
+            KingmakerUiFactory.ForceLayoutAndSnap(_root);
             UpdateCatalogDiagnostics(filters);
         }
 
@@ -262,7 +264,11 @@ namespace KingmakerBuffPlanner.UI
                 CastingModeControlCount = allText.Count(text =>
                     text.text.StartsWith("Casting mode: ", StringComparison.Ordinal)),
                 RetiredPrimaryLabelCount = allText.Count(text => IsRetired(text.text)),
-                ThemeResolution = _theme.ResolutionSummary
+                ThemeResolution = _theme.ResolutionSummary,
+                TextRenderingEvidence = BuildTextRenderingEvidence(),
+                NestedCanvasScalerCount = _root.GetComponentsInChildren<CanvasScaler>(true).Length,
+                FractionalRectCount = _root.GetComponentsInChildren<RectTransform>(true)
+                    .Count(HasFractionalGeometry)
             };
         }
 
@@ -329,11 +335,6 @@ namespace KingmakerBuffPlanner.UI
             _canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             _canvas.overrideSorting = true;
             _canvas.sortingOrder = 32000;
-            CanvasScaler scaler = _root.gameObject.AddComponent<CanvasScaler>();
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1920, 1080);
-            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-            scaler.matchWidthOrHeight = 0.5f;
             _raycaster = _root.gameObject.AddComponent<GraphicRaycaster>();
             _canvasGroup = _root.gameObject.AddComponent<CanvasGroup>();
             _canvasGroup.alpha = 1f;
@@ -399,7 +400,7 @@ namespace KingmakerBuffPlanner.UI
             {
                 _session.Model.SetAllValidTargets(ActiveRoutineId, false);
                 RefreshAll(true);
-            });
+            }, ShowTooltip);
             BuildFooter(frame);
             _settings = new PlannerSettingsView(frame, _theme, () =>
             {
@@ -547,9 +548,9 @@ namespace KingmakerBuffPlanner.UI
                 ConsolidatedCardCount = model == null ? 0 : model.Sources.Count(source =>
                     source.Abilities.Count > 1),
                 DirectSelectedTargetCount = model == null ? 0 : _viewModel.Targets().Count(target =>
-                    target.State == TargetPortraitState.DirectSelected),
+                    target.State == TargetPortraitState.DirectSelectedAndCovered),
                 IndirectCoveredTargetCount = model == null ? 0 : _viewModel.Targets().Count(target =>
-                    target.State == TargetPortraitState.IndirectCovered)
+                    target.State == TargetPortraitState.IndirectlyCovered)
             };
         }
 
@@ -589,6 +590,38 @@ namespace KingmakerBuffPlanner.UI
                 ",showGraphic=" + (mask != null && mask.showMaskGraphic) +
                 ",viewportImage=" + GraphicEvidence(image) + ",viewport=" +
                 RectEvidence(_grid.Viewport);
+        }
+
+        private string BuildTextRenderingEvidence()
+        {
+            Text sample = _root.GetComponentsInChildren<Text>(true).FirstOrDefault(text =>
+                text.gameObject.activeInHierarchy);
+            Material material = sample == null ? null : sample.material;
+            return "canvas=" + (_canvas == null ? "missing" : _canvas.name) +
+                ",renderMode=" + (_canvas == null ? "missing" : _canvas.renderMode.ToString()) +
+                ",scaleFactor=" + (_canvas == null ? 0f : _canvas.scaleFactor).ToString("F3") +
+                ",rootScale=" + (_root == null ? Vector3.zero : _root.localScale) +
+                ",nestedCanvases=" + (_root == null ? 0 :
+                    _root.GetComponentsInChildren<Canvas>(true).Length - 1) +
+                ",canvasScalers=" + (_root == null ? 0 :
+                    _root.GetComponentsInChildren<CanvasScaler>(true).Length) +
+                ",textType=" + (sample == null ? "missing" : sample.GetType().FullName) +
+                ",font=" + (sample == null || sample.font == null ? "missing" : sample.font.name) +
+                ",fontSize=" + (sample == null ? 0 : sample.fontSize) +
+                ",bestFit=" + (sample != null && sample.resizeTextForBestFit) +
+                ",shader=" + (material == null || material.shader == null ? "missing" :
+                    material.shader.name) + ",rect=" +
+                (sample == null ? "missing" : RectEvidence(sample.rectTransform));
+        }
+
+        private static bool HasFractionalGeometry(RectTransform rect)
+        {
+            if (rect == null) return false;
+            const float tolerance = 0.01f;
+            return Mathf.Abs(rect.anchoredPosition.x - Mathf.Round(rect.anchoredPosition.x)) > tolerance ||
+                Mathf.Abs(rect.anchoredPosition.y - Mathf.Round(rect.anchoredPosition.y)) > tolerance ||
+                Mathf.Abs(rect.sizeDelta.x - Mathf.Round(rect.sizeDelta.x)) > tolerance ||
+                Mathf.Abs(rect.sizeDelta.y - Mathf.Round(rect.sizeDelta.y)) > tolerance;
         }
 
         private static bool IsRetired(string value)
@@ -659,6 +692,9 @@ namespace KingmakerBuffPlanner.UI
                 ",enabled=" + graphic.enabled + ",raycast=" + graphic.raycastTarget +
                 ",color=" + graphic.color + ",cull=" + graphic.canvasRenderer.cull +
                 ",font=" + (text == null || text.font == null ? string.Empty : text.font.name) +
+                ",fontSize=" + (text == null ? 0 : text.fontSize) +
+                ",bestFit=" + (text != null && text.resizeTextForBestFit) +
+                ",scale=" + graphic.rectTransform.localScale +
                 ",text=" + (text == null ? string.Empty : text.text.Replace("\n", " ")) + ")";
         }
     }

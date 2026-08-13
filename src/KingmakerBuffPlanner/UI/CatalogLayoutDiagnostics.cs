@@ -21,6 +21,9 @@ namespace KingmakerBuffPlanner.UI
         [JsonProperty("castingModeControlCount", Order = 14)] public int CastingModeControlCount { get; set; }
         [JsonProperty("retiredPrimaryLabelCount", Order = 15)] public int RetiredPrimaryLabelCount { get; set; }
         [JsonProperty("themeResolution", Order = 16)] public string ThemeResolution { get; set; }
+        [JsonProperty("textRenderingEvidence", Order = 17)] public string TextRenderingEvidence { get; set; }
+        [JsonProperty("nestedCanvasScalerCount", Order = 18)] public int NestedCanvasScalerCount { get; set; }
+        [JsonProperty("fractionalRectCount", Order = 19)] public int FractionalRectCount { get; set; }
     }
 
     internal sealed class CatalogLayoutDiagnostics

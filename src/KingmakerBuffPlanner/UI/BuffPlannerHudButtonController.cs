@@ -65,6 +65,8 @@ namespace KingmakerBuffPlanner.UI
         internal string AnchorPath { get; private set; }
         internal string RaycastCanvasPath { get; private set; }
         internal bool RowAboveNativeCluster { get; private set; }
+        internal bool RowLeftAlignedWithNativeCluster { get; private set; }
+        internal bool GlyphsCentered { get; private set; }
         internal bool VisibleHitboxesOwnRaycasts { get; private set; }
         internal string ButtonOrder { get { return "Setup|Long|Important|Short"; } }
         internal int RuntimeUnderlyingNativeActivationCount { get; private set; }
@@ -96,6 +98,7 @@ namespace KingmakerBuffPlanner.UI
                             ? Color.clear : button.transform.Find("KBP.Icon").GetComponent<Image>().color) +
                         ",spriteInk=" + SpriteInkEvidence(button.transform.Find("KBP.Icon") == null
                             ? null : button.transform.Find("KBP.Icon").GetComponent<Image>()) +
+                        ",glyph=" + GlyphEvidence(button) +
                         ",screenCenter=" + ScreenCenter((RectTransform)button.transform) +
                         ",corners=" + string.Join("|", corners.Select(value => value.ToString()).ToArray()));
                 }
@@ -168,7 +171,7 @@ namespace KingmakerBuffPlanner.UI
             _root.pivot = new Vector2(0, 0);
             float width = Mathf.Max(42f, reference.rect.width);
             float height = Mathf.Max(42f, reference.rect.height);
-            _root.anchoredPosition = new Vector2(0, 8f);
+            _root.anchoredPosition = new Vector2(NativeGridLeftInset(parent), 8f);
             _root.sizeDelta = new Vector2(width * 4f + 18f, height);
             LayoutElement rootLayout = _root.gameObject.AddComponent<LayoutElement>();
             rootLayout.ignoreLayout = true;
@@ -256,11 +259,15 @@ namespace KingmakerBuffPlanner.UI
                 string rowFailure;
                 string hitFailure;
                 RowAboveNativeCluster = ValidateRowAboveCluster(out rowFailure);
+                RowLeftAlignedWithNativeCluster = ValidateRowLeftAlignment(out rowFailure);
+                GlyphsCentered = ValidateGlyphCentering(out rowFailure);
                 VisibleHitboxesOwnRaycasts = ValidateHitOwnership(out hitFailure);
-                if (!RowAboveNativeCluster || !VisibleHitboxesOwnRaycasts)
+                if (!RowAboveNativeCluster || !RowLeftAlignedWithNativeCluster ||
+                    !GlyphsCentered || !VisibleHitboxesOwnRaycasts)
                 {
                     _validationFailures++;
-                    LogFailure(!RowAboveNativeCluster ? rowFailure : hitFailure);
+                    LogFailure(!RowAboveNativeCluster || !RowLeftAlignedWithNativeCluster ||
+                        !GlyphsCentered ? rowFailure : hitFailure);
                     if (_validationFailures >= 120)
                     {
                         _log.Info("[KBP-BOOT] HUD candidate expired;candidate=" +
@@ -325,6 +332,8 @@ namespace KingmakerBuffPlanner.UI
             AnchorPath = string.Empty;
             RaycastCanvasPath = string.Empty;
             RowAboveNativeCluster = false;
+            RowLeftAlignedWithNativeCluster = false;
+            GlyphsCentered = false;
             VisibleHitboxesOwnRaycasts = false;
         }
 
@@ -569,14 +578,40 @@ namespace KingmakerBuffPlanner.UI
             hover.RoutineId = iconKind;
 
             RectTransform iconRect = KingmakerUiFactory.CreateRect("KBP.Icon", button.transform);
-            // The native host sits tight to the screen edge. Keep the proven button
-            // rectangle untouched, but bias the owned glyph inward for visual breathing room.
-            KingmakerUiFactory.Stretch(iconRect, 13, 7, 10, 10);
+            float safeSize = Mathf.Max(20f, Mathf.Min(width, height) - 16f);
+            iconRect.anchorMin = new Vector2(0.5f, 0.5f);
+            iconRect.anchorMax = new Vector2(0.5f, 0.5f);
+            iconRect.pivot = new Vector2(0.5f, 0.5f);
+            iconRect.sizeDelta = new Vector2(safeSize, safeSize);
+            iconRect.localScale = Vector3.one;
             Image icon = iconRect.gameObject.AddComponent<Image>();
             icon.sprite = CreateIcon(iconKind);
+            iconRect.anchoredPosition = HudGlyphLayout.OpticalOffset(icon.sprite, safeSize);
             icon.preserveAspect = true;
             icon.raycastTarget = true;
             return button;
+        }
+
+        private static float NativeGridLeftInset(RectTransform nativeCluster)
+        {
+            if (nativeCluster == null) return 0f;
+            bool found = false;
+            float left = 0f;
+            foreach (Button button in nativeCluster.GetComponentsInChildren<Button>(true))
+            {
+                if (button == null || button.transform.parent != nativeCluster ||
+                    button.transform.name == RootName) continue;
+                RectTransform rect = button.transform as RectTransform;
+                if (rect == null) continue;
+                var corners = new Vector3[4];
+                rect.GetWorldCorners(corners);
+                foreach (Vector3 corner in corners)
+                {
+                    float local = nativeCluster.InverseTransformPoint(corner).x;
+                    if (!found || local < left) { left = local; found = true; }
+                }
+            }
+            return found ? left : 0f;
         }
 
         private bool ValidateRowAboveCluster(out string failure)
@@ -637,6 +672,57 @@ namespace KingmakerBuffPlanner.UI
                 }
             }
             return true;
+        }
+
+        private bool ValidateRowLeftAlignment(out string failure)
+        {
+            failure = string.Empty;
+            if (_root == null || _nativeCluster == null) return false;
+            var rootCorners = new Vector3[4]; _root.GetWorldCorners(rootCorners);
+            float rootLeft = rootCorners.Min(value => value.x);
+            float expectedLocal = NativeGridLeftInset(_nativeCluster);
+            float expectedWorld = _nativeCluster.TransformPoint(new Vector3(expectedLocal, 0, 0)).x;
+            bool aligned = Mathf.Abs(rootLeft - expectedWorld) <= 1.1f;
+            if (!aligned) failure = "row-left-misaligned:root=" + rootLeft + ";native=" + expectedWorld;
+            return aligned;
+        }
+
+        private bool ValidateGlyphCentering(out string failure)
+        {
+            failure = string.Empty;
+            foreach (Button button in _buttons)
+            {
+                RectTransform icon = button == null ? null :
+                    button.transform.Find("KBP.Icon") as RectTransform;
+                RectTransform hitbox = button == null ? null : button.transform as RectTransform;
+                Image image = icon == null ? null : icon.GetComponent<Image>();
+                Vector2 expectedOffset = image == null ? Vector2.zero :
+                    HudGlyphLayout.OpticalOffset(image.sprite, icon == null ? 0f : icon.rect.width);
+                if (icon == null || hitbox == null || image == null || !image.preserveAspect ||
+                    icon.anchorMin != new Vector2(0.5f, 0.5f) ||
+                    icon.anchorMax != new Vector2(0.5f, 0.5f) || icon.pivot != new Vector2(0.5f, 0.5f) ||
+                    icon.localScale != Vector3.one ||
+                    Vector2.Distance(icon.anchoredPosition, expectedOffset) > 0.1f)
+                {
+                    failure = "glyph-not-centered:" + (button == null ? "missing" : button.name);
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private string GlyphEvidence(Button button)
+        {
+            RectTransform hitbox = button == null ? null : button.transform as RectTransform;
+            RectTransform icon = button == null ? null : button.transform.Find("KBP.Icon") as RectTransform;
+            Image image = icon == null ? null : icon.GetComponent<Image>();
+            return icon == null || hitbox == null ? "missing" : "anchor=" + icon.anchorMin +
+                ",pivot=" + icon.pivot + ",position=" + icon.anchoredPosition +
+                ",size=" + icon.sizeDelta + ",scale=" + icon.localScale +
+                ",preserve=" + (image != null && image.preserveAspect) + ",rectCenterDelta=" +
+                Vector2.Distance(ScreenCenter(icon), ScreenCenter(hitbox)).ToString("F2") +
+                ",alphaCenterCorrection=" + HudGlyphLayout.OpticalOffset(
+                    image == null ? null : image.sprite, icon.rect.width);
         }
 
         private Vector2 ScreenCenter(RectTransform rect)
@@ -837,6 +923,32 @@ namespace KingmakerBuffPlanner.UI
             }
             names.Reverse();
             return string.Join("/", names.ToArray());
+        }
+    }
+
+    internal static class HudGlyphLayout
+    {
+        internal static Vector2 OpticalOffset(Sprite sprite, float safeSize)
+        {
+            if (sprite == null || sprite.texture == null || safeSize <= 0f) return Vector2.zero;
+            Rect region = sprite.rect;
+            Texture2D texture = sprite.texture;
+            int minX = (int)region.xMax, minY = (int)region.yMax;
+            int maxX = (int)region.xMin - 1, maxY = (int)region.yMin - 1;
+            for (int y = (int)region.yMin; y < (int)region.yMax; y++)
+                for (int x = (int)region.xMin; x < (int)region.xMax; x++)
+                    if (texture.GetPixel(x, y).a > 0.05f)
+                    {
+                        minX = Math.Min(minX, x); maxX = Math.Max(maxX, x);
+                        minY = Math.Min(minY, y); maxY = Math.Max(maxY, y);
+                    }
+            if (maxX < minX || maxY < minY) return Vector2.zero;
+            float alphaCenterX = (minX + maxX + 1f) * 0.5f;
+            float alphaCenterY = (minY + maxY + 1f) * 0.5f;
+            float regionCenterX = region.xMin + region.width * 0.5f;
+            float regionCenterY = region.yMin + region.height * 0.5f;
+            return new Vector2(-(alphaCenterX - regionCenterX) / region.width * safeSize,
+                -(alphaCenterY - regionCenterY) / region.height * safeSize);
         }
     }
 

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using KingmakerBuffPlanner.Domain.Effects;
 using KingmakerBuffPlanner.Domain.Identity;
 using KingmakerBuffPlanner.Domain.Planning;
 using KingmakerBuffPlanner.Domain.Providers;
@@ -57,13 +58,15 @@ namespace KingmakerBuffPlanner.Planning
                     UnitSnapshot unit;
                     if (!units.TryGetValue(targetId, out unit))
                     {
-                        outcomes.Add(Unfulfilled(targetId, request.Source.SourceId + ":target-not-in-party"));
+                        outcomes.Add(Unfulfilled(request.Source.SourceId, targetId,
+                            request.Source.SourceId + ":target-not-in-party"));
                         continue;
                     }
                     if (!unit.TargetValidation.Alive || !unit.TargetValidation.Friendly ||
                         !unit.TargetValidation.Targetable)
                     {
-                        outcomes.Add(Unfulfilled(targetId, request.Source.SourceId + ":target-currently-invalid"));
+                        outcomes.Add(Unfulfilled(request.Source.SourceId, targetId,
+                            request.Source.SourceId + ":target-currently-invalid"));
                         continue;
                     }
                     if (request.ExistingEffectPolicy == ExistingEffectPolicy.SkipAlreadyActive)
@@ -72,7 +75,7 @@ namespace KingmakerBuffPlanner.Planning
                             activeEffects.GetEffects(targetId), ignored);
                         if (presence.Kind == EffectPresenceKind.Complete)
                         {
-                            outcomes.Add(new TargetPlanOutcome(targetId,
+                            outcomes.Add(new TargetPlanOutcome(request.Source.SourceId, targetId,
                                 TargetOutcomeKind.SkippedAlreadyActive,
                                 request.Source.SourceId + ":already-active", presence.PresentMarkers));
                             continue;
@@ -114,17 +117,21 @@ namespace KingmakerBuffPlanner.Planning
                     poolKinds, materials, new[] { targetId }, remaining);
                 if (selection == null)
                 {
-                    outcomes.Add(Unfulfilled(targetId,
+                    outcomes.Add(Unfulfilled(request.Source.SourceId, targetId,
                         request.Source.SourceId + ":no-valid-provider-or-resource"));
                     diagnostics.Add("unfulfilled:" + request.Source.SourceId + ":" +
                         targetId + ":no-valid-provider-or-resource");
                     remaining.Remove(targetId);
                     continue;
                 }
-                steps.Add(new CastStep(selection.Option.Provider.Key, selection.Anchor,
-                    new[] { targetId }, selection.Reservation, selection.MaterialReservation,
+                string[] recipients = ExpectedRecipients(request.Source.Effects, selection.Option,
+                    new[] { targetId });
+                steps.Add(new CastStep(request.Source.SourceId, selection.Option.Provider.Key,
+                    selection.Anchor, new[] { targetId }, recipients,
+                    selection.Reservation, selection.MaterialReservation,
                     request.Source.Effects, false));
-                outcomes.Add(new TargetPlanOutcome(targetId, TargetOutcomeKind.Fulfilled,
+                outcomes.Add(new TargetPlanOutcome(request.Source.SourceId, targetId,
+                    TargetOutcomeKind.Fulfilled,
                     request.Source.SourceId + ":planned", new string[0]));
                 remaining.Remove(targetId);
             }
@@ -151,7 +158,7 @@ namespace KingmakerBuffPlanner.Planning
                 if (selection == null)
                 {
                     foreach (string targetId in remaining)
-                        outcomes.Add(Unfulfilled(targetId,
+                        outcomes.Add(Unfulfilled(request.Source.SourceId, targetId,
                             request.Source.SourceId + ":no-valid-mass-provider-or-resource"));
                     diagnostics.Add("unfulfilled-mass-targets:" + request.Source.SourceId + ":" +
                         string.Join(",", remaining.ToArray()));
@@ -159,12 +166,16 @@ namespace KingmakerBuffPlanner.Planning
                 }
                 string[] covered = remaining.Where(id => selection.Option.ReachableTargetIds.Contains(id))
                     .OrderBy(id => id, StringComparer.Ordinal).ToArray();
-                steps.Add(new CastStep(selection.Option.Provider.Key, selection.Anchor,
-                    covered, selection.Reservation, selection.MaterialReservation,
+                string[] recipients = ExpectedRecipients(request.Source.Effects, selection.Option,
+                    covered);
+                steps.Add(new CastStep(request.Source.SourceId, selection.Option.Provider.Key,
+                    selection.Anchor, covered, recipients, selection.Reservation,
+                    selection.MaterialReservation,
                     request.Source.Effects, true));
                 foreach (string targetId in covered)
                 {
-                    outcomes.Add(new TargetPlanOutcome(targetId, TargetOutcomeKind.Fulfilled,
+                    outcomes.Add(new TargetPlanOutcome(request.Source.SourceId, targetId,
+                        TargetOutcomeKind.Fulfilled,
                         request.Source.SourceId + ":planned-mass", new string[0]));
                     remaining.Remove(targetId);
                 }
@@ -220,6 +231,16 @@ namespace KingmakerBuffPlanner.Planning
                 : int.MaxValue;
         }
 
+        private static string[] ExpectedRecipients(EffectExpression effects,
+            ProviderPlanningOption option, IEnumerable<string> directTargets)
+        {
+            bool expands = EffectExpressionTargetAnalysis.Contains(effects, EffectTarget.Party) ||
+                EffectExpressionTargetAnalysis.Contains(effects, EffectTarget.AreaRecipients);
+            return (expands ? option.ReachableTargetIds : directTargets)
+                .Where(id => !string.IsNullOrWhiteSpace(id)).Distinct(StringComparer.Ordinal)
+                .OrderBy(id => id, StringComparer.Ordinal).ToArray();
+        }
+
         private static bool HasMaterial(ProviderSnapshot provider, Dictionary<string, int> materials)
         {
             MaterialRequirementSnapshot requirement = provider.MaterialComponent;
@@ -273,9 +294,10 @@ namespace KingmakerBuffPlanner.Planning
             }
         }
 
-        private static TargetPlanOutcome Unfulfilled(string targetId, string reason)
+        private static TargetPlanOutcome Unfulfilled(string sourceId, string targetId, string reason)
         {
-            return new TargetPlanOutcome(targetId, TargetOutcomeKind.Unfulfilled, reason, new string[0]);
+            return new TargetPlanOutcome(sourceId, targetId, TargetOutcomeKind.Unfulfilled,
+                reason, new string[0]);
         }
 
         private sealed class Selection

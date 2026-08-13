@@ -52,10 +52,16 @@ namespace KingmakerBuffPlanner.UI
         {
             PlannerSetupModel model = _session.Model;
             SetupSourceRow source = model == null ? null : model.SelectedSource;
+            RoutinePlanResult preview = null;
+            if (source != null)
+            {
+                try { preview = _session.PreviewRoutine(ActiveRoutineId); }
+                catch { preview = null; }
+            }
             return new ReadOnlyCollection<TargetPortraitViewModel>(source == null
                 ? new List<TargetPortraitViewModel>()
                 : model.Snapshot.Units.Select(unit => TargetPortraitViewModel.Create(
-                    source, model, ActiveRoutineId, unit)).ToList());
+                    source, model, ActiveRoutineId, unit, preview)).ToList());
         }
 
         internal RoutineSummaryViewModel RoutineSummary(string routineId)
@@ -86,24 +92,17 @@ namespace KingmakerBuffPlanner.UI
             try
             {
                 RoutinePlanResult preview = _session.PreviewRoutine(ActiveRoutineId);
-                int covered = preview.Plan.Outcomes.Count(item =>
-                    item.Kind == TargetOutcomeKind.Fulfilled ||
-                    item.Kind == TargetOutcomeKind.SkippedAlreadyActive);
-                int requested = model.Profile.Routines.First(item =>
-                    item.RoutineId == ActiveRoutineId).Assignments
-                    .Sum(item => item.WantedTargetUnitIds.Count);
-                int blocked = preview.Plan.Outcomes.Count(item =>
-                    item.Kind == TargetOutcomeKind.Unfulfilled);
-                string summary = preview.Plan.Steps.Count +
-                    (preview.Plan.Steps.Count == 1 ? " cast" : " casts") + " | " +
-                    covered + " of " + requested + " targets covered";
-                return blocked == 0 ? summary : summary + " | " + blocked + " blocked";
+                SetupSourceRow source = model.SelectedSource;
+                if (source == null) return "Select a buff to view its plan.";
+                return new SelectedBuffPlanSummaryViewModel(source, model, ActiveRoutineId,
+                    preview).Text;
             }
             catch (Exception exception)
             {
                 return "Plan unavailable: " + exception.Message;
             }
         }
+
     }
 
 }

@@ -167,6 +167,11 @@ if ($screenSource.Contains('CreateDiagnosticRenderCanary') -or
     $screenSource.Contains('KBP RENDER CANARY')) {
     throw 'The temporary live render canary must not remain in production UI.'
 }
+foreach ($retiredSummary in @('targets covered', ' blocked')) {
+    if ($viewModelSource.Contains($retiredSummary)) {
+        throw "Ambiguous selected-buff summary returned: $retiredSummary"
+    }
+}
 foreach ($hotkeyContract in @('KeyboardAccess', 'InputMatched',
         'ShouldSuppressNativeBinding', 'return false;', 'Ctrl+Shift+B')) {
     if (-not ($hotkeySource.Contains($hotkeyContract) -or
@@ -180,6 +185,12 @@ if ($hotkeySource.Contains('KeyCode.F10') -or $mainSource.Contains('KeyCode.F10'
 $assertions++
 
 $factorySource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\UI\KingmakerUiFactory.cs') -Raw
+if ($screenSource.Contains('AddComponent<CanvasScaler>') -or
+    -not $screenSource.Contains('ForceLayoutAndSnap(_root)') -or
+    -not $factorySource.Contains('resizeTextForBestFit = false') -or
+    -not $factorySource.Contains('LayoutRebuilder.ForceRebuildLayoutImmediate(root)')) {
+    throw 'Planner text must use fixed native-font rendering without a nested CanvasScaler and must pixel-snap after forced layout.'
+}
 if (-not $factorySource.Contains('viewportImage.color = Color.white') -or
     -not $factorySource.Contains('showMaskGraphic = false') -or
     -not $factorySource.Contains('layout.childControlHeight = true') -or

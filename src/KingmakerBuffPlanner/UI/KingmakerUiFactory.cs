@@ -30,6 +30,7 @@ namespace KingmakerBuffPlanner.UI
 
         internal Font BodyFont;
         internal Font HeaderFont;
+        internal Material BodyTextMaterial;
         internal Sprite ParchmentBackgroundSprite;
         internal Sprite NativeFrameSprite;
         internal Sprite NativeCardSprite;
@@ -62,6 +63,7 @@ namespace KingmakerBuffPlanner.UI
             theme.BodyFont = nativeText == null || nativeText.font == null
                 ? Resources.GetBuiltinResource<Font>("Arial.ttf") : nativeText.font;
             theme.HeaderFont = theme.BodyFont;
+            theme.BodyTextMaterial = nativeText == null ? null : nativeText.material;
             if (nativeRoot != null)
             {
                 Transform root = nativeRoot.transform;
@@ -84,7 +86,9 @@ namespace KingmakerBuffPlanner.UI
                 ";toggleOn=" + Name(theme.NativeToggleOn) + ";portrait=" +
                 Name(theme.NativePortraitFrame) + ";selected=" +
                 Name(theme.NativeSelectedOrnament) + ";font=" +
-                (theme.BodyFont == null ? "missing" : theme.BodyFont.name);
+                (theme.BodyFont == null ? "missing" : theme.BodyFont.name) + ";textMaterial=" +
+                (theme.BodyTextMaterial == null || theme.BodyTextMaterial.shader == null
+                    ? "UI/Default" : theme.BodyTextMaterial.shader.name);
             return theme;
         }
 
@@ -151,6 +155,10 @@ namespace KingmakerBuffPlanner.UI
             Text text = rect.gameObject.AddComponent<Text>();
             text.font = theme.BodyFont;
             text.fontSize = size;
+            text.resizeTextForBestFit = false;
+            text.resizeTextMinSize = size;
+            text.resizeTextMaxSize = size;
+            if (theme.BodyTextMaterial != null) text.material = theme.BodyTextMaterial;
             text.color = theme.DarkBrownText;
             text.alignment = alignment;
             text.text = value ?? string.Empty;
@@ -290,6 +298,30 @@ namespace KingmakerBuffPlanner.UI
                 child.SetActive(false);
                 UnityEngine.Object.Destroy(child);
             }
+        }
+
+        internal static void ForceLayoutAndSnap(RectTransform root)
+        {
+            if (root == null) return;
+            Canvas.ForceUpdateCanvases();
+            LayoutRebuilder.ForceRebuildLayoutImmediate(root);
+            Canvas.ForceUpdateCanvases();
+            foreach (RectTransform rect in root.GetComponentsInChildren<RectTransform>(true))
+            {
+                rect.localScale = Vector3.one;
+                Vector2 anchored = rect.anchoredPosition;
+                Vector2 size = rect.sizeDelta;
+                rect.anchoredPosition = new Vector2(Mathf.Round(anchored.x), Mathf.Round(anchored.y));
+                rect.sizeDelta = new Vector2(Mathf.Round(size.x), Mathf.Round(size.y));
+                if (rect.anchorMin.x != rect.anchorMax.x || rect.anchorMin.y != rect.anchorMax.y)
+                {
+                    Vector2 min = rect.offsetMin;
+                    Vector2 max = rect.offsetMax;
+                    rect.offsetMin = new Vector2(Mathf.Round(min.x), Mathf.Round(min.y));
+                    rect.offsetMax = new Vector2(Mathf.Round(max.x), Mathf.Round(max.y));
+                }
+            }
+            Canvas.ForceUpdateCanvases();
         }
     }
 }
