@@ -1,6 +1,8 @@
 # Implementation Report
 
-## 0.0.10 visual clarity and plan communication — release candidate qualified
+## 0.0.10 visual clarity and plan communication — guarded-installed for human acceptance
+
+Final release source/package/DLL/MVID are `14719e816c31d4efadf829733d499774c6f5e741` / `46d741b7dd16120e5687069c215a5cc270b9ec1e8430fd764dd36a2bdb05f013` / `bcd6ed91e4d6898dec74e69f501389adb15728cd03fe0a0915522e5a1a18c55e` / `8bb28075-83cf-41d2-ad3d-e883886c4961`. Exact-source Animated and Instant passed 77/77 each; native passed 12/12; Call of the Wild passed 26/26; all four transactions restored exactly. Deterministic release packaging reproduced both ZIP and DLL twice. Guarded install `ui-clarity-0.0.10-final-install` preserved settings, verified all non-planner mods unchanged, and installed the exact release DLL/MVID. No merge, push, or public release occurred.
 
 The 0.0.9 mechanics remain frozen. This pass adds plan provenance and expected recipients to immutable planning results, then maps the selected consolidated card to five explicit portrait states. Strong green `SELECTED`, amber unavailable, light-green `COVERED`, red invalid, and neutral are deterministic and carry exact tooltips. Single-target and caster-centered negative cases are covered. The one-member authorized save cannot physically display a second covered portrait, so no automated multi-portrait cosmetic claim is made.
 
@@ -8,7 +10,7 @@ The selected-buff panel now shows `Available:` and `Planned:` for that buff, kee
 
 HUD row placement is derived from the native lower-left button cluster, and all glyph transforms use one centered safe-area contract plus centralized optical correction from sprite alpha bounds. Production hitboxes/listeners/input behavior were not changed. Text forensics removed the planner-only scaler and bound fixed-size legacy text to the native Arial/UI-Default path with unit transforms and post-layout pixel snapping.
 
-Candidate source `73de462b885bc7b24162d8670bc2be1b806baf37` passed source 32/32, behavior 75/75, filesystem 8/8, package 4/4, and deployment WhatIf 5/5. Fresh-process candidate runs passed Animated 77/77, Instant 77/77, native 12/12, and Call of the Wild 26/26; all restored exactly. Runtime diagnostics at the active 1280x720 configuration report native row alignment, all glyphs centered, zero native activations, zero nested planner scalers, zero fractional rendered text/card transforms, and Arial/UI-Default. The final exact documentation-inclusive release identity and guarded installation follow this checkpoint; human visual acceptance remains mandatory.
+Exact release source `14719e816c31d4efadf829733d499774c6f5e741` passed source 32/32, behavior 75/75, filesystem 8/8, package 4/4, and deployment WhatIf 5/5. Fresh-process exact runs passed Animated 77/77, Instant 77/77, native 12/12, and Call of the Wild 26/26; all restored exactly. Runtime diagnostics at the active 1280x720 configuration report native row alignment, all glyphs centered, zero native activations, zero nested planner scalers, zero fractional rendered text/card transforms, and Arial/UI-Default. Human visual acceptance remains mandatory.
 
 ## 0.0.9 UI polish and duplicate-source consolidation — installed for human visual acceptance
 

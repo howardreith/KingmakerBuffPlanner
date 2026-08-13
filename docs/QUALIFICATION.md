@@ -1,8 +1,10 @@
 # Qualification
 
-## 0.0.10 visual-clarity candidate qualification
+## 0.0.10 visual-clarity qualification
 
-Status: candidate deterministic and physical qualification PASS; exact documentation-inclusive release reproduction and guarded installation follow; human visual acceptance remains required.
+Status: deterministic, exact-release physical, packaging, and guarded-install qualification PASS; human visual acceptance remains required.
+
+Final release source/package/DLL/MVID are `14719e816c31d4efadf829733d499774c6f5e741` / `46d741b7dd16120e5687069c215a5cc270b9ec1e8430fd764dd36a2bdb05f013` / `bcd6ed91e4d6898dec74e69f501389adb15728cd03fe0a0915522e5a1a18c55e` / `8bb28075-83cf-41d2-ad3d-e883886c4961`. Deterministic release builds reproduced the exact ZIP and DLL twice.
 
 - Candidate source/package/DLL/MVID: `73de462b885bc7b24162d8670bc2be1b806baf37` / `19683ab7a01c9e583e8d2b8cd3f790b6ce6ca03284ab324fd42e4b035cf3da1b` / `92b2dcf09937c3d277af5e5235310e8a28c9737400911baa36535e7b88d47444` / `0c5f4132-baed-4a4b-90c5-0b5764125224`.
 - Deterministic gates: source 32/32; behavior/protocol 75/75; runtime filesystem 8/8; package 4/4; deployment WhatIf 5/5. Four-column calculations cover 1920x1080 and 1600x900 content widths with no horizontal scrolling.
@@ -13,6 +15,8 @@ Status: candidate deterministic and physical qualification PASS; exact documenta
 - `ui-clarity-0.0.10-final-native-1`: 12/12 with 1,722 abilities. `ui-clarity-0.0.10-final-cotw-1`: 26/26 with 9,064 abilities, 2,096 optional inclusions, zero unsupported, and zero planner Harmony overlap. Both restored exactly.
 - Every candidate transaction is `Restored` with `restorationVerified=true`. The immutable baseline descriptor remains the exact `KBP_AUTOMATION_BASELINE`; only Working was loaded through the normal save action.
 - The authorized campaign has one party member. It physically proves strong direct green and the new summary, but cannot honestly show a second `COVERED` portrait or a controlled invalid portrait. Deterministic plan-domain tests prove those mappings; their appearance remains human-gated in an appropriate multi-member party.
+- Documentation-inclusive exact runs `ui-clarity-0.0.10-exact-animated`, `ui-clarity-0.0.10-exact-instant`, `ui-clarity-0.0.10-exact-native`, and `ui-clarity-0.0.10-exact-cotw` repeated 77/77, 77/77, 12/12, and 26/26 respectively; every transaction restored exactly.
+- Guarded install `ui-clarity-0.0.10-final-install` is `Installed`; `settingsPreserved=true`; `otherModsVerified=true`; installed DLL/MVID match the release manifest. No process or deployment lock remains. No merge, push, or publication occurred.
 
 ## 0.0.9 UI polish and source-consolidation qualification
 

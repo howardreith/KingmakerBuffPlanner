@@ -278,3 +278,9 @@ Status: INSTALLED FOR HUMAN UI RETEST — campaign UI and save-backed qualificat
 - Active physical rendering: 1280x720, HUD alignment/glyph centering/hit ownership true, native activation zero; Arial/UI-Default, unit scale, no planner scaler, zero fractional rendered text/card transforms. Full screenshots are under the Animated run.
 - Runtime limitation: the authorized one-member save cannot exhibit a second indirect-covered or controlled invalid portrait. No hardcoded/fake evidence was introduced; deterministic plan tests cover it and human acceptance remains open.
 - Exact next command after committing this checkpoint: `.\scripts\Build-Local.ps1`, then exact-source final runtime repetitions if the resulting commit/hash changes, `.\scripts\Build-Release.ps1`, guarded `.\scripts\Install-Local.ps1`, exact identity/other-mod verification, and a documentation-only handoff commit.
+# 0.0.10 installed handoff — 2026-08-13
+
+- Engineering/runtime/package/install work is complete. Final release source `14719e816c31d4efadf829733d499774c6f5e741`; version 0.0.10; package `46d741b7dd16120e5687069c215a5cc270b9ec1e8430fd764dd36a2bdb05f013`; DLL `bcd6ed91e4d6898dec74e69f501389adb15728cd03fe0a0915522e5a1a18c55e`; MVID `8bb28075-83cf-41d2-ad3d-e883886c4961`.
+- Exact runs `ui-clarity-0.0.10-exact-animated` 77/77, `ui-clarity-0.0.10-exact-instant` 77/77, `ui-clarity-0.0.10-exact-native` 12/12, and `ui-clarity-0.0.10-exact-cotw` 26/26 all restored exactly.
+- Install `ui-clarity-0.0.10-final-install`: Installed; settings preserved; all non-planner mods verified; exact installed DLL/MVID; no lock/process remains.
+- Exact next action: human executes `docs/MANUAL-ACCEPTANCE.md` 0.0.10 at 1920x1080 and 1600x900, especially indirect/invalid portraits in a multi-member party. No merge, push, or publication is authorized.

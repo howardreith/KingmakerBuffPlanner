@@ -654,3 +654,10 @@ Status: ROOT CAUSE PROVEN; 0.0.4 SOURCE PASS; LIVE QUALIFICATION PENDING
 - Screenshot inspection caught and repaired a clipped `Planned: 1 cast` line; the final target-state screenshot shows both `Available: At will` and `Planned: 1 cast  1 selected target`.
 - Remaining uncertainty: the authorized save has one target and cannot physically show a second light-green `COVERED` portrait or a controlled invalid portrait. Deterministic multi-recipient tests prove the plan mapping; human visual acceptance remains authoritative.
 - Exact next action: commit this release-source documentation, build from the clean exact commit, rerun exact release qualifications as required, build deterministic release, guarded-install only KBP, and record final hashes/run IDs.
+# 0.0.10 release/install handoff — 2026-08-13
+
+- Final release source `14719e816c31d4efadf829733d499774c6f5e741`; package `46d741b7dd16120e5687069c215a5cc270b9ec1e8430fd764dd36a2bdb05f013`; DLL `bcd6ed91e4d6898dec74e69f501389adb15728cd03fe0a0915522e5a1a18c55e`; MVID `8bb28075-83cf-41d2-ad3d-e883886c4961`; version 0.0.10.
+- Exact-source final runs: Animated 77/77, Instant 77/77, native 12/12, Call of the Wild 26/26; every transaction restored exactly. Deterministic release 2/2 reproduced ZIP and DLL.
+- Guarded install `ui-clarity-0.0.10-final-install` is Installed; settings preserved; every non-planner mod verified unchanged; installed DLL/MVID exact. No process or deployment lock remains.
+- Human visual uncertainty remains: judgment of HUD/native text feel at 1920x1080 and 1600x900, plus multi-member `COVERED` and controlled invalid portrait appearance. No merge, push, or public release is authorized.
+- Exact next action: human completes the 0.0.10 checklist at the top of `docs/MANUAL-ACCEPTANCE.md` and returns full-resolution screenshots for any visual failure.

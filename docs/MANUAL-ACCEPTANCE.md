@@ -2,7 +2,9 @@
 
 ## 0.0.10 clarity and alignment visual gate
 
-Status: REQUIRED after guarded installation. Automation proves mechanics and captures rendered evidence; it does not grant cosmetic acceptance.
+Status: REQUIRED. Exact 0.0.10 is guarded-installed. Automation proves mechanics and captures rendered evidence; it does not grant cosmetic acceptance.
+
+Installed identity: source `14719e816c31d4efadf829733d499774c6f5e741`; package `46d741b7dd16120e5687069c215a5cc270b9ec1e8430fd764dd36a2bdb05f013`; DLL `bcd6ed91e4d6898dec74e69f501389adb15728cd03fe0a0915522e5a1a18c55e`; MVID `8bb28075-83cf-41d2-ad3d-e883886c4961`.
 
 Compare the installed build with `runtime-evidence/ui-clarity-0.0.10-final-animated-1/`:
 
