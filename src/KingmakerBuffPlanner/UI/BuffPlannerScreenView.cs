@@ -269,7 +269,7 @@ namespace KingmakerBuffPlanner.UI
 
         internal bool PrepareVisualEvidenceForRuntime(string view)
         {
-            bool settings = view == "advanced-settings";
+            bool settings = view == "settings";
             _settings.Show(settings);
             Canvas.ForceUpdateCanvases();
             return true;
@@ -601,8 +601,17 @@ namespace KingmakerBuffPlanner.UI
         private static string BuildGraphicEvidence(GameObject root)
         {
             if (root == null) return "missing";
+            CanvasRenderer renderer = root.GetComponent<CanvasRenderer>();
+            Graphic rootGraphic = root.GetComponent<Graphic>();
+            Material material = rootGraphic == null ? null : rootGraphic.materialForRendering;
+            float inheritedAlpha = root.GetComponentsInParent<CanvasGroup>(true)
+                .Aggregate(1f, (alpha, group) => alpha * group.alpha);
             return "path=" + GetPath(root.transform) + ";id=" + root.GetInstanceID() +
-                ";active=" + root.activeInHierarchy + ";rect=" +
+                ";active=" + root.activeInHierarchy + ";rendererCull=" +
+                (renderer != null && renderer.cull) + ";inheritedAlpha=" +
+                inheritedAlpha.ToString("0.###") + ";shader=" +
+                (material == null || material.shader == null ? string.Empty :
+                    material.shader.name) + ";rect=" +
                 RectEvidence(root.transform as RectTransform) + ";graphics=" +
                 string.Join("|", root.GetComponentsInChildren<Graphic>(true)
                     .Select(GraphicEvidence).ToArray());

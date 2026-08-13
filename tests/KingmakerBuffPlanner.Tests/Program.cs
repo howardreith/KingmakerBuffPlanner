@@ -89,6 +89,7 @@ namespace KingmakerBuffPlanner.Tests
                 Run("catalog-filter-selected-category-and-reset-contract", TestCatalogFilterState);
                 Run("presentation-view-models-use-player-facing-deterministic-state", TestPresentationModels);
                 Run("four-column-grid-metrics-have-no-horizontal-scroll", TestGridMetrics);
+                Run("large-catalog-grid-window-remains-bounded", TestLargeCatalogGridWindow);
                 Run("planner-hotkey-chord-consumes-native-primary-key", TestPlannerHotkeyBinding);
                 Run("input-lease-restores-on-close-and-acquire-failure", TestInputLease);
                 Run("screen-state-machine-is-idempotent", TestScreenStateMachine);
@@ -1016,12 +1017,24 @@ namespace KingmakerBuffPlanner.Tests
 
         private static void TestGridMetrics()
         {
-            BuffGridMetrics fullHd = BuffGridMetrics.Calculate(1740f, 610f);
+            BuffGridMetrics fullHd = BuffGridMetrics.Calculate(1824f, 610f);
             BuffGridMetrics compact = BuffGridMetrics.Calculate(1420f, 500f);
             if (fullHd.Columns != 4 || compact.Columns != 4 ||
                 fullHd.HorizontalScrolling || compact.HorizontalScrolling ||
                 fullHd.CellWidth <= 0 || compact.CellWidth <= 0)
                 throw new InvalidOperationException("Grid metrics did not preserve four columns without horizontal scrolling.");
+        }
+
+        private static void TestLargeCatalogGridWindow()
+        {
+            const int itemCount = 2500;
+            int lastRow = BuffGridMetrics.RowCount(itemCount) - 1;
+            int firstModel = BuffGridMetrics.ModelIndex(lastRow, 0);
+            if (BuffGridMetrics.RowCount(itemCount) != 625 ||
+                BuffGridMetrics.PoolCapacity != 32 || firstModel != 2496 ||
+                BuffGridMetrics.ModelIndex(400, 31) != 1631)
+                throw new InvalidOperationException(
+                    "Large-catalog grid paging is unbounded or maps pooled cards incorrectly.");
         }
 
         private static void TestPlannerHotkeyBinding()

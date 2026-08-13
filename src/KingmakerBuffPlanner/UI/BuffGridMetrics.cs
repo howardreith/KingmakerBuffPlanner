@@ -5,6 +5,21 @@ namespace KingmakerBuffPlanner.UI
     internal sealed class BuffGridMetrics
     {
         internal const int ColumnCount = 4;
+        internal const int PoolCapacity = 32;
+
+        internal static int RowCount(int itemCount)
+        {
+            if (itemCount < 0) throw new ArgumentOutOfRangeException("itemCount");
+            return (itemCount + ColumnCount - 1) / ColumnCount;
+        }
+
+        internal static int ModelIndex(int firstRow, int pooledCardIndex)
+        {
+            if (firstRow < 0) throw new ArgumentOutOfRangeException("firstRow");
+            if (pooledCardIndex < 0 || pooledCardIndex >= PoolCapacity)
+                throw new ArgumentOutOfRangeException("pooledCardIndex");
+            return checked(firstRow * ColumnCount + pooledCardIndex);
+        }
 
         internal static BuffGridMetrics Calculate(float viewportWidth, float viewportHeight)
         {

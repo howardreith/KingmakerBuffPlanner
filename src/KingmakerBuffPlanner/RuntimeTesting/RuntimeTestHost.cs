@@ -43,9 +43,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private string _liveRenderScreenshotPath;
         private string _liveRenderScreenshotSha256 = string.Empty;
         private string _liveSelectedDetailsScreenshotSha256 = string.Empty;
-        private string _liveCastingSourceScreenshotSha256 = string.Empty;
+        private string _liveGridOverviewScreenshotSha256 = string.Empty;
         private string _liveTargetColorsScreenshotSha256 = string.Empty;
-        private string _liveAdvancedSettingsScreenshotSha256 = string.Empty;
+        private string _liveSettingsScreenshotSha256 = string.Empty;
         private LiveRowRenderDiagnostics _liveRenderDiagnostics;
         private NativeUiContract _nativeUiContract;
 
@@ -354,9 +354,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         _liveRenderDiagnostics.DetailsEvidence,
                     UiRenderScreenshotSha256 = _liveRenderScreenshotSha256,
                     UiSelectedDetailsScreenshotSha256 = _liveSelectedDetailsScreenshotSha256,
-                    UiCastingSourceScreenshotSha256 = _liveCastingSourceScreenshotSha256,
+                    UiGridOverviewScreenshotSha256 = _liveGridOverviewScreenshotSha256,
                     UiTargetColorsScreenshotSha256 = _liveTargetColorsScreenshotSha256,
-                    UiAdvancedSettingsScreenshotSha256 = _liveAdvancedSettingsScreenshotSha256,
+                    UiSettingsScreenshotSha256 = _liveSettingsScreenshotSha256,
                     UiRenderAbilityIconCount = _liveRenderDiagnostics == null ? 0 :
                         _liveRenderDiagnostics.AbilityIconCount,
                     UiRenderMissingIconCount = _liveRenderDiagnostics == null ? 0 :
@@ -942,17 +942,17 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 if (!TryHashScreenshot(Path.Combine(_request.EvidenceDirectory,
                     "planner-selected-details.png"), out _liveSelectedDetailsScreenshotSha256))
                     return false;
-                if (!BuffPlannerUiRoot.PrepareVisualEvidenceForRuntime("casting-source"))
-                    throw new InvalidOperationException("Casting-source evidence view is unavailable.");
+                if (!BuffPlannerUiRoot.PrepareVisualEvidenceForRuntime("grid-overview"))
+                    throw new InvalidOperationException("Grid-overview evidence view is unavailable.");
                 CaptureScreenshot(Path.Combine(_request.EvidenceDirectory,
-                    "planner-casting-source.png"));
+                    "planner-grid-overview.png"));
                 _liveUiPhase = 16;
                 return false;
             }
             if (_liveUiPhase == 16)
             {
                 if (!TryHashScreenshot(Path.Combine(_request.EvidenceDirectory,
-                    "planner-casting-source.png"), out _liveCastingSourceScreenshotSha256))
+                    "planner-grid-overview.png"), out _liveGridOverviewScreenshotSha256))
                     return false;
                 BuffPlannerUiRoot.BeginRuntimeSmoke();
                 BuffPlannerUiRoot.DispatchRuntimeInputSmoke();
@@ -1090,17 +1090,17 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 if (!TryHashScreenshot(Path.Combine(_request.EvidenceDirectory,
                     "planner-target-colors.png"), out _liveTargetColorsScreenshotSha256))
                     return false;
-                if (!BuffPlannerUiRoot.PrepareVisualEvidenceForRuntime("advanced-settings"))
-                    throw new InvalidOperationException("Advanced-settings evidence view is unavailable.");
+                if (!BuffPlannerUiRoot.PrepareVisualEvidenceForRuntime("settings"))
+                    throw new InvalidOperationException("Settings evidence view is unavailable.");
                 CaptureScreenshot(Path.Combine(_request.EvidenceDirectory,
-                    "planner-advanced-settings.png"));
+                    "planner-settings.png"));
                 _liveUiPhase = 71;
                 return false;
             }
             if (_liveUiPhase == 71)
             {
                 if (!TryHashScreenshot(Path.Combine(_request.EvidenceDirectory,
-                    "planner-advanced-settings.png"), out _liveAdvancedSettingsScreenshotSha256))
+                    "planner-settings.png"), out _liveSettingsScreenshotSha256))
                     return false;
                 BuffPlannerUiRoot.CloseRuntimeSmoke();
                 if (BuffPlannerUiRoot.IsScreenOpen)
@@ -1442,9 +1442,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         [JsonProperty("uiRenderDetailsEvidence", Order = 155)] public string[] UiRenderDetailsEvidence { get; set; }
         [JsonProperty("uiRenderScreenshotSha256", Order = 156)] public string UiRenderScreenshotSha256 { get; set; }
         [JsonProperty("uiSelectedDetailsScreenshotSha256", Order = 157)] public string UiSelectedDetailsScreenshotSha256 { get; set; }
-        [JsonProperty("uiCastingSourceScreenshotSha256", Order = 158)] public string UiCastingSourceScreenshotSha256 { get; set; }
+        [JsonProperty("uiGridOverviewScreenshotSha256", Order = 158)] public string UiGridOverviewScreenshotSha256 { get; set; }
         [JsonProperty("uiTargetColorsScreenshotSha256", Order = 159)] public string UiTargetColorsScreenshotSha256 { get; set; }
-        [JsonProperty("uiAdvancedSettingsScreenshotSha256", Order = 160)] public string UiAdvancedSettingsScreenshotSha256 { get; set; }
+        [JsonProperty("uiSettingsScreenshotSha256", Order = 160)] public string UiSettingsScreenshotSha256 { get; set; }
         [JsonProperty("uiRenderAbilityIconCount", Order = 161)] public int UiRenderAbilityIconCount { get; set; }
         [JsonProperty("uiRenderMissingIconCount", Order = 162)] public int UiRenderMissingIconCount { get; set; }
         [JsonProperty("uiCastingModeControlCount", Order = 163)] public int UiCastingModeControlCount { get; set; }

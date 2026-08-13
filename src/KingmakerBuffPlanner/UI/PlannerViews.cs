@@ -238,7 +238,6 @@ namespace KingmakerBuffPlanner.UI
 
     internal sealed class BuffGridView
     {
-        private const int PoolCapacity = 32;
         private readonly ScrollRect _scroll;
         private readonly RectTransform _content;
         private readonly RectTransform _viewport;
@@ -270,7 +269,7 @@ namespace KingmakerBuffPlanner.UI
             _content.anchorMin = new Vector2(0, 1);
             _content.anchorMax = new Vector2(1, 1);
             _content.pivot = new Vector2(0.5f, 1);
-            _pool = new BuffCardPool(_content, theme, PoolCapacity);
+            _pool = new BuffCardPool(_content, theme, BuffGridMetrics.PoolCapacity);
             _scroll.onValueChanged.AddListener(ignored => BindVisible(false));
         }
 
@@ -288,7 +287,7 @@ namespace KingmakerBuffPlanner.UI
             float width = Mathf.Max(920f, _viewport.rect.width);
             float height = Mathf.Max(360f, _viewport.rect.height);
             _metrics = BuffGridMetrics.Calculate(width, height);
-            int rows = Mathf.CeilToInt(_models.Count / (float)BuffGridMetrics.ColumnCount);
+            int rows = BuffGridMetrics.RowCount(_models.Count);
             float contentHeight = Mathf.Max(height, 12f + rows * (_metrics.CellHeight + 10f));
             _content.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, contentHeight);
             _content.anchoredPosition = preserveScroll
@@ -327,7 +326,7 @@ namespace KingmakerBuffPlanner.UI
             float spacing = 10f;
             for (int poolIndex = 0; poolIndex < _pool.Capacity; poolIndex++)
             {
-                int modelIndex = row * BuffGridMetrics.ColumnCount + poolIndex;
+                int modelIndex = BuffGridMetrics.ModelIndex(row, poolIndex);
                 if (modelIndex >= _models.Count) break;
                 int absoluteRow = modelIndex / BuffGridMetrics.ColumnCount;
                 int column = modelIndex % BuffGridMetrics.ColumnCount;

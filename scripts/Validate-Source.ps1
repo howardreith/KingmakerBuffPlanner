@@ -137,6 +137,8 @@ foreach ($retiredPrimaryLabel in @('CONFIG: ', 'DURATION: ', 'SOURCE: ', 'SORT: 
 $viewSource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\UI\PlannerViews.cs') -Raw
 $viewModelSource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\UI\PlannerScreenViewModel.cs') -Raw
 $gridMetricsSource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\UI\BuffGridMetrics.cs') -Raw
+$hotkeySource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\UI\PlannerHotkey.cs') -Raw
+$hotkeyBindingSource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\UI\PlannerHotkeyBinding.cs') -Raw
 foreach ($workflowContract in @('PlannerSourceCategory', 'SelectedOnly',
         'SelectAllValid', 'ClearTargets')) {
     if (-not ($viewSource.Contains($workflowContract) -or $viewModelSource.Contains($workflowContract))) {
@@ -158,6 +160,16 @@ foreach ($gridContract in @('ColumnCount = 4', 'PoolCapacity = 32',
 if ($screenSource.Contains('CreateDiagnosticRenderCanary') -or
     $screenSource.Contains('KBP RENDER CANARY')) {
     throw 'The temporary live render canary must not remain in production UI.'
+}
+foreach ($hotkeyContract in @('KeyboardAccess', 'InputMatched',
+        'ShouldSuppressNativeBinding', 'return false;', 'Ctrl+Shift+B')) {
+    if (-not ($hotkeySource.Contains($hotkeyContract) -or
+        $hotkeyBindingSource.Contains($hotkeyContract))) {
+        throw "Planner hotkey native-isolation contract is missing: $hotkeyContract"
+    }
+}
+if ($hotkeySource.Contains('KeyCode.F10') -or $mainSource.Contains('KeyCode.F10')) {
+    throw 'F10 must not remain as an active planner hotkey.'
 }
 $assertions++
 
