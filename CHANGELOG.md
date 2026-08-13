@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.0.10 — Visual clarity and plan coverage
+
+- Aligns the HUD row to the native lower-left button grid and centers glyph alpha bounds in fixed safe areas without changing hitboxes or listeners.
+- Derives direct, unavailable, indirect, invalid, and neutral portrait states from the selected consolidated buff's real cast-plan steps and outcomes.
+- Replaces ambiguous routine-wide coverage fractions with selected-buff availability, planned casts, and explicit/additional recipient counts.
+- Removes the planner CanvasScaler, retains the proven modal canvas, reuses the native Arial/UI material path, disables best-fit, and pixel-snaps owned text/cards after layout.
+
 ## 0.0.8 — Four-column routine planner
 
 - Replaces the narrow technical catalog with one pooled, vertically scrolling four-card grid.

@@ -1,6 +1,14 @@
-# Kingmaker Buff Planner 0.0.9 — Draft Release Notes
+# Kingmaker Buff Planner 0.0.10 — Draft Release Notes
 
 Publication status: local qualification build only. Not a public release.
+
+Version 0.0.10 aligns the lower-left planner row from the native Kingmaker button grid and gives every dark/gold glyph a centered preserve-aspect safe area with measured optical correction. Button dimensions, hitboxes, listeners, tooltips, pointer capture, and quick actions are unchanged.
+
+Target portraits now consume the selected consolidated card's real plan slice. Explicit fulfilled selections are strongly green, unavailable selections amber with an exact reason, additional expected recipients softly green and labeled `COVERED`, invalid targets red with an exact reason, and unrelated valid targets neutral. Selected-buff text reports available uses and planned casts instead of unexplained covered/blocked fractions.
+
+The modal retains its proven top-level canvas and input lease, but no longer adds a CanvasScaler. It uses the native legacy Arial/default UI material path, fixed font sizes, unit transform scales, forced layout, and pixel-snapped owned rectangles. Human visual acceptance remains authoritative.
+
+## 0.0.9 source consolidation
 
 Version 0.0.9 polishes the accepted four-column planner without replacing its workflow. Provider-backed abilities with the same normalized effect semantics now appear as one card while the established planning backend automatically chooses among every eligible caster and resource source. Earlier per-ability routine assignments are rebound and unioned without losing targets.
 
