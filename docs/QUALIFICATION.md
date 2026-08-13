@@ -1,5 +1,15 @@
 # Qualification
 
+## 0.0.8 four-column UI qualification
+
+Status: implementation and deterministic qualification PASS; exact release packaging/runtime/install checkpoint follows; human visual acceptance remains required.
+
+- Deterministic gates: source 30/30; behavior/protocol 67/67; runtime filesystem 8/8; package 4/4; deployment WhatIf 5/5; aggregate 1/1.
+- Grid gate: four columns at the 1920x1080 content width and compact 1600x900 width, no horizontal scrolling, 2,500 entries map to 625 rows while allocation remains capped at 32 cards.
+- Candidate physical UI: actual four-column cards/icons, direct Bless portrait assignment, routine independence, all four category listeners, Selected only Long=1/Important=0/Long=1, one settings mode, zero retired labels, physical Ctrl+Shift+B, 21 open/close cycles, zero world/selection/camera/native leakage, confirmed execution, and exact restoration.
+- Candidate discovery: native 1,722 abilities/974 candidates; Call of the Wild 9,064 abilities/5,907 candidates/2,096 optional inclusions/0 unsupported/0 planner Harmony overlap.
+- The package is not cosmetically accepted by automation. Screenshots are evidence for the human checklist, not a visual verdict.
+
 ## 0.0.7 presentation qualification
 
 Status: automated functional, compatibility, screenshot, packaging, and guarded-install acceptance PASS; human visual verdict pending.

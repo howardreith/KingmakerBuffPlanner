@@ -1,5 +1,16 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-08-12 — four-column UI rebuild implementation and candidate qualification
+
+Status: RELEASE-SOURCE PREPARATION; HUMAN VISUAL VERDICT REMAINS REQUIRED
+
+- Replaced the old full-screen presentation with the routine tabs, allowed catalog controls, pooled four-column cards, direct portrait targeting, compact selected details, one Settings surface, and one Apply action. Obsolete controls/listeners and the alternate layout are absent.
+- Added schema 3 hidden/F10 migration, exact `KeyboardAccess.Binding.InputMatched()` B-key isolation, configurable Ctrl+Shift+B/P, and restored dark tile/antique-gold HUD treatment without changing row geometry/listeners/lifecycle.
+- Frozen discovery/provider/planning/resource/execution/profile-identity systems remain green. Current deterministic counts are source 30/30, behavior 67/67, runtime filesystem 8/8, package 4/4, deployment WhatIf 5/5.
+- Candidate physical runs confirmed Animated and Instant Bless, actual icons, 32-card pool, 21 lifecycle cycles, hotkey, modal/HUD/world isolation, and exact restoration. Native is 12/12. Call of the Wild is 26/26 with 9,064 abilities, 5,907 candidates, 2,096 optional inclusions, zero unsupported, and zero planner Harmony overlap.
+- Strengthened physical evidence dispatches all category buttons (11/2/9/0) and routine-local Selected only (Long/Important/Long 1/0/1), and samples all four sprite textures as 8-bit antique gold `0.961,0.820,0.420,1.000` on dark tiles `0.055,0.043,0.030,0.970`.
+- BubbleBuffs `f4871f763a23251284422ef0945a85e9f3fb788e` supplied information-design reference only; no source or asset entered the product.
+
 ## 2026-08-12 — four-column UI rebuild intake
 
 Status: IN PROGRESS; FULL PRESENTATION REPLACEMENT EXPLICITLY AUTHORIZED

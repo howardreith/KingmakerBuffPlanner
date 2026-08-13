@@ -735,7 +735,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                             !string.IsNullOrWhiteSpace(ui.HudObjectEvidence) &&
                             ui.HudObjectEvidence.Contains("corners=") &&
                             ui.HudObjectEvidence.Contains("active=True") &&
-                            ui.HudObjectEvidence.Split(new[] { "spriteInk=0.960,0.820,0.420,1.000" },
+                            ui.HudObjectEvidence.Split(new[] { "spriteInk=0.961,0.820,0.420,1.000" },
                                 StringSplitOptions.None).Length == 5,
                             "paths/ids/active/corners + four antique-gold sprite inks",
                             ui.HudObjectEvidence ?? "missing");

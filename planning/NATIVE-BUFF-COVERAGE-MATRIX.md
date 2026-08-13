@@ -1,5 +1,7 @@
 # Native Buff Coverage Matrix
 
+0.0.8 UI replacement checkpoint: the catalog/discovery contract is unchanged. Exact candidate qualification still reports 1,722 native abilities and 974 candidates; the final UI branch reruns native 12/12 before packaging.
+
 Status: PHASE 9 STRUCTURAL AUDIT PASS; RUNTIME EQUIVALENCE DEFERRED — EVIDENCED
 
 The generated row-level matrix is `planning/NATIVE-BUFF-CATALOG.json`: 1,722 blueprint rows, 974 player-accessible audited candidates, schema 4, SHA-256 `1c2881de5c600c430709fac075e0f4fb223d0e050ba52d07bfa7451cf97be0fa`.

@@ -1,5 +1,15 @@
 # Implementation Report
 
+## 0.0.8 four-column routine planner — implementation complete, human verdict pending
+
+The full-screen presentation was replaced rather than layered over 0.0.7. The production hierarchy now has top Long/Important/Short tabs, the allowed search/category/Selected only controls, a broad pooled four-column icon grid, a compact selected-buff/portrait/plan panel, one Settings surface, and one Apply action. Target portraits directly create or remove the selected buff assignment in the active routine; removing the last target removes that routine assignment. No alternate old layout, Add-to-routine listener, hidden-entry control, provider editor, technical filter, or duplicate mode control remains.
+
+The automatic provider/planning and Animated/Instant engines were not redesigned. Schema 3 reveals legacy hidden entries and migrates F10 to configurable Ctrl+Shift+B. Exact Kingmaker input inspection identified `KeyboardAccess.Binding.InputMatched()`; the planner chord is polled by the existing update path and its B primary is suppressed from native bindings only for the exact Ctrl+Shift chord. HUD visuals return to the earlier dark tile/antique-gold treatment without geometry or lifecycle changes.
+
+BubbleBuffs commit `f4871f763a23251284422ef0945a85e9f3fb788e` informed only the information design: icon-first multi-column browsing, selected-buff portrait targeting, routine readiness, and search/category hierarchy. No source, asset, shader, texture, or Wrath hierarchy path was copied.
+
+Candidate physical evidence reached 72 assertions with real All=11, Spells=2, Abilities=9, Other=0 and routine-local Selected only Long=1, Important=0, Long=1. A sampled generated glyph stores the authored 0.960 red channel as the expected 8-bit 0.961. Exact release-source reruns and guarded installation are recorded in the final qualification checkpoint.
+
 ## 0.0.7 Kingmaker-native presentation refinement — automation complete, human verdict pending
 
 Final release source is `2f125f9f1024692d83a1b2570209d1858d62eff1`; deterministic package/DLL/MVID are `9feed6dffa668812ed826c75b743d72892e6e8371b0f81585fb557aea8fcf453` / `bf8c72874377d56f91bcdb6daedaa8b28b340a948aee06583a32954d61b38927` / `966b7d8f-bd5f-46b9-beda-62774f82ccac`. The guarded 0.0.6-to-0.0.7 replacement preserved settings and verified every other mod unchanged. No merge, push, or public release occurred.

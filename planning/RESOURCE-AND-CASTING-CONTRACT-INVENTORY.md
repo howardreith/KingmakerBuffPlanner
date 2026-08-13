@@ -1,5 +1,7 @@
 # Resource and Casting Contract Inventory
 
+0.0.8 UI replacement checkpoint: automatic providers, resource accounting, material checks, confirmed-effect semantics, and both execution engines are frozen. Separate physical Animated and Instant runs remain release gates.
+
 Status: IN PROGRESS
 
 These contracts were established from the exact installed Kingmaker assembly, not from Wrath assumptions.

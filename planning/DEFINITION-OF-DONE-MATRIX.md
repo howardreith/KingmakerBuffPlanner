@@ -1,5 +1,23 @@
 # Definition of Done Matrix
 
+## 0.0.8 four-column routine planner
+
+| Criterion | Result | Exact evidence |
+|---|---|---|
+| Replace old layout | PASS | New component shell only; validator rejects old labels/callbacks and alternate controls. |
+| Four-column pooled catalog | PASS | Four columns/no horizontal scroll; 32-card pool; 2,500-entry/625-row gate. |
+| Direct routine targeting | PASS | Portrait listener creates/removes assignment; final-target removal, bulk operations, and routine independence tested. |
+| Allowed controls only | PASS | Search + All/Spells/Abilities/Other + Selected only; physical listener evidence 11/2/9/0. |
+| Routine-local Selected only | PASS | Candidate physical evidence Long=1, Important=0, Long restored=1. |
+| Migration | PASS | Schema 2 hidden IDs cleared and F10 -> Ctrl+Shift+B while assignments/targets/preferences persist. |
+| Hotkey/native isolation | PASS | Exact `Binding.InputMatched` prefix; physical keydown once; no native/world action; no default F10 polling. |
+| Dark/gold HUD | PASS | Tile `0.055,0.043,0.030,0.970`; sprite ink `0.961,0.820,0.420,1.000`; geometry/listeners retained. |
+| Frozen mechanics | PASS | Source 30/30; behavior 67/67; harness 8/8; deployment WhatIf 5/5. |
+| Native/Call of the Wild | PASS candidate | Native 12/12; COTW 26/26, 2,096 inclusions, zero unsupported/overlap. |
+| Animated/Instant | PASS candidate | Separate physical 71/71 runs confirmed Bless and restored. |
+| Human visual acceptance | PENDING HUMAN | Human verdict is authoritative for cosmetic completion. |
+| Merge/public release | NOT AUTHORIZED | Feature branch and local package only. |
+
 ## 0.0.7 parchment/BubbleBuffs-inspired presentation
 
 | Criterion | Result | Exact evidence |

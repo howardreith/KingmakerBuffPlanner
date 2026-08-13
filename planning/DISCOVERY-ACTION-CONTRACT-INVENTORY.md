@@ -1,5 +1,7 @@
 # Discovery Action Contract Inventory
 
+0.0.8 UI replacement checkpoint: no discovery action interpretation changed. The full deterministic and exact native/Call of the Wild regressions remain release gates.
+
 Status: IN PROGRESS
 
 Exact target: installed Kingmaker 2.1.7b `Assembly-CSharp.dll` SHA-256 `3b6450ffec440e296e586f71c711b195aed144b28d53e1cbb29406d18fef5afb`.

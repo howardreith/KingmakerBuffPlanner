@@ -1,5 +1,7 @@
 # Autonomous Blockers
 
+0.0.8 four-column rebuild, 2026-08-12: no critical engineering or runtime-safety blocker. The architecture replacement, migration, hotkey isolation, dark/gold HUD treatment, deterministic gates, and candidate physical matrix are complete. Exact release-source packaging/runtime/install remain actionable. Human visual acceptance is the intentional final gate, not an engineering blocker.
+
 Four-column UI rebuild intake, 2026-08-12: no critical engineering or runtime-safety blocker. The 0.0.7 package and installed identity are preserved, the complete unchanged baseline is green, the runtime transaction set is restored, and the mission supplies every material interaction decision. Human visual acceptance remains a mandatory final gate, not a blocker to implementation or automated/runtime qualification.
 
 Parchment UI mission status, 2026-08-12: no critical engineering or runtime-safety blocker. Exact release-source 0.0.7 Animated and Instant physical runs pass 71/71 each; native passes 12/12; Call of the Wild passes 26/26; all transactions restore exactly; guarded install preserves settings/other mods. Remaining boundary is intentionally human: visual acceptance is authoritative. No merge or public release is authorized.

@@ -1,5 +1,15 @@
 # Architecture
 
+## 0.0.8 four-column presentation boundary
+
+`BuffPlannerScreenView` is a new shell over the unchanged `PlannerUiSession` and `PlannerSetupModel`. `PlannerRoutineTabsView`, `PlannerCategoryTabsView`, `BuffGridView`, `BuffCardView`, `BuffCardPool`, `PlannerTargetStripView`, `PlannerSelectedBuffView`, and `PlannerSettingsView` own rendering only. `PlannerScreenViewModel` formats alphabetical cards, routine-local target state, readiness, and concise plan summaries; callbacks invoke existing model commands.
+
+The catalog is a vertical `ScrollRect` with exactly four computed columns and a fixed pool of 32 cards. Only Search, All/Spells/Abilities/Other, and Selected only exist in the normal catalog. Selected only reads assignments with at least one target in the active routine. The selected lower panel owns direct portrait toggle, Select All Valid, Clear Targets, icon/name/source/duration/description, and plan summary. Provider selection remains automatic and provider/resource preferences remain persistence-compatible but have no production view.
+
+Profile schema 3 clears legacy hidden IDs and migrates blank/F10 hotkeys to `Ctrl+Shift+B` while retaining routine assignments, target IDs, provider preferences, execution settings, and campaign identity. A narrow legacy Harmony12 prefix on exact `KeyboardAccess.Binding.InputMatched()` suppresses native B only while Ctrl+Shift+B is down. The existing modal input lease and HUD pointer ownership remain separate.
+
+HUD anchors, RectTransforms, hitboxes, listeners, tooltip ownership, and lifecycle are unchanged. Only the owned tile/glyph treatment is specialized: near-black brown tiles and generated antique-gold sprite ink. Guarded runtime evidence samples both tile and sprite pixels. Human visual acceptance remains pending.
+
 Status: 0.0.7 presentation architecture qualified in exact Kingmaker 2.1.7b; human visual verdict pending
 
 ## 0.0.7 presentation boundary

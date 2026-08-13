@@ -1,5 +1,20 @@
 # Manual Acceptance
 
+## 0.0.8 four-column planner visual gate
+
+Status: REQUIRED after guarded installation. Automation has not granted cosmetic acceptance.
+
+1. The four HUD buttons retain their established anchors/hitboxes/tooltips but use dark brown tiles with antique-gold glyphs; no bright white HUD treatment remains.
+2. Ctrl+Shift+B opens/closes the planner without triggering native B. F10 does nothing for the planner. Settings can toggle the hotkey to Ctrl+Shift+P and back.
+3. Long, Important, and Short clearly define edit context. The broad catalog is exactly four cards across at 1920x1080, vertically scrolls, and has readable actual icons, names, availability, badges, and restrained status accents.
+4. The only normal catalog controls are Search, All, Spells, Abilities, Other, and Selected only. Selected only follows the active routine. There is no Hide/Show hidden, Add to routine, Casting Source/provider editor, technical source/resource text, Advanced Filters, or duplicate Mode.
+5. Select Bless, click a portrait under Long, switch to Important, and return to Long. The click itself adds/removes the target; routines remain independent; Select All Valid and Clear Targets behave immediately.
+6. The lower area keeps icon/name/source/duration/description/portraits/plan compact. Settings contains one casting mode. Apply Long/Important/Short is the single planner action.
+7. Animated and Instant each confirm the expected effect/resource outcome; close/Escape/hotkey restores HUD, selection, camera, and mode without duplicate UI.
+8. Judge native feel, contrast, text clipping, scroll response, portrait-state clarity, and information density. Report the exact resolution and a screenshot for any failed item.
+
+No merge or public release is authorized by this checklist.
+
 ## 0.0.7 parchment UI visual gate
 
 Status: exact 0.0.7 is guarded-installed; automated mechanics/presentation evidence PASS; human visual acceptance REQUIRED. Do not treat installation as cosmetic acceptance.

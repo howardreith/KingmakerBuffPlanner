@@ -1,5 +1,13 @@
 # Autonomous Resume
 
+## 0.0.8 release-source preparation — 2026-08-12
+
+- Branch `codex/ui-grid-rebuild`; current implementation HEAD before this documentation checkpoint is `8e94b1e3777c072d9069c5fbed18555805a8d87c`; version 0.0.8.
+- New shell/grid/direct-target/migration/hotkey/HUD work is complete. Deterministic results: source 30/30, behavior 67/67, filesystem 8/8, package 4/4, deployment WhatIf 5/5.
+- Candidate `ui-grid-0.0.8-animated-7` completed the full scenario, produced All/Spells/Abilities/Other 11/2/9/0 and Selected only Long/Important/Long 1/0/1, and restored. Its only failed assertion expected authored 0.960 rather than the actual 8-bit sampled 0.961 red channel; the worktree corrects that evidence value.
+- Earlier exact-package candidate runs: Animated 71/71, Instant 71/71, native 12/12, Call of the Wild 26/26; all restored. They are superseded by final documentation-inclusive release-source repetitions.
+- No Kingmaker process or unresolved transaction remains. Exact next command after committing this checkpoint: `scripts/Build-Local.ps1`, then final Animated, Instant, native, and Call of the Wild runs against that exact clean commit, followed by deterministic release packaging and guarded 0.0.7-to-0.0.8 installation.
+
 ## Four-column UI rebuild intake checkpoint — 2026-08-12
 
 - Mission branch: `codex/ui-grid-rebuild`, created from exact starting HEAD `c2bc534827997fb75c1839a5cee5d1342a860369`; source version remains 0.0.7.
