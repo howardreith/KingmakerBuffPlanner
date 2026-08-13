@@ -46,6 +46,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private string _liveGridOverviewScreenshotSha256 = string.Empty;
         private string _liveTargetColorsScreenshotSha256 = string.Empty;
         private string _liveSettingsScreenshotSha256 = string.Empty;
+        private string _liveCatalogControlEvidence = string.Empty;
         private LiveRowRenderDiagnostics _liveRenderDiagnostics;
         private NativeUiContract _nativeUiContract;
 
@@ -314,6 +315,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     UiCatalogVisibleRows = ui == null ? 0 : ui.CatalogVisibleRows,
                     UiCatalogSelectedDetailsBound = ui != null && ui.CatalogSelectedDetailsBound,
                     UiCatalogBlessEvidence = ui == null ? null : ui.CatalogBlessEvidence,
+                    UiCatalogControlEvidence = _liveCatalogControlEvidence,
                     UiBlessSelectedAndConfigured = _liveBlessSelectedAndConfigured,
                     UiTooltipStable = _liveTooltipStable,
                     UiTooltipEvidence = _liveTooltipEvidence,
@@ -674,6 +676,17 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         AddUiAssertion(result, "ui-bless-material-contract", blessMaterialContract,
                             "require=false/item=none/hasEnough=false/consumable=false",
                             _liveInitialCatalogEvidence);
+                        bool catalogControls = _liveCatalogControlEvidence.Contains("All=11") &&
+                            _liveCatalogControlEvidence.Contains("Spells=") &&
+                            _liveCatalogControlEvidence.Contains("Abilities=") &&
+                            _liveCatalogControlEvidence.Contains("Other=") &&
+                            _liveCatalogControlEvidence.Contains("longSelected=1") &&
+                            _liveCatalogControlEvidence.Contains("importantSelected=0") &&
+                            _liveCatalogControlEvidence.Contains("longRestored=1") &&
+                            _liveCatalogControlEvidence.Contains("selectedOnlyOff=True");
+                        AddUiAssertion(result, "ui-catalog-controls-and-routine-local-selection",
+                            catalogControls, "all categories; Long=1/Important=0/Long=1",
+                            _liveCatalogControlEvidence);
                         AddUiAssertion(result, "ui-physical-tooltip-stable",
                             _liveTooltipStable && !string.IsNullOrWhiteSpace(_liveTooltipEvidence) &&
                             ui.TooltipListenerCount == 4 && ui.TooltipRaycastGraphicCount == 0 &&
@@ -721,8 +734,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         AddUiAssertion(result, "ui-hud-object-evidence",
                             !string.IsNullOrWhiteSpace(ui.HudObjectEvidence) &&
                             ui.HudObjectEvidence.Contains("corners=") &&
-                            ui.HudObjectEvidence.Contains("active=True"),
-                            "paths/ids/active/corners", ui.HudObjectEvidence ?? "missing");
+                            ui.HudObjectEvidence.Contains("active=True") &&
+                            ui.HudObjectEvidence.Split(new[] { "spriteInk=0.960,0.820,0.420,1.000" },
+                                StringSplitOptions.None).Length == 5,
+                            "paths/ids/active/corners + four antique-gold sprite inks",
+                            ui.HudObjectEvidence ?? "missing");
                         AddUiAssertion(result, "exact-working-save-load",
                             _liveSaveLoader != null && _liveSaveLoader.LoadActionCount == 1 &&
                             !string.IsNullOrWhiteSpace(_liveSaveLoader.WorkingDescriptor) &&
@@ -1078,6 +1094,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         (string)_request.Parameters["executionMode"]);
                 if (!_liveBlessSelectedAndConfigured)
                     throw new InvalidOperationException("Visible spellbook Bless row could not be selected/configured.");
+                _liveCatalogControlEvidence = BuffPlannerUiRoot.DispatchCatalogControlsForRuntime();
+                if (string.IsNullOrWhiteSpace(_liveCatalogControlEvidence))
+                    throw new InvalidOperationException("Catalog controls could not be physically dispatched.");
                 if (!BuffPlannerUiRoot.PrepareVisualEvidenceForRuntime("target-colors"))
                     throw new InvalidOperationException("Target-color evidence view is unavailable.");
                 CaptureScreenshot(Path.Combine(_request.EvidenceDirectory,
@@ -1411,6 +1430,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         [JsonProperty("uiCatalogVisibleRows", Order = 124)] public int UiCatalogVisibleRows { get; set; }
         [JsonProperty("uiCatalogSelectedDetailsBound", Order = 125)] public bool UiCatalogSelectedDetailsBound { get; set; }
         [JsonProperty("uiCatalogBlessEvidence", Order = 126)] public string UiCatalogBlessEvidence { get; set; }
+        [JsonProperty("uiCatalogControlEvidence", Order = 126)] public string UiCatalogControlEvidence { get; set; }
         [JsonProperty("uiBlessSelectedAndConfigured", Order = 127)] public bool UiBlessSelectedAndConfigured { get; set; }
         [JsonProperty("uiTooltipStable", Order = 128)] public bool UiTooltipStable { get; set; }
         [JsonProperty("uiTooltipEvidence", Order = 129)] public string UiTooltipEvidence { get; set; }

@@ -103,6 +103,9 @@ namespace KingmakerBuffPlanner.UI
             if (selectedImage != null) selectedImage.color = selectedOnly
                 ? _theme.BurgundyPrimary : _theme.ParchmentRaised;
         }
+
+        internal Button Button(PlannerSourceCategory category) { return _buttons[category]; }
+        internal Button SelectedOnlyButton { get { return _selectedOnly; } }
     }
 
     internal sealed class BuffCardView

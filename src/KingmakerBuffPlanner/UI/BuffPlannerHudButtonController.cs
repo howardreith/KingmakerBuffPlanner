@@ -88,8 +88,10 @@ namespace KingmakerBuffPlanner.UI
                         ",interactable=" + button.interactable +
                         ",tile=" + ColorEvidence((button.targetGraphic as Image) == null
                             ? Color.clear : ((Image)button.targetGraphic).color) +
-                        ",icon=" + ColorEvidence(button.transform.Find("KBP.Icon") == null
+                        ",iconTint=" + ColorEvidence(button.transform.Find("KBP.Icon") == null
                             ? Color.clear : button.transform.Find("KBP.Icon").GetComponent<Image>().color) +
+                        ",spriteInk=" + SpriteInkEvidence(button.transform.Find("KBP.Icon") == null
+                            ? null : button.transform.Find("KBP.Icon").GetComponent<Image>()) +
                         ",screenCenter=" + ScreenCenter((RectTransform)button.transform) +
                         ",corners=" + string.Join("|", corners.Select(value => value.ToString()).ToArray()));
                 }
@@ -102,6 +104,21 @@ namespace KingmakerBuffPlanner.UI
         {
             return color.r.ToString("0.000") + "," + color.g.ToString("0.000") + "," +
                 color.b.ToString("0.000") + "," + color.a.ToString("0.000");
+        }
+
+        private static string SpriteInkEvidence(Image image)
+        {
+            if (image == null || image.sprite == null || image.sprite.texture == null)
+                return "missing";
+            Rect rect = image.sprite.rect;
+            Texture2D texture = image.sprite.texture;
+            for (int y = (int)rect.yMin; y < (int)rect.yMax; y++)
+                for (int x = (int)rect.xMin; x < (int)rect.xMax; x++)
+                {
+                    Color pixel = texture.GetPixel(x, y);
+                    if (pixel.a > 0.5f) return ColorEvidence(pixel);
+                }
+            return "transparent";
         }
 
         internal bool TryInstall()

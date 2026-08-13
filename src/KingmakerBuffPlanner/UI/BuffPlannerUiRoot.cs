@@ -325,6 +325,13 @@ namespace KingmakerBuffPlanner.UI
                 _instance._runtimeInputProbe = probe.Dispatch(_instance._screen.View);
         }
 
+        internal static string DispatchCatalogControlsForRuntime()
+        {
+            return _instance == null || _instance._screen == null ||
+                _instance._screen.View == null ? string.Empty :
+                _instance._screen.View.DispatchCatalogControlsForRuntime();
+        }
+
         internal static UiRootDiagnostics EndRuntimeSmoke()
         {
             if (_instance == null) throw new InvalidOperationException("UI root is absent.");

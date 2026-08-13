@@ -267,6 +267,28 @@ namespace KingmakerBuffPlanner.UI
 
         internal void RefreshCatalogForRuntime() { RefreshCatalog(true); }
 
+        internal string DispatchCatalogControlsForRuntime()
+        {
+            var evidence = new List<string>();
+            foreach (PlannerSourceCategory category in Enum.GetValues(typeof(PlannerSourceCategory)))
+            {
+                Button button = _categoryTabs.Button(category);
+                if (button == null) return string.Empty;
+                button.onClick.Invoke();
+                evidence.Add(category + "=" + LastCatalogDiagnostics.Filters.VisibleViewModels);
+            }
+            _categoryTabs.Button(PlannerSourceCategory.All).onClick.Invoke();
+            _categoryTabs.SelectedOnlyButton.onClick.Invoke();
+            evidence.Add("longSelected=" + LastCatalogDiagnostics.Filters.VisibleViewModels);
+            if (!DispatchRoutineTabForRuntime("important")) return string.Empty;
+            evidence.Add("importantSelected=" + LastCatalogDiagnostics.Filters.VisibleViewModels);
+            if (!DispatchRoutineTabForRuntime("long")) return string.Empty;
+            evidence.Add("longRestored=" + LastCatalogDiagnostics.Filters.VisibleViewModels);
+            _categoryTabs.SelectedOnlyButton.onClick.Invoke();
+            evidence.Add("selectedOnlyOff=" + (!_viewModel.SelectedOnly));
+            return string.Join(";", evidence.ToArray());
+        }
+
         internal bool PrepareVisualEvidenceForRuntime(string view)
         {
             bool settings = view == "settings";

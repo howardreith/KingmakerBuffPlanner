@@ -273,6 +273,13 @@ function Assert-KbpRuntimeResult {
                 throw 'A production row failed the CanvasRenderer/font/alpha/material evidence contract.'
             }
         }
+        if ([string]::IsNullOrWhiteSpace([string]$Result.uiCatalogControlEvidence) -or
+            -not ([string]$Result.uiCatalogControlEvidence).Contains('longSelected=1') -or
+            -not ([string]$Result.uiCatalogControlEvidence).Contains('importantSelected=0') -or
+            ([regex]::Matches([string]$Result.uiHudObjectEvidence,
+                'spriteInk=0\.960,0\.820,0\.420,1\.000')).Count -ne 4) {
+            throw 'Catalog-control or dark/gold HUD evidence is incomplete.'
+        }
 
         Add-Type -AssemblyName System.Drawing
         $bitmap = [Drawing.Bitmap]::new($screenshotPath)
