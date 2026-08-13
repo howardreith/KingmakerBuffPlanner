@@ -50,6 +50,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private string _liveCatalogControlEvidence = string.Empty;
         private int _liveDirectSelectedTargetCount;
         private int _liveIndirectCoveredTargetCount;
+        private int _liveHudScreenshotWaitFrames;
         private LiveRowRenderDiagnostics _liveRenderDiagnostics;
         private NativeUiContract _nativeUiContract;
 
@@ -758,7 +759,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                             ui.CatalogAggregateAbilityCount + "/" + ui.CatalogVisibleViewModels +
                             ";consolidated=" + ui.CatalogConsolidatedCardCount);
                         AddUiAssertion(result, "ui-direct-target-state-visible",
-                            ui.DirectSelectedTargetCount >= 1, ">=1", ui.DirectSelectedTargetCount.ToString());
+                            _liveDirectSelectedTargetCount >= 1, ">=1",
+                            _liveDirectSelectedTargetCount.ToString());
                         AddUiAssertion(result, "exact-working-save-load",
                             _liveSaveLoader != null && _liveSaveLoader.LoadActionCount == 1 &&
                             !string.IsNullOrWhiteSpace(_liveSaveLoader.WorkingDescriptor) &&
@@ -1149,11 +1151,18 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 BuffPlannerUiRoot.CloseRuntimeSmoke();
                 if (BuffPlannerUiRoot.IsScreenOpen)
                     throw new InvalidOperationException("Planner did not close cleanly after configuration.");
-                CaptureScreenshot(Path.Combine(_request.EvidenceDirectory, "hud-integration.png"));
                 _liveUiPhase = 72;
                 return false;
             }
             if (_liveUiPhase == 72)
+            {
+                _liveHudScreenshotWaitFrames++;
+                if (_liveHudScreenshotWaitFrames < 2) return false;
+                CaptureScreenshot(Path.Combine(_request.EvidenceDirectory, "hud-integration.png"));
+                _liveUiPhase = 73;
+                return false;
+            }
+            if (_liveUiPhase == 73)
             {
                 if (!TryHashScreenshot(Path.Combine(_request.EvidenceDirectory,
                     "hud-integration.png"), out _liveHudScreenshotSha256)) return false;

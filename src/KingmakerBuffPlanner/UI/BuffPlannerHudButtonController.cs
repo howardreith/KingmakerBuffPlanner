@@ -569,7 +569,9 @@ namespace KingmakerBuffPlanner.UI
             hover.RoutineId = iconKind;
 
             RectTransform iconRect = KingmakerUiFactory.CreateRect("KBP.Icon", button.transform);
-            KingmakerUiFactory.Stretch(iconRect, 10, 10, 10, 10);
+            // The native host sits tight to the screen edge. Keep the proven button
+            // rectangle untouched, but bias the owned glyph inward for visual breathing room.
+            KingmakerUiFactory.Stretch(iconRect, 13, 7, 10, 10);
             Image icon = iconRect.gameObject.AddComponent<Image>();
             icon.sprite = CreateIcon(iconKind);
             icon.preserveAspect = true;
