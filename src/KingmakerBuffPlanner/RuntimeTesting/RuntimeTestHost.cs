@@ -47,6 +47,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private string _liveTargetColorsScreenshotSha256 = string.Empty;
         private string _liveSettingsScreenshotSha256 = string.Empty;
         private string _liveCatalogControlEvidence = string.Empty;
+        private int _liveDirectSelectedTargetCount;
+        private int _liveIndirectCoveredTargetCount;
         private LiveRowRenderDiagnostics _liveRenderDiagnostics;
         private NativeUiContract _nativeUiContract;
 
@@ -318,8 +320,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     UiCatalogProviderCount = ui == null ? 0 : ui.CatalogProviderCount,
                     UiCatalogAggregateAbilityCount = ui == null ? 0 : ui.CatalogAggregateAbilityCount,
                     UiCatalogConsolidatedCardCount = ui == null ? 0 : ui.CatalogConsolidatedCardCount,
-                    UiDirectSelectedTargetCount = ui == null ? 0 : ui.DirectSelectedTargetCount,
-                    UiIndirectCoveredTargetCount = ui == null ? 0 : ui.IndirectCoveredTargetCount,
+                    UiDirectSelectedTargetCount = _liveDirectSelectedTargetCount,
+                    UiIndirectCoveredTargetCount = _liveIndirectCoveredTargetCount,
                     UiCatalogControlEvidence = _liveCatalogControlEvidence,
                     UiBlessSelectedAndConfigured = _liveBlessSelectedAndConfigured,
                     UiTooltipStable = _liveTooltipStable,
@@ -681,7 +683,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         AddUiAssertion(result, "ui-bless-material-contract", blessMaterialContract,
                             "require=false/item=none/hasEnough=false/consumable=false",
                             _liveInitialCatalogEvidence);
-                        bool catalogControls = _liveCatalogControlEvidence.Contains("All=11") &&
+                        bool catalogControls = _liveCatalogControlEvidence.Contains(
+                                "All=" + ui.CatalogVisibleViewModels) &&
                             _liveCatalogControlEvidence.Contains("Spells=") &&
                             _liveCatalogControlEvidence.Contains("Abilities=") &&
                             _liveCatalogControlEvidence.Contains("Other=") &&
@@ -1107,6 +1110,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         (string)_request.Parameters["executionMode"]);
                 if (!_liveBlessSelectedAndConfigured)
                     throw new InvalidOperationException("Visible spellbook Bless row could not be selected/configured.");
+                CatalogLayoutDiagnostics targetState = BuffPlannerUiRoot.CatalogDiagnosticsForRuntime();
+                if (targetState == null) throw new InvalidOperationException(
+                    "Target-state diagnostics are unavailable after Bless configuration.");
+                _liveDirectSelectedTargetCount = targetState.DirectSelectedTargetCount;
+                _liveIndirectCoveredTargetCount = targetState.IndirectCoveredTargetCount;
                 _liveCatalogControlEvidence = BuffPlannerUiRoot.DispatchCatalogControlsForRuntime();
                 if (string.IsNullOrWhiteSpace(_liveCatalogControlEvidence))
                     throw new InvalidOperationException("Catalog controls could not be physically dispatched.");
