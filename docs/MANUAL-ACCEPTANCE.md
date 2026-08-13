@@ -2,7 +2,9 @@
 
 ## 0.0.9 polish and consolidation visual gate
 
-Status: REQUIRED after guarded installation. Automation proves behavior and rendered evidence, not the final cosmetic verdict.
+Status: REQUIRED. Exact 0.0.9 is guarded-installed; automation proves behavior and rendered evidence, not the final cosmetic verdict.
+
+Installed identity: source `f026a4a9974af8e4191ff7fb104e472f11c2016f`; package `471e86e0043b47bc899322b640fb448105bfc1689f796b56611ed5d980d4bbe8`; DLL `d66edcacedcfe9d862e5cd433e2e58166abbc5a5a5404b9b7c5d6fd39ae898a1`; MVID `174e2e17-9006-4667-b06d-85d372a2bb77`.
 
 Compare the installed build against `runtime-evidence/ui-polish-0.0.9-release-animated/`:
 

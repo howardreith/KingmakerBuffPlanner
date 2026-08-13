@@ -1,5 +1,12 @@
 # Autonomous Resume
 
+## 0.0.9 final local handoff — 2026-08-12
+
+- Release source `f026a4a9974af8e4191ff7fb104e472f11c2016f`; package `471e86e0043b47bc899322b640fb448105bfc1689f796b56611ed5d980d4bbe8`; DLL `d66edcacedcfe9d862e5cd433e2e58166abbc5a5a5404b9b7c5d6fd39ae898a1`; MVID `174e2e17-9006-4667-b06d-85d372a2bb77`.
+- Exact release-source runs: `ui-polish-0.0.9-exact-animated` 74/74, `ui-polish-0.0.9-exact-instant` 74/74, `ui-polish-0.0.9-exact-native` 12/12, and `ui-polish-0.0.9-exact-cotw` 26/26; all restored exactly.
+- Guarded install `ui-polish-0.0.9-final-install` is Installed; settings preserved; every non-planner mod verified unchanged; installed DLL exact. No process or deployment lock remains.
+- Exact next action: human completes the 0.0.9 checklist at the top of `docs/MANUAL-ACCEPTANCE.md`, with special attention to native HUD integration and a multi-member indirect `COVERED` portrait preview. No merge, push, or public publication is authorized.
+
 ## 0.0.9 exact-package qualification — 2026-08-12
 
 - Exact source `a9f18f88252a30d92bda4dafe1da70099a4fdb73`; local package `703d850025ede3fb501f7581fb911006432c705e40393e85ddc26f03942ea593`; DLL `fd1cc4c664f5d1a04aac7afc3be18b11e15f4fec381ac142cbc98b076b2b88b5`; MVID `b5eceb04-7f6a-4f46-9cbe-2f093a20f285`.

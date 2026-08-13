@@ -1,5 +1,16 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-08-12 — 0.0.9 source consolidation and UI polish installed
+
+Status: AUTOMATION PASS; GUARDED-INSTALLED; HUMAN VISUAL VERDICT REQUIRED; LOCAL-ONLY
+
+- Final release source `f026a4a9974af8e4191ff7fb104e472f11c2016f`; deterministic package `471e86e0043b47bc899322b640fb448105bfc1689f796b56611ed5d980d4bbe8`; DLL `d66edcacedcfe9d862e5cd433e2e58166abbc5a5a5404b9b7c5d6fd39ae898a1`; MVID `174e2e17-9006-4667-b06d-85d372a2bb77`.
+- Exact-source physical runs passed Animated 74/74, Instant 74/74, native 12/12, and Call of the Wild 26/26. All guarded transactions restored exactly.
+- Live campaign evidence consolidated 11 provider-backed abilities into 10 cards, including one Bless card backed by two abilities/providers and implicit automatic selection. Deterministic tests cover alternate-provider execution, shared-resource accounting, assignment migration/round trip, and non-merging of mechanically distinct same-name actions.
+- Direct targets render with the strong full green `SELECTED` state. Party/area recipients produce a distinct lighter `COVERED` token in deterministic coverage. The single-target fixture cannot physically show multiple portraits, so indirect appearance remains on the human checklist.
+- Deterministic gates pass source 30/30, behavior 72/72, filesystem 8/8, package 4/4, deployment WhatIf 5/5, and release reproducibility 2/2. Guarded install `ui-polish-0.0.9-final-install` preserved settings and verified every other mod unchanged.
+- Human acceptance remains authoritative for HUD native feel, grid balance, highlight appearance, and multi-member indirect coverage. No merge, push, or publication occurred.
+
 ## 2026-08-12 — 0.0.8 qualified, packaged, and guarded-installed
 
 Status: AUTOMATION PASS; HUMAN VISUAL VERDICT REQUIRED; LOCAL-ONLY

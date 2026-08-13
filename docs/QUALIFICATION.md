@@ -2,16 +2,17 @@
 
 ## 0.0.9 UI polish and source-consolidation qualification
 
-Status: deterministic and exact-package physical qualification PASS; release packaging/install checkpoint follows; human cosmetic acceptance remains required.
+Status: deterministic, exact-release physical, packaging, and guarded-install qualification PASS; human cosmetic acceptance remains required.
 
-Exact qualified source is `a9f18f88252a30d92bda4dafe1da70099a4fdb73`; local package `703d850025ede3fb501f7581fb911006432c705e40393e85ddc26f03942ea593`; DLL `fd1cc4c664f5d1a04aac7afc3be18b11e15f4fec381ac142cbc98b076b2b88b5`; MVID `b5eceb04-7f6a-4f46-9cbe-2f093a20f285`.
+Exact release source is `f026a4a9974af8e4191ff7fb104e472f11c2016f`; package `471e86e0043b47bc899322b640fb448105bfc1689f796b56611ed5d980d4bbe8`; DLL `d66edcacedcfe9d862e5cd433e2e58166abbc5a5a5404b9b7c5d6fd39ae898a1`; MVID `174e2e17-9006-4667-b06d-85d372a2bb77`. Deterministic release builds reproduced the exact runtime package twice.
 
 - Deterministic gates: source 30/30; behavior/protocol 72/72; runtime filesystem 8/8; package 4/4; deployment WhatIf 5/5.
-- `ui-polish-0.0.9-release-animated` and `ui-polish-0.0.9-release-instant`: 74/74 each. Both exercised physical Ctrl+Shift+B, modal/pointer isolation, tooltips, four-column vertical grid, routine-local direct portrait assignment, 21 open/close cycles, profile persistence, one-card two-source Bless, and confirmed effect execution. Animated planned/confirmed 1/1; Instant planned/submitted/confirmed 1/1/1. Both restored exactly.
+- `ui-polish-0.0.9-exact-animated` and `ui-polish-0.0.9-exact-instant`: 74/74 each. Both exercised physical Ctrl+Shift+B, modal/pointer isolation, tooltips, four-column vertical grid, routine-local direct portrait assignment, 21 open/close cycles, profile persistence, one-card two-source Bless, and confirmed effect execution. Animated planned/confirmed 1/1; Instant planned/submitted/confirmed 1/1/1. Both restored exactly.
 - The human-reproduction catalog has 11 provider-backed abilities but 10 visible cards. Bless reports `providers=2,abilities=2` on one card with automatic provider choice. Resistance also appears once in the captured grid. Deterministic tests separately prove alternative-provider selection, shared-pool non-double-counting, legacy-assignment union/round trip, and same-name mechanically distinct non-merging.
 - The direct portrait state is captured with full green tint/overlay, bright 4px frame, and `SELECTED`. Party/area expressions deterministically yield the distinct lighter `IndirectCovered` token. This disposable save has only one party target, so multi-portrait indirect visual inspection remains a stated human-runtime item rather than an automated physical claim.
-- `ui-polish-0.0.9-release-native`: 12/12, 1,722 abilities. `ui-polish-0.0.9-release-cotw`: 26/26, 9,064 abilities, 2,096 optional inclusions, zero unsupported, zero planner Harmony overlap. Both restored exactly.
+- `ui-polish-0.0.9-exact-native`: 12/12, 1,722 abilities. `ui-polish-0.0.9-exact-cotw`: 26/26, 9,064 abilities, 2,096 optional inclusions, zero unsupported, zero planner Harmony overlap. Both restored exactly.
 - Visual evidence: grid `c3cace3b...`, target state `7c9d594c...`, HUD integration `5dac3635...` under `runtime-evidence/ui-polish-0.0.9-release-animated/`. Screenshots inform the handoff but do not grant cosmetic acceptance.
+- Guarded install `ui-polish-0.0.9-final-install` replaced exact 0.0.8 with exact 0.0.9. Its result is `Installed`, `settingsPreserved=true`, and `otherModsVerified=true`; the installed DLL hash matches the release manifest. No merge, push, or publication occurred.
 
 ## 0.0.8 four-column UI qualification
 
