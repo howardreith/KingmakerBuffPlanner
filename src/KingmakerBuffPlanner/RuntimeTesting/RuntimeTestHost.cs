@@ -927,7 +927,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         _nativeUiContract.Portraits.Count + ".");
                 }
                 if (!BuffPlannerUiRoot.IsHudInstalled) return false;
-                BuffPlannerUiRoot.CaptureRuntimeBaseline();
+                // The harness may have just closed a native Escape veil after dismissing
+                // UMM. Capture the gameplay state that the planner is actually opening
+                // from, not the transient pre-dismiss menu state.
+                BuffPlannerUiRoot.CaptureRuntimeBaseline(true);
                 if (!_liveHotkeyMarkerWritten)
                 {
                     AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory, "hotkey-ready.json"),

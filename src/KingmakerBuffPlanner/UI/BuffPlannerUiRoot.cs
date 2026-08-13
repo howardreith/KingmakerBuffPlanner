@@ -145,10 +145,10 @@ namespace KingmakerBuffPlanner.UI
             if (StaticCanvas.Instance != null) _instance._screen.Open();
         }
 
-        internal static void CaptureRuntimeBaseline()
+        internal static void CaptureRuntimeBaseline(bool refresh = false)
         {
             if (_instance == null) throw new InvalidOperationException("UI root is absent.");
-            if (!_instance._runtimeBaselineCaptured)
+            if (refresh || !_instance._runtimeBaselineCaptured)
             {
                 _instance._runtimeBaselineCaptured = true;
                 _instance._runtimePausedBefore = Game.Instance != null && Game.Instance.IsPaused;

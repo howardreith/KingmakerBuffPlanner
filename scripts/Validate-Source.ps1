@@ -316,7 +316,7 @@ foreach ($livePhysicalContract in @('ui-physical-tooltip-stable',
 }
 $assertions++
 
-if (-not $runtimeHostSource.Contains('CaptureRuntimeBaseline();') -or
+if (-not $runtimeHostSource.Contains('CaptureRuntimeBaseline(true);') -or
     -not $runtimeScriptSource.Contains('loadedAssemblySha256')) {
     throw 'Live qualification must capture pre-hotkey state and distinguish an exact UMM cache assembly from its primary fixture file.'
 }
