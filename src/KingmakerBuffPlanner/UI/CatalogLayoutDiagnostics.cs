@@ -38,6 +38,11 @@ namespace KingmakerBuffPlanner.UI
         internal float ViewportHeight;
         internal string BindingFailure = string.Empty;
         internal string BlessEvidence = string.Empty;
+        internal int ProviderCount;
+        internal int AggregateAbilityCount;
+        internal int ConsolidatedCardCount;
+        internal int DirectSelectedTargetCount;
+        internal int IndirectCoveredTargetCount;
 
         public override string ToString()
         {
@@ -49,7 +54,10 @@ namespace KingmakerBuffPlanner.UI
                 ViewportHeight.ToString("F1") + ";selected=" + SelectedSourceId +
                 ";detailsBound=" + SelectedDetailsBound + ";detailChildren=" +
                 DetailChildren + ";bindingFailure=" + BindingFailure +
-                ";Bless=" + BlessEvidence;
+                ";providers=" + ProviderCount + ";aggregateAbilities=" +
+                AggregateAbilityCount + ";consolidatedCards=" + ConsolidatedCardCount +
+                ";directTargets=" + DirectSelectedTargetCount + ";indirectTargets=" +
+                IndirectCoveredTargetCount + ";Bless=" + BlessEvidence;
         }
     }
 }

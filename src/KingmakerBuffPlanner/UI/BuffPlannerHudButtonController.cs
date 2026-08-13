@@ -26,6 +26,7 @@ namespace KingmakerBuffPlanner.UI
         private RectTransform _root;
         private RectTransform _nativeCluster;
         private GraphicRaycaster _nativeRaycaster;
+        private Sprite _nativeHudButtonSprite;
         private Text _feedback;
         private Text _tooltip;
         private RectTransform _feedbackRoot;
@@ -88,6 +89,9 @@ namespace KingmakerBuffPlanner.UI
                         ",interactable=" + button.interactable +
                         ",tile=" + ColorEvidence((button.targetGraphic as Image) == null
                             ? Color.clear : ((Image)button.targetGraphic).color) +
+                        ",nativeSkin=" + ((button.targetGraphic as Image) != null &&
+                            ((Image)button.targetGraphic).sprite != null) +
+                        ",innerFrame=" + (button.transform.Find("KBP.InnerFrame") != null) +
                         ",iconTint=" + ColorEvidence(button.transform.Find("KBP.Icon") == null
                             ? Color.clear : button.transform.Find("KBP.Icon").GetComponent<Image>().color) +
                         ",spriteInk=" + SpriteInkEvidence(button.transform.Find("KBP.Icon") == null
@@ -154,6 +158,8 @@ namespace KingmakerBuffPlanner.UI
             _anchorController = controller;
             _nativeCluster = parent;
             _nativeRaycaster = raycaster;
+            Image nativeTile = formation.targetGraphic as Image;
+            _nativeHudButtonSprite = nativeTile == null ? null : nativeTile.sprite;
             AnchorPath = GetPath(parent);
             RaycastCanvasPath = GetPath(raycaster.transform);
             _root = KingmakerUiFactory.CreateRect(RootName, parent);
@@ -175,7 +181,7 @@ namespace KingmakerBuffPlanner.UI
 
             PlannerUiTheme theme = PlannerUiTheme.Resolve(controller);
             RectTransform clusterBacking = KingmakerUiFactory.CreateRect("KBP.ClusterBacking", _root);
-            KingmakerUiFactory.Stretch(clusterBacking, -5, -5, -5, -5);
+            KingmakerUiFactory.Stretch(clusterBacking, 2, 2, 2, 2);
             LayoutElement backingLayout = clusterBacking.gameObject.AddComponent<LayoutElement>();
             backingLayout.ignoreLayout = true;
             Image clusterSurface = KingmakerUiFactory.AddFramedPanel(clusterBacking,
@@ -315,6 +321,7 @@ namespace KingmakerBuffPlanner.UI
             _anchorController = null;
             _nativeCluster = null;
             _nativeRaycaster = null;
+            _nativeHudButtonSprite = null;
             AnchorPath = string.Empty;
             RaycastCanvasPath = string.Empty;
             RowAboveNativeCluster = false;
@@ -515,7 +522,7 @@ namespace KingmakerBuffPlanner.UI
             Image tile = button.targetGraphic as Image;
             if (tile != null)
             {
-                tile.sprite = theme.NativeButtonNormal;
+                tile.sprite = _nativeHudButtonSprite ?? theme.NativeButtonNormal;
                 tile.type = tile.sprite != null && tile.sprite.border.sqrMagnitude > 0
                     ? Image.Type.Sliced : Image.Type.Simple;
                 tile.color = new Color(0.10f, 0.075f, 0.045f, 0.97f);

@@ -211,7 +211,8 @@ namespace KingmakerBuffPlanner.UI
             if (_session.Model == null) return false;
             const string bless = "90e59f4a4ada87243b7b3535a06d0638";
             SetupSourceRow source = _session.Model.Sources.Where(item =>
-                    item.Ability.BaseAbilityGuid == bless || item.Ability.VariantGuid == bless)
+                    item.Abilities.Any(ability => ability.BaseAbilityGuid == bless ||
+                        ability.VariantGuid == bless))
                 .OrderBy(item => item.Ability.SourceKind == SourceKind.Spellbook ? 0 : 1)
                 .FirstOrDefault();
             return source != null && _grid.SelectForRuntime(source.SourceId) &&
@@ -540,7 +541,15 @@ namespace KingmakerBuffPlanner.UI
                 SelectedSourceId = model == null ? string.Empty : model.SelectedSourceId,
                 SelectedDetailsBound = model != null && model.SelectedSource != null,
                 BindingFailure = _session.LastBindingFailure ?? string.Empty,
-                BlessEvidence = BuildBlessEvidence(model)
+                BlessEvidence = BuildBlessEvidence(model),
+                ProviderCount = model == null ? 0 : model.Snapshot.Providers.Count,
+                AggregateAbilityCount = model == null ? 0 : model.Sources.Sum(source => source.Abilities.Count),
+                ConsolidatedCardCount = model == null ? 0 : model.Sources.Count(source =>
+                    source.Abilities.Count > 1),
+                DirectSelectedTargetCount = model == null ? 0 : _viewModel.Targets().Count(target =>
+                    target.State == TargetPortraitState.DirectSelected),
+                IndirectCoveredTargetCount = model == null ? 0 : _viewModel.Targets().Count(target =>
+                    target.State == TargetPortraitState.IndirectCovered)
             };
         }
 
@@ -556,14 +565,17 @@ namespace KingmakerBuffPlanner.UI
         {
             const string bless = "90e59f4a4ada87243b7b3535a06d0638";
             SetupSourceRow source = model == null ? null : model.Sources.FirstOrDefault(item =>
-                item.Ability.BaseAbilityGuid == bless || item.Ability.VariantGuid == bless);
+                item.Abilities.Any(ability => ability.BaseAbilityGuid == bless ||
+                    ability.VariantGuid == bless));
             if (source == null) return "absent";
             BuffCardView card = _grid.Cards.FirstOrDefault(item => item.SourceId == source.SourceId);
             return "source=" + source.SourceId + ",available=" + model.IsSourceAvailable(source) +
                 ",assigned=" + model.Profile.Routines.Any(routine => routine.Assignments.Any(
                     assignment => assignment.SourceId == source.SourceId &&
                     assignment.WantedTargetUnitIds.Count != 0)) + ",providers=" +
-                source.Providers.Count + ",card=" + (card != null) + ",rowVisible=" +
+                source.Providers.Count + ",abilities=" + source.Abilities.Count +
+                ",migrated=" + model.AssignmentMigrationApplied +
+                ",card=" + (card != null) + ",rowVisible=" +
                 (card != null && RectanglesOverlap(card.Rect, _grid.Viewport)) + ",material=" +
                 (_session.CatalogDiscovery == null ? "missing" :
                     _session.CatalogDiscovery.BlessMaterialEvidence);

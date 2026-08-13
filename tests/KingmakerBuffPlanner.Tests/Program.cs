@@ -81,6 +81,7 @@ namespace KingmakerBuffPlanner.Tests
                 Run("planner-routine-shares-resource-ledger", TestPlannerRoutineSharedLedger);
                 Run("effect-fingerprint-is-semantic-and-provider-independent", TestEffectFingerprint);
                 Run("duplicate-provider-effects-consolidate-and-auto-select", TestAggregateCardAndPlanning);
+                Run("aggregate-availability-does-not-double-count-shared-pool", TestAggregateAvailability);
                 Run("aggregate-assignment-round-trip-preserves-targets", () => TestAggregateRoundTrip(root));
                 Run("routine-service-reports-unsupported-sources", TestRoutineServiceUnsupportedSources);
                 Run("profile-round-trip-preserves-stable-ids", () => TestProfileRoundTrip(root));
@@ -762,6 +763,36 @@ namespace KingmakerBuffPlanner.Tests
             if (assignment.SourceId != model.Sources[0].SourceId ||
                 !assignment.WantedTargetUnitIds.SequenceEqual(new[] { "unit-a", "unit-b" }))
                 throw new InvalidOperationException("Legacy assignments did not merge and survive aggregate round trip.");
+        }
+
+        private static void TestAggregateAvailability()
+        {
+            AbilityKey firstAbility = Ability("shared-pool-a", string.Empty, 0);
+            AbilityKey secondAbility = Ability("shared-pool-b", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("shared-aggregate-pool",
+                ResourcePoolKind.SpontaneousLevel, 3, 3, null);
+            ProviderSnapshot first = PlannerProvider("unit-a", "book", firstAbility,
+                "shared-aggregate-pool", 1);
+            ProviderSnapshot second = PlannerProvider("unit-a", "book", secondAbility,
+                "shared-aggregate-pool", 1);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(new[] { first, second },
+                new[] { pool }, "unit-a");
+            var effects = new Dictionary<string, EffectExpression>
+            {
+                { firstAbility.Canonical, Leaf("shared-effect") },
+                { secondAbility.Canonical, Leaf("shared-effect") }
+            };
+            var options = new[]
+            {
+                new ProviderPlanningOption(first, new[] { "unit-a" }, new[] { "unit-a" }, 1, 10),
+                new ProviderPlanningOption(second, new[] { "unit-a" }, new[] { "unit-a" }, 1, 10)
+            };
+            var model = new PlannerSetupModel(BuffPlannerProfile.CreateDefault("shared-pool"),
+                snapshot, new ActiveEffectSnapshot(null), effects, options, ignored => { });
+            var card = new BuffCardViewModel(model.Sources.Single(), model, "long", false);
+            if (card.Availability != "3 available")
+                throw new InvalidOperationException("Aggregate availability double-counted a shared pool: " +
+                    card.Availability);
         }
 
         private static SourceAssignmentProfile Assignment(AbilityKey ability, string target)

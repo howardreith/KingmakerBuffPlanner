@@ -538,9 +538,7 @@ namespace KingmakerBuffPlanner.UI
             _icon.gameObject.SetActive(icon != null);
             _fallback.gameObject.SetActive(available && icon == null);
             _name.text = available ? source.DisplayName : "Select a buff";
-            _meta.text = available ? (source.Abilities.Select(ability => ability.SourceKind)
-                .Distinct().Count() > 1 ? "Multiple sources" :
-                BuffCardViewModel.PlayerSourceType(source.Ability.SourceKind)) +
+            _meta.text = available ? BuffCardViewModel.SourceSummary(source) +
                 (source.SpellLevel > 0 ? " | Level " + source.SpellLevel : string.Empty) +
                 (string.IsNullOrWhiteSpace(source.DurationText) ? string.Empty :
                     " | " + source.DurationText) : string.Empty;

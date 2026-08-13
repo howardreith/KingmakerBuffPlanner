@@ -1,8 +1,12 @@
-# Kingmaker Buff Planner 0.0.8 — Draft Release Notes
+# Kingmaker Buff Planner 0.0.9 — Draft Release Notes
 
 Publication status: local qualification build only. Not a public release.
 
-Version 0.0.8 replaces the planner presentation around a direct four-column routine workflow. It preserves discovery, planning, resource accounting, automatic providers, stable profile identities, Animated and Instant execution, confirmed effects, HUD/input isolation, modal lifecycle, optional-mod compatibility, and guarded runtime transactions.
+Version 0.0.9 polishes the accepted four-column planner without replacing its workflow. Provider-backed abilities with the same normalized effect semantics now appear as one card while the established planning backend automatically chooses among every eligible caster and resource source. Earlier per-ability routine assignments are rebound and unioned without losing targets.
+
+Direct targets now receive a strong full green portrait treatment; indirect party/area beneficiaries receive a distinct lighter green `COVERED` treatment. The grid uses balanced symmetric margins, and the unchanged lower-left HUD hitboxes receive a shared native-toned backing, neighboring button skin where available, inset antique-gold frames, and improved icon padding.
+
+Discovery, targeting commands, Animated and Instant execution, resource accounting, provider ranking, persistence durability, Ctrl+Shift+B isolation, HUD actions/tooltips/pointer capture, modal lifecycle, optional-mod compatibility, and guarded runtime transactions remain preserved. Cosmetic acceptance remains human-gated.
 
 Highlights:
 

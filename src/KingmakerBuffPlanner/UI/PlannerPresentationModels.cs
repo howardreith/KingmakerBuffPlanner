@@ -49,8 +49,7 @@ namespace KingmakerBuffPlanner.UI
                 ? "1 target selected" : requested + " targets selected";
             Status = requested == 0 ? PlannerPresentationStatus.Neutral :
                 BuildStatus(source, model, activeRoutineId, requested, available);
-            SourceType = source.Abilities.Select(ability => ability.SourceKind).Distinct().Count() > 1
-                ? "Multiple sources" : PlayerSourceType(source.Ability.SourceKind);
+            SourceType = SourceSummary(source);
         }
 
         public string SourceId { get; private set; }
@@ -100,12 +99,39 @@ namespace KingmakerBuffPlanner.UI
                 string reason = PlayerReason(model.GetSourceUnavailableReason(source));
                 return string.IsNullOrWhiteSpace(reason) ? "Unavailable now" : reason;
             }
-            if (usable.Any(provider => model.GetRemainingCasts(provider) == null)) return "At will";
-            int remaining = usable.Sum(provider => model.GetRemainingCasts(provider) ?? 0);
+            if (usable.Any(provider => model.GetRemainingCasts(provider) == null))
+                return usable.Count > 1 ? "At will · multiple sources" : "At will";
+            int remaining = usable.GroupBy(provider => provider.ResourcePoolKey,
+                    StringComparer.Ordinal).Sum(group => RemainingForPool(group, model));
             bool prepared = usable.Any(provider =>
                 model.GetResourcePool(provider).Kind == ResourcePoolKind.PreparedSlots);
             if (remaining == 1) return prepared ? "1 prepared" : "1 available";
             return remaining + (prepared ? " prepared" : " available");
+        }
+
+        private static int RemainingForPool(IEnumerable<ProviderSnapshot> providers,
+            PlannerSetupModel model)
+        {
+            List<ProviderSnapshot> values = providers.ToList();
+            ResourcePoolSnapshot pool = model.GetResourcePool(values[0]);
+            if (pool.Kind != ResourcePoolKind.PreparedSlots)
+                return values.Max(provider => model.GetRemainingCasts(provider) ?? 0);
+            var eligible = new HashSet<string>(values.SelectMany(provider => provider.EligibleTokenIds),
+                StringComparer.Ordinal);
+            int available = pool.Tokens.Count(token => token.Available && token.IsPrimary &&
+                eligible.Contains(token.TokenId));
+            int cost = Math.Max(1, values.Min(provider => provider.UnitsPerCast));
+            return available / cost;
+        }
+
+        internal static string SourceSummary(SetupSourceRow source)
+        {
+            string type = source.Abilities.Select(ability => ability.SourceKind).Distinct().Count() > 1
+                ? "Multiple sources" : PlayerSourceType(source.Ability.SourceKind);
+            int providers = source.Providers.Select(provider => provider.Key.CasterUnitId)
+                .Distinct(StringComparer.Ordinal).Count();
+            return providers > 1 && type != "Multiple sources"
+                ? type + " · " + providers + " sources" : type;
         }
 
         internal static string PlayerSourceType(SourceKind kind)

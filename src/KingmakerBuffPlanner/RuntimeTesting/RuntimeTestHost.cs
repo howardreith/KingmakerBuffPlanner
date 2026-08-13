@@ -315,6 +315,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     UiCatalogVisibleRows = ui == null ? 0 : ui.CatalogVisibleRows,
                     UiCatalogSelectedDetailsBound = ui != null && ui.CatalogSelectedDetailsBound,
                     UiCatalogBlessEvidence = ui == null ? null : ui.CatalogBlessEvidence,
+                    UiCatalogProviderCount = ui == null ? 0 : ui.CatalogProviderCount,
+                    UiCatalogAggregateAbilityCount = ui == null ? 0 : ui.CatalogAggregateAbilityCount,
+                    UiCatalogConsolidatedCardCount = ui == null ? 0 : ui.CatalogConsolidatedCardCount,
+                    UiDirectSelectedTargetCount = ui == null ? 0 : ui.DirectSelectedTargetCount,
+                    UiIndirectCoveredTargetCount = ui == null ? 0 : ui.IndirectCoveredTargetCount,
                     UiCatalogControlEvidence = _liveCatalogControlEvidence,
                     UiBlessSelectedAndConfigured = _liveBlessSelectedAndConfigured,
                     UiTooltipStable = _liveTooltipStable,
@@ -739,6 +744,14 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                                 StringSplitOptions.None).Length == 5,
                             "paths/ids/active/corners + four antique-gold sprite inks",
                             ui.HudObjectEvidence ?? "missing");
+                        AddUiAssertion(result, "ui-card-aggregation-evidence",
+                            ui.CatalogAggregateAbilityCount >= ui.CatalogVisibleViewModels &&
+                            ui.CatalogProviderCount >= ui.CatalogAggregateAbilityCount,
+                            "providers>=abilities>=cards", ui.CatalogProviderCount + "/" +
+                            ui.CatalogAggregateAbilityCount + "/" + ui.CatalogVisibleViewModels +
+                            ";consolidated=" + ui.CatalogConsolidatedCardCount);
+                        AddUiAssertion(result, "ui-direct-target-state-visible",
+                            ui.DirectSelectedTargetCount >= 1, ">=1", ui.DirectSelectedTargetCount.ToString());
                         AddUiAssertion(result, "exact-working-save-load",
                             _liveSaveLoader != null && _liveSaveLoader.LoadActionCount == 1 &&
                             !string.IsNullOrWhiteSpace(_liveSaveLoader.WorkingDescriptor) &&
@@ -1430,6 +1443,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         [JsonProperty("uiCatalogVisibleRows", Order = 124)] public int UiCatalogVisibleRows { get; set; }
         [JsonProperty("uiCatalogSelectedDetailsBound", Order = 125)] public bool UiCatalogSelectedDetailsBound { get; set; }
         [JsonProperty("uiCatalogBlessEvidence", Order = 126)] public string UiCatalogBlessEvidence { get; set; }
+        [JsonProperty("uiCatalogProviderCount", Order = 126)] public int UiCatalogProviderCount { get; set; }
+        [JsonProperty("uiCatalogAggregateAbilityCount", Order = 126)] public int UiCatalogAggregateAbilityCount { get; set; }
+        [JsonProperty("uiCatalogConsolidatedCardCount", Order = 126)] public int UiCatalogConsolidatedCardCount { get; set; }
+        [JsonProperty("uiDirectSelectedTargetCount", Order = 126)] public int UiDirectSelectedTargetCount { get; set; }
+        [JsonProperty("uiIndirectCoveredTargetCount", Order = 126)] public int UiIndirectCoveredTargetCount { get; set; }
         [JsonProperty("uiCatalogControlEvidence", Order = 126)] public string UiCatalogControlEvidence { get; set; }
         [JsonProperty("uiBlessSelectedAndConfigured", Order = 127)] public bool UiBlessSelectedAndConfigured { get; set; }
         [JsonProperty("uiTooltipStable", Order = 128)] public bool UiTooltipStable { get; set; }

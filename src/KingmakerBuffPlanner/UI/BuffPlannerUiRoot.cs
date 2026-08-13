@@ -424,6 +424,11 @@ namespace KingmakerBuffPlanner.UI
             result.CatalogVisibleRows = catalog == null ? 0 : catalog.VisibleRows;
             result.CatalogSelectedDetailsBound = catalog != null && catalog.SelectedDetailsBound;
             result.CatalogBlessEvidence = catalog == null ? "missing" : catalog.BlessEvidence;
+            result.CatalogProviderCount = catalog == null ? 0 : catalog.ProviderCount;
+            result.CatalogAggregateAbilityCount = catalog == null ? 0 : catalog.AggregateAbilityCount;
+            result.CatalogConsolidatedCardCount = catalog == null ? 0 : catalog.ConsolidatedCardCount;
+            result.DirectSelectedTargetCount = catalog == null ? 0 : catalog.DirectSelectedTargetCount;
+            result.IndirectCoveredTargetCount = catalog == null ? 0 : catalog.IndirectCoveredTargetCount;
             result.TooltipActive = tooltip != null && tooltip.Active;
             result.TooltipInsideScreen = tooltip != null && tooltip.InsideScreen;
             result.TooltipBounds = tooltip == null ? "missing" : tooltip.Bounds;
@@ -741,6 +746,11 @@ namespace KingmakerBuffPlanner.UI
         internal int CatalogVisibleRows;
         internal bool CatalogSelectedDetailsBound;
         internal string CatalogBlessEvidence;
+        internal int CatalogProviderCount;
+        internal int CatalogAggregateAbilityCount;
+        internal int CatalogConsolidatedCardCount;
+        internal int DirectSelectedTargetCount;
+        internal int IndirectCoveredTargetCount;
         internal bool TooltipActive;
         internal bool TooltipInsideScreen;
         internal string TooltipBounds;
