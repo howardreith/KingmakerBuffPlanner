@@ -295,6 +295,14 @@ if (-not $runtimeScriptSource.Contains('physical-umm-dismiss-recovery-sent') -or
     throw 'Live UI orchestration must include one bounded Escape-menu recovery after UMM dismissal.'
 }
 $assertions++
+
+$plannerViewsSource = Get-Content -LiteralPath (Join-Path $root `
+    'src\KingmakerBuffPlanner\UI\PlannerViews.cs') -Raw
+if (-not $plannerViewsSource.Contains('_plan.horizontalOverflow = HorizontalWrapMode.Wrap;') -or
+    -not $plannerViewsSource.Contains('_plan.verticalOverflow = VerticalWrapMode.Overflow;')) {
+    throw 'Selected-buff availability and planned-use lines must remain visibly wrapped.'
+}
+$assertions++
 foreach ($physicalContract in @('umm-overlay-ready.json',
         'physical-umm-dismiss-sent', '[byte]0x1B', 'hotkey-ready.json',
         '[byte]0x11', '[byte]0x10', '[byte]0x42',

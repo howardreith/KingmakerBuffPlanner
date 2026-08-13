@@ -511,7 +511,7 @@ namespace KingmakerBuffPlanner.UI
             _targetsLabel.fontStyle = FontStyle.Bold;
             KingmakerUiFactory.SetAnchors(_targetsLabel.rectTransform, 0.435f, 0.78f, 0.98f, 0.95f);
             _targets = new PlannerTargetStripView(Root, theme, showTooltip);
-            KingmakerUiFactory.SetAnchors(_targets.Root, 0.435f, 0.25f, 0.84f, 0.77f);
+            KingmakerUiFactory.SetAnchors(_targets.Root, 0.435f, 0.34f, 0.84f, 0.77f);
             _selectAll = KingmakerUiFactory.CreateButton("SelectAllValid", Root, theme,
                 "Select All Valid", () => selectAll());
             KingmakerUiFactory.SetAnchors((RectTransform)_selectAll.transform,
@@ -523,7 +523,9 @@ namespace KingmakerBuffPlanner.UI
             _plan = KingmakerUiFactory.CreateText("PlanSummary", Root, theme,
                 string.Empty, 15, TextAnchor.MiddleLeft);
             _plan.color = theme.BurgundyPrimary;
-            KingmakerUiFactory.SetAnchors(_plan.rectTransform, 0.435f, 0.04f, 0.975f, 0.22f);
+            _plan.horizontalOverflow = HorizontalWrapMode.Wrap;
+            _plan.verticalOverflow = VerticalWrapMode.Overflow;
+            KingmakerUiFactory.SetAnchors(_plan.rectTransform, 0.435f, 0.03f, 0.975f, 0.31f);
         }
 
         internal RectTransform Root { get; private set; }
