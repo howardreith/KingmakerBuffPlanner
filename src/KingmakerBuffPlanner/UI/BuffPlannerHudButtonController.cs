@@ -757,7 +757,9 @@ namespace KingmakerBuffPlanner.UI
                 }
             }
             texture.SetPixels(pixels);
-            texture.Apply(false, true);
+            // Keep these four tiny project-owned textures readable so guarded runtime
+            // qualification can sample the generated antique-gold ink itself.
+            texture.Apply(false, false);
             Sprite sprite = Sprite.Create(texture, new Rect(0, 0, size, size),
                 new Vector2(0.5f, 0.5f), 64f);
             sprite.name = texture.name;
