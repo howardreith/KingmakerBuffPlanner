@@ -1,5 +1,15 @@
 # Architecture
 
+## 0.0.10 plan-derived clarity and native rendering boundary
+
+The consolidated-card and provider-selection architecture from 0.0.9 is unchanged. `CastStep` and `TargetPlanOutcome` now retain aggregate `SourceId` provenance, while each step exposes the recipients already computed by the planning engine. `TargetPortraitViewModel` is a presentation adapter over that selected-source plan slice; it does not recalculate spell mechanics. Its deterministic precedence is `InvalidTarget`, `DirectSelectedAndCovered`, `DirectSelectedButUnavailable`, `IndirectlyCovered`, then `Neutral`. Area/party expected recipients can therefore be shown as light-green `COVERED`, while ordinary single-target plans do not leak coverage and caster-centered previews do not invent a receiver.
+
+`SelectedBuffPlanSummaryViewModel` reports only the selected aggregate's resource availability and planned cast count, with an optional selected/additional-recipient line. It deduplicates shared resource pools and preserves the implicit provider ranking. Generic coverage fractions and blocked counts are not presentation contracts.
+
+HUD construction still uses the same native host, four hitboxes, listeners, tooltips, pointer ownership, and actions. The owned row's horizontal origin is derived from the minimum left edge of the native cluster's direct button children. Each glyph uses a fixed safe area, centered anchors/pivot, unit scale, preserve-aspect, and one centralized alpha-bounds optical correction. Runtime qualification separately proves left-edge alignment, glyph centering, hit ownership, and zero native activation.
+
+The modal remains a dedicated top-level overlay because that boundary owns the already-qualified input lease. It no longer adds a `CanvasScaler`. Text uses the exact native legacy `Text` font/material path (Arial and `UI/Default` in the installed 2.1.7b service UI), fixed integer sizes, disabled best-fit, and unit-scale parents. After forced layout, rendered text and active cards are snapped to the canvas pixel grid. Global/native canvas settings are never changed.
+
 ## 0.0.9 effect-semantic card aggregation and polish boundary
 
 The four-column planner now groups provider-backed catalog rows by a deterministic normalized-effect fingerprint described in `planning/UI-POLISH-AND-SOURCE-CONSOLIDATION.md`. The key includes stable effect identity, kind, target semantics, sequence/conditional structure, and branch contracts. It excludes caster, provider, spellbook/resource state, discovery paths, and wrapper ability IDs. It never falls back to display-name matching, and unresolved effects retain exact ability identities. Each aggregate retains all member ability keys, so the unchanged provider ranking and resource ledger choose among every eligible source implicitly during planning and execution.

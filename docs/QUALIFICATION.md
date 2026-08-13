@@ -1,5 +1,19 @@
 # Qualification
 
+## 0.0.10 visual-clarity candidate qualification
+
+Status: candidate deterministic and physical qualification PASS; exact documentation-inclusive release reproduction and guarded installation follow; human visual acceptance remains required.
+
+- Candidate source/package/DLL/MVID: `73de462b885bc7b24162d8670bc2be1b806baf37` / `19683ab7a01c9e583e8d2b8cd3f790b6ce6ca03284ab324fd42e4b035cf3da1b` / `92b2dcf09937c3d277af5e5235310e8a28c9737400911baa36535e7b88d47444` / `0c5f4132-baed-4a4b-90c5-0b5764125224`.
+- Deterministic gates: source 32/32; behavior/protocol 75/75; runtime filesystem 8/8; package 4/4; deployment WhatIf 5/5. Four-column calculations cover 1920x1080 and 1600x900 content widths with no horizontal scrolling.
+- `ui-clarity-0.0.10-final-animated-1` and `ui-clarity-0.0.10-final-instant-1`: 77/77 each in fresh processes. Both prove physical Ctrl+Shift+B, HUD/modal/world-input isolation, tooltips, 21 lifecycle cycles, consolidated Bless, direct assignment, profile round trip, selected-buff availability/planned-use text, and confirmed effect/resource outcomes. Animated planned/confirmed 1/1; Instant planned/submitted/confirmed 1/1/1.
+- Active 1280x720/UI-scale evidence: HUD left-edge alignment `true`; glyph centering `true`; hit ownership `true`; native activation count 0. Text is `UnityEngine.UI.Text`, Arial, UI/Default, fixed size, best-fit false, root scale one, scale factor 1, nested canvases 0, planner scalers 0, fractional rendered text/card transforms 0.
+- Screenshot hashes from Animated: render `9e457361...`; selected details `24a63490...`; grid `8484cf45...`; target states `9c0190a2...`; settings `d503e4c9...`; HUD `4282f218...`. Full files are under `runtime-evidence/ui-clarity-0.0.10-final-animated-1/`.
+- The campaign catalog retains 11 provider-backed abilities and 10 visible cards, including one two-provider/two-ability Bless card and one Resistance card. Provider selection remains implicit.
+- `ui-clarity-0.0.10-final-native-1`: 12/12 with 1,722 abilities. `ui-clarity-0.0.10-final-cotw-1`: 26/26 with 9,064 abilities, 2,096 optional inclusions, zero unsupported, and zero planner Harmony overlap. Both restored exactly.
+- Every candidate transaction is `Restored` with `restorationVerified=true`. The immutable baseline descriptor remains the exact `KBP_AUTOMATION_BASELINE`; only Working was loaded through the normal save action.
+- The authorized campaign has one party member. It physically proves strong direct green and the new summary, but cannot honestly show a second `COVERED` portrait or a controlled invalid portrait. Deterministic plan-domain tests prove those mappings; their appearance remains human-gated in an appropriate multi-member party.
+
 ## 0.0.9 UI polish and source-consolidation qualification
 
 Status: deterministic, exact-release physical, packaging, and guarded-install qualification PASS; human cosmetic acceptance remains required.

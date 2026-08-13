@@ -1,5 +1,15 @@
 # Implementation Report
 
+## 0.0.10 visual clarity and plan communication — release candidate qualified
+
+The 0.0.9 mechanics remain frozen. This pass adds plan provenance and expected recipients to immutable planning results, then maps the selected consolidated card to five explicit portrait states. Strong green `SELECTED`, amber unavailable, light-green `COVERED`, red invalid, and neutral are deterministic and carry exact tooltips. Single-target and caster-centered negative cases are covered. The one-member authorized save cannot physically display a second covered portrait, so no automated multi-portrait cosmetic claim is made.
+
+The selected-buff panel now shows `Available:` and `Planned:` for that buff, keeps both lines visible, and removes ambiguous coverage fractions/generic blocked counts. Prepared, pooled, at-will, and multiple-caster availability use existing provider/resource state. Effect-semantic consolidation and saved aggregate assignments are unchanged.
+
+HUD row placement is derived from the native lower-left button cluster, and all glyph transforms use one centered safe-area contract plus centralized optical correction from sprite alpha bounds. Production hitboxes/listeners/input behavior were not changed. Text forensics removed the planner-only scaler and bound fixed-size legacy text to the native Arial/UI-Default path with unit transforms and post-layout pixel snapping.
+
+Candidate source `73de462b885bc7b24162d8670bc2be1b806baf37` passed source 32/32, behavior 75/75, filesystem 8/8, package 4/4, and deployment WhatIf 5/5. Fresh-process candidate runs passed Animated 77/77, Instant 77/77, native 12/12, and Call of the Wild 26/26; all restored exactly. Runtime diagnostics at the active 1280x720 configuration report native row alignment, all glyphs centered, zero native activations, zero nested planner scalers, zero fractional rendered text/card transforms, and Arial/UI-Default. The final exact documentation-inclusive release identity and guarded installation follow this checkpoint; human visual acceptance remains mandatory.
+
 ## 0.0.9 UI polish and duplicate-source consolidation — installed for human visual acceptance
 
 Final local-only release identity is source `f026a4a9974af8e4191ff7fb104e472f11c2016f`; package `471e86e0043b47bc899322b640fb448105bfc1689f796b56611ed5d980d4bbe8`; DLL `d66edcacedcfe9d862e5cd433e2e58166abbc5a5a5404b9b7c5d6fd39ae898a1`; MVID `174e2e17-9006-4667-b06d-85d372a2bb77`. Exact-source Animated and Instant runs passed 74/74 each; native passed 12/12; Call of the Wild passed 26/26; all four transactions restored exactly. The deterministic release reproduced the runtime ZIP byte-for-byte. Guarded install `ui-polish-0.0.9-final-install` preserved settings and verified every non-planner mod unchanged.

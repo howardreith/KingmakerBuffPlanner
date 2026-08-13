@@ -1,5 +1,7 @@
 # Autonomous Blockers
 
+0.0.10 visual-clarity status, 2026-08-13: no critical engineering or runtime-safety blocker. Candidate deterministic, Animated, Instant, native, Call of the Wild, screenshot, persistence, input, modal, and restoration gates pass. The authorized save contains one party member, so a live second `COVERED` portrait and controlled invalid portrait cannot be demonstrated without changing the authorized fixture or fabricating mechanics. Those appearance checks and overall visual acceptance remain explicitly human-gated; they do not block exact packaging and guarded installation.
+
 0.0.9 polish status, 2026-08-12: engineering/runtime/package/install work is complete with no critical blocker. Exact release source `f026a4a` passes deterministic 72/72, Animated 74/74, Instant 74/74, native 12/12, and Call of the Wild 26/26, with every transaction restored; deterministic package and guarded install pass, settings are preserved, and all other mods are verified unchanged. The disposable save contains one party target, so indirect multi-portrait appearance and the overall cosmetic verdict remain explicitly human-gated.
 
 0.0.8 final status, 2026-08-12: COMPLETE for engineering/runtime/package/install qualification; no critical blocker. The remaining boundary is explicitly human visual acceptance. No merge, push, or public release is authorized.

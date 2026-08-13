@@ -1,5 +1,20 @@
 # Manual Acceptance
 
+## 0.0.10 clarity and alignment visual gate
+
+Status: REQUIRED after guarded installation. Automation proves mechanics and captures rendered evidence; it does not grant cosmetic acceptance.
+
+Compare the installed build with `runtime-evidence/ui-clarity-0.0.10-final-animated-1/`:
+
+1. At the active UI scale, confirm the four-button row's left edge aligns with the native lower-left grid and every antique-gold glyph looks centered inside its unchanged hitbox. Recheck at 1920x1080 and 1600x900.
+2. Confirm planner text is as sharp as nearby native service-window text. There must be no soft rescaled appearance, clipping, or fuzzy fractional placement.
+3. Select Bless or another configured buff. A fulfilled explicit portrait must be unmistakably full green with a strong frame and `SELECTED`; selected-but-unavailable must be amber; invalid must be red and explain why.
+4. In a multi-member party, select one recipient for a normalized party/area effect. Additional expected recipients must be lighter green with `COVERED` and the tooltip `Also affected by the planned cast.` Single-target spells must not mark unrelated portraits.
+5. The selected-buff panel must visibly show `Available:` and `Planned:` lines. No unexplained coverage fraction or generic blocked count may appear.
+6. Bless, Resistance, Light, and similar entries must remain consolidated. Animated, Instant, automatic provider selection, routine persistence, Ctrl+Shift+B isolation, HUD clicks/tooltips, and modal close/restore must remain unchanged.
+
+Report resolution, UI scale, selected buff, party composition, and a full-resolution screenshot for any failed item. No merge, push, or public release is authorized by this checklist.
+
 ## 0.0.9 polish and consolidation visual gate
 
 Status: REQUIRED. Exact 0.0.9 is guarded-installed; automation proves behavior and rendered evidence, not the final cosmetic verdict.

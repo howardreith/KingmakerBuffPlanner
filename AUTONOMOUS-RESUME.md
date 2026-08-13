@@ -269,3 +269,12 @@ Status: INSTALLED FOR HUMAN UI RETEST — campaign UI and save-backed qualificat
 - Portrait status/hover is presentation-only; bulk changes use the existing assignment identity/list and save once. Selected details and plans use player language.
 - External runtime remains restored and idle; installed qualified MVP is unchanged.
 - Exact next command: commit Phase C, implement Phase D primary/advanced filters, one Settings mode control, readiness summaries, collapsed Casting Source, then rerun all mechanical gates.
+# 0.0.10 visual-clarity release-source checkpoint — 2026-08-13
+
+- Branch `codex/ui-clarity-presentation`; implementation candidate HEAD `73de462b885bc7b24162d8670bc2be1b806baf37`; version 0.0.10. The next commit contains only required durable qualification records.
+- Candidate exact identity: package `19683ab7a01c9e583e8d2b8cd3f790b6ce6ca03284ab324fd42e4b035cf3da1b`; DLL `92b2dcf09937c3d277af5e5235310e8a28c9737400911baa36535e7b88d47444`; MVID `0c5f4132-baed-4a4b-90c5-0b5764125224`.
+- Final candidate runs: `ui-clarity-0.0.10-final-animated-1` 77/77, `ui-clarity-0.0.10-final-instant-1` 77/77, `ui-clarity-0.0.10-final-native-1` 12/12, `ui-clarity-0.0.10-final-cotw-1` 26/26. All transactions are Restored/verified.
+- Deterministic gates: source 32/32; behavior 75/75; filesystem 8/8; package 4/4; deployment WhatIf 5/5. Current tree has no unresolved runtime transaction or Kingmaker process.
+- Active physical rendering: 1280x720, HUD alignment/glyph centering/hit ownership true, native activation zero; Arial/UI-Default, unit scale, no planner scaler, zero fractional rendered text/card transforms. Full screenshots are under the Animated run.
+- Runtime limitation: the authorized one-member save cannot exhibit a second indirect-covered or controlled invalid portrait. No hardcoded/fake evidence was introduced; deterministic plan tests cover it and human acceptance remains open.
+- Exact next command after committing this checkpoint: `.\scripts\Build-Local.ps1`, then exact-source final runtime repetitions if the resulting commit/hash changes, `.\scripts\Build-Release.ps1`, guarded `.\scripts\Install-Local.ps1`, exact identity/other-mod verification, and a documentation-only handoff commit.
