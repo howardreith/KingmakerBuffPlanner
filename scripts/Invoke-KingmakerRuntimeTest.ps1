@@ -100,6 +100,8 @@ try {
     $resultPath = Join-Path $evidence 'runtime-result.json'
     $plannerHotkeySent = $false
     $ummDismissSent = $false
+    $ummDismissRecoverySent = $false
+    $ummDismissSentAtUtc = [DateTime]::MinValue
     if ($Scenario -ceq 'live-ui-bootstrap') {
         Add-Type @'
 using System;
@@ -155,11 +157,27 @@ public static class KbpPhysicalInput {
             Start-Sleep -Milliseconds 100
             [KbpPhysicalInput]::KeyUp([byte]0x1B)
             $ummDismissSent = $true
+            $ummDismissSentAtUtc = [DateTime]::UtcNow
             $orchestration.stage = 'physical-umm-dismiss-sent'
-            $orchestration.ummDismissSentAtUtc = [DateTime]::UtcNow.ToString('o')
+            $orchestration.ummDismissSentAtUtc = $ummDismissSentAtUtc.ToString('o')
             Write-KbpJsonAtomic (Join-Path $evidence 'orchestration.json') $orchestration
         }
         $hotkeyMarker = Join-Path $evidence 'hotkey-ready.json'
+        if ($Scenario -ceq 'live-ui-bootstrap' -and $ummDismissSent -and
+            -not $ummDismissRecoverySent -and -not (Test-Path -LiteralPath $hotkeyMarker -PathType Leaf) -and
+            [DateTime]::UtcNow -ge $ummDismissSentAtUtc.AddSeconds(2)) {
+            # Depending on the active UMM overlay layer, the physical dismissal can also
+            # open Kingmaker's Escape menu. One bounded follow-up closes that native veil;
+            # production HUD ownership and input suppression remain unchanged.
+            $process.Refresh()
+            [KbpPhysicalInput]::KeyDown($process.MainWindowHandle, [byte]0x1B)
+            Start-Sleep -Milliseconds 100
+            [KbpPhysicalInput]::KeyUp([byte]0x1B)
+            $ummDismissRecoverySent = $true
+            $orchestration.stage = 'physical-umm-dismiss-recovery-sent'
+            $orchestration.ummDismissRecoverySentAtUtc = [DateTime]::UtcNow.ToString('o')
+            Write-KbpJsonAtomic (Join-Path $evidence 'orchestration.json') $orchestration
+        }
         if ($Scenario -ceq 'live-ui-bootstrap' -and -not $plannerHotkeySent -and
             (Test-Path -LiteralPath $hotkeyMarker -PathType Leaf)) {
             $process.Refresh()

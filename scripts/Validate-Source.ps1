@@ -290,6 +290,11 @@ foreach ($failureContract in @('_completed = true;',
 $assertions++
 
 $runtimeScriptSource = Get-Content -LiteralPath (Join-Path $root 'scripts\Invoke-KingmakerRuntimeTest.ps1') -Raw
+if (-not $runtimeScriptSource.Contains('physical-umm-dismiss-recovery-sent') -or
+    -not $runtimeScriptSource.Contains('$ummDismissSentAtUtc.AddSeconds(2)')) {
+    throw 'Live UI orchestration must include one bounded Escape-menu recovery after UMM dismissal.'
+}
+$assertions++
 foreach ($physicalContract in @('umm-overlay-ready.json',
         'physical-umm-dismiss-sent', '[byte]0x1B', 'hotkey-ready.json',
         '[byte]0x11', '[byte]0x10', '[byte]0x42',
