@@ -1,5 +1,20 @@
 # Manual Acceptance
 
+## 0.0.9 polish and consolidation visual gate
+
+Status: REQUIRED after guarded installation. Automation proves behavior and rendered evidence, not the final cosmetic verdict.
+
+Compare the installed build against `runtime-evidence/ui-polish-0.0.9-release-animated/`:
+
+1. The four dark/gold HUD buttons read as one framed cluster immediately above the native lower-left block. Confirm their screen-edge spacing, native skin, inset frame/accent, and inward-padded glyphs feel integrated; clicks, tooltips, anchors, and quick actions must remain unchanged.
+2. The grid remains exactly four columns without horizontal scrolling. Symmetric inner margins and wider gaps should feel balanced; Bless and Resistance should each appear once.
+3. Bless should say `At will · multiple sources` in the fixture while retaining automatic provider choice. No provider-management interface or provider-specific duplicate card should appear.
+4. Clicking a valid portrait must produce the strong full green tint/overlay, bright frame, and `SELECTED` label. Amber and invalid red/muted states must remain distinct.
+5. In a multi-member party with Remove Fear or another normalized Party/AreaRecipients effect, directly select one target. Other legal beneficiaries should receive the lighter green `COVERED` state, clearly distinct from direct selection. The one-member automation save cannot visually demonstrate this multi-portrait case.
+6. Long/Important/Short, Search/categories/Selected only, direct target toggles, one Apply action, Animated, Instant, Ctrl+Shift+B isolation, close/restore, and persistence should behave exactly as in 0.0.8.
+
+Report the exact resolution and screenshots for any failed item. No merge or public release is authorized by this checklist.
+
 ## 0.0.8 four-column planner visual gate
 
 Status: REQUIRED after guarded installation. Automation has not granted cosmetic acceptance.

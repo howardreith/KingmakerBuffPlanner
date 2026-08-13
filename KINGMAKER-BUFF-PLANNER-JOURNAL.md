@@ -627,3 +627,9 @@ Status: ROOT CAUSE PROVEN; 0.0.4 SOURCE PASS; LIVE QUALIFICATION PENDING
 
 - First runtime preflight rejected human-reproduction because BagOfTricks `Settings.xml` differs from the prior inventory by exactly one byte; all other 40 entries and DLL/Info identities match. Native-only then proved inappropriate for this save and timed out at campaign load, with verified restoration.
 - Refreshed only the compatibility profile's manifest hash and total bytes to describe the already-live read-only fixture; no third-party mutation occurred. Next: clean build and human-reproduction Animated rerun.
+# 0.0.9 exact-package runtime qualification — 2026-08-12
+
+- Exact source/package/DLL/MVID `a9f18f8` / `703d8500...` / `fd1cc4c...` / `b5eceb04-7f6a-4f46-9cbe-2f093a20f285` passes Animated 74/74, Instant 74/74, native 12/12, and Call of the Wild 26/26. All live transactions restored.
+- The live fixture now shows 10 cards from 11 aggregate abilities: Bless is one card with two abilities/providers and implicit selection; Resistance is visibly singular. Direct target screenshot shows the strong green full-state treatment. The one-target disposable save cannot exhibit a second indirect portrait, so its lighter `IndirectCovered` rendering is behavior-tested and remains a human multi-member check.
+- HUD physical evidence retains four listeners, original button rectangles, owned raycast centers, zero native activation, stable tooltip, and adds native skins/inset frames/cluster backing. Dedicated capture shows the row immediately above the native lower-left cluster.
+- Exact next action: checkpoint docs, deterministic release packaging, guarded 0.0.8 -> 0.0.9 install, then final handoff records.

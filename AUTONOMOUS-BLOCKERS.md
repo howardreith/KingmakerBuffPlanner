@@ -1,5 +1,7 @@
 # Autonomous Blockers
 
+0.0.9 polish status, 2026-08-12: no critical engineering or runtime-safety blocker. Exact source `a9f18f8` passes deterministic 72/72, Animated 74/74, Instant 74/74, native 12/12, and Call of the Wild 26/26, with every transaction restored. The disposable save contains one party target, so indirect multi-portrait appearance and overall cosmetics remain explicitly human-gated. Release packaging and guarded install are still actionable.
+
 0.0.8 final status, 2026-08-12: COMPLETE for engineering/runtime/package/install qualification; no critical blocker. The remaining boundary is explicitly human visual acceptance. No merge, push, or public release is authorized.
 
 0.0.8 four-column rebuild, 2026-08-12: no critical engineering or runtime-safety blocker. The architecture replacement, migration, hotkey isolation, dark/gold HUD treatment, deterministic gates, and candidate physical matrix are complete. Exact release-source packaging/runtime/install remain actionable. Human visual acceptance is the intentional final gate, not an engineering blocker.

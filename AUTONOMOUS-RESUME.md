@@ -1,5 +1,12 @@
 # Autonomous Resume
 
+## 0.0.9 exact-package qualification — 2026-08-12
+
+- Exact source `a9f18f88252a30d92bda4dafe1da70099a4fdb73`; local package `703d850025ede3fb501f7581fb911006432c705e40393e85ddc26f03942ea593`; DLL `fd1cc4c664f5d1a04aac7afc3be18b11e15f4fec381ac142cbc98b076b2b88b5`; MVID `b5eceb04-7f6a-4f46-9cbe-2f093a20f285`.
+- Exact runs: Animated 74/74, Instant 74/74, native 12/12, Call of the Wild 26/26; every transaction restored exactly. Catalog evidence is 11 provider-backed abilities -> 10 cards with one two-ability/two-provider Bless card.
+- Deterministic gates pass source 30/30, behavior 72/72, filesystem 8/8, package 4/4, deployment WhatIf 5/5.
+- Exact next action: commit qualification docs, build deterministic local release, then guarded-install over validated 0.0.8 and record final identity/handoff.
+
 ## 0.0.9 runtime fixture checkpoint — 2026-08-12
 
 - Runtime preflight found BagOfTricks `Settings.xml` had grown by one byte since the 0.0.8 qualified inventory; every other manifest entry and the primary DLL/Info hashes are unchanged. The human-reproduction profile inventory hash/byte count was refreshed read-only; no third-party file was edited.
