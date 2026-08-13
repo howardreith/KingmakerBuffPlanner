@@ -349,6 +349,8 @@ namespace KingmakerBuffPlanner.UI
     {
         private readonly RectTransform _root;
         private readonly PlannerUiTheme _theme;
+        private readonly Dictionary<string, Button> _buttons =
+            new Dictionary<string, Button>(StringComparer.Ordinal);
 
         internal PlannerTargetStripView(RectTransform parent, PlannerUiTheme theme)
         {
@@ -369,6 +371,7 @@ namespace KingmakerBuffPlanner.UI
             Func<PlannerPresentationStatus, Color> statusColor)
         {
             KingmakerUiFactory.DestroyChildren(_root);
+            _buttons.Clear();
             foreach (TargetPortraitViewModel target in targets)
             {
                 RectTransform rect = KingmakerUiFactory.CreateRect("Target." + target.UnitId, _root);
@@ -382,6 +385,7 @@ namespace KingmakerBuffPlanner.UI
                 button.targetGraphic = background;
                 button.interactable = target.Legal;
                 button.onClick.AddListener(() => toggle(target.UnitId));
+                _buttons[target.UnitId] = button;
                 RectTransform imageRect = KingmakerUiFactory.CreateRect("Portrait", rect);
                 KingmakerUiFactory.SetAnchors(imageRect, 0.08f, 0.25f, 0.92f, 0.94f);
                 Image image = imageRect.gameObject.AddComponent<Image>();
@@ -398,6 +402,15 @@ namespace KingmakerBuffPlanner.UI
                 mark.color = statusColor(target.Status);
                 KingmakerUiFactory.SetAnchors(mark.rectTransform, 0.62f, 0.63f, 0.96f, 0.97f);
             }
+        }
+
+        internal bool InvokeTarget(string unitId)
+        {
+            Button button;
+            if (!_buttons.TryGetValue(unitId, out button) || button == null || !button.interactable)
+                return false;
+            button.onClick.Invoke();
+            return true;
         }
     }
 
@@ -471,6 +484,7 @@ namespace KingmakerBuffPlanner.UI
         internal RectTransform Root { get; private set; }
         internal string BoundName { get { return _name.text; } }
         internal int TargetCount { get { return _targets.Root.childCount; } }
+        internal bool InvokeTarget(string unitId) { return _targets.InvokeTarget(unitId); }
 
         internal void Bind(SetupSourceRow source, Sprite icon, string routineId,
             IReadOnlyList<TargetPortraitViewModel> targets, Func<string, Sprite> portrait,

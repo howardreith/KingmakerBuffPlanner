@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.0.8 — Four-column routine planner
+
+- Replaces the narrow technical catalog with one pooled, vertically scrolling four-card grid.
+- Makes portrait clicks directly add or remove targets in the active Long, Important, or Short routine.
+- Reduces catalog controls to Search, All/Spells/Abilities/Other, and Selected only.
+- Migrates hidden entries to visible while preserving routine targets and automatic provider behavior.
+- Replaces F10 with configurable Ctrl+Shift+B (or Ctrl+Shift+P) and isolates the chord from native B/P actions.
+- Restores the HUD buttons to a dark tile with antique-gold glyph treatment without changing their interaction geometry or lifecycle.
+
 ## 0.0.7 — Kingmaker-native planner presentation
 
 - Replaced the diagnostic-looking setup screen with a centralized Kingmaker parchment, burgundy, antique-gold, and brown-text theme using exact 2.1.7b native candidates with safe fallbacks.

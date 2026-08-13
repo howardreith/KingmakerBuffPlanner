@@ -164,7 +164,7 @@ namespace KingmakerBuffPlanner.UI
             }
             else
             {
-                _status.text = model.Snapshot.Units.Count + " targets • " +
+                _status.text = model.Snapshot.Units.Count + " targets | " +
                     model.Sources.Count + " buffs found";
                 if (string.IsNullOrWhiteSpace(_result.text))
                     _result.text = _session.ProfileStatus.StartsWith("No prior profile",
@@ -224,6 +224,11 @@ namespace KingmakerBuffPlanner.UI
             SetupSourceRow first = model == null ? null : model.Sources
                 .OrderBy(source => source.DisplayName, StringComparer.OrdinalIgnoreCase).FirstOrDefault();
             return first != null && _grid.SelectForRuntime(first.SourceId);
+        }
+
+        internal bool DispatchTargetForRuntime(string unitId)
+        {
+            return _selected != null && _selected.InvokeTarget(unitId);
         }
 
         internal LiveRowRenderDiagnostics GetLiveRowRenderDiagnostics()

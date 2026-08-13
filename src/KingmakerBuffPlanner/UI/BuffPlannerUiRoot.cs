@@ -309,7 +309,8 @@ namespace KingmakerBuffPlanner.UI
                     unit.TargetValidation.Friendly && unit.TargetValidation.Targetable)
                 .Select(unit => unit.UnitId).FirstOrDefault();
             if (string.IsNullOrEmpty(target)) return false;
-            if (!model.IsTargetWanted("long", target)) model.ToggleTarget("long", target);
+            if (!model.IsTargetWanted("long", target) &&
+                !_instance._screen.View.DispatchTargetForRuntime(target)) return false;
             if (!model.Profile.Execution.RecastExisting) model.ToggleRecastExisting();
             if (model.Profile.Execution.Mode != executionMode) model.ToggleExecutionMode();
             _instance._screen.View.RefreshCatalogForRuntime();
