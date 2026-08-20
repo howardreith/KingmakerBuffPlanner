@@ -93,6 +93,7 @@ namespace KingmakerBuffPlanner.Tests
                 Run("setup-model-direct-targets-are-routine-local", TestSetupModel);
                 Run("catalog-filter-selected-category-and-reset-contract", TestCatalogFilterState);
                 Run("presentation-view-models-use-player-facing-deterministic-state", TestPresentationModels);
+                Run("personal-target-eligibility-is-provider-relative", TestPersonalTargetEligibility);
                 Run("area-coverage-preview-distinguishes-direct-and-indirect", TestAreaCoveragePresentation);
                 Run("single-target-plan-does-not-create-indirect-coverage", TestSingleTargetCoveragePresentation);
                 Run("caster-centered-plan-does-not-invent-direct-receiver", TestCasterCenteredCoveragePresentation);
@@ -1223,6 +1224,74 @@ namespace KingmakerBuffPlanner.Tests
                 indirect.State != TargetPortraitState.IndirectlyCovered || !indirect.Indirect ||
                 indirect.Wanted || indirect.Tooltip != "Also affected by the planned cast.")
                 throw new InvalidOperationException("Area coverage preview did not distinguish direct and indirect targets.");
+        }
+
+        private static void TestPersonalTargetEligibility()
+        {
+            AbilityKey personalAbility = Ability("personal-source", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("personal-free", ResourcePoolKind.Unlimited, 0, 0, null);
+            ProviderSnapshot casterA = PlannerProvider("unit-a", "book-personal-a",
+                personalAbility, "personal-free", 0);
+            PartyProviderSnapshot snapshotA = PlannerSnapshot(new[] { casterA }, new[] { pool },
+                "unit-a", "unit-b");
+            var personalA = new ProviderPlanningOption(casterA, new[] { "unit-a" },
+                new[] { "unit-a" }, 1, 10);
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault("personal-targeting");
+            var effects = new Dictionary<string, EffectExpression>
+            {
+                { personalAbility.Canonical, Leaf("personal-effect") }
+            };
+            var modelA = new PlannerSetupModel(profile, snapshotA, new ActiveEffectSnapshot(null),
+                effects, new[] { personalA }, ignored => { });
+            if (!modelA.IsTargetLegal(modelA.SelectedSource, "unit-a") ||
+                modelA.IsTargetLegal(modelA.SelectedSource, "unit-b"))
+                throw new InvalidOperationException("A personal spell was not limited to its provider caster.");
+            bool rejected = false;
+            try { modelA.ToggleTarget("long", "unit-b"); }
+            catch (InvalidOperationException) { rejected = true; }
+            if (!rejected || modelA.IsTargetWanted("long", "unit-b"))
+                throw new InvalidOperationException("An invalid personal target mutated the assignment.");
+
+            profile.Routines.First(routine => routine.RoutineId == "long").Assignments.Add(
+                new SourceAssignmentProfile
+                {
+                    SourceId = modelA.SelectedSource.SourceId,
+                    Ability = AbilityKeyProfile.FromKey(personalAbility),
+                    WantedTargetUnitIds = new List<string> { "unit-b" },
+                    ExistingEffectPolicy = ExistingEffectPolicy.Overwrite,
+                    IgnoredPresenceMarkers = new List<string>()
+                });
+            RoutinePlanResult stale = new RoutinePlanService().Plan(profile, "long", snapshotA,
+                new ActiveEffectSnapshot(null), effects, new[] { personalA });
+            if (stale.Plan.Steps.Count != 0 || stale.Plan.Outcomes.Count != 1 ||
+                stale.Plan.Outcomes[0].Kind != TargetOutcomeKind.Unfulfilled)
+                throw new InvalidOperationException("A persisted invalid personal target entered the cast plan.");
+
+            ProviderSnapshot casterB = PlannerProvider("unit-b", "book-personal-b",
+                personalAbility, "personal-free", 0);
+            PartyProviderSnapshot snapshotB = PlannerSnapshot(new[] { casterB }, new[] { pool },
+                "unit-a", "unit-b");
+            var personalB = new ProviderPlanningOption(casterB, new[] { "unit-b" },
+                new[] { "unit-b" }, 1, 10);
+            var modelB = new PlannerSetupModel(BuffPlannerProfile.CreateDefault("personal-rebound"),
+                snapshotB, new ActiveEffectSnapshot(null), effects, new[] { personalB }, ignored => { });
+            if (modelB.IsTargetLegal(modelB.SelectedSource, "unit-a") ||
+                !modelB.IsTargetLegal(modelB.SelectedSource, "unit-b"))
+                throw new InvalidOperationException("Personal target legality did not follow the changed caster.");
+
+            var friendly = new ProviderPlanningOption(casterA, new[] { "unit-b" },
+                new[] { "unit-b" }, 1, 10);
+            var selfOrAlly = new ProviderPlanningOption(casterA, new[] { "unit-a", "unit-b" },
+                new[] { "unit-a", "unit-b" }, 1, 10);
+            var friendlyModel = new PlannerSetupModel(BuffPlannerProfile.CreateDefault("friendly"),
+                snapshotA, new ActiveEffectSnapshot(null), effects, new[] { friendly }, ignored => { });
+            var selfOrAllyModel = new PlannerSetupModel(BuffPlannerProfile.CreateDefault("self-or-ally"),
+                snapshotA, new ActiveEffectSnapshot(null), effects, new[] { selfOrAlly }, ignored => { });
+            if (friendlyModel.IsTargetLegal(friendlyModel.SelectedSource, "unit-a") ||
+                !friendlyModel.IsTargetLegal(friendlyModel.SelectedSource, "unit-b") ||
+                !selfOrAllyModel.IsTargetLegal(selfOrAllyModel.SelectedSource, "unit-a") ||
+                !selfOrAllyModel.IsTargetLegal(selfOrAllyModel.SelectedSource, "unit-b"))
+                throw new InvalidOperationException("Friendly or self-or-ally target behavior regressed.");
         }
 
         private static void TestSingleTargetCoveragePresentation()

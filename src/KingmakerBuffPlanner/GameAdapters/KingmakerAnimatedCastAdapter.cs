@@ -37,7 +37,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                 resolved.Ability.RequireMaterialComponent,
                 () => resolved.Ability.HasEnoughMaterialComponent))
                 return CastRuntimeValidation.Fail("material-component-unavailable");
-            if (!resolved.Ability.CanTarget(resolved.Target)) return CastRuntimeValidation.Fail("target-invalid");
+            if (!CanTarget(resolved.Ability, resolved.Target)) return CastRuntimeValidation.Fail("target-invalid");
             return CastRuntimeValidation.Pass();
         }
 
@@ -78,21 +78,40 @@ namespace KingmakerBuffPlanner.GameAdapters
 
         private static AbilityData ResolveAbility(UnitEntityData caster, CastStep step)
         {
-            ProviderKey provider = step.Provider;
+            return ResolveAbility(caster, step.Provider, step.Reservation.TokenIds);
+        }
+
+        internal static AbilityData ResolveAbility(UnitEntityData caster, ProviderKey provider)
+        {
+            return ResolveAbility(caster, provider, null);
+        }
+
+        private static AbilityData ResolveAbility(
+            UnitEntityData caster,
+            ProviderKey provider,
+            IReadOnlyList<string> reservedTokenIds)
+        {
             if (provider.Ability.SourceKind == SourceKind.Spellbook)
             {
                 Spellbook book = caster.Descriptor.Spellbooks.FirstOrDefault(b => b != null &&
                     b.Blueprint != null && b.Blueprint.AssetGuid == provider.SpellbookGuid);
                 if (book == null) return null;
-                if (step.Reservation.TokenIds.Count != 0)
+                if (reservedTokenIds != null && reservedTokenIds.Count != 0)
                 {
                     foreach (SpellSlot slot in book.GetAllMemorizedSpells().Where(s => s != null &&
-                        s.Spell != null && s.IsMainSlot && step.Reservation.TokenIds.Contains(SlotId(s))))
+                        s.Spell != null && s.IsMainSlot && reservedTokenIds.Contains(SlotId(s))))
                     {
                         AbilityData match = Expand(new[] { slot.Spell }).FirstOrDefault(d => Matches(d, provider.Ability));
                         if (match != null) return match;
                     }
                     return null;
+                }
+                foreach (SpellSlot slot in book.GetAllMemorizedSpells().Where(s => s != null &&
+                    s.Spell != null && s.IsMainSlot))
+                {
+                    AbilityData match = Expand(new[] { slot.Spell }).FirstOrDefault(d =>
+                        Matches(d, provider.Ability));
+                    if (match != null) return match;
                 }
                 foreach (AbilityData data in Expand(book.GetAllKnownSpells()))
                     if (Matches(data, provider.Ability) && SourceInstanceMatches(data, provider.SourceInstanceId))
@@ -141,7 +160,7 @@ namespace KingmakerBuffPlanner.GameAdapters
             }
         }
 
-        private static Dictionary<string, UnitEntityData> CollectUnits()
+        internal static Dictionary<string, UnitEntityData> CollectUnits()
         {
             var units = new Dictionary<string, UnitEntityData>(StringComparer.Ordinal);
             foreach (UnitEntityData unit in Game.Instance.Player.Party ?? new List<UnitEntityData>())
@@ -169,6 +188,12 @@ namespace KingmakerBuffPlanner.GameAdapters
         {
             try { return ability == null ? -1 : ability.GetAvailableForCastCount(); }
             catch (Exception) { return -1; }
+        }
+
+        internal static bool CanTarget(AbilityData ability, TargetWrapper target)
+        {
+            try { return ability != null && target != null && ability.CanTarget(target); }
+            catch (Exception) { return false; }
         }
 
         internal static string ExpectedEffectIds(EffectExpression expression)
