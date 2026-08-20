@@ -353,6 +353,42 @@ namespace KingmakerBuffPlanner.UI
         }
     }
 
+    public enum PlannerPointerGesture
+    {
+        Left,
+        Right,
+        Other
+    }
+
+    public sealed class PlannerDescriptionRequest
+    {
+        private PlannerDescriptionRequest(string sourceId, AbilityKey ability)
+        {
+            SourceId = sourceId;
+            Ability = ability;
+        }
+
+        public string SourceId { get; private set; }
+        public AbilityKey Ability { get; private set; }
+
+        public static bool TryCreate(
+            PlannerPointerGesture gesture,
+            string sourceId,
+            IEnumerable<SetupSourceRow> sources,
+            out PlannerDescriptionRequest request)
+        {
+            request = null;
+            if (gesture != PlannerPointerGesture.Right || string.IsNullOrWhiteSpace(sourceId))
+                return false;
+            SetupSourceRow source = (sources ?? new SetupSourceRow[0])
+                .FirstOrDefault(item => item != null &&
+                    string.Equals(item.SourceId, sourceId, StringComparison.Ordinal));
+            if (source == null) return false;
+            request = new PlannerDescriptionRequest(source.SourceId, source.Ability);
+            return true;
+        }
+    }
+
     public sealed class PlannerSettingsViewModel
     {
         internal PlannerSettingsViewModel(BuffPlannerProfile profile)

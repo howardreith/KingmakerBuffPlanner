@@ -5,6 +5,7 @@ using Kingmaker;
 using Kingmaker.Blueprints;
 using Kingmaker.EntitySystem.Entities;
 using Kingmaker.UI;
+using Kingmaker.UI.Common;
 using Kingmaker.UnitLogic.Abilities.Blueprints;
 using KingmakerBuffPlanner.Domain.Identity;
 using UnityEngine;
@@ -38,6 +39,7 @@ namespace KingmakerBuffPlanner.UI
         private BuffGridView _grid;
         private PlannerSelectedBuffView _selected;
         private PlannerSettingsView _settings;
+        private PlannerDescriptionModal _description;
         private Button _executeButton;
         private bool _disposed;
 
@@ -390,7 +392,7 @@ namespace KingmakerBuffPlanner.UI
             {
                 _session.Model.SelectSource(sourceId);
                 RefreshCatalog(true);
-            }, StatusColor);
+            }, OpenDescription, StatusColor);
             BuffCardGridScrollSink gridScroll = _grid.Scroll.gameObject
                 .AddComponent<BuffCardGridScrollSink>();
             gridScroll.Scroll = _grid.Scroll;
@@ -423,6 +425,7 @@ namespace KingmakerBuffPlanner.UI
                 PlannerHotkey.SetBinding(_session.Model.Profile.Ui.Hotkey);
                 RefreshAll(true);
             }, () => _settings.Show(false));
+            _description = new PlannerDescriptionModal(_root, _theme);
             _root.SetAsLastSibling();
             _root.gameObject.SetActive(true);
             PlannerPointerOwnership.Register(_root);
@@ -482,6 +485,26 @@ namespace KingmakerBuffPlanner.UI
             _result.gameObject.SetActive(!show);
         }
 
+        private void OpenDescription(string sourceId)
+        {
+            PlannerSetupModel model = _session.Model;
+            PlannerDescriptionRequest request;
+            if (model == null || !PlannerDescriptionRequest.TryCreate(
+                    PlannerPointerGesture.Right, sourceId, model.Sources, out request))
+                return;
+            SetupSourceRow source = model.Sources.First(item =>
+                string.Equals(item.SourceId, request.SourceId, StringComparison.Ordinal));
+            BlueprintAbility ability = ResolveAbilityBlueprint(request.Ability);
+            if (ability == null)
+            {
+                ShowResult(new QuickExecutionResult(ActiveRoutineId, "Description",
+                    QuickExecutionDisposition.Refused,
+                    "The selected ability blueprint is no longer available.", 0, 0, 0));
+                return;
+            }
+            _description.Show(source, ability);
+        }
+
         private Sprite ResolveAbilityIcon(string sourceId)
         {
             PlannerSetupModel model = _session.Model;
@@ -496,6 +519,14 @@ namespace KingmakerBuffPlanner.UI
                 ? source.Ability.BaseAbilityGuid : source.Ability.VariantGuid;
             BlueprintAbility ability = ResourcesLibrary.TryGetBlueprint<BlueprintAbility>(guid);
             return ability == null ? null : ability.Icon;
+        }
+
+        private static BlueprintAbility ResolveAbilityBlueprint(AbilityKey ability)
+        {
+            if (ability == null) return null;
+            string guid = string.IsNullOrWhiteSpace(ability.VariantGuid)
+                ? ability.BaseAbilityGuid : ability.VariantGuid;
+            return ResourcesLibrary.TryGetBlueprint<BlueprintAbility>(guid);
         }
 
         private static Sprite ResolvePortrait(string unitId)
@@ -699,6 +730,141 @@ namespace KingmakerBuffPlanner.UI
                 ",bestFit=" + (text != null && text.resizeTextForBestFit) +
                 ",scale=" + graphic.rectTransform.localScale +
                 ",text=" + (text == null ? string.Empty : text.text.Replace("\n", " ")) + ")";
+        }
+    }
+
+    internal sealed class PlannerDescriptionModal
+    {
+        private readonly Image _icon;
+        private readonly Text _fallback;
+        private readonly Text _name;
+        private readonly Text _meta;
+        private readonly Text _body;
+        private readonly ScrollRect _scroll;
+
+        internal PlannerDescriptionModal(RectTransform parent, PlannerUiTheme theme)
+        {
+            Root = KingmakerUiFactory.CreateRect("DescriptionModal", parent);
+            KingmakerUiFactory.Stretch(Root);
+            Image backdrop = KingmakerUiFactory.AddPanel(Root,
+                new Color(0.05f, 0.035f, 0.025f, 0.82f));
+            backdrop.raycastTarget = true;
+            RectTransform frame = KingmakerUiFactory.CreateRect("DescriptionFrame", Root);
+            KingmakerUiFactory.SetAnchors(frame, 0.19f, 0.08f, 0.81f, 0.92f);
+            KingmakerUiFactory.AddFramedPanel(frame, theme.ParchmentRaised,
+                theme.GoldAccent, 3f);
+
+            RectTransform iconFrame = KingmakerUiFactory.CreateRect("AbilityIconFrame", frame);
+            KingmakerUiFactory.SetAnchors(iconFrame, 0.035f, 0.79f, 0.16f, 0.965f);
+            KingmakerUiFactory.AddFramedPanel(iconFrame,
+                new Color(0.16f, 0.10f, 0.07f, 1f), theme.GoldAccent, 2f).raycastTarget = false;
+            RectTransform iconRect = KingmakerUiFactory.CreateRect("AbilityIcon", iconFrame);
+            KingmakerUiFactory.Stretch(iconRect, 5, 5, 5, 5);
+            _icon = iconRect.gameObject.AddComponent<Image>();
+            _icon.preserveAspect = true;
+            _icon.raycastTarget = false;
+            _fallback = KingmakerUiFactory.CreateText("MissingIcon", iconFrame, theme,
+                "?", 40, TextAnchor.MiddleCenter);
+            KingmakerUiFactory.Stretch(_fallback.rectTransform);
+
+            _name = KingmakerUiFactory.CreateText("AbilityName", frame, theme,
+                string.Empty, 25, TextAnchor.MiddleLeft);
+            _name.fontStyle = FontStyle.Bold;
+            _name.color = theme.BurgundyPrimary;
+            KingmakerUiFactory.SetAnchors(_name.rectTransform, 0.18f, 0.885f, 0.86f, 0.965f);
+            _meta = KingmakerUiFactory.CreateText("AbilityMeta", frame, theme,
+                string.Empty, 15, TextAnchor.MiddleLeft);
+            _meta.color = theme.MutedBrownText;
+            KingmakerUiFactory.SetAnchors(_meta.rectTransform, 0.18f, 0.79f, 0.86f, 0.89f);
+
+            Button close = KingmakerUiFactory.CreateButton("CloseDescription", frame, theme,
+                "X", Hide);
+            KingmakerUiFactory.SetAnchors((RectTransform)close.transform,
+                0.89f, 0.90f, 0.965f, 0.97f);
+
+            RectTransform content;
+            _scroll = KingmakerUiFactory.CreateScrollView("DescriptionScroll", frame,
+                theme, out content);
+            KingmakerUiFactory.SetAnchors((RectTransform)_scroll.transform,
+                0.035f, 0.055f, 0.965f, 0.765f);
+            ContentSizeFitter contentFitter = content.gameObject.AddComponent<ContentSizeFitter>();
+            contentFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            _body = KingmakerUiFactory.CreateText("DescriptionBody", content, theme,
+                string.Empty, 16, TextAnchor.UpperLeft);
+            _body.horizontalOverflow = HorizontalWrapMode.Wrap;
+            _body.verticalOverflow = VerticalWrapMode.Overflow;
+            ContentSizeFitter bodyFitter = _body.gameObject.AddComponent<ContentSizeFitter>();
+            bodyFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            PlannerDescriptionEscape escape = Root.gameObject
+                .AddComponent<PlannerDescriptionEscape>();
+            escape.Close = Hide;
+            Root.gameObject.SetActive(false);
+        }
+
+        internal RectTransform Root { get; private set; }
+        internal bool IsOpen { get { return Root.gameObject.activeSelf; } }
+
+        internal void Show(SetupSourceRow source, BlueprintAbility ability)
+        {
+            if (source == null) throw new ArgumentNullException("source");
+            if (ability == null) throw new ArgumentNullException("ability");
+            _icon.sprite = ability.Icon;
+            _icon.gameObject.SetActive(ability.Icon != null);
+            _fallback.gameObject.SetActive(ability.Icon == null);
+            _name.text = ability.Name;
+            string school = ability.School.ToString() == "None"
+                ? string.Empty : ability.School.ToString();
+            _meta.text = BuffCardViewModel.SourceSummary(source) +
+                (source.SpellLevel > 0 ? " | Level " + source.SpellLevel : string.Empty) +
+                (string.IsNullOrWhiteSpace(school) ? string.Empty : " | " + school);
+            _body.text = BuildBody(ability);
+            _scroll.verticalNormalizedPosition = 1f;
+            Root.SetAsLastSibling();
+            Root.gameObject.SetActive(true);
+            KingmakerUiFactory.ForceLayoutAndSnap(Root);
+        }
+
+        internal void Hide()
+        {
+            Root.gameObject.SetActive(false);
+        }
+
+        private static string BuildBody(BlueprintAbility ability)
+        {
+            var sections = new List<string>();
+            Add(sections, "Target", Safe(ability.GetTarget));
+            Add(sections, "Duration", ability.LocalizedDuration);
+            Add(sections, "Casting time", Safe(() => UIUtilityTexts.GetAbilityActionText(ability)));
+            Add(sections, "Saving throw", ability.LocalizedSavingThrow);
+            Add(sections, "Spell resistance", Safe(() =>
+                UIUtilityTexts.GetSpellResistanceText(ability)));
+            Add(sections, "Descriptors", Safe(() =>
+                UIUtilityTexts.GetSpellDescriptorsText(ability)));
+            if (!string.IsNullOrWhiteSpace(ability.Description))
+                sections.Add(ability.Description);
+            return string.Join("\n\n", sections.ToArray());
+        }
+
+        private static void Add(ICollection<string> sections, string label, string value)
+        {
+            if (!string.IsNullOrWhiteSpace(value))
+                sections.Add("<b>" + label + "</b>\n" + value.Trim());
+        }
+
+        private static string Safe(Func<string> value)
+        {
+            try { return value == null ? string.Empty : value() ?? string.Empty; }
+            catch (Exception) { return string.Empty; }
+        }
+    }
+
+    internal sealed class PlannerDescriptionEscape : MonoBehaviour
+    {
+        internal Action Close;
+        private void Update()
+        {
+            if (Input.GetKeyDown(KeyCode.Escape) && Close != null) Close();
         }
     }
 

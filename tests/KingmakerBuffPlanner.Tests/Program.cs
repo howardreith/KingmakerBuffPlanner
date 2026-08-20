@@ -93,6 +93,7 @@ namespace KingmakerBuffPlanner.Tests
                 Run("setup-model-direct-targets-are-routine-local", TestSetupModel);
                 Run("catalog-filter-selected-category-and-reset-contract", TestCatalogFilterState);
                 Run("presentation-view-models-use-player-facing-deterministic-state", TestPresentationModels);
+                Run("right-click-description-resolves-without-plan-mutation", TestDescriptionRequest);
                 Run("personal-target-eligibility-is-provider-relative", TestPersonalTargetEligibility);
                 Run("area-coverage-preview-distinguishes-direct-and-indirect", TestAreaCoveragePresentation);
                 Run("single-target-plan-does-not-create-indirect-coverage", TestSingleTargetCoveragePresentation);
@@ -1195,6 +1196,39 @@ namespace KingmakerBuffPlanner.Tests
             model.SetAllValidTargets("long", false);
             if (model.IsTargetWanted("long", "unit-a") || saves != beforePreview + 1)
                 throw new InvalidOperationException("Bulk target edit did not save once.");
+        }
+
+        private static void TestDescriptionRequest()
+        {
+            AbilityKey ability = Ability("description-source", "description-variant", 0);
+            var pool = new ResourcePoolSnapshot("description-free",
+                ResourcePoolKind.Unlimited, 0, 0, null);
+            ProviderSnapshot provider = PlannerProvider("unit-a", "book-description",
+                ability, "description-free", 0);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(new[] { provider }, new[] { pool },
+                "unit-a", "unit-b");
+            var option = new ProviderPlanningOption(provider, new[] { "unit-a" },
+                new[] { "unit-a" }, 1, 10);
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault("description");
+            var model = new PlannerSetupModel(profile, snapshot, new ActiveEffectSnapshot(null),
+                new Dictionary<string, EffectExpression>
+                {
+                    { ability.Canonical, Leaf("description-effect") }
+                }, new[] { option }, ignored => { });
+            int assignmentsBefore = profile.Routines.Sum(routine => routine.Assignments.Count);
+            PlannerDescriptionRequest request;
+            if (PlannerDescriptionRequest.TryCreate(PlannerPointerGesture.Left,
+                    model.SelectedSourceId, model.Sources, out request) || request != null)
+                throw new InvalidOperationException("Left click was interpreted as description inspection.");
+            if (!PlannerDescriptionRequest.TryCreate(PlannerPointerGesture.Right,
+                    model.SelectedSourceId, model.Sources, out request) ||
+                request == null || request.SourceId != model.SelectedSourceId ||
+                !request.Ability.Equals(ability))
+                throw new InvalidOperationException("Right click did not resolve the clicked row blueprint.");
+            if (profile.Routines.Sum(routine => routine.Assignments.Count) != assignmentsBefore ||
+                model.IsTargetLegal(model.SelectedSource, "unit-b"))
+                throw new InvalidOperationException(
+                    "Description inspection mutated the plan or required a legal target.");
         }
 
         private static void TestAreaCoveragePresentation()

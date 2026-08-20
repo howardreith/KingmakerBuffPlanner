@@ -119,6 +119,7 @@ namespace KingmakerBuffPlanner.UI
         private readonly Text _availability;
         private readonly Text _configuration;
         private readonly Text _badge;
+        private readonly PlannerRightClickHandler _inspect;
         private UnityAction _select;
 
         internal BuffCardView(RectTransform parent, PlannerUiTheme theme)
@@ -129,6 +130,7 @@ namespace KingmakerBuffPlanner.UI
                 theme.MutedBrownText);
             Button = Rect.gameObject.AddComponent<Button>();
             Button.targetGraphic = _background;
+            _inspect = Rect.gameObject.AddComponent<PlannerRightClickHandler>();
             RectTransform stripe = KingmakerUiFactory.CreateRect("StatusStripe", Rect);
             KingmakerUiFactory.SetAnchors(stripe, 0, 0, 0.018f, 1, 1, 0, 3, 3);
             _status = KingmakerUiFactory.AddPanel(stripe, theme.MutedBrownText);
@@ -169,7 +171,7 @@ namespace KingmakerBuffPlanner.UI
         internal string SourceId { get; private set; }
 
         internal void Bind(BuffCardViewModel model, Sprite icon, UnityAction selected,
-            Func<PlannerPresentationStatus, Color> statusColor)
+            Action<string> inspect, Func<PlannerPresentationStatus, Color> statusColor)
         {
             SourceId = model.SourceId;
             Rect.name = "Source." + model.SourceId;
@@ -194,12 +196,16 @@ namespace KingmakerBuffPlanner.UI
             if (_select != null) Button.onClick.RemoveListener(_select);
             _select = selected;
             Button.onClick.AddListener(_select);
+            _inspect.SourceId = model.SourceId;
+            _inspect.Inspect = inspect;
             Rect.gameObject.SetActive(true);
         }
 
         internal void Hide()
         {
             SourceId = string.Empty;
+            _inspect.SourceId = string.Empty;
+            _inspect.Inspect = null;
             Rect.gameObject.SetActive(false);
         }
     }
@@ -247,6 +253,7 @@ namespace KingmakerBuffPlanner.UI
         private readonly BuffCardPool _pool;
         private readonly Func<string, Sprite> _icon;
         private readonly Action<string> _select;
+        private readonly Action<string> _inspect;
         private readonly Func<PlannerPresentationStatus, Color> _statusColor;
         private IReadOnlyList<BuffCardViewModel> _models = new BuffCardViewModel[0];
         private BuffGridMetrics _metrics;
@@ -254,10 +261,12 @@ namespace KingmakerBuffPlanner.UI
 
         internal BuffGridView(RectTransform parent, PlannerUiTheme theme,
             Func<string, Sprite> icon, Action<string> select,
+            Action<string> inspect,
             Func<PlannerPresentationStatus, Color> statusColor)
         {
             _icon = icon;
             _select = select;
+            _inspect = inspect;
             _statusColor = statusColor;
             _scroll = KingmakerUiFactory.CreateScrollView("BuffGrid", parent, theme, out _content);
             KingmakerUiFactory.SetAnchors((RectTransform)_scroll.transform, 0.02f, 0.315f,
@@ -342,7 +351,8 @@ namespace KingmakerBuffPlanner.UI
                     (_metrics.CellWidth + spacing), -6f - absoluteRow *
                     (_metrics.CellHeight + spacing));
                 BuffCardViewModel model = _models[modelIndex];
-                card.Bind(model, _icon(model.SourceId), () => _select(model.SourceId), _statusColor);
+                card.Bind(model, _icon(model.SourceId), () => _select(model.SourceId),
+                    _inspect, _statusColor);
             }
         }
     }
@@ -625,6 +635,23 @@ namespace KingmakerBuffPlanner.UI
             button.interactable = interactable;
             Text label = button.GetComponentInChildren<Text>(true);
             if (label != null) label.text = text;
+        }
+    }
+
+    internal sealed class PlannerRightClickHandler : MonoBehaviour,
+        UnityEngine.EventSystems.IPointerClickHandler
+    {
+        internal string SourceId;
+        internal Action<string> Inspect;
+
+        public void OnPointerClick(UnityEngine.EventSystems.PointerEventData eventData)
+        {
+            if (eventData == null ||
+                eventData.button != UnityEngine.EventSystems.PointerEventData.InputButton.Right)
+                return;
+            eventData.Use();
+            if (Inspect != null && !string.IsNullOrWhiteSpace(SourceId))
+                Inspect(SourceId);
         }
     }
 
