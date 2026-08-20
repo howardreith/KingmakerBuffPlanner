@@ -196,8 +196,31 @@ namespace KingmakerBuffPlanner.UI
             Text text = CreateText("Label", rect, theme, label, 17, TextAnchor.MiddleCenter);
             text.color = theme.ButtonText;
             text.fontStyle = FontStyle.Bold;
-            Stretch(text.rectTransform, 5, 5, 3, 3);
+            text.resizeTextForBestFit = true;
+            text.resizeTextMinSize = 12;
+            text.resizeTextMaxSize = 17;
+            text.verticalOverflow = VerticalWrapMode.Overflow;
+            Stretch(text.rectTransform, 5, 5, 1, 1);
+            SetButtonLabel(button, label);
             return button;
+        }
+
+        internal static Text SetButtonLabel(Button button, string value)
+        {
+            if (button == null) throw new ArgumentNullException("button");
+            Transform child = button.transform.Find("Label");
+            Text label = child == null ? null : child.GetComponent<Text>();
+            if (label == null) throw new InvalidOperationException("Button label is missing: " + button.name);
+            label.text = string.IsNullOrWhiteSpace(value) ? "Unavailable" : value;
+            label.enabled = true;
+            label.gameObject.SetActive(true);
+            label.canvasRenderer.SetAlpha(1f);
+            Color color = label.color;
+            label.color = new Color(color.r, color.g, color.b, 1f);
+            label.verticalOverflow = VerticalWrapMode.Overflow;
+            label.transform.SetAsLastSibling();
+            Stretch(label.rectTransform, 5, 5, 1, 1);
+            return label;
         }
 
         internal static InputField CreateInputField(

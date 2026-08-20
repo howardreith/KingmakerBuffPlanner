@@ -96,6 +96,8 @@ namespace KingmakerBuffPlanner.Tests
                 Run("right-click-description-resolves-without-plan-mutation", TestDescriptionRequest);
                 Run("cast-enhancement-applicability-and-reservation", TestCastEnhancementPlanning);
                 Run("cast-enhancement-selection-is-assignment-scoped", TestCastEnhancementSelection);
+                Run("casting-section-presents-caster-and-enhancement-choices", TestCastingSectionPresentation);
+                Run("casting-section-layout-keeps-button-labels-visible", TestCastingSectionLayout);
                 Run("cast-enhancement-execution-is-fail-closed-and-cleaned-up", TestCastEnhancementExecution);
                 Run("personal-target-eligibility-is-provider-relative", TestPersonalTargetEligibility);
                 Run("area-coverage-preview-distinguishes-direct-and-indirect", TestAreaCoveragePresentation);
@@ -1686,6 +1688,97 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("Enhancement category conflicts were not preserved.");
         }
 
+        private static void TestCastingSectionPresentation()
+        {
+            AbilityKey shield = Ability("shield-fixture", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("leinna-shield-pool", ResourcePoolKind.PreparedSlots,
+                1, 1, new[] { new ResourceTokenSnapshot("shield-slot", shield, 1,
+                    PreparedSlotKind.Common, true, true, null) });
+            ProviderSnapshot provider = new ProviderSnapshot(
+                new ProviderKey("leinna", "leinna-wizard-book", shield, "level-1"),
+                "Shield", 1, pool.PoolKey, 1, new[] { "shield-slot" });
+            var validation = new TargetValidationSnapshot(true, true, true, true);
+            var snapshot = new PartyProviderSnapshot(new[]
+            {
+                new UnitSnapshot("leinna", "Leinna", false, string.Empty, validation),
+                new UnitSnapshot("akasa", "Akasa", false, string.Empty, validation)
+            }, new[] { provider }, new[] { pool });
+            var option = new ProviderPlanningOption(provider, new[] { "leinna" },
+                new[] { "leinna" }, 1, 10);
+            var rod = new CastEnhancementSnapshot(
+                "metamagic-rod|leinna|lesser-extend", "leinna", "lesser-extend",
+                "Lesser Metamagic Rod of Extend", "Applies Extend Spell to this cast.",
+                CastEnhancementCategory.MetamagicRod, 2, 3, 3, null, "Extend");
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault("casting-presentation");
+            var effects = new Dictionary<string, EffectExpression>
+            {
+                { shield.Canonical, Leaf("shield-effect") }
+            };
+            var active = new ActiveEffectSnapshot(null);
+            var model = new PlannerSetupModel(profile, snapshot, active, effects,
+                new[] { option }, ignored => { }, new[] { rod });
+            SetupSourceRow source = model.SelectedSource;
+            model.ToggleTarget("long", "leinna");
+            RoutinePlanResult preview = new RoutinePlanService().Plan(profile, "long", snapshot,
+                active, effects, new[] { option }, new[] { rod });
+            SelectedCastingViewModel none = SelectedCastingViewModel.Create(source, model,
+                "long", preview);
+            if (none.CasterText != "Caster: Leinna" ||
+                none.EnhancementLabel != "Enhancement: None  1 available" ||
+                none.Choices.Count != 2 || none.Choices[0].Title != "None" ||
+                none.Choices[1].Title != "Lesser Metamagic Rod of Extend" ||
+                !none.Choices[1].Summary.Contains("Extend Spell") ||
+                !none.Choices[1].Summary.Contains("3 uses") ||
+                !none.Choices[1].Description.Contains("Owner: Leinna") ||
+                !none.Choices[1].Description.Contains("Spell-level limit: 3") ||
+                preview.Plan.Steps.Single().Provider.CasterUnitId != "leinna")
+                throw new InvalidOperationException("Casting section did not expose the execution provider and rod details.");
+
+            model.SetEnhancement("long", rod.EnhancementId);
+            preview = new RoutinePlanService().Plan(profile, "long", snapshot, active, effects,
+                new[] { option }, new[] { rod });
+            SelectedCastingViewModel selected = SelectedCastingViewModel.Create(source, model,
+                "long", preview);
+            if (!selected.EnhancementLabel.Contains("Lesser Metamagic Rod of Extend") ||
+                !selected.EnhancementLabel.Contains("3 uses") ||
+                !selected.Choices.Single(choice => choice.EnhancementId == rod.EnhancementId).Selected)
+                throw new InvalidOperationException("Selecting a rod did not update and highlight its canonical label.");
+
+            model.SetEnhancement("long", null);
+            if (!model.GetEnhancementSummary("long").StartsWith("Enhancement: None"))
+                throw new InvalidOperationException("Selecting None did not update the visible enhancement state.");
+
+            var noEnhancements = new PlannerSetupModel(BuffPlannerProfile.CreateDefault("no-enhancement"),
+                snapshot, active, effects, new[] { option }, ignored => { });
+            if (noEnhancements.GetEnhancementSummary("long") != "Enhancement: None available")
+                throw new InvalidOperationException("A no-candidate casting section disappeared instead of saying None available.");
+
+            var unavailable = new CastEnhancementSnapshot(rod.EnhancementId, "leinna",
+                rod.SourceBlueprintGuid, rod.DisplayName, rod.Description, rod.Category,
+                rod.MetamagicMask, rod.MaximumSpellLevel, 0, null, rod.EffectDisplayName);
+            model.SetEnhancement("long", rod.EnhancementId);
+            var reloaded = new PlannerSetupModel(profile, snapshot, active, effects,
+                new[] { option }, ignored => { }, new[] { unavailable });
+            SelectedCastingViewModel invalid = SelectedCastingViewModel.Create(reloaded.SelectedSource,
+                reloaded, "long", null);
+            if (invalid.EnhancementLabel !=
+                    "Enhancement unavailable: Lesser Metamagic Rod of Extend" ||
+                invalid.Choices.Single(choice => choice.EnhancementId == rod.EnhancementId).Available)
+                throw new InvalidOperationException("An unavailable persisted rod did not remain visible and fail closed.");
+
+            if (!model.IsTargetLegal(source, "leinna") || model.IsTargetLegal(source, "akasa"))
+                throw new InvalidOperationException("Shield personal-target eligibility regressed in casting presentation coverage.");
+        }
+
+        private static void TestCastingSectionLayout()
+        {
+            if (!CastingPanelLayoutContract.CanRenderLabel(
+                    CastingPanelLayoutContract.MinimumEnhancementButtonHeight) ||
+                CastingPanelLayoutContract.CanRenderLabel(16f) ||
+                CastingPanelLayoutContract.SettingsCloseLabel != "CLOSE" ||
+                string.IsNullOrWhiteSpace(CastingPanelLayoutContract.SettingsCloseLabel))
+                throw new InvalidOperationException("Casting button geometry or shared CLOSE label is not render-safe.");
+        }
         private static void TestCastEnhancementSelection()
         {
             AbilityKey ability = Ability("selection-spell", string.Empty, 0);

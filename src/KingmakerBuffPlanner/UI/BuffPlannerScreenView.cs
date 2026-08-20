@@ -8,6 +8,7 @@ using Kingmaker.UI;
 using Kingmaker.UI.Common;
 using Kingmaker.UnitLogic.Abilities.Blueprints;
 using KingmakerBuffPlanner.Domain.Identity;
+using KingmakerBuffPlanner.Planning;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -38,10 +39,12 @@ namespace KingmakerBuffPlanner.UI
         private PlannerCategoryTabsView _categoryTabs;
         private BuffGridView _grid;
         private PlannerSelectedBuffView _selected;
+        private PlannerEnhancementChooserView _enhancementChooser;
         private PlannerSettingsView _settings;
         private PlannerDescriptionModal _description;
         private Button _executeButton;
         private bool _disposed;
+        private string _lastEnhancementRenderEvidence = string.Empty;
 
         internal BuffPlannerScreenView(StaticCanvas nativeCanvas, PlannerUiSession session,
             BuffPlannerUiLifecycleDiagnostics diagnostics, Action close, Action<string> execute)
@@ -195,6 +198,7 @@ namespace KingmakerBuffPlanner.UI
                 " • alphabetical • " + filters.ActiveFilters;
             RefreshSelected();
             KingmakerUiFactory.ForceLayoutAndSnap(_root);
+            RecordEnhancementRenderEvidence();
             UpdateCatalogDiagnostics(filters);
         }
 
@@ -202,19 +206,41 @@ namespace KingmakerBuffPlanner.UI
         {
             PlannerSetupModel model = _session.Model;
             SetupSourceRow source = model == null ? null : model.SelectedSource;
+            IReadOnlyList<TargetPortraitViewModel> targets = _viewModel.Targets();
+            string planSummary = _viewModel.PlanSummary();
+            SelectedCastingViewModel casting = SelectedCastingViewModel.Create(source, model,
+                ActiveRoutineId, _session.LastPreview);
             _selected.Bind(source, ResolveAbilityIcon(source), ActiveRoutineId,
-                _viewModel.Targets(), ResolvePortrait, unitId =>
+                targets, ResolvePortrait, unitId =>
                 {
                     model.ToggleTarget(ActiveRoutineId, unitId);
                     RefreshAll(true);
-                }, StatusColor, _viewModel.PlanSummary(),
-                model == null ? "Enhancement: None" : model.GetEnhancementSummary(ActiveRoutineId),
-                model == null ? string.Empty : model.GetEnhancementDescription(ActiveRoutineId),
-                model != null && (model.GetApplicableEnhancements().Count != 0 ||
-                    model.GetSelectedEnhancementIds(ActiveRoutineId).Count != 0),
-                model != null && !_session.IsExecuting);
+                }, StatusColor, planSummary, casting, model != null && !_session.IsExecuting);
         }
 
+        private void OpenEnhancementChooser()
+        {
+            PlannerSetupModel model = _session.Model;
+            SetupSourceRow source = model == null ? null : model.SelectedSource;
+            if (source == null) return;
+            RoutinePlanResult preview = null;
+            try { preview = _session.PreviewRoutine(ActiveRoutineId); }
+            catch { preview = null; }
+            _enhancementChooser.Show(SelectedCastingViewModel.Create(source, model,
+                ActiveRoutineId, preview));
+        }
+
+        private void RecordEnhancementRenderEvidence()
+        {
+            if (_selected == null || _session.Model == null) return;
+            SelectedCastingViewModel casting = SelectedCastingViewModel.Create(
+                _session.Model.SelectedSource, _session.Model, ActiveRoutineId, _session.LastPreview);
+            string evidence = _selected.EnhancementRenderEvidence(casting.CandidateCount,
+                casting.SelectedEnhancementId);
+            if (evidence == _lastEnhancementRenderEvidence) return;
+            _lastEnhancementRenderEvidence = evidence;
+            _session.RecordEnhancementUiEvidence(evidence);
+        }
         internal bool DispatchBlessRowForRuntime()
         {
             if (_session.Model == null) return false;
@@ -395,6 +421,7 @@ namespace KingmakerBuffPlanner.UI
             KingmakerUiFactory.SetAnchors(_catalogSummary.rectTransform, 0.02f, 0.775f, 0.98f, 0.805f);
             _grid = new BuffGridView(frame, _theme, ResolveAbilityIcon, sourceId =>
             {
+                _enhancementChooser.Hide();
                 _session.Model.SelectSource(sourceId);
                 RefreshCatalog(true);
             }, OpenDescription, StatusColor);
@@ -410,11 +437,14 @@ namespace KingmakerBuffPlanner.UI
             {
                 _session.Model.SetAllValidTargets(ActiveRoutineId, false);
                 RefreshAll(true);
-            }, () =>
-            {
-                _session.Model.CycleEnhancement(ActiveRoutineId);
-                RefreshAll(true);
-            }, ShowTooltip);
+            }, OpenEnhancementChooser, ShowTooltip);
+            _enhancementChooser = new PlannerEnhancementChooserView(_root, _theme,
+                enhancementId =>
+                {
+                    _session.Model.SetEnhancement(ActiveRoutineId, enhancementId);
+                    _enhancementChooser.Hide();
+                    RefreshAll(true);
+                }, ShowTooltip);
             BuildFooter(frame);
             _settings = new PlannerSettingsView(frame, _theme, () =>
             {

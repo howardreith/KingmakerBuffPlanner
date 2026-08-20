@@ -85,7 +85,11 @@ namespace KingmakerBuffPlanner.UI
                 if (!string.IsNullOrEmpty(loaded.Warning))
                     _log.Info("Profile recovery warning: " + loaded.Warning);
                 _providerOptions = new KingmakerProviderOptionBuilder().Build(snapshot, effects);
-                _enhancements = new KingmakerCastEnhancementAdapter().Discover();
+                string[] persistedEnhancementIds = loaded.Profile.Routines
+                    .SelectMany(routine => routine.Assignments)
+                    .SelectMany(assignment => assignment.SelectedEnhancementIds ?? new List<string>())
+                    .Where(id => !string.IsNullOrWhiteSpace(id)).Distinct(StringComparer.Ordinal).ToArray();
+                _enhancements = new KingmakerCastEnhancementAdapter().Discover(persistedEnhancementIds);
                 Model = new PlannerSetupModel(loaded.Profile, snapshot, active, effects,
                     _providerOptions, _profiles.Save, _enhancements);
                 _snapshot = snapshot;
@@ -99,6 +103,18 @@ namespace KingmakerBuffPlanner.UI
                     _enhancements.Length + " cast enhancements.";
                 _log.Info("[KBP-ENHANCEMENT] metamagic-rods=" + _enhancements.Length +
                     ";brown-fur=FEATURE-NOT-PRESENT-IN-INSTALLED-OPTIONAL-MOD.");
+                foreach (CastEnhancementSnapshot enhancement in _enhancements)
+                {
+                    UnitSnapshot owner = snapshot.Units.FirstOrDefault(unit =>
+                        unit.UnitId == enhancement.CasterUnitId);
+                    _log.Info("[KBP-ENHANCEMENT-OPTION] id=" + enhancement.EnhancementId +
+                        ";name=" + enhancement.DisplayName +
+                        ";owner=" + (owner == null ? enhancement.CasterUnitId : owner.DisplayName) +
+                        ";effect=" + enhancement.EffectDisplayName +
+                        ";remaining=" + (enhancement.RemainingUses == null ? "unlimited" :
+                            enhancement.RemainingUses.Value.ToString()) +
+                        ";spellLevelLimit=" + enhancement.MaximumSpellLevel + ".");
+                }
                 _log.Info("[KBP-CATALOG] discovery;" + CatalogDiscovery + ".");
                 LogBlessSlice(loaded.Profile, snapshot, _providerOptions, Model);
             }
@@ -161,6 +177,11 @@ namespace KingmakerBuffPlanner.UI
                     CatalogDiscovery.BlessMaterialEvidence) + ".");
         }
 
+        internal void RecordEnhancementUiEvidence(string evidence)
+        {
+            if (!string.IsNullOrWhiteSpace(evidence))
+                _log.Info("[KBP-ENHANCEMENT-UI] " + evidence);
+        }
         internal RoutinePlanResult PreviewRoutine(string routineId)
         {
             if (Model == null || _snapshot == null || _activeEffects == null ||

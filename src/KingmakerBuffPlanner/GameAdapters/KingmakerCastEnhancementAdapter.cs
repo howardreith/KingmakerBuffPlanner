@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Kingmaker.Blueprints;
+using Kingmaker.Blueprints.Items;
+using Kingmaker.Blueprints.Items.Equipment;
 using Kingmaker.Designers.Mechanics.Facts;
 using Kingmaker.EntitySystem.Entities;
 using Kingmaker.UnitLogic.ActivatableAbilities;
@@ -12,14 +14,25 @@ namespace KingmakerBuffPlanner.GameAdapters
 {
     internal sealed class KingmakerCastEnhancementAdapter
     {
-        internal CastEnhancementSnapshot[] Discover()
+        internal CastEnhancementSnapshot[] Discover(IEnumerable<string> persistedEnhancementIds = null)
         {
-            return KingmakerAnimatedCastAdapter.CollectUnits().Values
+            var values = KingmakerAnimatedCastAdapter.CollectUnits().Values
                 .Where(unit => unit != null && unit.Descriptor != null)
                 .SelectMany(Entries)
                 .GroupBy(entry => entry.Snapshot.EnhancementId, StringComparer.Ordinal)
-                .Select(Combine)
-                .OrderBy(value => value.DisplayName, StringComparer.OrdinalIgnoreCase)
+                .Select(Combine).ToList();
+            var known = new HashSet<string>(values.Select(value => value.EnhancementId),
+                StringComparer.Ordinal);
+            foreach (string id in persistedEnhancementIds ?? new string[0])
+            {
+                CastEnhancementSnapshot unavailable;
+                if (!known.Contains(id) && TryDescribePersisted(id, out unavailable))
+                {
+                    values.Add(unavailable);
+                    known.Add(id);
+                }
+            }
+            return values.OrderBy(value => value.DisplayName, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(value => value.EnhancementId, StringComparer.Ordinal).ToArray();
         }
 
@@ -72,7 +85,43 @@ namespace KingmakerBuffPlanner.GameAdapters
                 ? (int?)null : values.Sum(value => value.RemainingUses.Value);
             return new CastEnhancementSnapshot(first.EnhancementId, first.CasterUnitId,
                 first.SourceBlueprintGuid, first.DisplayName, first.Description, first.Category,
-                first.MetamagicMask, first.MaximumSpellLevel, remaining, first.AbilityWhiteList);
+                first.MetamagicMask, first.MaximumSpellLevel, remaining, first.AbilityWhiteList,
+                first.EffectDisplayName);
+        }
+
+        private static bool TryDescribePersisted(string id, out CastEnhancementSnapshot snapshot)
+        {
+            snapshot = null;
+            string[] parts = (id ?? string.Empty).Split('|');
+            if (parts.Length != 3 || parts[0] != "metamagic-rod" ||
+                string.IsNullOrWhiteSpace(parts[1]) || string.IsNullOrWhiteSpace(parts[2])) return false;
+            BlueprintItem item = ResourcesLibrary.TryGetBlueprint<BlueprintItem>(parts[2]);
+            BlueprintItemEquipment equipment = item as BlueprintItemEquipment;
+            if (equipment == null || equipment.ActivatableAbility == null ||
+                equipment.ActivatableAbility.Buff == null) return false;
+            MetamagicRodMechanics mechanics = equipment.ActivatableAbility.Buff
+                .GetComponent<MetamagicRodMechanics>();
+            if (mechanics == null) return false;
+            snapshot = new CastEnhancementSnapshot(id, parts[1], parts[2], item.Name,
+                item.Description, CastEnhancementCategory.MetamagicRod,
+                (int)mechanics.Metamagic, mechanics.MaxSpellLevel, 0,
+                (mechanics.AbilitiesWhiteList ?? new Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility[0])
+                    .Where(value => value != null).Select(value => value.AssetGuid),
+                Humanize(mechanics.Metamagic.ToString()));
+            return true;
+        }
+
+        private static string Humanize(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return "Metamagic";
+            var result = new System.Text.StringBuilder(value.Length + 4);
+            for (int index = 0; index < value.Length; index++)
+            {
+                if (index != 0 && char.IsUpper(value[index]) && !char.IsUpper(value[index - 1]))
+                    result.Append(' ');
+                result.Append(value[index]);
+            }
+            return result.ToString();
         }
 
         private static IEnumerable<Entry> Entries(UnitEntityData unit)
@@ -93,7 +142,8 @@ namespace KingmakerBuffPlanner.GameAdapters
                         ability.SourceItem.Description, CastEnhancementCategory.MetamagicRod,
                     (int)mechanics.Metamagic, mechanics.MaxSpellLevel, remaining,
                     (mechanics.AbilitiesWhiteList ?? new Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility[0])
-                        .Where(value => value != null).Select(value => value.AssetGuid));
+                        .Where(value => value != null).Select(value => value.AssetGuid),
+                    Humanize(mechanics.Metamagic.ToString()));
                 yield return new Entry(ability, snapshot);
             }
         }

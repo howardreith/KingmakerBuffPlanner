@@ -24,7 +24,8 @@ namespace KingmakerBuffPlanner.Domain.Planning
             int metamagicMask,
             int maximumSpellLevel,
             int? remainingUses,
-            IEnumerable<string> abilityWhiteList)
+            IEnumerable<string> abilityWhiteList,
+            string effectDisplayName = null)
         {
             if (string.IsNullOrWhiteSpace(enhancementId)) throw new ArgumentException("Enhancement ID is required.", "enhancementId");
             if (string.IsNullOrWhiteSpace(casterUnitId)) throw new ArgumentException("Caster unit ID is required.", "casterUnitId");
@@ -41,6 +42,8 @@ namespace KingmakerBuffPlanner.Domain.Planning
             MetamagicMask = metamagicMask;
             MaximumSpellLevel = maximumSpellLevel;
             RemainingUses = remainingUses;
+            EffectDisplayName = string.IsNullOrWhiteSpace(effectDisplayName)
+                ? "Metamagic" : effectDisplayName;
             AbilityWhiteList = new ReadOnlyCollection<string>((abilityWhiteList ?? new string[0])
                 .Where(value => !string.IsNullOrWhiteSpace(value)).Distinct(StringComparer.Ordinal)
                 .OrderBy(value => value, StringComparer.Ordinal).ToList());
@@ -55,6 +58,7 @@ namespace KingmakerBuffPlanner.Domain.Planning
         public int MetamagicMask { get; private set; }
         public int MaximumSpellLevel { get; private set; }
         public int? RemainingUses { get; private set; }
+        public string EffectDisplayName { get; private set; }
         public IReadOnlyList<string> AbilityWhiteList { get; private set; }
 
         public bool IsApplicable(ProviderSnapshot provider)
@@ -73,6 +77,7 @@ namespace KingmakerBuffPlanner.Domain.Planning
                 AbilityWhiteList.Contains(provider.Ability.VariantGuid)) return true;
             return spellLevel <= MaximumSpellLevel;
         }
+
         public static bool AreCompatible(IEnumerable<CastEnhancementSnapshot> enhancements)
         {
             List<CastEnhancementSnapshot> values = (enhancements ?? new CastEnhancementSnapshot[0])
