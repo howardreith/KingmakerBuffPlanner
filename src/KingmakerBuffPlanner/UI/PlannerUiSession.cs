@@ -26,6 +26,7 @@ namespace KingmakerBuffPlanner.UI
         private ActiveEffectSnapshot _activeEffects;
         private Dictionary<string, EffectExpression> _effects;
         private ProviderPlanningOption[] _providerOptions;
+        private CastEnhancementSnapshot[] _enhancements;
 
         internal PlannerUiSession(string modPath, ModLog log)
         {
@@ -61,6 +62,7 @@ namespace KingmakerBuffPlanner.UI
                     _activeEffects = null;
                     _effects = null;
                     _providerOptions = null;
+                    _enhancements = null;
                     CatalogDiscovery = null;
                     Status = "No campaign is loaded. Profiles are external and are not created at the main menu.";
                     return;
@@ -83,8 +85,9 @@ namespace KingmakerBuffPlanner.UI
                 if (!string.IsNullOrEmpty(loaded.Warning))
                     _log.Info("Profile recovery warning: " + loaded.Warning);
                 _providerOptions = new KingmakerProviderOptionBuilder().Build(snapshot, effects);
+                _enhancements = new KingmakerCastEnhancementAdapter().Discover();
                 Model = new PlannerSetupModel(loaded.Profile, snapshot, active, effects,
-                    _providerOptions, _profiles.Save);
+                    _providerOptions, _profiles.Save, _enhancements);
                 _snapshot = snapshot;
                 _activeEffects = active;
                 _effects = effects;
@@ -92,7 +95,10 @@ namespace KingmakerBuffPlanner.UI
                 LastBindingFailure = string.Empty;
                 Status = snapshot.Units.Count + " party/pet targets; " +
                     Model.Sources.Count + " discovered buff sources; " +
-                    snapshot.Providers.Count + " providers.";
+                    snapshot.Providers.Count + " providers; " +
+                    _enhancements.Length + " cast enhancements.";
+                _log.Info("[KBP-ENHANCEMENT] metamagic-rods=" + _enhancements.Length +
+                    ";brown-fur=FEATURE-NOT-PRESENT-IN-INSTALLED-OPTIONAL-MOD.");
                 _log.Info("[KBP-CATALOG] discovery;" + CatalogDiscovery + ".");
                 LogBlessSlice(loaded.Profile, snapshot, _providerOptions, Model);
             }
@@ -161,7 +167,7 @@ namespace KingmakerBuffPlanner.UI
                 _effects == null || _providerOptions == null)
                 throw new InvalidOperationException("A campaign planner snapshot is required.");
             LastPreview = new RoutinePlanService().Plan(Model.Profile, routineId, _snapshot,
-                _activeEffects, _effects, _providerOptions);
+                _activeEffects, _effects, _providerOptions, _enhancements);
             return LastPreview;
         }
 
@@ -313,6 +319,7 @@ namespace KingmakerBuffPlanner.UI
                 _log.Info("Routine outcome: step=" + record.StepIndex + ";status=" + record.Status +
                     ";ability=" + record.AbilityKey + ";provider=" + record.ProviderKey +
                     ";targets=" + string.Join(",", record.TargetUnitIds.ToArray()) +
+                    ";enhancements=" + string.Join(",", record.EnhancementIds.ToArray()) +
                     ";pool=" + record.ResourcePoolKey + ";tokens=" +
                     string.Join(",", record.ResourceTokenIds.ToArray()) + ";detail=" + record.Detail);
             Complete(completed, new QuickExecutionResult(routineId, routineName,
@@ -329,7 +336,8 @@ namespace KingmakerBuffPlanner.UI
                 ";ability=" + step.Provider.Ability.Canonical + ";provider=" +
                 step.Provider.Canonical + ";targets=" + string.Join(",", step.TargetUnitIds.ToArray()) +
                 ";pool=" + step.Reservation.PoolKey + ";tokens=" +
-                string.Join(",", step.Reservation.TokenIds.ToArray()) + ";units=" +
+                string.Join(",", step.Reservation.TokenIds.ToArray()) + ";enhancements=" +
+                string.Join(",", step.EnhancementIds.ToArray()) + ";units=" +
                 step.Reservation.Units + ";material=" +
                 (step.MaterialReservation == null ? "none" :
                     step.MaterialReservation.ItemGuid + "x" + step.MaterialReservation.Count) +

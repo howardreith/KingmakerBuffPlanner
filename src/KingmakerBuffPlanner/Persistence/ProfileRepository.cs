@@ -147,8 +147,9 @@ namespace KingmakerBuffPlanner.Persistence
                 foreach (SourceAssignmentProfile assignment in routine.Assignments)
                 {
                     if (assignment.Ability == null || assignment.WantedTargetUnitIds == null ||
-                        assignment.IgnoredPresenceMarkers == null)
+                        assignment.IgnoredPresenceMarkers == null || assignment.SelectedEnhancementIds == null)
                         throw new InvalidDataException("invalid-assignment");
+                    RequireUnique(assignment.SelectedEnhancementIds, "enhancement-id");
                     assignment.Ability.ToKey();
                 }
             }
@@ -257,6 +258,22 @@ namespace KingmakerBuffPlanner.Persistence
                 document["hiddenSourceIds"] = new JArray();
                 document["schemaVersion"] = 3;
                 version = 3;
+                migrated = true;
+            }
+            if (version == 3)
+            {
+                JArray routines = document["routines"] as JArray;
+                if (routines == null) throw new InvalidDataException("routines-missing");
+                foreach (JObject routine in routines.OfType<JObject>())
+                {
+                    JArray assignments = routine["assignments"] as JArray;
+                    if (assignments == null) throw new InvalidDataException("assignments-missing");
+                    foreach (JObject assignment in assignments.OfType<JObject>())
+                        if (assignment["selectedEnhancementIds"] == null)
+                            assignment["selectedEnhancementIds"] = new JArray();
+                }
+                document["schemaVersion"] = 4;
+                version = 4;
                 migrated = true;
             }
             if (version != BuffPlannerProfile.CurrentSchemaVersion)

@@ -16,7 +16,7 @@ using KingmakerBuffPlanner.Planning;
 
 namespace KingmakerBuffPlanner.GameAdapters
 {
-    internal sealed class KingmakerAnimatedCastAdapter : ICastRuntimeAdapter
+    internal sealed class KingmakerAnimatedCastAdapter : ICastRuntimeAdapter, ICastEnhancementRuntimeAdapter
     {
         public bool IsInCombat
         {
@@ -39,6 +39,11 @@ namespace KingmakerBuffPlanner.GameAdapters
                 return CastRuntimeValidation.Fail("material-component-unavailable");
             if (!CanTarget(resolved.Ability, resolved.Target)) return CastRuntimeValidation.Fail("target-invalid");
             return CastRuntimeValidation.Pass();
+        }
+
+        public CastEnhancementPreparation PrepareEnhancements(CastStep step)
+        {
+            return new KingmakerCastEnhancementAdapter().Prepare(step);
         }
 
         public IAnimatedCastOperation StartAnimated(CastStep step)

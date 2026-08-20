@@ -34,6 +34,7 @@ namespace KingmakerBuffPlanner.Execution
             ResourcePoolKey = step.Reservation == null ? string.Empty : step.Reservation.PoolKey;
             ResourceTokenIds = new ReadOnlyCollection<string>(step.Reservation == null
                 ? new List<string>() : step.Reservation.TokenIds.ToList());
+            EnhancementIds = new ReadOnlyCollection<string>(step.EnhancementIds.ToList());
             Status = status;
             Detail = detail ?? string.Empty;
         }
@@ -44,6 +45,7 @@ namespace KingmakerBuffPlanner.Execution
         public IReadOnlyList<string> TargetUnitIds { get; private set; }
         public string ResourcePoolKey { get; private set; }
         public IReadOnlyList<string> ResourceTokenIds { get; private set; }
+        public IReadOnlyList<string> EnhancementIds { get; private set; }
         public CastExecutionStatus Status { get; private set; }
         public string Detail { get; private set; }
     }
@@ -114,6 +116,37 @@ namespace KingmakerBuffPlanner.Execution
         bool IsInCombat { get; }
         CastRuntimeValidation Validate(CastStep step);
         IAnimatedCastOperation StartAnimated(CastStep step);
+    }
+
+    public sealed class CastEnhancementPreparation : IDisposable
+    {
+        private CastEnhancementPreparation(bool valid, string reason, IDisposable lease)
+        {
+            Valid = valid;
+            Reason = reason ?? string.Empty;
+            _lease = lease;
+        }
+
+        private readonly IDisposable _lease;
+        public bool Valid { get; private set; }
+        public string Reason { get; private set; }
+        public static CastEnhancementPreparation Pass(IDisposable lease)
+        {
+            return new CastEnhancementPreparation(true, string.Empty, lease);
+        }
+        public static CastEnhancementPreparation Fail(string reason)
+        {
+            return new CastEnhancementPreparation(false, reason, null);
+        }
+        public void Dispose()
+        {
+            if (_lease != null) _lease.Dispose();
+        }
+    }
+
+    public interface ICastEnhancementRuntimeAdapter
+    {
+        CastEnhancementPreparation PrepareEnhancements(CastStep step);
     }
 
     public interface ICastExecutor

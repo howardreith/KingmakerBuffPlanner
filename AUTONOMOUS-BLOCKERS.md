@@ -68,3 +68,11 @@ Evidence: the current Steam session briefly attempted an App 640820 cloud downlo
 # Parchment UI polish blockers — 2026-08-12
 
 No critical blocker exists at intake. The exact Kingmaker 2.1.7b native theme inventory is an actionable diagnostic prerequisite, not a blocker. The stale `Test-InstallWhatIf.ps1` prior-version argument is recorded evidence and does not indicate an unresolved live transaction or invalid installation.
+
+## Brown-Fur Transmuter enhancement - FEATURE-NOT-PRESENT
+
+- Exact blocker: installed CallOfTheWild 1.14.4c-2.1 does not contain Brown-Fur Transmuter, Powerful Change, or Share Transmutation types, members, blueprint names, or identifying strings.
+- Assembly evidence: SHA-256 4EBF8E1ED3E66FFED72EA33EA325595629423DACD5BFFA23E3C9109144B26915; MVID 8caab254-aacf-4811-8093-44b9184e6e53.
+- Approaches: bounded installed-assembly type inventory and binary/string search; generic enhancement category and fail-soft discovery contract retained for a future optional-mod implementation.
+- Safety decision: do not invent blueprint GUIDs, simulate a stronger ability-score bonus, or show a phantom selector.
+- Next technical step: provide an installed optional mod assembly that actually implements Brown-Fur Transmuter, then inventory its activation/resource contracts and add an adapter without compile-time dependency.

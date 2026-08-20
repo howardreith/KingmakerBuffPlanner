@@ -94,6 +94,9 @@ namespace KingmakerBuffPlanner.Tests
                 Run("catalog-filter-selected-category-and-reset-contract", TestCatalogFilterState);
                 Run("presentation-view-models-use-player-facing-deterministic-state", TestPresentationModels);
                 Run("right-click-description-resolves-without-plan-mutation", TestDescriptionRequest);
+                Run("cast-enhancement-applicability-and-reservation", TestCastEnhancementPlanning);
+                Run("cast-enhancement-selection-is-assignment-scoped", TestCastEnhancementSelection);
+                Run("cast-enhancement-execution-is-fail-closed-and-cleaned-up", TestCastEnhancementExecution);
                 Run("personal-target-eligibility-is-provider-relative", TestPersonalTargetEligibility);
                 Run("area-coverage-preview-distinguishes-direct-and-indirect", TestAreaCoveragePresentation);
                 Run("single-target-plan-does-not-create-indirect-coverage", TestSingleTargetCoveragePresentation);
@@ -893,7 +896,8 @@ namespace KingmakerBuffPlanner.Tests
             if (loaded.RecoveredFromBackup || loaded.Migrated || loaded.Warning.Length != 0 ||
                 assignment.WantedTargetUnitIds[0] != "unit-z" ||
                 assignment.WantedTargetUnitIds[1] != "unit-a" ||
-                assignment.Ability.ToKey().Canonical != Ability("persisted", "variant", 8).Canonical)
+                assignment.Ability.ToKey().Canonical != Ability("persisted", "variant", 8).Canonical ||
+                assignment.SelectedEnhancementIds.Single() != "metamagic-rod|unit-a|persisted")
                 throw new InvalidOperationException("Stable IDs or exact profile values changed during round trip.");
             if (Directory.GetFiles(Path.GetDirectoryName(repository.GetProfilePath("campaign:alpha")), "*.tmp").Length != 0)
                 throw new InvalidOperationException("Atomic profile write left a temporary file.");
@@ -936,7 +940,7 @@ namespace KingmakerBuffPlanner.Tests
             Directory.CreateDirectory(Path.GetDirectoryName(path));
             File.WriteAllText(path, document.ToString());
             ProfileLoadResult migrated = repository.Load("campaign:migration");
-            if (!migrated.Migrated || migrated.Profile.SchemaVersion != 3 ||
+            if (!migrated.Migrated || migrated.Profile.SchemaVersion != 4 ||
                 migrated.Profile.Ui.Scale != 1.0f || migrated.Profile.Execution.Mode != "animated" ||
                 migrated.Profile.Ui.Hotkey != "Ctrl+Shift+B")
                 throw new InvalidOperationException("Schema-one profile was not migrated with safe defaults.");
@@ -952,16 +956,19 @@ namespace KingmakerBuffPlanner.Tests
             document["hiddenSourceIds"] = new JArray("hidden-a", "hidden-b");
             ((JObject)document["ui"])["hotkey"] = "F10";
             ((JObject)document["execution"]).Remove("recastExisting");
+            ((JObject)((JArray)((JObject)((JArray)document["routines"])[0])["assignments"])[0])
+                .Remove("selectedEnhancementIds");
             string path = repository.GetProfilePath("campaign:grid-migration");
             Directory.CreateDirectory(Path.GetDirectoryName(path));
             File.WriteAllText(path, document.ToString());
             ProfileLoadResult migrated = repository.Load("campaign:grid-migration");
-            if (!migrated.Migrated || migrated.Profile.SchemaVersion != 3 ||
+            if (!migrated.Migrated || migrated.Profile.SchemaVersion != 4 ||
                 migrated.Profile.Ui.Hotkey != "Ctrl+Shift+B" ||
                 migrated.Profile.HiddenSourceIds.Count != 0 || migrated.Profile.Execution.RecastExisting)
                 throw new InvalidOperationException("Grid UI migration did not reveal hidden entries or replace F10.");
             if (migrated.Profile.Routines[0].Assignments.Count != 1 ||
-                migrated.Profile.Routines[0].Assignments[0].WantedTargetUnitIds.Count != 2)
+                migrated.Profile.Routines[0].Assignments[0].WantedTargetUnitIds.Count != 2 ||
+                migrated.Profile.Routines[0].Assignments[0].SelectedEnhancementIds.Count != 0)
                 throw new InvalidOperationException("Grid UI migration did not preserve routine targets.");
         }
 
@@ -981,7 +988,7 @@ namespace KingmakerBuffPlanner.Tests
             repository.Save(duplicate);
             string duplicatePath = repository.GetProfilePath("campaign:duplicate");
             string duplicateJson = File.ReadAllText(duplicatePath).Replace(
-                "\"schemaVersion\": 3,", "\"schemaVersion\": 3,\r\n  \"schemaVersion\": 3,");
+                "\"schemaVersion\": 4,", "\"schemaVersion\": 4,\r\n  \"schemaVersion\": 4,");
             File.WriteAllText(duplicatePath, duplicateJson);
             ProfileLoadResult rejected = repository.Load("campaign:duplicate");
             if (!rejected.Warning.Contains("duplicate-property"))
@@ -997,7 +1004,8 @@ namespace KingmakerBuffPlanner.Tests
                 Ability = AbilityKeyProfile.FromKey(Ability("persisted", "variant", 8)),
                 WantedTargetUnitIds = new List<string> { "unit-z", "unit-a" },
                 ExistingEffectPolicy = ExistingEffectPolicy.SkipAlreadyActive,
-                IgnoredPresenceMarkers = new List<string> { "shared-marker" }
+                IgnoredPresenceMarkers = new List<string> { "shared-marker" },
+                SelectedEnhancementIds = new List<string> { "metamagic-rod|unit-a|persisted" }
             });
             profile.ProviderPreferences.Add(new ProviderPreferenceProfile
             {
@@ -1635,6 +1643,115 @@ namespace KingmakerBuffPlanner.Tests
                 new TargetValidationSnapshot(true, true, true, true))), providers, pools);
         }
 
+        private static void TestCastEnhancementPlanning()
+        {
+            AbilityKey ability = Ability("enhanced-spell", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("enhanced-free", ResourcePoolKind.Unlimited, 0, 0, null);
+            ProviderSnapshot provider = PlannerProvider("unit-a", "enhanced-book", ability,
+                "enhanced-free", 0);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(new[] { provider }, new[] { pool },
+                "unit-a", "unit-b");
+            var option = new ProviderPlanningOption(provider, new[] { "unit-a", "unit-b" },
+                new[] { "unit-a", "unit-b" }, 3, 10);
+            var rod = new CastEnhancementSnapshot("rod-a", "unit-a", "rod-guid", "Extend Rod",
+                "Extends applicable spells.", CastEnhancementCategory.MetamagicRod, 2, 3, 1, null);
+            var request = new BuffCastRequest(new BuffSourceDefinition("enhanced", ability,
+                Leaf("enhanced-effect"), CastGroupingKind.PerTarget),
+                new[] { "unit-a", "unit-b" }, ExistingEffectPolicy.Overwrite, null,
+                new[] { rod.EnhancementId });
+            CastPlan plan = new CastPlanner().Plan(snapshot, request, new[] { option }, EmptyPolicy(),
+                new ActiveEffectSnapshot(null), new[] { rod });
+            if (plan.Steps.Count != 1 || plan.Steps[0].EnhancementIds.Single() != "rod-a" ||
+                plan.Outcomes.Count(value => value.Kind == TargetOutcomeKind.Unfulfilled) != 1 ||
+                !plan.Outcomes.Any(value => value.Reason.Contains("requested-enhancement-unavailable")))
+                throw new InvalidOperationException("Finite enhancement uses were not reserved per actual cast.");
+            var exhausted = new CastEnhancementSnapshot("rod-empty", "unit-a", "rod-empty-guid",
+                "Empty Rod", string.Empty, CastEnhancementCategory.MetamagicRod, 2, 3, 0, null);
+            if (exhausted.IsApplicable(provider) == false || new CastPlanner().Plan(snapshot,
+                new BuffCastRequest(new BuffSourceDefinition("empty", ability, Leaf("effect"),
+                    CastGroupingKind.PerTarget), new[] { "unit-a" }, ExistingEffectPolicy.Overwrite,
+                    null, new[] { exhausted.EnhancementId }), new[] { option }, EmptyPolicy(),
+                new ActiveEffectSnapshot(null), new[] { exhausted }).Steps.Count != 0)
+                throw new InvalidOperationException("An exhausted enhancement was planned.");
+            ProviderSnapshot otherCaster = PlannerProvider("unit-b", "enhanced-book-b", ability,
+                "enhanced-free", 0);
+            if (rod.IsApplicable(otherCaster))
+                throw new InvalidOperationException("Enhancement applicability leaked to another caster.");
+            var secondRod = new CastEnhancementSnapshot("rod-b", "unit-a", "rod-b-guid", "Other Rod",
+                string.Empty, CastEnhancementCategory.MetamagicRod, 4, 3, 1, null);
+            var feature = new CastEnhancementSnapshot("feature-a", "unit-a", "feature-guid", "Feature",
+                string.Empty, CastEnhancementCategory.ClassFeature, 0, 0, 1, null);
+            if (CastEnhancementSnapshot.AreCompatible(new[] { rod, secondRod }) ||
+                !CastEnhancementSnapshot.AreCompatible(new[] { rod, feature }))
+                throw new InvalidOperationException("Enhancement category conflicts were not preserved.");
+        }
+
+        private static void TestCastEnhancementSelection()
+        {
+            AbilityKey ability = Ability("selection-spell", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("selection-free", ResourcePoolKind.Unlimited, 0, 0, null);
+            ProviderSnapshot provider = PlannerProvider("unit-a", "selection-book", ability,
+                "selection-free", 0);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(new[] { provider }, new[] { pool }, "unit-a");
+            var option = new ProviderPlanningOption(provider, new[] { "unit-a" },
+                new[] { "unit-a" }, 2, 10);
+            var rod = new CastEnhancementSnapshot("selection-rod", "unit-a", "selection-rod-guid",
+                "Selection Rod", "fixture", CastEnhancementCategory.MetamagicRod, 2, 3, 2, null);
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault("enhancement-selection");
+            var model = new PlannerSetupModel(profile, snapshot, new ActiveEffectSnapshot(null),
+                new Dictionary<string, EffectExpression> { { ability.Canonical, Leaf("selection-effect") } },
+                new[] { option }, ignored => { }, new[] { rod });
+            model.CycleEnhancement("long");
+            SourceAssignmentProfile assignment = profile.Routines[0].Assignments.Single();
+            if (assignment.SelectedEnhancementIds.Single() != rod.EnhancementId ||
+                assignment.WantedTargetUnitIds.Count != 0 ||
+                !model.GetEnhancementSummary("long").Contains("Selection Rod"))
+                throw new InvalidOperationException("Enhancement selection was not scoped to the assignment.");
+            model.ToggleTarget("long", "unit-a");
+            model.ToggleTarget("long", "unit-a");
+            if (profile.Routines[0].Assignments.Single().SelectedEnhancementIds.Single() != rod.EnhancementId)
+                throw new InvalidOperationException("Clearing targets discarded the planned enhancement.");
+            model.CycleEnhancement("long");
+            if (profile.Routines[0].Assignments.Count != 0)
+                throw new InvalidOperationException("Clearing an empty enhancement assignment left stale state.");
+        }
+
+        private static void TestCastEnhancementExecution()
+        {
+            AbilityKey ability = Ability("execution-enhanced", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("execution-enhanced-free", ResourcePoolKind.Unlimited,
+                0, 0, null);
+            ProviderSnapshot provider = PlannerProvider("unit-a", "execution-book", ability,
+                "execution-enhanced-free", 0);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(new[] { provider }, new[] { pool }, "unit-a");
+            var option = new ProviderPlanningOption(provider, new[] { "unit-a" },
+                new[] { "unit-a" }, 2, 10);
+            var rod = new CastEnhancementSnapshot("execution-rod", "unit-a", "execution-rod-guid",
+                "Execution Rod", string.Empty, CastEnhancementCategory.MetamagicRod, 2, 3, 3, null);
+            var request = new BuffCastRequest(new BuffSourceDefinition("execution-source", ability,
+                Leaf("execution-effect"), CastGroupingKind.PerTarget), new[] { "unit-a" },
+                ExistingEffectPolicy.Overwrite, null, new[] { rod.EnhancementId });
+            CastPlan plan = new CastPlanner().Plan(snapshot, request, new[] { option }, EmptyPolicy(),
+                new ActiveEffectSnapshot(null), new[] { rod });
+            var success = new EnhancementInstantRuntime(false, false);
+            ExecutionReport successReport = new ExecutionReport(plan);
+            Drain(new InstantCastExecutor(success, true).Execute(plan, successReport));
+            if (string.Join(",", success.Events.ToArray()) != "prepare,fire,cleanup" ||
+                successReport.Confirmed != 1)
+                throw new InvalidOperationException("Enhancement preparation/cast/cleanup order changed.");
+            var throwing = new EnhancementInstantRuntime(false, true);
+            ExecutionReport failureReport = new ExecutionReport(plan);
+            Drain(new InstantCastExecutor(throwing, true).Execute(plan, failureReport));
+            if (string.Join(",", throwing.Events.ToArray()) != "prepare,fire,cleanup" ||
+                failureReport.Failed != 1)
+                throw new InvalidOperationException("Enhancement cleanup did not run after a failed cast.");
+            var unavailable = new EnhancementInstantRuntime(true, false);
+            ExecutionReport unavailableReport = new ExecutionReport(plan);
+            Drain(new InstantCastExecutor(unavailable, true).Execute(plan, unavailableReport));
+            if (unavailable.FireCount != 0 || unavailableReport.Failed != 1 ||
+                !unavailableReport.Records.Any(value => value.Detail.Contains("enhancement-unavailable")))
+                throw new InvalidOperationException("Unavailable enhancement silently fell back to an ordinary cast.");
+        }
         private static ProviderSelectionPolicy EmptyPolicy()
         {
             return new ProviderSelectionPolicy(null, null, null);
@@ -1680,6 +1797,47 @@ namespace KingmakerBuffPlanner.Tests
                 pools);
         }
 
+        private sealed class EnhancementInstantRuntime : IInstantCastRuntimeAdapter, ICastEnhancementRuntimeAdapter
+        {
+            private readonly bool _unavailable;
+            private readonly bool _throwOnFire;
+            internal readonly List<string> Events = new List<string>();
+            internal int FireCount;
+            internal EnhancementInstantRuntime(bool unavailable, bool throwOnFire)
+            {
+                _unavailable = unavailable;
+                _throwOnFire = throwOnFire;
+            }
+            public bool IsInCombat { get { return false; } }
+            public CastRuntimeValidation Validate(CastStep step) { return CastRuntimeValidation.Pass(); }
+            public CastEnhancementPreparation PrepareEnhancements(CastStep step)
+            {
+                Events.Add("prepare");
+                return _unavailable ? CastEnhancementPreparation.Fail("fixture-exhausted") :
+                    CastEnhancementPreparation.Pass(new CallbackDisposable(() => Events.Add("cleanup")));
+            }
+            public InstantCastResult Fire(CastStep step)
+            {
+                FireCount++;
+                Events.Add("fire");
+                if (_throwOnFire) throw new InvalidOperationException("fixture-cast-failure");
+                return new InstantCastResult(true, true, true, true, "enhanced-success");
+            }
+            public bool EffectsObserved(CastStep step) { return true; }
+        }
+
+        private sealed class CallbackDisposable : IDisposable
+        {
+            private readonly Action _dispose;
+            private bool _disposed;
+            internal CallbackDisposable(Action dispose) { _dispose = dispose; }
+            public void Dispose()
+            {
+                if (_disposed) return;
+                _disposed = true;
+                _dispose();
+            }
+        }
         private sealed class FakeAnimatedRuntime : ICastRuntimeAdapter
         {
             private int _validations;

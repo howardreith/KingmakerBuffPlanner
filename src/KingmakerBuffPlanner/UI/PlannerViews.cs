@@ -482,9 +482,11 @@ namespace KingmakerBuffPlanner.UI
         private readonly PlannerTargetStripView _targets;
         private readonly Button _selectAll;
         private readonly Button _clear;
+        private readonly Button _enhancement;
+        private readonly PlannerHoverTooltip _enhancementTooltip;
 
         internal PlannerSelectedBuffView(RectTransform parent, PlannerUiTheme theme,
-            Action selectAll, Action clear, Action<string> showTooltip)
+            Action selectAll, Action clear, Action cycleEnhancement, Action<string> showTooltip)
         {
             _theme = theme;
             Root = KingmakerUiFactory.CreateRect("SelectedBuff", parent);
@@ -514,7 +516,13 @@ namespace KingmakerBuffPlanner.UI
             KingmakerUiFactory.SetAnchors(_meta.rectTransform, 0.105f, 0.61f, 0.42f, 0.76f);
             _description = KingmakerUiFactory.CreateText("SelectedDescription", Root, theme,
                 string.Empty, 14, TextAnchor.UpperLeft);
-            KingmakerUiFactory.SetAnchors(_description.rectTransform, 0.105f, 0.14f, 0.42f, 0.60f);
+            KingmakerUiFactory.SetAnchors(_description.rectTransform, 0.105f, 0.19f, 0.42f, 0.60f);
+            _enhancement = KingmakerUiFactory.CreateButton("CycleEnhancement", Root, theme,
+                "Enhancement: None", () => cycleEnhancement());
+            KingmakerUiFactory.SetAnchors((RectTransform)_enhancement.transform,
+                0.105f, 0.035f, 0.40f, 0.18f);
+            _enhancementTooltip = _enhancement.gameObject.AddComponent<PlannerHoverTooltip>();
+            _enhancementTooltip.Show = showTooltip;
             _targetsLabel = KingmakerUiFactory.CreateText("TargetsLabel", Root, theme,
                 string.Empty, 17, TextAnchor.MiddleLeft);
             _targetsLabel.color = theme.BurgundyPrimary;
@@ -546,7 +554,8 @@ namespace KingmakerBuffPlanner.UI
         internal void Bind(SetupSourceRow source, Sprite icon, string routineId,
             IReadOnlyList<TargetPortraitViewModel> targets, Func<string, Sprite> portrait,
             Action<string> toggle, Func<PlannerPresentationStatus, Color> statusColor,
-            string planSummary, bool interactable)
+            string planSummary, string enhancementSummary, string enhancementDescription,
+            bool enhancementAvailable, bool interactable)
         {
             bool available = source != null;
             _icon.sprite = icon;
@@ -563,6 +572,10 @@ namespace KingmakerBuffPlanner.UI
                 routineId.Substring(1);
             _targets.Bind(targets, portrait, toggle, statusColor);
             _plan.text = planSummary ?? string.Empty;
+            Text enhancementLabel = _enhancement.GetComponentInChildren<Text>(true);
+            if (enhancementLabel != null) enhancementLabel.text = enhancementSummary ?? "Enhancement: None";
+            _enhancementTooltip.Text = enhancementDescription ?? string.Empty;
+            _enhancement.interactable = available && enhancementAvailable && interactable;
             _selectAll.interactable = available && interactable;
             _clear.interactable = available && interactable && targets.Any(target => target.Wanted);
         }

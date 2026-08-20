@@ -207,7 +207,12 @@ namespace KingmakerBuffPlanner.UI
                 {
                     model.ToggleTarget(ActiveRoutineId, unitId);
                     RefreshAll(true);
-                }, StatusColor, _viewModel.PlanSummary(), model != null && !_session.IsExecuting);
+                }, StatusColor, _viewModel.PlanSummary(),
+                model == null ? "Enhancement: None" : model.GetEnhancementSummary(ActiveRoutineId),
+                model == null ? string.Empty : model.GetEnhancementDescription(ActiveRoutineId),
+                model != null && (model.GetApplicableEnhancements().Count != 0 ||
+                    model.GetSelectedEnhancementIds(ActiveRoutineId).Count != 0),
+                model != null && !_session.IsExecuting);
         }
 
         internal bool DispatchBlessRowForRuntime()
@@ -404,6 +409,10 @@ namespace KingmakerBuffPlanner.UI
             }, () =>
             {
                 _session.Model.SetAllValidTargets(ActiveRoutineId, false);
+                RefreshAll(true);
+            }, () =>
+            {
+                _session.Model.CycleEnhancement(ActiveRoutineId);
                 RefreshAll(true);
             }, ShowTooltip);
             BuildFooter(frame);
