@@ -5,6 +5,43 @@ using System.Linq;
 
 namespace KingmakerBuffPlanner.UI
 {
+    public sealed class HudInstallInvalidationGate
+    {
+        private bool _requested = true;
+        private int _hostIdentity;
+        private bool _hostActive;
+
+        public bool IsRequested { get { return _requested; } }
+        public int RequestCount { get; private set; }
+        public int AttemptCount { get; private set; }
+
+        public void Request()
+        {
+            if (_requested) return;
+            _requested = true;
+            RequestCount++;
+        }
+
+        public void Cancel()
+        {
+            _requested = false;
+        }
+
+        public bool ObserveHost(int hostIdentity, bool hostActive)
+        {
+            if (hostIdentity != _hostIdentity || hostActive != _hostActive)
+            {
+                _hostIdentity = hostIdentity;
+                _hostActive = hostActive;
+                if (hostActive) Request();
+            }
+            if (!_requested || !hostActive) return false;
+            _requested = false;
+            AttemptCount++;
+            return true;
+        }
+    }
+
     public sealed class DeferredUiReadinessGate
     {
         private readonly int _minimumFrames;

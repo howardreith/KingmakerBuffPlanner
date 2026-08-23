@@ -104,6 +104,7 @@ namespace KingmakerBuffPlanner.Tests
                 Run("input-lease-restores-on-close-and-acquire-failure", TestInputLease);
                 Run("screen-state-machine-is-idempotent", TestScreenStateMachine);
                 Run("ui-readiness-is-deferred-across-frames", TestDeferredUiReadiness);
+                Run("hud-install-discovery-is-invalidated-not-frame-polled", TestHudInstallInvalidation);
                 Run("quick-execution-instruments-and-presents-empty-group", TestQuickExecutionFlow);
                 Run("animated-executor-validates-before-queue-and-reports", TestAnimatedExecutor);
                 Run("instant-executor-revalidates-batches-and-reports", TestInstantExecutor);
@@ -1861,6 +1862,31 @@ namespace KingmakerBuffPlanner.Tests
                 !RuntimeTestProtocol.IsCatalogScenario(request.Scenario) ||
                 RuntimeTestProtocol.IsUiScenario(request.Scenario))
                 throw new InvalidOperationException("Valid final core request was rejected: " + rejection);
+        }
+
+        private static void TestHudInstallInvalidation()
+        {
+            var gate = new HudInstallInvalidationGate();
+            for (int frame = 0; frame < 240; frame++)
+                if (gate.ObserveHost(0, false))
+                    throw new InvalidOperationException("Absent campaign HUD triggered discovery.");
+            if (!gate.IsRequested || gate.AttemptCount != 0)
+                throw new InvalidOperationException("Initial invalidation was consumed without a HUD host.");
+            if (!gate.ObserveHost(101, true) || gate.AttemptCount != 1)
+                throw new InvalidOperationException("HUD appearance did not trigger one discovery.");
+            for (int frame = 0; frame < 240; frame++)
+                if (gate.ObserveHost(101, true))
+                    throw new InvalidOperationException("Unchanged HUD retriggered discovery.");
+            gate.Request();
+            if (!gate.ObserveHost(101, true) || gate.ObserveHost(101, true) ||
+                gate.AttemptCount != 2)
+                throw new InvalidOperationException("Lifecycle invalidation was not consumed exactly once.");
+            if (gate.ObserveHost(101, false) || !gate.ObserveHost(101, true) ||
+                gate.AttemptCount != 3)
+                throw new InvalidOperationException("HUD reactivation did not trigger exactly one discovery.");
+            if (!gate.ObserveHost(202, true) || gate.ObserveHost(202, true) ||
+                gate.AttemptCount != 4)
+                throw new InvalidOperationException("HUD replacement did not trigger exactly one discovery.");
         }
 
         private static void TestValidPerformanceRequest(string root)

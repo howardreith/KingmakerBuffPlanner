@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using Kingmaker;
 using Kingmaker.GameModes;
 using Kingmaker.UI;
+using Kingmaker.UI.Common;
 using Kingmaker.UI.Selection;
 using Kingmaker.PubSubSystem;
 using KingmakerBuffPlanner.Infrastructure;
@@ -44,7 +45,8 @@ namespace KingmakerBuffPlanner.UI
         private GameModeType _runtimeModeBefore;
         private IDisposable _eventSubscription;
         private bool _disposed;
-        private bool _installRequested = true;
+        private readonly HudInstallInvalidationGate _hudInstallGate =
+            new HudInstallInvalidationGate();
         private int _tickCount;
         private int _lifecycleSignalCount;
 
@@ -65,7 +67,12 @@ namespace KingmakerBuffPlanner.UI
         {
             if (_instance == null) return;
             _instance._enabled = enabled;
-            if (!enabled) _instance.ReleasePlayerUi();
+            if (enabled) _instance._hudInstallGate.Request();
+            else
+            {
+                _instance._hudInstallGate.Cancel();
+                _instance.ReleasePlayerUi();
+            }
         }
 
         internal static void DestroyOwned()
@@ -82,7 +89,7 @@ namespace KingmakerBuffPlanner.UI
             {
                 return;
             }
-            _instance._installRequested = true;
+            _instance._hudInstallGate.Request();
             if (_instance._screen.LifecycleState != PlannerScreenLifecycleState.Closed)
             {
                 _instance._screen.Close();
@@ -131,6 +138,9 @@ namespace KingmakerBuffPlanner.UI
                 ";hudInstalled=" + (root._hud != null && root._hud.IsInstalled) +
                 ";hudCandidate=" + (root._hud == null ? 0 : root._hud.RootInstanceId) +
                 ";hudAttempts=" + (root._hud == null ? 0 : root._hud.InstallAttempts) +
+                ";hudInstallRequested=" + root._hudInstallGate.IsRequested +
+                ";hudInstallInvalidations=" + root._hudInstallGate.RequestCount +
+                ";hudInstallDispatches=" + root._hudInstallGate.AttemptCount +
                 ";hudFailure=" + (root._hud == null ? "controller-null" : root._hud.LastFailure) +
                 ";screenState=" + (root._screen == null ? "controller-null" : root._screen.LifecycleState.ToString()) +
                 ";screenFailure=" + (root._screen == null ? "controller-null" : root._screen.LastFailure) +
@@ -541,7 +551,8 @@ namespace KingmakerBuffPlanner.UI
             }
             catch (Exception exception)
             {
-                _log.Error("[KBP-BOOT] EventBus subscription failed;polling retry remains active.",
+                _log.Error("[KBP-BOOT] EventBus subscription failed;" +
+                    "HUD host-transition observation remains active.",
                     exception);
             }
         }
@@ -562,7 +573,13 @@ namespace KingmakerBuffPlanner.UI
                     RuntimePerformanceDiagnostics.RecordOperation(
                         RuntimePerformanceOperation.ScreenTick, screenStartedAt);
                 }
-                if (!RuntimePerformanceDiagnostics.SuppressHudDiscovery)
+                StaticCanvas canvas = StaticCanvas.Instance;
+                UISectionHUDController hudHost = canvas == null ? null : canvas.HUDController;
+                int hudHostIdentity = hudHost == null ? 0 : hudHost.GetInstanceID();
+                bool hudHostActive = hudHost != null && hudHost.gameObject.activeInHierarchy;
+                bool installInvalidated = _hudInstallGate.ObserveHost(
+                    hudHostIdentity, hudHostActive);
+                if (installInvalidated && !RuntimePerformanceDiagnostics.SuppressHudDiscovery)
                 {
                     long installStartedAt = RuntimePerformanceDiagnostics.BeginOperation();
                     try { _hud.TryInstall(); }
@@ -579,7 +596,6 @@ namespace KingmakerBuffPlanner.UI
                     RuntimePerformanceDiagnostics.RecordOperation(
                         RuntimePerformanceOperation.HudTick, hudTickStartedAt);
                 }
-                _installRequested = !_hud.IsInstalled;
                 if (_screen.IsOpen) _runtimeObservedFrames++;
             }
             catch (Exception exception)
@@ -623,10 +639,11 @@ namespace KingmakerBuffPlanner.UI
         private void SignalLifecycle(string name, bool unloading)
         {
             _lifecycleSignalCount++;
-            _installRequested = !unloading;
+            if (unloading) _hudInstallGate.Cancel();
+            else _hudInstallGate.Request();
             _log.Info("[KBP-BOOT] lifecycle callback;name=" + name +
                 ";count=" + _lifecycleSignalCount + ";installRequested=" +
-                _installRequested + ";mode=" +
+                _hudInstallGate.IsRequested + ";mode=" +
                 (Game.Instance == null ? "game-null" : Game.Instance.CurrentMode.ToString()) + ".");
         }
 

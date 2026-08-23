@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Kingmaker.UI.Constructor;
+using Kingmaker.UI;
+using Kingmaker.UI.Common;
 using Kingmaker.UI.IngameMenu;
 using KingmakerBuffPlanner.Infrastructure;
 using KingmakerBuffPlanner.Persistence;
@@ -137,11 +139,16 @@ namespace KingmakerBuffPlanner.UI
                 LogFailure("candidate-host-destroyed");
                 DisposeOwnedRoot();
             }
+            StaticCanvas canvas = StaticCanvas.Instance;
+            UISectionHUDController hudHost = canvas == null ? null : canvas.HUDController;
+            if (hudHost == null) return RejectHost("campaign-hud-controller-not-found");
+            if (!hudHost.gameObject.activeInHierarchy)
+                return RejectHost("campaign-hud-controller-inactive:" + GetPath(hudHost.transform));
             long findStartedAt = RuntimePerformanceDiagnostics.BeginOperation();
             IngameMenuController controller = null;
             try
             {
-                controller = UnityEngine.Object.FindObjectOfType<IngameMenuController>();
+                controller = hudHost.GetComponentInChildren<IngameMenuController>(true);
             }
             finally
             {
