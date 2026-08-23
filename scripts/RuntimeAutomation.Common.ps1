@@ -100,7 +100,7 @@ function New-KbpRuntimeRequest {
         [ValidateSet('native-only', 'call-of-the-wild', 'human-reproduction')][string]$ProfileId = 'native-only',
         [object[]]$ExpectedOptionalMods = @(), [string[]]$ExpectedBlueprintGuids = @(),
         [hashtable]$Parameters = @{},
-        [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'live-ui-bootstrap', 'ui-native-contract-probe', 'final-no-save-core')][string]$Scenario = 'mod-load-smoke')
+        [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'live-ui-bootstrap', 'ui-native-contract-probe', 'final-no-save-core', 'performance-probe')][string]$Scenario = 'mod-load-smoke')
     return [ordered]@{
         schemaVersion = 1
         enabled = $true
@@ -199,8 +199,8 @@ function Assert-KbpRuntimeResult {
         assemblySha256 = [pscustomobject]@{ expected = $BuildManifest.dllSha256; observed = $Result.assemblySha256 }
         gameVersion = [pscustomobject]@{ expected = '2.1.7'; observed = $Result.gameVersion }
         gameExecutableSha256 = [pscustomobject]@{ expected = '94a779c5423199fcb0470bd89884a3b3875dee2072eb1a7b1d7bc8e67accb1a1'; observed = $Result.gameExecutableSha256 }
-        ummVersion = [pscustomobject]@{ expected = '0.28.2.0'; observed = $Result.ummVersion }
-        ummSha256 = [pscustomobject]@{ expected = '75b96e25a3a9fbadb47dd14a4ab490cb8c98143a6242aff3bba6145cd3047f39'; observed = $Result.ummSha256 }
+        ummVersion = [pscustomobject]@{ expected = '0.32.4.0'; observed = $Result.ummVersion }
+        ummSha256 = [pscustomobject]@{ expected = '1387468bc3af41c50fe51859a3bb7af4922891aa8f13a6187e7a348ceaabfd88'; observed = $Result.ummSha256 }
         harmonyVersion = [pscustomobject]@{ expected = '1.2.0.1'; observed = $Result.harmonyVersion }
         harmonySha256 = [pscustomobject]@{ expected = 'aa1cd48317254985d8b700cc74953477d1b40c3022ce9aa4c95ed2b8327e1292'; observed = $Result.harmonySha256 }
     }
@@ -476,6 +476,28 @@ function Assert-KbpRuntimeResult {
             @($contract.buttons).Count -ne [int]$Result.nativeUiButtonCount -or
             @($contract.buttons).Count -le 0 -or @($contract.raycasters).Count -le 0) {
             throw 'Native UI contract is incomplete or does not reconcile.'
+        }
+    }
+    if ($Request.scenario -ceq 'performance-probe') {
+        $performancePath = Join-Path $Request.evidenceDirectory 'performance-profile.json'
+        if (-not (Test-Path -LiteralPath $performancePath -PathType Leaf)) {
+            throw 'Performance profile evidence is missing.'
+        }
+        if ([string]$Result.performanceProfileSha256 -cne (Get-KbpSha256 $performancePath)) {
+            throw 'Performance profile hash mismatch.'
+        }
+        $performance = Read-KbpJson $performancePath
+        if ([int]$performance.schemaVersion -ne 1 -or
+            [string]$performance.runId -cne [string]$Request.runId -or
+            [string]$performance.version -cne [string]$BuildManifest.version -or
+            [string]$performance.commit -cne [string]$BuildManifest.commit -or
+            [bool]$performance.disableHudDiscovery -ne [bool]$Request.parameters.disableHudDiscovery -or
+            [int]$performance.requestedDurationSeconds -ne [int]$Request.parameters.durationSeconds -or
+            @($performance.samples).Count -lt 1 -or
+            [int]$performance.totalFrameCount -lt 1 -or
+            [int]$performance.qualifiedSampleCount -lt 1 -or
+            -not [bool]$performance.meetsRequestedMinimum) {
+            throw 'Performance profile is incomplete, mismatched, or below its requested minimum.'
         }
     }
 }

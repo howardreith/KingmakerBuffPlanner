@@ -6,6 +6,7 @@ using Harmony12;
 using Kingmaker.Controllers.Clicks;
 using Kingmaker.View;
 using KingmakerBuffPlanner.Infrastructure;
+using KingmakerBuffPlanner.RuntimeTesting;
 using UnityEngine;
 
 namespace KingmakerBuffPlanner.UI
@@ -107,20 +108,38 @@ namespace KingmakerBuffPlanner.UI
 
         private static bool Prefix(PointerController __instance)
         {
-            if (!Contains(Input.mousePosition)) return true;
-            if (__instance != null)
+            long startedAt = RuntimePerformanceDiagnostics.BeginOperation();
+            try
             {
-                _mouseDown.SetValue(__instance, false);
-                _mouseDrag.SetValue(__instance, false);
-                _mouseDownOn.SetValue(__instance, null);
-                _mouseDownHandler.SetValue(__instance, null);
+                if (!Contains(Input.mousePosition)) return true;
+                if (__instance != null)
+                {
+                    _mouseDown.SetValue(__instance, false);
+                    _mouseDrag.SetValue(__instance, false);
+                    _mouseDownOn.SetValue(__instance, null);
+                    _mouseDownHandler.SetValue(__instance, null);
+                }
+                return false;
             }
-            return false;
+            finally
+            {
+                RuntimePerformanceDiagnostics.RecordOperation(
+                    RuntimePerformanceOperation.PointerTickPrefix, startedAt);
+            }
         }
 
         private static void CameraPostfix(ref Vector2 __result)
         {
-            if (Contains(Input.mousePosition)) __result = Vector2.zero;
+            long startedAt = RuntimePerformanceDiagnostics.BeginOperation();
+            try
+            {
+                if (Contains(Input.mousePosition)) __result = Vector2.zero;
+            }
+            finally
+            {
+                RuntimePerformanceDiagnostics.RecordOperation(
+                    RuntimePerformanceOperation.CameraScrollPostfix, startedAt);
+            }
         }
 
         private static FieldInfo Field(string name)

@@ -6,6 +6,7 @@ using Kingmaker.UI.Constructor;
 using Kingmaker.UI.IngameMenu;
 using KingmakerBuffPlanner.Infrastructure;
 using KingmakerBuffPlanner.Persistence;
+using KingmakerBuffPlanner.RuntimeTesting;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.Events;
@@ -136,7 +137,17 @@ namespace KingmakerBuffPlanner.UI
                 LogFailure("candidate-host-destroyed");
                 DisposeOwnedRoot();
             }
-            IngameMenuController controller = UnityEngine.Object.FindObjectOfType<IngameMenuController>();
+            long findStartedAt = RuntimePerformanceDiagnostics.BeginOperation();
+            IngameMenuController controller = null;
+            try
+            {
+                controller = UnityEngine.Object.FindObjectOfType<IngameMenuController>();
+            }
+            finally
+            {
+                RuntimePerformanceDiagnostics.RecordHudObjectFind(
+                    findStartedAt, controller != null);
+            }
             if (controller == null) return RejectHost("ingame-menu-controller-not-found");
             if (!controller.gameObject.activeInHierarchy)
                 return RejectHost("ingame-menu-controller-inactive:" + GetPath(controller.transform));

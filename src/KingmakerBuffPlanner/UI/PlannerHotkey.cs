@@ -3,6 +3,7 @@ using System.Reflection;
 using Harmony12;
 using Kingmaker.UI;
 using KingmakerBuffPlanner.Infrastructure;
+using KingmakerBuffPlanner.RuntimeTesting;
 using UnityEngine;
 
 namespace KingmakerBuffPlanner.UI
@@ -63,20 +64,29 @@ namespace KingmakerBuffPlanner.UI
 
         private static bool InputMatchedPrefix(object __instance, ref bool __result)
         {
-            bool ctrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
-            bool shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
-            bool alt = Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt);
-            PropertyInfo keyProperty = __instance == null ? null : __instance.GetType()
-                .GetProperty("Key", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            if (keyProperty == null) return true;
-            PropertyInfo nameProperty = __instance.GetType().GetProperty("Name",
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            string name = nameProperty == null ? string.Empty :
-                Convert.ToString(nameProperty.GetValue(__instance, null));
-            if (!ShouldSuppressNativeBinding((KeyCode)keyProperty.GetValue(__instance, null),
-                    name, ctrl, shift, alt)) return true;
-            __result = false;
-            return false;
+            long startedAt = RuntimePerformanceDiagnostics.BeginOperation();
+            try
+            {
+                bool ctrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
+                bool shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+                bool alt = Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt);
+                PropertyInfo keyProperty = __instance == null ? null : __instance.GetType()
+                    .GetProperty("Key", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                if (keyProperty == null) return true;
+                PropertyInfo nameProperty = __instance.GetType().GetProperty("Name",
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                string name = nameProperty == null ? string.Empty :
+                    Convert.ToString(nameProperty.GetValue(__instance, null));
+                if (!ShouldSuppressNativeBinding((KeyCode)keyProperty.GetValue(__instance, null),
+                        name, ctrl, shift, alt)) return true;
+                __result = false;
+                return false;
+            }
+            finally
+            {
+                RuntimePerformanceDiagnostics.RecordOperation(
+                    RuntimePerformanceOperation.NativeHotkeyPrefix, startedAt);
+            }
         }
 
         private static bool ModifiersHeld()

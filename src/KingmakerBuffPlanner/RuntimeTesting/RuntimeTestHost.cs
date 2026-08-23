@@ -72,7 +72,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         {
             string rejection;
             RuntimeTestRequest request = RuntimeTestProtocol.TryRead(arguments, out rejection);
-            if (request != null) return new RuntimeTestHost(request, modEntry, log);
+            if (request != null)
+            {
+                RuntimePerformanceDiagnostics.Configure(request, log);
+                return new RuntimeTestHost(request, modEntry, log);
+            }
             if (!string.IsNullOrEmpty(rejection)) log.Info("Runtime request rejected: " + rejection);
             return null;
         }
@@ -97,6 +101,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             }
             if (RuntimeTestProtocol.IsCatalogScenario(_request.Scenario) &&
                 ResourcesLibrary.LibraryObject == null)
+                return false;
+            if (RuntimeTestProtocol.IsPerformanceScenario(_request.Scenario) &&
+                !RuntimePerformanceDiagnostics.IsDurationComplete)
                 return false;
             if (RuntimeTestProtocol.IsUiScenario(_request.Scenario) &&
                 !RuntimeTestProtocol.IsLiveUiScenario(_request.Scenario))
@@ -152,6 +159,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 string catalogHash = null;
                 HarmonyPatchInventory harmonyInventory = null;
                 string harmonyInventoryHash = null;
+                RuntimePerformanceProfile performanceProfile = null;
+                string performanceProfileHash = null;
                 UiRootDiagnostics ui = null;
                 NativeUiContract nativeUiContract = _nativeUiContract;
                 string nativeUiContractPath = Path.Combine(
@@ -195,6 +204,14 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     nativeUiContract = NativeUiContractProbe.Capture();
                     AtomicFile.WriteUtf8(nativeUiContractPath, Serialize(nativeUiContract));
                     nativeUiContractHash = Hashing.Sha256(nativeUiContractPath);
+                }
+                if (RuntimeTestProtocol.IsPerformanceScenario(_request.Scenario))
+                {
+                    performanceProfile = RuntimePerformanceDiagnostics.CompleteProfile();
+                    string performancePath = Path.Combine(
+                        _request.EvidenceDirectory, "performance-profile.json");
+                    AtomicFile.WriteUtf8(performancePath, Serialize(performanceProfile));
+                    performanceProfileHash = Hashing.Sha256(performancePath);
                 }
                 var result = new RuntimeTestResult
                 {
@@ -392,6 +409,15 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     NativeUiButtonCount = nativeUiContract == null ? 0 : nativeUiContract.Buttons.Count,
                     NativeUiCandidateAnchorCount = nativeUiContract == null
                         ? 0 : nativeUiContract.CandidateAnchors.Count,
+                    PerformanceProfileSha256 = performanceProfileHash,
+                    PerformanceMinimumFramesPerSecond = performanceProfile == null ? 0 :
+                        performanceProfile.MinimumFramesPerSecond,
+                    PerformanceAverageFramesPerSecond = performanceProfile == null ? 0 :
+                        performanceProfile.AverageFramesPerSecond,
+                    PerformanceHudObjectFindInvocationCount = performanceProfile == null ? 0 :
+                        performanceProfile.HudObjectFindInvocationCount,
+                    PerformanceHudObjectFindTotalMilliseconds = performanceProfile == null ? 0 :
+                        performanceProfile.HudObjectFindTotalMilliseconds,
                     Assertions = new List<RuntimeTestAssertion>
                     {
                         RuntimeTestAssertion.Pass("entry-point-loaded", "true", "true"),
@@ -403,6 +429,31 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                             : RuntimeTestAssertion.Fail("dll-sha256", _request.ExpectedDllSha256, dllHash)
                     }
                 };
+                if (RuntimeTestProtocol.IsPerformanceScenario(_request.Scenario))
+                {
+                    bool profileValid = performanceProfile != null &&
+                        performanceProfile.QualifiedSampleCount > 0 &&
+                        performanceProfile.TotalFrameCount > 0 &&
+                        !string.IsNullOrWhiteSpace(performanceProfileHash);
+                    result.Assertions.Add(profileValid
+                        ? RuntimeTestAssertion.Pass("performance-profile", "complete", performanceProfileHash)
+                        : RuntimeTestAssertion.Fail("performance-profile", "complete", "missing-or-empty"));
+                    bool minimumMet = profileValid && performanceProfile.MeetsRequestedMinimum;
+                    result.Assertions.Add(minimumMet
+                        ? RuntimeTestAssertion.Pass("performance-minimum-fps",
+                            performanceProfile.RequestedMinimumFramesPerSecond.ToString("F2"),
+                            performanceProfile.MinimumFramesPerSecond.ToString("F2"))
+                        : RuntimeTestAssertion.Fail("performance-minimum-fps",
+                            performanceProfile == null ? "missing" :
+                                performanceProfile.RequestedMinimumFramesPerSecond.ToString("F2"),
+                            performanceProfile == null ? "missing" :
+                                performanceProfile.MinimumFramesPerSecond.ToString("F2")));
+                    if (!profileValid || !minimumMet)
+                    {
+                        result.Status = "FAIL";
+                        result.Stage = "performance-validation";
+                    }
+                }
                 if (RuntimeTestProtocol.IsNativeUiProbeScenario(_request.Scenario))
                 {
                     bool validProbe = nativeUiContract != null &&
@@ -1430,6 +1481,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         [JsonProperty("nativeUiContractSha256", Order = 50)] public string NativeUiContractSha256 { get; set; }
         [JsonProperty("nativeUiButtonCount", Order = 51)] public int NativeUiButtonCount { get; set; }
         [JsonProperty("nativeUiCandidateAnchorCount", Order = 52)] public int NativeUiCandidateAnchorCount { get; set; }
+        [JsonProperty("performanceProfileSha256", Order = 52)] public string PerformanceProfileSha256 { get; set; }
+        [JsonProperty("performanceMinimumFramesPerSecond", Order = 52)] public double PerformanceMinimumFramesPerSecond { get; set; }
+        [JsonProperty("performanceAverageFramesPerSecond", Order = 52)] public double PerformanceAverageFramesPerSecond { get; set; }
+        [JsonProperty("performanceHudObjectFindInvocationCount", Order = 52)] public long PerformanceHudObjectFindInvocationCount { get; set; }
+        [JsonProperty("performanceHudObjectFindTotalMilliseconds", Order = 52)] public double PerformanceHudObjectFindTotalMilliseconds { get; set; }
         [JsonProperty("uiFullScreenBlocksRaycasts", Order = 53)] public bool UiFullScreenBlocksRaycasts { get; set; }
         [JsonProperty("uiGraphicRaycasterPresent", Order = 54)] public bool UiGraphicRaycasterPresent { get; set; }
         [JsonProperty("uiPlannerOpen", Order = 55)] public bool UiPlannerOpen { get; set; }

@@ -1,10 +1,13 @@
 [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
 param(
-    [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'live-ui-bootstrap', 'ui-native-contract-probe', 'final-no-save-core')][string]$Scenario = 'mod-load-smoke',
+    [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'live-ui-bootstrap', 'ui-native-contract-probe', 'final-no-save-core', 'performance-probe')][string]$Scenario = 'mod-load-smoke',
     [ValidateSet('native-only', 'call-of-the-wild', 'human-reproduction')][string]$CompatibilityProfileId = 'native-only',
     [ValidateRange(5, 1800)][int]$TimeoutSeconds = 180,
     [ValidateRange(5, 300)][int]$LaunchTimeoutSeconds = 60,
     [ValidateSet('animated', 'instant')][string]$ExecutionMode = 'instant',
+    [ValidateRange(5, 60)][int]$PerformanceDurationSeconds = 20,
+    [ValidateRange(0, 240)][double]$MinimumFramesPerSecond = 0,
+    [switch]$DiagnosticDisableHudDiscovery,
     [bool]$ExitAfterCompletion = $true,
     [string]$SteamPath = 'C:\Program Files (x86)\Steam\steam.exe',
     [ValidatePattern('^[A-Za-z0-9._-]{1,100}$')][string]$RunId
@@ -68,18 +71,23 @@ try {
         -RunId $runId -CompatibilityProfileId $CompatibilityProfileId `
         -Confirm:$false | Select-Object -Last 1
     $transactionEntered = $true
+    $scenarioParameters = if ($null -ne $savePair) { @{
+        workingSaveName = $savePair.working.name; workingFileName = $savePair.working.fileName
+        workingSha256 = $savePair.working.sha256; baselineSaveName = $savePair.baseline.name
+        baselineFileName = $savePair.baseline.fileName; baselineSha256 = $savePair.baseline.sha256
+        expectedGameName = $savePair.working.gameName; expectedGameId = $savePair.working.gameId
+        executionMode = $ExecutionMode
+    } } elseif ($Scenario -ceq 'performance-probe') { @{
+        durationSeconds = $PerformanceDurationSeconds
+        disableHudDiscovery = [bool]$DiagnosticDisableHudDiscovery
+        minimumFramesPerSecond = $MinimumFramesPerSecond
+    } } else { @{} }
     $request = New-KbpRuntimeRequest -RunId $runId -EvidenceDirectory $evidence `
         -BuildManifest $buildManifest -TimeoutSeconds $TimeoutSeconds `
         -ExitAfterCompletion $ExitAfterCompletion -Scenario $Scenario `
         -ProfileId $CompatibilityProfileId -ExpectedOptionalMods $expectedOptionalMods `
         -ExpectedBlueprintGuids @($compatibilityProfile.expectedBlueprints) `
-        -Parameters $(if ($null -eq $savePair) { @{} } else { @{
-            workingSaveName = $savePair.working.name; workingFileName = $savePair.working.fileName
-            workingSha256 = $savePair.working.sha256; baselineSaveName = $savePair.baseline.name
-            baselineFileName = $savePair.baseline.fileName; baselineSha256 = $savePair.baseline.sha256
-            expectedGameName = $savePair.working.gameName; expectedGameId = $savePair.working.gameId
-            executionMode = $ExecutionMode
-        } })
+        -Parameters $scenarioParameters
     $requestPath = Join-Path $evidence 'runtime-request.json'
     Write-KbpJsonAtomic $requestPath $request
     $orchestration = [ordered]@{

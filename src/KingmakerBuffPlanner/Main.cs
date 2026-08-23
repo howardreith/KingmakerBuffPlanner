@@ -79,6 +79,22 @@ namespace KingmakerBuffPlanner
 
         private static void OnUpdate(UnityModManager.ModEntry modEntry, float deltaTime)
         {
+            RuntimePerformanceDiagnostics.FrameStarted();
+            long startedAt = RuntimePerformanceDiagnostics.BeginOperation();
+            try
+            {
+                OnUpdateCore(modEntry, deltaTime);
+            }
+            finally
+            {
+                RuntimePerformanceDiagnostics.RecordOperation(
+                    RuntimePerformanceOperation.MainUpdate, startedAt);
+                RuntimePerformanceDiagnostics.FrameCompleted();
+            }
+        }
+
+        private static void OnUpdateCore(UnityModManager.ModEntry modEntry, float deltaTime)
+        {
             if (!_firstUpdateLogged)
             {
                 _firstUpdateLogged = true;

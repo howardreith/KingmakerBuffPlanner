@@ -41,6 +41,8 @@ namespace KingmakerBuffPlanner.Tests
                 Run("valid-live-ui-request-is-accepted", () => TestValidLiveUiRequest(root));
                 Run("valid-native-ui-probe-request-is-accepted", () => TestValidNativeUiProbeRequest(root));
                 Run("valid-final-core-request-is-accepted", () => TestValidFinalCoreRequest(root));
+                Run("valid-performance-request-is-accepted", () => TestValidPerformanceRequest(root));
+                Run("performance-parameters-are-exact", () => TestInvalidPerformanceRequest(root));
                 Run("duplicate-flag-rejected", () => TestDuplicateFlag(root));
                 Run("outside-path-rejected", TestOutsidePath);
                 Run("unknown-member-rejected", () => TestMutation(root, "unknown-member", AddUnknownMember));
@@ -1859,6 +1861,42 @@ namespace KingmakerBuffPlanner.Tests
                 !RuntimeTestProtocol.IsCatalogScenario(request.Scenario) ||
                 RuntimeTestProtocol.IsUiScenario(request.Scenario))
                 throw new InvalidOperationException("Valid final core request was rejected: " + rejection);
+        }
+
+        private static void TestValidPerformanceRequest(string root)
+        {
+            string path = WriteRequest(root, "valid-performance", o =>
+            {
+                o["scenario"] = "performance-probe";
+                o["parameters"] = new Dictionary<string, object>
+                {
+                    { "durationSeconds", 15 },
+                    { "disableHudDiscovery", true },
+                    { "minimumFramesPerSecond", 50.0 }
+                };
+            });
+            string rejection;
+            RuntimeTestRequest request = RuntimeTestProtocol.TryRead(
+                new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path }, out rejection);
+            if (request == null || rejection.Length != 0 ||
+                !RuntimeTestProtocol.IsPerformanceScenario(request.Scenario) ||
+                request.Parameters.Count != 3)
+                throw new InvalidOperationException("Valid performance request was rejected: " + rejection);
+        }
+
+        private static void TestInvalidPerformanceRequest(string root)
+        {
+            string path = WriteRequest(root, "invalid-performance", o =>
+            {
+                o["scenario"] = "performance-probe";
+                o["parameters"] = new Dictionary<string, object>
+                {
+                    { "durationSeconds", 4 },
+                    { "disableHudDiscovery", false },
+                    { "minimumFramesPerSecond", 0.0 }
+                };
+            });
+            AssertRejected(new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path });
         }
 
         private static void TestDuplicateFlag(string root)

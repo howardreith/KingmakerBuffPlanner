@@ -549,14 +549,36 @@ namespace KingmakerBuffPlanner.UI
         private void Tick(float deltaTime)
         {
             if (!_enabled) return;
+            long rootStartedAt = RuntimePerformanceDiagnostics.BeginOperation();
             _tickCount++;
             try
             {
                 if (_screen.LifecycleState != PlannerScreenLifecycleState.Closed &&
                     Input.GetKeyDown(KeyCode.Escape)) _screen.Close();
-                _screen.Tick();
-                _hud.TryInstall();
-                _hud.Tick();
+                long screenStartedAt = RuntimePerformanceDiagnostics.BeginOperation();
+                try { _screen.Tick(); }
+                finally
+                {
+                    RuntimePerformanceDiagnostics.RecordOperation(
+                        RuntimePerformanceOperation.ScreenTick, screenStartedAt);
+                }
+                if (!RuntimePerformanceDiagnostics.SuppressHudDiscovery)
+                {
+                    long installStartedAt = RuntimePerformanceDiagnostics.BeginOperation();
+                    try { _hud.TryInstall(); }
+                    finally
+                    {
+                        RuntimePerformanceDiagnostics.RecordOperation(
+                            RuntimePerformanceOperation.HudInstall, installStartedAt);
+                    }
+                }
+                long hudTickStartedAt = RuntimePerformanceDiagnostics.BeginOperation();
+                try { _hud.Tick(); }
+                finally
+                {
+                    RuntimePerformanceDiagnostics.RecordOperation(
+                        RuntimePerformanceOperation.HudTick, hudTickStartedAt);
+                }
                 _installRequested = !_hud.IsInstalled;
                 if (_screen.IsOpen) _runtimeObservedFrames++;
             }
@@ -564,6 +586,11 @@ namespace KingmakerBuffPlanner.UI
             {
                 _log.Error("Buff Planner UI update failed.", exception);
                 _screen.Close();
+            }
+            finally
+            {
+                RuntimePerformanceDiagnostics.RecordOperation(
+                    RuntimePerformanceOperation.UiRootTick, rootStartedAt);
             }
         }
 

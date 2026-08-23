@@ -124,6 +124,7 @@
     <Compile Include="RuntimeTesting\HarmonyPatchInventoryExporter.cs" />
     <Compile Include="RuntimeTesting\NativeUiContractProbe.cs" />
     <Compile Include="RuntimeTesting\RuntimePaths.cs" />
+    <Compile Include="RuntimeTesting\RuntimePerformanceDiagnostics.cs" />
     <Compile Include="RuntimeTesting\RuntimeTestProtocol.cs" />
     <Compile Include="UI\PlannerSetupModel.cs" />
     <Compile Include="UI\PlannerPresentationModels.cs" />

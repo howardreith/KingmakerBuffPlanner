@@ -172,16 +172,49 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             return string.Equals(scenario, "ui-native-contract-probe", StringComparison.Ordinal);
         }
 
+        internal static bool IsPerformanceScenario(string scenario)
+        {
+            return string.Equals(scenario, "performance-probe", StringComparison.Ordinal);
+        }
+
         private static bool IsKnownScenario(string scenario)
         {
             return string.Equals(scenario, "mod-load-smoke", StringComparison.Ordinal) ||
                 IsCatalogScenario(scenario) || IsUiScenario(scenario) ||
-                IsNativeUiProbeScenario(scenario);
+                IsNativeUiProbeScenario(scenario) || IsPerformanceScenario(scenario);
         }
 
         private static void ValidateParameters(RuntimeTestRequest request)
         {
             if (request.Parameters == null) throw new InvalidDataException("parameters");
+            if (IsPerformanceScenario(request.Scenario))
+            {
+                string[] performanceNames =
+                {
+                    "durationSeconds", "disableHudDiscovery", "minimumFramesPerSecond"
+                };
+                if (request.Parameters.Count != performanceNames.Length ||
+                    performanceNames.Any(name => !request.Parameters.ContainsKey(name)))
+                    throw new InvalidDataException("performance-parameters");
+                int duration;
+                double minimum;
+                try
+                {
+                    duration = Convert.ToInt32(request.Parameters["durationSeconds"]);
+                    minimum = Convert.ToDouble(request.Parameters["minimumFramesPerSecond"]);
+                }
+                catch (Exception exception)
+                {
+                    throw new InvalidDataException("performance-parameter-type", exception);
+                }
+                if (duration < 5 || duration > 60)
+                    throw new InvalidDataException("performance-duration");
+                if (double.IsNaN(minimum) || double.IsInfinity(minimum) || minimum < 0 || minimum > 240)
+                    throw new InvalidDataException("performance-minimum-fps");
+                if (!(request.Parameters["disableHudDiscovery"] is bool))
+                    throw new InvalidDataException("performance-disable-hud-discovery");
+                return;
+            }
             if (!IsLiveUiScenario(request.Scenario))
             {
                 if (request.Parameters.Count != 0) throw new InvalidDataException("parameters");
