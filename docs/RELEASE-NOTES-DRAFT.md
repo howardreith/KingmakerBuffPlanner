@@ -1,32 +1,61 @@
-# Kingmaker Buff Planner 0.0.10 — Draft Release Notes
+# Kingmaker Buff Planner 0.0.10
 
-Publication status: local qualification build only. Not a public release.
+This is the first owner-authorized GitHub release of Kingmaker Buff Planner for
+Pathfinder: Kingmaker Enhanced Plus Edition 2.1.7b.
 
-Version 0.0.10 aligns the lower-left planner row from the native Kingmaker button grid and gives every dark/gold glyph a centered preserve-aspect safe area with measured optical correction. Button dimensions, hitboxes, listeners, tooltips, pointer capture, and quick actions are unchanged.
+## Highlights
 
-Target portraits now consume the selected consolidated card's real plan slice. Explicit fulfilled selections are strongly green, unavailable selections amber with an exact reason, additional expected recipients softly green and labeled `COVERED`, invalid targets red with an exact reason, and unrelated valid targets neutral. Selected-buff text reports available uses and planned casts instead of unexplained covered/blocked fractions.
+- Discovers native and supported optional-mod buff abilities structurally rather
+  than through a fixed spell-name list.
+- Provides Long, Important, and Short routines with direct portrait assignment,
+  deterministic planning, resource previews, and Animated or Instant execution.
+- Consolidates mechanically equivalent provider-backed abilities into one card
+  while retaining every eligible caster and resource source for automatic
+  provider selection.
+- Preserves targeting, spell-slot, resource, duration, material-component, and
+  metamagic semantics.
+- Supports metamagic rods through a visible enhancement chooser with readable
+  effect names, remaining-use information, persisted selections, and explicit
+  unavailable states.
+- Opens full spell details on right-click and excludes invalid personal-spell
+  targets.
+- Uses a pooled vertical four-column catalog with real blueprint icons, search,
+  category tabs, routine-local **Selected only**, and no horizontal scrolling.
+- Shows selected, covered, unavailable, invalid, and neutral portrait states
+  with player-facing explanations.
+- Provides retained lower-left HUD controls and the configurable Ctrl+Shift+B
+  shortcut while isolating planner input from world selection and camera motion.
+- Stores profiles externally under the mod's UserSettings directory and creates
+  no Kingmaker save dependency.
+- Treats Call of the Wild and other gameplay mods as optional, read-only
+  compatibility inputs; no third-party mod payload is bundled.
 
-The modal retains its proven top-level canvas and input lease, but no longer adds a CanvasScaler. It uses the native legacy Arial/default UI material path, fixed font sizes, unit transform scales, forced layout, and pixel-snapped owned rectangles. Human visual acceptance remains authoritative.
+## Installation
 
-## 0.0.9 source consolidation
+1. Download `KingmakerBuffPlanner-0.0.10.zip` from **Assets** below.
+2. In Unity Mod Manager, select Pathfinder: Kingmaker.
+3. Drag the ZIP into the **Mods** tab.
+4. Launch the game and enable **Kingmaker Buff Planner**.
+5. Load a campaign and open the planner with Ctrl+Shift+B or the lower-left HUD
+   controls.
 
-Version 0.0.9 polishes the accepted four-column planner without replacing its workflow. Provider-backed abilities with the same normalized effect semantics now appear as one card while the established planning backend automatically chooses among every eligible caster and resource source. Earlier per-ability routine assignments are rebound and unioned without losing targets.
+Do not download GitHub's automatically generated **Source code** archives; they
+are not the Unity Mod Manager package.
 
-Direct targets now receive a strong full green portrait treatment; indirect party/area beneficiaries receive a distinct lighter green `COVERED` treatment. The grid uses balanced symmetric margins, and the unchanged lower-left HUD hitboxes receive a shared native-toned backing, neighboring button skin where available, inset antique-gold frames, and improved icon padding.
+## Qualification
 
-Discovery, targeting commands, Animated and Instant execution, resource accounting, provider ranking, persistence durability, Ctrl+Shift+B isolation, HUD actions/tooltips/pointer capture, modal lifecycle, optional-mod compatibility, and guarded runtime transactions remain preserved. Cosmetic acceptance remains human-gated.
+The repository's deterministic gates have covered source validation,
+behavior/protocol tests, runtime-filesystem safety, deployment WhatIf purity,
+strict package validation, native discovery, Call of the Wild discovery,
+Animated execution, Instant execution, exact Mods restoration, immutable
+baseline-save verification, and guarded installation. The repository owner
+accepted the current feature set and presentation for release on 2026-08-23.
 
-Highlights:
+The current repository is private, so a release remains visible only to GitHub
+users authorized for this repository unless repository visibility is changed.
 
-- Long/Important/Short edit-context tabs and one Apply action;
-- pooled vertical four-column grid with actual blueprint icons;
-- portrait clicks directly add/remove targets in the active routine;
-- Search, All/Spells/Abilities/Other, and routine-local Selected only as the complete normal catalog controls;
-- compact selected-buff source, duration, description, targets, and plan summary;
-- automatic provider selection with no normal provider-management interface;
-- schema-3 migration that reveals hidden entries and replaces F10 with configurable Ctrl+Shift+B;
-- exact native B suppression for the planner chord and restored dark/gold HUD treatment;
-- hashed campaign views plus physical Animated and Instant qualification;
-- no BubbleBuffs/Wrath code, assets, shaders, textures, or hierarchy paths.
+## Release policy
 
-Automated qualification includes source 30/30, behavior/protocol 67/67, runtime filesystem 8/8, deployment WhatIf 5/5, physical Animated/Instant, native 12/12, Call of the Wild 26/26, exact Mods restoration, and immutable baseline-save verification. The package remains human-gated for visual acceptance.
+This version is the permanent release identity for the current artifact. Any
+later code or presentation change will use a new version instead of replacing
+published bytes.
