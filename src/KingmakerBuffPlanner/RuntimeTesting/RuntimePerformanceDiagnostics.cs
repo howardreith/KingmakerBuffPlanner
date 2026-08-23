@@ -66,7 +66,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         {
             get
             {
-                return _enabled && Stopwatch.GetTimestamp() - _startedAtTimestamp >=
+                return _enabled && _startedAtTimestamp != 0 &&
+                    Stopwatch.GetTimestamp() - _startedAtTimestamp >=
                     (long)_durationSeconds * Stopwatch.Frequency;
             }
         }
@@ -81,9 +82,6 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             _disableHudDiscovery = Convert.ToBoolean(request.Parameters["disableHudDiscovery"]);
             _runId = request.RunId;
             _log = log;
-            _startedAtUtc = DateTime.UtcNow;
-            _startedAtTimestamp = Stopwatch.GetTimestamp();
-            _sampleStartedAtTimestamp = _startedAtTimestamp;
             _gameMode = "game-null";
             _enabled = true;
             _log.Info("[KBP-PERF] probe enabled;run=" + _runId + ";durationSeconds=" +
@@ -114,6 +112,12 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         {
             if (!_enabled) return;
             long now = Stopwatch.GetTimestamp();
+            if (_startedAtTimestamp == 0)
+            {
+                _startedAtUtc = DateTime.UtcNow;
+                _startedAtTimestamp = now;
+                _sampleStartedAtTimestamp = now;
+            }
             if (_sampleFrameCount > 0 && now - _sampleStartedAtTimestamp >= Stopwatch.Frequency)
                 CloseSample(now);
             _sampleFrameCount++;
