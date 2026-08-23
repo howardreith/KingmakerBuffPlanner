@@ -162,11 +162,23 @@ try {
 
     $tag = "v$version"
     $title = "Kingmaker Buff Planner $tag"
+    $existingRelease = $null
 
     if (Test-NativeCommand -FilePath 'gh' -Arguments @(
         'release', 'view', $tag, '--repo', $repository
     )) {
-        throw "GitHub release '$tag' already exists. Advance the version instead of replacing a release."
+        $existingReleaseJson = Get-NativeCommandOutput -FilePath 'gh' -Arguments @(
+            'release', 'view', $tag,
+            '--repo', $repository,
+            '--json', 'isDraft,isImmutable,url'
+        )
+        $existingRelease = $existingReleaseJson | ConvertFrom-Json
+        if (-not [bool] $existingRelease.isDraft) {
+            throw "Published GitHub release '$tag' already exists. Advance the version instead of replacing it."
+        }
+        if ([bool] $existingRelease.isImmutable) {
+            throw "GitHub release '$tag' is immutable and cannot be refreshed."
+        }
     }
 
     & (Join-Path $PSScriptRoot 'Test-SourceOnly.ps1')
@@ -239,24 +251,63 @@ try {
     $generatedNotesPath = Join-Path $releaseDirectory "release-notes-$version.md"
     $notes | Set-Content -LiteralPath $generatedNotesPath -Encoding UTF8
 
-    $releaseArguments = @(
-        'release', 'create', $tag,
-        $packagePath,
-        $checksumsPath,
-        '--repo', $repository,
-        '--title', $title,
-        '--notes-file', $generatedNotesPath,
-        '--verify-tag'
-    )
-    if ($version.Contains('-')) {
-        $releaseArguments += '--prerelease'
-        $releaseArguments += '--latest=false'
-    }
-    if (-not $Publish) {
-        $releaseArguments += '--draft'
-    }
+    if ($null -eq $existingRelease) {
+        $releaseArguments = @(
+            'release', 'create', $tag,
+            $packagePath,
+            $checksumsPath,
+            '--repo', $repository,
+            '--title', $title,
+            '--notes-file', $generatedNotesPath,
+            '--verify-tag'
+        )
+        if ($version.Contains('-')) {
+            $releaseArguments += '--prerelease'
+            $releaseArguments += '--latest=false'
+        }
+        if (-not $Publish) {
+            $releaseArguments += '--draft'
+        }
 
-    Invoke-NativeCommand -FilePath 'gh' -Arguments $releaseArguments
+        Invoke-NativeCommand -FilePath 'gh' -Arguments $releaseArguments
+    }
+    else {
+        Invoke-NativeCommand -FilePath 'gh' -Arguments @(
+            'release', 'upload', $tag,
+            $packagePath,
+            $checksumsPath,
+            '--repo', $repository,
+            '--clobber'
+        )
+
+        $editArguments = @(
+            'release', 'edit', $tag,
+            '--repo', $repository,
+            '--title', $title,
+            '--notes-file', $generatedNotesPath,
+            '--verify-tag'
+        )
+        if ($Publish) {
+            $editArguments += '--draft=false'
+        }
+        else {
+            $editArguments += '--draft'
+        }
+        if ($version.Contains('-')) {
+            $editArguments += '--prerelease'
+            if ($Publish) {
+                $editArguments += '--latest=false'
+            }
+        }
+        else {
+            $editArguments += '--prerelease=false'
+            if ($Publish) {
+                $editArguments += '--latest'
+            }
+        }
+
+        Invoke-NativeCommand -FilePath 'gh' -Arguments $editArguments
+    }
 
     $releaseUrl = Get-NativeCommandOutput -FilePath 'gh' -Arguments @(
         'release', 'view', $tag,
