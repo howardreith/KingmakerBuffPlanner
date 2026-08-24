@@ -8,12 +8,11 @@
       "directoryName": "CallOfTheWild",
       "version": "1.14.4c-2.1",
       "assemblyName": "CallOfTheWild.dll",
-      "fixtureRelativePath": "CallOfTheWild",
       "infoSha256": "32c0bc48c26eb22787e99fb1eb86d074df2cd7dcfe4804ce8eb381a3a589d44d",
       "assemblySha256": "4ebf8e1ed3e66ffed72ea33ea325595629423dacd5bffa23e3c9109144b26915",
-      "directoryManifestSha256": "c0b163d79faf5a4220f6cadefe731d5fff8484e02ba2e7fa467243d19577b45b",
-      "fileCount": 264,
-      "totalBytes": 55258405
+      "directoryManifestSha256": "3f1758b235820f3f64671cf4da5490afc5319ab40fce3a0e07d175b0d67a7a9c",
+      "fileCount": 266,
+      "totalBytes": 66186003
     }
   ],
   "expectedBlueprints": [
