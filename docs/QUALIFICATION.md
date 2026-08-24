@@ -11,6 +11,8 @@ Status: OPENING-CAMERA PERFORMANCE PASS; SOURCE/NATIVE/OPTIONAL PASS; SAVE-BACKE
 - `perf-fix-0.0.11-exact-native-1`: 12/12, catalog SHA-256 `41acd68374e93584a88b16b3a719fbbeeb2a9a0bca088fdf30ede30d371ba614`, 1,722 abilities / 974 candidates / 952 detected effects, zero scanner exceptions and Harmony overlap, restored.
 - `perf-fix-0.0.11-exact-cotw-2`: 26/26, catalog SHA-256 `2e207d41f69f5db533533d6be7ecb132512a94f14a3239f6dfab200a6627b6ad`, 9,064 abilities / 5,907 candidates / 2,096 optional included / zero unsupported / zero KBP Harmony overlap, restored.
 - Full source-only suite: 32/32 source, 78/78 behavior/protocol, 8/8 runtime filesystem, 4/4 package, 5/5 deployment WhatIf, aggregate 1/1.
+- Final artifact source `d3af9be4e62ab8aa796e29343ab30b75e918fb8c`, package `eac7dd50afdb8b68f9d3a6577eb7fff9863883b966df8404fed67d623d407d34`, DLL `1bde124702d013c7f66b159963c01a23eef691104ffa5523f9e944498238c4e7`, MVID `cab52ff1-e758-4f8f-ba92-5ad3cd4eb867`; deterministic builds 2/2 and release builder 3/3.
+- Exact-artifact run `perf-0.0.11-final-release-1` is rejected only because its first non-moving loading bucket was 39.945 FPS; all 18 moving buckets were 90.695-90.966 FPS, searches were zero, and restoration passed. Unchanged repeat `perf-0.0.11-final-release-2` passed 9/9 with 1,783 frames / 20.020 s, 18 moving samples, 56.687 / 89.061 / 90.873 FPS, zero searches, profile SHA-256 `d3eae40417e57b08d844d84cd42825ad6d1018eab7c136075ecd70ea66daf144`, and exact restoration.
 
 The local cap is 90 FPS; the severe KBP ceiling disappeared and motion stayed at approximately 90 FPS. This qualifies the opening-book/camera reproduction by same-scene before/after comparison, not the user's exact 60 FPS cap.
 

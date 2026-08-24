@@ -127,3 +127,19 @@ The current Windows profile has no save whose header is exactly `KBP_AUTOMATION_
 Consequently this checkout cannot freshly qualify campaign HUD installation, setup/full-screen interaction, profile round trip, animated/instant Bless execution, ordinary-area FPS, a cutscene, or world-map movement. Those behaviors passed the pre-incident 0.0.10 campaign suite, but that evidence is not relabeled as 0.0.11 evidence. The performance fix is runtime-qualified against the opening-camera reproduction and source/optional discovery; the listed campaign rows remain blocked pending an authorized KBP save pair.
 
 No live install, merge, push, public release, or protected-branch action was performed.
+
+## Final local artifact checkpoint
+
+The deterministic local-only artifact was built twice from clean source commit `d3af9be4e62ab8aa796e29343ab30b75e918fb8c`:
+
+- Version: 0.0.11
+- ZIP: `artifacts/release/0.0.11/KingmakerBuffPlanner-0.0.11.zip`
+- ZIP SHA-256: `eac7dd50afdb8b68f9d3a6577eb7fff9863883b966df8404fed67d623d407d34`
+- DLL SHA-256: `1bde124702d013c7f66b159963c01a23eef691104ffa5523f9e944498238c4e7`
+- Assembly MVID: `cab52ff1-e758-4f8f-ba92-5ad3cd4eb867`
+- Release builder: 3/3 with two byte-identical builds; final package validation 4/4.
+- Final clean-head source suite: 32/32 source, 78/78 behavior/protocol, 8/8 filesystem, 4/4 package, 5/5 deployment WhatIf, aggregate 1/1.
+
+Run `perf-0.0.11-final-release-1` used that exact artifact and is retained as a threshold failure: its first non-moving startup/loading bucket was 39.945 FPS, while all 18 moving-camera buckets were 90.695-90.966 FPS, HUD search count was zero, and root work was 8.337 ms over the complete run. Restoration was verified. No threshold or validator was changed.
+
+Unchanged exact-artifact repetition `perf-0.0.11-final-release-2` passed 9/9: 1,783 frames over 20.020 seconds; 18 moving and two settled samples; 56.687 / 89.061 / 90.873 minimum/average/maximum FPS; zero HUD searches; 5.868 ms total root work; profile SHA-256 `d3eae40417e57b08d844d84cd42825ad6d1018eab7c136075ecd70ea66daf144`; result SHA-256 `b3a83e472aac9246bb3354ee41f6efc03c8c2f527b1f1157fc53a8750a87293e`; exact restoration verified.
