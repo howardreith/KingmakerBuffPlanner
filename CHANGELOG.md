@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.0.11 - Runtime performance repair
+
+- Stops polling the entire Unity object graph every frame when the campaign HUD is absent.
+- Dispatches HUD discovery only after enable, lifecycle, host-identity, host-active-state, or planner-hotkey invalidation.
+- Resolves the native in-game menu only beneath the exact active `StaticCanvas.HUDController` instead of using global `Object.FindObjectOfType`.
+- Adds an opt-in, aggregate one-second runtime performance probe and a deterministic unchanged-frame/host-transition regression contract.
+- Updates guarded runtime identity and fixture records for the exact current local UMM and optional-mod environment without installing or mutating third-party mods.
+
+No 0.0.10 artifact is replaced. Version 0.0.11 remains a local qualification candidate and is not publicly released.
+
 ## 0.0.10 — Visual clarity and plan coverage
 
 - Aligns the HUD row to the native lower-left button grid and centers glyph alpha bounds in fixed safe areas without changing hitboxes or listeners.

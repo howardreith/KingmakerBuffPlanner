@@ -1,5 +1,17 @@
 # Implementation Report
 
+## 0.0.11 runtime performance repair
+
+Version 0.0.10's retained root called `BuffPlannerHudButtonController.TryInstall()` from every `Main.OnUpdate`, even while all planner windows were closed. With no campaign HUD, `TryInstall()` called `UnityEngine.Object.FindObjectOfType<IngameMenuController>()` globally on every frame. The exact unfixed diagnostic build spent 18,874.614 ms in 228 searches over 20.080 seconds and averaged 11.358 FPS. Suppressing only HUD discovery in the same DLL produced 1,787 frames and 89.234 average FPS.
+
+Commit `f23a07b7560b2aa4cd7b3d1635436c3abffd575a` replaces that loop with dirty invalidation and exact-host observation, then bounds the lookup below `StaticCanvas.HUDController`. Fixed normal-path runs averaged 89.236 and 88.671 FPS under the local 90 FPS cap, with zero HUD searches during 18 moving-camera samples. A later exact checkpoint repeated 89.237 FPS average and exact restoration.
+
+The static audit rejected frame/timing mutations, catalog/provider polling, full-screen UI construction, file/profile IO, infinite coroutines, and pointer/camera Harmony patches as causes. The runtime values stayed target 90, vSync 0, time scale 1, fixed delta 0.02, maximum delta 0.04, and capture framerate 0. Pointer/camera patch invocation counts were zero in the menu; hotkey isolation was negligible relative to the 82.78 ms average global search.
+
+Deterministic gates pass 32/32 source, 78/78 behavior/protocol, 8/8 filesystem, 4/4 package, and 5/5 deployment WhatIf. Native discovery passes 12/12 and Call of the Wild passes 26/26 with zero KBP Harmony overlap. Exact evidence, rejected experiments, and remaining save-backed boundary are recorded in `planning/PERFORMANCE-REGRESSION-ROOT-CAUSE.md` and `docs/QUALIFICATION.md`.
+
+No 0.0.10 artifact was changed and no public release/install action was taken.
+
 ## 0.0.10 visual clarity and plan communication — guarded-installed for human acceptance
 
 Final release source/package/DLL/MVID are `14719e816c31d4efadf829733d499774c6f5e741` / `46d741b7dd16120e5687069c215a5cc270b9ec1e8430fd764dd36a2bdb05f013` / `bcd6ed91e4d6898dec74e69f501389adb15728cd03fe0a0915522e5a1a18c55e` / `8bb28075-83cf-41d2-ad3d-e883886c4961`. Exact-source Animated and Instant passed 77/77 each; native passed 12/12; Call of the Wild passed 26/26; all four transactions restored exactly. Deterministic release packaging reproduced both ZIP and DLL twice. Guarded install `ui-clarity-0.0.10-final-install` preserved settings, verified all non-planner mods unchanged, and installed the exact release DLL/MVID. No merge, push, or public release occurred.

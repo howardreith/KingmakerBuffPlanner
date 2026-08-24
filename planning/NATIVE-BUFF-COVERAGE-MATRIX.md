@@ -1,5 +1,7 @@
 # Native Buff Coverage Matrix
 
+0.0.11 performance-repair regression: exact no-save run `perf-fix-0.0.11-exact-native-1` passes 12/12 with 1,722 abilities, 974 candidates, 952 detected effects, zero scanner exceptions, zero KBP Harmony overlap, catalog SHA-256 `41acd68374e93584a88b16b3a719fbbeeb2a9a0bca088fdf30ede30d371ba614`, and exact restoration. The HUD-lifecycle fix does not change structural classification. Save-backed effect/resource equivalence remains deferred because no authorized KBP save pair is present.
+
 0.0.8 UI replacement checkpoint: the catalog/discovery contract is unchanged. Exact candidate qualification still reports 1,722 native abilities and 974 candidates; the final UI branch reruns native 12/12 before packaging.
 
 Status: PHASE 9 STRUCTURAL AUDIT PASS; RUNTIME EQUIVALENCE DEFERRED — EVIDENCED

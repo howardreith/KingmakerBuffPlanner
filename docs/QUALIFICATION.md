@@ -1,5 +1,21 @@
 # Qualification
 
+## 0.0.11 performance repair
+
+Status: OPENING-CAMERA PERFORMANCE PASS; SOURCE/NATIVE/OPTIONAL PASS; SAVE-BACKED CAMPAIGN ROWS BLOCKED BY ABSENT AUTHORIZED FIXTURE.
+
+- Unfixed normal path `perf-0.0.11-unfixed-hud-on-2`: 228 frames / 20.080 s, 7.511 minimum, 11.358 average, 11.838 maximum FPS; 228 global HUD searches; 18,874.614 ms total and 95.441 ms maximum search time; transaction restored exactly.
+- Same DLL with only HUD discovery suppressed, `perf-0.0.11-unfixed-hud-off-1`: 1,787 frames / 20.026 s, 60.680 / 89.234 / 90.908 FPS; zero searches; transaction restored exactly. This is the causal A/B.
+- Fixed normal path `perf-0.0.11-fixed-hud-on-1` and `-2`: 1,786 and 1,775 frames; 18 moving samples each; 59.579 / 89.236 / 90.901 and 50.739 / 88.671 / 90.935 FPS; zero searches; 5.690 and 4.892 ms total root time; both restored exactly.
+- Later exact checkpoint `perf-0.0.11-exact-hud-on-1`: 1,786 frames / 20.014 s, 18 moving and 2 settled samples, 59.559 / 89.237 / 90.991 FPS, zero searches, profile SHA-256 `cd5276a85afe13370a16d5236eeedafef4fd3eeeff58f9accffe6ceb145971c8`, restoration verified.
+- `perf-fix-0.0.11-exact-native-1`: 12/12, catalog SHA-256 `41acd68374e93584a88b16b3a719fbbeeb2a9a0bca088fdf30ede30d371ba614`, 1,722 abilities / 974 candidates / 952 detected effects, zero scanner exceptions and Harmony overlap, restored.
+- `perf-fix-0.0.11-exact-cotw-2`: 26/26, catalog SHA-256 `2e207d41f69f5db533533d6be7ecb132512a94f14a3239f6dfab200a6627b6ad`, 9,064 abilities / 5,907 candidates / 2,096 optional included / zero unsupported / zero KBP Harmony overlap, restored.
+- Full source-only suite: 32/32 source, 78/78 behavior/protocol, 8/8 runtime filesystem, 4/4 package, 5/5 deployment WhatIf, aggregate 1/1.
+
+The local cap is 90 FPS; the severe KBP ceiling disappeared and motion stayed at approximately 90 FPS. This qualifies the opening-book/camera reproduction by same-scene before/after comparison, not the user's exact 60 FPS cap.
+
+Fresh campaign HUD/setup, profile persistence, target display, Animated/Instant execution, ordinary-area, cutscene, and world-map qualification is unavailable because the current profile contains zero exact `KBP_AUTOMATION_BASELINE` and zero exact `KBP_AUTOMATION_WORKING` saves. The guard rejects this as `Disposable save ambiguity: baseline=0; working=0.` Older 0.0.10 campaign passes remain historical evidence only. No unrelated automation or ordinary save was selected.
+
 ## 0.0.10 visual-clarity qualification
 
 Status: deterministic, exact-release physical, packaging, and guarded-install qualification PASS; human visual acceptance remains required.

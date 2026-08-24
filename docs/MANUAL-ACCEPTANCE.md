@@ -1,5 +1,17 @@
 # Manual Acceptance
 
+## 0.0.11 performance-repair completion gate
+
+Automated opening-camera performance is PASS on the local 90 FPS configuration. An authorized KBP campaign save pair was unavailable, so complete these rows on the repaired 0.0.11 test package before treating campaign qualification as closed:
+
+1. With only the declared comparison mod set, record the configured cap and FPS throughout the opening book/camera approach and after settlement. The former approximately 16-17 FPS KBP-specific ceiling must be absent.
+2. Load an ordinary gameplay area. Confirm the Setup/Long/Important/Short HUD row appears once, is aligned and clickable, and ordinary gameplay remains at the same-scene no-KBP frame rate.
+3. Open/close Setup with the HUD and Ctrl+Shift+B. Confirm full-screen input isolation, target-state display, profile round trip, and restoration of camera/selection/mode.
+4. Execute one configured Long routine in Animated mode and one in Instant mode. Confirm expected effects and exact resource outcomes; include metamagic-rod/enhancement behavior if configured.
+5. Record a safely reproducible cutscene and world-map movement segment with and without KBP. Severe KBP-specific judder must be absent.
+
+Attach the exact package/DLL hashes, resolution, graphics cap, per-scene FPS, mod inventory, and relevant `output_log.txt`. Do not use, rename, or mutate an ordinary save for automation; supply a distinct `KBP_AUTOMATION_BASELINE` / `KBP_AUTOMATION_WORKING` pair if guarded automation is desired. No public release is authorized by this checklist.
+
 ## 0.0.10 clarity and alignment visual gate
 
 Status: REQUIRED. Exact 0.0.10 is guarded-installed. Automation proves mechanics and captures rendered evidence; it does not grant cosmetic acceptance.

@@ -1,4 +1,16 @@
-# Kingmaker Buff Planner 0.0.10 — Draft Release Notes
+# Kingmaker Buff Planner 0.0.11 - Draft Release Notes
+
+Publication status: local qualification build only. Not a public release.
+
+Version 0.0.11 fixes a severe closed-window performance regression. Earlier builds attempted to discover the campaign HUD on every Unity Mod Manager update. When no campaign HUD existed, that attempt called Unity's global `FindObjectOfType<IngameMenuController>()` once per frame. Exact-build profiling measured 18.875 seconds inside those searches during a 20.080-second opening-camera interval and only 11.358 average FPS.
+
+HUD discovery is now invalidation-driven. KBP observes the known `StaticCanvas.HUDController` identity/active state, reacts to real area lifecycle signals, and performs one bounded lookup under that HUD host. Unchanged frames with no HUD do no hierarchy discovery. Two fresh fixed processes averaged 89.236 and 88.671 FPS under the local 90 FPS cap; a later exact package averaged 89.237 FPS with 18 moving-camera samples and zero HUD searches.
+
+Native discovery remains 12/12 and exact Call of the Wild compatibility remains 26/26. The source-only suite passes 32/32 source, 78/78 behavior/protocol, 8/8 filesystem, 4/4 package, and 5/5 deployment dry-run checks.
+
+The current machine has no authorized `KBP_AUTOMATION_BASELINE` / `KBP_AUTOMATION_WORKING` pair. Campaign HUD/workflow, animated/instant execution, ordinary-area, cutscene, and world-map checks therefore remain explicitly unqualified rather than using another product's automation save or an ordinary player save.
+
+## 0.0.10 visual clarity
 
 Publication status: local qualification build only. Not a public release.
 

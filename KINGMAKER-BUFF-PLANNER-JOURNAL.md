@@ -1,8 +1,8 @@
 # Kingmaker Buff Planner Journal
 
-## 2026-08-23 - 0.0.11 performance-repair runtime fixture checkpoint
+## 2026-08-23 - 0.0.11 performance-repair engineering handoff
 
-Status: ROOT CAUSE PROVEN; FIXED OPENING-CAMERA RUNS PASS; CAMPAIGN REGRESSION IN PROGRESS
+Status: ROOT CAUSE PROVEN; FIXED OPENING-CAMERA/SOURCE/NATIVE/OPTIONAL PASS; CAMPAIGN SAVE-BACKED ROWS BLOCKED
 
 - Branch `codex/kbp-performance-regression-0.0.11` started clean from `main` commit `c06793d2238577093b96a2dc3172839070e7d69a`. Diagnostic commits are `e077082643af63aa4ed29503eda7ae44604ae4c8` and `f45d04f341007d988f64de8d8a809fd53144ebbc`; production fix commit is `f23a07b7560b2aa4cd7b3d1635436c3abffd575a`.
 - Exact-build bisection proved the absent-HUD global `Object.FindObjectOfType<IngameMenuController>()` call consumed 18,874.614 ms in 228 frame callbacks over 20.080 seconds. Suppressing only HUD discovery on the same DLL changed 11.358 average FPS to 89.234 average FPS.
@@ -10,7 +10,8 @@ Status: ROOT CAUSE PROVEN; FIXED OPENING-CAMERA RUNS PASS; CAMPAIGN REGRESSION I
 - Save-backed preflight found current third-party fixture drift. BagOfTricks, CallOfTheWild, and CheatMenu retain their exact recorded DLL and Info hashes and file counts; only their full-directory configuration/cache identities changed. CraftMagicItems is no longer installed or present in the lab, so it was removed from the current `human-reproduction` staging profile rather than recreated or written to the live Mods tree.
 - The save resolver contained the obsolete absolute user path `C:\Users\Howie`; it now derives the standard Kingmaker save root from the current `USERPROFILE`. The current account contains no save whose header is `KBP_AUTOMATION_BASELINE` or `KBP_AUTOMATION_WORKING`; unrelated automation and ordinary saves remain protected and ineligible.
 - The separate Call of the Wild profile referenced a removed lab fixture. It is rebound to the exact current live directory identity already verified above; the primary DLL/Info hashes are unchanged, and the profile remains full-manifest fail-closed.
-- Exact next action: commit this fail-closed harness correction, complete no-save runtime qualification, and retain save-backed campaign qualification as an explicit blocker until an authorized KBP pair is supplied.
+- Later exact opening run `perf-0.0.11-exact-hud-on-1` passed 1,786 frames over 20.014 seconds, 18 moving samples, 59.559/89.237/90.991 minimum/average/maximum FPS, zero searches, and exact restoration. Native `perf-fix-0.0.11-exact-native-1` passed 12/12; Call of the Wild `perf-fix-0.0.11-exact-cotw-2` passed 26/26; both restored exactly.
+- Exact next action: supply/import a distinct authorized KBP baseline/working save pair, then run guarded Animated and Instant campaign workflows plus ordinary-area, cutscene, and world-map performance. Until then these rows are blocked and must not be inferred from the opening-camera result. Do not install or publish without separate authorization.
 
 ## 2026-08-12 — 0.0.9 source consolidation and UI polish installed
 

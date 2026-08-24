@@ -1,5 +1,15 @@
 # Architecture
 
+## 0.0.11 invalidation-driven HUD lifecycle
+
+The UMM composition root remains frame-driven because it must poll the configured hotkey and advance active execution/UI state. Native HUD discovery is no longer frame-driven. `BuffPlannerUiRoot` holds a `HudInstallInvalidationGate` and observes only the exact `StaticCanvas.HUDController` identity and active state. Enable, planner-hotkey, area-loaded, scenes-loaded, loading-complete, area-activated, host replacement, and host reactivation mark discovery dirty; unloading cancels it. An unchanged or absent host never consumes/repeats the pending request.
+
+`BuffPlannerHudButtonController` resolves `IngameMenuController` only below the active `UISectionHUDController`. The global Unity object graph is not a UI adapter. Once a candidate exists, the established two-frame presentation validator, native formation-button anchor, hit ownership, listeners, tooltip, and pointer region remain unchanged. `Hud.Tick` may maintain already-owned controls, but it does not reacquire the native host.
+
+The performance observer is an opt-in runtime-testing boundary. Ordinary runs execute only disabled guard branches. A strict `performance-probe` request enables `Stopwatch` aggregates, one-second samples, camera motion/state observations, and optional diagnostic suppression for causal bisection; it does not alter frame/time/camera settings.
+
+The full root-cause and exact A/B are in `planning/PERFORMANCE-REGRESSION-ROOT-CAUSE.md`.
+
 ## 0.0.10 plan-derived clarity and native rendering boundary
 
 The consolidated-card and provider-selection architecture from 0.0.9 is unchanged. `CastStep` and `TargetPlanOutcome` now retain aggregate `SourceId` provenance, while each step exposes the recipients already computed by the planning engine. `TargetPortraitViewModel` is a presentation adapter over that selected-source plan slice; it does not recalculate spell mechanics. Its deterministic precedence is `InvalidTarget`, `DirectSelectedAndCovered`, `DirectSelectedButUnavailable`, `IndirectlyCovered`, then `Neutral`. Area/party expected recipients can therefore be shown as light-green `COVERED`, while ordinary single-target plans do not leak coverage and caster-centered previews do not invent a receiver.

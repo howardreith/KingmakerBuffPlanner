@@ -1,5 +1,11 @@
 # CODEX AUTONOMOUS MISSION
 
+## 2026-08-23 performance-regression checkpoint
+
+The 0.0.10 closed-window regression is causally isolated to per-frame global HUD discovery. Same-DLL suppression changed 11.358 to 89.234 average FPS; the invalidation-driven production fix passed two fresh processes at 89.236 and 88.671 average FPS with zero global searches. See `planning/PERFORMANCE-REGRESSION-ROOT-CAUSE.md` for exact methods, profiles, hashes, rejected theories, and remaining save-backed boundary.
+
+Source/native/Call of the Wild gates pass. Campaign HUD/execution/world-map/cutscene rows cannot be freshly exercised because the current machine has no exact KBP baseline/working save pair. They remain blocked, not waived.
+
 ## Build a Standalone Pathfinder: Kingmaker Buff Planner
 
 You are the primary implementation agent for a new, independent Pathfinder: Kingmaker mod. Work continuously and autonomously until the full definition of done is met or a critical hard stop in this document is proven.

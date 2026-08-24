@@ -1,5 +1,11 @@
 # Kingmaker Buff Planner Implementation Report
 
+## 0.0.11 performance repair
+
+The severe 0.0.10 slowdown was an always-on UI-adapter defect: `Main.OnUpdate` called `BuffPlannerUiRoot.Tick`, which unconditionally called HUD installation, which globally searched for `IngameMenuController` every frame while the HUD was absent. Profiling measured 18.875 of 20.080 seconds in 228 searches. Same-DLL suppression restored 89.234 average FPS, and the invalidation-driven/bounded-host fix repeats at approximately 89 FPS with no searches.
+
+The complete engineering record is `planning/PERFORMANCE-REGRESSION-ROOT-CAUSE.md`; current architecture, qualification, and manual remaining rows are in `docs/ARCHITECTURE.md`, `docs/QUALIFICATION.md`, and `docs/MANUAL-ACCEPTANCE.md`. Version 0.0.11 is local-only and does not mutate or replace released 0.0.10.
+
 ## 0.0.3 R2 correction
 
 The installed 0.0.2 UI verdict is FAIL by direct human playtesting. Version 0.0.3 replaces cloned native HUD hierarchies with fresh bounded retained-mode buttons, makes visible presentation validation precede the full-screen input lease, and requires expected-effect confirmation for execution success. The installed schema-2 profile was audited read-only and preserves one Long Bless assignment and its target; no migration ran or discarded data. Source 21/21, behavior 57/57, two native 12/12, and two Call of the Wild 26/26 gates passed. Exact 0.0.3 is guarded-installed with settings preserved and non-planner mods unchanged; the campaign-only gate is correctly blocked without an authorized fixture, so the next authoritative human verdict remains pending.

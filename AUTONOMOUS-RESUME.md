@@ -8,7 +8,8 @@
 - `human-reproduction` was rebound read-only to the exact currently installed BagOfTricks, CallOfTheWild, and CheatMenu fixture identities. Their primary binaries/Info files and file counts are unchanged; mutable directory content drifted. CraftMagicItems is absent locally and was not installed or reconstructed.
 - The guarded save resolver now uses the current Windows profile rather than obsolete `C:\Users\Howie`. No authorized `KBP_AUTOMATION_BASELINE` / `KBP_AUTOMATION_WORKING` pair exists under the current profile; unrelated saves are not eligible.
 - The removed immutable CallOfTheWild example fixture was not recreated. Its profile now binds the exact current live directory identity with unchanged primary DLL/Info hashes so the no-save optional catalog gate can run transactionally.
-- Exact next action: commit and rebuild, then finish no-save runtime gates. Save-backed Animated/Instant, campaign HUD, ordinary-area, world-map, and cutscene checks require a separately supplied authorized KBP save pair; do not substitute or rename another save, install, or publish.
+- Exact later opening run `perf-0.0.11-exact-hud-on-1` passed 1,786 frames / 20.014 seconds, 18 moving samples, 59.559/89.237/90.991 FPS, zero searches, and restored. Native `perf-fix-0.0.11-exact-native-1` passed 12/12; Call of the Wild `perf-fix-0.0.11-exact-cotw-2` passed 26/26; both restored.
+- Exact next action: after a distinct authorized KBP save pair is supplied/imported, rebuild the recorded package and run guarded Animated/Instant campaign workflows plus ordinary-area, world-map, and cutscene performance. Do not substitute or rename another save, install, merge, push, or publish.
 
 ## 0.0.9 final local handoff — 2026-08-12
 

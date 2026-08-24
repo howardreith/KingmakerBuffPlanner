@@ -1,5 +1,7 @@
 # Resource and Casting Contract Inventory
 
+0.0.11 performance-repair checkpoint: production planning and Animated/Instant execution contracts are unchanged, and deterministic behavior remains green within the 78/78 suite. Fresh save-backed resource/effect execution is not claimed because the current machine has no exact `KBP_AUTOMATION_BASELINE` / `KBP_AUTOMATION_WORKING` pair. The guard rejected the campaign scenario before deployment/save access.
+
 0.0.8 UI replacement checkpoint: automatic providers, resource accounting, material checks, confirmed-effect semantics, and both execution engines are frozen. Separate physical Animated and Instant runs remain release gates.
 
 Status: IN PROGRESS
