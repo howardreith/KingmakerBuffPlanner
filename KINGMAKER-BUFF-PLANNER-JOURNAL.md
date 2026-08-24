@@ -1,5 +1,19 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-08-24 - 0.0.12 HUD lifecycle hotfix engineering handoff
+
+Status: SOURCE/DETERMINISTIC/PERFORMANCE/NATIVE/OPTIONAL PASS; CAMPAIGN HUD ROWS BLOCKED BY ABSENT AUTHORIZED SAVE PAIR; LOCAL-ONLY
+
+- Branch `codex/kbp-hud-lifecycle-hotfix-0.0.12` started clean from fetched `origin/main` commit `4a83aec19e0f6098e23b2965b3992c328136c576`, version 0.0.11. Implementation/test commit is `376e4a153753ae45fd2daad447790b4bd2c31590`; exact qualified artifact source is `083dfbfcf651d44bb01b302ccbbabac823e236e9`, version 0.0.12.
+- Root cause confirmed: the 0.0.11 gate consumed its one install request before an ambiguous Boolean result could report retryable inner readiness or provisional-candidate state. A later 120-frame candidate expiry was private to the controller, so an unchanged outer HUD never re-armed. Installed liveness checked only the owned root reference. The available 0.0.11 log additionally proves candidate construction could occur after unload cancellation against a transient HUD.
+- Repair: typed attempt/candidate/lifecycle outcomes; one retry per 30 active-HUD frames; no retry while HUD absent, candidate live, or installation stable; unload/disable suspension; expiry/staleness feedback; complete held-reference hosting-chain validation; owned-only disposal; scoped `hudHost.GetComponentInChildren<IngameMenuController>(true)` discovery. Placement, alignment, glyph, and raycast validation remain.
+- Exact `Test-SourceOnly.ps1`: source 34/34, protocol 91/91, filesystem 8/8, package 4/4, deployment WhatIf 5/5, aggregate 1/1. Exact `Build-Release.ps1`: 3/3, deterministic 2/2. Installer WhatIf passes 5/5 against installed 0.0.11; guarded-push WhatIf passes 6/6.
+- Artifact ZIP/DLL/MVID: `eabb4785be75129cbc6cffcab030afc9e4afac32957fb7b82af2c16b0e0ac72a` / `6db3693e0ba38b3672bd0eac36b06df6e5965de29a3e78f9b97513c6accfe9e1` / `920b3246-e7f7-4818-92f4-e54294ef2db0`.
+- `hud-lifecycle-0.0.12-performance-1` passes 9/9 at 50.493/88.780/90.896 FPS; all 18 moving samples are 90.710-90.896 FPS; global HUD searches and absent-HUD install dispatches are zero; steady `UiRoot.Tick` cost is 2.715 microseconds/frame; restoration is exact. Repeat `performance-2` is retained as 8/9 because only the first non-moving startup bucket was 49.810 FPS; all moving samples were at least 88.940 FPS, searches stayed zero, restoration passed, and no threshold changed.
+- `hud-lifecycle-0.0.12-native-1` passes 12/12; `hud-lifecycle-0.0.12-cotw-1` passes 26/26 with 2,096 optional inclusions and zero unsupported/overlap; both restore exactly. `ui-contract-1` honestly fails its main-menu campaign-UI precondition after 600 frames and restores.
+- Save audit is exactly `Disposable save ambiguity: baseline=0; working=0.` No unrelated automation/personal save was used. Existing/new campaign load, row survival, clicks, setup/hotkey, transition, cutscene, world-map, native-control isolation, and final `Installed` log evidence remain blocked. Human steps are in `docs/MANUAL-ACCEPTANCE.md`.
+- Exact next action: commit this evidence record, rerun the source-only gate, guarded-push the dedicated branch, and hand off the blocked campaign checklist. Do not merge, install, tag, or publish.
+
 ## 2026-08-23 - 0.0.11 crash investigation, merge, install, and publication
 
 Status: COMPLETE; HUMAN PERFORMANCE PASS; TEST CRASH FIXED; PUBLISHED

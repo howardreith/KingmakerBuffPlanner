@@ -10,8 +10,16 @@ created after unload cancellation against a transient HUD. The 0.0.12 source use
 typed outcomes, 30-active-frame bounded retry, unload/disable suspension, expiry
 feedback, and current-host liveness without restoring a global search. Current
 gates pass 34/34 source, 91/91 behavior/protocol, 8/8 filesystem, 4/4 package,
-5/5 WhatIf, and 1/1 aggregate. Exact clean artifact/runtime qualification remains
-the next action; no merge, tag, install, or publication is authorized.
+5/5 deployment WhatIf, and 1/1 aggregate. Exact source
+`083dfbfcf651d44bb01b302ccbbabac823e236e9` passes deterministic packaging 2/2;
+ZIP/DLL/MVID are `eabb4785be75129cbc6cffcab030afc9e4afac32957fb7b82af2c16b0e0ac72a` /
+`6db3693e0ba38b3672bd0eac36b06df6e5965de29a3e78f9b97513c6accfe9e1` /
+`920b3246-e7f7-4818-92f4-e54294ef2db0`. Guarded performance passes 9/9 at
+88.780 average FPS with zero searches and exact restoration; native and Call of
+the Wild pass 12/12 and 26/26. Exact authorized save inventory is baseline=0 and
+working=0, so campaign HUD survival, clicks, transitions, cutscene/world-map, and
+installed-state log evidence remain blocked rather than inferred. No merge, tag,
+install, or publication is authorized.
 
 ## 2026-08-23 0.0.11 release completion checkpoint
 

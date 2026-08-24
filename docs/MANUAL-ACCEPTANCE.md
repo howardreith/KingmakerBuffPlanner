@@ -2,10 +2,11 @@
 
 ## 0.0.12 HUD lifecycle hotfix gate
 
-Status: REQUIRED for campaign rows not exercised by the guarded harness. Use only
-the exact 0.0.12 local candidate and a normal personal campaign under human
-control, or the repository-authorized disposable pair through the guarded
-harness. Do not substitute another automation save.
+Status: BLOCKED in the guarded harness because the authorized save inventory is
+exactly baseline=0 and working=0; REQUIRED as a human campaign check. Use only the
+exact 0.0.12 local candidate and a normal personal campaign under human control,
+or the repository-authorized disposable pair through the guarded harness. Do not
+substitute another automation save.
 
 1. Start a fresh process and load an existing campaign. Watch the lower-left
    Setup/Long/Important/Short row from first appearance through full HUD settlement

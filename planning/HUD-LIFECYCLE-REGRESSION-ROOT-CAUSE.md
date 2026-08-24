@@ -80,7 +80,7 @@ return of the buttons is not claimed from this intake evidence.
   flow proves that expiry is terminal under an unchanged outer host, but fresh
   campaign runtime evidence remains conditional on authorized save fixtures.
 
-## Repair direction
+## Implemented repair and qualification
 
 Replace the Boolean installation contract with explicit attempt and candidate
 outcomes; evolve the invalidation gate into a lifecycle state machine with a
@@ -88,6 +88,18 @@ bounded active-HUD retry cadence; suspend discovery across unload/disable; repor
 candidate expiry and stale hosting chains to the owner; and retain zero discovery
 for absent, stable-installed, and live-candidate steady states.
 
-Exact next action: implement the pure lifecycle contracts and integrate them into
-the HUD controller and `BuffPlannerUiRoot`, then add deterministic regression tests
-before changing version or release documentation.
+That design is implemented in commit
+`376e4a153753ae45fd2daad447790b4bd2c31590`; exact qualified artifact source is
+`083dfbfcf651d44bb01b302ccbbabac823e236e9`. Deterministic tests pass 91/91 and
+cover retryable readiness, exact expiry/re-arm, stale hosting chains, performance
+steady states, lifecycle transitions, disable/enable, unloading/loading, and
+hotkey invalidation. Source guards reject global HUD searches and native UI
+destruction.
+
+Guarded no-save performance `hud-lifecycle-0.0.12-performance-1` passes with
+zero searches and 88.780 average FPS; native and Call of the Wild catalog runs
+pass. Campaign persistence of the row cannot be observed because the authorized
+save resolver returns baseline=0 and working=0. Exact next action is the human
+campaign checklist in `docs/MANUAL-ACCEPTANCE.md` or the same guarded scenario
+after a distinct authorized save pair is supplied. Do not substitute a save,
+merge, tag, install, or publish.

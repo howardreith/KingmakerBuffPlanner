@@ -36,8 +36,25 @@ attempt/candidate outcomes, hosting failure, and last validation failure.
 
 Source-only checkpoint after implementation: source 34/34, behavior/protocol
 91/91, runtime-harness filesystem 8/8, package 4/4, deployment WhatIf 5/5, and
-aggregate 1/1. Final clean-commit build, package, deterministic, runtime, and hash
-results are recorded in `docs/QUALIFICATION.md` after execution.
+aggregate 1/1. Exact source `083dfbfcf651d44bb01b302ccbbabac823e236e9`
+passes deterministic release packaging 2/2 with ZIP
+`eabb4785be75129cbc6cffcab030afc9e4afac32957fb7b82af2c16b0e0ac72a`, DLL
+`6db3693e0ba38b3672bd0eac36b06df6e5965de29a3e78f9b97513c6accfe9e1`, and
+MVID `920b3246-e7f7-4818-92f4-e54294ef2db0`.
+
+Fresh no-save performance passes 9/9 at 50.493/88.780/90.896 FPS with all 18
+moving-camera samples at 90.710-90.896 FPS, zero global HUD searches, zero
+absent-HUD installation dispatches, and 2.715 microseconds of steady
+`UiRoot.Tick` work per frame. Native and Call of the Wild catalog/Harmony runs
+pass 12/12 and 26/26 and restore exactly. An unchanged repetition is retained as
+an honest first-startup-bucket threshold miss at 49.810 FPS; every moving sample
+remained at least 88.940 FPS and the threshold was not changed.
+
+Campaign HUD qualification remains blocked because the exact authorized save
+inventory is baseline=0 and working=0. Consequently no runtime claim is made
+that the four controls remained installed, clickable, or input-isolated in a
+campaign. Exact run IDs, hashes, restoration state, and human steps are recorded
+in `docs/QUALIFICATION.md` and `docs/MANUAL-ACCEPTANCE.md`.
 
 ## 0.0.11 test-process crash correction and release
 

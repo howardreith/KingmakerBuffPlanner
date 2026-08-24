@@ -54,8 +54,20 @@ same-host recreation, every required hosting-chain liveness predicate, stable
 absent/installed/provisional frames, bounded temporary-readiness attempts, area
 and host transitions, unload/load, disable/re-enable, and hotkey invalidation.
 
-Final mechanical, deterministic-build, package, guarded-runtime, artifact hash,
-and MVID results will be recorded in the qualification documents after the exact
-clean candidate is built. Save-backed campaign claims remain conditional on the
-repository-authorized `KBP_AUTOMATION_BASELINE` and `KBP_AUTOMATION_WORKING`
-fixtures; no unrelated save may be substituted.
+Exact source `083dfbfcf651d44bb01b302ccbbabac823e236e9` passes the complete
+source-only suite and two deterministic release builds. The local-only ZIP is
+`eabb4785be75129cbc6cffcab030afc9e4afac32957fb7b82af2c16b0e0ac72a`; the DLL
+is `6db3693e0ba38b3672bd0eac36b06df6e5965de29a3e78f9b97513c6accfe9e1`; its
+MVID is `920b3246-e7f7-4818-92f4-e54294ef2db0`.
+
+The guarded performance run passes at 88.780 average FPS, with all 18 moving
+samples at 90.710-90.896 FPS, zero global HUD searches, zero absent-HUD install
+dispatches, and exact restoration. Native and Call of the Wild no-save runs pass
+12/12 and 26/26. A repeat retained the unchanged 50 FPS threshold and rejected
+its 49.810 FPS startup bucket; all moving samples remained at least 88.940 FPS.
+
+The repository-authorized save resolver found zero `KBP_AUTOMATION_BASELINE`
+and zero `KBP_AUTOMATION_WORKING` fixtures. Campaign button survival, clicks,
+hotkey interaction, transition/cutscene/world-map rows, and installed-state log
+evidence remain explicitly blocked; no unrelated save was substituted. This
+candidate is not merged, tagged, installed, or published.
