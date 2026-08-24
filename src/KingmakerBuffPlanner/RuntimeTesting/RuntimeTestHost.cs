@@ -25,6 +25,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private readonly DateTime _startedAtUtc;
         private bool _completed;
         private int _uiSmokeUpdates;
+        private bool _uiReconstructionRequested;
+        private int _uiPostReconstructionUpdates;
         private LiveCampaignSaveLoader _liveSaveLoader;
         private int _liveUiPhase;
         private int _liveCycleCount;
@@ -119,17 +121,26 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     else BuffPlannerUiRoot.CloseRuntimeSmoke();
                     return false;
                 }
-                else if (_uiSmokeUpdates == 41)
+                else if (!_uiReconstructionRequested)
                 {
+                    _uiReconstructionRequested = true;
                     BuffPlannerUiRoot.ReconstructRuntimeSmoke();
                     return false;
                 }
-                else if (_uiSmokeUpdates == 42)
+                else if (BuffPlannerUiRoot.IsRuntimeReconstructionPending)
                 {
-                    BuffPlannerUiRoot.DispatchRuntimeInputSmoke();
                     return false;
                 }
-                else if (_uiSmokeUpdates < 45) return false;
+                else
+                {
+                    _uiPostReconstructionUpdates++;
+                    if (_uiPostReconstructionUpdates == 1)
+                    {
+                        BuffPlannerUiRoot.DispatchRuntimeInputSmoke();
+                        return false;
+                    }
+                    if (_uiPostReconstructionUpdates < 4) return false;
+                }
             }
             if (RuntimeTestProtocol.IsNativeUiProbeScenario(_request.Scenario))
             {

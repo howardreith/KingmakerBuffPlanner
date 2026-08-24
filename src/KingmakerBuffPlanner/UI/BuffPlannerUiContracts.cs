@@ -5,40 +5,375 @@ using System.Linq;
 
 namespace KingmakerBuffPlanner.UI
 {
+    public enum HudInstallAttemptResult
+    {
+        None,
+        NoActiveHud,
+        RetryableNotReady,
+        CandidateCreated,
+        CandidatePending,
+        AlreadyInstalled,
+        StaleCandidateDisposed
+    }
+
+    public enum HudCandidateTickResult
+    {
+        None,
+        Pending,
+        Installed,
+        Expired,
+        Stale
+    }
+
+    public enum HudInstallationState
+    {
+        NoHud,
+        RetryPending,
+        CandidatePending,
+        Installed,
+        CandidateExpired,
+        StaleAnchor,
+        Suspended
+    }
+
+    public enum HudInstallDispatchDecision
+    {
+        None,
+        Dispatch
+    }
+
     public sealed class HudInstallInvalidationGate
     {
+        public const int DefaultRetryIntervalFrames = 30;
+
+        private readonly int _retryIntervalFrames;
         private bool _requested = true;
+        private bool _retryScheduled;
+        private bool _suspended;
         private int _hostIdentity;
         private bool _hostActive;
+        private int _retryFramesRemaining;
+
+        public HudInstallInvalidationGate()
+            : this(DefaultRetryIntervalFrames)
+        {
+        }
+
+        public HudInstallInvalidationGate(int retryIntervalFrames)
+        {
+            if (retryIntervalFrames < 1)
+                throw new ArgumentOutOfRangeException("retryIntervalFrames");
+            _retryIntervalFrames = retryIntervalFrames;
+            State = HudInstallationState.NoHud;
+            LastTransition = "initial-request";
+        }
 
         public bool IsRequested { get { return _requested; } }
+        public bool IsRetryScheduled { get { return _retryScheduled; } }
+        public bool IsSuspended { get { return _suspended; } }
+        public int HostIdentity { get { return _hostIdentity; } }
+        public bool HostActive { get { return _hostActive; } }
+        public int RetryFramesRemaining { get { return _retryFramesRemaining; } }
+        public int RetryIntervalFrames { get { return _retryIntervalFrames; } }
         public int RequestCount { get; private set; }
         public int AttemptCount { get; private set; }
+        public int RetryArmCount { get; private set; }
+        public int RetryDispatchCount { get; private set; }
+        public int HostTransitionCount { get; private set; }
+        public int SuspendCount { get; private set; }
+        public HudInstallationState State { get; private set; }
+        public HudInstallAttemptResult LastAttemptResult { get; private set; }
+        public HudCandidateTickResult LastCandidateResult { get; private set; }
+        public string LastTransition { get; private set; }
 
         public void Request()
         {
-            if (_requested) return;
+            Request("lifecycle-invalidation");
+        }
+
+        public bool Request(string reason)
+        {
+            if (_suspended)
+            {
+                LastTransition = "request-ignored-while-suspended:" + NormalizeReason(reason);
+                return false;
+            }
+            if (_requested && !_retryScheduled && _retryFramesRemaining == 0) return false;
             _requested = true;
+            _retryScheduled = false;
+            _retryFramesRemaining = 0;
             RequestCount++;
+            State = _hostActive ? HudInstallationState.RetryPending : HudInstallationState.NoHud;
+            LastTransition = "dispatch-requested:" + NormalizeReason(reason);
+            return true;
         }
 
         public void Cancel()
         {
-            _requested = false;
+            Suspend("cancelled");
         }
 
-        public bool ObserveHost(int hostIdentity, bool hostActive)
+        public bool Suspend(string reason)
         {
-            if (hostIdentity != _hostIdentity || hostActive != _hostActive)
-            {
-                _hostIdentity = hostIdentity;
-                _hostActive = hostActive;
-                if (hostActive) Request();
-            }
-            if (!_requested || !hostActive) return false;
+            if (_suspended) return false;
+            _suspended = true;
             _requested = false;
-            AttemptCount++;
+            _retryScheduled = false;
+            _retryFramesRemaining = 0;
+            State = HudInstallationState.Suspended;
+            SuspendCount++;
+            LastTransition = "suspended:" + NormalizeReason(reason);
             return true;
+        }
+
+        public bool ResumeAndRequest(string reason)
+        {
+            bool resumed = _suspended;
+            _suspended = false;
+            bool requested = Request(reason);
+            if (resumed && !requested)
+            {
+                _requested = true;
+                _retryScheduled = false;
+                _retryFramesRemaining = 0;
+                RequestCount++;
+                State = _hostActive ? HudInstallationState.RetryPending : HudInstallationState.NoHud;
+                LastTransition = "resumed-and-requested:" + NormalizeReason(reason);
+                requested = true;
+            }
+            else if (resumed)
+                LastTransition = "resumed-and-requested:" + NormalizeReason(reason);
+            return requested;
+        }
+
+        public HudInstallDispatchDecision ObserveHost(int hostIdentity, bool hostActive)
+        {
+            bool hostChanged = hostIdentity != _hostIdentity || hostActive != _hostActive;
+            int previousIdentity = _hostIdentity;
+            bool previousActive = _hostActive;
+            _hostIdentity = hostIdentity;
+            _hostActive = hostActive;
+            if (hostChanged)
+            {
+                HostTransitionCount++;
+                if (_suspended)
+                    LastTransition = "host-observed-while-suspended:" + hostIdentity;
+                else if (!hostActive)
+                {
+                    _requested = true;
+                    _retryScheduled = false;
+                    _retryFramesRemaining = 0;
+                    State = HudInstallationState.NoHud;
+                    LastTransition = "active-hud-absent:" + hostIdentity;
+                }
+                else
+                {
+                    ArmImmediateHostDispatch(previousIdentity, previousActive);
+                }
+            }
+            if (_suspended) return HudInstallDispatchDecision.None;
+            if (!hostActive)
+            {
+                State = HudInstallationState.NoHud;
+                return HudInstallDispatchDecision.None;
+            }
+            if (!_requested) return HudInstallDispatchDecision.None;
+            if (_retryFramesRemaining > 0)
+            {
+                _retryFramesRemaining--;
+                return HudInstallDispatchDecision.None;
+            }
+            bool retryDispatch = _retryScheduled;
+            _requested = false;
+            _retryScheduled = false;
+            AttemptCount++;
+            if (retryDispatch) RetryDispatchCount++;
+            State = HudInstallationState.RetryPending;
+            LastTransition = (retryDispatch ? "retry-dispatched:" : "install-dispatched:") +
+                hostIdentity;
+            return HudInstallDispatchDecision.Dispatch;
+        }
+
+        public void RecordAttemptResult(HudInstallAttemptResult result)
+        {
+            LastAttemptResult = result;
+            switch (result)
+            {
+                case HudInstallAttemptResult.NoActiveHud:
+                    _requested = true;
+                    _retryScheduled = false;
+                    _retryFramesRemaining = 0;
+                    State = HudInstallationState.NoHud;
+                    LastTransition = "attempt:no-active-hud";
+                    break;
+                case HudInstallAttemptResult.RetryableNotReady:
+                    ScheduleRetry(HudInstallationState.RetryPending,
+                        "attempt:retryable-not-ready");
+                    break;
+                case HudInstallAttemptResult.CandidateCreated:
+                    ClearRequest(HudInstallationState.CandidatePending,
+                        "attempt:candidate-created");
+                    break;
+                case HudInstallAttemptResult.CandidatePending:
+                    ClearRequest(HudInstallationState.CandidatePending,
+                        "attempt:candidate-pending");
+                    break;
+                case HudInstallAttemptResult.AlreadyInstalled:
+                    ClearRequest(HudInstallationState.Installed,
+                        "attempt:already-installed");
+                    break;
+                case HudInstallAttemptResult.StaleCandidateDisposed:
+                    ScheduleRetry(HudInstallationState.StaleAnchor,
+                        "attempt:stale-candidate-disposed");
+                    break;
+                case HudInstallAttemptResult.None:
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException("result");
+            }
+        }
+
+        public void RecordCandidateResult(HudCandidateTickResult result)
+        {
+            LastCandidateResult = result;
+            switch (result)
+            {
+                case HudCandidateTickResult.None:
+                    return;
+                case HudCandidateTickResult.Pending:
+                    if (State != HudInstallationState.CandidatePending)
+                    {
+                        State = HudInstallationState.CandidatePending;
+                        LastTransition = "candidate:pending";
+                    }
+                    _requested = false;
+                    _retryScheduled = false;
+                    _retryFramesRemaining = 0;
+                    return;
+                case HudCandidateTickResult.Installed:
+                    ClearRequest(HudInstallationState.Installed, "candidate:installed");
+                    return;
+                case HudCandidateTickResult.Expired:
+                    ScheduleRetry(HudInstallationState.CandidateExpired,
+                        "candidate:expired");
+                    return;
+                case HudCandidateTickResult.Stale:
+                    ScheduleRetry(HudInstallationState.StaleAnchor, "candidate:stale");
+                    return;
+                default:
+                    throw new ArgumentOutOfRangeException("result");
+            }
+        }
+
+        private void ArmImmediateHostDispatch(int previousIdentity, bool previousActive)
+        {
+            if (!_requested || _retryScheduled || _retryFramesRemaining != 0) RequestCount++;
+            _requested = true;
+            _retryScheduled = false;
+            _retryFramesRemaining = 0;
+            State = HudInstallationState.RetryPending;
+            string transition = !previousActive ? "active-hud-detected:" :
+                previousIdentity != _hostIdentity ? "active-hud-replaced:" :
+                "active-hud-reactivated:";
+            LastTransition = transition + _hostIdentity;
+        }
+
+        private void ScheduleRetry(HudInstallationState state, string reason)
+        {
+            _requested = true;
+            _retryScheduled = _hostActive && !_suspended;
+            _retryFramesRemaining = _retryScheduled ? _retryIntervalFrames : 0;
+            RetryArmCount++;
+            State = state;
+            LastTransition = "retry-rearmed:" + reason;
+        }
+
+        private void ClearRequest(HudInstallationState state, string transition)
+        {
+            _requested = false;
+            _retryScheduled = false;
+            _retryFramesRemaining = 0;
+            State = state;
+            LastTransition = transition;
+        }
+
+        private static string NormalizeReason(string reason)
+        {
+            return string.IsNullOrWhiteSpace(reason) ? "unspecified" : reason;
+        }
+    }
+
+    public sealed class HudHostingChainSnapshot
+    {
+        public HudHostingChainSnapshot(
+            bool ownedRootExists,
+            bool rootHasParent,
+            bool rootActive,
+            bool anchorExists,
+            bool anchorActive,
+            bool nativeClusterExists,
+            bool nativeClusterActive,
+            bool activeHudExists,
+            bool activeHudActive,
+            bool rootParentIsNativeCluster,
+            bool anchorBelongsToActiveHud,
+            bool nativeClusterBelongsToActiveHud,
+            bool rootBelongsToActiveHud,
+            bool nativeRaycasterActive)
+        {
+            OwnedRootExists = ownedRootExists;
+            RootHasParent = rootHasParent;
+            RootActive = rootActive;
+            AnchorExists = anchorExists;
+            AnchorActive = anchorActive;
+            NativeClusterExists = nativeClusterExists;
+            NativeClusterActive = nativeClusterActive;
+            ActiveHudExists = activeHudExists;
+            ActiveHudActive = activeHudActive;
+            RootParentIsNativeCluster = rootParentIsNativeCluster;
+            AnchorBelongsToActiveHud = anchorBelongsToActiveHud;
+            NativeClusterBelongsToActiveHud = nativeClusterBelongsToActiveHud;
+            RootBelongsToActiveHud = rootBelongsToActiveHud;
+            NativeRaycasterActive = nativeRaycasterActive;
+        }
+
+        public bool OwnedRootExists { get; private set; }
+        public bool RootHasParent { get; private set; }
+        public bool RootActive { get; private set; }
+        public bool AnchorExists { get; private set; }
+        public bool AnchorActive { get; private set; }
+        public bool NativeClusterExists { get; private set; }
+        public bool NativeClusterActive { get; private set; }
+        public bool ActiveHudExists { get; private set; }
+        public bool ActiveHudActive { get; private set; }
+        public bool RootParentIsNativeCluster { get; private set; }
+        public bool AnchorBelongsToActiveHud { get; private set; }
+        public bool NativeClusterBelongsToActiveHud { get; private set; }
+        public bool RootBelongsToActiveHud { get; private set; }
+        public bool NativeRaycasterActive { get; private set; }
+    }
+
+    public static class HudHostingChainValidator
+    {
+        public static bool IsViable(HudHostingChainSnapshot snapshot, out string failure)
+        {
+            if (snapshot == null) throw new ArgumentNullException("snapshot");
+            failure = string.Empty;
+            if (!snapshot.OwnedRootExists) failure = "owned-root-missing";
+            else if (!snapshot.RootHasParent) failure = "owned-root-parent-missing";
+            else if (!snapshot.RootActive) failure = "owned-root-inactive";
+            else if (!snapshot.AnchorExists) failure = "anchor-controller-missing";
+            else if (!snapshot.AnchorActive) failure = "anchor-controller-inactive";
+            else if (!snapshot.NativeClusterExists) failure = "native-cluster-missing";
+            else if (!snapshot.NativeClusterActive) failure = "native-cluster-inactive";
+            else if (!snapshot.ActiveHudExists) failure = "active-hud-missing";
+            else if (!snapshot.ActiveHudActive) failure = "active-hud-inactive";
+            else if (!snapshot.RootParentIsNativeCluster) failure = "owned-root-reparented";
+            else if (!snapshot.AnchorBelongsToActiveHud) failure = "anchor-outside-active-hud";
+            else if (!snapshot.NativeClusterBelongsToActiveHud) failure = "native-cluster-outside-active-hud";
+            else if (!snapshot.RootBelongsToActiveHud) failure = "owned-root-outside-active-hud";
+            else if (!snapshot.NativeRaycasterActive) failure = "native-raycaster-inactive";
+            return failure.Length == 0;
         }
     }
 
@@ -64,6 +399,35 @@ namespace KingmakerBuffPlanner.UI
         public void Reset()
         {
             ObservedFrames = 0;
+        }
+    }
+
+    public sealed class HudCandidateValidationGate
+    {
+        private readonly int _maximumFailureFrames;
+
+        public HudCandidateValidationGate(int maximumFailureFrames)
+        {
+            if (maximumFailureFrames < 1)
+                throw new ArgumentOutOfRangeException("maximumFailureFrames");
+            _maximumFailureFrames = maximumFailureFrames;
+        }
+
+        public int MaximumFailureFrames { get { return _maximumFailureFrames; } }
+        public int FailureFrames { get; private set; }
+
+        public HudCandidateTickResult RecordValidation(bool valid)
+        {
+            if (valid) return HudCandidateTickResult.Installed;
+            if (FailureFrames < _maximumFailureFrames) FailureFrames++;
+            return FailureFrames >= _maximumFailureFrames
+                ? HudCandidateTickResult.Expired
+                : HudCandidateTickResult.Pending;
+        }
+
+        public void Reset()
+        {
+            FailureFrames = 0;
         }
     }
 

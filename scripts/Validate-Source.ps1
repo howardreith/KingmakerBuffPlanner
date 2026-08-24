@@ -113,6 +113,29 @@ if ($hudSource -match 'Instantiate\s*\(\s*template\.gameObject' -or
 }
 $assertions++
 
+$hudLifecycleSource = Get-Content -LiteralPath (Join-Path $root `
+    'src\KingmakerBuffPlanner\UI\BuffPlannerUiContracts.cs') -Raw
+foreach ($lifecycleStateContract in @('HudInstallAttemptResult', 'HudCandidateTickResult',
+        'HudInstallationState', 'RetryableNotReady', 'CandidateExpired',
+        'StaleAnchor', 'HudHostingChainValidator')) {
+    if (-not $hudLifecycleSource.Contains($lifecycleStateContract)) {
+        throw "Explicit HUD lifecycle state contract is missing: $lifecycleStateContract"
+    }
+}
+if ($hudSource.Contains('FindObjectOfType<IngameMenuController>') -or
+    $hudSource.Contains('Resources.FindObjectsOfTypeAll') -or
+    -not $hudSource.Contains('hudHost.GetComponentInChildren<IngameMenuController>(true)') -or
+    -not $uiRootSource.Contains('_hud.TryInstall(hudHost)')) {
+    throw 'HUD discovery must remain scoped beneath the invalidated active HUD host.'
+}
+$assertions++
+
+if (-not $hudSource.Contains('Destroy(_root.gameObject)') -or
+    $hudSource -match 'Destroy\s*\(\s*(_nativeCluster|_anchorController|hudHost)') {
+    throw 'HUD disposal must remain bounded to Buff Planner-owned UI.'
+}
+$assertions++
+
 $screenSource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\UI\BuffPlannerScreenView.cs') -Raw
 foreach ($requiredScreenContract in @('CanvasGroup', 'GraphicRaycaster', 'raycastTarget = true',
         'blocksRaycasts = true', 'interactable = true', 'BUFF PLANNER',
