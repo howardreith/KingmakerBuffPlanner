@@ -69,7 +69,8 @@ namespace KingmakerBuffPlanner.Domain.Planning
             BuffSourceDefinition source,
             IEnumerable<string> targetUnitIds,
             ExistingEffectPolicy existingEffectPolicy,
-            IEnumerable<string> ignoredEffectIds)
+            IEnumerable<string> ignoredEffectIds,
+            IEnumerable<string> enhancementIds = null)
         {
             Source = source ?? throw new ArgumentNullException("source");
             TargetUnitIds = new ReadOnlyCollection<string>((targetUnitIds ?? throw new ArgumentNullException("targetUnitIds"))
@@ -79,12 +80,16 @@ namespace KingmakerBuffPlanner.Domain.Planning
             IgnoredEffectIds = new ReadOnlyCollection<string>((ignoredEffectIds ?? new string[0])
                 .Where(v => !string.IsNullOrWhiteSpace(v)).Distinct(StringComparer.Ordinal)
                 .OrderBy(v => v, StringComparer.Ordinal).ToList());
+            EnhancementIds = new ReadOnlyCollection<string>((enhancementIds ?? new string[0])
+                .Where(v => !string.IsNullOrWhiteSpace(v)).Distinct(StringComparer.Ordinal)
+                .OrderBy(v => v, StringComparer.Ordinal).ToList());
         }
 
         public BuffSourceDefinition Source { get; private set; }
         public IReadOnlyList<string> TargetUnitIds { get; private set; }
         public ExistingEffectPolicy ExistingEffectPolicy { get; private set; }
         public IReadOnlyList<string> IgnoredEffectIds { get; private set; }
+        public IReadOnlyList<string> EnhancementIds { get; private set; }
     }
 
     public sealed class ProviderPlanningOption
@@ -231,7 +236,8 @@ namespace KingmakerBuffPlanner.Domain.Planning
             ResourceReservation reservation,
             MaterialReservation materialReservation,
             EffectExpression expectedEffects,
-            bool massCast)
+            bool massCast,
+            IEnumerable<string> enhancementIds = null)
         {
             SourceId = sourceId ?? string.Empty;
             Provider = provider;
@@ -244,6 +250,9 @@ namespace KingmakerBuffPlanner.Domain.Planning
             MaterialReservation = materialReservation;
             ExpectedEffects = expectedEffects;
             MassCast = massCast;
+            EnhancementIds = new ReadOnlyCollection<string>((enhancementIds ?? new string[0])
+                .Where(value => !string.IsNullOrWhiteSpace(value)).Distinct(StringComparer.Ordinal)
+                .OrderBy(value => value, StringComparer.Ordinal).ToList());
         }
 
         public string SourceId { get; private set; }
@@ -255,6 +264,7 @@ namespace KingmakerBuffPlanner.Domain.Planning
         public MaterialReservation MaterialReservation { get; private set; }
         public EffectExpression ExpectedEffects { get; private set; }
         public bool MassCast { get; private set; }
+        public IReadOnlyList<string> EnhancementIds { get; private set; }
     }
 
     public sealed class MaterialReservation

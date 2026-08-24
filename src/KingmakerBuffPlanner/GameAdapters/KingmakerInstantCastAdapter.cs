@@ -9,7 +9,7 @@ using KingmakerBuffPlanner.Planning;
 
 namespace KingmakerBuffPlanner.GameAdapters
 {
-    internal sealed class KingmakerInstantCastAdapter : IInstantCastRuntimeAdapter
+    internal sealed class KingmakerInstantCastAdapter : IInstantCastRuntimeAdapter, ICastEnhancementRuntimeAdapter
     {
         public bool IsInCombat
         {
@@ -19,6 +19,11 @@ namespace KingmakerBuffPlanner.GameAdapters
         public CastRuntimeValidation Validate(CastStep step)
         {
             return new KingmakerAnimatedCastAdapter().Validate(step);
+        }
+
+        public CastEnhancementPreparation PrepareEnhancements(CastStep step)
+        {
+            return new KingmakerCastEnhancementAdapter().Prepare(step);
         }
 
         public InstantCastResult Fire(CastStep step)

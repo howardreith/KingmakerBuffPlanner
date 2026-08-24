@@ -60,6 +60,7 @@ namespace KingmakerBuffPlanner.UI
         private readonly ActiveEffectSnapshot _activeEffects;
         private readonly IReadOnlyDictionary<string, EffectExpression> _effects;
         private readonly IReadOnlyList<ProviderPlanningOption> _providerOptions;
+        private readonly IReadOnlyList<CastEnhancementSnapshot> _enhancements;
 
         public PlannerSetupModel(
             BuffPlannerProfile profile,
@@ -67,9 +68,14 @@ namespace KingmakerBuffPlanner.UI
             ActiveEffectSnapshot activeEffects,
             IDictionary<string, EffectExpression> effectsByAbilityKey,
             IEnumerable<ProviderPlanningOption> providerOptions,
-            Action<BuffPlannerProfile> save)
+            Action<BuffPlannerProfile> save,
+            IEnumerable<CastEnhancementSnapshot> enhancements = null)
         {
             Profile = profile ?? throw new ArgumentNullException("profile");
+            foreach (SourceAssignmentProfile assignment in Profile.Routines
+                .SelectMany(routine => routine.Assignments))
+                if (assignment.SelectedEnhancementIds == null)
+                    assignment.SelectedEnhancementIds = new List<string>();
             Snapshot = snapshot ?? throw new ArgumentNullException("snapshot");
             _activeEffects = activeEffects ?? throw new ArgumentNullException("activeEffects");
             var effects = new Dictionary<string, EffectExpression>(effectsByAbilityKey ??
@@ -78,6 +84,11 @@ namespace KingmakerBuffPlanner.UI
                 (providerOptions ?? new ProviderPlanningOption[0])
                     .OrderBy(item => item.Provider.Key.Canonical, StringComparer.Ordinal).ToList());
             _save = save ?? throw new ArgumentNullException("save");
+            _enhancements = new ReadOnlyCollection<CastEnhancementSnapshot>(
+                (enhancements ?? new CastEnhancementSnapshot[0])
+                    .Where(value => value != null).OrderBy(value => value.DisplayName,
+                        StringComparer.OrdinalIgnoreCase).ThenBy(value => value.EnhancementId,
+                        StringComparer.Ordinal).ToList());
             Sources = new ReadOnlyCollection<SetupSourceRow>(snapshot.Providers
                 .GroupBy(provider => AggregateId(provider.Key.Ability, effects), StringComparer.Ordinal)
                 .Select(group => CreateSourceRow(group.Key, group))
@@ -143,7 +154,7 @@ namespace KingmakerBuffPlanner.UI
             if (assignment.WantedTargetUnitIds.Contains(unitId))
                 assignment.WantedTargetUnitIds.Remove(unitId);
             else assignment.WantedTargetUnitIds.Add(unitId);
-            if (assignment.WantedTargetUnitIds.Count == 0) routine.Assignments.Remove(assignment);
+            if (assignment.WantedTargetUnitIds.Count == 0 && assignment.SelectedEnhancementIds.Count == 0) routine.Assignments.Remove(assignment);
             _save(Profile);
         }
 
@@ -205,7 +216,8 @@ namespace KingmakerBuffPlanner.UI
             if (next.Count == 0)
             {
                 if (assignment == null) return;
-                routine.Assignments.Remove(assignment);
+                assignment.WantedTargetUnitIds = next;
+                if (assignment.SelectedEnhancementIds.Count == 0) routine.Assignments.Remove(assignment);
                 _save(Profile);
                 return;
             }
@@ -219,6 +231,111 @@ namespace KingmakerBuffPlanner.UI
             _save(Profile);
         }
 
+        public CastEnhancementSnapshot GetEnhancement(string enhancementId)
+        {
+            return _enhancements.FirstOrDefault(value => value.EnhancementId == enhancementId);
+        }
+
+        public IReadOnlyList<CastEnhancementSnapshot> GetApplicableEnhancements()
+        {
+            SetupSourceRow source = SelectedSource;
+            if (source == null) return new ReadOnlyCollection<CastEnhancementSnapshot>(
+                new List<CastEnhancementSnapshot>());
+            return new ReadOnlyCollection<CastEnhancementSnapshot>(_enhancements.Where(value =>
+                    value.RemainingUses != 0 && source.Providers.Any(value.IsApplicable))
+                .OrderBy(value => value.DisplayName, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(value => value.EnhancementId, StringComparer.Ordinal).ToList());
+        }
+
+        public IReadOnlyList<string> GetSelectedEnhancementIds(string routineId)
+        {
+            SourceAssignmentProfile assignment = FindRoutine(routineId).Assignments
+                .FirstOrDefault(value => value.SourceId == SelectedSourceId);
+            return new ReadOnlyCollection<string>((assignment == null ||
+                    assignment.SelectedEnhancementIds == null ? (IEnumerable<string>)new string[0] :
+                    assignment.SelectedEnhancementIds)
+                .OrderBy(value => value, StringComparer.Ordinal).ToList());
+        }
+
+        public string GetEnhancementSummary(string routineId)
+        {
+            IReadOnlyList<string> selected = GetSelectedEnhancementIds(routineId);
+            IReadOnlyList<CastEnhancementSnapshot> applicable = GetApplicableEnhancements();
+            if (selected.Count == 0) return applicable.Count == 0
+                ? "Enhancement: None available"
+                : "Enhancement: None  " + applicable.Count + " available";
+            CastEnhancementSnapshot enhancement = GetEnhancement(selected[0]);
+            if (enhancement == null || !applicable.Any(value =>
+                value.EnhancementId == selected[0]))
+                return "Enhancement unavailable: " + (enhancement == null
+                    ? "Unknown source" : enhancement.DisplayName);
+            return "Enhancement: " + enhancement.DisplayName + UsesSuffix(enhancement);
+        }
+
+        public string GetEnhancementDescription(string routineId)
+        {
+            IReadOnlyList<string> selected = GetSelectedEnhancementIds(routineId);
+            if (selected.Count == 0)
+            {
+                IReadOnlyList<CastEnhancementSnapshot> options = GetApplicableEnhancements();
+                return options.Count == 0 ? "No applicable cast enhancements are available." :
+                    "Choose None or an applicable caster-owned enhancement. " +
+                    options.Count + " option(s) available.";
+            }
+            CastEnhancementSnapshot value = GetEnhancement(selected[0]);
+            if (value == null) return "Unavailable persisted enhancement: " + selected[0];
+            return value.DisplayName + UsesSuffix(value) + "\n" +
+                EffectName(value) + " | Maximum spell level " + value.MaximumSpellLevel +
+                (string.IsNullOrWhiteSpace(value.Description) ? string.Empty :
+                    "\n" + value.Description);
+        }
+
+        public void SetEnhancement(string routineId, string enhancementId)
+        {
+            SetupSourceRow source = RequireSelected();
+            RoutineProfile routine = FindRoutine(routineId);
+            SourceAssignmentProfile assignment = routine.Assignments
+                .FirstOrDefault(value => value.SourceId == source.SourceId);
+            if (!string.IsNullOrWhiteSpace(enhancementId) && !GetApplicableEnhancements()
+                .Any(value => value.EnhancementId == enhancementId))
+                throw new InvalidOperationException("The enhancement is not currently applicable and available.");
+            if (assignment == null)
+            {
+                if (string.IsNullOrWhiteSpace(enhancementId)) return;
+                assignment = CreateAssignment(source);
+                routine.Assignments.Add(assignment);
+            }
+            assignment.SelectedEnhancementIds = string.IsNullOrWhiteSpace(enhancementId)
+                ? new List<string>() : new List<string> { enhancementId };
+            if (assignment.SelectedEnhancementIds.Count == 0 &&
+                assignment.WantedTargetUnitIds.Count == 0) routine.Assignments.Remove(assignment);
+            _save(Profile);
+        }
+
+        public void CycleEnhancement(string routineId)
+        {
+            IReadOnlyList<CastEnhancementSnapshot> options = GetApplicableEnhancements();
+            string current = GetSelectedEnhancementIds(routineId).FirstOrDefault();
+            int index = options.ToList().FindIndex(value => value.EnhancementId == current);
+            string next = index < 0 ? (options.Count == 0 ? null : options[0].EnhancementId) :
+                (index + 1 < options.Count ? options[index + 1].EnhancementId : null);
+            SetEnhancement(routineId, next);
+        }
+
+        internal static string EffectName(CastEnhancementSnapshot enhancement)
+        {
+            string value = enhancement == null ? string.Empty : enhancement.EffectDisplayName;
+            if (string.IsNullOrWhiteSpace(value) || value == "Metamagic") return "Metamagic";
+            return value.EndsWith(" Spell", StringComparison.OrdinalIgnoreCase)
+                ? value : value + " Spell";
+        }
+
+        internal static string UsesSuffix(CastEnhancementSnapshot enhancement)
+        {
+            if (enhancement == null || enhancement.RemainingUses == null) return string.Empty;
+            return "  " + enhancement.RemainingUses.Value +
+                (enhancement.RemainingUses.Value == 1 ? " use" : " uses");
+        }
         public ProviderPreferenceProfile GetProviderPreference(string providerKey)
         {
             return Profile.ProviderPreferences.FirstOrDefault(p => p.ProviderKey == providerKey);
@@ -406,7 +523,8 @@ namespace KingmakerBuffPlanner.UI
                 WantedTargetUnitIds = new List<string>(),
                 ExistingEffectPolicy = Profile.Execution.RecastExisting
                     ? ExistingEffectPolicy.Overwrite : ExistingEffectPolicy.SkipAlreadyActive,
-                IgnoredPresenceMarkers = new List<string>()
+                IgnoredPresenceMarkers = new List<string>(),
+                SelectedEnhancementIds = new List<string>()
             };
         }
 
@@ -469,6 +587,9 @@ namespace KingmakerBuffPlanner.UI
                     existing.IgnoredPresenceMarkers = existing.IgnoredPresenceMarkers
                         .Concat(assignment.IgnoredPresenceMarkers).Distinct(StringComparer.Ordinal)
                         .OrderBy(item => item, StringComparer.Ordinal).ToList();
+                    existing.SelectedEnhancementIds = (existing.SelectedEnhancementIds ?? new List<string>())
+                        .Concat(assignment.SelectedEnhancementIds ?? new List<string>())
+                        .Distinct(StringComparer.Ordinal).OrderBy(item => item, StringComparer.Ordinal).ToList();
                     if (assignment.ExistingEffectPolicy == ExistingEffectPolicy.Overwrite)
                         existing.ExistingEffectPolicy = ExistingEffectPolicy.Overwrite;
                     changed = true;

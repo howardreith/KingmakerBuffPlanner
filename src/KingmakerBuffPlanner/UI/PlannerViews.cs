@@ -119,6 +119,7 @@ namespace KingmakerBuffPlanner.UI
         private readonly Text _availability;
         private readonly Text _configuration;
         private readonly Text _badge;
+        private readonly PlannerRightClickHandler _inspect;
         private UnityAction _select;
 
         internal BuffCardView(RectTransform parent, PlannerUiTheme theme)
@@ -129,6 +130,7 @@ namespace KingmakerBuffPlanner.UI
                 theme.MutedBrownText);
             Button = Rect.gameObject.AddComponent<Button>();
             Button.targetGraphic = _background;
+            _inspect = Rect.gameObject.AddComponent<PlannerRightClickHandler>();
             RectTransform stripe = KingmakerUiFactory.CreateRect("StatusStripe", Rect);
             KingmakerUiFactory.SetAnchors(stripe, 0, 0, 0.018f, 1, 1, 0, 3, 3);
             _status = KingmakerUiFactory.AddPanel(stripe, theme.MutedBrownText);
@@ -169,7 +171,7 @@ namespace KingmakerBuffPlanner.UI
         internal string SourceId { get; private set; }
 
         internal void Bind(BuffCardViewModel model, Sprite icon, UnityAction selected,
-            Func<PlannerPresentationStatus, Color> statusColor)
+            Action<string> inspect, Func<PlannerPresentationStatus, Color> statusColor)
         {
             SourceId = model.SourceId;
             Rect.name = "Source." + model.SourceId;
@@ -194,12 +196,16 @@ namespace KingmakerBuffPlanner.UI
             if (_select != null) Button.onClick.RemoveListener(_select);
             _select = selected;
             Button.onClick.AddListener(_select);
+            _inspect.SourceId = model.SourceId;
+            _inspect.Inspect = inspect;
             Rect.gameObject.SetActive(true);
         }
 
         internal void Hide()
         {
             SourceId = string.Empty;
+            _inspect.SourceId = string.Empty;
+            _inspect.Inspect = null;
             Rect.gameObject.SetActive(false);
         }
     }
@@ -247,6 +253,7 @@ namespace KingmakerBuffPlanner.UI
         private readonly BuffCardPool _pool;
         private readonly Func<string, Sprite> _icon;
         private readonly Action<string> _select;
+        private readonly Action<string> _inspect;
         private readonly Func<PlannerPresentationStatus, Color> _statusColor;
         private IReadOnlyList<BuffCardViewModel> _models = new BuffCardViewModel[0];
         private BuffGridMetrics _metrics;
@@ -254,10 +261,12 @@ namespace KingmakerBuffPlanner.UI
 
         internal BuffGridView(RectTransform parent, PlannerUiTheme theme,
             Func<string, Sprite> icon, Action<string> select,
+            Action<string> inspect,
             Func<PlannerPresentationStatus, Color> statusColor)
         {
             _icon = icon;
             _select = select;
+            _inspect = inspect;
             _statusColor = statusColor;
             _scroll = KingmakerUiFactory.CreateScrollView("BuffGrid", parent, theme, out _content);
             KingmakerUiFactory.SetAnchors((RectTransform)_scroll.transform, 0.02f, 0.315f,
@@ -342,7 +351,8 @@ namespace KingmakerBuffPlanner.UI
                     (_metrics.CellWidth + spacing), -6f - absoluteRow *
                     (_metrics.CellHeight + spacing));
                 BuffCardViewModel model = _models[modelIndex];
-                card.Bind(model, _icon(model.SourceId), () => _select(model.SourceId), _statusColor);
+                card.Bind(model, _icon(model.SourceId), () => _select(model.SourceId),
+                    _inspect, _statusColor);
             }
         }
     }
@@ -467,21 +477,25 @@ namespace KingmakerBuffPlanner.UI
         private readonly Text _name;
         private readonly Text _meta;
         private readonly Text _description;
+        private readonly Text _caster;
         private readonly Text _targetsLabel;
         private readonly Text _plan;
         private readonly PlannerTargetStripView _targets;
         private readonly Button _selectAll;
         private readonly Button _clear;
+        private readonly Button _enhancement;
+        private readonly Text _enhancementLabel;
+        private readonly PlannerHoverTooltip _enhancementTooltip;
 
         internal PlannerSelectedBuffView(RectTransform parent, PlannerUiTheme theme,
-            Action selectAll, Action clear, Action<string> showTooltip)
+            Action selectAll, Action clear, Action openEnhancements, Action<string> showTooltip)
         {
             _theme = theme;
             Root = KingmakerUiFactory.CreateRect("SelectedBuff", parent);
             KingmakerUiFactory.SetAnchors(Root, 0.02f, 0.075f, 0.98f, 0.305f);
             KingmakerUiFactory.AddFramedPanel(Root, theme.ParchmentPanel, theme.GoldAccent);
             RectTransform frame = KingmakerUiFactory.CreateRect("SelectedIconFrame", Root);
-            KingmakerUiFactory.SetAnchors(frame, 0.015f, 0.39f, 0.09f, 0.93f);
+            KingmakerUiFactory.SetAnchors(frame, 0.015f, 0.43f, 0.09f, 0.93f);
             Image frameImage = KingmakerUiFactory.AddFramedPanel(frame,
                 new Color(0.16f, 0.10f, 0.07f, 1f), theme.GoldAccent);
             frameImage.raycastTarget = false;
@@ -497,14 +511,32 @@ namespace KingmakerBuffPlanner.UI
                 "Select a buff", 23, TextAnchor.MiddleLeft);
             _name.fontStyle = FontStyle.Bold;
             _name.color = theme.BurgundyPrimary;
-            KingmakerUiFactory.SetAnchors(_name.rectTransform, 0.105f, 0.74f, 0.42f, 0.94f);
+            KingmakerUiFactory.SetAnchors(_name.rectTransform, 0.105f, 0.77f, 0.42f, 0.95f);
             _meta = KingmakerUiFactory.CreateText("SelectedMeta", Root, theme,
                 string.Empty, 14, TextAnchor.MiddleLeft);
             _meta.color = theme.MutedBrownText;
-            KingmakerUiFactory.SetAnchors(_meta.rectTransform, 0.105f, 0.61f, 0.42f, 0.76f);
+            KingmakerUiFactory.SetAnchors(_meta.rectTransform, 0.105f, 0.65f, 0.42f, 0.78f);
             _description = KingmakerUiFactory.CreateText("SelectedDescription", Root, theme,
                 string.Empty, 14, TextAnchor.UpperLeft);
-            KingmakerUiFactory.SetAnchors(_description.rectTransform, 0.105f, 0.14f, 0.42f, 0.60f);
+            _description.verticalOverflow = VerticalWrapMode.Truncate;
+            KingmakerUiFactory.SetAnchors(_description.rectTransform, 0.105f, 0.41f, 0.42f, 0.65f);
+            _caster = KingmakerUiFactory.CreateText("SelectedCaster", Root, theme,
+                "Caster: None", 14, TextAnchor.MiddleLeft);
+            _caster.fontStyle = FontStyle.Bold;
+            _caster.color = theme.BurgundyPrimary;
+            _caster.horizontalOverflow = HorizontalWrapMode.Wrap;
+            _caster.verticalOverflow = VerticalWrapMode.Overflow;
+            KingmakerUiFactory.SetAnchors(_caster.rectTransform, 0.105f, 0.225f, 0.42f, 0.41f);
+            _enhancement = KingmakerUiFactory.CreateButton("ChooseEnhancement", Root, theme,
+                "Enhancement: None available", () => openEnhancements());
+            KingmakerUiFactory.SetAnchors((RectTransform)_enhancement.transform,
+                0.105f, 0.035f, 0.42f, 0.215f);
+            _enhancementLabel = KingmakerUiFactory.SetButtonLabel(_enhancement,
+                "Enhancement: None available");
+            _enhancementLabel.alignment = TextAnchor.MiddleLeft;
+            _enhancementLabel.horizontalOverflow = HorizontalWrapMode.Wrap;
+            _enhancementTooltip = _enhancement.gameObject.AddComponent<PlannerHoverTooltip>();
+            _enhancementTooltip.Show = showTooltip;
             _targetsLabel = KingmakerUiFactory.CreateText("TargetsLabel", Root, theme,
                 string.Empty, 17, TextAnchor.MiddleLeft);
             _targetsLabel.color = theme.BurgundyPrimary;
@@ -536,7 +568,7 @@ namespace KingmakerBuffPlanner.UI
         internal void Bind(SetupSourceRow source, Sprite icon, string routineId,
             IReadOnlyList<TargetPortraitViewModel> targets, Func<string, Sprite> portrait,
             Action<string> toggle, Func<PlannerPresentationStatus, Color> statusColor,
-            string planSummary, bool interactable)
+            string planSummary, SelectedCastingViewModel casting, bool interactable)
         {
             bool available = source != null;
             _icon.sprite = icon;
@@ -547,14 +579,36 @@ namespace KingmakerBuffPlanner.UI
                 (source.SpellLevel > 0 ? " | Level " + source.SpellLevel : string.Empty) +
                 (string.IsNullOrWhiteSpace(source.DurationText) ? string.Empty :
                     " | " + source.DurationText) : string.Empty;
-            _description.text = available ? Compact(source.Description, 260) :
+            _description.text = available ? Compact(source.Description, 190) :
                 "Choose a card, then click portraits to edit the active routine.";
+            _caster.text = casting.CasterText + (string.IsNullOrWhiteSpace(casting.CasterDetail)
+                ? string.Empty : "\n" + casting.CasterDetail);
             _targetsLabel.text = "Targets for " + char.ToUpperInvariant(routineId[0]) +
                 routineId.Substring(1);
             _targets.Bind(targets, portrait, toggle, statusColor);
             _plan.text = planSummary ?? string.Empty;
+            KingmakerUiFactory.SetButtonLabel(_enhancement, casting.EnhancementLabel);
+            _enhancementTooltip.Text = casting.EnhancementDescription ?? string.Empty;
+            _enhancement.interactable = available && interactable;
             _selectAll.interactable = available && interactable;
             _clear.interactable = available && interactable && targets.Any(target => target.Wanted);
+        }
+
+        internal string EnhancementRenderEvidence(int candidateCount, string selectedEnhancementId)
+        {
+            RectTransform buttonRect = (RectTransform)_enhancement.transform;
+            Color color = _enhancementLabel.color;
+            return "EnhancementButton: active=" + _enhancement.gameObject.activeInHierarchy +
+                ";interactable=" + _enhancement.interactable +
+                ";labelText=" + _enhancementLabel.text +
+                ";labelActive=" + _enhancementLabel.gameObject.activeInHierarchy +
+                ";labelAlpha=" + _enhancementLabel.canvasRenderer.GetAlpha().ToString("0.###") +
+                ";labelColor=" + color +
+                ";labelRect=" + _enhancementLabel.rectTransform.rect +
+                ";buttonRect=" + buttonRect.rect +
+                ";siblingIndex=" + _enhancementLabel.transform.GetSiblingIndex() +
+                ";candidateCount=" + candidateCount +
+                ";selectedEnhancementId=" + (selectedEnhancementId ?? string.Empty);
         }
 
         private static string Compact(string value, int limit)
@@ -565,6 +619,111 @@ namespace KingmakerBuffPlanner.UI
         }
     }
 
+    internal sealed class PlannerEnhancementChooserView
+    {
+        private readonly PlannerUiTheme _theme;
+        private readonly RectTransform _content;
+        private readonly Action<string> _select;
+        private readonly Action<string> _showTooltip;
+        private readonly List<GameObject> _rows = new List<GameObject>();
+        private readonly Text _subtitle;
+
+        internal PlannerEnhancementChooserView(RectTransform parent, PlannerUiTheme theme,
+            Action<string> select, Action<string> showTooltip)
+        {
+            _theme = theme;
+            _select = select;
+            _showTooltip = showTooltip;
+            Root = KingmakerUiFactory.CreateRect("EnhancementChooser", parent);
+            KingmakerUiFactory.Stretch(Root);
+            Image blocker = Root.gameObject.AddComponent<Image>();
+            blocker.color = new Color(0.035f, 0.025f, 0.02f, 0.72f);
+            blocker.raycastTarget = true;
+            Button outside = Root.gameObject.AddComponent<Button>();
+            outside.onClick.AddListener(Hide);
+
+            RectTransform frame = KingmakerUiFactory.CreateRect("EnhancementChooserFrame", Root);
+            KingmakerUiFactory.SetAnchors(frame, 0.19f, 0.14f, 0.81f, 0.84f);
+            KingmakerUiFactory.AddFramedPanel(frame, theme.ParchmentRaised,
+                theme.BurgundyPrimary, 2f).raycastTarget = true;
+            Text title = KingmakerUiFactory.CreateText("EnhancementChooserTitle", frame, theme,
+                "CASTING ENHANCEMENT", 24, TextAnchor.MiddleLeft);
+            title.fontStyle = FontStyle.Bold;
+            title.color = theme.BurgundyPrimary;
+            KingmakerUiFactory.SetAnchors(title.rectTransform, 0.05f, 0.88f, 0.72f, 0.97f);
+            _subtitle = KingmakerUiFactory.CreateText("EnhancementChooserSubtitle", frame, theme,
+                string.Empty, 14, TextAnchor.MiddleLeft);
+            _subtitle.color = theme.MutedBrownText;
+            KingmakerUiFactory.SetAnchors(_subtitle.rectTransform, 0.05f, 0.81f, 0.82f, 0.89f);
+            Button close = KingmakerUiFactory.CreateButton("CloseEnhancementChooser", frame,
+                theme, "CLOSE", Hide);
+            KingmakerUiFactory.SetAnchors((RectTransform)close.transform,
+                0.83f, 0.88f, 0.95f, 0.97f);
+            ScrollRect scroll = KingmakerUiFactory.CreateScrollView("EnhancementChoices",
+                frame, theme, out _content);
+            KingmakerUiFactory.SetAnchors((RectTransform)scroll.transform,
+                0.05f, 0.08f, 0.95f, 0.79f);
+            PlannerDescriptionEscape escape = Root.gameObject.AddComponent<PlannerDescriptionEscape>();
+            escape.Close = Hide;
+            Root.gameObject.SetActive(false);
+        }
+
+        internal RectTransform Root { get; private set; }
+        internal bool IsOpen { get { return Root.gameObject.activeSelf; } }
+
+        internal void Show(SelectedCastingViewModel model)
+        {
+            ClearRows();
+            _subtitle.text = model.CasterText + " | " + model.CandidateCount +
+                (model.CandidateCount == 1 ? " applicable option" : " applicable options");
+            foreach (EnhancementChoiceViewModel choice in model.Choices)
+            {
+                string text = (choice.Selected ? "SELECTED | " : string.Empty) + choice.Title +
+                    "\n" + choice.Summary;
+                Button button = KingmakerUiFactory.CreateButton("EnhancementChoice", _content,
+                    _theme, text, () =>
+                    {
+                        if (!choice.Available) return;
+                        _select(choice.EnhancementId);
+                    });
+                RectTransform rect = (RectTransform)button.transform;
+                KingmakerUiFactory.AddLayout(rect, 68f);
+                Text label = KingmakerUiFactory.SetButtonLabel(button, text);
+                label.alignment = TextAnchor.MiddleLeft;
+                label.horizontalOverflow = HorizontalWrapMode.Wrap;
+                label.resizeTextForBestFit = true;
+                label.resizeTextMinSize = 12;
+                label.resizeTextMaxSize = 16;
+                if (choice.Selected)
+                    button.image.color = _theme.GreenSuccess;
+                button.interactable = choice.Available;
+                PlannerHoverTooltip tooltip = button.gameObject.AddComponent<PlannerHoverTooltip>();
+                tooltip.Text = choice.Description;
+                tooltip.Show = _showTooltip;
+                _rows.Add(button.gameObject);
+            }
+            Root.SetAsLastSibling();
+            Root.gameObject.SetActive(true);
+            KingmakerUiFactory.ForceLayoutAndSnap(Root);
+        }
+
+        internal void Hide()
+        {
+            Root.gameObject.SetActive(false);
+            if (_showTooltip != null) _showTooltip(string.Empty);
+        }
+
+        private void ClearRows()
+        {
+            foreach (GameObject row in _rows)
+            {
+                if (row == null) continue;
+                row.SetActive(false);
+                UnityEngine.Object.Destroy(row);
+            }
+            _rows.Clear();
+        }
+    }
     internal sealed class PlannerSettingsView
     {
         private readonly Button _mode;
@@ -592,8 +751,8 @@ namespace KingmakerBuffPlanner.UI
             _fallback = SettingButton("Fallback", 0.23f, 0.36f, toggleFallback, theme);
             _hotkey = SettingButton("PlannerHotkey", 0.08f, 0.21f, toggleHotkey, theme);
             Button done = KingmakerUiFactory.CreateButton("SettingsDone", Root, theme,
-                "Done", () => close());
-            KingmakerUiFactory.SetAnchors((RectTransform)done.transform, 0.72f, 0.015f, 0.94f, 0.075f);
+                CastingPanelLayoutContract.SettingsCloseLabel, () => close());
+            KingmakerUiFactory.SetAnchors((RectTransform)done.transform, 0.72f, 0.015f, 0.94f, 0.12f);
             Root.gameObject.SetActive(false);
         }
 
@@ -625,6 +784,23 @@ namespace KingmakerBuffPlanner.UI
             button.interactable = interactable;
             Text label = button.GetComponentInChildren<Text>(true);
             if (label != null) label.text = text;
+        }
+    }
+
+    internal sealed class PlannerRightClickHandler : MonoBehaviour,
+        UnityEngine.EventSystems.IPointerClickHandler
+    {
+        internal string SourceId;
+        internal Action<string> Inspect;
+
+        public void OnPointerClick(UnityEngine.EventSystems.PointerEventData eventData)
+        {
+            if (eventData == null ||
+                eventData.button != UnityEngine.EventSystems.PointerEventData.InputButton.Right)
+                return;
+            eventData.Use();
+            if (Inspect != null && !string.IsNullOrWhiteSpace(SourceId))
+                Inspect(SourceId);
         }
     }
 

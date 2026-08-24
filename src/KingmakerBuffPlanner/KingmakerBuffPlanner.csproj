@@ -95,6 +95,7 @@
     <Compile Include="Domain\Identity\StableKeys.cs" />
     <Compile Include="Domain\Providers\ProviderSnapshots.cs" />
     <Compile Include="Domain\Planning\PlanningModels.cs" />
+    <Compile Include="Domain\Planning\CastEnhancements.cs" />
     <Compile Include="Execution\ExecutionModels.cs" />
     <Compile Include="Execution\AnimatedCastExecutor.cs" />
     <Compile Include="Execution\InstantCastExecutor.cs" />
@@ -104,6 +105,7 @@
     <Compile Include="GameAdapters\KingmakerActiveEffectSnapshotBuilder.cs" />
     <Compile Include="GameAdapters\KingmakerAnimatedCastAdapter.cs" />
     <Compile Include="GameAdapters\KingmakerBuffSourceDiscovery.cs" />
+    <Compile Include="GameAdapters\KingmakerCastEnhancementAdapter.cs" />
     <Compile Include="GameAdapters\KingmakerInstantCastAdapter.cs" />
     <Compile Include="GameAdapters\KingmakerPartySnapshotBuilder.cs" />
     <Compile Include="GameAdapters\KingmakerProviderOptionBuilder.cs" />

@@ -35,45 +35,54 @@ namespace KingmakerBuffPlanner.Execution
                         report.Add(index, step, CastExecutionStatus.FailedValidation, validation.Reason);
                     else
                     {
-                        InstantCastResult result = null;
-                        Exception submissionFailure = null;
-                        try { result = _runtime.Fire(step); }
-                        catch (Exception exception) { submissionFailure = exception; }
-                        if (submissionFailure != null)
-                        {
-                            report.Add(index, step, CastExecutionStatus.FailedSubmission,
-                                "instant-exception:" + submissionFailure.GetType().FullName + ":" +
-                                submissionFailure.Message);
-                        }
-                        else if (result == null)
-                            report.Add(index, step, CastExecutionStatus.FailedSubmission, "instant-result-null");
+                        CastEnhancementPreparation enhancement = Prepare(step);
+                        if (!enhancement.Valid)
+                            report.Add(index, step, CastExecutionStatus.FailedValidation,
+                                "enhancement-unavailable:" + enhancement.Reason);
                         else
                         {
-                            if (result.Submitted)
+                            InstantCastResult result = null;
+                            Exception submissionFailure = null;
+                            try { result = _runtime.Fire(step); }
+                            catch (Exception exception) { submissionFailure = exception; }
+                            finally { enhancement.Dispose(); }
+                            if (submissionFailure != null)
                             {
-                                report.Add(index, step, CastExecutionStatus.Submitted, "rule-cast-submitted");
-                                report.Add(index, step, CastExecutionStatus.CastStarted, "rule-cast-started");
+                                report.Add(index, step, CastExecutionStatus.FailedSubmission,
+                                    "instant-exception:" + submissionFailure.GetType().FullName + ":" +
+                                    submissionFailure.Message);
                             }
-                            if (result.ResourceSpent)
-                                report.Add(index, step, CastExecutionStatus.ResourceSpent, "ability-data-spend-completed");
-                            if (!result.Submitted)
-                                report.Add(index, step, CastExecutionStatus.FailedSubmission, result.Detail);
-                            else if (!result.Succeeded)
-                                report.Add(index, step, CastExecutionStatus.FailedExecution, result.Detail);
+                            else if (result == null)
+                                report.Add(index, step, CastExecutionStatus.FailedSubmission, "instant-result-null");
                             else
                             {
-                                bool observed = result.EffectsObserved;
-                                for (int confirmationFrame = 0;
-                                    !observed && confirmationFrame < 12; confirmationFrame++)
+                                if (result.Submitted)
                                 {
-                                    yield return null;
-                                    observed = _runtime.EffectsObserved(step);
+                                    report.Add(index, step, CastExecutionStatus.Submitted, "rule-cast-submitted");
+                                    report.Add(index, step, CastExecutionStatus.CastStarted, "rule-cast-started");
                                 }
-                                report.Add(index, step, observed
-                                    ? CastExecutionStatus.EffectConfirmed
-                                    : CastExecutionStatus.TimedOutUnconfirmed,
-                                    (observed ? "expected-effects-observed;" :
-                                        "expected-effects-absent-after-confirmation-window;") + result.Detail);
+                                if (result.ResourceSpent)
+                                    report.Add(index, step, CastExecutionStatus.ResourceSpent,
+                                        "ability-data-spend-completed");
+                                if (!result.Submitted)
+                                    report.Add(index, step, CastExecutionStatus.FailedSubmission, result.Detail);
+                                else if (!result.Succeeded)
+                                    report.Add(index, step, CastExecutionStatus.FailedExecution, result.Detail);
+                                else
+                                {
+                                    bool observed = result.EffectsObserved;
+                                    for (int confirmationFrame = 0;
+                                        !observed && confirmationFrame < 12; confirmationFrame++)
+                                    {
+                                        yield return null;
+                                        observed = _runtime.EffectsObserved(step);
+                                    }
+                                    report.Add(index, step, observed
+                                        ? CastExecutionStatus.EffectConfirmed
+                                        : CastExecutionStatus.TimedOutUnconfirmed,
+                                        (observed ? "expected-effects-observed;" :
+                                            "expected-effects-absent-after-confirmation-window;") + result.Detail);
+                                }
                             }
                         }
                     }
@@ -84,6 +93,23 @@ namespace KingmakerBuffPlanner.Execution
                     sinceYield = 0;
                     yield return null;
                 }
+            }
+        }
+
+        private CastEnhancementPreparation Prepare(CastStep step)
+        {
+            if (step.EnhancementIds.Count == 0) return CastEnhancementPreparation.Pass(null);
+            var runtime = _runtime as ICastEnhancementRuntimeAdapter;
+            if (runtime == null) return CastEnhancementPreparation.Fail("runtime-adapter-unsupported");
+            try
+            {
+                return runtime.PrepareEnhancements(step) ??
+                    CastEnhancementPreparation.Fail("preparation-result-null");
+            }
+            catch (Exception exception)
+            {
+                return CastEnhancementPreparation.Fail("preparation-exception:" +
+                    exception.GetType().FullName + ":" + exception.Message);
             }
         }
     }

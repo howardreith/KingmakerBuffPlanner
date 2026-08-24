@@ -169,6 +169,159 @@ namespace KingmakerBuffPlanner.UI
         }
     }
 
+    public sealed class EnhancementChoiceViewModel
+    {
+        internal EnhancementChoiceViewModel(string enhancementId, string title, string summary,
+            string description, bool selected, bool available)
+        {
+            EnhancementId = enhancementId ?? string.Empty;
+            Title = title ?? string.Empty;
+            Summary = summary ?? string.Empty;
+            Description = description ?? string.Empty;
+            Selected = selected;
+            Available = available;
+        }
+
+        public string EnhancementId { get; private set; }
+        public string Title { get; private set; }
+        public string Summary { get; private set; }
+        public string Description { get; private set; }
+        public bool Selected { get; private set; }
+        public bool Available { get; private set; }
+    }
+
+    public sealed class SelectedCastingViewModel
+    {
+        private SelectedCastingViewModel(string casterText, string casterDetail,
+            string enhancementLabel, string enhancementDescription, int candidateCount,
+            string selectedEnhancementId, IEnumerable<EnhancementChoiceViewModel> choices)
+        {
+            CasterText = casterText;
+            CasterDetail = casterDetail;
+            EnhancementLabel = enhancementLabel;
+            EnhancementDescription = enhancementDescription;
+            CandidateCount = candidateCount;
+            SelectedEnhancementId = selectedEnhancementId ?? string.Empty;
+            Choices = choices.ToList().AsReadOnly();
+        }
+
+        public string CasterText { get; private set; }
+        public string CasterDetail { get; private set; }
+        public string EnhancementLabel { get; private set; }
+        public string EnhancementDescription { get; private set; }
+        public int CandidateCount { get; private set; }
+        public string SelectedEnhancementId { get; private set; }
+        public IReadOnlyList<EnhancementChoiceViewModel> Choices { get; private set; }
+
+        public static SelectedCastingViewModel Create(SetupSourceRow source,
+            PlannerSetupModel model, string routineId, RoutinePlanResult preview)
+        {
+            if (source == null || model == null)
+                return new SelectedCastingViewModel("Caster: None", string.Empty,
+                    "Enhancement: None available", "Select a buff to choose an enhancement.",
+                    0, string.Empty, new[] { NoneChoice(true) });
+
+            IReadOnlyList<string> selectedIds = model.GetSelectedEnhancementIds(routineId);
+            string selectedId = selectedIds.FirstOrDefault() ?? string.Empty;
+            CastEnhancementSnapshot selected = model.GetEnhancement(selectedId);
+            IReadOnlyList<CastEnhancementSnapshot> applicable = model.GetApplicableEnhancements();
+            var choices = new List<EnhancementChoiceViewModel> { NoneChoice(selectedId.Length == 0) };
+            choices.AddRange(applicable.Select(value => Choice(value,
+                value.EnhancementId == selectedId, true, model)));
+            if (selectedId.Length != 0 && !applicable.Any(value => value.EnhancementId == selectedId))
+                choices.Add(selected == null
+                    ? new EnhancementChoiceViewModel(selectedId, "Unavailable enhancement",
+                        "Unavailable", "Persisted enhancement source: " + selectedId, true, false)
+                    : Choice(selected, true, false, model));
+
+            List<ProviderSnapshot> providers = ResolveProviders(source, preview);
+            string casterText;
+            string casterDetail;
+            if (providers.Count == 1)
+            {
+                casterText = "Caster: " + model.GetCasterDisplayName(providers[0]);
+                casterDetail = ProviderDetail(providers[0], model);
+            }
+            else
+            {
+                string names = string.Join(", ", providers.Select(model.GetCasterDisplayName)
+                    .Distinct(StringComparer.OrdinalIgnoreCase).ToArray());
+                casterText = (preview != null && preview.Plan.Steps.Any(step =>
+                    step.SourceId == source.SourceId) ? "Casters: " : "Casters available: ") + names;
+                casterDetail = preview != null && preview.Plan.Steps.Any(step =>
+                    step.SourceId == source.SourceId)
+                    ? "Provider assignments are resolved per planned cast."
+                    : "The generated plan will resolve the caster for each cast.";
+            }
+
+            return new SelectedCastingViewModel(casterText, casterDetail,
+                model.GetEnhancementSummary(routineId), model.GetEnhancementDescription(routineId),
+                applicable.Count, selectedId, choices);
+        }
+
+        private static List<ProviderSnapshot> ResolveProviders(SetupSourceRow source,
+            RoutinePlanResult preview)
+        {
+            if (preview != null)
+            {
+                HashSet<string> keys = new HashSet<string>(preview.Plan.Steps
+                    .Where(step => step.SourceId == source.SourceId)
+                    .Select(step => step.Provider.Canonical), StringComparer.Ordinal);
+                if (keys.Count != 0)
+                    return source.Providers.Where(provider => keys.Contains(provider.Key.Canonical))
+                        .OrderBy(provider => provider.Key.Canonical, StringComparer.Ordinal).ToList();
+            }
+            return source.Providers.OrderBy(provider => provider.Key.Canonical,
+                StringComparer.Ordinal).ToList();
+        }
+
+        private static EnhancementChoiceViewModel NoneChoice(bool selected)
+        {
+            return new EnhancementChoiceViewModel(string.Empty, "None", "Unenhanced cast",
+                "Cast without a temporary casting enhancement.", selected, true);
+        }
+
+        private static EnhancementChoiceViewModel Choice(CastEnhancementSnapshot value,
+            bool selected, bool available, PlannerSetupModel model)
+        {
+            string uses = value.RemainingUses == null ? "Uses not limited" :
+                value.RemainingUses.Value + (value.RemainingUses.Value == 1 ? " use" : " uses");
+            string summary = PlannerSetupModel.EffectName(value) + " | " + uses;
+            string owner = model.Snapshot.Units.FirstOrDefault(unit =>
+                unit.UnitId == value.CasterUnitId)?.DisplayName ?? value.CasterUnitId;
+            string description = "Owner: " + owner + "\nApplies " +
+                PlannerSetupModel.EffectName(value) + " to this cast.\nSpell-level limit: " +
+                value.MaximumSpellLevel + (string.IsNullOrWhiteSpace(value.Description)
+                    ? string.Empty : "\n" + value.Description);
+            if (!available) description = "Unavailable: " + description;
+            return new EnhancementChoiceViewModel(value.EnhancementId, value.DisplayName,
+                summary, description, selected, available);
+        }
+
+        private static string ProviderDetail(ProviderSnapshot provider, PlannerSetupModel model)
+        {
+            ResourcePoolSnapshot pool = model.GetResourcePool(provider);
+            int? remaining = model.GetRemainingCasts(provider);
+            string source = provider.Key.Ability.SourceKind == SourceKind.Spellbook
+                ? "Spellbook" : provider.Key.Ability.SourceKind.ToString();
+            return source + " | " + (remaining == null ? "At will" :
+                remaining.Value + (remaining.Value == 1 ? " cast available" : " casts available")) +
+                (pool.Kind == ResourcePoolKind.PreparedSlots ? " | Prepared" : string.Empty);
+        }
+    }
+
+    public static class CastingPanelLayoutContract
+    {
+        public const int ButtonFontSize = 17;
+        public const int LabelVerticalPadding = 1;
+        public const float MinimumEnhancementButtonHeight = 32f;
+        public const string SettingsCloseLabel = "CLOSE";
+
+        public static bool CanRenderLabel(float buttonHeight)
+        {
+            return buttonHeight - (LabelVerticalPadding * 2) >= ButtonFontSize;
+        }
+    }
     public sealed class TargetPortraitViewModel
     {
         internal TargetPortraitViewModel(UnitSnapshot unit, TargetPortraitState state,
@@ -350,6 +503,42 @@ namespace KingmakerBuffPlanner.UI
                 model.GetResourcePool(provider).Kind == ResourcePoolKind.PreparedSlots);
             if (casters > 1) return casts + " casts across " + casters + " casters";
             return casts + (allPrepared ? " prepared" : casts == 1 ? " cast" : " casts");
+        }
+    }
+
+    public enum PlannerPointerGesture
+    {
+        Left,
+        Right,
+        Other
+    }
+
+    public sealed class PlannerDescriptionRequest
+    {
+        private PlannerDescriptionRequest(string sourceId, AbilityKey ability)
+        {
+            SourceId = sourceId;
+            Ability = ability;
+        }
+
+        public string SourceId { get; private set; }
+        public AbilityKey Ability { get; private set; }
+
+        public static bool TryCreate(
+            PlannerPointerGesture gesture,
+            string sourceId,
+            IEnumerable<SetupSourceRow> sources,
+            out PlannerDescriptionRequest request)
+        {
+            request = null;
+            if (gesture != PlannerPointerGesture.Right || string.IsNullOrWhiteSpace(sourceId))
+                return false;
+            SetupSourceRow source = (sources ?? new SetupSourceRow[0])
+                .FirstOrDefault(item => item != null &&
+                    string.Equals(item.SourceId, sourceId, StringComparison.Ordinal));
+            if (source == null) return false;
+            request = new PlannerDescriptionRequest(source.SourceId, source.Ability);
+            return true;
         }
     }
 

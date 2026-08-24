@@ -675,3 +675,13 @@ Status: ROOT CAUSE PROVEN; 0.0.4 SOURCE PASS; LIVE QUALIFICATION PENDING
 - Guarded install `ui-clarity-0.0.10-final-install` is Installed; settings preserved; every non-planner mod verified unchanged; installed DLL/MVID exact. No process or deployment lock remains.
 - Human visual uncertainty remains: judgment of HUD/native text feel at 1920x1080 and 1600x900, plus multi-member `COVERED` and controlled invalid portrait appearance. No merge, push, or public release is authorized.
 - Exact next action: human completes the 0.0.10 checklist at the top of `docs/MANUAL-ACCEPTANCE.md` and returns full-resolution screenshots for any visual failure.
+
+## 2026-08-20 - Per-cast enhancements and metamagic rods
+
+- Status: PASS deterministic/build validation; manual runtime effect qualification remains.
+- Installed CallOfTheWild evidence: version 1.14.4c-2.1; assembly SHA-256 4EBF8E1ED3E66FFED72EA33EA325595629423DACD5BFFA23E3C9109144B26915; MVID 8caab254-aacf-4811-8093-44b9184e6e53.
+- Bounded type/string inspection found no Brown-Fur Transmuter, Powerful Change, or Share Transmutation implementation in the installed optional-mod assembly.
+- Brown-Fur integration status: FEATURE-NOT-PRESENT. No selector is exposed because that would imply a capability the installed reference does not implement.
+- Metamagic rods use the native MetamagicRodMechanics activatable/buff path. Planner code does not synthesize duration or manually spend charges.
+- Verification at 2026-08-20 00:17:33 -04:00: Test-SourceOnly PASS; source 32/32, protocol 80/80, runtime harness filesystem 8/8, package 4/4, deployment WhatIf 5/5.
+- Runtime game scenario: not performed; no guarded KBP_AUTOMATION_WORKING launch was established during this issue.

@@ -8,7 +8,7 @@ namespace KingmakerBuffPlanner.Persistence
 {
     public sealed class BuffPlannerProfile
     {
-        internal const int CurrentSchemaVersion = 3;
+        internal const int CurrentSchemaVersion = 4;
 
         [JsonProperty("schemaVersion", Required = Required.Always, Order = 1)]
         public int SchemaVersion { get; set; }
@@ -68,6 +68,8 @@ namespace KingmakerBuffPlanner.Persistence
         public ExistingEffectPolicy ExistingEffectPolicy { get; set; }
         [JsonProperty("ignoredPresenceMarkers", Required = Required.Always, Order = 5)]
         public List<string> IgnoredPresenceMarkers { get; set; }
+        [JsonProperty("selectedEnhancementIds", Required = Required.Always, Order = 6)]
+        public List<string> SelectedEnhancementIds { get; set; }
     }
 
     public sealed class AbilityKeyProfile

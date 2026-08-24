@@ -1,44 +1,51 @@
-# Kingmaker Buff Planner 0.0.11 - Draft Release Notes
+# Kingmaker Buff Planner 0.0.11
 
-Publication status: local qualification build only. Not a public release.
+Version 0.0.11 fixes a severe closed-window performance regression in Pathfinder: Kingmaker Enhanced Plus Edition 2.1.7b.
 
-Version 0.0.11 fixes a severe closed-window performance regression. Earlier builds attempted to discover the campaign HUD on every Unity Mod Manager update. When no campaign HUD existed, that attempt called Unity's global `FindObjectOfType<IngameMenuController>()` once per frame. Exact-build profiling measured 18.875 seconds inside those searches during a 20.080-second opening-camera interval and only 11.358 average FPS.
+## Performance repair
 
-HUD discovery is now invalidation-driven. KBP observes the known `StaticCanvas.HUDController` identity/active state, reacts to real area lifecycle signals, and performs one bounded lookup under that HUD host. Unchanged frames with no HUD do no hierarchy discovery. Two fresh fixed processes averaged 89.236 and 88.671 FPS under the local 90 FPS cap; a later exact package averaged 89.237 FPS with 18 moving-camera samples and zero HUD searches.
+Earlier builds attempted to discover the campaign HUD on every Unity Mod Manager update. When no campaign HUD existed, that path called Unity's global `FindObjectOfType<IngameMenuController>()` once per frame. Exact-build profiling measured 18.875 seconds inside 228 searches during a 20.080-second opening-camera interval and only 11.358 average FPS.
 
-Native discovery remains 12/12 and exact Call of the Wild compatibility remains 26/26. The source-only suite passes 32/32 source, 78/78 behavior/protocol, 8/8 filesystem, 4/4 package, and 5/5 deployment dry-run checks.
+HUD discovery is now invalidation-driven. KBP observes the known `StaticCanvas.HUDController` identity and active state, reacts to real area lifecycle signals, and performs one bounded lookup below that HUD host only when invalidated. Unchanged frames with no HUD perform no hierarchy discovery.
 
-The current machine has no authorized `KBP_AUTOMATION_BASELINE` / `KBP_AUTOMATION_WORKING` pair. Campaign HUD/workflow, animated/instant execution, ordinary-area, cutscene, and world-map checks therefore remain explicitly unqualified rather than using another product's automation save or an ordinary player save.
+The same-DLL diagnostic A/B increased the opening-camera average from 11.358 to 89.234 FPS when only the pathological discovery path was disabled. Fixed exact-package runs hold moving-camera samples near the configured 90 FPS cap with zero global HUD searches. The repository owner also confirmed through human runtime testing that the severe approximately 16 FPS cutscene and world-map regression is gone.
 
-## 0.0.10 visual clarity
+## Test workflow reliability
 
-Publication status: local qualification build only. Not a public release.
+The source-only protocol tests no longer create disposable fixtures in the guarded live runtime-evidence tree. They use a unique temporary test boundary while separately proving that the production evidence root remains enforced. Infrastructure faults are reported on stderr with a nonzero exit instead of escaping the test entry point as an unhandled CLR exception.
 
-Version 0.0.10 aligns the lower-left planner row from the native Kingmaker button grid and gives every dark/gold glyph a centered preserve-aspect safe area with measured optical correction. Button dimensions, hitboxes, listeners, tooltips, pointer capture, and quick actions are unchanged.
+The direct test executable and complete source/build/release workflow now finish with exit code 0, no residual test process, and no new Windows `.NET Runtime`, `Application Error`, Windows Error Reporting, or `Application Popup` crash event.
 
-Target portraits now consume the selected consolidated card's real plan slice. Explicit fulfilled selections are strongly green, unavailable selections amber with an exact reason, additional expected recipients softly green and labeled `COVERED`, invalid targets red with an exact reason, and unrelated valid targets neutral. Selected-buff text reports available uses and planned casts instead of unexplained covered/blocked fractions.
+## Preserved functionality
 
-The modal retains its proven top-level canvas and input lease, but no longer adds a CanvasScaler. It uses the native legacy Arial/default UI material path, fixed font sizes, unit transform scales, forced layout, and pixel-snapped owned rectangles. Human visual acceptance remains authoritative.
+This release retains the complete owner-accepted 0.0.10 feature set, including:
 
-## 0.0.9 source consolidation
+- structural native and optional-mod buff discovery;
+- Long, Important, and Short routines;
+- automatic provider and resource selection;
+- Animated and Instant execution;
+- material-component and resource accounting;
+- metamagic rod and cast-enhancement selection;
+- full spell details on right-click and personal-spell target eligibility;
+- the four-column planner, target-state display, HUD controls, hotkey, input isolation, and external profile persistence;
+- fail-soft Call of the Wild compatibility with no compile-time gameplay-mod dependency.
 
-Version 0.0.9 polishes the accepted four-column planner without replacing its workflow. Provider-backed abilities with the same normalized effect semantics now appear as one card while the established planning backend automatically chooses among every eligible caster and resource source. Earlier per-ability routine assignments are rebound and unioned without losing targets.
+## Installation
 
-Direct targets now receive a strong full green portrait treatment; indirect party/area beneficiaries receive a distinct lighter green `COVERED` treatment. The grid uses balanced symmetric margins, and the unchanged lower-left HUD hitboxes receive a shared native-toned backing, neighboring button skin where available, inset antique-gold frames, and improved icon padding.
+1. Download `KingmakerBuffPlanner-0.0.11.zip` from **Assets** below.
+2. In Unity Mod Manager, select Pathfinder: Kingmaker.
+3. Drag the ZIP into the **Mods** tab.
+4. Launch the game and enable **Kingmaker Buff Planner**.
+5. Load a campaign and open the planner with Ctrl+Shift+B or the lower-left HUD controls.
 
-Discovery, targeting commands, Animated and Instant execution, resource accounting, provider ranking, persistence durability, Ctrl+Shift+B isolation, HUD actions/tooltips/pointer capture, modal lifecycle, optional-mod compatibility, and guarded runtime transactions remain preserved. Cosmetic acceptance remains human-gated.
+Do not download GitHub's automatically generated **Source code** archives; they are not the Unity Mod Manager package.
 
-Highlights:
+## Qualification
 
-- Long/Important/Short edit-context tabs and one Apply action;
-- pooled vertical four-column grid with actual blueprint icons;
-- portrait clicks directly add/remove targets in the active routine;
-- Search, All/Spells/Abilities/Other, and routine-local Selected only as the complete normal catalog controls;
-- compact selected-buff source, duration, description, targets, and plan summary;
-- automatic provider selection with no normal provider-management interface;
-- schema-3 migration that reveals hidden entries and replaces F10 with configurable Ctrl+Shift+B;
-- exact native B suppression for the planner chord and restored dark/gold HUD treatment;
-- hashed campaign views plus physical Animated and Instant qualification;
-- no BubbleBuffs/Wrath code, assets, shaders, textures, or hierarchy paths.
+The release publisher rebuilds from the fully pushed default branch, runs the complete source-only suite, performs two deterministic clean release builds, validates the strict package allowlist, and publishes the exact ZIP together with `SHA256SUMS.txt`.
 
-Automated qualification includes source 30/30, behavior/protocol 67/67, runtime filesystem 8/8, deployment WhatIf 5/5, physical Animated/Instant, native 12/12, Call of the Wild 26/26, exact Mods restoration, and immutable baseline-save verification. The package remains human-gated for visual acceptance.
+The current repository is private, so the release is visible only to GitHub users authorized for this repository unless repository visibility changes.
+
+## Release policy
+
+The existing 0.0.10 tag, release, and assets remain immutable. This 0.0.11 artifact receives its own tag and release; any later code or presentation change must advance the version instead of replacing published bytes.

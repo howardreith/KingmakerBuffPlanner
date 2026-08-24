@@ -17,11 +17,12 @@ namespace KingmakerBuffPlanner.Planning
             BuffCastRequest request,
             IEnumerable<ProviderPlanningOption> providerOptions,
             ProviderSelectionPolicy selectionPolicy,
-            ActiveEffectSnapshot activeEffects)
+            ActiveEffectSnapshot activeEffects,
+            IEnumerable<CastEnhancementSnapshot> enhancements = null)
         {
             if (request == null) throw new ArgumentNullException("request");
             return PlanRoutine(snapshot, new[] { request }, providerOptions,
-                selectionPolicy, activeEffects);
+                selectionPolicy, activeEffects, enhancements);
         }
 
         public CastPlan PlanRoutine(
@@ -29,7 +30,8 @@ namespace KingmakerBuffPlanner.Planning
             IEnumerable<BuffCastRequest> requests,
             IEnumerable<ProviderPlanningOption> providerOptions,
             ProviderSelectionPolicy selectionPolicy,
-            ActiveEffectSnapshot activeEffects)
+            ActiveEffectSnapshot activeEffects,
+            IEnumerable<CastEnhancementSnapshot> enhancements = null)
         {
             if (snapshot == null) throw new ArgumentNullException("snapshot");
             if (selectionPolicy == null) throw new ArgumentNullException("selectionPolicy");
@@ -43,6 +45,13 @@ namespace KingmakerBuffPlanner.Planning
             var steps = new List<CastStep>();
             var diagnostics = new List<string>();
             var ledger = new ResourceLedger(snapshot.ResourcePools);
+            var enhancementList = (enhancements ?? new CastEnhancementSnapshot[0]).ToList();
+            if (enhancementList.Any(value => value == null) ||
+                enhancementList.Select(value => value.EnhancementId).Distinct(StringComparer.Ordinal).Count() != enhancementList.Count)
+                throw new ArgumentException("Enhancement catalog contains null or duplicate IDs.", "enhancements");
+            var enhancementById = enhancementList.ToDictionary(value => value.EnhancementId, StringComparer.Ordinal);
+            var enhancementRemaining = enhancementList.ToDictionary(value => value.EnhancementId,
+                value => value.RemainingUses, StringComparer.Ordinal);
             var castsByProvider = new Dictionary<string, int>(StringComparer.Ordinal);
             var materials = snapshot.Providers.Where(p => p.MaterialComponent != null)
                 .GroupBy(p => p.MaterialComponent.ItemGuid, StringComparer.Ordinal)
@@ -89,10 +98,12 @@ namespace KingmakerBuffPlanner.Planning
                     eligibleAbilities.Contains(o.Provider.Key.Ability.Canonical)).ToList();
                 if (request.Source.Grouping == CastGroupingKind.MassConfiguredTargets)
                     PlanMass(request, pending, sourceOptions, selectionPolicy, ledger, castsByProvider,
-                        poolKinds, materials, steps, outcomes, diagnostics);
+                        poolKinds, materials, enhancementById, enhancementRemaining,
+                        steps, outcomes, diagnostics);
                 else
                     PlanPerTarget(request, pending, sourceOptions, selectionPolicy, ledger, castsByProvider,
-                        poolKinds, materials, steps, outcomes, diagnostics);
+                        poolKinds, materials, enhancementById, enhancementRemaining,
+                        steps, outcomes, diagnostics);
             }
             return new CastPlan(steps, outcomes, diagnostics);
         }
@@ -106,6 +117,8 @@ namespace KingmakerBuffPlanner.Planning
             Dictionary<string, int> castsByProvider,
             Dictionary<string, ResourcePoolKind> poolKinds,
             Dictionary<string, int> materials,
+            IDictionary<string, CastEnhancementSnapshot> enhancements,
+            IDictionary<string, int?> enhancementRemaining,
             List<CastStep> steps,
             List<TargetPlanOutcome> outcomes,
             List<string> diagnostics)
@@ -114,13 +127,16 @@ namespace KingmakerBuffPlanner.Planning
             foreach (string targetId in remaining.ToArray())
             {
                 Selection selection = SelectAndReserve(options, policy, ledger, castsByProvider,
-                    poolKinds, materials, new[] { targetId }, remaining);
+                    poolKinds, materials, request.EnhancementIds, enhancements, enhancementRemaining,
+                    new[] { targetId }, remaining);
                 if (selection == null)
                 {
+                    string failure = request.EnhancementIds.Count == 0
+                        ? "no-valid-provider-or-resource" : "requested-enhancement-unavailable";
                     outcomes.Add(Unfulfilled(request.Source.SourceId, targetId,
-                        request.Source.SourceId + ":no-valid-provider-or-resource"));
+                        request.Source.SourceId + ":" + failure));
                     diagnostics.Add("unfulfilled:" + request.Source.SourceId + ":" +
-                        targetId + ":no-valid-provider-or-resource");
+                        targetId + ":" + failure);
                     remaining.Remove(targetId);
                     continue;
                 }
@@ -129,7 +145,7 @@ namespace KingmakerBuffPlanner.Planning
                 steps.Add(new CastStep(request.Source.SourceId, selection.Option.Provider.Key,
                     selection.Anchor, new[] { targetId }, recipients,
                     selection.Reservation, selection.MaterialReservation,
-                    request.Source.Effects, false));
+                    request.Source.Effects, false, request.EnhancementIds));
                 outcomes.Add(new TargetPlanOutcome(request.Source.SourceId, targetId,
                     TargetOutcomeKind.Fulfilled,
                     request.Source.SourceId + ":planned", new string[0]));
@@ -146,6 +162,8 @@ namespace KingmakerBuffPlanner.Planning
             Dictionary<string, int> castsByProvider,
             Dictionary<string, ResourcePoolKind> poolKinds,
             Dictionary<string, int> materials,
+            IDictionary<string, CastEnhancementSnapshot> enhancements,
+            IDictionary<string, int?> enhancementRemaining,
             List<CastStep> steps,
             List<TargetPlanOutcome> outcomes,
             List<string> diagnostics)
@@ -154,13 +172,18 @@ namespace KingmakerBuffPlanner.Planning
             while (remaining.Count != 0)
             {
                 Selection selection = SelectAndReserve(options, policy, ledger, castsByProvider,
-                    poolKinds, materials, remaining, remaining);
+                    poolKinds, materials, request.EnhancementIds, enhancements, enhancementRemaining,
+                    remaining, remaining);
                 if (selection == null)
                 {
                     foreach (string targetId in remaining)
                         outcomes.Add(Unfulfilled(request.Source.SourceId, targetId,
-                            request.Source.SourceId + ":no-valid-mass-provider-or-resource"));
+                            request.Source.SourceId + (request.EnhancementIds.Count == 0
+                                ? ":no-valid-mass-provider-or-resource"
+                                : ":requested-enhancement-unavailable")));
                     diagnostics.Add("unfulfilled-mass-targets:" + request.Source.SourceId + ":" +
+                        (request.EnhancementIds.Count == 0 ? "provider-or-resource:" :
+                            "requested-enhancement-unavailable:") +
                         string.Join(",", remaining.ToArray()));
                     break;
                 }
@@ -171,7 +194,7 @@ namespace KingmakerBuffPlanner.Planning
                 steps.Add(new CastStep(request.Source.SourceId, selection.Option.Provider.Key,
                     selection.Anchor, covered, recipients, selection.Reservation,
                     selection.MaterialReservation,
-                    request.Source.Effects, true));
+                    request.Source.Effects, true, request.EnhancementIds));
                 foreach (string targetId in covered)
                 {
                     outcomes.Add(new TargetPlanOutcome(request.Source.SourceId, targetId,
@@ -189,6 +212,9 @@ namespace KingmakerBuffPlanner.Planning
             Dictionary<string, int> castsByProvider,
             Dictionary<string, ResourcePoolKind> poolKinds,
             Dictionary<string, int> materials,
+            IReadOnlyList<string> requestedEnhancementIds,
+            IDictionary<string, CastEnhancementSnapshot> enhancements,
+            IDictionary<string, int?> enhancementRemaining,
             IEnumerable<string> requiredTargets,
             IEnumerable<string> allRemainingTargets)
         {
@@ -197,6 +223,8 @@ namespace KingmakerBuffPlanner.Planning
             IEnumerable<ProviderPlanningOption> candidates = sourceOptions.Where(option =>
                 !policy.BannedProviderKeys.Contains(option.Provider.Key.Canonical) &&
                 HasMaterial(option.Provider, materials) &&
+                EnhancementsAvailable(option.Provider, requestedEnhancementIds,
+                    enhancements, enhancementRemaining) &&
                 option.LegalAnchorIds.Count != 0 &&
                 required.Any(id => option.ReachableTargetIds.Contains(id)) &&
                 IsUnderCap(option.Provider.Key.Canonical, policy, castsByProvider));
@@ -213,6 +241,7 @@ namespace KingmakerBuffPlanner.Planning
                 string reason;
                 if (!ledger.TryReserve(option.Provider, out reservation, out reason)) continue;
                 MaterialReservation materialReservation = ReserveMaterial(option.Provider, materials);
+                ReserveEnhancements(requestedEnhancementIds, enhancementRemaining);
                 string key = option.Provider.Key.Canonical;
                 castsByProvider[key] = castsByProvider.ContainsKey(key) ? castsByProvider[key] + 1 : 1;
                 string anchor = option.LegalAnchorIds.Contains(option.Provider.Key.CasterUnitId)
@@ -221,6 +250,37 @@ namespace KingmakerBuffPlanner.Planning
                 return new Selection(option, anchor, reservation, materialReservation);
             }
             return null;
+        }
+
+        private static bool EnhancementsAvailable(
+            ProviderSnapshot provider,
+            IReadOnlyList<string> requestedIds,
+            IDictionary<string, CastEnhancementSnapshot> enhancements,
+            IDictionary<string, int?> remaining)
+        {
+            if (requestedIds == null || requestedIds.Count == 0) return true;
+            var selected = new List<CastEnhancementSnapshot>();
+            foreach (string id in requestedIds)
+            {
+                CastEnhancementSnapshot enhancement;
+                int? uses;
+                if (!enhancements.TryGetValue(id, out enhancement) ||
+                    !remaining.TryGetValue(id, out uses) || uses == 0 ||
+                    !enhancement.IsApplicable(provider)) return false;
+                selected.Add(enhancement);
+            }
+            return CastEnhancementSnapshot.AreCompatible(selected);
+        }
+
+        private static void ReserveEnhancements(
+            IEnumerable<string> requestedIds,
+            IDictionary<string, int?> remaining)
+        {
+            foreach (string id in requestedIds ?? new string[0])
+            {
+                int? uses = remaining[id];
+                if (uses != null) remaining[id] = uses.Value - 1;
+            }
         }
 
         private static int Priority(ProviderPlanningOption option, ProviderSelectionPolicy policy)

@@ -37,7 +37,8 @@ namespace KingmakerBuffPlanner.Planning
             PartyProviderSnapshot snapshot,
             ActiveEffectSnapshot activeEffects,
             IDictionary<string, EffectExpression> effectsBySource,
-            IEnumerable<ProviderPlanningOption> providerOptions)
+            IEnumerable<ProviderPlanningOption> providerOptions,
+            IEnumerable<CastEnhancementSnapshot> enhancements = null)
         {
             if (profile == null) throw new ArgumentNullException("profile");
             if (snapshot == null) throw new ArgumentNullException("snapshot");
@@ -68,12 +69,12 @@ namespace KingmakerBuffPlanner.Planning
                 requests.Add(new BuffCastRequest(
                     new BuffSourceDefinition(assignment.SourceId, abilities, expression, grouping),
                     assignment.WantedTargetUnitIds, assignment.ExistingEffectPolicy,
-                    assignment.IgnoredPresenceMarkers));
+                    assignment.IgnoredPresenceMarkers, assignment.SelectedEnhancementIds));
                 abilitiesBySource[assignment.SourceId] = abilities;
             }
             ProviderSelectionPolicy policy = BuildPolicy(profile.ProviderPreferences);
             CastPlan plan = new CastPlanner().PlanRoutine(snapshot, requests,
-                optionList, policy, activeEffects);
+                optionList, policy, activeEffects, enhancements);
             var fallbackProviderAbilities = new HashSet<string>(optionList
                 .Where(o => o.RequiresAnimatedExecution)
                 .Select(o => o.Provider.Key.Ability.Canonical), StringComparer.Ordinal);
