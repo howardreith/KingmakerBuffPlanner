@@ -130,6 +130,11 @@ namespace KingmakerBuffPlanner.Tests
                 Run("screen-state-machine-is-idempotent", TestScreenStateMachine);
                 Run("ui-readiness-is-deferred-across-frames", TestDeferredUiReadiness);
                 Run("hud-install-discovery-is-invalidated-not-frame-polled", TestHudInstallInvalidation);
+                Run("hud-retryable-readiness-retries-at-bounded-cadence", TestHudRetryableReadiness);
+                Run("hud-provisional-expiry-rearms-without-host-transition", TestHudCandidateExpiry);
+                Run("hud-stale-hosting-chain-invalidates-installed-state", TestHudHostingChainStaleness);
+                Run("hud-stable-states-do-not-repeat-discovery", TestHudStablePerformance);
+                Run("hud-lifecycle-transitions-suspend-and-resume", TestHudLifecycleTransitions);
                 Run("quick-execution-instruments-and-presents-empty-group", TestQuickExecutionFlow);
                 Run("animated-executor-validates-before-queue-and-reports", TestAnimatedExecutor);
                 Run("instant-executor-revalidates-batches-and-reports", TestInstantExecutor);
@@ -2253,25 +2258,287 @@ namespace KingmakerBuffPlanner.Tests
         {
             var gate = new HudInstallInvalidationGate();
             for (int frame = 0; frame < 240; frame++)
-                if (gate.ObserveHost(0, false))
+                if (Dispatches(gate, 0, false))
                     throw new InvalidOperationException("Absent campaign HUD triggered discovery.");
             if (!gate.IsRequested || gate.AttemptCount != 0)
                 throw new InvalidOperationException("Initial invalidation was consumed without a HUD host.");
-            if (!gate.ObserveHost(101, true) || gate.AttemptCount != 1)
+            if (!Dispatches(gate, 101, true) || gate.AttemptCount != 1)
                 throw new InvalidOperationException("HUD appearance did not trigger one discovery.");
+            gate.RecordAttemptResult(HudInstallAttemptResult.AlreadyInstalled);
             for (int frame = 0; frame < 240; frame++)
-                if (gate.ObserveHost(101, true))
+                if (Dispatches(gate, 101, true))
                     throw new InvalidOperationException("Unchanged HUD retriggered discovery.");
-            gate.Request();
-            if (!gate.ObserveHost(101, true) || gate.ObserveHost(101, true) ||
+            gate.Request("planner-hotkey");
+            if (!Dispatches(gate, 101, true))
+                throw new InvalidOperationException("Hotkey invalidation did not dispatch.");
+            gate.RecordAttemptResult(HudInstallAttemptResult.AlreadyInstalled);
+            if (Dispatches(gate, 101, true) ||
                 gate.AttemptCount != 2)
                 throw new InvalidOperationException("Lifecycle invalidation was not consumed exactly once.");
-            if (gate.ObserveHost(101, false) || !gate.ObserveHost(101, true) ||
+            if (Dispatches(gate, 101, false) || !Dispatches(gate, 101, true) ||
                 gate.AttemptCount != 3)
                 throw new InvalidOperationException("HUD reactivation did not trigger exactly one discovery.");
-            if (!gate.ObserveHost(202, true) || gate.ObserveHost(202, true) ||
+            gate.RecordAttemptResult(HudInstallAttemptResult.AlreadyInstalled);
+            if (!Dispatches(gate, 202, true))
+                throw new InvalidOperationException("HUD replacement did not trigger discovery.");
+            gate.RecordAttemptResult(HudInstallAttemptResult.AlreadyInstalled);
+            if (Dispatches(gate, 202, true) ||
                 gate.AttemptCount != 4)
                 throw new InvalidOperationException("HUD replacement did not trigger exactly one discovery.");
+        }
+
+        private static void TestHudRetryableReadiness()
+        {
+            var gate = new HudInstallInvalidationGate(4);
+            int scopedDiscoveries = 0;
+            int globalSearches = 0;
+            for (int frame = 0; frame < 400; frame++)
+                if (Dispatches(gate, 0, false)) scopedDiscoveries++;
+            if (scopedDiscoveries != 0 || gate.AttemptCount != 0)
+                throw new InvalidOperationException("No-HUD frames dispatched hierarchy discovery.");
+
+            if (!Dispatches(gate, 41, true))
+                throw new InvalidOperationException("Active HUD did not dispatch initial readiness attempt.");
+            scopedDiscoveries++;
+            gate.RecordAttemptResult(HudInstallAttemptResult.RetryableNotReady);
+            if (!gate.IsRetryScheduled || gate.RetryFramesRemaining != 4 ||
+                gate.State != HudInstallationState.RetryPending)
+                throw new InvalidOperationException("Retryable readiness did not arm bounded retry.");
+            for (int frame = 0; frame < 4; frame++)
+                if (Dispatches(gate, 41, true))
+                    throw new InvalidOperationException("Readiness retry ignored its bounded cadence.");
+            if (!Dispatches(gate, 41, true))
+                throw new InvalidOperationException("Readiness retry did not dispatch on the later frame.");
+            scopedDiscoveries++;
+            gate.RecordAttemptResult(HudInstallAttemptResult.CandidateCreated);
+            gate.RecordCandidateResult(HudCandidateTickResult.Pending);
+            for (int frame = 0; frame < 300; frame++)
+                if (Dispatches(gate, 41, true))
+                    throw new InvalidOperationException("Live candidate retriggered discovery.");
+            gate.RecordCandidateResult(HudCandidateTickResult.Installed);
+            if (gate.State != HudInstallationState.Installed || scopedDiscoveries != 2 ||
+                gate.AttemptCount != 2 || gate.RetryArmCount != 1 ||
+                gate.RetryDispatchCount != 1 || globalSearches != 0)
+                throw new InvalidOperationException("Retryable readiness did not converge without global search.");
+        }
+
+        private static void TestHudCandidateExpiry()
+        {
+            var gate = new HudInstallInvalidationGate(4);
+            var validation = new HudCandidateValidationGate(120);
+            if (!Dispatches(gate, 51, true))
+                throw new InvalidOperationException("Candidate test did not receive its initial dispatch.");
+            gate.RecordAttemptResult(HudInstallAttemptResult.CandidateCreated);
+            for (int frame = 1; frame < validation.MaximumFailureFrames; frame++)
+            {
+                HudCandidateTickResult result = validation.RecordValidation(false);
+                if (result != HudCandidateTickResult.Pending)
+                    throw new InvalidOperationException("Candidate expired before its allowed validation period.");
+                gate.RecordCandidateResult(result);
+                if (Dispatches(gate, 51, true))
+                    throw new InvalidOperationException("Live provisional candidate was recreated.");
+            }
+            HudCandidateTickResult expiry = validation.RecordValidation(false);
+            if (expiry != HudCandidateTickResult.Expired ||
+                validation.FailureFrames != validation.MaximumFailureFrames)
+                throw new InvalidOperationException("Candidate did not report its exact expiry transition.");
+            gate.RecordCandidateResult(expiry);
+            if (!gate.IsRequested || !gate.IsRetryScheduled ||
+                gate.State != HudInstallationState.CandidateExpired ||
+                gate.HostTransitionCount != 1)
+                throw new InvalidOperationException("Candidate expiry did not re-arm the unchanged host.");
+            for (int frame = 0; frame < 4; frame++)
+                if (Dispatches(gate, 51, true))
+                    throw new InvalidOperationException("Expired candidate retried before settling delay.");
+            if (!Dispatches(gate, 51, true))
+                throw new InvalidOperationException("Expired candidate did not retry without a host transition.");
+            gate.RecordAttemptResult(HudInstallAttemptResult.CandidateCreated);
+            gate.RecordCandidateResult(HudCandidateTickResult.Installed);
+            if (gate.State != HudInstallationState.Installed || gate.AttemptCount != 2 ||
+                gate.RetryArmCount != 1 || gate.RetryDispatchCount != 1 ||
+                gate.HostTransitionCount != 1)
+                throw new InvalidOperationException("Replacement candidate did not install on the same HUD.");
+        }
+
+        private static void TestHudHostingChainStaleness()
+        {
+            string failure;
+            if (!HudHostingChainValidator.IsViable(HostingChain(), out failure) || failure.Length != 0)
+                throw new InvalidOperationException("A complete live hosting chain was rejected: " + failure);
+            AssertHostingFailure(HostingChain(ownedRootExists: false), "owned-root-missing");
+            AssertHostingFailure(HostingChain(rootHasParent: false), "owned-root-parent-missing");
+            AssertHostingFailure(HostingChain(rootActive: false), "owned-root-inactive");
+            AssertHostingFailure(HostingChain(anchorExists: false), "anchor-controller-missing");
+            AssertHostingFailure(HostingChain(anchorActive: false), "anchor-controller-inactive");
+            AssertHostingFailure(HostingChain(nativeClusterExists: false), "native-cluster-missing");
+            AssertHostingFailure(HostingChain(nativeClusterActive: false), "native-cluster-inactive");
+            AssertHostingFailure(HostingChain(activeHudExists: false), "active-hud-missing");
+            AssertHostingFailure(HostingChain(activeHudActive: false), "active-hud-inactive");
+            AssertHostingFailure(HostingChain(rootParentIsNativeCluster: false), "owned-root-reparented");
+            AssertHostingFailure(HostingChain(anchorBelongsToActiveHud: false), "anchor-outside-active-hud");
+            AssertHostingFailure(HostingChain(nativeClusterBelongsToActiveHud: false), "native-cluster-outside-active-hud");
+            AssertHostingFailure(HostingChain(rootBelongsToActiveHud: false), "owned-root-outside-active-hud");
+            AssertHostingFailure(HostingChain(nativeRaycasterActive: false), "native-raycaster-inactive");
+
+            var gate = new HudInstallInvalidationGate(3);
+            if (!Dispatches(gate, 61, true))
+                throw new InvalidOperationException("Installed-anchor test did not dispatch.");
+            gate.RecordAttemptResult(HudInstallAttemptResult.CandidateCreated);
+            gate.RecordCandidateResult(HudCandidateTickResult.Installed);
+            bool isInstalled = HudHostingChainValidator.IsViable(HostingChain(), out failure);
+            int ownedRootDisposals = 0;
+            int nativeUiDisposals = 0;
+            if (HudHostingChainValidator.IsViable(HostingChain(anchorActive: false), out failure))
+                throw new InvalidOperationException("Inactive inner anchor remained installed.");
+            isInstalled = false;
+            ownedRootDisposals++;
+            gate.RecordCandidateResult(HudCandidateTickResult.Stale);
+            if (isInstalled || ownedRootDisposals != 1 || nativeUiDisposals != 0 ||
+                gate.State != HudInstallationState.StaleAnchor || !gate.IsRetryScheduled)
+                throw new InvalidOperationException("Stale anchor cleanup crossed ownership or lost retryability.");
+            for (int frame = 0; frame < 3; frame++)
+                if (Dispatches(gate, 61, true))
+                    throw new InvalidOperationException("Stale anchor retried before bounded delay.");
+            if (!Dispatches(gate, 61, true))
+                throw new InvalidOperationException("Stale anchor did not request the current hierarchy.");
+        }
+
+        private static void TestHudStablePerformance()
+        {
+            var absent = new HudInstallInvalidationGate(30);
+            for (int frame = 0; frame < 1000; frame++)
+                if (Dispatches(absent, 0, false))
+                    throw new InvalidOperationException("Absent HUD performed discovery.");
+            if (absent.AttemptCount != 0)
+                throw new InvalidOperationException("Absent HUD accumulated attempts.");
+
+            var installed = new HudInstallInvalidationGate(30);
+            if (!Dispatches(installed, 71, true))
+                throw new InvalidOperationException("Stable installed fixture did not initialize.");
+            installed.RecordAttemptResult(HudInstallAttemptResult.CandidateCreated);
+            installed.RecordCandidateResult(HudCandidateTickResult.Installed);
+            for (int frame = 0; frame < 1000; frame++)
+                if (Dispatches(installed, 71, true))
+                    throw new InvalidOperationException("Stable installed HUD rediscovered its hierarchy.");
+            if (installed.AttemptCount != 1)
+                throw new InvalidOperationException("Stable installed HUD accumulated attempts.");
+
+            var provisional = new HudInstallInvalidationGate(30);
+            if (!Dispatches(provisional, 72, true))
+                throw new InvalidOperationException("Provisional fixture did not initialize.");
+            provisional.RecordAttemptResult(HudInstallAttemptResult.CandidateCreated);
+            for (int frame = 0; frame < 500; frame++)
+            {
+                provisional.RecordCandidateResult(HudCandidateTickResult.Pending);
+                if (Dispatches(provisional, 72, true))
+                    throw new InvalidOperationException("Live provisional candidate was recreated.");
+            }
+            if (provisional.AttemptCount != 1)
+                throw new InvalidOperationException("Provisional candidate accumulated attempts.");
+
+            var retrying = new HudInstallInvalidationGate(30);
+            int readinessAttempts = 0;
+            if (Dispatches(retrying, 73, true))
+            {
+                readinessAttempts++;
+                retrying.RecordAttemptResult(HudInstallAttemptResult.RetryableNotReady);
+            }
+            for (int frame = 0; frame < 600; frame++)
+                if (Dispatches(retrying, 73, true))
+                {
+                    readinessAttempts++;
+                    retrying.RecordAttemptResult(HudInstallAttemptResult.RetryableNotReady);
+                }
+            if (readinessAttempts < 2 || readinessAttempts > 21 ||
+                readinessAttempts != retrying.AttemptCount)
+                throw new InvalidOperationException("Temporary readiness retries were not bounded: " +
+                    readinessAttempts);
+        }
+
+        private static void TestHudLifecycleTransitions()
+        {
+            var gate = new HudInstallInvalidationGate(3);
+            if (Dispatches(gate, 0, false) || !Dispatches(gate, 81, true))
+                throw new InvalidOperationException("HUD absent-to-active transition failed.");
+            gate.RecordAttemptResult(HudInstallAttemptResult.AlreadyInstalled);
+            if (Dispatches(gate, 81, false) || gate.State != HudInstallationState.NoHud ||
+                !Dispatches(gate, 81, true))
+                throw new InvalidOperationException("HUD active/inactive/reactivation transition failed.");
+            gate.RecordAttemptResult(HudInstallAttemptResult.AlreadyInstalled);
+            if (!Dispatches(gate, 82, true))
+                throw new InvalidOperationException("HUD identity replacement did not dispatch.");
+            gate.RecordAttemptResult(HudInstallAttemptResult.AlreadyInstalled);
+
+            if (!gate.Suspend("OnAreaBeginUnloading") ||
+                gate.State != HudInstallationState.Suspended)
+                throw new InvalidOperationException("Area unload did not suspend installation.");
+            int beforeSuspendedFrames = gate.AttemptCount;
+            if (Dispatches(gate, 82, false) || Dispatches(gate, 83, true) ||
+                gate.AttemptCount != beforeSuspendedFrames)
+                throw new InvalidOperationException("Suspended unload observed or dispatched a transient HUD.");
+            if (!gate.ResumeAndRequest("OnAreaDidLoad") || !Dispatches(gate, 83, true))
+                throw new InvalidOperationException("Area load did not resume installation.");
+            gate.RecordAttemptResult(HudInstallAttemptResult.AlreadyInstalled);
+
+            gate.Suspend("mod-disabled");
+            if (Dispatches(gate, 83, true))
+                throw new InvalidOperationException("Disabled mod dispatched installation.");
+            gate.ResumeAndRequest("mod-enabled");
+            if (!Dispatches(gate, 83, true))
+                throw new InvalidOperationException("Re-enabled mod did not dispatch installation.");
+            gate.RecordAttemptResult(HudInstallAttemptResult.AlreadyInstalled);
+
+            gate.Request("planner-hotkey");
+            if (!Dispatches(gate, 83, true))
+                throw new InvalidOperationException("Hotkey did not re-arm an unchanged active host.");
+            gate.RecordAttemptResult(HudInstallAttemptResult.AlreadyInstalled);
+            if (Dispatches(gate, 83, true) || gate.IsRequested ||
+                gate.State != HudInstallationState.Installed)
+                throw new InvalidOperationException("Hotkey invalidation was not consumed exactly once.");
+        }
+
+        private static bool Dispatches(
+            HudInstallInvalidationGate gate,
+            int hostIdentity,
+            bool hostActive)
+        {
+            return gate.ObserveHost(hostIdentity, hostActive) ==
+                HudInstallDispatchDecision.Dispatch;
+        }
+
+        private static HudHostingChainSnapshot HostingChain(
+            bool ownedRootExists = true,
+            bool rootHasParent = true,
+            bool rootActive = true,
+            bool anchorExists = true,
+            bool anchorActive = true,
+            bool nativeClusterExists = true,
+            bool nativeClusterActive = true,
+            bool activeHudExists = true,
+            bool activeHudActive = true,
+            bool rootParentIsNativeCluster = true,
+            bool anchorBelongsToActiveHud = true,
+            bool nativeClusterBelongsToActiveHud = true,
+            bool rootBelongsToActiveHud = true,
+            bool nativeRaycasterActive = true)
+        {
+            return new HudHostingChainSnapshot(
+                ownedRootExists, rootHasParent, rootActive, anchorExists, anchorActive,
+                nativeClusterExists, nativeClusterActive, activeHudExists, activeHudActive,
+                rootParentIsNativeCluster, anchorBelongsToActiveHud,
+                nativeClusterBelongsToActiveHud, rootBelongsToActiveHud,
+                nativeRaycasterActive);
+        }
+
+        private static void AssertHostingFailure(
+            HudHostingChainSnapshot snapshot,
+            string expectedFailure)
+        {
+            string actualFailure;
+            if (HudHostingChainValidator.IsViable(snapshot, out actualFailure) ||
+                actualFailure != expectedFailure)
+                throw new InvalidOperationException("Hosting chain failure mismatch: expected=" +
+                    expectedFailure + " actual=" + actualFailure);
         }
 
         private static void TestValidPerformanceRequest(string root)

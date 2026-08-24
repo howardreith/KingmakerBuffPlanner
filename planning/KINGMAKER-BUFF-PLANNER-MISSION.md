@@ -1,5 +1,33 @@
 # CODEX AUTONOMOUS MISSION
 
+## 2026-08-24 0.0.12 HUD lifecycle hotfix checkpoint
+
+Branch `codex/kbp-hud-lifecycle-hotfix-0.0.12` started clean from fetched
+`origin/main` commit `4a83aec19e0f6098e23b2965b3992c328136c576` at version 0.0.11.
+The regression is the lost outcome between one-shot invalidation and provisional
+candidate validation; the current 0.0.11 log also proves a candidate could be
+created after unload cancellation against a transient HUD. The 0.0.12 source uses
+typed outcomes, 30-active-frame bounded retry, unload/disable suspension, expiry
+feedback, and current-host liveness without restoring a global search. Current
+gates pass 34/34 source, 91/91 behavior/protocol, 8/8 filesystem, 4/4 package,
+5/5 deployment WhatIf, and 1/1 aggregate. Exact source
+`083dfbfcf651d44bb01b302ccbbabac823e236e9` passes deterministic packaging 2/2;
+ZIP/DLL/MVID are `eabb4785be75129cbc6cffcab030afc9e4afac32957fb7b82af2c16b0e0ac72a` /
+`6db3693e0ba38b3672bd0eac36b06df6e5965de29a3e78f9b97513c6accfe9e1` /
+`920b3246-e7f7-4818-92f4-e54294ef2db0`. Guarded performance passes 9/9 at
+88.780 average FPS with zero searches and exact restoration; native and Call of
+the Wild pass 12/12 and 26/26. Exact authorized save inventory is baseline=0 and
+working=0, so campaign HUD survival, clicks, transitions, cutscene/world-map, and
+installed-state log evidence remain blocked rather than inferred. Explicitly
+authorized guarded install `hud-lifecycle-0.0.12-human-test-install-20260824`
+completed with exact identity, settings preservation, and all other mods verified.
+The owner then accepted the campaign repair. Log SHA-256
+`6fec850ea76a8cf43983b20cf58a50cf84b98ef1b064181d052fadf54b055548`
+proves the same candidate moved from loading-screen-blocked Pending to Installed
+after 57 validation frames with four buttons/listeners and successful Setup.
+Merge to default `main`, tag `v0.0.12`, and a new release are explicitly
+authorized; published 0.0.11 must not be overwritten.
+
 ## 2026-08-23 0.0.11 release completion checkpoint
 
 The owner accepted the performance repair in human runtime testing. A release-blocking test EXE popup was reproduced as an uncaught access failure during pre-test fixture creation, corrected in `f6bbe648e0311e8b0022ec9810b533fc66cc6502`, and regressed through direct and full release workflows without new crash events. Current-main integration/tag commit is `3661f5c31a1060bca67758c2369b2ef361a339c9`; published ZIP is `89cbebd2a1eb594d2307c4388c19588e1d4ea9c845284d36081c3e72d492795c`; release is `https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.0.11`. Exact published bytes are guarded-installed. Version 0.0.10 remains immutable.

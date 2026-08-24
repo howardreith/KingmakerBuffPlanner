@@ -1,5 +1,16 @@
 # Autonomous Resume
 
+## 0.0.12 HUD lifecycle hotfix - 2026-08-24
+
+- Dedicated branch `codex/kbp-hud-lifecycle-hotfix-0.0.12` started clean from fetched `origin/main` commit `4a83aec19e0f6098e23b2965b3992c328136c576`, version 0.0.11. The focused implementation/test commit is `376e4a1` and the working version sources are 0.0.12.
+- Root cause is confirmed: 0.0.11 consumed one install invalidation before a Boolean attempt could distinguish retryable readiness from candidate creation, while 120-frame candidate expiry could not notify or re-arm the unchanged outer-HUD coordinator. Installed liveness also omitted the inner hosting chain.
+- The repair uses typed attempt/candidate/lifecycle states, one retry per 30 active-HUD frames, explicit unload/disable suspension, candidate-expiry and stale-anchor feedback, complete held-reference hosting-chain validation, and scoped `GetComponentInChildren<IngameMenuController>(true)` discovery only. Deferred placement/glyph/raycast validation remains intact.
+- Exact qualified artifact source `083dfbfcf651d44bb01b302ccbbabac823e236e9` passes source 34/34, protocol 91/91, runtime filesystem 8/8, package 4/4, deployment WhatIf 5/5, aggregate 1/1, warning-free Release compilation 1/1, and deterministic release 2/2. ZIP/DLL/MVID are `eabb4785be75129cbc6cffcab030afc9e4afac32957fb7b82af2c16b0e0ac72a` / `6db3693e0ba38b3672bd0eac36b06df6e5965de29a3e78f9b97513c6accfe9e1` / `920b3246-e7f7-4818-92f4-e54294ef2db0`.
+- Guarded performance run `hud-lifecycle-0.0.12-performance-1` passes 9/9 at 88.780 average FPS, all 18 moving samples at 90.710-90.896 FPS, zero HUD searches/absent-HUD dispatches, and exact restoration. Native 12/12 and Call of the Wild 26/26 pass and restore. The unchanged repeat honestly rejected a 49.810 FPS non-moving startup bucket while every moving sample remained at least 88.940 FPS.
+- Explicitly authorized guarded install `hud-lifecycle-0.0.12-human-test-install-20260824` is `Installed`; exact DLL/MVID match, `otherModsVerified=true`, `settingsPreserved=true`, no process/lock remains, and install-result SHA-256 is `e1b42a8287718a2ee8aba625e6155cf9ba404e56efcf109bb16abf4798595f84`.
+- Exact authorized save audit remains `Disposable save ambiguity: baseline=0; working=0`, but the owner tested the guarded-installed build in a campaign and accepted the fix. Log SHA-256 `6fec850ea76a8cf43983b20cf58a50cf84b98ef1b064181d052fadf54b055548` proves the same candidate progressed from loading-screen-blocked Pending to Installed after 57 validation frames with four buttons/listeners, then Setup opened successfully.
+- The owner explicitly authorized merge to default `main` and publication of new version 0.0.12, incremented from published 0.0.11. Exact next action: finalize release records, merge, run publisher gates, push main/tag, and create the new release without altering 0.0.11.
+
 ## 0.0.11 published completion - 2026-08-23
 
 - No work remains for the bounded crash/release mission. Human runtime acceptance confirms the severe movement regression is gone; the test-process crash is corrected in `f6bbe648e0311e8b0022ec9810b533fc66cc6502` and integrated at release/tag commit `3661f5c31a1060bca67758c2369b2ef361a339c9`.

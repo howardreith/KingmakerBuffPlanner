@@ -1,5 +1,41 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-08-24 - 0.0.12 human acceptance and release authorization
+
+Status: HUMAN CAMPAIGN PASS; MERGE/TAG/NEW RELEASE AUTHORIZED
+
+- Owner verdict: `This fix is acceptable.` The owner explicitly authorized commit finalization, merge to the repository default branch, remote main push, and a new incremented release.
+- GitHub reports default branch `main`, private repository `howardreith/KingmakerBuffPlanner`, authenticated account `howardreith`, and no existing `v0.0.12` release or tag. Published version is 0.0.11, so the prepared 0.0.12 is the required increment and must not overwrite 0.0.11.
+- Accepted log `%USERPROFILE%\AppData\LocalLow\Owlcat Games\Pathfinder Kingmaker\output_log.txt`: 595,152 bytes, last write `2026-08-24T14:43:01.9133622-04:00`, SHA-256 `6fec850ea76a8cf43983b20cf58a50cf84b98ef1b064181d052fadf54b055548`.
+- Lifecycle evidence: unload suspended discovery; area scenes loaded dispatched once; candidate `-485022` was created once; loading screen temporarily owned the raycast; `OnAreaLoadingComplete` returned `CandidatePending` for that same candidate; it then reached `Installed` after 57 validation frames with four buttons/four listeners. Setup passed both presentation phases and opened. No KBP exception exists; the nearby null reference belongs to Owlcat `BugReportCanvas.OnEnable` before KBP's first update.
+- Exact evidence and bounded log excerpt: `planning/HUD-LIFECYCLE-0.0.12-HUMAN-ACCEPTANCE.md`.
+- Exact next action: finalize release-ready docs, rerun source/deterministic/publisher gates, merge the hotfix into `main`, guarded-push `main`, and publish new tag/release/assets `v0.0.12` without modifying `v0.0.11`.
+
+## 2026-08-24 - 0.0.12 guarded local installation for human testing
+
+Status: INSTALLED; IDENTITY/OTHER-MOD/SETTINGS GUARDS PASS; HUMAN CAMPAIGN TEST NEXT
+
+- Installation was explicitly authorized from clean branch `codex/kbp-hud-lifecycle-hotfix-0.0.12` at HEAD `2cb7edd8760cadbd80635d5a3280449ae4ea6528`. Kingmaker process count and deployment-lock state were both zero/false.
+- `Test-InstallWhatIf.ps1` passed package 4/4 and install purity 5/5. `Install-Local.ps1 -ReleaseManifestPath .\artifacts\release\0.0.12\release-manifest.json -InstallId hud-lifecycle-0.0.12-human-test-install-20260824 -ExpectedPriorVersion 0.0.11 -Confirm:$false` then replaced only the exact validated 0.0.11 planner.
+- Installed identity is version 0.0.12, DLL SHA-256 `6db3693e0ba38b3672bd0eac36b06df6e5965de29a3e78f9b97513c6accfe9e1`, MVID `920b3246-e7f7-4818-92f4-e54294ef2db0`, from package `eabb4785be75129cbc6cffcab030afc9e4afac32957fb7b82af2c16b0e0ac72a` and artifact source `083dfbfcf651d44bb01b302ccbbabac823e236e9`.
+- Evidence: `C:\Dev\KingmakerBuffPlannerLab\runtime-evidence\install-hud-lifecycle-0.0.12-human-test-install-20260824\install-result.json`, SHA-256 `e1b42a8287718a2ee8aba625e6155cf9ba404e56efcf109bb16abf4798595f84`. Result is `Installed`; `otherModsVerified=true`; `settingsPreserved=true`; failure is null. The exact prior planner is preserved under the transaction-owned backup path.
+- Post-install audit: installed Info/DLL/MVID are exact; repository worktree is clean; Kingmaker process count is zero; deployment lock is absent. No merge, tag, or release publication occurred.
+- Remaining uncertainty is the intended human campaign verdict: load an existing campaign, wait beyond the former expiry window, exercise all four controls/hotkey/transition, and report the `[KBP-BOOT]` lifecycle evidence. Exact next action is the 0.0.12 checklist at the top of `docs/MANUAL-ACCEPTANCE.md`.
+
+## 2026-08-24 - 0.0.12 HUD lifecycle hotfix engineering handoff
+
+Status: SOURCE/DETERMINISTIC/PERFORMANCE/NATIVE/OPTIONAL PASS; CAMPAIGN HUD ROWS BLOCKED BY ABSENT AUTHORIZED SAVE PAIR; LOCAL-ONLY
+
+- Branch `codex/kbp-hud-lifecycle-hotfix-0.0.12` started clean from fetched `origin/main` commit `4a83aec19e0f6098e23b2965b3992c328136c576`, version 0.0.11. Implementation/test commit is `376e4a153753ae45fd2daad447790b4bd2c31590`; exact qualified artifact source is `083dfbfcf651d44bb01b302ccbbabac823e236e9`, version 0.0.12.
+- Root cause confirmed: the 0.0.11 gate consumed its one install request before an ambiguous Boolean result could report retryable inner readiness or provisional-candidate state. A later 120-frame candidate expiry was private to the controller, so an unchanged outer HUD never re-armed. Installed liveness checked only the owned root reference. The available 0.0.11 log additionally proves candidate construction could occur after unload cancellation against a transient HUD.
+- Repair: typed attempt/candidate/lifecycle outcomes; one retry per 30 active-HUD frames; no retry while HUD absent, candidate live, or installation stable; unload/disable suspension; expiry/staleness feedback; complete held-reference hosting-chain validation; owned-only disposal; scoped `hudHost.GetComponentInChildren<IngameMenuController>(true)` discovery. Placement, alignment, glyph, and raycast validation remain.
+- Exact `Test-SourceOnly.ps1`: source 34/34, protocol 91/91, filesystem 8/8, package 4/4, deployment WhatIf 5/5, aggregate 1/1. Exact `Build-Release.ps1`: 3/3, deterministic 2/2. Installer WhatIf passes 5/5 against installed 0.0.11; guarded-push WhatIf passes 6/6.
+- Artifact ZIP/DLL/MVID: `eabb4785be75129cbc6cffcab030afc9e4afac32957fb7b82af2c16b0e0ac72a` / `6db3693e0ba38b3672bd0eac36b06df6e5965de29a3e78f9b97513c6accfe9e1` / `920b3246-e7f7-4818-92f4-e54294ef2db0`.
+- `hud-lifecycle-0.0.12-performance-1` passes 9/9 at 50.493/88.780/90.896 FPS; all 18 moving samples are 90.710-90.896 FPS; global HUD searches and absent-HUD install dispatches are zero; steady `UiRoot.Tick` cost is 2.715 microseconds/frame; restoration is exact. Repeat `performance-2` is retained as 8/9 because only the first non-moving startup bucket was 49.810 FPS; all moving samples were at least 88.940 FPS, searches stayed zero, restoration passed, and no threshold changed.
+- `hud-lifecycle-0.0.12-native-1` passes 12/12; `hud-lifecycle-0.0.12-cotw-1` passes 26/26 with 2,096 optional inclusions and zero unsupported/overlap; both restore exactly. `ui-contract-1` honestly fails its main-menu campaign-UI precondition after 600 frames and restores.
+- Save audit is exactly `Disposable save ambiguity: baseline=0; working=0.` No unrelated automation/personal save was used. Existing/new campaign load, row survival, clicks, setup/hotkey, transition, cutscene, world-map, native-control isolation, and final `Installed` log evidence remain blocked. Human steps are in `docs/MANUAL-ACCEPTANCE.md`.
+- Exact next action: commit this evidence record, rerun the source-only gate, guarded-push the dedicated branch, and hand off the blocked campaign checklist. Do not merge, install, tag, or publish.
+
 ## 2026-08-23 - 0.0.11 crash investigation, merge, install, and publication
 
 Status: COMPLETE; HUMAN PERFORMANCE PASS; TEST CRASH FIXED; PUBLISHED
@@ -697,3 +733,12 @@ Status: ROOT CAUSE PROVEN; 0.0.4 SOURCE PASS; LIVE QUALIFICATION PENDING
 - Metamagic rods use the native MetamagicRodMechanics activatable/buff path. Planner code does not synthesize duration or manually spend charges.
 - Verification at 2026-08-20 00:17:33 -04:00: Test-SourceOnly PASS; source 32/32, protocol 80/80, runtime harness filesystem 8/8, package 4/4, deployment WhatIf 5/5.
 - Runtime game scenario: not performed; no guarded KBP_AUTOMATION_WORKING launch was established during this issue.
+# 0.0.12 HUD lifecycle hotfix intake — 2026-08-24
+
+- Branch/HEAD/version: `codex/kbp-hud-lifecycle-hotfix-0.0.12` / `4a83aec19e0f6098e23b2965b3992c328136c576` / 0.0.11; fetched `origin/main` is the same commit; starting worktree was clean.
+- Commands: `git fetch origin main --tags --prune`; `git diff v0.0.10..v0.0.11 -- ...`; scoped source/disposal searches; recent Kingmaker and UMM log inventory. No validation suite has run yet, so pass/fail counts are pending.
+- Root cause confirmed: one-shot invalidation consumes retryable readiness and provisional-candidate outcomes; 120-frame candidate disposal cannot re-arm the unchanged outer host; installed liveness ignores the inner hosting chain.
+- Additional log evidence: current `output_log.txt` lines 3342-3392 show unload cancellation followed by candidate creation against a transient loading HUD and repeated validation failures. No candidate-expiry line or post-disappearance hotkey attempt exists in the available log.
+- Rejected: reverting scoped discovery, restoring a global search, deleting deferred validation, or attributing the defect to non-UI systems.
+- Uncertainty: fresh campaign qualification depends on an exact authorized `KBP_AUTOMATION_BASELINE` / `KBP_AUTOMATION_WORKING` pair; fixture availability will be re-audited after deterministic repair.
+- Exact next action: implement explicit install/candidate outcomes, suspended unload state, bounded retry, and hosting-chain liveness; then add deterministic tests.

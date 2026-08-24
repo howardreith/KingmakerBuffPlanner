@@ -1,5 +1,45 @@
 # Manual Acceptance
 
+## 0.0.12 HUD lifecycle hotfix gate
+
+Status: PASS. The owner accepted the guarded-installed 0.0.12 repair on
+2026-08-24. The accepted log proves a loading-screen-blocked candidate remained
+pending and then installed as four buttons/four listeners after 57 validation
+frames; Setup presentation also validated and opened. Exact evidence is in
+`planning/HUD-LIFECYCLE-0.0.12-HUMAN-ACCEPTANCE.md`.
+
+The authorized save inventory remains baseline=0 and working=0, so the guarded
+harness did not independently execute the campaign checklist. The checklist is
+retained for future regression testing; do not substitute another automation
+save.
+
+1. Start a fresh process and load an existing campaign. Watch the lower-left
+   Setup/Long/Important/Short row from first appearance through full HUD settlement
+   and for at least 10 seconds—materially longer than the former 120-frame window.
+   Record the final `[KBP-BOOT]` snapshot and confirm `hudState=Installed`.
+2. Start or enter a new campaign area where practical. Repeat the settlement wait
+   and verify exactly four controls remain visible and clickable.
+3. Click all four controls. Setup must open the planner; Long/Important/Short must
+   report their real configured result. No click may activate a native button
+   underneath, and native lower-left controls must still work independently.
+4. Open and close Setup through both its HUD button and Ctrl+Shift+B. After closing,
+   camera, selection, game mode, and native input must be restored.
+5. Perform an area transition. During unload no candidate should be created; after
+   load, the row should create once, validate, and remain installed. Capture host,
+   anchor, candidate, dispatch, and retry identities from the transition log.
+6. Exercise a reproducible opening-camera or cutscene segment, world-map
+   presentation, and settled gameplay. Compare with the accepted 0.0.11 behavior:
+   there must be no severe approximately 11–17 FPS ceiling, no continuous
+   absent-HUD discovery, and no continuous stable-installed discovery.
+7. If a candidate expires or an inner anchor becomes stale, confirm the log reports
+   `Expired` or `Stale`, a bounded retry re-arm, a later candidate creation, and
+   final `Installed` without an outer-HUD identity change.
+
+Report game area/save category, screen resolution, UI scale, configured FPS cap,
+wait duration, relevant `[KBP-BOOT]` lines, and full-resolution evidence for any
+future failure. The owner separately authorized merge, tag, and publication of
+0.0.12 after this acceptance.
+
 ## 0.0.11 performance-repair completion gate
 
 Status: PASS. The repository owner confirmed through human runtime testing that the severe approximately 16 FPS regression is gone. The checklist below records the accepted coverage and remains useful for later compatibility retesting:

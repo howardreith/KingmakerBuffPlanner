@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.0.12 - HUD lifecycle retry repair
+
+- Replaces the ambiguous Boolean HUD installation result with explicit attempt,
+  candidate-validation, and lifecycle states.
+- Retries temporarily unavailable inner HUD controls at one bounded attempt per
+  30 active-HUD frames without polling while the campaign HUD is absent.
+- Reports provisional-candidate expiry to the owner, waits for the HUD to settle,
+  and recreates the four controls without requiring an outer-HUD identity change.
+- Detects inactive, detached, reparented, or replaced owned roots, inner anchors,
+  native clusters, active HUD hosts, and raycasters before treating installation
+  as live.
+- Suspends host-triggered discovery during area unload and mod disable, preventing
+  candidates from being created against transient loading HUDs.
+- Preserves deferred placement, alignment, glyph, and raycast validation and keeps
+  discovery scoped beneath `StaticCanvas.HUDController`; no global Unity search
+  was restored.
+- Adds transition-level diagnostics and deterministic retry, expiry, staleness,
+  lifecycle, and steady-state performance regression coverage.
+
+The owner accepted the guarded-installed campaign repair on 2026-08-24 and
+authorized a new `v0.0.12` release. Version 0.0.11 remains immutable and is not
+overwritten.
+
 ## 0.0.11 - Runtime performance repair
 
 - Stops polling the entire Unity object graph every frame when the campaign HUD is absent.

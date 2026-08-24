@@ -10,8 +10,8 @@
 
 1. Exit Kingmaker.
 2. Extract the release ZIP into Kingmaker's `Mods` directory. The resulting path must be `Mods\KingmakerBuffPlanner\Info.json`.
-3. Start Kingmaker through Steam in the normal way and confirm Unity Mod Manager lists `KingmakerBuffPlanner` version 0.0.3 once.
-4. Load a campaign. Use the lower-left setup icon; F10 is the fallback open/close shortcut.
+3. Start Kingmaker through Steam in the normal way and confirm Unity Mod Manager lists `KingmakerBuffPlanner` version 0.0.12 once.
+4. Load a campaign. Use the lower-left setup icon; Ctrl+Shift+B is the fallback open/close shortcut.
 
 Do not copy game DLLs, Harmony, Unity Mod Manager, Call of the Wild, or another mod into the Kingmaker Buff Planner folder.
 

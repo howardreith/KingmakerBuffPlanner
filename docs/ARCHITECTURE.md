@@ -4,6 +4,40 @@
 
 Production runtime requests remain confined to the guarded external `RuntimeTestProtocol.EvidenceRoot`. Protocol unit tests inject a distinct unique directory beneath the operating-system temp root and separately test that the production root rejects those paths. The console entry point owns resolver registration and fixture disposal through completion; it prints PASS only after cleanup. Infrastructure setup failures are reported to stderr with exit 2, so they cannot escape as unhandled CLR exceptions or masquerade as successful tests.
 
+## 0.0.12 retryable HUD lifecycle
+
+`HudInstallInvalidationGate` now coordinates explicit `HudInstallAttemptResult`,
+`HudCandidateTickResult`, and `HudInstallationState` values. Host appearance,
+reactivation, replacement, lifecycle callbacks, enable, and the planner hotkey can
+request an attempt. A temporarily unready inner HUD, expired candidate, or stale
+hosting chain schedules at most one retry per 30 active-HUD frames. An absent
+outer HUD, a live provisional candidate, and a stable installation dispatch no
+hierarchy discovery on unchanged frames.
+
+Area unload and mod disable place the coordinator in `Suspended`, so observing a
+still-active or transient outer HUD cannot undo cancellation. Area load or enable
+explicitly resumes it. Candidate expiry and staleness are returned to
+`BuffPlannerUiRoot`; they are no longer private self-destruction events that can
+consume the only request.
+
+`BuffPlannerHudButtonController` receives the already-observed active
+`UISectionHUDController` and resolves `IngameMenuController` only below it. Its
+steady-state liveness check uses held references: the owned root must exist, have
+the native cluster as parent, be active, and remain under the active HUD; the
+inner anchor and cluster must exist, remain active, and belong to that HUD; and
+the native raycaster must remain active. This constant-time reference validation
+does not reacquire the hierarchy. A failure destroys only the owned
+`KingmakerBuffPlanner.HudButtons` tree and re-arms scoped discovery.
+
+The two-frame readiness delay and 120-frame placement, left-alignment,
+glyph-centering, and top-raycast ownership validation remain unchanged in
+meaning. Validation failures are logged at bounded milestones with the exact
+first failing predicate. Lifecycle snapshots expose no-HUD, retry, candidate,
+installed, expired, stale, and suspended states plus identities and counters.
+
+The intake proof is in
+`planning/HUD-LIFECYCLE-REGRESSION-ROOT-CAUSE.md`.
+
 ## 0.0.11 invalidation-driven HUD lifecycle
 
 The UMM composition root remains frame-driven because it must poll the configured hotkey and advance active execution/UI state. Native HUD discovery is no longer frame-driven. `BuffPlannerUiRoot` holds a `HudInstallInvalidationGate` and observes only the exact `StaticCanvas.HUDController` identity and active state. Enable, planner-hotkey, area-loaded, scenes-loaded, loading-complete, area-activated, host replacement, and host reactivation mark discovery dirty; unloading cancels it. An unchanged or absent host never consumes/repeats the pending request.

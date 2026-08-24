@@ -1,5 +1,117 @@
 # Qualification
 
+## 0.0.12 HUD lifecycle hotfix
+
+Status: SOURCE/BEHAVIOR/DETERMINISTIC PACKAGE/PERFORMANCE/NATIVE/OPTIONAL PASS;
+GUARDED-INSTALLED HUMAN CAMPAIGN PASS; RELEASE AUTHORIZED. SAVE-BACKED
+AUTOMATION REMAINS UNAVAILABLE BECAUSE THE AUTHORIZED FIXTURES ARE ABSENT.
+
+- Start: clean fetched `origin/main` at
+  `4a83aec19e0f6098e23b2965b3992c328136c576`, version 0.0.11; branch
+  `codex/kbp-hud-lifecycle-hotfix-0.0.12`.
+- Baseline before production changes: source 32/32, behavior/protocol 86/86,
+  runtime filesystem 8/8, package 4/4, deployment WhatIf 5/5, aggregate 1/1.
+- Exact qualified source is `083dfbfcf651d44bb01b302ccbbabac823e236e9`.
+  `Test-SourceOnly.ps1` passes source 34/34, behavior/protocol 91/91,
+  runtime filesystem 8/8, package 4/4, deployment WhatIf 5/5, and aggregate
+  1/1. Release compilation is warning-free.
+- `Build-Release.ps1` passes 3/3 with two deterministic builds. The accepted
+  pre-integration package is SHA-256
+  `eabb4785be75129cbc6cffcab030afc9e4afac32957fb7b82af2c16b0e0ac72a`;
+  DLL SHA-256 is
+  `6db3693e0ba38b3672bd0eac36b06df6e5965de29a3e78f9b97513c6accfe9e1`;
+  MVID is `920b3246-e7f7-4818-92f4-e54294ef2db0`.
+- The guarded installer wrapper's historical `0.0.2` prior-version argument
+  correctly failed against the installed published 0.0.11 identity without
+  mutation. After updating it to the exact prior release, installer WhatIf
+  passes 5/5. Guarded-push WhatIf passes 6/6 on the requested branch; only that
+  exact branch was added to the external helper allowlist.
+- Regression coverage proves absent-HUD zero dispatch, same-host bounded readiness
+  retry, live-candidate zero recreation, exact 120-frame expiry notification and
+  re-arm, same-host replacement installation, stable-installed zero rediscovery,
+  all required stale-chain predicates, active/inactive/replaced hosts, unload/load,
+  disable/re-enable, and planner-hotkey invalidation.
+- Source validation rejects global `FindObjectOfType<IngameMenuController>` and
+  `Resources.FindObjectsOfTypeAll` in the HUD path, requires the scoped
+  `hudHost.GetComponentInChildren<IngameMenuController>(true)` lookup, and rejects
+  native host/anchor/cluster destruction.
+- Intake log evidence is bounded: current 0.0.11 `output_log.txt` lines 3342-3392
+  show unload cancellation followed by transient candidate creation and repeated
+  validation failure. That process ended before expiry and contains no
+  post-disappearance hotkey attempt, so button survival is not claimed from it.
+
+Guarded runtime results against the exact qualified artifact:
+
+- `hud-lifecycle-0.0.12-performance-1` passes 9/9: 1,777 frames over
+  20.016 seconds; 50.493/88.780/90.896 minimum/average/maximum FPS; all 18
+  moving-camera samples are 90.710-90.896 FPS; zero HUD object searches; zero
+  HUD-install dispatches while the campaign HUD is absent; and exact
+  restoration. Steady samples spend 4.686 ms in `UiRoot.Tick` over 1,726 frames,
+  or 2.715 microseconds per frame. Profile SHA-256 is
+  `05f9194c31ba07f9d6b19e0b0bb002234f2022be55065cd61b2cb55501913e3a`.
+- Unchanged repetition `hud-lifecycle-0.0.12-performance-2` is retained as an
+  8/9 threshold failure: the first non-moving startup bucket measured 49.810
+  FPS against the unchanged 50 FPS threshold. All 18 moving samples were
+  88.940-90.886 FPS, average was 88.642 FPS, discovery and install dispatches
+  remained zero, and restoration verified. No threshold was weakened. Profile
+  SHA-256 is
+  `5527a7a8f1e2021bc343292dbd6891d01131419571e6828e4ded3d8361fead98`.
+- `hud-lifecycle-0.0.12-native-1` passes 12/12 with 1,722 abilities, 974
+  candidates, 952 detected effects, zero scanner exceptions, zero KBP Harmony
+  overlap, catalog SHA-256
+  `aa3e4e966c0edc3132444335362dcfcf97307451d783eb915ed4c0b126df76fb`,
+  and exact restoration.
+- `hud-lifecycle-0.0.12-cotw-1` passes 26/26 with 9,064 abilities, 5,907
+  candidates, 2,096 optional inclusions, zero optional unsupported candidates,
+  zero KBP Harmony overlap, catalog SHA-256
+  `a4e5d2206225dc5ad9dcf54e9b7a46bb0d8f5dcb58d1d617dd3534e1872356b9`,
+  and exact restoration.
+- `hud-lifecycle-0.0.12-ui-contract-1` is a preserved 4/5 precondition failure:
+  after 600 no-save main-menu frames, no campaign native UI contract was ready.
+  It loaded the exact 0.0.12 identity and restored exactly, but it is not a HUD
+  qualification pass.
+
+Evidence is under `C:\Dev\KingmakerBuffPlannerLab\runtime-evidence\<run-id>`.
+Runtime-result SHA-256 values for performance-1, performance-2, native, Call of
+the Wild, and UI-contract are respectively
+`27017ba0e4b03d9670428b493843bb1749f7dc45fc0086246f7064a30abee645`,
+`4069aa18accbccdbbd1030803d1309284b77a0c1743ec2cb29babb4ecc648da0`,
+`c0d5da78c32f8fc9ab3fc5cb48817066acca9fe51e64f80487ad03b2127aecd2`,
+`c9b244e37138490b50059b3e84d84280c1e6e2b0131c0bbcfb7de4ba15793fc4`,
+and `3d075b99bc5b5c04f3302f780a2cafc4c06d1c0ddce59a6f94a4eb47d13cf41e`.
+Native/Call-of-the-Wild Harmony inventory SHA-256 values are
+`28074625d02aed66d8ebdcd6b2321b444321db636712cb7042d018ccc30b55e4`
+and `5631e630366ed72758547397ee03db6cbd9ed5fcbccdab5fdaf50ef6921bf0e4`.
+
+The guarded save resolver reports exactly `Disposable save ambiguity:
+baseline=0; working=0.` Those guarded save-backed automation rows remain
+unavailable, and no unrelated save was substituted. The owner instead tested
+the exact guarded-installed build in a campaign and accepted the fix. The fresh
+log proves unloading suspension, one candidate creation, a temporary loading-
+screen raycast failure, the same candidate remaining pending, and final
+`Installed` state after 57 validation frames with four buttons and four
+listeners. Setup then passed both presentation phases and opened successfully.
+The full log SHA-256 is
+`6fec850ea76a8cf43983b20cf58a50cf84b98ef1b064181d052fadf54b055548`;
+the bounded excerpt and interpretation are in
+`planning/HUD-LIFECYCLE-0.0.12-HUMAN-ACCEPTANCE.md`. No Buff Planner exception
+appears. This human verdict satisfies the release gate without mislabeling the
+unavailable save-backed automation as executed.
+
+Every automated runtime transaction is `Restored` with
+`restorationVerified=true`; no game process or deployment lock remains.
+
+After explicit human authorization, guarded install
+`hud-lifecycle-0.0.12-human-test-install-20260824` replaced only the verified
+published 0.0.11 planner. Installed DLL/MVID match the local-only release above;
+`otherModsVerified=true`, `settingsPreserved=true`, and failure is null. Install
+result SHA-256 is
+`e1b42a8287718a2ee8aba625e6155cf9ba404e56efcf109bb16abf4798595f84`.
+No process or deployment lock remains. On 2026-08-24 the owner stated that the
+fix is acceptable and explicitly authorized merge to the default branch and a
+new incremented release. The public version before this action is 0.0.11, so the
+prepared new version is 0.0.12; 0.0.11 is not overwritten.
+
 ## 0.0.11 published crash and release qualification
 
 Status: PASS; HUMAN PERFORMANCE ACCEPTED; TEST PROCESS NORMAL; EXACT RELEASE PUBLISHED AND INSTALLED.

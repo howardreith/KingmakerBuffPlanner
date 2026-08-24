@@ -43,12 +43,17 @@ namespace KingmakerBuffPlanner.UI
         private bool _runtimePausedBefore;
         private bool _runtimeSelectionDisabledBefore;
         private GameModeType _runtimeModeBefore;
+        private bool _runtimeReconstructionPending;
         private IDisposable _eventSubscription;
         private bool _disposed;
         private readonly HudInstallInvalidationGate _hudInstallGate =
             new HudInstallInvalidationGate();
         private int _tickCount;
         private int _lifecycleSignalCount;
+        private int _lastLoggedHudIdentity = int.MinValue;
+        private bool _lastLoggedHudActive;
+        private int _hudInstallExceptionCount;
+        private int _hudTickExceptionCount;
 
         public int Priority { get { return 400; } }
 
@@ -67,10 +72,10 @@ namespace KingmakerBuffPlanner.UI
         {
             if (_instance == null) return;
             _instance._enabled = enabled;
-            if (enabled) _instance._hudInstallGate.Request();
+            if (enabled) _instance.RequestHudInstall("mod-enabled", true);
             else
             {
-                _instance._hudInstallGate.Cancel();
+                _instance.SuspendHudInstall("mod-disabled");
                 _instance.ReleasePlayerUi();
             }
         }
@@ -89,7 +94,7 @@ namespace KingmakerBuffPlanner.UI
             {
                 return;
             }
-            _instance._hudInstallGate.Request();
+            _instance.RequestHudInstall("planner-hotkey", false);
             if (_instance._screen.LifecycleState != PlannerScreenLifecycleState.Closed)
             {
                 _instance._screen.Close();
@@ -121,6 +126,11 @@ namespace KingmakerBuffPlanner.UI
             get { return _instance != null && _instance._screen != null && _instance._screen.IsOpen; }
         }
 
+        internal static bool IsRuntimeReconstructionPending
+        {
+            get { return _instance != null && _instance._runtimeReconstructionPending; }
+        }
+
         internal static string GetSnapshot()
         {
             if (_instance == null) return "controller=absent;plannerHotkey=polling-owned-by-Main";
@@ -138,9 +148,30 @@ namespace KingmakerBuffPlanner.UI
                 ";hudInstalled=" + (root._hud != null && root._hud.IsInstalled) +
                 ";hudCandidate=" + (root._hud == null ? 0 : root._hud.RootInstanceId) +
                 ";hudAttempts=" + (root._hud == null ? 0 : root._hud.InstallAttempts) +
+                ";hudCandidateCreates=" + (root._hud == null ? 0 : root._hud.CandidateCreateCount) +
+                ";hudState=" + root._hudInstallGate.State +
                 ";hudInstallRequested=" + root._hudInstallGate.IsRequested +
+                ";hudRetryScheduled=" + root._hudInstallGate.IsRetryScheduled +
+                ";hudRetryFrames=" + root._hudInstallGate.RetryFramesRemaining +
                 ";hudInstallInvalidations=" + root._hudInstallGate.RequestCount +
                 ";hudInstallDispatches=" + root._hudInstallGate.AttemptCount +
+                ";hudRetryRearms=" + root._hudInstallGate.RetryArmCount +
+                ";hudRetryDispatches=" + root._hudInstallGate.RetryDispatchCount +
+                ";hudHostIdentity=" + root._hudInstallGate.HostIdentity +
+                ";hudHostActive=" + root._hudInstallGate.HostActive +
+                ";hudAttemptResult=" + root._hudInstallGate.LastAttemptResult +
+                ";hudCandidateResult=" + root._hudInstallGate.LastCandidateResult +
+                ";hudTransition=" + root._hudInstallGate.LastTransition +
+                ";hudAnchorIdentity=" + (root._hud == null ? 0 : root._hud.AnchorInstanceId) +
+                ";hudNativeClusterIdentity=" + (root._hud == null ? 0 : root._hud.NativeClusterInstanceId) +
+                ";hudRootActive=" + (root._hud != null && root._hud.RootActive) +
+                ";hudAnchorActive=" + (root._hud != null && root._hud.AnchorActive) +
+                ";hudNativeClusterActive=" + (root._hud != null && root._hud.NativeClusterActive) +
+                ";hudHostingFailure=" + (root._hud == null ? "controller-null" : root._hud.HostingChainFailure) +
+                ";hudValidationFailures=" + (root._hud == null ? 0 : root._hud.CandidateValidationFailures) +
+                ";hudLastValidationFailure=" + (root._hud == null ? "controller-null" : root._hud.LastValidationFailure) +
+                ";hudInstallExceptions=" + root._hudInstallExceptionCount +
+                ";hudTickExceptions=" + root._hudTickExceptionCount +
                 ";hudFailure=" + (root._hud == null ? "controller-null" : root._hud.LastFailure) +
                 ";screenState=" + (root._screen == null ? "controller-null" : root._screen.LifecycleState.ToString()) +
                 ";screenFailure=" + (root._screen == null ? "controller-null" : root._screen.LastFailure) +
@@ -188,9 +219,8 @@ namespace KingmakerBuffPlanner.UI
             _instance._runtimePausedBefore = pausedBefore;
             _instance._runtimeSelectionDisabledBefore = selectionDisabledBefore;
             _instance._runtimeModeBefore = modeBefore;
-            if (!_instance._hud.TryInstall() || !_instance._hud.DispatchRuntimeClick("long"))
-                throw new InvalidOperationException("Runtime Long HUD click could not be dispatched.");
-            BeginRuntimeSmoke();
+            _instance._runtimeReconstructionPending = true;
+            _instance.RequestHudInstall("runtime-root-reconstruction", false);
         }
 
         internal static void CloseRuntimeSmoke()
@@ -577,25 +607,48 @@ namespace KingmakerBuffPlanner.UI
                 UISectionHUDController hudHost = canvas == null ? null : canvas.HUDController;
                 int hudHostIdentity = hudHost == null ? 0 : hudHost.GetInstanceID();
                 bool hudHostActive = hudHost != null && hudHost.gameObject.activeInHierarchy;
-                bool installInvalidated = _hudInstallGate.ObserveHost(
+                LogHudHostTransition(hudHostIdentity, hudHostActive);
+                HudInstallDispatchDecision installDecision = _hudInstallGate.ObserveHost(
                     hudHostIdentity, hudHostActive);
-                if (installInvalidated && !RuntimePerformanceDiagnostics.SuppressHudDiscovery)
+                if (installDecision == HudInstallDispatchDecision.Dispatch)
+                    _log.Info("[KBP-BOOT] HUD installation dispatch requested;reason=" +
+                        _hudInstallGate.LastTransition + ";dispatch=" +
+                        _hudInstallGate.AttemptCount + ";retryDispatch=" +
+                        _hudInstallGate.RetryDispatchCount + ";hud=" +
+                        hudHostIdentity + ";active=" + hudHostActive + ".");
+                if (installDecision == HudInstallDispatchDecision.Dispatch &&
+                    !RuntimePerformanceDiagnostics.SuppressHudDiscovery)
                 {
-                    long installStartedAt = RuntimePerformanceDiagnostics.BeginOperation();
-                    try { _hud.TryInstall(); }
-                    finally
-                    {
-                        RuntimePerformanceDiagnostics.RecordOperation(
-                            RuntimePerformanceOperation.HudInstall, installStartedAt);
-                    }
+                    DispatchHudInstall(hudHost);
                 }
                 long hudTickStartedAt = RuntimePerformanceDiagnostics.BeginOperation();
-                try { _hud.Tick(); }
+                try
+                {
+                    HudCandidateTickResult candidateResult = _hud.Tick(hudHost);
+                    ObserveHudCandidateResult(candidateResult);
+                }
+                catch (Exception exception)
+                {
+                    _hudTickExceptionCount++;
+                    _log.Error("[KBP-BOOT] HUD candidate tick failed;owned UI will be " +
+                        "disposed and retry re-armed.", exception);
+                    try
+                    {
+                        _hud.RecoverFromFault("candidate-tick-exception");
+                    }
+                    catch (Exception cleanupException)
+                    {
+                        _log.Error("[KBP-BOOT] HUD owned-UI fault cleanup also failed;" +
+                            "retry remains re-armed.", cleanupException);
+                    }
+                    ObserveHudCandidateResult(HudCandidateTickResult.Stale);
+                }
                 finally
                 {
                     RuntimePerformanceDiagnostics.RecordOperation(
                         RuntimePerformanceOperation.HudTick, hudTickStartedAt);
                 }
+                CompleteRuntimeReconstructionWhenReady();
                 if (_screen.IsOpen) _runtimeObservedFrames++;
             }
             catch (Exception exception)
@@ -608,6 +661,96 @@ namespace KingmakerBuffPlanner.UI
                 RuntimePerformanceDiagnostics.RecordOperation(
                     RuntimePerformanceOperation.UiRootTick, rootStartedAt);
             }
+        }
+
+        private void DispatchHudInstall(UISectionHUDController hudHost)
+        {
+            long installStartedAt = RuntimePerformanceDiagnostics.BeginOperation();
+            HudInstallAttemptResult result;
+            try
+            {
+                result = _hud.TryInstall(hudHost);
+            }
+            catch (Exception exception)
+            {
+                _hudInstallExceptionCount++;
+                _log.Error("[KBP-BOOT] scoped HUD installation attempt failed;owned UI " +
+                    "will be disposed and bounded retry re-armed.", exception);
+                try
+                {
+                    _hud.RecoverFromFault("scoped-install-exception");
+                }
+                catch (Exception cleanupException)
+                {
+                    _log.Error("[KBP-BOOT] HUD owned-UI install cleanup also failed;" +
+                        "retry remains re-armed.", cleanupException);
+                }
+                result = HudInstallAttemptResult.RetryableNotReady;
+            }
+            finally
+            {
+                RuntimePerformanceDiagnostics.RecordOperation(
+                    RuntimePerformanceOperation.HudInstall, installStartedAt);
+            }
+            _hudInstallGate.RecordAttemptResult(result);
+            _log.Info("[KBP-BOOT] scoped HUD attempt result;result=" + result +
+                ";dispatch=" + _hudInstallGate.AttemptCount +
+                ";retryDispatch=" + _hudInstallGate.RetryDispatchCount +
+                ";hud=" + (hudHost == null ? 0 : hudHost.GetInstanceID()) +
+                ";anchor=" + _hud.AnchorInstanceId + ";candidate=" + _hud.RootInstanceId +
+                ";state=" + _hudInstallGate.State + ";failure=" + _hud.LastFailure + ".");
+            if (result == HudInstallAttemptResult.RetryableNotReady ||
+                result == HudInstallAttemptResult.StaleCandidateDisposed)
+                LogHudRetryRearmed("attempt-" + result);
+        }
+
+        private void ObserveHudCandidateResult(HudCandidateTickResult result)
+        {
+            if (result == HudCandidateTickResult.None) return;
+            HudCandidateTickResult previous = _hudInstallGate.LastCandidateResult;
+            _hudInstallGate.RecordCandidateResult(result);
+            if (result != HudCandidateTickResult.Pending || previous != result)
+                _log.Info("[KBP-BOOT] HUD candidate transition;result=" + result +
+                    ";candidate=" + _hud.RootInstanceId + ";anchor=" +
+                    _hud.AnchorInstanceId + ";state=" + _hudInstallGate.State +
+                    ";validationFrames=" + _hud.CandidateValidationFailures +
+                    ";lastValidationFailure=" + _hud.LastValidationFailure + ".");
+            if (result == HudCandidateTickResult.Expired ||
+                result == HudCandidateTickResult.Stale)
+                LogHudRetryRearmed("candidate-" + result);
+        }
+
+        private void LogHudHostTransition(int hudHostIdentity, bool hudHostActive)
+        {
+            if (hudHostIdentity == _lastLoggedHudIdentity &&
+                hudHostActive == _lastLoggedHudActive) return;
+            int previousIdentity = _lastLoggedHudIdentity == int.MinValue
+                ? 0 : _lastLoggedHudIdentity;
+            _lastLoggedHudIdentity = hudHostIdentity;
+            _lastLoggedHudActive = hudHostActive;
+            _log.Info("[KBP-BOOT] " + (hudHostActive
+                    ? "active HUD detected" : "active HUD unavailable") +
+                ";previous=" + previousIdentity +
+                ";current=" + hudHostIdentity + ";active=" + hudHostActive +
+                ";suspended=" + _hudInstallGate.IsSuspended + ".");
+        }
+
+        private void LogHudRetryRearmed(string reason)
+        {
+            _log.Info("[KBP-BOOT] HUD retry re-armed;reason=" + reason +
+                ";retryArm=" + _hudInstallGate.RetryArmCount +
+                ";retryAfterFrames=" + _hudInstallGate.RetryFramesRemaining +
+                ";hud=" + _hudInstallGate.HostIdentity +
+                ";active=" + _hudInstallGate.HostActive +
+                ";state=" + _hudInstallGate.State + ".");
+        }
+
+        private void CompleteRuntimeReconstructionWhenReady()
+        {
+            if (!_runtimeReconstructionPending || !_hud.IsInstalled) return;
+            if (!_hud.DispatchRuntimeClick("long")) return;
+            _runtimeReconstructionPending = false;
+            BeginRuntimeSmoke();
         }
 
         public void OnAreaBeginUnloading()
@@ -639,12 +782,37 @@ namespace KingmakerBuffPlanner.UI
         private void SignalLifecycle(string name, bool unloading)
         {
             _lifecycleSignalCount++;
-            if (unloading) _hudInstallGate.Cancel();
-            else _hudInstallGate.Request();
+            if (unloading || !_enabled) SuspendHudInstall(name);
+            else RequestHudInstall(name, true);
             _log.Info("[KBP-BOOT] lifecycle callback;name=" + name +
                 ";count=" + _lifecycleSignalCount + ";installRequested=" +
-                _hudInstallGate.IsRequested + ";mode=" +
+                _hudInstallGate.IsRequested + ";suspended=" +
+                _hudInstallGate.IsSuspended + ";state=" +
+                _hudInstallGate.State + ";mode=" +
                 (Game.Instance == null ? "game-null" : Game.Instance.CurrentMode.ToString()) + ".");
+        }
+
+        private void RequestHudInstall(string reason, bool resume)
+        {
+            bool requested = resume
+                ? _hudInstallGate.ResumeAndRequest(reason)
+                : _hudInstallGate.Request(reason);
+            if (!requested) return;
+            _log.Info("[KBP-BOOT] HUD installation dispatch requested;reason=" + reason +
+                ";request=" + _hudInstallGate.RequestCount +
+                ";hud=" + _hudInstallGate.HostIdentity +
+                ";active=" + _hudInstallGate.HostActive +
+                ";state=" + _hudInstallGate.State + ".");
+        }
+
+        private void SuspendHudInstall(string reason)
+        {
+            if (!_hudInstallGate.Suspend(reason)) return;
+            _runtimeReconstructionPending = false;
+            _log.Info("[KBP-BOOT] HUD installation suspended;reason=" + reason +
+                ";hud=" + _hudInstallGate.HostIdentity +
+                ";active=" + _hudInstallGate.HostActive +
+                ";state=" + _hudInstallGate.State + ".");
         }
 
         private void LogUiUnavailable(string reason)
@@ -669,6 +837,7 @@ namespace KingmakerBuffPlanner.UI
 
         private void OnDisable()
         {
+            SuspendHudInstall("ui-root-disabled");
             ReleasePlayerUi();
         }
 
