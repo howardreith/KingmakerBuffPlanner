@@ -22,18 +22,36 @@ namespace KingmakerBuffPlanner.Tests
     {
         private static int _passed;
         private static readonly List<string> Failures = new List<string>();
+        private static string _protocolEvidenceRoot;
 
         private static int Main()
         {
-            AppDomain.CurrentDomain.AssemblyResolve += ResolveInstalledAssembly;
-            string root = Path.Combine(
-                RuntimeTestProtocol.EvidenceRoot,
-                "source-only-protocol-" + Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(root);
             try
             {
+                return RunAll();
+            }
+            catch (Exception exception)
+            {
+                Console.Error.WriteLine("Test runner infrastructure failure: " + exception);
+                return 2;
+            }
+        }
+
+        private static int RunAll()
+        {
+            ResolveEventHandler resolver = ResolveInstalledAssembly;
+            AppDomain.CurrentDomain.AssemblyResolve += resolver;
+            string boundary = Path.Combine(
+                Path.GetTempPath(),
+                "KingmakerBuffPlanner.Tests-" + Guid.NewGuid().ToString("N"));
+            string root = Path.Combine(boundary, "source-only-protocol");
+            _protocolEvidenceRoot = boundary;
+            try
+            {
+                Directory.CreateDirectory(root);
                 Run("absent-activation-is-inert", TestAbsentActivation);
                 Run("valid-request-is-accepted", () => TestValidRequest(root));
+                Run("production-evidence-root-remains-guarded", () => TestProductionEvidenceRoot(root));
                 Run("valid-catalog-request-is-accepted", () => TestValidCatalogRequest(root));
                 Run("valid-call-of-the-wild-request-is-accepted", () => TestValidCallOfTheWildRequest(root));
                 Run("valid-human-reproduction-request-is-accepted", () => TestValidHumanReproductionRequest(root));
@@ -113,7 +131,9 @@ namespace KingmakerBuffPlanner.Tests
             }
             finally
             {
-                if (Directory.Exists(root)) Directory.Delete(root, true);
+                _protocolEvidenceRoot = null;
+                AppDomain.CurrentDomain.AssemblyResolve -= resolver;
+                if (Directory.Exists(boundary)) Directory.Delete(boundary, true);
             }
 
             Console.WriteLine("Protocol tests: PASS=" + _passed + " FAIL=" + Failures.Count);
@@ -1734,17 +1754,28 @@ namespace KingmakerBuffPlanner.Tests
         {
             string path = WriteRequest(root, "valid", null);
             string rejection;
-            RuntimeTestRequest request = RuntimeTestProtocol.TryRead(
+            RuntimeTestRequest request = ReadProtocol(
                 new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path }, out rejection);
             if (request == null || rejection.Length != 0 || request.RunId != "valid")
                 throw new InvalidOperationException("Valid request was rejected: " + rejection);
+        }
+
+        private static void TestProductionEvidenceRoot(string root)
+        {
+            string path = WriteRequest(root, "production-root-guard", null);
+            string rejection;
+            RuntimeTestRequest request = RuntimeTestProtocol.TryRead(
+                new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path }, out rejection);
+            if (request != null || rejection != "invalid-request:path-outside-root")
+                throw new InvalidOperationException(
+                    "Fixture root relaxed the production evidence boundary: " + rejection);
         }
 
         private static void TestValidCatalogRequest(string root)
         {
             string path = WriteRequest(root, "valid-catalog", o => o["scenario"] = "native-buff-catalog");
             string rejection;
-            RuntimeTestRequest request = RuntimeTestProtocol.TryRead(
+            RuntimeTestRequest request = ReadProtocol(
                 new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path }, out rejection);
             if (request == null || rejection.Length != 0 || request.Scenario != "native-buff-catalog")
                 throw new InvalidOperationException("Valid catalog request was rejected: " + rejection);
@@ -1774,7 +1805,7 @@ namespace KingmakerBuffPlanner.Tests
                 };
             });
             string rejection;
-            RuntimeTestRequest request = RuntimeTestProtocol.TryRead(
+            RuntimeTestRequest request = ReadProtocol(
                 new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path }, out rejection);
             if (request == null || rejection.Length != 0 || request.ProfileId != "call-of-the-wild" ||
                 request.ExpectedOptionalMods.Count != 1 || request.ExpectedBlueprintGuids.Count != 3)
@@ -1795,7 +1826,7 @@ namespace KingmakerBuffPlanner.Tests
                     }).ToArray();
             });
             string rejection;
-            RuntimeTestRequest request = RuntimeTestProtocol.TryRead(
+            RuntimeTestRequest request = ReadProtocol(
                 new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path }, out rejection);
             if (request == null || rejection.Length != 0 ||
                 request.ProfileId != "human-reproduction" || request.ExpectedOptionalMods.Count != 4)
@@ -1806,7 +1837,7 @@ namespace KingmakerBuffPlanner.Tests
         {
             string path = WriteRequest(root, "valid-ui", o => o["scenario"] = "ui-root-smoke");
             string rejection;
-            RuntimeTestRequest request = RuntimeTestProtocol.TryRead(
+            RuntimeTestRequest request = ReadProtocol(
                 new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path }, out rejection);
             if (request == null || rejection.Length != 0 || request.Scenario != "ui-root-smoke")
                 throw new InvalidOperationException("Valid UI request was rejected: " + rejection);
@@ -1831,7 +1862,7 @@ namespace KingmakerBuffPlanner.Tests
                 };
             });
             string rejection;
-            RuntimeTestRequest request = RuntimeTestProtocol.TryRead(
+            RuntimeTestRequest request = ReadProtocol(
                 new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path }, out rejection);
             if (request == null || rejection.Length != 0 ||
                 !RuntimeTestProtocol.IsLiveUiScenario(request.Scenario) ||
@@ -1845,7 +1876,7 @@ namespace KingmakerBuffPlanner.Tests
             string path = WriteRequest(root, "valid-ui-probe", o =>
                 o["scenario"] = "ui-native-contract-probe");
             string rejection;
-            RuntimeTestRequest request = RuntimeTestProtocol.TryRead(
+            RuntimeTestRequest request = ReadProtocol(
                 new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path }, out rejection);
             if (request == null || rejection.Length != 0 ||
                 !RuntimeTestProtocol.IsNativeUiProbeScenario(request.Scenario))
@@ -1856,7 +1887,7 @@ namespace KingmakerBuffPlanner.Tests
         {
             string path = WriteRequest(root, "valid-final-core", o => o["scenario"] = "final-no-save-core");
             string rejection;
-            RuntimeTestRequest request = RuntimeTestProtocol.TryRead(
+            RuntimeTestRequest request = ReadProtocol(
                 new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path }, out rejection);
             if (request == null || rejection.Length != 0 ||
                 !RuntimeTestProtocol.IsCatalogScenario(request.Scenario) ||
@@ -1902,7 +1933,7 @@ namespace KingmakerBuffPlanner.Tests
                 };
             });
             string rejection;
-            RuntimeTestRequest request = RuntimeTestProtocol.TryRead(
+            RuntimeTestRequest request = ReadProtocol(
                 new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path }, out rejection);
             if (request == null || rejection.Length != 0 ||
                 !RuntimeTestProtocol.IsPerformanceScenario(request.Scenario) ||
@@ -1984,8 +2015,15 @@ namespace KingmakerBuffPlanner.Tests
         private static void AssertRejected(string[] args)
         {
             string rejection;
-            if (RuntimeTestProtocol.TryRead(args, out rejection) != null || string.IsNullOrWhiteSpace(rejection))
+            if (ReadProtocol(args, out rejection) != null || string.IsNullOrWhiteSpace(rejection))
                 throw new InvalidOperationException("Invalid request was not rejected.");
+        }
+
+        private static RuntimeTestRequest ReadProtocol(string[] args, out string rejection)
+        {
+            if (string.IsNullOrWhiteSpace(_protocolEvidenceRoot))
+                throw new InvalidOperationException("Protocol fixture root is unavailable.");
+            return RuntimeTestProtocol.TryReadWithinRoot(args, _protocolEvidenceRoot, out rejection);
         }
 
         private static string WriteRequest(

@@ -13,6 +13,14 @@ namespace KingmakerBuffPlanner.RuntimeTesting
 
         internal static RuntimeTestRequest TryRead(string[] arguments, out string rejection)
         {
+            return TryReadWithinRoot(arguments, EvidenceRoot, out rejection);
+        }
+
+        internal static RuntimeTestRequest TryReadWithinRoot(
+            string[] arguments,
+            string evidenceRoot,
+            out string rejection)
+        {
             rejection = string.Empty;
             if (arguments == null) return null;
 
@@ -38,7 +46,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
 
             try
             {
-                string requestPath = RequireDescendant(arguments[flagIndex + 1], EvidenceRoot);
+                string requestPath = RequireDescendant(arguments[flagIndex + 1], evidenceRoot);
                 if (!File.Exists(requestPath)) throw new InvalidDataException("request-file-missing");
                 string json = File.ReadAllText(requestPath);
                 RejectDuplicateProperties(json);
@@ -48,7 +56,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     NullValueHandling = NullValueHandling.Include
                 };
                 RuntimeTestRequest request = JsonConvert.DeserializeObject<RuntimeTestRequest>(json, settings);
-                Validate(request, requestPath);
+                Validate(request, requestPath, evidenceRoot);
                 return request;
             }
             catch (Exception exception)
@@ -58,7 +66,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             }
         }
 
-        private static void Validate(RuntimeTestRequest request, string requestPath)
+        private static void Validate(
+            RuntimeTestRequest request,
+            string requestPath,
+            string evidenceRoot)
         {
             if (request == null) throw new InvalidDataException("request-null");
             if (request.SchemaVersion != 1) throw new InvalidDataException("schema-version");
@@ -98,7 +109,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 (request.ProfileId == "call-of-the-wild" && request.ExpectedBlueprintGuids.Count < 3))
                 throw new InvalidDataException("profile-blueprint-expectation");
 
-            string evidence = RequireDescendant(request.EvidenceDirectory, EvidenceRoot);
+            string evidence = RequireDescendant(request.EvidenceDirectory, evidenceRoot);
             if (!Directory.Exists(evidence)) throw new InvalidDataException("evidence-directory-missing");
             string requestDirectory = Path.GetDirectoryName(requestPath).TrimEnd('\\');
             if (!string.Equals(evidence, requestDirectory, StringComparison.OrdinalIgnoreCase))
