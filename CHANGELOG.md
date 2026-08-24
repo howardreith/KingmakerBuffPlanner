@@ -19,9 +19,10 @@
 - Adds transition-level diagnostics and deterministic retry, expiry, staleness,
   lifecycle, and steady-state performance regression coverage.
 
-The owner accepted the guarded-installed campaign repair on 2026-08-24 and
-authorized a new `v0.0.12` release. Version 0.0.11 remains immutable and is not
-overwritten.
+The owner accepted the guarded-installed campaign repair on 2026-08-24. Version
+0.0.12 is published from tag commit
+`a48bfae2185a50f1c50d9151666e0b5ce0a0bc3e`; version 0.0.11 remains a separate
+immutable release and was not overwritten.
 
 ## 0.0.11 - Runtime performance repair
 

@@ -60,6 +60,18 @@ missing human lifecycle proof, while unexecuted automation rows remain honestly
 unexecuted. Exact evidence is recorded in
 `planning/HUD-LIFECYCLE-0.0.12-HUMAN-ACCEPTANCE.md`.
 
+The accepted repair was merged and released from
+`a48bfae2185a50f1c50d9151666e0b5ce0a0bc3e` as `v0.0.12`. The guarded
+publisher repeated every source/package gate and two deterministic builds. The
+published ZIP SHA-256 is
+`1cbb2b215a78ab4dea2af5c99ebae211fe21e1f3532eb1865af3420a90ea8494`;
+the DLL SHA-256 and MVID are
+`1964b0220fd0ddd4a15009900a30ee3ec3af83c4d90b022eebb87d27cde03cac`
+and `3947e19e-fd3b-4b11-95d8-8a1b360cf9a4`. A fresh downloaded asset passes
+strict package validation and the exact published bytes are guarded-installed
+with settings and non-planner mods preserved. See
+`planning/HUD-LIFECYCLE-0.0.12-RELEASE.md`.
+
 ## 0.0.11 test-process crash correction and release
 
 The popup was not a production-mod failure or an orphan process. The source-only executable reused `RuntimeTestProtocol.EvidenceRoot` for disposable protocol fixtures, then called `Directory.CreateDirectory` before its test/cleanup exception boundary. A restricted direct launch therefore let `UnauthorizedAccessException` escape `Program.Main`, which Windows surfaced as CLR exception `0xe0434352`. The same exact binary passed when allowed to access that external root, and no asynchronous, child-process, finalizer, duplicate-binary, or stale-worktree path existed.

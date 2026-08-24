@@ -1,5 +1,15 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-08-24 - 0.0.12 published completion
+
+Status: PUBLISHED; DOWNLOADED ASSET VERIFIED; EXACT PUBLISHED BYTES INSTALLED
+
+- `main` integration and release commit: `a48bfae2185a50f1c50d9151666e0b5ce0a0bc3e`. Annotated tag: `v0.0.12` (object `909253851300962204a7efdef36a251f60651dc1`, peeled to the integration commit). Release: `https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.0.12`; published `2026-08-24T18:54:29Z`, draft=false, prerelease=false.
+- Guarded publisher: source 34/34, protocol 91/91, runtime filesystem 8/8, package 4/4, deployment WhatIf 5/5, aggregate 1/1, release builder 3/3, deterministic builds 2/2.
+- Published ZIP/DLL/MVID: `1cbb2b215a78ab4dea2af5c99ebae211fe21e1f3532eb1865af3420a90ea8494` / `1964b0220fd0ddd4a15009900a30ee3ec3af83c4d90b022eebb87d27cde03cac` / `3947e19e-fd3b-4b11-95d8-8a1b360cf9a4`. Downloaded ZIP and GitHub digest agree; strict downloaded-package validation passes 4/4. `SHA256SUMS.txt` SHA-256 is `ae072c3398cd518d4735a8b764640563d07eee9b123808d49d6d4e21055324ed`.
+- Guarded install `hud-lifecycle-0.0.12-published-install-20260824` is `Installed` at exact release identity; `otherModsVerified=true`, `settingsPreserved=true`, failure null, no process/lock. Install-result SHA-256 is `bc7435f972acd52b4466781f2fcb2ead515364fe5d82528d7a03be1a4adefb76`.
+- Published 0.0.11 remains intact as a distinct release. Exact release record: `planning/HUD-LIFECYCLE-0.0.12-RELEASE.md`. Exact next action: commit and guarded-push this post-publication record; no further release-engineering action.
+
 ## 2026-08-24 - 0.0.12 human acceptance and release authorization
 
 Status: HUMAN CAMPAIGN PASS; MERGE/TAG/NEW RELEASE AUTHORIZED

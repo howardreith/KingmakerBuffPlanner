@@ -1,5 +1,28 @@
 # Autonomous Resume
 
+## 0.0.12 published completion - 2026-08-24
+
+- The accepted hotfix was merged to default `main` and released from exact
+  commit `a48bfae2185a50f1c50d9151666e0b5ce0a0bc3e` under annotated tag
+  `v0.0.12`. Release:
+  `https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.0.12`.
+- The guarded publisher passes source 34/34, protocol 91/91, runtime filesystem
+  8/8, package 4/4, deployment WhatIf 5/5, aggregate 1/1, and release build 3/3
+  with two deterministic builds.
+- Published ZIP/DLL/MVID are
+  `1cbb2b215a78ab4dea2af5c99ebae211fe21e1f3532eb1865af3420a90ea8494` /
+  `1964b0220fd0ddd4a15009900a30ee3ec3af83c4d90b022eebb87d27cde03cac` /
+  `3947e19e-fd3b-4b11-95d8-8a1b360cf9a4`. A fresh GitHub download matches and
+  passes strict package validation 4/4.
+- Guarded install `hud-lifecycle-0.0.12-published-install-20260824` installed
+  those exact published bytes with settings preserved and every non-planner mod
+  unchanged. Install-result SHA-256 is
+  `bc7435f972acd52b4466781f2fcb2ead515364fe5d82528d7a03be1a4adefb76`;
+  no process or deployment lock remains.
+- The separate published 0.0.11 release remains intact. Exact release evidence
+  is in `planning/HUD-LIFECYCLE-0.0.12-RELEASE.md`. No release-engineering work
+  remains.
+
 ## 0.0.12 HUD lifecycle hotfix - 2026-08-24
 
 - Dedicated branch `codex/kbp-hud-lifecycle-hotfix-0.0.12` started clean from fetched `origin/main` commit `4a83aec19e0f6098e23b2965b3992c328136c576`, version 0.0.11. The focused implementation/test commit is `376e4a1` and the working version sources are 0.0.12.
@@ -9,7 +32,7 @@
 - Guarded performance run `hud-lifecycle-0.0.12-performance-1` passes 9/9 at 88.780 average FPS, all 18 moving samples at 90.710-90.896 FPS, zero HUD searches/absent-HUD dispatches, and exact restoration. Native 12/12 and Call of the Wild 26/26 pass and restore. The unchanged repeat honestly rejected a 49.810 FPS non-moving startup bucket while every moving sample remained at least 88.940 FPS.
 - Explicitly authorized guarded install `hud-lifecycle-0.0.12-human-test-install-20260824` is `Installed`; exact DLL/MVID match, `otherModsVerified=true`, `settingsPreserved=true`, no process/lock remains, and install-result SHA-256 is `e1b42a8287718a2ee8aba625e6155cf9ba404e56efcf109bb16abf4798595f84`.
 - Exact authorized save audit remains `Disposable save ambiguity: baseline=0; working=0`, but the owner tested the guarded-installed build in a campaign and accepted the fix. Log SHA-256 `6fec850ea76a8cf43983b20cf58a50cf84b98ef1b064181d052fadf54b055548` proves the same candidate progressed from loading-screen-blocked Pending to Installed after 57 validation frames with four buttons/listeners, then Setup opened successfully.
-- The owner explicitly authorized merge to default `main` and publication of new version 0.0.12, incremented from published 0.0.11. Exact next action: finalize release records, merge, run publisher gates, push main/tag, and create the new release without altering 0.0.11.
+- The owner explicitly authorized merge to default `main` and publication of new version 0.0.12, incremented from published 0.0.11. That authorization was executed in the published-completion checkpoint above without altering 0.0.11.
 
 ## 0.0.11 published completion - 2026-08-23
 

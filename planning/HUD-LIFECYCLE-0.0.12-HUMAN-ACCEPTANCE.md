@@ -64,6 +64,7 @@ tests retain exact candidate-expiry/re-arm, stale-anchor, bounded-retry, and
 steady-state performance coverage. The owner's accepted installed-campaign
 verdict is the human release gate.
 
-Exact next action: finalize release-ready notes, merge the hotfix into default
-`main`, run the full publisher gates, and create a new `v0.0.12` release and
-assets. Do not replace or mutate `v0.0.11`.
+Completed result: the hotfix was merged and published from
+`a48bfae2185a50f1c50d9151666e0b5ce0a0bc3e` as the new `v0.0.12` release.
+Version 0.0.11 remains a separate intact release. See
+`planning/HUD-LIFECYCLE-0.0.12-RELEASE.md`.

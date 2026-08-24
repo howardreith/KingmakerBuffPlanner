@@ -3,8 +3,9 @@
 ## 0.0.12 HUD lifecycle hotfix
 
 Status: SOURCE/BEHAVIOR/DETERMINISTIC PACKAGE/PERFORMANCE/NATIVE/OPTIONAL PASS;
-GUARDED-INSTALLED HUMAN CAMPAIGN PASS; RELEASE AUTHORIZED. SAVE-BACKED
-AUTOMATION REMAINS UNAVAILABLE BECAUSE THE AUTHORIZED FIXTURES ARE ABSENT.
+GUARDED-INSTALLED HUMAN CAMPAIGN PASS; V0.0.12 PUBLISHED AND EXACT PUBLISHED
+BYTES INSTALLED. SAVE-BACKED AUTOMATION REMAINS UNAVAILABLE BECAUSE THE
+AUTHORIZED FIXTURES ARE ABSENT.
 
 - Start: clean fetched `origin/main` at
   `4a83aec19e0f6098e23b2965b3992c328136c576`, version 0.0.11; branch
@@ -21,6 +22,14 @@ AUTOMATION REMAINS UNAVAILABLE BECAUSE THE AUTHORIZED FIXTURES ARE ABSENT.
   DLL SHA-256 is
   `6db3693e0ba38b3672bd0eac36b06df6e5965de29a3e78f9b97513c6accfe9e1`;
   MVID is `920b3246-e7f7-4818-92f4-e54294ef2db0`.
+- Final integration/tag source is
+  `a48bfae2185a50f1c50d9151666e0b5ce0a0bc3e`. The guarded publisher repeats
+  source 34/34, protocol 91/91, runtime filesystem 8/8, package 4/4,
+  deployment WhatIf 5/5, aggregate 1/1, and deterministic release 2/2. Final
+  ZIP/DLL/MVID are
+  `1cbb2b215a78ab4dea2af5c99ebae211fe21e1f3532eb1865af3420a90ea8494` /
+  `1964b0220fd0ddd4a15009900a30ee3ec3af83c4d90b022eebb87d27cde03cac` /
+  `3947e19e-fd3b-4b11-95d8-8a1b360cf9a4`.
 - The guarded installer wrapper's historical `0.0.2` prior-version argument
   correctly failed against the installed published 0.0.11 identity without
   mutation. After updating it to the exact prior release, installer WhatIf
@@ -109,8 +118,20 @@ result SHA-256 is
 `e1b42a8287718a2ee8aba625e6155cf9ba404e56efcf109bb16abf4798595f84`.
 No process or deployment lock remains. On 2026-08-24 the owner stated that the
 fix is acceptable and explicitly authorized merge to the default branch and a
-new incremented release. The public version before this action is 0.0.11, so the
-prepared new version is 0.0.12; 0.0.11 is not overwritten.
+new incremented release.
+
+That authorization completed successfully. The public release is
+`https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.0.12`;
+GitHub reports draft=false, prerelease=false, and published time
+`2026-08-24T18:54:29Z`. A fresh asset download matches the GitHub digest and
+local deterministic artifact and passes package validation 4/4. Guarded install
+`hud-lifecycle-0.0.12-published-install-20260824` installed the exact published
+DLL/MVID with `otherModsVerified=true`, `settingsPreserved=true`, and failure
+null; result SHA-256 is
+`bc7435f972acd52b4466781f2fcb2ead515364fe5d82528d7a03be1a4adefb76`.
+No process or deployment lock remains. The separate published 0.0.11 asset is
+still present and unchanged. Full publication evidence is in
+`planning/HUD-LIFECYCLE-0.0.12-RELEASE.md`.
 
 ## 0.0.11 published crash and release qualification
 

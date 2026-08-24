@@ -1,5 +1,23 @@
 # CODEX AUTONOMOUS MISSION
 
+## 2026-08-24 0.0.12 release completion checkpoint
+
+The accepted repair is published from exact `main`/tag commit
+`a48bfae2185a50f1c50d9151666e0b5ce0a0bc3e` as `v0.0.12`. The guarded
+publisher passes source 34/34, protocol 91/91, runtime filesystem 8/8, package
+4/4, deployment WhatIf 5/5, aggregate 1/1, and deterministic release 2/2.
+Published ZIP/DLL/MVID are
+`1cbb2b215a78ab4dea2af5c99ebae211fe21e1f3532eb1865af3420a90ea8494` /
+`1964b0220fd0ddd4a15009900a30ee3ec3af83c4d90b022eebb87d27cde03cac` /
+`3947e19e-fd3b-4b11-95d8-8a1b360cf9a4`. A fresh GitHub download validates
+4/4. Guarded install `hud-lifecycle-0.0.12-published-install-20260824` installs
+that exact identity with settings and every non-planner mod preserved; result
+SHA-256 is `bc7435f972acd52b4466781f2fcb2ead515364fe5d82528d7a03be1a4adefb76`.
+Release URL is
+`https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.0.12`.
+Published 0.0.11 remains intact. Full evidence is in
+`planning/HUD-LIFECYCLE-0.0.12-RELEASE.md`; no release-engineering work remains.
+
 ## 2026-08-24 0.0.12 HUD lifecycle hotfix checkpoint
 
 Branch `codex/kbp-hud-lifecycle-hotfix-0.0.12` started clean from fetched
