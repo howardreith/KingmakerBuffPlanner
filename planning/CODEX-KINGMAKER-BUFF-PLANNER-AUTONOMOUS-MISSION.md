@@ -1,5 +1,18 @@
 # CODEX AUTONOMOUS MISSION
 
+## 2026-08-24 0.0.12 HUD lifecycle hotfix checkpoint
+
+Branch `codex/kbp-hud-lifecycle-hotfix-0.0.12` started clean from fetched
+`origin/main` commit `4a83aec19e0f6098e23b2965b3992c328136c576` at version 0.0.11.
+The regression is the lost outcome between one-shot invalidation and provisional
+candidate validation; the current 0.0.11 log also proves a candidate could be
+created after unload cancellation against a transient HUD. The 0.0.12 source uses
+typed outcomes, 30-active-frame bounded retry, unload/disable suspension, expiry
+feedback, and current-host liveness without restoring a global search. Current
+gates pass 34/34 source, 91/91 behavior/protocol, 8/8 filesystem, 4/4 package,
+5/5 WhatIf, and 1/1 aggregate. Exact clean artifact/runtime qualification remains
+the next action; no merge, tag, install, or publication is authorized.
+
 ## 2026-08-23 0.0.11 release completion checkpoint
 
 The owner accepted the performance repair in human runtime testing. A release-blocking test EXE popup was reproduced as an uncaught access failure during pre-test fixture creation, corrected in `f6bbe648e0311e8b0022ec9810b533fc66cc6502`, and regressed through direct and full release workflows without new crash events. Current-main integration/tag commit is `3661f5c31a1060bca67758c2369b2ef361a339c9`; published ZIP is `89cbebd2a1eb594d2307c4388c19588e1d4ea9c845284d36081c3e72d492795c`; release is `https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.0.11`. Exact published bytes are guarded-installed. Version 0.0.10 remains immutable.

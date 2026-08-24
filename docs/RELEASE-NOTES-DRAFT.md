@@ -1,51 +1,61 @@
-# Kingmaker Buff Planner 0.0.11
+# Kingmaker Buff Planner 0.0.12 — Draft
 
-Version 0.0.11 fixes a severe closed-window performance regression in Pathfinder: Kingmaker Enhanced Plus Edition 2.1.7b.
+Version 0.0.12 repairs the lower-left Buff Planner controls disappearing during
+campaign load while retaining the 0.0.11 performance correction.
 
-## Performance repair
+This is a local release candidate only. It has not been merged to `main`, tagged,
+or published. Install or publication requires separate human authorization.
 
-Earlier builds attempted to discover the campaign HUD on every Unity Mod Manager update. When no campaign HUD existed, that path called Unity's global `FindObjectOfType<IngameMenuController>()` once per frame. Exact-build profiling measured 18.875 seconds inside 228 searches during a 20.080-second opening-camera interval and only 11.358 average FPS.
+## HUD lifecycle repair
 
-HUD discovery is now invalidation-driven. KBP observes the known `StaticCanvas.HUDController` identity and active state, reacts to real area lifecycle signals, and performs one bounded lookup below that HUD host only when invalidated. Unchanged frames with no HUD perform no hierarchy discovery.
+Version 0.0.11 correctly stopped the closed planner from searching Unity's global
+object graph every rendered frame. Its one-shot invalidation gate, however,
+consumed an installation request before it knew whether the inner Kingmaker HUD
+was ready or whether a provisional Buff Planner row still needed validation. If
+that row expired after 120 failed validation frames, the unchanged outer HUD did
+not generate another request and the four controls could disappear permanently.
 
-The same-DLL diagnostic A/B increased the opening-camera average from 11.358 to 89.234 FPS when only the pathological discovery path was disabled. Fixed exact-package runs hold moving-camera samples near the configured 90 FPS cap with zero global HUD searches. The repository owner also confirmed through human runtime testing that the severe approximately 16 FPS cutscene and world-map regression is gone.
+The 0.0.12 coordinator now distinguishes:
 
-## Test workflow reliability
+- no active campaign HUD;
+- temporarily unavailable inner HUD controls;
+- a newly created or still-pending candidate;
+- a stable installed row;
+- candidate expiry; and
+- a stale or inactive hosting chain.
 
-The source-only protocol tests no longer create disposable fixtures in the guarded live runtime-evidence tree. They use a unique temporary test boundary while separately proving that the production evidence root remains enforced. Infrastructure faults are reported on stderr with a nonzero exit instead of escaping the test entry point as an unhandled CLR exception.
+Retryable readiness, expiry, and staleness re-arm one scoped attempt after a
+30-frame active-HUD settling interval. A live provisional candidate is not
+recreated, an unchanged stable installation performs no new discovery, and an
+absent campaign HUD performs no discovery at all. Area unload and mod disable
+suspend host-triggered attempts until a later load or enable signal.
 
-The direct test executable and complete source/build/release workflow now finish with exit code 0, no residual test process, and no new Windows `.NET Runtime`, `Application Error`, Windows Error Reporting, or `Application Popup` crash event.
+Installed and provisional rows are rejected when their owned root is missing,
+detached, inactive, or reparented; when the inner `IngameMenuController` or native
+button cluster is missing or inactive; when the active outer HUD is unavailable;
+when the row no longer belongs to that HUD hierarchy; or when its native
+raycaster is inactive. Cleanup destroys only Buff Planner-owned objects.
 
-## Preserved functionality
+Placement, left-alignment, glyph-centering, and top-raycast ownership validation
+remain intact. `IngameMenuController` discovery remains bounded beneath the known
+active `StaticCanvas.HUDController`; global `FindObjectOfType` and
+`Resources.FindObjectsOfTypeAll` searches are not used by the normal HUD path.
 
-This release retains the complete owner-accepted 0.0.10 feature set, including:
+## Diagnostics and tests
 
-- structural native and optional-mod buff discovery;
-- Long, Important, and Short routines;
-- automatic provider and resource selection;
-- Animated and Instant execution;
-- material-component and resource accounting;
-- metamagic rod and cast-enhancement selection;
-- full spell details on right-click and personal-spell target eligibility;
-- the four-column planner, target-state display, HUD controls, hotkey, input isolation, and external profile persistence;
-- fail-soft Call of the Wild compatibility with no compile-time gameplay-mod dependency.
+`[KBP-BOOT]` now records host transitions, dispatches, typed attempt results,
+candidate transitions, expiry/staleness reasons, retry counts, outer/inner object
+identities, and the last exact validation failure without logging identical
+pending state every frame. The UMM snapshot distinguishes no HUD, retry pending,
+candidate pending, installed, candidate expired, stale anchor, and suspended.
 
-## Installation
+Deterministic tests cover retryable readiness, exact 120-frame candidate expiry,
+same-host recreation, every required hosting-chain liveness predicate, stable
+absent/installed/provisional frames, bounded temporary-readiness attempts, area
+and host transitions, unload/load, disable/re-enable, and hotkey invalidation.
 
-1. Download `KingmakerBuffPlanner-0.0.11.zip` from **Assets** below.
-2. In Unity Mod Manager, select Pathfinder: Kingmaker.
-3. Drag the ZIP into the **Mods** tab.
-4. Launch the game and enable **Kingmaker Buff Planner**.
-5. Load a campaign and open the planner with Ctrl+Shift+B or the lower-left HUD controls.
-
-Do not download GitHub's automatically generated **Source code** archives; they are not the Unity Mod Manager package.
-
-## Qualification
-
-The release publisher rebuilds from the fully pushed default branch, runs the complete source-only suite, performs two deterministic clean release builds, validates the strict package allowlist, and publishes the exact ZIP together with `SHA256SUMS.txt`.
-
-The current repository is private, so the release is visible only to GitHub users authorized for this repository unless repository visibility changes.
-
-## Release policy
-
-The existing 0.0.10 tag, release, and assets remain immutable. This 0.0.11 artifact receives its own tag and release; any later code or presentation change must advance the version instead of replacing published bytes.
+Final mechanical, deterministic-build, package, guarded-runtime, artifact hash,
+and MVID results will be recorded in the qualification documents after the exact
+clean candidate is built. Save-backed campaign claims remain conditional on the
+repository-authorized `KBP_AUTOMATION_BASELINE` and `KBP_AUTOMATION_WORKING`
+fixtures; no unrelated save may be substituted.

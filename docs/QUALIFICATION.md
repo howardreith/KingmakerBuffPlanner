@@ -1,5 +1,36 @@
 # Qualification
 
+## 0.0.12 HUD lifecycle hotfix
+
+Status: SOURCE/BEHAVIOR CHECKPOINT PASS; CLEAN ARTIFACT AND GUARDED RUNTIME
+QUALIFICATION PENDING.
+
+- Start: clean fetched `origin/main` at
+  `4a83aec19e0f6098e23b2965b3992c328136c576`, version 0.0.11; branch
+  `codex/kbp-hud-lifecycle-hotfix-0.0.12`.
+- Baseline before production changes: source 32/32, behavior/protocol 86/86,
+  runtime filesystem 8/8, package 4/4, deployment WhatIf 5/5, aggregate 1/1.
+- Current deterministic checkpoint: source 34/34, behavior/protocol 91/91,
+  runtime filesystem 8/8, package 4/4, deployment WhatIf 5/5, aggregate 1/1;
+  warning-free Release compilation 1/1.
+- Regression coverage proves absent-HUD zero dispatch, same-host bounded readiness
+  retry, live-candidate zero recreation, exact 120-frame expiry notification and
+  re-arm, same-host replacement installation, stable-installed zero rediscovery,
+  all required stale-chain predicates, active/inactive/replaced hosts, unload/load,
+  disable/re-enable, and planner-hotkey invalidation.
+- Source validation rejects global `FindObjectOfType<IngameMenuController>` and
+  `Resources.FindObjectsOfTypeAll` in the HUD path, requires the scoped
+  `hudHost.GetComponentInChildren<IngameMenuController>(true)` lookup, and rejects
+  native host/anchor/cluster destruction.
+- Intake log evidence is bounded: current 0.0.11 `output_log.txt` lines 3342-3392
+  show unload cancellation followed by transient candidate creation and repeated
+  validation failure. That process ended before expiry and contains no
+  post-disappearance hotkey attempt, so button survival is not claimed from it.
+
+Final clean-build hashes/MVID, exact runtime run IDs/results, performance samples,
+and any authorized-fixture blocker are appended below before handoff. Version
+0.0.12 remains unmerged, untagged, and unpublished.
+
 ## 0.0.11 published crash and release qualification
 
 Status: PASS; HUMAN PERFORMANCE ACCEPTED; TEST PROCESS NORMAL; EXACT RELEASE PUBLISHED AND INSTALLED.

@@ -1,5 +1,14 @@
 # Autonomous Resume
 
+## 0.0.12 HUD lifecycle hotfix - 2026-08-24
+
+- Dedicated branch `codex/kbp-hud-lifecycle-hotfix-0.0.12` started clean from fetched `origin/main` commit `4a83aec19e0f6098e23b2965b3992c328136c576`, version 0.0.11. The focused implementation/test commit is `376e4a1` and the working version sources are 0.0.12.
+- Root cause is confirmed: 0.0.11 consumed one install invalidation before a Boolean attempt could distinguish retryable readiness from candidate creation, while 120-frame candidate expiry could not notify or re-arm the unchanged outer-HUD coordinator. Installed liveness also omitted the inner hosting chain.
+- The repair uses typed attempt/candidate/lifecycle states, one retry per 30 active-HUD frames, explicit unload/disable suspension, candidate-expiry and stale-anchor feedback, complete held-reference hosting-chain validation, and scoped `GetComponentInChildren<IngameMenuController>(true)` discovery only. Deferred placement/glyph/raycast validation remains intact.
+- Current source-only checkpoint passes source 34/34, protocol 91/91, runtime filesystem 8/8, package 4/4, deployment WhatIf 5/5, aggregate 1/1; warning-free Release compilation passes 1/1. Clean-commit deterministic release and guarded no-save runtime qualification remain.
+- Exact authorized save audit is `Disposable save ambiguity: baseline=0; working=0.` Campaign HUD survival/click/input/transition rows therefore remain blocked; unrelated automation and personal saves must not be substituted.
+- Exact next action: commit 0.0.12 version/documentation, build from the clean commit, rerun the full source and deterministic release gates, then run the permitted guarded no-save performance/catalog scenarios and record exact evidence.
+
 ## 0.0.11 published completion - 2026-08-23
 
 - No work remains for the bounded crash/release mission. Human runtime acceptance confirms the severe movement regression is gone; the test-process crash is corrected in `f6bbe648e0311e8b0022ec9810b533fc66cc6502` and integrated at release/tag commit `3661f5c31a1060bca67758c2369b2ef361a339c9`.

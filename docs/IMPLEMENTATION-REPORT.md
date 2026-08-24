@@ -1,5 +1,44 @@
 # Implementation Report
 
+## 0.0.12 HUD lifecycle repair
+
+The 0.0.11 performance fix correctly replaced per-frame global discovery with
+one-shot invalidation, but `ObserveHost` consumed that request before it knew the
+result of `TryInstall()`. The Boolean result conflated temporary native readiness,
+a newly created provisional row, a pending row, and stable installation. The
+candidate's later 120-frame self-expiry could therefore remove all four buttons
+without notifying the unchanged outer HUD gate.
+
+The repair keeps invalidation-driven scoped discovery and replaces the Boolean
+contract with typed attempt and candidate outcomes. Retryable inner readiness is
+paced at one attempt per 30 frames while the known outer HUD remains active.
+Candidate creation suppresses redispatch until validation reports installed,
+expired, or stale. Expiry and stale-anchor outcomes re-arm the same-host request
+after the settling interval. Unload and disable suspend host observation until an
+explicit load or enable resume, closing the log-proven path that constructed a
+candidate after `OnAreaBeginUnloading`.
+
+Installed state now validates the complete held hosting chain against the current
+`StaticCanvas.HUDController`: owned root existence, parent, activity and exact
+native-cluster parent; inner controller and cluster existence/activity; outer HUD
+existence/activity; hierarchy membership; and raycaster activity. The check is
+constant-time and never calls a hierarchy search. If it fails, only Buff Planner
+objects, sprites, textures, listeners, and pointer registrations are released.
+The next bounded attempt locates the current inner controller beneath the already
+known active outer host.
+
+Deferred placement/glyph/raycast validation is retained. A pure 120-frame
+validation gate makes expiry deterministic; the first failing predicate is no
+longer overwritten by later successful checks, and changing geometry values do
+not cause per-frame log spam. Root diagnostics now report lifecycle state,
+request/retry/dispatch counts, host/anchor/cluster identities and activity,
+attempt/candidate outcomes, hosting failure, and last validation failure.
+
+Source-only checkpoint after implementation: source 34/34, behavior/protocol
+91/91, runtime-harness filesystem 8/8, package 4/4, deployment WhatIf 5/5, and
+aggregate 1/1. Final clean-commit build, package, deterministic, runtime, and hash
+results are recorded in `docs/QUALIFICATION.md` after execution.
+
 ## 0.0.11 test-process crash correction and release
 
 The popup was not a production-mod failure or an orphan process. The source-only executable reused `RuntimeTestProtocol.EvidenceRoot` for disposable protocol fixtures, then called `Directory.CreateDirectory` before its test/cleanup exception boundary. A restricted direct launch therefore let `UnauthorizedAccessException` escape `Program.Main`, which Windows surfaced as CLR exception `0xe0434352`. The same exact binary passed when allowed to access that external root, and no asynchronous, child-process, finalizer, duplicate-binary, or stale-worktree path existed.

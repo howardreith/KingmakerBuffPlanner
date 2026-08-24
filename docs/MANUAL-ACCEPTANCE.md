@@ -1,5 +1,38 @@
 # Manual Acceptance
 
+## 0.0.12 HUD lifecycle hotfix gate
+
+Status: REQUIRED for campaign rows not exercised by the guarded harness. Use only
+the exact 0.0.12 local candidate and a normal personal campaign under human
+control, or the repository-authorized disposable pair through the guarded
+harness. Do not substitute another automation save.
+
+1. Start a fresh process and load an existing campaign. Watch the lower-left
+   Setup/Long/Important/Short row from first appearance through full HUD settlement
+   and for at least 10 seconds—materially longer than the former 120-frame window.
+   Record the final `[KBP-BOOT]` snapshot and confirm `hudState=Installed`.
+2. Start or enter a new campaign area where practical. Repeat the settlement wait
+   and verify exactly four controls remain visible and clickable.
+3. Click all four controls. Setup must open the planner; Long/Important/Short must
+   report their real configured result. No click may activate a native button
+   underneath, and native lower-left controls must still work independently.
+4. Open and close Setup through both its HUD button and Ctrl+Shift+B. After closing,
+   camera, selection, game mode, and native input must be restored.
+5. Perform an area transition. During unload no candidate should be created; after
+   load, the row should create once, validate, and remain installed. Capture host,
+   anchor, candidate, dispatch, and retry identities from the transition log.
+6. Exercise a reproducible opening-camera or cutscene segment, world-map
+   presentation, and settled gameplay. Compare with the accepted 0.0.11 behavior:
+   there must be no severe approximately 11–17 FPS ceiling, no continuous
+   absent-HUD discovery, and no continuous stable-installed discovery.
+7. If a candidate expires or an inner anchor becomes stale, confirm the log reports
+   `Expired` or `Stale`, a bounded retry re-arm, a later candidate creation, and
+   final `Installed` without an outer-HUD identity change.
+
+Report game area/save category, screen resolution, UI scale, configured FPS cap,
+wait duration, relevant `[KBP-BOOT]` lines, and full-resolution evidence for any
+failure. This checklist authorizes neither install, merge, tag, nor publication.
+
 ## 0.0.11 performance-repair completion gate
 
 Status: PASS. The repository owner confirmed through human runtime testing that the severe approximately 16 FPS regression is gone. The checklist below records the accepted coverage and remains useful for later compatibility retesting:

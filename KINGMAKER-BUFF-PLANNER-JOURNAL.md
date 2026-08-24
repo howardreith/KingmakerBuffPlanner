@@ -697,3 +697,12 @@ Status: ROOT CAUSE PROVEN; 0.0.4 SOURCE PASS; LIVE QUALIFICATION PENDING
 - Metamagic rods use the native MetamagicRodMechanics activatable/buff path. Planner code does not synthesize duration or manually spend charges.
 - Verification at 2026-08-20 00:17:33 -04:00: Test-SourceOnly PASS; source 32/32, protocol 80/80, runtime harness filesystem 8/8, package 4/4, deployment WhatIf 5/5.
 - Runtime game scenario: not performed; no guarded KBP_AUTOMATION_WORKING launch was established during this issue.
+# 0.0.12 HUD lifecycle hotfix intake — 2026-08-24
+
+- Branch/HEAD/version: `codex/kbp-hud-lifecycle-hotfix-0.0.12` / `4a83aec19e0f6098e23b2965b3992c328136c576` / 0.0.11; fetched `origin/main` is the same commit; starting worktree was clean.
+- Commands: `git fetch origin main --tags --prune`; `git diff v0.0.10..v0.0.11 -- ...`; scoped source/disposal searches; recent Kingmaker and UMM log inventory. No validation suite has run yet, so pass/fail counts are pending.
+- Root cause confirmed: one-shot invalidation consumes retryable readiness and provisional-candidate outcomes; 120-frame candidate disposal cannot re-arm the unchanged outer host; installed liveness ignores the inner hosting chain.
+- Additional log evidence: current `output_log.txt` lines 3342-3392 show unload cancellation followed by candidate creation against a transient loading HUD and repeated validation failures. No candidate-expiry line or post-disappearance hotkey attempt exists in the available log.
+- Rejected: reverting scoped discovery, restoring a global search, deleting deferred validation, or attributing the defect to non-UI systems.
+- Uncertainty: fresh campaign qualification depends on an exact authorized `KBP_AUTOMATION_BASELINE` / `KBP_AUTOMATION_WORKING` pair; fixture availability will be re-audited after deterministic repair.
+- Exact next action: implement explicit install/candidate outcomes, suspended unload state, bounded retry, and hosting-chain liveness; then add deterministic tests.
