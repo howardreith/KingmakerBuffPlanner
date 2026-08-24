@@ -1,5 +1,9 @@
 # Architecture
 
+## Test/runtime evidence boundary
+
+Production runtime requests remain confined to the guarded external `RuntimeTestProtocol.EvidenceRoot`. Protocol unit tests inject a distinct unique directory beneath the operating-system temp root and separately test that the production root rejects those paths. The console entry point owns resolver registration and fixture disposal through completion; it prints PASS only after cleanup. Infrastructure setup failures are reported to stderr with exit 2, so they cannot escape as unhandled CLR exceptions or masquerade as successful tests.
+
 ## 0.0.11 invalidation-driven HUD lifecycle
 
 The UMM composition root remains frame-driven because it must poll the configured hotkey and advance active execution/UI state. Native HUD discovery is no longer frame-driven. `BuffPlannerUiRoot` holds a `HudInstallInvalidationGate` and observes only the exact `StaticCanvas.HUDController` identity and active state. Enable, planner-hotkey, area-loaded, scenes-loaded, loading-complete, area-activated, host replacement, and host reactivation mark discovery dirty; unloading cancels it. An unchanged or absent host never consumes/repeats the pending request.

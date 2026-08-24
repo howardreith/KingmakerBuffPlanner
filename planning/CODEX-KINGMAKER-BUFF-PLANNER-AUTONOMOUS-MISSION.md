@@ -1,5 +1,9 @@
 # CODEX AUTONOMOUS MISSION
 
+## 2026-08-23 0.0.11 release completion checkpoint
+
+The owner accepted the performance repair in human runtime testing. A release-blocking test EXE popup was reproduced as an uncaught access failure during pre-test fixture creation, corrected in `f6bbe648e0311e8b0022ec9810b533fc66cc6502`, and regressed through direct and full release workflows without new crash events. Current-main integration/tag commit is `3661f5c31a1060bca67758c2369b2ef361a339c9`; published ZIP is `89cbebd2a1eb594d2307c4388c19588e1d4ea9c845284d36081c3e72d492795c`; release is `https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.0.11`. Exact published bytes are guarded-installed. Version 0.0.10 remains immutable.
+
 ## 2026-08-23 performance-regression checkpoint
 
 The 0.0.10 closed-window regression is causally isolated to per-frame global HUD discovery. Same-DLL suppression changed 11.358 to 89.234 average FPS; the invalidation-driven production fix passed two fresh processes at 89.236 and 88.671 average FPS with zero global searches. See `planning/PERFORMANCE-REGRESSION-ROOT-CAUSE.md` for exact methods, profiles, hashes, rejected theories, and remaining save-backed boundary.

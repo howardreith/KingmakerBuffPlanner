@@ -1,5 +1,17 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-08-23 - 0.0.11 crash investigation, merge, install, and publication
+
+Status: COMPLETE; HUMAN PERFORMANCE PASS; TEST CRASH FIXED; PUBLISHED
+
+- Crash investigation started on `codex/kbp-performance-regression-0.0.11` at clean HEAD `df003955ce7ed659bd77950be37ed4814ae42ea2`. The installed candidate was version 0.0.11, DLL `1bde124702d013c7f66b159963c01a23eef691104ffa5523f9e944498238c4e7`, MVID `cab52ff1-e758-4f8f-ba92-5ad3cd4eb867`.
+- The exact pre-fix test executable (`958bd34c276609d9735377471700d3ee3da68c389e4b7fef312049514b2830f6`) reproduced exit `-532462766` / `0xe0434352`. `Program.Main` created disposable fixtures under the guarded production `RuntimeTestProtocol.EvidenceRoot` before entering any exception boundary; restricted execution raised an unhandled `UnauthorizedAccessException` in `Directory.CreateDirectory` at line 32. System `Application Popup` Event 26 records 388107, 388115, 388134, 388139, and 388141 carry the observed popup. No paired `.NET Runtime`, `Application Error`, or Windows Error Reporting Application-log record exists, so no additional faulting module or managed stack was available there.
+- The same binary passed 78/78 when granted intended external-evidence access, proving a permission-dependent setup defect rather than stale bytes. The only two lab copies were the current `artifacts/tests` and identical `obj/Release` output; no orphan test process, asynchronous worker, child process, finalizer, or PASS-before-teardown path was found.
+- Commit `f6bbe648e0311e8b0022ec9810b533fc66cc6502` gives tests a unique temp boundary, retains a separate regression proving the production evidence root is rejected, disposes the assembly resolver and fixture tree before PASS, and converts top-level infrastructure faults to stderr plus exit 2. It does not suppress dialogs or force success.
+- Current remote `main` was integrated by merge commit `3661f5c31a1060bca67758c2369b2ef361a339c9`. Final publisher gates passed source 32/32, protocol 86/86, runtime filesystem 8/8, package 4/4, deployment WhatIf 5/5, source aggregate 1/1, and two deterministic release builds. The final direct repository invocation passed 86/86 with empty stderr, exit 0, no new crash event, and no remaining process.
+- Human testing confirmed the approximately 16 FPS regression is gone. Exact published-asset probe `perf-0.0.11-published-final-1` recorded 18 moving-camera samples at 90.693-90.914 FPS with zero global HUD searches. Its only rejected assertion was the unrelated first launch bucket at 49.600 FPS after one 194.286 ms initialization update; average was 88.730 FPS and restoration was exact.
+- Published tag/release commit is `3661f5c31a1060bca67758c2369b2ef361a339c9`; release URL is `https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.0.11`. Published ZIP `89cbebd2a1eb594d2307c4388c19588e1d4ea9c845284d36081c3e72d492795c`, DLL `95f484907f9a1008798e3557e46212faa1e41406bccf9d109d78e1921e9d46c6`, MVID `bf949174-0601-4822-a121-9c9d9c14597f`. The downloaded asset and `SHA256SUMS.txt` agree, and guarded install `published-0.0.11-final-install-20260823` preserved settings and every other mod. Existing release 0.0.10 remains present and unchanged.
+
 ## 2026-08-23 - 0.0.11 performance-repair engineering handoff
 
 Status: ROOT CAUSE PROVEN; FIXED OPENING-CAMERA/SOURCE/NATIVE/OPTIONAL PASS; CAMPAIGN SAVE-BACKED ROWS BLOCKED

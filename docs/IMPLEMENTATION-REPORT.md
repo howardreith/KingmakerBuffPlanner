@@ -1,5 +1,13 @@
 # Implementation Report
 
+## 0.0.11 test-process crash correction and release
+
+The popup was not a production-mod failure or an orphan process. The source-only executable reused `RuntimeTestProtocol.EvidenceRoot` for disposable protocol fixtures, then called `Directory.CreateDirectory` before its test/cleanup exception boundary. A restricted direct launch therefore let `UnauthorizedAccessException` escape `Program.Main`, which Windows surfaced as CLR exception `0xe0434352`. The same exact binary passed when allowed to access that external root, and no asynchronous, child-process, finalizer, duplicate-binary, or stale-worktree path existed.
+
+Commit `f6bbe648e0311e8b0022ec9810b533fc66cc6502` adds a test-only injected root beneath a unique temporary boundary while leaving the production root and its containment checks unchanged. It adds a production-boundary regression, completes resolver and filesystem cleanup before printing PASS, and catches only the entry-point infrastructure boundary to report stderr and exit 2. An intentional unwritable-temp check exits 2 without a Windows popup; it is neither swallowed nor converted to success.
+
+Current remote-main work was integrated without redesigning the human-qualified performance fix. Release/tag commit `3661f5c31a1060bca67758c2369b2ef361a339c9` passed 86/86 protocol tests and the complete guarded publisher with no new crash events. Published identity is ZIP `89cbebd2a1eb594d2307c4388c19588e1d4ea9c845284d36081c3e72d492795c`, DLL `95f484907f9a1008798e3557e46212faa1e41406bccf9d109d78e1921e9d46c6`, MVID `bf949174-0601-4822-a121-9c9d9c14597f`.
+
 ## 0.0.11 runtime performance repair
 
 Version 0.0.10's retained root called `BuffPlannerHudButtonController.TryInstall()` from every `Main.OnUpdate`, even while all planner windows were closed. With no campaign HUD, `TryInstall()` called `UnityEngine.Object.FindObjectOfType<IngameMenuController>()` globally on every frame. The exact unfixed diagnostic build spent 18,874.614 ms in 228 searches over 20.080 seconds and averaged 11.358 FPS. Suppressing only HUD discovery in the same DLL produced 1,787 frames and 89.234 average FPS.

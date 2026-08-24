@@ -1,5 +1,12 @@
 # Autonomous Resume
 
+## 0.0.11 published completion - 2026-08-23
+
+- No work remains for the bounded crash/release mission. Human runtime acceptance confirms the severe movement regression is gone; the test-process crash is corrected in `f6bbe648e0311e8b0022ec9810b533fc66cc6502` and integrated at release/tag commit `3661f5c31a1060bca67758c2369b2ef361a339c9`.
+- Final publisher gates: source 32/32, protocol 86/86, runtime filesystem 8/8, package 4/4, deployment WhatIf 5/5, source aggregate 1/1, deterministic release 2/2. Direct repository-style test invocation: stdout 86/86, empty stderr, exit 0, zero new crash events, zero residual processes.
+- Published release: `https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.0.11`; ZIP `89cbebd2a1eb594d2307c4388c19588e1d4ea9c845284d36081c3e72d492795c`; DLL `95f484907f9a1008798e3557e46212faa1e41406bccf9d109d78e1921e9d46c6`; MVID `bf949174-0601-4822-a121-9c9d9c14597f`.
+- Exact published bytes are installed under UMM by `published-0.0.11-final-install-20260823`; settings and non-planner mods were preserved. No Kingmaker/test process or deployment lock remains. The existing 0.0.10 release was not altered.
+
 ## 0.0.11 performance repair - 2026-08-23
 
 - Dedicated branch `codex/kbp-performance-regression-0.0.11`; starting commit `c06793d2238577093b96a2dc3172839070e7d69a`; current production fix `f23a07b7560b2aa4cd7b3d1635436c3abffd575a`.

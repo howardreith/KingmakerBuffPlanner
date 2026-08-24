@@ -7,8 +7,9 @@
 - Resolves the native in-game menu only beneath the exact active `StaticCanvas.HUDController` instead of using global `Object.FindObjectOfType`.
 - Adds an opt-in, aggregate one-second runtime performance probe and a deterministic unchanged-frame/host-transition regression contract.
 - Updates guarded runtime identity and fixture records for the exact current local UMM and optional-mod environment without installing or mutating third-party mods.
+- Separates disposable protocol-test fixtures from the guarded production evidence root and reports setup failures as controlled nonzero test exits instead of unhandled CLR exceptions.
 
-No 0.0.10 artifact is replaced. Version 0.0.11 remains a local qualification candidate and is not publicly released.
+No 0.0.10 artifact was replaced. Version 0.0.11 is published from tag commit `3661f5c31a1060bca67758c2369b2ef361a339c9`.
 
 ## 0.0.10 — Visual clarity and plan coverage
 

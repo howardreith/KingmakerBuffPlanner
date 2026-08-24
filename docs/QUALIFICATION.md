@@ -1,5 +1,18 @@
 # Qualification
 
+## 0.0.11 published crash and release qualification
+
+Status: PASS; HUMAN PERFORMANCE ACCEPTED; TEST PROCESS NORMAL; EXACT RELEASE PUBLISHED AND INSTALLED.
+
+- Starting crash checkpoint: branch `codex/kbp-performance-regression-0.0.11`, clean HEAD `df003955ce7ed659bd77950be37ed4814ae42ea2`; installed 0.0.11 DLL `1bde124702d013c7f66b159963c01a23eef691104ffa5523f9e944498238c4e7`, MVID `cab52ff1-e758-4f8f-ba92-5ad3cd4eb867`.
+- Reproduction: exact pre-fix test EXE `958bd34c276609d9735377471700d3ee3da68c389e4b7fef312049514b2830f6` exited `-532462766` (`0xe0434352`) after unhandled `UnauthorizedAccessException` from `Directory.CreateDirectory` in `Program.Main` line 32. System/Application Popup Event 26 records include 388139 and 388141. Application-log queries found zero paired `.NET Runtime`, `Application Error`, or WER records. No duplicate or remaining test process existed.
+- Causality: pre-fix tests used the guarded production runtime-evidence root for disposable fixtures, and directory creation preceded every catch/finally. The same exact EXE passed 78/78 with intended external access. Artifact enumeration found only current identical `artifacts/tests` and `obj/Release` copies; source audit found no thread, Task, async, timer, child process, or finalizer path.
+- Correction `f6bbe648e0311e8b0022ec9810b533fc66cc6502`: disposable tests use a unique temp boundary; a separate test proves production-root rejection; resolver/fixture cleanup precedes PASS; infrastructure failures produce full stderr and exit 2. Final direct repository-style invocation passed 86/86, stderr empty, exit 0, no popup/event, no process.
+- Integrated/tag commit `3661f5c31a1060bca67758c2369b2ef361a339c9`. Guarded publisher results: source 32/32, protocol 86/86, runtime filesystem 8/8, package 4/4, deployment WhatIf 5/5, source aggregate 1/1, deterministic release build 2/2 and release builder 3/3. No new test popup, `.NET Runtime`, `Application Error`, or WER event was generated.
+- Exact published identity: ZIP `89cbebd2a1eb594d2307c4388c19588e1d4ea9c845284d36081c3e72d492795c`; DLL `95f484907f9a1008798e3557e46212faa1e41406bccf9d109d78e1921e9d46c6`; MVID `bf949174-0601-4822-a121-9c9d9c14597f`; tag `v0.0.11`; URL `https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.0.11`. GitHub digest, downloaded asset, local artifact, and `SHA256SUMS.txt` agree; strict downloaded-package validation passed 4/4.
+- Owner runtime verdict: severe approximately 16 FPS regression gone. Exact published-asset run `perf-0.0.11-published-final-1` had 1,776 frames, 88.730 average FPS, and all 18 moving samples at 90.693-90.914 FPS with zero global HUD searches. Only the first non-moving launch bucket missed the strict threshold at 49.600 FPS due to one 194.286 ms initialization update; the harness rejected rather than hiding it, and restoration verified true.
+- Guarded install `published-0.0.11-final-install-20260823`: status Installed; version 0.0.11; published DLL/MVID exact; `settingsPreserved=true`; `otherModsVerified=true`; no process or deployment lock. Published 0.0.10 remains intact.
+
 ## 0.0.11 performance repair
 
 Status: OPENING-CAMERA PERFORMANCE PASS; SOURCE/NATIVE/OPTIONAL PASS; SAVE-BACKED CAMPAIGN ROWS BLOCKED BY ABSENT AUTHORIZED FIXTURE.

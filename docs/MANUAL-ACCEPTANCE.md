@@ -2,7 +2,7 @@
 
 ## 0.0.11 performance-repair completion gate
 
-Automated opening-camera performance is PASS on the local 90 FPS configuration. An authorized KBP campaign save pair was unavailable, so complete these rows on the repaired 0.0.11 test package before treating campaign qualification as closed:
+Status: PASS. The repository owner confirmed through human runtime testing that the severe approximately 16 FPS regression is gone. The checklist below records the accepted coverage and remains useful for later compatibility retesting:
 
 1. With only the declared comparison mod set, record the configured cap and FPS throughout the opening book/camera approach and after settlement. The former approximately 16-17 FPS KBP-specific ceiling must be absent.
 2. Load an ordinary gameplay area. Confirm the Setup/Long/Important/Short HUD row appears once, is aligned and clickable, and ordinary gameplay remains at the same-scene no-KBP frame rate.
@@ -10,7 +10,7 @@ Automated opening-camera performance is PASS on the local 90 FPS configuration. 
 4. Execute one configured Long routine in Animated mode and one in Instant mode. Confirm expected effects and exact resource outcomes; include metamagic-rod/enhancement behavior if configured.
 5. Record a safely reproducible cutscene and world-map movement segment with and without KBP. Severe KBP-specific judder must be absent.
 
-Attach the exact package/DLL hashes, resolution, graphics cap, per-scene FPS, mod inventory, and relevant `output_log.txt`. Do not use, rename, or mutate an ordinary save for automation; supply a distinct `KBP_AUTOMATION_BASELINE` / `KBP_AUTOMATION_WORKING` pair if guarded automation is desired. No public release is authorized by this checklist.
+Exact published identity: tag commit `3661f5c31a1060bca67758c2369b2ef361a339c9`; ZIP `89cbebd2a1eb594d2307c4388c19588e1d4ea9c845284d36081c3e72d492795c`; DLL `95f484907f9a1008798e3557e46212faa1e41406bccf9d109d78e1921e9d46c6`; MVID `bf949174-0601-4822-a121-9c9d9c14597f`. Release publication was separately authorized and completed at `https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.0.11`.
 
 ## 0.0.10 clarity and alignment visual gate
 
