@@ -103,4 +103,8 @@ save resolver returns baseline=0 and working=0. Exact next action is the human
 campaign checklist in `docs/MANUAL-ACCEPTANCE.md` or the same guarded scenario
 after a distinct authorized save pair is supplied. Do not substitute a save,
 merge, tag, or publish. The exact candidate was later guarded-installed only after
-separate human authorization.
+separate human authorization. The owner accepted that installed campaign build;
+its log proves the same provisional candidate progressed from a loading-screen
+raycast failure to `Installed` after 57 validation frames with four buttons and
+four listeners, followed by successful Setup presentation. The bounded evidence
+is in `planning/HUD-LIFECYCLE-0.0.12-HUMAN-ACCEPTANCE.md`.

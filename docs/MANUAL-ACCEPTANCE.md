@@ -2,11 +2,16 @@
 
 ## 0.0.12 HUD lifecycle hotfix gate
 
-Status: BLOCKED in the guarded harness because the authorized save inventory is
-exactly baseline=0 and working=0; REQUIRED as a human campaign check. The exact
-0.0.12 candidate is guarded-installed. Use it with a normal personal campaign under human control,
-or the repository-authorized disposable pair through the guarded harness. Do not
-substitute another automation save.
+Status: PASS. The owner accepted the guarded-installed 0.0.12 repair on
+2026-08-24. The accepted log proves a loading-screen-blocked candidate remained
+pending and then installed as four buttons/four listeners after 57 validation
+frames; Setup presentation also validated and opened. Exact evidence is in
+`planning/HUD-LIFECYCLE-0.0.12-HUMAN-ACCEPTANCE.md`.
+
+The authorized save inventory remains baseline=0 and working=0, so the guarded
+harness did not independently execute the campaign checklist. The checklist is
+retained for future regression testing; do not substitute another automation
+save.
 
 1. Start a fresh process and load an existing campaign. Watch the lower-left
    Setup/Long/Important/Short row from first appearance through full HUD settlement
@@ -32,7 +37,8 @@ substitute another automation save.
 
 Report game area/save category, screen resolution, UI scale, configured FPS cap,
 wait duration, relevant `[KBP-BOOT]` lines, and full-resolution evidence for any
-failure. This checklist authorizes neither install, merge, tag, nor publication.
+future failure. The owner separately authorized merge, tag, and publication of
+0.0.12 after this acceptance.
 
 ## 0.0.11 performance-repair completion gate
 

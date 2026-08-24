@@ -1,7 +1,7 @@
 # Kingmaker Buff Planner
 
-**Release status:** `0.0.11` is the current published GitHub release. A `0.0.12`
-HUD-lifecycle hotfix is being prepared on a separate branch and is not published.
+**Release:** `0.0.12` repairs HUD lifecycle retryability while retaining the
+`0.0.11` performance correction.
 
 Kingmaker Buff Planner is a standalone Unity Mod Manager mod for **Pathfinder:
 Kingmaker Enhanced Plus Edition 2.1.7b**.
@@ -14,7 +14,7 @@ packaging, and runtime automation owned by this repository.
 
 ## Install and use
 
-Download `KingmakerBuffPlanner-0.0.11.zip` from the GitHub Release's **Assets**
+Download `KingmakerBuffPlanner-0.0.12.zip` from the GitHub Release's **Assets**
 section. Do not download GitHub's automatically generated source-code archives.
 
 Install the ZIP through Unity Mod Manager, or extract its single

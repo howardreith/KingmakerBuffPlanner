@@ -1,5 +1,16 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-08-24 - 0.0.12 human acceptance and release authorization
+
+Status: HUMAN CAMPAIGN PASS; MERGE/TAG/NEW RELEASE AUTHORIZED
+
+- Owner verdict: `This fix is acceptable.` The owner explicitly authorized commit finalization, merge to the repository default branch, remote main push, and a new incremented release.
+- GitHub reports default branch `main`, private repository `howardreith/KingmakerBuffPlanner`, authenticated account `howardreith`, and no existing `v0.0.12` release or tag. Published version is 0.0.11, so the prepared 0.0.12 is the required increment and must not overwrite 0.0.11.
+- Accepted log `%USERPROFILE%\AppData\LocalLow\Owlcat Games\Pathfinder Kingmaker\output_log.txt`: 595,152 bytes, last write `2026-08-24T14:43:01.9133622-04:00`, SHA-256 `6fec850ea76a8cf43983b20cf58a50cf84b98ef1b064181d052fadf54b055548`.
+- Lifecycle evidence: unload suspended discovery; area scenes loaded dispatched once; candidate `-485022` was created once; loading screen temporarily owned the raycast; `OnAreaLoadingComplete` returned `CandidatePending` for that same candidate; it then reached `Installed` after 57 validation frames with four buttons/four listeners. Setup passed both presentation phases and opened. No KBP exception exists; the nearby null reference belongs to Owlcat `BugReportCanvas.OnEnable` before KBP's first update.
+- Exact evidence and bounded log excerpt: `planning/HUD-LIFECYCLE-0.0.12-HUMAN-ACCEPTANCE.md`.
+- Exact next action: finalize release-ready docs, rerun source/deterministic/publisher gates, merge the hotfix into `main`, guarded-push `main`, and publish new tag/release/assets `v0.0.12` without modifying `v0.0.11`.
+
 ## 2026-08-24 - 0.0.12 guarded local installation for human testing
 
 Status: INSTALLED; IDENTITY/OTHER-MOD/SETTINGS GUARDS PASS; HUMAN CAMPAIGN TEST NEXT

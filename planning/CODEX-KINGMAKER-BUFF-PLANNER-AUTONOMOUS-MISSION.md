@@ -21,7 +21,12 @@ working=0, so campaign HUD survival, clicks, transitions, cutscene/world-map, an
 installed-state log evidence remain blocked rather than inferred. Explicitly
 authorized guarded install `hud-lifecycle-0.0.12-human-test-install-20260824`
 completed with exact identity, settings preservation, and all other mods verified.
-No merge, tag, or publication is authorized.
+The owner then accepted the campaign repair. Log SHA-256
+`6fec850ea76a8cf43983b20cf58a50cf84b98ef1b064181d052fadf54b055548`
+proves the same candidate moved from loading-screen-blocked Pending to Installed
+after 57 validation frames with four buttons/listeners and successful Setup.
+Merge to default `main`, tag `v0.0.12`, and a new release are explicitly
+authorized; published 0.0.11 must not be overwritten.
 
 ## 2026-08-23 0.0.11 release completion checkpoint
 

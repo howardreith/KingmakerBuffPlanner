@@ -50,11 +50,15 @@ pass 12/12 and 26/26 and restore exactly. An unchanged repetition is retained as
 an honest first-startup-bucket threshold miss at 49.810 FPS; every moving sample
 remained at least 88.940 FPS and the threshold was not changed.
 
-Campaign HUD qualification remains blocked because the exact authorized save
-inventory is baseline=0 and working=0. Consequently no runtime claim is made
-that the four controls remained installed, clickable, or input-isolated in a
-campaign. Exact run IDs, hashes, restoration state, and human steps are recorded
-in `docs/QUALIFICATION.md` and `docs/MANUAL-ACCEPTANCE.md`.
+Guarded save-backed automation remains unavailable because the exact authorized
+inventory is baseline=0 and working=0. The owner subsequently tested the exact
+guarded-installed build in a campaign and accepted the repair. Its fresh log
+shows one candidate staying pending while the loading screen owned the raycast,
+then the same candidate installing with four buttons/four listeners after 57
+validation frames; Setup presentation also validated and opened. This is the
+missing human lifecycle proof, while unexecuted automation rows remain honestly
+unexecuted. Exact evidence is recorded in
+`planning/HUD-LIFECYCLE-0.0.12-HUMAN-ACCEPTANCE.md`.
 
 ## 0.0.11 test-process crash correction and release
 

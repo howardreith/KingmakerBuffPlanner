@@ -3,8 +3,8 @@
 ## 0.0.12 HUD lifecycle hotfix
 
 Status: SOURCE/BEHAVIOR/DETERMINISTIC PACKAGE/PERFORMANCE/NATIVE/OPTIONAL PASS;
-GUARDED-INSTALLED FOR HUMAN TESTING; SAVE-BACKED AUTOMATION BLOCKED BY ABSENT
-AUTHORIZED FIXTURES.
+GUARDED-INSTALLED HUMAN CAMPAIGN PASS; RELEASE AUTHORIZED. SAVE-BACKED
+AUTOMATION REMAINS UNAVAILABLE BECAUSE THE AUTHORIZED FIXTURES ARE ABSENT.
 
 - Start: clean fetched `origin/main` at
   `4a83aec19e0f6098e23b2965b3992c328136c576`, version 0.0.11; branch
@@ -15,8 +15,8 @@ AUTHORIZED FIXTURES.
   `Test-SourceOnly.ps1` passes source 34/34, behavior/protocol 91/91,
   runtime filesystem 8/8, package 4/4, deployment WhatIf 5/5, and aggregate
   1/1. Release compilation is warning-free.
-- `Build-Release.ps1` passes 3/3 with two deterministic builds. The local-only
-  package is SHA-256
+- `Build-Release.ps1` passes 3/3 with two deterministic builds. The accepted
+  pre-integration package is SHA-256
   `eabb4785be75129cbc6cffcab030afc9e4afac32957fb7b82af2c16b0e0ac72a`;
   DLL SHA-256 is
   `6db3693e0ba38b3672bd0eac36b06df6e5965de29a3e78f9b97513c6accfe9e1`;
@@ -84,13 +84,21 @@ Native/Call-of-the-Wild Harmony inventory SHA-256 values are
 and `5631e630366ed72758547397ee03db6cbd9ed5fcbccdab5fdaf50ef6921bf0e4`.
 
 The guarded save resolver reports exactly `Disposable save ambiguity:
-baseline=0; working=0.` Therefore existing/new campaign load, four-button
-survival beyond the former expiry window, clicks, Setup/hotkey interaction,
-area transition, cutscene, world map, native-button isolation, and a log ending
-in `hudState=Installed` are `BLOCKED`, not passed. No unrelated automation or
-personal save was selected. The no-save log instead reports `active HUD
-unavailable`, which corroborates zero discovery but cannot prove installed
-button persistence. Every attempted runtime transaction is `Restored` with
+baseline=0; working=0.` Those guarded save-backed automation rows remain
+unavailable, and no unrelated save was substituted. The owner instead tested
+the exact guarded-installed build in a campaign and accepted the fix. The fresh
+log proves unloading suspension, one candidate creation, a temporary loading-
+screen raycast failure, the same candidate remaining pending, and final
+`Installed` state after 57 validation frames with four buttons and four
+listeners. Setup then passed both presentation phases and opened successfully.
+The full log SHA-256 is
+`6fec850ea76a8cf43983b20cf58a50cf84b98ef1b064181d052fadf54b055548`;
+the bounded excerpt and interpretation are in
+`planning/HUD-LIFECYCLE-0.0.12-HUMAN-ACCEPTANCE.md`. No Buff Planner exception
+appears. This human verdict satisfies the release gate without mislabeling the
+unavailable save-backed automation as executed.
+
+Every automated runtime transaction is `Restored` with
 `restorationVerified=true`; no game process or deployment lock remains.
 
 After explicit human authorization, guarded install
@@ -99,8 +107,10 @@ published 0.0.11 planner. Installed DLL/MVID match the local-only release above;
 `otherModsVerified=true`, `settingsPreserved=true`, and failure is null. Install
 result SHA-256 is
 `e1b42a8287718a2ee8aba625e6155cf9ba404e56efcf109bb16abf4798595f84`.
-No process or deployment lock remains. Version 0.0.12 is installed only for human
-testing; no merge, tag, or release publication occurred.
+No process or deployment lock remains. On 2026-08-24 the owner stated that the
+fix is acceptable and explicitly authorized merge to the default branch and a
+new incremented release. The public version before this action is 0.0.11, so the
+prepared new version is 0.0.12; 0.0.11 is not overwritten.
 
 ## 0.0.11 published crash and release qualification
 

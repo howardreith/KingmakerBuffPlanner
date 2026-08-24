@@ -19,8 +19,9 @@
 - Adds transition-level diagnostics and deterministic retry, expiry, staleness,
   lifecycle, and steady-state performance regression coverage.
 
-Version 0.0.12 is a local release candidate. It has not been tagged, merged, or
-published; the existing 0.0.11 release remains the current downloadable release.
+The owner accepted the guarded-installed campaign repair on 2026-08-24 and
+authorized a new `v0.0.12` release. Version 0.0.11 remains immutable and is not
+overwritten.
 
 ## 0.0.11 - Runtime performance repair
 
