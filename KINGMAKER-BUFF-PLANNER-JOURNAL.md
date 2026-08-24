@@ -8,7 +8,8 @@ Status: ROOT CAUSE PROVEN; FIXED OPENING-CAMERA RUNS PASS; CAMPAIGN REGRESSION I
 - Exact-build bisection proved the absent-HUD global `Object.FindObjectOfType<IngameMenuController>()` call consumed 18,874.614 ms in 228 frame callbacks over 20.080 seconds. Suppressing only HUD discovery on the same DLL changed 11.358 average FPS to 89.234 average FPS.
 - Fixed normal-path runs `perf-0.0.11-fixed-hud-on-1` and `perf-0.0.11-fixed-hud-on-2` averaged 89.236 and 88.671 FPS with zero global HUD searches and verified exact restoration. The source-only suite passes 32/32 source, 78/78 protocol, 8/8 filesystem, 4/4 package, and 5/5 deployment WhatIf checks.
 - Save-backed preflight found current third-party fixture drift. BagOfTricks, CallOfTheWild, and CheatMenu retain their exact recorded DLL and Info hashes and file counts; only their full-directory configuration/cache identities changed. CraftMagicItems is no longer installed or present in the lab, so it was removed from the current `human-reproduction` staging profile rather than recreated or written to the live Mods tree.
-- Exact next action: commit this fail-closed fixture rebind, rebuild the clean package, and run guarded Animated and Instant `live-ui-bootstrap` scenarios against only `KBP_AUTOMATION_WORKING`.
+- The save resolver contained the obsolete absolute user path `C:\Users\Howie`; it now derives the standard Kingmaker save root from the current `USERPROFILE`. The current account contains no save whose header is `KBP_AUTOMATION_BASELINE` or `KBP_AUTOMATION_WORKING`; unrelated automation and ordinary saves remain protected and ineligible.
+- Exact next action: commit this fail-closed harness correction, complete no-save runtime qualification, and retain save-backed campaign qualification as an explicit blocker until an authorized KBP pair is supplied.
 
 ## 2026-08-12 — 0.0.9 source consolidation and UI polish installed
 

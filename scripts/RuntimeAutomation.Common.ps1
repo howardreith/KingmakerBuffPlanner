@@ -121,7 +121,8 @@ function New-KbpRuntimeRequest {
 }
 
 function Get-KbpDisposableSavePair {
-    $saveRoot = 'C:\Users\Howie\AppData\LocalLow\Owlcat Games\Pathfinder Kingmaker\Saved Games'
+    $saveRoot = Join-Path $env:USERPROFILE `
+        'AppData\LocalLow\Owlcat Games\Pathfinder Kingmaker\Saved Games'
     if (-not (Test-Path -LiteralPath $saveRoot -PathType Container)) {
         throw 'The exact Kingmaker save root is unavailable.'
     }

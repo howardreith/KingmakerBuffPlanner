@@ -6,7 +6,8 @@
 - Exact diagnostic A/B: unfixed normal path `perf-0.0.11-unfixed-hud-on-2` averaged 11.358 FPS with 228 global HUD searches consuming 18,874.614 ms; same DLL with only discovery suppressed averaged 89.234 FPS. Fixed normal-path runs average 89.236 and 88.671 FPS with zero searches and exact transaction restoration.
 - Source-only gates pass 32/32, 78/78, 8/8, 4/4, and 5/5. Candidate package before the fixture-record commit is `912eabb41e87122c20ac3186293e3beff569bede2b4e849c423cee66d69803a4`; DLL `6c4bc51d2099cb12add499cbda3ca1caa964475bdd86e5dfc8ec81383fa8dadd`.
 - `human-reproduction` was rebound read-only to the exact currently installed BagOfTricks, CallOfTheWild, and CheatMenu fixture identities. Their primary binaries/Info files and file counts are unchanged; mutable directory content drifted. CraftMagicItems is absent locally and was not installed or reconstructed.
-- Exact next action: commit and rebuild, then run guarded `live-ui-bootstrap` Animated and Instant with the disposable working save; do not install or publish.
+- The guarded save resolver now uses the current Windows profile rather than obsolete `C:\Users\Howie`. No authorized `KBP_AUTOMATION_BASELINE` / `KBP_AUTOMATION_WORKING` pair exists under the current profile; unrelated saves are not eligible.
+- Exact next action: commit and rebuild, then finish no-save runtime gates. Save-backed Animated/Instant, campaign HUD, ordinary-area, world-map, and cutscene checks require a separately supplied authorized KBP save pair; do not substitute or rename another save, install, or publish.
 
 ## 0.0.9 final local handoff — 2026-08-12
 
