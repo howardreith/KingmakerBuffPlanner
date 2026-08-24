@@ -3,8 +3,8 @@
 ## 0.0.12 HUD lifecycle hotfix gate
 
 Status: BLOCKED in the guarded harness because the authorized save inventory is
-exactly baseline=0 and working=0; REQUIRED as a human campaign check. Use only the
-exact 0.0.12 local candidate and a normal personal campaign under human control,
+exactly baseline=0 and working=0; REQUIRED as a human campaign check. The exact
+0.0.12 candidate is guarded-installed. Use it with a normal personal campaign under human control,
 or the repository-authorized disposable pair through the guarded harness. Do not
 substitute another automation save.
 

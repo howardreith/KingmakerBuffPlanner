@@ -1,5 +1,16 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-08-24 - 0.0.12 guarded local installation for human testing
+
+Status: INSTALLED; IDENTITY/OTHER-MOD/SETTINGS GUARDS PASS; HUMAN CAMPAIGN TEST NEXT
+
+- Installation was explicitly authorized from clean branch `codex/kbp-hud-lifecycle-hotfix-0.0.12` at HEAD `2cb7edd8760cadbd80635d5a3280449ae4ea6528`. Kingmaker process count and deployment-lock state were both zero/false.
+- `Test-InstallWhatIf.ps1` passed package 4/4 and install purity 5/5. `Install-Local.ps1 -ReleaseManifestPath .\artifacts\release\0.0.12\release-manifest.json -InstallId hud-lifecycle-0.0.12-human-test-install-20260824 -ExpectedPriorVersion 0.0.11 -Confirm:$false` then replaced only the exact validated 0.0.11 planner.
+- Installed identity is version 0.0.12, DLL SHA-256 `6db3693e0ba38b3672bd0eac36b06df6e5965de29a3e78f9b97513c6accfe9e1`, MVID `920b3246-e7f7-4818-92f4-e54294ef2db0`, from package `eabb4785be75129cbc6cffcab030afc9e4afac32957fb7b82af2c16b0e0ac72a` and artifact source `083dfbfcf651d44bb01b302ccbbabac823e236e9`.
+- Evidence: `C:\Dev\KingmakerBuffPlannerLab\runtime-evidence\install-hud-lifecycle-0.0.12-human-test-install-20260824\install-result.json`, SHA-256 `e1b42a8287718a2ee8aba625e6155cf9ba404e56efcf109bb16abf4798595f84`. Result is `Installed`; `otherModsVerified=true`; `settingsPreserved=true`; failure is null. The exact prior planner is preserved under the transaction-owned backup path.
+- Post-install audit: installed Info/DLL/MVID are exact; repository worktree is clean; Kingmaker process count is zero; deployment lock is absent. No merge, tag, or release publication occurred.
+- Remaining uncertainty is the intended human campaign verdict: load an existing campaign, wait beyond the former expiry window, exercise all four controls/hotkey/transition, and report the `[KBP-BOOT]` lifecycle evidence. Exact next action is the 0.0.12 checklist at the top of `docs/MANUAL-ACCEPTANCE.md`.
+
 ## 2026-08-24 - 0.0.12 HUD lifecycle hotfix engineering handoff
 
 Status: SOURCE/DETERMINISTIC/PERFORMANCE/NATIVE/OPTIONAL PASS; CAMPAIGN HUD ROWS BLOCKED BY ABSENT AUTHORIZED SAVE PAIR; LOCAL-ONLY

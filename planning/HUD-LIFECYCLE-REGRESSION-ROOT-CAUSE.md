@@ -102,4 +102,5 @@ pass. Campaign persistence of the row cannot be observed because the authorized
 save resolver returns baseline=0 and working=0. Exact next action is the human
 campaign checklist in `docs/MANUAL-ACCEPTANCE.md` or the same guarded scenario
 after a distinct authorized save pair is supplied. Do not substitute a save,
-merge, tag, install, or publish.
+merge, tag, or publish. The exact candidate was later guarded-installed only after
+separate human authorization.

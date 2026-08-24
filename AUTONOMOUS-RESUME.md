@@ -7,8 +7,9 @@
 - The repair uses typed attempt/candidate/lifecycle states, one retry per 30 active-HUD frames, explicit unload/disable suspension, candidate-expiry and stale-anchor feedback, complete held-reference hosting-chain validation, and scoped `GetComponentInChildren<IngameMenuController>(true)` discovery only. Deferred placement/glyph/raycast validation remains intact.
 - Exact qualified artifact source `083dfbfcf651d44bb01b302ccbbabac823e236e9` passes source 34/34, protocol 91/91, runtime filesystem 8/8, package 4/4, deployment WhatIf 5/5, aggregate 1/1, warning-free Release compilation 1/1, and deterministic release 2/2. ZIP/DLL/MVID are `eabb4785be75129cbc6cffcab030afc9e4afac32957fb7b82af2c16b0e0ac72a` / `6db3693e0ba38b3672bd0eac36b06df6e5965de29a3e78f9b97513c6accfe9e1` / `920b3246-e7f7-4818-92f4-e54294ef2db0`.
 - Guarded performance run `hud-lifecycle-0.0.12-performance-1` passes 9/9 at 88.780 average FPS, all 18 moving samples at 90.710-90.896 FPS, zero HUD searches/absent-HUD dispatches, and exact restoration. Native 12/12 and Call of the Wild 26/26 pass and restore. The unchanged repeat honestly rejected a 49.810 FPS non-moving startup bucket while every moving sample remained at least 88.940 FPS.
+- Explicitly authorized guarded install `hud-lifecycle-0.0.12-human-test-install-20260824` is `Installed`; exact DLL/MVID match, `otherModsVerified=true`, `settingsPreserved=true`, no process/lock remains, and install-result SHA-256 is `e1b42a8287718a2ee8aba625e6155cf9ba404e56efcf109bb16abf4798595f84`.
 - Exact authorized save audit is `Disposable save ambiguity: baseline=0; working=0.` Campaign HUD survival/click/input/transition rows therefore remain blocked; unrelated automation and personal saves must not be substituted.
-- Exact next action: commit final evidence, rerun source-only validation, guarded-push the dedicated branch, and hand off the human campaign checklist. Do not merge, install, tag, or publish.
+- Exact next action: human runs the installed 0.0.12 campaign checklist and returns the final `[KBP-BOOT]` lifecycle evidence. Do not merge, tag, or publish.
 
 ## 0.0.11 published completion - 2026-08-23
 

@@ -18,8 +18,10 @@ ZIP/DLL/MVID are `eabb4785be75129cbc6cffcab030afc9e4afac32957fb7b82af2c16b0e0ac7
 88.780 average FPS with zero searches and exact restoration; native and Call of
 the Wild pass 12/12 and 26/26. Exact authorized save inventory is baseline=0 and
 working=0, so campaign HUD survival, clicks, transitions, cutscene/world-map, and
-installed-state log evidence remain blocked rather than inferred. No merge, tag,
-install, or publication is authorized.
+installed-state log evidence remain blocked rather than inferred. Explicitly
+authorized guarded install `hud-lifecycle-0.0.12-human-test-install-20260824`
+completed with exact identity, settings preservation, and all other mods verified.
+No merge, tag, or publication is authorized.
 
 ## 2026-08-23 0.0.11 release completion checkpoint
 

@@ -3,7 +3,8 @@
 ## 0.0.12 HUD lifecycle hotfix
 
 Status: SOURCE/BEHAVIOR/DETERMINISTIC PACKAGE/PERFORMANCE/NATIVE/OPTIONAL PASS;
-SAVE-BACKED CAMPAIGN HUD QUALIFICATION BLOCKED BY ABSENT AUTHORIZED FIXTURES.
+GUARDED-INSTALLED FOR HUMAN TESTING; SAVE-BACKED AUTOMATION BLOCKED BY ABSENT
+AUTHORIZED FIXTURES.
 
 - Start: clean fetched `origin/main` at
   `4a83aec19e0f6098e23b2965b3992c328136c576`, version 0.0.11; branch
@@ -92,8 +93,14 @@ unavailable`, which corroborates zero discovery but cannot prove installed
 button persistence. Every attempted runtime transaction is `Restored` with
 `restorationVerified=true`; no game process or deployment lock remains.
 
-Version 0.0.12 remains locally prepared only. No merge, install, tag, or release
-publication occurred.
+After explicit human authorization, guarded install
+`hud-lifecycle-0.0.12-human-test-install-20260824` replaced only the verified
+published 0.0.11 planner. Installed DLL/MVID match the local-only release above;
+`otherModsVerified=true`, `settingsPreserved=true`, and failure is null. Install
+result SHA-256 is
+`e1b42a8287718a2ee8aba625e6155cf9ba404e56efcf109bb16abf4798595f84`.
+No process or deployment lock remains. Version 0.0.12 is installed only for human
+testing; no merge, tag, or release publication occurred.
 
 ## 0.0.11 published crash and release qualification
 

@@ -4,7 +4,8 @@ Version 0.0.12 repairs the lower-left Buff Planner controls disappearing during
 campaign load while retaining the 0.0.11 performance correction.
 
 This is a local release candidate only. It has not been merged to `main`, tagged,
-or published. Install or publication requires separate human authorization.
+or published. Guarded local installation for human testing was separately
+authorized and completed; publication still requires separate authorization.
 
 ## HUD lifecycle repair
 
@@ -70,4 +71,5 @@ The repository-authorized save resolver found zero `KBP_AUTOMATION_BASELINE`
 and zero `KBP_AUTOMATION_WORKING` fixtures. Campaign button survival, clicks,
 hotkey interaction, transition/cutscene/world-map rows, and installed-state log
 evidence remain explicitly blocked; no unrelated save was substituted. This
-candidate is not merged, tagged, installed, or published.
+candidate is guarded-installed for human testing, but is not merged, tagged, or
+published.
