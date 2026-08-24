@@ -10,9 +10,9 @@
       "assemblyName": "BagOfTricks.dll",
       "infoSha256": "891c4a7864d2dd556a4628bcb19a8f6239a2bfbec9399f81e2414badc6de2974",
       "assemblySha256": "d03626594ece0f339aeef03ec7259684af7ddeb8b2edf41936f144848059a0e6",
-      "directoryManifestSha256": "982ce05c31ea0d4164d4ec37991a4f05ce63caaeefbddd95650f44bcb8050eb0",
+      "directoryManifestSha256": "34d89823b1dc4e4be21a8a9053724abb444cd9f9a6857c6c5406afd62197f426",
       "fileCount": 41,
-      "totalBytes": 1806305
+      "totalBytes": 1805907
     },
     {
       "ummId": "CallOfTheWild",
@@ -21,9 +21,9 @@
       "assemblyName": "CallOfTheWild.dll",
       "infoSha256": "32c0bc48c26eb22787e99fb1eb86d074df2cd7dcfe4804ce8eb381a3a589d44d",
       "assemblySha256": "4ebf8e1ed3e66ffed72ea33ea325595629423dacd5bffa23e3c9109144b26915",
-      "directoryManifestSha256": "32b2f632d44b5c1bb20b4be70841e0fe7d511b01346c06ba4e0c336e788afcfe",
+      "directoryManifestSha256": "3f1758b235820f3f64671cf4da5490afc5319ab40fce3a0e07d175b0d67a7a9c",
       "fileCount": 266,
-      "totalBytes": 66181501
+      "totalBytes": 66186003
     },
     {
       "ummId": "CheatMenu",
@@ -33,20 +33,9 @@
       "infoSha256": "c53e29e5ec0d221be4dfea1228f27cacd99660e75124b61f4f81afa3ef2a0274",
       "assemblySha256": "7d659eb092073ab9e059414f8bfbdfe46991cede56b394f58f7ea2bcc1ff0845",
       "loadedAssemblySha256": "8a7525e061cbe4ad83ec2720e9ee97f9b536a6cd8e7dadee3a44ef2ea9343b84",
-      "directoryManifestSha256": "784e33400f595e72b6f78db620f564ba9e9dfe66749e79d19acc0eaca9fc6bad",
+      "directoryManifestSha256": "97f78227fb945c8e5e3b4fdd87e78e72ef3cda64500679ffcaf46c2aae44612a",
       "fileCount": 3,
       "totalBytes": 30594
-    },
-    {
-      "ummId": "CraftMagicItems",
-      "directoryName": "CraftMagicItems",
-      "version": "2.1.0",
-      "assemblyName": "CraftMagicItems.dll",
-      "infoSha256": "55c5a948f0f0afdcd45c81a5c528d667aec0dd5af166b1761b72b44b67ae533b",
-      "assemblySha256": "f7c06f32f18932e67bd8e36fa380bf593ec1e88a262c9f9ddb0812bc1d8b209a",
-      "directoryManifestSha256": "70936e5099c833a97b2607d3b3e68b8f76b05045c2e73a677d3c1337624a4e8e",
-      "fileCount": 21,
-      "totalBytes": 675775
     }
   ],
   "expectedBlueprints": []

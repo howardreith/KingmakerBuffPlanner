@@ -1,5 +1,15 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-08-23 - 0.0.11 performance-repair runtime fixture checkpoint
+
+Status: ROOT CAUSE PROVEN; FIXED OPENING-CAMERA RUNS PASS; CAMPAIGN REGRESSION IN PROGRESS
+
+- Branch `codex/kbp-performance-regression-0.0.11` started clean from `main` commit `c06793d2238577093b96a2dc3172839070e7d69a`. Diagnostic commits are `e077082643af63aa4ed29503eda7ae44604ae4c8` and `f45d04f341007d988f64de8d8a809fd53144ebbc`; production fix commit is `f23a07b7560b2aa4cd7b3d1635436c3abffd575a`.
+- Exact-build bisection proved the absent-HUD global `Object.FindObjectOfType<IngameMenuController>()` call consumed 18,874.614 ms in 228 frame callbacks over 20.080 seconds. Suppressing only HUD discovery on the same DLL changed 11.358 average FPS to 89.234 average FPS.
+- Fixed normal-path runs `perf-0.0.11-fixed-hud-on-1` and `perf-0.0.11-fixed-hud-on-2` averaged 89.236 and 88.671 FPS with zero global HUD searches and verified exact restoration. The source-only suite passes 32/32 source, 78/78 protocol, 8/8 filesystem, 4/4 package, and 5/5 deployment WhatIf checks.
+- Save-backed preflight found current third-party fixture drift. BagOfTricks, CallOfTheWild, and CheatMenu retain their exact recorded DLL and Info hashes and file counts; only their full-directory configuration/cache identities changed. CraftMagicItems is no longer installed or present in the lab, so it was removed from the current `human-reproduction` staging profile rather than recreated or written to the live Mods tree.
+- Exact next action: commit this fail-closed fixture rebind, rebuild the clean package, and run guarded Animated and Instant `live-ui-bootstrap` scenarios against only `KBP_AUTOMATION_WORKING`.
+
 ## 2026-08-12 — 0.0.9 source consolidation and UI polish installed
 
 Status: AUTOMATION PASS; GUARDED-INSTALLED; HUMAN VISUAL VERDICT REQUIRED; LOCAL-ONLY
