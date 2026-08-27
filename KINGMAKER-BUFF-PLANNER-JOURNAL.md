@@ -1,5 +1,37 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-08-27 - 0.0.13 install acceptance and release authorization
+
+Status: GUARDED-INSTALLED; OWNER ACCEPTED; MERGE/PUSH/NEW RELEASE AUTHORIZED
+
+- Pre-record branch/HEAD/version:
+  `codex/brown-fur-powerful-change-fix` /
+  `07370364b3ff4e5fc3cc2b2842b24cd079fdec63` / `0.0.13`; clean worktree.
+- Installed audit first found UMM 0.0.12 DLL
+  `1964b0220fd0ddd4a15009900a30ee3ec3af83c4d90b022eebb87d27cde03cac`,
+  not the current 0.0.13 candidate. No Kingmaker or UMM process was running.
+- `Install-Local.ps1 -WhatIf` passed package validation 4/4 and proved no
+  mutation. The matching live transaction
+  `brown-fur-powerful-change-0.0.13-install-20260827` then passed and installed
+  exact package/DLL/MVID
+  `9182e45cc5e31c137062ac9d2252a80836effc7bf8506676f303ed5276a7aa63` /
+  `6e88ea23d54fb1e3ab7e7dc264129592ea36739c96fe6bb49f9d75890b216551` /
+  `3a61d90c-74b2-4944-b68d-6e2229fd3eb4`.
+- Independent post-check: UMM ID/version `KingmakerBuffPlanner`/`0.0.13`,
+  `status=Installed`, `settingsPreserved=true`, `otherModsVerified=true`, stage
+  removed, recovery backup retained, clean worktree. Install-result SHA-256:
+  `e546995c3c6fe0f63ef16e7ba729894794f6d545c9fb96c83cb34bb6f0dc957a`.
+- Owner verdict: `This is acceptable.` Explicit authorization covers final
+  commit, merge to default `main`, remote `main` push, and a new release.
+- GitHub preflight passes authentication and repository/default-branch identity;
+  `origin/main=1a568c8af22b4c4f547be5ebb3a9ae8af86a931c`, and `v0.0.13` has no tag or
+  release. After release-facing edits, `Test-SourceOnly.ps1` passes source
+  34/34, protocol/domain 95/95, runtime filesystem 8/8, package 4/4, deployment
+  WhatIf 5/5, and aggregate 1/1. Direct cross-mod numerical runtime behavior
+  remains unclaimed. Exact next action: commit these records, run the
+  deterministic release gate, merge, guarded-push, publish, download/validate,
+  and record the exact remote result.
+
 ## 2026-08-27 - 0.0.13 deterministic local artifact
 
 - Clean release-source branch/HEAD/version:

@@ -1,5 +1,22 @@
 # CODEX AUTONOMOUS MISSION
 
+## 2026-08-27 0.0.13 install acceptance/publication checkpoint
+
+At clean feature HEAD `07370364b3ff4e5fc3cc2b2842b24cd079fdec63`, the
+guarded installer dry-run passed, then exact 0.0.13 replaced live UMM 0.0.12.
+Package/DLL/MVID are `9182e45cc5e31c137062ac9d2252a80836effc7bf8506676f303ed5276a7aa63` /
+`6e88ea23d54fb1e3ab7e7dc264129592ea36739c96fe6bb49f9d75890b216551` /
+`3a61d90c-74b2-4944-b68d-6e2229fd3eb4`; settings and every non-planner mod were
+preserved, staging was removed, and install evidence hashes to
+`e546995c3c6fe0f63ef16e7ba729894794f6d545c9fb96c83cb34bb6f0dc957a`.
+The owner accepted the candidate and explicitly authorized final commit, merge
+to default `main`, remote `main` push, and a new release. GitHub preflight found
+public `howardreith/KingmakerBuffPlanner`, default `main` at
+`1a568c8af22b4c4f547be5ebb3a9ae8af86a931c`, with no existing `v0.0.13` tag
+or release. Numerical cross-mod campaign results remain unclaimed. Exact next
+action is full qualification, guarded integration/push, publication, and remote
+artifact verification.
+
 ## 2026-08-27 0.0.13 deterministic artifact checkpoint
 
 Exact release-source branch/HEAD/version are

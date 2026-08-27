@@ -263,6 +263,25 @@ in-game cast on a real Brown-Fur character can prove the cross-mod Harmony
 transaction, exact reservoir debit, resulting +6/+8 modifier, non-stacking
 recast behavior, and ordinary unselected +4 result for the diagnostic build.
 
+## Install acceptance and publication authorization - 2026-08-27
+
+- Pre-record branch/HEAD/version:
+  `codex/brown-fur-powerful-change-fix` /
+  `07370364b3ff4e5fc3cc2b2842b24cd079fdec63` / `0.0.13`.
+- Guarded installer dry-run passed; live transaction
+  `brown-fur-powerful-change-0.0.13-install-20260827` upgraded UMM from 0.0.12
+  to the exact candidate, preserved settings, verified other mods unchanged,
+  and removed staging. Install-result SHA-256 is
+  `e546995c3c6fe0f63ef16e7ba729894794f6d545c9fb96c83cb34bb6f0dc957a`.
+- The owner accepted the candidate and authorized final commit, merge to the
+  default `main` branch, remote `main` push, and a new public release.
+- This authorization accepts publication with the explicitly documented runtime
+  caveat; it does not relabel the unexecuted cross-mod numerical checklist as a
+  PASS. The release-facing record edit passes `Test-SourceOnly.ps1`: source
+  34/34, protocol/domain 95/95, runtime filesystem 8/8, package 4/4, deployment
+  WhatIf 5/5, aggregate 1/1. Exact next action is the deterministic release gate,
+  guarded integration/publication, and remote artifact verification.
+
 Exact next action: use the artifact above with the bounded procedure in
 `docs/MANUAL-ACCEPTANCE.md` and record the real reservoir/modifier/toggle
 outcomes. Do not claim runtime qualification until that evidence exists.

@@ -1,14 +1,15 @@
 # Autonomous Blockers
 
-0.0.13 Powerful Change diagnostic repair, 2026-08-27: no source, architecture,
-deterministic-test, package-allowlist, or deployment-WhatIf blocker. The former
-FEATURE-NOT-PRESENT record is superseded: the installed CallOfTheWild assembly
-still does not itself publish Brown-Fur, but the now-installed independent
-optional module does, and its exact feature/toggle/resource/cast contracts were
-inventoried read-only. The remaining gate is real-campaign cross-mod execution:
-prove the exact reservoir delta, +6/+8 modifier, ordinary +4 control, and
-non-stacking/rearm behavior for the 0.0.13 artifact. No remote or publication
-action is authorized. The deterministic local ZIP is
+0.0.13 Powerful Change repair, 2026-08-27: no source, architecture,
+deterministic-test, package-allowlist, deployment, installation, authentication,
+merge, or publication-authorization blocker. Exact 0.0.13 is guarded-installed;
+settings are preserved and every unrelated mod is verified unchanged. The owner
+accepted the candidate and explicitly authorized final commit, merge to default
+`main`, remote `main` push, and a new public release. Direct real-campaign
+cross-mod execution still has no captured evidence for the exact reservoir
+delta, +6/+8 modifier, ordinary +4 control, and non-stacking/rearm behavior; it
+is an honestly documented post-release diagnostic caveat, not a claimed PASS.
+The deterministic ZIP is
 `artifacts/release/0.0.13/KingmakerBuffPlanner-0.0.13.zip`, SHA-256
 `9182e45cc5e31c137062ac9d2252a80836effc7bf8506676f303ed5276a7aa63`.
 

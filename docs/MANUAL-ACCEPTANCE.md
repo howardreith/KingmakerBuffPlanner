@@ -1,9 +1,12 @@
 # Manual Acceptance
 
-## 0.0.13 Powerful Change diagnostic gate
+## 0.0.13 Powerful Change post-release verification
 
-Status: REQUIRED. Use the local 0.0.13 diagnostic package; this checklist does
-not authorize a push, release, or modification of another mod.
+Status: RECOMMENDED DIAGNOSTIC FOLLOW-UP. The owner accepted the exact installed
+candidate and authorized publication on 2026-08-27. That acceptance authorizes
+the release but does not manufacture numerical in-game evidence; use this
+checklist to verify the remaining cross-mod runtime boundary. It never
+authorizes modification of another mod.
 
 Exact artifact: `artifacts/release/0.0.13/KingmakerBuffPlanner-0.0.13.zip`;
 release-source commit `f086c0257c8c8636cd5af0df9ca37c4f5ac7f794`;

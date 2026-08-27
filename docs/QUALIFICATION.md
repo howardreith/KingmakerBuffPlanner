@@ -1,8 +1,9 @@
 # Qualification
 
-## 0.0.13 Powerful Change diagnostic qualification
+## 0.0.13 Powerful Change qualification
 
-Status: AUTOMATED/STATIC PASS; REAL-CAMPAIGN CROSS-MOD CAST PENDING.
+Status: AUTOMATED/STATIC PASS; GUARDED INSTALL PASS; OWNER ACCEPTED PUBLICATION;
+REAL-CAMPAIGN CROSS-MOD NUMERICAL RESULTS NOT CLAIMED.
 
 Proven automatically or by exact read-only contract inspection:
 
@@ -28,7 +29,15 @@ Exact release-source commit is
 `6e88ea23d54fb1e3ab7e7dc264129592ea36739c96fe6bb49f9d75890b216551` /
 `3a61d90c-74b2-4944-b68d-6e2229fd3eb4`. Package validation passes 4/4, and a
 reflection-only audit finds zero compile-time optional gameplay-mod references.
-The release manifest records `publicationStatus=local-only`.
+The pre-publication release manifest records `publicationStatus=local-only`, as
+required by the guarded local installer. Install transaction
+`brown-fur-powerful-change-0.0.13-install-20260827` upgraded UMM from 0.0.12 to
+the exact 0.0.13 DLL/MVID, preserved all planner settings, verified every other
+mod unchanged, removed staging, and retained a recovery backup. Its
+`install-result.json` SHA-256 is
+`e546995c3c6fe0f63ef16e7ba729894794f6d545c9fb96c83cb34bb6f0dc957a`.
+The owner accepted this candidate and explicitly authorized merge, push, and a
+new public release on 2026-08-27.
 
 Not yet proven for this Buff Planner build: a real Brown-Fur cast invoking the
 other mod's Harmony transaction, exact reservoir delta, resulting Bull's

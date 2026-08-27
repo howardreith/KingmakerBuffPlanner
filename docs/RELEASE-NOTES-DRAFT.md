@@ -1,8 +1,9 @@
-# Kingmaker Buff Planner 0.0.13 diagnostic build
+# Kingmaker Buff Planner 0.0.13
 
 Version 0.0.13 repairs Powerful Change discovery and execution for the optional
 Brown-Fur Transmuter implementation used with Call of the Wild's Arcanist.
-This is a local diagnostic build; it has not been pushed or published.
+The owner accepted the validated, guarded-installed candidate on 2026-08-27 and
+authorized this public release.
 
 ## Root cause and repair
 
@@ -59,7 +60,10 @@ carriers, the expected Bull's Strength capability cases, wrong caster and
 spellbook rejection, unrelated spells, selected mass variants, shared reservoir
 reservation, mandatory native-command routing, and one-shot cleanup.
 
-Real-campaign verification is still required for the cross-mod Harmony
-transaction, one-point reservoir debit, final +6 Bull's Strength modifier (+8
-with Transmutation Supremacy), ordinary unselected +4 result, and repeated-cast
-non-stacking behavior. See `docs/MANUAL-ACCEPTANCE.md` for the short procedure.
+Direct real-campaign evidence has not yet been captured for the cross-mod
+Harmony transaction, one-point reservoir debit, final +6 Bull's Strength
+modifier (+8 with Transmutation Supremacy), ordinary unselected +4 result, and
+repeated-cast non-stacking behavior. The release keeps focused diagnostics for
+that verification boundary; see `docs/MANUAL-ACCEPTANCE.md` for the short
+procedure. These numerical runtime results are not claimed by the automated
+qualification.
