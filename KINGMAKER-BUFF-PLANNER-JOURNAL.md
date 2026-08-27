@@ -1,5 +1,26 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-08-27 - 0.0.13 deterministic local artifact
+
+- Clean release-source branch/HEAD/version:
+  `codex/brown-fur-powerful-change-fix` /
+  `f086c0257c8c8636cd5af0df9ca37c4f5ac7f794` / `0.0.13`.
+- `Build-Release.ps1` passes source 34/34 and build 1/1 twice, package
+  validation 4/4, deterministic equality 2/2, and release builder 3/3.
+  `Test-SourceOnly.ps1` passes source 34/34, protocol/domain 95/95,
+  runtime-filesystem 8/8, package 4/4, deployment WhatIf 5/5, aggregate 1/1.
+- Local-only ZIP:
+  `artifacts/release/0.0.13/KingmakerBuffPlanner-0.0.13.zip`; SHA-256
+  `9182e45cc5e31c137062ac9d2252a80836effc7bf8506676f303ed5276a7aa63`.
+  DLL SHA-256 is
+  `6e88ea23d54fb1e3ab7e7dc264129592ea36739c96fe6bb49f9d75890b216551`;
+  MVID is `3a61d90c-74b2-4944-b68d-6e2229fd3eb4`.
+- Package allowlist and identity/version validate 4/4. Reflection-only assembly
+  audit finds zero compile-time optional gameplay-mod references.
+- No install, launch, push, tag, remote mutation, or publication occurred. Exact
+  next action is the real-campaign Powerful Change checklist in
+  `docs/MANUAL-ACCEPTANCE.md`; numerical/resource qualification remains pending.
+
 ## 2026-08-27 - 0.0.13 Powerful Change diagnostic engineering checkpoint
 
 - Started from a clean `main` worktree at

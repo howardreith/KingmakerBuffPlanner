@@ -8,7 +8,9 @@ optional module does, and its exact feature/toggle/resource/cast contracts were
 inventoried read-only. The remaining gate is real-campaign cross-mod execution:
 prove the exact reservoir delta, +6/+8 modifier, ordinary +4 control, and
 non-stacking/rearm behavior for the 0.0.13 artifact. No remote or publication
-action is authorized.
+action is authorized. The deterministic local ZIP is
+`artifacts/release/0.0.13/KingmakerBuffPlanner-0.0.13.zip`, SHA-256
+`9182e45cc5e31c137062ac9d2252a80836effc7bf8506676f303ed5276a7aa63`.
 
 0.0.12 HUD lifecycle hotfix, 2026-08-24: COMPLETE; no source, deterministic-build, performance, native, optional, packaging, installation, restoration, human-acceptance, integration, authentication, or publication blocker. Release `v0.0.12` is published from `a48bfae2185a50f1c50d9151666e0b5ce0a0bc3e`; downloaded assets validate, and exact published bytes are guarded-installed with settings and every other mod preserved. Save-backed automation remains unavailable at baseline=0/working=0 and is not falsely claimed, but the owner accepted the campaign behavior and authorized release. Version 0.0.11 remains a separate intact release.
 

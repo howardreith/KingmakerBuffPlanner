@@ -28,8 +28,13 @@ follow the same policy.
 
 Implementation/test checkpoint commit:
 `650605aaf2c1c1f7272893074b5e7ad7ed9a9224`. Diagnostic version: `0.0.13`.
-The deterministic source slice passes; exact release-source/package identities
-are recorded after the clean-head release build. Cross-mod numerical behavior
+Exact release-source commit:
+`f086c0257c8c8636cd5af0df9ca37c4f5ac7f794`. The deterministic local package
+is `artifacts/release/0.0.13/KingmakerBuffPlanner-0.0.13.zip`; ZIP SHA-256 is
+`9182e45cc5e31c137062ac9d2252a80836effc7bf8506676f303ed5276a7aa63`,
+DLL SHA-256 is
+`6e88ea23d54fb1e3ab7e7dc264129592ea36739c96fe6bb49f9d75890b216551`,
+and MVID is `3a61d90c-74b2-4944-b68d-6e2229fd3eb4`. Cross-mod numerical behavior
 remains an explicit in-game acceptance item rather than an automated claim.
 
 ## 0.0.12 HUD lifecycle repair

@@ -1,7 +1,7 @@
 # Brown-Fur Powerful Change repair
 
-Status: implementation and deterministic regression slice complete; release
-qualification pending
+Status: implementation and deterministic diagnostic packaging complete;
+real-campaign verification pending
 
 ## Intake checkpoint — 2026-08-27
 
@@ -203,6 +203,45 @@ spellbook rejection, unrelated-spell rejection, selected mass-variant
 identity, shared reservoir reservation across score options, mandatory native
 command routing, and non-restoration of a consumed one-shot selection.
 
+## Deterministic diagnostic artifact checkpoint - 2026-08-27
+
+- Branch: `codex/brown-fur-powerful-change-fix`
+- Exact release-source HEAD:
+  `f086c0257c8c8636cd5af0df9ca37c4f5ac7f794`
+- Version: `0.0.13`
+- Command: `./scripts/Build-Release.ps1`
+  - source validation PASS `34`, FAIL `0` on both builds;
+  - product build PASS `1`, FAIL `0` on both builds;
+  - package validation PASS `4`, FAIL `0` on both local builds and the copied
+    release artifact;
+  - deterministic byte equality PASS `2`, FAIL `0`;
+  - release builder PASS `3`, FAIL `0`.
+- Command: `./scripts/Test-SourceOnly.ps1`
+  - source validation PASS `34`, FAIL `0`;
+  - protocol/domain tests PASS `95`, FAIL `0`;
+  - runtime-harness filesystem tests PASS `8`, FAIL `0`;
+  - package validation PASS `4`, FAIL `0`;
+  - deployment WhatIf purity PASS `5`, FAIL `0`;
+  - source-only wrapper PASS `1`, FAIL `0`.
+- Command: `./scripts/validate-package.ps1 -PackagePath
+  ./artifacts/release/0.0.13/KingmakerBuffPlanner-0.0.13.zip`: PASS `4`,
+  FAIL `0`.
+- Package:
+  `artifacts/release/0.0.13/KingmakerBuffPlanner-0.0.13.zip`
+- Package SHA-256:
+  `9182e45cc5e31c137062ac9d2252a80836effc7bf8506676f303ed5276a7aa63`
+- DLL SHA-256:
+  `6e88ea23d54fb1e3ab7e7dc264129592ea36739c96fe6bb49f9d75890b216551`
+- Assembly MVID: `3a61d90c-74b2-4944-b68d-6e2229fd3eb4`
+- Package allowlist: `Info.json`, `KingmakerBuffPlanner.dll`,
+  `NativeEffectOverrides.json`, and `THIRD-PARTY-NOTICES.md`, all under the
+  one correct mod directory with deterministic timestamps.
+- Reflection-only assembly audit: version `0.0.13.0`, zero optional gameplay-mod
+  references; only the established Kingmaker/Unity/UMM/Harmony/Newtonsoft/system
+  references are present.
+- Publication status: local-only. The artifact was not installed, pushed,
+  tagged, or published. No file in another mod was changed.
+
 ## Baseline validation
 
 Command: `./scripts/Test-SourceOnly.ps1`
@@ -224,6 +263,6 @@ in-game cast on a real Brown-Fur character can prove the cross-mod Harmony
 transaction, exact reservoir debit, resulting +6/+8 modifier, non-stacking
 recast behavior, and ordinary unselected +4 result for the diagnostic build.
 
-Exact next action: create the clean release-source checkpoint, run deterministic
-release build/package validation, and record the distributable/DLL/MVID hashes
-without installing, pushing, or publishing it.
+Exact next action: use the artifact above with the bounded procedure in
+`docs/MANUAL-ACCEPTANCE.md` and record the real reservoir/modifier/toggle
+outcomes. Do not claim runtime qualification until that evidence exists.

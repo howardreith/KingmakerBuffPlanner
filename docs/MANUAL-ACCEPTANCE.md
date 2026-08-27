@@ -5,6 +5,14 @@
 Status: REQUIRED. Use the local 0.0.13 diagnostic package; this checklist does
 not authorize a push, release, or modification of another mod.
 
+Exact artifact: `artifacts/release/0.0.13/KingmakerBuffPlanner-0.0.13.zip`;
+release-source commit `f086c0257c8c8636cd5af0df9ca37c4f5ac7f794`;
+ZIP SHA-256
+`9182e45cc5e31c137062ac9d2252a80836effc7bf8506676f303ed5276a7aa63`;
+DLL SHA-256
+`6e88ea23d54fb1e3ab7e7dc264129592ea36739c96fe6bb49f9d75890b216551`;
+MVID `3a61d90c-74b2-4944-b68d-6e2229fd3eb4`.
+
 1. Load a campaign containing a Brown-Fur Transmuter who owns Powerful Change,
    knows Bull's Strength in the CotW Arcanist casting spellbook, and has at least
    four Arcane Reservoir points. Record caster level and whether Transmutation

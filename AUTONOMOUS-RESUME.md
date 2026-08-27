@@ -3,7 +3,8 @@
 ## 0.0.13 Powerful Change diagnostic repair - 2026-08-27
 
 - Active local branch: `codex/brown-fur-powerful-change-fix`; implementation
-  checkpoint: `650605aaf2c1c1f7272893074b5e7ad7ed9a9224`; working version: 0.0.13.
+  checkpoint: `650605aaf2c1c1f7272893074b5e7ad7ed9a9224`; exact release source:
+  `f086c0257c8c8636cd5af0df9ca37c4f5ac7f794`; version: 0.0.13.
 - The old selector was empty because Buff Planner implemented rods only and
   rejected every class-feature enhancement. Installed-provider inspection
   disproved wrong Bull's Strength structure, rank mismatch, UI filtering,
@@ -14,10 +15,14 @@
   choices, and routes the real toggle through native command execution. It has
   no compile-time optional-mod dependency and fails safely when absent.
 - Automated status: source 34/34, protocol/domain 95/95, runtime filesystem 8/8,
-  package 4/4, deployment WhatIf 5/5, aggregate 1/1. No remote action occurred.
-- Exact next action: commit the version/durable-record release-source checkpoint,
-  run clean-head deterministic packaging, record ZIP/DLL/MVID hashes, and leave
-  the real-campaign checklist in `docs/MANUAL-ACCEPTANCE.md` pending.
+  package 4/4, deployment WhatIf 5/5, aggregate 1/1, deterministic release 2/2.
+  Local ZIP/DLL/MVID are
+  `9182e45cc5e31c137062ac9d2252a80836effc7bf8506676f303ed5276a7aa63` /
+  `6e88ea23d54fb1e3ab7e7dc264129592ea36739c96fe6bb49f9d75890b216551` /
+  `3a61d90c-74b2-4944-b68d-6e2229fd3eb4`. No install or remote action occurred.
+- Exact next action: run the bounded real-campaign procedure in
+  `docs/MANUAL-ACCEPTANCE.md`; do not claim cross-mod resource/modifier
+  qualification until it passes.
 
 ## 0.0.12 published completion - 2026-08-24
 
