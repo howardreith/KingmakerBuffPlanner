@@ -1,5 +1,91 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-08-27 - 0.0.13 install acceptance and release authorization
+
+Status: GUARDED-INSTALLED; OWNER ACCEPTED; MERGE/PUSH/NEW RELEASE AUTHORIZED
+
+- Pre-record branch/HEAD/version:
+  `codex/brown-fur-powerful-change-fix` /
+  `07370364b3ff4e5fc3cc2b2842b24cd079fdec63` / `0.0.13`; clean worktree.
+- Installed audit first found UMM 0.0.12 DLL
+  `1964b0220fd0ddd4a15009900a30ee3ec3af83c4d90b022eebb87d27cde03cac`,
+  not the current 0.0.13 candidate. No Kingmaker or UMM process was running.
+- `Install-Local.ps1 -WhatIf` passed package validation 4/4 and proved no
+  mutation. The matching live transaction
+  `brown-fur-powerful-change-0.0.13-install-20260827` then passed and installed
+  exact package/DLL/MVID
+  `9182e45cc5e31c137062ac9d2252a80836effc7bf8506676f303ed5276a7aa63` /
+  `6e88ea23d54fb1e3ab7e7dc264129592ea36739c96fe6bb49f9d75890b216551` /
+  `3a61d90c-74b2-4944-b68d-6e2229fd3eb4`.
+- Independent post-check: UMM ID/version `KingmakerBuffPlanner`/`0.0.13`,
+  `status=Installed`, `settingsPreserved=true`, `otherModsVerified=true`, stage
+  removed, recovery backup retained, clean worktree. Install-result SHA-256:
+  `e546995c3c6fe0f63ef16e7ba729894794f6d545c9fb96c83cb34bb6f0dc957a`.
+- Owner verdict: `This is acceptable.` Explicit authorization covers final
+  commit, merge to default `main`, remote `main` push, and a new release.
+- GitHub preflight passes authentication and repository/default-branch identity;
+  `origin/main=1a568c8af22b4c4f547be5ebb3a9ae8af86a931c`, and `v0.0.13` has no tag or
+  release. After release-facing edits, `Test-SourceOnly.ps1` passes source
+  34/34, protocol/domain 95/95, runtime filesystem 8/8, package 4/4, deployment
+  WhatIf 5/5, and aggregate 1/1. Direct cross-mod numerical runtime behavior
+  remains unclaimed. Exact next action: commit these records, run the
+  deterministic release gate, merge, guarded-push, publish, download/validate,
+  and record the exact remote result.
+
+## 2026-08-27 - 0.0.13 deterministic local artifact
+
+- Clean release-source branch/HEAD/version:
+  `codex/brown-fur-powerful-change-fix` /
+  `f086c0257c8c8636cd5af0df9ca37c4f5ac7f794` / `0.0.13`.
+- `Build-Release.ps1` passes source 34/34 and build 1/1 twice, package
+  validation 4/4, deterministic equality 2/2, and release builder 3/3.
+  `Test-SourceOnly.ps1` passes source 34/34, protocol/domain 95/95,
+  runtime-filesystem 8/8, package 4/4, deployment WhatIf 5/5, aggregate 1/1.
+- Local-only ZIP:
+  `artifacts/release/0.0.13/KingmakerBuffPlanner-0.0.13.zip`; SHA-256
+  `9182e45cc5e31c137062ac9d2252a80836effc7bf8506676f303ed5276a7aa63`.
+  DLL SHA-256 is
+  `6e88ea23d54fb1e3ab7e7dc264129592ea36739c96fe6bb49f9d75890b216551`;
+  MVID is `3a61d90c-74b2-4944-b68d-6e2229fd3eb4`.
+- Package allowlist and identity/version validate 4/4. Reflection-only assembly
+  audit finds zero compile-time optional gameplay-mod references.
+- No install, launch, push, tag, remote mutation, or publication occurred. Exact
+  next action is the real-campaign Powerful Change checklist in
+  `docs/MANUAL-ACCEPTANCE.md`; numerical/resource qualification remains pending.
+
+## 2026-08-27 - 0.0.13 Powerful Change diagnostic engineering checkpoint
+
+- Started from a clean `main` worktree at
+  `1a568c8dd402c3783b120117f29d3a34e921a334`, version 0.0.12, then created
+  local branch `codex/brown-fur-powerful-change-fix`. No remote mutation,
+  push, publication, or unrelated-mod edit occurred.
+- Root cause: the enhancement adapter discovered only native metamagic rods,
+  and domain applicability rejected the reserved class-feature category. No
+  Powerful Change option reached UI, persistence, planning, or execution; the
+  view's `None available` text was accurate for that empty model.
+- Read-only installed-contract inspection proved one exact Powerful Change
+  feature, six native score activatables/marker buffs, exact CotW Arcanist
+  spellbook and Arcane Reservoir contracts, structural positive ability-score
+  carrier qualification, and a transaction armed only by native
+  `UnitUseAbility`. The optional provider DLL SHA-256 is
+  `4003C284C116D8BF1E2019692D035BE563E87F1021B6C26C6470246905B916CC`;
+  MVID is `7a9cd325-48f9-4cbc-be10-a9fc898a6edd`; read-only source HEAD is
+  `0fe38002fc022ad5a04d65430eb461046cd9cc3c`.
+- Implementation/test commit
+  `650605aaf2c1c1f7272893074b5e7ad7ed9a9224` adds fail-soft optional
+  discovery, structural classification, exact applicability/rejection reasons,
+  shared reservoir planning, native toggle preparation, mandatory command
+  routing, one-shot cleanup, and focused diagnostics without a Bull's Strength
+  name/GUID exception.
+- `Test-SourceOnly.ps1` passes source 34/34, protocol/domain 95/95,
+  runtime-filesystem 8/8, package 4/4, deployment WhatIf 5/5, aggregate 1/1.
+  Diagnostic version sources are now 0.0.13. Deterministic release packaging
+  and exact artifact hashes remain the next action.
+- Remaining uncertainty: a real campaign must prove the external Harmony cast
+  transaction, exact one-point reservoir debit, +6/+8 resulting modifier,
+  ordinary +4 control, and repeated-cast non-stacking. No runtime qualification
+  is inferred from compilation or read-only provider evidence.
+
 ## 2026-08-24 - 0.0.12 published completion
 
 Status: PUBLISHED; DOWNLOADED ASSET VERIFIED; EXACT PUBLISHED BYTES INSTALLED

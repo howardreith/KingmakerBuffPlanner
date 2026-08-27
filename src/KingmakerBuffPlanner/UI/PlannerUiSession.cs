@@ -27,6 +27,7 @@ namespace KingmakerBuffPlanner.UI
         private Dictionary<string, EffectExpression> _effects;
         private ProviderPlanningOption[] _providerOptions;
         private CastEnhancementSnapshot[] _enhancements;
+        private KingmakerCastEnhancementAdapter _enhancementAdapter;
 
         internal PlannerUiSession(string modPath, ModLog log)
         {
@@ -63,6 +64,7 @@ namespace KingmakerBuffPlanner.UI
                     _effects = null;
                     _providerOptions = null;
                     _enhancements = null;
+                    _enhancementAdapter = null;
                     CatalogDiscovery = null;
                     Status = "No campaign is loaded. Profiles are external and are not created at the main menu.";
                     return;
@@ -89,7 +91,9 @@ namespace KingmakerBuffPlanner.UI
                     .SelectMany(routine => routine.Assignments)
                     .SelectMany(assignment => assignment.SelectedEnhancementIds ?? new List<string>())
                     .Where(id => !string.IsNullOrWhiteSpace(id)).Distinct(StringComparer.Ordinal).ToArray();
-                _enhancements = new KingmakerCastEnhancementAdapter().Discover(persistedEnhancementIds);
+                _enhancementAdapter = new KingmakerCastEnhancementAdapter();
+                _enhancements = _enhancementAdapter.Discover(snapshot,
+                    persistedEnhancementIds);
                 Model = new PlannerSetupModel(loaded.Profile, snapshot, active, effects,
                     _providerOptions, _profiles.Save, _enhancements);
                 _snapshot = snapshot;
@@ -101,8 +105,15 @@ namespace KingmakerBuffPlanner.UI
                     Model.Sources.Count + " discovered buff sources; " +
                     snapshot.Providers.Count + " providers; " +
                     _enhancements.Length + " cast enhancements.";
-                _log.Info("[KBP-ENHANCEMENT] metamagic-rods=" + _enhancements.Length +
-                    ";brown-fur=FEATURE-NOT-PRESENT-IN-INSTALLED-OPTIONAL-MOD.");
+                int rodCount = _enhancements.Count(value => value.Category ==
+                    CastEnhancementCategory.MetamagicRod);
+                int classFeatureCount = _enhancements.Count(value => value.Category ==
+                    CastEnhancementCategory.ClassFeature);
+                _log.Info("[KBP-ENHANCEMENT] total=" + _enhancements.Length +
+                    ";metamagic-rods=" + rodCount + ";class-features=" +
+                    classFeatureCount + ".");
+                foreach (string diagnostic in _enhancementAdapter.ContractDiagnostics)
+                    _log.Info("[KBP-ENHANCEMENT-CONTRACT] " + diagnostic + ".");
                 foreach (CastEnhancementSnapshot enhancement in _enhancements)
                 {
                     UnitSnapshot owner = snapshot.Units.FirstOrDefault(unit =>
@@ -113,7 +124,12 @@ namespace KingmakerBuffPlanner.UI
                         ";effect=" + enhancement.EffectDisplayName +
                         ";remaining=" + (enhancement.RemainingUses == null ? "unlimited" :
                             enhancement.RemainingUses.Value.ToString()) +
-                        ";spellLevelLimit=" + enhancement.MaximumSpellLevel + ".");
+                        ";category=" + enhancement.Category +
+                        ";usagePool=" + enhancement.UsagePoolId +
+                        ";requiresNativeCommand=" + enhancement.RequiresNativeCommand +
+                        (enhancement.Category == CastEnhancementCategory.MetamagicRod
+                            ? ";spellLevelLimit=" + enhancement.MaximumSpellLevel
+                            : ";qualifiedAbilities=" + enhancement.AbilityWhiteList.Count) + ".");
                 }
                 _log.Info("[KBP-CATALOG] discovery;" + CatalogDiscovery + ".");
                 LogBlessSlice(loaded.Profile, snapshot, _providerOptions, Model);
@@ -121,6 +137,7 @@ namespace KingmakerBuffPlanner.UI
             catch (Exception exception)
             {
                 Model = null;
+                _enhancementAdapter = null;
                 CatalogDiscovery = null;
                 Status = "Setup refresh failed: " + exception.Message;
                 _log.Error("Planner UI refresh failed.", exception);
@@ -181,6 +198,15 @@ namespace KingmakerBuffPlanner.UI
         {
             if (!string.IsNullOrWhiteSpace(evidence))
                 _log.Info("[KBP-ENHANCEMENT-UI] " + evidence);
+            if (_enhancementAdapter == null || Model == null ||
+                Model.SelectedSource == null) return;
+            foreach (ProviderSnapshot provider in Model.SelectedSource.Providers
+                .OrderBy(value => value.Key.Canonical, StringComparer.Ordinal))
+            {
+                string trace = _enhancementAdapter.Describe(provider,
+                    _enhancements);
+                if (!string.IsNullOrWhiteSpace(trace)) _log.Info(trace);
+            }
         }
         internal RoutinePlanResult PreviewRoutine(string routineId)
         {
@@ -274,11 +300,15 @@ namespace KingmakerBuffPlanner.UI
                 var fallbackProviders = new HashSet<string>(_providerOptions
                     .Where(o => o.RequiresAnimatedExecution)
                     .Select(o => o.Provider.Key.Canonical), StringComparer.Ordinal);
+                var nativeEnhancements = new HashSet<string>(_enhancements
+                    .Where(value => value.RequiresNativeCommand)
+                    .Select(value => value.EnhancementId), StringComparer.Ordinal);
                 executor = new HybridCastExecutor(
                     new KingmakerInstantCastAdapter(), new KingmakerAnimatedCastAdapter(),
                     step => fallbackProviders.Contains(step.Provider.Canonical),
                     Model.Profile.Execution.AllowAnimatedFallback,
-                    Model.Profile.Execution.OutOfCombatOnly);
+                    Model.Profile.Execution.OutOfCombatOnly,
+                    step => step.EnhancementIds.Any(nativeEnhancements.Contains));
             }
             else executor = new AnimatedCastExecutor(new KingmakerAnimatedCastAdapter(),
                 Model.Profile.Execution.OutOfCombatOnly);

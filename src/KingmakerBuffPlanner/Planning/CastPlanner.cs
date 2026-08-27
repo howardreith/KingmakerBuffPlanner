@@ -50,8 +50,17 @@ namespace KingmakerBuffPlanner.Planning
                 enhancementList.Select(value => value.EnhancementId).Distinct(StringComparer.Ordinal).Count() != enhancementList.Count)
                 throw new ArgumentException("Enhancement catalog contains null or duplicate IDs.", "enhancements");
             var enhancementById = enhancementList.ToDictionary(value => value.EnhancementId, StringComparer.Ordinal);
-            var enhancementRemaining = enhancementList.ToDictionary(value => value.EnhancementId,
-                value => value.RemainingUses, StringComparer.Ordinal);
+            var enhancementRemaining = new Dictionary<string, int?>(StringComparer.Ordinal);
+            foreach (IGrouping<string, CastEnhancementSnapshot> pool in enhancementList
+                .GroupBy(value => value.UsagePoolId, StringComparer.Ordinal))
+            {
+                int?[] amounts = pool.Select(value => value.RemainingUses)
+                    .Distinct().ToArray();
+                if (amounts.Length != 1)
+                    throw new ArgumentException("Enhancements sharing a usage pool disagree on remaining uses.",
+                        "enhancements");
+                enhancementRemaining.Add(pool.Key, amounts[0]);
+            }
             var castsByProvider = new Dictionary<string, int>(StringComparer.Ordinal);
             var materials = snapshot.Providers.Where(p => p.MaterialComponent != null)
                 .GroupBy(p => p.MaterialComponent.ItemGuid, StringComparer.Ordinal)
@@ -241,7 +250,8 @@ namespace KingmakerBuffPlanner.Planning
                 string reason;
                 if (!ledger.TryReserve(option.Provider, out reservation, out reason)) continue;
                 MaterialReservation materialReservation = ReserveMaterial(option.Provider, materials);
-                ReserveEnhancements(requestedEnhancementIds, enhancementRemaining);
+                ReserveEnhancements(requestedEnhancementIds, enhancements,
+                    enhancementRemaining);
                 string key = option.Provider.Key.Canonical;
                 castsByProvider[key] = castsByProvider.ContainsKey(key) ? castsByProvider[key] + 1 : 1;
                 string anchor = option.LegalAnchorIds.Contains(option.Provider.Key.CasterUnitId)
@@ -265,7 +275,7 @@ namespace KingmakerBuffPlanner.Planning
                 CastEnhancementSnapshot enhancement;
                 int? uses;
                 if (!enhancements.TryGetValue(id, out enhancement) ||
-                    !remaining.TryGetValue(id, out uses) || uses == 0 ||
+                    !remaining.TryGetValue(enhancement.UsagePoolId, out uses) || uses == 0 ||
                     !enhancement.IsApplicable(provider)) return false;
                 selected.Add(enhancement);
             }
@@ -274,12 +284,15 @@ namespace KingmakerBuffPlanner.Planning
 
         private static void ReserveEnhancements(
             IEnumerable<string> requestedIds,
+            IDictionary<string, CastEnhancementSnapshot> enhancements,
             IDictionary<string, int?> remaining)
         {
             foreach (string id in requestedIds ?? new string[0])
             {
-                int? uses = remaining[id];
-                if (uses != null) remaining[id] = uses.Value - 1;
+                CastEnhancementSnapshot enhancement = enhancements[id];
+                int? uses = remaining[enhancement.UsagePoolId];
+                if (uses != null)
+                    remaining[enhancement.UsagePoolId] = uses.Value - 1;
             }
         }
 

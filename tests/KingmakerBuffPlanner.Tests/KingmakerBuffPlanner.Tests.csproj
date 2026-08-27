@@ -41,6 +41,7 @@
     <Compile Include="..\..\src\KingmakerBuffPlanner\Domain\Providers\ProviderSnapshots.cs"><Link>Domain\Providers\ProviderSnapshots.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Domain\Planning\PlanningModels.cs"><Link>Domain\Planning\PlanningModels.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Domain\Planning\CastEnhancements.cs"><Link>Domain\Planning\CastEnhancements.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Domain\Planning\PowerfulChangeEligibility.cs"><Link>Domain\Planning\PowerfulChangeEligibility.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\ExecutionModels.cs"><Link>Execution\ExecutionModels.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\AnimatedCastExecutor.cs"><Link>Execution\AnimatedCastExecutor.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\InstantCastExecutor.cs"><Link>Execution\InstantCastExecutor.cs</Link></Compile>

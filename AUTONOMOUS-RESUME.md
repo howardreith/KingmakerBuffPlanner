@@ -1,5 +1,57 @@
 # Autonomous Resume
 
+## 0.0.13 install acceptance and publication authorization - 2026-08-27
+
+- Checkpoint branch/HEAD/version before this record:
+  `codex/brown-fur-powerful-change-fix` /
+  `07370364b3ff4e5fc3cc2b2842b24cd079fdec63` / `0.0.13`; worktree was clean.
+- Guarded installer dry-run passed package validation 4/4 and mutation purity,
+  then transaction `brown-fur-powerful-change-0.0.13-install-20260827` upgraded
+  live UMM 0.0.12 to exact 0.0.13. Package/DLL/MVID are
+  `9182e45cc5e31c137062ac9d2252a80836effc7bf8506676f303ed5276a7aa63` /
+  `6e88ea23d54fb1e3ab7e7dc264129592ea36739c96fe6bb49f9d75890b216551` /
+  `3a61d90c-74b2-4944-b68d-6e2229fd3eb4`.
+- `status=Installed`, `settingsPreserved=true`, `otherModsVerified=true`, no
+  staging or Kingmaker/UMM process remains, and install-result SHA-256 is
+  `e546995c3c6fe0f63ef16e7ba729894794f6d545c9fb96c83cb34bb6f0dc957a`.
+- Owner verdict: `This is acceptable.` The owner explicitly authorized final
+  commit, merge to default `main`, push to remote `main`, and a new release.
+  Direct cross-mod numerical cast evidence remains unclaimed and documented as
+  a post-release diagnostic boundary.
+- GitHub preflight: authenticated owner `howardreith`; public repository
+  `howardreith/KingmakerBuffPlanner`; default branch `main`; fetched
+  `origin/main` is `1a568c8af22b4c4f547be5ebb3a9ae8af86a931c`; neither tag nor release
+  `v0.0.13` exists.
+- After release-facing record edits, `./scripts/Test-SourceOnly.ps1` passes
+  source 34/34, protocol/domain 95/95, runtime filesystem 8/8, package 4/4,
+  deployment WhatIf 5/5, and aggregate 1/1. Exact next action: commit this
+  acceptance record, run the deterministic release gate, merge, guarded-push
+  `main`, and invoke the guarded public publisher.
+
+## 0.0.13 Powerful Change diagnostic repair - 2026-08-27
+
+- Active local branch: `codex/brown-fur-powerful-change-fix`; implementation
+  checkpoint: `650605aaf2c1c1f7272893074b5e7ad7ed9a9224`; exact release source:
+  `f086c0257c8c8636cd5af0df9ca37c4f5ac7f794`; version: 0.0.13.
+- The old selector was empty because Buff Planner implemented rods only and
+  rejected every class-feature enhancement. Installed-provider inspection
+  disproved wrong Bull's Strength structure, rank mismatch, UI filtering,
+  persistence loss, and wrong-caster caching as causes.
+- The repair detects the exact live feature and validated score toggles,
+  qualifies Transmutation spells by structural positive ability-score carriers
+  from the exact Arcanist spellbook, shares the Arcane Reservoir across score
+  choices, and routes the real toggle through native command execution. It has
+  no compile-time optional-mod dependency and fails safely when absent.
+- Automated status: source 34/34, protocol/domain 95/95, runtime filesystem 8/8,
+  package 4/4, deployment WhatIf 5/5, aggregate 1/1, deterministic release 2/2.
+  Local ZIP/DLL/MVID are
+  `9182e45cc5e31c137062ac9d2252a80836effc7bf8506676f303ed5276a7aa63` /
+  `6e88ea23d54fb1e3ab7e7dc264129592ea36739c96fe6bb49f9d75890b216551` /
+  `3a61d90c-74b2-4944-b68d-6e2229fd3eb4`. No install or remote action occurred.
+- Exact next action: run the bounded real-campaign procedure in
+  `docs/MANUAL-ACCEPTANCE.md`; do not claim cross-mod resource/modifier
+  qualification until it passes.
+
 ## 0.0.12 published completion - 2026-08-24
 
 - The accepted hotfix was merged to default `main` and released from exact

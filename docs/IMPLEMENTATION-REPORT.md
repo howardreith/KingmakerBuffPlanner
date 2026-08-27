@@ -1,5 +1,45 @@
 # Implementation Report
 
+## 0.0.13 Brown-Fur Powerful Change compatibility repair
+
+The exact `Enhancement: None available` result was produced before the view:
+`KingmakerCastEnhancementAdapter` discovered only `MetamagicRodMechanics`, and
+`CastEnhancementSnapshot.IsApplicable` rejected every non-rod category. No
+Powerful Change capability, qualified spell, option, or runtime toggle ever
+entered the model. Persistence, deduplication, resource filtering, and the view
+were not removing a previously discovered option.
+
+Read-only inspection of the installed environment established that Call of the
+Wild supplies the Arcanist contracts, while a separately optional module
+publishes Brown-Fur and its stable blueprints. The live implementation uses one
+level-3 feature, six native score activatables, marker buffs, and one shared
+Arcane Reservoir. Its cast engine qualifies genuine Transmutation spells from
+the exact Arcanist spellbook by positive ability-score carrier semantics and
+starts its transaction at native `UnitUseAbility` construction.
+
+The repair adds a fail-soft compatibility profile and live contract validation,
+structural buff-component classification, class-feature applicability and
+rejection reasons, shared usage-pool allocation, native toggle preparation,
+mandatory command routing, one-shot cleanup, and focused
+`[KBP][Enhancement]` diagnostics. Bull's Strength qualifies through its native
+`AddStatBonus` Strength +4 Enhancement carrier; no spell name or spell GUID is
+hard-coded. Other ability-score transmutations and supported polymorph carriers
+follow the same policy.
+
+Implementation/test checkpoint commit:
+`650605aaf2c1c1f7272893074b5e7ad7ed9a9224`. Release version: `0.0.13`.
+Exact release-source commit:
+`f086c0257c8c8636cd5af0df9ca37c4f5ac7f794`. The deterministic local package
+is `artifacts/release/0.0.13/KingmakerBuffPlanner-0.0.13.zip`; ZIP SHA-256 is
+`9182e45cc5e31c137062ac9d2252a80836effc7bf8506676f303ed5276a7aa63`,
+DLL SHA-256 is
+`6e88ea23d54fb1e3ab7e7dc264129592ea36739c96fe6bb49f9d75890b216551`,
+and MVID is `3a61d90c-74b2-4944-b68d-6e2229fd3eb4`. Cross-mod numerical behavior
+remains an explicit in-game acceptance item rather than an automated claim.
+The guarded local installer upgraded the live UMM copy from 0.0.12 to these
+exact bytes with settings preserved and every unrelated mod verified unchanged;
+the owner subsequently accepted the candidate and authorized publication.
+
 ## 0.0.12 HUD lifecycle repair
 
 The 0.0.11 performance fix correctly replaced per-frame global discovery with

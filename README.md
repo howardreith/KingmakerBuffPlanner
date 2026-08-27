@@ -1,7 +1,7 @@
 # Kingmaker Buff Planner
 
-**Release:** `0.0.12` repairs HUD lifecycle retryability while retaining the
-`0.0.11` performance correction.
+**Release:** `0.0.13` repairs Brown-Fur Transmuter Powerful Change enhancement
+discovery and execution while retaining the `0.0.12` HUD lifecycle repair.
 
 Kingmaker Buff Planner is a standalone Unity Mod Manager mod for **Pathfinder:
 Kingmaker Enhanced Plus Edition 2.1.7b**.
@@ -14,7 +14,7 @@ packaging, and runtime automation owned by this repository.
 
 ## Install and use
 
-Download `KingmakerBuffPlanner-0.0.12.zip` from the GitHub Release's **Assets**
+Download `KingmakerBuffPlanner-0.0.13.zip` from the GitHub Release's **Assets**
 section. Do not download GitHub's automatically generated source-code archives.
 
 Install the ZIP through Unity Mod Manager, or extract its single
@@ -42,7 +42,8 @@ Detailed instructions and qualification boundaries are in
 - Direct portrait assignment and deterministic resource-aware planning.
 - Animated and Instant execution engines.
 - Provider consolidation with automatic caster/resource selection.
-- Metamagic-rod discovery and a visible enhancement chooser.
+- Metamagic-rod and fail-soft Powerful Change discovery with a visible
+  enhancement chooser.
 - Four-column vertical catalog with real blueprint icons, search, categories,
   and routine-local **Selected only**.
 - Player-facing selected, covered, unavailable, invalid, and neutral target

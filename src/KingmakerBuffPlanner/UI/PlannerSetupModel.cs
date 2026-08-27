@@ -285,7 +285,10 @@ namespace KingmakerBuffPlanner.UI
             CastEnhancementSnapshot value = GetEnhancement(selected[0]);
             if (value == null) return "Unavailable persisted enhancement: " + selected[0];
             return value.DisplayName + UsesSuffix(value) + "\n" +
-                EffectName(value) + " | Maximum spell level " + value.MaximumSpellLevel +
+                EffectName(value) + (value.Category ==
+                    CastEnhancementCategory.MetamagicRod
+                    ? " | Maximum spell level " + value.MaximumSpellLevel
+                    : " | Qualifying caster spell only") +
                 (string.IsNullOrWhiteSpace(value.Description) ? string.Empty :
                     "\n" + value.Description);
         }
@@ -326,6 +329,8 @@ namespace KingmakerBuffPlanner.UI
         {
             string value = enhancement == null ? string.Empty : enhancement.EffectDisplayName;
             if (string.IsNullOrWhiteSpace(value) || value == "Metamagic") return "Metamagic";
+            if (enhancement.Category == CastEnhancementCategory.ClassFeature)
+                return value;
             return value.EndsWith(" Spell", StringComparison.OrdinalIgnoreCase)
                 ? value : value + " Spell";
         }

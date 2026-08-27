@@ -1,5 +1,55 @@
 # CODEX AUTONOMOUS MISSION
 
+## 2026-08-27 0.0.13 install acceptance/publication checkpoint
+
+At clean feature HEAD `07370364b3ff4e5fc3cc2b2842b24cd079fdec63`, the
+guarded installer dry-run passed, then exact 0.0.13 replaced live UMM 0.0.12.
+Package/DLL/MVID are `9182e45cc5e31c137062ac9d2252a80836effc7bf8506676f303ed5276a7aa63` /
+`6e88ea23d54fb1e3ab7e7dc264129592ea36739c96fe6bb49f9d75890b216551` /
+`3a61d90c-74b2-4944-b68d-6e2229fd3eb4`; settings and every non-planner mod were
+preserved, staging was removed, and install evidence hashes to
+`e546995c3c6fe0f63ef16e7ba729894794f6d545c9fb96c83cb34bb6f0dc957a`.
+The owner accepted the candidate and explicitly authorized final commit, merge
+to default `main`, remote `main` push, and a new release. GitHub preflight found
+public `howardreith/KingmakerBuffPlanner`, default `main` at
+`1a568c8af22b4c4f547be5ebb3a9ae8af86a931c`, with no existing `v0.0.13` tag
+or release. Numerical cross-mod campaign results remain unclaimed. Exact next
+action is full qualification, guarded integration/push, publication, and remote
+artifact verification.
+
+## 2026-08-27 0.0.13 deterministic artifact checkpoint
+
+Exact release-source branch/HEAD/version are
+`codex/brown-fur-powerful-change-fix` /
+`f086c0257c8c8636cd5af0df9ca37c4f5ac7f794` / 0.0.13.
+Deterministic release builds pass 2/2; final source/protocol/filesystem/package/
+deployment/aggregate counts are 34/34, 95/95, 8/8, 4/4, 5/5, and 1/1.
+Local ZIP/DLL/MVID are
+`9182e45cc5e31c137062ac9d2252a80836effc7bf8506676f303ed5276a7aa63` /
+`6e88ea23d54fb1e3ab7e7dc264129592ea36739c96fe6bb49f9d75890b216551` /
+`3a61d90c-74b2-4944-b68d-6e2229fd3eb4`. Package publication status is
+local-only. Nothing was installed, pushed, tagged, or published. Exact next
+action is the real-campaign procedure in `docs/MANUAL-ACCEPTANCE.md`; the
+cross-mod reservoir/modifier result remains pending rather than inferred.
+
+## 2026-08-27 0.0.13 Powerful Change diagnostic checkpoint
+
+Branch `codex/brown-fur-powerful-change-fix` started clean at
+`1a568c8dd402c3783b120117f29d3a34e921a334`, version 0.0.12. Read-only
+inspection proved that the installed independent optional module now publishes
+Brown-Fur against CotW's Arcanist, superseding the historical
+FEATURE-NOT-PRESENT environment. The missing integration—not Bull's Strength,
+rank, caster selection, or UI filtering—caused the empty enhancement list.
+
+Implementation checkpoint `650605aaf2c1c1f7272893074b5e7ad7ed9a9224`
+adds structural eligibility, fail-soft feature/toggle validation, exact
+caster/spellbook/variant applicability, shared reservoir allocation, real native
+toggle execution, mandatory command routing, one-shot cleanup, and rejection
+diagnostics. Source-only gates pass 34/34, 95/95, 8/8, 4/4, 5/5, and 1/1.
+Version is incremented locally to 0.0.13 for deterministic diagnostic packaging.
+No remote mutation or publication is authorized. In-game numerical/resource
+verification remains explicitly pending.
+
 ## 2026-08-24 0.0.12 release completion checkpoint
 
 The accepted repair is published from exact `main`/tag commit

@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.0.13 - Brown-Fur Powerful Change diagnostic repair
+
+- Discovers Powerful Change from the live caster fact and six validated native
+  score-toggle contracts supplied by the optional Brown-Fur implementation.
+- Qualifies genuine Transmutation spells from the exact Arcanist spellbook by
+  structural positive ability-score bonus carriers; Bull's Strength is not a
+  name or spell-GUID special case.
+- Models caster/spellbook/variant applicability and the six score selections as
+  one shared Arcane Reservoir usage pool.
+- Arms the provider's real one-shot toggle and requires a native animated
+  `UnitUseAbility` command so its own transaction adjusts the original modifier,
+  spends exactly one reservoir point, and consumes the selection.
+- Emits focused `[KBP][Enhancement]` qualification/rejection diagnostics and
+  fails safely when the optional blueprints or their proven contract are absent.
+- Adds deterministic coverage for all six ability scores, polymorph carriers,
+  missing capability, ordinary casters, wrong spellbooks, unrelated spells,
+  mass variants, shared uses, native routing, and one-shot cleanup.
+
+The owner accepted the validated, guarded-installed 0.0.13 candidate and
+authorized publication on 2026-08-27. Direct cross-mod numerical cast evidence
+is not claimed; the focused runtime diagnostic procedure remains documented.
+
 ## 0.0.12 - HUD lifecycle retry repair
 
 - Replaces the ambiguous Boolean HUD installation result with explicit attempt,
