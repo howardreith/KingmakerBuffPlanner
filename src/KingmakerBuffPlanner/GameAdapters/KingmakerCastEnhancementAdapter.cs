@@ -7,18 +7,33 @@ using Kingmaker.Blueprints.Items.Equipment;
 using Kingmaker.Designers.Mechanics.Facts;
 using Kingmaker.EntitySystem.Entities;
 using Kingmaker.UnitLogic.ActivatableAbilities;
+using KingmakerBuffPlanner.Compatibility;
 using KingmakerBuffPlanner.Domain.Planning;
+using KingmakerBuffPlanner.Domain.Providers;
 using KingmakerBuffPlanner.Execution;
 
 namespace KingmakerBuffPlanner.GameAdapters
 {
     internal sealed class KingmakerCastEnhancementAdapter
     {
-        internal CastEnhancementSnapshot[] Discover(IEnumerable<string> persistedEnhancementIds = null)
+        private readonly BrownFurPowerfulChangeCompatibility _brownFur =
+            new BrownFurPowerfulChangeCompatibility();
+
+        internal IReadOnlyList<string> ContractDiagnostics
+        { get { return _brownFur.ContractDiagnostics; } }
+
+        internal CastEnhancementSnapshot[] Discover(
+            PartyProviderSnapshot snapshot,
+            IEnumerable<string> persistedEnhancementIds = null)
         {
-            var values = KingmakerAnimatedCastAdapter.CollectUnits().Values
+            UnitEntityData[] units = KingmakerAnimatedCastAdapter.CollectUnits()
+                .Values
                 .Where(unit => unit != null && unit.Descriptor != null)
-                .SelectMany(Entries)
+                .ToArray();
+            var runtimeEntries = units.SelectMany(RodEntries).Concat(
+                _brownFur.Discover(units, snapshot).Select(value =>
+                    new Entry(value.Ability, value.Snapshot, true)));
+            var values = runtimeEntries
                 .GroupBy(entry => entry.Snapshot.EnhancementId, StringComparer.Ordinal)
                 .Select(Combine).ToList();
             var known = new HashSet<string>(values.Select(value => value.EnhancementId),
@@ -36,17 +51,27 @@ namespace KingmakerBuffPlanner.GameAdapters
                 .ThenBy(value => value.EnhancementId, StringComparer.Ordinal).ToArray();
         }
 
+        internal string Describe(ProviderSnapshot provider,
+            IEnumerable<CastEnhancementSnapshot> enhancements)
+        {
+            return _brownFur.Describe(provider, enhancements);
+        }
+
         internal CastEnhancementPreparation Prepare(CastStep step)
         {
             KingmakerAnimatedCastAdapter.ResolvedCast resolved;
             string reason;
             if (!KingmakerAnimatedCastAdapter.TryResolve(step, out resolved, out reason))
                 return CastEnhancementPreparation.Fail("cast-resolution:" + reason);
-            List<Entry> rods = Entries(resolved.Caster).ToList();
+            List<Entry> entries = RodEntries(resolved.Caster).Concat(
+                _brownFur.ForCast(resolved.Caster, step.Provider,
+                    resolved.Ability).Select(value => new Entry(value.Ability,
+                        value.Snapshot, true))).ToList();
             List<Entry> selected = new List<Entry>();
             foreach (string id in step.EnhancementIds)
             {
-                List<Entry> matches = rods.Where(value => value.Snapshot.EnhancementId == id).ToList();
+                List<Entry> matches = entries.Where(value =>
+                    value.Snapshot.EnhancementId == id).ToList();
                 if (matches.Count == 0) return CastEnhancementPreparation.Fail("source-not-owned:" + id);
                 if (!matches[0].Snapshot.IsApplicable(step.Provider, resolved.Ability.SpellLevel))
                     return CastEnhancementPreparation.Fail("source-inapplicable:" + id);
@@ -57,16 +82,31 @@ namespace KingmakerBuffPlanner.GameAdapters
             }
             if (!CastEnhancementSnapshot.AreCompatible(selected.Select(value => value.Snapshot)))
                 return CastEnhancementPreparation.Fail("enhancement-conflict");
-            var states = rods.Select(value => new State(value.Ability, value.Ability.IsOn)).ToList();
+            var states = new List<State>();
+            foreach (Entry entry in entries)
+            {
+                State state = states.FirstOrDefault(value =>
+                    ReferenceEquals(value.Ability, entry.Ability));
+                if (state == null)
+                {
+                    state = new State(entry.Ability, entry.Ability.IsOn);
+                    states.Add(state);
+                }
+                state.OneShot = state.OneShot || entry.OneShot;
+                state.Selected = state.Selected || selected.Contains(entry);
+            }
             var lease = new ActivationLease(states);
             try
             {
-                foreach (Entry rod in rods) rod.Ability.IsOn = selected.Contains(rod);
-                if (selected.Any(value => !value.Ability.IsOn))
+                foreach (State state in states)
+                    state.Ability.IsOn = state.Selected;
+                if (states.Any(value => value.Selected && !value.Ability.IsOn))
                 {
                     lease.Dispose();
                     return CastEnhancementPreparation.Fail("activation-refused");
                 }
+                foreach (State state in states.Where(value => value.Selected &&
+                    value.OneShot)) state.ArmedByLease = true;
                 return CastEnhancementPreparation.Pass(lease);
             }
             catch (Exception exception)
@@ -86,7 +126,8 @@ namespace KingmakerBuffPlanner.GameAdapters
             return new CastEnhancementSnapshot(first.EnhancementId, first.CasterUnitId,
                 first.SourceBlueprintGuid, first.DisplayName, first.Description, first.Category,
                 first.MetamagicMask, first.MaximumSpellLevel, remaining, first.AbilityWhiteList,
-                first.EffectDisplayName);
+                first.EffectDisplayName, first.SpellbookWhiteList,
+                first.UsagePoolId, first.RequiresNativeCommand);
         }
 
         private static bool TryDescribePersisted(string id, out CastEnhancementSnapshot snapshot)
@@ -94,7 +135,9 @@ namespace KingmakerBuffPlanner.GameAdapters
             snapshot = null;
             string[] parts = (id ?? string.Empty).Split('|');
             if (parts.Length != 3 || parts[0] != "metamagic-rod" ||
-                string.IsNullOrWhiteSpace(parts[1]) || string.IsNullOrWhiteSpace(parts[2])) return false;
+                string.IsNullOrWhiteSpace(parts[1]) || string.IsNullOrWhiteSpace(parts[2]))
+                return BrownFurPowerfulChangeCompatibility.TryDescribePersisted(
+                    id, out snapshot);
             BlueprintItem item = ResourcesLibrary.TryGetBlueprint<BlueprintItem>(parts[2]);
             BlueprintItemEquipment equipment = item as BlueprintItemEquipment;
             if (equipment == null || equipment.ActivatableAbility == null ||
@@ -124,7 +167,7 @@ namespace KingmakerBuffPlanner.GameAdapters
             return result.ToString();
         }
 
-        private static IEnumerable<Entry> Entries(UnitEntityData unit)
+        private static IEnumerable<Entry> RodEntries(UnitEntityData unit)
         {
             foreach (ActivatableAbility ability in unit.Descriptor.ActivatableAbilities.Enumerable
                 .Where(value => value != null && value.Blueprint != null && value.Blueprint.Buff != null))
@@ -144,19 +187,22 @@ namespace KingmakerBuffPlanner.GameAdapters
                     (mechanics.AbilitiesWhiteList ?? new Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility[0])
                         .Where(value => value != null).Select(value => value.AssetGuid),
                     Humanize(mechanics.Metamagic.ToString()));
-                yield return new Entry(ability, snapshot);
+                yield return new Entry(ability, snapshot, false);
             }
         }
 
         private sealed class Entry
         {
-            internal Entry(ActivatableAbility ability, CastEnhancementSnapshot snapshot)
+            internal Entry(ActivatableAbility ability,
+                CastEnhancementSnapshot snapshot, bool oneShot)
             {
                 Ability = ability;
                 Snapshot = snapshot;
+                OneShot = oneShot;
             }
             internal ActivatableAbility Ability;
             internal CastEnhancementSnapshot Snapshot;
+            internal bool OneShot;
         }
 
         private sealed class State
@@ -164,6 +210,9 @@ namespace KingmakerBuffPlanner.GameAdapters
             internal State(ActivatableAbility ability, bool isOn) { Ability = ability; IsOn = isOn; }
             internal ActivatableAbility Ability;
             internal bool IsOn;
+            internal bool Selected;
+            internal bool OneShot;
+            internal bool ArmedByLease;
         }
 
         private sealed class ActivationLease : IDisposable
@@ -175,9 +224,20 @@ namespace KingmakerBuffPlanner.GameAdapters
             {
                 if (_disposed) return;
                 _disposed = true;
+                bool oneShotConsumed = _states.Any(state => state.OneShot &&
+                    state.Selected && state.ArmedByLease &&
+                    !state.Ability.IsOn);
                 foreach (State state in _states.Reverse())
                 {
-                    try { state.Ability.IsOn = state.IsOn; }
+                    try
+                    {
+                        // A successful provider transaction consumes the
+                        // selected member of its mutually-exclusive one-shot
+                        // group. Do not resurrect any prior member afterward.
+                        if (CastEnhancementActivationPolicy.RestoreOriginalState(
+                                state.OneShot, oneShotConsumed))
+                            state.Ability.IsOn = state.IsOn;
+                    }
                     catch (Exception) { }
                 }
             }

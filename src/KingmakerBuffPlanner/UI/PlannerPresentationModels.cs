@@ -290,8 +290,11 @@ namespace KingmakerBuffPlanner.UI
             string owner = model.Snapshot.Units.FirstOrDefault(unit =>
                 unit.UnitId == value.CasterUnitId)?.DisplayName ?? value.CasterUnitId;
             string description = "Owner: " + owner + "\nApplies " +
-                PlannerSetupModel.EffectName(value) + " to this cast.\nSpell-level limit: " +
-                value.MaximumSpellLevel + (string.IsNullOrWhiteSpace(value.Description)
+                PlannerSetupModel.EffectName(value) + " to this cast." +
+                (value.Category == CastEnhancementCategory.MetamagicRod
+                    ? "\nSpell-level limit: " + value.MaximumSpellLevel
+                    : "\nRequires the matching live caster feature and spell qualification.") +
+                (string.IsNullOrWhiteSpace(value.Description)
                     ? string.Empty : "\n" + value.Description);
             if (!available) description = "Unavailable: " + description;
             return new EnhancementChoiceViewModel(value.EnhancementId, value.DisplayName,

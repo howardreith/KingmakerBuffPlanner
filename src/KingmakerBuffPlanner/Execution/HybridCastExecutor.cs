@@ -9,6 +9,7 @@ namespace KingmakerBuffPlanner.Execution
         private readonly IInstantCastRuntimeAdapter _instantRuntime;
         private readonly ICastRuntimeAdapter _animatedRuntime;
         private readonly Func<CastStep, bool> _requiresAnimated;
+        private readonly Func<CastStep, bool> _requiresNativeCommand;
         private readonly bool _allowAnimatedFallback;
         private readonly bool _outOfCombatOnly;
 
@@ -17,11 +18,13 @@ namespace KingmakerBuffPlanner.Execution
             ICastRuntimeAdapter animatedRuntime,
             Func<CastStep, bool> requiresAnimated,
             bool allowAnimatedFallback,
-            bool outOfCombatOnly)
+            bool outOfCombatOnly,
+            Func<CastStep, bool> requiresNativeCommand = null)
         {
             _instantRuntime = instantRuntime ?? throw new ArgumentNullException("instantRuntime");
             _animatedRuntime = animatedRuntime ?? throw new ArgumentNullException("animatedRuntime");
             _requiresAnimated = requiresAnimated ?? throw new ArgumentNullException("requiresAnimated");
+            _requiresNativeCommand = requiresNativeCommand ?? (step => false);
             _allowAnimatedFallback = allowAnimatedFallback;
             _outOfCombatOnly = outOfCombatOnly;
         }
@@ -33,8 +36,10 @@ namespace KingmakerBuffPlanner.Execution
             for (int index = 0; index < plan.Steps.Count; index++)
             {
                 CastStep step = plan.Steps[index];
-                bool fallback = _requiresAnimated(step);
-                if (fallback && !_allowAnimatedFallback)
+                bool mandatoryNativeCommand = _requiresNativeCommand(step);
+                bool fallback = mandatoryNativeCommand || _requiresAnimated(step);
+                if (fallback && !mandatoryNativeCommand &&
+                    !_allowAnimatedFallback)
                 {
                     report.Add(index, step, CastExecutionStatus.FailedValidation,
                         "animated-fallback-disabled");

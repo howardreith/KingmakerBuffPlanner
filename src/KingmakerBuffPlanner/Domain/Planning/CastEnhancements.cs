@@ -12,6 +12,15 @@ namespace KingmakerBuffPlanner.Domain.Planning
         ClassFeature
     }
 
+    internal static class CastEnhancementActivationPolicy
+    {
+        internal static bool RestoreOriginalState(bool oneShot,
+            bool oneShotGroupConsumed)
+        {
+            return !oneShot || !oneShotGroupConsumed;
+        }
+    }
+
     public sealed class CastEnhancementSnapshot
     {
         public CastEnhancementSnapshot(
@@ -25,7 +34,10 @@ namespace KingmakerBuffPlanner.Domain.Planning
             int maximumSpellLevel,
             int? remainingUses,
             IEnumerable<string> abilityWhiteList,
-            string effectDisplayName = null)
+            string effectDisplayName = null,
+            IEnumerable<string> spellbookWhiteList = null,
+            string usagePoolId = null,
+            bool requiresNativeCommand = false)
         {
             if (string.IsNullOrWhiteSpace(enhancementId)) throw new ArgumentException("Enhancement ID is required.", "enhancementId");
             if (string.IsNullOrWhiteSpace(casterUnitId)) throw new ArgumentException("Caster unit ID is required.", "casterUnitId");
@@ -43,10 +55,18 @@ namespace KingmakerBuffPlanner.Domain.Planning
             MaximumSpellLevel = maximumSpellLevel;
             RemainingUses = remainingUses;
             EffectDisplayName = string.IsNullOrWhiteSpace(effectDisplayName)
-                ? "Metamagic" : effectDisplayName;
+                ? (category == CastEnhancementCategory.MetamagicRod
+                    ? "Metamagic" : "Class feature") : effectDisplayName;
             AbilityWhiteList = new ReadOnlyCollection<string>((abilityWhiteList ?? new string[0])
                 .Where(value => !string.IsNullOrWhiteSpace(value)).Distinct(StringComparer.Ordinal)
                 .OrderBy(value => value, StringComparer.Ordinal).ToList());
+            SpellbookWhiteList = new ReadOnlyCollection<string>((spellbookWhiteList ??
+                    new string[0]).Where(value => !string.IsNullOrWhiteSpace(value))
+                .Distinct(StringComparer.Ordinal).OrderBy(value => value,
+                    StringComparer.Ordinal).ToList());
+            UsagePoolId = string.IsNullOrWhiteSpace(usagePoolId)
+                ? enhancementId : usagePoolId;
+            RequiresNativeCommand = requiresNativeCommand;
         }
 
         public string EnhancementId { get; private set; }
@@ -60,22 +80,55 @@ namespace KingmakerBuffPlanner.Domain.Planning
         public int? RemainingUses { get; private set; }
         public string EffectDisplayName { get; private set; }
         public IReadOnlyList<string> AbilityWhiteList { get; private set; }
+        public IReadOnlyList<string> SpellbookWhiteList { get; private set; }
+        public string UsagePoolId { get; private set; }
+        public bool RequiresNativeCommand { get; private set; }
 
         public bool IsApplicable(ProviderSnapshot provider)
         {
-            return provider != null && IsApplicable(provider.Key, provider.SpellLevel);
+            return string.IsNullOrEmpty(ApplicabilityFailure(provider));
         }
 
         public bool IsApplicable(Domain.Identity.ProviderKey provider, int spellLevel)
         {
-            if (provider == null || provider.CasterUnitId != CasterUnitId ||
-                provider.Ability.SourceKind != Domain.Identity.SourceKind.Spellbook)
-                return false;
-            if (Category != CastEnhancementCategory.MetamagicRod) return false;
-            if ((provider.Ability.MetamagicMask & MetamagicMask) != 0) return false;
+            return string.IsNullOrEmpty(ApplicabilityFailure(provider, spellLevel));
+        }
+
+        public string ApplicabilityFailure(ProviderSnapshot provider)
+        {
+            return provider == null ? "provider-missing" :
+                ApplicabilityFailure(provider.Key, provider.SpellLevel);
+        }
+
+        public string ApplicabilityFailure(
+            Domain.Identity.ProviderKey provider, int spellLevel)
+        {
+            if (provider == null) return "provider-missing";
+            if (!string.Equals(provider.CasterUnitId, CasterUnitId,
+                    StringComparison.Ordinal)) return "caster-mismatch";
+            if (provider.Ability.SourceKind !=
+                Domain.Identity.SourceKind.Spellbook)
+                return "source-not-spellbook";
+            if (Category == CastEnhancementCategory.ClassFeature)
+            {
+                if (!SpellbookWhiteList.Contains(provider.SpellbookGuid))
+                    return "spellbook-not-qualified";
+                string selectedAbilityGuid = string.IsNullOrWhiteSpace(
+                    provider.Ability.VariantGuid)
+                    ? provider.Ability.BaseAbilityGuid
+                    : provider.Ability.VariantGuid;
+                return AbilityWhiteList.Contains(selectedAbilityGuid)
+                    ? string.Empty : "ability-not-qualified";
+            }
+            if (Category != CastEnhancementCategory.MetamagicRod)
+                return "category-unsupported";
+            if ((provider.Ability.MetamagicMask & MetamagicMask) != 0)
+                return "metamagic-already-applied";
             if (AbilityWhiteList.Contains(provider.Ability.BaseAbilityGuid) ||
-                AbilityWhiteList.Contains(provider.Ability.VariantGuid)) return true;
-            return spellLevel <= MaximumSpellLevel;
+                AbilityWhiteList.Contains(provider.Ability.VariantGuid))
+                return string.Empty;
+            return spellLevel <= MaximumSpellLevel
+                ? string.Empty : "spell-level-exceeds-limit";
         }
 
         public static bool AreCompatible(IEnumerable<CastEnhancementSnapshot> enhancements)

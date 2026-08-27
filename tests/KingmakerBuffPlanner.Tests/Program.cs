@@ -114,11 +114,15 @@ namespace KingmakerBuffPlanner.Tests
                 Run("catalog-filter-selected-category-and-reset-contract", TestCatalogFilterState);
                 Run("presentation-view-models-use-player-facing-deterministic-state", TestPresentationModels);
                 Run("right-click-description-resolves-without-plan-mutation", TestDescriptionRequest);
+                Run("powerful-change-qualification-is-semantic", TestPowerfulChangeSemanticQualification);
+                Run("powerful-change-availability-is-caster-and-spell-exact", TestPowerfulChangeAvailability);
+                Run("powerful-change-score-options-share-reservoir", TestPowerfulChangeSharedReservoir);
                 Run("cast-enhancement-applicability-and-reservation", TestCastEnhancementPlanning);
                 Run("cast-enhancement-selection-is-assignment-scoped", TestCastEnhancementSelection);
                 Run("casting-section-presents-caster-and-enhancement-choices", TestCastingSectionPresentation);
                 Run("casting-section-layout-keeps-button-labels-visible", TestCastingSectionLayout);
                 Run("cast-enhancement-execution-is-fail-closed-and-cleaned-up", TestCastEnhancementExecution);
+                Run("consumed-one-shot-enhancement-is-not-rearmed", TestOneShotEnhancementRestoration);
                 Run("personal-target-eligibility-is-provider-relative", TestPersonalTargetEligibility);
                 Run("area-coverage-preview-distinguishes-direct-and-indirect", TestAreaCoveragePresentation);
                 Run("single-target-plan-does-not-create-indirect-coverage", TestSingleTargetCoveragePresentation);
@@ -1619,6 +1623,18 @@ namespace KingmakerBuffPlanner.Tests
             if (animated.StartCount != 0 || instant.FireCount != 1 || report.Failed != 1 ||
                 !report.Records.Any(r => r.Detail == "animated-fallback-disabled"))
                 throw new InvalidOperationException("Disabled animated fallback was not blocked before firing.");
+
+            animated = new AlwaysAnimatedRuntime();
+            instant = new AlwaysInstantRuntime();
+            report = new ExecutionReport(plan);
+            executor = new HybridCastExecutor(instant, animated,
+                step => false, false, true,
+                step => step.TargetUnitIds.Contains("unit-a"));
+            Drain(executor.Execute(plan, report));
+            if (animated.StartCount != 1 || instant.FireCount != 1 ||
+                report.Confirmed != 2 || report.Failed != 0)
+                throw new InvalidOperationException(
+                    "A native-command enhancement was treated as optional animated fallback.");
         }
 
         private static void TestUnconfirmedExecution()
@@ -1671,6 +1687,187 @@ namespace KingmakerBuffPlanner.Tests
         {
             return new PartyProviderSnapshot(unitIds.Select(id => new UnitSnapshot(id, id, false, string.Empty,
                 new TargetValidationSnapshot(true, true, true, true))), providers, pools);
+        }
+
+        private static void TestPowerfulChangeSemanticQualification()
+        {
+            const string book = "arcanist-casting-spellbook";
+            const string buff = "11111111111111111111111111111111";
+            string[] scores = {
+                "Strength", "Dexterity", "Constitution", "Intelligence",
+                "Wisdom", "Charisma"
+            };
+            foreach (string score in scores)
+            {
+                PowerfulChangeEligibility result =
+                    PowerfulChangeEligibilityClassifier.Classify(true, true,
+                        book, book, new[] {
+                            "buff[" + buff + "].components=" +
+                            "Kingmaker.Designers.Mechanics.Buffs.AddStatBonus{" +
+                            "Descriptor=Enhancement,Stat=" + score + ",Value=4}"
+                        }, new[] { buff });
+                PowerfulChangeAbilityScore expected;
+                if (!Enum.TryParse(score, false, out expected) ||
+                    !result.Eligible || !result.Supports(expected) ||
+                    result.AbilityScores.Count != 1 ||
+                    !result.CarrierFamilies.Contains("AddStatBonus"))
+                    throw new InvalidOperationException(
+                        "A structural ability-score transmutation was not classified: " + score);
+            }
+
+            PowerfulChangeEligibility polymorph =
+                PowerfulChangeEligibilityClassifier.Classify(true, true,
+                    book, book, new[] {
+                        "buff[" + buff + "].components=" +
+                        "Kingmaker.UnitLogic.Buffs.Polymorph{" +
+                        "ConstitutionBonus=2,DexterityBonus=2,StrengthBonus=6}"
+                    }, new[] { buff });
+            if (!polymorph.Eligible ||
+                !polymorph.Supports(PowerfulChangeAbilityScore.Strength) ||
+                !polymorph.Supports(PowerfulChangeAbilityScore.Dexterity) ||
+                !polymorph.Supports(PowerfulChangeAbilityScore.Constitution))
+                throw new InvalidOperationException(
+                    "Supported polymorph ability bonuses were not classified.");
+
+            string direct = "buff[" + buff + "].components=" +
+                "Kingmaker.Designers.Mechanics.Buffs.AddStatBonus{" +
+                "Stat=Strength,Value=4}";
+            if (PowerfulChangeEligibilityClassifier.Classify(false, true,
+                    book, book, new[] { direct }, new[] { buff }).Eligible ||
+                PowerfulChangeEligibilityClassifier.Classify(true, false,
+                    book, book, new[] { direct }, new[] { buff }).Eligible ||
+                PowerfulChangeEligibilityClassifier.Classify(true, true,
+                    "ordinary-wizard-book", book, new[] { direct },
+                    new[] { buff }).Eligible ||
+                PowerfulChangeEligibilityClassifier.Classify(true, true,
+                    book, book, new string[0], new[] { buff }).Eligible)
+                throw new InvalidOperationException(
+                    "A non-spell, wrong-school, wrong-spellbook, or unrelated spell qualified.");
+        }
+
+        private static void TestPowerfulChangeAvailability()
+        {
+            const string caster = "brown-fur-caster";
+            const string book = "arcanist-casting-spellbook";
+            AbilityKey bull = Ability("bull-strength-fixture", string.Empty, 0);
+            ProviderSnapshot bullProvider = PlannerProvider(caster, book, bull,
+                "bull-slots", 0);
+            var pool = new ResourcePoolSnapshot("bull-slots",
+                ResourcePoolKind.Unlimited, 0, 0, null);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(
+                new[] { bullProvider }, new[] { pool }, caster);
+            var option = new ProviderPlanningOption(bullProvider,
+                new[] { caster }, new[] { caster }, 3, 10);
+            var powerfulChange = new CastEnhancementSnapshot(
+                "class-feature|brown-fur-caster|strength", caster,
+                "powerful-change-strength", "Powerful Change — Strength",
+                "Increase a supported Strength bonus for this cast.",
+                CastEnhancementCategory.ClassFeature, 0, 0, 3,
+                new[] { bull.BaseAbilityGuid }, "Powerful Change: Strength",
+                new[] { book }, "reservoir|brown-fur-caster", true);
+            var effects = new Dictionary<string, EffectExpression> {
+                { bull.Canonical, Leaf("bull-strength-buff") }
+            };
+            var active = new ActiveEffectSnapshot(null);
+            var profile = BuffPlannerProfile.CreateDefault("powerful-change");
+            var model = new PlannerSetupModel(profile, snapshot, active,
+                effects, new[] { option }, ignored => { },
+                new[] { powerfulChange });
+            if (!powerfulChange.IsApplicable(bullProvider) ||
+                model.GetApplicableEnhancements().Single().EnhancementId !=
+                    powerfulChange.EnhancementId ||
+                PlannerSetupModel.EffectName(powerfulChange) !=
+                    "Powerful Change: Strength")
+                throw new InvalidOperationException(
+                    "Brown-Fur + Powerful Change + Bull's Strength was not available.");
+
+            var withoutFeature = new PlannerSetupModel(
+                BuffPlannerProfile.CreateDefault("without-feature"), snapshot,
+                active, effects, new[] { option }, ignored => { });
+            if (withoutFeature.GetApplicableEnhancements().Count != 0 ||
+                withoutFeature.GetEnhancementSummary("long") !=
+                    "Enhancement: None available")
+                throw new InvalidOperationException(
+                    "Brown-Fur without the discovered feature gained Powerful Change.");
+
+            ProviderSnapshot ordinary = PlannerProvider("ordinary-wizard",
+                "ordinary-wizard-book", bull, "ordinary-slots", 0);
+            AbilityKey unrelated = Ability("unrelated-spell", string.Empty, 0);
+            ProviderSnapshot unrelatedProvider = PlannerProvider(caster, book,
+                unrelated, "unrelated-slots", 0);
+            if (powerfulChange.IsApplicable(ordinary) ||
+                powerfulChange.IsApplicable(unrelatedProvider))
+                throw new InvalidOperationException(
+                    "Powerful Change leaked to another caster or unrelated spell.");
+
+            AbilityKey catMass = Ability("cat-grace-base", "cat-grace-mass", 0);
+            ProviderSnapshot catProvider = PlannerProvider(caster, book,
+                catMass, "cat-slots", 0);
+            var dexterity = new CastEnhancementSnapshot(
+                "class-feature|brown-fur-caster|dexterity", caster,
+                "powerful-change-dexterity", "Powerful Change — Dexterity",
+                string.Empty, CastEnhancementCategory.ClassFeature, 0, 0, 3,
+                new[] { catMass.VariantGuid }, "Powerful Change: Dexterity",
+                new[] { book }, "reservoir|brown-fur-caster", true);
+            if (!dexterity.IsApplicable(catProvider))
+                throw new InvalidOperationException(
+                    "A qualifying related ability-score mass variant was excluded.");
+        }
+
+        private static void TestPowerfulChangeSharedReservoir()
+        {
+            const string caster = "brown-fur-caster";
+            const string book = "arcanist-casting-spellbook";
+            const string reservoir = "reservoir|brown-fur-caster";
+            AbilityKey strength = Ability("strength-spell", string.Empty, 0);
+            AbilityKey dexterity = Ability("dexterity-spell", string.Empty, 0);
+            var spellPool = new ResourcePoolSnapshot("shared-spell-pool",
+                ResourcePoolKind.Unlimited, 0, 0, null);
+            ProviderSnapshot strengthProvider = PlannerProvider(caster, book,
+                strength, spellPool.PoolKey, 0);
+            ProviderSnapshot dexterityProvider = PlannerProvider(caster, book,
+                dexterity, spellPool.PoolKey, 0);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(new[] {
+                strengthProvider, dexterityProvider }, new[] { spellPool },
+                caster, "target-a", "target-b");
+            var options = new[] {
+                new ProviderPlanningOption(strengthProvider,
+                    new[] { "target-a" }, new[] { caster }, 2, 10),
+                new ProviderPlanningOption(dexterityProvider,
+                    new[] { "target-b" }, new[] { caster }, 2, 10)
+            };
+            var strengthEnhancement = new CastEnhancementSnapshot(
+                "powerful-change-strength", caster, "strength-toggle",
+                "Powerful Change — Strength", string.Empty,
+                CastEnhancementCategory.ClassFeature, 0, 0, 1,
+                new[] { strength.BaseAbilityGuid }, "Powerful Change: Strength",
+                new[] { book }, reservoir, true);
+            var dexterityEnhancement = new CastEnhancementSnapshot(
+                "powerful-change-dexterity", caster, "dexterity-toggle",
+                "Powerful Change — Dexterity", string.Empty,
+                CastEnhancementCategory.ClassFeature, 0, 0, 1,
+                new[] { dexterity.BaseAbilityGuid }, "Powerful Change: Dexterity",
+                new[] { book }, reservoir, true);
+            var requests = new[] {
+                new BuffCastRequest(new BuffSourceDefinition("a-strength",
+                    strength, Leaf("strength-buff"), CastGroupingKind.PerTarget),
+                    new[] { "target-a" }, ExistingEffectPolicy.Overwrite,
+                    null, new[] { strengthEnhancement.EnhancementId }),
+                new BuffCastRequest(new BuffSourceDefinition("b-dexterity",
+                    dexterity, Leaf("dexterity-buff"), CastGroupingKind.PerTarget),
+                    new[] { "target-b" }, ExistingEffectPolicy.Overwrite,
+                    null, new[] { dexterityEnhancement.EnhancementId })
+            };
+            CastPlan plan = new CastPlanner().PlanRoutine(snapshot, requests,
+                options, EmptyPolicy(), new ActiveEffectSnapshot(null),
+                new[] { strengthEnhancement, dexterityEnhancement });
+            if (plan.Steps.Count != 1 ||
+                plan.Steps.Single().EnhancementIds.Single() !=
+                    strengthEnhancement.EnhancementId ||
+                plan.Outcomes.Count(value => value.Kind ==
+                    TargetOutcomeKind.Unfulfilled) != 1)
+                throw new InvalidOperationException(
+                    "Score toggles did not reserve one shared reservoir use.");
         }
 
         private static void TestCastEnhancementPlanning()
@@ -1872,6 +2069,18 @@ namespace KingmakerBuffPlanner.Tests
             if (unavailable.FireCount != 0 || unavailableReport.Failed != 1 ||
                 !unavailableReport.Records.Any(value => value.Detail.Contains("enhancement-unavailable")))
                 throw new InvalidOperationException("Unavailable enhancement silently fell back to an ordinary cast.");
+        }
+
+        private static void TestOneShotEnhancementRestoration()
+        {
+            if (!CastEnhancementActivationPolicy.RestoreOriginalState(false,
+                    true) ||
+                !CastEnhancementActivationPolicy.RestoreOriginalState(true,
+                    false) ||
+                CastEnhancementActivationPolicy.RestoreOriginalState(true,
+                    true))
+                throw new InvalidOperationException(
+                    "A consumed one-shot group could be rearmed after execution.");
         }
         private static ProviderSelectionPolicy EmptyPolicy()
         {
