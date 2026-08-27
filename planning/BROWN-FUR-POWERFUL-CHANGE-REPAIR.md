@@ -181,9 +181,10 @@ The concrete implementation is split across the required boundaries:
 
 Branch: `codex/brown-fur-powerful-change-fix`
 
-Pre-version-bump HEAD remains the starting commit because this checkpoint has
-not yet been committed. Product version remains `0.0.12` until release
-qualification.
+Implementation/test commit:
+`650605aaf2c1c1f7272893074b5e7ad7ed9a9224`. Product version is now
+`0.0.13`; the exact clean release-source commit will be recorded after this
+version/durable-record checkpoint is committed.
 
 Commands and exact results:
 
@@ -223,6 +224,6 @@ in-game cast on a real Brown-Fur character can prove the cross-mod Harmony
 transaction, exact reservoir debit, resulting +6/+8 modifier, non-stacking
 recast behavior, and ordinary unselected +4 result for the diagnostic build.
 
-Exact next action: review the implementation diff, create the coherent local
-implementation checkpoint, increment the diagnostic version to `0.0.13`, then
-run release build/package validation and record the distributable hashes.
+Exact next action: create the clean release-source checkpoint, run deterministic
+release build/package validation, and record the distributable/DLL/MVID hashes
+without installing, pushing, or publishing it.

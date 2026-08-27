@@ -1,5 +1,36 @@
 # Qualification
 
+## 0.0.13 Powerful Change diagnostic qualification
+
+Status: AUTOMATED/STATIC PASS; REAL-CAMPAIGN CROSS-MOD CAST PENDING.
+
+Proven automatically or by exact read-only contract inspection:
+
+- the prior end-to-end empty-option failure path and absence of a UI-only filter;
+- exact installed feature/toggle/marker/spellbook/reservoir identities and native
+  command transaction boundary;
+- semantic classification for all six direct ability scores and supported
+  polymorph carriers;
+- Bull's Strength availability only with the discovered caster capability;
+- absent capability, ordinary caster, wrong spellbook, unrelated spell, and
+  ineligible source rejection;
+- selected mass-variant identity, shared-reservoir planning, fail-closed optional
+  integration, mandatory native routing, and consumed one-shot cleanup; and
+- unchanged source, package-allowlist, runtime-filesystem, and deployment-WhatIf
+  gates.
+
+The current deterministic test result is source `34/34`, protocol/domain
+`95/95`, runtime-harness filesystem `8/8`, package `4/4`, deployment WhatIf
+`5/5`, aggregate `1/1`. Exact diagnostic package/DLL/MVID values are appended
+after clean-head release packaging.
+
+Not yet proven for this Buff Planner build: a real Brown-Fur cast invoking the
+other mod's Harmony transaction, exact reservoir delta, resulting Bull's
+Strength +6 (+8 with Transmutation Supremacy), an unselected +4 control, and
+recast/non-stacking behavior. Those checks require the procedure in
+`docs/MANUAL-ACCEPTANCE.md`; compilation or blueprint inspection does not
+qualify them.
+
 ## 0.0.12 HUD lifecycle hotfix
 
 Status: SOURCE/BEHAVIOR/DETERMINISTIC PACKAGE/PERFORMANCE/NATIVE/OPTIONAL PASS;

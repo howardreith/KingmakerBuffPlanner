@@ -1,5 +1,23 @@
 # CODEX AUTONOMOUS MISSION
 
+## 2026-08-27 0.0.13 Powerful Change diagnostic checkpoint
+
+Branch `codex/brown-fur-powerful-change-fix` started clean at
+`1a568c8dd402c3783b120117f29d3a34e921a334`, version 0.0.12. Read-only
+inspection proved that the installed independent optional module now publishes
+Brown-Fur against CotW's Arcanist, superseding the historical
+FEATURE-NOT-PRESENT environment. The missing integration—not Bull's Strength,
+rank, caster selection, or UI filtering—caused the empty enhancement list.
+
+Implementation checkpoint `650605aaf2c1c1f7272893074b5e7ad7ed9a9224`
+adds structural eligibility, fail-soft feature/toggle validation, exact
+caster/spellbook/variant applicability, shared reservoir allocation, real native
+toggle execution, mandatory command routing, one-shot cleanup, and rejection
+diagnostics. Source-only gates pass 34/34, 95/95, 8/8, 4/4, 5/5, and 1/1.
+Version is incremented locally to 0.0.13 for deterministic diagnostic packaging.
+No remote mutation or publication is authorized. In-game numerical/resource
+verification remains explicitly pending.
+
 ## 2026-08-24 0.0.12 release completion checkpoint
 
 The accepted repair is published from exact `main`/tag commit

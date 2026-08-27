@@ -1,5 +1,15 @@
 # Autonomous Blockers
 
+0.0.13 Powerful Change diagnostic repair, 2026-08-27: no source, architecture,
+deterministic-test, package-allowlist, or deployment-WhatIf blocker. The former
+FEATURE-NOT-PRESENT record is superseded: the installed CallOfTheWild assembly
+still does not itself publish Brown-Fur, but the now-installed independent
+optional module does, and its exact feature/toggle/resource/cast contracts were
+inventoried read-only. The remaining gate is real-campaign cross-mod execution:
+prove the exact reservoir delta, +6/+8 modifier, ordinary +4 control, and
+non-stacking/rearm behavior for the 0.0.13 artifact. No remote or publication
+action is authorized.
+
 0.0.12 HUD lifecycle hotfix, 2026-08-24: COMPLETE; no source, deterministic-build, performance, native, optional, packaging, installation, restoration, human-acceptance, integration, authentication, or publication blocker. Release `v0.0.12` is published from `a48bfae2185a50f1c50d9151666e0b5ce0a0bc3e`; downloaded assets validate, and exact published bytes are guarded-installed with settings and every other mod preserved. Save-backed automation remains unavailable at baseline=0/working=0 and is not falsely claimed, but the owner accepted the campaign behavior and authorized release. Version 0.0.11 remains a separate intact release.
 
 0.0.11 final status, 2026-08-23: COMPLETE; no critical blocker. Human runtime testing accepted the performance correction. The test executable's unhandled `UnauthorizedAccessException` was fixed without suppression, direct and full publisher workflows complete normally with no new Windows crash event, exact published bytes are installed, and v0.0.11 is published. The older save-fixture note below is historical and does not reopen the user-completed human runtime gate.

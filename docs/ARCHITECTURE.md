@@ -1,5 +1,41 @@
 # Architecture
 
+## 0.0.13 Powerful Change enhancement boundary
+
+Powerful Change is an optional compatibility adapter, not a compile-time
+gameplay-mod dependency. `BrownFurPowerfulChangeCompatibility` resolves the
+proven live feature and six score activatables by centralized stable identities,
+then validates every activatable's marker buff and `ResourceSpendType.Never`
+Arcane Reservoir component before publishing a domain snapshot. Missing or
+changed optional blueprints contribute no enhancement and do not affect native
+or metamagic-rod discovery.
+
+`KingmakerPowerfulChangeBlueprintAnalyzer` reuses the bounded native action-graph
+adapter to identify resulting buffs. It inspects their component semantics and
+passes normalized carrier evidence to the Unity-free
+`PowerfulChangeEligibilityClassifier`. Qualification requires a genuine
+Transmutation spell, the exact Arcanist casting spellbook, an applied buff, and
+a supported positive bonus to the selected ability score. It does not match
+spell display names or maintain an ability-spell GUID allowlist. The original
+effect expression retains its conditional branches; this classification only
+answers whether the external provider's proven modifier adapter supports a
+score carried by the cast.
+
+`CastEnhancementSnapshot` owns exact caster/spellbook/selected-variant
+applicability, a shared usage-pool identity, and a native-command requirement.
+`CastPlanner` reserves finite uses by pool, so the six score choices consume one
+logical reservoir rather than six independent counters. Persistence continues
+to store only stable enhancement IDs.
+
+Execution activates the exact native score toggle through
+`KingmakerCastEnhancementAdapter`. A selected Powerful Change step is routed to
+`UnitUseAbility` even in Instant mode because only that native command invokes
+the optional provider's cast transaction. Buff Planner never edits the target's
+stats and never debits the reservoir itself. The provider changes the original
+modifier, preserves its descriptor, commits the exact debit, and consumes its
+one-shot selection. Failed/canceled casts restore prior activation state; a
+consumed one-shot group is not resurrected.
+
 ## Test/runtime evidence boundary
 
 Production runtime requests remain confined to the guarded external `RuntimeTestProtocol.EvidenceRoot`. Protocol unit tests inject a distinct unique directory beneath the operating-system temp root and separately test that the production root rejects those paths. The console entry point owns resolver registration and fixture disposal through completion; it prints PASS only after cleanup. Infrastructure setup failures are reported to stderr with exit 2, so they cannot escape as unhandled CLR exceptions or masquerade as successful tests.

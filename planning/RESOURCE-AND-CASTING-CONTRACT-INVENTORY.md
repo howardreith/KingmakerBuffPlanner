@@ -1,5 +1,18 @@
 # Resource and Casting Contract Inventory
 
+0.0.13 Powerful Change checkpoint: the six score activatables all validate one
+exact CotW Arcane Reservoir reference with
+`ActivatableAbilityResourceLogic.ResourceSpendType.Never`. Toggle activation is
+free; Buff Planner plans their common current amount under one caster-specific
+usage-pool ID and never debits it. The independent provider's transaction is the
+sole debit authority and spends one point only after a successful eligible
+native-command commit. Because it arms on `UnitUseAbility` construction, a
+selected Powerful Change step is mandatory animated/native execution even when
+ordinary Instant-mode fallback is disabled. Failed or canceled casts restore
+state; successful consumption does not rearm any one-shot score member.
+Deterministic planning/routing/cleanup passes; actual debit and resulting
+modifier remain in-game acceptance items.
+
 0.0.11 performance-repair checkpoint: production planning and Animated/Instant execution contracts are unchanged, and deterministic behavior remains green within the 78/78 suite. Fresh save-backed resource/effect execution is not claimed because the current machine has no exact `KBP_AUTOMATION_BASELINE` / `KBP_AUTOMATION_WORKING` pair. The guard rejected the campaign scenario before deployment/save access.
 
 0.0.8 UI replacement checkpoint: automatic providers, resource accounting, material checks, confirmed-effect semantics, and both execution engines are frozen. Separate physical Animated and Instant runs remain release gates.

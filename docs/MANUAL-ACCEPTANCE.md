@@ -1,5 +1,45 @@
 # Manual Acceptance
 
+## 0.0.13 Powerful Change diagnostic gate
+
+Status: REQUIRED. Use the local 0.0.13 diagnostic package; this checklist does
+not authorize a push, release, or modification of another mod.
+
+1. Load a campaign containing a Brown-Fur Transmuter who owns Powerful Change,
+   knows Bull's Strength in the CotW Arcanist casting spellbook, and has at least
+   four Arcane Reservoir points. Record caster level and whether Transmutation
+   Supremacy is present.
+2. Open Setup, select Bull's Strength, and inspect Enhancement. Confirm
+   `Powerful Change: Strength` is available. Capture the corresponding
+   `[KBP][Enhancement]` line; it must report the expected caster, ability/buff,
+   `School=Transmutation`, feature detected, `MatchedScores=[Strength]`,
+   qualification true, no rejection reason, and the option in the available
+   list.
+3. With no enhancement selected, cast Bull's Strength on a clean target. Confirm
+   the native Enhancement modifier is +4 and the reservoir does not change.
+4. Remove/expire that buff. Record the reservoir, select Powerful Change:
+   Strength, and execute the routine. Confirm exactly one point is spent, the
+   toggle is consumed, the resulting Enhancement modifier is +6 (or +8 at level
+   20 with Transmutation Supremacy), and the execution log names the selected
+   enhancement and a successful native command.
+5. Recast with Powerful Change after removing/expiring the prior buff. Confirm
+   one point is spent per selected successful cast and there is one normal buff
+   instance/modifier rather than duplicated or stacked enhancement entries.
+6. Execute once with Powerful Change unselected after an enhanced cast. Confirm
+   the result returns to +4 and no prior score toggle was silently rearmed.
+7. Repeat a representative related spell, preferably Cat's Grace or Bear's
+   Endurance, using its matching score. Confirm the matching option appears and
+   a nonmatching score does not. Select an unrelated nonqualifying spell and
+   confirm no Powerful Change option appears.
+8. Where practical, inspect an ordinary wizard and a multiclass spell copy from
+   a non-Arcanist spellbook. Neither may receive the option. Restart without the
+   optional Brown-Fur provider and confirm Buff Planner initializes normally
+   with no Powerful Change entries.
+
+Report the full `[KBP][Enhancement]`, `[KBP-ENHANCEMENT-OPTION]`, routine-plan,
+routine-outcome, and optional provider transaction lines for any failure, plus
+before/after reservoir values and the target's modifier breakdown.
+
 ## 0.0.12 HUD lifecycle hotfix gate
 
 Status: PASS. The owner accepted the guarded-installed 0.0.12 repair on

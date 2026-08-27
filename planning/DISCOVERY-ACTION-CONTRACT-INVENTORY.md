@@ -1,5 +1,17 @@
 # Discovery Action Contract Inventory
 
+## 0.0.13 Powerful Change consumer
+
+`KingmakerPowerfulChangeBlueprintAnalyzer` reuses
+`KingmakerActionGraphAdapter` and `ActionGraphScanner` rather than introducing a
+second spell-name catalog. Resulting `Buff`/`AreaBuff` leaves are resolved to
+their native blueprints and inspected for the optional provider's proven
+positive ability-score carrier families. Conditional structure remains in the
+catalog expression; the enhancement classifier only determines whether the
+provider supports the selected score somewhere in the cast's proven resulting
+buff graph. Unknown/malformed carriers block enhancement qualification rather
+than becoming guessed support.
+
 0.0.11 performance-repair regression: discovery code is unchanged. Native `perf-fix-0.0.11-exact-native-1` passes 12/12; Call of the Wild `perf-fix-0.0.11-exact-cotw-2` passes 26/26 with 9,064 abilities, 5,907 candidates, 2,096 optional inclusions, zero unsupported candidates, and exact restoration. The performance root cause is UI host discovery, not blueprint/action-graph discovery.
 
 0.0.8 UI replacement checkpoint: no discovery action interpretation changed. The full deterministic and exact native/Call of the Wild regressions remain release gates.

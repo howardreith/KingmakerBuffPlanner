@@ -1,5 +1,37 @@
 # Implementation Report
 
+## 0.0.13 Brown-Fur Powerful Change diagnostic repair
+
+The exact `Enhancement: None available` result was produced before the view:
+`KingmakerCastEnhancementAdapter` discovered only `MetamagicRodMechanics`, and
+`CastEnhancementSnapshot.IsApplicable` rejected every non-rod category. No
+Powerful Change capability, qualified spell, option, or runtime toggle ever
+entered the model. Persistence, deduplication, resource filtering, and the view
+were not removing a previously discovered option.
+
+Read-only inspection of the installed environment established that Call of the
+Wild supplies the Arcanist contracts, while a separately optional module
+publishes Brown-Fur and its stable blueprints. The live implementation uses one
+level-3 feature, six native score activatables, marker buffs, and one shared
+Arcane Reservoir. Its cast engine qualifies genuine Transmutation spells from
+the exact Arcanist spellbook by positive ability-score carrier semantics and
+starts its transaction at native `UnitUseAbility` construction.
+
+The repair adds a fail-soft compatibility profile and live contract validation,
+structural buff-component classification, class-feature applicability and
+rejection reasons, shared usage-pool allocation, native toggle preparation,
+mandatory command routing, one-shot cleanup, and focused
+`[KBP][Enhancement]` diagnostics. Bull's Strength qualifies through its native
+`AddStatBonus` Strength +4 Enhancement carrier; no spell name or spell GUID is
+hard-coded. Other ability-score transmutations and supported polymorph carriers
+follow the same policy.
+
+Implementation/test checkpoint commit:
+`650605aaf2c1c1f7272893074b5e7ad7ed9a9224`. Diagnostic version: `0.0.13`.
+The deterministic source slice passes; exact release-source/package identities
+are recorded after the clean-head release build. Cross-mod numerical behavior
+remains an explicit in-game acceptance item rather than an automated claim.
+
 ## 0.0.12 HUD lifecycle repair
 
 The 0.0.11 performance fix correctly replaced per-frame global discovery with

@@ -1,5 +1,24 @@
 # Autonomous Resume
 
+## 0.0.13 Powerful Change diagnostic repair - 2026-08-27
+
+- Active local branch: `codex/brown-fur-powerful-change-fix`; implementation
+  checkpoint: `650605aaf2c1c1f7272893074b5e7ad7ed9a9224`; working version: 0.0.13.
+- The old selector was empty because Buff Planner implemented rods only and
+  rejected every class-feature enhancement. Installed-provider inspection
+  disproved wrong Bull's Strength structure, rank mismatch, UI filtering,
+  persistence loss, and wrong-caster caching as causes.
+- The repair detects the exact live feature and validated score toggles,
+  qualifies Transmutation spells by structural positive ability-score carriers
+  from the exact Arcanist spellbook, shares the Arcane Reservoir across score
+  choices, and routes the real toggle through native command execution. It has
+  no compile-time optional-mod dependency and fails safely when absent.
+- Automated status: source 34/34, protocol/domain 95/95, runtime filesystem 8/8,
+  package 4/4, deployment WhatIf 5/5, aggregate 1/1. No remote action occurred.
+- Exact next action: commit the version/durable-record release-source checkpoint,
+  run clean-head deterministic packaging, record ZIP/DLL/MVID hashes, and leave
+  the real-campaign checklist in `docs/MANUAL-ACCEPTANCE.md` pending.
+
 ## 0.0.12 published completion - 2026-08-24
 
 - The accepted hotfix was merged to default `main` and released from exact

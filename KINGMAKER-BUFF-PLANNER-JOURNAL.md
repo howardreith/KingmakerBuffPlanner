@@ -1,5 +1,38 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-08-27 - 0.0.13 Powerful Change diagnostic engineering checkpoint
+
+- Started from a clean `main` worktree at
+  `1a568c8dd402c3783b120117f29d3a34e921a334`, version 0.0.12, then created
+  local branch `codex/brown-fur-powerful-change-fix`. No remote mutation,
+  push, publication, or unrelated-mod edit occurred.
+- Root cause: the enhancement adapter discovered only native metamagic rods,
+  and domain applicability rejected the reserved class-feature category. No
+  Powerful Change option reached UI, persistence, planning, or execution; the
+  view's `None available` text was accurate for that empty model.
+- Read-only installed-contract inspection proved one exact Powerful Change
+  feature, six native score activatables/marker buffs, exact CotW Arcanist
+  spellbook and Arcane Reservoir contracts, structural positive ability-score
+  carrier qualification, and a transaction armed only by native
+  `UnitUseAbility`. The optional provider DLL SHA-256 is
+  `4003C284C116D8BF1E2019692D035BE563E87F1021B6C26C6470246905B916CC`;
+  MVID is `7a9cd325-48f9-4cbc-be10-a9fc898a6edd`; read-only source HEAD is
+  `0fe38002fc022ad5a04d65430eb461046cd9cc3c`.
+- Implementation/test commit
+  `650605aaf2c1c1f7272893074b5e7ad7ed9a9224` adds fail-soft optional
+  discovery, structural classification, exact applicability/rejection reasons,
+  shared reservoir planning, native toggle preparation, mandatory command
+  routing, one-shot cleanup, and focused diagnostics without a Bull's Strength
+  name/GUID exception.
+- `Test-SourceOnly.ps1` passes source 34/34, protocol/domain 95/95,
+  runtime-filesystem 8/8, package 4/4, deployment WhatIf 5/5, aggregate 1/1.
+  Diagnostic version sources are now 0.0.13. Deterministic release packaging
+  and exact artifact hashes remain the next action.
+- Remaining uncertainty: a real campaign must prove the external Harmony cast
+  transaction, exact one-point reservoir debit, +6/+8 resulting modifier,
+  ordinary +4 control, and repeated-cast non-stacking. No runtime qualification
+  is inferred from compilation or read-only provider evidence.
+
 ## 2026-08-24 - 0.0.12 published completion
 
 Status: PUBLISHED; DOWNLOADED ASSET VERIFIED; EXACT PUBLISHED BYTES INSTALLED
