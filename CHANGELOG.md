@@ -18,9 +18,11 @@
   missing capability, ordinary casters, wrong spellbooks, unrelated spells,
   mass variants, shared uses, native routing, and one-shot cleanup.
 
-The owner accepted the validated, guarded-installed 0.0.13 candidate and
-authorized publication on 2026-08-27. Direct cross-mod numerical cast evidence
-is not claimed; the focused runtime diagnostic procedure remains documented.
+The owner accepted the validated candidate, and version 0.0.13 was published on
+2026-08-27 from tag commit
+`3c329cfff3530fe8397012565c238a81d55cec1d`. The exact published bytes are
+guarded-installed. Direct cross-mod numerical cast evidence is not claimed; the
+focused runtime diagnostic procedure remains documented.
 
 ## 0.0.12 - HUD lifecycle retry repair
 

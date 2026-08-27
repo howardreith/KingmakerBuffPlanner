@@ -1,5 +1,21 @@
 # CODEX AUTONOMOUS MISSION
 
+## 2026-08-27 0.0.13 published completion checkpoint
+
+Accepted 0.0.13 is public at
+`https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.0.13`.
+Exact `main`/tag commit is `3c329cfff3530fe8397012565c238a81d55cec1d`;
+package/DLL/MVID are `67768176032d6d980f09b708a636dfa8f07e5b052530deb327d833e8e4882d96` /
+`b41f31da57f9b7ee69a4e693792bf4bb1a6f7e5ea7dbff0e723c72f24d02bf86` /
+`995ed895-bb45-412c-b626-692816b1f833`. Publisher gates pass 34/34, 95/95,
+8/8, 4/4, 5/5, aggregate 1/1, guarded push 6/6, and deterministic release 2/2.
+An independent GitHub download validates 4/4. Exact published bytes are
+guarded-installed with settings and every unrelated mod preserved; install
+result SHA-256 is
+`49e81844fd1d111b09e4c69389a5764a9692c95b7210a2b81df34268c41afa2c`.
+Direct cross-mod numerical behavior remains unclaimed. Exact next action is the
+documentation-only completion commit and guarded push; no release work remains.
+
 ## 2026-08-27 0.0.13 install acceptance/publication checkpoint
 
 At clean feature HEAD `07370364b3ff4e5fc3cc2b2842b24cd079fdec63`, the

@@ -1,5 +1,34 @@
 # Autonomous Resume
 
+## 0.0.13 published completion - 2026-08-27
+
+- No release work remains. `main`, `origin/main`, and annotated tag `v0.0.13`
+  resolve to release commit `3c329cfff3530fe8397012565c238a81d55cec1d`;
+  tag object is `1ac6387f9d969053a4ca2a608021e106bae3b9ee`.
+- Guarded-push preflight passes 6/6. The publisher passes source 34/34,
+  protocol/domain 95/95, runtime filesystem 8/8, package 4/4, deployment WhatIf
+  5/5, aggregate 1/1, release builder 3/3, and two deterministic builds.
+- Public release, published `2026-08-27T17:33:41Z`, draft=false,
+  prerelease=false:
+  `https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.0.13`.
+- Published ZIP/DLL/MVID are
+  `67768176032d6d980f09b708a636dfa8f07e5b052530deb327d833e8e4882d96` /
+  `b41f31da57f9b7ee69a4e693792bf4bb1a6f7e5ea7dbff0e723c72f24d02bf86` /
+  `995ed895-bb45-412c-b626-692816b1f833`. Independent GitHub download matches
+  the GitHub digest and checksum and passes strict package validation 4/4;
+  `SHA256SUMS.txt` hashes to
+  `a5ebdab942d616c30f9e053641a76679371351e69342d5f796dfb4bd56cb15e3`.
+- Guarded published install
+  `brown-fur-powerful-change-0.0.13-published-install-20260827` is `Installed`;
+  exact DLL/MVID match, settings preserved, every other mod verified unchanged,
+  staging absent, recovery backup retained, and no Kingmaker/UMM process. Its
+  result SHA-256 is
+  `49e81844fd1d111b09e4c69389a5764a9692c95b7210a2b81df34268c41afa2c`.
+- Direct in-game cross-mod reservoir/modifier behavior remains unclaimed and is
+  retained only as the recommended diagnostic follow-up in
+  `docs/MANUAL-ACCEPTANCE.md`. Exact next action: commit and guarded-push this
+  post-publication evidence record; no further release-engineering action.
+
 ## 0.0.13 install acceptance and publication authorization - 2026-08-27
 
 - Checkpoint branch/HEAD/version before this record:

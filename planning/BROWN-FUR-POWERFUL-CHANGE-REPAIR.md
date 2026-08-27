@@ -282,6 +282,28 @@ recast behavior, and ordinary unselected +4 result for the diagnostic build.
   WhatIf 5/5, aggregate 1/1. Exact next action is the deterministic release gate,
   guarded integration/publication, and remote artifact verification.
 
+## Published completion - 2026-08-27
+
+- Release/default-branch/tag commit:
+  `3c329cfff3530fe8397012565c238a81d55cec1d`; annotated `v0.0.13` tag object:
+  `1ac6387f9d969053a4ca2a608021e106bae3b9ee`.
+- Guarded-push WhatIf passes 6/6. Publisher repeats source 34/34,
+  protocol/domain 95/95, runtime filesystem 8/8, package 4/4, deployment WhatIf
+  5/5, aggregate 1/1, and two deterministic builds.
+- Published ZIP/DLL/MVID:
+  `67768176032d6d980f09b708a636dfa8f07e5b052530deb327d833e8e4882d96` /
+  `b41f31da57f9b7ee69a4e693792bf4bb1a6f7e5ea7dbff0e723c72f24d02bf86` /
+  `995ed895-bb45-412c-b626-692816b1f833`. Independent download matches GitHub
+  digest/checksum and validates 4/4.
+- Public release:
+  `https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.0.13`.
+- Guarded install `brown-fur-powerful-change-0.0.13-published-install-20260827`
+  installs those exact bytes, preserves settings, verifies other mods unchanged,
+  and leaves no staging or running process. Install-result SHA-256:
+  `49e81844fd1d111b09e4c69389a5764a9692c95b7210a2b81df34268c41afa2c`.
+- No release-engineering work remains. The manual cross-mod numerical procedure
+  is retained as an explicitly unclaimed diagnostic follow-up.
+
 Exact next action: use the artifact above with the bounded procedure in
 `docs/MANUAL-ACCEPTANCE.md` and record the real reservoir/modifier/toggle
 outcomes. Do not claim runtime qualification until that evidence exists.

@@ -1,5 +1,39 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-08-27 - 0.0.13 published completion
+
+Status: PUBLISHED; DOWNLOADED ASSETS VERIFIED; EXACT PUBLISHED BYTES INSTALLED
+
+- Local release merge, `origin/main`, and annotated tag `v0.0.13` all peel to
+  `3c329cfff3530fe8397012565c238a81d55cec1d`; annotated tag object is
+  `1ac6387f9d969053a4ca2a608021e106bae3b9ee`.
+- Before remote mutation, guarded-push WhatIf passed 6/6, source passed 34/34,
+  domain/protocol 95/95, runtime filesystem 8/8, package 4/4, deployment WhatIf
+  5/5, aggregate 1/1, and the release builder passed 3/3 with two deterministic
+  builds. The guarded helper pushed exact `main` without force; the publisher
+  independently repeated the complete suite and deterministic release build.
+- Public release is draft=false, prerelease=false, published
+  `2026-08-27T17:33:41Z`:
+  `https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.0.13`.
+- Published ZIP is 239,630 bytes with GitHub/local/download SHA-256
+  `67768176032d6d980f09b708a636dfa8f07e5b052530deb327d833e8e4882d96`.
+  Published DLL SHA-256 is
+  `b41f31da57f9b7ee69a4e693792bf4bb1a6f7e5ea7dbff0e723c72f24d02bf86`;
+  MVID is `995ed895-bb45-412c-b626-692816b1f833`.
+  `SHA256SUMS.txt` content matches and its own SHA-256 is
+  `a5ebdab942d616c30f9e053641a76679371351e69342d5f796dfb4bd56cb15e3`;
+  independently downloaded ZIP passes strict package validation 4/4.
+- The prior installed diagnostic binary was intentionally replaced because the
+  build embeds the exact release commit. Guarded transaction
+  `brown-fur-powerful-change-0.0.13-published-install-20260827` installs the
+  published DLL/MVID exactly, preserves settings, verifies every unrelated mod
+  unchanged, removes staging, retains a recovery backup, and records no failure.
+  Install-result SHA-256 is
+  `49e81844fd1d111b09e4c69389a5764a9692c95b7210a2b81df34268c41afa2c`.
+- Direct cross-mod numerical behavior remains unclaimed. Exact next action:
+  commit and guarded-push this documentation-only publication record; no further
+  release-engineering work remains.
+
 ## 2026-08-27 - 0.0.13 install acceptance and release authorization
 
 Status: GUARDED-INSTALLED; OWNER ACCEPTED; MERGE/PUSH/NEW RELEASE AUTHORIZED

@@ -23,21 +23,23 @@ Proven automatically or by exact read-only contract inspection:
 The final deterministic test result is source `34/34`, protocol/domain `95/95`,
 runtime-harness filesystem `8/8`, package `4/4`, deployment WhatIf `5/5`, and
 aggregate `1/1`. Two clean-head release builds reproduced the same DLL and ZIP.
-Exact release-source commit is
-`f086c0257c8c8636cd5af0df9ca37c4f5ac7f794`; ZIP/DLL/MVID are
-`9182e45cc5e31c137062ac9d2252a80836effc7bf8506676f303ed5276a7aa63` /
-`6e88ea23d54fb1e3ab7e7dc264129592ea36739c96fe6bb49f9d75890b216551` /
-`3a61d90c-74b2-4944-b68d-6e2229fd3eb4`. Package validation passes 4/4, and a
+Exact release/tag commit is
+`3c329cfff3530fe8397012565c238a81d55cec1d`; published ZIP/DLL/MVID are
+`67768176032d6d980f09b708a636dfa8f07e5b052530deb327d833e8e4882d96` /
+`b41f31da57f9b7ee69a4e693792bf4bb1a6f7e5ea7dbff0e723c72f24d02bf86` /
+`995ed895-bb45-412c-b626-692816b1f833`. Package validation passes 4/4, and a
 reflection-only audit finds zero compile-time optional gameplay-mod references.
-The pre-publication release manifest records `publicationStatus=local-only`, as
-required by the guarded local installer. Install transaction
-`brown-fur-powerful-change-0.0.13-install-20260827` upgraded UMM from 0.0.12 to
-the exact 0.0.13 DLL/MVID, preserved all planner settings, verified every other
-mod unchanged, removed staging, and retained a recovery backup. Its
-`install-result.json` SHA-256 is
-`e546995c3c6fe0f63ef16e7ba729894794f6d545c9fb96c83cb34bb6f0dc957a`.
-The owner accepted this candidate and explicitly authorized merge, push, and a
-new public release on 2026-08-27.
+The annotated `v0.0.13` tag and public release were created on 2026-08-27; an
+independent GitHub download matches the asset digest and `SHA256SUMS.txt`, then
+passes strict package validation 4/4.
+
+Final install transaction
+`brown-fur-powerful-change-0.0.13-published-install-20260827` replaced the
+earlier diagnostic build with the exact published DLL/MVID, preserved all
+planner settings, verified every other mod unchanged, removed staging, and
+retained a recovery backup. Its `install-result.json` SHA-256 is
+`49e81844fd1d111b09e4c69389a5764a9692c95b7210a2b81df34268c41afa2c`.
+Release: `https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.0.13`.
 
 Not yet proven for this Buff Planner build: a real Brown-Fur cast invoking the
 other mod's Harmony transaction, exact reservoir delta, resulting Bull's

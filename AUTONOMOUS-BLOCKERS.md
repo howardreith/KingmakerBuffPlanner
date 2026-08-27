@@ -1,17 +1,17 @@
 # Autonomous Blockers
 
-0.0.13 Powerful Change repair, 2026-08-27: no source, architecture,
+0.0.13 Powerful Change repair, 2026-08-27: COMPLETE; no source, architecture,
 deterministic-test, package-allowlist, deployment, installation, authentication,
-merge, or publication-authorization blocker. Exact 0.0.13 is guarded-installed;
-settings are preserved and every unrelated mod is verified unchanged. The owner
-accepted the candidate and explicitly authorized final commit, merge to default
-`main`, remote `main` push, and a new public release. Direct real-campaign
-cross-mod execution still has no captured evidence for the exact reservoir
-delta, +6/+8 modifier, ordinary +4 control, and non-stacking/rearm behavior; it
-is an honestly documented post-release diagnostic caveat, not a claimed PASS.
-The deterministic ZIP is
-`artifacts/release/0.0.13/KingmakerBuffPlanner-0.0.13.zip`, SHA-256
-`9182e45cc5e31c137062ac9d2252a80836effc7bf8506676f303ed5276a7aa63`.
+merge, push, tag, publication, download-verification, or record blocker. Public
+release `v0.0.13` is published from
+`3c329cfff3530fe8397012565c238a81d55cec1d`; downloaded package SHA-256 is
+`67768176032d6d980f09b708a636dfa8f07e5b052530deb327d833e8e4882d96`,
+and exact published bytes are guarded-installed with settings preserved and all
+other mods unchanged. Direct real-campaign cross-mod execution still has no
+captured evidence for the exact reservoir delta, +6/+8 modifier, ordinary +4
+control, and non-stacking/rearm behavior; it is an honestly documented
+post-release diagnostic caveat, not a claimed PASS or release-engineering
+blocker.
 
 0.0.12 HUD lifecycle hotfix, 2026-08-24: COMPLETE; no source, deterministic-build, performance, native, optional, packaging, installation, restoration, human-acceptance, integration, authentication, or publication blocker. Release `v0.0.12` is published from `a48bfae2185a50f1c50d9151666e0b5ce0a0bc3e`; downloaded assets validate, and exact published bytes are guarded-installed with settings and every other mod preserved. Save-backed automation remains unavailable at baseline=0/working=0 and is not falsely claimed, but the owner accepted the campaign behavior and authorized release. Version 0.0.11 remains a separate intact release.
 

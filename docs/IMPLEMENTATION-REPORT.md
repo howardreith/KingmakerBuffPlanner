@@ -28,17 +28,18 @@ follow the same policy.
 
 Implementation/test checkpoint commit:
 `650605aaf2c1c1f7272893074b5e7ad7ed9a9224`. Release version: `0.0.13`.
-Exact release-source commit:
-`f086c0257c8c8636cd5af0df9ca37c4f5ac7f794`. The deterministic local package
+Exact release/tag commit:
+`3c329cfff3530fe8397012565c238a81d55cec1d`. The published package
 is `artifacts/release/0.0.13/KingmakerBuffPlanner-0.0.13.zip`; ZIP SHA-256 is
-`9182e45cc5e31c137062ac9d2252a80836effc7bf8506676f303ed5276a7aa63`,
+`67768176032d6d980f09b708a636dfa8f07e5b052530deb327d833e8e4882d96`,
 DLL SHA-256 is
-`6e88ea23d54fb1e3ab7e7dc264129592ea36739c96fe6bb49f9d75890b216551`,
-and MVID is `3a61d90c-74b2-4944-b68d-6e2229fd3eb4`. Cross-mod numerical behavior
+`b41f31da57f9b7ee69a4e693792bf4bb1a6f7e5ea7dbff0e723c72f24d02bf86`,
+and MVID is `995ed895-bb45-412c-b626-692816b1f833`. Cross-mod numerical behavior
 remains an explicit in-game acceptance item rather than an automated claim.
-The guarded local installer upgraded the live UMM copy from 0.0.12 to these
-exact bytes with settings preserved and every unrelated mod verified unchanged;
-the owner subsequently accepted the candidate and authorized publication.
+The guarded local installer replaced the earlier diagnostic UMM binary with
+these exact published bytes, preserving settings and verifying every unrelated
+mod unchanged. Public release:
+`https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.0.13`.
 
 ## 0.0.12 HUD lifecycle repair
 

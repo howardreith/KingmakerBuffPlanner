@@ -2,11 +2,11 @@
 
 ## 0.0.13 Brown-Fur Powerful Change repair
 
-Qualified binary source/package/DLL/MVID:
-`f086c0257c8c8636cd5af0df9ca37c4f5ac7f794` /
-`9182e45cc5e31c137062ac9d2252a80836effc7bf8506676f303ed5276a7aa63` /
-`6e88ea23d54fb1e3ab7e7dc264129592ea36739c96fe6bb49f9d75890b216551` /
-`3a61d90c-74b2-4944-b68d-6e2229fd3eb4`.
+Published tag source/package/DLL/MVID:
+`3c329cfff3530fe8397012565c238a81d55cec1d` /
+`67768176032d6d980f09b708a636dfa8f07e5b052530deb327d833e8e4882d96` /
+`b41f31da57f9b7ee69a4e693792bf4bb1a6f7e5ea7dbff0e723c72f24d02bf86` /
+`995ed895-bb45-412c-b626-692816b1f833`.
 
 | Criterion | Result | Exact evidence |
 |---|---|---|
@@ -16,9 +16,9 @@ Qualified binary source/package/DLL/MVID:
 | Planning/execution | PASS deterministic | One shared reservoir, caster/spellbook/variant applicability, native toggle lease, mandatory command routing, one-shot cleanup. |
 | Regression suite | PASS | Source 34/34; domain/protocol 95/95; filesystem 8/8; package 4/4; deployment WhatIf 5/5; aggregate 1/1. |
 | Deterministic package | PASS | Two byte-identical builds; strict allowlist and zero compile-time optional-mod references. |
-| Guarded UMM install | PASS | `brown-fur-powerful-change-0.0.13-install-20260827`; settings preserved; other mods unchanged; exact DLL/MVID. |
+| Guarded UMM install | PASS | Published install `brown-fur-powerful-change-0.0.13-published-install-20260827`; settings preserved; other mods unchanged; exact DLL/MVID. |
 | Owner acceptance | PASS | Owner verdict `This is acceptable.` on 2026-08-27. |
-| Merge/public release | AUTHORIZED | Owner explicitly requested final commit, merge to default branch, remote push, and a new release. |
+| Merge/public release | PASS | `main`/annotated `v0.0.13` at `3c329cf`; public release assets independently downloaded and validated. |
 | Direct cross-mod numerical cast | NOT CLAIMED | Post-release checklist documents reservoir delta, +4/+6/+8 modifier, and repeat-cast verification. |
 
 ## 0.0.8 four-column routine planner

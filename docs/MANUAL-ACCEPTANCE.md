@@ -9,12 +9,13 @@ checklist to verify the remaining cross-mod runtime boundary. It never
 authorizes modification of another mod.
 
 Exact artifact: `artifacts/release/0.0.13/KingmakerBuffPlanner-0.0.13.zip`;
-release-source commit `f086c0257c8c8636cd5af0df9ca37c4f5ac7f794`;
+release/tag commit `3c329cfff3530fe8397012565c238a81d55cec1d`;
 ZIP SHA-256
-`9182e45cc5e31c137062ac9d2252a80836effc7bf8506676f303ed5276a7aa63`;
+`67768176032d6d980f09b708a636dfa8f07e5b052530deb327d833e8e4882d96`;
 DLL SHA-256
-`6e88ea23d54fb1e3ab7e7dc264129592ea36739c96fe6bb49f9d75890b216551`;
-MVID `3a61d90c-74b2-4944-b68d-6e2229fd3eb4`.
+`b41f31da57f9b7ee69a4e693792bf4bb1a6f7e5ea7dbff0e723c72f24d02bf86`;
+MVID `995ed895-bb45-412c-b626-692816b1f833`. These are the exact published and
+guarded-installed bytes.
 
 1. Load a campaign containing a Brown-Fur Transmuter who owns Powerful Change,
    knows Bull's Strength in the CotW Arcanist casting spellbook, and has at least
