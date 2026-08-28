@@ -1,69 +1,65 @@
-# Kingmaker Buff Planner 0.0.13
+# Kingmaker Buff Planner 0.0.14
 
-Version 0.0.13 repairs Powerful Change discovery and execution for the optional
-Brown-Fur Transmuter implementation used with Call of the Wild's Arcanist.
-The owner accepted the validated, guarded-installed candidate on 2026-08-27 and
-authorized this public release.
+Version 0.0.14 keeps complete localized spell names visible and adds
+first-class concrete entries for buff spells whose parent requires a variant
+choice.
 
-## Root cause and repair
+## Complete names
 
-Buff Planner's enhancement pipeline implemented only native metamagic rods.
-Although the domain enum reserved a class-feature category, class features were
-always rejected, no Powerful Change fact or score toggle was discovered, and
-execution could arm only a rod. The UI therefore correctly rendered its empty
-candidate list as `Enhancement: None available`.
+Catalog cards no longer rely on a fixed one-line name region. The planner
+measures wrapped localized text, grows only the affected grid row, and moves the
+availability and configuration text below it. Short names remain compact.
+Selected-detail and description views also render the complete catalog name.
+This keeps distinctions such as Communal, Greater, Mass, and localized or
+mod-added suffixes in the primary UI rather than hiding them behind clipping,
+ellipsis, or a tooltip.
 
-The repair detects the exact live Powerful Change feature, validates the six
-native score activatables against their marker buffs and Arcane Reservoir
-component shape, and represents each score as a caster-owned enhancement. The
-six choices share one usage pool because the provider spends the same reservoir.
+## Concrete selectable variants
 
-Spell eligibility is structural. A candidate must be a genuine Transmutation
-spell from the exact Arcanist casting spellbook, and its resulting buff graph
-must contain a supported positive ability-score carrier such as `AddStatBonus`,
-`AddContextStatBonus`, `AddGenericStatBonus`, `AddStatBonusAbilityValue`, or
-`Polymorph`. Bull's Strength is covered by its native Strength +4 Enhancement
-carrier; there is no Bull's Strength name or spell-GUID exception.
+Eligible `AbilityVariants` children are discovered structurally and exposed as
+separate catalog entries. The complete localized parent is combined with the
+localized distinguishing child text through one formatter. Parent search finds
+all siblings, child terms find the requested choice, and siblings stay together
+in the blueprint's declared order. Child icons are preferred with a safe parent
+fallback.
 
-## Execution behavior
+The unresolved parent container is not selectable. Each child independently
+must satisfy the planner's existing persistent beneficial-buff rules, so this
+does not indiscriminately import summoning, weapon, transformation, or other
+choice menus.
 
-Selecting Powerful Change arms the provider's real native score toggle. Even
-when Buff Planner is configured for Instant mode, this one enhancement uses the
-native animated command path because the optional provider starts its immutable
-transaction when `UnitUseAbility` is constructed. The provider remains the sole
-authority for changing the original modifier, preserving its descriptor,
-spending exactly one reservoir point on a successful eligible cast, and
-consuming the selection.
+The exact Kingmaker 2.1.7b native catalog contains five supported children for
+both Resist Energy and Resist Energy, Communal, including Sonic. The two
+families retain their separate parent identities and native declared orders.
 
-Canceled or rejected casts restore the prior activatable state. A successful
-one-shot transaction leaves the entire score group consumed, preventing a prior
-score selection from being resurrected and affecting a later cast.
+## Casting, resources, and saved plans
 
-## Compatibility and diagnostics
+Each entry stores both the parent/source ability GUID and the concrete child
+GUID. The parent establishes spellbook ownership, spell level, prepared token
+or spontaneous pool, metamagic, fact/resource context, and material state. The
+child supplies the exact effect, localized presentation, target rules, and cast
+blueprint.
 
-The adapter has no compile-time dependency on another gameplay mod. If the
-optional Powerful Change blueprints are absent, the caster lacks the feature,
-or the toggle/marker/resource contract differs, it contributes no option and
-Buff Planner continues normally. Ordinary casters and spells from other
-spellbooks never inherit the capability.
+Execution constructs the concrete child through Kingmaker's own
+parent-data/child-blueprint `AbilityData` path. Availability and spending then
+delegate through the parent exactly once; neither executor chooses the first
+variant or falls back to a sibling.
 
-Opening the selected buff's casting section emits a focused
-`[KBP][Enhancement]` line with caster, ability and resulting buff identities,
-spellbook, school, descriptors, feature detection, component/carrier evidence,
-matched ability scores, qualification status, exact rejection reason, and the
-available enhancement list.
+Saved concrete choices round-trip by stable blueprint identifiers. A legacy
+parent-only assignment migrates only if one eligible child is unambiguous.
+Otherwise the planner leaves it unsupported and reports that the complete
+parent requires reselection; it never invents an energy type.
 
-## Validation status
+## Validation boundary
 
-The deterministic suite covers all six direct ability scores, polymorph bonus
-carriers, the expected Bull's Strength capability cases, wrong caster and
-spellbook rejection, unrelated spells, selected mass variants, shared reservoir
-reservation, mandatory native-command routing, and one-shot cleanup.
+The deterministic suite covers complete-name layout, generic expansion and
+filtering, stable identities, order/deduplication, parent/child search,
+persistence and legacy behavior, parent-backed availability, exact-child
+planning, single resource reservation, ordinary casting, icon fallback, and
+non-English formatting.
 
-Direct real-campaign evidence has not yet been captured for the cross-mod
-Harmony transaction, one-point reservoir debit, final +6 Bull's Strength
-modifier (+8 with Transmutation Supremacy), ordinary unselected +4 result, and
-repeated-cast non-stacking behavior. The release keeps focused diagnostics for
-that verification boundary; see `docs/MANUAL-ACCEPTANCE.md` for the short
-procedure. These numerical runtime results are not claimed by the automated
-qualification.
+Exact assembly IL and blueprint-catalog evidence were inspected locally. No
+save-backed in-game cast or visual qualification is claimed for this build
+because the repository guard found no authorized `KBP_AUTOMATION_BASELINE` or
+`KBP_AUTOMATION_WORKING` save. See `docs/MANUAL-ACCEPTANCE.md` for the bounded
+runtime checklist.
