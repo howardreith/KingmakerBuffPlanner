@@ -1,5 +1,29 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-08-28 - 0.0.14 deterministic local artifact
+
+Status: LOCAL RELEASE PASS; PUBLICATION/INSTALL/IN-GAME CLAIM NOT PERFORMED
+
+- Local commits are `932da35de573aec46d72adc03848ec417a09c4ff`
+  (`feat: add concrete selectable spell variants`) and
+  `a78869c329e39734cd77f4b587d3d97b05fede70`
+  (`chore: prepare 0.0.14 local release source`). Release source was clean.
+- `./scripts/Build-Release.ps1` passes source 34/34 and build 1/1 twice,
+  package validation 4/4 three times, deterministic equality 2/2, and aggregate
+  release builder 3/3.
+- Local-only ZIP is
+  `artifacts/release/0.0.14/KingmakerBuffPlanner-0.0.14.zip`, 249,448 bytes.
+  ZIP/DLL/MVID are
+  `182a597b899875851bd4f6e125a7222018a86bdf7688d455bcf750a512f4e5cd` /
+  `7c6ce2b7bf79fd24625d0d6263d36803a4ec1cd7a873be211fa569d877811fae` /
+  `9896cd99-f01e-44c5-afe3-980ca1d043b9`. Manifest records exact source commit
+  `a78869c329e39734cd77f4b587d3d97b05fede70`, validation true, publication
+  status local-only.
+- No game, live Mods transaction, install, remote operation, tag, push, or
+  publication occurred. Save-backed rows remain unclaimed because the guard is
+  exactly baseline=0/working=0. Exact next action is this documentation commit,
+  one final full gate, clean-status verification, and local handoff.
+
 ## 2026-08-28 - complete names and selectable variants engineering checkpoint
 
 Status: IMPLEMENTED; DETERMINISTIC GATES PASS; LOCAL COMMIT/PACKAGE PENDING;

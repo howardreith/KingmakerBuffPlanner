@@ -16,17 +16,22 @@
   complete localized names, preserves parent-backed availability, resolves the
   exact child for execution, and refuses ambiguous legacy inference.
 - Current gates: source 34/34, protocol/domain 112/112, runtime filesystem 8/8,
-  package fixture 4/4, deployment WhatIf 5/5, aggregate 1/1, Release build 1/1.
-  Current DLL SHA-256/MVID are
-  `7f32c802ca335c2ace41e10869253792aa2218872b85453d21d8c302ac08878f` /
-  `657c8f37-f755-4b3d-8974-445ec1a224f6`.
+  package 4/4, deployment WhatIf 5/5, aggregate 1/1, and deterministic release
+  2/2. Feature/release-source commits are
+  `932da35de573aec46d72adc03848ec417a09c4ff` and
+  `a78869c329e39734cd77f4b587d3d97b05fede70`.
+- Local-only ZIP/DLL/MVID are
+  `182a597b899875851bd4f6e125a7222018a86bdf7688d455bcf750a512f4e5cd` /
+  `7c6ce2b7bf79fd24625d0d6263d36803a4ec1cd7a873be211fa569d877811fae` /
+  `9896cd99-f01e-44c5-afe3-980ca1d043b9`. Package source is exact clean HEAD
+  `a78869c329e39734cd77f4b587d3d97b05fede70`; publication status is local-only.
 - Rejected theories: the game does not populate `AbilityData.Variants`; using a
   child GUID without source data is insufficient; presentation aliases cannot
   repair availability/spending; and selecting the first declared child would
   invent player intent.
 - Save audit is exactly `baseline=0; working=0`; in-game verification is not
-  claimed. Exact next action: create local implementation checkpoint(s), bump
-  to 0.0.14, run clean-head deterministic packaging, and record hashes.
+  claimed. Exact next action: commit this local evidence record, rerun the full
+  gate, verify a clean branch, and hand off without remote or live-game action.
 
 ## 0.0.13 published completion - 2026-08-27
 

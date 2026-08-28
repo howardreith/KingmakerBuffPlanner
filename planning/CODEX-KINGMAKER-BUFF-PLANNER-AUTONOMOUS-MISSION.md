@@ -14,10 +14,14 @@ Exact installed-assembly evidence and 17 new behavior regressions are recorded
 in the architecture, contract inventories, implementation report, and
 qualification files. Current gates are 34/34 source, 112/112 protocol/domain,
 8/8 runtime filesystem, 4/4 package fixture, 5/5 deployment WhatIf, aggregate
-1/1, and Release build 1/1. Save-backed runtime is not claimed because the
-guarded inventory is exactly baseline=0/working=0. No remote operation occurred.
-Exact next action: local implementation commit, 0.0.14 release-source update,
-deterministic package, and final local evidence commit.
+1/1, and deterministic release 2/2. Feature/release-source commits are
+`932da35de573aec46d72adc03848ec417a09c4ff` and
+`a78869c329e39734cd77f4b587d3d97b05fede70`; local ZIP/DLL/MVID are
+`182a597b899875851bd4f6e125a7222018a86bdf7688d455bcf750a512f4e5cd` /
+`7c6ce2b7bf79fd24625d0d6263d36803a4ec1cd7a873be211fa569d877811fae` /
+`9896cd99-f01e-44c5-afe3-980ca1d043b9`. Save-backed runtime is not claimed
+because the guarded inventory is exactly baseline=0/working=0. No remote
+operation occurred. Exact next action: final local evidence commit and handoff.
 
 ## 2026-08-27 0.0.13 published completion checkpoint
 

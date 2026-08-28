@@ -2,17 +2,22 @@
 
 ## 0.0.14 spell-name and concrete-variant engineering checkpoint
 
-Status: SOURCE/BEHAVIOR/EXACT-ASSEMBLY/RELEASE-COMPILE PASS; SAVE-BACKED
-IN-GAME VERIFICATION BLOCKED BY ABSENT GUARDED FIXTURES; CLEAN-HEAD PACKAGE
-PENDING THE LOCAL COMMITS.
+Status: SOURCE/BEHAVIOR/EXACT-ASSEMBLY/DETERMINISTIC LOCAL RELEASE PASS;
+SAVE-BACKED IN-GAME VERIFICATION BLOCKED BY ABSENT GUARDED FIXTURES.
 
 - `./scripts/Test-SourceOnly.ps1`: source `34/34`, protocol/domain `112/112`,
   runtime-harness filesystem `8/8`, package fixture `4/4`, deployment WhatIf
   `5/5`, aggregate `1/1`.
-- `./scripts/Build.ps1 -Configuration Release`: source `34/34`, build `1/1`;
-  DLL SHA-256
-  `7f32c802ca335c2ace41e10869253792aa2218872b85453d21d8c302ac08878f`,
-  MVID `657c8f37-f755-4b3d-8974-445ec1a224f6`.
+- `./scripts/Build-Release.ps1` at clean release-source commit
+  `a78869c329e39734cd77f4b587d3d97b05fede70`: source/build `34/34` and
+  `1/1` twice, package validation `4/4` three times, deterministic equality
+  `2/2`, release builder `3/3`.
+- Local-only package:
+  `artifacts/release/0.0.14/KingmakerBuffPlanner-0.0.14.zip`, 249,448 bytes;
+  ZIP/DLL/MVID are
+  `182a597b899875851bd4f6e125a7222018a86bdf7688d455bcf750a512f4e5cd` /
+  `7c6ce2b7bf79fd24625d0d6263d36803a4ec1cd7a873be211fa569d877811fae` /
+  `9896cd99-f01e-44c5-afe3-980ca1d043b9`.
 - `./scripts/Inspect-KingmakerVariantContracts.ps1`: exact
   `Assembly-CSharp.dll` SHA-256
   `3b6450ffec440e296e586f71c711b195aed144b28d53e1cbb29406d18fef5afb`,
@@ -22,8 +27,7 @@ PENDING THE LOCAL COMMITS.
   structurally eligible persistent-buff children, with exact child parent GUIDs
   and blueprint order; `Protection from Arrows, Communal` retains its complete
   localized name.
-- `git diff --check`: pass (the existing `Version.props` line-ending warning is
-  not a content error and will be replaced by the intentional version edit).
+- `git diff --check`: pass.
 
 The current guard reports exactly `Disposable save ambiguity: baseline=0;
 working=0`. No unrelated or personal save was substituted, no game was launched,

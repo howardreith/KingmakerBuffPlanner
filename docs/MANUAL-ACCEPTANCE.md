@@ -7,6 +7,11 @@ Status: REQUIRED FOR IN-GAME CLAIM; NOT RUN because the guarded resolver reports
 `KBP_AUTOMATION_BASELINE` / `KBP_AUTOMATION_WORKING` pair. Do not substitute an
 ordinary campaign save.
 
+Exact local-only test artifact is
+`artifacts/release/0.0.14/KingmakerBuffPlanner-0.0.14.zip`, built from
+`a78869c329e39734cd77f4b587d3d97b05fede70`; ZIP SHA-256 is
+`182a597b899875851bd4f6e125a7222018a86bdf7688d455bcf750a512f4e5cd`.
+
 1. Open Setup and verify `Protection from Arrows, Communal` is present in full
    on its selectable card, selected detail, and description view. Check one
    ordinary short name remains compact and adjacent controls do not overlap.
