@@ -1,5 +1,42 @@
 # CODEX AUTONOMOUS MISSION
 
+## 2026-08-28 0.0.14 publication authorization checkpoint
+
+The owner explicitly authorized final commit, merge to the repository's actual
+default branch, remote push, and a new release. Read-only network preflight
+proves public `howardreith/KingmakerBuffPlanner`, default branch `main`, active
+authenticated owner `howardreith`, synchronized local/remote main at
+`8460ae08157af40cd69b8f0a11259364ceceb885`, and no existing `v0.0.14` tag or
+release. Feature HEAD before this record is
+`d7b88b83953ac31e7af5eb4a803c6551ce601cab` and remains fully qualified. Exact
+next action is authorization commit, non-rewriting main merge, merge-commit
+qualification, guarded push/publication, independent verification, and final
+publication record. Missing save-backed runtime evidence remains honestly
+documented and is not upgraded to PASS by publication authorization.
+
+## 2026-08-28 complete spell names/selectable variants checkpoint
+
+Mission branch `codex/buff-spell-variants-ui` started from clean trusted `main`
+HEAD `8460ae08157af40cd69b8f0a11259364ceceb885`. The complete blueprint-to-cast
+flow now represents selectable children as first-class entries with stable
+parent+child identity, structural child eligibility, declared order,
+parent-backed availability/resources, exact-child execution, and noninventing
+legacy persistence. Full localized names use one formatter and measured wrapped
+card rows rather than clipping/ellipsis.
+
+Exact installed-assembly evidence and 17 new behavior regressions are recorded
+in the architecture, contract inventories, implementation report, and
+qualification files. Current gates are 34/34 source, 112/112 protocol/domain,
+8/8 runtime filesystem, 4/4 package fixture, 5/5 deployment WhatIf, aggregate
+1/1, and deterministic release 2/2. Feature/release-source commits are
+`932da35cb6633031d4077e43df65ab659bc9bd84` and
+`a78869c329e39734cd77f4b587d3d97b05fede70`; local ZIP/DLL/MVID are
+`182a597b899875851bd4f6e125a7222018a86bdf7688d455bcf750a512f4e5cd` /
+`7c6ce2b7bf79fd24625d0d6263d36803a4ec1cd7a873be211fa569d877811fae` /
+`9896cd99-f01e-44c5-afe3-980ca1d043b9`. Save-backed runtime is not claimed
+because the guarded inventory is exactly baseline=0/working=0. No remote
+operation occurred. Exact next action: final local evidence commit and handoff.
+
 ## 2026-08-27 0.0.13 published completion checkpoint
 
 Accepted 0.0.13 is public at

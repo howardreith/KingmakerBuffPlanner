@@ -6,6 +6,7 @@ using KingmakerBuffPlanner.Domain.Effects;
 using KingmakerBuffPlanner.Domain.Identity;
 using KingmakerBuffPlanner.Domain.Planning;
 using KingmakerBuffPlanner.Domain.Providers;
+using KingmakerBuffPlanner.Discovery;
 using KingmakerBuffPlanner.Persistence;
 using KingmakerBuffPlanner.Planning;
 
@@ -16,8 +17,8 @@ namespace KingmakerBuffPlanner.UI
         private readonly AbilityKey _ability;
 
         internal SetupSourceRow(string sourceId, IEnumerable<AbilityKey> abilities,
-            AbilityKey representativeAbility, string displayName, int spellLevel,
-            IEnumerable<ProviderSnapshot> providers)
+            AbilityKey representativeAbility, string displayName, string sourceDisplayName,
+            int variantOrder, int spellLevel, IEnumerable<ProviderSnapshot> providers)
         {
             if (string.IsNullOrWhiteSpace(sourceId)) throw new ArgumentException("Source ID is required.", "sourceId");
             SourceId = sourceId;
@@ -29,7 +30,15 @@ namespace KingmakerBuffPlanner.UI
             _ability = representativeAbility ?? throw new ArgumentNullException("representativeAbility");
             if (!Abilities.Any(item => item.Equals(_ability)))
                 throw new ArgumentException("Representative ability must belong to the aggregate.", "representativeAbility");
-            DisplayName = displayName;
+            DisplayName = displayName ?? string.Empty;
+            SourceDisplayName = string.IsNullOrWhiteSpace(sourceDisplayName)
+                ? DisplayName : sourceDisplayName;
+            SearchText = AbilityDisplayNameFormatter.SearchText(
+                DisplayName, SourceDisplayName);
+            VariantOrder = variantOrder;
+            IsConcreteVariant = CatalogSourceIdentity.IsVariant(SourceId);
+            SortGroupName = IsConcreteVariant ? SourceDisplayName : DisplayName;
+            SortGroupId = IsConcreteVariant ? _ability.BaseAbilityGuid : SourceId;
             SpellLevel = spellLevel;
             var ordered = providers.OrderBy(p => p.Key.Canonical, StringComparer.Ordinal).ToList();
             Providers = new ReadOnlyCollection<ProviderSnapshot>(ordered);
@@ -41,6 +50,12 @@ namespace KingmakerBuffPlanner.UI
         public AbilityKey Ability { get { return _ability; } }
         public IReadOnlyList<AbilityKey> Abilities { get; private set; }
         public string DisplayName { get; private set; }
+        public string SourceDisplayName { get; private set; }
+        public string SearchText { get; private set; }
+        public string SortGroupName { get; private set; }
+        public string SortGroupId { get; private set; }
+        public int VariantOrder { get; private set; }
+        public bool IsConcreteVariant { get; private set; }
         public int SpellLevel { get; private set; }
         public IReadOnlyList<ProviderSnapshot> Providers { get; private set; }
         public string Description { get; private set; }
@@ -52,6 +67,23 @@ namespace KingmakerBuffPlanner.UI
         {
             return Abilities.Any(ability => ability.SourceKind == kind);
         }
+    }
+
+    public sealed class VariantReselectionNotice
+    {
+        internal VariantReselectionNotice(
+            string routineId, string sourceId, string displayName, int candidateCount)
+        {
+            RoutineId = routineId ?? string.Empty;
+            SourceId = sourceId ?? string.Empty;
+            DisplayName = displayName ?? string.Empty;
+            CandidateCount = candidateCount;
+        }
+
+        public string RoutineId { get; private set; }
+        public string SourceId { get; private set; }
+        public string DisplayName { get; private set; }
+        public int CandidateCount { get; private set; }
     }
 
     public sealed class PlannerSetupModel
@@ -92,7 +124,10 @@ namespace KingmakerBuffPlanner.UI
             Sources = new ReadOnlyCollection<SetupSourceRow>(snapshot.Providers
                 .GroupBy(provider => AggregateId(provider.Key.Ability, effects), StringComparer.Ordinal)
                 .Select(group => CreateSourceRow(group.Key, group))
-                .OrderBy(s => s.DisplayName, StringComparer.OrdinalIgnoreCase)
+                .OrderBy(s => s.SortGroupName, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(s => s.SortGroupId, StringComparer.Ordinal)
+                .ThenBy(s => s.VariantOrder)
+                .ThenBy(s => s.DisplayName, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(s => s.SpellLevel)
                 .ThenBy(s => s.SourceId, StringComparer.Ordinal).ToList());
             foreach (SetupSourceRow source in Sources)
@@ -103,6 +138,7 @@ namespace KingmakerBuffPlanner.UI
             }
             _effects = new ReadOnlyDictionary<string, EffectExpression>(effects);
             AssignmentMigrationApplied = RebindLegacyAssignments();
+            VariantReselectionNotices = BuildVariantReselectionNotices();
             if (AssignmentMigrationApplied) _save(Profile);
             SelectedSourceId = Sources.Count == 0 ? string.Empty : Sources[0].SourceId;
         }
@@ -111,6 +147,7 @@ namespace KingmakerBuffPlanner.UI
         public PartyProviderSnapshot Snapshot { get; private set; }
         public IReadOnlyList<SetupSourceRow> Sources { get; private set; }
         public bool AssignmentMigrationApplied { get; private set; }
+        public IReadOnlyList<VariantReselectionNotice> VariantReselectionNotices { get; private set; }
         public string SelectedSourceId { get; private set; }
         public SetupSourceRow SelectedSource { get { return Sources.FirstOrDefault(s => s.SourceId == SelectedSourceId); } }
         public IReadOnlyList<string> UnsupportedSavedSourceIds
@@ -538,7 +575,7 @@ namespace KingmakerBuffPlanner.UI
         {
             EffectExpression expression;
             effects.TryGetValue(ability.Canonical, out expression);
-            return EffectAggregateIdentity.For(expression, ability.Canonical);
+            return CatalogSourceIdentity.For(ability, expression);
         }
 
         private static SetupSourceRow CreateSourceRow(string sourceId,
@@ -551,6 +588,8 @@ namespace KingmakerBuffPlanner.UI
             ProviderSnapshot representative = values[0];
             return new SetupSourceRow(sourceId, values.Select(provider => provider.Key.Ability),
                 representative.Key.Ability, representative.DisplayName,
+                representative.SourceDisplayName,
+                values.Min(provider => provider.VariantOrder),
                 values.Min(provider => provider.SpellLevel), values);
         }
 
@@ -562,6 +601,7 @@ namespace KingmakerBuffPlanner.UI
             bool changed = false;
             foreach (RoutineProfile routine in Profile.Routines)
             {
+                bool routineChanged = false;
                 var rebound = new List<SourceAssignmentProfile>();
                 var aggregateAssignments = new Dictionary<string, SourceAssignmentProfile>(StringComparer.Ordinal);
                 foreach (SourceAssignmentProfile assignment in routine.Assignments)
@@ -569,6 +609,8 @@ namespace KingmakerBuffPlanner.UI
                     SetupSourceRow source;
                     if (!sourceByLegacyId.TryGetValue(assignment.SourceId, out source))
                         source = Sources.FirstOrDefault(item => item.SourceId == assignment.SourceId);
+                    if (source == null)
+                        source = ResolveUnambiguousVariant(assignment);
                     if (source == null)
                     {
                         rebound.Add(assignment);
@@ -579,7 +621,10 @@ namespace KingmakerBuffPlanner.UI
                     {
                         if (assignment.SourceId != source.SourceId ||
                             assignment.Ability.ToKey().Canonical != source.Ability.Canonical)
+                        {
                             changed = true;
+                            routineChanged = true;
+                        }
                         assignment.SourceId = source.SourceId;
                         assignment.Ability = AbilityKeyProfile.FromKey(source.Ability);
                         aggregateAssignments.Add(source.SourceId, assignment);
@@ -598,10 +643,58 @@ namespace KingmakerBuffPlanner.UI
                     if (assignment.ExistingEffectPolicy == ExistingEffectPolicy.Overwrite)
                         existing.ExistingEffectPolicy = ExistingEffectPolicy.Overwrite;
                     changed = true;
+                    routineChanged = true;
                 }
-                if (changed) routine.Assignments = rebound;
+                if (routineChanged) routine.Assignments = rebound;
             }
             return changed;
+        }
+
+        private SetupSourceRow ResolveUnambiguousVariant(SourceAssignmentProfile assignment)
+        {
+            AbilityKey persisted = assignment.Ability.ToKey();
+            if (!string.IsNullOrWhiteSpace(persisted.VariantGuid)) return null;
+            List<SetupSourceRow> candidates = VariantCandidates(persisted);
+            return candidates.Count == 1 ? candidates[0] : null;
+        }
+
+        private IReadOnlyList<VariantReselectionNotice> BuildVariantReselectionNotices()
+        {
+            var notices = new List<VariantReselectionNotice>();
+            var supported = new HashSet<string>(Sources.Select(source => source.SourceId),
+                StringComparer.Ordinal);
+            foreach (RoutineProfile routine in Profile.Routines)
+            {
+                foreach (SourceAssignmentProfile assignment in routine.Assignments.Where(value =>
+                    !supported.Contains(value.SourceId)))
+                {
+                    AbilityKey persisted = assignment.Ability.ToKey();
+                    if (!string.IsNullOrWhiteSpace(persisted.VariantGuid)) continue;
+                    List<SetupSourceRow> candidates = VariantCandidates(persisted);
+                    if (candidates.Count < 2) continue;
+                    string name = candidates.Select(value => value.SourceDisplayName)
+                        .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ??
+                        persisted.BaseAbilityGuid;
+                    notices.Add(new VariantReselectionNotice(
+                        routine.RoutineId, assignment.SourceId, name, candidates.Count));
+                }
+            }
+            return new ReadOnlyCollection<VariantReselectionNotice>(notices
+                .OrderBy(value => value.DisplayName, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(value => value.RoutineId, StringComparer.Ordinal)
+                .ThenBy(value => value.SourceId, StringComparer.Ordinal).ToList());
+        }
+
+        private List<SetupSourceRow> VariantCandidates(AbilityKey persisted)
+        {
+            return Sources.Where(source => source.IsConcreteVariant &&
+                source.Abilities.Any(ability =>
+                    ability.BaseAbilityGuid == persisted.BaseAbilityGuid &&
+                    ability.SourceKind == persisted.SourceKind &&
+                    ability.MetamagicMask == persisted.MetamagicMask &&
+                    ability.SpecialSourceId == persisted.SpecialSourceId))
+                .OrderBy(source => source.VariantOrder)
+                .ThenBy(source => source.SourceId, StringComparer.Ordinal).ToList();
         }
 
         private void RequireProvider(string providerKey)

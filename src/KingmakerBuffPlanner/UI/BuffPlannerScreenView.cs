@@ -541,7 +541,7 @@ namespace KingmakerBuffPlanner.UI
                     "The selected ability blueprint is no longer available.", 0, 0, 0));
                 return;
             }
-            _description.Show(source, ability);
+            _description.Show(source, ability, ResolveAbilityIcon(source));
         }
 
         private Sprite ResolveAbilityIcon(string sourceId)
@@ -554,18 +554,30 @@ namespace KingmakerBuffPlanner.UI
         private static Sprite ResolveAbilityIcon(SetupSourceRow source)
         {
             if (source == null) return null;
-            string guid = string.IsNullOrWhiteSpace(source.Ability.VariantGuid)
-                ? source.Ability.BaseAbilityGuid : source.Ability.VariantGuid;
-            BlueprintAbility ability = ResourcesLibrary.TryGetBlueprint<BlueprintAbility>(guid);
-            return ability == null ? null : ability.Icon;
+            if (!string.IsNullOrWhiteSpace(source.Ability.VariantGuid))
+            {
+                BlueprintAbility concrete =
+                    ResourcesLibrary.TryGetBlueprint<BlueprintAbility>(
+                        source.Ability.VariantGuid);
+                if (concrete != null && concrete.Icon != null) return concrete.Icon;
+            }
+            BlueprintAbility parent = ResourcesLibrary.TryGetBlueprint<BlueprintAbility>(
+                source.Ability.BaseAbilityGuid);
+            return parent == null ? null : parent.Icon;
         }
 
         private static BlueprintAbility ResolveAbilityBlueprint(AbilityKey ability)
         {
             if (ability == null) return null;
-            string guid = string.IsNullOrWhiteSpace(ability.VariantGuid)
-                ? ability.BaseAbilityGuid : ability.VariantGuid;
-            return ResourcesLibrary.TryGetBlueprint<BlueprintAbility>(guid);
+            if (!string.IsNullOrWhiteSpace(ability.VariantGuid))
+            {
+                BlueprintAbility concrete =
+                    ResourcesLibrary.TryGetBlueprint<BlueprintAbility>(
+                        ability.VariantGuid);
+                if (concrete != null) return concrete;
+            }
+            return ResourcesLibrary.TryGetBlueprint<BlueprintAbility>(
+                ability.BaseAbilityGuid);
         }
 
         private static Sprite ResolvePortrait(string unitId)
@@ -810,11 +822,13 @@ namespace KingmakerBuffPlanner.UI
                 string.Empty, 25, TextAnchor.MiddleLeft);
             _name.fontStyle = FontStyle.Bold;
             _name.color = theme.BurgundyPrimary;
-            KingmakerUiFactory.SetAnchors(_name.rectTransform, 0.18f, 0.885f, 0.86f, 0.965f);
+            _name.horizontalOverflow = HorizontalWrapMode.Wrap;
+            _name.verticalOverflow = VerticalWrapMode.Overflow;
+            KingmakerUiFactory.SetAnchors(_name.rectTransform, 0.18f, 0.82f, 0.86f, 0.965f);
             _meta = KingmakerUiFactory.CreateText("AbilityMeta", frame, theme,
                 string.Empty, 15, TextAnchor.MiddleLeft);
             _meta.color = theme.MutedBrownText;
-            KingmakerUiFactory.SetAnchors(_meta.rectTransform, 0.18f, 0.79f, 0.86f, 0.89f);
+            KingmakerUiFactory.SetAnchors(_meta.rectTransform, 0.18f, 0.75f, 0.86f, 0.82f);
 
             Button close = KingmakerUiFactory.CreateButton("CloseDescription", frame, theme,
                 "X", Hide);
@@ -825,7 +839,7 @@ namespace KingmakerBuffPlanner.UI
             _scroll = KingmakerUiFactory.CreateScrollView("DescriptionScroll", frame,
                 theme, out content);
             KingmakerUiFactory.SetAnchors((RectTransform)_scroll.transform,
-                0.035f, 0.055f, 0.965f, 0.765f);
+                0.035f, 0.055f, 0.965f, 0.73f);
             ContentSizeFitter contentFitter = content.gameObject.AddComponent<ContentSizeFitter>();
             contentFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
             _body = KingmakerUiFactory.CreateText("DescriptionBody", content, theme,
@@ -844,14 +858,14 @@ namespace KingmakerBuffPlanner.UI
         internal RectTransform Root { get; private set; }
         internal bool IsOpen { get { return Root.gameObject.activeSelf; } }
 
-        internal void Show(SetupSourceRow source, BlueprintAbility ability)
+        internal void Show(SetupSourceRow source, BlueprintAbility ability, Sprite icon)
         {
             if (source == null) throw new ArgumentNullException("source");
             if (ability == null) throw new ArgumentNullException("ability");
-            _icon.sprite = ability.Icon;
-            _icon.gameObject.SetActive(ability.Icon != null);
-            _fallback.gameObject.SetActive(ability.Icon == null);
-            _name.text = ability.Name;
+            _icon.sprite = icon;
+            _icon.gameObject.SetActive(icon != null);
+            _fallback.gameObject.SetActive(icon == null);
+            _name.text = source.DisplayName;
             string school = ability.School.ToString() == "None"
                 ? string.Empty : ability.School.ToString();
             _meta.text = BuffCardViewModel.SourceSummary(source) +

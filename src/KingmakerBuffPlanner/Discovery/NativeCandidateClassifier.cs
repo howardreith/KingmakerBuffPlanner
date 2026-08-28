@@ -61,6 +61,9 @@ namespace KingmakerBuffPlanner.Discovery
                 diagnostics.Any(d => Contains(d, "excluded-summoning-action")))
                 return Exclude("summoning",
                     "Summoning is outside the product definition; after-spawn buffs are not planner effects.");
+            if (facts.HasVariants)
+                return Exclude("non-castable-variant-container",
+                    "The parent is an unresolved choice container; independently eligible concrete children are cataloged instead.");
             if (facts.CanTargetPoint)
                 return Exclude("point-target-without-placement",
                     "Point-target abilities are excluded until a deterministic safe placement rule exists.");
@@ -68,10 +71,6 @@ namespace KingmakerBuffPlanner.Discovery
                 return Exclude("no-persistent-effect",
                     "No persistent unit buff, area buff, or safely resolvable worn-item enchantment was detected.");
 
-            if (facts.HasVariants && !facts.CanTargetSelf && !facts.CanTargetFriends &&
-                !facts.CanTargetEnemies && !facts.CanTargetPoint)
-                return Exclude("non-castable-variant-container",
-                    "The parent groups castable variants but is not itself a targetable source.");
             if (facts.IsStickyTouch && effects.All(e => e.Target == "Caster"))
                 return Exclude("sticky-touch-carrier-only",
                     "Only the transient caster-side delivery carrier was detected; no persistent target effect remains.");

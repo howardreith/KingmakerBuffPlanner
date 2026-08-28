@@ -1,5 +1,22 @@
 # Autonomous Blockers
 
+0.0.14 publication authorization, 2026-08-28: the owner explicitly authorized
+final commit, default-branch merge, guarded remote push, and a new public
+release. Remote/default-branch/authentication identity and absence of v0.0.14
+are proven. No authorization or remote-divergence blocker remains. The
+save-backed runtime limitation remains documented but is not represented as a
+false automated PASS.
+
+0.0.14 spell-variant mission, 2026-08-28: no source, compile, deterministic
+behavior, deterministic-package, package-allowlist, or deployment-WhatIf
+blocker. Save-backed UI,
+persistence, exact Fire/Cold effect, Communal recipient, unresolved-window, and
+one-spend runtime qualification is unavailable because the repository-owned
+guard reports exactly `Disposable save ambiguity: baseline=0; working=0`.
+Steam is running but Kingmaker is not; no launch, deployment, live Mods staging,
+or save access was attempted. The safe local implementation, tests, two-build
+clean-head package, and explicit manual acceptance handoff are complete.
+
 0.0.13 Powerful Change repair, 2026-08-27: COMPLETE; no source, architecture,
 deterministic-test, package-allowlist, deployment, installation, authentication,
 merge, push, tag, publication, download-verification, or record blocker. Public

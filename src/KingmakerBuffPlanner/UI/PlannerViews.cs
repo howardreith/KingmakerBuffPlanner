@@ -114,6 +114,7 @@ namespace KingmakerBuffPlanner.UI
         private readonly Image _background;
         private readonly Image _status;
         private readonly Image _icon;
+        private readonly RectTransform _iconFrame;
         private readonly Text _fallback;
         private readonly Text _name;
         private readonly Text _availability;
@@ -135,23 +136,25 @@ namespace KingmakerBuffPlanner.UI
             KingmakerUiFactory.SetAnchors(stripe, 0, 0, 0.018f, 1, 1, 0, 3, 3);
             _status = KingmakerUiFactory.AddPanel(stripe, theme.MutedBrownText);
             _status.raycastTarget = false;
-            RectTransform frame = KingmakerUiFactory.CreateRect("IconFrame", Rect);
-            KingmakerUiFactory.SetAnchors(frame, 0.035f, 0.12f, 0.23f, 0.88f);
-            Image frameImage = KingmakerUiFactory.AddFramedPanel(frame,
+            _iconFrame = KingmakerUiFactory.CreateRect("IconFrame", Rect);
+            KingmakerUiFactory.SetAnchors(_iconFrame, 0.035f, 0.12f, 0.23f, 0.88f);
+            Image frameImage = KingmakerUiFactory.AddFramedPanel(_iconFrame,
                 new Color(0.16f, 0.10f, 0.07f, 1f), theme.GoldAccent);
             frameImage.raycastTarget = false;
-            RectTransform iconRect = KingmakerUiFactory.CreateRect("AbilityIcon", frame);
+            RectTransform iconRect = KingmakerUiFactory.CreateRect("AbilityIcon", _iconFrame);
             KingmakerUiFactory.Stretch(iconRect, 4, 4, 4, 4);
             _icon = iconRect.gameObject.AddComponent<Image>();
             _icon.preserveAspect = true;
             _icon.raycastTarget = false;
-            _fallback = KingmakerUiFactory.CreateText("MissingIcon", frame, theme, "?", 28,
+            _fallback = KingmakerUiFactory.CreateText("MissingIcon", _iconFrame, theme, "?", 28,
                 TextAnchor.MiddleCenter);
             _fallback.color = theme.MutedBrownText;
             KingmakerUiFactory.Stretch(_fallback.rectTransform);
             _name = KingmakerUiFactory.CreateText("Name", Rect, theme, string.Empty, 17,
                 TextAnchor.MiddleLeft);
             _name.fontStyle = FontStyle.Bold;
+            _name.horizontalOverflow = HorizontalWrapMode.Wrap;
+            _name.verticalOverflow = VerticalWrapMode.Overflow;
             KingmakerUiFactory.SetAnchors(_name.rectTransform, 0.25f, 0.55f, 0.79f, 0.92f);
             _badge = KingmakerUiFactory.CreateText("RoutineBadge", Rect, theme, string.Empty, 14,
                 TextAnchor.MiddleRight);
@@ -169,6 +172,53 @@ namespace KingmakerBuffPlanner.UI
         internal RectTransform Rect { get; private set; }
         internal Button Button { get; private set; }
         internal string SourceId { get; private set; }
+
+        internal float MeasureNameHeight(string value, float cellWidth)
+        {
+            float width = CompleteNameLayout.NameWidth(cellWidth);
+            ConfigureTopRect(_name.rectTransform, CompleteNameLayout.TextLeft,
+                CompleteNameLayout.TextTop, width, CompleteNameLayout.MinimumNameHeight);
+            string previous = _name.text;
+            _name.text = value ?? string.Empty;
+            float preferred = Mathf.Ceil(_name.preferredHeight);
+            _name.text = previous;
+            return Mathf.Max(CompleteNameLayout.MinimumNameHeight, preferred);
+        }
+
+        internal void ApplyLayout(float cellWidth, float cardHeight, float nameHeight)
+        {
+            float width = CompleteNameLayout.NameWidth(cellWidth);
+            float safeNameHeight = Mathf.Max(
+                CompleteNameLayout.MinimumNameHeight, nameHeight);
+            ConfigureTopRect(_iconFrame, 12f, 12f, 64f, 64f);
+            ConfigureTopRect(_name.rectTransform, CompleteNameLayout.TextLeft,
+                CompleteNameLayout.TextTop, width, safeNameHeight);
+            float availabilityTop = CompleteNameLayout.TextTop + safeNameHeight +
+                CompleteNameLayout.NameToAvailabilityGap;
+            ConfigureTopRect(_availability.rectTransform, CompleteNameLayout.TextLeft,
+                availabilityTop, width, CompleteNameLayout.AvailabilityHeight);
+            float configurationTop = availabilityTop +
+                CompleteNameLayout.AvailabilityHeight;
+            ConfigureTopRect(_configuration.rectTransform, CompleteNameLayout.TextLeft,
+                configurationTop, Mathf.Max(30f, width - CompleteNameLayout.BadgeWidth),
+                CompleteNameLayout.ConfigurationHeight);
+            ConfigureTopRect(_badge.rectTransform,
+                cellWidth - CompleteNameLayout.TextRight -
+                    CompleteNameLayout.BadgeWidth,
+                configurationTop, CompleteNameLayout.BadgeWidth,
+                CompleteNameLayout.ConfigurationHeight);
+            _badge.alignment = TextAnchor.MiddleRight;
+        }
+
+        private static void ConfigureTopRect(
+            RectTransform rect, float left, float top, float width, float height)
+        {
+            rect.anchorMin = new Vector2(0, 1);
+            rect.anchorMax = new Vector2(0, 1);
+            rect.pivot = new Vector2(0, 1);
+            rect.anchoredPosition = new Vector2(left, -top);
+            rect.sizeDelta = new Vector2(width, height);
+        }
 
         internal void Bind(BuffCardViewModel model, Sprite icon, UnityAction selected,
             Action<string> inspect, Func<PlannerPresentationStatus, Color> statusColor)
@@ -257,6 +307,8 @@ namespace KingmakerBuffPlanner.UI
         private readonly Func<PlannerPresentationStatus, Color> _statusColor;
         private IReadOnlyList<BuffCardViewModel> _models = new BuffCardViewModel[0];
         private BuffGridMetrics _metrics;
+        private BuffGridLayout _layout;
+        private float[] _nameHeights = new float[0];
         private int _firstRow = -1;
 
         internal BuffGridView(RectTransform parent, PlannerUiTheme theme,
@@ -299,8 +351,20 @@ namespace KingmakerBuffPlanner.UI
             float width = Mathf.Max(920f, _viewport.rect.width);
             float height = Mathf.Max(360f, _viewport.rect.height);
             _metrics = BuffGridMetrics.Calculate(width, height);
-            int rows = BuffGridMetrics.RowCount(_models.Count);
-            float contentHeight = Mathf.Max(height, 12f + rows * (_metrics.CellHeight + 10f));
+            _nameHeights = new float[_models.Count];
+            var requiredHeights = new float[_models.Count];
+            BuffCardView measurer = _pool[0];
+            for (int index = 0; index < _models.Count; index++)
+            {
+                float nameHeight = measurer.MeasureNameHeight(
+                    _models[index].Name, _metrics.CellWidth);
+                _nameHeights[index] = nameHeight;
+                requiredHeights[index] = CompleteNameLayout.RequiredCardHeight(
+                    _metrics.CellHeight, nameHeight);
+            }
+            _layout = BuffGridLayout.Calculate(requiredHeights,
+                _metrics.CellHeight, _metrics.VerticalSpacing);
+            float contentHeight = Mathf.Max(height, 12f + _layout.ContentHeight);
             _content.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, contentHeight);
             _content.anchoredPosition = preserveScroll
                 ? new Vector2(0, Mathf.Clamp(previous.y, 0, Mathf.Max(0, contentHeight - height)))
@@ -317,8 +381,8 @@ namespace KingmakerBuffPlanner.UI
             for (int i = 0; i < _models.Count; i++)
                 if (_models[i].SourceId == sourceId) { index = i; break; }
             if (index < 0) return false;
-            int row = index / BuffGridMetrics.ColumnCount;
-            _content.anchoredPosition = new Vector2(0, row * (_metrics.CellHeight + 10f));
+            _content.anchoredPosition = new Vector2(
+                0, _layout.ScrollOffsetForItem(index));
             _firstRow = -1;
             BindVisible(true);
             visible = _pool.Cards.FirstOrDefault(card => card.SourceId == sourceId);
@@ -329,9 +393,8 @@ namespace KingmakerBuffPlanner.UI
 
         private void BindVisible(bool force)
         {
-            if (_metrics == null) return;
-            int row = Mathf.Max(0, Mathf.FloorToInt(_content.anchoredPosition.y /
-                (_metrics.CellHeight + 10f)) - 1);
+            if (_metrics == null || _layout == null) return;
+            int row = _layout.FirstVisibleRow(_content.anchoredPosition.y);
             if (!force && row == _firstRow) return;
             _firstRow = row;
             _pool.HideAll();
@@ -346,10 +409,11 @@ namespace KingmakerBuffPlanner.UI
                 card.Rect.anchorMin = new Vector2(0, 1);
                 card.Rect.anchorMax = new Vector2(0, 1);
                 card.Rect.pivot = new Vector2(0, 1);
-                card.Rect.sizeDelta = new Vector2(_metrics.CellWidth, _metrics.CellHeight);
+                float rowHeight = _layout.RowHeight(absoluteRow);
+                card.Rect.sizeDelta = new Vector2(_metrics.CellWidth, rowHeight);
                 card.Rect.anchoredPosition = new Vector2(_metrics.SideInset + column *
-                    (_metrics.CellWidth + spacing), -6f - absoluteRow *
-                    (_metrics.CellHeight + spacing));
+                    (_metrics.CellWidth + spacing), -6f - _layout.RowOffset(absoluteRow));
+                card.ApplyLayout(_metrics.CellWidth, rowHeight, _nameHeights[modelIndex]);
                 BuffCardViewModel model = _models[modelIndex];
                 card.Bind(model, _icon(model.SourceId), () => _select(model.SourceId),
                     _inspect, _statusColor);
@@ -511,26 +575,28 @@ namespace KingmakerBuffPlanner.UI
                 "Select a buff", 23, TextAnchor.MiddleLeft);
             _name.fontStyle = FontStyle.Bold;
             _name.color = theme.BurgundyPrimary;
-            KingmakerUiFactory.SetAnchors(_name.rectTransform, 0.105f, 0.77f, 0.42f, 0.95f);
+            _name.horizontalOverflow = HorizontalWrapMode.Wrap;
+            _name.verticalOverflow = VerticalWrapMode.Overflow;
+            KingmakerUiFactory.SetAnchors(_name.rectTransform, 0.105f, 0.70f, 0.42f, 0.96f);
             _meta = KingmakerUiFactory.CreateText("SelectedMeta", Root, theme,
                 string.Empty, 14, TextAnchor.MiddleLeft);
             _meta.color = theme.MutedBrownText;
-            KingmakerUiFactory.SetAnchors(_meta.rectTransform, 0.105f, 0.65f, 0.42f, 0.78f);
+            KingmakerUiFactory.SetAnchors(_meta.rectTransform, 0.105f, 0.59f, 0.42f, 0.70f);
             _description = KingmakerUiFactory.CreateText("SelectedDescription", Root, theme,
                 string.Empty, 14, TextAnchor.UpperLeft);
             _description.verticalOverflow = VerticalWrapMode.Truncate;
-            KingmakerUiFactory.SetAnchors(_description.rectTransform, 0.105f, 0.41f, 0.42f, 0.65f);
+            KingmakerUiFactory.SetAnchors(_description.rectTransform, 0.105f, 0.39f, 0.42f, 0.59f);
             _caster = KingmakerUiFactory.CreateText("SelectedCaster", Root, theme,
                 "Caster: None", 14, TextAnchor.MiddleLeft);
             _caster.fontStyle = FontStyle.Bold;
             _caster.color = theme.BurgundyPrimary;
             _caster.horizontalOverflow = HorizontalWrapMode.Wrap;
             _caster.verticalOverflow = VerticalWrapMode.Overflow;
-            KingmakerUiFactory.SetAnchors(_caster.rectTransform, 0.105f, 0.225f, 0.42f, 0.41f);
+            KingmakerUiFactory.SetAnchors(_caster.rectTransform, 0.105f, 0.20f, 0.42f, 0.39f);
             _enhancement = KingmakerUiFactory.CreateButton("ChooseEnhancement", Root, theme,
                 "Enhancement: None available", () => openEnhancements());
             KingmakerUiFactory.SetAnchors((RectTransform)_enhancement.transform,
-                0.105f, 0.035f, 0.42f, 0.215f);
+                0.105f, 0.025f, 0.42f, 0.19f);
             _enhancementLabel = KingmakerUiFactory.SetButtonLabel(_enhancement,
                 "Enhancement: None available");
             _enhancementLabel.alignment = TextAnchor.MiddleLeft;

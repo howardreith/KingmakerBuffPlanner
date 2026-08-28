@@ -43,7 +43,7 @@ namespace KingmakerBuffPlanner.UI
 
             if (!string.IsNullOrWhiteSpace(Search))
             {
-                values = values.Where(source => source.DisplayName.IndexOf(
+                values = values.Where(source => source.SearchText.IndexOf(
                     Search, StringComparison.OrdinalIgnoreCase) >= 0).ToList();
                 active.Add("search='" + Search + "'");
             }
@@ -83,8 +83,11 @@ namespace KingmakerBuffPlanner.UI
             diagnostics.AfterSource = values.Count;
             diagnostics.AfterHidden = values.Count;
             diagnostics.AfterAvailability = values.Count;
-            values = values.OrderBy(source => source.DisplayName,
+            values = values.OrderBy(source => source.SortGroupName,
                     StringComparer.OrdinalIgnoreCase)
+                .ThenBy(source => source.SortGroupId, StringComparer.Ordinal)
+                .ThenBy(source => source.VariantOrder)
+                .ThenBy(source => source.DisplayName, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(source => source.SpellLevel)
                 .ThenBy(source => source.SourceId, StringComparer.Ordinal).ToList();
             diagnostics.VisibleViewModels = values.Count;

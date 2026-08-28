@@ -1,5 +1,54 @@
 # Implementation Report
 
+## 0.0.14 complete spell names and selectable variants
+
+The prior variant expansion called `AbilityData.Variants`. Reflection-only IL
+inspection of the exact installed Kingmaker 2.1.7b assembly proves that getter
+returns `null` and `InitVariants()` is empty in this build. The parent blueprint
+does expose its declared `AbilityVariants.Variants` array. The game-supported
+child constructor copies caster, fact/spellbook, and metamagic context and sets
+`ConvertedFrom` to the parent data; spell level, cast availability, and
+`SpendFromSpellbook()` delegate through that parent. This disproved the prior
+assumption that runtime variant data would be pre-expanded by the game.
+
+The implementation adds a central game adapter for parent/child materialization
+and exact resolution, a Unity-free variant catalog/formatter, and a stable
+variant aggregation identity. Spellbook known/custom/prepared enumeration and
+fact/resource enumeration now expand declared children in blueprint order and
+run every child through the existing structural buff discovery. The parent
+container is suppressed. Animated and Instant paths resolve the requested child
+from the matching parent spell/fact context and never select the first sibling;
+native `AbilityData.Spend()` still executes once.
+
+The exact local native catalog establishes five useful children for each of
+`Resist Energy` and `Resist Energy, Communal`, including Sonic. Their declared
+orders differ and are preserved. Communal children carry
+`AbilityTargetsAround`; this is normalized as area recipients and planned as
+one mass cast from a valid caster anchor. No spell name or energy-name allowlist
+drives inclusion.
+
+The presentation layer now renders names such as `Protection from Arrows,
+Communal` without abbreviation. Catalog cards measure wrapped localized text,
+grow only the affected row, and reflow availability/configuration controls.
+Selection and description names wrap and retain the same complete model text.
+Search matches both complete parent text and concrete distinguishing text.
+
+The behavior suite adds 17 regression cases covering full-name layout,
+ordinary and five-child expansion, parent suppression, stable identity,
+deduplication/order, Communal distinction, search, persistence, ambiguous legacy
+loading, parent-backed availability, exact-child planning, single consumption,
+non-variant behavior, icon fallback, and non-English formatting. Current
+engineering gates are source `34/34`, protocol/domain `112/112`, runtime
+filesystem `8/8`, package fixture `4/4`, deployment WhatIf `5/5`, aggregate
+`1/1`, and Release build `1/1`. Feature checkpoint is
+`932da35cb6633031d4077e43df65ab659bc9bd84`; clean release-source checkpoint is
+`a78869c329e39734cd77f4b587d3d97b05fede70`. Two clean-head builds reproduced
+the exact DLL and ZIP. The local-only release ZIP SHA-256 is
+`182a597b899875851bd4f6e125a7222018a86bdf7688d455bcf750a512f4e5cd`;
+DLL SHA-256 is
+`7c6ce2b7bf79fd24625d0d6263d36803a4ec1cd7a873be211fa569d877811fae`;
+MVID is `9896cd99-f01e-44c5-afe3-980ca1d043b9`.
+
 ## 0.0.13 Brown-Fur Powerful Change compatibility repair
 
 The exact `Enhancement: None available` result was produced before the view:

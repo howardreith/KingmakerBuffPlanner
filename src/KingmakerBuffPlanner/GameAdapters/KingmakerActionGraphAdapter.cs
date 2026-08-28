@@ -38,21 +38,23 @@ namespace KingmakerBuffPlanner.GameAdapters
             try
             {
                 var children = new List<DiscoveryNode>();
+                DiscoveryNode payload = null;
                 AbilityEffectStickyTouch sticky = ability.GetComponent<AbilityEffectStickyTouch>();
                 if (sticky != null && sticky.TouchDeliveryAbility != null)
-                    children.Add(Reference(sticky.TouchDeliveryAbility, "AbilityEffectStickyTouch"));
+                    payload = Reference(sticky.TouchDeliveryAbility, "AbilityEffectStickyTouch");
                 else
                 {
                     AbilityEffectRunAction run = ability.GetComponent<AbilityEffectRunAction>();
-                    if (run != null) children.Add(AdaptList(run.Actions));
+                    if (run != null) payload = AdaptList(run.Actions);
                 }
-                BlueprintAbility[] variants = ability.Variants;
-                if (variants != null)
+                if (payload != null)
                 {
-                    foreach (BlueprintAbility variant in variants
-                        .Where(v => v != null)
-                        .OrderBy(v => v.AssetGuid, StringComparer.Ordinal))
-                        children.Add(Reference(variant, "AbilityVariants"));
+                    AbilityTargetsAround targetsAround =
+                        ability.GetComponent<AbilityTargetsAround>();
+                    if (targetsAround != null)
+                        payload = Target(EffectTarget.AreaRecipients, payload,
+                            "AbilityTargetsAround");
+                    children.Add(payload);
                 }
                 return new DiscoveryNode(DiscoveryNodeKind.AbilityReference, id, children,
                     referencedAbilityId: id, sourceContract: "BlueprintAbility");

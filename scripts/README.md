@@ -1,5 +1,19 @@
 # Transfer and bootstrap scripts
 
+## Exact Kingmaker variant contracts
+
+`Inspect-KingmakerVariantContracts.ps1` is a read-only, reflection-only IL
+inspector for the installed 2.1.7b `Assembly-CSharp.dll`. It avoids loading the
+game assembly into an execution context and reports the exact SHA-256/MVID plus
+selected `AbilityData`, `BlueprintAbility`, `AbilityTargetsAround`, spellbook,
+command, and rule-cast contracts.
+
+```powershell
+.\scripts\Inspect-KingmakerVariantContracts.ps1 `
+  -TypePattern 'AbilityData$' `
+  -MethodPattern '^(\.ctor|get_Variants|GetAvailableForCastCount|SpendFromSpellbook)$'
+```
+
 ## Laptop
 
 Run the wrapper from the downloaded handoff kit:

@@ -55,8 +55,7 @@ namespace KingmakerBuffPlanner.Discovery
                         AbilityGuid = ability.AssetGuid,
                         ParentGuid = ability.Parent == null ? string.Empty : ability.Parent.AssetGuid,
                         VariantGuids = (ability.Variants ?? new BlueprintAbility[0])
-                            .Where(v => v != null).Select(v => v.AssetGuid)
-                            .OrderBy(v => v, StringComparer.Ordinal).ToArray(),
+                            .Where(v => v != null).Select(v => v.AssetGuid).ToArray(),
                         InternalName = ability.name ?? string.Empty,
                         DisplayName = ability.Name ?? string.Empty,
                         SourceAssembly = ability.GetType().Assembly.FullName,

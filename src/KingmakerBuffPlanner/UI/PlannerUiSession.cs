@@ -96,6 +96,20 @@ namespace KingmakerBuffPlanner.UI
                     persistedEnhancementIds);
                 Model = new PlannerSetupModel(loaded.Profile, snapshot, active, effects,
                     _providerOptions, _profiles.Save, _enhancements);
+                if (Model.VariantReselectionNotices.Count != 0)
+                {
+                    string names = string.Join(", ", Model.VariantReselectionNotices
+                        .Select(value => value.DisplayName)
+                        .Distinct(StringComparer.OrdinalIgnoreCase).ToArray());
+                    ProfileStatus += " Saved selections requiring a concrete variant " +
+                        "reselection: " + names + ".";
+                    foreach (VariantReselectionNotice notice in
+                        Model.VariantReselectionNotices)
+                        _log.Info("[KBP-VARIANT-MIGRATION] routine=" + notice.RoutineId +
+                            ";source=" + notice.SourceId + ";parent=" +
+                            notice.DisplayName + ";candidateCount=" +
+                            notice.CandidateCount + ";action=reselection-required.");
+                }
                 _snapshot = snapshot;
                 _activeEffects = active;
                 _effects = effects;
@@ -104,7 +118,10 @@ namespace KingmakerBuffPlanner.UI
                 Status = snapshot.Units.Count + " party/pet targets; " +
                     Model.Sources.Count + " discovered buff sources; " +
                     snapshot.Providers.Count + " providers; " +
-                    _enhancements.Length + " cast enhancements.";
+                    _enhancements.Length + " cast enhancements." +
+                    (Model.VariantReselectionNotices.Count == 0 ? string.Empty :
+                        " " + Model.VariantReselectionNotices.Count +
+                        " saved variant selection(s) require reselection.");
                 int rodCount = _enhancements.Count(value => value.Category ==
                     CastEnhancementCategory.MetamagicRod);
                 int classFeatureCount = _enhancements.Count(value => value.Category ==
@@ -250,6 +267,8 @@ namespace KingmakerBuffPlanner.UI
                 r.RoutineId == routineId);
             _log.Info("[KBP-QUICK] assignments resolved;group=" + routineId +
                 ";assignments=" + configuredRoutine.Assignments.Count + ".");
+            string variantReselection = VariantReselectionSummary(
+                Model, routineId);
             RoutinePlanResult preview;
             try
             {
@@ -286,7 +305,7 @@ namespace KingmakerBuffPlanner.UI
                 int unfulfilled = preview.Plan.Outcomes.Count(outcome =>
                     outcome.Kind == TargetOutcomeKind.Unfulfilled);
                 Status = "No " + routineName + " casts can run: skipped active=" + skipped +
-                    "; unfulfilled=" + unfulfilled + ".";
+                    "; unfulfilled=" + unfulfilled + "." + variantReselection;
                 Complete(completed, new QuickExecutionResult(routineId, routineName,
                     QuickExecutionDisposition.Refused, Status, 0, 0, 0));
                 _log.Info("[KBP-QUICK] deliberately refused;group=" + routineId +
@@ -355,7 +374,8 @@ namespace KingmakerBuffPlanner.UI
                 "; submitted=" + report.Submitted + "; cast-started=" + report.CastStarted +
                 "; effect-confirmed=" + report.Confirmed +
                 "; spent=" + report.ResourcesSpent + "; failed=" + report.Failed +
-                "; skipped=" + report.Skipped + "; unfulfilled=" + report.Unfulfilled + ".";
+                "; skipped=" + report.Skipped + "; unfulfilled=" + report.Unfulfilled + "." +
+                variantReselection;
             CastExecutionRecord firstFailure = report.Records.FirstOrDefault(record =>
                 record.Status == CastExecutionStatus.FailedValidation ||
                 record.Status == CastExecutionStatus.FailedSubmission ||
@@ -379,6 +399,20 @@ namespace KingmakerBuffPlanner.UI
             _log.Info("[KBP-QUICK] confirmed result produced;group=" + routineId +
                 ";confirmed=" + report.Confirmed + ";failed=" + report.Failed +
                 ";message=" + Status + ".");
+        }
+
+        private static string VariantReselectionSummary(
+            PlannerSetupModel model, string routineId)
+        {
+            if (model == null) return string.Empty;
+            string[] names = model.VariantReselectionNotices
+                .Where(value => value.RoutineId == routineId)
+                .Select(value => value.DisplayName)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(value => value, StringComparer.OrdinalIgnoreCase).ToArray();
+            return names.Length == 0 ? string.Empty :
+                " Reselect a concrete variant for: " +
+                string.Join(", ", names) + ".";
         }
 
         private static string DescribePlan(CastPlan plan)

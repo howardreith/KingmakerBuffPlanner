@@ -90,8 +90,10 @@
     <Compile Include="Discovery\NativeAccessibilityIndex.cs" />
     <Compile Include="Discovery\NativeCandidateClassifier.cs" />
     <Compile Include="Discovery\NativeCatalogExporter.cs" />
+    <Compile Include="Discovery\SelectableAbilityVariants.cs" />
     <Compile Include="Domain\Effects\EffectExpression.cs" />
     <Compile Include="Domain\Effects\EffectAggregateIdentity.cs" />
+    <Compile Include="Domain\Effects\CatalogSourceIdentity.cs" />
     <Compile Include="Domain\Identity\StableKeys.cs" />
     <Compile Include="Domain\Providers\ProviderSnapshots.cs" />
     <Compile Include="Domain\Planning\PlanningModels.cs" />
@@ -106,6 +108,7 @@
     <Compile Include="Compatibility\BrownFurPowerfulChangeCompatibility.cs" />
     <Compile Include="GameAdapters\KingmakerActionGraphAdapter.cs" />
     <Compile Include="GameAdapters\KingmakerActiveEffectSnapshotBuilder.cs" />
+    <Compile Include="GameAdapters\KingmakerAbilityVariants.cs" />
     <Compile Include="GameAdapters\KingmakerAnimatedCastAdapter.cs" />
     <Compile Include="GameAdapters\KingmakerBuffSourceDiscovery.cs" />
     <Compile Include="GameAdapters\KingmakerCastEnhancementAdapter.cs" />

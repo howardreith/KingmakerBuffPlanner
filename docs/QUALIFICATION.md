@@ -1,5 +1,40 @@
 # Qualification
 
+## 0.0.14 spell-name and concrete-variant engineering checkpoint
+
+Status: SOURCE/BEHAVIOR/EXACT-ASSEMBLY/DETERMINISTIC LOCAL RELEASE PASS;
+OWNER AUTHORIZED DEFAULT-BRANCH MERGE, GUARDED PUSH, AND PUBLIC RELEASE;
+SAVE-BACKED IN-GAME VERIFICATION BLOCKED BY ABSENT GUARDED FIXTURES AND NOT
+CLAIMED.
+
+- `./scripts/Test-SourceOnly.ps1`: source `34/34`, protocol/domain `112/112`,
+  runtime-harness filesystem `8/8`, package fixture `4/4`, deployment WhatIf
+  `5/5`, aggregate `1/1`.
+- `./scripts/Build-Release.ps1` at clean release-source commit
+  `a78869c329e39734cd77f4b587d3d97b05fede70`: source/build `34/34` and
+  `1/1` twice, package validation `4/4` three times, deterministic equality
+  `2/2`, release builder `3/3`.
+- Local-only package:
+  `artifacts/release/0.0.14/KingmakerBuffPlanner-0.0.14.zip`, 249,448 bytes;
+  ZIP/DLL/MVID are
+  `182a597b899875851bd4f6e125a7222018a86bdf7688d455bcf750a512f4e5cd` /
+  `7c6ce2b7bf79fd24625d0d6263d36803a4ec1cd7a873be211fa569d877811fae` /
+  `9896cd99-f01e-44c5-afe3-980ca1d043b9`.
+- `./scripts/Inspect-KingmakerVariantContracts.ps1`: exact
+  `Assembly-CSharp.dll` SHA-256
+  `3b6450ffec440e296e586f71c711b195aed144b28d53e1cbb29406d18fef5afb`,
+  MVID `07fa1e4d-8618-41b3-9b8d-faa17d3b26f7`; parent/child constructor,
+  `ConvertedFrom`, availability, spell-level, and one-spend contracts confirmed.
+- `planning/NATIVE-BUFF-CATALOG.json`: both Resist Energy parents declare five
+  structurally eligible persistent-buff children, with exact child parent GUIDs
+  and blueprint order; `Protection from Arrows, Communal` retains its complete
+  localized name.
+- `git diff --check`: pass.
+
+The current guard reports exactly `Disposable save ambiguity: baseline=0;
+working=0`. No unrelated or personal save was substituted, no game was launched,
+and compilation/IL/catalog evidence is not reported as an in-game PASS.
+
 ## 0.0.13 Powerful Change qualification
 
 Status: AUTOMATED/STATIC PASS; GUARDED INSTALL PASS; OWNER ACCEPTED PUBLICATION;

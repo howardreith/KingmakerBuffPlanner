@@ -63,7 +63,8 @@ namespace KingmakerBuffPlanner.Planning
                     continue;
                 }
                 CastGroupingKind grouping = EffectExpressionTargetAnalysis.Contains(
-                    expression, EffectTarget.Party)
+                    expression, EffectTarget.Party) ||
+                    EffectExpressionTargetAnalysis.Contains(expression, EffectTarget.AreaRecipients)
                     ? CastGroupingKind.MassConfiguredTargets
                     : CastGroupingKind.PerTarget;
                 requests.Add(new BuffCastRequest(
@@ -92,6 +93,18 @@ namespace KingmakerBuffPlanner.Planning
             out EffectExpression expression)
         {
             expression = null;
+            if (CatalogSourceIdentity.IsVariant(assignment.SourceId))
+            {
+                var matches = snapshot.Providers.Select(provider => provider.Key.Ability)
+                    .Where(ability => CatalogSourceIdentity.MatchesVariant(
+                        assignment.SourceId, ability))
+                    .GroupBy(ability => ability.Canonical, StringComparer.Ordinal)
+                    .Select(group => group.First())
+                    .OrderBy(ability => ability.Canonical, StringComparer.Ordinal).ToList();
+                if (matches.Count != 0)
+                    effectsBySource.TryGetValue(matches[0].Canonical, out expression);
+                return new ReadOnlyCollection<Domain.Identity.AbilityKey>(matches);
+            }
             if (EffectAggregateIdentity.IsAggregate(assignment.SourceId))
             {
                 var matches = snapshot.Providers.Select(provider => provider.Key.Ability)

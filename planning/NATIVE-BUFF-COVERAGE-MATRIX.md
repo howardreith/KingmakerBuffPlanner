@@ -1,5 +1,20 @@
 # Native Buff Coverage Matrix
 
+0.0.14 selectable-variant evidence: the exact catalog records five declared,
+independently eligible persistent-buff children for each Resist Energy family.
+Non-Communal order is Cold, Sonic, Electricity, Fire, Acid; Communal order is
+Fire, Electricity, Cold, Sonic, Acid. Every child points back to its exact
+parent and has a `ContextActionApplyBuff` leaf. The generic runtime catalog now
+suppresses the unresolved parent and independently applies the established
+eligibility policy to every child; it does not add all game-wide choice-menu
+children. The existing generated JSON remains immutable evidence from the prior
+runtime export and was not relabeled as a new in-game run.
+
+`Protection from Arrows, Communal`
+(`96c9d98b6a9a7c249b6c4572e4977157`) is present with that complete localized
+name. Deterministic UI coverage proves the suffix survives the primary card
+model and variable-height wrapped layout without ellipsis.
+
 0.0.13 Powerful Change checkpoint: native catalog inclusion counts are
 unchanged. Optional enhancement qualification consumes the existing
 branch-preserving action graph and inspects resulting buff component semantics;

@@ -1,5 +1,53 @@
 # Autonomous Resume
 
+## 0.0.14 publication authorization - 2026-08-28
+
+- Owner explicitly authorized final commit, merge to the repository default
+  branch, remote push, and a new public release.
+- Public repository/default branch/authenticated account are
+  `howardreith/KingmakerBuffPlanner` / `main` / `howardreith`. After an explicit
+  fetch, local and remote main are both
+  `8460ae08157af40cd69b8f0a11259364ceceb885`; feature HEAD before this record is
+  `d7b88b83953ac31e7af5eb4a803c6551ce601cab`. No `v0.0.14` tag or release exists.
+- Release notes are publication-safe and continue to state that save-backed
+  visual/cast/resource verification was unavailable at baseline=0/working=0.
+- Exact next action is authorization-record commit, non-rewriting merge to
+  `main`, exact merge-commit qualification, guarded push, guarded publication,
+  independent asset verification, and a final publication record.
+
+## 0.0.14 spell names and concrete variants - 2026-08-28
+
+- Started clean from `main` at
+  `8460ae08157af40cd69b8f0a11259364ceceb885`; active local branch is
+  `codex/buff-spell-variants-ui`. No fetch, pull, push, remote mutation, tag, or
+  publication occurred.
+- Exact Kingmaker evidence: `Assembly-CSharp.dll` SHA-256
+  `3b6450ffec440e296e586f71c711b195aed144b28d53e1cbb29406d18fef5afb`,
+  MVID `07fa1e4d-8618-41b3-9b8d-faa17d3b26f7`; runtime `AbilityData.Variants`
+  is a null stub, and the parent-data/child-blueprint constructor is the native
+  context-preserving route.
+- Implementation expands structurally eligible declared children, stores parent
+  plus concrete child identities, groups in declared order, renders/searches
+  complete localized names, preserves parent-backed availability, resolves the
+  exact child for execution, and refuses ambiguous legacy inference.
+- Current gates: source 34/34, protocol/domain 112/112, runtime filesystem 8/8,
+  package 4/4, deployment WhatIf 5/5, aggregate 1/1, and deterministic release
+  2/2. Feature/release-source commits are
+  `932da35cb6633031d4077e43df65ab659bc9bd84` and
+  `a78869c329e39734cd77f4b587d3d97b05fede70`.
+- Local-only ZIP/DLL/MVID are
+  `182a597b899875851bd4f6e125a7222018a86bdf7688d455bcf750a512f4e5cd` /
+  `7c6ce2b7bf79fd24625d0d6263d36803a4ec1cd7a873be211fa569d877811fae` /
+  `9896cd99-f01e-44c5-afe3-980ca1d043b9`. Package source is exact clean HEAD
+  `a78869c329e39734cd77f4b587d3d97b05fede70`; publication status is local-only.
+- Rejected theories: the game does not populate `AbilityData.Variants`; using a
+  child GUID without source data is insufficient; presentation aliases cannot
+  repair availability/spending; and selecting the first declared child would
+  invent player intent.
+- Save audit is exactly `baseline=0; working=0`; in-game verification is not
+  claimed. Exact next action: commit this local evidence record, rerun the full
+  gate, verify a clean branch, and hand off without remote or live-game action.
+
 ## 0.0.13 published completion - 2026-08-27
 
 - No release work remains. `main`, `origin/main`, and annotated tag `v0.0.13`

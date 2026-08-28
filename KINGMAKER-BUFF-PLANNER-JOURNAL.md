@@ -1,5 +1,86 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-08-28 - 0.0.14 release authorization
+
+Status: OWNER AUTHORIZED MERGE, GUARDED PUSH, AND PUBLIC RELEASE
+
+- The owner explicitly requested: finalize, commit, merge to main/master, push
+  to the remote, and create a new release. Repository/default-branch preflight
+  confirms public `howardreith/KingmakerBuffPlanner`, default branch `main`, and
+  authenticated owner `howardreith`.
+- Clean feature HEAD before this record is
+  `d7b88b83953ac31e7af5eb4a803c6551ce601cab`; refreshed local and remote `main`
+  both equal trusted baseline `8460ae08157af40cd69b8f0a11259364ceceb885`,
+  which is an ancestor of the feature branch. Neither local tag nor GitHub
+  release `v0.0.14` exists.
+- Final feature gate remains source 34/34, protocol/domain 112/112, runtime
+  filesystem 8/8, package 4/4, deployment WhatIf 5/5, and aggregate 1/1.
+  Publication authorization does not convert the absent-save runtime rows into
+  a PASS; the release notes retain that explicit limitation.
+- Exact next action: commit this authorization record, merge without rewriting
+  history into `main`, rebuild/qualify the merge commit, run guarded-push WhatIf
+  and live guarded push, then use the project-owned publisher with explicit
+  human-acceptance confirmation and verify the remote assets.
+
+## 2026-08-28 - 0.0.14 deterministic local artifact
+
+Status: LOCAL RELEASE PASS; PUBLICATION/INSTALL/IN-GAME CLAIM NOT PERFORMED
+
+- Local commits are `932da35cb6633031d4077e43df65ab659bc9bd84`
+  (`feat: add concrete selectable spell variants`) and
+  `a78869c329e39734cd77f4b587d3d97b05fede70`
+  (`chore: prepare 0.0.14 local release source`). Release source was clean.
+- `./scripts/Build-Release.ps1` passes source 34/34 and build 1/1 twice,
+  package validation 4/4 three times, deterministic equality 2/2, and aggregate
+  release builder 3/3.
+- Local-only ZIP is
+  `artifacts/release/0.0.14/KingmakerBuffPlanner-0.0.14.zip`, 249,448 bytes.
+  ZIP/DLL/MVID are
+  `182a597b899875851bd4f6e125a7222018a86bdf7688d455bcf750a512f4e5cd` /
+  `7c6ce2b7bf79fd24625d0d6263d36803a4ec1cd7a873be211fa569d877811fae` /
+  `9896cd99-f01e-44c5-afe3-980ca1d043b9`. Manifest records exact source commit
+  `a78869c329e39734cd77f4b587d3d97b05fede70`, validation true, publication
+  status local-only.
+- No game, live Mods transaction, install, remote operation, tag, push, or
+  publication occurred. Save-backed rows remain unclaimed because the guard is
+  exactly baseline=0/working=0. Exact next action is this documentation commit,
+  one final full gate, clean-status verification, and local handoff.
+
+## 2026-08-28 - complete names and selectable variants engineering checkpoint
+
+Status: IMPLEMENTED; DETERMINISTIC GATES PASS; LOCAL COMMIT/PACKAGE PENDING;
+SAVE-BACKED RUNTIME BLOCKED SAFELY
+
+- Read-only intake found a clean `main` worktree at exact trusted HEAD
+  `8460ae08157af40cd69b8f0a11259364ceceb885`, version 0.0.13. Local branch
+  `codex/buff-spell-variants-ui` was created from that HEAD. Required remote
+  inventory was read once; no remote operation or remote service communication
+  followed.
+- Exact assembly inspection disproved the existing `AbilityData.Variants`
+  assumption: its getter returns null and initializer is empty. The game
+  constructor taking parent `AbilityData` plus child `BlueprintAbility` retains
+  caster/spellbook/fact/metamagic and sets `ConvertedFrom`; availability,
+  spell level, and spellbook spend delegate through the parent once.
+- The exact native catalog proves both Resist Energy parents expose five useful
+  concrete children, including Sonic, in declared blueprint order. Every child
+  is independently structurally eligible. `Protection from Arrows, Communal`
+  retains its complete localized catalog name.
+- Implementation separates variant discovery/formatting, stable catalog
+  identity, provider snapshot construction, planning/persistence, exact runtime
+  resolution, and variable-height Unity presentation. No English spell/energy
+  name or gameplay blueprint allowlist was added.
+- Commands/results: `./scripts/Test-SourceOnly.ps1` = source 34/34,
+  protocol/domain 112/112, runtime filesystem 8/8, package fixture 4/4,
+  deployment WhatIf 5/5, aggregate 1/1; `./scripts/Build.ps1 -Configuration
+  Release` = source 34/34 and build 1/1; `git diff --check` = pass. Release DLL
+  SHA-256/MVID are
+  `7f32c802ca335c2ace41e10869253792aa2218872b85453d21d8c302ac08878f` /
+  `657c8f37-f755-4b3d-8974-445ec1a224f6`.
+- The guarded save resolver reports exactly `Disposable save ambiguity:
+  baseline=0; working=0`. No unrelated save, live Mods transaction, game launch,
+  or in-game claim occurred. Exact next action is local checkpoint commit,
+  version/release record update, and clean-head deterministic package build.
+
 ## 2026-08-27 - 0.0.13 published completion
 
 Status: PUBLISHED; DOWNLOADED ASSETS VERIFIED; EXACT PUBLISHED BYTES INSTALLED

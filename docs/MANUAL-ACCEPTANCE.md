@@ -1,5 +1,45 @@
 # Manual Acceptance
 
+## 0.0.14 complete names and concrete variants
+
+Status: REQUIRED FOR IN-GAME CLAIM; NOT RUN because the guarded resolver reports
+`baseline=0; working=0`. Use only a repository-authorized
+`KBP_AUTOMATION_BASELINE` / `KBP_AUTOMATION_WORKING` pair. Do not substitute an
+ordinary campaign save.
+
+Exact local-only test artifact is
+`artifacts/release/0.0.14/KingmakerBuffPlanner-0.0.14.zip`, built from
+`a78869c329e39734cd77f4b587d3d97b05fede70`; ZIP SHA-256 is
+`182a597b899875851bd4f6e125a7222018a86bdf7688d455bcf750a512f4e5cd`.
+
+1. Open Setup and verify `Protection from Arrows, Communal` is present in full
+   on its selectable card, selected detail, and description view. Check one
+   ordinary short name remains compact and adjacent controls do not overlap.
+2. Verify Resist Energy exposes exactly its blueprint-supported concrete
+   choices and no unresolved parent card. Repeat for Resist Energy, Communal.
+   Confirm parent siblings are adjacent and in declared blueprint order.
+3. Search the complete parent name and verify every child remains visible;
+   search Fire and Cold independently and verify the corresponding concrete
+   entries.
+4. With a prepared caster, select Fire, execute once, and confirm the Fire buff
+   rather than the first child. Record the exact prepared slot before/after and
+   confirm one slot is consumed. Repeat Cold from a restored working fixture.
+5. Repeat one choice with a spontaneous caster and any locally supported
+   innate/resource source. Confirm parent ownership establishes availability,
+   the concrete child effect is submitted, and the pool/charge changes once.
+6. Execute a Communal child on a representative party configuration. Confirm
+   actual `AbilityTargetsAround` recipients, one cast/resource debit, and no
+   unresolved variant-selection window or stall.
+7. Save a plan containing a concrete child, close/reopen Setup, return through
+   the main menu, and restart/reload where supported. Confirm the same parent
+   and child GUIDs and visible name return.
+8. Load a copied legacy parent-only plan. Confirm no child is invented; the UI
+   reports that the complete parent requires reselection. Also execute one
+   ordinary non-variant buff as a regression control.
+
+Capture the planner log, exact parent/child GUIDs, before/after slot/resource
+state, active buff GUID, and screenshots for every executed choice.
+
 ## 0.0.13 Powerful Change post-release verification
 
 Status: RECOMMENDED DIAGNOSTIC FOLLOW-UP. The owner accepted the exact installed
