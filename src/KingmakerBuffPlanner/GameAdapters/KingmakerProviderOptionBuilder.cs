@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Kingmaker.Blueprints;
 using Kingmaker.EntitySystem.Entities;
 using Kingmaker.UnitLogic.Abilities;
 using Kingmaker.UnitLogic.Abilities.Blueprints;
+using Kingmaker.UnitLogic.Abilities.Components;
 using Kingmaker.Utility;
 using KingmakerBuffPlanner.Domain.Effects;
 using KingmakerBuffPlanner.Domain.Planning;
@@ -31,13 +33,31 @@ namespace KingmakerBuffPlanner.GameAdapters
                 AbilityData ability = caster == null ? null :
                     KingmakerAnimatedCastAdapter.ResolveAbility(caster, provider.Key);
                 BlueprintAbility blueprint = ability == null ? null : ability.Blueprint;
+                AbilityTargetsAround targetsAround = blueprint == null
+                    ? null : blueprint.GetComponent<AbilityTargetsAround>();
+                bool party = EffectExpressionTargetAnalysis.Contains(
+                    expression, EffectTarget.Party);
+                bool areaRecipients = EffectExpressionTargetAnalysis.Contains(
+                    expression, EffectTarget.AreaRecipients);
                 IEnumerable<UnitSnapshot> reachable;
                 if (EffectExpressionTargetAnalysis.ContainsOnly(expression, EffectTarget.Caster))
                     reachable = units.Where(u => u.UnitId == provider.Key.CasterUnitId);
                 else if (EffectExpressionTargetAnalysis.Contains(expression, EffectTarget.Pet))
                     reachable = units.Where(u => u.IsPet && u.MasterUnitId == provider.Key.CasterUnitId);
-                else if (EffectExpressionTargetAnalysis.Contains(expression, EffectTarget.Party))
+                else if (party)
                     reachable = units;
+                else if (areaRecipients && targetsAround != null && caster != null)
+                {
+                    float radius = targetsAround.AoERadius.Meters;
+                    reachable = targetsAround.TargetType == TargetType.Enemy
+                        ? new UnitSnapshot[0]
+                        : units.Where(u =>
+                    {
+                        UnitEntityData target;
+                        return liveUnits.TryGetValue(u.UnitId, out target) &&
+                            caster.DistanceTo(target) <= radius + 0.01f;
+                    });
+                }
                 else
                     reachable = units.Where(u =>
                     {
@@ -45,9 +65,11 @@ namespace KingmakerBuffPlanner.GameAdapters
                         return liveUnits.TryGetValue(u.UnitId, out target) &&
                             KingmakerAnimatedCastAdapter.CanTarget(ability, new TargetWrapper(target));
                     });
-                string[] reachableIds = reachable.Select(u => u.UnitId).Distinct(StringComparer.Ordinal).ToArray();
-                bool mass = EffectExpressionTargetAnalysis.Contains(expression, EffectTarget.Party);
-                string[] anchors = mass
+                string[] reachableIds = reachable.Select(u => u.UnitId)
+                    .Distinct(StringComparer.Ordinal).ToArray();
+                bool mass = party || areaRecipients;
+                bool casterCentered = party || targetsAround != null;
+                string[] anchors = mass && casterCentered
                     ? reachableIds.Where(id => id == provider.Key.CasterUnitId).ToArray()
                     : reachableIds;
                 options.Add(new ProviderPlanningOption(provider, reachableIds, anchors,

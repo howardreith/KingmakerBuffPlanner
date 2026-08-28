@@ -1,5 +1,24 @@
 # CODEX AUTONOMOUS MISSION
 
+## 2026-08-28 complete spell names/selectable variants checkpoint
+
+Mission branch `codex/buff-spell-variants-ui` started from clean trusted `main`
+HEAD `8460ae08157af40cd69b8f0a11259364ceceb885`. The complete blueprint-to-cast
+flow now represents selectable children as first-class entries with stable
+parent+child identity, structural child eligibility, declared order,
+parent-backed availability/resources, exact-child execution, and noninventing
+legacy persistence. Full localized names use one formatter and measured wrapped
+card rows rather than clipping/ellipsis.
+
+Exact installed-assembly evidence and 17 new behavior regressions are recorded
+in the architecture, contract inventories, implementation report, and
+qualification files. Current gates are 34/34 source, 112/112 protocol/domain,
+8/8 runtime filesystem, 4/4 package fixture, 5/5 deployment WhatIf, aggregate
+1/1, and Release build 1/1. Save-backed runtime is not claimed because the
+guarded inventory is exactly baseline=0/working=0. No remote operation occurred.
+Exact next action: local implementation commit, 0.0.14 release-source update,
+deterministic package, and final local evidence commit.
+
 ## 2026-08-27 0.0.13 published completion checkpoint
 
 Accepted 0.0.13 is public at

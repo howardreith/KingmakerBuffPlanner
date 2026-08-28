@@ -128,11 +128,11 @@ namespace KingmakerBuffPlanner.GameAdapters
                     pools.Add(new ResourcePoolSnapshot(poolKey, ResourcePoolKind.SpontaneousLevel,
                         capacity, remaining, null));
                 }
-                foreach (AbilityData data in ExpandVariants(spellbook.GetKnownSpells(level)))
-                    AddSpellProvider(unit, spellbook, data, poolKey, level == 0 ? 0 : 1,
+                foreach (KingmakerAbilitySelection selection in KingmakerAbilityVariants.Expand(spellbook.GetKnownSpells(level)))
+                    AddSpellProvider(unit, spellbook, selection, poolKey, level == 0 ? 0 : 1,
                         new string[0], providers);
-                foreach (AbilityData data in ExpandVariants(spellbook.GetCustomSpells(level)))
-                    AddSpellProvider(unit, spellbook, data, poolKey, level == 0 ? 0 : 1,
+                foreach (KingmakerAbilitySelection selection in KingmakerAbilityVariants.Expand(spellbook.GetCustomSpells(level)))
+                    AddSpellProvider(unit, spellbook, selection, poolKey, level == 0 ? 0 : 1,
                         new string[0], providers);
             }
         }
@@ -153,8 +153,8 @@ namespace KingmakerBuffPlanner.GameAdapters
                 foreach (IGrouping<string, SpellSlot> group in cantripSlots.GroupBy(
                     s => ToAbilityKey(s.Spell, SourceKind.Spellbook).Canonical, StringComparer.Ordinal))
                 {
-                    foreach (AbilityData data in ExpandVariants(new[] { group.First().Spell }))
-                        AddSpellProvider(unit, spellbook, data, unlimitedKey, 0, new string[0], providers);
+                    foreach (KingmakerAbilitySelection selection in KingmakerAbilityVariants.Expand(new[] { group.First().Spell }))
+                        AddSpellProvider(unit, spellbook, selection, unlimitedKey, 0, new string[0], providers);
                 }
             }
             var slots = allSlots.Where(s => s.SpellLevel > 0).ToList();
@@ -175,8 +175,8 @@ namespace KingmakerBuffPlanner.GameAdapters
             foreach (IGrouping<string, SpellSlot> group in slots.GroupBy(
                 s => ToAbilityKey(s.Spell, SourceKind.Spellbook).Canonical, StringComparer.Ordinal))
             {
-                foreach (AbilityData data in ExpandVariants(new[] { group.First().Spell }))
-                    AddSpellProvider(unit, spellbook, data, poolKey, 1,
+                foreach (KingmakerAbilitySelection selection in KingmakerAbilityVariants.Expand(new[] { group.First().Spell }))
+                    AddSpellProvider(unit, spellbook, selection, poolKey, 1,
                         group.Where(s => s.IsMainSlot).Select(s => ids[s]), providers);
             }
         }
@@ -191,85 +191,111 @@ namespace KingmakerBuffPlanner.GameAdapters
                 .Where(a => a != null && a.Data != null && a.Data.Blueprint != null)
                 .OrderBy(a => a.Blueprint.AssetGuid, StringComparer.Ordinal))
             {
-                AbilityData data = fact.Data;
-                if (data.Spellbook != null) continue;
-                _rawCandidateCount++;
-                var ability = ToAbilityKey(data, data.Resource != null
-                    ? SourceKind.AbilityResource : SourceKind.Fact);
-                EffectExpression expression;
-                string reason;
-                bool beneficial = _sourceDiscovery.TryDiscover(
-                    data.Blueprint, out expression, out reason);
-                _sourceTraces.Add(new PartySourceDiscoveryTrace(
-                    ability.Canonical, data.Blueprint.AssetGuid, data.Name, unit.UniqueId,
-                    string.Empty, false, beneficial, reason));
-                if (!beneficial) continue;
-                _beneficialCandidateCount++;
-                _effectsBySource[ability.Canonical] = expression;
-                ResourcePoolSnapshot pool;
-                int cost;
-                SourceKind sourceKind;
-                if (data.Resource != null)
-                {
-                    string key = unit.UniqueId + "|resource|" + data.Resource.AssetGuid;
-                    int remaining = Math.Max(0, unit.Descriptor.Resources.GetResourceAmount(data.Resource));
-                    int capacity = Math.Max(remaining, data.Resource.GetMaxAmount(unit.Descriptor));
-                    pool = new ResourcePoolSnapshot(key, ResourcePoolKind.AbilityResource,
-                        capacity, remaining, null);
-                    cost = data.ResourceCost;
-                    sourceKind = SourceKind.AbilityResource;
-                }
-                else
-                {
-                    string key = unit.UniqueId + "|free|" + data.Blueprint.AssetGuid;
-                    pool = new ResourcePoolSnapshot(key, ResourcePoolKind.Unlimited, 0, 0, null);
-                    cost = 0;
-                    sourceKind = SourceKind.Fact;
-                }
-                if (poolKeys.Add(pool.PoolKey)) pools.Add(pool);
-                ability = ToAbilityKey(data, sourceKind);
-                var keyForProvider = new ProviderKey(unit.UniqueId, string.Empty, ability, string.Empty);
-                providers.Add(new ProviderSnapshot(keyForProvider, data.Name, 0,
-                    pool.PoolKey, cost, null, ToMaterialRequirement(data), CasterLevel(data),
-                    ExpectedDurationRounds(data), data.Blueprint.Description,
-                    data.Blueprint.LocalizedDuration == null ? string.Empty :
-                        data.Blueprint.LocalizedDuration.ToString()));
+                AbilityData source = fact.Data;
+                if (source.Spellbook != null) continue;
+                foreach (KingmakerAbilitySelection selection in
+                    KingmakerAbilityVariants.Expand(new[] { source }))
+                    AddFactProvider(unit, selection, providers, pools, poolKeys);
             }
+        }
+
+        private void AddFactProvider(
+            UnitEntityData unit,
+            KingmakerAbilitySelection selection,
+            List<ProviderSnapshot> providers,
+            List<ResourcePoolSnapshot> pools,
+            HashSet<string> poolKeys)
+        {
+            AbilityData data = selection.Concrete;
+            AbilityData resourceContext = data.Resource != null ? data : selection.Source;
+            SourceKind sourceKind = resourceContext.Resource != null
+                ? SourceKind.AbilityResource : SourceKind.Fact;
+            AbilityKey ability = KingmakerAbilityVariants.ToAbilityKey(selection, sourceKind);
+            _rawCandidateCount++;
+            EffectExpression expression;
+            string reason;
+            bool beneficial = _sourceDiscovery.TryDiscover(
+                data.Blueprint, out expression, out reason);
+            _sourceTraces.Add(new PartySourceDiscoveryTrace(
+                ability.Canonical, data.Blueprint.AssetGuid, selection.DisplayName,
+                unit.UniqueId, string.Empty, false, beneficial, reason));
+            if (!beneficial) return;
+            _beneficialCandidateCount++;
+            _effectsBySource[ability.Canonical] = expression;
+
+            ResourcePoolSnapshot pool;
+            int cost;
+            if (resourceContext.Resource != null)
+            {
+                string key = unit.UniqueId + "|resource|" + resourceContext.Resource.AssetGuid;
+                int remaining = Math.Max(0,
+                    unit.Descriptor.Resources.GetResourceAmount(resourceContext.Resource));
+                int capacity = Math.Max(remaining,
+                    resourceContext.Resource.GetMaxAmount(unit.Descriptor));
+                pool = new ResourcePoolSnapshot(key, ResourcePoolKind.AbilityResource,
+                    capacity, remaining, null);
+                cost = resourceContext.ResourceCost;
+            }
+            else
+            {
+                string key = unit.UniqueId + "|free|" +
+                    selection.SourceBlueprint.AssetGuid;
+                pool = new ResourcePoolSnapshot(key, ResourcePoolKind.Unlimited, 0, 0, null);
+                cost = 0;
+            }
+            if (poolKeys.Add(pool.PoolKey)) pools.Add(pool);
+            var keyForProvider = new ProviderKey(
+                unit.UniqueId, string.Empty, ability, string.Empty);
+            if (providers.Any(provider => provider.Key.Equals(keyForProvider))) return;
+            string duration = DurationText(selection);
+            providers.Add(new ProviderSnapshot(keyForProvider, selection.DisplayName, 0,
+                pool.PoolKey, cost, null, ToMaterialRequirement(selection),
+                CasterLevel(data), ExpectedDurationRounds(data, duration),
+                Description(selection), duration, selection.SourceDisplayName,
+                selection.VariantOrder));
         }
 
         private void AddSpellProvider(
             UnitEntityData unit,
             Spellbook spellbook,
-            AbilityData data,
+            KingmakerAbilitySelection selection,
             string poolKey,
             int cost,
             IEnumerable<string> tokens,
             List<ProviderSnapshot> providers)
         {
+            AbilityData data = selection.Concrete;
             if (data == null || data.Blueprint == null) return;
             if (data.Blueprint.AssetGuid == "90e59f4a4ada87243b7b3535a06d0638")
                 _blessMaterialEvidence = DescribeMaterialComponent(data);
-            var ability = ToAbilityKey(data, SourceKind.Spellbook);
+            AbilityKey ability = KingmakerAbilityVariants.ToAbilityKey(
+                selection, SourceKind.Spellbook);
             _rawCandidateCount++;
             EffectExpression expression;
             string reason;
-            bool beneficial = _sourceDiscovery.TryDiscover(data.Blueprint, out expression, out reason);
+            bool beneficial = _sourceDiscovery.TryDiscover(
+                data.Blueprint, out expression, out reason);
             _sourceTraces.Add(new PartySourceDiscoveryTrace(
-                ability.Canonical, data.Blueprint.AssetGuid, data.Name, unit.UniqueId,
-                spellbook.Blueprint.AssetGuid, !spellbook.Blueprint.Spontaneous,
-                beneficial, reason));
+                ability.Canonical, data.Blueprint.AssetGuid, selection.DisplayName,
+                unit.UniqueId, spellbook.Blueprint.AssetGuid,
+                !spellbook.Blueprint.Spontaneous, beneficial, reason));
             if (!beneficial) return;
             _beneficialCandidateCount++;
             _effectsBySource[ability.Canonical] = expression;
-            int heighten = data.MetamagicData == null ? 0 : data.MetamagicData.HeightenLevel;
-            string sourceInstance = "level-" + data.SpellLevel + "|heighten-" + heighten;
-            var key = new ProviderKey(unit.UniqueId, spellbook.Blueprint.AssetGuid, ability, sourceInstance);
+            AbilityData source = selection.Source;
+            int heighten = source.MetamagicData == null
+                ? 0 : source.MetamagicData.HeightenLevel;
+            string sourceInstance = "level-" + source.SpellLevel +
+                "|heighten-" + heighten;
+            var key = new ProviderKey(
+                unit.UniqueId, spellbook.Blueprint.AssetGuid, ability, sourceInstance);
             if (providers.Any(p => p.Key.Equals(key))) return;
-            providers.Add(new ProviderSnapshot(key, data.Name, data.SpellLevel,
-                poolKey, cost, tokens, ToMaterialRequirement(data), CasterLevel(data),
-                ExpectedDurationRounds(data), data.Blueprint.Description,
-                data.Blueprint.LocalizedDuration == null ? string.Empty :
-                    data.Blueprint.LocalizedDuration.ToString()));
+            string duration = DurationText(selection);
+            providers.Add(new ProviderSnapshot(key, selection.DisplayName,
+                source.SpellLevel, poolKey, cost, tokens,
+                ToMaterialRequirement(selection), CasterLevel(data),
+                ExpectedDurationRounds(data, duration), Description(selection),
+                duration, selection.SourceDisplayName, selection.VariantOrder));
         }
 
         private static int CasterLevel(AbilityData data)
@@ -278,11 +304,9 @@ namespace KingmakerBuffPlanner.GameAdapters
             catch (Exception) { return 0; }
         }
 
-        private static int ExpectedDurationRounds(AbilityData data)
+        private static int ExpectedDurationRounds(AbilityData data, string duration)
         {
             int casterLevel = Math.Max(1, CasterLevel(data));
-            string duration = data.Blueprint.LocalizedDuration == null
-                ? string.Empty : data.Blueprint.LocalizedDuration.ToString();
             string normalized = duration.ToLowerInvariant();
             if (normalized.Contains("day")) return 14400 * casterLevel;
             if (normalized.Contains("hour")) return 600 * casterLevel;
@@ -290,17 +314,6 @@ namespace KingmakerBuffPlanner.GameAdapters
             if (normalized.Contains("minute") || normalized.Contains(" min")) return 10 * casterLevel;
             if (normalized.Contains("round")) return casterLevel;
             return 0;
-        }
-
-        private static IEnumerable<AbilityData> ExpandVariants(IEnumerable<AbilityData> source)
-        {
-            foreach (AbilityData data in source ?? new AbilityData[0])
-            {
-                if (data == null) continue;
-                yield return data;
-                foreach (AbilityData variant in data.Variants ?? new AbilityData[0])
-                    if (variant != null) yield return variant;
-            }
         }
 
         private static AbilityKey ToAbilityKey(AbilityData data, SourceKind sourceKind)
@@ -312,12 +325,39 @@ namespace KingmakerBuffPlanner.GameAdapters
             return new AbilityKey(baseGuid, variantGuid, metamagic, sourceKind, string.Empty);
         }
 
-        private static MaterialRequirementSnapshot ToMaterialRequirement(AbilityData data)
+        private static MaterialRequirementSnapshot ToMaterialRequirement(
+            KingmakerAbilitySelection selection)
         {
+            AbilityData data = selection.Concrete;
             BlueprintAbility.MaterialComponentData material = data.Blueprint.MaterialComponent;
-            if (!data.RequireMaterialComponent || material.Item == null || material.Count < 1) return null;
+            if (!data.RequireMaterialComponent || material.Item == null || material.Count < 1)
+            {
+                data = selection.Source;
+                material = data.Blueprint.MaterialComponent;
+            }
+            if (!data.RequireMaterialComponent || material.Item == null || material.Count < 1)
+                return null;
             return new MaterialRequirementSnapshot(material.Item.AssetGuid, material.Count,
                 Game.Instance.Player.Inventory.Count(material.Item));
+        }
+
+        private static string Description(KingmakerAbilitySelection selection)
+        {
+            string value = selection.Concrete.Blueprint.Description;
+            return string.IsNullOrWhiteSpace(value)
+                ? selection.SourceBlueprint.Description ?? string.Empty
+                : value;
+        }
+
+        private static string DurationText(KingmakerAbilitySelection selection)
+        {
+            string value = selection.Concrete.Blueprint.LocalizedDuration == null
+                ? string.Empty
+                : selection.Concrete.Blueprint.LocalizedDuration.ToString();
+            if (!string.IsNullOrWhiteSpace(value)) return value;
+            return selection.SourceBlueprint.LocalizedDuration == null
+                ? string.Empty
+                : selection.SourceBlueprint.LocalizedDuration.ToString();
         }
 
         private static string DescribeMaterialComponent(AbilityData data)

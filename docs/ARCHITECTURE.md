@@ -1,5 +1,41 @@
 # Architecture
 
+## 0.0.14 concrete spell variants and complete-name layout
+
+Selectable variants are resolved before domain provider construction.
+`KingmakerAbilityVariants` reads the parent `BlueprintAbility.Variants` array in
+declared order and materializes each child with the exact game constructor
+`new AbilityData(parentData, childBlueprint)`. `KingmakerAbilitySelection`
+therefore retains both the source `AbilityData`/parent blueprint and the
+concrete child `AbilityData`; the normalized `AbilityKey` stores the parent in
+`BaseAbilityGuid` and the chosen child in `VariantGuid`. Ordinary abilities keep
+an empty variant GUID and their prior path.
+
+Each concrete child independently traverses the existing branch-preserving
+action graph and eligibility policy. The unresolved parent is not emitted, and
+encountering a child both through its parent and independently is deduplicated
+by the full provider key. The UI aggregation identity for a variant is
+`variant|parent-guid|child-guid`, so sibling choices cannot collapse merely
+because they apply the same buff. Caster, spellbook, metamagic, prepared token,
+resource, and material state remain on provider snapshots rather than being
+folded into catalog identity.
+
+The formatter uses localized parent and child blueprint text only. It renders
+the complete parent plus the localized distinguishing child text, retains the
+parent in search metadata, and groups siblings by localized parent, parent GUID,
+then declared variant order. Child icons are preferred with a parent fallback.
+Catalog cards use measured wrapped text and per-row variable heights; ordinary
+short names retain the compact baseline while long/localized names move the
+availability and configuration controls down instead of clipping or adding an
+ellipsis. Selected-detail and description views also use wrapped, overflowing
+full names.
+
+Persistence continues to serialize stable `AbilityKeyProfile` fields. A saved
+concrete selection round-trips both parent and child GUIDs. A legacy parent-only
+assignment migrates only when exactly one currently eligible child exists;
+otherwise it remains unsupported and produces a localized reselection notice.
+No energy type or first declared child is inferred.
+
 ## 0.0.13 Powerful Change enhancement boundary
 
 Powerful Change is an optional compatibility adapter, not a compile-time

@@ -106,7 +106,8 @@ namespace KingmakerBuffPlanner.GameAdapters
                     foreach (SpellSlot slot in book.GetAllMemorizedSpells().Where(s => s != null &&
                         s.Spell != null && s.IsMainSlot && reservedTokenIds.Contains(SlotId(s))))
                     {
-                        AbilityData match = Expand(new[] { slot.Spell }).FirstOrDefault(d => Matches(d, provider.Ability));
+                        AbilityData match = KingmakerAbilityVariants.Resolve(
+                            slot.Spell, provider.Ability);
                         if (match != null) return match;
                     }
                     return null;
@@ -114,38 +115,34 @@ namespace KingmakerBuffPlanner.GameAdapters
                 foreach (SpellSlot slot in book.GetAllMemorizedSpells().Where(s => s != null &&
                     s.Spell != null && s.IsMainSlot))
                 {
-                    AbilityData match = Expand(new[] { slot.Spell }).FirstOrDefault(d =>
-                        Matches(d, provider.Ability));
+                    AbilityData match = KingmakerAbilityVariants.Resolve(
+                        slot.Spell, provider.Ability);
                     if (match != null) return match;
                 }
-                foreach (AbilityData data in Expand(book.GetAllKnownSpells()))
-                    if (Matches(data, provider.Ability) && SourceInstanceMatches(data, provider.SourceInstanceId))
-                        return data;
+                AbilityData known = ResolveSource(
+                    book.GetAllKnownSpells(), provider);
+                if (known != null) return known;
                 for (int level = 0; level <= book.MaxSpellLevel; level++)
-                    foreach (AbilityData data in Expand(book.GetCustomSpells(level)))
-                        if (Matches(data, provider.Ability) && SourceInstanceMatches(data, provider.SourceInstanceId))
-                            return data;
+                {
+                    AbilityData custom = ResolveSource(
+                        book.GetCustomSpells(level), provider);
+                    if (custom != null) return custom;
+                }
                 return null;
             }
             if (provider.Ability.SourceKind == SourceKind.AbilityResource ||
                 provider.Ability.SourceKind == SourceKind.Fact)
             {
-                return caster.Descriptor.Abilities.Enumerable.Where(a => a != null && a.Data != null)
-                    .Select(a => a.Data).FirstOrDefault(d => Matches(d, provider.Ability));
+                foreach (Ability fact in caster.Descriptor.Abilities.Enumerable
+                    .Where(value => value != null && value.Data != null))
+                {
+                    AbilityData match = KingmakerAbilityVariants.Resolve(
+                        fact.Data, provider.Ability);
+                    if (match != null) return match;
+                }
+                return null;
             }
             return null;
-        }
-
-        private static bool Matches(AbilityData data, AbilityKey key)
-        {
-            if (data == null || data.Blueprint == null) return false;
-            string baseGuid = data.Blueprint.Parent == null
-                ? data.Blueprint.AssetGuid
-                : data.Blueprint.Parent.AssetGuid;
-            string variantGuid = data.Blueprint.Parent == null ? string.Empty : data.Blueprint.AssetGuid;
-            int metamagic = data.MetamagicData == null ? 0 : (int)data.MetamagicData.MetamagicMask;
-            return baseGuid == key.BaseAbilityGuid && variantGuid == key.VariantGuid &&
-                metamagic == key.MetamagicMask;
         }
 
         private static bool SourceInstanceMatches(AbilityData data, string sourceInstance)
@@ -154,15 +151,18 @@ namespace KingmakerBuffPlanner.GameAdapters
             return sourceInstance == "level-" + data.SpellLevel + "|heighten-" + heighten;
         }
 
-        private static IEnumerable<AbilityData> Expand(IEnumerable<AbilityData> source)
+        private static AbilityData ResolveSource(
+            IEnumerable<AbilityData> sources, ProviderKey provider)
         {
-            foreach (AbilityData data in source ?? new AbilityData[0])
+            foreach (AbilityData source in sources ?? new AbilityData[0])
             {
-                if (data == null) continue;
-                yield return data;
-                foreach (AbilityData variant in data.Variants ?? new AbilityData[0])
-                    if (variant != null) yield return variant;
+                AbilityData match = KingmakerAbilityVariants.Resolve(
+                    source, provider.Ability);
+                if (match != null &&
+                    SourceInstanceMatches(match, provider.SourceInstanceId))
+                    return match;
             }
+            return null;
         }
 
         internal static Dictionary<string, UnitEntityData> CollectUnits()

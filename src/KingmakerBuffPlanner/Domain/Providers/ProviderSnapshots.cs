@@ -150,7 +150,9 @@ namespace KingmakerBuffPlanner.Domain.Providers
             int effectiveCasterLevel = 0,
             int expectedDurationRounds = 0,
             string description = "",
-            string durationText = "")
+            string durationText = "",
+            string sourceDisplayName = "",
+            int variantOrder = 0)
         {
             Key = key ?? throw new ArgumentNullException("key");
             if (spellLevel < 0) throw new ArgumentOutOfRangeException("spellLevel");
@@ -159,7 +161,11 @@ namespace KingmakerBuffPlanner.Domain.Providers
             if (unitsPerCast < 0) throw new ArgumentOutOfRangeException("unitsPerCast");
             if (effectiveCasterLevel < 0) throw new ArgumentOutOfRangeException("effectiveCasterLevel");
             if (expectedDurationRounds < 0) throw new ArgumentOutOfRangeException("expectedDurationRounds");
+            if (variantOrder < 0) throw new ArgumentOutOfRangeException("variantOrder");
             DisplayName = displayName ?? string.Empty;
+            SourceDisplayName = string.IsNullOrWhiteSpace(sourceDisplayName)
+                ? DisplayName : sourceDisplayName;
+            VariantOrder = variantOrder;
             SpellLevel = spellLevel;
             ResourcePoolKey = resourcePoolKey;
             UnitsPerCast = unitsPerCast;
@@ -175,6 +181,12 @@ namespace KingmakerBuffPlanner.Domain.Providers
 
         public ProviderKey Key { get; private set; }
         public string DisplayName { get; private set; }
+        public string SourceDisplayName { get; private set; }
+        public int VariantOrder { get; private set; }
+        public bool IsConcreteVariant
+        {
+            get { return !string.IsNullOrWhiteSpace(Key.Ability.VariantGuid); }
+        }
         public int SpellLevel { get; private set; }
         public string ResourcePoolKey { get; private set; }
         public int UnitsPerCast { get; private set; }

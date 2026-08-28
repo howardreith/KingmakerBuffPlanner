@@ -1,5 +1,22 @@
 # Resource and Casting Contract Inventory
 
+## 0.0.14 parent-backed concrete variant casting
+
+Reflection-only IL inspection proves `AbilityData(AbilityData,
+BlueprintAbility)` copies caster, fact/spellbook blueprint, and metamagic data,
+then sets `m_ConvertedFrom` to the source data when a concrete child is supplied.
+The child reports its own blueprint name/icon/description, while `SpellLevel`
+and `GetAvailableForCastCount()` delegate to `ConvertedFrom`.
+`SpendFromSpellbook()` also delegates and returns before the child can perform a
+second spend. Thus the supported model is one concrete child cast with one
+parent availability/resource context, not independent parent and child costs.
+
+Prepared child providers retain the parent slot token IDs. Spontaneous children
+share the parent caster/spellbook/level pool. Fact/resource children share the
+source fact/resource context. Animated resolution and Instant rule submission
+both require an exact parent GUID, exact child GUID, metamagic mask, and source
+instance match; no resolver falls back to `Variants[0]` or a sibling.
+
 0.0.13 Powerful Change checkpoint: the six score activatables all validate one
 exact CotW Arcane Reservoir reference with
 `ActivatableAbilityResourceLogic.ResourceSpendType.Never`. Toggle activation is

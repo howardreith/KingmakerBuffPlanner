@@ -1,5 +1,28 @@
 # Discovery Action Contract Inventory
 
+## 0.0.14 selectable variant correction
+
+Exact Kingmaker 2.1.7b inspection establishes two different contracts that must
+not be conflated: `BlueprintAbility.Variants` returns the declared
+`AbilityVariants.Variants` blueprint array, while `AbilityData.Variants` is
+literally `ldnull; ret` and `AbilityData.InitVariants()` is `ret`. Discovery now
+enumerates declared child blueprints in their native array order and creates
+concrete runtime data explicitly. The parent variant container is not traversed
+as one flattened union of mutually exclusive child effects.
+
+Each child independently enters `KingmakerActionGraphAdapter` and the existing
+beneficial persistent-effect classifier. This prevents unrelated summoning or
+choice menus from entering merely because they use `AbilityVariants`, while
+allowing independently eligible energy, alignment, form, size, and analogous
+buff children. `AbilityTargetsAround` wraps the child's expression as
+`AreaRecipients`; it does not erase its concrete child identity.
+
+The inspection helper is
+`scripts/Inspect-KingmakerVariantContracts.ps1`. Exact assembly evidence is
+SHA-256
+`3b6450ffec440e296e586f71c711b195aed144b28d53e1cbb29406d18fef5afb`
+and MVID `07fa1e4d-8618-41b3-9b8d-faa17d3b26f7`.
+
 ## 0.0.13 Powerful Change consumer
 
 `KingmakerPowerfulChangeBlueprintAnalyzer` reuses

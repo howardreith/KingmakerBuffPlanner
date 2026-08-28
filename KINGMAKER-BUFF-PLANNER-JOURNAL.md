@@ -1,5 +1,40 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-08-28 - complete names and selectable variants engineering checkpoint
+
+Status: IMPLEMENTED; DETERMINISTIC GATES PASS; LOCAL COMMIT/PACKAGE PENDING;
+SAVE-BACKED RUNTIME BLOCKED SAFELY
+
+- Read-only intake found a clean `main` worktree at exact trusted HEAD
+  `8460ae08157af40cd69b8f0a11259364ceceb885`, version 0.0.13. Local branch
+  `codex/buff-spell-variants-ui` was created from that HEAD. Required remote
+  inventory was read once; no remote operation or remote service communication
+  followed.
+- Exact assembly inspection disproved the existing `AbilityData.Variants`
+  assumption: its getter returns null and initializer is empty. The game
+  constructor taking parent `AbilityData` plus child `BlueprintAbility` retains
+  caster/spellbook/fact/metamagic and sets `ConvertedFrom`; availability,
+  spell level, and spellbook spend delegate through the parent once.
+- The exact native catalog proves both Resist Energy parents expose five useful
+  concrete children, including Sonic, in declared blueprint order. Every child
+  is independently structurally eligible. `Protection from Arrows, Communal`
+  retains its complete localized catalog name.
+- Implementation separates variant discovery/formatting, stable catalog
+  identity, provider snapshot construction, planning/persistence, exact runtime
+  resolution, and variable-height Unity presentation. No English spell/energy
+  name or gameplay blueprint allowlist was added.
+- Commands/results: `./scripts/Test-SourceOnly.ps1` = source 34/34,
+  protocol/domain 112/112, runtime filesystem 8/8, package fixture 4/4,
+  deployment WhatIf 5/5, aggregate 1/1; `./scripts/Build.ps1 -Configuration
+  Release` = source 34/34 and build 1/1; `git diff --check` = pass. Release DLL
+  SHA-256/MVID are
+  `7f32c802ca335c2ace41e10869253792aa2218872b85453d21d8c302ac08878f` /
+  `657c8f37-f755-4b3d-8974-445ec1a224f6`.
+- The guarded save resolver reports exactly `Disposable save ambiguity:
+  baseline=0; working=0`. No unrelated save, live Mods transaction, game launch,
+  or in-game claim occurred. Exact next action is local checkpoint commit,
+  version/release record update, and clean-head deterministic package build.
+
 ## 2026-08-27 - 0.0.13 published completion
 
 Status: PUBLISHED; DOWNLOADED ASSETS VERIFIED; EXACT PUBLISHED BYTES INSTALLED

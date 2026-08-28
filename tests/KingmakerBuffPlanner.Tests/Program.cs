@@ -85,6 +85,23 @@ namespace KingmakerBuffPlanner.Tests
                 Run("installed-harmony-inventory-api-is-callable", TestHarmonyInventoryApi);
                 Run("effect-overrides-are-versioned-and-branch-preserving", TestEffectOverrides);
                 Run("stable-keys-distinguish-variants-and-metamagic", TestStableKeys);
+                Run("complete-name-layout-preserves-long-communal-suffix", TestCompleteNameLayout);
+                Run("ordinary-nonvariant-catalog-entry-remains-single", TestOrdinaryCatalogExpansion);
+                Run("variant-parent-expands-five-eligible-children", TestVariantCatalogFive);
+                Run("unresolved-variant-parent-is-not-selectable", TestVariantParentSuppressed);
+                Run("variant-stable-identities-are-distinct", TestVariantStableIdentities);
+                Run("variant-entry-retains-parent-and-child-identities", TestVariantParentChildIdentity);
+                Run("variant-expansion-deduplicates-declared-children", TestVariantDeduplication);
+                Run("variant-display-keeps-communal-distinction", TestVariantCommunalNames);
+                Run("variant-search-finds-parent-and-concrete-name", TestVariantSearchAndOrder);
+                Run("variant-profile-roundtrip-preserves-child", () => TestVariantProfileRoundTrip(root));
+                Run("legacy-ambiguous-parent-requires-reselection", TestLegacyAmbiguousVariant);
+                Run("variant-availability-uses-parent-resource-context", TestVariantParentAvailability);
+                Run("variant-execution-plan-selects-requested-child", TestVariantExecutionSelection);
+                Run("variant-execution-reserves-one-parent-resource", TestVariantSingleConsumption);
+                Run("nonvariant-planning-remains-exact", TestNonVariantPlanningRegression);
+                Run("variant-icon-falls-back-to-parent", TestVariantIconFallback);
+                Run("localized-variant-formatting-does-not-parse-English", TestLocalizedVariantFormatting);
                 Run("spontaneous-providers-share-one-pool", TestSpontaneousSharedPool);
                 Run("prepared-opposition-consumes-linked-slots", TestPreparedLinkedSlots);
                 Run("prepared-domain-slot-eligibility-is-preserved", TestPreparedDomainEligibility);
@@ -347,6 +364,7 @@ namespace KingmakerBuffPlanner.Tests
             {
                 IsPlayerAccessible = true,
                 HasVariants = true,
+                CanTargetSelf = true,
                 Effects = new[] { CandidateEffect("Buff", "CurrentTarget", false, "ContextActionApplyBuff", "root") },
                 DiagnosticContracts = new string[0]
             });
@@ -429,6 +447,510 @@ namespace KingmakerBuffPlanner.Tests
             var first = new ProviderKey("unit-a", "book-a", baseKey, string.Empty);
             var second = new ProviderKey("unit-a", "book-b", baseKey, string.Empty);
             if (first.Equals(second)) throw new InvalidOperationException("Spellbook identity was lost from provider key.");
+        }
+
+        private static void TestCompleteNameLayout()
+        {
+            const string name = "Protection from Arrows, Communal";
+            AbilityKey ability = Ability("long-name-source", string.Empty, 0);
+            const string poolKey = "long-name-free";
+            var pool = new ResourcePoolSnapshot(
+                poolKey, ResourcePoolKind.Unlimited, 0, 0, null);
+            var provider = new ProviderSnapshot(
+                new ProviderKey("unit-a", "book-a", ability, "level-0"),
+                name, 0, poolKey, 0, null, null, 1, 10,
+                "A localized communal protection.", "one hour", name, 0);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(
+                new[] { provider }, new[] { pool }, "unit-a");
+            var effect = Leaf("long-name-effect");
+            var option = new ProviderPlanningOption(
+                provider, new[] { "unit-a" }, new[] { "unit-a" }, 1, 10);
+            var model = new PlannerSetupModel(
+                BuffPlannerProfile.CreateDefault("long-name-layout"),
+                snapshot, new ActiveEffectSnapshot(null),
+                new Dictionary<string, EffectExpression>
+                {
+                    { ability.Canonical, effect }
+                },
+                new[] { option }, ignored => { });
+            var card = new BuffCardViewModel(
+                model.Sources.Single(), model, "long", false);
+            float compact = CompleteNameLayout.RequiredCardHeight(92f, 20f);
+            float expanded = CompleteNameLayout.RequiredCardHeight(92f, 72f);
+            BuffGridLayout layout = BuffGridLayout.Calculate(
+                new[] { compact, expanded, compact, compact, compact }, 92f, 10f);
+            if (card.Name != name || !card.Name.EndsWith(", Communal",
+                    StringComparison.Ordinal) || card.Name.Contains("...") ||
+                card.Name.Contains("…") || compact != 92f || expanded <= compact ||
+                layout.RowHeight(0) != expanded || layout.RowOffset(1) <= expanded)
+                throw new InvalidOperationException(
+                    "The primary card model or row layout shortened a complete localized name.");
+        }
+
+        private static void TestOrdinaryCatalogExpansion()
+        {
+            var source = new SelectableAbilityBlueprint(
+                "ordinary", "Ordinary Ward", "ordinary-icon", true);
+            IReadOnlyList<SelectableAbilityEntry> entries =
+                SelectableAbilityVariantCatalog.Expand(
+                    source, new SelectableAbilityBlueprint[0]);
+            if (entries.Count != 1 || entries[0].IsConcreteVariant ||
+                entries[0].Source.BlueprintGuid != "ordinary" ||
+                entries[0].Concrete.BlueprintGuid != "ordinary" ||
+                entries[0].DisplayName != "Ordinary Ward")
+                throw new InvalidOperationException(
+                    "A non-variant ability did not remain one unchanged catalog entry.");
+        }
+
+        private static void TestVariantCatalogFive()
+        {
+            IReadOnlyList<SelectableAbilityEntry> entries =
+                SelectableAbilityVariantCatalog.Expand(
+                    VariantParent(), VariantBlueprints(true));
+            string[] expected = VariantBlueprints(true)
+                .Select(value => value.BlueprintGuid).ToArray();
+            if (entries.Count != 5 ||
+                !entries.Select(value => value.Concrete.BlueprintGuid)
+                    .SequenceEqual(expected) ||
+                !entries.Select(value => value.VariantOrder)
+                    .SequenceEqual(Enumerable.Range(0, 5)))
+                throw new InvalidOperationException(
+                    "Five eligible declared variants were not expanded in blueprint order.");
+        }
+
+        private static void TestVariantParentSuppressed()
+        {
+            SelectableAbilityBlueprint[] variants = VariantBlueprints(true);
+            variants[1] = new SelectableAbilityBlueprint(
+                variants[1].BlueprintGuid, variants[1].DisplayName,
+                variants[1].IconIdentity, false);
+            IReadOnlyList<SelectableAbilityEntry> entries =
+                SelectableAbilityVariantCatalog.Expand(VariantParent(), variants);
+            IReadOnlyList<SelectableAbilityEntry> none =
+                SelectableAbilityVariantCatalog.Expand(VariantParent(),
+                    VariantBlueprints(false));
+            if (entries.Count != 4 || entries.Any(value =>
+                    value.Concrete.BlueprintGuid == VariantParent().BlueprintGuid) ||
+                none.Count != 0)
+                throw new InvalidOperationException(
+                    "An unresolved parent remained selectable or ineligible children leaked in.");
+        }
+
+        private static void TestVariantStableIdentities()
+        {
+            IReadOnlyList<SelectableAbilityEntry> entries =
+                SelectableAbilityVariantCatalog.Expand(
+                    VariantParent(), VariantBlueprints(true));
+            var effect = Leaf("same-visible-buff");
+            string[] sourceIds = entries.Select(value =>
+                CatalogSourceIdentity.For(Ability(
+                    value.Source.BlueprintGuid,
+                    value.Concrete.BlueprintGuid, 0), effect)).ToArray();
+            if (entries.Select(value => value.StableIdentity)
+                    .Distinct(StringComparer.Ordinal).Count() != 5 ||
+                sourceIds.Distinct(StringComparer.Ordinal).Count() != 5 ||
+                sourceIds.Any(value => !CatalogSourceIdentity.IsVariant(value)))
+                throw new InvalidOperationException(
+                    "Concrete variants collided by parent, name, icon, or effect.");
+        }
+
+        private static void TestVariantParentChildIdentity()
+        {
+            SelectableAbilityEntry entry = SelectableAbilityVariantCatalog.Expand(
+                VariantParent(), VariantBlueprints(true))[3];
+            AbilityKey ability = Ability(
+                entry.Source.BlueprintGuid, entry.Concrete.BlueprintGuid, 0);
+            var provider = new ProviderSnapshot(
+                new ProviderKey("unit-a", "book-a", ability, "level-3"),
+                entry.DisplayName, 3, "identity-free", 0, null,
+                null, 5, 100, string.Empty, string.Empty,
+                entry.Source.DisplayName, entry.VariantOrder);
+            if (provider.Key.Ability.BaseAbilityGuid !=
+                    entry.Source.BlueprintGuid ||
+                provider.Key.Ability.VariantGuid !=
+                    entry.Concrete.BlueprintGuid ||
+                provider.SourceDisplayName != "Resist Energy, Communal" ||
+                provider.VariantOrder != 3 || !provider.IsConcreteVariant)
+                throw new InvalidOperationException(
+                    "The catalog entry lost its parent source or concrete child identity.");
+        }
+
+        private static void TestVariantDeduplication()
+        {
+            SelectableAbilityBlueprint[] variants = VariantBlueprints(true);
+            IReadOnlyList<SelectableAbilityEntry> entries =
+                SelectableAbilityVariantCatalog.Expand(VariantParent(),
+                    new[] { variants[0], variants[0], variants[1], variants[1] });
+            if (entries.Count != 2 ||
+                entries[0].Concrete.BlueprintGuid != variants[0].BlueprintGuid ||
+                entries[1].Concrete.BlueprintGuid != variants[1].BlueprintGuid ||
+                entries[0].VariantOrder != 0 || entries[1].VariantOrder != 1)
+                throw new InvalidOperationException(
+                    "Duplicate parent/child discovery changed declared order or emitted duplicates.");
+        }
+
+        private static void TestVariantCommunalNames()
+        {
+            var ordinaryParent = new SelectableAbilityBlueprint(
+                "resist-parent", "Resist Energy", "parent-icon", true);
+            var ordinaryChild = new SelectableAbilityBlueprint(
+                "resist-cold", "Resist Cold", "cold-icon", true);
+            SelectableAbilityEntry ordinary =
+                SelectableAbilityVariantCatalog.Expand(
+                    ordinaryParent, new[] { ordinaryChild }).Single();
+            SelectableAbilityEntry communal =
+                SelectableAbilityVariantCatalog.Expand(
+                    VariantParent(), VariantBlueprints(true)).First();
+            if (ordinary.DisplayName != "Resist Energy \u2014 Cold" ||
+                communal.DisplayName != "Resist Energy, Communal \u2014 Cold" ||
+                ordinary.DisplayName == communal.DisplayName ||
+                ordinary.Source.BlueprintGuid == communal.Source.BlueprintGuid)
+                throw new InvalidOperationException(
+                    "Communal and non-communal variant distinctions were lost.");
+        }
+
+        private static void TestVariantSearchAndOrder()
+        {
+            VariantModelFixture fixture = CreateVariantFixture(
+                BuffPlannerProfile.CreateDefault("variant-search"), false);
+            var state = new CatalogFilterState
+            {
+                Search = "Resist Energy, Communal"
+            };
+            CatalogFilterDiagnostics diagnostics;
+            List<SetupSourceRow> parentMatches = state.Apply(
+                fixture.Model, "long", out diagnostics);
+            state.Search = "Fire";
+            List<SetupSourceRow> fireMatches = state.Apply(
+                fixture.Model, "long", out diagnostics);
+            string[] declared = VariantBlueprints(true)
+                .Select(value => value.BlueprintGuid).ToArray();
+            if (fixture.Model.Sources.Count != 5 ||
+                parentMatches.Count != 5 || fireMatches.Count != 1 ||
+                fireMatches[0].DisplayName != "Resist Energy, Communal \u2014 Fire" ||
+                !fixture.Model.Sources.Select(value => value.Ability.VariantGuid)
+                    .SequenceEqual(declared))
+                throw new InvalidOperationException(
+                    "Parent/concrete search or declared sibling ordering was not preserved.");
+        }
+
+        private static void TestVariantProfileRoundTrip(string root)
+        {
+            const string campaign = "variant-profile-roundtrip";
+            AbilityKey child = Ability(
+                VariantParent().BlueprintGuid, "resist-fire-communal", 4);
+            string sourceId = CatalogSourceIdentity.For(
+                child, Leaf("resist-fire-effect"));
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault(campaign);
+            profile.Routines[0].Assignments.Add(new SourceAssignmentProfile
+            {
+                SourceId = sourceId,
+                Ability = AbilityKeyProfile.FromKey(child),
+                WantedTargetUnitIds = new List<string> { "target-a" },
+                ExistingEffectPolicy = ExistingEffectPolicy.Overwrite,
+                IgnoredPresenceMarkers = new List<string>(),
+                SelectedEnhancementIds = new List<string>()
+            });
+            string modPath = Path.Combine(root, "variant-profile-roundtrip");
+            Directory.CreateDirectory(modPath);
+            var repository = new ProfileRepository(modPath);
+            repository.Save(profile);
+            SourceAssignmentProfile loaded = repository.Load(campaign)
+                .Profile.Routines[0].Assignments.Single();
+            AbilityKey restored = loaded.Ability.ToKey();
+            if (loaded.SourceId != sourceId ||
+                restored.BaseAbilityGuid != child.BaseAbilityGuid ||
+                restored.VariantGuid != child.VariantGuid ||
+                restored.MetamagicMask != 4)
+                throw new InvalidOperationException(
+                    "Serialization did not retain the selected concrete child.");
+        }
+
+        private static void TestLegacyAmbiguousVariant()
+        {
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault(
+                "legacy-ambiguous-variant");
+            AbilityKey parent = Ability(VariantParent().BlueprintGuid, string.Empty, 0);
+            profile.Routines[0].Assignments.Add(new SourceAssignmentProfile
+            {
+                SourceId = parent.Canonical,
+                Ability = AbilityKeyProfile.FromKey(parent),
+                WantedTargetUnitIds = new List<string> { "target-a" },
+                ExistingEffectPolicy = ExistingEffectPolicy.Overwrite,
+                IgnoredPresenceMarkers = new List<string>(),
+                SelectedEnhancementIds = new List<string>()
+            });
+            VariantModelFixture fixture = CreateVariantFixture(profile, false);
+            SourceAssignmentProfile retained =
+                profile.Routines[0].Assignments.Single();
+            VariantReselectionNotice notice =
+                fixture.Model.VariantReselectionNotices.Single();
+            if (fixture.Model.AssignmentMigrationApplied ||
+                retained.Ability.VariantGuid.Length != 0 ||
+                retained.SourceId != parent.Canonical ||
+                notice.DisplayName != "Resist Energy, Communal" ||
+                notice.CandidateCount != 5 ||
+                !fixture.Model.UnsupportedSavedSourceIds.Contains(parent.Canonical))
+                throw new InvalidOperationException(
+                    "A legacy ambiguous parent invented a concrete variant or lacked a clear diagnostic.");
+        }
+
+        private static void TestVariantParentAvailability()
+        {
+            VariantModelFixture fixture = CreateVariantFixture(
+                BuffPlannerProfile.CreateDefault("variant-parent-availability"), true);
+            SetupSourceRow source = fixture.Model.Sources.First();
+            var card = new BuffCardViewModel(
+                source, fixture.Model, "long", false);
+            ResourceTokenSnapshot token = fixture.Snapshot.ResourcePools.Single()
+                .Tokens.Single();
+            if (card.Availability != "1 prepared" ||
+                token.SlottedAbility.VariantGuid.Length != 0 ||
+                source.Ability.VariantGuid.Length == 0 ||
+                !source.Providers.Single().EligibleTokenIds.Contains(token.TokenId))
+                throw new InvalidOperationException(
+                    "A child variant did not validate against its parent prepared slot.");
+        }
+
+        private static void TestVariantExecutionSelection()
+        {
+            VariantModelFixture fixture = CreateVariantFixture(
+                BuffPlannerProfile.CreateDefault("variant-exact-execution"), false);
+            SetupSourceRow requested = fixture.Model.Sources.Single(value =>
+                value.Ability.VariantGuid == "resist-fire-communal");
+            fixture.Model.SelectSource(requested.SourceId);
+            fixture.Model.ToggleTarget("long", "target-a");
+            RoutinePlanResult plan = new RoutinePlanService().Plan(
+                fixture.Model.Profile, "long", fixture.Snapshot,
+                new ActiveEffectSnapshot(null), fixture.Effects, fixture.Options);
+            if (plan.Plan.Steps.Count != 1 ||
+                plan.Plan.Steps[0].Provider.Ability.BaseAbilityGuid !=
+                    VariantParent().BlueprintGuid ||
+                plan.Plan.Steps[0].Provider.Ability.VariantGuid !=
+                    "resist-fire-communal" ||
+                plan.Plan.Steps[0].Provider.Ability.VariantGuid ==
+                    VariantBlueprints(true)[0].BlueprintGuid)
+                throw new InvalidOperationException(
+                    "Planning selected the first sibling instead of the requested child.");
+        }
+
+        private static void TestVariantSingleConsumption()
+        {
+            AbilityKey parent = Ability(VariantParent().BlueprintGuid, string.Empty, 0);
+            AbilityKey child = Ability(
+                VariantParent().BlueprintGuid, "resist-cold-communal", 0);
+            const string poolKey = "variant-parent-prepared";
+            var token = new ResourceTokenSnapshot(
+                "slot-parent", parent, 3, PreparedSlotKind.Common,
+                true, true, null);
+            var pool = new ResourcePoolSnapshot(
+                poolKey, ResourcePoolKind.PreparedSlots, 1, 1,
+                new[] { token });
+            var provider = new ProviderSnapshot(
+                new ProviderKey("unit-a", "book-a", child, "level-3"),
+                "Resist Cold, Communal", 3, poolKey, 1,
+                new[] { token.TokenId }, null, 5, 100,
+                string.Empty, string.Empty, "Resist Energy, Communal", 0);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(
+                new[] { provider }, new[] { pool },
+                "unit-a", "target-a", "target-b");
+            var area = new EffectLeafExpression(
+                EffectKind.Buff, "resist-cold-effect",
+                EffectTarget.AreaRecipients, "AbilityTargetsAround",
+                "variant/area");
+            var source = new BuffSourceDefinition(
+                CatalogSourceIdentity.For(child, area), child, area,
+                CastGroupingKind.MassConfiguredTargets);
+            var request = new BuffCastRequest(
+                source, new[] { "target-a", "target-b" },
+                ExistingEffectPolicy.Overwrite, null);
+            var option = new ProviderPlanningOption(
+                provider, new[] { "unit-a", "target-a", "target-b" },
+                new[] { "unit-a" }, 5, 100);
+            CastPlan plan = new CastPlanner().Plan(
+                snapshot, request, new[] { option }, EmptyPolicy(),
+                new ActiveEffectSnapshot(null));
+            if (plan.Steps.Count != 1 ||
+                plan.Steps[0].Reservation.TokenIds.Count != 1 ||
+                plan.Steps[0].Reservation.TokenIds[0] != token.TokenId ||
+                plan.Outcomes.Count(value =>
+                    value.Kind == TargetOutcomeKind.Fulfilled) != 2)
+                throw new InvalidOperationException(
+                    "A concrete communal variant reserved its parent slot more than once.");
+        }
+
+        private static void TestNonVariantPlanningRegression()
+        {
+            AbilityKey ability = Ability("ordinary-cast", string.Empty, 0);
+            const string poolKey = "ordinary-free";
+            var pool = new ResourcePoolSnapshot(
+                poolKey, ResourcePoolKind.Unlimited, 0, 0, null);
+            ProviderSnapshot provider = PlannerProvider(
+                "unit-a", "book-a", ability, poolKey, 0);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(
+                new[] { provider }, new[] { pool }, "unit-a");
+            var option = new ProviderPlanningOption(
+                provider, new[] { "unit-a" }, new[] { "unit-a" }, 1, 10);
+            CastPlan plan = PlannerPlan(
+                snapshot, ability, CastGroupingKind.PerTarget,
+                new[] { "unit-a" }, new[] { option }, EmptyPolicy(),
+                new ActiveEffectSnapshot(null));
+            if (plan.Steps.Count != 1 ||
+                plan.Steps[0].Provider.Ability.VariantGuid.Length != 0 ||
+                !plan.Steps[0].Provider.Ability.Equals(ability))
+                throw new InvalidOperationException(
+                    "Ordinary non-variant planning changed.");
+        }
+
+        private static void TestVariantIconFallback()
+        {
+            if (AbilityDisplayNameFormatter.PreferredIcon(
+                    string.Empty, "parent-icon") != "parent-icon" ||
+                AbilityDisplayNameFormatter.PreferredIcon(
+                    "child-icon", "parent-icon") != "child-icon" ||
+                AbilityDisplayNameFormatter.PreferredIcon(
+                    string.Empty, string.Empty) != string.Empty)
+                throw new InvalidOperationException(
+                    "Child-first icon selection did not safely fall back to the parent.");
+        }
+
+        private static void TestLocalizedVariantFormatting()
+        {
+            string parent = "Protection élémentaire, communauté";
+            string child = "Feu";
+            string combined = AbilityDisplayNameFormatter.Format(
+                parent, child, true);
+            string localizedFull = "Résistance au feu, communauté";
+            string localized = AbilityDisplayNameFormatter.Format(
+                "Résistance à l'énergie, communauté", localizedFull, true);
+            string japanese = AbilityDisplayNameFormatter.Format(
+                "エネルギー耐性", "火炎", true);
+            string missingQualifier = AbilityDisplayNameFormatter.Format(
+                "Protection élémentaire, communauté",
+                "Protection contre le feu", true);
+            if (combined != parent + " \u2014 " + child ||
+                localized != "Résistance à l'énergie, communauté \u2014 au feu" ||
+                japanese != "エネルギー耐性 \u2014 火炎" ||
+                missingQualifier !=
+                    "Protection élémentaire, communauté \u2014 contre le feu" ||
+                !AbilityDisplayNameFormatter.SearchText(
+                    combined, parent).Contains(parent))
+                throw new InvalidOperationException(
+                    "Variant naming depended on English words or discarded localized text.");
+        }
+
+        private static SelectableAbilityBlueprint VariantParent()
+        {
+            return new SelectableAbilityBlueprint(
+                "resist-energy-communal-parent",
+                "Resist Energy, Communal", "parent-icon", true);
+        }
+
+        private static SelectableAbilityBlueprint[] VariantBlueprints(bool eligible)
+        {
+            return new[]
+            {
+                new SelectableAbilityBlueprint(
+                    "resist-cold-communal", "Resist Cold, Communal",
+                    "cold-icon", eligible),
+                new SelectableAbilityBlueprint(
+                    "resist-sonic-communal", "Resist Sonic, Communal",
+                    "sonic-icon", eligible),
+                new SelectableAbilityBlueprint(
+                    "resist-electricity-communal",
+                    "Resist Electricity, Communal",
+                    "electricity-icon", eligible),
+                new SelectableAbilityBlueprint(
+                    "resist-fire-communal", "Resist Fire, Communal",
+                    "fire-icon", eligible),
+                new SelectableAbilityBlueprint(
+                    "resist-acid-communal", "Resist Acid, Communal",
+                    "acid-icon", eligible)
+            };
+        }
+
+        private static VariantModelFixture CreateVariantFixture(
+            BuffPlannerProfile profile, bool prepared)
+        {
+            const string poolKey = "variant-fixture-pool";
+            AbilityKey parent = Ability(VariantParent().BlueprintGuid, string.Empty, 0);
+            ResourcePoolSnapshot pool;
+            string[] tokens;
+            int cost;
+            if (prepared)
+            {
+                var token = new ResourceTokenSnapshot(
+                    "variant-parent-slot", parent, 3,
+                    PreparedSlotKind.Common, true, true, null);
+                pool = new ResourcePoolSnapshot(
+                    poolKey, ResourcePoolKind.PreparedSlots,
+                    1, 1, new[] { token });
+                tokens = new[] { token.TokenId };
+                cost = 1;
+            }
+            else
+            {
+                pool = new ResourcePoolSnapshot(
+                    poolKey, ResourcePoolKind.Unlimited, 0, 0, null);
+                tokens = new string[0];
+                cost = 0;
+            }
+
+            SelectableAbilityBlueprint[] variants = VariantBlueprints(true);
+            IReadOnlyList<SelectableAbilityEntry> entries =
+                SelectableAbilityVariantCatalog.Expand(
+                    VariantParent(), variants);
+            var providers = new List<ProviderSnapshot>();
+            var effects = new Dictionary<string, EffectExpression>(
+                StringComparer.Ordinal);
+            var options = new List<ProviderPlanningOption>();
+            for (int index = 0; index < entries.Count; index++)
+            {
+                AbilityKey ability = Ability(
+                    VariantParent().BlueprintGuid,
+                    entries[index].Concrete.BlueprintGuid, 0);
+                var provider = new ProviderSnapshot(
+                    new ProviderKey("unit-a", "book-a", ability, "level-3"),
+                    entries[index].DisplayName, 3, poolKey, cost, tokens,
+                    null, 5, 100, "Variant fixture", "one minute",
+                    VariantParent().DisplayName, index);
+                providers.Add(provider);
+                effects.Add(ability.Canonical, Leaf(
+                    "effect-" + variants[index].BlueprintGuid));
+                options.Add(new ProviderPlanningOption(
+                    provider, new[] { "unit-a", "target-a", "target-b" },
+                    new[] { "unit-a", "target-a", "target-b" }, 5, 100));
+            }
+            PartyProviderSnapshot snapshot = PlannerSnapshot(
+                providers, new[] { pool }, "unit-a", "target-a", "target-b");
+            var model = new PlannerSetupModel(
+                profile, snapshot, new ActiveEffectSnapshot(null),
+                effects, options, ignored => { });
+            return new VariantModelFixture(
+                model, snapshot, effects, options, providers);
+        }
+
+        private sealed class VariantModelFixture
+        {
+            internal VariantModelFixture(
+                PlannerSetupModel model,
+                PartyProviderSnapshot snapshot,
+                IDictionary<string, EffectExpression> effects,
+                IEnumerable<ProviderPlanningOption> options,
+                IEnumerable<ProviderSnapshot> providers)
+            {
+                Model = model;
+                Snapshot = snapshot;
+                Effects = effects;
+                Options = options.ToArray();
+                Providers = providers.ToArray();
+            }
+
+            internal PlannerSetupModel Model;
+            internal PartyProviderSnapshot Snapshot;
+            internal IDictionary<string, EffectExpression> Effects;
+            internal ProviderPlanningOption[] Options;
+            internal ProviderSnapshot[] Providers;
         }
 
         private static void TestSpontaneousSharedPool()

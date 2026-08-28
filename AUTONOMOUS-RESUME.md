@@ -1,5 +1,33 @@
 # Autonomous Resume
 
+## 0.0.14 spell names and concrete variants - 2026-08-28
+
+- Started clean from `main` at
+  `8460ae08157af40cd69b8f0a11259364ceceb885`; active local branch is
+  `codex/buff-spell-variants-ui`. No fetch, pull, push, remote mutation, tag, or
+  publication occurred.
+- Exact Kingmaker evidence: `Assembly-CSharp.dll` SHA-256
+  `3b6450ffec440e296e586f71c711b195aed144b28d53e1cbb29406d18fef5afb`,
+  MVID `07fa1e4d-8618-41b3-9b8d-faa17d3b26f7`; runtime `AbilityData.Variants`
+  is a null stub, and the parent-data/child-blueprint constructor is the native
+  context-preserving route.
+- Implementation expands structurally eligible declared children, stores parent
+  plus concrete child identities, groups in declared order, renders/searches
+  complete localized names, preserves parent-backed availability, resolves the
+  exact child for execution, and refuses ambiguous legacy inference.
+- Current gates: source 34/34, protocol/domain 112/112, runtime filesystem 8/8,
+  package fixture 4/4, deployment WhatIf 5/5, aggregate 1/1, Release build 1/1.
+  Current DLL SHA-256/MVID are
+  `7f32c802ca335c2ace41e10869253792aa2218872b85453d21d8c302ac08878f` /
+  `657c8f37-f755-4b3d-8974-445ec1a224f6`.
+- Rejected theories: the game does not populate `AbilityData.Variants`; using a
+  child GUID without source data is insufficient; presentation aliases cannot
+  repair availability/spending; and selecting the first declared child would
+  invent player intent.
+- Save audit is exactly `baseline=0; working=0`; in-game verification is not
+  claimed. Exact next action: create local implementation checkpoint(s), bump
+  to 0.0.14, run clean-head deterministic packaging, and record hashes.
+
 ## 0.0.13 published completion - 2026-08-27
 
 - No release work remains. `main`, `origin/main`, and annotated tag `v0.0.13`
