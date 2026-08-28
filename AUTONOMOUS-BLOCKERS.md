@@ -1,5 +1,13 @@
 # Autonomous Blockers
 
+0.0.14 published completion, 2026-08-28: COMPLETE; no source, deterministic,
+merge, guarded-push, tag, publication, checksum, download, or package-validation
+blocker. Public v0.0.14 is published from
+`1ad148780d801d63d7ab40e52bba94b7c4627b47` and independently downloaded bytes
+validate 4/4. Save-backed visual/cast/resource evidence remains unavailable at
+baseline=0/working=0 and is not falsely claimed; it does not reopen completed
+release engineering.
+
 0.0.14 publication authorization, 2026-08-28: the owner explicitly authorized
 final commit, default-branch merge, guarded remote push, and a new public
 release. Remote/default-branch/authentication identity and absence of v0.0.14

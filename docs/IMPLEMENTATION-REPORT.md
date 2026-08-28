@@ -1,5 +1,17 @@
 # Implementation Report
 
+## 0.0.14 release result
+
+The qualified implementation was merged without history rewriting and released
+from exact commit `1ad148780d801d63d7ab40e52bba94b7c4627b47` as annotated tag
+`v0.0.14`. Public ZIP/DLL/MVID are
+`a319a7f18aa7a20e47282fdf5b10dfee0adafd355677cf870a7fbb065028484b` /
+`4602cfe124470f5b5e5d336018ddc51a474cd931b2327e58d58eac299e4bc5bf` /
+`9f2db5b0-f61b-41c5-a3f7-54bc0296e3fe`. The remote asset digest, checksum file,
+and independent download agree; the downloaded package validates 4/4. Release:
+`https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.0.14`.
+This publication does not claim the save-backed manual rows documented below.
+
 ## 0.0.14 complete spell names and selectable variants
 
 The prior variant expansion called `AbilityData.Variants`. Reflection-only IL

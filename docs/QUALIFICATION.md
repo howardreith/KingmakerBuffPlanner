@@ -1,5 +1,32 @@
 # Qualification
 
+## 0.0.14 published release qualification
+
+Status: MERGED; GUARDED-PUSHED; PUBLISHED; REMOTE/DOWNLOADED ASSETS VERIFIED;
+SAVE-BACKED IN-GAME RESULTS NOT CLAIMED.
+
+- Exact release/tag commit:
+  `1ad148780d801d63d7ab40e52bba94b7c4627b47`; annotated tag object:
+  `d9cd66949623f66f1da3a1c902df16f8f45a9955`.
+- Guarded-push WhatIf `6/6`; live guarded push verified exact remote main.
+- Publisher repeated source `34/34`, protocol/domain `112/112`, runtime
+  filesystem `8/8`, package `4/4`, deployment WhatIf `5/5`, aggregate `1/1`,
+  and deterministic release `2/2` before publishing.
+- Release is public, draft=false, prerelease=false, published
+  `2026-08-28T21:52:28Z`:
+  `https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.0.14`.
+- Published ZIP is 249,439 bytes; ZIP/DLL/MVID are
+  `a319a7f18aa7a20e47282fdf5b10dfee0adafd355677cf870a7fbb065028484b` /
+  `4602cfe124470f5b5e5d336018ddc51a474cd931b2327e58d58eac299e4bc5bf` /
+  `9f2db5b0-f61b-41c5-a3f7-54bc0296e3fe`.
+- GitHub reports matching SHA-256 digests for both assets. Independently
+  downloaded ZIP and checksum bytes match, and strict package validation passes
+  `4/4`. Checksum-file SHA-256 is
+  `4bdc2449090f506382772e5efeef4805c4ea103c0b6ad7c908cf4d18f1e19a8d`.
+
+No install or Kingmaker launch occurred during publication. The manual
+save-backed checks remain explicit limitations rather than inferred PASS rows.
+
 ## 0.0.14 spell-name and concrete-variant engineering checkpoint
 
 Status: SOURCE/BEHAVIOR/EXACT-ASSEMBLY/DETERMINISTIC LOCAL RELEASE PASS;

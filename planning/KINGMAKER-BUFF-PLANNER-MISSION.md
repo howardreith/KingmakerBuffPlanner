@@ -1,5 +1,21 @@
 # CODEX AUTONOMOUS MISSION
 
+## 2026-08-28 0.0.14 published completion checkpoint
+
+Qualified feature history was merged without rewriting and released from exact
+commit `1ad148780d801d63d7ab40e52bba94b7c4627b47`; annotated tag object is
+`d9cd66949623f66f1da3a1c902df16f8f45a9955`. Guarded push and publisher gates
+pass 6/6, 34/34, 112/112, 8/8, 4/4, 5/5, aggregate 1/1, and deterministic
+release 2/2. Public ZIP/DLL/MVID are
+`a319a7f18aa7a20e47282fdf5b10dfee0adafd355677cf870a7fbb065028484b` /
+`4602cfe124470f5b5e5d336018ddc51a474cd931b2327e58d58eac299e4bc5bf` /
+`9f2db5b0-f61b-41c5-a3f7-54bc0296e3fe`. GitHub digests and independently
+downloaded assets match; the downloaded ZIP validates 4/4. Release:
+`https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.0.14`.
+No install or game launch occurred; save-backed runtime rows remain unclaimed.
+Exact next action is documentation-only completion commit and guarded push; no
+release work remains.
+
 ## 2026-08-28 0.0.14 publication authorization checkpoint
 
 The owner explicitly authorized final commit, merge to the repository's actual

@@ -1,5 +1,24 @@
 # Autonomous Resume
 
+## 0.0.14 published completion - 2026-08-28
+
+- Release/tag commit is `1ad148780d801d63d7ab40e52bba94b7c4627b47`;
+  annotated tag object is `d9cd66949623f66f1da3a1c902df16f8f45a9955`.
+  Guarded push verified remote main at that commit before publication.
+- Publisher repeated source 34/34, protocol/domain 112/112, runtime filesystem
+  8/8, package 4/4, deployment WhatIf 5/5, aggregate 1/1, and deterministic
+  release 2/2. Public release is non-draft/non-prerelease:
+  `https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.0.14`.
+- Published ZIP/DLL/MVID are
+  `a319a7f18aa7a20e47282fdf5b10dfee0adafd355677cf870a7fbb065028484b` /
+  `4602cfe124470f5b5e5d336018ddc51a474cd931b2327e58d58eac299e4bc5bf` /
+  `9f2db5b0-f61b-41c5-a3f7-54bc0296e3fe`; checksum asset SHA-256 is
+  `4bdc2449090f506382772e5efeef4805c4ea103c0b6ad7c908cf4d18f1e19a8d`.
+  Independent downloads match and the ZIP validates 4/4.
+- No install or game launch was performed. The documented baseline=0/working=0
+  in-game limitation remains. Exact next action: commit and guarded-push this
+  post-publication record; no release work remains.
+
 ## 0.0.14 publication authorization - 2026-08-28
 
 - Owner explicitly authorized final commit, merge to the repository default
