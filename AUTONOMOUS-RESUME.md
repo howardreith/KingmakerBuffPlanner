@@ -16,8 +16,9 @@
   `4bdc2449090f506382772e5efeef4805c4ea103c0b6ad7c908cf4d18f1e19a8d`.
   Independent downloads match and the ZIP validates 4/4.
 - No install or game launch was performed. The documented baseline=0/working=0
-  in-game limitation remains. Exact next action: commit and guarded-push this
-  post-publication record; no release work remains.
+  in-game limitation remains. The post-publication record has been committed
+  and guarded-pushed; no release-engineering action remains. Optional
+  save-backed manual acceptance remains separately documented.
 
 ## 0.0.14 publication authorization - 2026-08-28
 

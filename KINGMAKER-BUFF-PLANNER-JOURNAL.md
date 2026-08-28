@@ -28,9 +28,8 @@ Status: PUBLISHED; REMOTE REFS AND DOWNLOADED ASSETS VERIFIED
   `artifacts/verification/0.0.14-published` match both GitHub digests; the
   downloaded ZIP passes strict package validation 4/4. No install or game
   launch occurred. Save-backed visual/effect/resource rows remain honestly
-  unclaimed. Exact next action is commit and guarded-push of this
-  documentation-only completion record; no further release-engineering work
-  remains.
+  unclaimed. The documentation-only completion record has been committed and
+  guarded-pushed; no further release-engineering work remains.
 
 ## 2026-08-28 - 0.0.14 release authorization
 

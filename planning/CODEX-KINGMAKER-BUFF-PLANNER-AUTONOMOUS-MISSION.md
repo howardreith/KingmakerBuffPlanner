@@ -13,8 +13,9 @@ release 2/2. Public ZIP/DLL/MVID are
 downloaded assets match; the downloaded ZIP validates 4/4. Release:
 `https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.0.14`.
 No install or game launch occurred; save-backed runtime rows remain unclaimed.
-Exact next action is documentation-only completion commit and guarded push; no
-release work remains.
+The documentation-only completion record has been committed and guarded-pushed.
+No release-engineering action remains; optional save-backed manual acceptance
+remains separately documented.
 
 ## 2026-08-28 0.0.14 publication authorization checkpoint
 
