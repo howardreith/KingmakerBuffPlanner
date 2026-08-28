@@ -3,7 +3,9 @@
 ## 0.0.14 spell-name and concrete-variant engineering checkpoint
 
 Status: SOURCE/BEHAVIOR/EXACT-ASSEMBLY/DETERMINISTIC LOCAL RELEASE PASS;
-SAVE-BACKED IN-GAME VERIFICATION BLOCKED BY ABSENT GUARDED FIXTURES.
+OWNER AUTHORIZED DEFAULT-BRANCH MERGE, GUARDED PUSH, AND PUBLIC RELEASE;
+SAVE-BACKED IN-GAME VERIFICATION BLOCKED BY ABSENT GUARDED FIXTURES AND NOT
+CLAIMED.
 
 - `./scripts/Test-SourceOnly.ps1`: source `34/34`, protocol/domain `112/112`,
   runtime-harness filesystem `8/8`, package fixture `4/4`, deployment WhatIf

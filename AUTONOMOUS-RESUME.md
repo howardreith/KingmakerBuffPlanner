@@ -1,5 +1,20 @@
 # Autonomous Resume
 
+## 0.0.14 publication authorization - 2026-08-28
+
+- Owner explicitly authorized final commit, merge to the repository default
+  branch, remote push, and a new public release.
+- Public repository/default branch/authenticated account are
+  `howardreith/KingmakerBuffPlanner` / `main` / `howardreith`. After an explicit
+  fetch, local and remote main are both
+  `8460ae08157af40cd69b8f0a11259364ceceb885`; feature HEAD before this record is
+  `d7b88b83953ac31e7af5eb4a803c6551ce601cab`. No `v0.0.14` tag or release exists.
+- Release notes are publication-safe and continue to state that save-backed
+  visual/cast/resource verification was unavailable at baseline=0/working=0.
+- Exact next action is authorization-record commit, non-rewriting merge to
+  `main`, exact merge-commit qualification, guarded push, guarded publication,
+  independent asset verification, and a final publication record.
+
 ## 0.0.14 spell names and concrete variants - 2026-08-28
 
 - Started clean from `main` at

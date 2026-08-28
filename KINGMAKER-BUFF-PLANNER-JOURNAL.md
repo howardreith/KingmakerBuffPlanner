@@ -1,5 +1,27 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-08-28 - 0.0.14 release authorization
+
+Status: OWNER AUTHORIZED MERGE, GUARDED PUSH, AND PUBLIC RELEASE
+
+- The owner explicitly requested: finalize, commit, merge to main/master, push
+  to the remote, and create a new release. Repository/default-branch preflight
+  confirms public `howardreith/KingmakerBuffPlanner`, default branch `main`, and
+  authenticated owner `howardreith`.
+- Clean feature HEAD before this record is
+  `d7b88b83953ac31e7af5eb4a803c6551ce601cab`; refreshed local and remote `main`
+  both equal trusted baseline `8460ae08157af40cd69b8f0a11259364ceceb885`,
+  which is an ancestor of the feature branch. Neither local tag nor GitHub
+  release `v0.0.14` exists.
+- Final feature gate remains source 34/34, protocol/domain 112/112, runtime
+  filesystem 8/8, package 4/4, deployment WhatIf 5/5, and aggregate 1/1.
+  Publication authorization does not convert the absent-save runtime rows into
+  a PASS; the release notes retain that explicit limitation.
+- Exact next action: commit this authorization record, merge without rewriting
+  history into `main`, rebuild/qualify the merge commit, run guarded-push WhatIf
+  and live guarded push, then use the project-owned publisher with explicit
+  human-acceptance confirmation and verify the remote assets.
+
 ## 2026-08-28 - 0.0.14 deterministic local artifact
 
 Status: LOCAL RELEASE PASS; PUBLICATION/INSTALL/IN-GAME CLAIM NOT PERFORMED

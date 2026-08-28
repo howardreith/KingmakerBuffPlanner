@@ -1,5 +1,12 @@
 # Autonomous Blockers
 
+0.0.14 publication authorization, 2026-08-28: the owner explicitly authorized
+final commit, default-branch merge, guarded remote push, and a new public
+release. Remote/default-branch/authentication identity and absence of v0.0.14
+are proven. No authorization or remote-divergence blocker remains. The
+save-backed runtime limitation remains documented but is not represented as a
+false automated PASS.
+
 0.0.14 spell-variant mission, 2026-08-28: no source, compile, deterministic
 behavior, deterministic-package, package-allowlist, or deployment-WhatIf
 blocker. Save-backed UI,

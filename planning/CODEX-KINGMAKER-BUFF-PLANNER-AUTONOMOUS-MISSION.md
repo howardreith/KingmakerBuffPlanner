@@ -1,5 +1,19 @@
 # CODEX AUTONOMOUS MISSION
 
+## 2026-08-28 0.0.14 publication authorization checkpoint
+
+The owner explicitly authorized final commit, merge to the repository's actual
+default branch, remote push, and a new release. Read-only network preflight
+proves public `howardreith/KingmakerBuffPlanner`, default branch `main`, active
+authenticated owner `howardreith`, synchronized local/remote main at
+`8460ae08157af40cd69b8f0a11259364ceceb885`, and no existing `v0.0.14` tag or
+release. Feature HEAD before this record is
+`d7b88b83953ac31e7af5eb4a803c6551ce601cab` and remains fully qualified. Exact
+next action is authorization commit, non-rewriting main merge, merge-commit
+qualification, guarded push/publication, independent verification, and final
+publication record. Missing save-backed runtime evidence remains honestly
+documented and is not upgraded to PASS by publication authorization.
+
 ## 2026-08-28 complete spell names/selectable variants checkpoint
 
 Mission branch `codex/buff-spell-variants-ui` started from clean trusted `main`
