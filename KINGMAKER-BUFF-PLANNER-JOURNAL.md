@@ -4,7 +4,7 @@
 
 Status: LOCAL RELEASE PASS; PUBLICATION/INSTALL/IN-GAME CLAIM NOT PERFORMED
 
-- Local commits are `932da35de573aec46d72adc03848ec417a09c4ff`
+- Local commits are `932da35cb6633031d4077e43df65ab659bc9bd84`
   (`feat: add concrete selectable spell variants`) and
   `a78869c329e39734cd77f4b587d3d97b05fede70`
   (`chore: prepare 0.0.14 local release source`). Release source was clean.

@@ -18,7 +18,7 @@
 - Current gates: source 34/34, protocol/domain 112/112, runtime filesystem 8/8,
   package 4/4, deployment WhatIf 5/5, aggregate 1/1, and deterministic release
   2/2. Feature/release-source commits are
-  `932da35de573aec46d72adc03848ec417a09c4ff` and
+  `932da35cb6633031d4077e43df65ab659bc9bd84` and
   `a78869c329e39734cd77f4b587d3d97b05fede70`.
 - Local-only ZIP/DLL/MVID are
   `182a597b899875851bd4f6e125a7222018a86bdf7688d455bcf750a512f4e5cd` /

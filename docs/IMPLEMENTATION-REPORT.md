@@ -41,7 +41,7 @@ non-variant behavior, icon fallback, and non-English formatting. Current
 engineering gates are source `34/34`, protocol/domain `112/112`, runtime
 filesystem `8/8`, package fixture `4/4`, deployment WhatIf `5/5`, aggregate
 `1/1`, and Release build `1/1`. Feature checkpoint is
-`932da35de573aec46d72adc03848ec417a09c4ff`; clean release-source checkpoint is
+`932da35cb6633031d4077e43df65ab659bc9bd84`; clean release-source checkpoint is
 `a78869c329e39734cd77f4b587d3d97b05fede70`. Two clean-head builds reproduced
 the exact DLL and ZIP. The local-only release ZIP SHA-256 is
 `182a597b899875851bd4f6e125a7222018a86bdf7688d455bcf750a512f4e5cd`;
