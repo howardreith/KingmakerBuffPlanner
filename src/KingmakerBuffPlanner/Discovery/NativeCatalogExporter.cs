@@ -76,9 +76,12 @@ namespace KingmakerBuffPlanner.Discovery
                         CanTargetEnemies = ability.CanTargetEnemies,
                         CanTargetPoint = ability.CanTargetPoint,
                         IsStickyTouch = ability.StickyTouch != null,
-                        IsMass = effects.Any(e => e.Target == EffectTarget.Party.ToString()),
+                        IsMass = effects.Any(e => e.Target == EffectTarget.Party.ToString() ||
+                            e.Target == EffectTarget.AlliedAreaRecipients.ToString()),
                         IsArea = effects.Any(e => e.Kind == EffectKind.AreaBuff.ToString() ||
-                            e.Target == EffectTarget.AreaRecipients.ToString()),
+                            e.Target == EffectTarget.AlliedAreaRecipients.ToString() ||
+                            e.Target == EffectTarget.EnemyAreaRecipients.ToString() ||
+                            e.Target == EffectTarget.AmbiguousAreaRecipients.ToString()),
                         AccessibilitySources = accessibilitySources,
                         SpellLists = spellLists,
                         ResourceIds = (ability.GetResourceIds() ?? new string[0])
@@ -111,16 +114,28 @@ namespace KingmakerBuffPlanner.Discovery
                             EffectOnAlly = entry.EffectOnAlly,
                             EffectOnEnemy = entry.EffectOnEnemy,
                             Range = entry.Range,
+                            AbilityComponentTypes = entry.AbilityComponentTypes,
                             Effects = effects.Select(e => new NativeCandidateEffectFacts
                             {
                                 Kind = e.Kind,
                                 Target = e.Target,
                                 Harmful = e.Harmful,
+                                IsHiddenInUi = e.IsHiddenInUi,
+                                IsClassFeature = e.IsClassFeature,
+                                ComponentTypes = e.ComponentTypes,
                                 SourceContract = e.SourceContract,
                                 ActionPath = e.ActionPath
                             }).ToArray(),
                             DiagnosticContracts = scan.Diagnostics.Select(d =>
-                                d.NodeIdentity + "|" + d.Detail).ToArray()
+                                d.NodeIdentity + "|" + d.Detail).ToArray(),
+                            Diagnostics = scan.Diagnostics.Select(d =>
+                                new NativeCandidateDiagnosticFacts
+                                {
+                                    Code = d.Code,
+                                    Contract = d.NodeIdentity,
+                                    Detail = d.Detail,
+                                    ActionPath = d.ActionPath
+                                }).ToArray()
                         });
                     entry.Disposition = decision.Disposition;
                     entry.SupportClass = decision.SupportClass;

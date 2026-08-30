@@ -541,7 +541,9 @@ namespace KingmakerBuffPlanner.UI
         private readonly Text _name;
         private readonly Text _meta;
         private readonly Text _description;
-        private readonly Text _caster;
+        private readonly Button _casterPolicy;
+        private readonly Text _casterPolicyLabel;
+        private readonly PlannerHoverTooltip _casterPolicyTooltip;
         private readonly Text _targetsLabel;
         private readonly Text _plan;
         private readonly PlannerTargetStripView _targets;
@@ -552,7 +554,8 @@ namespace KingmakerBuffPlanner.UI
         private readonly PlannerHoverTooltip _enhancementTooltip;
 
         internal PlannerSelectedBuffView(RectTransform parent, PlannerUiTheme theme,
-            Action selectAll, Action clear, Action openEnhancements, Action<string> showTooltip)
+            Action selectAll, Action clear, Action openCasters,
+            Action openEnhancements, Action<string> showTooltip)
         {
             _theme = theme;
             Root = KingmakerUiFactory.CreateRect("SelectedBuff", parent);
@@ -586,13 +589,19 @@ namespace KingmakerBuffPlanner.UI
                 string.Empty, 14, TextAnchor.UpperLeft);
             _description.verticalOverflow = VerticalWrapMode.Truncate;
             KingmakerUiFactory.SetAnchors(_description.rectTransform, 0.105f, 0.39f, 0.42f, 0.59f);
-            _caster = KingmakerUiFactory.CreateText("SelectedCaster", Root, theme,
-                "Caster: None", 14, TextAnchor.MiddleLeft);
-            _caster.fontStyle = FontStyle.Bold;
-            _caster.color = theme.BurgundyPrimary;
-            _caster.horizontalOverflow = HorizontalWrapMode.Wrap;
-            _caster.verticalOverflow = VerticalWrapMode.Overflow;
-            KingmakerUiFactory.SetAnchors(_caster.rectTransform, 0.105f, 0.20f, 0.42f, 0.39f);
+            _casterPolicy = KingmakerUiFactory.CreateButton(
+                "ChooseCasters", Root, theme, "Casters: Automatic",
+                () => openCasters());
+            KingmakerUiFactory.SetAnchors((RectTransform)_casterPolicy.transform,
+                0.105f, 0.20f, 0.42f, 0.39f);
+            _casterPolicyLabel = KingmakerUiFactory.SetButtonLabel(
+                _casterPolicy, "Casters: Automatic");
+            _casterPolicyLabel.alignment = TextAnchor.MiddleLeft;
+            _casterPolicyLabel.horizontalOverflow = HorizontalWrapMode.Wrap;
+            _casterPolicyLabel.verticalOverflow = VerticalWrapMode.Overflow;
+            _casterPolicyTooltip =
+                _casterPolicy.gameObject.AddComponent<PlannerHoverTooltip>();
+            _casterPolicyTooltip.Show = showTooltip;
             _enhancement = KingmakerUiFactory.CreateButton("ChooseEnhancement", Root, theme,
                 "Enhancement: None available", () => openEnhancements());
             KingmakerUiFactory.SetAnchors((RectTransform)_enhancement.transform,
@@ -647,8 +656,11 @@ namespace KingmakerBuffPlanner.UI
                     " | " + source.DurationText) : string.Empty;
             _description.text = available ? Compact(source.Description, 190) :
                 "Choose a card, then click portraits to edit the active routine.";
-            _caster.text = casting.CasterText + (string.IsNullOrWhiteSpace(casting.CasterDetail)
-                ? string.Empty : "\n" + casting.CasterDetail);
+            KingmakerUiFactory.SetButtonLabel(
+                _casterPolicy, casting.CasterPolicy.Summary);
+            _casterPolicyTooltip.Text = casting.CasterPolicy.Description;
+            _casterPolicy.image.color = casting.CasterPolicy.Warning
+                ? _theme.AmberWarning : _theme.ParchmentRaised;
             _targetsLabel.text = "Targets for " + char.ToUpperInvariant(routineId[0]) +
                 routineId.Substring(1);
             _targets.Bind(targets, portrait, toggle, statusColor);
@@ -656,6 +668,7 @@ namespace KingmakerBuffPlanner.UI
             KingmakerUiFactory.SetButtonLabel(_enhancement, casting.EnhancementLabel);
             _enhancementTooltip.Text = casting.EnhancementDescription ?? string.Empty;
             _enhancement.interactable = available && interactable;
+            _casterPolicy.interactable = available && interactable;
             _selectAll.interactable = available && interactable;
             _clear.interactable = available && interactable && targets.Any(target => target.Wanted);
         }
@@ -777,6 +790,221 @@ namespace KingmakerBuffPlanner.UI
         {
             Root.gameObject.SetActive(false);
             if (_showTooltip != null) _showTooltip(string.Empty);
+        }
+
+        private void ClearRows()
+        {
+            foreach (GameObject row in _rows)
+            {
+                if (row == null) continue;
+                row.SetActive(false);
+                UnityEngine.Object.Destroy(row);
+            }
+            _rows.Clear();
+        }
+    }
+
+    internal sealed class PlannerCasterPolicyChooserView
+    {
+        private readonly PlannerUiTheme _theme;
+        private readonly RectTransform _content;
+        private readonly Action<string, bool> _setEnabled;
+        private readonly Action<string> _moveEarlier;
+        private readonly Action<string> _moveLater;
+        private readonly Action<string, int?> _setMaximum;
+        private readonly Action _reset;
+        private readonly Action<string> _showTooltip;
+        private readonly List<GameObject> _rows = new List<GameObject>();
+        private readonly Text _subtitle;
+        private readonly Button _resetButton;
+
+        internal PlannerCasterPolicyChooserView(
+            RectTransform parent,
+            PlannerUiTheme theme,
+            Action<string, bool> setEnabled,
+            Action<string> moveEarlier,
+            Action<string> moveLater,
+            Action<string, int?> setMaximum,
+            Action reset,
+            Action<string> showTooltip)
+        {
+            _theme = theme;
+            _setEnabled = setEnabled;
+            _moveEarlier = moveEarlier;
+            _moveLater = moveLater;
+            _setMaximum = setMaximum;
+            _reset = reset;
+            _showTooltip = showTooltip;
+            Root = KingmakerUiFactory.CreateRect("CasterPolicyChooser", parent);
+            KingmakerUiFactory.Stretch(Root);
+            Image blocker = Root.gameObject.AddComponent<Image>();
+            blocker.color = new Color(0.035f, 0.025f, 0.02f, 0.72f);
+            blocker.raycastTarget = true;
+            Button outside = Root.gameObject.AddComponent<Button>();
+            outside.onClick.AddListener(Hide);
+
+            RectTransform frame = KingmakerUiFactory.CreateRect(
+                "CasterPolicyChooserFrame", Root);
+            KingmakerUiFactory.SetAnchors(frame, 0.10f, 0.08f, 0.90f, 0.92f);
+            KingmakerUiFactory.AddFramedPanel(frame, theme.ParchmentRaised,
+                theme.BurgundyPrimary, 2f).raycastTarget = true;
+            Text title = KingmakerUiFactory.CreateText(
+                "CasterPolicyChooserTitle", frame, theme,
+                "CASTER POLICY", 24, TextAnchor.MiddleLeft);
+            title.fontStyle = FontStyle.Bold;
+            title.color = theme.BurgundyPrimary;
+            KingmakerUiFactory.SetAnchors(
+                title.rectTransform, 0.035f, 0.89f, 0.48f, 0.97f);
+            _subtitle = KingmakerUiFactory.CreateText(
+                "CasterPolicyChooserSubtitle", frame, theme,
+                "Choose order, enabled casters, and maximum casts per run.",
+                14, TextAnchor.MiddleLeft);
+            _subtitle.color = theme.MutedBrownText;
+            _subtitle.horizontalOverflow = HorizontalWrapMode.Wrap;
+            KingmakerUiFactory.SetAnchors(
+                _subtitle.rectTransform, 0.035f, 0.80f, 0.72f, 0.89f);
+            _resetButton = KingmakerUiFactory.CreateButton(
+                "ResetCasterPolicy", frame, theme,
+                "RESET AUTOMATIC", () => _reset());
+            KingmakerUiFactory.SetAnchors(
+                (RectTransform)_resetButton.transform,
+                0.69f, 0.89f, 0.84f, 0.97f);
+            Button close = KingmakerUiFactory.CreateButton(
+                "CloseCasterPolicyChooser", frame, theme, "CLOSE", Hide);
+            KingmakerUiFactory.SetAnchors(
+                (RectTransform)close.transform,
+                0.85f, 0.89f, 0.965f, 0.97f);
+            ScrollRect scroll = KingmakerUiFactory.CreateScrollView(
+                "CasterPolicyRows", frame, theme, out _content);
+            KingmakerUiFactory.SetAnchors(
+                (RectTransform)scroll.transform,
+                0.035f, 0.055f, 0.965f, 0.79f);
+            PlannerDescriptionEscape escape =
+                Root.gameObject.AddComponent<PlannerDescriptionEscape>();
+            escape.Close = Hide;
+            Root.gameObject.SetActive(false);
+        }
+
+        internal RectTransform Root { get; private set; }
+        internal bool IsOpen { get { return Root.gameObject.activeSelf; } }
+
+        internal void Show(
+            CasterPolicyViewModel model,
+            Func<string, Sprite> portrait,
+            bool interactable)
+        {
+            ClearRows();
+            _subtitle.text = model.Summary +
+                "\nMaximum per run applies only to this buff in one routine execution.";
+            _resetButton.interactable = interactable;
+            foreach (ProviderPolicyRowViewModel provider in model.Providers)
+                BuildRow(provider, portrait == null
+                    ? null : portrait(provider.CasterUnitId), interactable);
+            Root.SetAsLastSibling();
+            Root.gameObject.SetActive(true);
+            KingmakerUiFactory.ForceLayoutAndSnap(Root);
+        }
+
+        internal void Hide()
+        {
+            Root.gameObject.SetActive(false);
+            if (_showTooltip != null) _showTooltip(string.Empty);
+        }
+
+        private void BuildRow(
+            ProviderPolicyRowViewModel model,
+            Sprite portrait,
+            bool interactable)
+        {
+            RectTransform row = KingmakerUiFactory.CreateRect(
+                "Provider." + model.Order, _content);
+            KingmakerUiFactory.AddLayout(
+                row, CastingPanelLayoutContract.MinimumCasterPolicyRowHeight);
+            KingmakerUiFactory.AddFramedPanel(row,
+                model.Enabled ? _theme.ParchmentPanel : _theme.DisabledGray,
+                _theme.MutedBrownText);
+
+            RectTransform portraitFrame =
+                KingmakerUiFactory.CreateRect("Portrait", row);
+            KingmakerUiFactory.SetAnchors(
+                portraitFrame, 0.012f, 0.14f, 0.078f, 0.86f);
+            KingmakerUiFactory.AddFramedPanel(
+                portraitFrame, Color.black, _theme.GoldAccent);
+            RectTransform portraitImage =
+                KingmakerUiFactory.CreateRect("PortraitImage", portraitFrame);
+            KingmakerUiFactory.Stretch(portraitImage, 3, 3, 3, 3);
+            Image image = portraitImage.gameObject.AddComponent<Image>();
+            image.sprite = portrait;
+            image.preserveAspect = true;
+            image.raycastTarget = false;
+            Text identity = KingmakerUiFactory.CreateText(
+                "Identity", row, _theme,
+                model.Order + ". " + model.CasterName +
+                "\n" + model.Source,
+                15, TextAnchor.MiddleLeft);
+            identity.fontStyle = FontStyle.Bold;
+            identity.horizontalOverflow = HorizontalWrapMode.Wrap;
+            KingmakerUiFactory.SetAnchors(
+                identity.rectTransform, 0.09f, 0.47f, 0.47f, 0.91f);
+            Text availability = KingmakerUiFactory.CreateText(
+                "Availability", row, _theme,
+                model.Remaining +
+                (string.IsNullOrWhiteSpace(model.UnavailableReason)
+                    ? string.Empty : " | " + model.UnavailableReason),
+                13, TextAnchor.MiddleLeft);
+            availability.horizontalOverflow = HorizontalWrapMode.Wrap;
+            availability.color = string.IsNullOrWhiteSpace(model.UnavailableReason)
+                ? _theme.MutedBrownText : _theme.AmberWarning;
+            KingmakerUiFactory.SetAnchors(
+                availability.rectTransform, 0.09f, 0.08f, 0.47f, 0.48f);
+
+            Button enabled = KingmakerUiFactory.CreateButton(
+                "Enabled", row, _theme,
+                model.Enabled ? "USE" : "DO NOT USE",
+                () => _setEnabled(model.ProviderKey, !model.Enabled));
+            KingmakerUiFactory.SetAnchors(
+                (RectTransform)enabled.transform,
+                0.49f, 0.22f, 0.62f, 0.78f);
+            enabled.interactable = interactable;
+            Button earlier = KingmakerUiFactory.CreateButton(
+                "Earlier", row, _theme, "EARLIER",
+                () => _moveEarlier(model.ProviderKey));
+            KingmakerUiFactory.SetAnchors(
+                (RectTransform)earlier.transform,
+                0.635f, 0.22f, 0.735f, 0.78f);
+            earlier.interactable = interactable && model.CanMoveEarlier;
+            Button later = KingmakerUiFactory.CreateButton(
+                "Later", row, _theme, "LATER",
+                () => _moveLater(model.ProviderKey));
+            KingmakerUiFactory.SetAnchors(
+                (RectTransform)later.transform,
+                0.745f, 0.22f, 0.835f, 0.78f);
+            later.interactable = interactable && model.CanMoveLater;
+            Button maximum = KingmakerUiFactory.CreateButton(
+                "MaximumPerRun", row, _theme,
+                "MAX/RUN\n" + (model.MaximumCasts == null
+                    ? "Unlimited" : model.MaximumCasts.Value.ToString()),
+                () => _setMaximum(
+                    model.ProviderKey, model.NextMaximumCasts()));
+            KingmakerUiFactory.SetAnchors(
+                (RectTransform)maximum.transform,
+                0.85f, 0.16f, 0.985f, 0.84f);
+            Text maximumLabel =
+                maximum.GetComponentInChildren<Text>(true);
+            if (maximumLabel != null)
+            {
+                maximumLabel.horizontalOverflow = HorizontalWrapMode.Wrap;
+                maximumLabel.resizeTextForBestFit = true;
+                maximumLabel.resizeTextMinSize = 11;
+                maximumLabel.resizeTextMaxSize = 15;
+            }
+            maximum.interactable = interactable;
+            PlannerHoverTooltip tooltip =
+                maximum.gameObject.AddComponent<PlannerHoverTooltip>();
+            tooltip.Text =
+                "Maximum casts from this exact provider in one routine execution.";
+            tooltip.Show = _showTooltip;
+            _rows.Add(row.gameObject);
         }
 
         private void ClearRows()

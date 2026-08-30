@@ -233,7 +233,8 @@ namespace KingmakerBuffPlanner.UI
             EffectExpression expression;
             if (!_effects.TryGetValue(source.SourceId, out expression) ||
                 (!EffectExpressionTargetAnalysis.Contains(expression, EffectTarget.Party) &&
-                 !EffectExpressionTargetAnalysis.Contains(expression, EffectTarget.AreaRecipients))) return false;
+                 !EffectExpressionTargetAnalysis.Contains(
+                     expression, EffectTarget.AlliedAreaRecipients))) return false;
             SourceAssignmentProfile assignment = FindRoutine(routineId).Assignments
                 .FirstOrDefault(item => item.SourceId == source.SourceId);
             return assignment != null && assignment.WantedTargetUnitIds.Count != 0 &&
@@ -383,49 +384,61 @@ namespace KingmakerBuffPlanner.UI
             return Profile.ProviderPreferences.FirstOrDefault(p => p.ProviderKey == providerKey);
         }
 
-        public void CycleProviderPreference(string providerKey)
+        public IReadOnlyList<ProviderSnapshot> GetOrderedProviders(SetupSourceRow source)
         {
-            RequireProvider(providerKey);
-            ProviderPreferenceProfile preference = GetProviderPreference(providerKey);
-            if (preference == null)
-            {
-                Profile.ProviderPreferences.Add(new ProviderPreferenceProfile
+            if (source == null)
+                return new ReadOnlyCollection<ProviderSnapshot>(
+                    new List<ProviderSnapshot>());
+            return new ReadOnlyCollection<ProviderSnapshot>(source.Providers
+                .OrderBy(provider =>
                 {
-                    ProviderKey = providerKey,
-                    Priority = 0,
-                    Banned = false,
-                    MaximumCasts = null
-                });
-            }
-            else if (!preference.Banned)
-            {
-                preference.Banned = true;
-                preference.Priority = null;
-            }
-            else Profile.ProviderPreferences.Remove(preference);
+                    ProviderPreferenceProfile preference =
+                        GetProviderPreference(provider.Key.Canonical);
+                    return preference == null || preference.Priority == null
+                        ? int.MaxValue : preference.Priority.Value;
+                })
+                .ThenBy(provider => provider.Key.Canonical, StringComparer.Ordinal)
+                .ToList());
+        }
+
+        public void SetProviderEnabled(string providerKey, bool enabled)
+        {
+            RequireSelectedProvider(providerKey);
+            ProviderPreferenceProfile preference = GetOrCreateProviderPreference(providerKey);
+            preference.Banned = !enabled;
+            RemoveAutomaticPreference(preference);
             _save(Profile);
         }
 
-        public void AdjustProviderCap(string providerKey, int delta)
+        public void SetProviderMaximumCasts(string providerKey, int? maximumCasts)
         {
-            RequireProvider(providerKey);
-            ProviderPreferenceProfile preference = GetProviderPreference(providerKey);
-            if (preference == null)
-            {
-                preference = new ProviderPreferenceProfile
-                {
-                    ProviderKey = providerKey,
-                    Banned = false,
-                    Priority = null,
-                    MaximumCasts = null
-                };
-                Profile.ProviderPreferences.Add(preference);
-            }
-            int next = (preference.MaximumCasts ?? 0) + delta;
-            preference.MaximumCasts = next <= 0 ? (int?)null : next;
-            if (!preference.Banned && preference.Priority == null && preference.MaximumCasts == null)
-                Profile.ProviderPreferences.Remove(preference);
+            RequireSelectedProvider(providerKey);
+            if (maximumCasts != null && maximumCasts.Value < 1)
+                throw new ArgumentOutOfRangeException("maximumCasts");
+            ProviderPreferenceProfile preference = GetOrCreateProviderPreference(providerKey);
+            preference.MaximumCasts = maximumCasts;
+            RemoveAutomaticPreference(preference);
             _save(Profile);
+        }
+
+        public void MoveProviderEarlier(string providerKey)
+        {
+            MoveProvider(providerKey, -1);
+        }
+
+        public void MoveProviderLater(string providerKey)
+        {
+            MoveProvider(providerKey, 1);
+        }
+
+        public void ResetSelectedSourceProvidersToAutomatic()
+        {
+            SetupSourceRow source = RequireSelected();
+            var keys = new HashSet<string>(source.Providers.Select(
+                provider => provider.Key.Canonical), StringComparer.Ordinal);
+            int removed = Profile.ProviderPreferences.RemoveAll(
+                preference => keys.Contains(preference.ProviderKey));
+            if (removed != 0) _save(Profile);
         }
 
         public void SetScale(float scale)
@@ -507,6 +520,12 @@ namespace KingmakerBuffPlanner.UI
         {
             ProviderPreferenceProfile preference = GetProviderPreference(provider.Key.Canonical);
             if (preference != null && preference.Banned) return "banned by profile";
+            return GetProviderTemporaryUnavailableReason(provider);
+        }
+
+        public string GetProviderTemporaryUnavailableReason(ProviderSnapshot provider)
+        {
+            if (provider == null) throw new ArgumentNullException("provider");
             if (provider.MaterialComponent != null &&
                 provider.MaterialComponent.AvailableCount < provider.MaterialComponent.RequiredCount)
                 return "missing material component";
@@ -516,6 +535,45 @@ namespace KingmakerBuffPlanner.UI
             if (caster == null || !caster.TargetValidation.Alive || !caster.TargetValidation.Conscious)
                 return "caster unavailable";
             return string.Empty;
+        }
+
+        private void MoveProvider(string providerKey, int delta)
+        {
+            SetupSourceRow source = RequireSelectedProvider(providerKey);
+            List<ProviderSnapshot> ordered = GetOrderedProviders(source).ToList();
+            int current = ordered.FindIndex(provider =>
+                provider.Key.Canonical == providerKey);
+            int next = Math.Max(0, Math.Min(ordered.Count - 1, current + delta));
+            if (current < 0 || next == current) return;
+            ProviderSnapshot moved = ordered[current];
+            ordered.RemoveAt(current);
+            ordered.Insert(next, moved);
+            for (int index = 0; index < ordered.Count; index++)
+                GetOrCreateProviderPreference(
+                    ordered[index].Key.Canonical).Priority = index;
+            _save(Profile);
+        }
+
+        private ProviderPreferenceProfile GetOrCreateProviderPreference(string providerKey)
+        {
+            ProviderPreferenceProfile preference = GetProviderPreference(providerKey);
+            if (preference != null) return preference;
+            preference = new ProviderPreferenceProfile
+            {
+                ProviderKey = providerKey,
+                Banned = false,
+                Priority = null,
+                MaximumCasts = null
+            };
+            Profile.ProviderPreferences.Add(preference);
+            return preference;
+        }
+
+        private void RemoveAutomaticPreference(ProviderPreferenceProfile preference)
+        {
+            if (preference != null && !preference.Banned &&
+                preference.Priority == null && preference.MaximumCasts == null)
+                Profile.ProviderPreferences.Remove(preference);
         }
 
         public bool IsSourceAvailable(SetupSourceRow source)
@@ -669,9 +727,9 @@ namespace KingmakerBuffPlanner.UI
                     !supported.Contains(value.SourceId)))
                 {
                     AbilityKey persisted = assignment.Ability.ToKey();
-                    if (!string.IsNullOrWhiteSpace(persisted.VariantGuid)) continue;
                     List<SetupSourceRow> candidates = VariantCandidates(persisted);
-                    if (candidates.Count < 2) continue;
+                    if (string.IsNullOrWhiteSpace(persisted.VariantGuid) &&
+                        candidates.Count < 2) continue;
                     string name = candidates.Select(value => value.SourceDisplayName)
                         .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ??
                         persisted.BaseAbilityGuid;
@@ -697,10 +755,12 @@ namespace KingmakerBuffPlanner.UI
                 .ThenBy(source => source.SourceId, StringComparer.Ordinal).ToList();
         }
 
-        private void RequireProvider(string providerKey)
+        private SetupSourceRow RequireSelectedProvider(string providerKey)
         {
-            if (!Snapshot.Providers.Any(p => p.Key.Canonical == providerKey))
+            SetupSourceRow source = RequireSelected();
+            if (!source.Providers.Any(p => p.Key.Canonical == providerKey))
                 throw new ArgumentException("Unknown provider.", "providerKey");
+            return source;
         }
     }
 }

@@ -19,7 +19,9 @@ namespace KingmakerBuffPlanner.Domain.Effects
         Caster,
         Pet,
         Party,
-        AreaRecipients
+        AlliedAreaRecipients,
+        EnemyAreaRecipients,
+        AmbiguousAreaRecipients
     }
 
     public abstract class EffectExpression

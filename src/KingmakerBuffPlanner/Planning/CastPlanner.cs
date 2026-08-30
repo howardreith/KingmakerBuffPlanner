@@ -146,6 +146,8 @@ namespace KingmakerBuffPlanner.Planning
                         request.Source.SourceId + ":" + failure));
                     diagnostics.Add("unfulfilled:" + request.Source.SourceId + ":" +
                         targetId + ":" + failure);
+                    diagnostics.Add(ProviderSelectionFailure(request.Source.SourceId,
+                        options, policy, castsByProvider));
                     remaining.Remove(targetId);
                     continue;
                 }
@@ -194,6 +196,8 @@ namespace KingmakerBuffPlanner.Planning
                         (request.EnhancementIds.Count == 0 ? "provider-or-resource:" :
                             "requested-enhancement-unavailable:") +
                         string.Join(",", remaining.ToArray()));
+                    diagnostics.Add(ProviderSelectionFailure(request.Source.SourceId,
+                        options, policy, castsByProvider));
                     break;
                 }
                 string[] covered = remaining.Where(id => selection.Option.ReachableTargetIds.Contains(id))
@@ -308,7 +312,8 @@ namespace KingmakerBuffPlanner.Planning
             ProviderPlanningOption option, IEnumerable<string> directTargets)
         {
             bool expands = EffectExpressionTargetAnalysis.Contains(effects, EffectTarget.Party) ||
-                EffectExpressionTargetAnalysis.Contains(effects, EffectTarget.AreaRecipients);
+                EffectExpressionTargetAnalysis.Contains(
+                    effects, EffectTarget.AlliedAreaRecipients);
             return (expands ? option.ReachableTargetIds : directTargets)
                 .Where(id => !string.IsNullOrWhiteSpace(id)).Distinct(StringComparer.Ordinal)
                 .OrderBy(id => id, StringComparer.Ordinal).ToArray();
@@ -343,6 +348,30 @@ namespace KingmakerBuffPlanner.Planning
             int used;
             castsByProvider.TryGetValue(providerKey, out used);
             return used < maximum;
+        }
+
+        private static string ProviderSelectionFailure(
+            string sourceId,
+            IEnumerable<ProviderPlanningOption> sourceOptions,
+            ProviderSelectionPolicy policy,
+            Dictionary<string, int> castsByProvider)
+        {
+            List<ProviderPlanningOption> providers = sourceOptions.ToList();
+            int banned = providers.Count(option =>
+                policy.BannedProviderKeys.Contains(option.Provider.Key.Canonical));
+            int capped = providers.Count(option =>
+                !policy.BannedProviderKeys.Contains(option.Provider.Key.Canonical) &&
+                !IsUnderCap(option.Provider.Key.Canonical, policy, castsByProvider));
+            int policyEligible = providers.Count - banned - capped;
+            string reason = providers.Count == 0
+                ? "no-current-provider"
+                : policyEligible == 0
+                    ? "provider-policy-refusal"
+                    : "temporary-resource-or-target-unavailable";
+            return "provider-selection-refused:source=" + sourceId +
+                ";reason=" + reason + ";providers=" + providers.Count +
+                ";banned=" + banned + ";at-cap=" + capped +
+                ";policy-eligible=" + policyEligible;
         }
 
         private static int ResourceRank(ResourcePoolKind kind)

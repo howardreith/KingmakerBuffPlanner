@@ -40,6 +40,7 @@ namespace KingmakerBuffPlanner.UI
         private BuffGridView _grid;
         private PlannerSelectedBuffView _selected;
         private PlannerEnhancementChooserView _enhancementChooser;
+        private PlannerCasterPolicyChooserView _casterPolicyChooser;
         private PlannerSettingsView _settings;
         private PlannerDescriptionModal _description;
         private Button _executeButton;
@@ -223,11 +224,32 @@ namespace KingmakerBuffPlanner.UI
             PlannerSetupModel model = _session.Model;
             SetupSourceRow source = model == null ? null : model.SelectedSource;
             if (source == null) return;
+            _casterPolicyChooser.Hide();
             RoutinePlanResult preview = null;
             try { preview = _session.PreviewRoutine(ActiveRoutineId); }
             catch { preview = null; }
             _enhancementChooser.Show(SelectedCastingViewModel.Create(source, model,
                 ActiveRoutineId, preview));
+        }
+
+        private void OpenCasterPolicyChooser()
+        {
+            PlannerSetupModel model = _session.Model;
+            SetupSourceRow source = model == null ? null : model.SelectedSource;
+            if (source == null) return;
+            _enhancementChooser.Hide();
+            RoutinePlanResult preview = null;
+            try { preview = _session.PreviewRoutine(ActiveRoutineId); }
+            catch { preview = null; }
+            _casterPolicyChooser.Show(CasterPolicyViewModel.Create(
+                source, model, ActiveRoutineId, preview),
+                ResolvePortrait, !_session.IsExecuting);
+        }
+
+        private void RefreshCasterPolicyChooser()
+        {
+            RefreshAll(true);
+            OpenCasterPolicyChooser();
         }
 
         private void RecordEnhancementRenderEvidence()
@@ -422,6 +444,7 @@ namespace KingmakerBuffPlanner.UI
             _grid = new BuffGridView(frame, _theme, ResolveAbilityIcon, sourceId =>
             {
                 _enhancementChooser.Hide();
+                _casterPolicyChooser.Hide();
                 _session.Model.SelectSource(sourceId);
                 RefreshCatalog(true);
             }, OpenDescription, StatusColor);
@@ -437,7 +460,7 @@ namespace KingmakerBuffPlanner.UI
             {
                 _session.Model.SetAllValidTargets(ActiveRoutineId, false);
                 RefreshAll(true);
-            }, OpenEnhancementChooser, ShowTooltip);
+            }, OpenCasterPolicyChooser, OpenEnhancementChooser, ShowTooltip);
             _enhancementChooser = new PlannerEnhancementChooserView(_root, _theme,
                 enhancementId =>
                 {
@@ -445,6 +468,35 @@ namespace KingmakerBuffPlanner.UI
                     _enhancementChooser.Hide();
                     RefreshAll(true);
                 }, ShowTooltip);
+            _casterPolicyChooser = new PlannerCasterPolicyChooserView(
+                _root, _theme,
+                (providerKey, enabled) =>
+                {
+                    _session.Model.SetProviderEnabled(providerKey, enabled);
+                    RefreshCasterPolicyChooser();
+                },
+                providerKey =>
+                {
+                    _session.Model.MoveProviderEarlier(providerKey);
+                    RefreshCasterPolicyChooser();
+                },
+                providerKey =>
+                {
+                    _session.Model.MoveProviderLater(providerKey);
+                    RefreshCasterPolicyChooser();
+                },
+                (providerKey, maximum) =>
+                {
+                    _session.Model.SetProviderMaximumCasts(
+                        providerKey, maximum);
+                    RefreshCasterPolicyChooser();
+                },
+                () =>
+                {
+                    _session.Model.ResetSelectedSourceProvidersToAutomatic();
+                    RefreshCasterPolicyChooser();
+                },
+                ShowTooltip);
             BuildFooter(frame);
             _settings = new PlannerSettingsView(frame, _theme, () =>
             {

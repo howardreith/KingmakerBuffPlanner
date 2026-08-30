@@ -7,16 +7,19 @@ namespace KingmakerBuffPlanner.Discovery
 {
     public sealed class DiscoveryDiagnostic
     {
-        public DiscoveryDiagnostic(string code, string nodeIdentity, string detail)
+        public DiscoveryDiagnostic(
+            string code, string nodeIdentity, string detail, string actionPath = "")
         {
             Code = code ?? string.Empty;
             NodeIdentity = nodeIdentity ?? string.Empty;
             Detail = detail ?? string.Empty;
+            ActionPath = actionPath ?? string.Empty;
         }
 
         [JsonProperty("code", Order = 1)] public string Code { get; private set; }
         [JsonProperty("nodeIdentity", Order = 2)] public string NodeIdentity { get; private set; }
         [JsonProperty("detail", Order = 3)] public string Detail { get; private set; }
+        [JsonProperty("actionPath", Order = 4)] public string ActionPath { get; private set; }
     }
 
     public sealed class DiscoveryScanResult
@@ -62,12 +65,14 @@ namespace KingmakerBuffPlanner.Discovery
             if (node == null) return new EmptyEffectExpression();
             if (depth > _maximumDepth)
             {
-                diagnostics.Add(new DiscoveryDiagnostic("maximum-depth", node.Identity, depth.ToString()));
+                diagnostics.Add(new DiscoveryDiagnostic(
+                    "maximum-depth", node.Identity, depth.ToString(), path));
                 return new EmptyEffectExpression();
             }
             if (!active.Add(node))
             {
-                diagnostics.Add(new DiscoveryDiagnostic("cycle", node.Identity, "Active traversal cycle detected."));
+                diagnostics.Add(new DiscoveryDiagnostic(
+                    "cycle", node.Identity, "Active traversal cycle detected.", path));
                 return new EmptyEffectExpression();
             }
             try
@@ -83,6 +88,10 @@ namespace KingmakerBuffPlanner.Discovery
                             targetOverride ?? node.Target,
                             node.SourceContract,
                             path);
+                    case DiscoveryNodeKind.OffensiveAction:
+                        diagnostics.Add(new DiscoveryDiagnostic(
+                            "offensive-action", node.Identity, node.SourceContract, path));
+                        return new EmptyEffectExpression();
                     case DiscoveryNodeKind.Sequence:
                         return VisitSequence(node, depth, active, diagnostics, targetOverride, path);
                     case DiscoveryNodeKind.Conditional:
@@ -99,7 +108,8 @@ namespace KingmakerBuffPlanner.Discovery
                             node.ReferencedAbilityId,
                             VisitSequence(node, depth, active, diagnostics, targetOverride, path));
                     default:
-                        diagnostics.Add(new DiscoveryDiagnostic("unknown-node", node.Identity, node.SourceContract));
+                        diagnostics.Add(new DiscoveryDiagnostic(
+                            "unknown-node", node.Identity, node.SourceContract, path));
                         return new EmptyEffectExpression();
                 }
             }

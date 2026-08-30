@@ -115,13 +115,31 @@ $contracts = [ordered]@{
     'Kingmaker.UnitLogic.Abilities.AbilityData' = @(
         '.ctor', 'get_Variants', 'InitVariants', 'get_Spellbook', 'get_Name',
         'get_Icon', 'get_Description', 'get_SpellLevel', 'get_ConvertedFrom',
-        'get_IsAvailableForCast',
+        'get_IsAvailableForCast', 'IsVisible',
         'GetAvailableForCastCount', 'HasVariant', 'Spend', 'SpendFromSpellbook')
     'Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility' = @(
         'get_Variants', 'get_HasVariants', 'HasVariant')
     'Kingmaker.UnitLogic.Abilities.Components.AbilityVariants' = @('Validate')
     'Kingmaker.UnitLogic.Abilities.Components.AbilityTargetsAround' = @(
         'get_Targets', 'get_TargetType', 'get_AoERadius', 'Select')
+    'Kingmaker.UnitLogic.Abilities.Components.AreaEffects.AbilityAreaEffectBuff' = @(
+        'OnUnitEnter', 'OnUnitExit')
+    'Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbilityAreaEffect' = @()
+    'Kingmaker.UnitLogic.Mechanics.Conditions.ContextConditionIsAlly' = @(
+        'CheckCondition')
+    'Kingmaker.UnitLogic.Mechanics.Conditions.ContextConditionIsEnemy' = @(
+        'CheckCondition')
+    'Kingmaker.UnitLogic.Mechanics.Actions.ContextActionDealDamage' = @(
+        'RunAction')
+    'Kingmaker.UnitLogic.Abilities.Components.AbilityDeliverProjectile' = @()
+    'Kingmaker.UnitLogic.Abilities.Components.AbilityDeliverAttackWithWeapon' = @()
+    'Kingmaker.UI.UnitSettings.MechanicActionBarSlotAbility' = @(
+        'get_IsVariantAbility', 'GetConvertedAbilityData',
+        '<GetConvertedAbilityData>b__21_0', 'OnClick')
+    'Kingmaker.UI.UnitSettings.MechanicActionBarSlotAbility+<>c' = @(
+        '<GetConvertedAbilityData>b__21_1')
+    'Kingmaker.UI.ActionBar.ActionBarGroupSlot' = @(
+        'SetToggleAdditionalSpells', 'OnClick')
     'Kingmaker.UnitLogic.Spellbook' = @(
         'CanSpend', 'GetAvailableForCastSpellCount', 'Spend')
     'Kingmaker.UnitLogic.SpellSlot' = @('Spend')
@@ -138,6 +156,13 @@ try {
     $flags = [Reflection.BindingFlags]'Public,NonPublic,Instance,Static,DeclaredOnly'
     Write-Output ('Assembly-CSharp SHA-256: ' + (Get-KbpSha256 $assemblyPath))
     Write-Output ('Assembly-CSharp MVID: ' + $assembly.ManifestModule.ModuleVersionId)
+    $targetType = $assembly.GetType(
+        'Kingmaker.UnitLogic.Abilities.Components.TargetType', $true)
+    $targetValues = @($targetType.GetFields($flags) |
+        Where-Object IsLiteral |
+        Sort-Object { [int]$_.GetRawConstantValue() } |
+        ForEach-Object { $_.Name + '=' + $_.GetRawConstantValue() })
+    Write-Output ('TargetType values: ' + ($targetValues -join ', '))
     foreach ($entry in $contracts.GetEnumerator()) {
         if ([string]$entry.Key -notmatch $TypePattern) { continue }
         $type = $assembly.GetType([string]$entry.Key, $true)
@@ -145,7 +170,11 @@ try {
             Write-Output ''
             Write-Output ('=== ' + $entry.Key + ' members ===')
             foreach ($field in @($type.GetFields($flags) | Sort-Object Name)) {
-                Write-Output ('field ' + $field.FieldType.FullName + ' ' + $field.Name)
+                $constant = if ($field.IsLiteral) {
+                    ' = ' + $field.GetRawConstantValue()
+                } else { '' }
+                Write-Output ('field ' + $field.FieldType.FullName + ' ' +
+                    $field.Name + $constant)
             }
             foreach ($property in @($type.GetProperties($flags) | Sort-Object Name)) {
                 Write-Output ('property ' + $property.PropertyType.FullName + ' ' + $property.Name)

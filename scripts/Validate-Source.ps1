@@ -113,6 +113,21 @@ if ($hudSource -match 'Instantiate\s*\(\s*template\.gameObject' -or
 }
 $assertions++
 
+if ($hudSource.Contains('"Feedback"') -or
+    $hudSource.Contains('_feedback') -or
+    $hudSource.Contains('void Present(QuickExecutionResult') -or
+    $uiRootSource.Contains('_hud.Present(result)') -or
+    -not $uiRootSource.Contains('_screen.Present(result)') -or
+    -not $uiRootSource.Contains('Routine UI result:')) {
+    throw 'Quick results must remain in the planner footer and UMM log, never a floating HUD object.'
+}
+$nativeLogCalls = @($identityFiles | Select-String -Pattern `
+    'MessageLogThread|AddMessage\(|CombatLog|EventLog')
+if ($nativeLogCalls.Count -ne 0) {
+    throw 'Production source must not route quick results to a native common/combat/event log.'
+}
+$assertions++
+
 $hudLifecycleSource = Get-Content -LiteralPath (Join-Path $root `
     'src\KingmakerBuffPlanner\UI\BuffPlannerUiContracts.cs') -Raw
 foreach ($lifecycleStateContract in @('HudInstallAttemptResult', 'HudCandidateTickResult',
@@ -204,6 +219,55 @@ foreach ($hotkeyContract in @('KeyboardAccess', 'InputMatched',
 }
 if ($hotkeySource.Contains('KeyCode.F10') -or $mainSource.Contains('KeyCode.F10')) {
     throw 'F10 must not remain as an active planner hotkey.'
+}
+$assertions++
+
+$setupModelSource = Get-Content -LiteralPath (Join-Path $root `
+    'src\KingmakerBuffPlanner\UI\PlannerSetupModel.cs') -Raw
+$presentationSource = Get-Content -LiteralPath (Join-Path $root `
+    'src\KingmakerBuffPlanner\UI\PlannerPresentationModels.cs') -Raw
+foreach ($casterPolicyContract in @('SetProviderEnabled', 'SetProviderMaximumCasts',
+        'MoveProviderEarlier', 'MoveProviderLater',
+        'ResetSelectedSourceProvidersToAutomatic', 'CASTER POLICY',
+        'MAX/RUN', 'DO NOT USE', 'Planned casters:')) {
+    if (-not ($setupModelSource.Contains($casterPolicyContract) -or
+        $presentationSource.Contains($casterPolicyContract) -or
+        $viewSource.Contains($casterPolicyContract))) {
+        throw "Explicit per-buff caster-policy contract is missing: $casterPolicyContract"
+    }
+}
+$assertions++
+
+$plannerSource = Get-Content -LiteralPath (Join-Path $root `
+    'src\KingmakerBuffPlanner\Planning\CastPlanner.cs') -Raw
+$sessionSource = Get-Content -LiteralPath (Join-Path $root `
+    'src\KingmakerBuffPlanner\UI\PlannerUiSession.cs') -Raw
+if (-not $plannerSource.Contains('provider-policy-refusal') -or
+    -not $sessionSource.Contains('[KBP-PLAN-DIAGNOSTIC]')) {
+    throw 'Provider-policy refusals are not retained in structured UMM diagnostics.'
+}
+$assertions++
+
+$variantSource = Get-Content -LiteralPath (Join-Path $root `
+    'src\KingmakerBuffPlanner\GameAdapters\KingmakerAbilityVariants.cs') -Raw
+$actionSource = Get-Content -LiteralPath (Join-Path $root `
+    'src\KingmakerBuffPlanner\GameAdapters\KingmakerActionGraphAdapter.cs') -Raw
+$classifierSource = Get-Content -LiteralPath (Join-Path $root `
+    'src\KingmakerBuffPlanner\Discovery\NativeCandidateClassifier.cs') -Raw
+foreach ($variantContract in @('.IsVisible()', 'directly-owned-concrete-source',
+        'native-selectable-child', 'variant-not-granted',
+        'variant-native-validation-failed', 'variant-contract-unavailable')) {
+    if (-not $variantSource.Contains($variantContract)) {
+        throw "Native variant ownership contract is missing: $variantContract"
+    }
+}
+if ($variantSource.Contains('.IsAvailableForCast') -or
+    -not $actionSource.Contains('AlliedAreaRecipients') -or
+    -not $actionSource.Contains('EnemyAreaRecipients') -or
+    -not $actionSource.Contains('AmbiguousAreaRecipients') -or
+    -not $classifierSource.Contains('offensive-carrier-only') -or
+    -not $classifierSource.Contains('hidden-marker-only')) {
+    throw 'Variant ownership must ignore transient cast availability and discovery must preserve recipient/offensive semantics.'
 }
 $assertions++
 

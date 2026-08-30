@@ -48,10 +48,28 @@ namespace KingmakerBuffPlanner.GameAdapters
         }
     }
 
+    internal sealed class KingmakerVariantEligibilityTrace
+    {
+        internal KingmakerVariantEligibilityTrace(
+            string sourceGuid, string childGuid, bool eligible, string reason)
+        {
+            SourceGuid = sourceGuid ?? string.Empty;
+            ChildGuid = childGuid ?? string.Empty;
+            Eligible = eligible;
+            Reason = reason ?? string.Empty;
+        }
+
+        internal string SourceGuid { get; private set; }
+        internal string ChildGuid { get; private set; }
+        internal bool Eligible { get; private set; }
+        internal string Reason { get; private set; }
+    }
+
     internal static class KingmakerAbilityVariants
     {
         internal static IEnumerable<KingmakerAbilitySelection> Expand(
-            IEnumerable<AbilityData> source)
+            IEnumerable<AbilityData> source,
+            Action<KingmakerVariantEligibilityTrace> diagnostic = null)
         {
             foreach (AbilityData data in source ?? new AbilityData[0])
             {
@@ -61,10 +79,24 @@ namespace KingmakerBuffPlanner.GameAdapters
                 if (declared.Length != 0)
                 {
                     var sourceDescriptor = Describe(blueprint, false);
+                    var concreteByGuid = new Dictionary<string, AbilityData>(
+                        StringComparer.Ordinal);
+                    var descriptions = new List<SelectableAbilityBlueprint>();
+                    foreach (BlueprintAbility child in declared.Where(value => value != null))
+                    {
+                        AbilityData concrete;
+                        string reason;
+                        bool eligible = CanSelectConcreteChild(
+                            data, child, out concrete, out reason);
+                        if (diagnostic != null)
+                            diagnostic(new KingmakerVariantEligibilityTrace(
+                                blueprint.AssetGuid, child.AssetGuid, eligible, reason));
+                        descriptions.Add(Describe(child, eligible));
+                        if (eligible) concreteByGuid[child.AssetGuid] = concrete;
+                    }
                     IReadOnlyList<SelectableAbilityEntry> entries =
-                        SelectableAbilityVariantCatalog.Expand(sourceDescriptor,
-                            declared.Where(value => value != null)
-                                .Select(value => Describe(value, true)));
+                        SelectableAbilityVariantCatalog.Expand(
+                            sourceDescriptor, descriptions);
                     var byGuid = declared.Where(value => value != null)
                         .GroupBy(value => value.AssetGuid, StringComparer.Ordinal)
                         .ToDictionary(group => group.Key, group => group.First(),
@@ -73,8 +105,11 @@ namespace KingmakerBuffPlanner.GameAdapters
                     {
                         BlueprintAbility child;
                         if (!byGuid.TryGetValue(entry.Concrete.BlueprintGuid, out child)) continue;
+                        AbilityData concrete;
+                        if (!concreteByGuid.TryGetValue(
+                            entry.Concrete.BlueprintGuid, out concrete)) continue;
                         yield return new KingmakerAbilitySelection(
-                            data, new AbilityData(data, child), blueprint,
+                            data, concrete, blueprint,
                             entry.VariantOrder, true);
                     }
                     continue;
@@ -88,10 +123,52 @@ namespace KingmakerBuffPlanner.GameAdapters
                         value => value != null && value.AssetGuid == blueprint.AssetGuid);
                     yield return new KingmakerAbilitySelection(
                         data, data, parent, Math.Max(0, order), true);
+                    if (diagnostic != null)
+                        diagnostic(new KingmakerVariantEligibilityTrace(
+                            parent.AssetGuid, blueprint.AssetGuid, true,
+                            "directly-owned-concrete-source"));
                     continue;
                 }
 
                 yield return new KingmakerAbilitySelection(data, data, blueprint, 0, false);
+            }
+        }
+
+        private static bool CanSelectConcreteChild(
+            AbilityData source, BlueprintAbility child,
+            out AbilityData concrete, out string reason)
+        {
+            concrete = null;
+            try
+            {
+                concrete = new AbilityData(source, child);
+                if (!concrete.IsVisible())
+                {
+                    concrete = null;
+                    reason = "variant-not-granted";
+                    return false;
+                }
+                reason = "native-selectable-child";
+                return true;
+            }
+            catch (MissingMethodException)
+            {
+                reason = "variant-contract-unavailable";
+                concrete = null;
+                return false;
+            }
+            catch (TypeLoadException)
+            {
+                reason = "variant-contract-unavailable";
+                concrete = null;
+                return false;
+            }
+            catch (Exception exception)
+            {
+                reason = "variant-native-validation-failed:" +
+                    exception.GetType().Name;
+                concrete = null;
+                return false;
             }
         }
 

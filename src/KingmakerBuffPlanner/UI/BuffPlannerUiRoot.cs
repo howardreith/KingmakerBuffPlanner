@@ -829,7 +829,6 @@ namespace KingmakerBuffPlanner.UI
             if (result.RoutineId == "long" && _runtimeFirstLongResult == null)
                 _runtimeFirstLongResult = result;
             _runtimeQuickResults[result.RoutineId] = result;
-            _hud.Present(result);
             _screen.Present(result);
             _log.Info("Routine UI result: " + result.RoutineId + " " +
                 result.Disposition + " " + result.Message);
