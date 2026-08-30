@@ -4,7 +4,9 @@
 
 Implementation checkpoint:
 `ec718fa96ae1cbbb1feeb5b3acd1900e867b699a` on
-`codex/buff-catalog-caster-controls`.
+`codex/buff-catalog-caster-controls`. Final qualified implementation/record
+HEAD is `ce7099b089440e40716cbbd39c4e377c4fbe21c2`; the subsequent handoff
+record commit is documentation-only.
 
 The lower-left result was produced by an owned `Feedback` Text created by
 `BuffPlannerHudButtonController` and fed by
@@ -49,10 +51,10 @@ Regression coverage grew from 112 to 119 protocol/domain tests. Current
 implementation-checkpoint gates are source 38/38, protocol/domain 119/119,
 runtime filesystem 8/8, package fixture 4/4, deployment WhatIf 5/5, aggregate
 1/1, Release build 1/1, deterministic builds 2/2, and release builder 3/3.
-Local-only ZIP/DLL/MVID are
-`665077eb9fbb24077c73bdd726ad114dfa8930ea2cc754bfd860ee101f3a1eab` /
-`ac826993249878188133e90eb12c3171b3aedd01129503d01555576f8d909613` /
-`799ce2f9-6928-4180-88de-860c06bcbc12`.
+Final qualified local-only ZIP/DLL/MVID are
+`239eb9de3657de030c88dabfffeaa3fab344ec01e8d561e6649281d7a9cf0571` /
+`6fe6d6837f5155b5ad1b1cdd1e64d47974cadbab44a824efa42dc0edea48b4d6` /
+`80732098-e9da-45b2-b402-7b4ca6f52752`.
 Full evidence and rejected approaches are in
 `planning/BUFF-CATALOG-CASTER-CONTROLS-EVIDENCE.md`.
 

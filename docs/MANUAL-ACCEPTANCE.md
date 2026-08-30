@@ -7,11 +7,11 @@ Status: REQUIRED FOR IN-GAME CLAIM; NOT RUN. The guarded resolver returned
 authorized `KBP_AUTOMATION_BASELINE` / `KBP_AUTOMATION_WORKING` pair. Never
 substitute an ordinary campaign save.
 
-Exact local implementation checkpoint is
-`ec718fa96ae1cbbb1feeb5b3acd1900e867b699a`. Local-only ZIP/DLL/MVID are
-`665077eb9fbb24077c73bdd726ad114dfa8930ea2cc754bfd860ee101f3a1eab` /
-`ac826993249878188133e90eb12c3171b3aedd01129503d01555576f8d909613` /
-`799ce2f9-6928-4180-88de-860c06bcbc12`.
+Exact qualified implementation/record HEAD is
+`ce7099b089440e40716cbbd39c4e377c4fbe21c2`. Local-only ZIP/DLL/MVID are
+`239eb9de3657de030c88dabfffeaa3fab344ec01e8d561e6649281d7a9cf0571` /
+`6fe6d6837f5155b5ad1b1cdd1e64d47974cadbab44a824efa42dc0edea48b4d6` /
+`80732098-e9da-45b2-b402-7b4ca6f52752`.
 
 1. Load the representative party and run Long when all twelve configured buffs
    are active. Confirm no lower-left floating result, no bottom-right/common/

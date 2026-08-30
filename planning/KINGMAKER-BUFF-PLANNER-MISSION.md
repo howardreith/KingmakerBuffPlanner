@@ -1,5 +1,19 @@
 # CODEX AUTONOMOUS MISSION
 
+## 2026-08-29 final clean-head caster-controls handoff
+
+Qualified implementation/record HEAD is
+`ce7099b089440e40716cbbd39c4e377c4fbe21c2` on
+`codex/buff-catalog-caster-controls`, version 0.0.14. Final inspection/source/
+protocol/filesystem/package/WhatIf/aggregate/build/deterministic/release-builder
+counts are 1/1, 38/38, 119/119, 8/8, 4/4, 5/5, 1/1, 1/1, 2/2, and 3/3.
+Qualified ZIP/DLL/MVID are
+`239eb9de3657de030c88dabfffeaa3fab344ec01e8d561e6649281d7a9cf0571` /
+`6fe6d6837f5155b5ad1b1cdd1e64d47974cadbab44a824efa42dc0edea48b4d6` /
+`80732098-e9da-45b2-b402-7b4ca6f52752`. Runtime remains blocked at exact
+baseline=0/working=0. This following record commit is documentation-only; exact
+next action is the guarded/manual checklist when authorized fixtures exist.
+
 ## 2026-08-29 buff catalog/caster-controls checkpoint
 
 Branch/intake/implementation/version are

@@ -8,6 +8,9 @@ SAVE-BACKED IN-GAME VERIFICATION BLOCKED AND NOT CLAIMED.
 - Branch/implementation checkpoint/version:
   `codex/buff-catalog-caster-controls` /
   `ec718fa96ae1cbbb1feeb5b3acd1900e867b699a` / 0.0.14.
+  Final qualified implementation/record HEAD:
+  `ce7099b089440e40716cbbd39c4e377c4fbe21c2`; subsequent handoff record is
+  documentation-only.
 - `.\scripts\Inspect-KingmakerVariantContracts.ps1`: exit 0. Exact
   `Assembly-CSharp.dll` SHA-256
   `3b6450ffec440e296e586f71c711b195aed144b28d53e1cbb29406d18fef5afb`;
@@ -23,9 +26,9 @@ SAVE-BACKED IN-GAME VERIFICATION BLOCKED AND NOT CLAIMED.
   with package validation 4/4.
 - `git diff --check`: pass.
 - Local-only release ZIP/DLL/MVID:
-  `665077eb9fbb24077c73bdd726ad114dfa8930ea2cc754bfd860ee101f3a1eab` /
-  `ac826993249878188133e90eb12c3171b3aedd01129503d01555576f8d909613` /
-  `799ce2f9-6928-4180-88de-860c06bcbc12`.
+  `239eb9de3657de030c88dabfffeaa3fab344ec01e8d561e6649281d7a9cf0571` /
+  `6fe6d6837f5155b5ad1b1cdd1e64d47974cadbab44a824efa42dc0edea48b4d6` /
+  `80732098-e9da-45b2-b402-7b4ca6f52752`.
 
 The behavioral suite proves HUD callbacks/results and no Feedback/native-log
 route; direct/selectable/rejected/exhausted/stale variant semantics; five-child

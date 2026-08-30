@@ -3,7 +3,9 @@
 ## Buff catalog/caster-controls checkpoint - 2026-08-29
 
 - Active branch is `codex/buff-catalog-caster-controls`; implementation commit
-  is `ec718fa96ae1cbbb1feeb5b3acd1900e867b699a`; version remains 0.0.14.
+  is `ec718fa96ae1cbbb1feeb5b3acd1900e867b699a`; qualified implementation/
+  record HEAD is `ce7099b089440e40716cbbd39c4e377c4fbe21c2`; version remains
+  0.0.14.
 - Implementation is complete for HUD feedback retirement, exact current-caster
   variant selectability, safe persistent-payload classification, allied area
   semantics, and exact-provider caster policy UI/persistence/preview.
@@ -12,16 +14,16 @@
   Release build 1/1; deterministic builds 2/2; release builder 3/3; diff check
   pass.
 - Local-only ZIP/DLL/MVID:
-  `665077eb9fbb24077c73bdd726ad114dfa8930ea2cc754bfd860ee101f3a1eab` /
-  `ac826993249878188133e90eb12c3171b3aedd01129503d01555576f8d909613` /
-  `799ce2f9-6928-4180-88de-860c06bcbc12`.
+  `239eb9de3657de030c88dabfffeaa3fab344ec01e8d561e6649281d7a9cf0571` /
+  `6fe6d6837f5155b5ad1b1cdd1e64d47974cadbab44a824efa42dc0edea48b4d6` /
+  `80732098-e9da-45b2-b402-7b4ca6f52752`.
 - Structured implementation/contract/probe evidence is
   `planning/BUFF-CATALOG-CASTER-CONTROLS-EVIDENCE.md`.
 - Runtime remains honestly blocked at exact guarded inventory
   `baseline=0; working=0`. Nothing was installed, launched, pushed, tagged,
   or published.
-- Exact next action: commit the durable record, repeat final source/build/diff
-  gates at that documentation HEAD, then hand off the bounded manual checklist.
+- Exact next action: use the bounded manual checklist only after an authorized
+  save pair exists. No further safe source/package work remains.
 
 ## 0.0.14 published completion - 2026-08-28
 

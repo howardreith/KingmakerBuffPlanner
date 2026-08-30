@@ -1,5 +1,32 @@
 # Buff Catalog and Caster Controls Evidence
 
+## Final clean-head handoff qualification
+
+The implementation plus durable-record/mirror HEAD qualified for handoff is
+`ce7099b089440e40716cbbd39c4e377c4fbe21c2` on
+`codex/buff-catalog-caster-controls`, version 0.0.14. The final record commit
+that follows this checkpoint is documentation-only.
+
+- Contract inspection: 1/1, exact assembly SHA-256/MVID and TargetType values
+  unchanged.
+- Source-only: source 38/38, protocol/domain 119/119, runtime filesystem 8/8,
+  package 4/4, deployment WhatIf 5/5, aggregate 1/1.
+- Exact `.\scripts\Build.ps1 -Configuration Release`: source 38/38,
+  build 1/1.
+- Clean-head `.\scripts\Build-Release.ps1`: two identical builds (2/2),
+  release builder 3/3, each source 38/38, build 1/1, local package 1/1, package
+  validation 4/4.
+- Final qualified local-only ZIP SHA-256:
+  `239eb9de3657de030c88dabfffeaa3fab344ec01e8d561e6649281d7a9cf0571`.
+- Final qualified DLL SHA-256:
+  `6fe6d6837f5155b5ad1b1cdd1e64d47974cadbab44a824efa42dc0edea48b4d6`;
+  MVID `80732098-e9da-45b2-b402-7b4ca6f52752`.
+- `git diff --check`: pass; worktree clean. The two authoritative mission
+  files are byte-identical at SHA-256
+  `abd96d3bea9f4d0bc7e9b4996e4a83d6dfa852acb989035b32b16404f254106d`.
+- Guarded runtime remains blocked at exactly
+  `Disposable save ambiguity: baseline=0; working=0.`
+
 ## Checkpoint identity
 
 - Mission branch: `codex/buff-catalog-caster-controls`.

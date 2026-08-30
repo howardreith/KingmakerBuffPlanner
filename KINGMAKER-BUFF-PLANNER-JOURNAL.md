@@ -1,5 +1,24 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-08-29 - final clean-head caster-controls handoff
+
+- Qualified implementation/record HEAD:
+  `ce7099b089440e40716cbbd39c4e377c4fbe21c2`; branch/version:
+  `codex/buff-catalog-caster-controls` / 0.0.14. The following checkpoint
+  commit is record-only.
+- Final commands/counts: inspection 1/1; source 38/38; protocol 119/119;
+  filesystem 8/8; package 4/4; deployment WhatIf 5/5; aggregate 1/1; exact
+  Release build 1/1; deterministic equality 2/2; release builder 3/3; diff
+  check pass.
+- Final qualified local ZIP/DLL/MVID:
+  `239eb9de3657de030c88dabfffeaa3fab344ec01e8d561e6649281d7a9cf0571` /
+  `6fe6d6837f5155b5ad1b1cdd1e64d47974cadbab44a824efa42dc0edea48b4d6` /
+  `80732098-e9da-45b2-b402-7b4ca6f52752`.
+- Worktree was clean and mission mirrors were byte-identical. Runtime remains
+  blocked at baseline=0/working=0; no live/remote operation occurred. Exact
+  next action is guarded/manual in-game acceptance when authorized fixtures
+  exist.
+
 ## 2026-08-29 - buff catalog/caster-controls implementation checkpoint
 
 Status: SOURCE/BEHAVIOR/ASSEMBLY/DETERMINISTIC LOCAL PACKAGE PASS; GUARDED
