@@ -1,65 +1,64 @@
-# Kingmaker Buff Planner 0.0.14
+# Kingmaker Buff Planner 0.0.15
 
-Version 0.0.14 keeps complete localized spell names visible and adds
-first-class concrete entries for buff spells whose parent requires a variant
-choice.
+Version 0.0.15 makes quick routines quieter, removes catalog entries the
+current party cannot genuinely use, and adds explicit per-buff caster policy
+controls for splitting a routine across multiple providers.
 
-## Complete names
+## Quieter quick actions
 
-Catalog cards no longer rely on a fixed one-line name region. The planner
-measures wrapped localized text, grows only the affected grid row, and moves the
-availability and configuration text below it. Short names remain compact.
-Selected-detail and description views also render the complete catalog name.
-This keeps distinctions such as Communal, Greater, Mass, and localized or
-mod-added suffixes in the primary UI rather than hiding them behind clipping,
-ellipsis, or a tooltip.
+Long, Important, and Short no longer create the temporary lower-left result
+panel. Quick execution still returns its complete result and writes structured
+diagnostics to the Unity Mod Manager log. When the full planner is open, Apply
+can still show that result in the planner's own footer. Nothing is redirected
+to Kingmaker's common, combat, or event logs.
 
-## Concrete selectable variants
+## Party-owned, beneficial catalog sources
 
-Eligible `AbilityVariants` children are discovered structurally and exposed as
-separate catalog entries. The complete localized parent is combined with the
-localized distinguishing child text through one formatter. Parent search finds
-all siblings, child terms find the requested choice, and siblings stay together
-in the blueprint's declared order. Child icons are preferred with a safe parent
-fallback.
+Declared ability variants now enter the catalog only when the exact owned
+source context establishes that the character can select that child. A child
+that is directly owned remains valid, and an owned source with depleted slots
+or resources remains visible as temporarily unavailable. A stale or unlearned
+child is not recovered from the parent's declaration or replaced with a
+sibling.
 
-The unresolved parent container is not selectable. Each child independently
-must satisfy the planner's existing persistent beneficial-buff rules, so this
-does not indiscriminately import summoning, weapon, transformation, or other
-choice menus.
+Discovery now preserves allied, enemy-only, and ambiguous area recipients as
+well as offensive delivery and action-branch provenance. A planner entry needs
+a persistent beneficial payload that can affect a proven safe player
+recipient. Instant damage, hostile delivery, enemy-only or ambiguous areas,
+instant healing without a persistent effect, and hidden carrier markers that
+only accompany an offensive action no longer qualify. Legitimate hidden
+self-buffs remain supported when their structure proves the hidden effect is
+the actual beneficial payload.
 
-The exact Kingmaker 2.1.7b native catalog contains five supported children for
-both Resist Energy and Resist Energy, Communal, including Sonic. The two
-families retain their separate parent identities and native declared orders.
+## Caster Policy
 
-## Casting, resources, and saved plans
+The selected-buff panel now opens a Caster Policy dialog with one row for each
+exact provider, including distinct spellbooks and source instances. Each row
+shows the caster and source, spell level where relevant, casts remaining or At
+will, and any temporary unavailable reason.
 
-Each entry stores both the parent/source ability GUID and the concrete child
-GUID. The parent establishes spellbook ownership, spell level, prepared token
-or spontaneous pool, metamagic, fact/resource context, and material state. The
-child supplies the exact effect, localized presentation, target rules, and cast
-blueprint.
+For each provider, a routine can explicitly choose Use or Do not use, move the
+provider earlier or later, and set a maximum per run such as Unlimited, 1, or
+2. A provider can be both preferred and capped. Reset Automatic clears only
+the selected buff's provider preferences. Preview allocation updates after
+every change, so configurations such as one cast from Felix followed by the
+remaining casts from Akasa are visible before execution. Disabled providers
+and exhausted combined caps produce unfulfilled casts instead of being
+silently bypassed.
 
-Execution constructs the concrete child through Kingmaker's own
-parent-data/child-blueprint `AbilityData` path. Availability and spending then
-delegate through the parent exactly once; neither executor chooses the first
-variant or falls back to a sibling.
-
-Saved concrete choices round-trip by stable blueprint identifiers. A legacy
-parent-only assignment migrates only if one eligible child is unambiguous.
-Otherwise the planner leaves it unsupported and reports that the complete
-parent requires reselection; it never invents an energy type.
+The policy keeps the existing exact provider identity and schema 4 persistence
+fields. No profile schema migration is required, and stale provider keys remain
+harmless ignored data rather than binding to a different caster or source.
 
 ## Validation boundary
 
-The deterministic suite covers complete-name layout, generic expansion and
-filtering, stable identities, order/deduplication, parent/child search,
-persistence and legacy behavior, parent-backed availability, exact-child
-planning, single resource reservation, ordinary casting, icon fallback, and
-non-English formatting.
+The deterministic suite covers HUD callbacks and diagnostics, variant
+ownership and depletion, exact child execution and single resource spending,
+beneficial/offensive branch classification, provider ordering/bans/caps,
+persistence, preview allocation, and modal layout/input isolation. Exact
+Kingmaker 2.1.7b contracts were inspected from the installed assembly.
 
-Exact assembly IL and blueprint-catalog evidence were inspected locally. No
-save-backed in-game cast or visual qualification is claimed for this build
-because the repository guard found no authorized `KBP_AUTOMATION_BASELINE` or
-`KBP_AUTOMATION_WORKING` save. See `docs/MANUAL-ACCEPTANCE.md` for the bounded
-runtime checklist.
+Save-backed in-game checks could not be run because the repository guard found
+zero exact `KBP_AUTOMATION_BASELINE` and `KBP_AUTOMATION_WORKING` fixtures. No
+ordinary campaign save was substituted. The bounded in-game checklist is in
+`docs/MANUAL-ACCEPTANCE.md`.

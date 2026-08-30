@@ -1,5 +1,53 @@
 # Manual Acceptance
 
+## 0.0.14 buff catalog and caster controls
+
+Status: REQUIRED FOR IN-GAME CLAIM; NOT RUN. The guarded resolver returned
+`Disposable save ambiguity: baseline=0; working=0.` Use only an explicitly
+authorized `KBP_AUTOMATION_BASELINE` / `KBP_AUTOMATION_WORKING` pair. Never
+substitute an ordinary campaign save.
+
+Exact qualified implementation/record HEAD is
+`ce7099b089440e40716cbbd39c4e377c4fbe21c2`. Local-only ZIP/DLL/MVID are
+`239eb9de3657de030c88dabfffeaa3fab344ec01e8d561e6649281d7a9cf0571` /
+`6fe6d6837f5155b5ad1b1cdd1e64d47974cadbab44a824efa42dc0edea48b4d6` /
+`80732098-e9da-45b2-b402-7b4ca6f52752`.
+
+1. Load the representative party and run Long when all twelve configured buffs
+   are active. Confirm no lower-left floating result, no bottom-right/common/
+   combat/event-log message, and a UMM result with `skipped=12` and
+   `unfulfilled=0`. Confirm Setup, Long, Important, Short, hover tooltips, and
+   running-state button disabling still work.
+2. Open the full planner and press APPLY. The planner footer may show the
+   complete result. Close the planner and confirm no floating result remains.
+3. With no investigator and no learned Flying Kick, confirm Effortless Aid and
+   Flying Kick concrete options are absent. Capture the UMM variant-eligibility
+   reasons and exact parent/child keys.
+4. Inspect the catalog. Confirm Alchemist's Fire, Channel Positive Energy -
+   Damage Undead, and its quick/damage sibling are absent while genuine
+   personal, friend, party, pet, communal, worn-item, and substantive hidden
+   buffs remain.
+5. Verify valid Resist Energy choices. Select Fire and prove Fire, not the
+   first sibling, is applied with one slot/resource debit. Verify Communal uses
+   actual allied recipients and one debit. Record parent/child/provider keys,
+   active buff, and before/after resources.
+6. Configure Blur with Felix enabled/first/max 1 and Akasa enabled/second/
+   Unlimited. Select enough targets for multiple casts. Confirm preview shows
+   Felix 1 and Akasa the remainder; execution matches; Felix casts Blur once;
+   and Felix's unrelated level-two Bulls Strength allocation remains governed
+   by its own exact provider/resource state.
+7. Close/reopen, return through the main menu where safe, and reload the
+   campaign. Confirm order, enabled states, and caps persist, including for a
+   temporarily depleted provider that remains visible/configured.
+8. Disable every Blur provider. Confirm the preview marks casts unfulfilled,
+   execution uses none, `[KBP-PLAN-DIAGNOSTIC]` reports
+   `provider-policy-refusal`, and no floating/native-log result appears.
+
+Capture full-resolution screenshots, relevant UMM slices, exact source/provider
+keys, profile JSON before/after reload, active-effect evidence, and resource
+deltas. Restore the working fixture through the guarded transaction and verify
+the immutable baseline hash.
+
 ## 0.0.14 complete names and concrete variants
 
 Status: REQUIRED FOR IN-GAME CLAIM; NOT RUN because the guarded resolver reports

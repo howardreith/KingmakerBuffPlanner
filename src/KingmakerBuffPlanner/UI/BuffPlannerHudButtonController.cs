@@ -30,15 +30,12 @@ namespace KingmakerBuffPlanner.UI
         private RectTransform _nativeCluster;
         private GraphicRaycaster _nativeRaycaster;
         private Sprite _nativeHudButtonSprite;
-        private Text _feedback;
         private Text _tooltip;
-        private RectTransform _feedbackRoot;
         private RectTransform _tooltipRoot;
         private RectTransform _tooltipOwner;
         private Button[] _buttons = new Button[0];
         private Func<string>[] _tooltips = new Func<string>[0];
         private int _listenerCount;
-        private float _feedbackUntil;
         private IngameMenuController _anchorController;
         private DeferredUiReadinessGate _readiness = new DeferredUiReadinessGate(2);
         private readonly HudCandidateValidationGate _candidateValidation =
@@ -293,8 +290,6 @@ namespace KingmakerBuffPlanner.UI
             clusterSurface.raycastTarget = false;
             clusterBacking.SetAsFirstSibling();
             _tooltip = CreateHudMessage("Tooltip", theme, height + 8f, 360f, out _tooltipRoot);
-            _feedback = CreateHudMessage("Feedback", theme, height + 42f, 480f, out _feedbackRoot);
-            _feedback.color = new Color(1f, 0.84f, 0.42f, 1f);
             _buttons = new[]
             {
                 CreatePlannerButton("Setup", "setup", width, height, _openSetup,
@@ -337,22 +332,6 @@ namespace KingmakerBuffPlanner.UI
             _buttons[0].interactable = !_session.IsExecuting;
             for (int index = 1; index < 4; index++)
                 _buttons[index].interactable = !_session.IsExecuting;
-        }
-
-        internal void Present(QuickExecutionResult result)
-        {
-            if (_feedback == null) return;
-            _feedback.text = result == null ? "Buff routine finished." : result.Message;
-            _feedback.transform.parent.gameObject.SetActive(true);
-            Canvas.ForceUpdateCanvases();
-            if (_feedbackRoot != null)
-            {
-                _feedbackRoot.sizeDelta = new Vector2(480f,
-                    Mathf.Clamp(_feedback.preferredHeight + 8f, 30f, 96f));
-                ClampToScreen(_feedbackRoot);
-            }
-            _feedbackUntil = Time.unscaledTime + 8f;
-            RefreshAvailability();
         }
 
         internal HudCandidateTickResult Tick(UISectionHUDController hudHost)
@@ -434,9 +413,6 @@ namespace KingmakerBuffPlanner.UI
                         _root.gameObject.activeInHierarchy + ".");
                 }
             }
-            if (_feedback != null && _feedback.transform.parent.gameObject.activeSelf &&
-                Time.unscaledTime >= _feedbackUntil)
-                _feedback.transform.parent.gameObject.SetActive(false);
             RefreshAvailability();
             return _lastCandidateTickResult;
         }
@@ -481,9 +457,7 @@ namespace KingmakerBuffPlanner.UI
             _installed = false;
             _readiness.Reset();
             _candidateValidation.Reset();
-            _feedback = null;
             _tooltip = null;
-            _feedbackRoot = null;
             _tooltipRoot = null;
             _tooltipOwner = null;
             _buttons = new Button[0];

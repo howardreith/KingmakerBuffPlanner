@@ -1,5 +1,73 @@
 # Qualification
 
+## 0.0.15 publication preflight
+
+Status: OWNER AUTHORIZED; VERSION/NOTES PREPARED; CLEAN-HEAD AND MERGE-COMMIT
+QUALIFICATION PENDING THIS RELEASE CHECKPOINT.
+
+- Feature branch/HEAD before preparation:
+  `codex/buff-catalog-caster-controls` /
+  `ed6108f1549aadf8b570d686e9f97f2aa80940b3`.
+- Public repository/default branch/authenticated account:
+  `howardreith/KingmakerBuffPlanner` / `main` / `howardreith`.
+- Refreshed local and remote `main`:
+  `011a57ff0565b5954745a8b0e742726a74b4315f`; the feature is a direct
+  descendant. No local tag or GitHub release `v0.0.15` exists.
+- The owner authorized final commit, non-rewriting merge, guarded remote push,
+  and a new public release. Product metadata and notes now identify 0.0.15;
+  persistence remains schema 4.
+- Save-backed qualification remains unavailable at exact guarded inventory
+  baseline=0/working=0. Publication will not be reported as in-game proof.
+
+Exact next action: commit this release source; rerun inspection, source,
+protocol/domain, filesystem, package, deployment-WhatIf, Release, deterministic
+release, and diff gates; then repeat the required gates on the exact `main`
+merge before guarded publication.
+
+## 0.0.14 buff catalog/caster-controls maintenance
+
+Status: SOURCE/BEHAVIOR/EXACT-ASSEMBLY/DETERMINISTIC LOCAL PACKAGE PASS;
+SAVE-BACKED IN-GAME VERIFICATION BLOCKED AND NOT CLAIMED.
+
+- Branch/implementation checkpoint/version:
+  `codex/buff-catalog-caster-controls` /
+  `ec718fa96ae1cbbb1feeb5b3acd1900e867b699a` / 0.0.14.
+  Final qualified implementation/record HEAD:
+  `ce7099b089440e40716cbbd39c4e377c4fbe21c2`; subsequent handoff record is
+  documentation-only.
+- `.\scripts\Inspect-KingmakerVariantContracts.ps1`: exit 0. Exact
+  `Assembly-CSharp.dll` SHA-256
+  `3b6450ffec440e296e586f71c711b195aed144b28d53e1cbb29406d18fef5afb`;
+  MVID `07fa1e4d-8618-41b3-9b8d-faa17d3b26f7`. Verified native visibility
+  selection, transient availability, parent-child construction, target
+  disposition, area filter, damage, projectile, and weapon-delivery contracts.
+- `.\scripts\Test-SourceOnly.ps1`: source 38/38, protocol/domain 119/119,
+  runtime-harness filesystem 8/8, package 4/4, deployment WhatIf 5/5,
+  aggregate 1/1.
+- `.\scripts\Build.ps1 -Configuration Release`: source 38/38, build 1/1.
+- `.\scripts\Build-Release.ps1`: deterministic equality 2/2, release
+  builder 3/3; each internal build source 38/38, build 1/1, local package 1/1,
+  with package validation 4/4.
+- `git diff --check`: pass.
+- Local-only release ZIP/DLL/MVID:
+  `239eb9de3657de030c88dabfffeaa3fab344ec01e8d561e6649281d7a9cf0571` /
+  `6fe6d6837f5155b5ad1b1cdd1e64d47974cadbab44a824efa42dc0edea48b4d6` /
+  `80732098-e9da-45b2-b402-7b4ca6f52752`.
+
+The behavioral suite proves HUD callbacks/results and no Feedback/native-log
+route; direct/selectable/rejected/exhausted/stale variant semantics; five-child
+expansion and one parent debit; allied/enemy/ambiguous, offensive-marker,
+legitimate-hidden, conditional, heal, worn-item, and pet classification; and
+automatic/split/banned/capped/ability-scoped/reset/round-trip/stale/exhausted
+provider policy plus layout contracts.
+
+The repository guard was rerun read-only and returned exactly
+`Disposable save ambiguity: baseline=0; working=0.` No Kingmaker process was
+launched and no live Mods staging occurred. The guard read save headers only to
+count exact authorized names; no ordinary save was selected, loaded, mutated,
+or substituted. The checks in `docs/MANUAL-ACCEPTANCE.md` remain required for any
+in-game claim, screenshots, active-effect proof, or resource-debit proof.
+
 ## 0.0.14 published release qualification
 
 Status: MERGED; GUARDED-PUSHED; PUBLISHED; REMOTE/DOWNLOADED ASSETS VERIFIED;

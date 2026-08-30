@@ -37,16 +37,31 @@ namespace KingmakerBuffPlanner.GameAdapters
                 EffectOnAlly = ability.EffectOnAlly.ToString(),
                 EffectOnEnemy = ability.EffectOnEnemy.ToString(),
                 Range = ability.Range.ToString(),
+                AbilityComponentTypes = (ability.ComponentsArray ??
+                    new Kingmaker.Blueprints.BlueprintComponent[0])
+                    .Where(component => component != null)
+                    .Select(component => component.GetType().FullName).ToArray(),
                 Effects = effects.Select(e => new NativeCandidateEffectFacts
                 {
                     Kind = e.Kind,
                     Target = e.Target,
                     Harmful = e.Harmful,
+                    IsHiddenInUi = e.IsHiddenInUi,
+                    IsClassFeature = e.IsClassFeature,
+                    ComponentTypes = e.ComponentTypes,
                     SourceContract = e.SourceContract,
                     ActionPath = e.ActionPath
                 }).ToArray(),
                 DiagnosticContracts = scan.Diagnostics.Select(d =>
-                    d.NodeIdentity + "|" + d.Detail).ToArray()
+                    d.NodeIdentity + "|" + d.Detail).ToArray(),
+                Diagnostics = scan.Diagnostics.Select(d =>
+                    new NativeCandidateDiagnosticFacts
+                    {
+                        Code = d.Code,
+                        Contract = d.NodeIdentity,
+                        Detail = d.Detail,
+                        ActionPath = d.ActionPath
+                    }).ToArray()
             });
             if (applied.Entry != null)
             {

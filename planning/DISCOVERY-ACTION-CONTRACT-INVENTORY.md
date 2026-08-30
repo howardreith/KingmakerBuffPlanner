@@ -1,5 +1,36 @@
 # Discovery Action Contract Inventory
 
+## 0.0.14 current-caster and recipient correction
+
+Exact inspection extends the earlier variant record:
+
+- native action-bar conversion enumerates declared children, constructs
+  `AbilityData(parent, child)`, and filters with `IsVisible()`;
+- `IsVisible()` invokes child visibility providers in actual source context,
+  while `IsAvailableForCast` and `GetAvailableForCastCount` include transient
+  cast/resource state;
+- `TargetType` values are Enemy=0, Ally=1, Any=2, and
+  `AbilityTargetsAround.Select` enforces those dispositions;
+- `AbilityAreaEffectBuff.Condition` exposes the area recipient filter;
+  exact non-negated ally/enemy conditions are recognized, all other forms fail
+  closed as ambiguous; and
+- `ContextActionDealDamage`, `AbilityDeliverProjectile`, and
+  `AbilityDeliverAttackWithWeapon` are offensive action/delivery evidence.
+
+The scanner now carries every diagnostic action path, so an offensive action
+removes a purported payload only on its compatible conditional branch.
+Delivery components remain ability-level carrier evidence. Effect facts also
+carry harmful, hidden, class-feature, component-type, source-contract, target,
+and branch data. New dispositions include enemy-only-area,
+ambiguous-area-recipient, no-persistent-beneficial-party-effect,
+offensive-carrier-only, harmful-only, hidden-marker-only,
+valid-beneficial-self-effect, and valid-beneficial-party-effect.
+
+The inspection command exits 0 against exact assembly SHA-256/MVID
+`3b6450ffec440e296e586f71c711b195aed144b28d53e1cbb29406d18fef5afb` /
+`07fa1e4d-8618-41b3-9b8d-faa17d3b26f7`. Structured conclusions and probe
+evidence are in `planning/BUFF-CATALOG-CASTER-CONTROLS-EVIDENCE.md`.
+
 ## 0.0.14 selectable variant correction
 
 Exact Kingmaker 2.1.7b inspection establishes two different contracts that must

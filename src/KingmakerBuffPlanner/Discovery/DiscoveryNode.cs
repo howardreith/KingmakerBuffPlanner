@@ -12,6 +12,7 @@ namespace KingmakerBuffPlanner.Discovery
         Conditional,
         TargetTransform,
         Effect,
+        OffensiveAction,
         AbilityReference,
         Unknown
     }

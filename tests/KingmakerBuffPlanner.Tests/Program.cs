@@ -80,6 +80,8 @@ namespace KingmakerBuffPlanner.Tests
                 Run("scanner-reports-unknown-node", TestScannerUnknown);
                 Run("scanner-expression-wire-contract", TestScannerExpressionWireContract);
                 Run("native-candidate-classification-is-structural", TestNativeCandidateClassification);
+                Run("persistent-beneficial-classification-is-branch-and-recipient-aware",
+                    TestPersistentBeneficialClassification);
                 Run("optional-blueprint-ownership-is-exact", TestBlueprintOwnership);
                 Run("harmony-target-identities-are-stable", TestHarmonyTargetIdentity);
                 Run("installed-harmony-inventory-api-is-callable", TestHarmonyInventoryApi);
@@ -88,6 +90,8 @@ namespace KingmakerBuffPlanner.Tests
                 Run("complete-name-layout-preserves-long-communal-suffix", TestCompleteNameLayout);
                 Run("ordinary-nonvariant-catalog-entry-remains-single", TestOrdinaryCatalogExpansion);
                 Run("variant-parent-expands-five-eligible-children", TestVariantCatalogFive);
+                Run("variant-membership-is-independent-of-temporary-availability",
+                    TestVariantOwnershipAvailability);
                 Run("unresolved-variant-parent-is-not-selectable", TestVariantParentSuppressed);
                 Run("variant-stable-identities-are-distinct", TestVariantStableIdentities);
                 Run("variant-entry-retains-parent-and-child-identities", TestVariantParentChildIdentity);
@@ -128,6 +132,14 @@ namespace KingmakerBuffPlanner.Tests
                 Run("profile-migrates-hidden-and-f10-state", () => TestGridProfileMigration(root));
                 Run("profile-malformed-json-recovers-default", () => TestProfileMalformed(root));
                 Run("setup-model-direct-targets-are-routine-local", TestSetupModel);
+                Run("provider-policy-operations-are-explicit-and-normalized",
+                    TestProviderPolicyOperations);
+                Run("provider-policy-splits-casts-and-fails-closed",
+                    TestProviderPolicyPlanning);
+                Run("provider-policy-presentation-retains-unavailable-owned-casters",
+                    TestProviderPolicyPresentation);
+                Run("provider-policy-roundtrip-and-stale-keys-are-exact",
+                    () => TestProviderPolicyRoundTrip(root));
                 Run("catalog-filter-selected-category-and-reset-contract", TestCatalogFilterState);
                 Run("presentation-view-models-use-player-facing-deterministic-state", TestPresentationModels);
                 Run("right-click-description-resolves-without-plan-mutation", TestDescriptionRequest);
@@ -157,6 +169,8 @@ namespace KingmakerBuffPlanner.Tests
                 Run("hud-stable-states-do-not-repeat-discovery", TestHudStablePerformance);
                 Run("hud-lifecycle-transitions-suspend-and-resume", TestHudLifecycleTransitions);
                 Run("quick-execution-instruments-and-presents-empty-group", TestQuickExecutionFlow);
+                Run("quick-result-has-no-floating-or-native-log-presentation",
+                    TestQuickResultPresentationBoundary);
                 Run("animated-executor-validates-before-queue-and-reports", TestAnimatedExecutor);
                 Run("instant-executor-revalidates-batches-and-reports", TestInstantExecutor);
                 Run("submitted-without-effect-is-not-success", TestUnconfirmedExecution);
@@ -334,8 +348,12 @@ namespace KingmakerBuffPlanner.Tests
                 Effects = new[] { CandidateEffect("Buff", "CurrentTarget", false, "ContextActionApplyBuff", "root") },
                 DiagnosticContracts = new string[0]
             });
-            if (hostile.Disposition != "exclude" || !hostile.Reason.StartsWith("hostile-only:", StringComparison.Ordinal))
-                throw new InvalidOperationException("Hostile current-target effect was mistaken for a self buff.");
+            if (hostile.Disposition != "exclude" ||
+                !hostile.Reason.StartsWith(
+                    "no-persistent-beneficial-party-effect:",
+                    StringComparison.Ordinal))
+                throw new InvalidOperationException(
+                    "Hostile current-target effect was mistaken for a self buff.");
 
             NativeCandidateAuditDecision point = classifier.Classify(new NativeCandidateAuditFacts
             {
@@ -398,14 +416,227 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("A hostile weapon carrier was exposed as a buff.");
         }
 
+        private static void TestPersistentBeneficialClassification()
+        {
+            var classifier = new NativeCandidateClassifier();
+            NativeCandidateAuditDecision self = classifier.Classify(
+                new NativeCandidateAuditFacts
+                {
+                    IsPlayerAccessible = true,
+                    CanTargetSelf = true,
+                    Effects = new[] { CandidateEffect(
+                        "Buff", "CurrentTarget", false,
+                        "ContextActionApplyBuff", "root/self") }
+                });
+            NativeCandidateAuditDecision friend = classifier.Classify(
+                new NativeCandidateAuditFacts
+                {
+                    IsPlayerAccessible = true,
+                    CanTargetFriends = true,
+                    EffectOnAlly = "Helpful",
+                    Effects = new[] { CandidateEffect(
+                        "Buff", "CurrentTarget", false,
+                        "ContextActionApplyBuff", "root/friend") }
+                });
+            NativeCandidateAuditDecision alliedArea = classifier.Classify(
+                new NativeCandidateAuditFacts
+                {
+                    IsPlayerAccessible = true,
+                    Effects = new[] { CandidateEffect(
+                        "AreaBuff", "AlliedAreaRecipients", false,
+                        "ContextActionSpawnAreaEffect+AbilityAreaEffectBuff",
+                        "root/area") }
+                });
+            if (self.Disposition != "include" ||
+                !self.Reason.StartsWith(
+                    "valid-beneficial-self-effect:", StringComparison.Ordinal) ||
+                friend.Disposition != "include" ||
+                alliedArea.Disposition != "include" ||
+                !alliedArea.Reason.StartsWith(
+                    "valid-beneficial-party-effect:", StringComparison.Ordinal))
+                throw new InvalidOperationException(
+                    "Valid self, friend, or allied-area persistent effects were lost.");
+
+            NativeCandidateAuditDecision enemyArea = classifier.Classify(
+                new NativeCandidateAuditFacts
+                {
+                    IsPlayerAccessible = true,
+                    Effects = new[] { CandidateEffect(
+                        "AreaBuff", "EnemyAreaRecipients", true,
+                        "ContextActionApplyBuff", "root/enemy") }
+                });
+            NativeCandidateAuditDecision ambiguousArea = classifier.Classify(
+                new NativeCandidateAuditFacts
+                {
+                    IsPlayerAccessible = true,
+                    Effects = new[] { CandidateEffect(
+                        "AreaBuff", "AmbiguousAreaRecipients", false,
+                        "ContextActionApplyBuff", "root/ambiguous") }
+                });
+            if (!enemyArea.Reason.StartsWith("enemy-only-area:",
+                    StringComparison.Ordinal) ||
+                !ambiguousArea.Reason.StartsWith(
+                    "ambiguous-area-recipient:", StringComparison.Ordinal))
+                throw new InvalidOperationException(
+                    "Enemy or ambiguous area recipients were treated as party coverage.");
+
+            NativeCandidateEffectFacts hiddenMarker = CandidateEffect(
+                "Buff", "Caster", false, "ContextActionApplyBuff",
+                "root/1:marker", true, false,
+                new[]
+                {
+                    "CallOfTheWild.NewMechanics.BuffRemoveOnSave",
+                    "Kingmaker.UnitLogic.Mechanics.Components.AddFactContextActions"
+                });
+            NativeCandidateAuditDecision offensiveCarrier = classifier.Classify(
+                new NativeCandidateAuditFacts
+                {
+                    IsPlayerAccessible = true,
+                    CanTargetSelf = true,
+                    CanTargetEnemies = true,
+                    EffectOnEnemy = "Harmful",
+                    Range = "Projectile",
+                    AbilityComponentTypes = new[]
+                    {
+                        "Kingmaker.UnitLogic.Abilities.Components.AbilityDeliverProjectile"
+                    },
+                    Effects = new[] { hiddenMarker },
+                    Diagnostics = new[]
+                    {
+                        new NativeCandidateDiagnosticFacts
+                        {
+                            Code = "offensive-action",
+                            Contract = "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionDealDamage",
+                            Detail = "offensive-action",
+                            ActionPath = "root/0:damage"
+                        }
+                    }
+                });
+            if (!offensiveCarrier.Reason.StartsWith(
+                    "offensive-carrier-only:", StringComparison.Ordinal))
+                throw new InvalidOperationException(
+                    "A hidden caster save marker rescued an offensive carrier.");
+
+            NativeCandidateAuditDecision harmfulWithMarker = classifier.Classify(
+                new NativeCandidateAuditFacts
+                {
+                    IsPlayerAccessible = true,
+                    CanTargetSelf = true,
+                    Effects = new[]
+                    {
+                        CandidateEffect("Buff", "CurrentTarget", true,
+                            "ContextActionApplyBuff", "root/harmful"),
+                        hiddenMarker
+                    }
+                });
+            if (!harmfulWithMarker.Reason.StartsWith(
+                    "hidden-marker-only:", StringComparison.Ordinal))
+                throw new InvalidOperationException(
+                    "A harmless hidden marker rescued a harmful target payload.");
+
+            NativeCandidateAuditDecision hiddenSelf = classifier.Classify(
+                new NativeCandidateAuditFacts
+                {
+                    IsPlayerAccessible = true,
+                    CanTargetSelf = true,
+                    Effects = new[]
+                    {
+                        CandidateEffect("Buff", "Caster", false,
+                            "ContextActionApplyBuff", "root/hidden-self",
+                            true, false,
+                            new[] { "Kingmaker.UnitLogic.Mechanics.Components.AddStatBonus" })
+                    }
+                });
+            if (hiddenSelf.Disposition != "include" ||
+                !hiddenSelf.Reason.StartsWith(
+                    "valid-beneficial-self-effect:", StringComparison.Ordinal))
+                throw new InvalidOperationException(
+                    "A structurally substantive hidden self buff was excluded only for being hidden.");
+
+            NativeCandidateAuditDecision separateSupportBranch =
+                classifier.Classify(new NativeCandidateAuditFacts
+                {
+                    IsPlayerAccessible = true,
+                    CanTargetFriends = true,
+                    EffectOnAlly = "Helpful",
+                    Effects = new[]
+                    {
+                        CandidateEffect("Buff", "CurrentTarget", false,
+                            "ContextActionApplyBuff",
+                            "root/0:Conditional/false/0:support")
+                    },
+                    Diagnostics = new[]
+                    {
+                        new NativeCandidateDiagnosticFacts
+                        {
+                            Code = "offensive-action",
+                            Contract = "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionDealDamage",
+                            Detail = "offensive-action",
+                            ActionPath = "root/0:Conditional/true/0:damage"
+                        }
+                    }
+                });
+            if (separateSupportBranch.Disposition != "include")
+                throw new InvalidOperationException(
+                    "An unrelated offensive conditional branch erased an exact support branch.");
+
+            NativeCandidateAuditDecision instantOnly = classifier.Classify(
+                new NativeCandidateAuditFacts
+                {
+                    IsPlayerAccessible = true,
+                    CanTargetFriends = true,
+                    Effects = new NativeCandidateEffectFacts[0],
+                    DiagnosticContracts = new[]
+                    {
+                        "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionHealTarget|unsupported-action"
+                    }
+                });
+            if (!instantOnly.Reason.StartsWith(
+                    "no-persistent-beneficial-party-effect:",
+                    StringComparison.Ordinal))
+                throw new InvalidOperationException(
+                    "Instant healing without a persistent effect entered the catalog.");
+
+            NativeCandidateAuditDecision pet = classifier.Classify(
+                new NativeCandidateAuditFacts
+                {
+                    IsPlayerAccessible = true,
+                    Effects = new[] { CandidateEffect(
+                        "Buff", "Pet", false, "ContextActionsOnPet", "root/pet") }
+                });
+            NativeCandidateAuditDecision enchantment = classifier.Classify(
+                new NativeCandidateAuditFacts
+                {
+                    IsPlayerAccessible = true,
+                    CanTargetFriends = true,
+                    Effects = new[] { CandidateEffect(
+                        "WornItemEnchantment", "CurrentTarget", null,
+                        "ContextActionEnchantWornItem", "root/enchant") }
+                });
+            if (pet.Disposition != "include" ||
+                enchantment.Disposition != "include")
+                throw new InvalidOperationException(
+                    "Pet or worn-item persistent support regressed.");
+        }
+
         private static NativeCandidateEffectFacts CandidateEffect(
-            string kind, string target, bool? harmful, string source, string path)
+            string kind,
+            string target,
+            bool? harmful,
+            string source,
+            string path,
+            bool hidden = false,
+            bool classFeature = false,
+            IEnumerable<string> components = null)
         {
             return new NativeCandidateEffectFacts
             {
                 Kind = kind,
                 Target = target,
                 Harmful = harmful,
+                IsHiddenInUi = hidden,
+                IsClassFeature = classFeature,
+                ComponentTypes = (components ?? new string[0]).ToArray(),
                 SourceContract = source,
                 ActionPath = path
             };
@@ -516,6 +747,75 @@ namespace KingmakerBuffPlanner.Tests
                     .SequenceEqual(Enumerable.Range(0, 5)))
                 throw new InvalidOperationException(
                     "Five eligible declared variants were not expanded in blueprint order.");
+        }
+
+        private static void TestVariantOwnershipAvailability()
+        {
+            var parent = new SelectableAbilityBlueprint(
+                "parent-guid", "Parent", "parent-icon", true);
+            var granted = new SelectableAbilityBlueprint(
+                "granted-guid", "Granted", "granted-icon", true);
+            var ungranted = new SelectableAbilityBlueprint(
+                "ungranted-guid", "Ungranted", "ungranted-icon", false);
+            IReadOnlyList<SelectableAbilityEntry> expanded =
+                SelectableAbilityVariantCatalog.Expand(
+                    parent, new[] { granted, ungranted });
+            if (expanded.Count != 1 ||
+                expanded.Single().Concrete.BlueprintGuid != "granted-guid")
+                throw new InvalidOperationException(
+                    "A declared child rejected by native eligibility was cataloged.");
+
+            AbilityKey ownedChild = Ability(
+                "parent-guid", "granted-guid", 0);
+            var exhaustedPool = new ResourcePoolSnapshot(
+                "owned-exhausted", ResourcePoolKind.SpontaneousLevel,
+                4, 0, null);
+            var provider = new ProviderSnapshot(
+                new ProviderKey("unit-owner", "book-owner",
+                    ownedChild, "level-2"),
+                "Concrete Child", 2, exhaustedPool.PoolKey,
+                1, null);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(
+                new[] { provider }, new[] { exhaustedPool }, "unit-owner");
+            var option = new ProviderPlanningOption(
+                provider, new[] { "unit-owner" },
+                new[] { "unit-owner" }, 4, 40);
+            BuffPlannerProfile profile =
+                BuffPlannerProfile.CreateDefault("variant-owned-exhausted");
+            var effects = new Dictionary<string, EffectExpression>
+            {
+                { ownedChild.Canonical, Leaf("owned-child-effect") }
+            };
+            var model = new PlannerSetupModel(
+                profile, snapshot, new ActiveEffectSnapshot(null),
+                effects, new[] { option }, ignored => { });
+            SetupSourceRow source = model.Sources.Single();
+            if (!source.IsConcreteVariant ||
+                source.Ability.VariantGuid != "granted-guid" ||
+                model.GetRemainingCasts(provider) != 0 ||
+                model.IsSourceAvailable(source))
+                throw new InvalidOperationException(
+                    "An exhausted directly owned child vanished or appeared castable.");
+
+            profile.Routines[0].Assignments.Add(new SourceAssignmentProfile
+            {
+                SourceId = "variant|parent-guid|ungranted-guid",
+                Ability = AbilityKeyProfile.FromKey(Ability(
+                    "parent-guid", "ungranted-guid", 0)),
+                WantedTargetUnitIds = new List<string> { "unit-owner" },
+                ExistingEffectPolicy =
+                    ExistingEffectPolicy.SkipAlreadyActive,
+                IgnoredPresenceMarkers = new List<string>(),
+                SelectedEnhancementIds = new List<string>()
+            });
+            var reloaded = new PlannerSetupModel(
+                profile, snapshot, new ActiveEffectSnapshot(null),
+                effects, new[] { option }, ignored => { });
+            if (reloaded.Sources.Any(item =>
+                    item.Ability.VariantGuid == "ungranted-guid") ||
+                reloaded.VariantReselectionNotices.Count == 0)
+                throw new InvalidOperationException(
+                    "A stale unowned child was resurrected or silently remapped.");
         }
 
         private static void TestVariantParentSuppressed()
@@ -756,7 +1056,7 @@ namespace KingmakerBuffPlanner.Tests
                 "unit-a", "target-a", "target-b");
             var area = new EffectLeafExpression(
                 EffectKind.Buff, "resist-cold-effect",
-                EffectTarget.AreaRecipients, "AbilityTargetsAround",
+                EffectTarget.AlliedAreaRecipients, "AbilityTargetsAround",
                 "variant/area");
             var source = new BuffSourceDefinition(
                 CatalogSourceIdentity.For(child, area), child, area,
@@ -1049,7 +1349,8 @@ namespace KingmakerBuffPlanner.Tests
             EffectPresenceResult absent = evaluator.Evaluate(expression,
                 new HashSet<string>(StringComparer.Ordinal), null);
             EffectPresenceResult wrongKind = evaluator.EvaluateTyped(
-                new EffectLeafExpression(EffectKind.AreaBuff, "required", EffectTarget.AreaRecipients,
+                new EffectLeafExpression(EffectKind.AreaBuff, "required",
+                    EffectTarget.AlliedAreaRecipients,
                     "fixture", "fixture/area"),
                 new HashSet<ActiveEffectMarker> { new ActiveEffectMarker(EffectKind.Buff, "required") }, null);
             if (complete.Kind != EffectPresenceKind.Complete ||
@@ -1608,16 +1909,13 @@ namespace KingmakerBuffPlanner.Tests
             if (!model.IsTargetWanted("long", "unit-a") || !model.IsTargetWanted("long", "unit-b") ||
                 model.GetPresence("unit-b") != EffectPresenceKind.Complete)
                 throw new InvalidOperationException("Setup target matrix lost stable IDs or active state.");
-            model.CycleProviderPreference(provider.Key.Canonical);
-            if (model.GetProviderPreference(provider.Key.Canonical).Priority != 0)
-                throw new InvalidOperationException("Automatic provider did not enter explicit-priority state.");
-            model.CycleProviderPreference(provider.Key.Canonical);
+            model.SetProviderEnabled(provider.Key.Canonical, false);
             if (!model.GetProviderPreference(provider.Key.Canonical).Banned)
-                throw new InvalidOperationException("Provider preference did not enter banned state.");
-            model.CycleProviderPreference(provider.Key.Canonical);
+                throw new InvalidOperationException("Provider was not explicitly disabled.");
+            model.SetProviderEnabled(provider.Key.Canonical, true);
             if (model.GetProviderPreference(provider.Key.Canonical) != null)
-                throw new InvalidOperationException("Provider preference did not reset to automatic.");
-            model.AdjustProviderCap(provider.Key.Canonical, 1);
+                throw new InvalidOperationException("Provider did not return to automatic.");
+            model.SetProviderMaximumCasts(provider.Key.Canonical, 1);
             model.SetScale(1.25f);
             model.ToggleExecutionMode();
             model.ToggleOutOfCombatOnly();
@@ -1645,6 +1943,370 @@ namespace KingmakerBuffPlanner.Tests
             reloaded.ClearRoutine("short");
             if (reloaded.Profile.Routines.First(r => r.RoutineId == "short").Assignments.Count != 0)
                 throw new InvalidOperationException("Routine clear changed or retained the wrong assignment set.");
+        }
+
+        private static void TestProviderPolicyOperations()
+        {
+            ProviderPolicyFixture fixture =
+                CreateProviderPolicyFixture("policy-operations", false);
+            PlannerSetupModel model = fixture.Model;
+            model.MoveProviderEarlier(fixture.FelixBlur.Key.Canonical);
+            ProviderPreferenceProfile felix =
+                model.GetProviderPreference(fixture.FelixBlur.Key.Canonical);
+            ProviderPreferenceProfile akasa =
+                model.GetProviderPreference(fixture.AkasaBlur.Key.Canonical);
+            if (felix == null || akasa == null ||
+                felix.Priority != 0 || akasa.Priority != 1)
+                throw new InvalidOperationException(
+                    "Moving a provider earlier did not assign normalized priorities.");
+
+            model.SetProviderMaximumCasts(
+                fixture.FelixBlur.Key.Canonical, 1);
+            if (felix.Priority != 0 || felix.MaximumCasts != 1 ||
+                felix.Banned)
+                throw new InvalidOperationException(
+                    "A preferred provider could not remain capped.");
+            model.MoveProviderLater(fixture.FelixBlur.Key.Canonical);
+            int[] priorities = fixture.BlurSource.Providers.Select(provider =>
+                    model.GetProviderPreference(
+                        provider.Key.Canonical).Priority.Value)
+                .OrderBy(value => value).ToArray();
+            if (!priorities.SequenceEqual(new[] { 0, 1 }))
+                throw new InvalidOperationException(
+                    "Reordering left duplicate, sparse, or order-dependent priorities.");
+
+            model.SetProviderEnabled(
+                fixture.FelixBlur.Key.Canonical, false);
+            if (!felix.Banned || felix.MaximumCasts != 1 ||
+                felix.Priority == null)
+                throw new InvalidOperationException(
+                    "Disabling a provider discarded its order or cap.");
+            model.SetProviderEnabled(
+                fixture.FelixBlur.Key.Canonical, true);
+            if (felix.Banned || felix.MaximumCasts != 1)
+                throw new InvalidOperationException(
+                    "Re-enabling a provider changed its cap.");
+
+            model.SelectSource(fixture.BullsSource.SourceId);
+            model.SetProviderMaximumCasts(
+                fixture.FelixBulls.Key.Canonical, 2);
+            model.SelectSource(fixture.BlurSource.SourceId);
+            model.ResetSelectedSourceProvidersToAutomatic();
+            if (model.GetProviderPreference(
+                    fixture.FelixBlur.Key.Canonical) != null ||
+                model.GetProviderPreference(
+                    fixture.AkasaBlur.Key.Canonical) != null ||
+                model.GetProviderPreference(
+                    fixture.FelixBulls.Key.Canonical).MaximumCasts != 2)
+                throw new InvalidOperationException(
+                    "Reset Automatic removed preferences outside the selected buff.");
+        }
+
+        private static void TestProviderPolicyPlanning()
+        {
+            ProviderPolicyFixture fixture =
+                CreateProviderPolicyFixture("policy-planning", false);
+            foreach (string target in fixture.TargetIds)
+                fixture.Model.ToggleTarget("long", target);
+
+            RoutinePlanResult automatic = fixture.Plan("long");
+            if (automatic.Plan.Steps.Count != fixture.TargetIds.Length ||
+                automatic.Plan.Steps.Any(step =>
+                    step.Provider.Canonical !=
+                        fixture.AkasaBlur.Key.Canonical))
+                throw new InvalidOperationException(
+                    "No-preference planning changed the deterministic Automatic plan.");
+
+            fixture.Model.MoveProviderEarlier(
+                fixture.FelixBlur.Key.Canonical);
+            fixture.Model.SetProviderMaximumCasts(
+                fixture.FelixBlur.Key.Canonical, 1);
+            RoutinePlanResult split = fixture.Plan("long");
+            if (split.Plan.Steps.Count != fixture.TargetIds.Length ||
+                split.Plan.Steps.First().Provider.Canonical !=
+                    fixture.FelixBlur.Key.Canonical ||
+                split.Plan.Steps.Count(step =>
+                    step.Provider.Canonical ==
+                        fixture.FelixBlur.Key.Canonical) != 1 ||
+                split.Plan.Steps.Skip(1).Any(step =>
+                    step.Provider.Canonical !=
+                        fixture.AkasaBlur.Key.Canonical))
+                throw new InvalidOperationException(
+                    "Priority plus maximum one did not split the buff across casters.");
+
+            fixture.Model.SetProviderEnabled(
+                fixture.FelixBlur.Key.Canonical, false);
+            RoutinePlanResult banned = fixture.Plan("long");
+            if (banned.Plan.Steps.Any(step =>
+                    step.Provider.Canonical ==
+                        fixture.FelixBlur.Key.Canonical) ||
+                banned.Plan.Steps.Count != fixture.TargetIds.Length)
+                throw new InvalidOperationException(
+                    "Banning the first caster did not route every cast to the fallback.");
+
+            fixture.Model.SetProviderEnabled(
+                fixture.FelixBlur.Key.Canonical, true);
+            fixture.Model.SetProviderMaximumCasts(
+                fixture.AkasaBlur.Key.Canonical, 2);
+            RoutinePlanResult capped = fixture.Plan("long");
+            if (capped.Plan.Steps.Count != 3 ||
+                capped.Plan.Outcomes.Count(outcome =>
+                    outcome.Kind == TargetOutcomeKind.Unfulfilled) != 2 ||
+                !capped.Plan.Diagnostics.Any(value =>
+                    value.Contains("reason=provider-policy-refusal") &&
+                    value.Contains("at-cap=2")))
+                throw new InvalidOperationException(
+                    "Insufficient combined caps did not produce exact outcomes and diagnostics.");
+
+            fixture.Model.SetProviderEnabled(
+                fixture.FelixBlur.Key.Canonical, false);
+            fixture.Model.SetProviderEnabled(
+                fixture.AkasaBlur.Key.Canonical, false);
+            RoutinePlanResult allBanned = fixture.Plan("long");
+            if (allBanned.Plan.Steps.Count != 0 ||
+                allBanned.Plan.Outcomes.Count(outcome =>
+                    outcome.Kind == TargetOutcomeKind.Unfulfilled) !=
+                        fixture.TargetIds.Length ||
+                !allBanned.Plan.Diagnostics.Any(value =>
+                    value.Contains("reason=provider-policy-refusal") &&
+                    value.Contains("banned=2")))
+                throw new InvalidOperationException(
+                    "All-provider bans were bypassed or lacked policy-refusal diagnostics.");
+
+            fixture.Model.SelectSource(fixture.BullsSource.SourceId);
+            fixture.Model.ToggleTarget("important", fixture.TargetIds[0]);
+            RoutinePlanResult unrelated = fixture.Plan("important");
+            if (unrelated.Plan.Steps.Count != 1 ||
+                unrelated.Plan.Steps.Single().Provider.Canonical !=
+                    fixture.FelixBulls.Key.Canonical)
+                throw new InvalidOperationException(
+                    "A cap or ban on one exact buff provider leaked to another ability.");
+        }
+
+        private static void TestProviderPolicyPresentation()
+        {
+            ProviderPolicyFixture fixture =
+                CreateProviderPolicyFixture("policy-presentation", true);
+            CasterPolicyViewModel automatic = CasterPolicyViewModel.Create(
+                fixture.BlurSource, fixture.Model, "long", fixture.Plan("long"));
+            ProviderPolicyRowViewModel felix = automatic.Providers.Single(
+                provider => provider.ProviderKey ==
+                    fixture.FelixBlur.Key.Canonical);
+            if (automatic.Summary != "Casters: Automatic" ||
+                automatic.Providers.Count != 2 ||
+                string.IsNullOrWhiteSpace(felix.UnavailableReason) ||
+                felix.Remaining != "0 casts remaining" ||
+                !felix.Source.Contains("Spellbook") ||
+                felix.SpellLevel != 2)
+                throw new InvalidOperationException(
+                    "The chooser hid an exhausted owned provider or omitted player-facing details.");
+
+            fixture.Model.MoveProviderEarlier(
+                fixture.FelixBlur.Key.Canonical);
+            fixture.Model.SetProviderMaximumCasts(
+                fixture.FelixBlur.Key.Canonical, 1);
+            foreach (string target in fixture.TargetIds)
+                fixture.Model.ToggleTarget("long", target);
+            RoutinePlanResult preview = fixture.Plan("long");
+            CasterPolicyViewModel planned = CasterPolicyViewModel.Create(
+                fixture.BlurSource, fixture.Model, "long", preview);
+            felix = planned.Providers.Single(provider =>
+                provider.ProviderKey == fixture.FelixBlur.Key.Canonical);
+            if (felix.Order != 1 || felix.MaximumCasts != 1 ||
+                planned.Summary != "Planned casters: Akasa 5" ||
+                planned.Warning)
+                throw new InvalidOperationException(
+                    "Caster policy presentation did not match the actual pure preview allocation.");
+
+            fixture.Model.SetProviderEnabled(
+                fixture.AkasaBlur.Key.Canonical, false);
+            preview = fixture.Plan("long");
+            planned = CasterPolicyViewModel.Create(
+                fixture.BlurSource, fixture.Model, "long", preview);
+            if (!planned.Warning ||
+                !planned.Summary.Contains("5 unfulfilled") ||
+                !planned.Description.Contains(
+                    "Provider policy cannot cover every selected target."))
+                throw new InvalidOperationException(
+                    "Insufficient policy was not surfaced as a planner-local warning.");
+        }
+
+        private static void TestProviderPolicyRoundTrip(string root)
+        {
+            ProviderPolicyFixture fixture =
+                CreateProviderPolicyFixture("campaign:policy-roundtrip", false);
+            fixture.Model.MoveProviderEarlier(
+                fixture.FelixBlur.Key.Canonical);
+            fixture.Model.SetProviderMaximumCasts(
+                fixture.FelixBlur.Key.Canonical, 3);
+            fixture.Model.SetProviderEnabled(
+                fixture.AkasaBlur.Key.Canonical, false);
+            fixture.Profile.ProviderPreferences.Add(
+                new ProviderPreferenceProfile
+                {
+                    ProviderKey = "stale-unit|stale-book|stale-ability|stale-instance",
+                    Banned = true,
+                    Priority = 999999,
+                    MaximumCasts = 17
+                });
+
+            string modPath = Path.Combine(root, "provider-policy-roundtrip");
+            Directory.CreateDirectory(modPath);
+            var repository = new ProfileRepository(modPath);
+            repository.Save(fixture.Profile);
+            ProfileLoadResult loaded = repository.Load(
+                fixture.Profile.CampaignId);
+            ProviderPreferenceProfile felix =
+                loaded.Profile.ProviderPreferences.Single(preference =>
+                    preference.ProviderKey ==
+                        fixture.FelixBlur.Key.Canonical);
+            ProviderPreferenceProfile akasa =
+                loaded.Profile.ProviderPreferences.Single(preference =>
+                    preference.ProviderKey ==
+                        fixture.AkasaBlur.Key.Canonical);
+            ProviderPreferenceProfile stale =
+                loaded.Profile.ProviderPreferences.Single(preference =>
+                    preference.ProviderKey.StartsWith(
+                        "stale-unit|", StringComparison.Ordinal));
+            if (loaded.Profile.SchemaVersion != 4 ||
+                felix.Priority != 0 || felix.MaximumCasts != 3 ||
+                felix.Banned || !akasa.Banned ||
+                stale.MaximumCasts != 17)
+                throw new InvalidOperationException(
+                    "Provider policy fields did not round-trip without a schema change.");
+
+            var reloaded = new PlannerSetupModel(
+                loaded.Profile, fixture.Snapshot,
+                new ActiveEffectSnapshot(null), fixture.Effects,
+                fixture.Options, ignored => { });
+            reloaded.SelectSource(fixture.BlurSource.SourceId);
+            foreach (string target in fixture.TargetIds)
+                reloaded.ToggleTarget("short", target);
+            RoutinePlanResult plan = new RoutinePlanService().Plan(
+                loaded.Profile, "short", fixture.Snapshot,
+                new ActiveEffectSnapshot(null), fixture.Effects,
+                fixture.Options);
+            if (plan.Plan.Steps.Any(step =>
+                    step.Provider.Canonical == stale.ProviderKey) ||
+                reloaded.SelectedSource.Providers.Any(provider =>
+                    provider.Key.Canonical == stale.ProviderKey))
+                throw new InvalidOperationException(
+                    "A stale preference rebound to a current provider.");
+        }
+
+        private static ProviderPolicyFixture CreateProviderPolicyFixture(
+            string campaignId, bool exhaustedFelix)
+        {
+            AbilityKey blur = Ability("ability-blur", string.Empty, 0);
+            AbilityKey bulls = Ability("ability-bulls", string.Empty, 0);
+            var felixBlurPool = new ResourcePoolSnapshot(
+                "felix-blur-pool", ResourcePoolKind.SpontaneousLevel,
+                10, exhaustedFelix ? 0 : 10, null);
+            var akasaBlurPool = new ResourcePoolSnapshot(
+                "akasa-blur-pool", ResourcePoolKind.SpontaneousLevel,
+                10, 10, null);
+            var felixBullsPool = new ResourcePoolSnapshot(
+                "felix-bulls-pool", ResourcePoolKind.SpontaneousLevel,
+                3, 3, null);
+            var felixBlur = new ProviderSnapshot(
+                new ProviderKey("felix", "felix-book", blur, "level-2"),
+                "Blur", 2, felixBlurPool.PoolKey, 1, null);
+            var akasaBlur = new ProviderSnapshot(
+                new ProviderKey("akasa", "akasa-book", blur, "level-2"),
+                "Blur", 2, akasaBlurPool.PoolKey, 1, null);
+            var felixBulls = new ProviderSnapshot(
+                new ProviderKey("felix", "felix-book", bulls, "level-2"),
+                "Bulls Strength", 2, felixBullsPool.PoolKey, 1, null);
+            string[] targets = { "target-1", "target-2", "target-3",
+                "target-4", "target-5" };
+            string[] units = new[] { "felix", "akasa" }.Concat(targets).ToArray();
+            PartyProviderSnapshot snapshot = new PartyProviderSnapshot(
+                units.Select(unit => new UnitSnapshot(
+                    unit,
+                    unit == "felix" ? "Felix" :
+                    unit == "akasa" ? "Akasa" : unit,
+                    false, string.Empty,
+                    new TargetValidationSnapshot(
+                        true, true, true, true))),
+                new[] { felixBlur, akasaBlur, felixBulls },
+                new[] { felixBlurPool, akasaBlurPool, felixBullsPool });
+            var options = new[]
+            {
+                new ProviderPlanningOption(
+                    felixBlur, units, units, 5, 50),
+                new ProviderPlanningOption(
+                    akasaBlur, units, units, 5, 50),
+                new ProviderPlanningOption(
+                    felixBulls, units, units, 5, 50)
+            };
+            var effects = new Dictionary<string, EffectExpression>
+            {
+                { blur.Canonical, Leaf("blur-effect") },
+                { bulls.Canonical, Leaf("bulls-effect") }
+            };
+            BuffPlannerProfile profile =
+                BuffPlannerProfile.CreateDefault(campaignId);
+            var model = new PlannerSetupModel(
+                profile, snapshot, new ActiveEffectSnapshot(null),
+                effects, options, ignored => { });
+            SetupSourceRow blurSource = model.Sources.Single(source =>
+                source.Abilities.Any(ability => ability.Equals(blur)));
+            SetupSourceRow bullsSource = model.Sources.Single(source =>
+                source.Abilities.Any(ability => ability.Equals(bulls)));
+            model.SelectSource(blurSource.SourceId);
+            return new ProviderPolicyFixture(
+                profile, model, snapshot, effects, options,
+                blurSource, bullsSource,
+                felixBlur, akasaBlur, felixBulls, targets);
+        }
+
+        private sealed class ProviderPolicyFixture
+        {
+            internal ProviderPolicyFixture(
+                BuffPlannerProfile profile,
+                PlannerSetupModel model,
+                PartyProviderSnapshot snapshot,
+                IDictionary<string, EffectExpression> effects,
+                IEnumerable<ProviderPlanningOption> options,
+                SetupSourceRow blurSource,
+                SetupSourceRow bullsSource,
+                ProviderSnapshot felixBlur,
+                ProviderSnapshot akasaBlur,
+                ProviderSnapshot felixBulls,
+                string[] targetIds)
+            {
+                Profile = profile;
+                Model = model;
+                Snapshot = snapshot;
+                Effects = effects;
+                Options = options.ToArray();
+                BlurSource = blurSource;
+                BullsSource = bullsSource;
+                FelixBlur = felixBlur;
+                AkasaBlur = akasaBlur;
+                FelixBulls = felixBulls;
+                TargetIds = targetIds;
+            }
+
+            internal BuffPlannerProfile Profile;
+            internal PlannerSetupModel Model;
+            internal PartyProviderSnapshot Snapshot;
+            internal IDictionary<string, EffectExpression> Effects;
+            internal ProviderPlanningOption[] Options;
+            internal SetupSourceRow BlurSource;
+            internal SetupSourceRow BullsSource;
+            internal ProviderSnapshot FelixBlur;
+            internal ProviderSnapshot AkasaBlur;
+            internal ProviderSnapshot FelixBulls;
+            internal string[] TargetIds;
+
+            internal RoutinePlanResult Plan(string routineId)
+            {
+                return new RoutinePlanService().Plan(
+                    Profile, routineId, Snapshot,
+                    new ActiveEffectSnapshot(null),
+                    Effects, Options);
+            }
         }
 
         private static void TestCatalogFilterState()
@@ -1805,7 +2467,7 @@ namespace KingmakerBuffPlanner.Tests
             var option = new ProviderPlanningOption(provider, new[] { "unit-a", "unit-b" },
                 new[] { "unit-a" }, 1, 10);
             var area = new EffectLeafExpression(EffectKind.AreaBuff, "area-effect",
-                EffectTarget.AreaRecipients, "area-contract", "area/path");
+                EffectTarget.AlliedAreaRecipients, "area-contract", "area/path");
             var model = new PlannerSetupModel(BuffPlannerProfile.CreateDefault("area-preview"),
                 snapshot, new ActiveEffectSnapshot(null),
                 new Dictionary<string, EffectExpression> { { ability.Canonical, area } },
@@ -2091,6 +2753,79 @@ namespace KingmakerBuffPlanner.Tests
                 flow.PlansRevalidated != 1 || flow.ExecutionsInvoked != 0 || flow.Refusals != 1 ||
                 flow.ResultsPresented != 1 || runner.StartCount != 1)
                 throw new InvalidOperationException("Quick execution stages did not reconcile exactly once.");
+
+            var activeResult = new QuickExecutionResult(
+                "long", "Long", QuickExecutionDisposition.Refused,
+                "No Long casts can run: skipped active=12; unfulfilled=0.",
+                0, 0, 0);
+            var activeRunner = new FakeRoutineRunner(activeResult);
+            var activeController = new BuffPlannerQuickExecuteController(
+                activeRunner, diagnostics, result => presented = result);
+            if (!activeController.Execute("long") ||
+                !ReferenceEquals(presented, activeResult) ||
+                presented.Disposition != QuickExecutionDisposition.Refused ||
+                presented.Planned != 0 || presented.Submitted != 0 ||
+                presented.Confirmed != 0 ||
+                !presented.Message.Contains("skipped active=12") ||
+                !presented.Message.Contains("unfulfilled=0"))
+                throw new InvalidOperationException(
+                    "All-active quick execution changed its callback result or counts.");
+        }
+
+        private static void TestQuickResultPresentationBoundary()
+        {
+            DirectoryInfo directory =
+                new DirectoryInfo(Environment.CurrentDirectory);
+            while (directory != null &&
+                !File.Exists(Path.Combine(
+                    directory.FullName, "KingmakerBuffPlanner.sln")))
+                directory = directory.Parent;
+            if (directory == null)
+                throw new InvalidOperationException(
+                    "Repository root was not discoverable for the source boundary test.");
+            string root = directory.FullName;
+            string hud = File.ReadAllText(Path.Combine(
+                root, "src", "KingmakerBuffPlanner", "UI",
+                "BuffPlannerHudButtonController.cs"));
+            string uiRoot = File.ReadAllText(Path.Combine(
+                root, "src", "KingmakerBuffPlanner", "UI",
+                "BuffPlannerUiRoot.cs"));
+            string screen = File.ReadAllText(Path.Combine(
+                root, "src", "KingmakerBuffPlanner", "UI",
+                "BuffPlannerScreenView.cs"));
+            string session = File.ReadAllText(Path.Combine(
+                root, "src", "KingmakerBuffPlanner", "UI",
+                "PlannerUiSession.cs"));
+            if (hud.Contains("Feedback") ||
+                hud.Contains("_feedback") ||
+                hud.Contains("void Present(QuickExecutionResult") ||
+                uiRoot.Contains("_hud.Present(result)") ||
+                !uiRoot.Contains("_screen.Present(result)") ||
+                !uiRoot.Contains("Routine UI result:") ||
+                !screen.Contains("result.Message") ||
+                !session.Contains("[KBP-QUICK]") ||
+                !session.Contains("skipped active=") ||
+                !hud.Contains("Setup|Long|Important|Short") ||
+                !hud.Contains("RoutineTooltip"))
+                throw new InvalidOperationException(
+                    "Quick results crossed the HUD-only presentation boundary or lost diagnostics.");
+
+            string[] nativeLogContracts =
+            {
+                "MessageLogThread",
+                "AddMessage(",
+                "CombatLog",
+                "EventLog"
+            };
+            string[] production = Directory.GetFiles(
+                Path.Combine(root, "src", "KingmakerBuffPlanner"),
+                "*.cs", SearchOption.AllDirectories);
+            foreach (string contract in nativeLogContracts)
+                if (production.Any(path => File.ReadAllText(path)
+                    .IndexOf(contract, StringComparison.Ordinal) >= 0))
+                    throw new InvalidOperationException(
+                        "A native common/combat/event-log path was added: " +
+                        contract);
         }
 
         private static void TestInstantExecutor()
@@ -2470,7 +3205,7 @@ namespace KingmakerBuffPlanner.Tests
                 active, effects, new[] { option }, new[] { rod });
             SelectedCastingViewModel none = SelectedCastingViewModel.Create(source, model,
                 "long", preview);
-            if (none.CasterText != "Caster: Leinna" ||
+            if (none.CasterText != "Planned casters: Leinna 1" ||
                 none.EnhancementLabel != "Enhancement: None  1 available" ||
                 none.Choices.Count != 2 || none.Choices[0].Title != "None" ||
                 none.Choices[1].Title != "Lesser Metamagic Rod of Extend" ||
@@ -2522,6 +3257,10 @@ namespace KingmakerBuffPlanner.Tests
             if (!CastingPanelLayoutContract.CanRenderLabel(
                     CastingPanelLayoutContract.MinimumEnhancementButtonHeight) ||
                 CastingPanelLayoutContract.CanRenderLabel(16f) ||
+                !CastingPanelLayoutContract.CanRenderCasterPolicyRow(
+                    CastingPanelLayoutContract.MinimumCasterPolicyRowWidth,
+                    CastingPanelLayoutContract.MinimumCasterPolicyRowHeight) ||
+                CastingPanelLayoutContract.CanRenderCasterPolicyRow(640f, 80f) ||
                 CastingPanelLayoutContract.SettingsCloseLabel != "CLOSE" ||
                 string.IsNullOrWhiteSpace(CastingPanelLayoutContract.SettingsCloseLabel))
                 throw new InvalidOperationException("Casting button geometry or shared CLOSE label is not render-safe.");

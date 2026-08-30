@@ -103,8 +103,8 @@ namespace KingmakerBuffPlanner.Persistence
     {
         [JsonProperty("providerKey", Required = Required.Always, Order = 1)] public string ProviderKey { get; set; }
         [JsonProperty("banned", Required = Required.Always, Order = 2)] public bool Banned { get; set; }
-        [JsonProperty("priority", Required = Required.Always, Order = 3)] public int? Priority { get; set; }
-        [JsonProperty("maximumCasts", Required = Required.Always, Order = 4)] public int? MaximumCasts { get; set; }
+        [JsonProperty("priority", Required = Required.AllowNull, Order = 3)] public int? Priority { get; set; }
+        [JsonProperty("maximumCasts", Required = Required.AllowNull, Order = 4)] public int? MaximumCasts { get; set; }
     }
 
     public sealed class UiProfile

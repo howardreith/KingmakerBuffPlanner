@@ -9,6 +9,7 @@ using Kingmaker.UnitLogic.Abilities.Blueprints;
 using Kingmaker.UnitLogic.Abilities.Components;
 using Kingmaker.UnitLogic.Abilities.Components.AreaEffects;
 using Kingmaker.UnitLogic.Mechanics.Actions;
+using Kingmaker.UnitLogic.Mechanics.Conditions;
 using KingmakerBuffPlanner.Discovery;
 using KingmakerBuffPlanner.Domain.Effects;
 
@@ -52,7 +53,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                     AbilityTargetsAround targetsAround =
                         ability.GetComponent<AbilityTargetsAround>();
                     if (targetsAround != null)
-                        payload = Target(EffectTarget.AreaRecipients, payload,
+                        payload = Target(AreaTarget(targetsAround.TargetType), payload,
                             "AbilityTargetsAround");
                     children.Add(payload);
                 }
@@ -115,6 +116,9 @@ namespace KingmakerBuffPlanner.GameAdapters
             if (action is ContextActionSpawnMonster)
                 return new DiscoveryNode(DiscoveryNodeKind.Unknown,
                     DescribeType(action.GetType()), sourceContract: "excluded-summoning-action");
+            if (IsOffensiveAction(action.GetType()))
+                return new DiscoveryNode(DiscoveryNodeKind.OffensiveAction,
+                    DescribeType(action.GetType()), sourceContract: "offensive-action");
             if (action is ContextActionSelectByValue)
                 return AdaptExactActionListAlternatives(action, "m_Variants", "Action",
                     "ContextActionSelectByValue");
@@ -127,7 +131,8 @@ namespace KingmakerBuffPlanner.GameAdapters
                 AbilityAreaEffectBuff areaBuff = area.AreaEffect.GetComponent<AbilityAreaEffectBuff>();
                 if (areaBuff != null && areaBuff.Buff != null)
                     return Effect(EffectKind.AreaBuff, areaBuff.Buff.AssetGuid,
-                        EffectTarget.AreaRecipients, "ContextActionSpawnAreaEffect+AbilityAreaEffectBuff");
+                        AreaEffectTarget(areaBuff),
+                        "ContextActionSpawnAreaEffect+AbilityAreaEffectBuff");
             }
             DiscoveryNode reflected = AdaptProvenActionLists(action);
             return reflected ?? new DiscoveryNode(DiscoveryNodeKind.Unknown,
@@ -224,6 +229,40 @@ namespace KingmakerBuffPlanner.GameAdapters
         {
             return new DiscoveryNode(DiscoveryNodeKind.TargetTransform, contract,
                 new[] { child }, target: target, sourceContract: contract);
+        }
+
+        private static EffectTarget AreaTarget(TargetType target)
+        {
+            if (target == TargetType.Ally) return EffectTarget.AlliedAreaRecipients;
+            if (target == TargetType.Enemy) return EffectTarget.EnemyAreaRecipients;
+            return EffectTarget.AmbiguousAreaRecipients;
+        }
+
+        private static EffectTarget AreaEffectTarget(
+            AbilityAreaEffectBuff areaBuff)
+        {
+            Condition[] conditions = areaBuff == null ||
+                areaBuff.Condition == null ||
+                areaBuff.Condition.Conditions == null
+                    ? new Condition[0]
+                    : areaBuff.Condition.Conditions;
+            if (conditions.Length != 1 || conditions[0] == null ||
+                conditions[0].Not)
+                return EffectTarget.AmbiguousAreaRecipients;
+            if (conditions[0] is ContextConditionIsAlly)
+                return EffectTarget.AlliedAreaRecipients;
+            if (conditions[0] is ContextConditionIsEnemy)
+                return EffectTarget.EnemyAreaRecipients;
+            return EffectTarget.AmbiguousAreaRecipients;
+        }
+
+        private static bool IsOffensiveAction(Type type)
+        {
+            string name = type == null ? string.Empty : type.FullName;
+            return name == "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionDealDamage" ||
+                name == "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionAttack" ||
+                name == "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionRangedAttack" ||
+                name == "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionDealDirectDamage";
         }
 
         private static string DescribeConditions(Conditional conditional)

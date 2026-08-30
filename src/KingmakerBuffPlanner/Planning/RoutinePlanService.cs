@@ -64,7 +64,8 @@ namespace KingmakerBuffPlanner.Planning
                 }
                 CastGroupingKind grouping = EffectExpressionTargetAnalysis.Contains(
                     expression, EffectTarget.Party) ||
-                    EffectExpressionTargetAnalysis.Contains(expression, EffectTarget.AreaRecipients)
+                    EffectExpressionTargetAnalysis.Contains(
+                        expression, EffectTarget.AlliedAreaRecipients)
                     ? CastGroupingKind.MassConfiguredTargets
                     : CastGroupingKind.PerTarget;
                 requests.Add(new BuffCastRequest(

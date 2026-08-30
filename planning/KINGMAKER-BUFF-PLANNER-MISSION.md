@@ -1,5 +1,59 @@
 # CODEX AUTONOMOUS MISSION
 
+## 2026-08-29 0.0.15 publication authorization checkpoint
+
+The owner explicitly authorized final commit, merge to default branch `main`,
+guarded remote push, and a new public release. Read-only preflight proves public
+`howardreith/KingmakerBuffPlanner`, authenticated owner `howardreith`, feature
+HEAD `ed6108f1549aadf8b570d686e9f97f2aa80940b3`, synchronized local/remote
+main `011a57ff0565b5954745a8b0e742726a74b4315f`, and no existing local or
+GitHub v0.0.15 tag/release. Product metadata and release notes advance to
+0.0.15 with persistence schema 4 unchanged. The absent guarded save pair
+(baseline=0/working=0) remains an explicit in-game evidence limitation.
+
+Exact next action is to commit and fully qualify this clean release source,
+merge without history rewriting, qualify exact `main`, use the project-owned
+guarded push/publisher, independently verify refs/downloaded assets, and commit
+the final publication record.
+
+## 2026-08-29 final clean-head caster-controls handoff
+
+Qualified implementation/record HEAD is
+`ce7099b089440e40716cbbd39c4e377c4fbe21c2` on
+`codex/buff-catalog-caster-controls`, version 0.0.14. Final inspection/source/
+protocol/filesystem/package/WhatIf/aggregate/build/deterministic/release-builder
+counts are 1/1, 38/38, 119/119, 8/8, 4/4, 5/5, 1/1, 1/1, 2/2, and 3/3.
+Qualified ZIP/DLL/MVID are
+`239eb9de3657de030c88dabfffeaa3fab344ec01e8d561e6649281d7a9cf0571` /
+`6fe6d6837f5155b5ad1b1cdd1e64d47974cadbab44a824efa42dc0edea48b4d6` /
+`80732098-e9da-45b2-b402-7b4ca6f52752`. Runtime remains blocked at exact
+baseline=0/working=0. This following record commit is documentation-only; exact
+next action is the guarded/manual checklist when authorized fixtures exist.
+
+## 2026-08-29 buff catalog/caster-controls checkpoint
+
+Branch/intake/implementation/version are
+`codex/buff-catalog-caster-controls` /
+`011a57ff0565b5954745a8b0e742726a74b4315f` /
+`ec718fa96ae1cbbb1feeb5b3acd1900e867b699a` / 0.0.14. Intake was clean.
+
+The focused mission is implemented without changing product boundaries or
+schema: the HUD Feedback lifecycle is gone while callbacks/footer/UMM results
+remain; parent-declared children use actual current-caster native visibility
+for both discovery and execution; transient depletion remains availability;
+allied/enemy/ambiguous recipients and offensive branch provenance prevent
+marker-rescued damage sources; and one blocked modal edits the existing exact
+provider ban/order/cap policy with pure regenerated previews.
+
+Exact assembly evidence, probe causes, rejected blacklist/dropdown/bypass
+approaches, changed-file groups, and local artifact hashes are recorded in
+`planning/BUFF-CATALOG-CASTER-CONTROLS-EVIDENCE.md`. Gates pass inspection
+exit 0, source 38/38, protocol 119/119, filesystem 8/8, package 4/4, WhatIf
+5/5, aggregate 1/1, build 1/1, deterministic 2/2, release builder 3/3, and diff
+check. Guarded saves remain exactly baseline=0/working=0, so in-game acceptance
+is not claimed. Exact next action is the authorized-save/manual checklist; no
+remote or live-game mutation is authorized.
+
 ## 2026-08-28 0.0.14 published completion checkpoint
 
 Qualified feature history was merged without rewriting and released from exact

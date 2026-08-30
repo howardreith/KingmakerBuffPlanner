@@ -38,7 +38,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                 bool party = EffectExpressionTargetAnalysis.Contains(
                     expression, EffectTarget.Party);
                 bool areaRecipients = EffectExpressionTargetAnalysis.Contains(
-                    expression, EffectTarget.AreaRecipients);
+                    expression, EffectTarget.AlliedAreaRecipients);
                 IEnumerable<UnitSnapshot> reachable;
                 if (EffectExpressionTargetAnalysis.ContainsOnly(expression, EffectTarget.Caster))
                     reachable = units.Where(u => u.UnitId == provider.Key.CasterUnitId);
@@ -49,9 +49,8 @@ namespace KingmakerBuffPlanner.GameAdapters
                 else if (areaRecipients && targetsAround != null && caster != null)
                 {
                     float radius = targetsAround.AoERadius.Meters;
-                    reachable = targetsAround.TargetType == TargetType.Enemy
-                        ? new UnitSnapshot[0]
-                        : units.Where(u =>
+                    reachable = targetsAround.TargetType != TargetType.Ally
+                        ? new UnitSnapshot[0] : units.Where(u =>
                     {
                         UnitEntityData target;
                         return liveUnits.TryGetValue(u.UnitId, out target) &&

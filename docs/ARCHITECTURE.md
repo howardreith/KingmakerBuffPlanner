@@ -1,5 +1,44 @@
 # Architecture
 
+## 0.0.14 buff membership, persistent payloads, and caster policy
+
+Catalog membership and temporary cast availability are now separate contracts.
+`KingmakerPartySnapshotBuilder` still begins at actual current-party and pet
+spellbook/fact/resource collections. `KingmakerAbilityVariants` treats a
+concrete source encountered there as owned. When an owned parent declares
+children, the game adapter constructs each child from the actual source
+`AbilityData` and uses the same `IsVisible()` gate as native action-bar
+conversion. It does not consult current slots or resources for membership.
+Discovery and execution resolution share this gate and fail closed, so an
+ineligible saved child cannot be reconstructed from the parent array.
+
+The branch-preserving discovery model distinguishes
+`AlliedAreaRecipients`, `EnemyAreaRecipients`, and
+`AmbiguousAreaRecipients`. Exact `TargetType` and
+`AbilityAreaEffectBuff.Condition` adapters establish disposition; ambiguous
+filters remain ambiguous. Only proven allied areas create mass grouping or
+indirect party coverage. Offensive actions are explicit graph nodes with
+action paths. The classifier combines target, harmful/hidden/class-feature
+flags, component types, source contract, delivery components, and conditional
+path. A persistent safe-party payload must remain after hidden marker and
+offensive-branch analysis. This preserves substantive hidden self-buffs while
+excluding hostile carriers whose only leaf is an internal marker.
+
+Provider policy remains domain allocation policy rather than UI allocation.
+`ProviderPreferenceProfile` continues to key `Banned`, `Priority`, and
+`MaximumCasts` by exact `ProviderKey`. `PlannerSetupModel` exposes explicit
+set, cap, reorder, and selected-source reset operations. Reorder normalizes
+priorities; `CastPlanner` retains deterministic automatic fallback for
+unprioritized providers and fails closed when bans/caps exhaust the set. The
+full-screen caster-policy chooser edits these values, saves through the
+existing repository callback, and obtains its visible allocation from a fresh
+pure preview. No persistence schema change was required.
+
+Quick-result construction is unchanged. The composition root now has two
+result sinks only: the planner-local footer (when open) and UMM logging. The HUD
+controller no longer owns a Feedback object or timer, and no native game-log
+adapter was introduced.
+
 ## 0.0.14 concrete spell variants and complete-name layout
 
 Selectable variants are resolved before domain provider construction.

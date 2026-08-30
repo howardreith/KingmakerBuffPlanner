@@ -190,11 +190,205 @@ namespace KingmakerBuffPlanner.UI
         public bool Available { get; private set; }
     }
 
+    public sealed class ProviderPolicyRowViewModel
+    {
+        internal ProviderPolicyRowViewModel(
+            ProviderSnapshot provider,
+            PlannerSetupModel model,
+            int order,
+            int count)
+        {
+            ProviderKey = provider.Key.Canonical;
+            CasterUnitId = provider.Key.CasterUnitId;
+            CasterName = model.GetCasterDisplayName(provider);
+            ProviderPreferenceProfile preference =
+                model.GetProviderPreference(ProviderKey);
+            Enabled = preference == null || !preference.Banned;
+            MaximumCasts = preference == null ? null : preference.MaximumCasts;
+            Priority = preference == null ? null : preference.Priority;
+            Order = order + 1;
+            CanMoveEarlier = order > 0;
+            CanMoveLater = order + 1 < count;
+            SpellLevel = provider.SpellLevel;
+            int? remaining = model.GetRemainingCasts(provider);
+            Remaining = remaining == null ? "At will" :
+                remaining.Value + (remaining.Value == 1
+                    ? " cast remaining" : " casts remaining");
+            string unavailable =
+                model.GetProviderTemporaryUnavailableReason(provider);
+            UnavailableReason = unavailable == "resource pool exhausted" &&
+                model.GetResourcePool(provider).Kind !=
+                    ResourcePoolKind.PreparedSlots
+                ? "No casts remain right now."
+                : BuffCardViewModel.PlayerReason(unavailable);
+            Source = SourceDescription(provider);
+            MaximumSelectable = Math.Max(6,
+                Math.Min(20, remaining ?? 6));
+            if (MaximumCasts != null)
+                MaximumSelectable = Math.Max(MaximumSelectable,
+                    Math.Min(20, MaximumCasts.Value));
+        }
+
+        public string ProviderKey { get; private set; }
+        public string CasterUnitId { get; private set; }
+        public string CasterName { get; private set; }
+        public string Source { get; private set; }
+        public int SpellLevel { get; private set; }
+        public string Remaining { get; private set; }
+        public string UnavailableReason { get; private set; }
+        public bool Enabled { get; private set; }
+        public int? MaximumCasts { get; private set; }
+        public int? Priority { get; private set; }
+        public int Order { get; private set; }
+        public bool CanMoveEarlier { get; private set; }
+        public bool CanMoveLater { get; private set; }
+        public int MaximumSelectable { get; private set; }
+
+        public int? NextMaximumCasts()
+        {
+            if (MaximumCasts == null) return 1;
+            return MaximumCasts.Value >= MaximumSelectable
+                ? (int?)null : MaximumCasts.Value + 1;
+        }
+
+        private static string SourceDescription(ProviderSnapshot provider)
+        {
+            if (provider.Key.Ability.SourceKind == SourceKind.Spellbook)
+            {
+                string book = provider.Key.SpellbookGuid;
+                if (book.Length > 8) book = book.Substring(0, 8);
+                return "Spellbook " + book +
+                    (provider.SpellLevel > 0 ? " | spell level " +
+                        provider.SpellLevel : " | cantrip") +
+                    (string.IsNullOrWhiteSpace(provider.Key.SourceInstanceId)
+                        ? string.Empty : " | " + provider.Key.SourceInstanceId);
+            }
+            string kind = provider.Key.Ability.SourceKind == SourceKind.AbilityResource
+                ? "Resource ability" :
+                provider.Key.Ability.SourceKind == SourceKind.Fact
+                    ? "Granted ability" :
+                provider.Key.Ability.SourceKind == SourceKind.Item
+                    ? "Item source" : "Ability source";
+            return kind + (string.IsNullOrWhiteSpace(provider.Key.SourceInstanceId)
+                ? string.Empty : " | " + provider.Key.SourceInstanceId);
+        }
+    }
+
+    public sealed class CasterPolicyViewModel
+    {
+        private CasterPolicyViewModel(
+            string summary,
+            string description,
+            bool warning,
+            IEnumerable<ProviderPolicyRowViewModel> providers)
+        {
+            Summary = summary ?? string.Empty;
+            Description = description ?? string.Empty;
+            Warning = warning;
+            Providers = providers.ToList().AsReadOnly();
+        }
+
+        public string Summary { get; private set; }
+        public string Description { get; private set; }
+        public bool Warning { get; private set; }
+        public IReadOnlyList<ProviderPolicyRowViewModel> Providers { get; private set; }
+
+        internal static CasterPolicyViewModel Empty()
+        {
+            return new CasterPolicyViewModel(
+                "Casters: None",
+                "Select a buff to choose its casters.",
+                false,
+                new ProviderPolicyRowViewModel[0]);
+        }
+
+        public static CasterPolicyViewModel Create(
+            SetupSourceRow source,
+            PlannerSetupModel model,
+            string routineId,
+            RoutinePlanResult preview)
+        {
+            if (source == null || model == null) return Empty();
+            List<ProviderSnapshot> ordered = model.GetOrderedProviders(source).ToList();
+            var rows = ordered.Select((provider, index) =>
+                new ProviderPolicyRowViewModel(
+                    provider, model, index, ordered.Count)).ToList();
+            RoutineProfile routine = model.Profile.Routines.First(item =>
+                item.RoutineId == routineId);
+            SourceAssignmentProfile assignment = routine.Assignments.FirstOrDefault(
+                item => item.SourceId == source.SourceId);
+            int requested = assignment == null
+                ? 0 : assignment.WantedTargetUnitIds.Count;
+            List<CastStep> steps = preview == null ? new List<CastStep>() :
+                preview.Plan.Steps.Where(step =>
+                    step.SourceId == source.SourceId).ToList();
+            int unfulfilled = preview == null ? 0 : preview.Plan.Outcomes.Count(outcome =>
+                outcome.SourceId == source.SourceId &&
+                outcome.Kind == TargetOutcomeKind.Unfulfilled);
+
+            string summary;
+            bool warning = requested != 0 && unfulfilled != 0;
+            if (requested != 0)
+            {
+                var counts = steps.GroupBy(step => step.Provider.Canonical,
+                        StringComparer.Ordinal)
+                    .Select(group => new
+                    {
+                        Key = group.Key,
+                        Count = group.Count()
+                    }).ToList();
+                string allocations = string.Join(", ", counts.Select(value =>
+                {
+                    ProviderPolicyRowViewModel row = rows.FirstOrDefault(item =>
+                        item.ProviderKey == value.Key);
+                    return (row == null ? value.Key : row.CasterName) +
+                        " " + value.Count;
+                }).ToArray());
+                summary = counts.Count == 0
+                    ? "Planned casters: None"
+                    : "Planned casters: " + allocations;
+                if (unfulfilled != 0)
+                    summary += " | " + unfulfilled + " unfulfilled";
+            }
+            else
+            {
+                bool automatic = rows.All(row => row.Enabled &&
+                    row.Priority == null && row.MaximumCasts == null);
+                if (automatic) summary = "Casters: Automatic";
+                else
+                {
+                    string configured = string.Join(", ", rows.Where(row => row.Enabled)
+                        .Select(row => row.CasterName +
+                            (row.MaximumCasts == null ? string.Empty :
+                                " (max " + row.MaximumCasts.Value + ")"))
+                        .ToArray());
+                    summary = configured.Length == 0
+                        ? "Casters: None enabled" : "Casters: " + configured;
+                    warning = configured.Length == 0;
+                }
+            }
+            string description = string.Join("\n", rows.Select(row =>
+                row.Order + ". " + row.CasterName + " | " + row.Source +
+                " | " + row.Remaining +
+                (row.Enabled ? string.Empty : " | Do not use") +
+                (row.MaximumCasts == null ? string.Empty :
+                    " | maximum per run " + row.MaximumCasts.Value) +
+                (string.IsNullOrWhiteSpace(row.UnavailableReason)
+                    ? string.Empty : " | " + row.UnavailableReason)).ToArray());
+            if (warning)
+                description = "Provider policy cannot cover every selected target.\n" +
+                    description;
+            return new CasterPolicyViewModel(
+                summary, description, warning, rows);
+        }
+    }
+
     public sealed class SelectedCastingViewModel
     {
         private SelectedCastingViewModel(string casterText, string casterDetail,
             string enhancementLabel, string enhancementDescription, int candidateCount,
-            string selectedEnhancementId, IEnumerable<EnhancementChoiceViewModel> choices)
+            string selectedEnhancementId, IEnumerable<EnhancementChoiceViewModel> choices,
+            CasterPolicyViewModel casterPolicy)
         {
             CasterText = casterText;
             CasterDetail = casterDetail;
@@ -203,6 +397,7 @@ namespace KingmakerBuffPlanner.UI
             CandidateCount = candidateCount;
             SelectedEnhancementId = selectedEnhancementId ?? string.Empty;
             Choices = choices.ToList().AsReadOnly();
+            CasterPolicy = casterPolicy ?? CasterPolicyViewModel.Empty();
         }
 
         public string CasterText { get; private set; }
@@ -212,6 +407,7 @@ namespace KingmakerBuffPlanner.UI
         public int CandidateCount { get; private set; }
         public string SelectedEnhancementId { get; private set; }
         public IReadOnlyList<EnhancementChoiceViewModel> Choices { get; private set; }
+        public CasterPolicyViewModel CasterPolicy { get; private set; }
 
         public static SelectedCastingViewModel Create(SetupSourceRow source,
             PlannerSetupModel model, string routineId, RoutinePlanResult preview)
@@ -219,7 +415,8 @@ namespace KingmakerBuffPlanner.UI
             if (source == null || model == null)
                 return new SelectedCastingViewModel("Caster: None", string.Empty,
                     "Enhancement: None available", "Select a buff to choose an enhancement.",
-                    0, string.Empty, new[] { NoneChoice(true) });
+                    0, string.Empty, new[] { NoneChoice(true) },
+                    CasterPolicyViewModel.Empty());
 
             IReadOnlyList<string> selectedIds = model.GetSelectedEnhancementIds(routineId);
             string selectedId = selectedIds.FirstOrDefault() ?? string.Empty;
@@ -234,45 +431,13 @@ namespace KingmakerBuffPlanner.UI
                         "Unavailable", "Persisted enhancement source: " + selectedId, true, false)
                     : Choice(selected, true, false, model));
 
-            List<ProviderSnapshot> providers = ResolveProviders(source, preview);
-            string casterText;
-            string casterDetail;
-            if (providers.Count == 1)
-            {
-                casterText = "Caster: " + model.GetCasterDisplayName(providers[0]);
-                casterDetail = ProviderDetail(providers[0], model);
-            }
-            else
-            {
-                string names = string.Join(", ", providers.Select(model.GetCasterDisplayName)
-                    .Distinct(StringComparer.OrdinalIgnoreCase).ToArray());
-                casterText = (preview != null && preview.Plan.Steps.Any(step =>
-                    step.SourceId == source.SourceId) ? "Casters: " : "Casters available: ") + names;
-                casterDetail = preview != null && preview.Plan.Steps.Any(step =>
-                    step.SourceId == source.SourceId)
-                    ? "Provider assignments are resolved per planned cast."
-                    : "The generated plan will resolve the caster for each cast.";
-            }
+            CasterPolicyViewModel casterPolicy = CasterPolicyViewModel.Create(
+                source, model, routineId, preview);
 
-            return new SelectedCastingViewModel(casterText, casterDetail,
+            return new SelectedCastingViewModel(casterPolicy.Summary,
+                casterPolicy.Description,
                 model.GetEnhancementSummary(routineId), model.GetEnhancementDescription(routineId),
-                applicable.Count, selectedId, choices);
-        }
-
-        private static List<ProviderSnapshot> ResolveProviders(SetupSourceRow source,
-            RoutinePlanResult preview)
-        {
-            if (preview != null)
-            {
-                HashSet<string> keys = new HashSet<string>(preview.Plan.Steps
-                    .Where(step => step.SourceId == source.SourceId)
-                    .Select(step => step.Provider.Canonical), StringComparer.Ordinal);
-                if (keys.Count != 0)
-                    return source.Providers.Where(provider => keys.Contains(provider.Key.Canonical))
-                        .OrderBy(provider => provider.Key.Canonical, StringComparer.Ordinal).ToList();
-            }
-            return source.Providers.OrderBy(provider => provider.Key.Canonical,
-                StringComparer.Ordinal).ToList();
+                applicable.Count, selectedId, choices, casterPolicy);
         }
 
         private static EnhancementChoiceViewModel NoneChoice(bool selected)
@@ -301,16 +466,6 @@ namespace KingmakerBuffPlanner.UI
                 summary, description, selected, available);
         }
 
-        private static string ProviderDetail(ProviderSnapshot provider, PlannerSetupModel model)
-        {
-            ResourcePoolSnapshot pool = model.GetResourcePool(provider);
-            int? remaining = model.GetRemainingCasts(provider);
-            string source = provider.Key.Ability.SourceKind == SourceKind.Spellbook
-                ? "Spellbook" : provider.Key.Ability.SourceKind.ToString();
-            return source + " | " + (remaining == null ? "At will" :
-                remaining.Value + (remaining.Value == 1 ? " cast available" : " casts available")) +
-                (pool.Kind == ResourcePoolKind.PreparedSlots ? " | Prepared" : string.Empty);
-        }
     }
 
     public static class CastingPanelLayoutContract
@@ -318,11 +473,19 @@ namespace KingmakerBuffPlanner.UI
         public const int ButtonFontSize = 17;
         public const int LabelVerticalPadding = 1;
         public const float MinimumEnhancementButtonHeight = 32f;
+        public const float MinimumCasterPolicyRowHeight = 92f;
+        public const float MinimumCasterPolicyRowWidth = 720f;
         public const string SettingsCloseLabel = "CLOSE";
 
         public static bool CanRenderLabel(float buttonHeight)
         {
             return buttonHeight - (LabelVerticalPadding * 2) >= ButtonFontSize;
+        }
+
+        public static bool CanRenderCasterPolicyRow(float width, float height)
+        {
+            return width >= MinimumCasterPolicyRowWidth &&
+                height >= MinimumCasterPolicyRowHeight;
         }
     }
     public sealed class TargetPortraitViewModel

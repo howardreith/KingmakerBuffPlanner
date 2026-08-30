@@ -1,5 +1,47 @@
 # Autonomous Resume
 
+## 0.0.15 publication authorization - 2026-08-29
+
+- The owner explicitly authorized the final commit, merge to `main`, remote
+  push, and a new public release for the completed caster-controls mission.
+- Public repository/default branch/authenticated account are
+  `howardreith/KingmakerBuffPlanner` / `main` / `howardreith`. Feature HEAD
+  before release preparation is
+  `ed6108f1549aadf8b570d686e9f97f2aa80940b3`; refreshed local and remote
+  `main` are both `011a57ff0565b5954745a8b0e742726a74b4315f`. `v0.0.15`
+  is unused locally and on GitHub.
+- Product metadata and release notes advance to 0.0.15. Existing schema 4 is
+  unchanged. The guarded baseline=0/working=0 runtime limitation remains
+  explicit and no ordinary save will be substituted.
+- Exact next action: commit and fully qualify the clean release source, merge
+  without history rewriting, qualify exact `main`, then use the guarded push
+  and publication helpers and independently verify the published assets.
+
+## Buff catalog/caster-controls checkpoint - 2026-08-29
+
+- Active branch is `codex/buff-catalog-caster-controls`; implementation commit
+  is `ec718fa96ae1cbbb1feeb5b3acd1900e867b699a`; qualified implementation/
+  record HEAD is `ce7099b089440e40716cbbd39c4e377c4fbe21c2`; version remains
+  0.0.14.
+- Implementation is complete for HUD feedback retirement, exact current-caster
+  variant selectability, safe persistent-payload classification, allied area
+  semantics, and exact-provider caster policy UI/persistence/preview.
+- Exact gates: inspection exit 0; source 38/38; protocol/domain 119/119;
+  runtime filesystem 8/8; package 4/4; deployment WhatIf 5/5; aggregate 1/1;
+  Release build 1/1; deterministic builds 2/2; release builder 3/3; diff check
+  pass.
+- Local-only ZIP/DLL/MVID:
+  `239eb9de3657de030c88dabfffeaa3fab344ec01e8d561e6649281d7a9cf0571` /
+  `6fe6d6837f5155b5ad1b1cdd1e64d47974cadbab44a824efa42dc0edea48b4d6` /
+  `80732098-e9da-45b2-b402-7b4ca6f52752`.
+- Structured implementation/contract/probe evidence is
+  `planning/BUFF-CATALOG-CASTER-CONTROLS-EVIDENCE.md`.
+- Runtime remains honestly blocked at exact guarded inventory
+  `baseline=0; working=0`. Nothing was installed, launched, pushed, tagged,
+  or published.
+- Exact next action: use the bounded manual checklist only after an authorized
+  save pair exists. No further safe source/package work remains.
+
 ## 0.0.14 published completion - 2026-08-28
 
 - Release/tag commit is `1ad148780d801d63d7ab40e52bba94b7c4627b47`;

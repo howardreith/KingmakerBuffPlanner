@@ -106,7 +106,7 @@ namespace KingmakerBuffPlanner.Discovery
 
         private static EffectTarget ToTarget(string kind)
         {
-            if (kind == "AreaBuff") return EffectTarget.AreaRecipients;
+            if (kind == "AreaBuff") return EffectTarget.AmbiguousAreaRecipients;
             return EffectTarget.CurrentTarget;
         }
 

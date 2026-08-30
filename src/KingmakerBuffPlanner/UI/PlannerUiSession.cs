@@ -149,6 +149,13 @@ namespace KingmakerBuffPlanner.UI
                             : ";qualifiedAbilities=" + enhancement.AbilityWhiteList.Count) + ".");
                 }
                 _log.Info("[KBP-CATALOG] discovery;" + CatalogDiscovery + ".");
+                foreach (PartyVariantEligibilityTrace trace in CatalogDiscovery.Variants)
+                    _log.Info("[KBP-VARIANT-ELIGIBILITY] caster=" + trace.CasterUnitId +
+                        ";spellbook=" + trace.SpellbookGuid +
+                        ";source=" + trace.SourceGuid +
+                        ";child=" + trace.ChildGuid +
+                        ";eligible=" + trace.Eligible +
+                        ";reason=" + trace.Reason + ".");
                 LogBlessSlice(loaded.Profile, snapshot, _providerOptions, Model);
             }
             catch (Exception exception)
@@ -286,6 +293,9 @@ namespace KingmakerBuffPlanner.UI
                 ";steps=" + preview.Plan.Steps.Count + ";outcomes=" +
                 preview.Plan.Outcomes.Count + ";unsupported=" +
                 preview.UnsupportedSourceIds.Count + ".");
+            foreach (string diagnostic in preview.Plan.Diagnostics)
+                _log.Info("[KBP-PLAN-DIAGNOSTIC] group=" + routineId + ";" +
+                    diagnostic + ".");
             RoutineProfile routine = configuredRoutine;
             if (routine.Assignments.Count == 0)
             {

@@ -21,6 +21,8 @@ namespace KingmakerBuffPlanner.GameAdapters
             new Dictionary<string, EffectExpression>(StringComparer.Ordinal);
         private readonly List<PartySourceDiscoveryTrace> _sourceTraces =
             new List<PartySourceDiscoveryTrace>();
+        private readonly List<PartyVariantEligibilityTrace> _variantTraces =
+            new List<PartyVariantEligibilityTrace>();
         private int _rawCandidateCount;
         private int _beneficialCandidateCount;
         private int _spellbookCount;
@@ -43,6 +45,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                 throw new InvalidOperationException("Kingmaker player state is unavailable.");
             _effectsBySource.Clear();
             _sourceTraces.Clear();
+            _variantTraces.Clear();
             _rawCandidateCount = 0;
             _beneficialCandidateCount = 0;
             _spellbookCount = 0;
@@ -61,7 +64,7 @@ namespace KingmakerBuffPlanner.GameAdapters
             Diagnostics = new PartyCatalogDiscoveryDiagnostics(
                 units.Count, _spellbookCount, _rawCandidateCount, _beneficialCandidateCount,
                 _effectsBySource.Count, providers.Count, _sourceTraces,
-                _blessMaterialEvidence);
+                _variantTraces, _blessMaterialEvidence);
             return snapshot;
         }
 
@@ -128,10 +131,12 @@ namespace KingmakerBuffPlanner.GameAdapters
                     pools.Add(new ResourcePoolSnapshot(poolKey, ResourcePoolKind.SpontaneousLevel,
                         capacity, remaining, null));
                 }
-                foreach (KingmakerAbilitySelection selection in KingmakerAbilityVariants.Expand(spellbook.GetKnownSpells(level)))
+                foreach (KingmakerAbilitySelection selection in ExpandOwned(
+                    spellbook.GetKnownSpells(level), unit, spellbook.Blueprint.AssetGuid))
                     AddSpellProvider(unit, spellbook, selection, poolKey, level == 0 ? 0 : 1,
                         new string[0], providers);
-                foreach (KingmakerAbilitySelection selection in KingmakerAbilityVariants.Expand(spellbook.GetCustomSpells(level)))
+                foreach (KingmakerAbilitySelection selection in ExpandOwned(
+                    spellbook.GetCustomSpells(level), unit, spellbook.Blueprint.AssetGuid))
                     AddSpellProvider(unit, spellbook, selection, poolKey, level == 0 ? 0 : 1,
                         new string[0], providers);
             }
@@ -153,7 +158,8 @@ namespace KingmakerBuffPlanner.GameAdapters
                 foreach (IGrouping<string, SpellSlot> group in cantripSlots.GroupBy(
                     s => ToAbilityKey(s.Spell, SourceKind.Spellbook).Canonical, StringComparer.Ordinal))
                 {
-                    foreach (KingmakerAbilitySelection selection in KingmakerAbilityVariants.Expand(new[] { group.First().Spell }))
+                    foreach (KingmakerAbilitySelection selection in ExpandOwned(
+                        new[] { group.First().Spell }, unit, spellbook.Blueprint.AssetGuid))
                         AddSpellProvider(unit, spellbook, selection, unlimitedKey, 0, new string[0], providers);
                 }
             }
@@ -175,7 +181,8 @@ namespace KingmakerBuffPlanner.GameAdapters
             foreach (IGrouping<string, SpellSlot> group in slots.GroupBy(
                 s => ToAbilityKey(s.Spell, SourceKind.Spellbook).Canonical, StringComparer.Ordinal))
             {
-                foreach (KingmakerAbilitySelection selection in KingmakerAbilityVariants.Expand(new[] { group.First().Spell }))
+                foreach (KingmakerAbilitySelection selection in ExpandOwned(
+                    new[] { group.First().Spell }, unit, spellbook.Blueprint.AssetGuid))
                     AddSpellProvider(unit, spellbook, selection, poolKey, 1,
                         group.Where(s => s.IsMainSlot).Select(s => ids[s]), providers);
             }
@@ -194,9 +201,22 @@ namespace KingmakerBuffPlanner.GameAdapters
                 AbilityData source = fact.Data;
                 if (source.Spellbook != null) continue;
                 foreach (KingmakerAbilitySelection selection in
-                    KingmakerAbilityVariants.Expand(new[] { source }))
+                    ExpandOwned(new[] { source }, unit, string.Empty))
                     AddFactProvider(unit, selection, providers, pools, poolKeys);
             }
+        }
+
+        private IEnumerable<KingmakerAbilitySelection> ExpandOwned(
+            IEnumerable<AbilityData> source, UnitEntityData unit, string spellbookGuid)
+        {
+            return KingmakerAbilityVariants.Expand(source, trace =>
+                _variantTraces.Add(new PartyVariantEligibilityTrace(
+                    unit == null ? string.Empty : unit.UniqueId,
+                    spellbookGuid,
+                    trace.SourceGuid,
+                    trace.ChildGuid,
+                    trace.Eligible,
+                    trace.Reason)));
         }
 
         private void AddFactProvider(
@@ -413,6 +433,7 @@ namespace KingmakerBuffPlanner.GameAdapters
             int normalizedEntryCount,
             int providerCount,
             IEnumerable<PartySourceDiscoveryTrace> sources,
+            IEnumerable<PartyVariantEligibilityTrace> variants,
             string blessMaterialEvidence)
         {
             PartyUnitCount = partyUnitCount;
@@ -422,6 +443,10 @@ namespace KingmakerBuffPlanner.GameAdapters
             NormalizedEntryCount = normalizedEntryCount;
             ProviderCount = providerCount;
             Sources = (sources ?? new PartySourceDiscoveryTrace[0]).ToArray();
+            Variants = (variants ?? new PartyVariantEligibilityTrace[0])
+                .GroupBy(value => value.Canonical, StringComparer.Ordinal)
+                .Select(group => group.First())
+                .OrderBy(value => value.Canonical, StringComparer.Ordinal).ToArray();
             BlessMaterialEvidence = blessMaterialEvidence ?? string.Empty;
         }
 
@@ -432,6 +457,7 @@ namespace KingmakerBuffPlanner.GameAdapters
         internal int NormalizedEntryCount { get; private set; }
         internal int ProviderCount { get; private set; }
         internal IReadOnlyList<PartySourceDiscoveryTrace> Sources { get; private set; }
+        internal IReadOnlyList<PartyVariantEligibilityTrace> Variants { get; private set; }
         internal string BlessMaterialEvidence { get; private set; }
 
         public override string ToString()
@@ -439,6 +465,40 @@ namespace KingmakerBuffPlanner.GameAdapters
             return "party=" + PartyUnitCount + ";spellbooks=" + SpellbookCount +
                 ";raw=" + RawCandidateCount + ";beneficial=" + BeneficialCandidateCount +
                 ";normalized=" + NormalizedEntryCount + ";providers=" + ProviderCount;
+        }
+    }
+
+    internal sealed class PartyVariantEligibilityTrace
+    {
+        internal PartyVariantEligibilityTrace(
+            string casterUnitId,
+            string spellbookGuid,
+            string sourceGuid,
+            string childGuid,
+            bool eligible,
+            string reason)
+        {
+            CasterUnitId = casterUnitId ?? string.Empty;
+            SpellbookGuid = spellbookGuid ?? string.Empty;
+            SourceGuid = sourceGuid ?? string.Empty;
+            ChildGuid = childGuid ?? string.Empty;
+            Eligible = eligible;
+            Reason = reason ?? string.Empty;
+        }
+
+        internal string CasterUnitId { get; private set; }
+        internal string SpellbookGuid { get; private set; }
+        internal string SourceGuid { get; private set; }
+        internal string ChildGuid { get; private set; }
+        internal bool Eligible { get; private set; }
+        internal string Reason { get; private set; }
+        internal string Canonical
+        {
+            get
+            {
+                return CasterUnitId + "|" + SpellbookGuid + "|" +
+                    SourceGuid + "|" + ChildGuid + "|" + Eligible + "|" + Reason;
+            }
         }
     }
 

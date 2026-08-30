@@ -1,5 +1,94 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-08-29 - 0.0.15 release authorization and preparation
+
+Status: OWNER AUTHORIZED FINAL COMMIT, MAIN MERGE, GUARDED PUSH, AND NEW
+PUBLIC RELEASE.
+
+- The owner explicitly requested commit, merge, push, and creation of a new
+  release for the completed buff-catalog/caster-controls mission. Version is
+  advanced from the already-published 0.0.14 to 0.0.15 without a schema change.
+- Read-only preflight confirms public `howardreith/KingmakerBuffPlanner`,
+  default branch `main`, active authenticated owner `howardreith`, and feature
+  HEAD `ed6108f1549aadf8b570d686e9f97f2aa80940b3`. Refreshed local and remote
+  `main` both equal `011a57ff0565b5954745a8b0e742726a74b4315f`, which is an
+  ancestor of the feature branch. No local tag or GitHub release `v0.0.15`
+  exists.
+- Publication will use the project-owned guarded push and release helpers. It
+  does not convert the exact baseline=0/working=0 save-fixture limitation into
+  an in-game PASS; release notes retain that boundary.
+- Exact next action: commit this 0.0.15 release source, run all clean-head
+  gates, merge without rewriting history into `main`, qualify the merge, then
+  guarded-push, publish, and independently verify remote refs and assets.
+
+## 2026-08-29 - final clean-head caster-controls handoff
+
+- Qualified implementation/record HEAD:
+  `ce7099b089440e40716cbbd39c4e377c4fbe21c2`; branch/version:
+  `codex/buff-catalog-caster-controls` / 0.0.14. The following checkpoint
+  commit is record-only.
+- Final commands/counts: inspection 1/1; source 38/38; protocol 119/119;
+  filesystem 8/8; package 4/4; deployment WhatIf 5/5; aggregate 1/1; exact
+  Release build 1/1; deterministic equality 2/2; release builder 3/3; diff
+  check pass.
+- Final qualified local ZIP/DLL/MVID:
+  `239eb9de3657de030c88dabfffeaa3fab344ec01e8d561e6649281d7a9cf0571` /
+  `6fe6d6837f5155b5ad1b1cdd1e64d47974cadbab44a824efa42dc0edea48b4d6` /
+  `80732098-e9da-45b2-b402-7b4ca6f52752`.
+- Worktree was clean and mission mirrors were byte-identical. Runtime remains
+  blocked at baseline=0/working=0; no live/remote operation occurred. Exact
+  next action is guarded/manual in-game acceptance when authorized fixtures
+  exist.
+
+## 2026-08-29 - buff catalog/caster-controls implementation checkpoint
+
+Status: SOURCE/BEHAVIOR/ASSEMBLY/DETERMINISTIC LOCAL PACKAGE PASS; GUARDED
+SAVE-BACKED RUNTIME BLOCKED.
+
+- Branch/intake/implementation HEAD/version:
+  `codex/buff-catalog-caster-controls` /
+  `011a57ff0565b5954745a8b0e742726a74b4315f` /
+  `ec718fa96ae1cbbb1feeb5b3acd1900e867b699a` / 0.0.14. Intake status was
+  clean; no pre-existing changes were present.
+- Removed the HUD-owned Feedback text/root/timer and its composition-root
+  presentation call. Quick callbacks, exact result messages/counts, planner
+  footer, UMM diagnostics, four buttons, tooltips, and execution disabling
+  remain.
+- Replaced unconditional declared-child expansion with the exact native
+  action-bar `AbilityData(parent, child).IsVisible()` eligibility contract.
+  Direct concrete ownership and exhausted-but-owned catalog membership remain;
+  stale execution resolution now fails closed.
+- Replaced generic area recipients with allied/enemy/ambiguous disposition and
+  added branch-path offensive-action/delivery and hidden-marker classification.
+  Probe names/GUIDs are evidence only; no blacklist or override was added.
+- Added explicit exact-provider Use, maximum per run, normalized order, and
+  selected-buff Automatic reset operations plus the blocked Caster Policy
+  modal and allocation summary. Existing schema 4
+  `Banned/Priority/MaximumCasts` fields remain authoritative.
+- Changed production/test files are grouped in
+  `planning/BUFF-CATALOG-CASTER-CONTROLS-EVIDENCE.md`. Implementation commit:
+  `ec718fa`.
+- Exact assembly SHA-256/MVID:
+  `3b6450ffec440e296e586f71c711b195aed144b28d53e1cbb29406d18fef5afb` /
+  `07fa1e4d-8618-41b3-9b8d-faa17d3b26f7`.
+- Commands: inspection exit 0; source 38/38; protocol/domain 119/119;
+  runtime-filesystem 8/8; package fixture 4/4; deployment WhatIf 5/5;
+  aggregate 1/1; Release build 1/1; deterministic builds 2/2; release builder
+  3/3; `git diff --check` pass.
+- Local-only ZIP/DLL/MVID:
+  `665077eb9fbb24077c73bdd726ad114dfa8930ea2cc754bfd860ee101f3a1eab` /
+  `ac826993249878188133e90eb12c3171b3aedd01129503d01555576f8d909613` /
+  `799ce2f9-6928-4180-88de-860c06bcbc12`.
+- Rejected theories/fixes: native game-log redirection, display-name/GUID
+  suppression, resource count as ownership, all-area-as-friendly, branch
+  flattening, hidden-marker rescue, first-sibling fallback, a fixed-caster
+  dropdown, UI allocator replacement, policy bypass, and stale-key remapping.
+- The read-only guarded resolver still reports
+  `Disposable save ambiguity: baseline=0; working=0.` No game, live Mods
+  transaction, or ordinary save was used. Exact next action: execute the eight
+  guarded/manual rows at the top of `docs/MANUAL-ACCEPTANCE.md` when an
+  authorized pair exists.
+
 ## 2026-08-28 - 0.0.14 published completion
 
 Status: PUBLISHED; REMOTE REFS AND DOWNLOADED ASSETS VERIFIED

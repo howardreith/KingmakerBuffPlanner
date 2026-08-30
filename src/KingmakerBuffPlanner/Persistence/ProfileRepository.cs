@@ -139,6 +139,11 @@ namespace KingmakerBuffPlanner.Persistence
                 throw new InvalidDataException("required-profile-section-null");
             RequireUnique(profile.Routines.Select(r => r == null ? null : r.RoutineId), "routine-id");
             RequireUnique(profile.ProviderPreferences.Select(p => p == null ? null : p.ProviderKey), "provider-key");
+            if (profile.ProviderPreferences.Any(preference =>
+                    (preference.Priority != null && preference.Priority.Value < 0) ||
+                    (preference.MaximumCasts != null &&
+                        preference.MaximumCasts.Value < 1)))
+                throw new InvalidDataException("invalid-provider-preference");
             foreach (RoutineProfile routine in profile.Routines)
             {
                 if (string.IsNullOrWhiteSpace(routine.Name) || routine.Assignments == null)

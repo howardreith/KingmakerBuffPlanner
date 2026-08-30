@@ -1,5 +1,77 @@
 # Implementation Report
 
+## 0.0.15 release preparation
+
+The completed buff-catalog/caster-controls maintenance is packaged as 0.0.15
+because 0.0.14 is already public. This is a product-version and release-notes
+advance over the implementation described below; it adds no persistence schema
+change or dependency. The exact-provider policy continues to use schema 4
+`Banned`, `Priority`, and `MaximumCasts` fields.
+
+The owner explicitly authorized final commit, merge to `main`, guarded push,
+and a new public release. Preflight found synchronized local/remote main at
+`011a57ff0565b5954745a8b0e742726a74b4315f`, authenticated owner
+`howardreith`, and no existing v0.0.15 tag or release. The release process will
+retain the documented baseline=0/working=0 save-backed qualification boundary.
+
+## 0.0.14 buff catalog/caster-controls maintenance
+
+Implementation checkpoint:
+`ec718fa96ae1cbbb1feeb5b3acd1900e867b699a` on
+`codex/buff-catalog-caster-controls`. Final qualified implementation/record
+HEAD is `ce7099b089440e40716cbbd39c4e377c4fbe21c2`; the subsequent handoff
+record commit is documentation-only.
+
+The lower-left result was produced by an owned `Feedback` Text created by
+`BuffPlannerHudButtonController` and fed by
+`BuffPlannerUiRoot.PresentQuickResult`. That object, its root, timer,
+presentation method, timeout polling, and composition-root call are removed.
+The complete `QuickExecutionResult`, callback instrumentation, planner-local
+footer, and `Routine UI result` UMM diagnostic remain.
+
+Unowned children appeared because every declared
+`BlueprintAbility.Variants` child was marked eligible once a parent source
+was owned. Exact Kingmaker 2.1.7b action-bar IL instead constructs child
+`AbilityData` from the parent context and calls `IsVisible()`. Discovery and
+execution now share that exact native visibility gate. Direct concrete sources
+remain owned. Exhausted slots/resources remain cataloged but unavailable
+because `IsAvailableForCast` and `GetAvailableForCastCount` are deliberately
+not ownership tests.
+
+Non-buff false positives came from erasing area disposition and allowing a
+non-harmful persistent marker to rescue offensive actions. The action graph
+now preserves allied/enemy/ambiguous areas, damage actions, delivery
+components, and action paths. Only a persistent beneficial payload on a proven
+safe recipient branch qualifies. Hidden carrier/activation/cleanup markers do
+not rescue damage or hostile delivery; a structurally substantive hidden
+self-buff remains supported.
+
+The selected panel now has a clickable Caster Policy summary and a blocked,
+scrolling modal with one row per exact provider. Rows show portrait, caster,
+spellbook/source identity, spell level, casts remaining/At will, transient
+unavailability, enabled state, order, and maximum per run. Buttons provide
+Use/Do not use, Earlier, Later, Unlimited/1/2/etc., Reset Automatic, and Close.
+Changes save immediately and regenerate the preview. With selected targets the
+summary reports actual planned caster counts; otherwise it reports configured
+policy. All-disabled or insufficient-cap plans remain unfulfilled and emit
+structured policy-refusal diagnostics. A preferred provider may also be
+capped, and a Blur cap cannot affect the same caster's different ability.
+
+The existing provider-preference fields and schema 4 are retained. Nullable
+Automatic/Unlimited values now deserialize explicitly, positive numeric values
+are validated, and stale provider keys remain exact ignored data.
+
+Regression coverage grew from 112 to 119 protocol/domain tests. Current
+implementation-checkpoint gates are source 38/38, protocol/domain 119/119,
+runtime filesystem 8/8, package fixture 4/4, deployment WhatIf 5/5, aggregate
+1/1, Release build 1/1, deterministic builds 2/2, and release builder 3/3.
+Final qualified local-only ZIP/DLL/MVID are
+`239eb9de3657de030c88dabfffeaa3fab344ec01e8d561e6649281d7a9cf0571` /
+`6fe6d6837f5155b5ad1b1cdd1e64d47974cadbab44a824efa42dc0edea48b4d6` /
+`80732098-e9da-45b2-b402-7b4ca6f52752`.
+Full evidence and rejected approaches are in
+`planning/BUFF-CATALOG-CASTER-CONTROLS-EVIDENCE.md`.
+
 ## 0.0.14 release result
 
 The qualified implementation was merged without history rewriting and released
