@@ -1,5 +1,29 @@
 # CODEX AUTONOMOUS MISSION
 
+## 2026-08-29 buff catalog/caster-controls checkpoint
+
+Branch/intake/implementation/version are
+`codex/buff-catalog-caster-controls` /
+`011a57ff0565b5954745a8b0e742726a74b4315f` /
+`ec718fa96ae1cbbb1feeb5b3acd1900e867b699a` / 0.0.14. Intake was clean.
+
+The focused mission is implemented without changing product boundaries or
+schema: the HUD Feedback lifecycle is gone while callbacks/footer/UMM results
+remain; parent-declared children use actual current-caster native visibility
+for both discovery and execution; transient depletion remains availability;
+allied/enemy/ambiguous recipients and offensive branch provenance prevent
+marker-rescued damage sources; and one blocked modal edits the existing exact
+provider ban/order/cap policy with pure regenerated previews.
+
+Exact assembly evidence, probe causes, rejected blacklist/dropdown/bypass
+approaches, changed-file groups, and local artifact hashes are recorded in
+`planning/BUFF-CATALOG-CASTER-CONTROLS-EVIDENCE.md`. Gates pass inspection
+exit 0, source 38/38, protocol 119/119, filesystem 8/8, package 4/4, WhatIf
+5/5, aggregate 1/1, build 1/1, deterministic 2/2, release builder 3/3, and diff
+check. Guarded saves remain exactly baseline=0/working=0, so in-game acceptance
+is not claimed. Exact next action is the authorized-save/manual checklist; no
+remote or live-game mutation is authorized.
+
 ## 2026-08-28 0.0.14 published completion checkpoint
 
 Qualified feature history was merged without rewriting and released from exact
