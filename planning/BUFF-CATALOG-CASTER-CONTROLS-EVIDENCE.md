@@ -215,7 +215,8 @@ binding to a different provider.
 
 The guarded save inventory still fails closed with exactly
 `Disposable save ambiguity: baseline=0; working=0.` No game launch, live Mods
-staging, or save access occurred. These results do not claim in-game
+staging, save selection, load, or mutation occurred. The repository guard read
+headers only to count exact authorized fixture names. These results do not claim in-game
 qualification. The exact next action is the bounded checklist at the top of
 `docs/MANUAL-ACCEPTANCE.md` after an authorized save pair exists.
 

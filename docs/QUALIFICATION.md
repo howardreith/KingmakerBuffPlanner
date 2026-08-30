@@ -39,8 +39,9 @@ provider policy plus layout contracts.
 
 The repository guard was rerun read-only and returned exactly
 `Disposable save ambiguity: baseline=0; working=0.` No Kingmaker process was
-launched, no live Mods staging occurred, and no ordinary save was inspected or
-used. The checks in `docs/MANUAL-ACCEPTANCE.md` remain required for any
+launched and no live Mods staging occurred. The guard read save headers only to
+count exact authorized names; no ordinary save was selected, loaded, mutated,
+or substituted. The checks in `docs/MANUAL-ACCEPTANCE.md` remain required for any
 in-game claim, screenshots, active-effect proof, or resource-debit proof.
 
 ## 0.0.14 published release qualification
