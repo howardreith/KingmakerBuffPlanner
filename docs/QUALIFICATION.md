@@ -1,5 +1,45 @@
 # Qualification
 
+## 0.0.14 buff catalog/caster-controls maintenance
+
+Status: SOURCE/BEHAVIOR/EXACT-ASSEMBLY/DETERMINISTIC LOCAL PACKAGE PASS;
+SAVE-BACKED IN-GAME VERIFICATION BLOCKED AND NOT CLAIMED.
+
+- Branch/implementation checkpoint/version:
+  `codex/buff-catalog-caster-controls` /
+  `ec718fa96ae1cbbb1feeb5b3acd1900e867b699a` / 0.0.14.
+- `.\scripts\Inspect-KingmakerVariantContracts.ps1`: exit 0. Exact
+  `Assembly-CSharp.dll` SHA-256
+  `3b6450ffec440e296e586f71c711b195aed144b28d53e1cbb29406d18fef5afb`;
+  MVID `07fa1e4d-8618-41b3-9b8d-faa17d3b26f7`. Verified native visibility
+  selection, transient availability, parent-child construction, target
+  disposition, area filter, damage, projectile, and weapon-delivery contracts.
+- `.\scripts\Test-SourceOnly.ps1`: source 38/38, protocol/domain 119/119,
+  runtime-harness filesystem 8/8, package 4/4, deployment WhatIf 5/5,
+  aggregate 1/1.
+- `.\scripts\Build.ps1 -Configuration Release`: source 38/38, build 1/1.
+- `.\scripts\Build-Release.ps1`: deterministic equality 2/2, release
+  builder 3/3; each internal build source 38/38, build 1/1, local package 1/1,
+  with package validation 4/4.
+- `git diff --check`: pass.
+- Local-only release ZIP/DLL/MVID:
+  `665077eb9fbb24077c73bdd726ad114dfa8930ea2cc754bfd860ee101f3a1eab` /
+  `ac826993249878188133e90eb12c3171b3aedd01129503d01555576f8d909613` /
+  `799ce2f9-6928-4180-88de-860c06bcbc12`.
+
+The behavioral suite proves HUD callbacks/results and no Feedback/native-log
+route; direct/selectable/rejected/exhausted/stale variant semantics; five-child
+expansion and one parent debit; allied/enemy/ambiguous, offensive-marker,
+legitimate-hidden, conditional, heal, worn-item, and pet classification; and
+automatic/split/banned/capped/ability-scoped/reset/round-trip/stale/exhausted
+provider policy plus layout contracts.
+
+The repository guard was rerun read-only and returned exactly
+`Disposable save ambiguity: baseline=0; working=0.` No Kingmaker process was
+launched, no live Mods staging occurred, and no ordinary save was inspected or
+used. The checks in `docs/MANUAL-ACCEPTANCE.md` remain required for any
+in-game claim, screenshots, active-effect proof, or resource-debit proof.
+
 ## 0.0.14 published release qualification
 
 Status: MERGED; GUARDED-PUSHED; PUBLISHED; REMOTE/DOWNLOADED ASSETS VERIFIED;

@@ -1,5 +1,21 @@
 # Autonomous Blockers
 
+Buff catalog/caster-controls maintenance, 2026-08-29: no source, compilation,
+deterministic behavior, package-allowlist, deployment-WhatIf, exact assembly
+inspection, architecture, or persistence blocker. Implementation checkpoint is
+`ec718fa96ae1cbbb1feeb5b3acd1900e867b699a` on
+`codex/buff-catalog-caster-controls`. Automated counts are 38/38, 119/119,
+8/8, 4/4, 5/5, aggregate 1/1, build 1/1, deterministic 2/2, and release builder
+3/3.
+
+Save-backed catalog screenshots, actual native visibility results for the
+reported party, exact Resist Energy child effect/resource debit, live
+caster-policy execution/persistence, and absence of both HUD/native-log text
+remain blocked because the repository guard reports exactly
+`Disposable save ambiguity: baseline=0; working=0.` This is an external
+fixture blocker, not an automated PASS. No ordinary save may substitute. No
+game launch, live install, remote mutation, or publication occurred.
+
 0.0.14 published completion, 2026-08-28: COMPLETE; no source, deterministic,
 merge, guarded-push, tag, publication, checksum, download, or package-validation
 blocker. Public v0.0.14 is published from

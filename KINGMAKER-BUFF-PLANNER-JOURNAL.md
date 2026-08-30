@@ -1,5 +1,54 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-08-29 - buff catalog/caster-controls implementation checkpoint
+
+Status: SOURCE/BEHAVIOR/ASSEMBLY/DETERMINISTIC LOCAL PACKAGE PASS; GUARDED
+SAVE-BACKED RUNTIME BLOCKED.
+
+- Branch/intake/implementation HEAD/version:
+  `codex/buff-catalog-caster-controls` /
+  `011a57ff0565b5954745a8b0e742726a74b4315f` /
+  `ec718fa96ae1cbbb1feeb5b3acd1900e867b699a` / 0.0.14. Intake status was
+  clean; no pre-existing changes were present.
+- Removed the HUD-owned Feedback text/root/timer and its composition-root
+  presentation call. Quick callbacks, exact result messages/counts, planner
+  footer, UMM diagnostics, four buttons, tooltips, and execution disabling
+  remain.
+- Replaced unconditional declared-child expansion with the exact native
+  action-bar `AbilityData(parent, child).IsVisible()` eligibility contract.
+  Direct concrete ownership and exhausted-but-owned catalog membership remain;
+  stale execution resolution now fails closed.
+- Replaced generic area recipients with allied/enemy/ambiguous disposition and
+  added branch-path offensive-action/delivery and hidden-marker classification.
+  Probe names/GUIDs are evidence only; no blacklist or override was added.
+- Added explicit exact-provider Use, maximum per run, normalized order, and
+  selected-buff Automatic reset operations plus the blocked Caster Policy
+  modal and allocation summary. Existing schema 4
+  `Banned/Priority/MaximumCasts` fields remain authoritative.
+- Changed production/test files are grouped in
+  `planning/BUFF-CATALOG-CASTER-CONTROLS-EVIDENCE.md`. Implementation commit:
+  `ec718fa`.
+- Exact assembly SHA-256/MVID:
+  `3b6450ffec440e296e586f71c711b195aed144b28d53e1cbb29406d18fef5afb` /
+  `07fa1e4d-8618-41b3-9b8d-faa17d3b26f7`.
+- Commands: inspection exit 0; source 38/38; protocol/domain 119/119;
+  runtime-filesystem 8/8; package fixture 4/4; deployment WhatIf 5/5;
+  aggregate 1/1; Release build 1/1; deterministic builds 2/2; release builder
+  3/3; `git diff --check` pass.
+- Local-only ZIP/DLL/MVID:
+  `665077eb9fbb24077c73bdd726ad114dfa8930ea2cc754bfd860ee101f3a1eab` /
+  `ac826993249878188133e90eb12c3171b3aedd01129503d01555576f8d909613` /
+  `799ce2f9-6928-4180-88de-860c06bcbc12`.
+- Rejected theories/fixes: native game-log redirection, display-name/GUID
+  suppression, resource count as ownership, all-area-as-friendly, branch
+  flattening, hidden-marker rescue, first-sibling fallback, a fixed-caster
+  dropdown, UI allocator replacement, policy bypass, and stale-key remapping.
+- The read-only guarded resolver still reports
+  `Disposable save ambiguity: baseline=0; working=0.` No game, live Mods
+  transaction, or ordinary save was used. Exact next action: execute the eight
+  guarded/manual rows at the top of `docs/MANUAL-ACCEPTANCE.md` when an
+  authorized pair exists.
+
 ## 2026-08-28 - 0.0.14 published completion
 
 Status: PUBLISHED; REMOTE REFS AND DOWNLOADED ASSETS VERIFIED

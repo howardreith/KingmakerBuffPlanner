@@ -1,5 +1,33 @@
 # Resource and Casting Contract Inventory
 
+## 0.0.14 membership/availability and per-buff provider policy
+
+Catalog ownership is established before resource availability. Direct actual
+spell/fact/resource children remain owned, and parent-expanded children require
+native source-context visibility. Current spontaneous/prepared slots, ability
+resources, item charges/materials, and caster state remain provider
+availability. Therefore an owned exhausted provider stays visible and keeps its
+saved policy, while an ungranted child never becomes a provider.
+
+The existing exact `ProviderKey` scope and `ProviderSelectionPolicy` remain
+unchanged. Explicit UI operations edit `Banned`, normalized `Priority`, and
+`MaximumCasts`; a provider can be both preferred and capped. `CastPlanner`
+continues to own allocation and its shared resource ledger. It assigns the
+first eligible cast to the preferred provider until its cap, then uses enabled
+fallbacks; bans/caps are never bypassed. Exhausted policy produces exact
+fulfilled/unfulfilled outcomes plus structured counts for providers, banned,
+at-cap, and policy-eligible candidates. Preview uses the same allocator without
+resource mutation.
+
+Schema remains 4. Preferences are exact-provider data across campaign routines,
+so Felix/Blur cannot cap Felix/Bulls Strength and distinct spellbooks/source
+instances cannot alias. Stale keys are ignored rather than rebound. Pure
+regressions cover Automatic equivalence, split 1/remainder allocation, all-ban,
+insufficient caps, ability scope, normalized reorder, selected-source reset,
+round trip, stale keys, and temporarily unavailable chooser rows. Actual native
+debit/execution remains a guarded manual row because the save inventory is
+baseline=0/working=0.
+
 ## 0.0.14 parent-backed concrete variant casting
 
 Reflection-only IL inspection proves `AbilityData(AbilityData,

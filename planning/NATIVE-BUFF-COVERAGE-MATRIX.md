@@ -1,5 +1,24 @@
 # Native Buff Coverage Matrix
 
+0.0.14 catalog-membership correction: a global blueprint accessibility path
+and a real persistent buff no longer imply that the current party owns every
+declared child. Direct actual sources qualify; parent-expanded children require
+the exact source-context native visibility gate. Exhaustion affects displayed
+availability, not membership. Historical Effortless Aid and Flying Kick rows
+prove why both layers are needed: each has a genuine beneficial effect and an
+`AbilityShowIfCasterHasFact` contract, but only the latter establishes
+current-caster selectability.
+
+Persistent-effect coverage now distinguishes self/friend/party/pet/allied area
+from enemy-only and ambiguous area recipients. Mass grouping is allied-only.
+Damage/offensive delivery plus hidden carrier/activation/save/cleanup leaves is
+excluded with action-path evidence; a substantive hidden self-buff remains
+eligible. The Channel damage and Alchemist's Fire probes informed generic
+fixtures only. Their English names and GUIDs do not occur in production policy,
+and no override was added. The prior generated catalog remains immutable
+historical input, not a relabeled current runtime result. See
+`planning/BUFF-CATALOG-CASTER-CONTROLS-EVIDENCE.md`.
+
 0.0.14 selectable-variant evidence: the exact catalog records five declared,
 independently eligible persistent-buff children for each Resist Energy family.
 Non-Communal order is Cold, Sonic, Electricity, Fire, Acid; Communal order is
