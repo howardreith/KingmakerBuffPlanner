@@ -1,5 +1,19 @@
 # Implementation Report
 
+## 0.0.15 release preparation
+
+The completed buff-catalog/caster-controls maintenance is packaged as 0.0.15
+because 0.0.14 is already public. This is a product-version and release-notes
+advance over the implementation described below; it adds no persistence schema
+change or dependency. The exact-provider policy continues to use schema 4
+`Banned`, `Priority`, and `MaximumCasts` fields.
+
+The owner explicitly authorized final commit, merge to `main`, guarded push,
+and a new public release. Preflight found synchronized local/remote main at
+`011a57ff0565b5954745a8b0e742726a74b4315f`, authenticated owner
+`howardreith`, and no existing v0.0.15 tag or release. The release process will
+retain the documented baseline=0/working=0 save-backed qualification boundary.
+
 ## 0.0.14 buff catalog/caster-controls maintenance
 
 Implementation checkpoint:

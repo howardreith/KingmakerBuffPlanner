@@ -1,5 +1,26 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-08-29 - 0.0.15 release authorization and preparation
+
+Status: OWNER AUTHORIZED FINAL COMMIT, MAIN MERGE, GUARDED PUSH, AND NEW
+PUBLIC RELEASE.
+
+- The owner explicitly requested commit, merge, push, and creation of a new
+  release for the completed buff-catalog/caster-controls mission. Version is
+  advanced from the already-published 0.0.14 to 0.0.15 without a schema change.
+- Read-only preflight confirms public `howardreith/KingmakerBuffPlanner`,
+  default branch `main`, active authenticated owner `howardreith`, and feature
+  HEAD `ed6108f1549aadf8b570d686e9f97f2aa80940b3`. Refreshed local and remote
+  `main` both equal `011a57ff0565b5954745a8b0e742726a74b4315f`, which is an
+  ancestor of the feature branch. No local tag or GitHub release `v0.0.15`
+  exists.
+- Publication will use the project-owned guarded push and release helpers. It
+  does not convert the exact baseline=0/working=0 save-fixture limitation into
+  an in-game PASS; release notes retain that boundary.
+- Exact next action: commit this 0.0.15 release source, run all clean-head
+  gates, merge without rewriting history into `main`, qualify the merge, then
+  guarded-push, publish, and independently verify remote refs and assets.
+
 ## 2026-08-29 - final clean-head caster-controls handoff
 
 - Qualified implementation/record HEAD:

@@ -1,5 +1,22 @@
 # Autonomous Resume
 
+## 0.0.15 publication authorization - 2026-08-29
+
+- The owner explicitly authorized the final commit, merge to `main`, remote
+  push, and a new public release for the completed caster-controls mission.
+- Public repository/default branch/authenticated account are
+  `howardreith/KingmakerBuffPlanner` / `main` / `howardreith`. Feature HEAD
+  before release preparation is
+  `ed6108f1549aadf8b570d686e9f97f2aa80940b3`; refreshed local and remote
+  `main` are both `011a57ff0565b5954745a8b0e742726a74b4315f`. `v0.0.15`
+  is unused locally and on GitHub.
+- Product metadata and release notes advance to 0.0.15. Existing schema 4 is
+  unchanged. The guarded baseline=0/working=0 runtime limitation remains
+  explicit and no ordinary save will be substituted.
+- Exact next action: commit and fully qualify the clean release source, merge
+  without history rewriting, qualify exact `main`, then use the guarded push
+  and publication helpers and independently verify the published assets.
+
 ## Buff catalog/caster-controls checkpoint - 2026-08-29
 
 - Active branch is `codex/buff-catalog-caster-controls`; implementation commit

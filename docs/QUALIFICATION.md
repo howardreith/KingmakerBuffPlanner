@@ -1,5 +1,29 @@
 # Qualification
 
+## 0.0.15 publication preflight
+
+Status: OWNER AUTHORIZED; VERSION/NOTES PREPARED; CLEAN-HEAD AND MERGE-COMMIT
+QUALIFICATION PENDING THIS RELEASE CHECKPOINT.
+
+- Feature branch/HEAD before preparation:
+  `codex/buff-catalog-caster-controls` /
+  `ed6108f1549aadf8b570d686e9f97f2aa80940b3`.
+- Public repository/default branch/authenticated account:
+  `howardreith/KingmakerBuffPlanner` / `main` / `howardreith`.
+- Refreshed local and remote `main`:
+  `011a57ff0565b5954745a8b0e742726a74b4315f`; the feature is a direct
+  descendant. No local tag or GitHub release `v0.0.15` exists.
+- The owner authorized final commit, non-rewriting merge, guarded remote push,
+  and a new public release. Product metadata and notes now identify 0.0.15;
+  persistence remains schema 4.
+- Save-backed qualification remains unavailable at exact guarded inventory
+  baseline=0/working=0. Publication will not be reported as in-game proof.
+
+Exact next action: commit this release source; rerun inspection, source,
+protocol/domain, filesystem, package, deployment-WhatIf, Release, deterministic
+release, and diff gates; then repeat the required gates on the exact `main`
+merge before guarded publication.
+
 ## 0.0.14 buff catalog/caster-controls maintenance
 
 Status: SOURCE/BEHAVIOR/EXACT-ASSEMBLY/DETERMINISTIC LOCAL PACKAGE PASS;

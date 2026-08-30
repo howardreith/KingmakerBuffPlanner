@@ -1,5 +1,21 @@
 # CODEX AUTONOMOUS MISSION
 
+## 2026-08-29 0.0.15 publication authorization checkpoint
+
+The owner explicitly authorized final commit, merge to default branch `main`,
+guarded remote push, and a new public release. Read-only preflight proves public
+`howardreith/KingmakerBuffPlanner`, authenticated owner `howardreith`, feature
+HEAD `ed6108f1549aadf8b570d686e9f97f2aa80940b3`, synchronized local/remote
+main `011a57ff0565b5954745a8b0e742726a74b4315f`, and no existing local or
+GitHub v0.0.15 tag/release. Product metadata and release notes advance to
+0.0.15 with persistence schema 4 unchanged. The absent guarded save pair
+(baseline=0/working=0) remains an explicit in-game evidence limitation.
+
+Exact next action is to commit and fully qualify this clean release source,
+merge without history rewriting, qualify exact `main`, use the project-owned
+guarded push/publisher, independently verify refs/downloaded assets, and commit
+the final publication record.
+
 ## 2026-08-29 final clean-head caster-controls handoff
 
 Qualified implementation/record HEAD is

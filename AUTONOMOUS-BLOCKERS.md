@@ -1,5 +1,14 @@
 # Autonomous Blockers
 
+0.0.15 publication authorization, 2026-08-29: no authorization, repository,
+default-branch, authentication, version-collision, or remote-divergence
+blocker. The owner explicitly authorized final commit, merge, guarded push, and
+a new public release. Public repository/default branch/account are
+`howardreith/KingmakerBuffPlanner` / `main` / `howardreith`; synchronized
+local/remote main is `011a57ff0565b5954745a8b0e742726a74b4315f`, and v0.0.15
+is unused. The absent exact save fixtures remain an honest in-game evidence
+limitation, not a release-engineering blocker or automated PASS.
+
 Buff catalog/caster-controls maintenance, 2026-08-29: no source, compilation,
 deterministic behavior, package-allowlist, deployment-WhatIf, exact assembly
 inspection, architecture, or persistence blocker. Implementation checkpoint is
