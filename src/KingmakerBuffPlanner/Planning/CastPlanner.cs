@@ -11,6 +11,12 @@ namespace KingmakerBuffPlanner.Planning
     public sealed class CastPlanner
     {
         private readonly EffectPresenceEvaluator _presence = new EffectPresenceEvaluator();
+        private readonly EffectiveProviderOptionResolver _targeting;
+
+        public CastPlanner(EffectiveProviderOptionResolver targeting = null)
+        {
+            _targeting = targeting ?? new EffectiveProviderOptionResolver();
+        }
 
         public CastPlan Plan(
             PartyProviderSnapshot snapshot,
@@ -101,10 +107,8 @@ namespace KingmakerBuffPlanner.Planning
                     }
                     pending.Add(targetId);
                 }
-                var eligibleAbilities = new HashSet<string>(request.Source.Abilities
-                    .Select(ability => ability.Canonical), StringComparer.Ordinal);
-                List<ProviderPlanningOption> sourceOptions = options.Where(o =>
-                    eligibleAbilities.Contains(o.Provider.Key.Ability.Canonical)).ToList();
+                List<ProviderPlanningOption> sourceOptions = _targeting.Resolve(
+                    snapshot, request, options, enhancementList).ToList();
                 if (request.Source.Grouping == CastGroupingKind.MassConfiguredTargets)
                     PlanMass(request, pending, sourceOptions, selectionPolicy, ledger, castsByProvider,
                         poolKinds, materials, enhancementById, enhancementRemaining,
@@ -156,7 +160,8 @@ namespace KingmakerBuffPlanner.Planning
                 steps.Add(new CastStep(request.Source.SourceId, selection.Option.Provider.Key,
                     selection.Anchor, new[] { targetId }, recipients,
                     selection.Reservation, selection.MaterialReservation,
-                    request.Source.Effects, false, request.EnhancementIds));
+                    request.Source.Effects, false, request.EnhancementIds,
+                    EnhancementUsage(request.EnhancementIds, enhancements)));
                 outcomes.Add(new TargetPlanOutcome(request.Source.SourceId, targetId,
                     TargetOutcomeKind.Fulfilled,
                     request.Source.SourceId + ":planned", new string[0]));
@@ -208,7 +213,8 @@ namespace KingmakerBuffPlanner.Planning
                 steps.Add(new CastStep(request.Source.SourceId, selection.Option.Provider.Key,
                     selection.Anchor, covered, recipients, selection.Reservation,
                     selection.MaterialReservation,
-                    request.Source.Effects, true, request.EnhancementIds));
+                    request.Source.Effects, true, request.EnhancementIds,
+                    EnhancementUsage(request.EnhancementIds, enhancements)));
                 foreach (string targetId in covered)
                 {
                     outcomes.Add(new TargetPlanOutcome(request.Source.SourceId, targetId,
@@ -284,13 +290,20 @@ namespace KingmakerBuffPlanner.Planning
             foreach (string id in requestedIds)
             {
                 CastEnhancementSnapshot enhancement;
-                int? uses;
                 if (!enhancements.TryGetValue(id, out enhancement) ||
-                    !remaining.TryGetValue(enhancement.UsagePoolId, out uses) || uses == 0 ||
                     !enhancement.IsApplicable(provider)) return false;
                 selected.Add(enhancement);
             }
-            return CastEnhancementSnapshot.AreCompatible(selected);
+            if (!CastEnhancementSnapshot.AreCompatible(selected)) return false;
+            foreach (KeyValuePair<string, int> requirement in
+                CastEnhancementSnapshot.UsageRequirements(selected))
+            {
+                int? uses;
+                if (!remaining.TryGetValue(requirement.Key, out uses) ||
+                    (uses != null && uses.Value < requirement.Value))
+                    return false;
+            }
+            return true;
         }
 
         private static void ReserveEnhancements(
@@ -298,12 +311,20 @@ namespace KingmakerBuffPlanner.Planning
             IDictionary<string, CastEnhancementSnapshot> enhancements,
             IDictionary<string, int?> remaining)
         {
-            foreach (string id in requestedIds ?? new string[0])
+            List<CastEnhancementSnapshot> selected = (requestedIds ??
+                new string[0]).Select(id => enhancements[id]).ToList();
+            foreach (KeyValuePair<string, int> requirement in
+                CastEnhancementSnapshot.UsageRequirements(selected))
             {
-                CastEnhancementSnapshot enhancement = enhancements[id];
-                int? uses = remaining[enhancement.UsagePoolId];
+                int? uses = remaining[requirement.Key];
                 if (uses != null)
-                    remaining[enhancement.UsagePoolId] = uses.Value - 1;
+                {
+                    if (uses.Value < requirement.Value)
+                        throw new InvalidOperationException(
+                            "Enhancement usage ledger would become negative.");
+                    remaining[requirement.Key] = uses.Value -
+                        requirement.Value;
+                }
             }
         }
 
@@ -313,6 +334,16 @@ namespace KingmakerBuffPlanner.Planning
             return policy.ExplicitPriorities.TryGetValue(option.Provider.Key.Canonical, out value)
                 ? value
                 : int.MaxValue;
+        }
+
+        private static IDictionary<string, int> EnhancementUsage(
+            IEnumerable<string> requestedIds,
+            IDictionary<string, CastEnhancementSnapshot> enhancements)
+        {
+            return CastEnhancementSnapshot.UsageRequirements((requestedIds ??
+                new string[0]).Select(id => enhancements[id]))
+                .ToDictionary(value => value.Key, value => value.Value,
+                    StringComparer.Ordinal);
         }
 
         private static string[] ExpectedRecipients(EffectExpression effects,

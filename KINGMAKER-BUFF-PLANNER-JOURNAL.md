@@ -1,5 +1,32 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-09-01 - communal/Share Transmutation/Infusion intake
+
+Status: IN PROGRESS; CLEAN BASELINE PASS; IMPLEMENTATION NOT YET STARTED.
+
+- Starting branch/HEAD/version/status: `main` /
+  `f9cf2ac35535c8201dea7ef7f5172ebaa051e7ad` / 0.0.16 / clean,
+  tracking `origin/main`. Read-only `git ls-remote --symref origin HEAD
+  refs/heads/main` confirmed both remote `HEAD` and `refs/heads/main` at the
+  same SHA and confirmed `main` as the default branch.
+- Created local branch
+  `codex/kbp-communal-share-transmutation-infusion` before production edits.
+  No stash, reset, cleanup, checkout overwrite, merge, push, tag, publication,
+  install, game launch, live Mods mutation, or save access occurred.
+- Untouched source-only baseline: source validation 39/39, protocol/domain
+  127/127, and runtime-harness filesystem 8/8. The first sandboxed invocation
+  reached and passed 39/39 plus 127/127, then was denied while creating the
+  repository harness's external disposable fixture; the identical guarded
+  rerun with only that required filesystem authority completed 8/8. No
+  assertion, validator, or warning was weakened.
+- Requested mission: restore structural multi-recipient presentation, add one
+  assignment-aware effective-targeting seam, compose optional native Share
+  Transmutation with Powerful Change and aggregate Arcane Reservoir forecasts,
+  and verify passive native Alchemist Infusion targeting.
+- Exact next action: establish the first failing communal pipeline stage from
+  current source/history and inspect the authoritative read-only Brown Fur and
+  Share implementation before changing production code.
+
 ## 2026-09-01 - 0.0.16 public release completion
 
 Status: MERGED; GUARDED-PUSHED; TAGGED; PUBLISHED; DOWNLOADED ASSET AND LOCAL

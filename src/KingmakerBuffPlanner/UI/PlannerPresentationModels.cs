@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using KingmakerBuffPlanner.Domain.Identity;
 using KingmakerBuffPlanner.Domain.Planning;
@@ -101,7 +102,7 @@ namespace KingmakerBuffPlanner.UI
             int legal = model.Profile.Routines.First(routine => routine.RoutineId == routineId)
                 .Assignments.Where(assignment => assignment.SourceId == source.SourceId)
                 .SelectMany(assignment => assignment.WantedTargetUnitIds)
-                .Count(unitId => model.IsTargetLegal(source, unitId));
+                .Count(unitId => model.IsTargetLegal(source, routineId, unitId));
             if (legal == requested) return PlannerPresentationStatus.Success;
             return legal == 0 ? PlannerPresentationStatus.Failure : PlannerPresentationStatus.Warning;
         }
@@ -220,7 +221,8 @@ namespace KingmakerBuffPlanner.UI
     public sealed class EnhancementChoiceViewModel
     {
         internal EnhancementChoiceViewModel(string enhancementId, string title, string summary,
-            string description, bool selected, bool available)
+            string description, bool selected, bool available,
+            bool checkboxStyle = false)
         {
             EnhancementId = enhancementId ?? string.Empty;
             Title = title ?? string.Empty;
@@ -228,6 +230,7 @@ namespace KingmakerBuffPlanner.UI
             Description = description ?? string.Empty;
             Selected = selected;
             Available = available;
+            CheckboxStyle = checkboxStyle;
         }
 
         public string EnhancementId { get; private set; }
@@ -236,6 +239,7 @@ namespace KingmakerBuffPlanner.UI
         public string Description { get; private set; }
         public bool Selected { get; private set; }
         public bool Available { get; private set; }
+        public bool CheckboxStyle { get; private set; }
     }
 
     public sealed class ProviderPolicyRowViewModel
@@ -435,7 +439,8 @@ namespace KingmakerBuffPlanner.UI
     {
         private SelectedCastingViewModel(string casterText, string casterDetail,
             string enhancementLabel, string enhancementDescription, int candidateCount,
-            string selectedEnhancementId, IEnumerable<EnhancementChoiceViewModel> choices,
+            IEnumerable<string> selectedEnhancementIds,
+            IEnumerable<EnhancementChoiceViewModel> choices,
             CasterPolicyViewModel casterPolicy)
         {
             CasterText = casterText;
@@ -443,7 +448,13 @@ namespace KingmakerBuffPlanner.UI
             EnhancementLabel = enhancementLabel;
             EnhancementDescription = enhancementDescription;
             CandidateCount = candidateCount;
-            SelectedEnhancementId = selectedEnhancementId ?? string.Empty;
+            SelectedEnhancementIds = new ReadOnlyCollection<string>(
+                (selectedEnhancementIds ?? new string[0]).Where(value =>
+                    !string.IsNullOrWhiteSpace(value)).Distinct(
+                    StringComparer.Ordinal).OrderBy(value => value,
+                    StringComparer.Ordinal).ToList());
+            SelectedEnhancementId = SelectedEnhancementIds.FirstOrDefault() ??
+                string.Empty;
             Choices = choices.ToList().AsReadOnly();
             CasterPolicy = casterPolicy ?? CasterPolicyViewModel.Empty();
         }
@@ -454,6 +465,8 @@ namespace KingmakerBuffPlanner.UI
         public string EnhancementDescription { get; private set; }
         public int CandidateCount { get; private set; }
         public string SelectedEnhancementId { get; private set; }
+        public IReadOnlyList<string> SelectedEnhancementIds
+        { get; private set; }
         public IReadOnlyList<EnhancementChoiceViewModel> Choices { get; private set; }
         public CasterPolicyViewModel CasterPolicy { get; private set; }
 
@@ -463,21 +476,27 @@ namespace KingmakerBuffPlanner.UI
             if (source == null || model == null)
                 return new SelectedCastingViewModel("Caster: None", string.Empty,
                     "Enhancement: None available", "Select a buff to choose an enhancement.",
-                    0, string.Empty, new[] { NoneChoice(true) },
+                    0, new string[0], new[] { NoneChoice(true) },
                     CasterPolicyViewModel.Empty());
 
             IReadOnlyList<string> selectedIds = model.GetSelectedEnhancementIds(routineId);
-            string selectedId = selectedIds.FirstOrDefault() ?? string.Empty;
-            CastEnhancementSnapshot selected = model.GetEnhancement(selectedId);
             IReadOnlyList<CastEnhancementSnapshot> applicable = model.GetApplicableEnhancements();
-            var choices = new List<EnhancementChoiceViewModel> { NoneChoice(selectedId.Length == 0) };
+            var choices = new List<EnhancementChoiceViewModel> {
+                NoneChoice(selectedIds.Count == 0) };
             choices.AddRange(applicable.Select(value => Choice(value,
-                value.EnhancementId == selectedId, true, model)));
-            if (selectedId.Length != 0 && !applicable.Any(value => value.EnhancementId == selectedId))
+                selectedIds.Contains(value.EnhancementId), true, model)));
+            foreach (string unavailableId in selectedIds.Where(id =>
+                !applicable.Any(value => value.EnhancementId == id)))
+            {
+                CastEnhancementSnapshot selected = model.GetEnhancement(
+                    unavailableId);
                 choices.Add(selected == null
-                    ? new EnhancementChoiceViewModel(selectedId, "Unavailable enhancement",
-                        "Unavailable", "Persisted enhancement source: " + selectedId, true, false)
+                    ? new EnhancementChoiceViewModel(unavailableId,
+                        "Unavailable enhancement", "Unavailable",
+                        "Persisted enhancement source: " + unavailableId,
+                        true, false)
                     : Choice(selected, true, false, model));
+            }
 
             CasterPolicyViewModel casterPolicy = CasterPolicyViewModel.Create(
                 source, model, routineId, preview);
@@ -485,7 +504,7 @@ namespace KingmakerBuffPlanner.UI
             return new SelectedCastingViewModel(casterPolicy.Summary,
                 casterPolicy.Description,
                 model.GetEnhancementSummary(routineId), model.GetEnhancementDescription(routineId),
-                applicable.Count, selectedId, choices, casterPolicy);
+                applicable.Count, selectedIds, choices, casterPolicy);
         }
 
         private static EnhancementChoiceViewModel NoneChoice(bool selected)
@@ -511,7 +530,8 @@ namespace KingmakerBuffPlanner.UI
                     ? string.Empty : "\n" + value.Description);
             if (!available) description = "Unavailable: " + description;
             return new EnhancementChoiceViewModel(value.EnhancementId, value.DisplayName,
-                summary, description, selected, available);
+                summary, description, selected, available,
+                value.AffectsTargeting);
         }
 
     }
@@ -587,7 +607,7 @@ namespace KingmakerBuffPlanner.UI
             RoutinePlanResult preview)
         {
             bool wanted = model.IsTargetWanted(routineId, source.SourceId, unit.UnitId);
-            bool legal = model.IsTargetLegal(source, unit.UnitId);
+            bool legal = model.IsTargetLegal(source, routineId, unit.UnitId);
             List<TargetPlanOutcome> outcomes = preview == null ? new List<TargetPlanOutcome>() :
                 preview.Plan.Outcomes.Where(item => item.SourceId == source.SourceId &&
                     item.UnitId == unit.UnitId).ToList();

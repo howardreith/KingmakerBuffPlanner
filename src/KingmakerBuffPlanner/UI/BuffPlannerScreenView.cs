@@ -259,7 +259,7 @@ namespace KingmakerBuffPlanner.UI
             SelectedCastingViewModel casting = SelectedCastingViewModel.Create(
                 _session.Model.SelectedSource, _session.Model, ActiveRoutineId, _session.LastPreview);
             string evidence = _selected.EnhancementRenderEvidence(casting.CandidateCount,
-                casting.SelectedEnhancementId);
+                string.Join(",", casting.SelectedEnhancementIds.ToArray()));
             if (evidence == _lastEnhancementRenderEvidence) return;
             _lastEnhancementRenderEvidence = evidence;
             _session.RecordEnhancementUiEvidence(evidence);
@@ -471,8 +471,8 @@ namespace KingmakerBuffPlanner.UI
                 enhancementId =>
                 {
                     _session.Model.SetEnhancement(ActiveRoutineId, enhancementId);
-                    _enhancementChooser.Hide();
                     RefreshAll(true);
+                    OpenEnhancementChooser();
                 }, ShowTooltip);
             _casterPolicyChooser = new PlannerCasterPolicyChooserView(
                 _root, _theme,

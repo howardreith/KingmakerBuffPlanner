@@ -221,7 +221,9 @@ namespace KingmakerBuffPlanner.Compatibility
                 eligibleAbilityGuids,
                 "Powerful Change: " + contract.Score,
                 new[] { BrownFurPowerfulChangeProfile.CastingSpellbookGuid },
-                BrownFurPowerfulChangeProfile.UsagePoolId(casterUnitId), true);
+                BrownFurPowerfulChangeProfile.UsagePoolId(casterUnitId), true,
+                "brown-fur-powerful-change", 1, false,
+                "brown-fur-powerful-change", "Arcane Reservoir");
         }
 
         private static bool TryResolveToggle(UnitEntityData unit,

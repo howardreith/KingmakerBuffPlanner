@@ -81,7 +81,7 @@ namespace KingmakerBuffPlanner.Domain.Planning
                 .Where(v => !string.IsNullOrWhiteSpace(v)).Distinct(StringComparer.Ordinal)
                 .OrderBy(v => v, StringComparer.Ordinal).ToList());
             EnhancementIds = new ReadOnlyCollection<string>((enhancementIds ?? new string[0])
-                .Where(v => !string.IsNullOrWhiteSpace(v)).Distinct(StringComparer.Ordinal)
+                .Where(v => !string.IsNullOrWhiteSpace(v))
                 .OrderBy(v => v, StringComparer.Ordinal).ToList());
         }
 
@@ -269,7 +269,8 @@ namespace KingmakerBuffPlanner.Domain.Planning
             MaterialReservation materialReservation,
             EffectExpression expectedEffects,
             bool massCast,
-            IEnumerable<string> enhancementIds = null)
+            IEnumerable<string> enhancementIds = null,
+            IDictionary<string, int> enhancementUsageByPool = null)
         {
             SourceId = sourceId ?? string.Empty;
             Provider = provider;
@@ -285,6 +286,9 @@ namespace KingmakerBuffPlanner.Domain.Planning
             EnhancementIds = new ReadOnlyCollection<string>((enhancementIds ?? new string[0])
                 .Where(value => !string.IsNullOrWhiteSpace(value)).Distinct(StringComparer.Ordinal)
                 .OrderBy(value => value, StringComparer.Ordinal).ToList());
+            EnhancementUsageByPool = new ReadOnlyDictionary<string, int>(
+                new Dictionary<string, int>(enhancementUsageByPool ??
+                    new Dictionary<string, int>(), StringComparer.Ordinal));
         }
 
         public string SourceId { get; private set; }
@@ -297,6 +301,8 @@ namespace KingmakerBuffPlanner.Domain.Planning
         public EffectExpression ExpectedEffects { get; private set; }
         public bool MassCast { get; private set; }
         public IReadOnlyList<string> EnhancementIds { get; private set; }
+        public IReadOnlyDictionary<string, int> EnhancementUsageByPool
+        { get; private set; }
     }
 
     public sealed class MaterialReservation

@@ -19,6 +19,13 @@ namespace KingmakerBuffPlanner.Domain.Planning
         {
             return !oneShot || !oneShotGroupConsumed;
         }
+
+        internal static bool RestoreOriginalState(bool oneShot,
+            string activationGroupId, ISet<string> consumedGroups)
+        {
+            return RestoreOriginalState(oneShot, consumedGroups != null &&
+                consumedGroups.Contains(activationGroupId ?? string.Empty));
+        }
     }
 
     public sealed class CastEnhancementSnapshot
@@ -37,7 +44,12 @@ namespace KingmakerBuffPlanner.Domain.Planning
             string effectDisplayName = null,
             IEnumerable<string> spellbookWhiteList = null,
             string usagePoolId = null,
-            bool requiresNativeCommand = false)
+            bool requiresNativeCommand = false,
+            string exclusiveGroupId = null,
+            int usageUnitsPerCast = 1,
+            bool affectsTargeting = false,
+            string nativeActivationGroupId = null,
+            string usagePoolDisplayName = null)
         {
             if (string.IsNullOrWhiteSpace(enhancementId)) throw new ArgumentException("Enhancement ID is required.", "enhancementId");
             if (string.IsNullOrWhiteSpace(casterUnitId)) throw new ArgumentException("Caster unit ID is required.", "casterUnitId");
@@ -45,6 +57,7 @@ namespace KingmakerBuffPlanner.Domain.Planning
             if (metamagicMask < 0) throw new ArgumentOutOfRangeException("metamagicMask");
             if (maximumSpellLevel < 0) throw new ArgumentOutOfRangeException("maximumSpellLevel");
             if (remainingUses != null && remainingUses.Value < 0) throw new ArgumentOutOfRangeException("remainingUses");
+            if (usageUnitsPerCast < 1) throw new ArgumentOutOfRangeException("usageUnitsPerCast");
             EnhancementId = enhancementId;
             CasterUnitId = casterUnitId;
             SourceBlueprintGuid = sourceBlueprintGuid;
@@ -67,6 +80,17 @@ namespace KingmakerBuffPlanner.Domain.Planning
             UsagePoolId = string.IsNullOrWhiteSpace(usagePoolId)
                 ? enhancementId : usagePoolId;
             RequiresNativeCommand = requiresNativeCommand;
+            ExclusiveGroupId = string.IsNullOrWhiteSpace(exclusiveGroupId)
+                ? (category == CastEnhancementCategory.MetamagicRod
+                    ? "metamagic-rod" : "class-feature")
+                : exclusiveGroupId;
+            UsageUnitsPerCast = usageUnitsPerCast;
+            AffectsTargeting = affectsTargeting;
+            NativeActivationGroupId = string.IsNullOrWhiteSpace(
+                nativeActivationGroupId) ? ExclusiveGroupId :
+                nativeActivationGroupId;
+            UsagePoolDisplayName = string.IsNullOrWhiteSpace(
+                usagePoolDisplayName) ? "Uses" : usagePoolDisplayName;
         }
 
         public string EnhancementId { get; private set; }
@@ -83,6 +107,11 @@ namespace KingmakerBuffPlanner.Domain.Planning
         public IReadOnlyList<string> SpellbookWhiteList { get; private set; }
         public string UsagePoolId { get; private set; }
         public bool RequiresNativeCommand { get; private set; }
+        public string ExclusiveGroupId { get; private set; }
+        public int UsageUnitsPerCast { get; private set; }
+        public bool AffectsTargeting { get; private set; }
+        public string NativeActivationGroupId { get; private set; }
+        public string UsagePoolDisplayName { get; private set; }
 
         public bool IsApplicable(ProviderSnapshot provider)
         {
@@ -133,10 +162,28 @@ namespace KingmakerBuffPlanner.Domain.Planning
 
         public static bool AreCompatible(IEnumerable<CastEnhancementSnapshot> enhancements)
         {
-            List<CastEnhancementSnapshot> values = (enhancements ?? new CastEnhancementSnapshot[0])
-                .Where(value => value != null).ToList();
-            return values.Select(value => value.EnhancementId).Distinct(StringComparer.Ordinal).Count() == values.Count &&
-                values.Select(value => value.Category).Distinct().Count() == values.Count;
+            List<CastEnhancementSnapshot> values = (enhancements ??
+                new CastEnhancementSnapshot[0]).ToList();
+            return values.All(value => value != null) &&
+                values.Select(value => value.EnhancementId)
+                    .Distinct(StringComparer.Ordinal).Count() == values.Count &&
+                values.Select(value => value.ExclusiveGroupId)
+                    .Distinct(StringComparer.Ordinal).Count() == values.Count;
+        }
+
+        public static IReadOnlyDictionary<string, int> UsageRequirements(
+            IEnumerable<CastEnhancementSnapshot> enhancements)
+        {
+            List<CastEnhancementSnapshot> values = (enhancements ??
+                new CastEnhancementSnapshot[0]).ToList();
+            if (values.Any(value => value == null))
+                throw new ArgumentException("Enhancement selection contains null.",
+                    "enhancements");
+            return new ReadOnlyDictionary<string, int>(values
+                .GroupBy(value => value.UsagePoolId, StringComparer.Ordinal)
+                .ToDictionary(group => group.Key,
+                    group => group.Sum(value => value.UsageUnitsPerCast),
+                    StringComparer.Ordinal));
         }
     }
 }

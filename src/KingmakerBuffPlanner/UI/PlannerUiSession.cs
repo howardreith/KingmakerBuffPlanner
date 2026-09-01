@@ -28,6 +28,8 @@ namespace KingmakerBuffPlanner.UI
         private ProviderPlanningOption[] _providerOptions;
         private CastEnhancementSnapshot[] _enhancements;
         private KingmakerCastEnhancementAdapter _enhancementAdapter;
+        private KingmakerShareTargetingModifier _shareTargeting;
+        private EffectiveProviderOptionResolver _targeting;
 
         internal PlannerUiSession(string modPath, ModLog log)
         {
@@ -86,7 +88,10 @@ namespace KingmakerBuffPlanner.UI
                 _log.Info("Profile load: " + ProfileStatus);
                 if (!string.IsNullOrEmpty(loaded.Warning))
                     _log.Info("Profile recovery warning: " + loaded.Warning);
-                _providerOptions = new KingmakerProviderOptionBuilder().Build(snapshot, effects);
+                var optionBuilder = new KingmakerProviderOptionBuilder();
+                _providerOptions = optionBuilder.Build(snapshot, effects);
+                foreach (string diagnostic in optionBuilder.Diagnostics)
+                    _log.Info("[KBP-TARGETING-CONTRACT] " + diagnostic + ".");
                 string[] persistedEnhancementIds = loaded.Profile.Routines
                     .SelectMany(routine => routine.Assignments)
                     .SelectMany(assignment => assignment.SelectedEnhancementIds ?? new List<string>())
@@ -94,8 +99,12 @@ namespace KingmakerBuffPlanner.UI
                 _enhancementAdapter = new KingmakerCastEnhancementAdapter();
                 _enhancements = _enhancementAdapter.Discover(snapshot,
                     persistedEnhancementIds);
+                _shareTargeting = new KingmakerShareTargetingModifier();
+                _targeting = new EffectiveProviderOptionResolver(
+                    new ICastTargetingModifier[] { _shareTargeting });
                 Model = new PlannerSetupModel(loaded.Profile, snapshot, active, effects,
-                    _providerOptions, _profiles.Save, _enhancements);
+                    _providerOptions, _profiles.Save, _enhancements,
+                    _targeting);
                 if (Model.VariantReselectionNotices.Count != 0)
                 {
                     string names = string.Join(", ", Model.VariantReselectionNotices
@@ -246,7 +255,11 @@ namespace KingmakerBuffPlanner.UI
                 _effects == null || _providerOptions == null)
                 throw new InvalidOperationException("A campaign planner snapshot is required.");
             LastPreview = new RoutinePlanService().Plan(Model.Profile, routineId, _snapshot,
-                _activeEffects, _effects, _providerOptions, _enhancements);
+                _activeEffects, _effects, _providerOptions, _enhancements,
+                _targeting);
+            if (_shareTargeting != null)
+                foreach (string diagnostic in _shareTargeting.DrainDiagnostics())
+                    _log.Info("[KBP-SHARE-TARGETING] " + diagnostic + ".");
             return LastPreview;
         }
 

@@ -99,6 +99,7 @@
     <Compile Include="Domain\Providers\ProviderSnapshots.cs" />
     <Compile Include="Domain\Planning\PlanningModels.cs" />
     <Compile Include="Domain\Planning\CastEnhancements.cs" />
+    <Compile Include="Domain\Planning\EffectiveTargeting.cs" />
     <Compile Include="Domain\Planning\PowerfulChangeEligibility.cs" />
     <Compile Include="Execution\ExecutionModels.cs" />
     <Compile Include="Execution\AnimatedCastExecutor.cs" />
@@ -107,6 +108,8 @@
     <Compile Include="Execution\HybridCastExecutor.cs" />
     <Compile Include="Compatibility\BrownFurPowerfulChangeProfile.cs" />
     <Compile Include="Compatibility\BrownFurPowerfulChangeCompatibility.cs" />
+    <Compile Include="Compatibility\BrownFurShareTransmutationProfile.cs" />
+    <Compile Include="Compatibility\BrownFurShareTransmutationCompatibility.cs" />
     <Compile Include="Compatibility\SpellbookRoleResolver.cs" />
     <Compile Include="GameAdapters\KingmakerActionGraphAdapter.cs" />
     <Compile Include="GameAdapters\KingmakerAreaCoverageResolver.cs" />
@@ -120,6 +123,7 @@
     <Compile Include="GameAdapters\KingmakerPartySnapshotBuilder.cs" />
     <Compile Include="GameAdapters\KingmakerSpellbookRoleAdapter.cs" />
     <Compile Include="GameAdapters\KingmakerProviderOptionBuilder.cs" />
+    <Compile Include="GameAdapters\KingmakerShareTargetingModifier.cs" />
     <Compile Include="Infrastructure\AtomicFile.cs" />
     <Compile Include="Infrastructure\Hashing.cs" />
     <Compile Include="Infrastructure\ModLog.cs" />
