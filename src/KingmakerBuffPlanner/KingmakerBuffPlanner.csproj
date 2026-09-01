@@ -84,6 +84,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Discovery\ActionGraphScanner.cs" />
+    <Compile Include="Discovery\AreaRecipientSemantics.cs" />
     <Compile Include="Discovery\BlueprintOwnershipIndex.cs" />
     <Compile Include="Discovery\DiscoveryNode.cs" />
     <Compile Include="Discovery\EffectOverrideRegistry.cs" />
@@ -106,7 +107,9 @@
     <Compile Include="Execution\HybridCastExecutor.cs" />
     <Compile Include="Compatibility\BrownFurPowerfulChangeProfile.cs" />
     <Compile Include="Compatibility\BrownFurPowerfulChangeCompatibility.cs" />
+    <Compile Include="Compatibility\SpellbookRoleResolver.cs" />
     <Compile Include="GameAdapters\KingmakerActionGraphAdapter.cs" />
+    <Compile Include="GameAdapters\KingmakerAreaCoverageResolver.cs" />
     <Compile Include="GameAdapters\KingmakerActiveEffectSnapshotBuilder.cs" />
     <Compile Include="GameAdapters\KingmakerAbilityVariants.cs" />
     <Compile Include="GameAdapters\KingmakerAnimatedCastAdapter.cs" />
@@ -115,6 +118,7 @@
     <Compile Include="GameAdapters\KingmakerPowerfulChangeBlueprintAnalyzer.cs" />
     <Compile Include="GameAdapters\KingmakerInstantCastAdapter.cs" />
     <Compile Include="GameAdapters\KingmakerPartySnapshotBuilder.cs" />
+    <Compile Include="GameAdapters\KingmakerSpellbookRoleAdapter.cs" />
     <Compile Include="GameAdapters\KingmakerProviderOptionBuilder.cs" />
     <Compile Include="Infrastructure\AtomicFile.cs" />
     <Compile Include="Infrastructure\Hashing.cs" />

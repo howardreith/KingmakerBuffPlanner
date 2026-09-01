@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.0.16 - catalog semantics and native HUD maintenance candidate
+
+- Normalizes optional Call of the Wild preparation/casting companion spellbooks
+  at the party snapshot boundary, so a preparation-only Arcanist book cannot be
+  selected by catalog, policy, planning, or execution while ordinary prepared,
+  spontaneous, multiclass, and exhausted cast-capable books remain available.
+- Adds branch-aware restorative-action semantics. Pure healing, restoration,
+  condition-removal, resurrection, dispel, and cleanup paths whose only lasting
+  leaves are internal markers no longer become catalog buffs; a substantive
+  persistent beneficial leaf on a safe branch still qualifies.
+- Propagates conservative allied area recipient semantics through per-anchor
+  coverage maps, so structurally allied communal/mass effects use one anchor
+  cast and visibly cover their legal nearby recipients without making enemy or
+  ambiguous areas party-wide.
+- Adds profile-derived L/I/S routine-membership chips to every card, including
+  active-routine emphasis, secondary cross-routine indication, text tooltips,
+  and a compact legend. Existing assignments and persistence schema 4 remain
+  authoritative.
+- Rebuilds the lower-left HUD controls as owned `ButtonPF` instances styled
+  from the exact live native formation button, with neutral alpha-mask glyphs,
+  native `TooltipTrigger` parchment presentation, and one native
+  `CharacterScreenOpen` sound per successful setup transition.
+
 ## 0.0.13 - Brown-Fur Powerful Change diagnostic repair
 
 - Discovers Powerful Change from the live caster fact and six validated native

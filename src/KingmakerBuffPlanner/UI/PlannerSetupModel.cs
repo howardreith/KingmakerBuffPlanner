@@ -237,8 +237,12 @@ namespace KingmakerBuffPlanner.UI
                      expression, EffectTarget.AlliedAreaRecipients))) return false;
             SourceAssignmentProfile assignment = FindRoutine(routineId).Assignments
                 .FirstOrDefault(item => item.SourceId == source.SourceId);
-            return assignment != null && assignment.WantedTargetUnitIds.Count != 0 &&
-                IsTargetLegal(source, unitId);
+            if (assignment == null || assignment.WantedTargetUnitIds.Count == 0) return false;
+            return _providerOptions.Where(option => source.Providers.Any(provider =>
+                    option.Provider.Key.Equals(provider.Key)))
+                .Any(option => assignment.WantedTargetUnitIds.Any(anchor =>
+                    option.LegalAnchorIds.Contains(anchor) &&
+                    option.CoveredTargetIdsForAnchor(anchor).Contains(unitId)));
         }
 
         public void SetAllValidTargets(string routineId, bool selected)

@@ -1,5 +1,34 @@
 # Qualification
 
+## 0.0.16 catalog/native-HUD candidate
+
+Status: SOURCE/BEHAVIOR/EXACT-ASSEMBLY/WHATIF PASS; FINAL LOCAL PACKAGE AND
+GUARDED INSTALL PENDING THE CLEAN-HEAD RELEASE BUILD.
+
+- Branch/intake baseline: `codex/kingmaker-buff-planner-0.0.16-catalog-native-hud`
+  from `91f198f53733b0fa63bfbc6c93ee133360b9b194`; version 0.0.16; persistence
+  schema 4 unchanged.
+- Exact assembly probes confirm `Assembly-CSharp.dll`
+  `3b6450ffec440e296e586f71c711b195aed144b28d53e1cbb29406d18fef5afb`
+  / `07fa1e4d-8618-41b3-9b8d-faa17d3b26f7`, and Call of the Wild
+  `4ebf8e1ed3e66ffed72ea33ea325595629423dacd5bffa23e3c9109144b26915`
+  / `8caab254-aacf-4811-8093-44b9184e6e53`, including the three exact
+  spellbook-role component contracts.
+- Source validation passes 39/39 and the protocol/domain executable passes
+  127/127. The preceding aggregate source-only pass was 125/125 before the two
+  new tests; its remaining package-dependent filesystem/package/WhatIf stages
+  will be rerun after the 0.0.16 local package is built. The Release build
+  passes 1/1; the prior runtime-harness filesystem and deployment WhatIf gates
+  pass 8/8 and 5/5 respectively.
+- Save-backed qualification is blocked—not passed—because the guarded resolver
+  reports `baseline=0; working=0`. No ordinary save, game launch, or live
+  staging was substituted. The final package/installer record will retain this
+  boundary.
+
+Exact next action: commit the release source, execute the clean-head
+deterministic release builder, run guarded installation WhatIf and installation,
+then record ZIP/DLL/MVID/hashes and the installation transaction.
+
 ## 0.0.15 publication preflight
 
 Status: OWNER AUTHORIZED; VERSION/NOTES PREPARED; CLEAN-HEAD AND MERGE-COMMIT

@@ -27,6 +27,29 @@ namespace KingmakerBuffPlanner.UI
         InvalidTarget
     }
 
+    public sealed class RoutineMembershipChipViewModel
+    {
+        internal RoutineMembershipChipViewModel(
+            string routineId,
+            string abbreviation,
+            string label,
+            bool active)
+        {
+            RoutineId = routineId ?? string.Empty;
+            Abbreviation = abbreviation ?? string.Empty;
+            Label = label ?? string.Empty;
+            IsActive = active;
+            Tooltip = (active ? "Configured in active " : "Also configured in ") +
+                Label + ".";
+        }
+
+        public string RoutineId { get; private set; }
+        public string Abbreviation { get; private set; }
+        public string Label { get; private set; }
+        public bool IsActive { get; private set; }
+        public string Tooltip { get; private set; }
+    }
+
     public sealed class BuffCardViewModel
     {
         internal BuffCardViewModel(SetupSourceRow source, PlannerSetupModel model,
@@ -37,7 +60,10 @@ namespace KingmakerBuffPlanner.UI
             SourceId = source.SourceId;
             Name = string.IsNullOrWhiteSpace(source.DisplayName) ? "Unnamed buff" : source.DisplayName;
             Selected = selected;
-            RoutineBadge = BuildRoutineBadge(model.Profile, source.SourceId);
+            RoutineMemberships = BuildRoutineMemberships(model.Profile, source.SourceId,
+                activeRoutineId);
+            RoutineBadge = string.Join(" ", RoutineMemberships.Select(value =>
+                value.Abbreviation).ToArray());
             RoutineProfile activeRoutine = model.Profile.Routines.First(routine =>
                 routine.RoutineId == activeRoutineId);
             SourceAssignmentProfile activeAssignment = activeRoutine.Assignments
@@ -57,6 +83,10 @@ namespace KingmakerBuffPlanner.UI
         public string SourceId { get; private set; }
         public string Name { get; private set; }
         public string RoutineBadge { get; private set; }
+        public IReadOnlyList<RoutineMembershipChipViewModel> RoutineMemberships
+        {
+            get; private set;
+        }
         public string Availability { get; private set; }
         public string Configuration { get; private set; }
         public string SourceType { get; private set; }
@@ -76,13 +106,31 @@ namespace KingmakerBuffPlanner.UI
             return legal == 0 ? PlannerPresentationStatus.Failure : PlannerPresentationStatus.Warning;
         }
 
-        private static string BuildRoutineBadge(BuffPlannerProfile profile, string sourceId)
+        private static IReadOnlyList<RoutineMembershipChipViewModel> BuildRoutineMemberships(
+            BuffPlannerProfile profile, string sourceId, string activeRoutineId)
         {
-            var labels = new List<string>();
-            if (Assigned(profile, "long", sourceId)) labels.Add("L");
-            if (Assigned(profile, "important", sourceId)) labels.Add("I");
-            if (Assigned(profile, "short", sourceId)) labels.Add("S");
-            return string.Join(" ", labels.ToArray());
+            var values = new List<RoutineMembershipChipViewModel>();
+            AddMembership(values, profile, sourceId, activeRoutineId,
+                "long", "L", "Long");
+            AddMembership(values, profile, sourceId, activeRoutineId,
+                "important", "I", "Important");
+            AddMembership(values, profile, sourceId, activeRoutineId,
+                "short", "S", "Short");
+            return values;
+        }
+
+        private static void AddMembership(
+            ICollection<RoutineMembershipChipViewModel> values,
+            BuffPlannerProfile profile,
+            string sourceId,
+            string activeRoutineId,
+            string routineId,
+            string abbreviation,
+            string label)
+        {
+            if (Assigned(profile, routineId, sourceId))
+                values.Add(new RoutineMembershipChipViewModel(routineId, abbreviation,
+                    label, routineId == activeRoutineId));
         }
 
         private static bool Assigned(BuffPlannerProfile profile, string routineId, string sourceId)

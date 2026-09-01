@@ -11,6 +11,8 @@ namespace KingmakerBuffPlanner.UI
         private readonly ModLog _log;
         private readonly PlannerScreenStateMachine _state;
         private readonly Action<string> _quickExecute;
+        private readonly Func<bool> _onSetupVisible;
+        private readonly SetupOpenSoundGate _soundGate = new SetupOpenSoundGate();
         private BuffPlannerScreenView _view;
         private bool _disposed;
         private int _validationTick;
@@ -20,12 +22,14 @@ namespace KingmakerBuffPlanner.UI
             PlannerUiSession session,
             BuffPlannerUiLifecycleDiagnostics diagnostics,
             ModLog log,
-            Action<string> quickExecute)
+            Action<string> quickExecute,
+            Func<bool> onSetupVisible = null)
         {
             _session = session ?? throw new ArgumentNullException("session");
             _diagnostics = diagnostics ?? throw new ArgumentNullException("diagnostics");
             _log = log ?? throw new ArgumentNullException("log");
             _quickExecute = quickExecute ?? throw new ArgumentNullException("quickExecute");
+            _onSetupVisible = onSetupVisible;
             _state = new PlannerScreenStateMachine(() => BuffPlannerInputLease.Acquire(
                 new KingmakerPlannerInputBoundary()));
         }
@@ -39,6 +43,7 @@ namespace KingmakerBuffPlanner.UI
         internal bool Open()
         {
             if (_disposed || !_state.BeginPresentation()) return false;
+            _soundGate.BeginHiddenToVisible();
             try
             {
                 _session.Refresh();
@@ -69,6 +74,7 @@ namespace KingmakerBuffPlanner.UI
                 if (_view != null) _view.Dispose();
                 _view = null;
                 _readiness.Reset();
+                _soundGate.Cancel();
             }
             finally
             {
@@ -124,6 +130,7 @@ namespace KingmakerBuffPlanner.UI
                     catalog = _view.GetCatalogDiagnostics();
                     _log.Info("[KBP-CATALOG] presentation phase B;" + catalog + ".");
                     LastFailure = string.Empty;
+                    EmitSetupOpenSound();
                     _log.Info("[KBP-BOOT] full-screen install succeeded;root=" +
                         _view.RootObject.GetInstanceID() + ";inputLease=true;active=" +
                         _view.RootObject.activeInHierarchy + ".");
@@ -162,12 +169,35 @@ namespace KingmakerBuffPlanner.UI
             if (_view != null) _view.Dispose();
             _view = null;
             _readiness.Reset();
+            _soundGate.Cancel();
             _state.Rollback();
             if (hadLease) _diagnostics.RecordInputLeaseReleased();
             var failure = exception ?? new InvalidOperationException(LastFailure);
             _log.Error("[KBP-BOOT] full-screen install failed;reason=" + LastFailure +
                 ";retryable=true;inputLease=" + hadLease + ".", failure);
             _log.Info("Buff Planner UI is unavailable: " + LastFailure);
+        }
+
+        private void EmitSetupOpenSound()
+        {
+            if (!_soundGate.CompleteVisible(_state.IsOpen)) return;
+            bool played = false;
+            try
+            {
+                played = _onSetupVisible != null && _onSetupVisible();
+            }
+            catch (Exception exception)
+            {
+                _log.Error("[KBP-HUD-SOUND] native setup-opening sound failed.", exception);
+            }
+            if (played)
+            {
+                _diagnostics.RecordSetupOpenSound();
+                _log.Info("[KBP-HUD-SOUND] event=CharacterScreenOpen;transition=hidden-to-visible;count=" +
+                    _diagnostics.SetupOpenSoundCount + ".");
+            }
+            else
+                _log.Info("[KBP-HUD-SOUND] unavailable;transition=hidden-to-visible.");
         }
 
         public void Dispose()

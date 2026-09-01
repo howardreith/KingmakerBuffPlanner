@@ -94,6 +94,14 @@ namespace KingmakerBuffPlanner.Discovery
                             .Where(v => !string.IsNullOrEmpty(v)).Distinct(StringComparer.Ordinal)
                             .OrderBy(v => v, StringComparer.Ordinal).ToArray(),
                         Effects = effects,
+                        RestorativeActions = scan.Diagnostics
+                            .Where(d => d.Code == "restorative-action")
+                            .Select(d => new NativeActionRecord
+                            {
+                                Contract = d.NodeIdentity,
+                                Detail = d.Detail,
+                                ActionPath = d.ActionPath
+                            }).ToArray(),
                         Expression = effectiveExpression,
                         Diagnostics = scan.Diagnostics.ToArray(),
                         ManualOverride = overrideApplication.Entry == null
@@ -122,6 +130,8 @@ namespace KingmakerBuffPlanner.Discovery
                                 Harmful = e.Harmful,
                                 IsHiddenInUi = e.IsHiddenInUi,
                                 IsClassFeature = e.IsClassFeature,
+                                RemoveOnRest = e.RemoveOnRest,
+                                StayOnDeath = e.StayOnDeath,
                                 ComponentTypes = e.ComponentTypes,
                                 SourceContract = e.SourceContract,
                                 ActionPath = e.ActionPath
@@ -374,17 +384,18 @@ namespace KingmakerBuffPlanner.Discovery
         [JsonProperty("materialCount", Order = 27)] public int MaterialCount { get; set; }
         [JsonProperty("recognizedActionContracts", Order = 28)] public string[] RecognizedActionContracts { get; set; }
         [JsonProperty("effects", Order = 29)] public NativeEffectRecord[] Effects { get; set; }
-        [JsonProperty("expression", Order = 30)]
+        [JsonProperty("restorativeActions", Order = 30)] public NativeActionRecord[] RestorativeActions { get; set; }
+        [JsonProperty("expression", Order = 31)]
         public EffectExpression Expression { get; set; }
-        [JsonProperty("diagnostics", Order = 31)]
+        [JsonProperty("diagnostics", Order = 32)]
         public DiscoveryDiagnostic[] Diagnostics { get; set; }
-        [JsonProperty("disposition", Order = 32)]
+        [JsonProperty("disposition", Order = 33)]
         public string Disposition { get; set; }
-        [JsonProperty("supportClass", Order = 33)] public string SupportClass { get; set; }
-        [JsonProperty("dispositionReason", Order = 34)] public string DispositionReason { get; set; }
-        [JsonProperty("manualOverride", Order = 35)] public string ManualOverride { get; set; }
-        [JsonProperty("runtimeEvidence", Order = 36)] public string[] RuntimeEvidence { get; set; }
-        [JsonProperty("qualificationStatus", Order = 37)] public string QualificationStatus { get; set; }
+        [JsonProperty("supportClass", Order = 34)] public string SupportClass { get; set; }
+        [JsonProperty("dispositionReason", Order = 35)] public string DispositionReason { get; set; }
+        [JsonProperty("manualOverride", Order = 36)] public string ManualOverride { get; set; }
+        [JsonProperty("runtimeEvidence", Order = 37)] public string[] RuntimeEvidence { get; set; }
+        [JsonProperty("qualificationStatus", Order = 38)] public string QualificationStatus { get; set; }
     }
 
     internal sealed class NativeEffectRecord
@@ -401,5 +412,12 @@ namespace KingmakerBuffPlanner.Discovery
         [JsonProperty("componentTypes", Order = 10)] public string[] ComponentTypes { get; set; }
         [JsonProperty("sourceContract", Order = 11)] public string SourceContract { get; set; }
         [JsonProperty("actionPath", Order = 12)] public string ActionPath { get; set; }
+    }
+
+    internal sealed class NativeActionRecord
+    {
+        [JsonProperty("contract", Order = 1)] public string Contract { get; set; }
+        [JsonProperty("detail", Order = 2)] public string Detail { get; set; }
+        [JsonProperty("actionPath", Order = 3)] public string ActionPath { get; set; }
     }
 }

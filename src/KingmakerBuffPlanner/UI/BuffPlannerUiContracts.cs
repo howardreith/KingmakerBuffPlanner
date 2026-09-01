@@ -585,6 +585,30 @@ namespace KingmakerBuffPlanner.UI
         }
     }
 
+    public sealed class SetupOpenSoundGate
+    {
+        private bool _pending;
+
+        public bool BeginHiddenToVisible()
+        {
+            if (_pending) return false;
+            _pending = true;
+            return true;
+        }
+
+        public bool CompleteVisible(bool visible)
+        {
+            if (!_pending || !visible) return false;
+            _pending = false;
+            return true;
+        }
+
+        public void Cancel()
+        {
+            _pending = false;
+        }
+    }
+
     public enum QuickExecutionDisposition
     {
         Completed,
@@ -692,6 +716,7 @@ namespace KingmakerBuffPlanner.UI
         public int ScreenDestroyCount { get; private set; }
         public int InputLeaseAcquireCount { get; private set; }
         public int InputLeaseReleaseCount { get; private set; }
+        public int SetupOpenSoundCount { get; private set; }
         public int PointerEventCount { get; private set; }
         public int ScrollEventCount { get; private set; }
         public int DragEventCount { get; private set; }
@@ -715,6 +740,7 @@ namespace KingmakerBuffPlanner.UI
             InputLeaseAcquiredOrder = ++_eventOrder;
         }
         public void RecordInputLeaseReleased() { InputLeaseReleaseCount++; }
+        public void RecordSetupOpenSound() { SetupOpenSoundCount++; }
         public void RecordPointer(string routineId)
         {
             PointerEventCount++;

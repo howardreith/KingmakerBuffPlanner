@@ -1,5 +1,37 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-08-31 - 0.0.16 catalog/native-HUD implementation checkpoint
+
+Status: IMPLEMENTED; SOURCE/BEHAVIOR/EXACT-ASSEMBLY/WHATIF PASS; CLEAN-HEAD
+PACKAGE AND GUARDED LOCAL INSTALL NEXT.
+
+- Started from clean `main` at
+  `91f198f53733b0fa63bfbc6c93ee133360b9b194` and created
+  `codex/kingmaker-buff-planner-0.0.16-catalog-native-hud`. No reset, stash,
+  cleanup, push, merge, tag, publication, game launch, or live Mods mutation
+  occurred during implementation.
+- Added bounded optional spellbook-role reflection, restorative semantic action
+  nodes, conservative per-anchor allied coverage, profile-derived L/I/S card
+  membership chips, and native-style owned `ButtonPF` HUD controls/tooltips/
+  opening sound. Production logic has no Arcanist, Lay on Hands, Protection
+  from Arrows, Communal, or Good Hope name/GUID condition.
+- Exact probes: Assembly-CSharp SHA/MVID
+  `3b6450ffec440e296e586f71c711b195aed144b28d53e1cbb29406d18fef5afb` /
+  `07fa1e4d-8618-41b3-9b8d-faa17d3b26f7`; Call of the Wild SHA/MVID
+  `4ebf8e1ed3e66ffed72ea33ea325595629423dacd5bffa23e3c9109144b26915` /
+  `8caab254-aacf-4811-8093-44b9184e6e53`.
+- Gates so far: source 39/39; protocol/domain 127/127; the prior full aggregate
+  is 125/125 before those two new tests; runtime filesystem 8/8; package
+  fixture 4/4; deployment WhatIf 5/5; aggregate 1/1; Release build 1/1; diff
+  check pass. The aggregate will be rerun against the fresh 0.0.16 package. The
+  previous install-WhatIf expected obsolete 0.0.11;
+  the guarded local UMM install is proven 0.0.13, so the fixture is tightened
+  to exactly that valid predecessor.
+- Exact next action: commit clean release source; run `Build-Release.ps1`, then
+  `Test-InstallWhatIf.ps1` and guarded `Install-Local.ps1` using the produced
+  local-only manifest. Save-backed visual/audio/cast proof remains blocked at
+  baseline=0/working=0.
+
 ## 2026-08-29 - 0.0.15 release authorization and preparation
 
 Status: OWNER AUTHORIZED FINAL COMMIT, MAIN MERGE, GUARDED PUSH, AND NEW

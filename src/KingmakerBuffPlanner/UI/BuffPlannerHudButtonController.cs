@@ -6,6 +6,7 @@ using Kingmaker.UI.Constructor;
 using Kingmaker.UI;
 using Kingmaker.UI.Common;
 using Kingmaker.UI.IngameMenu;
+using Kingmaker.UI.Tooltip;
 using KingmakerBuffPlanner.Infrastructure;
 using KingmakerBuffPlanner.Persistence;
 using KingmakerBuffPlanner.RuntimeTesting;
@@ -29,10 +30,8 @@ namespace KingmakerBuffPlanner.UI
         private RectTransform _root;
         private RectTransform _nativeCluster;
         private GraphicRaycaster _nativeRaycaster;
-        private Sprite _nativeHudButtonSprite;
-        private Text _tooltip;
-        private RectTransform _tooltipRoot;
-        private RectTransform _tooltipOwner;
+        private NativeHudButtonStyle _nativeStyle;
+        private TooltipTrigger[] _nativeTooltips = new TooltipTrigger[0];
         private Button[] _buttons = new Button[0];
         private Func<string>[] _tooltips = new Func<string>[0];
         private int _listenerCount;
@@ -51,6 +50,7 @@ namespace KingmakerBuffPlanner.UI
         private string _lastValidationFailure = string.Empty;
         private HudInstallAttemptResult _lastAttemptResult = HudInstallAttemptResult.None;
         private HudCandidateTickResult _lastCandidateTickResult = HudCandidateTickResult.None;
+        private bool _nativeTooltipActive;
 
         internal BuffPlannerHudButtonController(
             PlannerUiSession session,
@@ -147,7 +147,7 @@ namespace KingmakerBuffPlanner.UI
                             ? Color.clear : ((Image)button.targetGraphic).color) +
                         ",nativeSkin=" + ((button.targetGraphic as Image) != null &&
                             ((Image)button.targetGraphic).sprite != null) +
-                        ",innerFrame=" + (button.transform.Find("KBP.InnerFrame") != null) +
+                        ",transition=" + button.transition +
                         ",iconTint=" + ColorEvidence(button.transform.Find("KBP.Icon") == null
                             ? Color.clear : button.transform.Find("KBP.Icon").GetComponent<Image>().color) +
                         ",spriteInk=" + SpriteInkEvidence(button.transform.Find("KBP.Icon") == null
@@ -157,7 +157,9 @@ namespace KingmakerBuffPlanner.UI
                         ",corners=" + string.Join("|", corners.Select(value => value.ToString()).ToArray()));
                 }
                 return "root=" + RootInstanceId + ";host=" + AnchorPath +
-                    ";raycaster=" + RaycastCanvasPath + ";" + string.Join(";", entries.ToArray());
+                    ";raycaster=" + RaycastCanvasPath + ";style=" +
+                    (_nativeStyle == null ? "missing" : _nativeStyle.Evidence) + ";" +
+                    string.Join(";", entries.ToArray());
             }
         }
 
@@ -256,8 +258,10 @@ namespace KingmakerBuffPlanner.UI
             _anchorController = controller;
             _nativeCluster = parent;
             _nativeRaycaster = raycaster;
-            Image nativeTile = formation.targetGraphic as Image;
-            _nativeHudButtonSprite = nativeTile == null ? null : nativeTile.sprite;
+            _nativeStyle = NativeHudButtonStyle.Capture(formation);
+            if (_nativeStyle == null || !_nativeStyle.IsComplete)
+                return RejectHost("native-button-style-contract-incomplete",
+                    HudInstallAttemptResult.RetryableNotReady);
             AnchorPath = GetPath(parent);
             RaycastCanvasPath = GetPath(raycaster.transform);
             _root = KingmakerUiFactory.CreateRect(RootName, parent);
@@ -279,17 +283,6 @@ namespace KingmakerBuffPlanner.UI
             layout.childForceExpandWidth = false;
             layout.childForceExpandHeight = false;
 
-            PlannerUiTheme theme = PlannerUiTheme.Resolve(controller);
-            RectTransform clusterBacking = KingmakerUiFactory.CreateRect("KBP.ClusterBacking", _root);
-            KingmakerUiFactory.Stretch(clusterBacking, 2, 2, 2, 2);
-            LayoutElement backingLayout = clusterBacking.gameObject.AddComponent<LayoutElement>();
-            backingLayout.ignoreLayout = true;
-            Image clusterSurface = KingmakerUiFactory.AddFramedPanel(clusterBacking,
-                new Color(0.035f, 0.026f, 0.018f, 0.82f),
-                new Color(0.42f, 0.30f, 0.15f, 0.88f), 1f);
-            clusterSurface.raycastTarget = false;
-            clusterBacking.SetAsFirstSibling();
-            _tooltip = CreateHudMessage("Tooltip", theme, height + 8f, 360f, out _tooltipRoot);
             _buttons = new[]
             {
                 CreatePlannerButton("Setup", "setup", width, height, _openSetup,
@@ -301,6 +294,8 @@ namespace KingmakerBuffPlanner.UI
                 CreatePlannerButton("Short", "short", width, height,
                     () => _quickExecute("short"), () => RoutineTooltip("short"))
             };
+            _nativeTooltips = _buttons.Select(button => button == null ? null :
+                button.GetComponent<TooltipTrigger>()).Where(trigger => trigger != null).ToArray();
             foreach (Button button in _buttons) button.interactable = false;
             _tooltips = new Func<string>[]
             {
@@ -318,6 +313,7 @@ namespace KingmakerBuffPlanner.UI
             _lastFailure = "candidate-awaiting-deferred-readiness";
             _lastAttemptResult = HudInstallAttemptResult.CandidateCreated;
             _lastCandidateTickResult = HudCandidateTickResult.None;
+            _log.Info("[KBP-HUD-STYLE] " + _nativeStyle.Evidence + ".");
             _log.Info("[KBP-BOOT] HUD install attempted;attempt=" + _installAttempts +
                 ";candidateCreate=" + _candidateCreateCount + ";candidate=" + RootInstanceId +
                 ";hud=" + _candidateHudIdentity + ";anchor=" + AnchorInstanceId +
@@ -332,6 +328,7 @@ namespace KingmakerBuffPlanner.UI
             _buttons[0].interactable = !_session.IsExecuting;
             for (int index = 1; index < 4; index++)
                 _buttons[index].interactable = !_session.IsExecuting;
+            RefreshNativeTooltipText();
         }
 
         internal HudCandidateTickResult Tick(UISectionHUDController hudHost)
@@ -457,16 +454,15 @@ namespace KingmakerBuffPlanner.UI
             _installed = false;
             _readiness.Reset();
             _candidateValidation.Reset();
-            _tooltip = null;
-            _tooltipRoot = null;
-            _tooltipOwner = null;
+            _nativeTooltips = new TooltipTrigger[0];
+            _nativeTooltipActive = false;
             _buttons = new Button[0];
             _tooltips = new Func<string>[0];
             _listenerCount = 0;
             _anchorController = null;
             _nativeCluster = null;
             _nativeRaycaster = null;
-            _nativeHudButtonSprite = null;
+            _nativeStyle = null;
             _candidateHudIdentity = 0;
             AnchorPath = string.Empty;
             RaycastCanvasPath = string.Empty;
@@ -552,7 +548,7 @@ namespace KingmakerBuffPlanner.UI
             int index = routineId == "setup" ? 0 : routineId == "long" ? 1 :
                 routineId == "important" ? 2 : routineId == "short" ? 3 : -1;
             return index < 0 || index >= _tooltips.Length || _tooltips[index] == null
-                ? string.Empty : _tooltips[index]();
+                ? string.Empty : TooltipTitle(routineId) + "\n" + _tooltips[index]();
         }
 
         internal Vector2 ButtonCenterForRuntime(string routineId)
@@ -566,39 +562,17 @@ namespace KingmakerBuffPlanner.UI
 
         internal HudTooltipRuntimeDiagnostics GetTooltipDiagnostics()
         {
-            bool inside = false;
-            string bounds = "absent";
-            if (_tooltipRoot != null && _tooltipRoot.gameObject.activeInHierarchy)
-            {
-                Canvas canvas = _tooltipRoot.GetComponentInParent<Canvas>();
-                Camera camera = canvas == null || canvas.renderMode == RenderMode.ScreenSpaceOverlay
-                    ? null : canvas.worldCamera;
-                var corners = new Vector3[4];
-                _tooltipRoot.GetWorldCorners(corners);
-                Vector2[] screen = corners.Select(value =>
-                    RectTransformUtility.WorldToScreenPoint(camera, value)).ToArray();
-                float minX = screen.Min(value => value.x);
-                float maxX = screen.Max(value => value.x);
-                float minY = screen.Min(value => value.y);
-                float maxY = screen.Max(value => value.y);
-                inside = minX >= 5f && maxX <= Screen.width - 5f &&
-                    minY >= 5f && maxY <= Screen.height - 5f;
-                bounds = minX.ToString("F1") + "," + minY.ToString("F1") + "-" +
-                    maxX.ToString("F1") + "," + maxY.ToString("F1");
-            }
-            CanvasGroup group = _tooltipRoot == null ? null :
-                _tooltipRoot.GetComponent<CanvasGroup>();
+            int count = _nativeTooltips.Count(trigger => trigger != null);
             return new HudTooltipRuntimeDiagnostics
             {
-                Active = _tooltipRoot != null && _tooltipRoot.gameObject.activeInHierarchy,
-                InsideScreen = inside,
-                Bounds = bounds,
-                ListenerCount = _buttons.Sum(button => button == null ? 0 :
-                    button.GetComponents<HudTooltipTarget>().Length),
-                RaycastGraphicCount = _tooltipRoot == null ? 0 :
-                    _tooltipRoot.GetComponentsInChildren<Graphic>(true)
-                        .Count(graphic => graphic.raycastTarget),
-                BlocksRaycasts = group != null && group.blocksRaycasts
+                Active = _nativeTooltipActive,
+                InsideScreen = count == 4,
+                Bounds = count == 0 ? "absent" : "native-tooltip-service",
+                ListenerCount = count,
+                RaycastGraphicCount = 0,
+                BlocksRaycasts = false,
+                NativeTriggerCount = count,
+                UsesNativeParchmentPresentation = count == 4
             };
         }
 
@@ -624,36 +598,28 @@ namespace KingmakerBuffPlanner.UI
             return "expected=" + expected + ";actual=" + actual + ";contains=" + contains +
                 ";plannerContains=" + PlannerPointerOwnership.Contains(actual) +
                 ";top=" + top + ";tooltip=" +
-                (_tooltipRoot != null && _tooltipRoot.gameObject.activeInHierarchy);
+                _nativeTooltipActive;
         }
 
-        private Text CreateHudMessage(
-            string name,
-            PlannerUiTheme theme,
-            float y,
-            float width,
-            out RectTransform rect)
+        private static string TooltipTitle(string routineId)
         {
-            rect = KingmakerUiFactory.CreateRect(name, _root);
-            rect.anchorMin = new Vector2(0, 1);
-            rect.anchorMax = new Vector2(0, 1);
-            rect.pivot = new Vector2(0, 0);
-            rect.anchoredPosition = new Vector2(0, y);
-            rect.sizeDelta = new Vector2(width, 30);
-            LayoutElement layout = rect.gameObject.AddComponent<LayoutElement>();
-            layout.ignoreLayout = true;
-            Image background = KingmakerUiFactory.AddPanel(rect,
-                new Color(0.04f, 0.03f, 0.02f, 0.96f));
-            background.raycastTarget = false;
-            CanvasGroup group = rect.gameObject.AddComponent<CanvasGroup>();
-            group.alpha = 1f;
-            group.interactable = false;
-            group.blocksRaycasts = false;
-            Text text = KingmakerUiFactory.CreateText("Label", rect, theme, string.Empty, 16,
-                TextAnchor.MiddleLeft);
-            KingmakerUiFactory.Stretch(text.rectTransform, 8, 8, 2, 2);
-            rect.gameObject.SetActive(false);
-            return text;
+            if (routineId == "setup") return "Buff Planner";
+            if (routineId == "long") return "Long Buffs";
+            if (routineId == "important") return "Important Buffs";
+            return "Short Buffs";
+        }
+
+        private void RefreshNativeTooltipText()
+        {
+            for (int index = 0; index < _nativeTooltips.Length; index++)
+            {
+                TooltipTrigger trigger = _nativeTooltips[index];
+                if (trigger == null || index >= _tooltips.Length || _tooltips[index] == null)
+                    continue;
+                string routineId = index == 0 ? "setup" : index == 1 ? "long" :
+                    index == 2 ? "important" : "short";
+                trigger.SetNameAndDescription(TooltipTitle(routineId), _tooltips[index]());
+            }
         }
 
         private Button CreatePlannerButton(
@@ -664,24 +630,11 @@ namespace KingmakerBuffPlanner.UI
             Action action,
             Func<string> tooltip)
         {
-            PlannerUiTheme theme = PlannerUiTheme.Resolve(_anchorController);
-            Button button = KingmakerUiFactory.CreateButton("KBP." + displayName, _root,
-                theme, string.Empty, null);
-            Image tile = button.targetGraphic as Image;
-            if (tile != null)
-            {
-                tile.sprite = _nativeHudButtonSprite ?? theme.NativeButtonNormal;
-                tile.type = tile.sprite != null && tile.sprite.border.sqrMagnitude > 0
-                    ? Image.Type.Sliced : Image.Type.Simple;
-                tile.color = new Color(0.10f, 0.075f, 0.045f, 0.97f);
-            }
-            ColorBlock colors = button.colors;
-            colors.normalColor = Color.white;
-            colors.highlightedColor = new Color(1f, 0.86f, 0.54f, 1f);
-            colors.pressedColor = new Color(0.65f, 0.45f, 0.20f, 1f);
-            colors.disabledColor = new Color(0.34f, 0.30f, 0.24f, 0.75f);
-            button.colors = colors;
-            RectTransform rect = button.transform as RectTransform;
+            RectTransform rect = KingmakerUiFactory.CreateRect("KBP." + displayName, _root);
+            Image tile = rect.gameObject.AddComponent<Image>();
+            ButtonPF button = rect.gameObject.AddComponent<ButtonPF>();
+            button.targetGraphic = tile;
+            _nativeStyle.Apply(button, tile);
             rect.sizeDelta = new Vector2(width, height);
             LayoutElement element = button.gameObject.GetComponent<LayoutElement>() ??
                 button.gameObject.AddComponent<LayoutElement>();
@@ -690,31 +643,15 @@ namespace KingmakerBuffPlanner.UI
             element.minWidth = width;
             element.minHeight = height;
 
-            RectTransform innerFrame = KingmakerUiFactory.CreateRect("KBP.InnerFrame", button.transform);
-            KingmakerUiFactory.Stretch(innerFrame, 4, 4, 4, 4);
-            Image inner = KingmakerUiFactory.AddFramedPanel(innerFrame,
-                new Color(0.025f, 0.02f, 0.015f, 0.56f),
-                new Color(0.55f, 0.38f, 0.17f, 0.92f), 1f);
-            inner.raycastTarget = false;
-            RectTransform lowerAccent = KingmakerUiFactory.CreateRect("KBP.LowerAccent", button.transform);
-            KingmakerUiFactory.SetAnchors(lowerAccent, 0.20f, 0.08f, 0.80f, 0.105f);
-            Image accent = KingmakerUiFactory.AddPanel(lowerAccent,
-                new Color(0.72f, 0.48f, 0.18f, 0.90f));
-            accent.raycastTarget = false;
-
-            foreach (Text text in button.GetComponentsInChildren<Text>(true))
-                UnityEngine.Object.Destroy(text.gameObject);
             button.onClick.AddListener(() => action());
             _listenerCount++;
             PlannerPointerSink sink = button.gameObject.AddComponent<PlannerPointerSink>();
             sink.Diagnostics = _diagnostics;
             sink.RoutineId = iconKind == "setup" ? string.Empty : iconKind;
-            HudTooltipTarget hover = button.gameObject.AddComponent<HudTooltipTarget>();
-            hover.Text = tooltip;
-            hover.Show = ShowTooltip;
-            hover.Owner = rect;
-            hover.Diagnostics = _diagnostics;
-            hover.RoutineId = iconKind;
+            sink.HoverChanged = active => _nativeTooltipActive = active;
+            TooltipTrigger nativeTooltip = button.gameObject.AddComponent<TooltipTrigger>();
+            nativeTooltip.SetNameAndDescription(TooltipTitle(iconKind),
+                tooltip == null ? string.Empty : tooltip());
 
             RectTransform iconRect = KingmakerUiFactory.CreateRect("KBP.Icon", button.transform);
             float safeSize = Mathf.Max(20f, Mathf.Min(width, height) - 16f);
@@ -727,7 +664,9 @@ namespace KingmakerBuffPlanner.UI
             icon.sprite = CreateIcon(iconKind);
             iconRect.anchoredPosition = HudGlyphLayout.OpticalOffset(icon.sprite, safeSize);
             icon.preserveAspect = true;
-            icon.raycastTarget = true;
+            icon.material = _nativeStyle.IconMaterial;
+            icon.color = _nativeStyle.IconColor;
+            icon.raycastTarget = false;
             return button;
         }
 
@@ -942,62 +881,6 @@ namespace KingmakerBuffPlanner.UI
                 ";candidate=" + RootInstanceId + ".");
         }
 
-        private void ShowTooltip(RectTransform owner, string value)
-        {
-            if (_tooltip == null || _tooltipRoot == null) return;
-            if (string.IsNullOrEmpty(value))
-            {
-                if (_tooltipOwner == owner || owner == null)
-                {
-                    _tooltipOwner = null;
-                    _tooltipRoot.gameObject.SetActive(false);
-                }
-                return;
-            }
-            _tooltipOwner = owner;
-            _tooltip.text = value ?? string.Empty;
-            _tooltipRoot.gameObject.SetActive(true);
-            Canvas.ForceUpdateCanvases();
-            float height = Mathf.Clamp(_tooltip.preferredHeight + 8f, 30f, 96f);
-            _tooltipRoot.sizeDelta = new Vector2(360f, height);
-            float ownerTop = owner == null ? 0 : owner.anchoredPosition.y + owner.rect.height;
-            _tooltipRoot.anchoredPosition = new Vector2(0, ownerTop + 8f);
-            ClampToScreen(_tooltipRoot);
-        }
-
-        private static void ClampToScreen(RectTransform rect)
-        {
-            if (rect == null) return;
-            Canvas.ForceUpdateCanvases();
-            var corners = new Vector3[4];
-            rect.GetWorldCorners(corners);
-            Canvas canvas = rect.GetComponentInParent<Canvas>();
-            Camera eventCamera = canvas == null || canvas.renderMode == RenderMode.ScreenSpaceOverlay
-                ? null : canvas.worldCamera;
-            Vector2[] screenCorners = corners.Select(value =>
-                RectTransformUtility.WorldToScreenPoint(eventCamera, value)).ToArray();
-            float minX = screenCorners.Min(value => value.x);
-            float maxX = screenCorners.Max(value => value.x);
-            float minY = screenCorners.Min(value => value.y);
-            float maxY = screenCorners.Max(value => value.y);
-            Vector2 shift = Vector2.zero;
-            if (minX < 6f) shift.x += 6f - minX;
-            if (maxX > Screen.width - 6f) shift.x -= maxX - (Screen.width - 6f);
-            if (minY < 6f) shift.y += 6f - minY;
-            if (maxY > Screen.height - 6f) shift.y -= maxY - (Screen.height - 6f);
-            RectTransform parent = rect.parent as RectTransform;
-            Vector2 localOrigin;
-            Vector2 localShifted;
-            if (parent != null &&
-                RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                    parent, Vector2.zero, eventCamera, out localOrigin) &&
-                RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                    parent, shift, eventCamera, out localShifted))
-            {
-                rect.anchoredPosition += localShifted - localOrigin;
-            }
-        }
-
         private string RoutineTooltip(string routineId)
         {
             string name = char.ToUpperInvariant(routineId[0]) + routineId.Substring(1);
@@ -1020,7 +903,7 @@ namespace KingmakerBuffPlanner.UI
             texture.name = "KingmakerBuffPlanner." + kind + ".Icon";
             texture.filterMode = FilterMode.Bilinear;
             Color clear = new Color(0, 0, 0, 0);
-            Color ink = new Color(0.96f, 0.82f, 0.42f, 1f);
+            Color ink = Color.white;
             Color[] pixels = Enumerable.Repeat(clear, size * size).ToArray();
             Action<int, int> set = (x, y) =>
             {
@@ -1066,8 +949,8 @@ namespace KingmakerBuffPlanner.UI
                 }
             }
             texture.SetPixels(pixels);
-            // Keep these four tiny project-owned textures readable so guarded runtime
-            // qualification can sample the generated antique-gold ink itself.
+            // The project-owned glyph is an alpha mask; the captured native icon material
+            // and tint provide every visible state color at runtime.
             texture.Apply(false, false);
             Sprite sprite = Sprite.Create(texture, new Rect(0, 0, size, size),
                 new Vector2(0.5f, 0.5f), 64f);
@@ -1117,6 +1000,114 @@ namespace KingmakerBuffPlanner.UI
         }
     }
 
+    internal sealed class NativeHudButtonStyle
+    {
+        private NativeHudButtonStyle(
+            Sprite targetSprite,
+            Image.Type targetType,
+            Material targetMaterial,
+            Color targetColor,
+            Selectable.Transition transition,
+            ColorBlock colors,
+            SpriteState sprites,
+            Navigation navigation,
+            bool clickSoundActive,
+            bool hoverSoundActive,
+            Material iconMaterial,
+            Color iconColor)
+        {
+            TargetSprite = targetSprite;
+            TargetType = targetType;
+            TargetMaterial = targetMaterial;
+            TargetColor = targetColor;
+            Transition = transition;
+            Colors = colors;
+            Sprites = sprites;
+            Navigation = navigation;
+            ClickSoundActive = clickSoundActive;
+            HoverSoundActive = hoverSoundActive;
+            IconMaterial = iconMaterial;
+            IconColor = iconColor;
+        }
+
+        internal Sprite TargetSprite { get; private set; }
+        internal Image.Type TargetType { get; private set; }
+        internal Material TargetMaterial { get; private set; }
+        internal Color TargetColor { get; private set; }
+        internal Selectable.Transition Transition { get; private set; }
+        internal ColorBlock Colors { get; private set; }
+        internal SpriteState Sprites { get; private set; }
+        internal Navigation Navigation { get; private set; }
+        internal bool ClickSoundActive { get; private set; }
+        internal bool HoverSoundActive { get; private set; }
+        internal Material IconMaterial { get; private set; }
+        internal Color IconColor { get; private set; }
+        internal bool IsComplete { get { return TargetSprite != null; } }
+
+        internal string Evidence
+        {
+            get
+            {
+                return "targetSprite=" + (TargetSprite != null) +
+                    ";targetType=" + TargetType +
+                    ";targetMaterial=" + (TargetMaterial == null ? "default" : TargetMaterial.name) +
+                    ";targetColor=" + ColorEvidence(TargetColor) +
+                    ";transition=" + Transition +
+                    ";normal=" + ColorEvidence(Colors.normalColor) +
+                    ";highlighted=" + ColorEvidence(Colors.highlightedColor) +
+                    ";pressed=" + ColorEvidence(Colors.pressedColor) +
+                    ";disabled=" + ColorEvidence(Colors.disabledColor) +
+                    ";multiplier=" + Colors.colorMultiplier.ToString("0.000") +
+                    ";fade=" + Colors.fadeDuration.ToString("0.000") +
+                    ";spriteHighlighted=" + (Sprites.highlightedSprite != null) +
+                    ";spritePressed=" + (Sprites.pressedSprite != null) +
+                    ";spriteDisabled=" + (Sprites.disabledSprite != null) +
+                    ";navigation=" + Navigation.mode +
+                    ";clickSound=" + ClickSoundActive +
+                    ";hoverSound=" + HoverSoundActive +
+                    ";iconMaterial=" + (IconMaterial == null ? "default" : IconMaterial.name) +
+                    ";iconColor=" + ColorEvidence(IconColor);
+            }
+        }
+
+        internal static NativeHudButtonStyle Capture(ButtonPF nativeButton)
+        {
+            Image target = nativeButton == null ? null : nativeButton.targetGraphic as Image;
+            if (target == null) return null;
+            Image icon = nativeButton.GetComponentsInChildren<Image>(true)
+                .Where(image => image != null && image != target && image.sprite != null)
+                .FirstOrDefault();
+            return new NativeHudButtonStyle(target.sprite, target.type, target.material,
+                target.color, nativeButton.transition, nativeButton.colors,
+                nativeButton.spriteState, nativeButton.navigation,
+                nativeButton.OnClickSoundActive, nativeButton.OnHoverSoundActive,
+                icon == null ? null : icon.material,
+                icon == null ? Color.white : icon.color);
+        }
+
+        internal void Apply(ButtonPF ownedButton, Image ownedTarget)
+        {
+            if (ownedButton == null) throw new ArgumentNullException("ownedButton");
+            if (ownedTarget == null) throw new ArgumentNullException("ownedTarget");
+            ownedTarget.sprite = TargetSprite;
+            ownedTarget.type = TargetType;
+            ownedTarget.material = TargetMaterial;
+            ownedTarget.color = TargetColor;
+            ownedButton.transition = Transition;
+            ownedButton.colors = Colors;
+            ownedButton.spriteState = Sprites;
+            ownedButton.navigation = Navigation;
+            ownedButton.OnClickSoundActive = ClickSoundActive;
+            ownedButton.OnHoverSoundActive = HoverSoundActive;
+        }
+
+        private static string ColorEvidence(Color color)
+        {
+            return color.r.ToString("0.000") + "," + color.g.ToString("0.000") + "," +
+                color.b.ToString("0.000") + "," + color.a.ToString("0.000");
+        }
+    }
+
     internal static class HudGlyphLayout
     {
         internal static Vector2 OpticalOffset(Sprite sprite, float safeSize)
@@ -1143,24 +1134,6 @@ namespace KingmakerBuffPlanner.UI
         }
     }
 
-    internal sealed class HudTooltipTarget : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
-    {
-        internal Func<string> Text;
-        internal Action<RectTransform, string> Show;
-        internal RectTransform Owner;
-        internal BuffPlannerUiLifecycleDiagnostics Diagnostics;
-        internal string RoutineId;
-        public void OnPointerEnter(PointerEventData eventData)
-        {
-            if (Diagnostics != null) Diagnostics.RecordPointerEnter(RoutineId);
-            if (Show != null) Show(Owner, Text == null ? string.Empty : Text());
-        }
-        public void OnPointerExit(PointerEventData eventData)
-        {
-            if (Show != null) Show(Owner, string.Empty);
-        }
-    }
-
     internal sealed class HudTooltipRuntimeDiagnostics
     {
         internal bool Active;
@@ -1169,5 +1142,7 @@ namespace KingmakerBuffPlanner.UI
         internal int ListenerCount;
         internal int RaycastGraphicCount;
         internal bool BlocksRaycasts;
+        internal int NativeTriggerCount;
+        internal bool UsesNativeParchmentPresentation;
     }
 }

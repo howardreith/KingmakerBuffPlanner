@@ -1,5 +1,47 @@
 # Implementation Report
 
+## 0.0.16 catalog/native-HUD maintenance candidate
+
+The duplicate Arcanist provider defect originated before the UI: snapshot
+enumeration accepted every `UnitDescriptor.Spellbooks` entry. The new optional
+adapter proves the Call of the Wild preparation/casting relationship from the
+installed component field contracts and filters only a `CanNotUseSpells` book
+whose relationship resolves to another spellbook owned by the same unit. The
+actual spontaneous companion remains keyed by its own spellbook GUID, including
+when exhausted; ordinary Wizard/Cleric/Druid-style prepared books and legitimate
+multiclass books are unchanged. Execution refuses a structurally excluded key
+as a second boundary.
+
+The catalog previously treated any discovered `ContextActionApplyBuff` leaf as
+enough, allowing a temporary technical marker to make reactive recovery appear
+as a planner buff. Discovery now emits explicit restorative action nodes for
+the installed healing/restoration/removal/resurrection/dispel action families.
+The classifier retains conditional paths and rejects only a restorative branch
+without substantive safe persistence, emitting deterministic reasons including
+`instantaneous-restoration-without-substantive-buff` and
+`reactive-restoration-marker-only`. Therefore Lay on Hands is rejected for its
+shape rather than its name, class, or GUID; a restorative adjunct followed by
+real protection remains eligible.
+
+The reported communal gaps were propagation gaps: broad targets were not
+represented as anchor-specific recipient sets in the planning option. The
+conservative area adapter and `RecipientIdsByAnchor` mapping now drive setup
+portrait coverage and mass grouping together. Protection from Arrows, Communal
+and Good Hope are regression fixtures, not production conditions.
+
+Routine card overlap is presented from existing saved assignments as compact
+L/I/S chips. The active routine is emphasized and other configured routines are
+visible with textual hover explanations; removing a routine's final target
+immediately removes its chip.
+
+The HUD no longer invents a brown tile, bright-gold baked icon, inner frame,
+lower accent, or black tooltip. It captures and applies the exact native
+formation-button visual contract, tints white alpha-mask glyphs through the
+native icon treatment, uses the native parchment `TooltipTrigger`, and plays
+the inspected `UISoundManager` `CharacterScreenOpen` path only through the
+successful setup transition gate. Runtime evidence now validates those native
+contracts instead of the retired visual constants.
+
 ## 0.0.15 release preparation
 
 The completed buff-catalog/caster-controls maintenance is packaged as 0.0.15

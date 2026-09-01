@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [string]$TypePattern = '.*',
-    [string]$MethodPattern = '.*'
+    [string]$MethodPattern = '.*',
+    [switch]$ListMembers
 )
 
 Set-StrictMode -Version Latest
@@ -111,7 +112,7 @@ function Read-MethodIl([Reflection.MethodBase]$Method) {
 $contracts = [ordered]@{
     'Kingmaker.UI.ServiceWindow.FullScreenTabsWindow' = @(
         'OnShow', 'OnHide', 'ToggleShow', 'OnButtonClose', 'OnHotKeyEscPressed',
-        '<OnShow>b__11_0', '<OnHide>b__12_0')
+        '<OnShow>b__11_0', '<OnHide>b__12_0', 'OnHotkeyToShow', 'PlayShowSound')
     'Kingmaker.UI.ServiceWindow.ServiceWindowTabs' = @(
         'Show', 'OnShow', 'OnHide', 'Hide', 'ShowScreen')
     'Kingmaker.Game' = @(
@@ -123,6 +124,14 @@ $contracts = [ordered]@{
     'Kingmaker.View.CameraRig' = @('OnGameModeStart', 'OnGameModeStop', 'UpdateInternal',
         'TickScroll', 'GetCameraScrollShiftByMouse', 'IsScrollActive', 'get_AnyMoveCameraKeyIsDown')
     'Kingmaker.View.CameraZoom' = @('UpdateInputFromMouse')
+    'Kingmaker.UI.ServiceWindow.ServiceWindowController' = @(
+        'HandleOpenInventory', 'HandleOpenCharScreen', 'HandleOpenJournal',
+        'HandleOpenMap', 'HandleOpenSpellbook', 'OnHotKeyPressed')
+    'Kingmaker.UI.UISoundManager' = @('Play')
+    'Kingmaker.UI.Constructor.ButtonPF' = @(
+        'OnPointerClick', 'OnPointerEnter', 'OnPointerExit')
+    'Kingmaker.UI.Tooltip.TooltipTrigger' = @(
+        'SetNameAndDescription', 'ShowTooltipManual', 'OnPointerEnter', 'OnPointerExit')
 }
 
 [AppDomain]::CurrentDomain.add_ReflectionOnlyAssemblyResolve($resolver)
@@ -134,6 +143,16 @@ try {
     foreach ($entry in $contracts.GetEnumerator()) {
         if ([string]$entry.Key -notmatch $TypePattern) { continue }
         $type = $assembly.GetType([string]$entry.Key, $true)
+        if ($ListMembers) {
+            Write-Output ''
+            Write-Output ('=== ' + $entry.Key + ' declared members ===')
+            foreach ($field in @($type.GetFields($flags) | Sort-Object Name)) {
+                Write-Output ('field ' + $field.FieldType.FullName + ' ' + $field.Name)
+            }
+            foreach ($property in @($type.GetProperties($flags) | Sort-Object Name)) {
+                Write-Output ('property ' + $property.PropertyType.FullName + ' ' + $property.Name)
+            }
+        }
         foreach ($methodName in @($entry.Value)) {
             if ($methodName -notmatch $MethodPattern) { continue }
             $methods = @($type.GetMethods($flags) | Where-Object Name -ceq $methodName)

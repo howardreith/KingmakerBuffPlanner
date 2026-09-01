@@ -98,9 +98,12 @@ namespace KingmakerBuffPlanner.GameAdapters
         {
             if (provider.Ability.SourceKind == SourceKind.Spellbook)
             {
-                Spellbook book = caster.Descriptor.Spellbooks.FirstOrDefault(b => b != null &&
+                List<Spellbook> ownedBooks = caster.Descriptor.Spellbooks.Where(b => b != null &&
+                    b.Blueprint != null).ToList();
+                Spellbook book = ownedBooks.FirstOrDefault(b => b != null &&
                     b.Blueprint != null && b.Blueprint.AssetGuid == provider.SpellbookGuid);
-                if (book == null) return null;
+                if (book == null || !new KingmakerSpellbookRoleAdapter().IsIncluded(book, ownedBooks))
+                    return null;
                 if (reservedTokenIds != null && reservedTokenIds.Count != 0)
                 {
                     foreach (SpellSlot slot in book.GetAllMemorizedSpells().Where(s => s != null &&

@@ -53,7 +53,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                     AbilityTargetsAround targetsAround =
                         ability.GetComponent<AbilityTargetsAround>();
                     if (targetsAround != null)
-                        payload = Target(AreaTarget(targetsAround.TargetType), payload,
+                        payload = Target(AreaTarget(targetsAround.TargetType, ability), payload,
                             "AbilityTargetsAround");
                     children.Add(payload);
                 }
@@ -116,6 +116,9 @@ namespace KingmakerBuffPlanner.GameAdapters
             if (action is ContextActionSpawnMonster)
                 return new DiscoveryNode(DiscoveryNodeKind.Unknown,
                     DescribeType(action.GetType()), sourceContract: "excluded-summoning-action");
+            if (IsRestorativeAction(action.GetType()))
+                return new DiscoveryNode(DiscoveryNodeKind.RestorativeAction,
+                    DescribeType(action.GetType()), sourceContract: "restorative-action");
             if (IsOffensiveAction(action.GetType()))
                 return new DiscoveryNode(DiscoveryNodeKind.OffensiveAction,
                     DescribeType(action.GetType()), sourceContract: "offensive-action");
@@ -231,11 +234,20 @@ namespace KingmakerBuffPlanner.GameAdapters
                 new[] { child }, target: target, sourceContract: contract);
         }
 
-        private static EffectTarget AreaTarget(TargetType target)
+        private static EffectTarget AreaTarget(TargetType target, BlueprintAbility ability)
         {
-            if (target == TargetType.Ally) return EffectTarget.AlliedAreaRecipients;
-            if (target == TargetType.Enemy) return EffectTarget.EnemyAreaRecipients;
-            return EffectTarget.AmbiguousAreaRecipients;
+            return AreaRecipientSemantics.Resolve(AreaSelection(target),
+                ability != null && ability.CanTargetFriends,
+                ability != null && ability.CanTargetEnemies,
+                ability != null && ability.CanTargetPoint);
+        }
+
+        private static AreaSelectionTarget AreaSelection(TargetType target)
+        {
+            if (target == TargetType.Ally) return AreaSelectionTarget.Ally;
+            if (target == TargetType.Enemy) return AreaSelectionTarget.Enemy;
+            if (target == TargetType.Any) return AreaSelectionTarget.Any;
+            return AreaSelectionTarget.Unknown;
         }
 
         private static EffectTarget AreaEffectTarget(
@@ -263,6 +275,20 @@ namespace KingmakerBuffPlanner.GameAdapters
                 name == "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionAttack" ||
                 name == "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionRangedAttack" ||
                 name == "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionDealDirectDamage";
+        }
+
+        private static bool IsRestorativeAction(Type type)
+        {
+            string name = type == null ? string.Empty : type.FullName;
+            return name == "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionHealTarget" ||
+                name == "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionHealEnergyDrain" ||
+                name == "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionHealStatDamage" ||
+                name == "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionResurrect" ||
+                name == "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionRemoveBuff" ||
+                name == "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionRemoveBuffsByDescriptor" ||
+                name == "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionRemoveBuffSingleStack" ||
+                name == "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionRemoveDeathDoor" ||
+                name == "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionDispelMagic";
         }
 
         private static string DescribeConditions(Conditional conditional)

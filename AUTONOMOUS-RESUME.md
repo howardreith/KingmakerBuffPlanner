@@ -1,5 +1,27 @@
 # Autonomous Resume
 
+## 0.0.16 catalog/native-HUD candidate - 2026-08-31
+
+- Active branch is `codex/kingmaker-buff-planner-0.0.16-catalog-native-hud`,
+  based on clean `main` `91f198f53733b0fa63bfbc6c93ee133360b9b194`; product
+  metadata is 0.0.16 and persistence remains schema 4.
+- Structural provider roles, restorative payload classification, per-anchor
+  allied coverage, routine membership chips, and native lower-left HUD style,
+  parchment tooltip, and setup-opening sound are implemented. The exact
+  installed Call of the Wild contracts and native UI contracts are recorded in
+  `planning/BUFF-CATALOG-NATIVE-HUD-EVIDENCE.md`.
+- Current deterministic gates: source 39/39; protocol/domain 127/127; prior
+  aggregate source-only 125/125 before the two new tests; runtime-harness
+  filesystem 8/8; package fixture 4/4; deployment WhatIf 5/5; aggregate 1/1;
+  Release build 1/1; diff check pass. The aggregate must be rerun after a new
+  local package exists. No game launch, live
+  staging, push, merge, tag, or publication has occurred.
+- Exact next action: make the release-source commit, run the clean-worktree
+  deterministic release builder, run the corrected guarded installer WhatIf,
+  then install the validated 0.0.16 ZIP locally from the produced manifest.
+  Record the transaction/hash/MVID and retain the honest absent-save-fixture
+  runtime blocker.
+
 ## 0.0.15 publication authorization - 2026-08-29
 
 - The owner explicitly authorized the final commit, merge to `main`, remote

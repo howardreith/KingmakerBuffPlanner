@@ -152,7 +152,7 @@ namespace KingmakerBuffPlanner.Planning
                     continue;
                 }
                 string[] recipients = ExpectedRecipients(request.Source.Effects, selection.Option,
-                    new[] { targetId });
+                    selection.Anchor, new[] { targetId });
                 steps.Add(new CastStep(request.Source.SourceId, selection.Option.Provider.Key,
                     selection.Anchor, new[] { targetId }, recipients,
                     selection.Reservation, selection.MaterialReservation,
@@ -200,10 +200,11 @@ namespace KingmakerBuffPlanner.Planning
                         options, policy, castsByProvider));
                     break;
                 }
-                string[] covered = remaining.Where(id => selection.Option.ReachableTargetIds.Contains(id))
+                string[] covered = remaining.Where(id => selection.Option
+                    .CoveredTargetIdsForAnchor(selection.Anchor).Contains(id))
                     .OrderBy(id => id, StringComparer.Ordinal).ToArray();
                 string[] recipients = ExpectedRecipients(request.Source.Effects, selection.Option,
-                    covered);
+                    selection.Anchor, covered);
                 steps.Add(new CastStep(request.Source.SourceId, selection.Option.Provider.Key,
                     selection.Anchor, covered, recipients, selection.Reservation,
                     selection.MaterialReservation,
@@ -250,6 +251,15 @@ namespace KingmakerBuffPlanner.Planning
                 .ThenBy(o => ResourceRank(poolKinds[o.Provider.ResourcePoolKey]))
                 .ThenBy(o => o.Provider.Key.Canonical, StringComparer.Ordinal))
             {
+                string anchor = option.LegalAnchorIds
+                    .Where(value => option.CoveredTargetIdsForAnchor(value)
+                        .Any(id => required.Contains(id)))
+                    .OrderByDescending(value => required.Contains(value))
+                    .ThenByDescending(value => option.CoveredTargetIdsForAnchor(value)
+                        .Count(id => allRemaining.Contains(id)))
+                    .ThenBy(value => value, StringComparer.Ordinal)
+                    .FirstOrDefault();
+                if (string.IsNullOrWhiteSpace(anchor)) continue;
                 ResourceReservation reservation;
                 string reason;
                 if (!ledger.TryReserve(option.Provider, out reservation, out reason)) continue;
@@ -258,9 +268,6 @@ namespace KingmakerBuffPlanner.Planning
                     enhancementRemaining);
                 string key = option.Provider.Key.Canonical;
                 castsByProvider[key] = castsByProvider.ContainsKey(key) ? castsByProvider[key] + 1 : 1;
-                string anchor = option.LegalAnchorIds.Contains(option.Provider.Key.CasterUnitId)
-                    ? option.Provider.Key.CasterUnitId
-                    : option.LegalAnchorIds[0];
                 return new Selection(option, anchor, reservation, materialReservation);
             }
             return null;
@@ -309,12 +316,13 @@ namespace KingmakerBuffPlanner.Planning
         }
 
         private static string[] ExpectedRecipients(EffectExpression effects,
-            ProviderPlanningOption option, IEnumerable<string> directTargets)
+            ProviderPlanningOption option, string anchorUnitId,
+            IEnumerable<string> directTargets)
         {
             bool expands = EffectExpressionTargetAnalysis.Contains(effects, EffectTarget.Party) ||
                 EffectExpressionTargetAnalysis.Contains(
                     effects, EffectTarget.AlliedAreaRecipients);
-            return (expands ? option.ReachableTargetIds : directTargets)
+            return (expands ? option.CoveredTargetIdsForAnchor(anchorUnitId) : directTargets)
                 .Where(id => !string.IsNullOrWhiteSpace(id)).Distinct(StringComparer.Ordinal)
                 .OrderBy(id => id, StringComparer.Ordinal).ToArray();
         }

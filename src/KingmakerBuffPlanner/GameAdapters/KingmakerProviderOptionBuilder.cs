@@ -7,6 +7,7 @@ using Kingmaker.UnitLogic.Abilities;
 using Kingmaker.UnitLogic.Abilities.Blueprints;
 using Kingmaker.UnitLogic.Abilities.Components;
 using Kingmaker.Utility;
+using KingmakerBuffPlanner.Discovery;
 using KingmakerBuffPlanner.Domain.Effects;
 using KingmakerBuffPlanner.Domain.Planning;
 using KingmakerBuffPlanner.Domain.Providers;
@@ -33,49 +34,89 @@ namespace KingmakerBuffPlanner.GameAdapters
                 AbilityData ability = caster == null ? null :
                     KingmakerAnimatedCastAdapter.ResolveAbility(caster, provider.Key);
                 BlueprintAbility blueprint = ability == null ? null : ability.Blueprint;
-                AbilityTargetsAround targetsAround = blueprint == null
-                    ? null : blueprint.GetComponent<AbilityTargetsAround>();
+                AlliedAreaCoverage areaCoverage = blueprint == null
+                    ? null : new KingmakerAreaCoverageResolver().Resolve(blueprint);
                 bool party = EffectExpressionTargetAnalysis.Contains(
                     expression, EffectTarget.Party);
                 bool areaRecipients = EffectExpressionTargetAnalysis.Contains(
                     expression, EffectTarget.AlliedAreaRecipients);
                 IEnumerable<UnitSnapshot> reachable;
+                var recipientIdsByAnchor =
+                    new Dictionary<string, IEnumerable<string>>(StringComparer.Ordinal);
+                string[] anchors;
                 if (EffectExpressionTargetAnalysis.ContainsOnly(expression, EffectTarget.Caster))
-                    reachable = units.Where(u => u.UnitId == provider.Key.CasterUnitId);
-                else if (EffectExpressionTargetAnalysis.Contains(expression, EffectTarget.Pet))
-                    reachable = units.Where(u => u.IsPet && u.MasterUnitId == provider.Key.CasterUnitId);
-                else if (party)
-                    reachable = units;
-                else if (areaRecipients && targetsAround != null && caster != null)
                 {
-                    float radius = targetsAround.AoERadius.Meters;
-                    reachable = targetsAround.TargetType != TargetType.Ally
-                        ? new UnitSnapshot[0] : units.Where(u =>
+                    reachable = units.Where(u => u.UnitId == provider.Key.CasterUnitId);
+                    anchors = reachable.Select(u => u.UnitId).ToArray();
+                }
+                else if (EffectExpressionTargetAnalysis.Contains(expression, EffectTarget.Pet))
+                {
+                    reachable = units.Where(u => u.IsPet && u.MasterUnitId == provider.Key.CasterUnitId);
+                    anchors = reachable.Select(u => u.UnitId).ToArray();
+                }
+                else if (party)
+                {
+                    reachable = units;
+                    anchors = LegalAnchorIds(ability, units, liveUnits);
+                    if (anchors.Length == 0 && units.Any(unit =>
+                        unit.UnitId == provider.Key.CasterUnitId))
+                        anchors = new[] { provider.Key.CasterUnitId };
+                    foreach (string anchor in anchors)
+                        recipientIdsByAnchor.Add(anchor,
+                            units.Select(unit => unit.UnitId).ToArray());
+                }
+                else if (areaRecipients && areaCoverage != null && caster != null)
+                {
+                    float radius = areaCoverage.Radius;
+                    anchors = LegalAnchorIds(ability, units, liveUnits);
+                    foreach (string anchorId in anchors)
                     {
-                        UnitEntityData target;
-                        return liveUnits.TryGetValue(u.UnitId, out target) &&
-                            caster.DistanceTo(target) <= radius + 0.01f;
-                    });
+                        UnitEntityData anchor;
+                        if (!liveUnits.TryGetValue(anchorId, out anchor)) continue;
+                        recipientIdsByAnchor.Add(anchorId, units.Where(unit =>
+                        {
+                            UnitEntityData target;
+                            return liveUnits.TryGetValue(unit.UnitId, out target) &&
+                                anchor.DistanceTo(target) <= radius + 0.01f;
+                        }).Select(unit => unit.UnitId).ToArray());
+                    }
+                    reachable = units.Where(unit => recipientIdsByAnchor.Values
+                        .Any(recipients => recipients.Contains(unit.UnitId)));
                 }
                 else
+                {
                     reachable = units.Where(u =>
                     {
                         UnitEntityData target;
                         return liveUnits.TryGetValue(u.UnitId, out target) &&
                             KingmakerAnimatedCastAdapter.CanTarget(ability, new TargetWrapper(target));
                     });
+                    anchors = reachable.Select(u => u.UnitId).ToArray();
+                }
                 string[] reachableIds = reachable.Select(u => u.UnitId)
                     .Distinct(StringComparer.Ordinal).ToArray();
-                bool mass = party || areaRecipients;
-                bool casterCentered = party || targetsAround != null;
-                string[] anchors = mass && casterCentered
-                    ? reachableIds.Where(id => id == provider.Key.CasterUnitId).ToArray()
-                    : reachableIds;
+                bool mass = party || recipientIdsByAnchor.Count != 0;
                 options.Add(new ProviderPlanningOption(provider, reachableIds, anchors,
                     provider.EffectiveCasterLevel, provider.ExpectedDurationRounds,
-                    blueprint != null && blueprint.StickyTouch != null));
+                    blueprint != null && blueprint.StickyTouch != null,
+                    recipientIdsByAnchor));
             }
             return options.OrderBy(o => o.Provider.Key.Canonical, StringComparer.Ordinal).ToArray();
         }
+
+        private static string[] LegalAnchorIds(
+            AbilityData ability,
+            IEnumerable<UnitSnapshot> units,
+            IDictionary<string, UnitEntityData> liveUnits)
+        {
+            return (units ?? new UnitSnapshot[0]).Where(unit =>
+            {
+                UnitEntityData target;
+                return liveUnits != null && liveUnits.TryGetValue(unit.UnitId, out target) &&
+                    KingmakerAnimatedCastAdapter.CanTarget(ability, new TargetWrapper(target));
+            }).Select(unit => unit.UnitId).Distinct(StringComparer.Ordinal)
+                .OrderBy(unitId => unitId, StringComparer.Ordinal).ToArray();
+        }
+
     }
 }

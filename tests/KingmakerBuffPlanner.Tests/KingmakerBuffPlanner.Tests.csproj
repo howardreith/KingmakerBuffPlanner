@@ -31,11 +31,13 @@
     <Compile Include="Program.cs" />
     <Compile Include="TestBuildInfo.cs" />
     <Compile Include="..\..\src\KingmakerBuffPlanner\Discovery\ActionGraphScanner.cs"><Link>Discovery\ActionGraphScanner.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Discovery\AreaRecipientSemantics.cs"><Link>Discovery\AreaRecipientSemantics.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Discovery\BlueprintOwnershipIndex.cs"><Link>Discovery\BlueprintOwnershipIndex.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Discovery\DiscoveryNode.cs"><Link>Discovery\DiscoveryNode.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Discovery\EffectOverrideRegistry.cs"><Link>Discovery\EffectOverrideRegistry.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Discovery\NativeCandidateClassifier.cs"><Link>Discovery\NativeCandidateClassifier.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Discovery\SelectableAbilityVariants.cs"><Link>Discovery\SelectableAbilityVariants.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Compatibility\SpellbookRoleResolver.cs"><Link>Compatibility\SpellbookRoleResolver.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Domain\Effects\EffectExpression.cs"><Link>Domain\Effects\EffectExpression.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Domain\Effects\EffectAggregateIdentity.cs"><Link>Domain\Effects\EffectAggregateIdentity.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Domain\Effects\CatalogSourceIdentity.cs"><Link>Domain\Effects\CatalogSourceIdentity.cs</Link></Compile>

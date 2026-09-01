@@ -1,5 +1,25 @@
 # CODEX AUTONOMOUS MISSION
 
+## 2026-08-31 0.0.16 catalog/native-HUD checkpoint
+
+The current implementation branch is
+`codex/kingmaker-buff-planner-0.0.16-catalog-native-hud`, taken from clean
+`main` `91f198f53733b0fa63bfbc6c93ee133360b9b194`. It adds structural optional
+spellbook roles, restorative-payload classification, conservative per-anchor
+allied coverage, profile-derived L/I/S membership chips, and captured native
+lower-left HUD controls/tooltips/opening sound. Version is 0.0.16; persistence
+schema is unchanged at 4.
+
+Current local gates pass source 39/39, protocol/domain 125/125, runtime
+filesystem 8/8, package fixture 4/4, deployment WhatIf 5/5, aggregate 1/1,
+and Release build 1/1. Exact contracts, rejected theories, and next actions
+are in `planning/BUFF-CATALOG-NATIVE-HUD-EVIDENCE.md`. The current guarded
+save inventory is baseline=0/working=0, so no live runtime claim is made.
+
+Exact next action: commit release source, produce a clean-head deterministic
+local-only package, run the guarded UMM installer WhatIf and installation, and
+then record hashes/transaction without launching or publishing.
+
 ## 2026-08-29 0.0.15 publication authorization checkpoint
 
 The owner explicitly authorized final commit, merge to default branch `main`,
