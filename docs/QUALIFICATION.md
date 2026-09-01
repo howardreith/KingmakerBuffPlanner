@@ -2,8 +2,8 @@
 
 ## 0.0.16 catalog/native-HUD candidate
 
-Status: SOURCE/BEHAVIOR/EXACT-ASSEMBLY/WHATIF PASS; FINAL LOCAL PACKAGE AND
-GUARDED INSTALL PENDING THE CLEAN-HEAD RELEASE BUILD.
+Status: SOURCE/BEHAVIOR/EXACT-ASSEMBLY/DETERMINISTIC PACKAGE/GUARDED LOCAL
+INSTALL PASS; SAVE-BACKED IN-GAME ACCEPTANCE BLOCKED, NOT CLAIMED.
 
 - Branch/intake baseline: `codex/kingmaker-buff-planner-0.0.16-catalog-native-hud`
   from `91f198f53733b0fa63bfbc6c93ee133360b9b194`; version 0.0.16; persistence
@@ -14,20 +14,33 @@ GUARDED INSTALL PENDING THE CLEAN-HEAD RELEASE BUILD.
   `4ebf8e1ed3e66ffed72ea33ea325595629423dacd5bffa23e3c9109144b26915`
   / `8caab254-aacf-4811-8093-44b9184e6e53`, including the three exact
   spellbook-role component contracts.
-- Source validation passes 39/39 and the protocol/domain executable passes
-  127/127. The preceding aggregate source-only pass was 125/125 before the two
-  new tests; its remaining package-dependent filesystem/package/WhatIf stages
-  will be rerun after the 0.0.16 local package is built. The Release build
-  passes 1/1; the prior runtime-harness filesystem and deployment WhatIf gates
-  pass 8/8 and 5/5 respectively.
+- Release source is `90e5f43ed0c3447a3f73ca799706d653aa4a67f7`. Source-only
+  qualification passes source 39/39, protocol/domain 127/127, runtime-harness
+  filesystem 8/8, package fixture 4/4, deployment WhatIf 5/5, and aggregate
+  1/1. The deterministic release builder passes builds 2/2 and release builder
+  3/3; each internal build passes source 39/39, build 1/1, and package
+  validation 4/4. `git diff --check` passes.
+- The local-only ZIP is
+  `artifacts/release/0.0.16/KingmakerBuffPlanner-0.0.16.zip` with SHA-256
+  `0cced8d7dffc6543686ee413885bcd12d645af9c4ece8ad7d2a3ca2b2600c4a8`.
+  Its DLL SHA-256 is
+  `d1164180519dc6c91d3fe851aa87192f0985cfbc0a8005f97186e165654acdde`; MVID
+  `a91c37ec-1d91-4ab2-99d0-24da8fe5b686`.
+- `Test-InstallWhatIf.ps1` passed before installation with package validation
+  4/4, local-install preflight PASS, and WhatIf purity 5/5. Guarded install
+  `kbp-0.0.16-catalog-native-hud-20260831` completed `Installed`, replacing
+  only verified prior 0.0.13. Settings were preserved, other mods were
+  verified unchanged, and the installed DLL/hash/MVID exactly match the
+  manifest. Evidence:
+  `C:\Dev\KingmakerBuffPlannerLab\runtime-evidence\install-kbp-0.0.16-catalog-native-hud-20260831\install-result.json`.
 - Save-backed qualification is blocked—not passed—because the guarded resolver
   reports `baseline=0; working=0`. No ordinary save, game launch, or live
   staging was substituted. The final package/installer record will retain this
   boundary.
 
-Exact next action: commit the release source, execute the clean-head
-deterministic release builder, run guarded installation WhatIf and installation,
-then record ZIP/DLL/MVID/hashes and the installation transaction.
+Exact next action: await the exact guarded save pair and run the manual
+in-game acceptance rows. No ordinary save, game launch, push, merge to main,
+tag, or publication is authorized by this checkpoint.
 
 ## 0.0.15 publication preflight
 

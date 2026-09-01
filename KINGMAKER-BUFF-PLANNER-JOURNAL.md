@@ -1,5 +1,32 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-08-31 - 0.0.16 release/package/install handoff
+
+Status: DETERMINISTIC PACKAGE AND GUARDED LOCAL INSTALL PASS; SAVE-BACKED
+IN-GAME ACCEPTANCE BLOCKED, NOT CLAIMED.
+
+- Release source is `90e5f43ed0c3447a3f73ca799706d653aa4a67f7` on
+  `codex/kingmaker-buff-planner-0.0.16-catalog-native-hud`; version 0.0.16,
+  persistence schema 4.
+- Final aggregate source-only gate: source 39/39, protocol/domain 127/127,
+  runtime filesystem 8/8, package 4/4, deployment WhatIf 5/5, aggregate 1/1.
+  Clean-head `Build-Release.ps1` passes deterministic builds 2/2 and release
+  builder 3/3; `git diff --check` passes.
+- Local-only ZIP/DLL/MVID:
+  `0cced8d7dffc6543686ee413885bcd12d645af9c4ece8ad7d2a3ca2b2600c4a8` /
+  `d1164180519dc6c91d3fe851aa87192f0985cfbc0a8005f97186e165654acdde` /
+  `a91c37ec-1d91-4ab2-99d0-24da8fe5b686`.
+- `Test-InstallWhatIf.ps1` passed before installation (package 4/4, preflight
+  PASS, purity 5/5). Guarded install
+  `kbp-0.0.16-catalog-native-hud-20260831` completed `Installed` from the
+  manifest; it replaced only verified 0.0.13, preserved settings, and verified
+  all other mods unchanged. The installed DLL/MVID match exactly. No game was
+  launched; transaction evidence is
+  `C:\Dev\KingmakerBuffPlannerLab\runtime-evidence\install-kbp-0.0.16-catalog-native-hud-20260831`.
+- Exact next action: when an authorized baseline/working pair exists, run the
+  manual in-game provider/catalog/chip/coverage/native-HUD/sound checklist.
+  No ordinary save, push, merge to main, tag, or publication is authorized.
+
 ## 2026-08-31 - 0.0.16 catalog/native-HUD implementation checkpoint
 
 Status: IMPLEMENTED; SOURCE/BEHAVIOR/EXACT-ASSEMBLY/WHATIF PASS; CLEAN-HEAD

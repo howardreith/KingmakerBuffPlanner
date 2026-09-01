@@ -1,16 +1,17 @@
 # Autonomous Blockers
 
-0.0.16 catalog/native-HUD candidate, 2026-08-31: no source, compilation,
-behavioral, exact-assembly, package-fixture, or deployment-WhatIf blocker is
-known. The exact guarded local UMM installation is a valid 0.0.13 build; the
-repository install-WhatIf fixture was corrected from its stale 0.0.11
-predecessor expectation and must be rerun against the 0.0.16 release manifest.
-The sole current qualification boundary is external: the guard reports exactly
+0.0.16 catalog/native-HUD package/install handoff, 2026-08-31: no source,
+compilation, behavioral, exact-assembly, package, deployment-WhatIf, or
+guarded-install blocker is known. Release source `90e5f43ed0c3447a3f73ca799706d653aa4a67f7`
+has a deterministic local-only ZIP; guarded installation
+`kbp-0.0.16-catalog-native-hud-20260831` completed `Installed`, replacing only
+verified 0.0.13, preserving settings, and verifying other mods unchanged. The
+sole current qualification boundary is external: the guard reports exactly
 `baseline=0; working=0`, so Arcanist/provider UI, Lay on Hands absence,
 cross-routine chips, communal coverage, native visual states, parchment
 tooltip, and sound cannot be claimed as live in-game PASS. No ordinary save may
-be substituted. This does not authorize a game launch, remote mutation, tag,
-or publication.
+be substituted. No game launch, remote mutation, tag, merge to main, or
+publication occurred.
 
 0.0.15 publication authorization, 2026-08-29: no authorization, repository,
 default-branch, authentication, version-collision, or remote-divergence

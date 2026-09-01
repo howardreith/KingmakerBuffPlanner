@@ -10,15 +10,22 @@ allied coverage, profile-derived L/I/S membership chips, and captured native
 lower-left HUD controls/tooltips/opening sound. Version is 0.0.16; persistence
 schema is unchanged at 4.
 
-Current local gates pass source 39/39, protocol/domain 125/125, runtime
-filesystem 8/8, package fixture 4/4, deployment WhatIf 5/5, aggregate 1/1,
-and Release build 1/1. Exact contracts, rejected theories, and next actions
-are in `planning/BUFF-CATALOG-NATIVE-HUD-EVIDENCE.md`. The current guarded
-save inventory is baseline=0/working=0, so no live runtime claim is made.
+Release source `90e5f43ed0c3447a3f73ca799706d653aa4a67f7` passes source
+39/39, protocol/domain 127/127, runtime filesystem 8/8, package fixture 4/4,
+deployment WhatIf 5/5, aggregate 1/1, deterministic builds 2/2, and release
+builder 3/3. The local-only ZIP/DLL/MVID are
+`0cced8d7dffc6543686ee413885bcd12d645af9c4ece8ad7d2a3ca2b2600c4a8` /
+`d1164180519dc6c91d3fe851aa87192f0985cfbc0a8005f97186e165654acdde` /
+`a91c37ec-1d91-4ab2-99d0-24da8fe5b686`. Guarded installation
+`kbp-0.0.16-catalog-native-hud-20260831` is Installed with settings preserved,
+other mods verified unchanged, and exact installed bytes. Exact contracts,
+rejected theories, and transaction evidence are in
+`planning/BUFF-CATALOG-NATIVE-HUD-EVIDENCE.md`.
 
-Exact next action: commit release source, produce a clean-head deterministic
-local-only package, run the guarded UMM installer WhatIf and installation, and
-then record hashes/transaction without launching or publishing.
+The current guarded save inventory remains baseline=0/working=0, so no live
+runtime claim is made. Exact next action: await the authorized pair and run the
+manual acceptance rows; do not substitute an ordinary save. No push, merge to
+main, tag, or publication is authorized or has occurred.
 
 ## 2026-08-29 0.0.15 publication authorization checkpoint
 

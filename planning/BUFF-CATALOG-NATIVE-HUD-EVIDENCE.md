@@ -148,9 +148,42 @@ acceptance remains blocked until the authorized fixture pair exists.
   installation and was tightened to that exact predecessor; it must be rerun
   after clean-head 0.0.16 packaging.
 
+## Final deterministic packaging and guarded local installation
+
+- Release source: `90e5f43ed0c3447a3f73ca799706d653aa4a67f7` on
+  `codex/kingmaker-buff-planner-0.0.16-catalog-native-hud`.
+- `./scripts/Build-Release.ps1`: PASS; deterministic builds `2/2`, release
+  builder `3/3`, with source validation `39/39`, build `1/1`, and package
+  validation `4/4` for each internal build.
+- Final local-only ZIP:
+  `artifacts/release/0.0.16/KingmakerBuffPlanner-0.0.16.zip`, SHA-256
+  `0cced8d7dffc6543686ee413885bcd12d645af9c4ece8ad7d2a3ca2b2600c4a8`.
+  Final DLL: `artifacts/build/Release/KingmakerBuffPlanner.dll`, SHA-256
+  `d1164180519dc6c91d3fe851aa87192f0985cfbc0a8005f97186e165654acdde`,
+  MVID `a91c37ec-1d91-4ab2-99d0-24da8fe5b686`.
+- `./scripts/Test-SourceOnly.ps1`: source `39/39`, protocol/domain `127/127`,
+  runtime-harness filesystem `8/8`, package validation `4/4`, deployment
+  WhatIf `5/5`, aggregate `1/1`; the validated package hash is the ZIP hash
+  above. `./scripts/Test-InstallWhatIf.ps1` passed pre-install with package
+  validation `4/4`, local-install preflight PASS, and install-WhatIf purity
+  `5/5`.
+- Guarded installation ID `kbp-0.0.16-catalog-native-hud-20260831` completed
+  with status `Installed` at `2026-09-01T01:38:48.3933942Z`. It replaced the
+  verified prior `0.0.13` planner only, preserved settings, verified all other
+  mods unchanged, and installed an exact DLL/hash/MVID match at
+  `C:\Program Files (x86)\Steam\steamapps\common\Pathfinder Kingmaker\Mods\KingmakerBuffPlanner`.
+  Evidence is
+  `C:\Dev\KingmakerBuffPlannerLab\runtime-evidence\install-kbp-0.0.16-catalog-native-hud-20260831\install-result.json`;
+  recoverable prior backup is
+  `C:\Dev\KingmakerBuffPlannerLab\runtime-backups\install-kbp-0.0.16-catalog-native-hud-20260831\KingmakerBuffPlanner.prior`.
+  No game process was launched. `rollbackVerified=false` means rollback was not
+  needed after the successful transaction, not that a failed restoration was
+  accepted.
+
 ## Exact next action
 
-Commit the release source, run the clean-worktree deterministic package builder,
-rerun guarded installer WhatIf, and install only the manifest-verified 0.0.16
-package. Record exact ZIP/DLL/MVID/transaction hashes. Do not launch the game
-without the required guarded save pair.
+Await an authorized, exact `KBP_AUTOMATION_BASELINE` /
+`KBP_AUTOMATION_WORKING` pair, then run the manual acceptance rows for provider
+selection, catalog visibility, routine chips, communal coverage, native visual
+states/tooltips, and one-shot setup sound. Do not substitute an ordinary save.
+No push, merge to main, tag, or publication is authorized or has occurred.
