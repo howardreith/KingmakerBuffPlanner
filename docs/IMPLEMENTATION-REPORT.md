@@ -1,5 +1,24 @@
 # Implementation Report
 
+## 0.0.17 final local artifact
+
+The exact product-bearing qualified commit is
+`5976a4b5222c408f0b6c3c8fb3f5314c8db5c54f`. Its deterministic local-only
+release ZIP is
+`artifacts/release/0.0.17/KingmakerBuffPlanner-0.0.17.zip` with SHA-256
+`e8991848e9d11168f2f7a4f6ea67a7ff233661e497e0d8867505f384286f963d`.
+The packaged DLL is SHA-256
+`0451807d8c0f7431467c2cb3be22ba4e20edc9b552bfb6f66445fd69128e8d01`,
+MVID `983a62c2-5e63-4261-b7d0-996cbd836aaa`. Release construction passed
+two deterministic builds and strict validation. It was not installed,
+launched, pushed, tagged, or published.
+
+Final guarded runtime WhatIf was pure. Save-backed preflight found no exact
+baseline or working fixture and stopped before staging. Consequently the source
+and contract results establish implementation correctness but do not assert
+that Resist Energy, Remove Fear, Good Hope, native Share debit/cancellation, or
+Infusion was observed in a live campaign.
+
 ## 0.0.17 communal, Share Transmutation, and Infusion update
 
 Starting state was clean `main`

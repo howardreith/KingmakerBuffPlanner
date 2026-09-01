@@ -1,5 +1,66 @@
 # Qualification
 
+## 0.0.17 final local qualification record
+
+Status: SOURCE/BEHAVIOR/EXACT-ASSEMBLY/DEBUG/RELEASE/DETERMINISTIC LOCAL
+PACKAGE/WHATIF PASS. SAVE-BACKED GAMEPLAY BLOCKED; GUARDED PUSH TEST
+INTENTIONALLY REFUSED THIS NON-ALLOWLISTED BRANCH; NO RUNTIME OR PUBLICATION
+CLAIM.
+
+- Exact qualified source/package commit:
+  `5976a4b5222c408f0b6c3c8fb3f5314c8db5c54f` on
+  `codex/kbp-communal-share-transmutation-infusion`, version 0.0.17,
+  persistence schema 4. The following provenance update is documentation-only.
+- Final source-only: source 41/41; protocol/domain 135/135; runtime-harness
+  filesystem 8/8; package validation 4/4; deployment WhatIf 5/5; aggregate
+  source-only suite 1/1.
+- Final Debug build: 1/1, DLL SHA-256
+  `613eab9320cc3b88459904262c1c08555fef4f6351a7ece8dacb0239f544d68a`.
+  Final explicit Release build: 1/1, DLL SHA-256
+  `0451807d8c0f7431467c2cb3be22ba4e20edc9b552bfb6f66445fd69128e8d01`.
+- `Build-Release.ps1`: deterministic builds 2/2 and release builder 3/3.
+  Local-only ZIP
+  `artifacts/release/0.0.17/KingmakerBuffPlanner-0.0.17.zip` SHA-256
+  `e8991848e9d11168f2f7a4f6ea67a7ff233661e497e0d8867505f384286f963d`;
+  packaged DLL SHA-256
+  `0451807d8c0f7431467c2cb3be22ba4e20edc9b552bfb6f66445fd69128e8d01`;
+  assembly MVID `983a62c2-5e63-4261-b7d0-996cbd836aaa`. Strict package
+  validation is 4/4 and publication status is `local-only`.
+- Brown Fur optional-provider inspection passes 57/57 against
+  `KingmakerGunslinger.dll` 0.0.113.0, SHA-256
+  `97a1ad535a7b384759272cf37c0fe8705843b9d149a61e9e8b6c41df39437913`,
+  MVID `685d2575-41e1-4897-881c-a314229ad7cf`. The built product has no
+  optional gameplay-mod assembly reference.
+- Base-game targeting IL inspection exits 0 against `Assembly-CSharp.dll`
+  SHA-256
+  `3b6450ffec440e296e586f71c711b195aed144b28d53e1cbb29406d18fef5afb`,
+  MVID `07fa1e4d-8618-41b3-9b8d-faa17d3b26f7`, including
+  `IsAlchemistSpell`, `AlchemistInfusion`, `TargetAnchor`, and
+  `CanTarget(TargetWrapper)`. The installed Call of the Wild spellbook probe
+  also exits 0 at its recorded hash/MVID.
+- `Test-InstallWhatIf.ps1`: package 4/4 and install purity 5/5 for exact
+  installed 0.0.16 to candidate 0.0.17. No install, state, evidence, staging,
+  backup, game, or mod mutation occurred.
+- Guarded `Invoke-KingmakerRuntimeTest.ps1 ... -WhatIf`: source 41/41,
+  package 4/4, deployment preflight PASS, runtime WhatIf PASS, and explicitly
+  no evidence/deployment/process/game/mod/save mutation.
+- Save-backed `live-ui-bootstrap -WhatIf` stopped before runtime staging with
+  `Disposable save ambiguity: baseline=0; working=0`. This is the expected
+  safety blocker, not a live test pass. Actual runtime scenarios performed: 0.
+- `Test-GuardedPush.ps1` invoked only the external helper's WhatIf path and
+  returned exit 1 before network access:
+  `Refusing to push unapproved branch
+  'codex/kbp-communal-share-transmutation-infusion'.` The branch is the
+  dedicated branch requested for this mission. The external allowlist was not
+  edited, no branch was changed, and no push was attempted.
+
+One sequencing invocation of `Test-SourceOnly.ps1` immediately after the
+version bump passed source 41/41 and protocol 135/135, then returned exit 1
+because the required 0.0.17 local package did not yet exist. The normal
+`Build-Local.ps1` prerequisite was created and the complete suite then passed
+twice, including the final clean-head result above. This was not an assertion
+failure and no guard was relaxed.
+
 ## 0.0.17 communal/Share/Infusion local candidate
 
 Status: IMPLEMENTATION AND SOURCE-ONLY QUALIFICATION PASS; CLEAN-HEAD

@@ -1,5 +1,26 @@
 # Autonomous Resume
 
+## 0.0.17 final local handoff - 2026-09-01
+
+- Exact qualified source/package commit:
+  `5976a4b5222c408f0b6c3c8fb3f5314c8db5c54f`; branch
+  `codex/kbp-communal-share-transmutation-infusion`; version 0.0.17; schema 4.
+  The next commit is provenance-only.
+- Final gates: source 41/41, protocol/domain 135/135, runtime filesystem 8/8,
+  package 4/4, deployment WhatIf 5/5, aggregate 1/1, Debug 1/1, Release 1/1,
+  Brown Fur exact contract 57/57, deterministic builds 2/2, release builder
+  3/3, install WhatIf 5/5, guarded runtime WhatIf PASS.
+- ZIP/DLL/MVID:
+  `e8991848e9d11168f2f7a4f6ea67a7ff233661e497e0d8867505f384286f963d` /
+  `0451807d8c0f7431467c2cb3be22ba4e20edc9b552bfb6f66445fd69128e8d01` /
+  `983a62c2-5e63-4261-b7d0-996cbd836aaa`.
+- Save preflight is blocked at baseline=0/working=0; actual gameplay runs=0.
+  The guarded push WhatIf is non-applicable/refused because its external
+  allowlist does not contain this dedicated mission branch. No policy was
+  changed and no install, launch, push, merge, tag, or publication occurred.
+- Exact next action: await an explicitly authorized exact KBP automation save
+  pair and run `docs/MANUAL-ACCEPTANCE.md`. Do not substitute another save.
+
 ## 0.0.17 communal/Share/Infusion checkpoint - 2026-09-01
 
 - Start: clean `main`

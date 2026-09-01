@@ -1,5 +1,55 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-09-01 - 0.0.17 final local qualification
+
+Status: LOCAL IMPLEMENTATION/PACKAGE COMPLETE; RUNTIME BLOCKED; NO PUBLICATION.
+
+- Qualified source/package HEAD:
+  `5976a4b5222c408f0b6c3c8fb3f5314c8db5c54f`; branch
+  `codex/kbp-communal-share-transmutation-infusion`; version 0.0.17; clean at
+  qualification. This record commit contains documentation only.
+- Final exact results: source 41/41; protocol/domain 135/135; runtime harness
+  filesystem 8/8; package 4/4; deployment WhatIf 5/5; source-only aggregate
+  1/1; Debug 1/1; Release 1/1; Brown Fur assembly contract 57/57;
+  deterministic release builds 2/2; release builder 3/3; install WhatIf 5/5;
+  runtime WhatIf preflight PASS.
+- Final Debug DLL SHA-256:
+  `613eab9320cc3b88459904262c1c08555fef4f6351a7ece8dacb0239f544d68a`.
+  Final local-only ZIP/DLL/MVID:
+  `e8991848e9d11168f2f7a4f6ea67a7ff233661e497e0d8867505f384286f963d` /
+  `0451807d8c0f7431467c2cb3be22ba4e20edc9b552bfb6f66445fd69128e8d01` /
+  `983a62c2-5e63-4261-b7d0-996cbd836aaa`.
+- Final command set:
+  `scripts\Build.ps1 -Configuration Debug`;
+  `scripts\Build-Local.ps1`;
+  `scripts\Test-SourceOnly.ps1`;
+  `scripts\Build.ps1 -Configuration Release`;
+  `scripts\Inspect-BrownFurShareContracts.ps1`;
+  `scripts\Inspect-KingmakerVariantContracts.ps1 -TypePattern
+  '^Kingmaker\.UnitLogic\.Abilities\.AbilityData$' -MethodPattern
+  '^(get_IsAlchemistSpell|get_AlchemistInfusion|get_TargetAnchor|CanTarget)$'`;
+  `scripts\Inspect-KingmakerSpellbookContracts.ps1`;
+  `scripts\Build-Release.ps1`;
+  `scripts\validate-package.ps1 -PackagePath
+  .\artifacts\release\0.0.17\KingmakerBuffPlanner-0.0.17.zip`;
+  `scripts\Test-InstallWhatIf.ps1`;
+  `scripts\Invoke-KingmakerRuntimeTest.ps1 -Scenario final-no-save-core
+  -CompatibilityProfileId native-only -RunId
+  kbp-0.0.17-final-head-whatif -WhatIf -Confirm:$false`;
+  save-backed `live-ui-bootstrap -WhatIf`; `scripts\Test-GuardedPush.ps1`;
+  `git diff --check`; final status/artifact/tracked-payload inspection.
+- The first post-version `Test-SourceOnly.ps1` passed 41/41 and 135/135,
+  then stopped because no 0.0.17 package existed. `Build-Local.ps1` satisfied
+  the documented prerequisite; later complete invocations passed. No test or
+  validator was weakened.
+- Save-backed preflight returned exit 1 before staging:
+  `Disposable save ambiguity: baseline=0; working=0`. Runtime scenarios
+  actually performed: 0. Push-helper WhatIf also returned exit 1 before network
+  access because the dedicated branch is absent from its external allowlist.
+  No bypass, network push, or policy edit occurred.
+- Exact next action: none without an authorized save pair. Use the manual
+  checklist when one exists. No ordinary or other product's save may substitute.
+
 ## 2026-09-01 - 0.0.17 implementation checkpoint
 
 Status: IMPLEMENTATION COMMITTED; SOURCE-ONLY PASS; VERSION/RECORD CANDIDATE IN

@@ -1,5 +1,21 @@
 # Autonomous Blockers
 
+0.0.17 final local qualification, 2026-09-01: no remaining source,
+compilation, deterministic-test, exact-assembly, package, install-WhatIf, or
+runtime-WhatIf blocker. Qualified source is
+`5976a4b5222c408f0b6c3c8fb3f5314c8db5c54f`; local ZIP/DLL/MVID are
+`e8991848e9d11168f2f7a4f6ea67a7ff233661e497e0d8867505f384286f963d` /
+`0451807d8c0f7431467c2cb3be22ba4e20edc9b552bfb6f66445fd69128e8d01` /
+`983a62c2-5e63-4261-b7d0-996cbd836aaa`.
+
+The only gameplay evidence blocker remains external:
+`Disposable save ambiguity: baseline=0; working=0`. No actual communal,
+Share, Powerful Change composition, cancellation, or Infusion runtime scenario
+was performed. The guarded push-helper test also refuses this dedicated branch
+because its external allowlist has not been expanded; publication is both
+unauthorized and intentionally unattempted. Neither condition is represented as
+a product/runtime PASS.
+
 0.0.17 communal/Share/Infusion update, 2026-09-01: no known source,
 architecture, compile, deterministic behavior, exact-assembly, or
 deployment-WhatIf blocker. Implementation checkpoint is
