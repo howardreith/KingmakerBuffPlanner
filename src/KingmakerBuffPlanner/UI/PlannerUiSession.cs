@@ -156,6 +156,14 @@ namespace KingmakerBuffPlanner.UI
                         ";child=" + trace.ChildGuid +
                         ";eligible=" + trace.Eligible +
                         ";reason=" + trace.Reason + ".");
+                foreach (PartySpellbookRoleTrace trace in CatalogDiscovery.SpellbookRoles)
+                    _log.Info("[KBP-SPELLBOOK-ROLE] caster=" + trace.CasterUnitId +
+                        ";spellbook=" + trace.SpellbookGuid +
+                        ";spontaneous=" + trace.Spontaneous +
+                        ";role=" + trace.Role +
+                        ";relationship=" + trace.RelationshipTargetGuid +
+                        ";included=" + trace.Included +
+                        ";reason=" + trace.Reason + ".");
                 LogBlessSlice(loaded.Profile, snapshot, _providerOptions, Model);
             }
             catch (Exception exception)

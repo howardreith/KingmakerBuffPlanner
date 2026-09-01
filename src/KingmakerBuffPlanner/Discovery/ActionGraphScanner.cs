@@ -85,12 +85,16 @@ namespace KingmakerBuffPlanner.Discovery
                         return new EffectLeafExpression(
                             node.EffectKind,
                             node.EffectId,
-                            targetOverride ?? node.Target,
+                            ResolveLeafTarget(targetOverride, node.Target),
                             node.SourceContract,
                             path);
                     case DiscoveryNodeKind.OffensiveAction:
                         diagnostics.Add(new DiscoveryDiagnostic(
                             "offensive-action", node.Identity, node.SourceContract, path));
+                        return new EmptyEffectExpression();
+                    case DiscoveryNodeKind.RestorativeAction:
+                        diagnostics.Add(new DiscoveryDiagnostic(
+                            "restorative-action", node.Identity, node.SourceContract, path));
                         return new EmptyEffectExpression();
                     case DiscoveryNodeKind.Sequence:
                         return VisitSequence(node, depth, active, diagnostics, targetOverride, path);
@@ -100,9 +104,11 @@ namespace KingmakerBuffPlanner.Discovery
                             Visit(node.WhenTrue, depth + 1, active, diagnostics, targetOverride, path + "/true"),
                             Visit(node.WhenFalse, depth + 1, active, diagnostics, targetOverride, path + "/false"));
                     case DiscoveryNodeKind.TargetTransform:
+                        EffectTarget transformedTarget = ComposeTarget(
+                            targetOverride, node.Target);
                         return new TargetedEffectExpression(
-                            node.Target,
-                            VisitSequence(node, depth, active, diagnostics, node.Target, path));
+                            transformedTarget,
+                            VisitSequence(node, depth, active, diagnostics, transformedTarget, path));
                     case DiscoveryNodeKind.AbilityReference:
                         return new ReferencedAbilityExpression(
                             node.ReferencedAbilityId,
@@ -129,6 +135,22 @@ namespace KingmakerBuffPlanner.Discovery
                 children.Add(Visit(node.Children[i], depth + 1, active, diagnostics, targetOverride,
                     path + "/" + i + ":" + node.Children[i].Identity));
             return new SequenceEffectExpression(children);
+        }
+
+        private static EffectTarget ResolveLeafTarget(
+            EffectTarget? targetOverride,
+            EffectTarget leafTarget)
+        {
+            return leafTarget == EffectTarget.CurrentTarget && targetOverride != null
+                ? targetOverride.Value : leafTarget;
+        }
+
+        private static EffectTarget ComposeTarget(
+            EffectTarget? outerTarget,
+            EffectTarget transformTarget)
+        {
+            return transformTarget == EffectTarget.CurrentTarget && outerTarget != null
+                ? outerTarget.Value : transformTarget;
         }
     }
 

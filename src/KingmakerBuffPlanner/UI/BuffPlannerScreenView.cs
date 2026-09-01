@@ -33,6 +33,7 @@ namespace KingmakerBuffPlanner.UI
         private Text _status;
         private Text _result;
         private Text _catalogSummary;
+        private Text _routineLegend;
         private Text _tooltip;
         private InputField _search;
         private PlannerRoutineTabsView _routineTabs;
@@ -440,14 +441,19 @@ namespace KingmakerBuffPlanner.UI
             _catalogSummary = KingmakerUiFactory.CreateText("CatalogSummary", frame, _theme,
                 string.Empty, 13, TextAnchor.MiddleLeft);
             _catalogSummary.color = _theme.MutedBrownText;
-            KingmakerUiFactory.SetAnchors(_catalogSummary.rectTransform, 0.02f, 0.775f, 0.98f, 0.805f);
+            KingmakerUiFactory.SetAnchors(_catalogSummary.rectTransform, 0.02f, 0.775f, 0.68f, 0.805f);
+            _routineLegend = KingmakerUiFactory.CreateText("RoutineChipLegend", frame, _theme,
+                "L Long  I Important  S Short", 12, TextAnchor.MiddleRight);
+            _routineLegend.color = _theme.MutedBrownText;
+            KingmakerUiFactory.SetAnchors(_routineLegend.rectTransform,
+                0.69f, 0.775f, 0.98f, 0.805f);
             _grid = new BuffGridView(frame, _theme, ResolveAbilityIcon, sourceId =>
             {
                 _enhancementChooser.Hide();
                 _casterPolicyChooser.Hide();
                 _session.Model.SelectSource(sourceId);
                 RefreshCatalog(true);
-            }, OpenDescription, StatusColor);
+            }, OpenDescription, StatusColor, ShowTooltip);
             BuffCardGridScrollSink gridScroll = _grid.Scroll.gameObject
                 .AddComponent<BuffCardGridScrollSink>();
             gridScroll.Scroll = _grid.Scroll;

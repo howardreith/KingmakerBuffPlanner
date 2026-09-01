@@ -1,5 +1,34 @@
 # Autonomous Resume
 
+## 0.0.16 catalog/native-HUD publication authorization - 2026-08-31
+
+- Active branch is `codex/kingmaker-buff-planner-0.0.16-catalog-native-hud`,
+  based on clean `main` `91f198f53733b0fa63bfbc6c93ee133360b9b194`; product
+  metadata is 0.0.16 and persistence remains schema 4.
+- Structural provider roles, restorative payload classification, per-anchor
+  allied coverage, routine membership chips, and native lower-left HUD style,
+  parchment tooltip, and setup-opening sound are implemented. The exact
+  installed Call of the Wild contracts and native UI contracts are recorded in
+  `planning/BUFF-CATALOG-NATIVE-HUD-EVIDENCE.md`.
+- Release source is `90e5f43ed0c3447a3f73ca799706d653aa4a67f7`. Final
+  source-only gates pass source 39/39, protocol/domain 127/127, runtime
+  filesystem 8/8, package 4/4, deployment WhatIf 5/5, aggregate 1/1; the
+  clean-head release builder passes deterministic builds 2/2 and release
+  builder 3/3. ZIP/DLL/MVID are
+  `0cced8d7dffc6543686ee413885bcd12d645af9c4ece8ad7d2a3ca2b2600c4a8` /
+  `d1164180519dc6c91d3fe851aa87192f0985cfbc0a8005f97186e165654acdde` /
+  `a91c37ec-1d91-4ab2-99d0-24da8fe5b686`.
+- The package is guarded-installed locally under installation ID
+  `kbp-0.0.16-catalog-native-hud-20260831`: status Installed, settings
+  preserved, other mods verified unchanged, installed bytes exact. No game was
+  launched.
+- The owner explicitly accepted the qualified candidate and authorized its final
+  documentation commit, non-rewriting merge to `main`, guarded push, annotated
+  tag, and GitHub release. Exact next action: execute that guarded sequence,
+  independently verify the public release bytes, and record it. The absent
+  exact baseline/working pair remains an honest runtime boundary; no ordinary
+  save may substitute.
+
 ## 0.0.15 publication authorization - 2026-08-29
 
 - The owner explicitly authorized the final commit, merge to `main`, remote

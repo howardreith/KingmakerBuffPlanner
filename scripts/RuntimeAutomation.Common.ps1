@@ -279,12 +279,19 @@ function Assert-KbpRuntimeResult {
             -not ([string]$Result.uiCatalogControlEvidence).Contains('longSelected=1') -or
             -not ([string]$Result.uiCatalogControlEvidence).Contains('importantSelected=0') -or
             ([regex]::Matches([string]$Result.uiHudObjectEvidence,
-                'spriteInk=0\.961,0\.820,0\.420,1\.000')).Count -ne 4 -or
-            ([regex]::Matches([string]$Result.uiHudObjectEvidence, 'innerFrame=True')).Count -ne 4 -or
+                'nativeSkin=True')).Count -ne 4 -or
+            ([regex]::Matches([string]$Result.uiHudObjectEvidence,
+                'spriteInk=1\.000,1\.000,1\.000,1\.000')).Count -ne 4 -or
+            -not ([string]$Result.uiHudObjectEvidence).Contains('style=targetSprite=True') -or
+            -not ([string]$Result.uiHudObjectEvidence).Contains('highlighted=') -or
+            -not ([string]$Result.uiHudObjectEvidence).Contains('pressed=') -or
+            [int]$Result.uiTooltipNativeTriggerCount -ne 4 -or
+            -not [bool]$Result.uiTooltipUsesNativeParchmentPresentation -or
+            [int]$Result.uiSetupOpenSoundCount -lt 1 -or
             [int]$Result.uiCatalogProviderCount -lt [int]$Result.uiCatalogAggregateAbilityCount -or
             [int]$Result.uiCatalogAggregateAbilityCount -lt [int]$Result.uiCatalogVisibleViewModels -or
             [int]$Result.uiDirectSelectedTargetCount -lt 1) {
-            throw 'Catalog-control or dark/gold HUD evidence is incomplete.'
+            throw 'Catalog-control or native HUD evidence is incomplete.'
         }
 
         Add-Type -AssemblyName System.Drawing

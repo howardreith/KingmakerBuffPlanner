@@ -29,6 +29,8 @@ namespace KingmakerBuffPlanner.Discovery
         public bool? Harmful { get; set; }
         public bool IsHiddenInUi { get; set; }
         public bool IsClassFeature { get; set; }
+        public bool RemoveOnRest { get; set; }
+        public bool StayOnDeath { get; set; }
         public IReadOnlyList<string> ComponentTypes { get; set; }
         public string SourceContract { get; set; }
         public string ActionPath { get; set; }
@@ -69,6 +71,19 @@ namespace KingmakerBuffPlanner.Discovery
             IReadOnlyList<string> diagnostics = facts.DiagnosticContracts ?? new string[0];
             IReadOnlyList<NativeCandidateDiagnosticFacts> diagnosticFacts =
                 facts.Diagnostics ?? new NativeCandidateDiagnosticFacts[0];
+            IReadOnlyList<NativeCandidateDiagnosticFacts> restorative = diagnosticFacts
+                .Where(IsRestorative).ToArray();
+            if (restorative.Count == 0)
+            {
+                restorative = diagnostics.Where(IsRestorativeContract)
+                    .Select(value => new NativeCandidateDiagnosticFacts
+                    {
+                        Code = "restorative-action",
+                        Contract = value,
+                        Detail = value,
+                        ActionPath = string.Empty
+                    }).ToArray();
+            }
             IReadOnlyList<string> abilityComponents =
                 facts.AbilityComponentTypes ?? new string[0];
             if (!facts.IsPlayerAccessible)
@@ -85,8 +100,13 @@ namespace KingmakerBuffPlanner.Discovery
                 return Exclude("point-target-without-placement",
                     "Point-target abilities are excluded until a deterministic safe placement rule exists.");
             if (effects.Count == 0)
+            {
+                if (restorative.Count != 0)
+                    return Exclude("instantaneous-restoration-without-substantive-buff",
+                        "Only exact healing, recovery, removal, resurrection, or dispel actions were reachable; no persistent beneficial payload was detected.");
                 return Exclude("no-persistent-beneficial-party-effect",
                     "No persistent unit buff, area buff, or safely resolvable worn-item enchantment was detected.");
+            }
 
             if (facts.IsStickyTouch && effects.All(e => e.Target == "Caster"))
                 return Exclude("sticky-touch-carrier-only",
@@ -156,6 +176,12 @@ namespace KingmakerBuffPlanner.Discovery
                 if (hasOffensiveCarrier || offensive.Count != 0)
                     return Exclude("offensive-carrier-only",
                         "Offensive delivery or damage semantics leave only hidden carrier, save, activation, or cleanup markers.");
+                if (restorative.Count != 0 && safe.All(IsMarker))
+                    return Exclude("reactive-restoration-marker-only",
+                        "Exact restorative actions leave only hidden carrier, activation, or cleanup marker buffs on every safe branch.");
+                if (restorative.Count != 0)
+                    return Exclude("restorative-action-without-substantive-buff",
+                        "Exact restorative actions do not establish a substantive persistent beneficial state on a safe branch.");
                 if (safe.All(IsMarker))
                     return Exclude("hidden-marker-only",
                         "Only hidden class-feature, activation, or cleanup marker effects were detected.");
@@ -238,12 +264,31 @@ namespace KingmakerBuffPlanner.Discovery
                  IsOffensiveContract(diagnostic.Detail));
         }
 
+        private static bool IsRestorative(NativeCandidateDiagnosticFacts diagnostic)
+        {
+            return diagnostic != null &&
+                (string.Equals(diagnostic.Code, "restorative-action", StringComparison.Ordinal) ||
+                 IsRestorativeContract(diagnostic.Contract) ||
+                 IsRestorativeContract(diagnostic.Detail));
+        }
+
         private static bool IsOffensiveContract(string value)
         {
             return Contains(value, "ContextActionDealDamage") ||
                 Contains(value, "ContextActionDealDirectDamage") ||
                 Contains(value, "ContextActionAttack") ||
                 Contains(value, "ContextActionRangedAttack");
+        }
+
+        private static bool IsRestorativeContract(string value)
+        {
+            return Contains(value, "ContextActionHealTarget") ||
+                Contains(value, "ContextActionHealEnergyDrain") ||
+                Contains(value, "ContextActionHealStatDamage") ||
+                Contains(value, "ContextActionResurrect") ||
+                Contains(value, "ContextActionRemoveBuff") ||
+                Contains(value, "ContextActionRemoveDeathDoor") ||
+                Contains(value, "ContextActionDispelMagic");
         }
 
         private static bool SameConditionalBranch(string firstPath, string secondPath)

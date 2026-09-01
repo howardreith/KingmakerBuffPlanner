@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using KingmakerBuffPlanner.RuntimeTesting;
 using KingmakerBuffPlanner.Discovery;
+using KingmakerBuffPlanner.Compatibility;
 using KingmakerBuffPlanner.Domain.Effects;
 using KingmakerBuffPlanner.Domain.Identity;
 using KingmakerBuffPlanner.Domain.Providers;
@@ -79,9 +80,17 @@ namespace KingmakerBuffPlanner.Tests
                 Run("scanner-reports-cycle", TestScannerCycle);
                 Run("scanner-reports-unknown-node", TestScannerUnknown);
                 Run("scanner-expression-wire-contract", TestScannerExpressionWireContract);
+                Run("spellbook-role-filtering-is-structural-and-fail-soft",
+                    TestSpellbookRoleResolution);
+                Run("installed-call-of-the-wild-spellbook-contract-is-exact",
+                    TestInstalledSpellbookRoleContract);
+                Run("area-recipient-refinement-is-conservative",
+                    TestAreaRecipientSemantics);
                 Run("native-candidate-classification-is-structural", TestNativeCandidateClassification);
                 Run("persistent-beneficial-classification-is-branch-and-recipient-aware",
                     TestPersistentBeneficialClassification);
+                Run("restorative-marker-only-candidates-are-excluded-without-name-rules",
+                    TestRestorativeCandidateClassification);
                 Run("optional-blueprint-ownership-is-exact", TestBlueprintOwnership);
                 Run("harmony-target-identities-are-stable", TestHarmonyTargetIdentity);
                 Run("installed-harmony-inventory-api-is-callable", TestHarmonyInventoryApi);
@@ -142,6 +151,8 @@ namespace KingmakerBuffPlanner.Tests
                     () => TestProviderPolicyRoundTrip(root));
                 Run("catalog-filter-selected-category-and-reset-contract", TestCatalogFilterState);
                 Run("presentation-view-models-use-player-facing-deterministic-state", TestPresentationModels);
+                Run("routine-membership-chips-are-active-aware-and-persistent",
+                    () => TestRoutineMembershipChips(root));
                 Run("right-click-description-resolves-without-plan-mutation", TestDescriptionRequest);
                 Run("powerful-change-qualification-is-semantic", TestPowerfulChangeSemanticQualification);
                 Run("powerful-change-availability-is-caster-and-spell-exact", TestPowerfulChangeAvailability);
@@ -154,6 +165,8 @@ namespace KingmakerBuffPlanner.Tests
                 Run("consumed-one-shot-enhancement-is-not-rearmed", TestOneShotEnhancementRestoration);
                 Run("personal-target-eligibility-is-provider-relative", TestPersonalTargetEligibility);
                 Run("area-coverage-preview-distinguishes-direct-and-indirect", TestAreaCoveragePresentation);
+                Run("per-anchor-mass-coverage-avoids-duplicate-communal-casts",
+                    TestPerAnchorMassCoverage);
                 Run("single-target-plan-does-not-create-indirect-coverage", TestSingleTargetCoveragePresentation);
                 Run("caster-centered-plan-does-not-invent-direct-receiver", TestCasterCenteredCoveragePresentation);
                 Run("four-column-grid-metrics-have-no-horizontal-scroll", TestGridMetrics);
@@ -161,6 +174,10 @@ namespace KingmakerBuffPlanner.Tests
                 Run("planner-hotkey-chord-consumes-native-primary-key", TestPlannerHotkeyBinding);
                 Run("input-lease-restores-on-close-and-acquire-failure", TestInputLease);
                 Run("screen-state-machine-is-idempotent", TestScreenStateMachine);
+                Run("setup-open-sound-gate-emits-once-per-successful-transition",
+                    TestSetupOpenSoundGate);
+                Run("native-hud-source-contract-retires-custom-chrome",
+                    TestNativeHudSourceContract);
                 Run("ui-readiness-is-deferred-across-frames", TestDeferredUiReadiness);
                 Run("hud-install-discovery-is-invalidated-not-frame-polled", TestHudInstallInvalidation);
                 Run("hud-retryable-readiness-retries-at-bounded-cadence", TestHudRetryableReadiness);
@@ -195,6 +212,34 @@ namespace KingmakerBuffPlanner.Tests
             string name = new AssemblyName(args.Name).Name + ".dll";
             string path = Path.Combine(game, "Kingmaker_Data", "Managed", name);
             return File.Exists(path) ? Assembly.LoadFrom(path) : null;
+        }
+
+        private static void TestInstalledSpellbookRoleContract()
+        {
+            string game = Environment.GetEnvironmentVariable("KBP_TEST_GAME_PATH");
+            string path = string.IsNullOrWhiteSpace(game) ? string.Empty : Path.Combine(
+                game, "Mods", "CallOfTheWild", "CallOfTheWild.dll");
+            if (!File.Exists(path)) return;
+            Assembly assembly = Assembly.LoadFrom(path);
+            const BindingFlags flags = BindingFlags.Public | BindingFlags.NonPublic |
+                BindingFlags.Instance | BindingFlags.DeclaredOnly;
+            Type cannotUse = assembly.GetType(
+                "CallOfTheWild.SpellbookMechanics.CanNotUseSpells", true);
+            if (cannotUse.GetFields(flags).Length != 0)
+                throw new InvalidOperationException(
+                    "Installed CanNotUseSpells contract unexpectedly gained fields.");
+            foreach (string typeName in new[]
+            {
+                "CallOfTheWild.SpellbookMechanics.CompanionSpellbook",
+                "CallOfTheWild.SpellbookMechanics.GetKnownSpellsFromMemorizationSpellbook"
+            })
+            {
+                FieldInfo field = assembly.GetType(typeName, true).GetField("spellbook", flags);
+                if (field == null || field.FieldType.FullName !=
+                    "Kingmaker.Blueprints.Classes.Spells.BlueprintSpellbook")
+                    throw new InvalidOperationException(
+                        "Installed optional spellbook relationship contract changed: " + typeName);
+            }
         }
 
         private static void TestGameRootWithoutTrailingSeparator()
@@ -269,6 +314,82 @@ namespace KingmakerBuffPlanner.Tests
                 !json.Contains("\"effectId\":\"wire-buff\"") ||
                 !json.Contains("\"actionPath\":\"wire-buff\""))
                 throw new InvalidOperationException("Effect expression JSON contract is incomplete: " + json);
+        }
+
+        private static void TestSpellbookRoleResolution()
+        {
+            IReadOnlyDictionary<string, SpellbookRoleResolution> roles =
+                SpellbookRoleResolver.Resolve(new[]
+                {
+                    new SpellbookRoleInput("arcanist-preparation", false, true,
+                        "arcanist-casting", string.Empty),
+                    new SpellbookRoleInput("arcanist-casting", true, false,
+                        string.Empty, "arcanist-preparation"),
+                    new SpellbookRoleInput("wizard-prepared", false, false,
+                        string.Empty, string.Empty),
+                    new SpellbookRoleInput("sorcerer-spontaneous", true, false,
+                        string.Empty, string.Empty),
+                    new SpellbookRoleInput("multiclass-first", false, false,
+                        string.Empty, string.Empty),
+                    new SpellbookRoleInput("multiclass-second", true, false,
+                        string.Empty, string.Empty),
+                    new SpellbookRoleInput("exhausted-but-structural", false, false,
+                        string.Empty, string.Empty)
+                });
+            SpellbookRoleResolution preparation = roles["arcanist-preparation"];
+            SpellbookRoleResolution casting = roles["arcanist-casting"];
+            if (preparation.Included || preparation.Role != SpellbookRole.PreparationOnly ||
+                preparation.RelationshipTargetGuid != "arcanist-casting" ||
+                preparation.Reason !=
+                    "cannot-use-spells-with-owned-companion-casting-book" ||
+                !casting.Included || casting.Role != SpellbookRole.CastingCapable ||
+                casting.RelationshipTargetGuid != "arcanist-preparation" ||
+                !roles["wizard-prepared"].Included ||
+                !roles["sorcerer-spontaneous"].Included ||
+                !roles["multiclass-first"].Included ||
+                !roles["multiclass-second"].Included ||
+                !roles["exhausted-but-structural"].Included)
+                throw new InvalidOperationException(
+                    "Structural spellbook roles hid a legitimate caster or retained the Arcanist preparation book.");
+
+            var ownedProviders = roles.Where(pair => pair.Value.Included)
+                .Select(pair => new ProviderKey("arcanist", pair.Key,
+                    Ability("arcanist-fixture", string.Empty, 0), "level-2"))
+                .ToArray();
+            if (ownedProviders.Count(value => value.SpellbookGuid == "arcanist-casting") != 1 ||
+                ownedProviders.Any(value => value.SpellbookGuid == "arcanist-preparation"))
+                throw new InvalidOperationException(
+                    "Provider keys did not retain only the structurally cast-capable Arcanist spellbook.");
+
+            IReadOnlyDictionary<string, SpellbookRoleResolution> malformed =
+                SpellbookRoleResolver.Resolve(new[]
+                {
+                    new SpellbookRoleInput("unresolved-optional-component", false, true,
+                        "not-owned", string.Empty)
+                });
+            SpellbookRoleResolution unresolved = malformed["unresolved-optional-component"];
+            if (!unresolved.Included || unresolved.Role != SpellbookRole.Ambiguous ||
+                unresolved.Reason != "cannot-use-spells-relationship-unproven")
+                throw new InvalidOperationException(
+                    "A missing optional compatibility relationship did not fail softly.");
+        }
+
+        private static void TestAreaRecipientSemantics()
+        {
+            if (AreaRecipientSemantics.Resolve(AreaSelectionTarget.Ally,
+                    false, true, true) != EffectTarget.AlliedAreaRecipients ||
+                AreaRecipientSemantics.Resolve(AreaSelectionTarget.Enemy,
+                    true, false, false) != EffectTarget.EnemyAreaRecipients ||
+                AreaRecipientSemantics.Resolve(AreaSelectionTarget.Any,
+                    true, false, false) != EffectTarget.AlliedAreaRecipients ||
+                AreaRecipientSemantics.Resolve(AreaSelectionTarget.Any,
+                    true, true, false) != EffectTarget.AmbiguousAreaRecipients ||
+                AreaRecipientSemantics.Resolve(AreaSelectionTarget.Any,
+                    true, false, true) != EffectTarget.AmbiguousAreaRecipients ||
+                AreaRecipientSemantics.Resolve(AreaSelectionTarget.Unknown,
+                    true, false, false) != EffectTarget.AmbiguousAreaRecipients)
+                throw new InvalidOperationException(
+                    "Area recipient refinement was not exact and conservative.");
         }
 
         private static void TestBlueprintOwnership()
@@ -592,7 +713,7 @@ namespace KingmakerBuffPlanner.Tests
                     }
                 });
             if (!instantOnly.Reason.StartsWith(
-                    "no-persistent-beneficial-party-effect:",
+                    "instantaneous-restoration-without-substantive-buff:",
                     StringComparison.Ordinal))
                 throw new InvalidOperationException(
                     "Instant healing without a persistent effect entered the catalog.");
@@ -617,6 +738,126 @@ namespace KingmakerBuffPlanner.Tests
                 enchantment.Disposition != "include")
                 throw new InvalidOperationException(
                     "Pet or worn-item persistent support regressed.");
+        }
+
+        private static void TestRestorativeCandidateClassification()
+        {
+            var classifier = new NativeCandidateClassifier();
+            NativeCandidateAuditDecision layOnHandsFixture = classifier.Classify(
+                new NativeCandidateAuditFacts
+                {
+                    IsPlayerAccessible = true,
+                    CanTargetFriends = true,
+                    Effects = new NativeCandidateEffectFacts[0],
+                    Diagnostics = new[]
+                    {
+                        new NativeCandidateDiagnosticFacts
+                        {
+                            Code = "restorative-action",
+                            Contract =
+                                "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionHealTarget",
+                            Detail = "restorative-action",
+                            ActionPath = "root/0:heal"
+                        }
+                    }
+                });
+            if (layOnHandsFixture.Disposition != "exclude" ||
+                !layOnHandsFixture.Reason.StartsWith(
+                    "instantaneous-restoration-without-substantive-buff:",
+                    StringComparison.Ordinal))
+                throw new InvalidOperationException(
+                    "A direct healing fixture with no persistent payload entered the catalog.");
+
+            NativeCandidateAuditDecision markerOnly = classifier.Classify(
+                new NativeCandidateAuditFacts
+                {
+                    IsPlayerAccessible = true,
+                    CanTargetSelf = true,
+                    Effects = new[]
+                    {
+                        CandidateEffect("Buff", "Caster", false,
+                            "ContextActionApplyBuff", "root/1:cleanup",
+                            true, false, new[]
+                            {
+                                "Kingmaker.UnitLogic.Mechanics.Components.AddFactContextActions"
+                            })
+                    },
+                    Diagnostics = new[]
+                    {
+                        new NativeCandidateDiagnosticFacts
+                        {
+                            Code = "restorative-action",
+                            Contract =
+                                "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionRemoveBuff",
+                            Detail = "restorative-action",
+                            ActionPath = "root/0:remove"
+                        }
+                    }
+                });
+            if (markerOnly.Disposition != "exclude" ||
+                !markerOnly.Reason.StartsWith(
+                    "reactive-restoration-marker-only:",
+                    StringComparison.Ordinal))
+                throw new InvalidOperationException(
+                    "A restorative carrier marker was treated as a player-facing buff.");
+
+            NativeCandidateAuditDecision recovery = classifier.Classify(
+                new NativeCandidateAuditFacts
+                {
+                    IsPlayerAccessible = true,
+                    CanTargetFriends = true,
+                    Effects = new NativeCandidateEffectFacts[0],
+                    Diagnostics = new[]
+                    {
+                        new NativeCandidateDiagnosticFacts
+                        {
+                            Code = "restorative-action",
+                            Contract =
+                                "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionResurrect",
+                            Detail = "restorative-action",
+                            ActionPath = "root/0:resurrect"
+                        }
+                    }
+                });
+            if (recovery.Disposition != "exclude" ||
+                !recovery.Reason.StartsWith(
+                    "instantaneous-restoration-without-substantive-buff:",
+                    StringComparison.Ordinal))
+                throw new InvalidOperationException(
+                    "Resurrection/recovery without a persistent protection entered the catalog.");
+
+            NativeCandidateAuditDecision protectionPlusAdjunct = classifier.Classify(
+                new NativeCandidateAuditFacts
+                {
+                    IsPlayerAccessible = true,
+                    CanTargetFriends = true,
+                    EffectOnAlly = "Helpful",
+                    Effects = new[]
+                    {
+                        CandidateEffect("Buff", "CurrentTarget", false,
+                            "ContextActionApplyBuff", "root/1:protection", false,
+                            false, new[]
+                            {
+                                "Kingmaker.UnitLogic.Mechanics.Components.AddStatBonus"
+                            })
+                    },
+                    Diagnostics = new[]
+                    {
+                        new NativeCandidateDiagnosticFacts
+                        {
+                            Code = "restorative-action",
+                            Contract =
+                                "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionRemoveBuff",
+                            Detail = "restorative-action",
+                            ActionPath = "root/0:remove"
+                        }
+                    }
+                });
+            if (protectionPlusAdjunct.Disposition != "include" ||
+                !protectionPlusAdjunct.Reason.StartsWith(
+                    "valid-beneficial-party-effect:", StringComparison.Ordinal))
+                throw new InvalidOperationException(
+                    "A substantive lasting protection was discarded merely because it has a restorative adjunct.");
         }
 
         private static NativeCandidateEffectFacts CandidateEffect(
@@ -2424,6 +2665,122 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("Bulk target edit did not save once.");
         }
 
+        private static void TestRoutineMembershipChips(string root)
+        {
+            AbilityKey ability = Ability("routine-membership", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("routine-membership-free",
+                ResourcePoolKind.Unlimited, 0, 0, null);
+            ProviderSnapshot provider = PlannerProvider("unit-a", "routine-book",
+                ability, pool.PoolKey, 0);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(new[] { provider },
+                new[] { pool }, "unit-a");
+            var option = new ProviderPlanningOption(provider, new[] { "unit-a" },
+                new[] { "unit-a" }, 1, 10);
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault(
+                "campaign:routine-membership");
+            var effects = new Dictionary<string, EffectExpression>
+            {
+                { ability.Canonical, Leaf("routine-membership-effect") }
+            };
+            int saves = 0;
+            var model = new PlannerSetupModel(profile, snapshot,
+                new ActiveEffectSnapshot(null), effects, new[] { option },
+                ignored => saves++);
+            SetupSourceRow source = model.Sources.Single();
+            BuffCardViewModel card = new BuffCardViewModel(source, model, "short", false);
+            if (card.RoutineMemberships.Count != 0 || card.RoutineBadge.Length != 0)
+                throw new InvalidOperationException("An unconfigured buff rendered a routine membership chip.");
+
+            model.ToggleTarget("important", "unit-a");
+            card = new BuffCardViewModel(source, model, "important", false);
+            AssertMemberships(card, "I", "important");
+            model.ToggleTarget("important", "unit-a");
+
+            model.ToggleTarget("short", "unit-a");
+            card = new BuffCardViewModel(source, model, "short", false);
+            AssertMemberships(card, "S", "short");
+            model.ToggleTarget("short", "unit-a");
+
+            model.ToggleTarget("long", "unit-a");
+            model.ToggleTarget("short", "unit-a");
+            card = new BuffCardViewModel(source, model, "short", false);
+            AssertMemberships(card, "LS", "short");
+            if (card.RoutineMemberships.Single(value => value.RoutineId == "long").IsActive)
+                throw new InvalidOperationException("Long plus Short did not emphasize Short only.");
+            model.ToggleTarget("long", "unit-a");
+            model.ToggleTarget("short", "unit-a");
+
+            model.ToggleTarget("long", "unit-a");
+            card = new BuffCardViewModel(source, model, "long", false);
+            AssertMemberships(card, "L", "long");
+            if (card.RoutineMemberships.Single().Tooltip != "Configured in active Long.")
+                throw new InvalidOperationException("Active Long membership did not expose descriptive text.");
+
+            model.ToggleTarget("important", "unit-a");
+            card = new BuffCardViewModel(source, model, "important", false);
+            AssertMemberships(card, "LI", "important");
+            RoutineMembershipChipViewModel longChip = card.RoutineMemberships.Single(
+                value => value.RoutineId == "long");
+            if (longChip.IsActive || longChip.Tooltip != "Also configured in Long.")
+                throw new InvalidOperationException("Cross-routine Long membership was not distinguishable.");
+
+            model.ToggleTarget("short", "unit-a");
+            card = new BuffCardViewModel(source, model, "short", false);
+            AssertMemberships(card, "LIS", "short");
+            if (card.RoutineBadge != "L I S" || !card.RoutineMemberships.Single(
+                    value => value.RoutineId == "short").IsActive ||
+                card.RoutineMemberships.Count(value => value.IsActive) != 1)
+                throw new InvalidOperationException(
+                    "All-routine membership did not preserve a single emphasized active chip.");
+
+            var filters = new CatalogFilterState { Search = "routine-membership" };
+            CatalogFilterDiagnostics diagnostics;
+            SetupSourceRow rebuilt = filters.Apply(model, "short", out diagnostics).Single();
+            BuffCardViewModel rebuiltCard = new BuffCardViewModel(rebuilt, model, "short", false);
+            AssertMemberships(rebuiltCard, "LIS", "short");
+            if (diagnostics.AfterSearch != 1)
+                throw new InvalidOperationException("Search/filter rebuild lost the membership-bearing card.");
+
+            string persistencePath = Path.Combine(root, "routine-membership");
+            Directory.CreateDirectory(persistencePath);
+            var repository = new ProfileRepository(persistencePath);
+            repository.Save(profile);
+            ProfileLoadResult loaded = repository.Load(profile.CampaignId);
+            var reloaded = new PlannerSetupModel(loaded.Profile, snapshot,
+                new ActiveEffectSnapshot(null), effects, new[] { option }, ignored => { });
+            BuffCardViewModel reloadedCard = new BuffCardViewModel(
+                reloaded.Sources.Single(), reloaded, "short", false);
+            AssertMemberships(reloadedCard, "LIS", "short");
+
+            model.ToggleTarget("short", "unit-a");
+            card = new BuffCardViewModel(source, model, "short", false);
+            AssertMemberships(card, "LI", string.Empty);
+            if (saves < 12 || card.RoutineMemberships.Any(value =>
+                    value.RoutineId == "short"))
+                throw new InvalidOperationException(
+                    "Removing the final active-routine target did not immediately remove its chip.");
+
+            BuffGridMetrics narrow = BuffGridMetrics.Calculate(1420f, 500f);
+            if (CompleteNameLayout.NameWidth(narrow.CellWidth) <=
+                    CompleteNameLayout.RoutineChipWidth ||
+                CompleteNameLayout.RoutineChipSize * 3f +
+                    CompleteNameLayout.RoutineChipSpacing * 2f >
+                    CompleteNameLayout.RoutineChipWidth)
+                throw new InvalidOperationException(
+                    "Narrow four-column cards cannot reserve non-overlapping membership chips and name text.");
+        }
+
+        private static void AssertMemberships(BuffCardViewModel card,
+            string abbreviations, string activeRoutineId)
+        {
+            string actual = string.Concat(card.RoutineMemberships.Select(
+                value => value.Abbreviation).ToArray());
+            if (actual != abbreviations || card.RoutineMemberships.Any(value =>
+                    value.IsActive != (value.RoutineId == activeRoutineId)))
+                throw new InvalidOperationException(
+                    "Routine membership chips did not reflect persisted assignments and active routine state.");
+        }
+
         private static void TestDescriptionRequest()
         {
             AbilityKey ability = Ability("description-source", "description-variant", 0);
@@ -2484,6 +2841,80 @@ namespace KingmakerBuffPlanner.Tests
                 indirect.State != TargetPortraitState.IndirectlyCovered || !indirect.Indirect ||
                 indirect.Wanted || indirect.Tooltip != "Also affected by the planned cast.")
                 throw new InvalidOperationException("Area coverage preview did not distinguish direct and indirect targets.");
+        }
+
+        private static void TestPerAnchorMassCoverage()
+        {
+            AssertPerAnchorMassCoverage("protection-from-arrows-communal-fixture");
+            AssertPerAnchorMassCoverage("good-hope-fixture");
+            AssertPerAnchorMassCoverage("existing-communal-positive-control");
+        }
+
+        private static void AssertPerAnchorMassCoverage(string sourceId)
+        {
+            AbilityKey ability = Ability(sourceId, string.Empty, 0);
+            var pool = new ResourcePoolSnapshot(sourceId + "-pool",
+                ResourcePoolKind.SpontaneousLevel, 3, 3, null);
+            ProviderSnapshot provider = PlannerProvider("caster", "communal-book",
+                ability, pool.PoolKey, 1);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(new[] { provider },
+                new[] { pool }, "caster", "anchor", "ally", "pet");
+            string[] recipients = { "caster", "anchor", "ally", "pet" };
+            var coverage = new Dictionary<string, IEnumerable<string>>
+            {
+                { "anchor", recipients }
+            };
+            var option = new ProviderPlanningOption(provider, recipients,
+                new[] { "anchor" }, 5, 50, false, coverage);
+            var effect = new EffectLeafExpression(EffectKind.AreaBuff,
+                sourceId + "-effect", EffectTarget.AlliedAreaRecipients,
+                "AbilityTargetsAround+friend-only", "root/area");
+            var source = new BuffSourceDefinition(sourceId, ability, effect,
+                CastGroupingKind.MassConfiguredTargets);
+            var planner = new CastPlanner();
+            CastPlan persistedAnchor = planner.Plan(snapshot, new BuffCastRequest(source,
+                new[] { "anchor" }, ExistingEffectPolicy.Overwrite, null),
+                new[] { option }, EmptyPolicy(), new ActiveEffectSnapshot(null));
+            if (persistedAnchor.Steps.Count != 1 ||
+                persistedAnchor.Steps.Single().AnchorUnitId != "anchor" ||
+                !persistedAnchor.Steps.Single().TargetUnitIds.SequenceEqual(
+                    new[] { "anchor" }) ||
+                !persistedAnchor.Steps.Single().ExpectedRecipientUnitIds.SequenceEqual(
+                    recipients.OrderBy(value => value, StringComparer.Ordinal)))
+                throw new InvalidOperationException(
+                    "A single selected communal anchor did not produce complete indirect recipient coverage: " + sourceId);
+
+            CastPlan explicitEveryRecipient = planner.Plan(snapshot,
+                new BuffCastRequest(source, recipients,
+                    ExistingEffectPolicy.Overwrite, null), new[] { option },
+                EmptyPolicy(), new ActiveEffectSnapshot(null));
+            if (explicitEveryRecipient.Steps.Count != 1 ||
+                explicitEveryRecipient.Steps.Single().Reservation.Units != 1 ||
+                explicitEveryRecipient.Outcomes.Count(outcome =>
+                    outcome.Kind == TargetOutcomeKind.Fulfilled) != recipients.Length)
+                throw new InvalidOperationException(
+                    "Mass coverage scheduled one cast per teammate instead of one structural cast: " + sourceId);
+
+            var model = new PlannerSetupModel(BuffPlannerProfile.CreateDefault(
+                "coverage:" + sourceId), snapshot, new ActiveEffectSnapshot(null),
+                new Dictionary<string, EffectExpression> { { ability.Canonical, effect } },
+                new[] { option }, ignored => { });
+            model.ToggleTarget("short", "anchor");
+            RoutinePlanResult preview = new RoutinePlanService().Plan(model.Profile,
+                "short", snapshot, new ActiveEffectSnapshot(null),
+                new Dictionary<string, EffectExpression> { { ability.Canonical, effect } },
+                new[] { option });
+            TargetPortraitViewModel anchor = TargetPortraitViewModel.Create(
+                model.Sources.Single(), model, "short", snapshot.Units.Single(unit =>
+                    unit.UnitId == "anchor"), preview);
+            TargetPortraitViewModel teammate = TargetPortraitViewModel.Create(
+                model.Sources.Single(), model, "short", snapshot.Units.Single(unit =>
+                    unit.UnitId == "ally"), preview);
+            if (anchor.State != TargetPortraitState.DirectSelectedAndCovered ||
+                teammate.State != TargetPortraitState.IndirectlyCovered ||
+                teammate.Wanted || !teammate.Indirect)
+                throw new InvalidOperationException(
+                    "Anchor/direct and teammate/indirect presentation diverged from the structural plan: " + sourceId);
         }
 
         private static void TestPersonalTargetEligibility()
@@ -2734,6 +3165,56 @@ namespace KingmakerBuffPlanner.Tests
             if (machine.State != PlannerScreenLifecycleState.Closed || boundary.CaptureCount != 0 ||
                 boundary.EnterCount != 0 || boundary.RestoreCount != 0 || machine.RollbackTransitions != 1)
                 throw new InvalidOperationException("Invalid presentation acquired or restored a lease it never owned.");
+        }
+
+        private static void TestSetupOpenSoundGate()
+        {
+            var gate = new SetupOpenSoundGate();
+            if (!gate.BeginHiddenToVisible() || gate.BeginHiddenToVisible() ||
+                gate.CompleteVisible(false) || !gate.CompleteVisible(true) ||
+                gate.CompleteVisible(true))
+                throw new InvalidOperationException(
+                    "Setup-opening sound gate did not emit exactly once after a successful visible transition.");
+            if (!gate.BeginHiddenToVisible())
+                throw new InvalidOperationException(
+                    "A later hidden-to-visible setup transition did not re-arm its native sound.");
+            gate.Cancel();
+            if (gate.CompleteVisible(true))
+                throw new InvalidOperationException(
+                    "A rejected or rolled-back setup opening emitted a sound.");
+        }
+
+        private static void TestNativeHudSourceContract()
+        {
+            DirectoryInfo directory = new DirectoryInfo(Environment.CurrentDirectory);
+            while (directory != null && !File.Exists(Path.Combine(
+                directory.FullName, "KingmakerBuffPlanner.sln")))
+                directory = directory.Parent;
+            if (directory == null)
+                throw new InvalidOperationException("Repository root was not discoverable.");
+            string root = directory.FullName;
+            string hud = File.ReadAllText(Path.Combine(root, "src",
+                "KingmakerBuffPlanner", "UI", "BuffPlannerHudButtonController.cs"));
+            string screen = File.ReadAllText(Path.Combine(root, "src",
+                "KingmakerBuffPlanner", "UI", "BuffPlannerScreenController.cs"));
+            string uiRoot = File.ReadAllText(Path.Combine(root, "src",
+                "KingmakerBuffPlanner", "UI", "BuffPlannerUiRoot.cs"));
+            string runtime = File.ReadAllText(Path.Combine(root, "src",
+                "KingmakerBuffPlanner", "RuntimeTesting", "RuntimeTestHost.cs"));
+            if (!hud.Contains("NativeHudButtonStyle.Capture") ||
+                !hud.Contains("TooltipTrigger") ||
+                !hud.Contains("Color ink = Color.white") ||
+                !hud.Contains("nativeTooltip.SetNameAndDescription") ||
+                hud.Contains("KBP.InnerFrame") || hud.Contains("KBP.LowerAccent") ||
+                hud.Contains("CreateHudMessage") ||
+                hud.Contains("Color(0.961f, 0.820f, 0.420f") ||
+                !screen.Contains("SetupOpenSoundGate") ||
+                !uiRoot.Contains("UISoundType.CharacterScreenOpen") ||
+                !runtime.Contains("nativeSkin=True") ||
+                !runtime.Contains("TooltipUsesNativeParchmentPresentation") ||
+                runtime.Contains("spriteInk=0.961,0.820,0.420,1.000"))
+                throw new InvalidOperationException(
+                    "Native HUD capture, parchment tooltip, or one-shot setup sound contract regressed.");
         }
 
         private static void TestQuickExecutionFlow()

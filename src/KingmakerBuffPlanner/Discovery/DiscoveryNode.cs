@@ -13,6 +13,7 @@ namespace KingmakerBuffPlanner.Discovery
         TargetTransform,
         Effect,
         OffensiveAction,
+        RestorativeAction,
         AbilityReference,
         Unknown
     }

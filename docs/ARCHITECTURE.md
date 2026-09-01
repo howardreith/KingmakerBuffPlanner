@@ -1,5 +1,50 @@
 # Architecture
 
+## 0.0.16 structural spellbook roles, payload semantics, and native HUD
+
+`KingmakerPartySnapshotBuilder` now asks the compatibility-layer
+`KingmakerSpellbookRoleAdapter` and Unity-free `SpellbookRoleResolver` to
+classify every owned spellbook before provider construction. The optional
+adapter reflects only the installed Call of the Wild
+`CanNotUseSpells`, `CompanionSpellbook.spellbook`, and
+`GetKnownSpellsFromMemorizationSpellbook.spellbook` contracts. A book is
+excluded only when a cannot-cast component and an owned same-unit companion
+relationship prove it is preparation-only. Ambiguous/missing optional contracts
+retain the book. The resolver has no class, display-name, GUID, or temporary
+availability rule; `KingmakerAnimatedCastAdapter` repeats its inclusion gate at
+execution resolution.
+
+Discovery represents proven restorative actions as `DiscoveryNode` semantic
+nodes with branch paths. The classifier evaluates each branch without flattening
+conditionals: direct restoration is rejected only when it has no safe
+substantive persistent payload, or all safe lasting leaves are internal marker,
+carrier, cleanup, or activation effects. A branch containing lasting protection
+remains eligible even if another action restores or removes a condition. Catalog
+audit records preserve both persistent leaves and restorative action paths.
+
+`AreaRecipientSemantics` keeps `Enemy`, `Ally`, `Any`, and unknown selectors
+separate. `Any` is refined to allied only where the enclosing ability proves
+friends are targetable while enemies and points are impossible. Provider options
+then carry `RecipientIdsByAnchor`; `CastPlanner` and planner presentation use
+the same `CoveredTargetIdsForAnchor` map for indirect coverage and mass
+allocation. This avoids source-name overrides and avoids broadening genuinely
+ambiguous/caster-centered effects.
+
+Routine overlap remains persisted only in existing routine assignments.
+`BuffCardViewModel` derives structured L/I/S membership chips from those
+assignments; the views render active membership as emphasized and other
+membership as secondary text-backed chips. No schema or deduplication layer was
+introduced.
+
+The HUD controller creates owned `ButtonPF` controls under the native lower-left
+cluster and copies target image, transition, complete `ColorBlock`,
+`SpriteState`, navigation, button sound flags, and child icon material/tint from
+the live formation button. It uses native `TooltipTrigger` data rather than a
+planner-rendered tooltip. `SetupOpenSoundGate` centralizes exactly one
+`UISoundType.CharacterScreenOpen` dispatch after a successful hidden-to-visible
+screen transition; HUD clicks and the hotkey both use the same `OpenSetup`
+path.
+
 ## 0.0.14 buff membership, persistent payloads, and caster policy
 
 Catalog membership and temporary cast availability are now separate contracts.

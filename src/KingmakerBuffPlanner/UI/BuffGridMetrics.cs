@@ -15,7 +15,10 @@ namespace KingmakerBuffPlanner.UI
         internal const float AvailabilityHeight = 20f;
         internal const float ConfigurationHeight = 18f;
         internal const float BottomInset = 7f;
-        internal const float BadgeWidth = 42f;
+        internal const float RoutineChipWidth = 54f;
+        internal const float RoutineChipSize = 16f;
+        internal const float RoutineChipSpacing = 2f;
+        internal const float BadgeWidth = RoutineChipWidth;
 
         internal static float NameWidth(float cellWidth)
         {

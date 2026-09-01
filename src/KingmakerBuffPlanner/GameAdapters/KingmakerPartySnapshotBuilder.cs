@@ -6,6 +6,7 @@ using Kingmaker.Blueprints.Classes.Spells;
 using Kingmaker.EntitySystem.Entities;
 using Kingmaker.UnitLogic;
 using Kingmaker.UnitLogic.Abilities;
+using KingmakerBuffPlanner.Compatibility;
 using Kingmaker.UnitLogic.Abilities.Blueprints;
 using KingmakerBuffPlanner.Discovery;
 using KingmakerBuffPlanner.Domain.Effects;
@@ -23,6 +24,8 @@ namespace KingmakerBuffPlanner.GameAdapters
             new List<PartySourceDiscoveryTrace>();
         private readonly List<PartyVariantEligibilityTrace> _variantTraces =
             new List<PartyVariantEligibilityTrace>();
+        private readonly List<PartySpellbookRoleTrace> _spellbookRoleTraces =
+            new List<PartySpellbookRoleTrace>();
         private int _rawCandidateCount;
         private int _beneficialCandidateCount;
         private int _spellbookCount;
@@ -46,6 +49,7 @@ namespace KingmakerBuffPlanner.GameAdapters
             _effectsBySource.Clear();
             _sourceTraces.Clear();
             _variantTraces.Clear();
+            _spellbookRoleTraces.Clear();
             _rawCandidateCount = 0;
             _beneficialCandidateCount = 0;
             _spellbookCount = 0;
@@ -64,7 +68,7 @@ namespace KingmakerBuffPlanner.GameAdapters
             Diagnostics = new PartyCatalogDiscoveryDiagnostics(
                 units.Count, _spellbookCount, _rawCandidateCount, _beneficialCandidateCount,
                 _effectsBySource.Count, providers.Count, _sourceTraces,
-                _variantTraces, _blessMaterialEvidence);
+                _variantTraces, _spellbookRoleTraces, _blessMaterialEvidence);
             return snapshot;
         }
 
@@ -100,11 +104,22 @@ namespace KingmakerBuffPlanner.GameAdapters
             List<ProviderSnapshot> providers,
             List<ResourcePoolSnapshot> pools)
         {
-            foreach (Spellbook spellbook in unit.Descriptor.Spellbooks
+            List<Spellbook> spellbooks = unit.Descriptor.Spellbooks
                 .Where(b => b != null && b.Blueprint != null)
-                .OrderBy(b => b.Blueprint.AssetGuid, StringComparer.Ordinal))
+                .OrderBy(b => b.Blueprint.AssetGuid, StringComparer.Ordinal).ToList();
+            IReadOnlyDictionary<string, SpellbookRoleResolution> roles =
+                new KingmakerSpellbookRoleAdapter().Resolve(spellbooks);
+            foreach (Spellbook spellbook in spellbooks)
             {
                 _spellbookCount++;
+                SpellbookRoleResolution role;
+                if (!roles.TryGetValue(spellbook.Blueprint.AssetGuid, out role))
+                    role = new SpellbookRoleResolution(SpellbookRole.Ambiguous,
+                        string.Empty, true, "role-resolution-missing-fail-soft");
+                _spellbookRoleTraces.Add(new PartySpellbookRoleTrace(unit.UniqueId,
+                    spellbook.Blueprint.AssetGuid, spellbook.Blueprint.Spontaneous,
+                    role.Role, role.RelationshipTargetGuid, role.Included, role.Reason));
+                if (!role.Included) continue;
                 if (spellbook.Blueprint.Spontaneous)
                     ScanSpontaneousSpellbook(unit, spellbook, providers, pools);
                 else
@@ -434,6 +449,7 @@ namespace KingmakerBuffPlanner.GameAdapters
             int providerCount,
             IEnumerable<PartySourceDiscoveryTrace> sources,
             IEnumerable<PartyVariantEligibilityTrace> variants,
+            IEnumerable<PartySpellbookRoleTrace> spellbookRoles,
             string blessMaterialEvidence)
         {
             PartyUnitCount = partyUnitCount;
@@ -447,6 +463,9 @@ namespace KingmakerBuffPlanner.GameAdapters
                 .GroupBy(value => value.Canonical, StringComparer.Ordinal)
                 .Select(group => group.First())
                 .OrderBy(value => value.Canonical, StringComparer.Ordinal).ToArray();
+            SpellbookRoles = (spellbookRoles ?? new PartySpellbookRoleTrace[0])
+                .OrderBy(value => value.CasterUnitId, StringComparer.Ordinal)
+                .ThenBy(value => value.SpellbookGuid, StringComparer.Ordinal).ToArray();
             BlessMaterialEvidence = blessMaterialEvidence ?? string.Empty;
         }
 
@@ -458,6 +477,7 @@ namespace KingmakerBuffPlanner.GameAdapters
         internal int ProviderCount { get; private set; }
         internal IReadOnlyList<PartySourceDiscoveryTrace> Sources { get; private set; }
         internal IReadOnlyList<PartyVariantEligibilityTrace> Variants { get; private set; }
+        internal IReadOnlyList<PartySpellbookRoleTrace> SpellbookRoles { get; private set; }
         internal string BlessMaterialEvidence { get; private set; }
 
         public override string ToString()
@@ -500,6 +520,35 @@ namespace KingmakerBuffPlanner.GameAdapters
                     SourceGuid + "|" + ChildGuid + "|" + Eligible + "|" + Reason;
             }
         }
+    }
+
+    internal sealed class PartySpellbookRoleTrace
+    {
+        internal PartySpellbookRoleTrace(
+            string casterUnitId,
+            string spellbookGuid,
+            bool spontaneous,
+            SpellbookRole role,
+            string relationshipTargetGuid,
+            bool included,
+            string reason)
+        {
+            CasterUnitId = casterUnitId ?? string.Empty;
+            SpellbookGuid = spellbookGuid ?? string.Empty;
+            Spontaneous = spontaneous;
+            Role = role;
+            RelationshipTargetGuid = relationshipTargetGuid ?? string.Empty;
+            Included = included;
+            Reason = reason ?? string.Empty;
+        }
+
+        internal string CasterUnitId { get; private set; }
+        internal string SpellbookGuid { get; private set; }
+        internal bool Spontaneous { get; private set; }
+        internal SpellbookRole Role { get; private set; }
+        internal string RelationshipTargetGuid { get; private set; }
+        internal bool Included { get; private set; }
+        internal string Reason { get; private set; }
     }
 
     internal sealed class PartySourceDiscoveryTrace

@@ -1,5 +1,55 @@
 # Manual Acceptance
 
+## 0.0.16 catalog semantics and native HUD
+
+Status: REQUIRED FOR IN-GAME CLAIM; NOT RUN. The guarded resolver currently
+reports `baseline=0; working=0`. Use only the exact authorized
+`KBP_AUTOMATION_BASELINE` / `KBP_AUTOMATION_WORKING` pair; do not substitute an
+ordinary save.
+
+The exact 0.0.16 package is already guarded-installed at the local
+UMM path with settings preserved and other mods verified unchanged. This is not
+an in-game acceptance result: no game process was launched and no screenshots
+or live audio/cast evidence exist yet.
+
+1. Load an Arcanist with its Call of the Wild preparation/casting pair. Open a
+   spell-backed card's Caster Policy and confirm one actual casting spellbook
+   entry, not a preparation companion. Confirm an ordinary prepared caster,
+   spontaneous caster, multiclass pair, and exhausted casting book remain
+   visible according to their real capability.
+2. Search for Lay on Hands and confirm it is absent. Confirm a genuine self,
+   ally, pet, communal, and resource-backed persistent buff remain. Record the
+   `[KBP-CATALOG]` reason/action-path diagnostics for any unexpected entry.
+3. Put a buff only in Long, switch to Short, and confirm its L chip is visible.
+   Add Short and confirm both chips display with Short emphasized. Repeat for
+   every combination, remove the last Long target, search/filter, close/reopen,
+   and reload to confirm chips follow persisted assignments without overlap
+   deletion.
+4. Select one legal anchor for Protection from Arrows, Communal and then Good
+   Hope. Confirm the anchor remains directly selected while legal allies/pets
+   inside the proven recipient set show indirect coverage. Reopen and confirm
+   reconstruction from the saved anchor; verify the plan uses one group cast,
+   not a cast per covered unit. Check a single-target, caster-only, enemy-area,
+   and ambiguous-area control do not mark everyone covered.
+5. Compare all four lower-left buttons with their adjacent native controls at
+   normal, hover, pointer-down/up, disabled, and controller-selected states.
+   Confirm dark native surfaces, muted native-tinted glyphs, no inner/lower
+   custom chrome, and no underlying native activation. Capture normal/hover/
+   pressed screenshots at supported resolutions/scales.
+6. Hover each button and confirm a native parchment/scroll tooltip with title
+   and body, correct edge clamping, no raycast interception, and disappearance
+   on exit, HUD rebuild, pause, and screen teardown. Confirm no duplicate
+   listeners/roots/tooltips after repeated rebuilds.
+7. Open Setup once by clicking and once by the configured hotkey. Confirm the
+   native opening sound occurs exactly once for each hidden-to-visible opening,
+   not when already open, rejected, or during Long/Important/Short quick runs.
+   Record `[KBP-HUD-SOUND]` and native style/tooltip diagnostics.
+
+Capture full-resolution screenshots, profile JSON before/after reload, exact
+provider keys, planned groups, active effects, resource/slot deltas, and UMM
+log slices. Restore the working fixture through the guarded transaction and
+verify the immutable baseline hash.
+
 ## 0.0.14 buff catalog and caster controls
 
 Status: REQUIRED FOR IN-GAME CLAIM; NOT RUN. The guarded resolver returned

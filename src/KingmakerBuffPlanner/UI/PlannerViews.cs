@@ -119,7 +119,7 @@ namespace KingmakerBuffPlanner.UI
         private readonly Text _name;
         private readonly Text _availability;
         private readonly Text _configuration;
-        private readonly Text _badge;
+        private readonly RoutineMembershipChipView[] _routineChips;
         private readonly PlannerRightClickHandler _inspect;
         private UnityAction _select;
 
@@ -156,10 +156,12 @@ namespace KingmakerBuffPlanner.UI
             _name.horizontalOverflow = HorizontalWrapMode.Wrap;
             _name.verticalOverflow = VerticalWrapMode.Overflow;
             KingmakerUiFactory.SetAnchors(_name.rectTransform, 0.25f, 0.55f, 0.79f, 0.92f);
-            _badge = KingmakerUiFactory.CreateText("RoutineBadge", Rect, theme, string.Empty, 14,
-                TextAnchor.MiddleRight);
-            _badge.color = theme.BurgundyPrimary;
-            KingmakerUiFactory.SetAnchors(_badge.rectTransform, 0.80f, 0.57f, 0.965f, 0.92f);
+            _routineChips = new[]
+            {
+                new RoutineMembershipChipView("L", Rect, theme, Button),
+                new RoutineMembershipChipView("I", Rect, theme, Button),
+                new RoutineMembershipChipView("S", Rect, theme, Button)
+            };
             _availability = KingmakerUiFactory.CreateText("Availability", Rect, theme,
                 string.Empty, 14, TextAnchor.MiddleLeft);
             _availability.color = theme.MutedBrownText;
@@ -202,12 +204,14 @@ namespace KingmakerBuffPlanner.UI
             ConfigureTopRect(_configuration.rectTransform, CompleteNameLayout.TextLeft,
                 configurationTop, Mathf.Max(30f, width - CompleteNameLayout.BadgeWidth),
                 CompleteNameLayout.ConfigurationHeight);
-            ConfigureTopRect(_badge.rectTransform,
-                cellWidth - CompleteNameLayout.TextRight -
-                    CompleteNameLayout.BadgeWidth,
-                configurationTop, CompleteNameLayout.BadgeWidth,
-                CompleteNameLayout.ConfigurationHeight);
-            _badge.alignment = TextAnchor.MiddleRight;
+            float chipsLeft = cellWidth - CompleteNameLayout.TextRight -
+                CompleteNameLayout.RoutineChipWidth;
+            for (int index = 0; index < _routineChips.Length; index++)
+                ConfigureTopRect(_routineChips[index].Rect,
+                    chipsLeft + index * (CompleteNameLayout.RoutineChipSize +
+                        CompleteNameLayout.RoutineChipSpacing),
+                    configurationTop + 1f, CompleteNameLayout.RoutineChipSize,
+                    CompleteNameLayout.RoutineChipSize);
         }
 
         private static void ConfigureTopRect(
@@ -221,12 +225,15 @@ namespace KingmakerBuffPlanner.UI
         }
 
         internal void Bind(BuffCardViewModel model, Sprite icon, UnityAction selected,
-            Action<string> inspect, Func<PlannerPresentationStatus, Color> statusColor)
+            Action<string> inspect, Func<PlannerPresentationStatus, Color> statusColor,
+            Action<string> showTooltip)
         {
             SourceId = model.SourceId;
             Rect.name = "Source." + model.SourceId;
             _name.text = model.Name;
-            _badge.text = model.RoutineBadge;
+            foreach (RoutineMembershipChipView chip in _routineChips)
+                chip.Bind(model.RoutineMemberships.FirstOrDefault(value =>
+                    value.Abbreviation == chip.Abbreviation), showTooltip);
             _availability.text = model.Availability;
             _configuration.text = model.Configuration;
             Color color = statusColor(model.Status);
@@ -257,6 +264,56 @@ namespace KingmakerBuffPlanner.UI
             _inspect.SourceId = string.Empty;
             _inspect.Inspect = null;
             Rect.gameObject.SetActive(false);
+        }
+    }
+
+    internal sealed class RoutineMembershipChipView
+    {
+        private readonly Image _background;
+        private readonly Text _label;
+        private readonly Outline _outline;
+        private readonly PlannerHoverTooltip _tooltip;
+
+        internal RoutineMembershipChipView(string abbreviation, RectTransform parent,
+            PlannerUiTheme theme, Button owner)
+        {
+            Abbreviation = abbreviation;
+            Rect = KingmakerUiFactory.CreateRect("RoutineChip." + abbreviation, parent);
+            _background = KingmakerUiFactory.AddPanel(Rect, theme.ParchmentPanel);
+            _background.raycastTarget = true;
+            _outline = Rect.gameObject.AddComponent<Outline>();
+            _outline.effectColor = theme.MutedBrownText;
+            _outline.effectDistance = new Vector2(1f, -1f);
+            _label = KingmakerUiFactory.CreateText("Label", Rect, theme, abbreviation, 11,
+                TextAnchor.MiddleCenter);
+            _label.fontStyle = FontStyle.Bold;
+            _label.raycastTarget = false;
+            KingmakerUiFactory.Stretch(_label.rectTransform);
+            _tooltip = Rect.gameObject.AddComponent<PlannerHoverTooltip>();
+            PlannerCardChildClickForwarder forwarder =
+                Rect.gameObject.AddComponent<PlannerCardChildClickForwarder>();
+            forwarder.Owner = owner;
+        }
+
+        internal string Abbreviation { get; private set; }
+        internal RectTransform Rect { get; private set; }
+
+        internal void Bind(RoutineMembershipChipViewModel model,
+            Action<string> showTooltip)
+        {
+            bool configured = model != null;
+            Rect.gameObject.SetActive(configured);
+            if (!configured) return;
+            _label.text = model.Abbreviation;
+            _background.color = model.IsActive
+                ? new Color(0.38f, 0.13f, 0.10f, 1f)
+                : new Color(0.74f, 0.65f, 0.45f, 0.82f);
+            _label.color = model.IsActive ? Color.white : Color.black;
+            _outline.effectColor = model.IsActive
+                ? new Color(0.86f, 0.70f, 0.34f, 1f)
+                : new Color(0.31f, 0.22f, 0.12f, 1f);
+            _tooltip.Text = model.Tooltip;
+            _tooltip.Show = showTooltip;
         }
     }
 
@@ -305,6 +362,7 @@ namespace KingmakerBuffPlanner.UI
         private readonly Action<string> _select;
         private readonly Action<string> _inspect;
         private readonly Func<PlannerPresentationStatus, Color> _statusColor;
+        private readonly Action<string> _showTooltip;
         private IReadOnlyList<BuffCardViewModel> _models = new BuffCardViewModel[0];
         private BuffGridMetrics _metrics;
         private BuffGridLayout _layout;
@@ -314,12 +372,14 @@ namespace KingmakerBuffPlanner.UI
         internal BuffGridView(RectTransform parent, PlannerUiTheme theme,
             Func<string, Sprite> icon, Action<string> select,
             Action<string> inspect,
-            Func<PlannerPresentationStatus, Color> statusColor)
+            Func<PlannerPresentationStatus, Color> statusColor,
+            Action<string> showTooltip)
         {
             _icon = icon;
             _select = select;
             _inspect = inspect;
             _statusColor = statusColor;
+            _showTooltip = showTooltip;
             _scroll = KingmakerUiFactory.CreateScrollView("BuffGrid", parent, theme, out _content);
             KingmakerUiFactory.SetAnchors((RectTransform)_scroll.transform, 0.02f, 0.315f,
                 0.98f, 0.795f);
@@ -416,7 +476,7 @@ namespace KingmakerBuffPlanner.UI
                 card.ApplyLayout(_metrics.CellWidth, rowHeight, _nameHeights[modelIndex]);
                 BuffCardViewModel model = _models[modelIndex];
                 card.Bind(model, _icon(model.SourceId), () => _select(model.SourceId),
-                    _inspect, _statusColor);
+                    _inspect, _statusColor, _showTooltip);
             }
         }
     }
@@ -1095,6 +1155,21 @@ namespace KingmakerBuffPlanner.UI
             eventData.Use();
             if (Inspect != null && !string.IsNullOrWhiteSpace(SourceId))
                 Inspect(SourceId);
+        }
+    }
+
+    internal sealed class PlannerCardChildClickForwarder : MonoBehaviour,
+        UnityEngine.EventSystems.IPointerClickHandler
+    {
+        internal Button Owner;
+
+        public void OnPointerClick(UnityEngine.EventSystems.PointerEventData eventData)
+        {
+            if (eventData == null || Owner == null || !Owner.interactable ||
+                eventData.button != UnityEngine.EventSystems.PointerEventData.InputButton.Left)
+                return;
+            Owner.onClick.Invoke();
+            eventData.Use();
         }
     }
 

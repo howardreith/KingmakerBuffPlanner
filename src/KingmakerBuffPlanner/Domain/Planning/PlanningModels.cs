@@ -100,13 +100,33 @@ namespace KingmakerBuffPlanner.Domain.Planning
             IEnumerable<string> legalAnchorIds,
             int effectiveCasterLevel,
             int expectedDurationRounds,
-            bool requiresAnimatedExecution = false)
+            bool requiresAnimatedExecution = false,
+            IDictionary<string, IEnumerable<string>> recipientIdsByAnchor = null)
         {
             Provider = provider ?? throw new ArgumentNullException("provider");
             if (effectiveCasterLevel < 0) throw new ArgumentOutOfRangeException("effectiveCasterLevel");
             if (expectedDurationRounds < 0) throw new ArgumentOutOfRangeException("expectedDurationRounds");
             ReachableTargetIds = Sorted(reachableTargetIds);
             LegalAnchorIds = Sorted(legalAnchorIds);
+            var reachable = new HashSet<string>(ReachableTargetIds, StringComparer.Ordinal);
+            var coverage = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
+            foreach (KeyValuePair<string, IEnumerable<string>> pair in recipientIdsByAnchor ??
+                new Dictionary<string, IEnumerable<string>>(StringComparer.Ordinal))
+            {
+                if (string.IsNullOrWhiteSpace(pair.Key) ||
+                    !LegalAnchorIds.Contains(pair.Key))
+                    throw new ArgumentException(
+                        "Anchor coverage references an unknown legal anchor.",
+                        "recipientIdsByAnchor");
+                IReadOnlyList<string> recipients = Sorted(pair.Value);
+                if (recipients.Any(id => !reachable.Contains(id)))
+                    throw new ArgumentException(
+                        "Anchor coverage references an unreachable target.",
+                        "recipientIdsByAnchor");
+                coverage.Add(pair.Key, recipients);
+            }
+            RecipientIdsByAnchor = new ReadOnlyDictionary<string, IReadOnlyList<string>>(
+                coverage);
             EffectiveCasterLevel = effectiveCasterLevel;
             ExpectedDurationRounds = expectedDurationRounds;
             RequiresAnimatedExecution = requiresAnimatedExecution;
@@ -115,9 +135,21 @@ namespace KingmakerBuffPlanner.Domain.Planning
         public ProviderSnapshot Provider { get; private set; }
         public IReadOnlyList<string> ReachableTargetIds { get; private set; }
         public IReadOnlyList<string> LegalAnchorIds { get; private set; }
+        public IReadOnlyDictionary<string, IReadOnlyList<string>> RecipientIdsByAnchor
+        {
+            get; private set;
+        }
         public int EffectiveCasterLevel { get; private set; }
         public int ExpectedDurationRounds { get; private set; }
         public bool RequiresAnimatedExecution { get; private set; }
+
+        public IReadOnlyList<string> CoveredTargetIdsForAnchor(string anchorUnitId)
+        {
+            IReadOnlyList<string> covered;
+            return !string.IsNullOrWhiteSpace(anchorUnitId) &&
+                RecipientIdsByAnchor.TryGetValue(anchorUnitId, out covered)
+                ? covered : ReachableTargetIds;
+        }
 
         private static IReadOnlyList<string> Sorted(IEnumerable<string> values)
         {

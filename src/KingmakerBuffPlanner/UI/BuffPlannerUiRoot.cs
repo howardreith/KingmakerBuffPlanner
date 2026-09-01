@@ -101,7 +101,7 @@ namespace KingmakerBuffPlanner.UI
                 _instance._log.Info("[KBP-BOOT] full-screen close requested;source=PlannerHotkey.");
                 return;
             }
-            if (!_instance._screen.Open())
+            if (!_instance.OpenSetup())
                 _instance.LogUiUnavailable(_instance._screen.LastFailure);
         }
 
@@ -183,7 +183,7 @@ namespace KingmakerBuffPlanner.UI
             if (_instance == null) throw new InvalidOperationException("UI root is absent.");
             CaptureRuntimeBaseline();
             _instance._runtimeOpenCycles++;
-            if (StaticCanvas.Instance != null) _instance._screen.Open();
+            if (StaticCanvas.Instance != null) _instance.OpenSetup();
         }
 
         internal static void CaptureRuntimeBaseline(bool refresh = false)
@@ -477,6 +477,10 @@ namespace KingmakerBuffPlanner.UI
             result.TooltipListenerCount = tooltip == null ? 0 : tooltip.ListenerCount;
             result.TooltipRaycastGraphicCount = tooltip == null ? -1 : tooltip.RaycastGraphicCount;
             result.TooltipBlocksRaycasts = tooltip != null && tooltip.BlocksRaycasts;
+            result.TooltipNativeTriggerCount = tooltip == null ? 0 : tooltip.NativeTriggerCount;
+            result.TooltipUsesNativeParchmentPresentation = tooltip != null &&
+                tooltip.UsesNativeParchmentPresentation;
+            result.SetupOpenSoundCount = _instance._diagnostics.SetupOpenSoundCount;
             result.PhysicalInputPlayerCommandCount = physical == null ? -1 : physical.PlayerCommandCount;
             result.PhysicalInputMovementCommandCount = physical == null ? -1 : physical.MovementCommandCount;
             result.PhysicalInputAbilityCommandCount = physical == null ? -1 : physical.AbilityCommandCount;
@@ -570,9 +574,9 @@ namespace KingmakerBuffPlanner.UI
             _diagnostics = new BuffPlannerUiLifecycleDiagnostics();
             _quick = new BuffPlannerQuickExecuteController(this, _diagnostics, PresentQuickResult);
             _screen = new BuffPlannerScreenController(_session, _diagnostics, log,
-                routineId => _quick.Execute(routineId));
+                routineId => _quick.Execute(routineId), PlayNativeSetupOpenSound);
             _hud = new BuffPlannerHudButtonController(_session, _diagnostics, log,
-                () => _screen.Open(), routineId => _quick.Execute(routineId));
+                () => { OpenSetup(); }, routineId => _quick.Execute(routineId));
             try
             {
                 _eventSubscription = EventBus.Subscribe((object)this);
@@ -585,6 +589,20 @@ namespace KingmakerBuffPlanner.UI
                     "HUD host-transition observation remains active.",
                     exception);
             }
+        }
+
+        private bool OpenSetup()
+        {
+            return _screen != null && _screen.Open();
+        }
+
+        private bool PlayNativeSetupOpenSound()
+        {
+            if (Game.Instance == null || Game.Instance.UI == null ||
+                Game.Instance.UI.Common == null || Game.Instance.UI.Common.UISound == null)
+                return false;
+            Game.Instance.UI.Common.UISound.Play(UISoundType.CharacterScreenOpen);
+            return true;
         }
 
         private void Tick(float deltaTime)
@@ -973,6 +991,9 @@ namespace KingmakerBuffPlanner.UI
         internal int TooltipListenerCount;
         internal int TooltipRaycastGraphicCount;
         internal bool TooltipBlocksRaycasts;
+        internal int TooltipNativeTriggerCount;
+        internal bool TooltipUsesNativeParchmentPresentation;
+        internal int SetupOpenSoundCount;
         internal int PhysicalInputPlayerCommandCount;
         internal int PhysicalInputMovementCommandCount;
         internal int PhysicalInputAbilityCommandCount;

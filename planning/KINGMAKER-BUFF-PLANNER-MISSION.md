@@ -1,5 +1,33 @@
 # CODEX AUTONOMOUS MISSION
 
+## 2026-08-31 0.0.16 catalog/native-HUD checkpoint
+
+The current implementation branch is
+`codex/kingmaker-buff-planner-0.0.16-catalog-native-hud`, taken from clean
+`main` `91f198f53733b0fa63bfbc6c93ee133360b9b194`. It adds structural optional
+spellbook roles, restorative-payload classification, conservative per-anchor
+allied coverage, profile-derived L/I/S membership chips, and captured native
+lower-left HUD controls/tooltips/opening sound. Version is 0.0.16; persistence
+schema is unchanged at 4.
+
+Release source `90e5f43ed0c3447a3f73ca799706d653aa4a67f7` passes source
+39/39, protocol/domain 127/127, runtime filesystem 8/8, package fixture 4/4,
+deployment WhatIf 5/5, aggregate 1/1, deterministic builds 2/2, and release
+builder 3/3. The release ZIP/DLL/MVID are
+`0cced8d7dffc6543686ee413885bcd12d645af9c4ece8ad7d2a3ca2b2600c4a8` /
+`d1164180519dc6c91d3fe851aa87192f0985cfbc0a8005f97186e165654acdde` /
+`a91c37ec-1d91-4ab2-99d0-24da8fe5b686`. Guarded installation
+`kbp-0.0.16-catalog-native-hud-20260831` is Installed with settings preserved,
+other mods verified unchanged, and exact installed bytes. Exact contracts,
+rejected theories, and transaction evidence are in
+`planning/BUFF-CATALOG-NATIVE-HUD-EVIDENCE.md`.
+
+The current guarded save inventory remains baseline=0/working=0, so no live
+runtime claim is made. The owner explicitly authorized final commit,
+non-rewriting merge to `main`, guarded push, annotated tag, and GitHub release.
+Exact next action: execute that guarded sequence, then record public tag/assets
+and independent download verification. Do not substitute an ordinary save.
+
 ## 2026-08-29 0.0.15 publication authorization checkpoint
 
 The owner explicitly authorized final commit, merge to default branch `main`,

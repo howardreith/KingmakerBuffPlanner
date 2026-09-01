@@ -48,6 +48,8 @@ namespace KingmakerBuffPlanner.GameAdapters
                     Harmful = e.Harmful,
                     IsHiddenInUi = e.IsHiddenInUi,
                     IsClassFeature = e.IsClassFeature,
+                    RemoveOnRest = e.RemoveOnRest,
+                    StayOnDeath = e.StayOnDeath,
                     ComponentTypes = e.ComponentTypes,
                     SourceContract = e.SourceContract,
                     ActionPath = e.ActionPath

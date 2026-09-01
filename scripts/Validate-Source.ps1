@@ -104,12 +104,23 @@ foreach ($requiredHudContract in @('m_FormationButton', '"Setup"', '"Long"', '"I
 }
 if ($hudSource -match 'Instantiate\s*\(\s*template\.gameObject' -or
     $hudSource -match 'CreateNativeButton' -or
-    -not $hudSource.Contains('icon.raycastTarget = true') -or
+    $hudSource -match 'Instantiate\s*\(' -or
+    -not $hudSource.Contains('NativeHudButtonStyle.Capture') -or
+    -not $hudSource.Contains('ButtonPF') -or
+    -not $hudSource.Contains('TooltipTrigger') -or
+    -not $hudSource.Contains('SetNameAndDescription') -or
+    -not $hudSource.Contains('Color ink = Color.white') -or
     -not $hudSource.Contains('rootLayout.ignoreLayout = true') -or
     -not $hudSource.Contains('RectTransformUtility.WorldToScreenPoint') -or
     -not $hudSource.Contains('Setup|Long|Important|Short') -or
     -not $hudSource.Contains('ValidateHitOwnership')) {
-    throw 'The HUD must use an out-of-layout retained row with fresh bounded buttons and explicit top-hit ownership.'
+    throw 'The HUD must use fresh owned native-style ButtonPF controls, native parchment tooltips, neutral tintable glyphs, and explicit top-hit ownership.'
+}
+foreach ($retiredHudTreatment in @('KBP.InnerFrame', 'KBP.LowerAccent', 'KBP.ClusterBacking',
+        'CreateHudMessage', 'new Color(0.10f, 0.075f, 0.045f', 'Color(0.961f, 0.820f, 0.420f')) {
+    if ($hudSource.Contains($retiredHudTreatment)) {
+        throw "Retired custom brown/black HUD treatment remains: $retiredHudTreatment"
+    }
 }
 $assertions++
 
@@ -271,6 +282,72 @@ if ($variantSource.Contains('.IsAvailableForCast') -or
 }
 $assertions++
 
+$spellbookAdapterSource = Get-Content -LiteralPath (Join-Path $root `
+    'src\KingmakerBuffPlanner\GameAdapters\KingmakerSpellbookRoleAdapter.cs') -Raw
+$spellbookResolverSource = Get-Content -LiteralPath (Join-Path $root `
+    'src\KingmakerBuffPlanner\Compatibility\SpellbookRoleResolver.cs') -Raw
+$snapshotBuilderSource = Get-Content -LiteralPath (Join-Path $root `
+    'src\KingmakerBuffPlanner\GameAdapters\KingmakerPartySnapshotBuilder.cs') -Raw
+$animatedAdapterSource = Get-Content -LiteralPath (Join-Path $root `
+    'src\KingmakerBuffPlanner\GameAdapters\KingmakerAnimatedCastAdapter.cs') -Raw
+foreach ($spellbookRoleContract in @('CallOfTheWild.SpellbookMechanics.CanNotUseSpells',
+        'CallOfTheWild.SpellbookMechanics.CompanionSpellbook',
+        'CallOfTheWild.SpellbookMechanics.GetKnownSpellsFromMemorizationSpellbook',
+        'cannot-use-spells-with-owned-companion-casting-book',
+        'role-resolution-missing-fail-soft', '[KBP-SPELLBOOK-ROLE]')) {
+    if (-not ($spellbookAdapterSource.Contains($spellbookRoleContract) -or
+        $spellbookResolverSource.Contains($spellbookRoleContract) -or
+        $snapshotBuilderSource.Contains($spellbookRoleContract) -or
+        $sessionSource.Contains($spellbookRoleContract))) {
+        throw "Structural spellbook role contract is missing: $spellbookRoleContract"
+    }
+}
+if ($spellbookAdapterSource.Contains('IsAvailableForCast') -or
+    $spellbookResolverSource -match 'Arcanist|Prepared|Wizard|Guid.*==' -or
+    -not $animatedAdapterSource.Contains('KingmakerSpellbookRoleAdapter().IsIncluded')) {
+    throw 'Spellbook provider normalization must remain structural, resource-independent, and shared by execution.'
+}
+$restorativeContracts = @('RestorativeAction', 'ContextActionHealTarget',
+    'ContextActionResurrect', 'ContextActionRemoveBuff', 'ContextActionDispelMagic',
+    'reactive-restoration-marker-only',
+    'instantaneous-restoration-without-substantive-buff')
+foreach ($restorativeContract in $restorativeContracts) {
+    if (-not ($actionSource.Contains($restorativeContract) -or
+        $classifierSource.Contains($restorativeContract))) {
+        throw "Structural restorative classification contract is missing: $restorativeContract"
+    }
+}
+if ($actionSource -match 'Lay on Hands|Good Hope|Protection from Arrows' -or
+    $classifierSource -match 'Lay on Hands|Good Hope|Protection from Arrows') {
+    throw 'Production classification may not special-case owner-reported spell names.'
+}
+$areaSemanticsSource = Get-Content -LiteralPath (Join-Path $root `
+    'src\KingmakerBuffPlanner\Discovery\AreaRecipientSemantics.cs') -Raw
+$providerOptionSource = Get-Content -LiteralPath (Join-Path $root `
+    'src\KingmakerBuffPlanner\GameAdapters\KingmakerProviderOptionBuilder.cs') -Raw
+$areaCoverageSource = Get-Content -LiteralPath (Join-Path $root `
+    'src\KingmakerBuffPlanner\GameAdapters\KingmakerAreaCoverageResolver.cs') -Raw
+if (-not $areaSemanticsSource.Contains('canTargetFriends') -or
+    -not $areaSemanticsSource.Contains('!canTargetEnemies') -or
+    -not $areaSemanticsSource.Contains('!canTargetPoint') -or
+    -not $providerOptionSource.Contains('recipientIdsByAnchor') -or
+    -not $providerOptionSource.Contains('KingmakerAreaCoverageResolver') -or
+    -not $areaCoverageSource.Contains('ContextActionCastSpell') -or
+    -not $areaCoverageSource.Contains('ContextActionPartyMembers') -or
+    -not $areaCoverageSource.Contains('ContextActionsOnPet') -or
+    -not $plannerSource.Contains('CoveredTargetIdsForAnchor')) {
+    throw 'Allied area refinement and per-anchor communal coverage must remain conservative and shared by planning.'
+}
+$routineMembershipSource = Get-Content -LiteralPath (Join-Path $root `
+    'src\KingmakerBuffPlanner\UI\PlannerPresentationModels.cs') -Raw
+if (-not $routineMembershipSource.Contains('RoutineMembershipChipViewModel') -or
+    -not $routineMembershipSource.Contains('Also configured in ') -or
+    -not $viewSource.Contains('RoutineMembershipChipView') -or
+    -not $screenSource.Contains('RoutineChipLegend')) {
+    throw 'Routine membership chips must remain profile-derived, textually explained, and visibly legend-backed.'
+}
+$assertions++
+
 $factorySource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\UI\KingmakerUiFactory.cs') -Raw
 if ($screenSource.Contains('AddComponent<CanvasScaler>') -or
     -not $screenSource.Contains('ForceLayoutAndSnap(_root)') -or
@@ -344,11 +421,23 @@ foreach ($failSoftPatchContract in @('callbacks assigned;OnToggle=true',
         throw "Pointer patch failures must preserve callback/hotkey registration and unload cleanly: $failSoftPatchContract"
     }
 }
-foreach ($tooltipContract in @('layout.ignoreLayout = true', 'group.blocksRaycasts = false',
-        'group.interactable = false', 'ClampToScreen', '360f')) {
+foreach ($tooltipContract in @('TooltipTrigger', 'SetNameAndDescription',
+        'RefreshNativeTooltipText', '_nativeTooltips', 'raycastTarget = false')) {
     if (-not $hudSource.Contains($tooltipContract)) {
-        throw "Stable cached tooltip contract is missing: $tooltipContract"
+        throw "Native parchment tooltip contract is missing: $tooltipContract"
     }
+}
+if ($hudSource.Contains('HudTooltipTarget') -or $hudSource.Contains('ClampToScreen') -or
+    $hudSource.Contains('CreateHudMessage')) {
+    throw 'The custom black HUD tooltip remains as a normal presentation path.'
+}
+$screenControllerSource = Get-Content -LiteralPath (Join-Path $root `
+    'src\KingmakerBuffPlanner\UI\BuffPlannerScreenController.cs') -Raw
+if (-not $screenControllerSource.Contains('SetupOpenSoundGate') -or
+    -not $screenControllerSource.Contains('EmitSetupOpenSound') -or
+    -not $uiRootSource.Contains('UISoundType.CharacterScreenOpen') -or
+    -not $uiRootSource.Contains('Game.Instance.UI.Common.UISound.Play')) {
+    throw 'Setup opening must use the exact native sound service once per hidden-to-visible transition.'
 }
 foreach ($catalogContract in @('RefreshCatalog', 'BuffGridView',
         'VisibleRows', 'SelectedDetailsBound', 'CatalogFilterDiagnostics')) {
@@ -373,6 +462,20 @@ foreach ($failureContract in @('_completed = true;',
     if (-not $runtimeHostSource.Contains($failureContract)) {
         throw "Live UI failures must be committed once instead of escaping into the per-frame update loop: $failureContract"
     }
+}
+if ($runtimeHostSource.Contains('spriteInk=0.961,0.820,0.420,1.000') -or
+    $runtimeHostSource.Contains('innerFrame=True') -or
+    -not $runtimeHostSource.Contains('nativeSkin=True') -or
+    -not $runtimeHostSource.Contains('TooltipUsesNativeParchmentPresentation') -or
+    -not $runtimeHostSource.Contains('SetupOpenSoundCount')) {
+    throw 'Runtime HUD qualification must validate the captured native skin, parchment trigger, and one-shot setup sound.'
+}
+$runtimeAutomationSource = Get-Content -LiteralPath (Join-Path $root 'scripts\RuntimeAutomation.Common.ps1') -Raw
+if ($runtimeAutomationSource.Contains('spriteInk=0\.961,0\.820,0\.420,1\.000') -or
+    $runtimeAutomationSource.Contains('innerFrame=True') -or
+    -not $runtimeAutomationSource.Contains('uiTooltipUsesNativeParchmentPresentation') -or
+    -not $runtimeAutomationSource.Contains('uiSetupOpenSoundCount')) {
+    throw 'Runtime evidence validation must not retain the retired dark/gold HUD criteria.'
 }
 $assertions++
 

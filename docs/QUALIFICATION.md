@@ -1,5 +1,49 @@
 # Qualification
 
+## 0.0.16 catalog/native-HUD release authorization
+
+Status: SOURCE/BEHAVIOR/EXACT-ASSEMBLY/DETERMINISTIC PACKAGE/GUARDED LOCAL
+INSTALL PASS; OWNER AUTHORIZED MERGE, GUARDED PUSH, AND RELEASE. SAVE-BACKED
+IN-GAME ACCEPTANCE REMAINS BLOCKED, NOT CLAIMED.
+
+- Branch/intake baseline: `codex/kingmaker-buff-planner-0.0.16-catalog-native-hud`
+  from `91f198f53733b0fa63bfbc6c93ee133360b9b194`; version 0.0.16; persistence
+  schema 4 unchanged.
+- Exact assembly probes confirm `Assembly-CSharp.dll`
+  `3b6450ffec440e296e586f71c711b195aed144b28d53e1cbb29406d18fef5afb`
+  / `07fa1e4d-8618-41b3-9b8d-faa17d3b26f7`, and Call of the Wild
+  `4ebf8e1ed3e66ffed72ea33ea325595629423dacd5bffa23e3c9109144b26915`
+  / `8caab254-aacf-4811-8093-44b9184e6e53`, including the three exact
+  spellbook-role component contracts.
+- Release source is `90e5f43ed0c3447a3f73ca799706d653aa4a67f7`. Source-only
+  qualification passes source 39/39, protocol/domain 127/127, runtime-harness
+  filesystem 8/8, package fixture 4/4, deployment WhatIf 5/5, and aggregate
+  1/1. The deterministic release builder passes builds 2/2 and release builder
+  3/3; each internal build passes source 39/39, build 1/1, and package
+  validation 4/4. `git diff --check` passes.
+- The release ZIP is
+  `artifacts/release/0.0.16/KingmakerBuffPlanner-0.0.16.zip` with SHA-256
+  `0cced8d7dffc6543686ee413885bcd12d645af9c4ece8ad7d2a3ca2b2600c4a8`.
+  Its DLL SHA-256 is
+  `d1164180519dc6c91d3fe851aa87192f0985cfbc0a8005f97186e165654acdde`; MVID
+  `a91c37ec-1d91-4ab2-99d0-24da8fe5b686`.
+- `Test-InstallWhatIf.ps1` passed before installation with package validation
+  4/4, local-install preflight PASS, and WhatIf purity 5/5. Guarded install
+  `kbp-0.0.16-catalog-native-hud-20260831` completed `Installed`, replacing
+  only verified prior 0.0.13. Settings were preserved, other mods were
+  verified unchanged, and the installed DLL/hash/MVID exactly match the
+  manifest. Evidence:
+  `C:\Dev\KingmakerBuffPlannerLab\runtime-evidence\install-kbp-0.0.16-catalog-native-hud-20260831\install-result.json`.
+- Save-backed qualification is blocked—not passed—because the guarded resolver
+  reports `baseline=0; working=0`. No ordinary save, game launch, or live
+  staging was substituted. The final package/installer record will retain this
+  boundary.
+
+The owner explicitly accepted the deterministic/local-install qualification for
+publication and authorized the final documentation commit, non-rewriting merge
+to `main`, guarded push, tag, and GitHub release. Exact next action: complete
+that guarded release sequence, then record the published tag/asset identity.
+
 ## 0.0.15 publication preflight
 
 Status: OWNER AUTHORIZED; VERSION/NOTES PREPARED; CLEAN-HEAD AND MERGE-COMMIT

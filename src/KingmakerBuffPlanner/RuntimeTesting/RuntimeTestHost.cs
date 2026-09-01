@@ -362,6 +362,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     UiTooltipListenerCount = ui == null ? 0 : ui.TooltipListenerCount,
                     UiTooltipRaycastGraphicCount = ui == null ? -1 : ui.TooltipRaycastGraphicCount,
                     UiTooltipBlocksRaycasts = ui != null && ui.TooltipBlocksRaycasts,
+                    UiTooltipNativeTriggerCount = ui == null ? 0 : ui.TooltipNativeTriggerCount,
+                    UiTooltipUsesNativeParchmentPresentation = ui != null &&
+                        ui.TooltipUsesNativeParchmentPresentation,
+                    UiSetupOpenSoundCount = ui == null ? 0 : ui.SetupOpenSoundCount,
                     UiPhysicalInputPlayerCommandCount = ui == null ? -1 : ui.PhysicalInputPlayerCommandCount,
                     UiPhysicalInputMovementCommandCount = ui == null ? -1 : ui.PhysicalInputMovementCommandCount,
                     UiPhysicalInputAbilityCommandCount = ui == null ? -1 : ui.PhysicalInputAbilityCommandCount,
@@ -777,8 +781,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         AddUiAssertion(result, "ui-physical-tooltip-stable",
                             _liveTooltipStable && !string.IsNullOrWhiteSpace(_liveTooltipEvidence) &&
                             ui.TooltipListenerCount == 4 && ui.TooltipRaycastGraphicCount == 0 &&
-                            !ui.TooltipBlocksRaycasts,
-                            ">=5 seconds/inside/4 listeners/0 raycast/blocks=false",
+                            !ui.TooltipBlocksRaycasts && ui.TooltipNativeTriggerCount == 4 &&
+                            ui.TooltipUsesNativeParchmentPresentation,
+                            ">=5 seconds/inside/4 native triggers/0 raycast/blocks=false",
                             _liveTooltipEvidence + ";finalListeners=" + ui.TooltipListenerCount);
                         AddUiAssertion(result, "ui-physical-pointer-isolation",
                             ui.PhysicalInputPlayerCommandCount == 0 &&
@@ -822,9 +827,16 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                             !string.IsNullOrWhiteSpace(ui.HudObjectEvidence) &&
                             ui.HudObjectEvidence.Contains("corners=") &&
                             ui.HudObjectEvidence.Contains("active=True") &&
-                            ui.HudObjectEvidence.Split(new[] { "spriteInk=0.961,0.820,0.420,1.000" },
+                            ui.HudObjectEvidence.Contains("style=targetSprite=True") &&
+                            ui.HudObjectEvidence.Contains("normal=") &&
+                            ui.HudObjectEvidence.Contains("highlighted=") &&
+                            ui.HudObjectEvidence.Contains("pressed=") &&
+                            ui.HudObjectEvidence.Contains("disabled=") &&
+                            ui.HudObjectEvidence.Split(new[] { "nativeSkin=True" },
+                                StringSplitOptions.None).Length == 5 &&
+                            ui.HudObjectEvidence.Split(new[] { "spriteInk=1.000,1.000,1.000,1.000" },
                                 StringSplitOptions.None).Length == 5,
-                            "paths/ids/active/corners + four antique-gold sprite inks",
+                            "paths/ids/active/corners + captured native skin + four neutral alpha glyphs",
                             ui.HudObjectEvidence ?? "missing");
                         AddUiAssertion(result, "ui-text-native-pixel-path",
                             _liveRenderDiagnostics != null &&
@@ -912,6 +924,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                             string.IsNullOrWhiteSpace(_liveRenderScreenshotSha256) ||
                             !_liveTooltipStable || ui.TooltipListenerCount != 4 ||
                             ui.TooltipRaycastGraphicCount != 0 || ui.TooltipBlocksRaycasts ||
+                            ui.TooltipNativeTriggerCount != 4 ||
+                            !ui.TooltipUsesNativeParchmentPresentation ||
+                            ui.SetupOpenSoundCount < 1 ||
                             ui.PhysicalInputPlayerCommandCount != 0 ||
                             ui.PhysicalInputMovementCommandCount != 0 ||
                             ui.PhysicalInputAbilityCommandCount != 0 ||
@@ -1586,6 +1601,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         [JsonProperty("uiTooltipListenerCount", Order = 130)] public int UiTooltipListenerCount { get; set; }
         [JsonProperty("uiTooltipRaycastGraphicCount", Order = 131)] public int UiTooltipRaycastGraphicCount { get; set; }
         [JsonProperty("uiTooltipBlocksRaycasts", Order = 132)] public bool UiTooltipBlocksRaycasts { get; set; }
+        [JsonProperty("uiTooltipNativeTriggerCount", Order = 132)] public int UiTooltipNativeTriggerCount { get; set; }
+        [JsonProperty("uiTooltipUsesNativeParchmentPresentation", Order = 132)]
+        public bool UiTooltipUsesNativeParchmentPresentation { get; set; }
+        [JsonProperty("uiSetupOpenSoundCount", Order = 132)] public int UiSetupOpenSoundCount { get; set; }
         [JsonProperty("uiPhysicalInputPlayerCommandCount", Order = 133)] public int UiPhysicalInputPlayerCommandCount { get; set; }
         [JsonProperty("uiPhysicalInputMovementCommandCount", Order = 134)] public int UiPhysicalInputMovementCommandCount { get; set; }
         [JsonProperty("uiPhysicalInputAbilityCommandCount", Order = 135)] public int UiPhysicalInputAbilityCommandCount { get; set; }
