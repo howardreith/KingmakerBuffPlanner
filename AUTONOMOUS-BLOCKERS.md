@@ -1,5 +1,17 @@
 # Autonomous Blockers
 
+0.0.16 catalog/native-HUD public release completion, 2026-09-01: COMPLETE for
+source, deterministic build/package, guarded merge/push/tag/publication,
+download verification, and guarded local installation. `main`, `origin/main`,
+and `v0.0.16` resolve to `2628738dbae09051ebce467fd35c2da6dd27f58d`; public
+asset ZIP/DLL/MVID are
+`0f46a16cd7210a9be4d92138bad5135b32f5017b5c270b353309f7036f8a44f6` /
+`4c7249ad7a953522ea755e8bb46c5b89b136b9479a7360440526f417fb171597` /
+`49488746-8fa8-46b0-827e-7a73cc00f1af`; guarded published-byte installation
+preserved settings and every other mod. The unresolved external boundary is
+only live in-game evidence: `baseline=0; working=0`. No ordinary save may
+substitute; that limitation is not represented as an automated runtime PASS.
+
 0.0.16 catalog/native-HUD publication authorization, 2026-08-31: no source,
 compilation, behavioral, exact-assembly, package, deployment-WhatIf, or
 guarded-install blocker is known. Release source `90e5f43ed0c3447a3f73ca799706d653aa4a67f7`

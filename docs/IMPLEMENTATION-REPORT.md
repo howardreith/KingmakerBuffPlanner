@@ -42,12 +42,16 @@ the inspected `UISoundManager` `CharacterScreenOpen` path only through the
 successful setup transition gate. Runtime evidence now validates those native
 contracts instead of the retired visual constants.
 
-Release source `90e5f43ed0c3447a3f73ca799706d653aa4a67f7` passed deterministic
-builds 2/2 and release builder 3/3. The 0.0.16 release ZIP is
-`0cced8d7dffc6543686ee413885bcd12d645af9c4ece8ad7d2a3ca2b2600c4a8`; its DLL is
-`d1164180519dc6c91d3fe851aa87192f0985cfbc0a8005f97186e165654acdde` with MVID
-`a91c37ec-1d91-4ab2-99d0-24da8fe5b686`. Guarded install
-`kbp-0.0.16-catalog-native-hud-20260831` installed those exact bytes locally,
+Initial source `90e5f43ed0c3447a3f73ca799706d653aa4a67f7` passed deterministic
+builds 2/2 and release builder 3/3. The guarded publisher then rebuilt exact
+merge commit `2628738dbae09051ebce467fd35c2da6dd27f58d`, repeated the source
+suite and deterministic release, pushed annotated `v0.0.16`, and published
+`https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.0.16`.
+The published ZIP/DLL/MVID are
+`0f46a16cd7210a9be4d92138bad5135b32f5017b5c270b353309f7036f8a44f6` /
+`4c7249ad7a953522ea755e8bb46c5b89b136b9479a7360440526f417fb171597` /
+`49488746-8fa8-46b0-827e-7a73cc00f1af`; an independent download matched. Guarded
+install `published-0.0.16-final-install-20260831` installed those exact bytes,
 preserved planner settings, and verified all other mods unchanged. No game was
 launched; the absent exact guarded save pair still blocks live acceptance.
 

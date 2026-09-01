@@ -180,10 +180,33 @@ acceptance remains blocked until the authorized fixture pair exists.
   needed after the successful transaction, not that a failed restoration was
   accepted.
 
+## Publication, independent download, and exact local install
+
+- Non-rewriting `main` merge/tag commit:
+  `2628738dbae09051ebce467fd35c2da6dd27f58d`; annotated tag `v0.0.16`;
+  public release `https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.0.16`.
+  Publisher reported source `39/39`, protocol/domain `127/127`, runtime
+  filesystem `8/8`, package `4/4`, deployment WhatIf `5/5`, aggregate `1/1`,
+  deterministic builds `2/2`, release builder `3/3`.
+- The published asset is deliberately identified separately from the earlier
+  local candidate: ZIP SHA-256
+  `0f46a16cd7210a9be4d92138bad5135b32f5017b5c270b353309f7036f8a44f6`, DLL
+  SHA-256 `4c7249ad7a953522ea755e8bb46c5b89b136b9479a7360440526f417fb171597`,
+  MVID `49488746-8fa8-46b0-827e-7a73cc00f1af`. GitHub asset digest, downloaded
+  ZIP, `SHA256SUMS.txt`, downloaded DLL, and downloaded MVID agree. Download
+  evidence is
+  `C:\Dev\KingmakerBuffPlannerLab\runtime-evidence\release-0.0.16-published-download-20260831`.
+  The strict package validator intentionally rejects that external download path
+  by repository-root containment; the publisher validated the byte-identical
+  local release package `4/4`, while the independent download check compared
+  ZIP checksum, GitHub digest, DLL SHA-256, and MVID directly.
+- Guarded installation `published-0.0.16-final-install-20260831` passed its
+  exact-version WhatIf and completed `Installed`; settings were preserved,
+  other mods were verified unchanged, and the installed DLL/MVID equal the
+  published asset. Evidence is
+  `C:\Dev\KingmakerBuffPlannerLab\runtime-evidence\install-published-0.0.16-final-install-20260831\install-result.json`.
+
 ## Exact next action
 
-The owner explicitly authorized final commit, non-rewriting merge to `main`,
-guarded push, annotated tag, and GitHub release despite the documented
-save-fixture boundary. Execute the repository-owned guarded release sequence,
-then record the public tag, asset hashes, and independent download verification.
-Save-backed manual rows remain deferred; do not substitute an ordinary save.
+Save-backed manual rows remain deferred at `baseline=0; working=0`; do not
+substitute an ordinary save. No further release-engineering action remains.

@@ -1,10 +1,29 @@
 # Qualification
 
-## 0.0.16 catalog/native-HUD release authorization
+## 0.0.16 catalog/native-HUD published release qualification
 
-Status: SOURCE/BEHAVIOR/EXACT-ASSEMBLY/DETERMINISTIC PACKAGE/GUARDED LOCAL
-INSTALL PASS; OWNER AUTHORIZED MERGE, GUARDED PUSH, AND RELEASE. SAVE-BACKED
-IN-GAME ACCEPTANCE REMAINS BLOCKED, NOT CLAIMED.
+Status: MERGED; GUARDED-PUSHED; PUBLISHED; REMOTE/DOWNLOADED ASSETS AND
+GUARDED LOCAL INSTALL VERIFIED. SAVE-BACKED IN-GAME ACCEPTANCE REMAINS BLOCKED,
+NOT CLAIMED.
+
+- Exact release/tag commit: `2628738dbae09051ebce467fd35c2da6dd27f58d`;
+  annotated tag `v0.0.16`; public release:
+  `https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.0.16`.
+  GitHub reports `draft=false`, `prerelease=false`, published
+  `2026-09-01T01:59:20Z`.
+- The guarded publisher reran source 39/39, protocol/domain 127/127,
+  runtime-harness filesystem 8/8, package validation 4/4, deployment WhatIf
+  5/5, aggregate 1/1, deterministic builds 2/2, and release builder 3/3 on
+  exact `main` before tagging and upload.
+- Published ZIP/DLL/MVID are
+  `0f46a16cd7210a9be4d92138bad5135b32f5017b5c270b353309f7036f8a44f6` /
+  `4c7249ad7a953522ea755e8bb46c5b89b136b9479a7360440526f417fb171597` /
+  `49488746-8fa8-46b0-827e-7a73cc00f1af`. Independent GitHub download and its
+  `SHA256SUMS.txt` entry match; downloaded DLL hash/MVID also match.
+- Guarded installation `published-0.0.16-final-install-20260831` completed
+  `Installed` from the published manifest, preserving settings and verifying
+  all other mods unchanged. The installed version/DLL/MVID exactly match the
+  published asset.
 
 - Branch/intake baseline: `codex/kingmaker-buff-planner-0.0.16-catalog-native-hud`
   from `91f198f53733b0fa63bfbc6c93ee133360b9b194`; version 0.0.16; persistence
@@ -15,20 +34,20 @@ IN-GAME ACCEPTANCE REMAINS BLOCKED, NOT CLAIMED.
   `4ebf8e1ed3e66ffed72ea33ea325595629423dacd5bffa23e3c9109144b26915`
   / `8caab254-aacf-4811-8093-44b9184e6e53`, including the three exact
   spellbook-role component contracts.
-- Release source is `90e5f43ed0c3447a3f73ca799706d653aa4a67f7`. Source-only
-  qualification passes source 39/39, protocol/domain 127/127, runtime-harness
+- Initial local candidate source was `90e5f43ed0c3447a3f73ca799706d653aa4a67f7`.
+  Its source-only qualification passes source 39/39, protocol/domain 127/127, runtime-harness
   filesystem 8/8, package fixture 4/4, deployment WhatIf 5/5, and aggregate
   1/1. The deterministic release builder passes builds 2/2 and release builder
   3/3; each internal build passes source 39/39, build 1/1, and package
   validation 4/4. `git diff --check` passes.
-- The release ZIP is
+- The pre-merge local candidate ZIP was
   `artifacts/release/0.0.16/KingmakerBuffPlanner-0.0.16.zip` with SHA-256
   `0cced8d7dffc6543686ee413885bcd12d645af9c4ece8ad7d2a3ca2b2600c4a8`.
   Its DLL SHA-256 is
   `d1164180519dc6c91d3fe851aa87192f0985cfbc0a8005f97186e165654acdde`; MVID
   `a91c37ec-1d91-4ab2-99d0-24da8fe5b686`.
-- `Test-InstallWhatIf.ps1` passed before installation with package validation
-  4/4, local-install preflight PASS, and WhatIf purity 5/5. Guarded install
+- `Test-InstallWhatIf.ps1` passed before the initial candidate installation with
+  package validation 4/4, local-install preflight PASS, and WhatIf purity 5/5. Guarded install
   `kbp-0.0.16-catalog-native-hud-20260831` completed `Installed`, replacing
   only verified prior 0.0.13. Settings were preserved, other mods were
   verified unchanged, and the installed DLL/hash/MVID exactly match the
@@ -39,10 +58,10 @@ IN-GAME ACCEPTANCE REMAINS BLOCKED, NOT CLAIMED.
   staging was substituted. The final package/installer record will retain this
   boundary.
 
-The owner explicitly accepted the deterministic/local-install qualification for
-publication and authorized the final documentation commit, non-rewriting merge
-to `main`, guarded push, tag, and GitHub release. Exact next action: complete
-that guarded release sequence, then record the published tag/asset identity.
+The owner authorized the release sequence, which completed through guarded
+merge, push, annotated tag, public release, independent asset verification, and
+published-byte local installation. Exact next action: await an authorized save
+pair for the manual in-game rows; no ordinary save may substitute.
 
 ## 0.0.15 publication preflight
 

@@ -7,10 +7,10 @@ reports `baseline=0; working=0`. Use only the exact authorized
 `KBP_AUTOMATION_BASELINE` / `KBP_AUTOMATION_WORKING` pair; do not substitute an
 ordinary save.
 
-The exact 0.0.16 package is already guarded-installed at the local
-UMM path with settings preserved and other mods verified unchanged. This is not
-an in-game acceptance result: no game process was launched and no screenshots
-or live audio/cast evidence exist yet.
+The exact published 0.0.16 package is guarded-installed at the local UMM path
+by `published-0.0.16-final-install-20260831`, with settings preserved and other
+mods verified unchanged. This is not an in-game acceptance result: no game
+process was launched and no screenshots or live audio/cast evidence exist yet.
 
 1. Load an Arcanist with its Call of the Wild preparation/casting pair. Open a
    spell-backed card's Caster Policy and confirm one actual casting spellbook

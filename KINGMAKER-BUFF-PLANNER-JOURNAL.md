@@ -1,5 +1,32 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-09-01 - 0.0.16 public release completion
+
+Status: MERGED; GUARDED-PUSHED; TAGGED; PUBLISHED; DOWNLOADED ASSET AND LOCAL
+UMM INSTALL VERIFIED. SAVE-BACKED IN-GAME ACCEPTANCE REMAINS BLOCKED, NOT
+CLAIMED.
+
+- `main` merge/tag commit is `2628738dbae09051ebce467fd35c2da6dd27f58d`;
+  annotated `v0.0.16` and public release are
+  `https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.0.16`.
+  GitHub reports draft=false, prerelease=false, published
+  `2026-09-01T01:59:20Z`.
+- Guarded publisher repetition: source 39/39, protocol/domain 127/127,
+  runtime filesystem 8/8, package 4/4, deployment WhatIf 5/5, aggregate 1/1,
+  deterministic builds 2/2, release builder 3/3. The guarded push helper
+  passed WhatIf 6/6 and pushed exact `main` without force.
+- Published ZIP/DLL/MVID:
+  `0f46a16cd7210a9be4d92138bad5135b32f5017b5c270b353309f7036f8a44f6` /
+  `4c7249ad7a953522ea755e8bb46c5b89b136b9479a7360440526f417fb171597` /
+  `49488746-8fa8-46b0-827e-7a73cc00f1af`. Downloaded ZIP, GitHub digest,
+  `SHA256SUMS.txt`, downloaded DLL, and MVID agree.
+- Guarded local install `published-0.0.16-final-install-20260831` is
+  `Installed`, settingsPreserved=true, otherModsVerified=true, with exact
+  published bytes. Evidence:
+  `C:\Dev\KingmakerBuffPlannerLab\runtime-evidence\install-published-0.0.16-final-install-20260831`.
+- Exact next action: use only an authorized baseline/working pair for the
+  manual in-game acceptance rows. No ordinary save may substitute.
+
 ## 2026-08-31 - 0.0.16 publication authorization
 
 Status: DETERMINISTIC PACKAGE AND GUARDED LOCAL INSTALL PASS; OWNER AUTHORIZED

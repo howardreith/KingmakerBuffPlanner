@@ -23,6 +23,8 @@
   native `TooltipTrigger` parchment presentation, and one native
   `CharacterScreenOpen` sound per successful setup transition.
 
+Published 2026-09-01 from annotated tag `v0.0.16`.
+
 ## 0.0.13 - Brown-Fur Powerful Change diagnostic repair
 
 - Discovers Powerful Change from the live caster fact and six validated native

@@ -1,5 +1,21 @@
 # Autonomous Resume
 
+## 0.0.16 public release completion - 2026-09-01
+
+- `main`, `origin/main`, and annotated tag `v0.0.16` resolve to
+  `2628738dbae09051ebce467fd35c2da6dd27f58d`. The public release is
+  `https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.0.16`.
+- Publisher results: source 39/39; protocol/domain 127/127; runtime filesystem
+  8/8; package 4/4; deployment WhatIf 5/5; aggregate 1/1; deterministic builds
+  2/2; release builder 3/3. Published ZIP/DLL/MVID are
+  `0f46a16cd7210a9be4d92138bad5135b32f5017b5c270b353309f7036f8a44f6` /
+  `4c7249ad7a953522ea755e8bb46c5b89b136b9479a7360440526f417fb171597` /
+  `49488746-8fa8-46b0-827e-7a73cc00f1af`; independent download agrees.
+- Guarded install `published-0.0.16-final-install-20260831` is Installed with
+  settings preserved and other mods verified unchanged; installed bytes match.
+- No release-engineering action remains. Runtime manual acceptance remains
+  blocked at `baseline=0; working=0`; do not use an ordinary save.
+
 ## 0.0.16 catalog/native-HUD publication authorization - 2026-08-31
 
 - Active branch is `codex/kingmaker-buff-planner-0.0.16-catalog-native-hud`,
