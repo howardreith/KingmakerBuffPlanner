@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.0.16 - catalog semantics and native HUD maintenance candidate
+## 0.0.16 - catalog semantics and native HUD maintenance
 
 - Normalizes optional Call of the Wild preparation/casting companion spellbooks
   at the party snapshot boundary, so a preparation-only Arcanist book cannot be

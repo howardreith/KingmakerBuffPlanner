@@ -13,7 +13,7 @@ schema is unchanged at 4.
 Release source `90e5f43ed0c3447a3f73ca799706d653aa4a67f7` passes source
 39/39, protocol/domain 127/127, runtime filesystem 8/8, package fixture 4/4,
 deployment WhatIf 5/5, aggregate 1/1, deterministic builds 2/2, and release
-builder 3/3. The local-only ZIP/DLL/MVID are
+builder 3/3. The release ZIP/DLL/MVID are
 `0cced8d7dffc6543686ee413885bcd12d645af9c4ece8ad7d2a3ca2b2600c4a8` /
 `d1164180519dc6c91d3fe851aa87192f0985cfbc0a8005f97186e165654acdde` /
 `a91c37ec-1d91-4ab2-99d0-24da8fe5b686`. Guarded installation
@@ -23,9 +23,10 @@ rejected theories, and transaction evidence are in
 `planning/BUFF-CATALOG-NATIVE-HUD-EVIDENCE.md`.
 
 The current guarded save inventory remains baseline=0/working=0, so no live
-runtime claim is made. Exact next action: await the authorized pair and run the
-manual acceptance rows; do not substitute an ordinary save. No push, merge to
-main, tag, or publication is authorized or has occurred.
+runtime claim is made. The owner explicitly authorized final commit,
+non-rewriting merge to `main`, guarded push, annotated tag, and GitHub release.
+Exact next action: execute that guarded sequence, then record public tag/assets
+and independent download verification. Do not substitute an ordinary save.
 
 ## 2026-08-29 0.0.15 publication authorization checkpoint
 

@@ -1,17 +1,18 @@
 # Autonomous Blockers
 
-0.0.16 catalog/native-HUD package/install handoff, 2026-08-31: no source,
+0.0.16 catalog/native-HUD publication authorization, 2026-08-31: no source,
 compilation, behavioral, exact-assembly, package, deployment-WhatIf, or
 guarded-install blocker is known. Release source `90e5f43ed0c3447a3f73ca799706d653aa4a67f7`
-has a deterministic local-only ZIP; guarded installation
+has a deterministic release ZIP; guarded installation
 `kbp-0.0.16-catalog-native-hud-20260831` completed `Installed`, replacing only
 verified 0.0.13, preserving settings, and verifying other mods unchanged. The
 sole current qualification boundary is external: the guard reports exactly
 `baseline=0; working=0`, so Arcanist/provider UI, Lay on Hands absence,
 cross-routine chips, communal coverage, native visual states, parchment
 tooltip, and sound cannot be claimed as live in-game PASS. No ordinary save may
-be substituted. No game launch, remote mutation, tag, merge to main, or
-publication occurred.
+be substituted. The owner explicitly authorized final commit, non-rewriting
+merge to `main`, guarded push, annotated tag, and GitHub release. No game launch
+has occurred.
 
 0.0.15 publication authorization, 2026-08-29: no authorization, repository,
 default-branch, authentication, version-collision, or remote-divergence

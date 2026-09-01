@@ -155,7 +155,7 @@ acceptance remains blocked until the authorized fixture pair exists.
 - `./scripts/Build-Release.ps1`: PASS; deterministic builds `2/2`, release
   builder `3/3`, with source validation `39/39`, build `1/1`, and package
   validation `4/4` for each internal build.
-- Final local-only ZIP:
+- Final release ZIP:
   `artifacts/release/0.0.16/KingmakerBuffPlanner-0.0.16.zip`, SHA-256
   `0cced8d7dffc6543686ee413885bcd12d645af9c4ece8ad7d2a3ca2b2600c4a8`.
   Final DLL: `artifacts/build/Release/KingmakerBuffPlanner.dll`, SHA-256
@@ -182,8 +182,8 @@ acceptance remains blocked until the authorized fixture pair exists.
 
 ## Exact next action
 
-Await an authorized, exact `KBP_AUTOMATION_BASELINE` /
-`KBP_AUTOMATION_WORKING` pair, then run the manual acceptance rows for provider
-selection, catalog visibility, routine chips, communal coverage, native visual
-states/tooltips, and one-shot setup sound. Do not substitute an ordinary save.
-No push, merge to main, tag, or publication is authorized or has occurred.
+The owner explicitly authorized final commit, non-rewriting merge to `main`,
+guarded push, annotated tag, and GitHub release despite the documented
+save-fixture boundary. Execute the repository-owned guarded release sequence,
+then record the public tag, asset hashes, and independent download verification.
+Save-backed manual rows remain deferred; do not substitute an ordinary save.

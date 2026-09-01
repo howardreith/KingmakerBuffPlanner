@@ -1,6 +1,6 @@
 # Implementation Report
 
-## 0.0.16 catalog/native-HUD maintenance candidate
+## 0.0.16 catalog/native-HUD maintenance release
 
 The duplicate Arcanist provider defect originated before the UI: snapshot
 enumeration accepted every `UnitDescriptor.Spellbooks` entry. The new optional
@@ -43,7 +43,7 @@ successful setup transition gate. Runtime evidence now validates those native
 contracts instead of the retired visual constants.
 
 Release source `90e5f43ed0c3447a3f73ca799706d653aa4a67f7` passed deterministic
-builds 2/2 and release builder 3/3. The local-only 0.0.16 ZIP is
+builds 2/2 and release builder 3/3. The 0.0.16 release ZIP is
 `0cced8d7dffc6543686ee413885bcd12d645af9c4ece8ad7d2a3ca2b2600c4a8`; its DLL is
 `d1164180519dc6c91d3fe851aa87192f0985cfbc0a8005f97186e165654acdde` with MVID
 `a91c37ec-1d91-4ab2-99d0-24da8fe5b686`. Guarded install

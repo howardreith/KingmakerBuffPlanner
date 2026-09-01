@@ -1,8 +1,7 @@
-# Kingmaker Buff Planner 0.0.16 candidate
+# Kingmaker Buff Planner 0.0.16
 
-This local-only maintenance candidate improves structural catalog accuracy,
-cross-routine clarity, communal coverage, and lower-left HUD integration. It is
-not published, tagged, merged, or uploaded.
+This maintenance release improves structural catalog accuracy, cross-routine
+clarity, communal coverage, and lower-left HUD integration.
 
 ## Correct caster spellbooks
 
@@ -49,6 +48,7 @@ black box, and successfully opening Setup plays the inspected native
 The deterministic suite covers provider roles, restoration semantics,
 membership/persistence/layout, per-anchor coverage/grouping, native-style
 contracts, tooltip ownership, and setup sound gating. Exact installed game and
-Call of the Wild contracts were inspected. Save-backed in-game verification is
-not claimed because the guarded workflow reports zero exact
-`KBP_AUTOMATION_BASELINE` and `KBP_AUTOMATION_WORKING` fixtures.
+Call of the Wild contracts were inspected. Live save-backed scenarios were not
+performed because the guarded workflow reports zero exact
+`KBP_AUTOMATION_BASELINE` and `KBP_AUTOMATION_WORKING` fixtures; no ordinary
+save was substituted.

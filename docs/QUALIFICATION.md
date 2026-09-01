@@ -1,9 +1,10 @@
 # Qualification
 
-## 0.0.16 catalog/native-HUD candidate
+## 0.0.16 catalog/native-HUD release authorization
 
 Status: SOURCE/BEHAVIOR/EXACT-ASSEMBLY/DETERMINISTIC PACKAGE/GUARDED LOCAL
-INSTALL PASS; SAVE-BACKED IN-GAME ACCEPTANCE BLOCKED, NOT CLAIMED.
+INSTALL PASS; OWNER AUTHORIZED MERGE, GUARDED PUSH, AND RELEASE. SAVE-BACKED
+IN-GAME ACCEPTANCE REMAINS BLOCKED, NOT CLAIMED.
 
 - Branch/intake baseline: `codex/kingmaker-buff-planner-0.0.16-catalog-native-hud`
   from `91f198f53733b0fa63bfbc6c93ee133360b9b194`; version 0.0.16; persistence
@@ -20,7 +21,7 @@ INSTALL PASS; SAVE-BACKED IN-GAME ACCEPTANCE BLOCKED, NOT CLAIMED.
   1/1. The deterministic release builder passes builds 2/2 and release builder
   3/3; each internal build passes source 39/39, build 1/1, and package
   validation 4/4. `git diff --check` passes.
-- The local-only ZIP is
+- The release ZIP is
   `artifacts/release/0.0.16/KingmakerBuffPlanner-0.0.16.zip` with SHA-256
   `0cced8d7dffc6543686ee413885bcd12d645af9c4ece8ad7d2a3ca2b2600c4a8`.
   Its DLL SHA-256 is
@@ -38,9 +39,10 @@ INSTALL PASS; SAVE-BACKED IN-GAME ACCEPTANCE BLOCKED, NOT CLAIMED.
   staging was substituted. The final package/installer record will retain this
   boundary.
 
-Exact next action: await the exact guarded save pair and run the manual
-in-game acceptance rows. No ordinary save, game launch, push, merge to main,
-tag, or publication is authorized by this checkpoint.
+The owner explicitly accepted the deterministic/local-install qualification for
+publication and authorized the final documentation commit, non-rewriting merge
+to `main`, guarded push, tag, and GitHub release. Exact next action: complete
+that guarded release sequence, then record the published tag/asset identity.
 
 ## 0.0.15 publication preflight
 

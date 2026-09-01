@@ -1,9 +1,10 @@
 # Kingmaker Buff Planner Journal
 
-## 2026-08-31 - 0.0.16 release/package/install handoff
+## 2026-08-31 - 0.0.16 publication authorization
 
-Status: DETERMINISTIC PACKAGE AND GUARDED LOCAL INSTALL PASS; SAVE-BACKED
-IN-GAME ACCEPTANCE BLOCKED, NOT CLAIMED.
+Status: DETERMINISTIC PACKAGE AND GUARDED LOCAL INSTALL PASS; OWNER AUTHORIZED
+MERGE, GUARDED PUSH, TAG, AND RELEASE. SAVE-BACKED IN-GAME ACCEPTANCE BLOCKED,
+NOT CLAIMED.
 
 - Release source is `90e5f43ed0c3447a3f73ca799706d653aa4a67f7` on
   `codex/kingmaker-buff-planner-0.0.16-catalog-native-hud`; version 0.0.16,
@@ -23,9 +24,11 @@ IN-GAME ACCEPTANCE BLOCKED, NOT CLAIMED.
   all other mods unchanged. The installed DLL/MVID match exactly. No game was
   launched; transaction evidence is
   `C:\Dev\KingmakerBuffPlannerLab\runtime-evidence\install-kbp-0.0.16-catalog-native-hud-20260831`.
-- Exact next action: when an authorized baseline/working pair exists, run the
-  manual in-game provider/catalog/chip/coverage/native-HUD/sound checklist.
-  No ordinary save, push, merge to main, tag, or publication is authorized.
+- The owner explicitly accepted the candidate for publication and authorized its
+  final documentation commit, non-rewriting merge to `main`, guarded push,
+  annotated tag, and GitHub release. Exact next action: execute the guarded
+  publication sequence, independently verify tag/assets, and record the result.
+  The absent baseline/working pair remains an honest in-game evidence boundary.
 
 ## 2026-08-31 - 0.0.16 catalog/native-HUD implementation checkpoint
 

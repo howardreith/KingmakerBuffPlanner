@@ -1,6 +1,6 @@
 # Autonomous Resume
 
-## 0.0.16 catalog/native-HUD package/install handoff - 2026-08-31
+## 0.0.16 catalog/native-HUD publication authorization - 2026-08-31
 
 - Active branch is `codex/kingmaker-buff-planner-0.0.16-catalog-native-hud`,
   based on clean `main` `91f198f53733b0fa63bfbc6c93ee133360b9b194`; product
@@ -21,10 +21,13 @@
 - The package is guarded-installed locally under installation ID
   `kbp-0.0.16-catalog-native-hud-20260831`: status Installed, settings
   preserved, other mods verified unchanged, installed bytes exact. No game was
-  launched, pushed, merged to main, tagged, or published.
-- Exact next action: await the authorized exact baseline/working save pair and
-  run `docs/MANUAL-ACCEPTANCE.md`. No ordinary save may substitute; no further
-  safe source/package/install work remains.
+  launched.
+- The owner explicitly accepted the qualified candidate and authorized its final
+  documentation commit, non-rewriting merge to `main`, guarded push, annotated
+  tag, and GitHub release. Exact next action: execute that guarded sequence,
+  independently verify the public release bytes, and record it. The absent
+  exact baseline/working pair remains an honest runtime boundary; no ordinary
+  save may substitute.
 
 ## 0.0.15 publication authorization - 2026-08-29
 

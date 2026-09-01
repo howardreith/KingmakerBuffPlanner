@@ -1,7 +1,8 @@
 # Kingmaker Buff Planner
 
-**Release:** `0.0.13` repairs Brown-Fur Transmuter Powerful Change enhancement
-discovery and execution while retaining the `0.0.12` HUD lifecycle repair.
+**Release:** `0.0.16` improves caster-spellbook normalization, persistent-buff
+catalog semantics, communal coverage, routine membership clarity, and native
+lower-left HUD integration.
 
 Kingmaker Buff Planner is a standalone Unity Mod Manager mod for **Pathfinder:
 Kingmaker Enhanced Plus Edition 2.1.7b**.
@@ -14,7 +15,7 @@ packaging, and runtime automation owned by this repository.
 
 ## Install and use
 
-Download `KingmakerBuffPlanner-0.0.13.zip` from the GitHub Release's **Assets**
+Download `KingmakerBuffPlanner-0.0.16.zip` from the GitHub Release's **Assets**
 section. Do not download GitHub's automatically generated source-code archives.
 
 Install the ZIP through Unity Mod Manager, or extract its single
