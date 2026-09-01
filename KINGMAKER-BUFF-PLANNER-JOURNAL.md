@@ -63,8 +63,10 @@ PROGRESS; LIVE SAVE-BACKED WORK BLOCKED.
   `6a9fab9e00176d62dafc7cd323b7ac211f6bfa34` and retained the correct
   personal-target safety change at
   `e3287d17d3a80bace0bd7dd6be18c32ec3e042ba`. The current regression's first
-  failing stage was provider-option construction introduced around the
-  per-anchor work in
+  failing stage was provider-option construction. The null-geometry/direct-
+  target fallthrough first appeared in
+  `932da35cb6633031d4077e43df65ab659bc9bd84` with area grouping and was
+  retained by the per-anchor work in
   `90e5f43ed0c3447a3f73ca799706d653aa4a67f7`: a null area-geometry result
   fell through to direct `CanTarget` and erased the coverage map.
 - Implemented exact selected/base geometry recovery with relationship proof

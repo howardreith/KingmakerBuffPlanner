@@ -43,8 +43,10 @@ legality; that safety repair was retained.
 
 The first failing stage in the current real-provider pipeline was
 `KingmakerProviderOptionBuilder`, not discovery, grouping, planning, or
-rendering. Commit `90e5f43ed0c3447a3f73ca799706d653aa4a67f7`
-introduced the current per-anchor map, but asked
+rendering. The null-geometry/direct-target fallthrough first appeared in
+`932da35cb6633031d4077e43df65ab659bc9bd84` when area grouping was
+introduced. Commit `90e5f43ed0c3447a3f73ca799706d653aa4a67f7`
+carried it into the current per-anchor map, which asked
 `KingmakerAreaCoverageResolver` only about the selected
 `AbilityData.Blueprint`. If a concrete selected variant carried its delivery
 graph while the unambiguous `AbilityTargetsAround` geometry lived on its
