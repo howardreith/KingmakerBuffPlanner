@@ -1,5 +1,116 @@
 # Implementation Report
 
+## 0.0.17 communal, Share Transmutation, and Infusion update
+
+Starting state was clean `main`
+`f9cf2ac35535c8201dea7ef7f5172ebaa051e7ad`, version 0.0.16. Work is isolated
+on `codex/kbp-communal-share-transmutation-infusion`; implementation checkpoint
+`98d41723cec611a4d2a7528ac801bf7c3654bdb9` contains production code,
+contract inspectors, and behavior tests. The reference checkout was verified
+read-only at
+`C:\Dev\KingmakerGunslingerLab\repo\KingmakerGunslinger`, remote
+`git@github.com:howardreith/KingmakerGunslingerAndOtherTabletopRules.git`,
+HEAD `06c4d998f160df75ad3be7bfcf3de7e415c631d4`.
+
+### Communal regression diagnosis
+
+The tint/portrait renderer was not missing. Commit
+`6a9fab9e00176d62dafc7cd323b7ac211f6bfa34` introduced the still-valid
+direct-versus-indirect presentation from planned
+`ExpectedRecipientUnitIds`. Commit
+`e3287d17d3a80bace0bd7dd6be18c32ec3e042ba` correctly replaced loose
+blueprint flags with live `AbilityData.CanTarget` for personal/direct
+legality; that safety repair was retained.
+
+The first failing stage in the current real-provider pipeline was
+`KingmakerProviderOptionBuilder`, not discovery, grouping, planning, or
+rendering. Commit `90e5f43ed0c3447a3f73ca799706d653aa4a67f7`
+introduced the current per-anchor map, but asked
+`KingmakerAreaCoverageResolver` only about the selected
+`AbilityData.Blueprint`. If a concrete selected variant carried its delivery
+graph while the unambiguous `AbilityTargetsAround` geometry lived on its
+declared source (or the graph was unreadable/contradictory), the resolver
+returned null. The builder's subsequent generic `else` silently treated the
+same structurally allied-area expression as ordinary direct
+`AbilityData.CanTarget`. The resulting option had direct anchors and no
+`RecipientIdsByAnchor`; consequently the planner produced only the selected
+unit in `ExpectedRecipientUnitIds`, and the intact presentation had nobody
+else to mark `COVERED`. Earlier tests injected already-normalized coverage
+maps, so they bypassed this adapter failure.
+
+The repair resolves the exact declared base blueprint as well as the selected
+variant, proves their parent/variant relationship, and accepts exactly one
+allied radius across those related graphs. Party actions still cover all valid
+party members. Structurally allied areas compute distance per legal anchor.
+Dead, hostile, untargetable, out-of-radius, hostile-area, ambiguous-area, and
+conflicting-radius cases fail closed. There is no spell-name or communal-GUID
+production rule. Exact catalog canaries—Resist Energy, Communal; Remove Fear;
+Good Hope; and Protection from Arrows, Communal—are assertions on structural
+evidence only.
+
+### Effective targeting and enhancements
+
+`EffectiveProviderOptionResolver` and `ICastTargetingModifier` are the new
+authoritative application seam. The UI, persisted-target pruning, preview,
+provider selection, and plan creation all resolve the active routine's exact
+assignment and enhancement set. Execution resolves the immutable planned
+provider again, acquires its native activation lease, and performs final
+`AbilityData` availability/material/target validation under that lease. A
+rejected preflight never creates a command and never redirects a Personal spell
+to self.
+
+Enhancement compatibility no longer means “different categories.” Explicit
+groups enforce one metamagic rod and one Powerful Change score while allowing a
+rod plus class feature and Share plus one Powerful Change choice. Usage is
+grouped by `UsagePoolId`, summed by `UsageUnitsPerCast`, compared before any
+reservation, and subtracted once from the plan-local forecast. The same
+aggregate check is repeated against live values at execution. A one-point
+reservoir cannot accept a two-point Share-plus-Powerful cast and no ledger can
+become negative.
+
+### Optional Share contract
+
+The standalone assembly has no reference to KingmakerGunslinger, Tabletop Added
+Rules, or Call of the Wild. The bounded compatibility adapter requires exactly
+one loaded `KingmakerGunslinger` assembly with the expected native intent,
+targeting, commit/debit, and Harmony patch surfaces. It then proves exact Share
+feature `b7e929dac874cd22d173ee8f4fe0bfa4`, activatable
+`8641e6c39ff133ad71f669e35e1ee688`, marker
+`215a03a25c8ff8b76114bf7513869d6c`, and Arcane Reservoir
+`3b775ee982444493b3de8f7bc31bd872` identities plus the feature grant,
+empty marker, single never-spend resource component, activation type/group, and
+caster ownership. It accepts only a genuine spellbook spell whose live
+blueprint is Personal Transmutation and whose native pending-Share patch changes
+`TargetAnchor` to Unit.
+
+Share is an independent checkbox-style choice and defaults off. With it on,
+native `CanTarget` decides willing relationships, dead/hostile rejection,
+touch delivery, and Transmutation Supremacy's exact 30-foot boundary. Share
+sets native-command-required and shares the reservoir forecast with Powerful
+Change. The planner never invokes the provider's commit path while probing and
+never subtracts reservoir points. On execution the provider's own transaction
+spends one point for Share and one additional point for Powerful Change only
+after successful commit. Per-activation-group cleanup avoids resurrecting a
+consumed one-shot or suppressing restoration of an unrelated group.
+
+### Alchemist Infusion and rejected theories
+
+Exact Kingmaker IL confirms `IsAlchemistSpell`,
+`AlchemistInfusion`, `TargetAnchor`, and
+`CanTarget(TargetWrapper)` already implement passive Infusion targeting.
+The planner had been suppressing that result by forcing every Caster-only
+expression to self. The base option builder now permits live native target
+enumeration only for the exact Alchemist+Infusion shape. There is no toggle,
+enhancement ID, migration, or extra resource; the extract slot is reserved
+once.
+
+Rejected approaches were: changing the existing portrait tint; reverting
+personal-target validation; matching localized “Communal”; maintaining a spell
+GUID allowlist; opening all Personal spells; approximating Share willingness or
+range; directly spending Arcane Reservoir; adding an Infusion toggle; adding a
+gameplay-mod reference; or flattening conditional branches. Live save-backed
+claims remain unverified because both required KBP automation saves are absent.
+
 ## 0.0.16 catalog/native-HUD maintenance release
 
 The duplicate Arcanist provider defect originated before the UI: snapshot

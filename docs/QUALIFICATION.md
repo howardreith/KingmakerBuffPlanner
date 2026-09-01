@@ -1,5 +1,59 @@
 # Qualification
 
+## 0.0.17 communal/Share/Infusion local candidate
+
+Status: IMPLEMENTATION AND SOURCE-ONLY QUALIFICATION PASS; CLEAN-HEAD
+DETERMINISTIC RELEASE PACKAGE PENDING THIS RECORD COMMIT; SAVE-BACKED IN-GAME
+QUALIFICATION BLOCKED AND NOT CLAIMED.
+
+- Start: clean `main`
+  `f9cf2ac35535c8201dea7ef7f5172ebaa051e7ad`, version 0.0.16. Current
+  branch is `codex/kbp-communal-share-transmutation-infusion`; implementation
+  checkpoint is
+  `98d41723cec611a4d2a7528ac801bf7c3654bdb9`; candidate version is
+  0.0.17. Persistence schema remains 4.
+- Untouched baseline passed source 39/39, protocol/domain 127/127, runtime
+  filesystem 8/8, package 4/4, deployment WhatIf 5/5, aggregate 1/1.
+- Post-implementation source-only qualification passes source 41/41,
+  protocol/domain 135/135, runtime filesystem 8/8, package fixture 4/4
+  (fixture SHA-256
+  `0f46a16cd7210a9be4d92138bad5135b32f5017b5c270b353309f7036f8a44f6`),
+  deployment WhatIf 5/5, aggregate 1/1. `git diff --check` passes.
+- Debug build passes with DLL SHA-256
+  `b93791212624fc146bed1294df97eb17d9a5b5784d282867f6ec97694e3836a7`.
+  Release build passes with DLL SHA-256
+  `7819bd26ba5d7b8d2c0d2004d16252b2cbdfd6ada7a78d533229840c02a647d0`.
+  Those pre-version-bump hashes are engineering evidence, not the final 0.0.17
+  package identity.
+- Installed `Assembly-CSharp.dll` is SHA-256
+  `3b6450ffec440e296e586f71c711b195aed144b28d53e1cbb29406d18fef5afb`,
+  MVID `07fa1e4d-8618-41b3-9b8d-faa17d3b26f7`. Exact IL inspection includes
+  `AbilityData.IsAlchemistSpell`, `AlchemistInfusion`,
+  `TargetAnchor`, and `CanTarget(TargetWrapper)`.
+- Installed optional Brown Fur provider is version 0.0.113.0, SHA-256
+  `97a1ad535a7b384759272cf37c0fe8705843b9d149a61e9e8b6c41df39437913`,
+  MVID `685d2575-41e1-4897-881c-a314229ad7cf`; the read-only
+  assembly/profile probe passes 57/57. The product assembly has no reference to
+  the optional gameplay mod.
+- New deterministic cases cover structural party/allied-area/nested/
+  conditional/conflicting semantics, exact catalog canaries, per-anchor
+  presentation/reload and one-cost grouping; routine-aware Share on/off,
+  native-accepted/rejected targets, provider constraint, exclusivity,
+  shared-pool aggregation/overcommit, multi-enhancement persistence/UI,
+  preflight-under-lease and independent one-shot groups; and passive Infusion
+  with one extract-slot reservation and no enhancement surcharge.
+- During development, an added plural UI property initially lacked its
+  `System.Collections.ObjectModel` import and an expanded persistence fixture
+  initially exceeded a Windows path limit. Both failures were corrected at
+  their source; no warning, validator, assertion, or path guard was weakened.
+
+Live scenario count is zero. The repository-owned resolver reports exactly
+`KBP_AUTOMATION_BASELINE=0` and `KBP_AUTOMATION_WORKING=0`. Therefore no
+game process was launched, no live Mods transaction began, and none of the
+communal, Share debit/cancellation, Powerful Change composition, or Infusion
+rows is represented as runtime PASS. The exact manual rows below remain
+required.
+
 ## 0.0.16 catalog/native-HUD published release qualification
 
 Status: MERGED; GUARDED-PUSHED; PUBLISHED; REMOTE/DOWNLOADED ASSETS AND

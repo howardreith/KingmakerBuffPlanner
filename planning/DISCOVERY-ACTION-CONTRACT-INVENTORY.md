@@ -1,5 +1,35 @@
 # Discovery Action Contract Inventory
 
+## 0.0.17 recipient and optional-Share contract
+
+- `ContextActionPartyMembers` retains `EffectTarget.Party`; one structural
+  operation covers every valid represented party recipient.
+- Proven allied `AbilityTargetsAround` retains
+  `EffectTarget.AlliedAreaRecipients`; radius comes from the selected ability
+  and its exact declared source only after their parent/variant relationship is
+  proven.
+- Nested exact `ActionList` wrappers remain traversed and Conditional branches
+  remain separate. Multiple radii, unreadable wrappers, mixed hostile/unknown
+  selection, or allied plus ambiguous recipient branches are unsupported and
+  fail closed.
+- Ordinary direct effects remain per-target and Personal effects remain
+  `Caster`; neither is promoted by localized text. Good Hope is a positive
+  canary precisely because its name contains no communal marker.
+- Resist Energy, Communal
+  (`7bb0c402f7f789d4d9fae8ca87b4c7e2`), Remove Fear
+  (`55a037e514c0ee14a8e3ed14b47061de`), Good Hope
+  (`a5e23522eda32dc45801e32c05dc9f96`), and Protection from Arrows,
+  Communal (`96c9d98b6a9a7c249b6c4572e4977157`) remain canary identities,
+  while classification is asserted from the catalog's friendly
+  `AbilityTargetsAround` component/flags and action paths.
+
+Share Transmutation does not change discovery output. It is a selected-cast
+targeting modifier applied after the normalized Personal Transmutation source
+is known. The optional adapter proves the exact feature/toggle/marker/reservoir
+profile and asks native `AbilityData.TargetAnchor` to prove that the optional
+provider's supported-spell inventory accepts the exact provider. A failure
+omits Share and emits a bounded reason; it never rewrites the expression.
+
 ## 0.0.14 current-caster and recipient correction
 
 Exact inspection extends the earlier variant record:

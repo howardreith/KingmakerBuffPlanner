@@ -1,5 +1,53 @@
 # Architecture
 
+## 0.0.17 effective targeting, communal coverage, and native Share
+
+The planner now has one assignment-aware targeting boundary:
+`EffectiveProviderOptionResolver`. Its input is the current party/provider
+snapshot, normalized source request, candidate provider, selected enhancement
+IDs, enhancement catalog, and base `ProviderPlanningOption` set. It rejects an
+unknown, duplicate, incompatible, or provider-inapplicable persisted selection
+instead of falling back to broader targeting. `PlannerSetupModel`,
+`BuffCardViewModel`, portrait legality/coverage, routine preview,
+`RoutinePlanService`, and `CastPlanner` consume this same result. Because the
+request contains one routine assignment, a targeting enhancement in Long cannot
+alter the same source in Important or Short.
+
+Base provider options remain the authority for unenhanced native behavior.
+Personal effects are self-only except when exact live `AbilityData` proves the
+passive Alchemist `IsAlchemistSpell && AlchemistInfusion` contract. No
+Infusion enhancement, profile value, or surcharge exists. Explicit targeting
+changes are narrow `ICastTargetingModifier` implementations. The Share
+modifier recognizes only the exact optional profile, temporarily arms the
+caster's validated native Share activatable, asks native `TargetAnchor` and
+`CanTarget(TargetWrapper)` for every planner-controlled unit, and restores
+the original state in `finally`. The resulting option requires animated
+execution so the optional mod retains command, touch/30-foot targeting,
+transaction, debit, and one-shot authority.
+
+Communal geometry stays in the base option builder. Party-member actions cover
+all currently valid party recipients. Structurally allied
+`AbilityTargetsAround` effects produce one map per legal anchor from the exact
+runtime radius. `KingmakerAreaCoverageResolver` may combine a selected
+concrete variant with its proven declared source, but only after validating that
+parent/child relationship. Missing, contradictory, unreadable, hostile, or
+ambiguous geometry produces no legal option; it never degrades to ordinary
+direct targeting. `CastStep.ExpectedRecipientUnitIds` is built from that same
+map, so portrait `COVERED` state and execution evidence agree.
+
+`CastEnhancementSnapshot` now carries explicit exclusivity group, native
+activation group, shared usage pool, units-per-cast, and targeting/native-command
+flags. Duplicate IDs and collisions within one explicit group fail closed;
+Share and Powerful Change use different groups while sharing one
+caster-specific Arcane Reservoir pool. Planning groups selected enhancements by
+pool and reserves the summed forecast once per cast. Execution repeats the
+aggregate live check after resolving the exact ability, then arms the native
+toggles before target validation. Activation restoration tracks consumption by
+native group, so native consumption of Share cannot suppress restoration of an
+independent Powerful Change state, or vice versa. These reservations never
+mutate Kingmaker resources; the optional Brown Fur transaction is the only
+Arcane Reservoir debit authority.
+
 ## 0.0.16 structural spellbook roles, payload semantics, and native HUD
 
 `KingmakerPartySnapshotBuilder` now asks the compatibility-layer

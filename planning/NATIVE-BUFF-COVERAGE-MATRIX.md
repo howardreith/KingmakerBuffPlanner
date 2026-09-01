@@ -1,5 +1,27 @@
 # Native Buff Coverage Matrix
 
+## 0.0.17 communal, Share, and Infusion coverage
+
+| Behavior | Deterministic / contract result | Save-backed result |
+|---|---|---|
+| Resist Energy, Communal | PASS: exact catalog allied-area canary; per-anchor indirect coverage; one slot | NOT RUN |
+| Remove Fear | PASS: exact catalog allied-area canary; structural grouping | NOT RUN |
+| Good Hope | PASS: exact catalog allied-area canary with no name rule; per-anchor indirect coverage | NOT RUN |
+| Protection from Arrows, Communal | PASS: exact catalog allied-area canary; persisted anchor reload | NOT RUN |
+| Additional party-member action | PASS: nested wrappers retain Party grouping | NOT RUN |
+| Additional allied-radius fixture | PASS: actual-radius option map changes by anchor and excludes outside/invalid units | NOT RUN |
+| Ordinary Resist Energy / direct buff | PASS: PerTarget; no indirect recipient | NOT RUN |
+| Personal Shield shape | PASS: Caster/self only without proven native augmentation | NOT RUN |
+| Hostile, ambiguous, conflicting area | PASS: unsupported/fail closed | NOT RUN |
+| Share absent/unknown/unsupported | PASS: empty or unavailable selection, self-only, no exception/broadening | NOT RUN |
+| Share on/off and provider constraint | PASS: routine-aware native-accepted expansion and stale-target pruning | NOT RUN |
+| Share + Powerful shared reservoir | PASS: costs aggregate 1/2 and never overcommit | NOT RUN |
+| Passive Alchemist Infusion | PASS: native option expansion, no toggle/surcharge, one extract slot | NOT RUN |
+
+The save-backed column is deliberately not inferred from the deterministic
+column. The guarded inventory is `KBP_AUTOMATION_BASELINE=0` and
+`KBP_AUTOMATION_WORKING=0`; no player or other product's save may substitute.
+
 0.0.14 catalog-membership correction: a global blueprint accessibility path
 and a real persistent buff no longer imply that the current party owns every
 declared child. Direct actual sources qualify; parent-expanded children require

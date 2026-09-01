@@ -1,5 +1,74 @@
 # Manual Acceptance
 
+## 0.0.17 communal, Share Transmutation, and Infusion
+
+Status: REQUIRED FOR IN-GAME CLAIM; NOT RUN. The guarded save resolver reports
+`KBP_AUTOMATION_BASELINE=0` and `KBP_AUTOMATION_WORKING=0`. Create or import
+an explicitly authorized pair through the repository workflow before using the
+runtime harness. Never rename, copy, or substitute an ordinary/KMG/other save.
+
+For every row, record exact candidate ZIP/DLL hashes and MVID, profile before
+and after, selected provider key, base and selected variant GUID, action path,
+grouping/radius, legal anchors, covered recipients, cast count, spell/extract
+slots, Arcane Reservoir, native toggle states, active buffs, UMM/game logs, and
+full-resolution screenshots.
+
+1. Select one legal anchor for Resist Energy, Communal. Confirm exactly that
+   portrait is selected, all and only actual allied recipients show the light
+   `COVERED` state, the anchor is absent from the indirect collection, preview
+   and `ExpectedRecipientUnitIds` agree, and one cast consumes one slot.
+2. Repeat the complete coverage check for Remove Fear, Good Hope, Protection
+   from Arrows, Communal, one other party-member-action buff, and one other
+   allied-radius buff. Move the anchor and prove coverage changes by actual
+   geometry. Verify dead, hostile, unavailable, and out-of-radius units never
+   highlight. Close/reopen and reload to prove persisted reconstruction.
+3. Verify ordinary Resist Energy and another direct single-target buff remain
+   per-target. Verify unmodified Personal Shield remains self-only. Verify a
+   hostile or ambiguous area source does not produce allied coverage.
+4. With the optional provider absent or disabled in an authorized transaction,
+   open the same profile: Buff Planner must load, Share must not appear, and
+   Personal spells must remain self-only with no missing-type/assembly error.
+5. With an eligible Brown Fur caster, inspect Personal Transmutation and
+   controls: Share is a separate unchecked checkbox; one Powerful Change score
+   remains a separate selection; both can be active; the summary lists both and
+   reports Arcane Reservoir 2 per cast against current remaining points.
+6. Share OFF: only the caster is legal. Share ON: every native-accepted
+   planner-controlled willing unit becomes legal while enemy, hostile-neutral,
+   friendly-attackable, dead, unsupported, and other rejected units remain
+   illegal. Share OFF again must immediately remove expanded highlights and
+   stale persisted ally targets. Other routines must remain unchanged.
+7. Below level 20, issue a Share cast and prove native touch approach/delivery.
+   With Transmutation Supremacy, prove a target at or within exactly 30 feet is
+   accepted and one beyond 30 feet is rejected. Do not accept a planner
+   approximation as evidence; capture native target/preflight result.
+8. With one reservoir point, successfully cast Share only: one spell slot and
+   exactly one reservoir point change. With two points, cast Share plus
+   Powerful Change: one spell slot and exactly two points change; verify the
+   expected Powerful Change result and that both native one-shots are consumed.
+   Confirm Buff Planner performs no second debit.
+9. With one point, attempt Share plus Powerful Change: preview/preflight must
+   reject before command creation. With one point across two Share assignments,
+   only one may plan. With three points across two combined assignments, only
+   one may plan. Reservoir must never become negative.
+10. Cancel Share target selection, invalidate the target before command, and
+    exercise a rejected/failed command. Confirm no reservoir or completed-cast
+    spell-slot debit and exact prior toggle restoration. After a successful
+    consumed one-shot, confirm the lease does not reactivate it and an unrelated
+    activation group restores independently.
+11. For a qualifying Personal Alchemist extract without Infusion, confirm self
+    only. Acquire Infusion through the authorized fixture and refresh: all and
+    only native-legal party targets appear automatically, with no Infusion
+    toggle/ID/surcharge; one successful cast consumes exactly one normal extract
+    slot. A non-Alchemist Personal spell remains unchanged.
+12. Exercise a saved zero-enhancement assignment, legacy single enhancement,
+    new Share+Powerful assignment, and profile containing an absent optional
+    Share ID. Confirm deterministic round trip, unavailable fail-closed display,
+    no target broadening, and no crash.
+
+Restore the working save and live Mods directory through the guarded
+transaction, then verify the immutable baseline hash and all non-planner mods
+exactly match their pre-run state.
+
 ## 0.0.16 catalog semantics and native HUD
 
 Status: REQUIRED FOR IN-GAME CLAIM; NOT RUN. The guarded resolver currently

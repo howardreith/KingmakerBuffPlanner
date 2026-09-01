@@ -1,5 +1,22 @@
 # Autonomous Blockers
 
+0.0.17 communal/Share/Infusion update, 2026-09-01: no known source,
+architecture, compile, deterministic behavior, exact-assembly, or
+deployment-WhatIf blocker. Implementation checkpoint is
+`98d41723cec611a4d2a7528ac801bf7c3654bdb9` on
+`codex/kbp-communal-share-transmutation-infusion`; current automated counts
+are source 41/41, protocol/domain 135/135, runtime filesystem 8/8, package
+fixture 4/4, WhatIf 5/5, aggregate 1/1, and Brown Fur optional contract 57/57.
+
+The external runtime blocker is exact and unchanged:
+`KBP_AUTOMATION_BASELINE=0`; `KBP_AUTOMATION_WORKING=0`. Therefore
+save-backed communal portraits/casts, Share on/off/30-foot behavior, exact
+one/two-point native reservoir deltas, cancellation restoration, and passive
+Infusion targeting cannot be run safely. Ordinary player saves and other
+products' fixtures are protected and were not substituted. This is not an
+automated runtime PASS and does not authorize install, launch, push, merge,
+tag, or publication.
+
 0.0.16 catalog/native-HUD public release completion, 2026-09-01: COMPLETE for
 source, deterministic build/package, guarded merge/push/tag/publication,
 download verification, and guarded local installation. `main`, `origin/main`,

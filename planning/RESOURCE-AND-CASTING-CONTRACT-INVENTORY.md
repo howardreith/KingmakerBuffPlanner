@@ -1,5 +1,47 @@
 # Resource and Casting Contract Inventory
 
+## 0.0.17 composable enhancements, Share, and passive Infusion
+
+`CastEnhancementSnapshot` now records `ExclusiveGroupId`,
+`NativeActivationGroupId`, `UsagePoolId`, `UsageUnitsPerCast`,
+`AffectsTargeting`, and `RequiresNativeCommand`. Duplicate IDs fail closed.
+Metamagic rods share one exclusivity group; all Powerful Change score toggles
+share another; Share uses its own group. Share plus one Powerful Change choice
+is valid and uses the same caster-scoped Arcane Reservoir pool.
+
+Planning aggregates each selected set before acceptance:
+
+| Selection / current reservoir | Forecast | Result |
+|---|---:|---|
+| Share / 1 | 1 | one cast accepted |
+| Powerful Change / 1 | 1 | one cast accepted |
+| Share + Powerful Change / 2 | 2 | one cast and one spell slot accepted |
+| Share + Powerful Change / 1 | 2 | rejected before command |
+| two Share casts / 1 | 2 total | only one cast accepted |
+| two Share + Powerful casts / 3 | 4 total | only one cast accepted |
+
+The planner subtracts requirements once from its local enhancement forecast,
+never the live resource. Execution resolves all selected activatables again,
+requires their shared live amount to agree, compares the summed requirement,
+arms them, and only then performs native target/resource preflight. The native
+Brown Fur transaction remains sole successful-cast debit authority: Share costs
+one and Powerful Change adds one. Cancellation/rejection restores prior toggle
+states and incurs no planner debit. Successful native one-shot consumption is
+tracked per activation group so it is not rearmed.
+
+Exact installed optional-provider inspection:
+`KingmakerGunslinger.dll` version 0.0.113.0, SHA-256
+`97a1ad535a7b384759272cf37c0fe8705843b9d149a61e9e8b6c41df39437913`,
+MVID `685d2575-41e1-4897-881c-a314229ad7cf`; contract assertions
+57/57. `KingmakerBuffPlanner.dll` retains no optional gameplay-mod assembly
+reference.
+
+Exact base-game inspection confirms Personal Alchemist extracts become Unit
+targeted only through native `IsAlchemistSpell && AlchemistInfusion`.
+Provider option construction inherits `CanTarget` for that passive case.
+Infusion creates no enhancement, no profile selection, no extra pool, and no
+debit beyond the one ordinary extract-slot reservation.
+
 ## 0.0.14 membership/availability and per-buff provider policy
 
 Catalog ownership is established before resource availability. Direct actual

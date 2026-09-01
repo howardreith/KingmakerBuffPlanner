@@ -1,5 +1,36 @@
 # Autonomous Resume
 
+## 0.0.17 communal/Share/Infusion checkpoint - 2026-09-01
+
+- Start: clean `main`
+  `f9cf2ac35535c8201dea7ef7f5172ebaa051e7ad`, version 0.0.16. Active branch:
+  `codex/kbp-communal-share-transmutation-infusion`. Implementation/test
+  checkpoint:
+  `98d41723cec611a4d2a7528ac801bf7c3654bdb9`. Candidate metadata is 0.0.17;
+  schema remains 4.
+- Communal failure was in provider-option normalization: an allied-area
+  expression whose selected concrete blueprint did not yield one radius fell
+  into ordinary direct `AbilityData.CanTarget`, erasing the recipient map
+  before the intact presentation layer. Exact declared-source/selected-variant
+  geometry is now recovered only for a proven relationship; unsafe or missing
+  contracts have zero options.
+- `EffectiveProviderOptionResolver` makes target legality assignment/routine
+  aware. Optional Share uses exact native feature/toggle/marker/reservoir
+  contracts and native targeting; enhancement groups and shared pools compose
+  Share + Powerful Change at aggregate cost 2. Native code alone debits.
+  Alchemist Infusion is passive native targeting with no toggle/surcharge.
+- Latest post-implementation source-only result: source 41/41, protocol 135/135,
+  runtime filesystem 8/8, package 4/4, WhatIf 5/5, aggregate 1/1. Optional
+  Brown Fur assembly contract is 57/57 against version 0.0.113.0, SHA-256
+  `97a1ad535a7b384759272cf37c0fe8705843b9d149a61e9e8b6c41df39437913`,
+  MVID `685d2575-41e1-4897-881c-a314229ad7cf`.
+- Live qualification is blocked honestly at baseline=0/working=0. No save,
+  install, game launch, live staging, push, merge, tag, or publication occurred.
+- Exact next action: commit the 0.0.17 metadata and durable records, run the
+  clean-head source/Debug/Release/exact-contract/deterministic release/package/
+  diff gates, then append exact package hashes in a provenance-only commit. Do
+  not publish or install.
+
 ## 0.0.16 public release completion - 2026-09-01
 
 - `main`, `origin/main`, and annotated tag `v0.0.16` resolve to

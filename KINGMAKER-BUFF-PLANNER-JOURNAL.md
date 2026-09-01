@@ -1,5 +1,51 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-09-01 - 0.0.17 implementation checkpoint
+
+Status: IMPLEMENTATION COMMITTED; SOURCE-ONLY PASS; VERSION/RECORD CANDIDATE IN
+PROGRESS; LIVE SAVE-BACKED WORK BLOCKED.
+
+- Implementation commit:
+  `98d41723cec611a4d2a7528ac801bf7c3654bdb9` on
+  `codex/kbp-communal-share-transmutation-infusion`. Version is now prepared
+  as 0.0.17; schema 4 and standalone product identity are unchanged.
+- History established the intact indirect-recipient presentation at
+  `6a9fab9e00176d62dafc7cd323b7ac211f6bfa34` and retained the correct
+  personal-target safety change at
+  `e3287d17d3a80bace0bd7dd6be18c32ec3e042ba`. The current regression's first
+  failing stage was provider-option construction introduced around the
+  per-anchor work in
+  `90e5f43ed0c3447a3f73ca799706d653aa4a67f7`: a null area-geometry result
+  fell through to direct `CanTarget` and erased the coverage map.
+- Implemented exact selected/base geometry recovery with relationship proof
+  and hostile/ambiguous/missing-contract fail-close; one assignment-aware
+  effective-targeting resolver; exact optional native Share probe/activation;
+  explicit enhancement exclusivity/native groups; aggregate shared-pool
+  forecast/preflight; and passive native Alchemist Infusion targeting.
+- Verified read-only reference repository
+  `C:\Dev\KingmakerGunslingerLab\repo\KingmakerGunslinger`, remote
+  `git@github.com:howardreith/KingmakerGunslingerAndOtherTabletopRules.git`,
+  HEAD `06c4d998f160df75ad3be7bfcf3de7e415c631d4`. No reference source changed.
+- Commands/results to this checkpoint:
+  `scripts\Test-SourceOnly.ps1` => source 41/41, protocol 135/135, runtime
+  filesystem 8/8, package 4/4, WhatIf 5/5, aggregate 1/1;
+  `scripts\Inspect-BrownFurShareContracts.ps1` => 57/57 against provider
+  0.0.113.0, SHA-256
+  `97a1ad535a7b384759272cf37c0fe8705843b9d149a61e9e8b6c41df39437913`,
+  MVID `685d2575-41e1-4897-881c-a314229ad7cf`;
+  Debug/Release builds passed before the version bump; `git diff --check`
+  passed.
+- Rejected theories/approaches: missing portrait renderer, name/GUID communal
+  policy, reverting personal self-only enforcement, broad Personal targeting,
+  planner-owned reservoir debit, Infusion toggle/surcharge, gameplay-mod
+  reference, and flattened conditional semantics.
+- Runtime blocker: exact save inventory remains baseline=0/working=0. No game
+  launch, live Mods staging, installation, or save access occurred.
+- Exact next action: commit version/durable records; qualify that clean commit
+  with source-only, exact contracts, Debug, Release, deterministic release
+  package, package validator, hashes, and diff/status inspection; then append a
+  final provenance record and commit locally without push.
+
 ## 2026-09-01 - communal/Share Transmutation/Infusion intake
 
 Status: IN PROGRESS; CLEAN BASELINE PASS; IMPLEMENTATION NOT YET STARTED.
