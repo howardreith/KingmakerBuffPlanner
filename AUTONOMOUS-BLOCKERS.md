@@ -1,5 +1,12 @@
 # Autonomous Blockers
 
+0.0.18 publication authorization, 2026-09-01: no authorization,
+authentication, repository-visibility, default-branch, remote-divergence,
+version, tag, or existing-release blocker remains. The owner explicitly
+authorized the main merge, guarded push, annotated tag, and new public 0.0.18
+release. Public notes retain the baseline=0/working=0 gameplay limitation; it
+is accepted as an evidence boundary and is not represented as runtime PASS.
+
 0.0.18 sticky-touch repair, 2026-09-01: no known source, architecture,
 compile, exact-assembly, deterministic behavior, or local-package blocker.
 Implementation/test/package checkpoints are `0504474` / `1c0a409` /

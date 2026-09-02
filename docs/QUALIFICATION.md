@@ -1,5 +1,22 @@
 # Qualification
 
+## 0.0.18 publication authorization
+
+The owner explicitly authorized merging the accepted candidate to `main`,
+guarded-pushing the exact merge, and publishing a new public 0.0.18 GitHub
+release. Read-only preflight at `2026-09-02T02:18:02Z` proved authenticated
+owner `howardreith`, public repository `howardreith/KingmakerBuffPlanner`,
+default branch `main`, synchronized local/remote main
+`81df77847487683d1857f0a8f400a1a2781a6244`, and no existing local/remote tag
+or GitHub release `v0.0.18`. Accepted feature HEAD is
+`ebc146ec3abb8b08475b1b1c055ea121007fefb2`.
+
+Authorization does not relabel the missing save-backed scenarios as PASS. The
+guarded resolver remains baseline=0/working=0, gameplay scenarios performed
+remain zero, and the public notes retain that boundary. Publication must use
+the repository-owned guarded main push and publisher without force, tag
+replacement, or asset replacement.
+
 ## 0.0.18 sticky-touch final local candidate
 
 Status: STRUCTURAL IMPLEMENTATION, EXACT-ASSEMBLY CONTRACT, SOURCE/BEHAVIOR,

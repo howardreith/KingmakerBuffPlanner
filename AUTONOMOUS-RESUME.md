@@ -1,5 +1,19 @@
 # Autonomous Resume
 
+## 0.0.18 publication authorization - 2026-09-01
+
+- The owner explicitly authorized merging accepted feature HEAD
+  `ebc146ec3abb8b08475b1b1c055ea121007fefb2` to `main`, guarded-pushing it,
+  and publishing a new public 0.0.18 release.
+- GitHub preflight: authenticated owner `howardreith`, public repository,
+  default branch `main`, synchronized local/remote main
+  `81df77847487683d1857f0a8f400a1a2781a6244`, and no existing `v0.0.18` tag
+  or release.
+- The accepted runtime limitation remains baseline=0/working=0 and is retained
+  in public notes. Exact next action is authorization commit, non-fast-forward
+  main merge, exact-merge qualification, guarded push, guarded publication,
+  independent asset verification, and a completion record.
+
 ## 0.0.18 sticky-touch instant repair - 2026-09-01
 
 - Branch `codex/kingmaker-buff-planner-sticky-touch-instant`; start

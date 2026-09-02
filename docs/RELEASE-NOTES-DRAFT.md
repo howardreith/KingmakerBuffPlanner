@@ -1,4 +1,4 @@
-# Kingmaker Buff Planner 0.0.18 (local candidate)
+# Kingmaker Buff Planner 0.0.18
 
 This candidate fixes repeated Freedom of Movement execution in Instant mode
 through a structural sticky-touch transaction. Freedom of Movement is the
@@ -56,5 +56,6 @@ Save-backed gameplay qualification is still blocked: the guarded resolver
 finds no exact `KBP_AUTOMATION_BASELINE` or `KBP_AUTOMATION_WORKING` save. No
 ordinary player save was substituted, so the observed frequency of the live
 third-target failure and the real Freedom of Movement canary remain manual
-acceptance items. No public release is authorized or published by this local
-candidate.
+verification items. The owner reviewed this explicit evidence boundary,
+accepted the mechanically qualified candidate, and authorized publication of
+version 0.0.18.

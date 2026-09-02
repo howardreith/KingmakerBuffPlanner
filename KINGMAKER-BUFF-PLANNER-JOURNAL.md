@@ -1,5 +1,27 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-09-01 - 0.0.18 publication authorization
+
+Status: OWNER AUTHORIZED MAIN MERGE, GUARDED PUSH, ANNOTATED TAG, AND NEW
+PUBLIC RELEASE; SAVE-BACKED GAMEPLAY REMAINS UNAVAILABLE AND UNCLAIMED.
+
+- Owner instruction: merge the accepted candidate to `main`, push it to the
+  remote, and cut a new release, with explicit authorization for all actions.
+- Accepted feature HEAD:
+  `ebc146ec3abb8b08475b1b1c055ea121007fefb2`; candidate version 0.0.18.
+- Read-only preflight at `2026-09-02T02:18:02Z`: authenticated GitHub owner
+  `howardreith`; public `howardreith/KingmakerBuffPlanner`; default branch
+  `main`; local/remote main synchronized at
+  `81df77847487683d1857f0a8f400a1a2781a6244`; remote/local `v0.0.18` tag and
+  GitHub release absent.
+- Release notes now authorize publication while preserving the exact
+  baseline=0/working=0 runtime boundary. No save-backed result is promoted to
+  PASS and no ordinary save is substituted.
+- Exact next action: commit this authorization, create the established
+  non-fast-forward merge on `main`, qualify it, pass the guarded push WhatIf,
+  guarded-push main, then run the project publisher with explicit publish and
+  human-acceptance switches. Independently verify tag, release, and assets.
+
 ## 2026-09-01 - 0.0.18 sticky-touch final local qualification
 
 Status: IMPLEMENTED, MECHANICALLY QUALIFIED, AND LOCALLY PACKAGED;
