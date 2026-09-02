@@ -1,5 +1,19 @@
 # Autonomous Blockers
 
+0.0.17 public release completion, 2026-09-01: release engineering is complete
+with no remaining merge, push, tag, asset, checksum, or publication blocker.
+Annotated `v0.0.17` object
+`9476b556a64157b4965257b8bc66e62303b36ee8` peels to release commit
+`edf9e642c4a743309ef0686e377ed798a2a88340`; the public release is
+`https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.0.17`.
+Downloaded ZIP/API/checksum SHA-256 is
+`eda62dbf9c70d0e416fec923428f88a6f9cbe22ccd98b8fe95d2a61e1467bdb8`;
+DLL SHA-256/MVID are
+`0f2d3309b5ed309b5f537e3707cd5dd1977c32ed8fd6d96eb1e5d3e48d38eb61` /
+`7be5178e-f5e6-4fb6-b4b5-dad581aca39b`. The only remaining limitation is
+save-backed gameplay evidence at baseline=0/working=0; it is not a release
+blocker and is not represented as runtime PASS.
+
 0.0.17 publication authorization, 2026-09-01: no authorization,
 authentication, repository, default-branch, remote-divergence, version, tag,
 release, source, build, deterministic-test, package, or guarded-publication

@@ -1,5 +1,43 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-09-01 - 0.0.17 public release completion
+
+Status: MERGED, GUARDED-PUSHED, ANNOTATED-TAGGED, PUBLICLY RELEASED, AND
+INDEPENDENTLY VERIFIED. SAVE-BACKED GAMEPLAY REMAINS UNAVAILABLE AND UNCLAIMED.
+
+- Non-fast-forward release merge:
+  `1e21511c7793d797d2af87d1c8c0455e7e5fd2cf`, parents
+  `f9cf2ac35535c8201dea7ef7f5172ebaa051e7ad` and
+  `dcbcda041b9142bedc6db015a0a5334561499091`. A publication-note correction
+  made exact release source/tag commit
+  `edf9e642c4a743309ef0686e377ed798a2a88340` without changing product logic.
+- Exact-source pre-push gates: source 41/41; protocol/domain 135/135; runtime
+  filesystem 8/8; package 4/4; deployment WhatIf 5/5; aggregate 1/1; Debug
+  1/1; Release 1/1; Brown Fur exact contract 57/57; deterministic builds 2/2;
+  release builder 3/3; guarded push WhatIf 6/6; strict package validation 4/4.
+- Project-owned guarded helper pushed exact clean `main` without force and
+  verified `origin/main` at `edf9e642c4a743309ef0686e377ed798a2a88340`.
+  The guarded publisher repeated the aggregate suite, two deterministic
+  builds, and package validation before pushing annotated tag `v0.0.17` and
+  publishing the release.
+- Annotated tag object:
+  `9476b556a64157b4965257b8bc66e62303b36ee8`; peeled commit:
+  `edf9e642c4a743309ef0686e377ed798a2a88340`. Release is public,
+  draft=false, prerelease=false, published `2026-09-02T00:17:46Z`:
+  `https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.0.17`.
+- Independently downloaded asset/API/checksum ZIP SHA-256:
+  `eda62dbf9c70d0e416fec923428f88a6f9cbe22ccd98b8fe95d2a61e1467bdb8`;
+  size 279,019 bytes. `SHA256SUMS.txt` contains that exact identity and itself
+  has GitHub digest
+  `b55db65c3b33d3b4fccb203a6cad6271c21e9cb4a47a0e235385699866bda3d2`.
+  Downloaded packaged DLL SHA-256/MVID are
+  `0f2d3309b5ed309b5f537e3707cd5dd1977c32ed8fd6d96eb1e5d3e48d38eb61` /
+  `7be5178e-f5e6-4fb6-b4b5-dad581aca39b`; downloaded package validation is 4/4.
+- No install, game launch, Mods mutation, save access, force push, existing-tag
+  replacement, or prior-release asset replacement occurred. Exact next action:
+  commit and guarded-push this documentation-only completion record; then no
+  release-engineering action remains.
+
 ## 2026-09-01 - 0.0.17 publication authorization
 
 Status: OWNER AUTHORIZED FINALIZATION, MAIN MERGE, GUARDED PUSH, ANNOTATED TAG,

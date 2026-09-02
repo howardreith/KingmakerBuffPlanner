@@ -1,5 +1,28 @@
 # Autonomous Resume
 
+## 0.0.17 public release completion - 2026-09-01
+
+- Release engineering is complete. Exact release/tag commit is
+  `edf9e642c4a743309ef0686e377ed798a2a88340`; annotated tag object is
+  `9476b556a64157b4965257b8bc66e62303b36ee8`. The public, non-draft,
+  non-prerelease release was published at `2026-09-02T00:17:46Z`:
+  `https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.0.17`.
+- Guarded main push passed at exact release source. The publisher repeated
+  source 41/41, protocol/domain 135/135, runtime filesystem 8/8, package 4/4,
+  deployment WhatIf 5/5, aggregate 1/1, deterministic builds 2/2, and release
+  builder 3/3 before pushing the annotated tag and publishing.
+- Published ZIP is 279,019 bytes, SHA-256
+  `eda62dbf9c70d0e416fec923428f88a6f9cbe22ccd98b8fe95d2a61e1467bdb8`.
+  Packaged DLL SHA-256/MVID are
+  `0f2d3309b5ed309b5f537e3707cd5dd1977c32ed8fd6d96eb1e5d3e48d38eb61` /
+  `7be5178e-f5e6-4fb6-b4b5-dad581aca39b`. Downloaded GitHub assets, API digest,
+  `SHA256SUMS.txt`, strict package validation 4/4, DLL, and MVID all agree.
+- No install, game launch, Mods staging, or save access occurred. The missing
+  baseline/working save pair remains an explicit runtime-evidence limitation,
+  not a release-engineering blocker or a claimed gameplay PASS.
+- Exact next action: commit and guarded-push this documentation-only completion
+  record. After that, no release-engineering action remains.
+
 ## 0.0.17 publication authorization - 2026-09-01
 
 - The owner explicitly authorized finalization, non-rewriting merge to `main`,

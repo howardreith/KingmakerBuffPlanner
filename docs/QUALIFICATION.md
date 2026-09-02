@@ -1,5 +1,36 @@
 # Qualification
 
+## 0.0.17 public release verification
+
+Release/tag commit `edf9e642c4a743309ef0686e377ed798a2a88340` passed the
+aggregate source-only suite (source 41/41, protocol/domain 135/135, runtime
+filesystem 8/8, package 4/4, deployment WhatIf 5/5, aggregate 1/1), Debug 1/1,
+Release 1/1, Brown Fur exact contract 57/57, deterministic builds 2/2, release
+builder 3/3, guarded push WhatIf 6/6, and strict package validation 4/4. The
+publisher independently repeated the aggregate suite, deterministic builds,
+and validation after exact clean `main` was guarded-pushed.
+
+Annotated tag object `9476b556a64157b4965257b8bc66e62303b36ee8` peels to the
+exact release commit. GitHub reports public release `v0.0.17`, draft=false,
+prerelease=false, published `2026-09-02T00:17:46Z`:
+`https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.0.17`.
+
+Independent post-publication download verification agrees across the GitHub API
+digest, downloaded ZIP, `SHA256SUMS.txt`, and local publisher output:
+
+- ZIP: 279,019 bytes; SHA-256
+  `eda62dbf9c70d0e416fec923428f88a6f9cbe22ccd98b8fe95d2a61e1467bdb8`;
+- packaged DLL SHA-256
+  `0f2d3309b5ed309b5f537e3707cd5dd1977c32ed8fd6d96eb1e5d3e48d38eb61`;
+- packaged assembly MVID `7be5178e-f5e6-4fb6-b4b5-dad581aca39b`;
+- checksum-asset digest
+  `b55db65c3b33d3b4fccb203a6cad6271c21e9cb4a47a0e235385699866bda3d2`;
+- downloaded strict package validation 4/4.
+
+No install, game launch, Mods staging, or save access occurred. Save-backed
+communal, Share/Powerful Change debit, cancellation, and Infusion scenarios
+remain unavailable at baseline=0/working=0 and are not claimed as runtime PASS.
+
 ## 0.0.17 publication authorization
 
 The owner explicitly accepted the mechanically qualified 0.0.17 candidate and
