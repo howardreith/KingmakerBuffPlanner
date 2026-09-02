@@ -8,20 +8,35 @@ namespace KingmakerBuffPlanner.Execution
     {
         private readonly ICastRuntimeAdapter _runtime;
         private readonly bool _outOfCombatOnly;
+        private readonly string _configuredMode;
 
-        public AnimatedCastExecutor(ICastRuntimeAdapter runtime, bool outOfCombatOnly)
+        public AnimatedCastExecutor(ICastRuntimeAdapter runtime,
+            bool outOfCombatOnly, string configuredMode = "animated")
         {
             _runtime = runtime ?? throw new ArgumentNullException("runtime");
             _outOfCombatOnly = outOfCombatOnly;
+            _configuredMode = configuredMode ?? "animated";
         }
 
         public IEnumerator Execute(CastPlan plan, ExecutionReport report)
         {
             if (plan == null) throw new ArgumentNullException("plan");
             if (report == null) throw new ArgumentNullException("report");
+            bool priorTransactionUnsettled = false;
             for (int index = 0; index < plan.Steps.Count; index++)
             {
                 CastStep step = plan.Steps[index];
+                report.Add(index, step, CastExecutionStatus.StrategySelected,
+                    "configured-mode:" + _configuredMode +
+                    ";selected-strategy:native-command;provider-capability:" +
+                    step.ExecutionStrategy + ";reason:" +
+                    step.ExecutionStrategyReason);
+                if (priorTransactionUnsettled)
+                {
+                    report.Add(index, step, CastExecutionStatus.FailedValidation,
+                        "prior-animated-transaction-unsettled");
+                    continue;
+                }
                 if (_outOfCombatOnly && _runtime.IsInCombat)
                 {
                     report.Add(index, step, CastExecutionStatus.FailedValidation, "combat-policy");
@@ -34,7 +49,14 @@ namespace KingmakerBuffPlanner.Execution
                         "enhancement-unavailable:" + enhancement.Reason);
                     continue;
                 }
-                CastRuntimeValidation validation = _runtime.Validate(step);
+                CastRuntimeValidation validation;
+                try { validation = _runtime.Validate(step); }
+                catch (Exception exception)
+                {
+                    validation = CastRuntimeValidation.Fail(
+                        "validation-exception:" + exception.GetType().FullName +
+                        ":" + exception.Message);
+                }
                 if (!validation.Valid)
                 {
                     enhancement.Dispose();
@@ -57,40 +79,106 @@ namespace KingmakerBuffPlanner.Execution
                     report.Add(index, step, CastExecutionStatus.FailedSubmission, "operation-null");
                     continue;
                 }
+                Exception cleanupFailure = null;
+                Exception operationFailure = null;
                 try
                 {
                     report.Add(index, step, CastExecutionStatus.Queued, "animated-command-queued");
                     bool startedRecorded = false;
-                    while (!operation.IsCompleted)
+                    while (true)
                     {
-                        if (!startedRecorded && operation.IsStarted)
+                        bool completed = false;
+                        try
                         {
-                            report.Add(index, step, CastExecutionStatus.CastStarted,
-                                "animated-command-started");
-                            startedRecorded = true;
+                            completed = operation.IsCompleted;
+                            if (!startedRecorded && operation.IsStarted)
+                            {
+                                report.Add(index, step,
+                                    CastExecutionStatus.CastStarted,
+                                    "animated-command-started");
+                                startedRecorded = true;
+                            }
                         }
+                        catch (Exception exception)
+                        { operationFailure = exception; }
+                        if (completed || operationFailure != null) break;
                         yield return null;
                     }
-                    if (!startedRecorded && operation.IsStarted)
-                        report.Add(index, step, CastExecutionStatus.CastStarted,
-                            "animated-command-started");
-                    if (operation.TimedOut)
-                        report.Add(index, step, CastExecutionStatus.TimedOutUnconfirmed, operation.Detail);
-                    else if (!operation.Succeeded)
-                        report.Add(index, step, CastExecutionStatus.FailedExecution, operation.Detail);
-                    else if (operation.EffectsObserved)
-                        report.Add(index, step, CastExecutionStatus.EffectConfirmed,
-                            "expected-effects-observed;" + operation.Detail);
-                    else
-                        report.Add(index, step, CastExecutionStatus.TimedOutUnconfirmed,
-                            "expected-effects-absent;" + operation.Detail);
-                    if (operation.Succeeded && operation.ResourceSpent)
-                        report.Add(index, step, CastExecutionStatus.ResourceSpent,
-                            "native-command-spend-completed");
+                    if (operationFailure == null)
+                    {
+                        try
+                        {
+                            if (!startedRecorded && operation.IsStarted)
+                                report.Add(index, step,
+                                    CastExecutionStatus.CastStarted,
+                                    "animated-command-started");
+                            if (operation.TimedOut)
+                                report.Add(index, step,
+                                    CastExecutionStatus.TimedOutUnconfirmed,
+                                    operation.Detail);
+                            else if (!operation.Succeeded)
+                                report.Add(index, step,
+                                    CastExecutionStatus.FailedExecution,
+                                    operation.Detail);
+                            else if (operation.EffectsObserved)
+                                report.Add(index, step,
+                                    CastExecutionStatus.EffectConfirmed,
+                                    "expected-effects-observed;" +
+                                    operation.Detail);
+                            else
+                                report.Add(index, step,
+                                    CastExecutionStatus.TimedOutUnconfirmed,
+                                    "expected-effects-absent;" +
+                                    operation.Detail);
+                            if (operation.Succeeded &&
+                                operation.ResourceSpent)
+                                report.Add(index, step,
+                                    CastExecutionStatus.ResourceSpent,
+                                    "native-command-spend-completed");
+                        }
+                        catch (Exception exception)
+                        { operationFailure = exception; }
+                    }
+                    if (operationFailure != null)
+                        report.Add(index, step,
+                            CastExecutionStatus.FailedExecution,
+                            "animated-operation-exception:" +
+                            operationFailure.GetType().FullName + ":" +
+                            operationFailure.Message);
                 }
                 finally
                 {
-                    enhancement.Dispose();
+                    try { operation.Dispose(); }
+                    catch (Exception exception)
+                    {
+                        cleanupFailure = exception;
+                    }
+                    finally { enhancement.Dispose(); }
+                }
+                try
+                {
+                    if (cleanupFailure != null ||
+                        operation.HasResidualDeliveryState)
+                    {
+                        priorTransactionUnsettled = true;
+                        report.Add(index, step,
+                            CastExecutionStatus.ResidualStateUnsettled,
+                            cleanupFailure == null
+                                ? "animated-delivery-state-remained-after-cleanup;" +
+                                    operation.Detail
+                                : "animated-cleanup-exception:" +
+                                    cleanupFailure.GetType().FullName + ":" +
+                                    cleanupFailure.Message);
+                    }
+                }
+                catch (Exception exception)
+                {
+                    priorTransactionUnsettled = true;
+                    report.Add(index, step,
+                        CastExecutionStatus.ResidualStateUnsettled,
+                        "animated-residual-inspection-exception:" +
+                        exception.GetType().FullName + ":" +
+                        exception.Message);
                 }
                 yield return null;
             }

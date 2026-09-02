@@ -79,7 +79,9 @@ namespace KingmakerBuffPlanner.GameAdapters
                     ";share=accepted;legalTargets=" + string.Join(",", legal));
                 return new ProviderPlanningOption(option.Provider, legal, legal,
                     option.EffectiveCasterLevel,
-                    option.ExpectedDurationRounds, true);
+                    option.ExpectedDurationRounds,
+                    CastExecutionStrategy.NativeCommandRequired,
+                    "share-transmutation-native-command-required");
             }
             catch (Exception exception)
             {

@@ -347,15 +347,11 @@ namespace KingmakerBuffPlanner.UI
             ICastExecutor executor;
             if (Model.Profile.Execution.Mode == "instant")
             {
-                var fallbackProviders = new HashSet<string>(_providerOptions
-                    .Where(o => o.RequiresAnimatedExecution)
-                    .Select(o => o.Provider.Key.Canonical), StringComparer.Ordinal);
                 var nativeEnhancements = new HashSet<string>(_enhancements
                     .Where(value => value.RequiresNativeCommand)
                     .Select(value => value.EnhancementId), StringComparer.Ordinal);
                 executor = new HybridCastExecutor(
                     new KingmakerInstantCastAdapter(), new KingmakerAnimatedCastAdapter(),
-                    step => fallbackProviders.Contains(step.Provider.Canonical),
                     Model.Profile.Execution.AllowAnimatedFallback,
                     Model.Profile.Execution.OutOfCombatOnly,
                     step => step.EnhancementIds.Any(nativeEnhancements.Contains));
@@ -404,6 +400,7 @@ namespace KingmakerBuffPlanner.UI
                 "planned=" + report.Planned + "; queued=" + report.Queued +
                 "; submitted=" + report.Submitted + "; cast-started=" + report.CastStarted +
                 "; effect-confirmed=" + report.Confirmed +
+                "; spend-invoked=" + report.SpendInvocations +
                 "; spent=" + report.ResourcesSpent + "; failed=" + report.Failed +
                 "; skipped=" + report.Skipped + "; unfulfilled=" + report.Unfulfilled + "." +
                 variantReselection;
@@ -418,9 +415,17 @@ namespace KingmakerBuffPlanner.UI
                     string.Join(",", firstFailure.TargetUnitIds.ToArray()) + "; " +
                     firstFailure.Detail;
             foreach (CastExecutionRecord record in report.Records)
-                _log.Info("Routine outcome: step=" + record.StepIndex + ";status=" + record.Status +
-                    ";ability=" + record.AbilityKey + ";provider=" + record.ProviderKey +
+                _log.Info("Routine outcome: group=" + routineId + ";step=" +
+                    record.StepIndex + ";status=" + record.Status +
+                    ";mode=" + Model.Profile.Execution.Mode +
+                    ";source=" + record.SourceId + ";ability=" +
+                    record.AbilityKey + ";provider=" + record.ProviderKey +
+                    ";caster=" + record.CasterUnitId +
                     ";targets=" + string.Join(",", record.TargetUnitIds.ToArray()) +
+                    ";expected-recipients=" + string.Join(",",
+                        record.ExpectedRecipientUnitIds.ToArray()) +
+                    ";strategy=" + record.ExecutionStrategy +
+                    ";strategy-reason=" + record.ExecutionStrategyReason +
                     ";enhancements=" + string.Join(",", record.EnhancementIds.ToArray()) +
                     ";pool=" + record.ResourcePoolKey + ";tokens=" +
                     string.Join(",", record.ResourceTokenIds.ToArray()) + ";detail=" + record.Detail);
@@ -449,8 +454,13 @@ namespace KingmakerBuffPlanner.UI
         private static string DescribePlan(CastPlan plan)
         {
             return string.Join(" | ", plan.Steps.Select((step, index) => "step=" + index +
-                ";ability=" + step.Provider.Ability.Canonical + ";provider=" +
+                ";source=" + step.SourceId + ";ability=" +
+                step.Provider.Ability.Canonical + ";provider=" +
                 step.Provider.Canonical + ";targets=" + string.Join(",", step.TargetUnitIds.ToArray()) +
+                ";expected-recipients=" + string.Join(",",
+                    step.ExpectedRecipientUnitIds.ToArray()) +
+                ";strategy=" + step.ExecutionStrategy +
+                ";strategy-reason=" + step.ExecutionStrategyReason +
                 ";pool=" + step.Reservation.PoolKey + ";tokens=" +
                 string.Join(",", step.Reservation.TokenIds.ToArray()) + ";enhancements=" +
                 string.Join(",", step.EnhancementIds.ToArray()) + ";units=" +

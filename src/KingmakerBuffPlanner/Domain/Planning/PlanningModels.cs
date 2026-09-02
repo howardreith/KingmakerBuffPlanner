@@ -21,6 +21,66 @@ namespace KingmakerBuffPlanner.Domain.Planning
         Overwrite
     }
 
+    public enum CastExecutionStrategy
+    {
+        DirectRuleCast,
+        StickyTouchDeliveryRuleCast,
+        AnimatedFallback,
+        NativeCommandRequired
+    }
+
+    public sealed class CastExecutionCapability
+    {
+        public CastExecutionCapability(CastExecutionStrategy strategy, string reason)
+        {
+            Strategy = strategy;
+            Reason = reason ?? string.Empty;
+        }
+
+        public CastExecutionStrategy Strategy { get; private set; }
+        public string Reason { get; private set; }
+    }
+
+    public static class StickyTouchExecutionClassifier
+    {
+        public static CastExecutionCapability Classify(
+            bool isStickyTouch,
+            bool hasDeliveryBlueprint,
+            bool hasTouchDeliveryComponent,
+            bool deliveryTargetsUnit,
+            bool deliveryCanTargetSelf,
+            bool deliveryCanTargetFriends,
+            bool deliveryCanTargetEnemies,
+            bool deliveryCanTargetPoint)
+        {
+            if (!isStickyTouch)
+                return new CastExecutionCapability(
+                    CastExecutionStrategy.DirectRuleCast,
+                    "ordinary-direct-rule-cast");
+            if (!hasDeliveryBlueprint)
+                return AnimatedFallback("sticky-delivery-blueprint-missing");
+            if (!hasTouchDeliveryComponent)
+                return AnimatedFallback("sticky-delivery-touch-component-missing");
+            if (!deliveryTargetsUnit)
+                return AnimatedFallback("sticky-delivery-target-anchor-unsupported");
+            if (deliveryCanTargetPoint)
+                return AnimatedFallback("sticky-delivery-point-targeting-ambiguous");
+            if (deliveryCanTargetEnemies)
+                return AnimatedFallback("sticky-delivery-hostile-targeting-ambiguous");
+            if (!deliveryCanTargetSelf && !deliveryCanTargetFriends)
+                return AnimatedFallback("sticky-delivery-has-no-beneficial-unit-target");
+            return new CastExecutionCapability(
+                CastExecutionStrategy.StickyTouchDeliveryRuleCast,
+                "supported-beneficial-sticky-touch-delivery");
+        }
+
+        private static CastExecutionCapability AnimatedFallback(string reason)
+        {
+            return new CastExecutionCapability(
+                CastExecutionStrategy.AnimatedFallback, reason);
+        }
+    }
+
     public enum TargetOutcomeKind
     {
         Fulfilled,
@@ -102,6 +162,27 @@ namespace KingmakerBuffPlanner.Domain.Planning
             int expectedDurationRounds,
             bool requiresAnimatedExecution = false,
             IDictionary<string, IEnumerable<string>> recipientIdsByAnchor = null)
+            : this(provider, reachableTargetIds, legalAnchorIds,
+                effectiveCasterLevel, expectedDurationRounds,
+                requiresAnimatedExecution
+                    ? CastExecutionStrategy.AnimatedFallback
+                    : CastExecutionStrategy.DirectRuleCast,
+                requiresAnimatedExecution
+                    ? "legacy-animated-fallback"
+                    : "ordinary-direct-rule-cast",
+                recipientIdsByAnchor)
+        {
+        }
+
+        public ProviderPlanningOption(
+            ProviderSnapshot provider,
+            IEnumerable<string> reachableTargetIds,
+            IEnumerable<string> legalAnchorIds,
+            int effectiveCasterLevel,
+            int expectedDurationRounds,
+            CastExecutionStrategy executionStrategy,
+            string executionStrategyReason,
+            IDictionary<string, IEnumerable<string>> recipientIdsByAnchor = null)
         {
             Provider = provider ?? throw new ArgumentNullException("provider");
             if (effectiveCasterLevel < 0) throw new ArgumentOutOfRangeException("effectiveCasterLevel");
@@ -129,7 +210,8 @@ namespace KingmakerBuffPlanner.Domain.Planning
                 coverage);
             EffectiveCasterLevel = effectiveCasterLevel;
             ExpectedDurationRounds = expectedDurationRounds;
-            RequiresAnimatedExecution = requiresAnimatedExecution;
+            ExecutionStrategy = executionStrategy;
+            ExecutionStrategyReason = executionStrategyReason ?? string.Empty;
         }
 
         public ProviderSnapshot Provider { get; private set; }
@@ -141,7 +223,16 @@ namespace KingmakerBuffPlanner.Domain.Planning
         }
         public int EffectiveCasterLevel { get; private set; }
         public int ExpectedDurationRounds { get; private set; }
-        public bool RequiresAnimatedExecution { get; private set; }
+        public CastExecutionStrategy ExecutionStrategy { get; private set; }
+        public string ExecutionStrategyReason { get; private set; }
+        public bool RequiresAnimatedExecution
+        {
+            get
+            {
+                return ExecutionStrategy == CastExecutionStrategy.AnimatedFallback ||
+                    ExecutionStrategy == CastExecutionStrategy.NativeCommandRequired;
+            }
+        }
 
         public IReadOnlyList<string> CoveredTargetIdsForAnchor(string anchorUnitId)
         {
@@ -269,6 +360,8 @@ namespace KingmakerBuffPlanner.Domain.Planning
             MaterialReservation materialReservation,
             EffectExpression expectedEffects,
             bool massCast,
+            CastExecutionStrategy executionStrategy,
+            string executionStrategyReason,
             IEnumerable<string> enhancementIds = null,
             IDictionary<string, int> enhancementUsageByPool = null)
         {
@@ -283,6 +376,8 @@ namespace KingmakerBuffPlanner.Domain.Planning
             MaterialReservation = materialReservation;
             ExpectedEffects = expectedEffects;
             MassCast = massCast;
+            ExecutionStrategy = executionStrategy;
+            ExecutionStrategyReason = executionStrategyReason ?? string.Empty;
             EnhancementIds = new ReadOnlyCollection<string>((enhancementIds ?? new string[0])
                 .Where(value => !string.IsNullOrWhiteSpace(value)).Distinct(StringComparer.Ordinal)
                 .OrderBy(value => value, StringComparer.Ordinal).ToList());
@@ -300,6 +395,8 @@ namespace KingmakerBuffPlanner.Domain.Planning
         public MaterialReservation MaterialReservation { get; private set; }
         public EffectExpression ExpectedEffects { get; private set; }
         public bool MassCast { get; private set; }
+        public CastExecutionStrategy ExecutionStrategy { get; private set; }
+        public string ExecutionStrategyReason { get; private set; }
         public IReadOnlyList<string> EnhancementIds { get; private set; }
         public IReadOnlyDictionary<string, int> EnhancementUsageByPool
         { get; private set; }

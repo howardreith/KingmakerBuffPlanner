@@ -405,13 +405,51 @@ if (-not $plannerSource.Contains('Enhancement usage ledger would become negative
     -not $enhancementAdapterSource.Contains('consumedGroups') -or
     $animatedExecutorSource.IndexOf('CastEnhancementPreparation enhancement = Prepare(step);',
         [StringComparison]::Ordinal) -gt
-        $animatedExecutorSource.IndexOf('CastRuntimeValidation validation = _runtime.Validate(step);',
+        $animatedExecutorSource.IndexOf('_runtime.Validate(step)',
             [StringComparison]::Ordinal) -or
     $instantExecutorSource.IndexOf('CastEnhancementPreparation enhancement = Prepare(step);',
         [StringComparison]::Ordinal) -gt
-        $instantExecutorSource.IndexOf('CastRuntimeValidation validation = _runtime.Validate(step);',
+        $instantExecutorSource.IndexOf('_runtime.Validate(step)',
             [StringComparison]::Ordinal)) {
     throw 'Aggregate shared-pool validation or per-activation-group execution restoration is missing.'
+}
+$assertions++
+$planningModelSource = Get-Content -LiteralPath (Join-Path $root `
+    'src\KingmakerBuffPlanner\Domain\Planning\PlanningModels.cs') -Raw
+$hybridExecutorSource = Get-Content -LiteralPath (Join-Path $root `
+    'src\KingmakerBuffPlanner\Execution\HybridCastExecutor.cs') -Raw
+$instantAdapterSource = Get-Content -LiteralPath (Join-Path $root `
+    'src\KingmakerBuffPlanner\GameAdapters\KingmakerInstantCastAdapter.cs') -Raw
+$animatedAdapterSource = Get-Content -LiteralPath (Join-Path $root `
+    'src\KingmakerBuffPlanner\GameAdapters\KingmakerAnimatedCastAdapter.cs') -Raw
+$providerOptionSource = Get-Content -LiteralPath (Join-Path $root `
+    'src\KingmakerBuffPlanner\GameAdapters\KingmakerProviderOptionBuilder.cs') -Raw
+$productionCSharp = (Get-ChildItem -LiteralPath (Join-Path $root `
+    'src\KingmakerBuffPlanner') -Recurse -File -Filter '*.cs' |
+    ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw }) -join "`n"
+if (-not $planningModelSource.Contains('StickyTouchDeliveryRuleCast') -or
+    -not $planningModelSource.Contains('sticky-delivery-hostile-targeting-ambiguous') -or
+    -not $providerOptionSource.Contains(
+        'KingmakerStickyTouchCastAdapter.Classify(blueprint)') -or
+    -not $hybridExecutorSource.Contains(
+        'CastExecutionStrategy.AnimatedFallback') -or
+    -not $instantAdapterSource.Contains('new AbilityData(source, delivery)') -or
+    -not $instantAdapterSource.Contains('ConvertedFrom = source') -or
+    -not $instantAdapterSource.Contains('new RuleCastSpell(') -or
+    -not $instantAdapterSource.Contains('sourceAbility.Spend();') -or
+    $instantAdapterSource.Contains('executionAbility.Spend') -or
+    -not $animatedAdapterSource.Contains('s.Available') -or
+    -not $animatedAdapterSource.Contains(
+        'new AnimatedStickyTouchLifecycle(3600)') -or
+    -not $animatedAdapterSource.Contains('FindDeliveryCommand(') -or
+    $productionCSharp.Contains('0087fc2d64b6095478bc7b8d7d512caf') -or
+    $productionCSharp.Contains('Freedom of Movement') -or
+    $instantAdapterSource.Contains('AddBuff(') -or
+    $instantAdapterSource.Contains('Thread.Sleep') -or
+    $animatedAdapterSource.Contains('Thread.Sleep') -or
+    $instantAdapterSource.Contains('WaitForSeconds') -or
+    $animatedAdapterSource.Contains('WaitForSeconds')) {
+    throw 'Sticky-touch execution must remain structural, exact-source-spent, state-bounded, and name/GUID independent.'
 }
 $assertions++
 $routineMembershipSource = Get-Content -LiteralPath (Join-Path $root `

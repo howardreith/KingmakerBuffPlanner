@@ -40,6 +40,24 @@ namespace KingmakerBuffPlanner.GameAdapters
                 AbilityData ability = caster == null ? null :
                     KingmakerAnimatedCastAdapter.ResolveAbility(caster, provider.Key);
                 BlueprintAbility blueprint = ability == null ? null : ability.Blueprint;
+                CastExecutionCapability executionCapability =
+                    KingmakerStickyTouchCastAdapter.Classify(blueprint);
+                AbilityData targetingAbility = ability;
+                StickyTouchCastResolution stickyResolution = null;
+                string stickyResolutionReason = string.Empty;
+                if (executionCapability.Strategy ==
+                    CastExecutionStrategy.StickyTouchDeliveryRuleCast)
+                {
+                    if (KingmakerStickyTouchCastAdapter.TryCreateDelivery(
+                            ability, out stickyResolution,
+                            out stickyResolutionReason))
+                        targetingAbility = stickyResolution.ExecutionAbility;
+                    else
+                        executionCapability = new CastExecutionCapability(
+                            CastExecutionStrategy.AnimatedFallback,
+                            "sticky-delivery-context-unsupported:" +
+                            stickyResolutionReason);
+                }
                 BlueprintAbility declaredSource = ResourcesLibrary
                     .TryGetBlueprint<BlueprintAbility>(
                         provider.Key.Ability.BaseAbilityGuid);
@@ -77,7 +95,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                 else if (party)
                 {
                     reachable = units;
-                    anchors = LegalAnchorIds(ability, units, liveUnits);
+                    anchors = LegalAnchorIds(targetingAbility, units, liveUnits);
                     if (anchors.Length == 0 && units.Any(unit =>
                         unit.UnitId == provider.Key.CasterUnitId))
                         anchors = new[] { provider.Key.CasterUnitId };
@@ -88,7 +106,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                 else if (areaRecipients && areaCoverage != null && caster != null)
                 {
                     float radius = areaCoverage.Radius;
-                    anchors = LegalAnchorIds(ability, units, liveUnits);
+                    anchors = LegalAnchorIds(targetingAbility, units, liveUnits);
                     foreach (string anchorId in anchors)
                     {
                         UnitEntityData anchor;
@@ -114,7 +132,8 @@ namespace KingmakerBuffPlanner.GameAdapters
                     {
                         UnitEntityData target;
                         return liveUnits.TryGetValue(u.UnitId, out target) &&
-                            KingmakerAnimatedCastAdapter.CanTarget(ability, new TargetWrapper(target));
+                            KingmakerAnimatedCastAdapter.CanTarget(targetingAbility,
+                                new TargetWrapper(target));
                     });
                     anchors = reachable.Select(u => u.UnitId).ToArray();
                 }
@@ -122,7 +141,8 @@ namespace KingmakerBuffPlanner.GameAdapters
                     .Distinct(StringComparer.Ordinal).ToArray();
                 options.Add(new ProviderPlanningOption(provider, reachableIds, anchors,
                     provider.EffectiveCasterLevel, provider.ExpectedDurationRounds,
-                    blueprint != null && blueprint.StickyTouch != null,
+                    executionCapability.Strategy,
+                    executionCapability.Reason,
                     recipientIdsByAnchor));
                 string targetClass = party ? "Party" : areaRecipients
                     ? "AlliedAreaRecipients" : unsafeArea
@@ -136,6 +156,36 @@ namespace KingmakerBuffPlanner.GameAdapters
                     .Where(value => !string.IsNullOrWhiteSpace(value))
                     .Distinct(StringComparer.Ordinal).OrderBy(value => value,
                         StringComparer.Ordinal).ToArray();
+                if (blueprint != null && blueprint.StickyTouch != null)
+                {
+                    AbilityEffectStickyTouch sticky = blueprint.StickyTouch;
+                    BlueprintAbility delivery = sticky == null
+                        ? null : sticky.TouchDeliveryAbility;
+                    _diagnostics.Add("provider=" + provider.Key.Canonical +
+                        ";execution-strategy=" + executionCapability.Strategy +
+                        ";strategy-reason=" + executionCapability.Reason +
+                        ";carrier-guid=" + blueprint.AssetGuid +
+                        ";delivery-guid=" + (delivery == null
+                            ? "none" : delivery.AssetGuid) +
+                        ";source-ability-data=" +
+                        KingmakerStickyTouchCastAdapter.Identity(ability) +
+                        ";execution-ability-data=" +
+                        KingmakerStickyTouchCastAdapter.Identity(targetingAbility) +
+                        ";delivery-target-anchor=" + (stickyResolution == null
+                            ? "unresolved" : stickyResolution.ExecutionAbility
+                                .TargetAnchor.ToString()) +
+                        ";delivery-target-self=" + (delivery != null &&
+                            delivery.CanTargetSelf) +
+                        ";delivery-target-friends=" + (delivery != null &&
+                            delivery.CanTargetFriends) +
+                        ";delivery-target-enemies=" + (delivery != null &&
+                            delivery.CanTargetEnemies) +
+                        ";delivery-target-point=" + (delivery != null &&
+                            delivery.CanTargetPoint) +
+                        (string.IsNullOrEmpty(stickyResolutionReason)
+                            ? string.Empty : ";delivery-resolution=" +
+                                stickyResolutionReason));
+                }
                 if (party || areaRecipients || unsafeArea || infusedPersonal)
                     _diagnostics.Add("base=" +
                         provider.Key.Ability.BaseAbilityGuid + ";variant=" +

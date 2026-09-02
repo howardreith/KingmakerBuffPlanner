@@ -23,10 +23,18 @@ namespace KingmakerBuffPlanner.Execution
             if (plan == null) throw new ArgumentNullException("plan");
             if (report == null) throw new ArgumentNullException("report");
             int sinceYield = 0;
+            bool priorTransactionUnsettled = false;
             for (int index = 0; index < plan.Steps.Count; index++)
             {
                 CastStep step = plan.Steps[index];
-                if (_outOfCombatOnly && _runtime.IsInCombat)
+                report.Add(index, step, CastExecutionStatus.StrategySelected,
+                    "configured-mode:instant;selected-strategy:" +
+                    step.ExecutionStrategy + ";reason:" +
+                    step.ExecutionStrategyReason);
+                if (priorTransactionUnsettled)
+                    report.Add(index, step, CastExecutionStatus.FailedValidation,
+                        "prior-instant-transaction-unsettled");
+                else if (_outOfCombatOnly && _runtime.IsInCombat)
                     report.Add(index, step, CastExecutionStatus.FailedValidation, "combat-policy");
                 else
                 {
@@ -36,58 +44,152 @@ namespace KingmakerBuffPlanner.Execution
                             "enhancement-unavailable:" + enhancement.Reason);
                     else
                     {
-                        CastRuntimeValidation validation = _runtime.Validate(step);
-                        if (!validation.Valid)
+                        try
                         {
-                            enhancement.Dispose();
-                            report.Add(index, step, CastExecutionStatus.FailedValidation,
-                                validation.Reason);
-                        }
-                        else
-                        {
-                            InstantCastResult result = null;
-                            Exception submissionFailure = null;
-                            try { result = _runtime.Fire(step); }
-                            catch (Exception exception) { submissionFailure = exception; }
-                            finally { enhancement.Dispose(); }
-                            if (submissionFailure != null)
+                            CastRuntimeValidation validation;
+                            try { validation = _runtime.Validate(step); }
+                            catch (Exception exception)
                             {
-                                report.Add(index, step, CastExecutionStatus.FailedSubmission,
-                                    "instant-exception:" + submissionFailure.GetType().FullName + ":" +
-                                    submissionFailure.Message);
+                                validation = CastRuntimeValidation.Fail(
+                                    "validation-exception:" +
+                                    exception.GetType().FullName + ":" +
+                                    exception.Message);
                             }
-                            else if (result == null)
-                                report.Add(index, step, CastExecutionStatus.FailedSubmission, "instant-result-null");
+                            if (!validation.Valid)
+                                report.Add(index, step,
+                                    CastExecutionStatus.FailedValidation,
+                                    validation.Reason);
                             else
                             {
-                                if (result.Submitted)
+                                InstantCastResult result = null;
+                                Exception submissionFailure = null;
+                                try { result = _runtime.Fire(step); }
+                                catch (Exception exception)
                                 {
-                                    report.Add(index, step, CastExecutionStatus.Submitted, "rule-cast-submitted");
-                                    report.Add(index, step, CastExecutionStatus.CastStarted, "rule-cast-started");
+                                    submissionFailure = exception;
                                 }
-                                if (result.ResourceSpent)
-                                    report.Add(index, step, CastExecutionStatus.ResourceSpent,
-                                        "ability-data-spend-completed");
-                                if (!result.Submitted)
-                                    report.Add(index, step, CastExecutionStatus.FailedSubmission, result.Detail);
-                                else if (!result.Succeeded)
-                                    report.Add(index, step, CastExecutionStatus.FailedExecution, result.Detail);
+                                if (submissionFailure != null)
+                                {
+                                    InstantCastCompletion failedCleanup =
+                                        Cleanup(step);
+                                    report.Add(index, step,
+                                        CastExecutionStatus.FailedSubmission,
+                                        "instant-exception:" +
+                                        submissionFailure.GetType().FullName + ":" +
+                                        submissionFailure.Message +
+                                        ";cleanup-complete:" +
+                                        failedCleanup.Complete +
+                                        ";cleanup-state:" +
+                                        failedCleanup.Detail);
+                                    if (!failedCleanup.Complete &&
+                                        failedCleanup.ResidualDeliveryState)
+                                    {
+                                        priorTransactionUnsettled = true;
+                                        report.Add(index, step,
+                                            CastExecutionStatus
+                                                .ResidualStateUnsettled,
+                                            failedCleanup.Detail);
+                                    }
+                                }
+                                else if (result == null)
+                                {
+                                    InstantCastCompletion nullCleanup =
+                                        Cleanup(step);
+                                    report.Add(index, step,
+                                        CastExecutionStatus.FailedSubmission,
+                                        "instant-result-null;cleanup-complete:" +
+                                        nullCleanup.Complete +
+                                        ";cleanup-state:" +
+                                        nullCleanup.Detail);
+                                    if (!nullCleanup.Complete &&
+                                        nullCleanup.ResidualDeliveryState)
+                                    {
+                                        priorTransactionUnsettled = true;
+                                        report.Add(index, step,
+                                            CastExecutionStatus
+                                                .ResidualStateUnsettled,
+                                            nullCleanup.Detail);
+                                    }
+                                }
                                 else
                                 {
+                                    if (result.Submitted)
+                                    {
+                                        report.Add(index, step,
+                                            CastExecutionStatus.Submitted,
+                                            "rule-cast-submitted");
+                                        report.Add(index, step,
+                                            CastExecutionStatus.CastStarted,
+                                            "rule-cast-started");
+                                    }
+                                    if (result.SpendInvoked)
+                                        report.Add(index, step,
+                                            CastExecutionStatus.SpendInvoked,
+                                            "ability-data-spend-invoked");
+                                    if (result.ResourceSpent)
+                                        report.Add(index, step,
+                                            CastExecutionStatus.ResourceSpent,
+                                            "native-resource-delta-observed");
+
                                     bool observed = result.EffectsObserved;
+                                    InstantCastCompletion completion = result.Submitted
+                                        ? InspectCompletion(step)
+                                        : InstantCastCompletion.Settled(
+                                            "rule-cast-not-submitted");
                                     for (int confirmationFrame = 0;
-                                        !observed && confirmationFrame < 12; confirmationFrame++)
+                                        result.Submitted &&
+                                        (!completion.Complete ||
+                                         (result.Succeeded && !observed)) &&
+                                        confirmationFrame < 12;
+                                        confirmationFrame++)
                                     {
                                         yield return null;
-                                        observed = _runtime.EffectsObserved(step);
+                                        if (result.Succeeded && !observed)
+                                            observed = _runtime.EffectsObserved(step);
+                                        completion = InspectCompletion(step);
                                     }
-                                    report.Add(index, step, observed
-                                        ? CastExecutionStatus.EffectConfirmed
-                                        : CastExecutionStatus.TimedOutUnconfirmed,
-                                        (observed ? "expected-effects-observed;" :
-                                            "expected-effects-absent-after-confirmation-window;") + result.Detail);
+                                    InstantCastCompletion cleanup = completion;
+                                    if (!completion.Complete)
+                                        cleanup = Cleanup(step);
+                                    string terminalDetail = result.Detail +
+                                        ";transaction-complete:" +
+                                        completion.Complete +
+                                        ";transaction-state:" +
+                                        completion.Detail +
+                                        ";cleanup-complete:" + cleanup.Complete +
+                                        ";cleanup-state:" + cleanup.Detail;
+                                    if (!result.Submitted)
+                                        report.Add(index, step,
+                                            CastExecutionStatus.FailedSubmission,
+                                            terminalDetail);
+                                    else if (!result.Succeeded)
+                                        report.Add(index, step,
+                                            CastExecutionStatus.FailedExecution,
+                                            terminalDetail);
+                                    else
+                                        report.Add(index, step,
+                                            observed && completion.Complete
+                                                ? CastExecutionStatus.EffectConfirmed
+                                                : CastExecutionStatus.TimedOutUnconfirmed,
+                                            (observed
+                                                ? "expected-effects-observed;"
+                                                : "expected-effects-absent-after-confirmation-window;") +
+                                            terminalDetail);
+                                    if (!cleanup.Complete &&
+                                        cleanup.ResidualDeliveryState)
+                                    {
+                                        priorTransactionUnsettled = true;
+                                        report.Add(index, step,
+                                            CastExecutionStatus
+                                                .ResidualStateUnsettled,
+                                            cleanup.Detail);
+                                    }
                                 }
                             }
+                        }
+                        finally
+                        {
+                            enhancement.Dispose();
                         }
                     }
                 }
@@ -97,6 +199,38 @@ namespace KingmakerBuffPlanner.Execution
                     sinceYield = 0;
                     yield return null;
                 }
+            }
+        }
+
+        private InstantCastCompletion InspectCompletion(CastStep step)
+        {
+            try
+            {
+                return _runtime.InspectCompletion(step) ??
+                    InstantCastCompletion.Pending(
+                        "completion-inspection-returned-null");
+            }
+            catch (Exception exception)
+            {
+                return InstantCastCompletion.Pending(
+                    "completion-inspection-exception:" +
+                    exception.GetType().FullName + ":" + exception.Message);
+            }
+        }
+
+        private InstantCastCompletion Cleanup(CastStep step)
+        {
+            try
+            {
+                return _runtime.Cleanup(step) ??
+                    InstantCastCompletion.Pending(
+                        "completion-cleanup-returned-null");
+            }
+            catch (Exception exception)
+            {
+                return InstantCastCompletion.Pending(
+                    "completion-cleanup-exception:" +
+                    exception.GetType().FullName + ":" + exception.Message);
             }
         }
 

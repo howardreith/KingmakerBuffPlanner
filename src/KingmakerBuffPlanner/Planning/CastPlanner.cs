@@ -160,7 +160,10 @@ namespace KingmakerBuffPlanner.Planning
                 steps.Add(new CastStep(request.Source.SourceId, selection.Option.Provider.Key,
                     selection.Anchor, new[] { targetId }, recipients,
                     selection.Reservation, selection.MaterialReservation,
-                    request.Source.Effects, false, request.EnhancementIds,
+                    request.Source.Effects, false,
+                    selection.Option.ExecutionStrategy,
+                    selection.Option.ExecutionStrategyReason,
+                    request.EnhancementIds,
                     EnhancementUsage(request.EnhancementIds, enhancements)));
                 outcomes.Add(new TargetPlanOutcome(request.Source.SourceId, targetId,
                     TargetOutcomeKind.Fulfilled,
@@ -213,7 +216,10 @@ namespace KingmakerBuffPlanner.Planning
                 steps.Add(new CastStep(request.Source.SourceId, selection.Option.Provider.Key,
                     selection.Anchor, covered, recipients, selection.Reservation,
                     selection.MaterialReservation,
-                    request.Source.Effects, true, request.EnhancementIds,
+                    request.Source.Effects, true,
+                    selection.Option.ExecutionStrategy,
+                    selection.Option.ExecutionStrategyReason,
+                    request.EnhancementIds,
                     EnhancementUsage(request.EnhancementIds, enhancements)));
                 foreach (string targetId in covered)
                 {
