@@ -1,5 +1,17 @@
 # Autonomous Blockers
 
+0.0.18 public release completion, 2026-09-01: no merge, push, tag, asset,
+checksum, or publication blocker remains. Annotated tag object
+`31578aa531a4d49620d6cf3939c1689d366f986b` peels to exact release commit
+`1477979fa8b44e220adc3ece0afc85581a8b5811`; public release is
+`https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.0.18`.
+Published ZIP/DLL/MVID are
+`b81797f67b7a47b6caa8ee6bca327fdbfbe91571e38dc1ee7ce3486beac4c54f` /
+`4dec770681762893a77584cf83bc56e7a00d8bbe4e2fcbc6f6d843b2d0ad5f04` /
+`2bd9bceb-1aab-4310-be32-34f661c3e3ff`, independently verified. The sole
+remaining limitation is save-backed gameplay evidence at baseline=0/working=0;
+it is not represented as runtime PASS.
+
 0.0.18 publication authorization, 2026-09-01: no authorization,
 authentication, repository-visibility, default-branch, remote-divergence,
 version, tag, or existing-release blocker remains. The owner explicitly

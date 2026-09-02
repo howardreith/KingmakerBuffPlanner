@@ -1,5 +1,39 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-09-01 - 0.0.18 public release completion
+
+Status: MERGED, GUARDED-PUSHED, ANNOTATED-TAGGED, PUBLICLY RELEASED, AND
+INDEPENDENTLY VERIFIED; SAVE-BACKED GAMEPLAY REMAINS UNAVAILABLE AND UNCLAIMED.
+
+- Non-fast-forward merge:
+  `1477979fa8b44e220adc3ece0afc85581a8b5811`, parents
+  `81df77847487683d1857f0a8f400a1a2781a6244` and
+  `10b15253bc7146b7eb5a22dbd8577ab91d6d1a0f`.
+- Exact-merge gates: source 42/42; protocol/domain 145/145; runtime filesystem
+  8/8; package 4/4; deployment WhatIf 5/5; aggregate 1/1; Debug 1/1; Release
+  1/1; deterministic builds 2/2; release builder 3/3; install WhatIf 5/5;
+  guarded push WhatIf 6/6; runtime WhatIf PASS. Save-backed preflight stopped
+  before staging at baseline=0/working=0.
+- Project-owned guarded helper pushed exact main without force and verified
+  origin at the merge. The publisher repeated the aggregate, deterministic
+  builds, and package validation, pushed annotated `v0.0.18`, and published.
+- Annotated tag object:
+  `31578aa531a4d49620d6cf3939c1689d366f986b`; peeled commit:
+  `1477979fa8b44e220adc3ece0afc85581a8b5811`. Public non-draft,
+  non-prerelease release published `2026-09-02T02:23:47Z`:
+  `https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.0.18`.
+- Independent GitHub download/API/checksum ZIP SHA-256:
+  `b81797f67b7a47b6caa8ee6bca327fdbfbe91571e38dc1ee7ce3486beac4c54f`;
+  287,409 bytes. `SHA256SUMS.txt` contains that identity and has SHA-256
+  `b11d71c5e64802de6bd61bba16b6cac606ff9c07173382fa3f1f1aa80e0a8ec6`.
+  Packaged DLL SHA-256/MVID are
+  `4dec770681762893a77584cf83bc56e7a00d8bbe4e2fcbc6f6d843b2d0ad5f04` /
+  `2bd9bceb-1aab-4310-be32-34f661c3e3ff`; downloaded validation is 4/4.
+- No install, game launch, Mods mutation, save access, force push, tag
+  replacement, or prior-release asset replacement occurred. Exact next action:
+  commit and guarded-push this documentation-only completion record; afterward
+  only protected-save manual acceptance remains.
+
 ## 2026-09-01 - 0.0.18 publication authorization
 
 Status: OWNER AUTHORIZED MAIN MERGE, GUARDED PUSH, ANNOTATED TAG, AND NEW

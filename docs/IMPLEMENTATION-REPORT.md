@@ -1,5 +1,22 @@
 # Implementation Report
 
+## 0.0.18 public release artifact
+
+Exact release/tag commit `1477979fa8b44e220adc3ece0afc85581a8b5811`
+passed the full source aggregate, Debug/Release builds, two deterministic
+release builds, strict package validation, install/deployment/runtime WhatIf,
+and guarded push policy before public publication. Annotated tag object
+`31578aa531a4d49620d6cf3939c1689d366f986b` identifies public release
+`https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.0.18`.
+
+Independently downloaded ZIP SHA-256 is
+`b81797f67b7a47b6caa8ee6bca327fdbfbe91571e38dc1ee7ce3486beac4c54f`;
+packaged DLL SHA-256/MVID are
+`4dec770681762893a77584cf83bc56e7a00d8bbe4e2fcbc6f6d843b2d0ad5f04` /
+`2bd9bceb-1aab-4310-be32-34f661c3e3ff`. Publication did not add live-game
+evidence: protected save inventory remains baseline=0/working=0 and no install
+or launch occurred.
+
 ## 0.0.18 repeated sticky-touch execution repair
 
 Mission start was clean `main`

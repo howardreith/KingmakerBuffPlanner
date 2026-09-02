@@ -1,5 +1,27 @@
 # Autonomous Resume
 
+## 0.0.18 public release completion - 2026-09-01
+
+- Exact release/tag commit is
+  `1477979fa8b44e220adc3ece0afc85581a8b5811`; annotated tag object is
+  `31578aa531a4d49620d6cf3939c1689d366f986b`. Public release published at
+  `2026-09-02T02:23:47Z`:
+  `https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.0.18`.
+- Exact-merge and publisher gates passed 42/42 source, 145/145 protocol/domain,
+  8/8 runtime filesystem, 4/4 package, 5/5 deployment WhatIf, aggregate 1/1,
+  Debug/Release 1/1 each, deterministic builds 2/2, release builder 3/3,
+  install WhatIf 5/5, guarded push WhatIf 6/6, and runtime WhatIf.
+- Published ZIP is 287,409 bytes, SHA-256
+  `b81797f67b7a47b6caa8ee6bca327fdbfbe91571e38dc1ee7ce3486beac4c54f`.
+  Packaged DLL SHA-256/MVID are
+  `4dec770681762893a77584cf83bc56e7a00d8bbe4e2fcbc6f6d843b2d0ad5f04` /
+  `2bd9bceb-1aab-4310-be32-34f661c3e3ff`; independent GitHub asset/API,
+  checksum, and strict validation all agree.
+- No install, launch, Mods mutation, or save access occurred. The remaining
+  gameplay evidence boundary is baseline=0/working=0. Exact next action is to
+  commit and guarded-push this documentation-only completion record; then only
+  future protected-save manual acceptance remains.
+
 ## 0.0.18 publication authorization - 2026-09-01
 
 - The owner explicitly authorized merging accepted feature HEAD

@@ -1,5 +1,39 @@
 # Qualification
 
+## 0.0.18 public release verification
+
+The non-fast-forward release merge is
+`1477979fa8b44e220adc3ece0afc85581a8b5811`, with parents
+`81df77847487683d1857f0a8f400a1a2781a6244` and
+`10b15253bc7146b7eb5a22dbd8577ab91d6d1a0f`. Exact-merge qualification
+passed source 42/42, protocol/domain 145/145, runtime filesystem 8/8, package
+4/4, deployment WhatIf 5/5, aggregate 1/1, Debug 1/1, Release 1/1,
+deterministic builds 2/2, release builder 3/3, install WhatIf 5/5, runtime
+WhatIf, and guarded push WhatIf 6/6. The guarded helper pushed and verified
+exact `main`; the publisher repeated the aggregate, deterministic builds, and
+strict validation before publication.
+
+Annotated tag object `31578aa531a4d49620d6cf3939c1689d366f986b` peels to the
+exact merge. GitHub release `v0.0.18` is public, draft=false,
+prerelease=false, published `2026-09-02T02:23:47Z`:
+`https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.0.18`.
+Independent download verification agrees across the GitHub asset digest,
+downloaded ZIP, `SHA256SUMS.txt`, local publisher output, and strict validator:
+
+- ZIP: 287,409 bytes; SHA-256
+  `b81797f67b7a47b6caa8ee6bca327fdbfbe91571e38dc1ee7ce3486beac4c54f`;
+- packaged DLL SHA-256
+  `4dec770681762893a77584cf83bc56e7a00d8bbe4e2fcbc6f6d843b2d0ad5f04`;
+- packaged assembly MVID `2bd9bceb-1aab-4310-be32-34f661c3e3ff`;
+- checksum asset SHA-256
+  `b11d71c5e64802de6bd61bba16b6cac606ff9c07173382fa3f1f1aa80e0a8ec6`;
+- downloaded strict package validation 4/4.
+
+No install, game launch, Mods mutation, or save access occurred. The guarded
+save-backed preflight still stops before staging at baseline=0/working=0; live
+Freedom of Movement acceptance remains unclaimed and documented for a future
+authorized protected save pair.
+
 ## 0.0.18 publication authorization
 
 The owner explicitly authorized merging the accepted candidate to `main`,

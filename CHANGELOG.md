@@ -16,10 +16,11 @@
   UMD coverage, animated two-stage lifecycle coverage, and failure-cleanup
   coverage.
 
-Source and guarded mechanical gates are qualified. Save-backed Freedom of
-Movement execution remains blocked because the protected automation
+Published at `2026-09-02T02:23:47Z` from annotated tag `v0.0.18` and exact
+release commit `1477979fa8b44e220adc3ece0afc85581a8b5811`. Save-backed Freedom
+of Movement execution remains blocked because the protected automation
 baseline/working save pair is absent; the owner accepted that explicit evidence
-boundary and authorized public publication of version 0.0.18.
+boundary without relabeling it as runtime PASS.
 
 ## 0.0.17 - communal coverage, Share Transmutation, and Infusion
 
