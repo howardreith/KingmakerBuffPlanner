@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.0.18 - reliable instant sticky-touch delivery
+
+- Separates supported beneficial sticky-touch delivery from abilities that
+  genuinely require a native queued command. Instant profiles now execute the
+  structurally validated delivery blueprint directly through `RuleCastSpell`.
+- Preserves the exact planned source `AbilityData` and prepared-slot token,
+  charges that source exactly once through native `Spend()`, and never charges
+  both the carrier and delivery ability.
+- Adds state-based transaction completion, delayed effect confirmation, held
+  touch cleanup, and distinct submission/rule/spend/effect diagnostics.
+- Makes deliberate or enhancement-required Animated execution observe both the
+  carrier and its generated delivery command before advancing.
+- Adds four-target prepared and spontaneous regressions, no-double-spend and
+  UMD coverage, animated two-stage lifecycle coverage, and failure-cleanup
+  coverage.
+
+Source and guarded mechanical gates are qualified. Save-backed Freedom of
+Movement execution remains blocked because the protected automation
+baseline/working save pair is absent; the owner accepted that explicit evidence
+boundary and authorized public publication of version 0.0.18.
+
 ## 0.0.17 - communal coverage, Share Transmutation, and Infusion
 
 - Restores one-cast party/allied-area recipient maps for structurally proven

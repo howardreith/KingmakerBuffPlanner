@@ -1,5 +1,70 @@
 # Qualification
 
+## 0.0.18 publication authorization
+
+The owner explicitly authorized merging the accepted candidate to `main`,
+guarded-pushing the exact merge, and publishing a new public 0.0.18 GitHub
+release. Read-only preflight at `2026-09-02T02:18:02Z` proved authenticated
+owner `howardreith`, public repository `howardreith/KingmakerBuffPlanner`,
+default branch `main`, synchronized local/remote main
+`81df77847487683d1857f0a8f400a1a2781a6244`, and no existing local/remote tag
+or GitHub release `v0.0.18`. Accepted feature HEAD is
+`ebc146ec3abb8b08475b1b1c055ea121007fefb2`.
+
+Authorization does not relabel the missing save-backed scenarios as PASS. The
+guarded resolver remains baseline=0/working=0, gameplay scenarios performed
+remain zero, and the public notes retain that boundary. Publication must use
+the repository-owned guarded main push and publisher without force, tag
+replacement, or asset replacement.
+
+## 0.0.18 sticky-touch final local candidate
+
+Status: STRUCTURAL IMPLEMENTATION, EXACT-ASSEMBLY CONTRACT, SOURCE/BEHAVIOR,
+BUILD, HARNESS, AND WHATIF GATES PASS. SAVE-BACKED FREEDOM OF MOVEMENT RUNTIME
+QUALIFICATION BLOCKED; NO LIVE OR PUBLICATION CLAIM.
+
+- Start: clean `main`
+  `81df77847487683d1857f0a8f400a1a2781a6244`, synchronized with
+  `origin/main`, version 0.0.17.
+- Branch: `codex/kingmaker-buff-planner-sticky-touch-instant`.
+- Implementation/test checkpoints: `0504474` / `1c0a409`; version/record and
+  exact product-bearing package commit
+  `5111f52d0407e12a5c05614a1f7c6e0fa8378be3`.
+- Installed Kingmaker contract: `Assembly-CSharp.dll` SHA-256
+  `3b6450ffec440e296e586f71c711b195aed144b28d53e1cbb29406d18fef5afb`,
+  MVID `07fa1e4d-8618-41b3-9b8d-faa17d3b26f7`.
+- Exact-head results: source 42/42, protocol/domain 145/145, runtime filesystem
+  8/8, package fixture/strict validation 4/4, deployment WhatIf 5/5,
+  aggregate 1/1, Debug 1/1, Release 1/1, deterministic builds 2/2, release
+  builder 3/3, and install WhatIf 5/5. `git diff --check` passes.
+- The untouched baseline's initial sandboxed source-only invocation passed
+  41/41 and 135/135 but could not create its disposable fixture directory.
+  The identical approved repository command passed completely; no validator
+  or assertion changed to hide the environment-only denial.
+- The first post-version source-only invocation passed 42/42 and 145/145, then
+  correctly required a validated 0.0.18 local package. `Build-Local.ps1`
+  supplied it and the complete rerun passed. The first install-WhatIf
+  invocation likewise stopped before mutation because no clean-head release
+  manifest existed. After `Build-Release.ps1`, the complete rerun passed 5/5.
+
+The clean-head deterministic local-only ZIP is
+`artifacts/release/0.0.18/KingmakerBuffPlanner-0.0.18.zip` (287,409 bytes),
+SHA-256
+`b47698e66bc8b82ff916abc115b8d712799ab0b941b6525bbca1d60dca525029`.
+The packaged DLL SHA-256 is
+`4c81954380b50612d1df65f9590fb4058f733dfa18cffb8905f11eaf0a67c4b0`;
+MVID `4659c6e8-41a5-4a11-a996-e64826c37c9d`. The release manifest records
+`validated=true`, two deterministic builds, and `publicationStatus=local-only`.
+
+Save-backed runtime scenarios performed: 0. The guarded no-save runtime WhatIf
+passed with no evidence, deployment, process, game, mod, or save mutation. The
+save-backed Instant preflight stopped before staging with `Disposable save
+ambiguity: baseline=0; working=0`. Therefore no claim is made for live cast
+duration, real target-three frequency, real slots/resources, touch cursor
+state, or animated carrier/delivery timing. Exact manual acceptance is
+specified below and must use only an authorized `KBP_AUTOMATION_WORKING` copy.
+No install, launch, push, tag, or publication occurred.
+
 ## 0.0.17 public release verification
 
 Release/tag commit `edf9e642c4a743309ef0686e377ed798a2a88340` passed the

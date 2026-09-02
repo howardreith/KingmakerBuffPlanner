@@ -34,6 +34,12 @@ function Format-Member($Member) {
     return $Member.DeclaringType.FullName + '::' + $Member.Name
 }
 
+function Format-TypeName([Type]$Type) {
+    if ($null -eq $Type) { return '<null>' }
+    if (-not [string]::IsNullOrWhiteSpace($Type.FullName)) { return $Type.FullName }
+    return $Type.ToString()
+}
+
 function Read-MethodIl([Reflection.MethodBase]$Method) {
     $body = $Method.GetMethodBody()
     if ($null -eq $body) { return @('<no method body>') }
@@ -115,10 +121,14 @@ $contracts = [ordered]@{
     'Kingmaker.UnitLogic.Abilities.AbilityData' = @(
         '.ctor', 'get_Variants', 'InitVariants', 'get_Spellbook', 'get_Name',
         'get_Icon', 'get_Description', 'get_SpellLevel', 'get_ConvertedFrom',
+        'get_StickyTouch', 'get_Fact', 'get_MetamagicData',
+        'get_ParamSpellbook', 'get_ParamSpellLevel', 'get_ParamSpellSlot',
+        'get_SourceItem', 'get_OverrideDC', 'get_OverrideSpellLevel',
         'get_IsAlchemistSpell', 'get_AlchemistInfusion', 'get_TargetAnchor',
-        'CanTarget',
+        'CalculateParams', 'CanTarget',
         'get_IsAvailableForCast', 'IsVisible',
-        'GetAvailableForCastCount', 'HasVariant', 'Spend', 'SpendFromSpellbook')
+        'GetAvailableForCastCount', 'HasVariant', 'Spend', 'SpendFromSpellbook',
+        'SpendMaterialComponent')
     'Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility' = @(
         'get_Variants', 'get_HasVariants', 'HasVariant')
     'Kingmaker.UnitLogic.Abilities.Components.AbilityVariants' = @('Validate')
@@ -134,6 +144,7 @@ $contracts = [ordered]@{
     'Kingmaker.UnitLogic.Mechanics.Actions.ContextActionDealDamage' = @(
         'RunAction')
     'Kingmaker.UnitLogic.Abilities.Components.AbilityDeliverProjectile' = @()
+    'Kingmaker.UnitLogic.Abilities.Components.AbilityDeliverTouch' = @('Deliver')
     'Kingmaker.UnitLogic.Abilities.Components.AbilityDeliverAttackWithWeapon' = @()
     'Kingmaker.UI.UnitSettings.MechanicActionBarSlotAbility' = @(
         'get_IsVariantAbility', 'GetConvertedAbilityData',
@@ -143,9 +154,19 @@ $contracts = [ordered]@{
     'Kingmaker.UI.ActionBar.ActionBarGroupSlot' = @(
         'SetToggleAdditionalSpells', 'OnClick')
     'Kingmaker.UnitLogic.Spellbook' = @(
-        'CanSpend', 'GetAvailableForCastSpellCount', 'Spend')
+        'CanSpend', 'GetAvailableForCastSpellCount', 'Spend', 'SpendInternal')
     'Kingmaker.UnitLogic.SpellSlot' = @('Spend')
-    'Kingmaker.UnitLogic.Commands.UnitUseAbility' = @('.ctor', 'CreateCastCommand')
+    'Kingmaker.UnitLogic.Abilities.Components.AbilityEffectStickyTouch' = @(
+        'Apply', 'Validate')
+    'Kingmaker.UnitLogic.Parts.UnitPartTouch' = @(
+        'Init', 'OnRemove')
+    'Kingmaker.UnitLogic.Commands.UnitCommands' = @(
+        'AddToQueue', 'AddToQueueFirst', 'Run', 'GetEnumerator')
+    'Kingmaker.UnitLogic.Commands.Base.UnitCommand' = @(
+        'Interrupt', 'OnEnded')
+    'Kingmaker.UnitLogic.Commands.UnitUseAbility' = @(
+        '.ctor', 'CreateCastCommand', 'OnAction', 'OnEnded')
+    'Kingmaker.UnitLogic.UnitDescriptor' = @()
     'Kingmaker.RuleSystem.Rules.Abilities.RuleCastSpell' = @('.ctor')
     'Kingmaker.Utility.Feet' = @()
     'Kingmaker.UnitLogic.Abilities.Components.TargetType' = @()
@@ -175,18 +196,23 @@ try {
                 $constant = if ($field.IsLiteral) {
                     ' = ' + $field.GetRawConstantValue()
                 } else { '' }
-                Write-Output ('field ' + $field.FieldType.FullName + ' ' +
+                Write-Output ('field ' + (Format-TypeName $field.FieldType) + ' ' +
                     $field.Name + $constant)
             }
             foreach ($property in @($type.GetProperties($flags) | Sort-Object Name)) {
-                Write-Output ('property ' + $property.PropertyType.FullName + ' ' + $property.Name)
+                Write-Output ('property ' + (Format-TypeName $property.PropertyType) + ' ' + $property.Name)
             }
             foreach ($listedMethod in @($type.GetMethods($flags) | Sort-Object Name)) {
-                $listedParameters = @($listedMethod.GetParameters() | ForEach-Object {
-                    $_.ParameterType.FullName
-                })
-                Write-Output ('method ' + $listedMethod.ReturnType.FullName + ' ' +
-                    $listedMethod.Name + '(' + ($listedParameters -join ', ') + ')')
+                try {
+                    $listedParameters = @($listedMethod.GetParameters() | ForEach-Object {
+                        Format-TypeName $_.ParameterType
+                    })
+                    Write-Output ('method ' + (Format-TypeName $listedMethod.ReturnType) + ' ' +
+                        $listedMethod.Name + '(' + ($listedParameters -join ', ') + ')')
+                }
+                catch {
+                    Write-Output ('method <reflection-unavailable> ' + $listedMethod.Name)
+                }
             }
             continue
         }
@@ -202,10 +228,10 @@ try {
             }
             foreach ($method in $methods) {
                 $parameters = @($method.GetParameters() | ForEach-Object {
-                    $_.ParameterType.FullName
+                    Format-TypeName $_.ParameterType
                 })
                 $returnType = if ($method -is [Reflection.MethodInfo]) {
-                    $method.ReturnType.FullName
+                    Format-TypeName $method.ReturnType
                 } else { '<constructor>' }
                 Write-Output ''
                 Write-Output ('=== ' + $entry.Key + '::' + $method.Name +

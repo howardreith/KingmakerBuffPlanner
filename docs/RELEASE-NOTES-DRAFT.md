@@ -1,70 +1,61 @@
-# Kingmaker Buff Planner 0.0.17
+# Kingmaker Buff Planner 0.0.18
 
-This release restores dependable communal coverage and adds optional
-native Brown Fur Share Transmutation support while keeping Personal targeting
-strict and Alchemist Infusion passive.
+This candidate fixes repeated Freedom of Movement execution in Instant mode
+through a structural sticky-touch transaction. Freedom of Movement is the
+regression canary; no spell name, spell GUID, caster, spellbook, target count,
+or party size is hardcoded in production behavior.
 
-## Communal coverage is visible again
+## True instant sticky-touch delivery
 
-Select one legal anchor for a structurally party-wide or allied-area buff and
-every other recipient of that same cast now receives the light `COVERED`
-portrait state. Covered allies are not silently selected, do not create extra
-casts, and do not consume extra slots.
+A safe beneficial sticky-touch carrier with one valid friendly delivery
+blueprint is now classified as `StickyTouchDeliveryRuleCast`, not as inherently
+animated-only. Instant execution derives the delivery `AbilityData` from the
+exact planned source instance, preserves its caster, spellbook, reservation,
+variant, metamagic, and calculated context, and submits one `RuleCastSpell` for
+that delivery.
 
-The repair follows the actual party-member action or friendly-area radius,
-including the relationship between a selected variant and its declared source.
-Resist Energy, Communal; Remove Fear; Good Hope; and Protection from Arrows,
-Communal are regression canaries, not a production allowlist. Ordinary direct
-spells and unmodified Personal spells remain unchanged, while hostile,
-ambiguous, or malformed areas fail closed.
+Resource ownership remains with the exact source `AbilityData`. The executor
+calls native `Spend()` once on that source after rule submission, never spends
+the derived delivery instance, and never casts or charges both carrier and
+delivery. Prepared reservation tokens and linked opposition slots therefore
+remain exact; spontaneous spell pools lose one use per successful planned
+cast.
 
-## Optional Share Transmutation
+## Reliable repeated targets
 
-When the exact compatible Brown Fur implementation is installed and a caster
-owns its validated Share feature/toggle, an eligible Personal Transmutation
-spell gains an independent Share Transmutation checkbox. Turning it on exposes
-only party or controlled units accepted by the provider's own
-`AbilityData.CanTarget` behavior. Turning it off immediately removes stale
-ally selections. Touch delivery below level 20 and the exact 30-foot
-Transmutation Supremacy boundary remain native behavior.
+The executor now uses a state-based completion boundary. It confirms the
+expected target effect and proves that no matching held touch or generated
+delivery command remains before the next transaction may begin. Failure,
+timeout, exception, or cancellation cleans up cast-scoped state and releases
+enhancement leases.
 
-Share can be combined with one Powerful Change score. The planner forecasts one
-Arcane Reservoir point for either feature or two for both while reserving only
-one spell slot. It never spends the live reservoir itself: the optional mod's
-native animated-command transaction remains the sole successful-cast debit and
-one-shot authority. If the mod or any exact feature/component contract is
-absent or changed, Share is omitted or shown unavailable without broadening
-targeting.
+Diagnostics distinguish strategy selection, rule submission, native rule
+success, UMD/spell failure, `Spend()` invocation, observed resource delta,
+effect confirmation, and residual touch state. Stable routine, step, source,
+provider, unit, reservation-token, and carrier/delivery identifiers accompany
+those results.
 
-## Passive Alchemist Infusion
+## Deliberate Animated mode
 
-Qualifying Personal extracts automatically use Kingmaker's native Infusion
-targeting when the Alchemist owns Infusion. There is no planner Infusion toggle,
-no enhancement ID, and no added resource surcharge; the ordinary extract slot
-is still consumed once.
-
-## Safer enhancement composition
-
-Temporary cast enhancements now use explicit exclusivity and native activation
-groups instead of assuming every class feature conflicts. Shared resource costs
-are summed before planning and checked again immediately before command
-creation. Multi-enhancement summaries and existing profile collections remain
-deterministic and backward compatible without a schema migration.
+Animated mode remains available, and native-command-required enhancements still
+force it. A sticky-touch animated operation now owns the complete native
+lifecycle: carrier command, generated delivery command when applicable,
+expected effect, and settled held-touch state. It cannot report success after
+only the carrier command.
 
 ## Validation boundary
 
-The source-only suite passes 41/41 source contracts, 135/135 behavior/protocol
-tests, 8/8 harness filesystem tests, 4/4 package-fixture checks, 5/5 guarded
-deployment-WhatIf checks, and 1/1 aggregate suite. The installed optional Brown
-Fur 0.0.113 assembly contract passes 57/57, and the product retains no
-compile-time gameplay-mod reference.
+The focused suite passes 42/42 source contracts, 145/145 behavior/protocol
+tests, 8/8 runtime-harness filesystem tests, 4/4 package-fixture checks, and
+5/5 deployment-WhatIf checks. Regression coverage includes four consecutive
+prepared and spontaneous targets, exact reservation tokens, delayed effects,
+UMD spend policy, no double spend, animated two-stage completion, and cleanup
+after failures and exceptions.
 
-The guarded publisher rebuilds from the exact pushed release commit and appends
-that installable asset's SHA-256 under **Verification** below. Historical
-pre-merge candidate hashes remain in the engineering qualification record.
-
-The owner accepted the mechanically qualified candidate and authorized public
-publication. Save-backed gameplay scenarios could not be performed because
-the guarded resolver reports zero exact `KBP_AUTOMATION_BASELINE` and
-`KBP_AUTOMATION_WORKING` fixtures. This remains an explicit post-release
-runtime-evidence boundary; no player save was substituted.
+Save-backed gameplay qualification is still blocked: the guarded resolver
+finds no exact `KBP_AUTOMATION_BASELINE` or `KBP_AUTOMATION_WORKING` save. No
+ordinary player save was substituted, so the observed frequency of the live
+third-target failure and the real Freedom of Movement canary remain manual
+verification items. The owner reviewed this explicit evidence boundary,
+accepted the mechanically qualified candidate, and authorized publication of
+version 0.0.18.

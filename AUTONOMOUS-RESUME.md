@@ -1,5 +1,42 @@
 # Autonomous Resume
 
+## 0.0.18 publication authorization - 2026-09-01
+
+- The owner explicitly authorized merging accepted feature HEAD
+  `ebc146ec3abb8b08475b1b1c055ea121007fefb2` to `main`, guarded-pushing it,
+  and publishing a new public 0.0.18 release.
+- GitHub preflight: authenticated owner `howardreith`, public repository,
+  default branch `main`, synchronized local/remote main
+  `81df77847487683d1857f0a8f400a1a2781a6244`, and no existing `v0.0.18` tag
+  or release.
+- The accepted runtime limitation remains baseline=0/working=0 and is retained
+  in public notes. Exact next action is authorization commit, non-fast-forward
+  main merge, exact-merge qualification, guarded push, guarded publication,
+  independent asset verification, and a completion record.
+
+## 0.0.18 sticky-touch instant repair - 2026-09-01
+
+- Branch `codex/kingmaker-buff-planner-sticky-touch-instant`; start
+  `81df77847487683d1857f0a8f400a1a2781a6244` / 0.0.17; implementation and
+  regression commits `0504474` and `1c0a409`; exact product-bearing candidate
+  commit `5111f52d0407e12a5c05614a1f7c6e0fa8378be3`.
+- Structural sticky delivery now stays in Instant mode, rule-casts a derived
+  delivery `AbilityData`, spends the exact reserved source once, and will not
+  advance through residual held/command state. Animated mode watches the
+  carrier plus generated delivery and cleans its own state.
+- Final gates: source 42/42, protocol/domain 145/145, runtime filesystem 8/8,
+  package 4/4, deployment WhatIf 5/5, aggregate 1/1, Debug/Release 1/1 each,
+  deterministic builds 2/2, release builder 3/3, install WhatIf 5/5. Version
+  is 0.0.18. ZIP/DLL/MVID are
+  `b47698e66bc8b82ff916abc115b8d712799ab0b941b6525bbca1d60dca525029` /
+  `4c81954380b50612d1df65f9590fb4058f733dfa18cffb8905f11eaf0a67c4b0` /
+  `4659c6e8-41a5-4a11-a996-e64826c37c9d`.
+- Live qualification is unavailable at baseline=0/working=0. The no-save
+  runtime WhatIf is pure; save-backed preflight refused before staging. Do not
+  install, launch, or substitute another save. Exact next action is the manual
+  protected-save checklist when an authorized pair exists; publication is
+  forbidden without separate authorization.
+
 ## 0.0.17 public release completion - 2026-09-01
 
 - Release engineering is complete. Exact release/tag commit is

@@ -1,5 +1,31 @@
 # Autonomous Blockers
 
+0.0.18 publication authorization, 2026-09-01: no authorization,
+authentication, repository-visibility, default-branch, remote-divergence,
+version, tag, or existing-release blocker remains. The owner explicitly
+authorized the main merge, guarded push, annotated tag, and new public 0.0.18
+release. Public notes retain the baseline=0/working=0 gameplay limitation; it
+is accepted as an evidence boundary and is not represented as runtime PASS.
+
+0.0.18 sticky-touch repair, 2026-09-01: no known source, architecture,
+compile, exact-assembly, deterministic behavior, or local-package blocker.
+Implementation/test/package checkpoints are `0504474` / `1c0a409` /
+`5111f52d0407e12a5c05614a1f7c6e0fa8378be3`; final gates pass 42/42 source,
+145/145 protocol/domain, 8/8 runtime filesystem, 4/4 package, 5/5 deployment
+WhatIf, aggregate 1/1, Debug/Release 1/1 each, deterministic builds 2/2,
+release builder 3/3, and install WhatIf 5/5. ZIP/DLL/MVID are
+`b47698e66bc8b82ff916abc115b8d712799ab0b941b6525bbca1d60dca525029` /
+`4c81954380b50612d1df65f9590fb4058f733dfa18cffb8905f11eaf0a67c4b0` /
+`4659c6e8-41a5-4a11-a996-e64826c37c9d`.
+
+The sole gameplay qualification blocker is the protected save inventory:
+`Disposable save ambiguity: baseline=0; working=0`. Consequently real Freedom
+of Movement duration, repeated-target resource deltas, target-three behavior,
+held-touch cleanup, and deliberate Animated delivery have not been observed in
+game. No ordinary or other-product save may substitute. This does not block
+safe mechanical gates or a local-only validated package, and it must not be
+reported as runtime PASS. No publication is authorized.
+
 0.0.17 public release completion, 2026-09-01: release engineering is complete
 with no remaining merge, push, tag, asset, checksum, or publication blocker.
 Annotated `v0.0.17` object

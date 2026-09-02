@@ -1,5 +1,70 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-09-01 - 0.0.18 publication authorization
+
+Status: OWNER AUTHORIZED MAIN MERGE, GUARDED PUSH, ANNOTATED TAG, AND NEW
+PUBLIC RELEASE; SAVE-BACKED GAMEPLAY REMAINS UNAVAILABLE AND UNCLAIMED.
+
+- Owner instruction: merge the accepted candidate to `main`, push it to the
+  remote, and cut a new release, with explicit authorization for all actions.
+- Accepted feature HEAD:
+  `ebc146ec3abb8b08475b1b1c055ea121007fefb2`; candidate version 0.0.18.
+- Read-only preflight at `2026-09-02T02:18:02Z`: authenticated GitHub owner
+  `howardreith`; public `howardreith/KingmakerBuffPlanner`; default branch
+  `main`; local/remote main synchronized at
+  `81df77847487683d1857f0a8f400a1a2781a6244`; remote/local `v0.0.18` tag and
+  GitHub release absent.
+- Release notes now authorize publication while preserving the exact
+  baseline=0/working=0 runtime boundary. No save-backed result is promoted to
+  PASS and no ordinary save is substituted.
+- Exact next action: commit this authorization, create the established
+  non-fast-forward merge on `main`, qualify it, pass the guarded push WhatIf,
+  guarded-push main, then run the project publisher with explicit publish and
+  human-acceptance switches. Independently verify tag, release, and assets.
+
+## 2026-09-01 - 0.0.18 sticky-touch final local qualification
+
+Status: IMPLEMENTED, MECHANICALLY QUALIFIED, AND LOCALLY PACKAGED;
+SAVE-BACKED FREEDOM OF MOVEMENT RUN BLOCKED AND NOT CLAIMED.
+
+- Start: clean synchronized `main`
+  `81df77847487683d1857f0a8f400a1a2781a6244`, version 0.0.17. Dedicated
+  branch: `codex/kingmaker-buff-planner-sticky-touch-instant`.
+- Production checkpoint `0504474` separates sticky delivery from mandatory
+  animation, derives a context-preserving delivery `AbilityData`, spends the
+  exact source once, rejects stale prepared slots, sequences on effect plus
+  residual state, and observes/cleans the complete animated delivery lifecycle.
+- Regression checkpoint `1c0a409` adds exact installed assembly and Freedom
+  catalog canaries plus four-target prepared/spontaneous, delayed, routing,
+  UMD, no-double-spend, animated two-stage, timeout, residual, exception, and
+  later-run recovery coverage. Exact checkpoint HEAD:
+  `1c0a40948e2dea2c0aa905086db0a9b81a5d513e`.
+- Installed contract: Assembly-CSharp SHA-256
+  `3b6450ffec440e296e586f71c711b195aed144b28d53e1cbb29406d18fef5afb`,
+  MVID `07fa1e4d-8618-41b3-9b8d-faa17d3b26f7`.
+- Exact product-bearing package commit:
+  `5111f52d0407e12a5c05614a1f7c6e0fa8378be3`. Final gates: source 42/42;
+  protocol/domain 145/145; runtime filesystem 8/8; package 4/4; deployment
+  WhatIf 5/5; aggregate 1/1; Debug 1/1; Release 1/1; deterministic builds
+  2/2; release builder 3/3; install WhatIf 5/5; diff check PASS.
+- Local-only ZIP SHA-256, DLL SHA-256, and DLL MVID:
+  `b47698e66bc8b82ff916abc115b8d712799ab0b941b6525bbca1d60dca525029` /
+  `4c81954380b50612d1df65f9590fb4058f733dfa18cffb8905f11eaf0a67c4b0` /
+  `4659c6e8-41a5-4a11-a996-e64826c37c9d`. Exact package:
+  `artifacts/release/0.0.18/KingmakerBuffPlanner-0.0.18.zip`.
+- Confirmed cause: the old Instant profile routed every sticky carrier into a
+  carrier-only animated operation. Kingmaker creates held state plus a second
+  delivery command, and the next `UnitPartTouch.Init` replaces any unresolved
+  prior touch. Rejected causes: planner token reuse, material requirements,
+  variant selection, old Instant double-spend, and a confirmation-timeout-only
+  defect.
+- Runtime boundary: guarded no-save WhatIf passed without mutation; save-backed
+  Instant preflight stopped before staging at baseline=0/working=0. Actual
+  gameplay runs, installs, save mutations, pushes, tags, and publications: 0.
+- Candidate version is 0.0.18. Exact next action: perform the documented manual
+  Instant and deliberate Animated checks only after an authorized protected
+  save pair exists. Do not publish without separate authorization.
+
 ## 2026-09-01 - 0.0.17 public release completion
 
 Status: MERGED, GUARDED-PUSHED, ANNOTATED-TAGGED, PUBLICLY RELEASED, AND
