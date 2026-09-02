@@ -2,9 +2,14 @@
 
 0.0.18 sticky-touch repair, 2026-09-01: no known source, architecture,
 compile, exact-assembly, deterministic behavior, or local-package blocker.
-Implementation/test checkpoints are `0504474` / `1c0a409`; current gates pass
-42/42 source, 145/145 protocol/domain, 8/8 runtime filesystem, 4/4 package,
-5/5 deployment WhatIf, aggregate 1/1, and Release build 1/1.
+Implementation/test/package checkpoints are `0504474` / `1c0a409` /
+`5111f52d0407e12a5c05614a1f7c6e0fa8378be3`; final gates pass 42/42 source,
+145/145 protocol/domain, 8/8 runtime filesystem, 4/4 package, 5/5 deployment
+WhatIf, aggregate 1/1, Debug/Release 1/1 each, deterministic builds 2/2,
+release builder 3/3, and install WhatIf 5/5. ZIP/DLL/MVID are
+`b47698e66bc8b82ff916abc115b8d712799ab0b941b6525bbca1d60dca525029` /
+`4c81954380b50612d1df65f9590fb4058f733dfa18cffb8905f11eaf0a67c4b0` /
+`4659c6e8-41a5-4a11-a996-e64826c37c9d`.
 
 The sole gameplay qualification blocker is the protected save inventory:
 `Disposable save ambiguity: baseline=0; working=0`. Consequently real Freedom

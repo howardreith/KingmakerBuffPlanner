@@ -50,13 +50,24 @@ cleanup; and later-routine recovery. Existing ordinary Instant/Animated,
 communal, variant, material, Brown Fur, rod, Infusion, and quick-result tests
 remain green.
 
-Current mechanical checkpoint: source validators 42/42, protocol/domain tests
-145/145, runtime-harness filesystem tests 8/8, package checks 4/4, deployment
-WhatIf checks 5/5, aggregate 1/1, and Release build 1/1. These are not live
-Freedom of Movement evidence. The protected resolver remains
-`KBP_AUTOMATION_BASELINE=0` / `KBP_AUTOMATION_WORKING=0`; no save was accessed,
-no mod was installed, and no game was launched. Candidate version is 0.0.18;
-clean-head deterministic package identity is recorded after release building.
+The exact product-bearing candidate commit is
+`5111f52d0407e12a5c05614a1f7c6e0fa8378be3`. Final mechanical results are
+source validators 42/42, protocol/domain tests 145/145, runtime-harness
+filesystem tests 8/8, package checks 4/4, deployment WhatIf checks 5/5,
+aggregate 1/1, Debug build 1/1, Release build 1/1, deterministic builds 2/2,
+release builder 3/3, and install WhatIf 5/5. The strict validator passed the
+exact local-only package 4/4:
+`artifacts/release/0.0.18/KingmakerBuffPlanner-0.0.18.zip`, SHA-256
+`b47698e66bc8b82ff916abc115b8d712799ab0b941b6525bbca1d60dca525029`.
+Its DLL SHA-256/MVID are
+`4c81954380b50612d1df65f9590fb4058f733dfa18cffb8905f11eaf0a67c4b0` /
+`4659c6e8-41a5-4a11-a996-e64826c37c9d`.
+
+These are not live Freedom of Movement evidence. The guarded no-save runtime
+WhatIf passed without mutation; the save-backed Instant preflight stopped
+before staging with `Disposable save ambiguity: baseline=0; working=0`. No save
+was accessed, no mod was installed, and no game was launched. Candidate
+version is 0.0.18 and publication status is local-only.
 
 ## 0.0.17 final local artifact
 
