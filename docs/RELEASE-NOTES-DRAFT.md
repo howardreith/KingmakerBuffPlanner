@@ -59,11 +59,9 @@ deployment-WhatIf checks, and 1/1 aggregate suite. The installed optional Brown
 Fur 0.0.113 assembly contract passes 57/57, and the product retains no
 compile-time gameplay-mod reference.
 
-The qualified deterministic ZIP SHA-256 is
-`e8991848e9d11168f2f7a4f6ea67a7ff233661e497e0d8867505f384286f963d`;
-its DLL SHA-256/MVID are
-`0451807d8c0f7431467c2cb3be22ba4e20edc9b552bfb6f66445fd69128e8d01` /
-`983a62c2-5e63-4261-b7d0-996cbd836aaa`.
+The guarded publisher rebuilds from the exact pushed release commit and appends
+that installable asset's SHA-256 under **Verification** below. Historical
+pre-merge candidate hashes remain in the engineering qualification record.
 
 The owner accepted the mechanically qualified candidate and authorized public
 publication. Save-backed gameplay scenarios could not be performed because
