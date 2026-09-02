@@ -1,5 +1,23 @@
 # Autonomous Resume
 
+## 0.0.18 sticky-touch instant repair - 2026-09-01
+
+- Branch `codex/kingmaker-buff-planner-sticky-touch-instant`; start
+  `81df77847487683d1857f0a8f400a1a2781a6244` / 0.0.17; implementation and
+  regression commits `0504474` and `1c0a409`; exact pre-record HEAD
+  `1c0a40948e2dea2c0aa905086db0a9b81a5d513e`.
+- Structural sticky delivery now stays in Instant mode, rule-casts a derived
+  delivery `AbilityData`, spends the exact reserved source once, and will not
+  advance through residual held/command state. Animated mode watches the
+  carrier plus generated delivery and cleans its own state.
+- Current gates: source 42/42, protocol/domain 145/145, runtime filesystem
+  8/8, package 4/4, deployment WhatIf 5/5, aggregate 1/1, Release build 1/1.
+  Candidate version surfaces are moving together to 0.0.18.
+- Live qualification is unavailable at baseline=0/working=0. Do not install,
+  launch, or substitute another save. Exact next action is clean-head
+  qualification and local-only release packaging; publication is forbidden
+  without separate authorization.
+
 ## 0.0.17 public release completion - 2026-09-01
 
 - Release engineering is complete. Exact release/tag commit is

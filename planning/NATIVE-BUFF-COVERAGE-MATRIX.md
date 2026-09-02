@@ -1,5 +1,23 @@
 # Native Buff Coverage Matrix
 
+## 0.0.18 sticky-touch execution coverage
+
+| Behavior | Deterministic / contract result | Save-backed result |
+|---|---|---|
+| Freedom carrier/delivery/effect structure | PASS: exact catalog GUIDs, components, friendly delivery flags, and action path | NOT RUN |
+| Supported beneficial sticky classification | PASS: `StickyTouchDeliveryRuleCast`, not inherently animated | NOT RUN |
+| Unsafe/missing/hostile/point delivery | PASS: explicit fallback/fail closed | NOT RUN |
+| Four prepared targets | PASS: four rule submissions/effects/source spends, distinct tokens, linked opposition preserved, no animated queue | NOT RUN |
+| Four spontaneous targets | PASS: shared level pool decremented once per step | NOT RUN |
+| Delayed confirmation/sequencing | PASS: no later validation/submission until prior effect and transaction settle | NOT RUN |
+| Animated ally delivery | PASS: carrier then identified delivery then effect/held settlement | NOT RUN |
+| Animated self delivery | PASS: structural no-second-command completion | NOT RUN |
+| Failure/timeout/exception cleanup | PASS: scoped disposal, residual blocking, later-run recovery | NOT RUN |
+| Ordinary Instant/Animated/mass/variant/material/enhancement/Infusion | PASS: existing regressions retained | NOT RUN |
+
+The protected inventory is baseline=0/working=0. The right column is not
+inferred from exact assembly inspection or deterministic execution fixtures.
+
 ## 0.0.17 communal, Share, and Infusion coverage
 
 | Behavior | Deterministic / contract result | Save-backed result |

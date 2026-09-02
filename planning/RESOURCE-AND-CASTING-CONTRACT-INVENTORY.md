@@ -1,5 +1,56 @@
 # Resource and Casting Contract Inventory
 
+## 0.0.18 sticky-touch source, delivery, and spend ownership
+
+Installed base-game contract: `Assembly-CSharp.dll` SHA-256
+`3b6450ffec440e296e586f71c711b195aed144b28d53e1cbb29406d18fef5afb`,
+MVID `07fa1e4d-8618-41b3-9b8d-faa17d3b26f7`.
+
+Freedom of Movement is the exact regression canary, not a production rule:
+
+| Role | Installed identity and shape |
+|---|---|
+| carrier | `0087fc2d64b6095478bc7b8d7d512caf` / `FreedomOfMovementCast`; `AbilityEffectStickyTouch`; Touch range; source spellbook/slot ownership |
+| delivery | `4c349361d720e844e846ad8c19959b1e` / `FreedomOfMovement`; `AbilityDeliverTouch` + `AbilityEffectRunAction`; self/friends true, enemies/point false |
+| expected effect | `1533e782fca42b84ea370fc1dcbf4fc1`; delivery path `4c349361d720e844e846ad8c19959b1e/0:ActionList/0:ContextActionApplyBuff` |
+
+`AbilityData(AbilityData, BlueprintAbility)` copies caster, fact, spellbook
+blueprint, and metamagic context, but does not copy every public calculated
+parameter/slot override. The adapter therefore explicitly retains
+`ConvertedFrom`, `MetamagicData`, `OverrideDC`, `OverrideSpellLevel`,
+`ParamSpellbook`, `ParamSpellLevel`, `ParamSpellSlot`, `PotionForOther`, and
+`SpellSource`, then verifies caster/fact/spellbook/conversion identity and Unit
+targeting.
+
+`AbilityData.Spend()` first spends the receiver blueprint's material
+component, then item charges, spellbook, and the receiver blueprint's ability
+resource logic. `SpendFromSpellbook()` follows `ConvertedFrom`, and
+`Spellbook.SpendInternal` spends the exact available prepared `AbilityData` or
+one shared spontaneous level use. `SpellSlot.Spend()` also marks its linked
+opposition slots unavailable. Therefore the proven transaction is:
+
+1. rule-cast the derived delivery `AbilityData` once;
+2. invoke `Spend()` exactly once on the original reserved source
+   `AbilityData` when the rule is not UMD-failed;
+3. never spend the delivery, both objects, or a planner-inferred pool.
+
+`AbilityEffectStickyTouch.Apply` initializes `UnitPartTouch` and, for a
+non-self target, queues a generated delivery `UnitUseAbility` at the front.
+`UnitPartTouch.Init` removes an existing held touch before installing the new
+one. The old animated operation watched only the carrier and a short effect
+window, so advancing could cause the next carrier to replace an unresolved
+prior held delivery. This is the confirmed structural cause of cross-iteration
+interference; the exact live frequency near target three remains unobserved
+because the protected save inventory is still baseline=0/working=0.
+
+Rejected theories at this checkpoint: reservation-token order (the planner
+already allocated distinct tokens; runtime now additionally rejects spent
+slots), duplicate `RuleCastSpell` or double `Spend()` in the old Instant path
+(Freedom never reached that path), material-component failure (the canary has
+no material), variant selection, and an effect-confirmation-only timeout. The
+proven fault was sticky-touch being classified as animated-only plus completion
+being scoped to the carrier rather than the full native delivery lifecycle.
+
 ## 0.0.17 composable enhancements, Share, and passive Infusion
 
 `CastEnhancementSnapshot` now records `ExclusiveGroupId`,

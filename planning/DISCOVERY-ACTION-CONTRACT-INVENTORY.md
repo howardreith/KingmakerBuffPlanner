@@ -1,5 +1,16 @@
 # Discovery Action Contract Inventory
 
+## 0.0.18 sticky-touch execution normalization
+
+Discovery continues to follow `AbilityEffectStickyTouch.TouchDeliveryAbility`
+and retains the delivery action path/effect expression. Execution now consumes
+that same structural relationship without changing discovery output: a safe
+beneficial delivery becomes `StickyTouchDeliveryRuleCast`, while missing,
+hostile, point-targeted, non-touch, or otherwise ambiguous delivery becomes an
+explicit animated fallback. No localized name, Freedom of Movement GUID,
+caster, spellbook, party-size, or iteration-count condition exists in
+production.
+
 ## 0.0.17 recipient and optional-Share contract
 
 - `ContextActionPartyMembers` retains `EffectTarget.Party`; one structural

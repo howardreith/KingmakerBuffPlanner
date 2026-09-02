@@ -1,5 +1,41 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-09-01 - 0.0.18 sticky-touch implementation checkpoint
+
+Status: IMPLEMENTED AND MECHANICALLY GREEN; CLEAN-HEAD RELEASE PACKAGE
+PENDING; SAVE-BACKED FREEDOM OF MOVEMENT RUN BLOCKED AND NOT CLAIMED.
+
+- Start: clean synchronized `main`
+  `81df77847487683d1857f0a8f400a1a2781a6244`, version 0.0.17. Dedicated
+  branch: `codex/kingmaker-buff-planner-sticky-touch-instant`.
+- Production checkpoint `0504474` separates sticky delivery from mandatory
+  animation, derives a context-preserving delivery `AbilityData`, spends the
+  exact source once, rejects stale prepared slots, sequences on effect plus
+  residual state, and observes/cleans the complete animated delivery lifecycle.
+- Regression checkpoint `1c0a409` adds exact installed assembly and Freedom
+  catalog canaries plus four-target prepared/spontaneous, delayed, routing,
+  UMD, no-double-spend, animated two-stage, timeout, residual, exception, and
+  later-run recovery coverage. Exact checkpoint HEAD:
+  `1c0a40948e2dea2c0aa905086db0a9b81a5d513e`.
+- Installed contract: Assembly-CSharp SHA-256
+  `3b6450ffec440e296e586f71c711b195aed144b28d53e1cbb29406d18fef5afb`,
+  MVID `07fa1e4d-8618-41b3-9b8d-faa17d3b26f7`.
+- Current gates: source 42/42; protocol/domain 145/145; runtime filesystem
+  8/8; package 4/4; deployment WhatIf 5/5; aggregate 1/1; Release build 1/1;
+  diff check PASS.
+- Confirmed cause: the old Instant profile routed every sticky carrier into a
+  carrier-only animated operation. Kingmaker creates held state plus a second
+  delivery command, and the next `UnitPartTouch.Init` replaces any unresolved
+  prior touch. Rejected causes: planner token reuse, material requirements,
+  variant selection, old Instant double-spend, and a confirmation-timeout-only
+  defect.
+- Runtime boundary: guarded inventory remains baseline=0/working=0. Actual
+  gameplay runs, installs, save mutations, pushes, tags, and publications: 0.
+- Candidate version is advanced to 0.0.18. Exact next action: commit records
+  and version surfaces, run every clean-head mechanical/WhatIf gate, attempt
+  only the guarded runtime WhatIf/save preflight, and build/validate a local
+  release ZIP. Do not publish.
+
 ## 2026-09-01 - 0.0.17 public release completion
 
 Status: MERGED, GUARDED-PUSHED, ANNOTATED-TAGGED, PUBLICLY RELEASED, AND

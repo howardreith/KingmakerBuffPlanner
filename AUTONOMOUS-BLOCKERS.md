@@ -1,5 +1,19 @@
 # Autonomous Blockers
 
+0.0.18 sticky-touch repair, 2026-09-01: no known source, architecture,
+compile, exact-assembly, deterministic behavior, or local-package blocker.
+Implementation/test checkpoints are `0504474` / `1c0a409`; current gates pass
+42/42 source, 145/145 protocol/domain, 8/8 runtime filesystem, 4/4 package,
+5/5 deployment WhatIf, aggregate 1/1, and Release build 1/1.
+
+The sole gameplay qualification blocker is the protected save inventory:
+`Disposable save ambiguity: baseline=0; working=0`. Consequently real Freedom
+of Movement duration, repeated-target resource deltas, target-three behavior,
+held-touch cleanup, and deliberate Animated delivery have not been observed in
+game. No ordinary or other-product save may substitute. This does not block
+safe mechanical gates or a local-only validated package, and it must not be
+reported as runtime PASS. No publication is authorized.
+
 0.0.17 public release completion, 2026-09-01: release engineering is complete
 with no remaining merge, push, tag, asset, checksum, or publication blocker.
 Annotated `v0.0.17` object

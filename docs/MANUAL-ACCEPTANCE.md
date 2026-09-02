@@ -1,5 +1,61 @@
 # Manual Acceptance
 
+## 0.0.18 repeated Freedom of Movement execution
+
+Status: REQUIRED FOR LIVE GAMEPLAY CLAIM; NOT RUN. The protected environment
+still reports `KBP_AUTOMATION_BASELINE=0` and
+`KBP_AUTOMATION_WORKING=0`. Do not rename, clone, or substitute any ordinary
+or other-product save.
+
+For every run, capture candidate ZIP/DLL hashes and MVID, routine ID, step
+index, provider canonical key, caster/target unit IDs, carrier/delivery GUIDs,
+source/execution `AbilityData` identities, reservation pool and exact tokens,
+configured mode, selected strategy/reason, rule flags, `Spend()` invocation,
+available count before/after, active expected effect, carrier/delivery command
+stages, and held-touch state.
+
+1. Restore an authorized Working save containing a real provider with Freedom
+   of Movement and at least four legal casts. Configure Instant mode with no
+   enhancement and assign four eligible party members.
+2. Execute once. Confirm all four steps select
+   `StickyTouchDeliveryRuleCast`, submit `RuleCastSpell`, create no carrier or
+   delivery `UnitUseAbility`, require no full casting animation, confirm the
+   actual Freedom buff on each intended recipient, and consume exactly four
+   correct slots/shared uses. Prepared casts must list four distinct primary
+   reservation tokens and preserve linked opposition behavior.
+3. After every target and at routine end, prove there is no matching
+   `UnitPartTouch`, held cursor/charge, queued/generated delivery command, or
+   outstanding transaction. Confirm target three is not interrupted or skipped
+   and no source or delivery is double charged.
+4. Restore or otherwise return to an equivalent valid Working state and repeat
+   the four-target Instant run. Compare resource and execution records to rule
+   out accidental preexisting effects.
+5. Repeat with one spontaneous provider: four successful recipients must
+   reduce the one shared spell-level pool by exactly four.
+6. Exercise a legal delayed effect observation. Confirm the next target is not
+   submitted until effect and transaction state settle; no fixed multi-second
+   delay is acceptable evidence.
+7. Select deliberate Animated mode. For an ally, prove carrier start/end,
+   generated delivery identification/start/end, effect confirmation, one
+   resource delta, and no held state before the next step. Repeat self-target
+   delivery and confirm the structurally valid no-second-command case.
+8. If an exact supported native-command enhancement is available, repeat
+   Animated Freedom or another safe sticky-touch canary with Share, Powerful
+   Change, and one metamagic rod separately as applicable. Prove activation
+   remains leased through delivery and restores in failure/cancel/timeout
+   paths; native one-shot consumption must not be rearmed.
+9. Force or safely observe carrier failure, delivery failure, timeout, and
+   cancellation. Confirm precise failed records, scoped cleanup, UI execution
+   release, and successful start of a later unrelated routine.
+10. Re-run ordinary Instant/Animated direct buffs, one communal buff, one
+    variant, a prepared/spontaneous source, a material-component cast,
+    Alchemist Infusion, and quick execution reporting to establish no
+    regression.
+
+Use only repository-owned guarded staging/launch tooling. Restore the live Mods
+transaction and Working save afterward, then verify the immutable Baseline and
+every protected/non-planner path exactly match pre-run hashes.
+
 ## 0.0.17 communal, Share Transmutation, and Infusion
 
 Status: REQUIRED FOR IN-GAME CLAIM; NOT RUN. The guarded save resolver reports

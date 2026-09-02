@@ -1,5 +1,45 @@
 # Qualification
 
+## 0.0.18 sticky-touch local candidate checkpoint
+
+Status: STRUCTURAL IMPLEMENTATION, EXACT-ASSEMBLY CONTRACT, SOURCE/BEHAVIOR,
+BUILD, HARNESS, AND WHATIF GATES PASS. SAVE-BACKED FREEDOM OF MOVEMENT RUNTIME
+QUALIFICATION BLOCKED; NO LIVE OR PUBLICATION CLAIM.
+
+- Start: clean `main`
+  `81df77847487683d1857f0a8f400a1a2781a6244`, synchronized with
+  `origin/main`, version 0.0.17.
+- Branch: `codex/kingmaker-buff-planner-sticky-touch-instant`.
+- Implementation/test checkpoints: `0504474` / `1c0a409`; exact current
+  pre-record HEAD `1c0a40948e2dea2c0aa905086db0a9b81a5d513e`.
+- Installed Kingmaker contract: `Assembly-CSharp.dll` SHA-256
+  `3b6450ffec440e296e586f71c711b195aed144b28d53e1cbb29406d18fef5afb`,
+  MVID `07fa1e4d-8618-41b3-9b8d-faa17d3b26f7`.
+- Post-implementation source-only: source 42/42, protocol/domain 145/145,
+  runtime filesystem 8/8, package fixture 4/4, deployment WhatIf 5/5,
+  aggregate 1/1. `git diff --check` passes.
+- Canonical Release `Build-Local.ps1`: build 1/1 and strict local package
+  validation 4/4. The preliminary 0.0.18 local-runtime ZIP/DLL SHA-256 are
+  `bb6e4e216f4ad76ee3af049a5333fd7e920680fd4d367ec04d041d119897131e` /
+  `3b80465cbbc8590f01fa4e57a498bc43e005010cd429339bc533875a6486afdd`;
+  this development package is not the clean-head release artifact.
+- The untouched baseline's initial sandboxed source-only invocation passed
+  41/41 and 135/135 but could not create its disposable fixture directory.
+  The identical approved repository command passed completely; no validator
+  or assertion changed to hide the environment-only denial.
+- The first post-version source-only invocation passed 42/42 and 145/145, then
+  correctly required a validated 0.0.18 local package. `Build-Local.ps1`
+  supplied it and the complete rerun passed. The first install-WhatIf
+  invocation likewise stopped before mutation because a clean-head release
+  manifest does not exist yet; it must be rerun after `Build-Release.ps1`.
+
+Save-backed runtime scenarios performed: 0. The repository record and guarded
+resolver report no exact baseline/working pair. Therefore no claim is made for
+live cast duration, real target-three frequency, real slots/resources, touch
+cursor state, or animated carrier/delivery timing. Exact manual acceptance is
+specified below and must use only an authorized `KBP_AUTOMATION_WORKING` copy.
+No install, launch, push, tag, or publication occurred.
+
 ## 0.0.17 public release verification
 
 Release/tag commit `edf9e642c4a743309ef0686e377ed798a2a88340` passed the

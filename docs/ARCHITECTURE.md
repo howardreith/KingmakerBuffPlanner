@@ -1,5 +1,25 @@
 # Architecture
 
+## 0.0.18 structural sticky-touch execution
+
+Execution capability is normalized in the domain plan instead of being
+reconstructed in the UI. `KingmakerProviderOptionBuilder` asks a narrow game
+adapter to classify a carrier and, for supported beneficial touch delivery,
+uses a context-preserving derived delivery `AbilityData` for target legality.
+`CastPlanner` persists the capability and its stable reason on each immutable
+`CastStep`. `HybridCastExecutor` then applies configured mode: direct and
+supported sticky delivery use Instant, optional unsupported fallback uses
+Animated only when allowed, and native-command enhancements remain mandatory
+Animated.
+
+The instant adapter owns source/execution identity translation and exact
+Kingmaker validation. The engine owns sequencing, bounded effect observation,
+enhancement lifetime, cleanup, and structured results. The animated adapter
+owns only the submitted carrier and the matching generated delivery command;
+its lifecycle observer is pure planning/execution-domain code and installs no
+global scheduler or command hook. Discovery and persistence remain unchanged,
+and no gameplay-mod compile-time dependency or blueprint mutation was added.
+
 ## 0.0.17 effective targeting, communal coverage, and native Share
 
 The planner now has one assignment-aware targeting boundary:

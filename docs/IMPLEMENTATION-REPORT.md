@@ -1,5 +1,63 @@
 # Implementation Report
 
+## 0.0.18 repeated sticky-touch execution repair
+
+Mission start was clean `main`
+`81df77847487683d1857f0a8f400a1a2781a6244`, version 0.0.17. Fetch proved
+`origin/main` identical (ahead/behind 0/0). Work is isolated on
+`codex/kingmaker-buff-planner-sticky-touch-instant`. Implementation and
+regression commits are `0504474` and `1c0a409` respectively; the exact
+pre-version-record HEAD is
+`1c0a40948e2dea2c0aa905086db0a9b81a5d513e`.
+
+The old provider builder equated every non-null sticky touch with
+`RequiresAnimatedExecution`. Instant profiles therefore routed Freedom of
+Movement to a normal queued `UnitUseAbility`. The animated operation observed
+only the carrier command, then at most twelve effect frames. Installed
+Kingmaker IL proves a non-self sticky carrier creates `UnitPartTouch` and a
+second front-queued delivery command; initializing the next carrier removes
+any previous held touch. Carrier-only completion could consequently advance
+into and replace the prior delivery. That is the confirmed code/assembly cause
+of interruption between iterations. No authorized save exists to prove why
+the user's observed failure clustered around target three, so that frequency
+is retained as runtime uncertainty rather than restated as measured fact.
+
+The repair introduces explicit direct, sticky-delivery, optional animated
+fallback, and mandatory native-command strategies. Safe beneficial touch
+delivery enters Instant mode, derives the exact delivery `AbilityData`, submits
+one `RuleCastSpell`, and invokes one `Spend()` on the exact reserved source.
+Prepared resolution rejects unavailable planned slots; spontaneous sources
+continue using one shared level pool. Source material/resource components,
+conversion/variant/metamagic/spell parameters, UMD behavior, and opposition
+links remain native. The executor waits for effect and transaction settlement,
+blocks on uncleared residual state, and retains every enhancement lease through
+cleanup.
+
+Deliberate Animated execution now identifies the generated delivery command
+within the submitted cast, distinguishes self delivery, and waits for carrier,
+delivery, effect, and held-state settlement. Disposal interrupts only owned
+unfinished commands and removes only the matching held touch. No global hook,
+fixed sleep, direct `AddBuff`, inferred debit, blueprint mutation, gameplay-mod
+reference, or Freedom-specific production rule was introduced.
+
+Regression coverage added to the custom runner includes structural supported
+and unsupported classification; the exact installed MVID/hash/member contract;
+the catalog Freedom carrier/delivery/effect canary; Instant/native routing;
+four delayed consecutive prepared targets with distinct and opposition-linked
+tokens; four spontaneous targets; UMD/no-double-spend policy; complete animated
+carrier/delivery/self/failure/timeout lifecycle; residual cleanup; exception
+cleanup; and later-routine recovery. Existing ordinary Instant/Animated,
+communal, variant, material, Brown Fur, rod, Infusion, and quick-result tests
+remain green.
+
+Current mechanical checkpoint: source validators 42/42, protocol/domain tests
+145/145, runtime-harness filesystem tests 8/8, package checks 4/4, deployment
+WhatIf checks 5/5, aggregate 1/1, and Release build 1/1. These are not live
+Freedom of Movement evidence. The protected resolver remains
+`KBP_AUTOMATION_BASELINE=0` / `KBP_AUTOMATION_WORKING=0`; no save was accessed,
+no mod was installed, and no game was launched. Candidate version is 0.0.18;
+clean-head deterministic package identity is recorded after release building.
+
 ## 0.0.17 final local artifact
 
 The exact product-bearing qualified commit is
