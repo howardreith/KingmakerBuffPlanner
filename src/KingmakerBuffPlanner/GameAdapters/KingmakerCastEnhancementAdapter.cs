@@ -18,9 +18,17 @@ namespace KingmakerBuffPlanner.GameAdapters
     {
         private readonly BrownFurPowerfulChangeCompatibility _brownFur =
             new BrownFurPowerfulChangeCompatibility();
+        private readonly BrownFurShareTransmutationCompatibility _share =
+            new BrownFurShareTransmutationCompatibility();
 
         internal IReadOnlyList<string> ContractDiagnostics
-        { get { return _brownFur.ContractDiagnostics; } }
+        {
+            get
+            {
+                return _brownFur.ContractDiagnostics.Concat(
+                    _share.ContractDiagnostics).ToArray();
+            }
+        }
 
         internal CastEnhancementSnapshot[] Discover(
             PartyProviderSnapshot snapshot,
@@ -32,6 +40,8 @@ namespace KingmakerBuffPlanner.GameAdapters
                 .ToArray();
             var runtimeEntries = units.SelectMany(RodEntries).Concat(
                 _brownFur.Discover(units, snapshot).Select(value =>
+                    new Entry(value.Ability, value.Snapshot, true))).Concat(
+                _share.Discover(units, snapshot).Select(value =>
                     new Entry(value.Ability, value.Snapshot, true)));
             var values = runtimeEntries
                 .GroupBy(entry => entry.Snapshot.EnhancementId, StringComparer.Ordinal)
@@ -66,6 +76,9 @@ namespace KingmakerBuffPlanner.GameAdapters
             List<Entry> entries = RodEntries(resolved.Caster).Concat(
                 _brownFur.ForCast(resolved.Caster, step.Provider,
                     resolved.Ability).Select(value => new Entry(value.Ability,
+                        value.Snapshot, true))).Concat(
+                _share.ForCast(resolved.Caster, step.Provider,
+                    resolved.Ability).Select(value => new Entry(value.Ability,
                         value.Snapshot, true))).ToList();
             List<Entry> selected = new List<Entry>();
             foreach (string id in step.EnhancementIds)
@@ -76,12 +89,30 @@ namespace KingmakerBuffPlanner.GameAdapters
                 if (!matches[0].Snapshot.IsApplicable(step.Provider, resolved.Ability.SpellLevel))
                     return CastEnhancementPreparation.Fail("source-inapplicable:" + id);
                 Entry entry = matches.FirstOrDefault(value =>
-                    value.Ability.IsAvailable && value.Ability.ResourceCount > 0);
+                    value.Ability.IsAvailable);
                 if (entry == null) return CastEnhancementPreparation.Fail("source-exhausted:" + id);
                 selected.Add(entry);
             }
             if (!CastEnhancementSnapshot.AreCompatible(selected.Select(value => value.Snapshot)))
                 return CastEnhancementPreparation.Fail("enhancement-conflict");
+            foreach (KeyValuePair<string, int> requirement in
+                CastEnhancementSnapshot.UsageRequirements(selected.Select(
+                    value => value.Snapshot)))
+            {
+                int?[] remaining = selected.Where(value =>
+                        value.Snapshot.UsagePoolId == requirement.Key)
+                    .Select(value => value.Snapshot.RemainingUses).Distinct()
+                    .ToArray();
+                if (remaining.Length != 1)
+                    return CastEnhancementPreparation.Fail(
+                        "usage-pool-contract-mismatch:" + requirement.Key);
+                if (remaining[0] != null && remaining[0].Value <
+                    requirement.Value)
+                    return CastEnhancementPreparation.Fail(
+                        "shared-pool-exhausted:" + requirement.Key +
+                        ":required-" + requirement.Value + ":remaining-" +
+                        remaining[0].Value);
+            }
             var states = new List<State>();
             foreach (Entry entry in entries)
             {
@@ -89,7 +120,8 @@ namespace KingmakerBuffPlanner.GameAdapters
                     ReferenceEquals(value.Ability, entry.Ability));
                 if (state == null)
                 {
-                    state = new State(entry.Ability, entry.Ability.IsOn);
+                    state = new State(entry.Ability, entry.Ability.IsOn,
+                        entry.Snapshot.NativeActivationGroupId);
                     states.Add(state);
                 }
                 state.OneShot = state.OneShot || entry.OneShot;
@@ -127,7 +159,10 @@ namespace KingmakerBuffPlanner.GameAdapters
                 first.SourceBlueprintGuid, first.DisplayName, first.Description, first.Category,
                 first.MetamagicMask, first.MaximumSpellLevel, remaining, first.AbilityWhiteList,
                 first.EffectDisplayName, first.SpellbookWhiteList,
-                first.UsagePoolId, first.RequiresNativeCommand);
+                first.UsagePoolId, first.RequiresNativeCommand,
+                first.ExclusiveGroupId, first.UsageUnitsPerCast,
+                first.AffectsTargeting, first.NativeActivationGroupId,
+                first.UsagePoolDisplayName);
         }
 
         private static bool TryDescribePersisted(string id, out CastEnhancementSnapshot snapshot)
@@ -136,8 +171,12 @@ namespace KingmakerBuffPlanner.GameAdapters
             string[] parts = (id ?? string.Empty).Split('|');
             if (parts.Length != 3 || parts[0] != "metamagic-rod" ||
                 string.IsNullOrWhiteSpace(parts[1]) || string.IsNullOrWhiteSpace(parts[2]))
-                return BrownFurPowerfulChangeCompatibility.TryDescribePersisted(
-                    id, out snapshot);
+            {
+                if (BrownFurPowerfulChangeCompatibility.TryDescribePersisted(
+                        id, out snapshot)) return true;
+                return BrownFurShareTransmutationCompatibility
+                    .TryDescribePersisted(id, out snapshot);
+            }
             BlueprintItem item = ResourcesLibrary.TryGetBlueprint<BlueprintItem>(parts[2]);
             BlueprintItemEquipment equipment = item as BlueprintItemEquipment;
             if (equipment == null || equipment.ActivatableAbility == null ||
@@ -207,12 +246,19 @@ namespace KingmakerBuffPlanner.GameAdapters
 
         private sealed class State
         {
-            internal State(ActivatableAbility ability, bool isOn) { Ability = ability; IsOn = isOn; }
+            internal State(ActivatableAbility ability, bool isOn,
+                string activationGroupId)
+            {
+                Ability = ability;
+                IsOn = isOn;
+                ActivationGroupId = activationGroupId ?? string.Empty;
+            }
             internal ActivatableAbility Ability;
             internal bool IsOn;
             internal bool Selected;
             internal bool OneShot;
             internal bool ArmedByLease;
+            internal string ActivationGroupId;
         }
 
         private sealed class ActivationLease : IDisposable
@@ -224,9 +270,11 @@ namespace KingmakerBuffPlanner.GameAdapters
             {
                 if (_disposed) return;
                 _disposed = true;
-                bool oneShotConsumed = _states.Any(state => state.OneShot &&
-                    state.Selected && state.ArmedByLease &&
-                    !state.Ability.IsOn);
+                var consumedGroups = new HashSet<string>(_states.Where(state =>
+                        state.OneShot && state.Selected && state.ArmedByLease &&
+                        !state.Ability.IsOn)
+                    .Select(state => state.ActivationGroupId),
+                    StringComparer.Ordinal);
                 foreach (State state in _states.Reverse())
                 {
                     try
@@ -235,7 +283,8 @@ namespace KingmakerBuffPlanner.GameAdapters
                         // selected member of its mutually-exclusive one-shot
                         // group. Do not resurrect any prior member afterward.
                         if (CastEnhancementActivationPolicy.RestoreOriginalState(
-                                state.OneShot, oneShotConsumed))
+                                state.OneShot, state.ActivationGroupId,
+                                consumedGroups))
                             state.Ability.IsOn = state.IsOn;
                     }
                     catch (Exception) { }

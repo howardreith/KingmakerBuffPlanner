@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.0.17 - communal coverage, Share Transmutation, and Infusion
+
+- Restores one-cast party/allied-area recipient maps for structurally proven
+  communal effects, including per-anchor radius coverage and the existing
+  indirect `COVERED` portrait state, while hostile/ambiguous geometry fails
+  closed.
+- Adds one routine/assignment-aware effective-targeting seam shared by portrait
+  legality, stale-target pruning, preview, provider selection, planning, and
+  native execution preflight.
+- Adds optional, exact-profile Brown Fur Share Transmutation support without a
+  compile-time gameplay-mod dependency. Share is an independent toggle, uses
+  native `AbilityData` targeting, forces native animated execution, and leaves
+  successful Arcane Reservoir debit to the provider's transaction.
+- Replaces category-only enhancement compatibility with explicit exclusivity
+  and native activation groups. Share composes with one Powerful Change choice,
+  and shared-pool costs are summed before planning and again at execution.
+- Inherits passive Alchemist Infusion targeting from native
+  `AbilityData.CanTarget`; no Infusion toggle or planner surcharge is added.
+- Adds deterministic structural, planning, presentation, persistence,
+  execution-lease, shared-resource, optional-contract, and Infusion regressions.
+
+The owner accepted the mechanically qualified candidate and authorized public
+publication. Save-backed runtime behavior remains explicitly unverified because
+the exact protected automation save pair is absent; no player save was used.
+
 ## 0.0.16 - catalog semantics and native HUD maintenance
 
 - Normalizes optional Call of the Wild preparation/casting companion spellbooks

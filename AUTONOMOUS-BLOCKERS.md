@@ -1,5 +1,49 @@
 # Autonomous Blockers
 
+0.0.17 publication authorization, 2026-09-01: no authorization,
+authentication, repository, default-branch, remote-divergence, version, tag,
+release, source, build, deterministic-test, package, or guarded-publication
+blocker remains. The owner explicitly authorized finalization, non-rewriting
+merge to `main`, guarded push, annotated `v0.0.17` tag, and a new public
+release. GitHub preflight proved public `howardreith/KingmakerBuffPlanner`,
+default branch `main`, authenticated owner `howardreith`, synchronized
+local/remote main `f9cf2ac35535c8201dea7ef7f5172ebaa051e7ad`, and no existing `v0.0.17`
+tag or release. The separate save-backed limitation remains baseline=0 and
+working=0 and is not represented as runtime PASS.
+
+0.0.17 final local qualification, 2026-09-01: no remaining source,
+compilation, deterministic-test, exact-assembly, package, install-WhatIf, or
+runtime-WhatIf blocker. Qualified source is
+`5976a4b5222c408f0b6c3c8fb3f5314c8db5c54f`; local ZIP/DLL/MVID are
+`e8991848e9d11168f2f7a4f6ea67a7ff233661e497e0d8867505f384286f963d` /
+`0451807d8c0f7431467c2cb3be22ba4e20edc9b552bfb6f66445fd69128e8d01` /
+`983a62c2-5e63-4261-b7d0-996cbd836aaa`.
+
+The only gameplay evidence blocker remains external:
+`Disposable save ambiguity: baseline=0; working=0`. No actual communal,
+Share, Powerful Change composition, cancellation, or Infusion runtime scenario
+was performed. The guarded push-helper test also refuses this dedicated branch
+because its external allowlist has not been expanded; the authorized release
+therefore follows the established merge-to-allowlisted-`main` path. Neither
+condition is represented as a product/runtime PASS.
+
+0.0.17 communal/Share/Infusion update, 2026-09-01: no known source,
+architecture, compile, deterministic behavior, exact-assembly, or
+deployment-WhatIf blocker. Implementation checkpoint is
+`98d41723cec611a4d2a7528ac801bf7c3654bdb9` on
+`codex/kbp-communal-share-transmutation-infusion`; current automated counts
+are source 41/41, protocol/domain 135/135, runtime filesystem 8/8, package
+fixture 4/4, WhatIf 5/5, aggregate 1/1, and Brown Fur optional contract 57/57.
+
+The external runtime blocker is exact and unchanged:
+`KBP_AUTOMATION_BASELINE=0`; `KBP_AUTOMATION_WORKING=0`. Therefore
+save-backed communal portraits/casts, Share on/off/30-foot behavior, exact
+one/two-point native reservoir deltas, cancellation restoration, and passive
+Infusion targeting cannot be run safely. Ordinary player saves and other
+products' fixtures are protected and were not substituted. This is not an
+automated runtime PASS and does not authorize install, launch, push, merge,
+tag, or publication.
+
 0.0.16 catalog/native-HUD public release completion, 2026-09-01: COMPLETE for
 source, deterministic build/package, guarded merge/push/tag/publication,
 download verification, and guarded local installation. `main`, `origin/main`,

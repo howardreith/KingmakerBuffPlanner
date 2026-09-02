@@ -27,17 +27,19 @@ namespace KingmakerBuffPlanner.Execution
                     report.Add(index, step, CastExecutionStatus.FailedValidation, "combat-policy");
                     continue;
                 }
-                CastRuntimeValidation validation = _runtime.Validate(step);
-                if (!validation.Valid)
-                {
-                    report.Add(index, step, CastExecutionStatus.FailedValidation, validation.Reason);
-                    continue;
-                }
                 CastEnhancementPreparation enhancement = Prepare(step);
                 if (!enhancement.Valid)
                 {
                     report.Add(index, step, CastExecutionStatus.FailedValidation,
                         "enhancement-unavailable:" + enhancement.Reason);
+                    continue;
+                }
+                CastRuntimeValidation validation = _runtime.Validate(step);
+                if (!validation.Valid)
+                {
+                    enhancement.Dispose();
+                    report.Add(index, step, CastExecutionStatus.FailedValidation,
+                        validation.Reason);
                     continue;
                 }
                 IAnimatedCastOperation operation;

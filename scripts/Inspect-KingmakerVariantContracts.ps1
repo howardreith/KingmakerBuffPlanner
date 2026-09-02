@@ -115,6 +115,8 @@ $contracts = [ordered]@{
     'Kingmaker.UnitLogic.Abilities.AbilityData' = @(
         '.ctor', 'get_Variants', 'InitVariants', 'get_Spellbook', 'get_Name',
         'get_Icon', 'get_Description', 'get_SpellLevel', 'get_ConvertedFrom',
+        'get_IsAlchemistSpell', 'get_AlchemistInfusion', 'get_TargetAnchor',
+        'CanTarget',
         'get_IsAvailableForCast', 'IsVisible',
         'GetAvailableForCastCount', 'HasVariant', 'Spend', 'SpendFromSpellbook')
     'Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility' = @(

@@ -817,7 +817,10 @@ namespace KingmakerBuffPlanner.UI
                 (model.CandidateCount == 1 ? " applicable option" : " applicable options");
             foreach (EnhancementChoiceViewModel choice in model.Choices)
             {
-                string text = (choice.Selected ? "SELECTED | " : string.Empty) + choice.Title +
+                string selection = choice.CheckboxStyle
+                    ? (choice.Selected ? "[x] " : "[ ] ")
+                    : (choice.Selected ? "SELECTED | " : string.Empty);
+                string text = selection + choice.Title +
                     "\n" + choice.Summary;
                 Button button = KingmakerUiFactory.CreateButton("EnhancementChoice", _content,
                     _theme, text, () =>

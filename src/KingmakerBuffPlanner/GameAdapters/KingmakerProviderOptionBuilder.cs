@@ -17,10 +17,16 @@ namespace KingmakerBuffPlanner.GameAdapters
 {
     internal sealed class KingmakerProviderOptionBuilder
     {
+        private readonly List<string> _diagnostics = new List<string>();
+
+        internal IReadOnlyList<string> Diagnostics
+        { get { return _diagnostics.AsReadOnly(); } }
+
         internal ProviderPlanningOption[] Build(
             PartyProviderSnapshot snapshot,
             IDictionary<string, EffectExpression> effectsBySource)
         {
+            _diagnostics.Clear();
             var units = snapshot.Units.Where(u => u.TargetValidation.Alive &&
                 u.TargetValidation.Friendly && u.TargetValidation.Targetable).ToArray();
             Dictionary<string, UnitEntityData> liveUnits = KingmakerAnimatedCastAdapter.CollectUnits();
@@ -34,17 +40,31 @@ namespace KingmakerBuffPlanner.GameAdapters
                 AbilityData ability = caster == null ? null :
                     KingmakerAnimatedCastAdapter.ResolveAbility(caster, provider.Key);
                 BlueprintAbility blueprint = ability == null ? null : ability.Blueprint;
+                BlueprintAbility declaredSource = ResourcesLibrary
+                    .TryGetBlueprint<BlueprintAbility>(
+                        provider.Key.Ability.BaseAbilityGuid);
+                var areaResolver = new KingmakerAreaCoverageResolver();
                 AlliedAreaCoverage areaCoverage = blueprint == null
-                    ? null : new KingmakerAreaCoverageResolver().Resolve(blueprint);
+                    ? null : areaResolver.Resolve(blueprint, declaredSource);
                 bool party = EffectExpressionTargetAnalysis.Contains(
                     expression, EffectTarget.Party);
                 bool areaRecipients = EffectExpressionTargetAnalysis.Contains(
                     expression, EffectTarget.AlliedAreaRecipients);
+                bool unsafeArea = EffectExpressionTargetAnalysis.Contains(
+                        expression, EffectTarget.EnemyAreaRecipients) ||
+                    EffectExpressionTargetAnalysis.Contains(expression,
+                        EffectTarget.AmbiguousAreaRecipients);
+                bool infusedPersonal = EffectExpressionTargetAnalysis
+                    .ContainsOnly(expression, EffectTarget.Caster) &&
+                    ability != null && ability.IsAlchemistSpell &&
+                    ability.AlchemistInfusion && ability.TargetAnchor ==
+                        AbilityTargetAnchor.Unit;
                 IEnumerable<UnitSnapshot> reachable;
                 var recipientIdsByAnchor =
                     new Dictionary<string, IEnumerable<string>>(StringComparer.Ordinal);
                 string[] anchors;
-                if (EffectExpressionTargetAnalysis.ContainsOnly(expression, EffectTarget.Caster))
+                if (EffectExpressionTargetAnalysis.ContainsOnly(expression,
+                        EffectTarget.Caster) && !infusedPersonal)
                 {
                     reachable = units.Where(u => u.UnitId == provider.Key.CasterUnitId);
                     anchors = reachable.Select(u => u.UnitId).ToArray();
@@ -83,6 +103,11 @@ namespace KingmakerBuffPlanner.GameAdapters
                     reachable = units.Where(unit => recipientIdsByAnchor.Values
                         .Any(recipients => recipients.Contains(unit.UnitId)));
                 }
+                else if (areaRecipients || unsafeArea)
+                {
+                    reachable = new UnitSnapshot[0];
+                    anchors = new string[0];
+                }
                 else
                 {
                     reachable = units.Where(u =>
@@ -95,11 +120,38 @@ namespace KingmakerBuffPlanner.GameAdapters
                 }
                 string[] reachableIds = reachable.Select(u => u.UnitId)
                     .Distinct(StringComparer.Ordinal).ToArray();
-                bool mass = party || recipientIdsByAnchor.Count != 0;
                 options.Add(new ProviderPlanningOption(provider, reachableIds, anchors,
                     provider.EffectiveCasterLevel, provider.ExpectedDurationRounds,
                     blueprint != null && blueprint.StickyTouch != null,
                     recipientIdsByAnchor));
+                string targetClass = party ? "Party" : areaRecipients
+                    ? "AlliedAreaRecipients" : unsafeArea
+                        ? "UnsafeArea" : infusedPersonal
+                            ? "NativeAlchemistInfusion" :
+                            EffectExpressionTargetAnalysis.ContainsOnly(
+                                expression, EffectTarget.Caster)
+                                ? "Caster" : "Direct";
+                string[] paths = NativeCatalogExporter.GetEffects(expression)
+                    .Select(value => value.ActionPath)
+                    .Where(value => !string.IsNullOrWhiteSpace(value))
+                    .Distinct(StringComparer.Ordinal).OrderBy(value => value,
+                        StringComparer.Ordinal).ToArray();
+                if (party || areaRecipients || unsafeArea || infusedPersonal)
+                    _diagnostics.Add("base=" +
+                        provider.Key.Ability.BaseAbilityGuid + ";variant=" +
+                        provider.Key.Ability.VariantGuid + ";source=" +
+                        provider.Key.Ability.Canonical + ";paths=[" +
+                        string.Join(",", paths) + "];target=" + targetClass +
+                        ";grouping=" + (party || areaRecipients ? "Mass" :
+                            "PerTarget") + ";radius=" + (areaCoverage == null
+                            ? "none" : areaCoverage.Radius.ToString("R")) +
+                        ";anchors=[" + string.Join(",", anchors) +
+                        "];coverage=[" + string.Join("|", recipientIdsByAnchor
+                            .OrderBy(value => value.Key, StringComparer.Ordinal)
+                            .Select(value => value.Key + "->" + string.Join(",",
+                                value.Value.ToArray())).ToArray()) + "]" +
+                        (areaRecipients && areaCoverage == null ? ";rejected=" +
+                            areaResolver.LastFailureReason : string.Empty));
             }
             return options.OrderBy(o => o.Provider.Key.Canonical, StringComparer.Ordinal).ToArray();
         }

@@ -38,7 +38,8 @@ namespace KingmakerBuffPlanner.Planning
             ActiveEffectSnapshot activeEffects,
             IDictionary<string, EffectExpression> effectsBySource,
             IEnumerable<ProviderPlanningOption> providerOptions,
-            IEnumerable<CastEnhancementSnapshot> enhancements = null)
+            IEnumerable<CastEnhancementSnapshot> enhancements = null,
+            EffectiveProviderOptionResolver targeting = null)
         {
             if (profile == null) throw new ArgumentNullException("profile");
             if (snapshot == null) throw new ArgumentNullException("snapshot");
@@ -62,12 +63,13 @@ namespace KingmakerBuffPlanner.Planning
                     unsupported.Add(assignment.SourceId);
                     continue;
                 }
-                CastGroupingKind grouping = EffectExpressionTargetAnalysis.Contains(
-                    expression, EffectTarget.Party) ||
-                    EffectExpressionTargetAnalysis.Contains(
-                        expression, EffectTarget.AlliedAreaRecipients)
-                    ? CastGroupingKind.MassConfiguredTargets
-                    : CastGroupingKind.PerTarget;
+                CastGroupingKind grouping;
+                if (!EffectExpressionTargetAnalysis.TryGetGrouping(
+                        expression, out grouping))
+                {
+                    unsupported.Add(assignment.SourceId);
+                    continue;
+                }
                 requests.Add(new BuffCastRequest(
                     new BuffSourceDefinition(assignment.SourceId, abilities, expression, grouping),
                     assignment.WantedTargetUnitIds, assignment.ExistingEffectPolicy,
@@ -75,7 +77,7 @@ namespace KingmakerBuffPlanner.Planning
                 abilitiesBySource[assignment.SourceId] = abilities;
             }
             ProviderSelectionPolicy policy = BuildPolicy(profile.ProviderPreferences);
-            CastPlan plan = new CastPlanner().PlanRoutine(snapshot, requests,
+            CastPlan plan = new CastPlanner(targeting).PlanRoutine(snapshot, requests,
                 optionList, policy, activeEffects, enhancements);
             var fallbackProviderAbilities = new HashSet<string>(optionList
                 .Where(o => o.RequiresAnimatedExecution)
@@ -163,6 +165,19 @@ namespace KingmakerBuffPlanner.Planning
             var targets = new HashSet<EffectTarget>();
             Collect(expression, targets);
             return targets.Count != 0 && targets.All(t => t == target);
+        }
+
+        public static bool TryGetGrouping(EffectExpression expression,
+            out CastGroupingKind grouping)
+        {
+            grouping = CastGroupingKind.PerTarget;
+            if (Contains(expression, EffectTarget.EnemyAreaRecipients) ||
+                Contains(expression, EffectTarget.AmbiguousAreaRecipients))
+                return false;
+            if (Contains(expression, EffectTarget.Party) ||
+                Contains(expression, EffectTarget.AlliedAreaRecipients))
+                grouping = CastGroupingKind.MassConfiguredTargets;
+            return true;
         }
 
         private static void Collect(EffectExpression expression, ISet<EffectTarget> targets)

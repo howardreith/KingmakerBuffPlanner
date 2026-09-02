@@ -1,5 +1,78 @@
 # Autonomous Resume
 
+## 0.0.17 publication authorization - 2026-09-01
+
+- The owner explicitly authorized finalization, non-rewriting merge to `main`,
+  guarded remote push, annotated tag, and a new public GitHub release.
+- Read-only preflight proved authenticated account `howardreith`, public
+  repository `howardreith/KingmakerBuffPlanner`, default branch `main`, and
+  origin `https://github.com/howardreith/KingmakerBuffPlanner.git`.
+- Before this authorization record, feature HEAD is
+  `9d460e025a934d91c2d310bbaeced225f398ff2b`; local `main` and `origin/main`
+  are synchronized at `f9cf2ac35535c8201dea7ef7f5172ebaa051e7ad`, which is an ancestor of the
+  five candidate commits. Both remote tag and GitHub release `v0.0.17` are
+  absent.
+- Release notes and changelog are publication-safe while continuing to state
+  the exact save-backed limitation. The owner accepts the qualified candidate
+  for publication without relabeling the unavailable runtime scenarios as
+  PASS.
+- Exact next action: commit this authorization record, create the established
+  no-fast-forward release merge on `main`, qualify that exact merge commit,
+  guarded-push `main`, run the guarded public publisher, independently verify
+  the tag and downloaded assets, then record and guarded-push completion.
+
+## 0.0.17 final local handoff - 2026-09-01
+
+- Exact qualified source/package commit:
+  `5976a4b5222c408f0b6c3c8fb3f5314c8db5c54f`; branch
+  `codex/kbp-communal-share-transmutation-infusion`; version 0.0.17; schema 4.
+  The next commit is provenance-only.
+- Final gates: source 41/41, protocol/domain 135/135, runtime filesystem 8/8,
+  package 4/4, deployment WhatIf 5/5, aggregate 1/1, Debug 1/1, Release 1/1,
+  Brown Fur exact contract 57/57, deterministic builds 2/2, release builder
+  3/3, install WhatIf 5/5, guarded runtime WhatIf PASS.
+- ZIP/DLL/MVID:
+  `e8991848e9d11168f2f7a4f6ea67a7ff233661e497e0d8867505f384286f963d` /
+  `0451807d8c0f7431467c2cb3be22ba4e20edc9b552bfb6f66445fd69128e8d01` /
+  `983a62c2-5e63-4261-b7d0-996cbd836aaa`.
+- Save preflight is blocked at baseline=0/working=0; actual gameplay runs=0.
+  The guarded push WhatIf is non-applicable/refused because its external
+  allowlist does not contain this dedicated mission branch. No policy was
+  changed and no install, launch, push, merge, tag, or publication occurred.
+- Exact next action: await an explicitly authorized exact KBP automation save
+  pair and run `docs/MANUAL-ACCEPTANCE.md`. Do not substitute another save.
+
+## 0.0.17 communal/Share/Infusion checkpoint - 2026-09-01
+
+- Start: clean `main`
+  `f9cf2ac35535c8201dea7ef7f5172ebaa051e7ad`, version 0.0.16. Active branch:
+  `codex/kbp-communal-share-transmutation-infusion`. Implementation/test
+  checkpoint:
+  `98d41723cec611a4d2a7528ac801bf7c3654bdb9`. Candidate metadata is 0.0.17;
+  schema remains 4.
+- Communal failure was in provider-option normalization: an allied-area
+  expression whose selected concrete blueprint did not yield one radius fell
+  into ordinary direct `AbilityData.CanTarget`, erasing the recipient map
+  before the intact presentation layer. Exact declared-source/selected-variant
+  geometry is now recovered only for a proven relationship; unsafe or missing
+  contracts have zero options.
+- `EffectiveProviderOptionResolver` makes target legality assignment/routine
+  aware. Optional Share uses exact native feature/toggle/marker/reservoir
+  contracts and native targeting; enhancement groups and shared pools compose
+  Share + Powerful Change at aggregate cost 2. Native code alone debits.
+  Alchemist Infusion is passive native targeting with no toggle/surcharge.
+- Latest post-implementation source-only result: source 41/41, protocol 135/135,
+  runtime filesystem 8/8, package 4/4, WhatIf 5/5, aggregate 1/1. Optional
+  Brown Fur assembly contract is 57/57 against version 0.0.113.0, SHA-256
+  `97a1ad535a7b384759272cf37c0fe8705843b9d149a61e9e8b6c41df39437913`,
+  MVID `685d2575-41e1-4897-881c-a314229ad7cf`.
+- Live qualification is blocked honestly at baseline=0/working=0. No save,
+  install, game launch, live staging, push, merge, tag, or publication occurred.
+- Exact next action: commit the 0.0.17 metadata and durable records, run the
+  clean-head source/Debug/Release/exact-contract/deterministic release/package/
+  diff gates, then append exact package hashes in a provenance-only commit. Do
+  not publish or install.
+
 ## 0.0.16 public release completion - 2026-09-01
 
 - `main`, `origin/main`, and annotated tag `v0.0.16` resolve to

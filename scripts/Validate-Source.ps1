@@ -82,8 +82,32 @@ if ($prohibited.Count -ne 0) { throw "Prohibited tracked payloads: $($prohibited
 $assertions++
 
 $identityFiles = Get-ChildItem -LiteralPath (Join-Path $root 'src') -Recurse -File
-$foreignIdentity = @($identityFiles | Select-String -Pattern 'KingmakerGunslinger|TabletopAddedRules')
-if ($foreignIdentity.Count -ne 0) { throw 'Foreign product identity was found in production source.' }
+$foreignIdentity = @($identityFiles | Select-String -Pattern `
+    'KingmakerGunslinger|TabletopAddedRules')
+$shareCompatibilityPath = Join-Path $root `
+    'src\KingmakerBuffPlanner\Compatibility\BrownFurShareTransmutationCompatibility.cs'
+$unexpectedForeignIdentity = @($foreignIdentity | Where-Object {
+    $_.Path -cne $shareCompatibilityPath
+})
+if ($unexpectedForeignIdentity.Count -ne 0) {
+    throw 'Foreign product identity escaped the bounded Share compatibility adapter.'
+}
+$foreignReferences = @($references | Where-Object {
+    $_.Include -match 'KingmakerGunslinger|TabletopAddedRules|CallOfTheWild'
+})
+if ($foreignReferences.Count -ne 0) {
+    throw 'A compile-time gameplay-mod reference entered the standalone product.'
+}
+$shareCompatibilitySource = Get-Content -LiteralPath $shareCompatibilityPath -Raw
+foreach ($boundedContract in @('AppDomain.CurrentDomain.GetAssemblies()',
+        'KingmakerGunslinger.BrownFur.BrownFurCastIntentRuntime',
+        'KingmakerGunslinger.BrownFur.BrownFurShareTargetingRuntime',
+        'KingmakerGunslinger.BrownFur.BrownFurExactDebitPolicy',
+        'native-contract-probe-exception')) {
+    if (-not $shareCompatibilitySource.Contains($boundedContract)) {
+        throw "Bounded optional Share runtime proof is missing: $boundedContract"
+    }
+}
 $wrathUi = @($identityFiles | Select-String -Pattern `
     'ServiceWindowsPCView|SpellbookPCView|OwlcatButton|bubbly_overlay|bubble_overlay_full|BubbleBuffs')
 if ($wrathUi.Count -ne 0) { throw 'Wrath/BubbleBuffs UI types, paths, or assets entered production source.' }
@@ -332,12 +356,64 @@ if (-not $areaSemanticsSource.Contains('canTargetFriends') -or
     -not $areaSemanticsSource.Contains('!canTargetPoint') -or
     -not $providerOptionSource.Contains('recipientIdsByAnchor') -or
     -not $providerOptionSource.Contains('KingmakerAreaCoverageResolver') -or
+    -not $providerOptionSource.Contains('provider.Key.Ability.BaseAbilityGuid') -or
+    -not $areaCoverageSource.Contains('IsDeclaredSource') -or
+    -not $areaCoverageSource.Contains('selected-variant-source-mismatch') -or
     -not $areaCoverageSource.Contains('ContextActionCastSpell') -or
     -not $areaCoverageSource.Contains('ContextActionPartyMembers') -or
     -not $areaCoverageSource.Contains('ContextActionsOnPet') -or
     -not $plannerSource.Contains('CoveredTargetIdsForAnchor')) {
     throw 'Allied area refinement and per-anchor communal coverage must remain conservative and shared by planning.'
 }
+$effectiveTargetingSource = Get-Content -LiteralPath (Join-Path $root `
+    'src\KingmakerBuffPlanner\Domain\Planning\EffectiveTargeting.cs') -Raw
+foreach ($targetingContract in @('EffectiveProviderOptionResolver',
+        'EffectiveProviderOptionContext', 'ICastTargetingModifier',
+        'request.EnhancementIds', 'modifier.Apply(context, effective)')) {
+    if (-not $effectiveTargetingSource.Contains($targetingContract)) {
+        throw "Assignment-aware effective targeting is missing: $targetingContract"
+    }
+}
+if (-not $setupModelSource.Contains('GetEffectiveProviderOptions') -or
+    -not $plannerSource.Contains('_targeting.Resolve(') -or
+    -not $sessionSource.Contains('new KingmakerShareTargetingModifier') -or
+    -not $providerOptionSource.Contains('ability.IsAlchemistSpell') -or
+    -not $providerOptionSource.Contains('ability.AlchemistInfusion') -or
+    -not $providerOptionSource.Contains('areaRecipients || unsafeArea') -or
+    $providerOptionSource -match '(?i)Contains\([^\r\n]*Communal') {
+    throw 'UI, planning, passive Infusion, and structural communal targeting do not share the fail-closed effective-option contract.'
+}
+$assertions++
+
+$enhancementSource = Get-Content -LiteralPath (Join-Path $root `
+    'src\KingmakerBuffPlanner\Domain\Planning\CastEnhancements.cs') -Raw
+$enhancementAdapterSource = Get-Content -LiteralPath (Join-Path $root `
+    'src\KingmakerBuffPlanner\GameAdapters\KingmakerCastEnhancementAdapter.cs') -Raw
+$animatedExecutorSource = Get-Content -LiteralPath (Join-Path $root `
+    'src\KingmakerBuffPlanner\Execution\AnimatedCastExecutor.cs') -Raw
+$instantExecutorSource = Get-Content -LiteralPath (Join-Path $root `
+    'src\KingmakerBuffPlanner\Execution\InstantCastExecutor.cs') -Raw
+foreach ($enhancementContract in @('ExclusiveGroupId', 'UsageUnitsPerCast',
+        'AffectsTargeting', 'NativeActivationGroupId', 'UsageRequirements')) {
+    if (-not $enhancementSource.Contains($enhancementContract)) {
+        throw "Explicit enhancement composition contract is missing: $enhancementContract"
+    }
+}
+if (-not $plannerSource.Contains('Enhancement usage ledger would become negative') -or
+    -not $enhancementAdapterSource.Contains(
+        'CastEnhancementSnapshot.UsageRequirements(selected.Select(') -or
+    -not $enhancementAdapterSource.Contains('consumedGroups') -or
+    $animatedExecutorSource.IndexOf('CastEnhancementPreparation enhancement = Prepare(step);',
+        [StringComparison]::Ordinal) -gt
+        $animatedExecutorSource.IndexOf('CastRuntimeValidation validation = _runtime.Validate(step);',
+            [StringComparison]::Ordinal) -or
+    $instantExecutorSource.IndexOf('CastEnhancementPreparation enhancement = Prepare(step);',
+        [StringComparison]::Ordinal) -gt
+        $instantExecutorSource.IndexOf('CastRuntimeValidation validation = _runtime.Validate(step);',
+            [StringComparison]::Ordinal)) {
+    throw 'Aggregate shared-pool validation or per-activation-group execution restoration is missing.'
+}
+$assertions++
 $routineMembershipSource = Get-Content -LiteralPath (Join-Path $root `
     'src\KingmakerBuffPlanner\UI\PlannerPresentationModels.cs') -Raw
 if (-not $routineMembershipSource.Contains('RoutineMembershipChipViewModel') -or

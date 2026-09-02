@@ -1,5 +1,155 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-09-01 - 0.0.17 publication authorization
+
+Status: OWNER AUTHORIZED FINALIZATION, MAIN MERGE, GUARDED PUSH, ANNOTATED TAG,
+AND NEW PUBLIC RELEASE. SAVE-BACKED GAMEPLAY REMAINS UNAVAILABLE AND UNCLAIMED.
+
+- Owner instruction: finalize the accepted candidate, merge it to `main`, push
+  it to the remote, and create a new release, with full authorization for all
+  of those release-engineering actions.
+- Read-only GitHub preflight: authenticated account `howardreith`; public
+  repository `howardreith/KingmakerBuffPlanner`; default branch `main`; origin
+  `https://github.com/howardreith/KingmakerBuffPlanner.git`.
+- Before this record, feature HEAD is
+  `9d460e025a934d91c2d310bbaeced225f398ff2b`; local `main` and `origin/main`
+  are synchronized at `f9cf2ac35535c8201dea7ef7f5172ebaa051e7ad` and the feature branch is five
+  commits ahead with no divergence. Local/remote `v0.0.17` and the GitHub
+  release are absent.
+- Release notes and changelog now authorize publication while preserving the
+  exact baseline=0/working=0 runtime-evidence limitation. No save-backed row is
+  promoted to PASS and no player save is substituted.
+- Exact next action: commit the authorization record, create the established
+  non-fast-forward release merge on `main`, repeat exact-merge qualification,
+  guarded-push `main`, invoke `Publish-Release.ps1 -Publish
+  -ConfirmHumanAcceptance`, independently verify tag/release/assets, and commit
+  the final publication evidence.
+
+## 2026-09-01 - 0.0.17 final local qualification
+
+Status: LOCAL IMPLEMENTATION/PACKAGE COMPLETE; RUNTIME BLOCKED; NO PUBLICATION.
+
+- Qualified source/package HEAD:
+  `5976a4b5222c408f0b6c3c8fb3f5314c8db5c54f`; branch
+  `codex/kbp-communal-share-transmutation-infusion`; version 0.0.17; clean at
+  qualification. This record commit contains documentation only.
+- Final exact results: source 41/41; protocol/domain 135/135; runtime harness
+  filesystem 8/8; package 4/4; deployment WhatIf 5/5; source-only aggregate
+  1/1; Debug 1/1; Release 1/1; Brown Fur assembly contract 57/57;
+  deterministic release builds 2/2; release builder 3/3; install WhatIf 5/5;
+  runtime WhatIf preflight PASS.
+- Final Debug DLL SHA-256:
+  `613eab9320cc3b88459904262c1c08555fef4f6351a7ece8dacb0239f544d68a`.
+  Final local-only ZIP/DLL/MVID:
+  `e8991848e9d11168f2f7a4f6ea67a7ff233661e497e0d8867505f384286f963d` /
+  `0451807d8c0f7431467c2cb3be22ba4e20edc9b552bfb6f66445fd69128e8d01` /
+  `983a62c2-5e63-4261-b7d0-996cbd836aaa`.
+- Final command set:
+  `scripts\Build.ps1 -Configuration Debug`;
+  `scripts\Build-Local.ps1`;
+  `scripts\Test-SourceOnly.ps1`;
+  `scripts\Build.ps1 -Configuration Release`;
+  `scripts\Inspect-BrownFurShareContracts.ps1`;
+  `scripts\Inspect-KingmakerVariantContracts.ps1 -TypePattern
+  '^Kingmaker\.UnitLogic\.Abilities\.AbilityData$' -MethodPattern
+  '^(get_IsAlchemistSpell|get_AlchemistInfusion|get_TargetAnchor|CanTarget)$'`;
+  `scripts\Inspect-KingmakerSpellbookContracts.ps1`;
+  `scripts\Build-Release.ps1`;
+  `scripts\validate-package.ps1 -PackagePath
+  .\artifacts\release\0.0.17\KingmakerBuffPlanner-0.0.17.zip`;
+  `scripts\Test-InstallWhatIf.ps1`;
+  `scripts\Invoke-KingmakerRuntimeTest.ps1 -Scenario final-no-save-core
+  -CompatibilityProfileId native-only -RunId
+  kbp-0.0.17-final-head-whatif -WhatIf -Confirm:$false`;
+  save-backed `live-ui-bootstrap -WhatIf`; `scripts\Test-GuardedPush.ps1`;
+  `git diff --check`; final status/artifact/tracked-payload inspection.
+- The first post-version `Test-SourceOnly.ps1` passed 41/41 and 135/135,
+  then stopped because no 0.0.17 package existed. `Build-Local.ps1` satisfied
+  the documented prerequisite; later complete invocations passed. No test or
+  validator was weakened.
+- Save-backed preflight returned exit 1 before staging:
+  `Disposable save ambiguity: baseline=0; working=0`. Runtime scenarios
+  actually performed: 0. Push-helper WhatIf also returned exit 1 before network
+  access because the dedicated branch is absent from its external allowlist.
+  No bypass, network push, or policy edit occurred.
+- Exact next action: none without an authorized save pair. Use the manual
+  checklist when one exists. No ordinary or other product's save may substitute.
+
+## 2026-09-01 - 0.0.17 implementation checkpoint
+
+Status: IMPLEMENTATION COMMITTED; SOURCE-ONLY PASS; VERSION/RECORD CANDIDATE IN
+PROGRESS; LIVE SAVE-BACKED WORK BLOCKED.
+
+- Implementation commit:
+  `98d41723cec611a4d2a7528ac801bf7c3654bdb9` on
+  `codex/kbp-communal-share-transmutation-infusion`. Version is now prepared
+  as 0.0.17; schema 4 and standalone product identity are unchanged.
+- History established the intact indirect-recipient presentation at
+  `6a9fab9e00176d62dafc7cd323b7ac211f6bfa34` and retained the correct
+  personal-target safety change at
+  `e3287d17d3a80bace0bd7dd6be18c32ec3e042ba`. The current regression's first
+  failing stage was provider-option construction. The null-geometry/direct-
+  target fallthrough first appeared in
+  `932da35cb6633031d4077e43df65ab659bc9bd84` with area grouping and was
+  retained by the per-anchor work in
+  `90e5f43ed0c3447a3f73ca799706d653aa4a67f7`: a null area-geometry result
+  fell through to direct `CanTarget` and erased the coverage map.
+- Implemented exact selected/base geometry recovery with relationship proof
+  and hostile/ambiguous/missing-contract fail-close; one assignment-aware
+  effective-targeting resolver; exact optional native Share probe/activation;
+  explicit enhancement exclusivity/native groups; aggregate shared-pool
+  forecast/preflight; and passive native Alchemist Infusion targeting.
+- Verified read-only reference repository
+  `C:\Dev\KingmakerGunslingerLab\repo\KingmakerGunslinger`, remote
+  `git@github.com:howardreith/KingmakerGunslingerAndOtherTabletopRules.git`,
+  HEAD `06c4d998f160df75ad3be7bfcf3de7e415c631d4`. No reference source changed.
+- Commands/results to this checkpoint:
+  `scripts\Test-SourceOnly.ps1` => source 41/41, protocol 135/135, runtime
+  filesystem 8/8, package 4/4, WhatIf 5/5, aggregate 1/1;
+  `scripts\Inspect-BrownFurShareContracts.ps1` => 57/57 against provider
+  0.0.113.0, SHA-256
+  `97a1ad535a7b384759272cf37c0fe8705843b9d149a61e9e8b6c41df39437913`,
+  MVID `685d2575-41e1-4897-881c-a314229ad7cf`;
+  Debug/Release builds passed before the version bump; `git diff --check`
+  passed.
+- Rejected theories/approaches: missing portrait renderer, name/GUID communal
+  policy, reverting personal self-only enforcement, broad Personal targeting,
+  planner-owned reservoir debit, Infusion toggle/surcharge, gameplay-mod
+  reference, and flattened conditional semantics.
+- Runtime blocker: exact save inventory remains baseline=0/working=0. No game
+  launch, live Mods staging, installation, or save access occurred.
+- Exact next action: commit version/durable records; qualify that clean commit
+  with source-only, exact contracts, Debug, Release, deterministic release
+  package, package validator, hashes, and diff/status inspection; then append a
+  final provenance record and commit locally without push.
+
+## 2026-09-01 - communal/Share Transmutation/Infusion intake
+
+Status: IN PROGRESS; CLEAN BASELINE PASS; IMPLEMENTATION NOT YET STARTED.
+
+- Starting branch/HEAD/version/status: `main` /
+  `f9cf2ac35535c8201dea7ef7f5172ebaa051e7ad` / 0.0.16 / clean,
+  tracking `origin/main`. Read-only `git ls-remote --symref origin HEAD
+  refs/heads/main` confirmed both remote `HEAD` and `refs/heads/main` at the
+  same SHA and confirmed `main` as the default branch.
+- Created local branch
+  `codex/kbp-communal-share-transmutation-infusion` before production edits.
+  No stash, reset, cleanup, checkout overwrite, merge, push, tag, publication,
+  install, game launch, live Mods mutation, or save access occurred.
+- Untouched source-only baseline: source validation 39/39, protocol/domain
+  127/127, and runtime-harness filesystem 8/8. The first sandboxed invocation
+  reached and passed 39/39 plus 127/127, then was denied while creating the
+  repository harness's external disposable fixture; the identical guarded
+  rerun with only that required filesystem authority completed 8/8. No
+  assertion, validator, or warning was weakened.
+- Requested mission: restore structural multi-recipient presentation, add one
+  assignment-aware effective-targeting seam, compose optional native Share
+  Transmutation with Powerful Change and aggregate Arcane Reservoir forecasts,
+  and verify passive native Alchemist Infusion targeting.
+- Exact next action: establish the first failing communal pipeline stage from
+  current source/history and inspect the authoritative read-only Brown Fur and
+  Share implementation before changing production code.
+
 ## 2026-09-01 - 0.0.16 public release completion
 
 Status: MERGED; GUARDED-PUSHED; TAGGED; PUBLISHED; DOWNLOADED ASSET AND LOCAL

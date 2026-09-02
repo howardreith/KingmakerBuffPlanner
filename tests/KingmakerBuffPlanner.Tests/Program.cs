@@ -86,6 +86,10 @@ namespace KingmakerBuffPlanner.Tests
                     TestInstalledSpellbookRoleContract);
                 Run("area-recipient-refinement-is-conservative",
                     TestAreaRecipientSemantics);
+                Run("communal-canaries-derive-mass-semantics-from-structure",
+                    TestCommunalStructuralCanaries);
+                Run("conflicting-recipient-semantics-fail-closed",
+                    TestConflictingRecipientSemantics);
                 Run("native-candidate-classification-is-structural", TestNativeCandidateClassification);
                 Run("persistent-beneficial-classification-is-branch-and-recipient-aware",
                     TestPersistentBeneficialClassification);
@@ -158,15 +162,27 @@ namespace KingmakerBuffPlanner.Tests
                 Run("powerful-change-availability-is-caster-and-spell-exact", TestPowerfulChangeAvailability);
                 Run("powerful-change-score-options-share-reservoir", TestPowerfulChangeSharedReservoir);
                 Run("cast-enhancement-applicability-and-reservation", TestCastEnhancementPlanning);
+                Run("effective-targeting-is-routine-and-assignment-aware",
+                    TestEffectiveTargetingRoutineAwareness);
+                Run("enhancement-exclusivity-and-shared-pool-costs-are-explicit",
+                    TestEnhancementCompatibilityAndSharedCost);
+                Run("shared-enhancement-pools-never-overcommit",
+                    TestSharedEnhancementPoolOvercommit);
+                Run("multi-enhancement-profile-roundtrip-is-deterministic",
+                    () => TestMultiEnhancementRoundTrip(root));
+                Run("alchemist-infusion-remains-passive-native-targeting",
+                    TestPassiveInfusionTargeting);
                 Run("cast-enhancement-selection-is-assignment-scoped", TestCastEnhancementSelection);
                 Run("casting-section-presents-caster-and-enhancement-choices", TestCastingSectionPresentation);
                 Run("casting-section-layout-keeps-button-labels-visible", TestCastingSectionLayout);
                 Run("cast-enhancement-execution-is-fail-closed-and-cleaned-up", TestCastEnhancementExecution);
                 Run("consumed-one-shot-enhancement-is-not-rearmed", TestOneShotEnhancementRestoration);
+                Run("execution-preflight-runs-under-the-native-activation-lease",
+                    TestExecutionPreflightUnderLease);
                 Run("personal-target-eligibility-is-provider-relative", TestPersonalTargetEligibility);
                 Run("area-coverage-preview-distinguishes-direct-and-indirect", TestAreaCoveragePresentation);
                 Run("per-anchor-mass-coverage-avoids-duplicate-communal-casts",
-                    TestPerAnchorMassCoverage);
+                    () => TestPerAnchorMassCoverage(root));
                 Run("single-target-plan-does-not-create-indirect-coverage", TestSingleTargetCoveragePresentation);
                 Run("caster-centered-plan-does-not-invent-direct-receiver", TestCasterCenteredCoveragePresentation);
                 Run("four-column-grid-metrics-have-no-horizontal-scroll", TestGridMetrics);
@@ -2843,29 +2859,50 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("Area coverage preview did not distinguish direct and indirect targets.");
         }
 
-        private static void TestPerAnchorMassCoverage()
+        private static void TestPerAnchorMassCoverage(string root)
         {
-            AssertPerAnchorMassCoverage("protection-from-arrows-communal-fixture");
-            AssertPerAnchorMassCoverage("good-hope-fixture");
-            AssertPerAnchorMassCoverage("existing-communal-positive-control");
+            AssertPerAnchorMassCoverage(
+                "protection-from-arrows-communal-fixture", root);
+            AssertPerAnchorMassCoverage("good-hope-fixture", root);
+            AssertPerAnchorMassCoverage(
+                "existing-communal-positive-control", root);
         }
 
-        private static void AssertPerAnchorMassCoverage(string sourceId)
+        private static void AssertPerAnchorMassCoverage(string sourceId,
+            string root)
         {
             AbilityKey ability = Ability(sourceId, string.Empty, 0);
             var pool = new ResourcePoolSnapshot(sourceId + "-pool",
                 ResourcePoolKind.SpontaneousLevel, 3, 3, null);
             ProviderSnapshot provider = PlannerProvider("caster", "communal-book",
                 ability, pool.PoolKey, 1);
-            PartyProviderSnapshot snapshot = PlannerSnapshot(new[] { provider },
-                new[] { pool }, "caster", "anchor", "ally", "pet");
-            string[] recipients = { "caster", "anchor", "ally", "pet" };
+            var valid = new TargetValidationSnapshot(true, true, true, true);
+            PartyProviderSnapshot snapshot = new PartyProviderSnapshot(new[] {
+                new UnitSnapshot("caster", "Caster", false, string.Empty, valid),
+                new UnitSnapshot("anchor-a", "Anchor A", false, string.Empty, valid),
+                new UnitSnapshot("anchor-b", "Anchor B", false, string.Empty, valid),
+                new UnitSnapshot("ally-a", "Ally A", false, string.Empty, valid),
+                new UnitSnapshot("ally-b", "Ally B", false, string.Empty, valid),
+                new UnitSnapshot("outside", "Outside", false, string.Empty, valid),
+                new UnitSnapshot("dead", "Dead", false, string.Empty,
+                    new TargetValidationSnapshot(false, false, true, true)),
+                new UnitSnapshot("hostile", "Hostile", false, string.Empty,
+                    new TargetValidationSnapshot(true, true, false, true)),
+                new UnitSnapshot("unavailable", "Unavailable", false,
+                    string.Empty, new TargetValidationSnapshot(
+                        true, true, true, false))
+            }, new[] { provider }, new[] { pool });
+            string[] firstRecipients = { "caster", "anchor-a", "ally-a" };
+            string[] secondRecipients = { "anchor-b", "ally-b" };
             var coverage = new Dictionary<string, IEnumerable<string>>
             {
-                { "anchor", recipients }
+                { "anchor-a", firstRecipients },
+                { "anchor-b", secondRecipients }
             };
-            var option = new ProviderPlanningOption(provider, recipients,
-                new[] { "anchor" }, 5, 50, false, coverage);
+            string[] reachable = firstRecipients.Concat(secondRecipients)
+                .Distinct(StringComparer.Ordinal).ToArray();
+            var option = new ProviderPlanningOption(provider, reachable,
+                new[] { "anchor-a", "anchor-b" }, 5, 50, false, coverage);
             var effect = new EffectLeafExpression(EffectKind.AreaBuff,
                 sourceId + "-effect", EffectTarget.AlliedAreaRecipients,
                 "AbilityTargetsAround+friend-only", "root/area");
@@ -2873,48 +2910,101 @@ namespace KingmakerBuffPlanner.Tests
                 CastGroupingKind.MassConfiguredTargets);
             var planner = new CastPlanner();
             CastPlan persistedAnchor = planner.Plan(snapshot, new BuffCastRequest(source,
-                new[] { "anchor" }, ExistingEffectPolicy.Overwrite, null),
+                new[] { "anchor-a" }, ExistingEffectPolicy.Overwrite, null),
                 new[] { option }, EmptyPolicy(), new ActiveEffectSnapshot(null));
             if (persistedAnchor.Steps.Count != 1 ||
-                persistedAnchor.Steps.Single().AnchorUnitId != "anchor" ||
+                persistedAnchor.Steps.Single().AnchorUnitId != "anchor-a" ||
                 !persistedAnchor.Steps.Single().TargetUnitIds.SequenceEqual(
-                    new[] { "anchor" }) ||
+                    new[] { "anchor-a" }) ||
                 !persistedAnchor.Steps.Single().ExpectedRecipientUnitIds.SequenceEqual(
-                    recipients.OrderBy(value => value, StringComparer.Ordinal)))
+                    firstRecipients.OrderBy(value => value,
+                        StringComparer.Ordinal)) ||
+                persistedAnchor.Steps.Single().Reservation.Units != 1)
                 throw new InvalidOperationException(
                     "A single selected communal anchor did not produce complete indirect recipient coverage: " + sourceId);
 
             CastPlan explicitEveryRecipient = planner.Plan(snapshot,
-                new BuffCastRequest(source, recipients,
+                new BuffCastRequest(source, firstRecipients,
                     ExistingEffectPolicy.Overwrite, null), new[] { option },
                 EmptyPolicy(), new ActiveEffectSnapshot(null));
             if (explicitEveryRecipient.Steps.Count != 1 ||
                 explicitEveryRecipient.Steps.Single().Reservation.Units != 1 ||
                 explicitEveryRecipient.Outcomes.Count(outcome =>
-                    outcome.Kind == TargetOutcomeKind.Fulfilled) != recipients.Length)
+                    outcome.Kind == TargetOutcomeKind.Fulfilled) !=
+                        firstRecipients.Length)
                 throw new InvalidOperationException(
                     "Mass coverage scheduled one cast per teammate instead of one structural cast: " + sourceId);
 
-            var model = new PlannerSetupModel(BuffPlannerProfile.CreateDefault(
-                "coverage:" + sourceId), snapshot, new ActiveEffectSnapshot(null),
+            string profileRoot = Path.Combine(root, "coverage-" +
+                sourceId.Substring(0, Math.Min(8, sourceId.Length)));
+            Directory.CreateDirectory(profileRoot);
+            var repository = new ProfileRepository(profileRoot);
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault(
+                "coverage:" + sourceId);
+            var model = new PlannerSetupModel(profile, snapshot,
+                new ActiveEffectSnapshot(null),
                 new Dictionary<string, EffectExpression> { { ability.Canonical, effect } },
-                new[] { option }, ignored => { });
-            model.ToggleTarget("short", "anchor");
+                new[] { option }, repository.Save);
+            model.ToggleTarget("short", "anchor-a");
             RoutinePlanResult preview = new RoutinePlanService().Plan(model.Profile,
                 "short", snapshot, new ActiveEffectSnapshot(null),
                 new Dictionary<string, EffectExpression> { { ability.Canonical, effect } },
                 new[] { option });
-            TargetPortraitViewModel anchor = TargetPortraitViewModel.Create(
-                model.Sources.Single(), model, "short", snapshot.Units.Single(unit =>
-                    unit.UnitId == "anchor"), preview);
-            TargetPortraitViewModel teammate = TargetPortraitViewModel.Create(
-                model.Sources.Single(), model, "short", snapshot.Units.Single(unit =>
-                    unit.UnitId == "ally"), preview);
-            if (anchor.State != TargetPortraitState.DirectSelectedAndCovered ||
-                teammate.State != TargetPortraitState.IndirectlyCovered ||
-                teammate.Wanted || !teammate.Indirect)
+            TargetPortraitViewModel[] portraits = snapshot.Units.Select(unit =>
+                TargetPortraitViewModel.Create(model.Sources.Single(), model,
+                    "short", unit, preview)).ToArray();
+            if (portraits.Count(value => value.State ==
+                    TargetPortraitState.DirectSelectedAndCovered) != 1 ||
+                portraits.Single(value => value.UnitId == "anchor-a").Indirect ||
+                portraits.Single(value => value.UnitId == "ally-a").State !=
+                    TargetPortraitState.IndirectlyCovered ||
+                portraits.Single(value => value.UnitId == "outside").State !=
+                    TargetPortraitState.InvalidTarget ||
+                new[] { "dead", "hostile", "unavailable" }.Any(id =>
+                    portraits.Single(value => value.UnitId == id).Indirect))
                 throw new InvalidOperationException(
                     "Anchor/direct and teammate/indirect presentation diverged from the structural plan: " + sourceId);
+
+            BuffPlannerProfile loaded = repository.Load(profile.CampaignId)
+                .Profile;
+            var reloaded = new PlannerSetupModel(loaded, snapshot,
+                new ActiveEffectSnapshot(null),
+                new Dictionary<string, EffectExpression> {
+                    { ability.Canonical, effect }
+                }, new[] { option }, repository.Save);
+            RoutinePlanResult reloadedPreview = new RoutinePlanService().Plan(
+                loaded, "short", snapshot, new ActiveEffectSnapshot(null),
+                new Dictionary<string, EffectExpression> {
+                    { ability.Canonical, effect }
+                }, new[] { option });
+            if (!reloadedPreview.Plan.Steps.Single()
+                    .ExpectedRecipientUnitIds.SequenceEqual(
+                        preview.Plan.Steps.Single().ExpectedRecipientUnitIds) ||
+                TargetPortraitViewModel.Create(reloaded.Sources.Single(),
+                    reloaded, "short", snapshot.Units.Single(value =>
+                        value.UnitId == "ally-a"), reloadedPreview).State !=
+                    TargetPortraitState.IndirectlyCovered)
+                throw new InvalidOperationException(
+                    "Persisted communal coverage did not reproduce after reload: " +
+                    sourceId);
+
+            reloaded.ToggleTarget("short", "anchor-a");
+            reloaded.ToggleTarget("short", "anchor-b");
+            RoutinePlanResult moved = new RoutinePlanService().Plan(loaded,
+                "short", snapshot, new ActiveEffectSnapshot(null),
+                new Dictionary<string, EffectExpression> {
+                    { ability.Canonical, effect }
+                }, new[] { option });
+            if (moved.Plan.Steps.Count != 1 ||
+                moved.Plan.Steps.Single().AnchorUnitId != "anchor-b" ||
+                !moved.Plan.Steps.Single().ExpectedRecipientUnitIds
+                    .SequenceEqual(secondRecipients.OrderBy(value => value,
+                        StringComparer.Ordinal)) ||
+                moved.Plan.Steps.Single().ExpectedRecipientUnitIds.Contains(
+                    "ally-a"))
+                throw new InvalidOperationException(
+                    "Changing the communal anchor did not recompute coverage deterministically: " +
+                    sourceId);
         }
 
         private static void TestPersonalTargetEligibility()
@@ -3823,7 +3913,568 @@ namespace KingmakerBuffPlanner.Tests
                     true))
                 throw new InvalidOperationException(
                     "A consumed one-shot group could be rearmed after execution.");
+            var consumed = new HashSet<string>(new[] { "share" },
+                StringComparer.Ordinal);
+            if (CastEnhancementActivationPolicy.RestoreOriginalState(true,
+                    "share", consumed) ||
+                !CastEnhancementActivationPolicy.RestoreOriginalState(true,
+                    "powerful", consumed))
+                throw new InvalidOperationException(
+                    "Consumption in one native activation group suppressed restoration in another group.");
         }
+
+        private static void TestCommunalStructuralCanaries()
+        {
+            string[] canaries = {
+                "7bb0c402f7f789d4d9fae8ca87b4c7e2|Resist Energy, Communal",
+                "55a037e514c0ee14a8e3ed14b47061de|Remove Fear",
+                "a5e23522eda32dc45801e32c05dc9f96|Good Hope",
+                "96c9d98b6a9a7c249b6c4572e4977157|Protection from Arrows, Communal",
+                "allied-radius-additional|Allied radius fixture"
+            };
+            foreach (string canary in canaries)
+            {
+                string[] fields = canary.Split('|');
+                var conditional = new DiscoveryNode(
+                    DiscoveryNodeKind.Conditional, "Conditional",
+                    whenTrue: new DiscoveryNode(DiscoveryNodeKind.Empty,
+                        "already-present"),
+                    whenFalse: EffectNode(fields[0] + "-buff"),
+                    conditionContract: "ContextConditionHasBuff");
+                var root = new DiscoveryNode(DiscoveryNodeKind.AbilityReference,
+                    fields[0], new[] {
+                        new DiscoveryNode(DiscoveryNodeKind.TargetTransform,
+                            "AbilityTargetsAround", new[] {
+                                new DiscoveryNode(DiscoveryNodeKind.Sequence,
+                                    "ActionList", new[] { conditional })
+                            }, target: EffectTarget.AlliedAreaRecipients,
+                            sourceContract: "AbilityTargetsAround")
+                    }, referencedAbilityId: fields[0],
+                    sourceContract: "BlueprintAbility");
+                DiscoveryScanResult scan = new ActionGraphScanner().Scan(root);
+                CastGroupingKind grouping;
+                if (!EffectExpressionTargetAnalysis.TryGetGrouping(
+                        scan.Expression, out grouping) || grouping !=
+                    CastGroupingKind.MassConfiguredTargets ||
+                    !EffectExpressionTargetAnalysis.Contains(scan.Expression,
+                        EffectTarget.AlliedAreaRecipients) ||
+                    !(scan.Expression is ReferencedAbilityExpression))
+                    throw new InvalidOperationException(
+                        "Structural allied-area canary did not retain mass semantics: " + fields[1]);
+            }
+
+            var party = new DiscoveryNode(DiscoveryNodeKind.TargetTransform,
+                "ContextActionPartyMembers", new[] {
+                    new DiscoveryNode(DiscoveryNodeKind.Sequence,
+                        "reflected:ActionListWrapper", new[] {
+                            new DiscoveryNode(DiscoveryNodeKind.Sequence,
+                                "ActionList", new[] { EffectNode(
+                                    "party-wide-additional-buff") })
+                        })
+                }, target: EffectTarget.Party,
+                sourceContract: "ContextActionPartyMembers");
+            CastGroupingKind partyGrouping;
+            if (!EffectExpressionTargetAnalysis.TryGetGrouping(
+                    new ActionGraphScanner().Scan(party).Expression,
+                    out partyGrouping) || partyGrouping !=
+                CastGroupingKind.MassConfiguredTargets)
+                throw new InvalidOperationException(
+                    "Nested party-member action wrappers lost party-wide semantics.");
+
+            CastGroupingKind ordinary;
+            if (!EffectExpressionTargetAnalysis.TryGetGrouping(
+                    Leaf("ordinary-resist-energy"), out ordinary) ||
+                ordinary != CastGroupingKind.PerTarget ||
+                !EffectExpressionTargetAnalysis.TryGetGrouping(
+                    new EffectLeafExpression(EffectKind.Buff, "shield",
+                        EffectTarget.Caster, "ContextActionApplyBuff",
+                        "shield/action"), out ordinary) ||
+                ordinary != CastGroupingKind.PerTarget)
+                throw new InvalidOperationException(
+                    "An ordinary direct or personal spell acquired mass semantics.");
+
+            string repository = FindRepositoryRoot();
+            JObject catalog = JObject.Parse(File.ReadAllText(Path.Combine(
+                repository, "planning", "NATIVE-BUFF-CATALOG.json")));
+            JArray abilities = (JArray)catalog["abilities"];
+            foreach (string canary in canaries.Take(4))
+            {
+                string[] fields = canary.Split('|');
+                JObject row = abilities.OfType<JObject>().Single(value =>
+                    (string)value["abilityGuid"] == fields[0]);
+                string[] components = ((JArray)row["abilityComponentTypes"])
+                    .Values<string>().ToArray();
+                if ((string)row["displayName"] != fields[1] ||
+                    !components.Contains(
+                        "Kingmaker.UnitLogic.Abilities.Components.AbilityTargetsAround") ||
+                    !(bool)row["canTargetFriends"] ||
+                    (bool)row["canTargetEnemies"] || (bool)row["canTargetPoint"])
+                    throw new InvalidOperationException(
+                        "Exact loaded-blueprint evidence no longer proves a friendly allied-area contract: " +
+                        fields[1]);
+            }
+            JObject resist = abilities.OfType<JObject>().Single(value =>
+                (string)value["abilityGuid"] ==
+                    "7bb0c402f7f789d4d9fae8ca87b4c7e2");
+            if (((JArray)resist["variantGuids"]).Count != 5)
+                throw new InvalidOperationException(
+                    "The exact communal Resist Energy parent/variant evidence changed.");
+            string optionBuilder = File.ReadAllText(Path.Combine(repository,
+                "src", "KingmakerBuffPlanner", "GameAdapters",
+                "KingmakerProviderOptionBuilder.cs"));
+            string areaResolver = File.ReadAllText(Path.Combine(repository,
+                "src", "KingmakerBuffPlanner", "GameAdapters",
+                "KingmakerAreaCoverageResolver.cs"));
+            if (!optionBuilder.Contains(
+                    "provider.Key.Ability.BaseAbilityGuid") ||
+                !areaResolver.Contains("declaredSource") ||
+                !areaResolver.Contains("selected-variant-source-mismatch"))
+                throw new InvalidOperationException(
+                    "Concrete communal variants no longer recover geometry from their proven declared source.");
+        }
+
+        private static void TestConflictingRecipientSemantics()
+        {
+            AbilityKey ability = Ability("conflicting-area", string.Empty, 0);
+            EffectExpression expression = new SequenceEffectExpression(new EffectExpression[] {
+                new TargetedEffectExpression(EffectTarget.AlliedAreaRecipients,
+                    Leaf("friendly-branch")),
+                new TargetedEffectExpression(EffectTarget.AmbiguousAreaRecipients,
+                    Leaf("ambiguous-branch"))
+            });
+            CastGroupingKind ignored;
+            if (EffectExpressionTargetAnalysis.TryGetGrouping(expression,
+                    out ignored))
+                throw new InvalidOperationException(
+                    "Contradictory area recipient semantics did not fail closed.");
+            var pool = new ResourcePoolSnapshot("conflicting-pool",
+                ResourcePoolKind.Unlimited, 0, 0, null);
+            ProviderSnapshot provider = PlannerProvider("caster", "book",
+                ability, pool.PoolKey, 0);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(new[] { provider },
+                new[] { pool }, "caster", "ally");
+            var coverage = new Dictionary<string, IEnumerable<string>> {
+                { "caster", new[] { "caster", "ally" } }
+            };
+            var option = new ProviderPlanningOption(provider,
+                new[] { "caster", "ally" }, new[] { "caster" }, 4, 20,
+                false, coverage);
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault(
+                "conflicting-area");
+            profile.Routines.First(value => value.RoutineId == "long")
+                .Assignments.Add(new SourceAssignmentProfile {
+                    SourceId = ability.Canonical,
+                    Ability = AbilityKeyProfile.FromKey(ability),
+                    WantedTargetUnitIds = new List<string> { "caster" },
+                    ExistingEffectPolicy = ExistingEffectPolicy.Overwrite,
+                    IgnoredPresenceMarkers = new List<string>(),
+                    SelectedEnhancementIds = new List<string>()
+                });
+            RoutinePlanResult plan = new RoutinePlanService().Plan(profile,
+                "long", snapshot, new ActiveEffectSnapshot(null),
+                new Dictionary<string, EffectExpression> {
+                    { ability.Canonical, expression }
+                }, new[] { option });
+            if (plan.Plan.Steps.Count != 0 ||
+                !plan.UnsupportedSourceIds.Contains(ability.Canonical))
+                throw new InvalidOperationException(
+                    "A malformed conflicting graph reached planning as an allied cast.");
+        }
+
+        private static void TestEffectiveTargetingRoutineAwareness()
+        {
+            AbilityKey ability = Ability("personal-transmutation",
+                string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("personal-slots",
+                ResourcePoolKind.Unlimited, 0, 0, null);
+            ProviderSnapshot brown = PlannerProvider("brown", "brown-book",
+                ability, pool.PoolKey, 0);
+            ProviderSnapshot other = PlannerProvider("other", "other-book",
+                ability, pool.PoolKey, 0);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(new[] { brown, other },
+                new[] { pool }, "brown", "other", "ally", "rejected");
+            var options = new[] {
+                new ProviderPlanningOption(brown, new[] { "brown" },
+                    new[] { "brown" }, 6, 60),
+                new ProviderPlanningOption(other, new[] { "other" },
+                    new[] { "other" }, 5, 50)
+            };
+            CastEnhancementSnapshot share = ClassEnhancement(
+                "share", "brown", ability, "brown-book", 2,
+                "reservoir|brown", "brown-fur-share-transmutation", true);
+            var targeting = new EffectiveProviderOptionResolver(
+                new ICastTargetingModifier[] {
+                    new FixtureShareTargetingModifier("share", "brown",
+                        new[] { "brown", "ally" })
+                });
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault(
+                "routine-aware-share");
+            int saves = 0;
+            var model = new PlannerSetupModel(profile, snapshot,
+                new ActiveEffectSnapshot(null),
+                new Dictionary<string, EffectExpression> {
+                    { ability.Canonical, new EffectLeafExpression(
+                        EffectKind.Buff, "personal-buff", EffectTarget.Caster,
+                        "ContextActionApplyBuff", "root/apply") }
+                }, options, ignored => saves++, new[] { share }, targeting);
+            SetupSourceRow source = model.SelectedSource;
+            if (model.IsTargetLegal(source, "long", "ally") ||
+                model.GetSelectedEnhancementIds("long").Count != 0)
+                throw new InvalidOperationException(
+                    "Share did not default off for a new assignment.");
+            model.SetEnhancement("long", share.EnhancementId);
+            if (!model.IsTargetLegal(source, "long", "ally") ||
+                model.IsTargetLegal(source, "long", "rejected") ||
+                model.IsTargetLegal(source, "short", "ally"))
+                throw new InvalidOperationException(
+                    "Share targeting leaked across routines or admitted a native-rejected target.");
+            model.ToggleTarget("long", "ally");
+            if (new BuffCardViewModel(source, model, "long", true).Status !=
+                    PlannerPresentationStatus.Success)
+                throw new InvalidOperationException(
+                    "The buff-card status bypassed routine-aware Share targeting.");
+            model.SetEnhancement("long", share.EnhancementId);
+            if (model.IsTargetLegal(source, "long", "ally") ||
+                profile.Routines.First(value => value.RoutineId == "long")
+                    .Assignments.Any(value => value.SourceId == source.SourceId) ||
+                saves != 3)
+                throw new InvalidOperationException(
+                    "Disabling Share did not atomically prune the stale ally target.");
+        }
+
+        private static void TestEnhancementCompatibilityAndSharedCost()
+        {
+            AbilityKey ability = Ability("brown-fur-spell", string.Empty, 0);
+            var spellPool = new ResourcePoolSnapshot("brown-slots",
+                ResourcePoolKind.SpontaneousLevel, 3, 3, null);
+            ProviderSnapshot provider = PlannerProvider("brown", "brown-book",
+                ability, spellPool.PoolKey, 1);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(new[] { provider },
+                new[] { spellPool }, "brown", "ally");
+            var option = new ProviderPlanningOption(provider,
+                new[] { "brown", "ally" }, new[] { "brown", "ally" },
+                8, 80);
+            CastEnhancementSnapshot share = ClassEnhancement("share", "brown",
+                ability, "brown-book", 2, "reservoir|brown",
+                "brown-fur-share-transmutation", true);
+            CastEnhancementSnapshot powerful = ClassEnhancement("powerful-strength",
+                "brown", ability, "brown-book", 2, "reservoir|brown",
+                "brown-fur-powerful-change", false);
+            CastEnhancementSnapshot otherScore = ClassEnhancement("powerful-dexterity",
+                "brown", ability, "brown-book", 2, "reservoir|brown",
+                "brown-fur-powerful-change", false);
+            var rodA = new CastEnhancementSnapshot("rod-a", "brown", "rod-a",
+                "Extend Rod", string.Empty,
+                CastEnhancementCategory.MetamagicRod, 2, 9, 2, null);
+            var rodB = new CastEnhancementSnapshot("rod-b", "brown", "rod-b",
+                "Reach Rod", string.Empty,
+                CastEnhancementCategory.MetamagicRod, 4, 9, 2, null);
+            if (!CastEnhancementSnapshot.AreCompatible(new[] { share, powerful }) ||
+                CastEnhancementSnapshot.AreCompatible(new[] { powerful, otherScore }) ||
+                CastEnhancementSnapshot.AreCompatible(new[] { rodA, rodB }) ||
+                !CastEnhancementSnapshot.AreCompatible(new[] { rodA, powerful }) ||
+                CastEnhancementSnapshot.AreCompatible(new[] { share, share }))
+                throw new InvalidOperationException(
+                    "Explicit enhancement exclusivity groups were not enforced.");
+
+            var duplicateRequest = new BuffCastRequest(new BuffSourceDefinition(
+                "duplicate-enhancement", ability, Leaf("duplicate-buff"),
+                CastGroupingKind.PerTarget), new[] { "ally" },
+                ExistingEffectPolicy.Overwrite, null,
+                new[] { share.EnhancementId, share.EnhancementId });
+            CastPlan duplicatePlan = new CastPlanner().Plan(snapshot,
+                duplicateRequest, new[] { option }, EmptyPolicy(),
+                new ActiveEffectSnapshot(null), new[] { share });
+            if (duplicatePlan.Steps.Count != 0)
+                throw new InvalidOperationException(
+                    "Duplicate persisted enhancement IDs were silently accepted.");
+
+            var request = new BuffCastRequest(new BuffSourceDefinition(
+                "brown-combined", ability, Leaf("brown-buff"),
+                CastGroupingKind.PerTarget), new[] { "ally" },
+                ExistingEffectPolicy.Overwrite, null,
+                new[] { share.EnhancementId, powerful.EnhancementId });
+            CastPlan plan = new CastPlanner().Plan(snapshot, request,
+                new[] { option }, EmptyPolicy(), new ActiveEffectSnapshot(null),
+                new[] { share, powerful });
+            if (plan.Steps.Count != 1 ||
+                plan.Steps.Single().Reservation.Units != 1 ||
+                plan.Steps.Single().EnhancementUsageByPool["reservoir|brown"] != 2)
+                throw new InvalidOperationException(
+                    "Share plus Powerful Change did not reserve one spell slot and two forecast reservoir units.");
+
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault(
+                "combined-ui");
+            var model = new PlannerSetupModel(profile, snapshot,
+                new ActiveEffectSnapshot(null),
+                new Dictionary<string, EffectExpression> {
+                    { ability.Canonical, Leaf("brown-buff") }
+                }, new[] { option }, ignored => { },
+                new[] { powerful, share });
+            model.SetEnhancement("long", share.EnhancementId);
+            model.SetEnhancement("long", powerful.EnhancementId);
+            SelectedCastingViewModel casting = SelectedCastingViewModel.Create(
+                model.SelectedSource, model, "long", null);
+            if (!casting.EnhancementLabel.Contains("Share") ||
+                !casting.EnhancementLabel.Contains("Powerful") ||
+                !casting.EnhancementLabel.Contains("Arcane Reservoir: 2 per cast / 2 remaining") ||
+                casting.Choices.Count(value => value.Selected) != 2 ||
+                !casting.SelectedEnhancementIds.SequenceEqual(
+                    new[] { "powerful-strength", "share" }) ||
+                !casting.Choices.Single(value => value.EnhancementId == "share")
+                    .CheckboxStyle)
+                throw new InvalidOperationException(
+                    "The multi-enhancement summary or independent Share checkbox state was incomplete.");
+        }
+
+        private static void TestSharedEnhancementPoolOvercommit()
+        {
+            AbilityKey ability = Ability("reservoir-limited", string.Empty, 0);
+            var spellPool = new ResourcePoolSnapshot("reservoir-spells",
+                ResourcePoolKind.SpontaneousLevel, 4, 4, null);
+            ProviderSnapshot provider = PlannerProvider("brown", "brown-book",
+                ability, spellPool.PoolKey, 1);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(new[] { provider },
+                new[] { spellPool }, "brown", "a", "b");
+            var option = new ProviderPlanningOption(provider,
+                new[] { "brown", "a", "b" },
+                new[] { "brown", "a", "b" }, 8, 80);
+            CastEnhancementSnapshot shareOne = ClassEnhancement("share", "brown",
+                ability, "brown-book", 1, "reservoir|brown",
+                "brown-fur-share-transmutation", true);
+            CastPlan sharePlan = new CastPlanner().Plan(snapshot,
+                new BuffCastRequest(new BuffSourceDefinition("share-twice",
+                    ability, Leaf("share-buff"), CastGroupingKind.PerTarget),
+                    new[] { "a", "b" }, ExistingEffectPolicy.Overwrite,
+                    null, new[] { "share" }), new[] { option }, EmptyPolicy(),
+                new ActiveEffectSnapshot(null), new[] { shareOne });
+            if (sharePlan.Steps.Count != 1 ||
+                sharePlan.Outcomes.Count(value => value.Kind ==
+                    TargetOutcomeKind.Unfulfilled) != 1)
+                throw new InvalidOperationException(
+                    "Two Share casts overcommitted a one-point reservoir.");
+
+            CastEnhancementSnapshot shareThree = ClassEnhancement("share", "brown",
+                ability, "brown-book", 3, "reservoir|brown",
+                "brown-fur-share-transmutation", true);
+            CastEnhancementSnapshot powerfulThree = ClassEnhancement("powerful",
+                "brown", ability, "brown-book", 3, "reservoir|brown",
+                "brown-fur-powerful-change", false);
+            string[] combined = { "share", "powerful" };
+            var requests = new[] {
+                new BuffCastRequest(new BuffSourceDefinition("a-first", ability,
+                    Leaf("first"), CastGroupingKind.PerTarget), new[] { "a" },
+                    ExistingEffectPolicy.Overwrite, null, combined),
+                new BuffCastRequest(new BuffSourceDefinition("b-second", ability,
+                    Leaf("second"), CastGroupingKind.PerTarget), new[] { "b" },
+                    ExistingEffectPolicy.Overwrite, null, combined)
+            };
+            CastPlan combinedPlan = new CastPlanner().PlanRoutine(snapshot,
+                requests, new[] { option }, EmptyPolicy(),
+                new ActiveEffectSnapshot(null),
+                new[] { shareThree, powerfulThree });
+            if (combinedPlan.Steps.Count != 1 ||
+                combinedPlan.Steps.Single().EnhancementUsageByPool[
+                    "reservoir|brown"] != 2 ||
+                combinedPlan.Outcomes.Count(value => value.Kind ==
+                    TargetOutcomeKind.Unfulfilled) != 1)
+                throw new InvalidOperationException(
+                    "Two two-point casts overcommitted a three-point reservoir.");
+
+            CastEnhancementSnapshot powerfulOne = ClassEnhancement("powerful",
+                "brown", ability, "brown-book", 1, "reservoir|brown",
+                "brown-fur-powerful-change", false);
+            CastPlan rejected = new CastPlanner().Plan(snapshot,
+                requests[0], new[] { option }, EmptyPolicy(),
+                new ActiveEffectSnapshot(null),
+                new[] { shareOne, powerfulOne });
+            if (rejected.Steps.Count != 0)
+                throw new InvalidOperationException(
+                    "A two-point cast was accepted with one reservoir point.");
+        }
+
+        private static void TestMultiEnhancementRoundTrip(string root)
+        {
+            AbilityKey ability = Ability("profile-multi-enhancement",
+                string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("profile-free",
+                ResourcePoolKind.Unlimited, 0, 0, null);
+            ProviderSnapshot provider = PlannerProvider("brown", "brown-book",
+                ability, pool.PoolKey, 0);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(new[] { provider },
+                new[] { pool }, "brown");
+            var option = new ProviderPlanningOption(provider,
+                new[] { "brown" }, new[] { "brown" }, 5, 50);
+            CastEnhancementSnapshot share = ClassEnhancement("share", "brown",
+                ability, "brown-book", 4, "reservoir|brown",
+                "brown-fur-share-transmutation", true);
+            CastEnhancementSnapshot powerful = ClassEnhancement("powerful",
+                "brown", ability, "brown-book", 4, "reservoir|brown",
+                "brown-fur-powerful-change", false);
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault(
+                "multi-enhancement-profile");
+            var effects = new Dictionary<string, EffectExpression> {
+                { ability.Canonical, Leaf("profile-buff") }
+            };
+            var model = new PlannerSetupModel(profile, snapshot,
+                new ActiveEffectSnapshot(null), effects, new[] { option },
+                ignored => { }, new[] { share, powerful });
+            model.SetEnhancement("long", powerful.EnhancementId);
+            model.SetEnhancement("long", share.EnhancementId);
+            string path = Path.Combine(root, "multi-enhancement-roundtrip");
+            Directory.CreateDirectory(path);
+            var repository = new ProfileRepository(path);
+            repository.Save(profile);
+            BuffPlannerProfile loaded = repository.Load(profile.CampaignId).Profile;
+            string[] actual = loaded.Routines.First(value => value.RoutineId ==
+                    "long").Assignments.Single().SelectedEnhancementIds.ToArray();
+            if (!actual.SequenceEqual(new[] { "powerful", "share" }) ||
+                loaded.SchemaVersion != BuffPlannerProfile.CurrentSchemaVersion)
+                throw new InvalidOperationException(
+                    "A multi-enhancement assignment did not round-trip in deterministic order.");
+            BuffPlannerProfile old = BuffPlannerProfile.CreateDefault(
+                "old-single-enhancement-profile");
+            old.Routines.First(value => value.RoutineId == "long")
+                .Assignments.Add(new SourceAssignmentProfile {
+                    SourceId = ability.Canonical,
+                    Ability = AbilityKeyProfile.FromKey(ability),
+                    WantedTargetUnitIds = new List<string>(),
+                    IgnoredPresenceMarkers = new List<string>(),
+                    SelectedEnhancementIds = new List<string> { "share" }
+                });
+            repository.Save(old);
+            if (repository.Load(old.CampaignId).Profile.Routines.First(value =>
+                    value.RoutineId == "long").Assignments.Single()
+                .SelectedEnhancementIds.Single() != "share")
+                throw new InvalidOperationException(
+                    "A legacy single-enhancement assignment no longer loads.");
+        }
+
+        private static void TestPassiveInfusionTargeting()
+        {
+            AbilityKey extract = Ability("personal-extract", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("extract-slots",
+                ResourcePoolKind.SpontaneousLevel, 1, 1, null);
+            ProviderSnapshot provider = PlannerProvider("alchemist",
+                "alchemist-book", extract, pool.PoolKey, 1);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(new[] { provider },
+                new[] { pool }, "alchemist", "ally");
+            var withoutInfusion = new ProviderPlanningOption(provider,
+                new[] { "alchemist" }, new[] { "alchemist" }, 6, 60);
+            var withInfusion = new ProviderPlanningOption(provider,
+                new[] { "alchemist", "ally" },
+                new[] { "alchemist", "ally" }, 6, 60);
+            var effects = new Dictionary<string, EffectExpression> {
+                { extract.Canonical, Leaf("extract-buff") }
+            };
+            var absent = new PlannerSetupModel(BuffPlannerProfile.CreateDefault(
+                "without-infusion"), snapshot, new ActiveEffectSnapshot(null),
+                effects, new[] { withoutInfusion }, ignored => { });
+            if (absent.IsTargetLegal(absent.SelectedSource, "ally"))
+                throw new InvalidOperationException(
+                    "A personal extract without Infusion targeted an ally.");
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault(
+                "with-infusion");
+            var present = new PlannerSetupModel(profile, snapshot,
+                new ActiveEffectSnapshot(null), effects, new[] { withInfusion },
+                ignored => { });
+            if (!present.IsTargetLegal(present.SelectedSource, "ally") ||
+                present.GetApplicableEnhancements().Count != 0)
+                throw new InvalidOperationException(
+                    "Native Infusion targeting was not passive or invented a toggle.");
+            var request = new BuffCastRequest(new BuffSourceDefinition(
+                "infused-extract", extract, Leaf("extract-buff"),
+                CastGroupingKind.PerTarget), new[] { "ally" },
+                ExistingEffectPolicy.Overwrite, null);
+            CastPlan plan = new CastPlanner().Plan(snapshot, request,
+                new[] { withInfusion }, EmptyPolicy(),
+                new ActiveEffectSnapshot(null));
+            if (plan.Steps.Count != 1 ||
+                plan.Steps.Single().Reservation.Units != 1 ||
+                plan.Steps.Single().EnhancementIds.Count != 0 ||
+                plan.Steps.Single().EnhancementUsageByPool.Count != 0)
+                throw new InvalidOperationException(
+                    "Infusion added a surcharge or changed ordinary extract-slot consumption.");
+
+            string repository = FindRepositoryRoot();
+            string source = File.ReadAllText(Path.Combine(repository, "src",
+                "KingmakerBuffPlanner", "GameAdapters",
+                "KingmakerProviderOptionBuilder.cs"));
+            if (!source.Contains("ability.IsAlchemistSpell") ||
+                !source.Contains("ability.AlchemistInfusion") ||
+                !source.Contains("ability.TargetAnchor") ||
+                source.Contains("InfusionEnhancement"))
+                throw new InvalidOperationException(
+                    "The passive native AbilityData Infusion seam is absent or toggle-backed.");
+        }
+
+        private static void TestExecutionPreflightUnderLease()
+        {
+            AbilityKey ability = Ability("lease-preflight", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("lease-free",
+                ResourcePoolKind.Unlimited, 0, 0, null);
+            ProviderSnapshot provider = PlannerProvider("brown", "brown-book",
+                ability, pool.PoolKey, 0);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(new[] { provider },
+                new[] { pool }, "brown");
+            var option = new ProviderPlanningOption(provider,
+                new[] { "brown" }, new[] { "brown" }, 4, 40);
+            CastEnhancementSnapshot share = ClassEnhancement("share", "brown",
+                ability, "brown-book", 1, "reservoir|brown",
+                "brown-fur-share-transmutation", true);
+            CastPlan plan = new CastPlanner().Plan(snapshot,
+                new BuffCastRequest(new BuffSourceDefinition("lease", ability,
+                    Leaf("lease-buff"), CastGroupingKind.PerTarget),
+                    new[] { "brown" }, ExistingEffectPolicy.Overwrite,
+                    null, new[] { "share" }), new[] { option }, EmptyPolicy(),
+                new ActiveEffectSnapshot(null), new[] { share });
+            var success = new LeaseAwareInstantRuntime(false);
+            ExecutionReport successReport = new ExecutionReport(plan);
+            Drain(new InstantCastExecutor(success, true).Execute(plan,
+                successReport));
+            if (string.Join(",", success.Events.ToArray()) !=
+                    "prepare,validate,fire,cleanup" || successReport.Confirmed != 1)
+                throw new InvalidOperationException(
+                    "Execution preflight did not run while the native activation lease was armed.");
+            var rejected = new LeaseAwareInstantRuntime(true);
+            ExecutionReport rejectedReport = new ExecutionReport(plan);
+            Drain(new InstantCastExecutor(rejected, true).Execute(plan,
+                rejectedReport));
+            if (string.Join(",", rejected.Events.ToArray()) !=
+                    "prepare,validate,cleanup" || rejected.FireCount != 0 ||
+                !rejectedReport.Records.Any(value => value.Detail ==
+                    "target-invalid-after-activation"))
+                throw new InvalidOperationException(
+                    "A post-activation target rejection issued or redirected a cast.");
+        }
+
+        private static CastEnhancementSnapshot ClassEnhancement(string id,
+            string caster, AbilityKey ability, string spellbook, int remaining,
+            string pool, string group, bool targeting)
+        {
+            string name = id == "share" ? "Share Transmutation" :
+                id.StartsWith("powerful", StringComparison.Ordinal)
+                    ? "Powerful Change: Strength" : id;
+            return new CastEnhancementSnapshot(id, caster, id + "-toggle",
+                name, string.Empty, CastEnhancementCategory.ClassFeature,
+                0, 0, remaining, new[] { ability.BaseAbilityGuid }, name,
+                new[] { spellbook }, pool, true, group, 1, targeting,
+                group, "Arcane Reservoir");
+        }
+
+        private static string FindRepositoryRoot()
+        {
+            DirectoryInfo directory = new DirectoryInfo(
+                Environment.CurrentDirectory);
+            while (directory != null && !File.Exists(Path.Combine(
+                directory.FullName, "KingmakerBuffPlanner.sln")))
+                directory = directory.Parent;
+            if (directory == null)
+                throw new InvalidOperationException(
+                    "Repository root was not discoverable.");
+            return directory.FullName;
+        }
+
         private static ProviderSelectionPolicy EmptyPolicy()
         {
             return new ProviderSelectionPolicy(null, null, null);
@@ -3895,6 +4546,80 @@ namespace KingmakerBuffPlanner.Tests
                 if (_throwOnFire) throw new InvalidOperationException("fixture-cast-failure");
                 return new InstantCastResult(true, true, true, true, "enhanced-success");
             }
+            public bool EffectsObserved(CastStep step) { return true; }
+        }
+
+        private sealed class FixtureShareTargetingModifier :
+            ICastTargetingModifier
+        {
+            private readonly string _enhancementId;
+            private readonly string _casterId;
+            private readonly string[] _legalIds;
+
+            internal FixtureShareTargetingModifier(string enhancementId,
+                string casterId, IEnumerable<string> legalIds)
+            {
+                _enhancementId = enhancementId;
+                _casterId = casterId;
+                _legalIds = (legalIds ?? new string[0]).ToArray();
+            }
+
+            public ProviderPlanningOption Apply(
+                EffectiveProviderOptionContext context,
+                ProviderPlanningOption option)
+            {
+                if (!context.SelectedEnhancements.Any(value =>
+                        value.EnhancementId == _enhancementId)) return option;
+                if (option.Provider.Key.CasterUnitId != _casterId) return null;
+                return new ProviderPlanningOption(option.Provider, _legalIds,
+                    _legalIds, option.EffectiveCasterLevel,
+                    option.ExpectedDurationRounds, true);
+            }
+        }
+
+        private sealed class LeaseAwareInstantRuntime :
+            IInstantCastRuntimeAdapter, ICastEnhancementRuntimeAdapter
+        {
+            private readonly bool _rejectTarget;
+            private bool _armed;
+            internal readonly List<string> Events = new List<string>();
+            internal int FireCount;
+
+            internal LeaseAwareInstantRuntime(bool rejectTarget)
+            {
+                _rejectTarget = rejectTarget;
+            }
+
+            public bool IsInCombat { get { return false; } }
+
+            public CastEnhancementPreparation PrepareEnhancements(CastStep step)
+            {
+                Events.Add("prepare");
+                _armed = true;
+                return CastEnhancementPreparation.Pass(new CallbackDisposable(
+                    () => { _armed = false; Events.Add("cleanup"); }));
+            }
+
+            public CastRuntimeValidation Validate(CastStep step)
+            {
+                Events.Add("validate");
+                if (!_armed)
+                    return CastRuntimeValidation.Fail(
+                        "activation-lease-not-armed");
+                return _rejectTarget
+                    ? CastRuntimeValidation.Fail(
+                        "target-invalid-after-activation")
+                    : CastRuntimeValidation.Pass();
+            }
+
+            public InstantCastResult Fire(CastStep step)
+            {
+                FireCount++;
+                Events.Add("fire");
+                return new InstantCastResult(true, true, true, true,
+                    "native-commit");
+            }
+
             public bool EffectsObserved(CastStep step) { return true; }
         }
 

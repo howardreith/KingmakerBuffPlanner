@@ -21,20 +21,64 @@ namespace KingmakerBuffPlanner.GameAdapters
     {
         private static readonly Dictionary<Type, MemberInfo[]> ActionListMembers =
             new Dictionary<Type, MemberInfo[]>();
+        private bool _ambiguous;
 
-        internal AlliedAreaCoverage Resolve(BlueprintAbility root)
+        internal string LastFailureReason { get; private set; }
+
+        internal AlliedAreaCoverage Resolve(BlueprintAbility root,
+            BlueprintAbility declaredSource = null)
         {
-            if (root == null) return null;
+            LastFailureReason = string.Empty;
+            _ambiguous = false;
+            if (root == null)
+            {
+                LastFailureReason = "ability-missing";
+                return null;
+            }
+            if (declaredSource != null && !IsDeclaredSource(root,
+                    declaredSource))
+            {
+                LastFailureReason = "selected-variant-source-mismatch";
+                return null;
+            }
             var candidates = new List<AlliedAreaCoverage>();
-            CollectAbility(root, new HashSet<BlueprintAbility>(
-                ReferenceEqualityComparer<BlueprintAbility>.Instance), candidates);
+            var active = new HashSet<BlueprintAbility>(
+                ReferenceEqualityComparer<BlueprintAbility>.Instance);
+            CollectAbility(root, active, candidates);
+            if (declaredSource != null && !ReferenceEquals(root,
+                    declaredSource))
+                CollectAbility(declaredSource, active, candidates);
             AlliedAreaCoverage[] distinct = candidates
                 .GroupBy(value => value.Radius.ToString("R"), StringComparer.Ordinal)
                 .Select(group => group.First()).ToArray();
-            return distinct.Length == 1 ? distinct[0] : null;
+            if (_ambiguous)
+            {
+                LastFailureReason = "conflicting-or-unreadable-area-contract";
+                return null;
+            }
+            if (distinct.Length != 1)
+            {
+                LastFailureReason = distinct.Length == 0
+                    ? "allied-area-radius-missing"
+                    : "contradictory-allied-area-radii";
+                return null;
+            }
+            return distinct[0];
         }
 
-        private static void CollectAbility(
+        private static bool IsDeclaredSource(BlueprintAbility selected,
+            BlueprintAbility source)
+        {
+            if (selected == null || source == null) return false;
+            if (ReferenceEquals(selected, source) || selected.AssetGuid ==
+                    source.AssetGuid) return true;
+            if (selected.Parent != null && selected.Parent.AssetGuid ==
+                    source.AssetGuid) return true;
+            return (source.Variants ?? new BlueprintAbility[0]).Any(value =>
+                value != null && value.AssetGuid == selected.AssetGuid);
+        }
+
+        private void CollectAbility(
             BlueprintAbility ability,
             HashSet<BlueprintAbility> active,
             List<AlliedAreaCoverage> candidates)
@@ -43,12 +87,15 @@ namespace KingmakerBuffPlanner.GameAdapters
             try
             {
                 AbilityTargetsAround around = ability.GetComponent<AbilityTargetsAround>();
-                if (around != null && AreaRecipientSemantics.IsAllied(
-                    AreaSelection(around.TargetType), ability.CanTargetFriends,
-                    ability.CanTargetEnemies, ability.CanTargetPoint))
+                if (around != null)
                 {
-                    candidates.Add(new AlliedAreaCoverage(around.AoERadius.Meters,
-                        ability.AssetGuid));
+                    if (AreaRecipientSemantics.IsAllied(
+                        AreaSelection(around.TargetType),
+                        ability.CanTargetFriends, ability.CanTargetEnemies,
+                        ability.CanTargetPoint))
+                        candidates.Add(new AlliedAreaCoverage(
+                            around.AoERadius.Meters, ability.AssetGuid));
+                    else _ambiguous = true;
                 }
 
                 AbilityEffectStickyTouch sticky = ability.GetComponent<AbilityEffectStickyTouch>();
@@ -59,7 +106,7 @@ namespace KingmakerBuffPlanner.GameAdapters
             finally { active.Remove(ability); }
         }
 
-        private static void CollectList(
+        private void CollectList(
             ActionList list,
             HashSet<BlueprintAbility> active,
             List<AlliedAreaCoverage> candidates)
@@ -70,7 +117,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                 CollectAction(action, active, candidates);
         }
 
-        private static void CollectAction(
+        private void CollectAction(
             GameAction action,
             HashSet<BlueprintAbility> active,
             List<AlliedAreaCoverage> candidates)
@@ -101,8 +148,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                 }
                 catch (Exception)
                 {
-                    // An optional wrapper that cannot be read is ambiguous; it
-                    // contributes no coverage rather than widening recipients.
+                    _ambiguous = true;
                 }
             }
         }

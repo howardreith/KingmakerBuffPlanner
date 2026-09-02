@@ -21,7 +21,7 @@ foreach ($target in $targets) {
     } else { $null }
 }
 & (Join-Path $PSScriptRoot 'Install-Local.ps1') -ReleaseManifestPath $manifest `
-    -InstallId 'whatif-install-proof' -ExpectedPriorVersion '0.0.13' -WhatIf -Confirm:$false
+    -InstallId 'whatif-install-proof' -ExpectedPriorVersion '0.0.16' -WhatIf -Confirm:$false
 foreach ($target in $targets) {
     $after = if (Test-Path -LiteralPath $target -PathType Container) {
         @(Get-KbpDirectoryManifest $target)
