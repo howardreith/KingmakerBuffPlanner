@@ -1,5 +1,30 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-09-01 - 0.0.17 publication authorization
+
+Status: OWNER AUTHORIZED FINALIZATION, MAIN MERGE, GUARDED PUSH, ANNOTATED TAG,
+AND NEW PUBLIC RELEASE. SAVE-BACKED GAMEPLAY REMAINS UNAVAILABLE AND UNCLAIMED.
+
+- Owner instruction: finalize the accepted candidate, merge it to `main`, push
+  it to the remote, and create a new release, with full authorization for all
+  of those release-engineering actions.
+- Read-only GitHub preflight: authenticated account `howardreith`; public
+  repository `howardreith/KingmakerBuffPlanner`; default branch `main`; origin
+  `https://github.com/howardreith/KingmakerBuffPlanner.git`.
+- Before this record, feature HEAD is
+  `9d460e025a934d91c2d310bbaeced225f398ff2b`; local `main` and `origin/main`
+  are synchronized at `f9cf2ac35535c8201dea7ef7f5172ebaa051e7ad` and the feature branch is five
+  commits ahead with no divergence. Local/remote `v0.0.17` and the GitHub
+  release are absent.
+- Release notes and changelog now authorize publication while preserving the
+  exact baseline=0/working=0 runtime-evidence limitation. No save-backed row is
+  promoted to PASS and no player save is substituted.
+- Exact next action: commit the authorization record, create the established
+  non-fast-forward release merge on `main`, repeat exact-merge qualification,
+  guarded-push `main`, invoke `Publish-Release.ps1 -Publish
+  -ConfirmHumanAcceptance`, independently verify tag/release/assets, and commit
+  the final publication evidence.
+
 ## 2026-09-01 - 0.0.17 final local qualification
 
 Status: LOCAL IMPLEMENTATION/PACKAGE COMPLETE; RUNTIME BLOCKED; NO PUBLICATION.

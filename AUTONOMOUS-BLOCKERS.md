@@ -1,5 +1,16 @@
 # Autonomous Blockers
 
+0.0.17 publication authorization, 2026-09-01: no authorization,
+authentication, repository, default-branch, remote-divergence, version, tag,
+release, source, build, deterministic-test, package, or guarded-publication
+blocker remains. The owner explicitly authorized finalization, non-rewriting
+merge to `main`, guarded push, annotated `v0.0.17` tag, and a new public
+release. GitHub preflight proved public `howardreith/KingmakerBuffPlanner`,
+default branch `main`, authenticated owner `howardreith`, synchronized
+local/remote main `f9cf2ac35535c8201dea7ef7f5172ebaa051e7ad`, and no existing `v0.0.17`
+tag or release. The separate save-backed limitation remains baseline=0 and
+working=0 and is not represented as runtime PASS.
+
 0.0.17 final local qualification, 2026-09-01: no remaining source,
 compilation, deterministic-test, exact-assembly, package, install-WhatIf, or
 runtime-WhatIf blocker. Qualified source is
@@ -12,9 +23,9 @@ The only gameplay evidence blocker remains external:
 `Disposable save ambiguity: baseline=0; working=0`. No actual communal,
 Share, Powerful Change composition, cancellation, or Infusion runtime scenario
 was performed. The guarded push-helper test also refuses this dedicated branch
-because its external allowlist has not been expanded; publication is both
-unauthorized and intentionally unattempted. Neither condition is represented as
-a product/runtime PASS.
+because its external allowlist has not been expanded; the authorized release
+therefore follows the established merge-to-allowlisted-`main` path. Neither
+condition is represented as a product/runtime PASS.
 
 0.0.17 communal/Share/Infusion update, 2026-09-01: no known source,
 architecture, compile, deterministic behavior, exact-assembly, or

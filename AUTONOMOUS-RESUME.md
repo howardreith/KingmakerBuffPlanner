@@ -1,5 +1,26 @@
 # Autonomous Resume
 
+## 0.0.17 publication authorization - 2026-09-01
+
+- The owner explicitly authorized finalization, non-rewriting merge to `main`,
+  guarded remote push, annotated tag, and a new public GitHub release.
+- Read-only preflight proved authenticated account `howardreith`, public
+  repository `howardreith/KingmakerBuffPlanner`, default branch `main`, and
+  origin `https://github.com/howardreith/KingmakerBuffPlanner.git`.
+- Before this authorization record, feature HEAD is
+  `9d460e025a934d91c2d310bbaeced225f398ff2b`; local `main` and `origin/main`
+  are synchronized at `f9cf2ac35535c8201dea7ef7f5172ebaa051e7ad`, which is an ancestor of the
+  five candidate commits. Both remote tag and GitHub release `v0.0.17` are
+  absent.
+- Release notes and changelog are publication-safe while continuing to state
+  the exact save-backed limitation. The owner accepts the qualified candidate
+  for publication without relabeling the unavailable runtime scenarios as
+  PASS.
+- Exact next action: commit this authorization record, create the established
+  no-fast-forward release merge on `main`, qualify that exact merge commit,
+  guarded-push `main`, run the guarded public publisher, independently verify
+  the tag and downloaded assets, then record and guarded-push completion.
+
 ## 0.0.17 final local handoff - 2026-09-01
 
 - Exact qualified source/package commit:

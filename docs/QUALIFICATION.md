@@ -1,5 +1,21 @@
 # Qualification
 
+## 0.0.17 publication authorization
+
+The owner explicitly accepted the mechanically qualified 0.0.17 candidate and
+authorized finalization, a non-rewriting merge to the default branch, guarded
+remote push, annotated tag, and a new public GitHub release. Read-only preflight
+proved authenticated owner `howardreith`, public repository
+`howardreith/KingmakerBuffPlanner`, default branch `main`, synchronized local
+and remote main `f9cf2ac35535c8201dea7ef7f5172ebaa051e7ad`, candidate HEAD
+`9d460e025a934d91c2d310bbaeced225f398ff2b`, and no existing local/remote tag
+or GitHub release `v0.0.17`.
+
+This publication authorization does not change the runtime evidence boundary:
+the guarded resolver still reports baseline=0 and working=0, zero gameplay
+scenarios were executed, and no ordinary save may substitute. The release
+notes preserve that limitation without representing it as automated PASS.
+
 ## 0.0.17 final local qualification record
 
 Status: SOURCE/BEHAVIOR/EXACT-ASSEMBLY/DEBUG/RELEASE/DETERMINISTIC LOCAL

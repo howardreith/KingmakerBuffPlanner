@@ -21,9 +21,9 @@
 - Adds deterministic structural, planning, presentation, persistence,
   execution-lease, shared-resource, optional-contract, and Infusion regressions.
 
-Local candidate only; not pushed, tagged, installed, or published. Save-backed
-runtime acceptance remains pending because the exact protected automation save
-pair is absent.
+The owner accepted the mechanically qualified candidate and authorized public
+publication. Save-backed runtime behavior remains explicitly unverified because
+the exact protected automation save pair is absent; no player save was used.
 
 ## 0.0.16 - catalog semantics and native HUD maintenance
 
