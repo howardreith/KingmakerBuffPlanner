@@ -208,6 +208,26 @@ namespace KingmakerBuffPlanner.Tests
                 Run("instant-executor-revalidates-batches-and-reports", TestInstantExecutor);
                 Run("submitted-without-effect-is-not-success", TestUnconfirmedExecution);
                 Run("hybrid-executor-routes-and-blocks-fallbacks", TestHybridExecutor);
+                Run("supported-sticky-touch-classification-is-direct-delivery",
+                    TestSupportedStickyTouchClassification);
+                Run("unsupported-sticky-touch-classification-fails-closed",
+                    TestUnsupportedStickyTouchClassification);
+                Run("freedom-of-movement-catalog-canary-is-sticky-delivery",
+                    TestFreedomOfMovementStickyTouchCatalogCanary);
+                Run("installed-sticky-touch-execution-contract-is-exact",
+                    TestInstalledStickyTouchExecutionContract);
+                Run("instant-sticky-touch-routing-bypasses-animated-command",
+                    TestStickyTouchInstantRouting);
+                Run("four-target-prepared-sticky-touch-is-sequential-and-exact",
+                    TestPreparedStickyTouchRepeatedTargets);
+                Run("spontaneous-sticky-touch-spends-shared-pool-once",
+                    TestSpontaneousStickyTouchRepeatedTargets);
+                Run("sticky-touch-rule-cast-spend-policy-is-single-owner",
+                    TestStickyTouchSpendPolicy);
+                Run("animated-sticky-touch-waits-for-complete-delivery-lifecycle",
+                    TestAnimatedStickyTouchLifecycle);
+                Run("sticky-touch-failure-cleanup-does-not-block-later-work",
+                    TestStickyTouchFailureCleanup);
             }
             finally
             {
@@ -3485,6 +3505,450 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("A submitted cast without its expected fact was counted as success.");
         }
 
+        private static void TestSupportedStickyTouchClassification()
+        {
+            CastExecutionCapability capability =
+                StickyTouchExecutionClassifier.Classify(true, true, true,
+                    true, true, true, false, false);
+            if (capability.Strategy !=
+                    CastExecutionStrategy.StickyTouchDeliveryRuleCast ||
+                capability.Reason !=
+                    "supported-beneficial-sticky-touch-delivery")
+                throw new InvalidOperationException(
+                    "A valid beneficial touch delivery remained animated-only.");
+            CastPlan plan = CreateStickyPlan(ResourcePoolKind.PreparedSlots,
+                1, capability.Strategy);
+            if (plan.Steps.Single().ExecutionStrategy !=
+                    CastExecutionStrategy.StickyTouchDeliveryRuleCast ||
+                plan.Steps.Single().ExecutionStrategyReason !=
+                    "sticky-touch-regression-fixture")
+                throw new InvalidOperationException(
+                    "The structural sticky-delivery strategy did not survive planning.");
+        }
+
+        private static void TestUnsupportedStickyTouchClassification()
+        {
+            CastExecutionCapability[] unsupported =
+            {
+                StickyTouchExecutionClassifier.Classify(true, false, false,
+                    false, false, false, false, false),
+                StickyTouchExecutionClassifier.Classify(true, true, false,
+                    true, true, true, false, false),
+                StickyTouchExecutionClassifier.Classify(true, true, true,
+                    false, true, true, false, false),
+                StickyTouchExecutionClassifier.Classify(true, true, true,
+                    true, true, true, true, false),
+                StickyTouchExecutionClassifier.Classify(true, true, true,
+                    true, true, true, false, true),
+                StickyTouchExecutionClassifier.Classify(true, true, true,
+                    true, false, false, false, false)
+            };
+            if (unsupported.Any(value => value.Strategy !=
+                    CastExecutionStrategy.AnimatedFallback) ||
+                unsupported.Any(value => string.IsNullOrWhiteSpace(
+                    value.Reason)))
+                throw new InvalidOperationException(
+                    "An unsafe or ambiguous touch delivery was treated as an ordinary direct spell.");
+        }
+
+        private static void TestFreedomOfMovementStickyTouchCatalogCanary()
+        {
+            JObject catalog = JObject.Parse(File.ReadAllText(Path.Combine(
+                FindRepositoryRoot(), "planning", "NATIVE-BUFF-CATALOG.json")));
+            JArray abilities = (JArray)catalog["abilities"];
+            JObject carrier = abilities.OfType<JObject>().Single(value =>
+                (string)value["abilityGuid"] ==
+                    "0087fc2d64b6095478bc7b8d7d512caf");
+            JObject delivery = abilities.OfType<JObject>().Single(value =>
+                (string)value["abilityGuid"] ==
+                    "4c349361d720e844e846ad8c19959b1e");
+            string[] carrierComponents = ((JArray)carrier[
+                "abilityComponentTypes"]).Values<string>().ToArray();
+            string[] deliveryComponents = ((JArray)delivery[
+                "abilityComponentTypes"]).Values<string>().ToArray();
+            JObject effect = ((JArray)delivery["effects"])
+                .OfType<JObject>().Single();
+            if (!(bool)carrier["isStickyTouch"] ||
+                !carrierComponents.Contains(
+                    "Kingmaker.UnitLogic.Abilities.Components.AbilityEffectStickyTouch") ||
+                !deliveryComponents.Contains(
+                    "Kingmaker.UnitLogic.Abilities.Components.AbilityDeliverTouch") ||
+                !deliveryComponents.Contains(
+                    "Kingmaker.UnitLogic.Abilities.Components.AbilityEffectRunAction") ||
+                !(bool)delivery["canTargetSelf"] ||
+                !(bool)delivery["canTargetFriends"] ||
+                (bool)delivery["canTargetEnemies"] ||
+                (bool)delivery["canTargetPoint"] ||
+                (string)effect["effectGuid"] !=
+                    "1533e782fca42b84ea370fc1dcbf4fc1" ||
+                (string)effect["actionPath"] !=
+                    "4c349361d720e844e846ad8c19959b1e/0:ActionList/0:ContextActionApplyBuff")
+                throw new InvalidOperationException(
+                    "The installed-catalog Freedom of Movement carrier/delivery canary changed.");
+        }
+
+        private static void TestInstalledStickyTouchExecutionContract()
+        {
+            string game = Environment.GetEnvironmentVariable(
+                "KBP_TEST_GAME_PATH");
+            if (string.IsNullOrWhiteSpace(game))
+                throw new InvalidOperationException(
+                    "KBP_TEST_GAME_PATH is missing.");
+            string path = Path.Combine(game, "Kingmaker_Data", "Managed",
+                "Assembly-CSharp.dll");
+            Assembly assembly = Assembly.LoadFrom(path);
+            if (assembly.ManifestModule.ModuleVersionId.ToString("D") !=
+                    "07fa1e4d-8618-41b3-9b8d-faa17d3b26f7")
+                throw new InvalidOperationException(
+                    "Installed Assembly-CSharp MVID is not the inspected Kingmaker 2.1.7b contract.");
+            string hash;
+            using (var stream = File.OpenRead(path))
+            using (var sha = System.Security.Cryptography.SHA256.Create())
+                hash = string.Concat(sha.ComputeHash(stream).Select(value =>
+                    value.ToString("x2")).ToArray());
+            if (hash !=
+                    "3b6450ffec440e296e586f71c711b195aed144b28d53e1cbb29406d18fef5afb")
+                throw new InvalidOperationException(
+                    "Installed Assembly-CSharp hash changed: " + hash);
+
+            Type abilityData = RequireType(assembly,
+                "Kingmaker.UnitLogic.Abilities.AbilityData");
+            Type blueprintAbility = RequireType(assembly,
+                "Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility");
+            Type sticky = RequireType(assembly,
+                "Kingmaker.UnitLogic.Abilities.Components.AbilityEffectStickyTouch");
+            Type partTouch = RequireType(assembly,
+                "Kingmaker.UnitLogic.Parts.UnitPartTouch");
+            Type unitCommand = RequireType(assembly,
+                "Kingmaker.UnitLogic.Commands.Base.UnitCommand");
+            Type unitCommands = RequireType(assembly,
+                "Kingmaker.UnitLogic.Commands.UnitCommands");
+            Type useAbility = RequireType(assembly,
+                "Kingmaker.UnitLogic.Commands.UnitUseAbility");
+            Type spellSlot = RequireType(assembly,
+                "Kingmaker.UnitLogic.SpellSlot");
+            Type ruleCast = RequireType(assembly,
+                "Kingmaker.RuleSystem.Rules.Abilities.RuleCastSpell");
+            BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic |
+                BindingFlags.Instance | BindingFlags.Static;
+            if (abilityData.GetConstructor(all, null,
+                    new[] { abilityData, blueprintAbility }, null) == null ||
+                abilityData.GetMethod("Spend", all, null, Type.EmptyTypes,
+                    null) == null ||
+                abilityData.GetMethod("SpendFromSpellbook", all) == null ||
+                abilityData.GetMethod("SpendMaterialComponent", all) == null ||
+                !WritableProperty(abilityData, "ConvertedFrom", all) ||
+                !WritableProperty(abilityData, "MetamagicData", all) ||
+                !WritableProperty(abilityData, "ParamSpellbook", all) ||
+                !WritableProperty(abilityData, "ParamSpellLevel", all) ||
+                !WritableProperty(abilityData, "ParamSpellSlot", all) ||
+                !WritableProperty(abilityData, "OverrideDC", all) ||
+                !WritableProperty(abilityData, "OverrideSpellLevel", all) ||
+                blueprintAbility.GetProperty("StickyTouch", all) == null ||
+                sticky.GetField("TouchDeliveryAbility", all) == null ||
+                partTouch.GetProperty("Ability", all) == null ||
+                partTouch.GetMethod("Init", all) == null ||
+                unitCommand.GetMethod("Interrupt", all, null,
+                    new[] { typeof(bool) }, null) == null ||
+                unitCommands.GetProperty("PreviousCommand", all) == null ||
+                unitCommands.GetMethod("AddToQueueFirst", all) == null ||
+                useAbility.GetField("Spell", all) == null ||
+                useAbility.GetProperty("Target", all) == null ||
+                spellSlot.GetField("Available", all) == null ||
+                spellSlot.GetField("LinkedSlots", all) == null ||
+                ruleCast.GetProperty("Success", all) == null ||
+                ruleCast.GetProperty("IsUMDFailed", all) == null ||
+                ruleCast.GetProperty("IsSpellFailed", all) == null)
+                throw new InvalidOperationException(
+                    "An installed sticky-touch, resource, command, or reporting member changed.");
+        }
+
+        private static void TestStickyTouchInstantRouting()
+        {
+            CastPlan sticky = CreateStickyPlan(
+                ResourcePoolKind.PreparedSlots, 4,
+                CastExecutionStrategy.StickyTouchDeliveryRuleCast);
+            var instant = new StickySequenceRuntime(0, 1);
+            var animated = new AlwaysAnimatedRuntime();
+            var report = new ExecutionReport(sticky);
+            Drain(new HybridCastExecutor(instant, animated, false, true)
+                .Execute(sticky, report));
+            if (instant.FireCount != 4 || animated.StartCount != 0 ||
+                report.Submitted != 4 || report.Confirmed != 4)
+                throw new InvalidOperationException(
+                    "A supported sticky delivery in Instant mode queued an animated command.");
+
+            CastPlan native = CreateStickyPlan(ResourcePoolKind.Unlimited, 1,
+                CastExecutionStrategy.NativeCommandRequired);
+            instant = new StickySequenceRuntime(0, 0);
+            animated = new AlwaysAnimatedRuntime();
+            report = new ExecutionReport(native);
+            Drain(new HybridCastExecutor(instant, animated, false, true)
+                .Execute(native, report));
+            if (instant.FireCount != 0 || animated.StartCount != 1 ||
+                report.Queued != 1 || report.Confirmed != 1)
+                throw new InvalidOperationException(
+                    "A native-command-only enhancement was redirected to RuleCastSpell.");
+        }
+
+        private static void TestPreparedStickyTouchRepeatedTargets()
+        {
+            CastPlan plan = CreateStickyPlan(ResourcePoolKind.PreparedSlots,
+                4, CastExecutionStrategy.StickyTouchDeliveryRuleCast);
+            string[][] expectedTokens =
+            {
+                new[] { "slot-0", "slot-0-linked" },
+                new[] { "slot-1" },
+                new[] { "slot-2" },
+                new[] { "slot-3" }
+            };
+            if (!plan.Steps.Select(step => step.Reservation.TokenIds.ToArray())
+                    .Zip(expectedTokens, (actual, expected) =>
+                        actual.SequenceEqual(expected)).All(value => value))
+                throw new InvalidOperationException(
+                    "Prepared sticky casts did not reserve exact distinct primary and opposition-linked tokens.");
+            var runtime = new StickySequenceRuntime(0, 2);
+            var report = new ExecutionReport(plan);
+            Drain(new InstantCastExecutor(runtime, true, 1)
+                .Execute(plan, report));
+            if (runtime.FireCount != 4 || runtime.RuleTransactions != 4 ||
+                runtime.SourceSpendInvocations != 4 ||
+                runtime.DeliverySpendInvocations != 0 ||
+                runtime.CleanupCount != 0 || runtime.PrematureValidation ||
+                runtime.SpentTokenIds.Count != 5 ||
+                report.Submitted != 4 || report.SpendInvocations != 4 ||
+                report.ResourcesSpent != 4 || report.Confirmed != 4 ||
+                report.Failed != 0)
+                throw new InvalidOperationException(
+                    "Four prepared sticky deliveries reused a slot, double-spent, advanced early, or failed near target three.");
+        }
+
+        private static void TestSpontaneousStickyTouchRepeatedTargets()
+        {
+            CastPlan plan = CreateStickyPlan(
+                ResourcePoolKind.SpontaneousLevel, 4,
+                CastExecutionStrategy.StickyTouchDeliveryRuleCast);
+            var runtime = new StickySequenceRuntime(4, 1);
+            var report = new ExecutionReport(plan);
+            Drain(new InstantCastExecutor(runtime, true, 1)
+                .Execute(plan, report));
+            if (runtime.SharedRemaining != 0 ||
+                runtime.SourceSpendInvocations != 4 ||
+                runtime.DeliverySpendInvocations != 0 ||
+                report.SpendInvocations != 4 ||
+                report.ResourcesSpent != 4 || report.Confirmed != 4 ||
+                report.Failed != 0)
+                throw new InvalidOperationException(
+                    "Repeated sticky delivery did not consume the spontaneous level pool exactly once per target.");
+        }
+
+        private static void TestStickyTouchSpendPolicy()
+        {
+            if (RuleCastSpendPolicy.ShouldInvokeSpend(false, false) ||
+                RuleCastSpendPolicy.ShouldInvokeSpend(true, true) ||
+                !RuleCastSpendPolicy.ShouldInvokeSpend(true, false))
+                throw new InvalidOperationException(
+                    "RuleCastSpell/Spend ownership changed for submission or UMD failure.");
+            CastPlan plan = CreateStickyPlan(ResourcePoolKind.Unlimited, 1,
+                CastExecutionStrategy.StickyTouchDeliveryRuleCast);
+            var report = new ExecutionReport(plan);
+            Drain(new InstantCastExecutor(new UmdInstantRuntime(), true, 1)
+                .Execute(plan, report));
+            if (report.Submitted != 1 || report.SpendInvocations != 0 ||
+                report.ResourcesSpent != 0 || report.Failed != 1)
+                throw new InvalidOperationException(
+                    "A UMD-failed rule transaction was charged or reported as successful.");
+        }
+
+        private static void TestAnimatedStickyTouchLifecycle()
+        {
+            var lifecycle = new AnimatedStickyTouchLifecycle(10);
+            if (lifecycle.Observe(StickyLifecycle(false, false, true,
+                    false, false, false, false, false)).Complete ||
+                lifecycle.Observe(StickyLifecycle(true, true, true,
+                    false, false, false, true, false)).Complete ||
+                lifecycle.Observe(StickyLifecycle(true, true, true,
+                    true, false, false, true, false)).Complete ||
+                lifecycle.Observe(StickyLifecycle(true, true, true,
+                    true, true, true, false, false)).Complete)
+                throw new InvalidOperationException(
+                    "Animated sticky execution completed at the carrier or before effect confirmation.");
+            AnimatedStickyTouchLifecycleDecision complete = lifecycle.Observe(
+                StickyLifecycle(true, true, true, true, true, true,
+                    false, true));
+            if (!complete.Complete || !complete.Succeeded ||
+                complete.TimedOut)
+                throw new InvalidOperationException(
+                    "Animated sticky execution did not finish after delivery, effect, and held-state settlement.");
+            AnimatedStickyTouchLifecycleDecision self =
+                new AnimatedStickyTouchLifecycle(3).Observe(StickyLifecycle(
+                    true, true, false, false, false, false, false, true));
+            if (!self.Complete || !self.Succeeded)
+                throw new InvalidOperationException(
+                    "A self-target sticky cast incorrectly required a generated delivery command.");
+            AnimatedStickyTouchLifecycleDecision failed =
+                new AnimatedStickyTouchLifecycle(3).Observe(StickyLifecycle(
+                    true, true, true, true, true, false, false, false));
+            if (!failed.Complete || failed.Succeeded || failed.TimedOut ||
+                failed.Detail != "delivery-command-failed")
+                throw new InvalidOperationException(
+                    "A failed animated delivery was not reported precisely.");
+            var timeout = new AnimatedStickyTouchLifecycle(2);
+            timeout.Observe(StickyLifecycle(false, false, true, false,
+                false, false, false, false));
+            AnimatedStickyTouchLifecycleDecision timed = timeout.Observe(
+                StickyLifecycle(false, false, true, false, false, false,
+                    false, false));
+            if (!timed.Complete || !timed.TimedOut || timed.Succeeded)
+                throw new InvalidOperationException(
+                    "A stalled animated carrier escaped its bounded lifecycle timeout.");
+        }
+
+        private static void TestStickyTouchFailureCleanup()
+        {
+            CastPlan plan = CreateStickyPlan(ResourcePoolKind.Unlimited, 2,
+                CastExecutionStrategy.StickyTouchDeliveryRuleCast);
+            var cleaned = new CleanupInstantRuntime(false);
+            var report = new ExecutionReport(plan);
+            Drain(new HybridCastExecutor(cleaned, new AlwaysAnimatedRuntime(),
+                false, true).Execute(plan, report));
+            if (cleaned.FireCount != 2 || cleaned.CleanupCount != 1 ||
+                report.Confirmed != 1 ||
+                !report.Records.Any(record => record.Status ==
+                    CastExecutionStatus.TimedOutUnconfirmed) ||
+                report.Records.Any(record => record.Status ==
+                    CastExecutionStatus.ResidualStateUnsettled))
+                throw new InvalidOperationException(
+                    "A cleaned failed transaction blocked the next target or claimed residual state.");
+
+            var uncleared = new CleanupInstantRuntime(true);
+            report = new ExecutionReport(plan);
+            Drain(new HybridCastExecutor(uncleared,
+                new AlwaysAnimatedRuntime(), false, true)
+                .Execute(plan, report));
+            if (uncleared.FireCount != 1 ||
+                !report.Records.Any(record => record.Status ==
+                    CastExecutionStatus.ResidualStateUnsettled) ||
+                !report.Records.Any(record => record.Detail ==
+                    "prior-hybrid-transaction-unsettled"))
+                throw new InvalidOperationException(
+                    "An uncleared delivery state allowed the next conflicting transaction.");
+            uncleared.RecoverExternalState();
+            CastPlan later = CreateStickyPlan(ResourcePoolKind.Unlimited, 1,
+                CastExecutionStrategy.StickyTouchDeliveryRuleCast);
+            var laterReport = new ExecutionReport(later);
+            Drain(new HybridCastExecutor(uncleared,
+                new AlwaysAnimatedRuntime(), false, true)
+                .Execute(later, laterReport));
+            if (laterReport.Confirmed != 1)
+                throw new InvalidOperationException(
+                    "A later routine remained globally blocked after delivery state recovery.");
+
+            var animated = new CleanupAnimatedRuntime();
+            report = new ExecutionReport(plan);
+            Drain(new AnimatedCastExecutor(animated, true)
+                .Execute(plan, report));
+            if (animated.StartCount != 2 || animated.DisposeCount != 2 ||
+                report.Confirmed != 1 ||
+                report.Records.Any(record => record.Status ==
+                    CastExecutionStatus.ResidualStateUnsettled))
+                throw new InvalidOperationException(
+                    "Animated carrier/delivery cleanup leaked state or blocked the following cast.");
+
+            var exceptionRuntime =
+                new ExceptionThenSuccessAnimatedRuntime();
+            report = new ExecutionReport(plan);
+            Drain(new AnimatedCastExecutor(exceptionRuntime, true)
+                .Execute(plan, report));
+            if (exceptionRuntime.StartCount != 2 ||
+                exceptionRuntime.DisposeCount != 2 ||
+                report.Confirmed != 1 || report.Failed != 1 ||
+                !report.Records.Any(record => record.Detail.Contains(
+                    "animated-operation-exception:System.InvalidOperationException:fixture-operation-failure")))
+                throw new InvalidOperationException(
+                    "An animated operation exception leaked cleanup or prevented later work.");
+        }
+
+        private static AnimatedStickyTouchLifecycleSnapshot StickyLifecycle(
+            bool carrierFinished, bool carrierSucceeded,
+            bool deliveryExpected, bool deliveryIdentified,
+            bool deliveryFinished, bool deliverySucceeded,
+            bool heldTouch, bool effectsObserved)
+        {
+            return new AnimatedStickyTouchLifecycleSnapshot(carrierFinished,
+                carrierSucceeded, deliveryExpected, deliveryIdentified,
+                deliveryFinished, deliverySucceeded, heldTouch,
+                effectsObserved);
+        }
+
+        private static CastPlan CreateStickyPlan(ResourcePoolKind poolKind,
+            int targetCount, CastExecutionStrategy strategy)
+        {
+            AbilityKey ability = Ability("sticky-carrier-fixture",
+                string.Empty, 0);
+            string poolKey = "sticky-pool-" + poolKind;
+            ResourcePoolSnapshot pool;
+            string[] eligible = new string[0];
+            if (poolKind == ResourcePoolKind.PreparedSlots)
+            {
+                var tokens = new List<ResourceTokenSnapshot>();
+                var primary = new List<string>();
+                for (int index = 0; index < targetCount; index++)
+                {
+                    string token = "slot-" + index;
+                    primary.Add(token);
+                    tokens.Add(new ResourceTokenSnapshot(token, ability, 4,
+                        index == 0 ? PreparedSlotKind.Opposition :
+                            PreparedSlotKind.Common,
+                        true, true, index == 0
+                            ? new[] { "slot-0-linked" } : null));
+                }
+                tokens.Add(new ResourceTokenSnapshot("slot-0-linked",
+                    ability, 4, PreparedSlotKind.Opposition, true, false,
+                    null));
+                pool = new ResourcePoolSnapshot(poolKey,
+                    ResourcePoolKind.PreparedSlots, tokens.Count,
+                    tokens.Count, tokens);
+                eligible = primary.ToArray();
+            }
+            else if (poolKind == ResourcePoolKind.Unlimited)
+                pool = new ResourcePoolSnapshot(poolKey,
+                    ResourcePoolKind.Unlimited, 0, 0, null);
+            else
+                pool = new ResourcePoolSnapshot(poolKey, poolKind,
+                    targetCount, targetCount, null);
+            var provider = new ProviderSnapshot(new ProviderKey("caster",
+                "sticky-book", ability, "level-4"), "Sticky carrier", 4,
+                poolKey, poolKind == ResourcePoolKind.Unlimited ? 0 : 1,
+                eligible);
+            string[] targets = Enumerable.Range(0, targetCount)
+                .Select(index => "target-" + index).ToArray();
+            PartyProviderSnapshot snapshot = PlannerSnapshot(
+                new[] { provider }, new[] { pool },
+                new[] { "caster" }.Concat(targets).ToArray());
+            var option = new ProviderPlanningOption(provider, targets,
+                targets, 8, 80, strategy,
+                "sticky-touch-regression-fixture");
+            return PlannerPlan(snapshot, ability,
+                CastGroupingKind.PerTarget, targets, new[] { option },
+                EmptyPolicy(), new ActiveEffectSnapshot(null));
+        }
+
+        private static Type RequireType(Assembly assembly, string name)
+        {
+            Type type = assembly.GetType(name, false);
+            if (type == null) throw new InvalidOperationException(
+                "Installed contract type is absent: " + name);
+            return type;
+        }
+
+        private static bool WritableProperty(Type type, string name,
+            BindingFlags flags)
+        {
+            PropertyInfo property = type.GetProperty(name, flags);
+            return property != null && property.GetSetMethod(true) != null;
+        }
+
         private static void Drain(System.Collections.IEnumerator enumerator)
         {
             int moves = 0;
@@ -4547,6 +5011,10 @@ namespace KingmakerBuffPlanner.Tests
                 return new InstantCastResult(true, true, true, true, "enhanced-success");
             }
             public bool EffectsObserved(CastStep step) { return true; }
+            public InstantCastCompletion InspectCompletion(CastStep step)
+            { return InstantCastCompletion.Settled("fixture-settled"); }
+            public InstantCastCompletion Cleanup(CastStep step)
+            { return InstantCastCompletion.Settled("fixture-clean"); }
         }
 
         private sealed class FixtureShareTargetingModifier :
@@ -4621,6 +5089,10 @@ namespace KingmakerBuffPlanner.Tests
             }
 
             public bool EffectsObserved(CastStep step) { return true; }
+            public InstantCastCompletion InspectCompletion(CastStep step)
+            { return InstantCastCompletion.Settled("fixture-settled"); }
+            public InstantCastCompletion Cleanup(CastStep step)
+            { return InstantCastCompletion.Settled("fixture-clean"); }
         }
 
         private sealed class CallbackDisposable : IDisposable
@@ -4699,7 +5171,9 @@ namespace KingmakerBuffPlanner.Tests
             public bool Succeeded { get { return true; } }
             public bool EffectsObserved { get { return true; } }
             public bool ResourceSpent { get { return true; } }
+            public bool HasResidualDeliveryState { get { return false; } }
             public string Detail { get { return "command-success"; } }
+            public void Dispose() { }
         }
 
         private sealed class FakeInstantRuntime : IInstantCastRuntimeAdapter
@@ -4720,6 +5194,10 @@ namespace KingmakerBuffPlanner.Tests
                 return new InstantCastResult(true, true, true, true, "rule-success");
             }
             public bool EffectsObserved(CastStep step) { return true; }
+            public InstantCastCompletion InspectCompletion(CastStep step)
+            { return InstantCastCompletion.Settled("fixture-settled"); }
+            public InstantCastCompletion Cleanup(CastStep step)
+            { return InstantCastCompletion.Settled("fixture-clean"); }
         }
 
         private sealed class AlwaysAnimatedRuntime : ICastRuntimeAdapter
@@ -4745,6 +5223,10 @@ namespace KingmakerBuffPlanner.Tests
                 return new InstantCastResult(true, true, true, true, "rule-success");
             }
             public bool EffectsObserved(CastStep step) { return true; }
+            public InstantCastCompletion InspectCompletion(CastStep step)
+            { return InstantCastCompletion.Settled("fixture-settled"); }
+            public InstantCastCompletion Cleanup(CastStep step)
+            { return InstantCastCompletion.Settled("fixture-clean"); }
         }
 
         private sealed class NeverObservedInstantRuntime : IInstantCastRuntimeAdapter
@@ -4756,6 +5238,260 @@ namespace KingmakerBuffPlanner.Tests
                 return new InstantCastResult(true, true, false, true, "rule-success-no-effect");
             }
             public bool EffectsObserved(CastStep step) { return false; }
+            public InstantCastCompletion InspectCompletion(CastStep step)
+            { return InstantCastCompletion.Settled("fixture-settled"); }
+            public InstantCastCompletion Cleanup(CastStep step)
+            { return InstantCastCompletion.Settled("fixture-clean"); }
+        }
+
+        private sealed class StickySequenceRuntime : IInstantCastRuntimeAdapter
+        {
+            private readonly int _effectDelayPolls;
+            private readonly Dictionary<CastStep, int> _effectPolls =
+                new Dictionary<CastStep, int>();
+            private CastStep _outstanding;
+
+            internal StickySequenceRuntime(int sharedRemaining,
+                int effectDelayPolls)
+            {
+                SharedRemaining = sharedRemaining;
+                _effectDelayPolls = effectDelayPolls;
+            }
+
+            internal int FireCount;
+            internal int RuleTransactions;
+            internal int SourceSpendInvocations;
+            internal int DeliverySpendInvocations { get { return 0; } }
+            internal int CleanupCount;
+            internal int SharedRemaining;
+            internal bool PrematureValidation;
+            internal readonly HashSet<string> SpentTokenIds =
+                new HashSet<string>(StringComparer.Ordinal);
+
+            public bool IsInCombat { get { return false; } }
+
+            public CastRuntimeValidation Validate(CastStep step)
+            {
+                if (_outstanding != null)
+                {
+                    PrematureValidation = true;
+                    return CastRuntimeValidation.Fail(
+                        "prior-effect-not-confirmed");
+                }
+                if (step.Reservation.TokenIds.Any(
+                        SpentTokenIds.Contains))
+                    return CastRuntimeValidation.Fail(
+                        "prepared-token-already-spent");
+                return CastRuntimeValidation.Pass();
+            }
+
+            public InstantCastResult Fire(CastStep step)
+            {
+                FireCount++;
+                RuleTransactions++;
+                SourceSpendInvocations++;
+                foreach (string token in step.Reservation.TokenIds)
+                    if (!SpentTokenIds.Add(token))
+                        throw new InvalidOperationException(
+                            "A prepared token was reused: " + token);
+                if (step.Reservation.TokenIds.Count == 0 &&
+                    step.Reservation.Units > 0)
+                {
+                    if (SharedRemaining < step.Reservation.Units)
+                        throw new InvalidOperationException(
+                            "The shared spell pool was overdrawn.");
+                    SharedRemaining -= step.Reservation.Units;
+                }
+                if (_effectDelayPolls > 0) _outstanding = step;
+                return new InstantCastResult(true, true,
+                    _effectDelayPolls == 0, true, true,
+                    "sticky-rule-cast;spend-owner:source;delivery-spend:false");
+            }
+
+            public bool EffectsObserved(CastStep step)
+            {
+                if (_effectDelayPolls == 0) return true;
+                int polls;
+                _effectPolls.TryGetValue(step, out polls);
+                polls++;
+                _effectPolls[step] = polls;
+                if (polls < _effectDelayPolls) return false;
+                if (object.ReferenceEquals(_outstanding, step))
+                    _outstanding = null;
+                return true;
+            }
+
+            public InstantCastCompletion InspectCompletion(CastStep step)
+            {
+                return InstantCastCompletion.Settled(
+                    "direct-delivery-has-no-held-touch-or-command");
+            }
+
+            public InstantCastCompletion Cleanup(CastStep step)
+            {
+                CleanupCount++;
+                _outstanding = null;
+                return InstantCastCompletion.Settled(
+                    "sticky-sequence-clean");
+            }
+        }
+
+        private sealed class UmdInstantRuntime : IInstantCastRuntimeAdapter
+        {
+            public bool IsInCombat { get { return false; } }
+            public CastRuntimeValidation Validate(CastStep step)
+            { return CastRuntimeValidation.Pass(); }
+            public InstantCastResult Fire(CastStep step)
+            {
+                return new InstantCastResult(true, false, false, false,
+                    false, "rule-success:false;umd-failed:true;spend-invoked:false");
+            }
+            public bool EffectsObserved(CastStep step) { return false; }
+            public InstantCastCompletion InspectCompletion(CastStep step)
+            { return InstantCastCompletion.Settled("umd-rule-settled"); }
+            public InstantCastCompletion Cleanup(CastStep step)
+            { return InstantCastCompletion.Settled("umd-no-cleanup"); }
+        }
+
+        private sealed class CleanupInstantRuntime :
+            IInstantCastRuntimeAdapter
+        {
+            private bool _failCleanup;
+            private bool _residualOnNextFire = true;
+            private bool _residual;
+
+            internal CleanupInstantRuntime(bool failCleanup)
+            {
+                _failCleanup = failCleanup;
+            }
+
+            internal int FireCount;
+            internal int CleanupCount;
+            public bool IsInCombat { get { return false; } }
+            public CastRuntimeValidation Validate(CastStep step)
+            { return CastRuntimeValidation.Pass(); }
+            public InstantCastResult Fire(CastStep step)
+            {
+                FireCount++;
+                if (_residualOnNextFire)
+                {
+                    _residual = true;
+                    _residualOnNextFire = false;
+                }
+                return new InstantCastResult(true, true, true, true, true,
+                    "cleanup-fixture-rule-success");
+            }
+            public bool EffectsObserved(CastStep step) { return true; }
+            public InstantCastCompletion InspectCompletion(CastStep step)
+            {
+                return _residual ? InstantCastCompletion.Pending(
+                    "fixture-held-touch:true") :
+                    InstantCastCompletion.Settled(
+                        "fixture-held-touch:false");
+            }
+            public InstantCastCompletion Cleanup(CastStep step)
+            {
+                CleanupCount++;
+                if (!_failCleanup) _residual = false;
+                return _residual ? InstantCastCompletion.Pending(
+                    "fixture-cleanup-residual:true") :
+                    InstantCastCompletion.Settled(
+                        "fixture-cleanup-residual:false");
+            }
+            internal void RecoverExternalState()
+            {
+                _failCleanup = false;
+                _residual = false;
+                _residualOnNextFire = false;
+            }
+        }
+
+        private sealed class CleanupAnimatedRuntime : ICastRuntimeAdapter
+        {
+            internal int StartCount;
+            internal int DisposeCount;
+            public bool IsInCombat { get { return false; } }
+            public CastRuntimeValidation Validate(CastStep step)
+            { return CastRuntimeValidation.Pass(); }
+            public IAnimatedCastOperation StartAnimated(CastStep step)
+            {
+                StartCount++;
+                return new CleanupAnimatedOperation(StartCount != 1,
+                    () => DisposeCount++);
+            }
+        }
+
+        private sealed class CleanupAnimatedOperation :
+            IAnimatedCastOperation
+        {
+            private readonly bool _success;
+            private readonly Action _disposedCallback;
+            private bool _residual;
+            private bool _disposed;
+
+            internal CleanupAnimatedOperation(bool success,
+                Action disposedCallback)
+            {
+                _success = success;
+                _residual = !success;
+                _disposedCallback = disposedCallback;
+            }
+
+            public bool IsCompleted { get { return true; } }
+            public bool IsStarted { get { return true; } }
+            public bool TimedOut { get { return false; } }
+            public bool Succeeded { get { return _success; } }
+            public bool EffectsObserved { get { return _success; } }
+            public bool ResourceSpent { get { return _success; } }
+            public bool HasResidualDeliveryState
+            { get { return _residual; } }
+            public string Detail
+            { get { return _success ? "delivery-success" : "delivery-failed"; } }
+            public void Dispose()
+            {
+                if (_disposed) return;
+                _disposed = true;
+                _residual = false;
+                _disposedCallback();
+            }
+        }
+
+        private sealed class ExceptionThenSuccessAnimatedRuntime :
+            ICastRuntimeAdapter
+        {
+            internal int StartCount;
+            internal int DisposeCount;
+            public bool IsInCombat { get { return false; } }
+            public CastRuntimeValidation Validate(CastStep step)
+            { return CastRuntimeValidation.Pass(); }
+            public IAnimatedCastOperation StartAnimated(CastStep step)
+            {
+                StartCount++;
+                return StartCount == 1
+                    ? (IAnimatedCastOperation)new ThrowingAnimatedOperation(
+                        () => DisposeCount++)
+                    : new CleanupAnimatedOperation(true,
+                        () => DisposeCount++);
+            }
+        }
+
+        private sealed class ThrowingAnimatedOperation :
+            IAnimatedCastOperation
+        {
+            private readonly Action _disposedCallback;
+            internal ThrowingAnimatedOperation(Action disposedCallback)
+            { _disposedCallback = disposedCallback; }
+            public bool IsCompleted
+            { get { throw new InvalidOperationException(
+                "fixture-operation-failure"); } }
+            public bool IsStarted { get { return true; } }
+            public bool TimedOut { get { return false; } }
+            public bool Succeeded { get { return false; } }
+            public bool EffectsObserved { get { return false; } }
+            public bool ResourceSpent { get { return false; } }
+            public bool HasResidualDeliveryState { get { return false; } }
+            public string Detail { get { return "throwing-operation"; } }
+            public void Dispose() { _disposedCallback(); }
         }
 
         private static DiscoveryNode EffectNode(string id)
