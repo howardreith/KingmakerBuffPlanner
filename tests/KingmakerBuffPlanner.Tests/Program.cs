@@ -208,6 +208,8 @@ namespace KingmakerBuffPlanner.Tests
                 Run("instant-executor-revalidates-batches-and-reports", TestInstantExecutor);
                 Run("submitted-without-effect-is-not-success", TestUnconfirmedExecution);
                 Run("hybrid-executor-routes-and-blocks-fallbacks", TestHybridExecutor);
+                Run("routing-evidence-precedes-cast-and-survives-cancellation", TestRoutingEvidence);
+                Run("instant-fallback-distinguishes-effect-confirmation", TestInstantFallbackFeedback);
                 Run("share-direct-capability-controls-combined-routing",
                     TestShareDirectRoutingPolicy);
                 Run("share-direct-four-recipients-preserve-resource-ownership",
@@ -3489,6 +3491,63 @@ namespace KingmakerBuffPlanner.Tests
                 report.Confirmed != 2 || report.Failed != 0)
                 throw new InvalidOperationException(
                     "A native-command enhancement was treated as optional animated fallback.");
+        }
+
+        private static void TestRoutingEvidence()
+        {
+            CastPlan plan = CreateShareDirectPlan(4, false);
+            var instant = new AlwaysInstantRuntime();
+            var animated = new AlwaysAnimatedRuntime();
+            var report = new ExecutionReport(plan);
+            var routes = new List<string>();
+            int nativeChecks = 0;
+            System.Collections.IEnumerator work = new HybridCastExecutor(instant, animated, false, true,
+                step => { nativeChecks++; return true; },
+                (index, step, useAnimated, detail) =>
+                {
+                    if (index != 0 || !useAnimated || instant.FireCount != 0 ||
+                        animated.StartCount != 0 || report.Records.Count != 1 ||
+                        report.Records[0].Status != CastExecutionStatus.ExecutorSelected)
+                        throw new InvalidOperationException("Routing was not recorded before starting the cast.");
+                    routes.Add(detail);
+                }).Execute(plan, report);
+            work.MoveNext();
+            ((IDisposable)work).Dispose();
+            if (nativeChecks != 1 || routes.Count != 1 ||
+                !routes[0].Contains("planned-strategy:ProviderDirectRuleCast") ||
+                !routes[0].Contains("actual-executor:Animated") ||
+                !routes[0].Contains("native-callback:True") ||
+                !routes[0].Contains("native-strategy:False") ||
+                report.Records.Count(record => record.Status ==
+                    CastExecutionStatus.ExecutorSelected) != 1)
+                throw new InvalidOperationException("Cancellation lost the decisive native callback override.");
+
+            plan = CreateLegacySharePlan();
+            report = new ExecutionReport(plan);
+            routes.Clear();
+            Drain(new HybridCastExecutor(new AlwaysInstantRuntime(),
+                new AlwaysAnimatedRuntime(), false, true, null,
+                (index, step, useAnimated, detail) => routes.Add(detail))
+                .Execute(plan, report));
+            if (routes.Count != 1 || !routes[0].Contains("native-callback:False") ||
+                !routes[0].Contains("native-strategy:True") ||
+                !routes[0].Contains("actual-executor:Animated"))
+                throw new InvalidOperationException("Legacy strategy fallback was confused with a callback override.");
+        }
+
+        private static void TestInstantFallbackFeedback()
+        {
+            var fallback = new QuickExecutionResult("long", "Long",
+                QuickExecutionDisposition.Completed, "Animated Share fallback.", 4, 4, 4, true);
+            var direct = new QuickExecutionResult("long", "Long",
+                QuickExecutionDisposition.Completed, "Effects confirmed.", 4, 4, 4);
+            var failed = new QuickExecutionResult("long", "Long",
+                QuickExecutionDisposition.Failed, "Cast interrupted.", 4, 1, 0, true);
+            if (fallback.Disposition != QuickExecutionDisposition.CompletedWithFallback ||
+                !fallback.UsedAnimatedFallback || fallback.Confirmed != 4 ||
+                direct.Disposition != QuickExecutionDisposition.Completed ||
+                direct.UsedAnimatedFallback || failed.Disposition != QuickExecutionDisposition.Failed)
+                throw new InvalidOperationException("Fallback erased effect confirmation or claimed Instant completion.");
         }
 
         private static void TestShareDirectRoutingPolicy()

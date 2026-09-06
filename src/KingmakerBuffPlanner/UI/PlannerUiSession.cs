@@ -6,6 +6,7 @@ using Kingmaker;
 using Kingmaker.Blueprints;
 using Kingmaker.UnitLogic.Abilities.Blueprints;
 using KingmakerBuffPlanner.Discovery;
+using KingmakerBuffPlanner.Diagnostics;
 using KingmakerBuffPlanner.Domain.Effects;
 using KingmakerBuffPlanner.Domain.Planning;
 using KingmakerBuffPlanner.Domain.Providers;
@@ -349,16 +350,51 @@ namespace KingmakerBuffPlanner.UI
             }
             LastExecutionReport = new ExecutionReport(preview.Plan);
             ICastExecutor executor;
+            var fallbackWarnings = new HashSet<string>(StringComparer.Ordinal);
             if (Model.Profile.Execution.Mode == "instant")
             {
-                var nativeEnhancements = new HashSet<string>(_enhancements
+                CastEnhancementSnapshot[] executionEnhancements = _enhancements;
+                var nativeEnhancements = new HashSet<string>(executionEnhancements
                     .Where(value => value.RequiresNativeCommand)
                     .Select(value => value.EnhancementId), StringComparer.Ordinal);
+                string providerVersion;
+                bool directCapable;
+                string directReason;
+                ShareCastDiagnostics.Capture(_log.Info, out providerVersion,
+                    out directCapable, out directReason);
                 executor = new HybridCastExecutor(
-                    new KingmakerInstantCastAdapter(), new KingmakerAnimatedCastAdapter(),
+                    new KingmakerInstantCastAdapter(_log.Info), new KingmakerAnimatedCastAdapter(),
                     Model.Profile.Execution.AllowAnimatedFallback,
                     Model.Profile.Execution.OutOfCombatOnly,
-                    step => step.EnhancementIds.Any(nativeEnhancements.Contains));
+                    step => step.EnhancementIds.Any(nativeEnhancements.Contains),
+                    (index, step, animated, route) =>
+                    {
+                        CastEnhancementSnapshot[] selected = executionEnhancements.Where(value =>
+                            step.EnhancementIds.Contains(value.EnhancementId)).ToArray();
+                        _log.Info("[KBP-ROUTE] group=" + routineId + ";step=" + index +
+                            ";provider=" + step.Provider.Canonical + ";source=" + step.SourceId +
+                            ";targets=" + string.Join(",", step.TargetUnitIds.ToArray()) +
+                            ";selected-enhancements=" + string.Join(",", step.EnhancementIds.ToArray()) +
+                            ";native-enhancements=" + string.Join(",", selected.Where(value =>
+                                value.RequiresNativeCommand).Select(value => value.EnhancementId).ToArray()) +
+                            ";direct-providers=" + string.Join(",", selected.Select(value =>
+                                value.DirectCastProviderId).ToArray()) + ";" + route);
+                        if (!animated) return;
+                        bool share = selected.Any(value => value.AffectsTargeting);
+                        string cause = share && !directCapable
+                            ? "Gunslinger " + providerVersion +
+                                " has no compatible Instant Share capability (" + directReason + ")."
+                            : selected.Any(value => value.RequiresNativeCommand)
+                                ? string.Join(", ", selected.Where(value => value.RequiresNativeCommand)
+                                    .Select(value => value.DisplayName).ToArray()) +
+                                    " requires native animated casting."
+                                : step.ExecutionStrategyReason;
+                        string warning = "Warning: " + (share ? "Share Transmutation" : "This cast") +
+                            " is using animated casting in Instant mode. " + cause;
+                        fallbackWarnings.Add(warning);
+                        Status = warning;
+                        _log.Info("[KBP-INSTANT-FALLBACK] " + warning);
+                    });
             }
             else executor = new AnimatedCastExecutor(new KingmakerAnimatedCastAdapter(),
                 Model.Profile.Execution.OutOfCombatOnly);
@@ -397,12 +433,14 @@ namespace KingmakerBuffPlanner.UI
             IsExecuting = false;
             if (failure != null)
             {
-                Status = "Routine execution failed: " + failure.Message;
+                Status = "Routine execution failed: " + failure.Message +
+                    (fallbackWarnings.Count == 0 ? "" : " " +
+                        string.Join(" ", fallbackWarnings.OrderBy(value => value).ToArray()));
                 _log.Error("Routine execution failed.", failure);
                 Complete(completed, new QuickExecutionResult(routineId, routineName,
                     QuickExecutionDisposition.Failed, Status,
                     LastExecutionReport.Planned, LastExecutionReport.Submitted,
-                    LastExecutionReport.Confirmed));
+                    LastExecutionReport.Confirmed, fallbackWarnings.Count != 0));
                 yield break;
             }
             ExecutionReport report = LastExecutionReport;
@@ -416,6 +454,9 @@ namespace KingmakerBuffPlanner.UI
                 "; spent=" + report.ResourcesSpent + "; failed=" + report.Failed +
                 "; skipped=" + report.Skipped + "; unfulfilled=" + report.Unfulfilled + "." +
                 variantReselection;
+            if (fallbackWarnings.Count != 0)
+                Status = "Instant mode was not fully satisfied. " +
+                    string.Join(" ", fallbackWarnings.OrderBy(value => value).ToArray()) + " " + Status;
             CastExecutionRecord firstFailure = report.Records.FirstOrDefault(record =>
                 record.Status == CastExecutionStatus.FailedValidation ||
                 record.Status == CastExecutionStatus.FailedSubmission ||
@@ -443,7 +484,8 @@ namespace KingmakerBuffPlanner.UI
                     string.Join(",", record.ResourceTokenIds.ToArray()) + ";detail=" + record.Detail);
             Complete(completed, new QuickExecutionResult(routineId, routineName,
                 confirmed ? QuickExecutionDisposition.Completed : QuickExecutionDisposition.Failed,
-                Status, report.Planned, report.Submitted, report.Confirmed));
+                Status, report.Planned, report.Submitted, report.Confirmed,
+                fallbackWarnings.Count != 0));
             _log.Info("[KBP-QUICK] confirmed result produced;group=" + routineId +
                 ";confirmed=" + report.Confirmed + ";failed=" + report.Failed +
                 ";message=" + Status + ".");

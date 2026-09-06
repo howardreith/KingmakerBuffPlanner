@@ -29,6 +29,27 @@ namespace KingmakerBuffPlanner.GameAdapters
             _providerTransactions =
                 new Dictionary<CastStep, BrownFurDirectCastLease>();
 
+        private readonly Action<string> _diagnostic;
+
+        internal KingmakerInstantCastAdapter(Action<string> diagnostic = null)
+        {
+            _diagnostic = diagnostic;
+        }
+
+        private void TraceProvider(CastStep step, string phase, string detail = "")
+        {
+            if (_diagnostic == null) return;
+            try
+            {
+                _diagnostic("[KBP-PROVIDER-DIRECT] phase=" + phase +
+                    ";utc=" + DateTime.UtcNow.ToString("O") +
+                    ";source=" + step.SourceId + ";provider=" + step.Provider.Canonical +
+                    ";targets=" + string.Join(",", step.TargetUnitIds.ToArray()) +
+                    ";detail=" + detail);
+            }
+            catch (Exception) { /* Diagnostics must not change source or provider spending. */ }
+        }
+
         public bool IsInCombat
         {
             get { return Game.Instance != null && Game.Instance.Player != null && Game.Instance.Player.IsInCombat; }
@@ -108,6 +129,8 @@ namespace KingmakerBuffPlanner.GameAdapters
 
         public InstantCastResult Fire(CastStep step)
         {
+            if (step.ExecutionStrategy == CastExecutionStrategy.ProviderDirectRuleCast)
+                TraceProvider(step, "Fire-enter");
             CastRuntimeValidation finalValidation = Validate(step);
             if (!finalValidation.Valid)
                 return new InstantCastResult(false, false, false, false, false,
@@ -146,6 +169,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                 if (_providerTransactions.ContainsKey(step))
                     return new InstantCastResult(false, false, false, false,
                         false, "provider-direct-step-already-active");
+                TraceProvider(step, "Begin-enter");
                 if (!BrownFurDirectCastCompatibility.TryBegin(sourceAbility,
                         resolved.Target, out providerTransaction,
                         out providerStatus, out reason))
@@ -171,6 +195,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                         rejected);
                 }
                 _providerTransactions.Add(step, providerTransaction);
+                TraceProvider(step, "Begin-accepted", providerStatus.Describe());
             }
 
             int availableBefore = KingmakerAnimatedCastAdapter.SafeAvailableCount(
@@ -178,6 +203,7 @@ namespace KingmakerBuffPlanner.GameAdapters
             RuleCastSpell rule;
             try
             {
+                if (providerDirect) TraceProvider(step, "RuleCastSpell-enter");
                 rule = Rulebook.Trigger(new RuleCastSpell(
                     executionAbility, resolved.Target));
             }
@@ -195,6 +221,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                 try
                 {
                     providerStatus = providerTransaction.CompleteRule(rule);
+                    TraceProvider(step, "CompleteRule-returned", providerStatus.Describe());
                 }
                 catch (Exception exception)
                 {

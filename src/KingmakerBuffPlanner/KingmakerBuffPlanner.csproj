@@ -106,6 +106,7 @@
     <Compile Include="Execution\InstantCastExecutor.cs" />
     <Compile Include="Execution\MaterialComponentAvailability.cs" />
     <Compile Include="Execution\HybridCastExecutor.cs" />
+    <Compile Include="Diagnostics\ShareCastDiagnostics.cs" />
     <Compile Include="Compatibility\BrownFurPowerfulChangeProfile.cs" />
     <Compile Include="Compatibility\BrownFurPowerfulChangeCompatibility.cs" />
     <Compile Include="Compatibility\BrownFurShareTransmutationProfile.cs" />

@@ -613,7 +613,8 @@ namespace KingmakerBuffPlanner.UI
     {
         Completed,
         Refused,
-        Failed
+        Failed,
+        CompletedWithFallback
     }
 
     public sealed class QuickExecutionResult
@@ -625,11 +626,14 @@ namespace KingmakerBuffPlanner.UI
             string message,
             int planned,
             int submitted,
-            int confirmed)
+            int confirmed,
+            bool usedAnimatedFallback = false)
         {
             RoutineId = routineId ?? string.Empty;
             RoutineName = routineName ?? string.Empty;
-            Disposition = disposition;
+            Disposition = disposition == QuickExecutionDisposition.Completed && usedAnimatedFallback
+                ? QuickExecutionDisposition.CompletedWithFallback : disposition;
+            UsedAnimatedFallback = usedAnimatedFallback;
             Message = message ?? string.Empty;
             Planned = planned;
             Submitted = submitted;
@@ -639,6 +643,7 @@ namespace KingmakerBuffPlanner.UI
         public string RoutineId { get; private set; }
         public string RoutineName { get; private set; }
         public QuickExecutionDisposition Disposition { get; private set; }
+        public bool UsedAnimatedFallback { get; private set; }
         public string Message { get; private set; }
         public int Planned { get; private set; }
         public int Submitted { get; private set; }
