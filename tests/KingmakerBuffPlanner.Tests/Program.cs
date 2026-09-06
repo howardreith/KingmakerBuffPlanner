@@ -3609,6 +3609,24 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException(
                     "A provider cleanup failure was reported as settled or successful after iterator cancellation.");
 
+            var hybridResidual = new PendingProviderDirectRuntime(false);
+            var hybridReport = new ExecutionReport(plan);
+            work = new HybridCastExecutor(hybridResidual,
+                new AlwaysAnimatedRuntime(), false, true)
+                .Execute(plan, hybridReport);
+            if (!work.MoveNext())
+                throw new InvalidOperationException(
+                    "The hybrid cancellation fixture did not become active.");
+            ((IDisposable)work).Dispose();
+            if (hybridResidual.CleanupCount != 1 || !hybridResidual.Active ||
+                hybridResidual.EnhancementDisposeCount != 1 ||
+                hybridReport.Confirmed != 0 ||
+                !hybridReport.Records.Any(record => record.Status ==
+                    CastExecutionStatus.ResidualStateUnsettled &&
+                    record.Detail.Contains("iterator-finalizer")))
+                throw new InvalidOperationException(
+                    "Hybrid cancellation discarded its inner transaction cleanup evidence.");
+
             var terminalFailure = new TerminalProviderFailureRuntime();
             var terminalReport = new ExecutionReport(plan);
             Drain(new InstantCastExecutor(terminalFailure, true, 1)

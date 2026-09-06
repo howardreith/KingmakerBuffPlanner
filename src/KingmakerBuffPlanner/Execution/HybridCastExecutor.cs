@@ -95,11 +95,19 @@ namespace KingmakerBuffPlanner.Execution
                 }
                 finally
                 {
-                    IDisposable disposable = work as IDisposable;
-                    if (disposable != null) disposable.Dispose();
+                    try
+                    {
+                        IDisposable disposable = work as IDisposable;
+                        if (disposable != null) disposable.Dispose();
+                    }
+                    finally
+                    {
+                        // Disposal can add cleanup failures. Copy them even
+                        // when the outer iterator is cancelled or throws.
+                        foreach (CastExecutionRecord record in partial.Records)
+                            report.Add(index, step, record.Status, record.Detail);
+                    }
                 }
-                foreach (CastExecutionRecord record in partial.Records)
-                    report.Add(index, step, record.Status, record.Detail);
                 priorTransactionUnsettled = partial.Records.Any(record =>
                     record.Status ==
                         CastExecutionStatus.ResidualStateUnsettled);

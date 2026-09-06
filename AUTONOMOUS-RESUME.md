@@ -1,5 +1,43 @@
 # Autonomous Resume
 
+## 2026-09-06 paired release authorization
+
+The owner explicitly authorized committing all task changes, merging to both
+default branches, pushing, and publishing new releases. This supersedes the
+earlier authorization blocker, not the save-backed gameplay evidence boundary.
+Planner branch is now `codex/kingmaker-buff-planner/share-transmutation-instant`
+at `e0fc450b8414581ce6adcc38d46d5c56b328aaec`, version 0.0.19. Provider branch
+`codex/share-transmutation-instant` is at
+`e985aad7671992885210df448deca18d05081096`, version 0.0.115.
+The provider worktree and all generated evidence were preserved in
+`C:/Dev/KingmakerGunslingerLab/worktrees/share-transmutation-instant`.
+
+Final cancellation review extended the existing regression: Hybrid disposal
+now forwards inner cleanup-failure records even when its iterator is cancelled.
+`scripts/Test-SourceOnly.ps1` passes source 42/42, behavior 148/148, harness
+8/8, package 4/4, deployment WhatIf 5/5, aggregate 1/1. Provider
+`scripts/Build-Local.ps1 -ReferenceBundleDir <qualified-private-references>`
+passes focused source validation, 1393/1393 domain tests, exact-reference
+Release compile, supply-icon, output, SoundBank, and strict 135-file package
+gates. Logs: `artifacts/share-release-precommit-source.log` and provider
+`artifacts/share-release-precommit-build.log`. Current exact contract gate is
+87/87; final release commits and hashes must be captured after deterministic
+rebuilds.
+
+Both missing lab push guards were restored with exact-origin, approved-branch,
+clean-tree, unfinished-operation, protected-file, credential, fast-forward,
+and remote-hash checks; Planner `Test-GuardedPush.ps1` passes 6/6 WhatIf
+checks. No installed dependencies were downgraded or replaced. Provider
+publication can explicitly use its existing provenance-checked builder;
+the missing external bundle input resolves only to identical hash-validated
+tracked bytes. No asset was edited.
+
+Exact next action: commit/guarded-push the feature checkpoints, merge into
+`main`/`master`, run exact-merge deterministic and contract gates,
+guarded-push defaults, publish both versions, independently download and
+validate their assets, then record final identities. Runtime: NOT RUN,
+protected save pair baseline=0/working=0; no ordinary save substitutes.
+
 ## 0.0.19 Instant Share Transmutation - 2026-09-06
 
 - Continue on primary/provider branch `codex/share-transmutation-instant`.

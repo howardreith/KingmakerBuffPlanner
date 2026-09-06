@@ -1,6 +1,6 @@
 # Kingmaker Buff Planner 0.0.19
 
-This candidate fixes Share Transmutation ignoring Instant mode. Resinous Skin
+This release fixes Share Transmutation ignoring Instant mode. Resinous Skin
 is the reported reproduction spell, but neither its name nor its GUID, Felix,
 or any party position appears in production routing.
 
@@ -43,6 +43,15 @@ completion, iterator cancellation, and cleanup failure. Exact final build and
 package identities are recorded in `docs/QUALIFICATION.md` after the clean
 release build.
 
-Save-backed gameplay qualification is not claimed. No live mod installation,
-game launch, or save mutation is authorized by this candidate build, and public
-release publication requires separate owner authorization.
+The owner authorized committing, merging, pushing, and publishing both mods.
+Save-backed gameplay: NOT RUN. The required protected automation save pair is
+unavailable; no ordinary campaign save was substituted and no live mod staging
+or game launch occurred. Mechanical evidence is not live gameplay evidence.
+
+Install the paired Kingmaker Gunslinger 0.0.115 update for Instant Share support.
+Older providers safely retain animated Share casting with a diagnostic reason.
+On an approved disposable working save, cast Felix's Resinous Skin with Share
+on four different allies out of combat, checking the effect, one normal spell
+use and one reservoir point per cast, including casts three and four. Follow
+with an ordinary buff. Separately check eligible Share plus Powerful Change
+(two reservoir points), applicable Supremacy, and Animated/manual controls.
