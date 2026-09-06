@@ -3,7 +3,7 @@
 ## Diagnostic candidate delivery checkpoint
 
 Product-bearing commit: `de57d90b38711c4c641d470900339bd8815a3fa8`.
-Branch: `codex/kingmaker-buff-planner/instant-share-routing-diagnosis`.
+Branch: `codex/kingmaker-buff-planner-instant-share-routing-diagnosis`.
 Version remains **0.0.19**; this is a separately named local diagnostic build,
 not a replacement release or a confirmed casting fix. The paired provider is
 the installed/released Gunslinger **0.0.115**, whose contract-v1 acceptance was
@@ -66,6 +66,12 @@ not close the missing Unity/Mono cast-routing observation. Exact next action
 remains the reproducing-machine log capture described below. Gameplay:
 **NOT VERIFIED**.
 
+The initial slash-nested branch push was rejected by GitHub because the remote
+already has a branch named `codex/kingmaker-buff-planner`. The active branch
+was renamed to the compatible hyphenated name above; no remote branch was
+deleted or rewritten. Product source commit and candidate hashes are unchanged.
+Evidence/reporting checkpoint before this rename: `610dcd7cc9d686d52d7869e57ad27cfecc3d19e8`.
+
 ## Finding and evidence boundary
 
 The reported casting defect remains unresolved. Gameplay is **NOT VERIFIED**.
@@ -95,7 +101,7 @@ been answered. No remote-machine evidence is substituted with local results.
 | Gunslinger | master, clean | dfd551080a1aad38cdd0b19714fbcb12c81ca4ca | 0.0.115 |
 
 Planner work is on
-`codex/kingmaker-buff-planner/instant-share-routing-diagnosis`.
+`codex/kingmaker-buff-planner-instant-share-routing-diagnosis`.
 The provider repository at
 `C:/Dev/KingmakerGunslingerLab/repo/KingmakerGunslinger` was inspected,
 including its AGENTS.md and provider-owned direct transaction. It was not

@@ -15,7 +15,7 @@ hashes and MVIDs. Executing the real production bridge accepts that pair and
 rejects the actual older 0.0.114 provider. No affected casting log or running
 game is available; the exact Kingmaker save root is absent.
 
-Active branch: `codex/kingmaker-buff-planner/instant-share-routing-diagnosis`;
+Active branch: `codex/kingmaker-buff-planner-instant-share-routing-diagnosis`;
 starting/audited HEAD: `fd0e6dc1c32dfc929a56dbc575163e641b150746`;
 version remains 0.0.19. Diagnostic-only source adds pre-cast routing evidence,
 loaded-pair identity, provider-direct phase records and visible fallback
