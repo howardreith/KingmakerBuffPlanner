@@ -44,6 +44,9 @@ namespace KingmakerBuffPlanner.Execution
                             "enhancement-unavailable:" + enhancement.Reason);
                     else
                     {
+                        bool runtimeLifecycleEntered = false;
+                        bool runtimeLifecycleSettled = false;
+                        bool unsettledReported = false;
                         try
                         {
                             CastRuntimeValidation validation;
@@ -63,6 +66,7 @@ namespace KingmakerBuffPlanner.Execution
                             {
                                 InstantCastResult result = null;
                                 Exception submissionFailure = null;
+                                runtimeLifecycleEntered = true;
                                 try { result = _runtime.Fire(step); }
                                 catch (Exception exception)
                                 {
@@ -72,6 +76,8 @@ namespace KingmakerBuffPlanner.Execution
                                 {
                                     InstantCastCompletion failedCleanup =
                                         Cleanup(step);
+                                    runtimeLifecycleSettled =
+                                        failedCleanup.Complete;
                                     report.Add(index, step,
                                         CastExecutionStatus.FailedSubmission,
                                         "instant-exception:" +
@@ -85,6 +91,7 @@ namespace KingmakerBuffPlanner.Execution
                                         failedCleanup.ResidualDeliveryState)
                                     {
                                         priorTransactionUnsettled = true;
+                                        unsettledReported = true;
                                         report.Add(index, step,
                                             CastExecutionStatus
                                                 .ResidualStateUnsettled,
@@ -95,6 +102,8 @@ namespace KingmakerBuffPlanner.Execution
                                 {
                                     InstantCastCompletion nullCleanup =
                                         Cleanup(step);
+                                    runtimeLifecycleSettled =
+                                        nullCleanup.Complete;
                                     report.Add(index, step,
                                         CastExecutionStatus.FailedSubmission,
                                         "instant-result-null;cleanup-complete:" +
@@ -105,6 +114,7 @@ namespace KingmakerBuffPlanner.Execution
                                         nullCleanup.ResidualDeliveryState)
                                     {
                                         priorTransactionUnsettled = true;
+                                        unsettledReported = true;
                                         report.Add(index, step,
                                             CastExecutionStatus
                                                 .ResidualStateUnsettled,
@@ -151,6 +161,7 @@ namespace KingmakerBuffPlanner.Execution
                                     InstantCastCompletion cleanup = completion;
                                     if (!completion.Complete)
                                         cleanup = Cleanup(step);
+                                    runtimeLifecycleSettled = cleanup.Complete;
                                     string terminalDetail = result.Detail +
                                         ";transaction-complete:" +
                                         completion.Complete +
@@ -162,7 +173,8 @@ namespace KingmakerBuffPlanner.Execution
                                         report.Add(index, step,
                                             CastExecutionStatus.FailedSubmission,
                                             terminalDetail);
-                                    else if (!result.Succeeded)
+                                    else if (!result.Succeeded ||
+                                        completion.Failed || cleanup.Failed)
                                         report.Add(index, step,
                                             CastExecutionStatus.FailedExecution,
                                             terminalDetail);
@@ -179,6 +191,7 @@ namespace KingmakerBuffPlanner.Execution
                                         cleanup.ResidualDeliveryState)
                                     {
                                         priorTransactionUnsettled = true;
+                                        unsettledReported = true;
                                         report.Add(index, step,
                                             CastExecutionStatus
                                                 .ResidualStateUnsettled,
@@ -189,6 +202,29 @@ namespace KingmakerBuffPlanner.Execution
                         }
                         finally
                         {
+                            if (runtimeLifecycleEntered &&
+                                !runtimeLifecycleSettled &&
+                                !unsettledReported)
+                            {
+                                InstantCastCompletion finalCleanup =
+                                    Cleanup(step);
+                                if (finalCleanup.Failed)
+                                    report.Add(index, step,
+                                        CastExecutionStatus.FailedExecution,
+                                        "iterator-finalizer:" +
+                                            finalCleanup.Detail);
+                                if (!finalCleanup.Complete &&
+                                    finalCleanup.ResidualDeliveryState &&
+                                    !unsettledReported)
+                                {
+                                    priorTransactionUnsettled = true;
+                                    report.Add(index, step,
+                                        CastExecutionStatus
+                                            .ResidualStateUnsettled,
+                                        "iterator-finalizer:" +
+                                            finalCleanup.Detail);
+                                }
+                            }
                             enhancement.Dispose();
                         }
                     }

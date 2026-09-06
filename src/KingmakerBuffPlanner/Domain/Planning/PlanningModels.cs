@@ -26,7 +26,8 @@ namespace KingmakerBuffPlanner.Domain.Planning
         DirectRuleCast,
         StickyTouchDeliveryRuleCast,
         AnimatedFallback,
-        NativeCommandRequired
+        NativeCommandRequired,
+        ProviderDirectRuleCast
     }
 
     public sealed class CastExecutionCapability

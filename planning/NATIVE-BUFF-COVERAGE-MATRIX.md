@@ -1,5 +1,23 @@
 # Native Buff Coverage Matrix
 
+## 0.0.19 Instant Share Transmutation coverage
+
+| Behavior | Deterministic / contract result | Save-backed result |
+|---|---|---|
+| Share personal Transmutation, Instant | PASS: `ProviderDirectRuleCast`; no animated executor | NOT RUN |
+| Four sequential recipients | PASS: effects 1-4, including third/fourth; exact source spend and provider reservoir debit each attempt | NOT RUN |
+| Subsequent ordinary instant buff | PASS: executes after four Share casts; no stale transaction or spend suppression | NOT RUN |
+| Share plus Powerful Change | PASS: one provider contract and combined two-point reservoir cost; both effects retained | NOT RUN |
+| Self cast / ordinary Instant | PASS: unchanged ordinary direct rule path | NOT RUN |
+| Explicit Animated / native manual cast | PASS: unchanged native command transaction | NOT RUN |
+| Missing, old, duplicate, or incompatible provider | PASS: Share remains mandatory Animated with an explicit legacy reason | NOT RUN |
+| Preflight/reservation/commit rejection | PASS: no unenhanced rule effect and no spell-source spend | NOT RUN |
+| Delayed process / cancellation / cleanup failure | PASS: retain provider state, fail or block later casts until terminal | NOT RUN |
+
+Resinous Skin is a manual canary only. Production classification remains based
+on native Personal Transmutation shape, exact provider/source/variant identity,
+selected enhancement IDs, and the validated optional contract.
+
 ## 0.0.18 sticky-touch execution coverage
 
 | Behavior | Deterministic / contract result | Save-backed result |

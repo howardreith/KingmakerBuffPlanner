@@ -14,6 +14,7 @@ using Kingmaker.UnitLogic.Commands;
 using Kingmaker.UnitLogic.Commands.Base;
 using Kingmaker.UnitLogic.Parts;
 using Kingmaker.Utility;
+using KingmakerBuffPlanner.Compatibility;
 using KingmakerBuffPlanner.Domain.Planning;
 using KingmakerBuffPlanner.Execution;
 using KingmakerBuffPlanner.Planning;
@@ -24,6 +25,9 @@ namespace KingmakerBuffPlanner.GameAdapters
     {
         private readonly Dictionary<CastStep, StickyTouchTransaction> _transactions =
             new Dictionary<CastStep, StickyTouchTransaction>();
+        private readonly Dictionary<CastStep, BrownFurDirectCastLease>
+            _providerTransactions =
+                new Dictionary<CastStep, BrownFurDirectCastLease>();
 
         public bool IsInCombat
         {
@@ -63,6 +67,30 @@ namespace KingmakerBuffPlanner.GameAdapters
                         "sticky-delivery-command-already-active");
                 return CastRuntimeValidation.Pass();
             }
+            if (step.ExecutionStrategy ==
+                CastExecutionStrategy.ProviderDirectRuleCast)
+            {
+                if (resolved.Ability.Blueprint != null &&
+                    resolved.Ability.Blueprint.StickyTouch != null)
+                    return CastRuntimeValidation.Fail(
+                        "provider-direct-sticky-touch-unsupported");
+                if (!KingmakerAnimatedCastAdapter.CanTarget(
+                        resolved.Ability, resolved.Target))
+                    return CastRuntimeValidation.Fail(
+                        "provider-direct-target-invalid");
+                BrownFurDirectCastStatusSnapshot status;
+                if (!BrownFurDirectCastCompatibility.TryValidate(
+                        resolved.Ability, resolved.Target, out status,
+                        out reason))
+                    return CastRuntimeValidation.Fail(
+                        "provider-direct-preflight-contract:" + reason);
+                if (status == null || !status.Accepted)
+                    return CastRuntimeValidation.Fail(
+                        "provider-direct-preflight-rejected:" +
+                        (status == null ? "status-null" :
+                            status.Describe()));
+                return CastRuntimeValidation.Pass();
+            }
             if (resolved.Ability.Blueprint != null &&
                 resolved.Ability.Blueprint.StickyTouch != null)
                 return CastRuntimeValidation.Fail(
@@ -93,6 +121,10 @@ namespace KingmakerBuffPlanner.GameAdapters
             AbilityData executionAbility = sourceAbility;
             StickyTouchCastResolution stickyResolution = null;
             StickyTouchTransaction transaction = null;
+            BrownFurDirectCastLease providerTransaction = null;
+            BrownFurDirectCastStatusSnapshot providerStatus = null;
+            bool providerDirect = step.ExecutionStrategy ==
+                CastExecutionStrategy.ProviderDirectRuleCast;
             if (step.ExecutionStrategy ==
                 CastExecutionStrategy.StickyTouchDeliveryRuleCast)
             {
@@ -109,6 +141,38 @@ namespace KingmakerBuffPlanner.GameAdapters
                 return new InstantCastResult(false, false, false, false,
                     false, "sticky-touch-provider-was-not-classified-for-direct-delivery");
 
+            if (providerDirect)
+            {
+                if (_providerTransactions.ContainsKey(step))
+                    return new InstantCastResult(false, false, false, false,
+                        false, "provider-direct-step-already-active");
+                if (!BrownFurDirectCastCompatibility.TryBegin(sourceAbility,
+                        resolved.Target, out providerTransaction,
+                        out providerStatus, out reason))
+                    return new InstantCastResult(false, false, false, false,
+                        false, "provider-direct-reservation-contract:" +
+                        reason);
+                if (providerStatus == null || !providerStatus.Accepted)
+                {
+                    string rejected = providerStatus == null ? "status-null" :
+                        providerStatus.Describe();
+                    try
+                    {
+                        if (providerTransaction != null)
+                            providerTransaction.Dispose();
+                    }
+                    catch (Exception exception)
+                    {
+                        rejected += ";rejected-handle-cleanup-exception:" +
+                            exception.GetType().FullName;
+                    }
+                    return new InstantCastResult(false, false, false, false,
+                        false, "provider-direct-reservation-rejected:" +
+                        rejected);
+                }
+                _providerTransactions.Add(step, providerTransaction);
+            }
+
             int availableBefore = KingmakerAnimatedCastAdapter.SafeAvailableCount(
                 sourceAbility);
             RuleCastSpell rule;
@@ -119,14 +183,33 @@ namespace KingmakerBuffPlanner.GameAdapters
             }
             catch (Exception exception)
             {
+                if (providerDirect) throw;
                 return new InstantCastResult(false, false, false, false,
                     false, "rule-cast-exception:" +
                     exception.GetType().FullName + ":" + exception.Message);
             }
             if (transaction != null) _transactions[step] = transaction;
+            Exception providerCompletionFailure = null;
+            if (providerDirect)
+            {
+                try
+                {
+                    providerStatus = providerTransaction.CompleteRule(rule);
+                }
+                catch (Exception exception)
+                {
+                    providerCompletionFailure = exception;
+                    try { providerStatus = providerTransaction.Inspect(); }
+                    catch (Exception) { }
+                }
+            }
+            bool providerCommitted = !providerDirect ||
+                (providerStatus != null && providerStatus.Accepted &&
+                    providerStatus.Committed);
             bool spendInvoked = false;
             Exception spendFailure = null;
-            if (RuleCastSpendPolicy.ShouldInvokeSpend(true, rule.IsUMDFailed))
+            if (providerCommitted &&
+                RuleCastSpendPolicy.ShouldInvokeSpend(true, rule.IsUMDFailed))
             {
                 spendInvoked = true;
                 try { sourceAbility.Spend(); }
@@ -135,19 +218,33 @@ namespace KingmakerBuffPlanner.GameAdapters
             int availableAfter = KingmakerAnimatedCastAdapter.SafeAvailableCount(
                 sourceAbility);
             bool spent = availableBefore >= 0 && availableAfter >= 0 && availableAfter < availableBefore;
-            bool observed = rule.Success && EffectsObserved(step);
+            bool providerSucceeded = !providerDirect ||
+                (providerStatus != null && providerStatus.Accepted &&
+                    providerStatus.Committed &&
+                    string.IsNullOrWhiteSpace(providerStatus.Failure) &&
+                    providerCompletionFailure == null);
+            bool observed = rule.Success && providerSucceeded &&
+                EffectsObserved(step);
             string carrierGuid = sourceAbility.Blueprint == null
                 ? string.Empty : sourceAbility.Blueprint.AssetGuid;
             string deliveryGuid = stickyResolution == null
                 ? string.Empty : stickyResolution.DeliveryBlueprint.AssetGuid;
             return new InstantCastResult(true,
-                rule.Success && spendFailure == null, observed, spent,
+                rule.Success && spendFailure == null && providerSucceeded,
+                observed, spent,
                 spendInvoked,
                 "rule-success:" + rule.Success + ";umd-failed:" + rule.IsUMDFailed +
                 ";spell-failed:" + rule.IsSpellFailed + ";spend-invoked:" + spendInvoked +
                 ";spend-failure:" + (spendFailure == null
                     ? "none" : spendFailure.GetType().FullName + ":" +
                         spendFailure.Message) +
+                ";provider-direct:" + providerDirect +
+                ";provider-status:" + (providerStatus == null ? "none" :
+                    providerStatus.Describe()) +
+                ";provider-completion-failure:" +
+                    (providerCompletionFailure == null ? "none" :
+                        providerCompletionFailure.GetType().FullName + ":" +
+                        providerCompletionFailure.Message) +
                 ";spend-owner:source-ability-data" +
                 ";available-before:" + availableBefore +
                 ";available-after:" + availableAfter +
@@ -181,6 +278,24 @@ namespace KingmakerBuffPlanner.GameAdapters
 
         public InstantCastCompletion InspectCompletion(CastStep step)
         {
+            BrownFurDirectCastLease providerTransaction;
+            if (_providerTransactions.TryGetValue(step,
+                    out providerTransaction))
+            {
+                try
+                {
+                    return CompleteProviderTransaction(step,
+                        providerTransaction, providerTransaction.Inspect(),
+                        "inspect");
+                }
+                catch (Exception exception)
+                {
+                    return InstantCastCompletion.Pending(
+                        "provider-direct-inspect-exception:" +
+                        exception.GetType().FullName + ":" +
+                        exception.Message);
+                }
+            }
             StickyTouchTransaction transaction;
             if (!_transactions.TryGetValue(step, out transaction))
                 return InstantCastCompletion.Settled(
@@ -207,6 +322,24 @@ namespace KingmakerBuffPlanner.GameAdapters
 
         public InstantCastCompletion Cleanup(CastStep step)
         {
+            BrownFurDirectCastLease providerTransaction;
+            if (_providerTransactions.TryGetValue(step,
+                    out providerTransaction))
+            {
+                try
+                {
+                    return CompleteProviderTransaction(step,
+                        providerTransaction, providerTransaction.Cleanup(),
+                        "cleanup");
+                }
+                catch (Exception exception)
+                {
+                    return InstantCastCompletion.Pending(
+                        "provider-direct-cleanup-exception:" +
+                        exception.GetType().FullName + ":" +
+                        exception.Message);
+                }
+            }
             StickyTouchTransaction transaction;
             if (!_transactions.TryGetValue(step, out transaction))
                 return InstantCastCompletion.Settled(
@@ -242,6 +375,31 @@ namespace KingmakerBuffPlanner.GameAdapters
                 ";residual-delivery-state:" + residual;
             return residual ? InstantCastCompletion.Pending(detail) :
                 InstantCastCompletion.Settled(detail);
+        }
+
+        private InstantCastCompletion CompleteProviderTransaction(
+            CastStep step, BrownFurDirectCastLease transaction,
+            BrownFurDirectCastStatusSnapshot status, string operation)
+        {
+            if (status == null)
+                return InstantCastCompletion.Pending(
+                    "provider-direct-" + operation + "-status-null");
+            string detail = "provider-direct-" + operation + ";" +
+                status.Describe();
+            if (!status.Complete)
+                return InstantCastCompletion.Pending(detail);
+            try { transaction.Dispose(); }
+            catch (Exception exception)
+            {
+                return InstantCastCompletion.Pending(detail +
+                    ";provider-direct-dispose-exception:" +
+                    exception.GetType().FullName + ":" +
+                    exception.Message);
+            }
+            _providerTransactions.Remove(step);
+            return string.IsNullOrWhiteSpace(status.Failure)
+                ? InstantCastCompletion.Settled(detail)
+                : InstantCastCompletion.FailedSettled(detail);
         }
 
         private sealed class StickyTouchTransaction

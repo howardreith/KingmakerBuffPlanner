@@ -1,5 +1,87 @@
 # CODEX AUTONOMOUS MISSION
 
+## 2026-09-06 paired release authorization
+
+The owner explicitly authorized committing all task changes, merging to both
+default branches, pushing, and publishing new releases. This supersedes the
+earlier authorization blocker, not the save-backed gameplay evidence boundary.
+Planner branch is now `codex/kingmaker-buff-planner/share-transmutation-instant`
+at `e0fc450b8414581ce6adcc38d46d5c56b328aaec`, version 0.0.19. Provider branch
+`codex/share-transmutation-instant` is at
+`e985aad7671992885210df448deca18d05081096`, version 0.0.115.
+The provider worktree and all generated evidence were preserved in
+`C:/Dev/KingmakerGunslingerLab/worktrees/share-transmutation-instant`.
+
+Final cancellation review extended the existing regression: Hybrid disposal
+now forwards inner cleanup-failure records even when its iterator is cancelled.
+`scripts/Test-SourceOnly.ps1` passes source 42/42, behavior 148/148, harness
+8/8, package 4/4, deployment WhatIf 5/5, aggregate 1/1. Provider
+`scripts/Build-Local.ps1 -ReferenceBundleDir <qualified-private-references>`
+passes focused source validation, 1393/1393 domain tests, exact-reference
+Release compile, supply-icon, output, SoundBank, and strict 135-file package
+gates. Logs: `artifacts/share-release-precommit-source.log` and provider
+`artifacts/share-release-precommit-build.log`. Current exact contract gate is
+87/87; final release commits and hashes must be captured after deterministic
+rebuilds.
+
+Both missing lab push guards were restored with exact-origin, approved-branch,
+clean-tree, unfinished-operation, protected-file, credential, fast-forward,
+and remote-hash checks; Planner `Test-GuardedPush.ps1` passes 6/6 WhatIf
+checks. No installed dependencies were downgraded or replaced. Provider
+publication can explicitly use its existing provenance-checked builder;
+the missing external bundle input resolves only to identical hash-validated
+tracked bytes. No asset was edited.
+
+Exact next action: commit/guarded-push the feature checkpoints, merge into
+`main`/`master`, run exact-merge deterministic and contract gates,
+guarded-push defaults, publish both versions, independently download and
+validate their assets, then record final identities. Runtime: NOT RUN,
+protected save pair baseline=0/working=0; no ordinary save substitutes.
+
+## 2026-09-06 0.0.19 Instant Share Transmutation checkpoint
+
+Work is isolated on `codex/share-transmutation-instant`, based on clean `main`
+`622760c9aeb1d2f583652bb71d391956b4a6576b`; scoped implementation commit and
+current HEAD are `95b723da35046f5b1fa1c229ee3e318a0aaedf38`.
+Product version is 0.0.19. The companion provider work
+is isolated on the same branch name from clean provider commit
+`6874dc15a27ded132456dbdd480f47c794543a05`; its provider-owned API commit is
+`a788d2269fcc4aaa24f8c49f820257ceb9cf7403`. Version 0.0.115 release plumbing
+remains an uncommitted, separately reviewable change pending explicit scope
+authorization.
+
+The fault is reproduced in policy: Share independently set both
+`RequiresNativeCommand` and `NativeCommandRequired`, so
+`HybridCastExecutor` selected `AnimatedCastExecutor` despite configured Instant
+mode. The repair adds a bounded version-1 reflection contract to a
+provider-owned direct transaction, then makes both routing decisions consume
+that capability. The provider reuses its exact intent, eligibility,
+reservation, Share targeting, Powerful Change, Transmutation Supremacy, commit,
+reservoir, process-lifecycle, and cleanup machinery. Buff Planner retains exact
+spell-source `AbilityData.Spend()` ownership and never debits the reservoir.
+
+Versioned runs of `tests/KingmakerBuffPlanner.Tests.exe` and
+`scripts/Validate-Source.ps1` passed 148/148 and 42/42; the complete aggregate
+also passed runtime-harness purity 8/8, package validation 4/4, and deployment
+WhatIf purity 5/5. Provider
+`tools/validate_share_transmutation115.py` passed, the complete provider domain
+suite passed 1393/1393, and its exact-reference production compile completed at
+`.provider-direct-cast-worktree/artifacts/local-runtime/0.0.115/exact-build/`.
+Installed `Assembly-CSharp.dll` SHA-256 is
+`3b6450ffec440e296e586f71c711b195aed144b28d53e1cbb29406d18fef5afb`.
+The current working candidate ZIP/DLL/MVID are
+`deab9ed286a94c11d99410556ef99bff9005563be96ea1b85e1f3cde19103df2` /
+`b494a5963db7405cbd304daca4b6c2487500e3427dbbdd994529852d7f23f7ca` /
+`73cff075-c258-4c47-bcca-fd7129125511`; these are pre-clean-release identities.
+
+Rejected theories: a Resinous Skin/Felix/GUID exception, merely flipping the
+two animation flags, synthetic `UnitUseAbility`, planner-owned reservoir debit,
+global command acceleration, and treating `Rulebook.Trigger` return as process
+completion. Remaining uncertainty is save-backed gameplay because no protected
+KBP baseline/working pair is present. Exact next action: run the versioned clean
+source/contract/build/package gates, record immutable artifact identities, and
+perform no live staging or publication without its separate authorization.
+
 ## 2026-09-01 0.0.16 public release completion
 
 The owner-authorized release is complete. Non-rewriting `main` merge/tag commit

@@ -1,5 +1,15 @@
 # Discovery Action Contract Inventory
 
+## 0.0.19 Share execution integration
+
+Discovery output is intentionally unchanged. Share Transmutation still
+qualifies structurally discovered Personal Transmutation sources through the
+existing optional adapter, and conditional/action-graph branches remain
+preserved. Version 0.0.19 changes only the assignment-scoped execution
+capability carried by selected Share/Powerful enhancements. There is no
+production branch for Resinous Skin, Felix, a localized display name, spell
+GUID, party size, or cast ordinal.
+
 ## 0.0.18 sticky-touch execution normalization
 
 Discovery continues to follow `AbilityEffectStickyTouch.TouchDeliveryAbility`

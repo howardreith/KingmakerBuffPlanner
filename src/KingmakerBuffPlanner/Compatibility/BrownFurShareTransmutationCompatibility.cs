@@ -6,11 +6,13 @@ using Kingmaker.Blueprints;
 using Kingmaker.Blueprints.Classes;
 using Kingmaker.Blueprints.Classes.Spells;
 using Kingmaker.EntitySystem.Entities;
+using Kingmaker.RuleSystem.Rules.Abilities;
 using Kingmaker.UnitLogic;
 using Kingmaker.UnitLogic.Abilities;
 using Kingmaker.UnitLogic.Abilities.Blueprints;
 using Kingmaker.UnitLogic.ActivatableAbilities;
 using Kingmaker.UnitLogic.FactLogic;
+using Kingmaker.Utility;
 using KingmakerBuffPlanner.Domain.Identity;
 using KingmakerBuffPlanner.Domain.Planning;
 using KingmakerBuffPlanner.Domain.Providers;
@@ -322,6 +324,9 @@ namespace KingmakerBuffPlanner.Compatibility
             BlueprintActivatableAbility blueprint, int remaining,
             IEnumerable<string> abilities, IEnumerable<string> spellbooks)
         {
+            string directReason;
+            bool direct = BrownFurDirectCastCompatibility
+                .TryValidateContract(out directReason);
             return new CastEnhancementSnapshot(
                 BrownFurShareTransmutationProfile.EnhancementId(casterUnitId),
                 casterUnitId,
@@ -332,8 +337,9 @@ namespace KingmakerBuffPlanner.Compatibility
                 CastEnhancementCategory.ClassFeature, 0, 0, remaining,
                 abilities, "Share Transmutation", spellbooks,
                 BrownFurShareTransmutationProfile.UsagePoolId(casterUnitId),
-                true, "brown-fur-share-transmutation", 1, true,
-                "brown-fur-share-transmutation", "Arcane Reservoir");
+                !direct, "brown-fur-share-transmutation", 1, true,
+                "brown-fur-share-transmutation", "Arcane Reservoir",
+                direct ? BrownFurDirectCastCompatibility.ProviderId : null);
         }
 
         private static string SelectedAbilityGuid(ProviderKey provider)
@@ -342,6 +348,351 @@ namespace KingmakerBuffPlanner.Compatibility
                 (string.IsNullOrWhiteSpace(provider.Ability.VariantGuid)
                     ? provider.Ability.BaseAbilityGuid
                     : provider.Ability.VariantGuid);
+        }
+
+        private static bool Fail(string value, out string reason)
+        {
+            reason = value;
+            return false;
+        }
+    }
+
+    internal sealed class BrownFurDirectCastStatusSnapshot
+    {
+        internal BrownFurDirectCastStatusSnapshot(bool accepted,
+            bool committed, bool complete, bool residualState, string state,
+            string failure, string detail, string transactionIdentity,
+            int reservoirCost)
+        {
+            Accepted = accepted;
+            Committed = committed;
+            Complete = complete;
+            ResidualState = residualState;
+            State = state ?? string.Empty;
+            Failure = failure ?? string.Empty;
+            Detail = detail ?? string.Empty;
+            TransactionIdentity = transactionIdentity ?? string.Empty;
+            ReservoirCost = reservoirCost;
+        }
+
+        internal bool Accepted { get; private set; }
+        internal bool Committed { get; private set; }
+        internal bool Complete { get; private set; }
+        internal bool ResidualState { get; private set; }
+        internal string State { get; private set; }
+        internal string Failure { get; private set; }
+        internal string Detail { get; private set; }
+        internal string TransactionIdentity { get; private set; }
+        internal int ReservoirCost { get; private set; }
+
+        internal string Describe()
+        {
+            return "accepted:" + Accepted + ";committed:" + Committed +
+                ";complete:" + Complete + ";residual:" + ResidualState +
+                ";state:" + State + ";failure:" +
+                (string.IsNullOrWhiteSpace(Failure) ? "none" : Failure) +
+                ";detail:" + Detail + ";transaction:" +
+                TransactionIdentity + ";reservoir-cost:" + ReservoirCost;
+        }
+    }
+
+    internal sealed class BrownFurDirectCastLease : IDisposable
+    {
+        private readonly BrownFurDirectCastContract _contract;
+        private readonly object _handle;
+        private bool _disposed;
+
+        internal BrownFurDirectCastLease(
+            BrownFurDirectCastContract contract, object handle)
+        {
+            _contract = contract ?? throw new ArgumentNullException("contract");
+            _handle = handle ?? throw new ArgumentNullException("handle");
+        }
+
+        internal BrownFurDirectCastStatusSnapshot Inspect()
+        {
+            return _contract.InvokeStatus(_contract.Inspect, _handle,
+                new object[0]);
+        }
+
+        internal BrownFurDirectCastStatusSnapshot CompleteRule(
+            RuleCastSpell rule)
+        {
+            return _contract.InvokeStatus(_contract.CompleteRule, _handle,
+                new object[] { rule });
+        }
+
+        internal BrownFurDirectCastStatusSnapshot Cleanup()
+        {
+            return _contract.InvokeStatus(_contract.Cleanup, _handle,
+                new object[0]);
+        }
+
+        public void Dispose()
+        {
+            if (_disposed) return;
+            ((IDisposable)_handle).Dispose();
+            _disposed = true;
+        }
+    }
+
+    internal sealed class BrownFurDirectCastContract
+    {
+        internal BrownFurDirectCastContract(MethodInfo validate,
+            MethodInfo begin, MethodInfo inspect, MethodInfo completeRule,
+            MethodInfo cleanup, IDictionary<string, PropertyInfo> properties)
+        {
+            Validate = validate;
+            Begin = begin;
+            Inspect = inspect;
+            CompleteRule = completeRule;
+            Cleanup = cleanup;
+            Properties = properties;
+        }
+
+        internal MethodInfo Validate { get; private set; }
+        internal MethodInfo Begin { get; private set; }
+        internal MethodInfo Inspect { get; private set; }
+        internal MethodInfo CompleteRule { get; private set; }
+        internal MethodInfo Cleanup { get; private set; }
+        internal IDictionary<string, PropertyInfo> Properties
+        { get; private set; }
+
+        internal BrownFurDirectCastStatusSnapshot InvokeStatus(
+            MethodInfo method, object instance, object[] arguments)
+        {
+            object status = method.Invoke(instance, arguments);
+            if (status == null) throw new InvalidOperationException(
+                "Provider direct-cast status was null.");
+            return new BrownFurDirectCastStatusSnapshot(
+                (bool)Properties["Accepted"].GetValue(status, null),
+                (bool)Properties["Committed"].GetValue(status, null),
+                (bool)Properties["Complete"].GetValue(status, null),
+                (bool)Properties["ResidualState"].GetValue(status, null),
+                (string)Properties["State"].GetValue(status, null),
+                (string)Properties["Failure"].GetValue(status, null),
+                (string)Properties["Detail"].GetValue(status, null),
+                (string)Properties["TransactionIdentity"].GetValue(
+                    status, null),
+                (int)Properties["ReservoirCost"].GetValue(status, null));
+        }
+    }
+
+    /// <summary>
+    /// Bounded reflection bridge to the provider-owned transaction. The
+    /// version, public types, exact game parameters, return types, and status
+    /// surface are all validated before Instant routing is advertised.
+    /// </summary>
+    internal static class BrownFurDirectCastCompatibility
+    {
+        internal const string ProviderId = "brown-fur-direct-cast-v1";
+        private const int ContractVersion = 1;
+        private const string ProviderAssemblyName = "KingmakerGunslinger";
+        private const string ApiTypeName =
+            "KingmakerGunslinger.BrownFur.BrownFurDirectCastApi";
+        private const string HandleTypeName =
+            "KingmakerGunslinger.BrownFur.BrownFurDirectCastHandle";
+        private const string StatusTypeName =
+            "KingmakerGunslinger.BrownFur.BrownFurDirectCastStatus";
+
+        internal static bool TryValidateContract(out string reason)
+        {
+            BrownFurDirectCastContract contract;
+            return TryResolve(out contract, out reason);
+        }
+
+        internal static bool TryValidate(AbilityData ability,
+            TargetWrapper target, out BrownFurDirectCastStatusSnapshot status,
+            out string reason)
+        {
+            status = null;
+            BrownFurDirectCastContract contract;
+            if (!TryResolve(out contract, out reason)) return false;
+            try
+            {
+                status = contract.InvokeStatus(contract.Validate, null,
+                    new object[] { ability, target });
+                return true;
+            }
+            catch (Exception exception)
+            {
+                reason = InvocationFailure("validate", exception);
+                return false;
+            }
+        }
+
+        internal static bool TryBegin(AbilityData ability,
+            TargetWrapper target, out BrownFurDirectCastLease lease,
+            out BrownFurDirectCastStatusSnapshot status, out string reason)
+        {
+            lease = null;
+            status = null;
+            BrownFurDirectCastContract contract;
+            if (!TryResolve(out contract, out reason)) return false;
+            object handle = null;
+            try
+            {
+                handle = contract.Begin.Invoke(null,
+                    new object[] { ability, target });
+                if (handle == null)
+                {
+                    reason = "provider-direct-begin-returned-null";
+                    return false;
+                }
+                lease = new BrownFurDirectCastLease(contract, handle);
+                status = lease.Inspect();
+                return true;
+            }
+            catch (Exception exception)
+            {
+                if (handle is IDisposable)
+                {
+                    try { ((IDisposable)handle).Dispose(); }
+                    catch (Exception) { }
+                }
+                lease = null;
+                reason = InvocationFailure("begin", exception);
+                return false;
+            }
+        }
+
+        private static bool TryResolve(out BrownFurDirectCastContract contract,
+            out string reason)
+        {
+            contract = null;
+            reason = string.Empty;
+            try
+            {
+                Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies()
+                    .Where(value => value.GetName().Name ==
+                        ProviderAssemblyName).ToArray();
+                if (assemblies.Length != 1)
+                    return Fail("provider-direct-assembly-count-" +
+                        assemblies.Length, out reason);
+                Assembly assembly = assemblies[0];
+                Type api = assembly.GetType(ApiTypeName, false);
+                Type handle = assembly.GetType(HandleTypeName, false);
+                Type status = assembly.GetType(StatusTypeName, false);
+                if (api == null || !api.IsPublic || !api.IsAbstract ||
+                    !api.IsSealed)
+                    return Fail("provider-direct-api-type-mismatch",
+                        out reason);
+                if (handle == null || !handle.IsPublic || !handle.IsSealed ||
+                    !typeof(IDisposable).IsAssignableFrom(handle))
+                    return Fail("provider-direct-handle-type-mismatch",
+                        out reason);
+                if (status == null || !status.IsPublic || !status.IsSealed)
+                    return Fail("provider-direct-status-type-mismatch",
+                        out reason);
+                FieldInfo version = api.GetField("ContractVersion",
+                    BindingFlags.Public | BindingFlags.Static |
+                    BindingFlags.DeclaredOnly);
+                if (version == null || !version.IsLiteral ||
+                    version.FieldType != typeof(int) ||
+                    (int)version.GetRawConstantValue() != ContractVersion)
+                    return Fail("provider-direct-contract-version-mismatch",
+                        out reason);
+
+                MethodInfo validate;
+                MethodInfo begin;
+                MethodInfo inspect;
+                MethodInfo completeRule;
+                MethodInfo cleanup;
+                if (!TryMethod(api, "Validate", true, status,
+                        new[] { typeof(AbilityData), typeof(TargetWrapper) },
+                        out validate, out reason) ||
+                    !TryMethod(api, "Begin", true, handle,
+                        new[] { typeof(AbilityData), typeof(TargetWrapper) },
+                        out begin, out reason) ||
+                    !TryMethod(handle, "Inspect", false, status, Type.EmptyTypes,
+                        out inspect, out reason) ||
+                    !TryMethod(handle, "CompleteRule", false, status,
+                        new[] { typeof(RuleCastSpell) }, out completeRule,
+                        out reason) ||
+                    !TryMethod(handle, "Cleanup", false, status,
+                        Type.EmptyTypes, out cleanup, out reason)) return false;
+
+                var properties = new Dictionary<string, PropertyInfo>(
+                    StringComparer.Ordinal);
+                foreach (KeyValuePair<string, Type> expected in
+                    ExpectedStatusProperties())
+                {
+                    PropertyInfo property = status.GetProperty(expected.Key,
+                        BindingFlags.Public | BindingFlags.Instance |
+                        BindingFlags.DeclaredOnly);
+                    if (property == null || property.PropertyType !=
+                            expected.Value || property.GetIndexParameters()
+                            .Length != 0 || property.GetGetMethod(false) == null ||
+                        property.GetSetMethod(false) != null)
+                        return Fail("provider-direct-status-property-mismatch:" +
+                            expected.Key, out reason);
+                    properties.Add(expected.Key, property);
+                }
+                contract = new BrownFurDirectCastContract(validate, begin,
+                    inspect, completeRule, cleanup, properties);
+                return true;
+            }
+            catch (Exception exception)
+            {
+                return Fail("provider-direct-contract-probe-exception:" +
+                    exception.GetType().Name, out reason);
+            }
+        }
+
+        private static bool TryMethod(Type type, string name, bool isStatic,
+            Type returnType, Type[] parameters, out MethodInfo method,
+            out string reason)
+        {
+            method = null;
+            reason = string.Empty;
+            MethodInfo[] matches = type.GetMethods(BindingFlags.Public |
+                    (isStatic ? BindingFlags.Static : BindingFlags.Instance) |
+                    BindingFlags.DeclaredOnly)
+                .Where(value => value.Name == name &&
+                    value.ReturnType == returnType &&
+                    value.GetParameters().Select(parameter =>
+                        parameter.ParameterType).SequenceEqual(parameters))
+                .ToArray();
+            if (matches.Length != 1)
+                return Fail("provider-direct-method-mismatch:" +
+                    type.FullName + "::" + name, out reason);
+            method = matches[0];
+            return true;
+        }
+
+        private static IEnumerable<KeyValuePair<string, Type>>
+            ExpectedStatusProperties()
+        {
+            yield return new KeyValuePair<string, Type>("Accepted",
+                typeof(bool));
+            yield return new KeyValuePair<string, Type>("Committed",
+                typeof(bool));
+            yield return new KeyValuePair<string, Type>("Complete",
+                typeof(bool));
+            yield return new KeyValuePair<string, Type>("ResidualState",
+                typeof(bool));
+            yield return new KeyValuePair<string, Type>("State",
+                typeof(string));
+            yield return new KeyValuePair<string, Type>("Failure",
+                typeof(string));
+            yield return new KeyValuePair<string, Type>("Detail",
+                typeof(string));
+            yield return new KeyValuePair<string, Type>("TransactionIdentity",
+                typeof(string));
+            yield return new KeyValuePair<string, Type>("ReservoirCost",
+                typeof(int));
+        }
+
+        private static string InvocationFailure(string operation,
+            Exception exception)
+        {
+            TargetInvocationException invocation = exception as
+                TargetInvocationException;
+            Exception actual = invocation != null &&
+                invocation.InnerException != null ? invocation.InnerException :
+                    exception;
+            return "provider-direct-" + operation + "-exception:" +
+                (actual == null ? "unknown" : actual.GetType().FullName);
         }
 
         private static bool Fail(string value, out string reason)

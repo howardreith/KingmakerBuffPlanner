@@ -54,7 +54,7 @@ $requiredTypes = [ordered]@{
     'KingmakerGunslinger.BrownFur.BrownFurPlayerIntentRuntime' = @(
         'Observe', 'Consume', 'Clear', 'Find', 'IsBrownFurToggle')
     'KingmakerGunslinger.BrownFur.BrownFurCastIntentRuntime' = @(
-        'Arm', 'Clear', 'FindRecord')
+        'Arm', 'ValidateDirect', 'BeginDirect', 'Clear', 'FindRecord')
     'KingmakerGunslinger.BrownFur.BrownFurShareTargetingRuntime' = @(
         'Begin', 'Release', 'Clear', 'TryOverrideAnchor',
         'TryOverrideTarget', 'TryOverrideApproachDistance')
@@ -62,8 +62,11 @@ $requiredTypes = [ordered]@{
         'Decide', 'IsWilling')
     'KingmakerGunslinger.BrownFur.BrownFurCastPolicy' = @('Decide')
     'KingmakerGunslinger.BrownFur.BrownFurCastCommitCoordinator`6' = @(
-        'Begin', 'AttachRule', 'AttachProcess', 'Commit', 'EndCommand',
-        'ProcessTerminal')
+        'Begin', 'BeginDirect', 'AttachRule', 'AttachProcess', 'Commit',
+        'EndCommand', 'CompleteDirect', 'CancelDirect', 'FailDirect',
+        'DirectProcessAttached', 'ProcessTerminal')
+    'KingmakerGunslinger.BrownFur.BrownFurCastExecutionRuntime' = @(
+        'BeginDirect', 'CompleteDirectRule', 'InspectDirect', 'CleanupDirect')
     'KingmakerGunslinger.BrownFur.BrownFurExactDebitPolicy' = @(
         'TryDebitExact')
     'KingmakerGunslinger.BrownFur.BrownFurShareTargetAnchorPatch' = @(
@@ -99,8 +102,89 @@ try {
         }
     }
 
-    $rawText = [Text.Encoding]::Unicode.GetString(
-        [IO.File]::ReadAllBytes($AssemblyPath))
+    $api = $assembly.GetType(
+        'KingmakerGunslinger.BrownFur.BrownFurDirectCastApi', $false)
+    $handle = $assembly.GetType(
+        'KingmakerGunslinger.BrownFur.BrownFurDirectCastHandle', $false)
+    $status = $assembly.GetType(
+        'KingmakerGunslinger.BrownFur.BrownFurDirectCastStatus', $false)
+    Assert-Contract ($null -ne $api -and $api.IsPublic -and
+        $api.IsAbstract -and $api.IsSealed) `
+        'Direct-cast API type is absent or is not public static.'
+    Assert-Contract ($null -ne $handle -and $handle.IsPublic -and
+        $handle.IsSealed -and @($handle.GetInterfaces() | Where-Object {
+            $_.FullName -ceq 'System.IDisposable'
+        }).Count -eq 1) `
+        'Direct-cast handle is absent or lacks its public IDisposable contract.'
+    Assert-Contract ($null -ne $status -and $status.IsPublic -and
+        $status.IsSealed) `
+        'Direct-cast status is absent or is not public sealed.'
+    $version = $api.GetField('ContractVersion',
+        [Reflection.BindingFlags]'Public,Static,DeclaredOnly')
+    Assert-Contract ($null -ne $version -and $version.IsLiteral -and
+        $version.FieldType.FullName -ceq 'System.Int32' -and
+        [int]$version.GetRawConstantValue() -eq 1) `
+        'Direct-cast capability version is not exactly 1.'
+
+    function Assert-ExactMethod(
+        [Type]$Type,
+        [string]$Name,
+        [bool]$Static,
+        [string]$ReturnType,
+        [string[]]$ParameterTypes) {
+        $scope = if ($Static) {
+            [Reflection.BindingFlags]'Public,Static,DeclaredOnly'
+        } else {
+            [Reflection.BindingFlags]'Public,Instance,DeclaredOnly'
+        }
+        $matches = @($Type.GetMethods($scope) | Where-Object {
+            $_.Name -ceq $Name -and
+            $_.ReturnType.FullName -ceq $ReturnType -and
+            [string]::Join('|', @($_.GetParameters() | ForEach-Object {
+                $_.ParameterType.FullName
+            })) -ceq [string]::Join('|', $ParameterTypes)
+        })
+        Assert-Contract ($matches.Count -eq 1) `
+            "Direct-cast method signature mismatch: $($Type.FullName)::$Name"
+    }
+    Assert-ExactMethod $api 'Validate' $true $status.FullName @(
+        'Kingmaker.UnitLogic.Abilities.AbilityData',
+        'Kingmaker.Utility.TargetWrapper')
+    Assert-ExactMethod $api 'Begin' $true $handle.FullName @(
+        'Kingmaker.UnitLogic.Abilities.AbilityData',
+        'Kingmaker.Utility.TargetWrapper')
+    Assert-ExactMethod $handle 'Inspect' $false $status.FullName @()
+    Assert-ExactMethod $handle 'CompleteRule' $false $status.FullName @(
+        'Kingmaker.RuleSystem.Rules.Abilities.RuleCastSpell')
+    Assert-ExactMethod $handle 'Cleanup' $false $status.FullName @()
+    $statusProperties = [ordered]@{
+        Accepted = 'System.Boolean'
+        Committed = 'System.Boolean'
+        Complete = 'System.Boolean'
+        ResidualState = 'System.Boolean'
+        State = 'System.String'
+        Failure = 'System.String'
+        Detail = 'System.String'
+        TransactionIdentity = 'System.String'
+        ReservoirCost = 'System.Int32'
+    }
+    foreach ($expected in $statusProperties.GetEnumerator()) {
+        $property = $status.GetProperty([string]$expected.Key,
+            [Reflection.BindingFlags]'Public,Instance,DeclaredOnly')
+        Assert-Contract ($null -ne $property -and
+            $property.PropertyType.FullName -ceq [string]$expected.Value -and
+            $null -ne $property.GetGetMethod($false) -and
+            $null -eq $property.GetSetMethod($false) -and
+            $property.GetIndexParameters().Count -eq 0) `
+            "Direct-cast status property mismatch: $($expected.Key)"
+    }
+
+    $assemblyBytes = [IO.File]::ReadAllBytes($AssemblyPath)
+    # PE metadata heaps are not guaranteed to start on an even file offset.
+    # Inspect both UTF-16 alignments so the identity gate is deterministic.
+    $rawText = [Text.Encoding]::Unicode.GetString($assemblyBytes) +
+        [Text.Encoding]::Unicode.GetString(
+            $assemblyBytes, 1, $assemblyBytes.Length - 1)
     $profileSource = Get-Content -LiteralPath (Join-Path $root `
         'src\KingmakerBuffPlanner\Compatibility\BrownFurShareTransmutationProfile.cs') -Raw
     $powerfulProfileSource = Get-Content -LiteralPath (Join-Path $root `

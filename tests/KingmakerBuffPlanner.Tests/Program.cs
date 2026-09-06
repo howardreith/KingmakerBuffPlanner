@@ -208,6 +208,12 @@ namespace KingmakerBuffPlanner.Tests
                 Run("instant-executor-revalidates-batches-and-reports", TestInstantExecutor);
                 Run("submitted-without-effect-is-not-success", TestUnconfirmedExecution);
                 Run("hybrid-executor-routes-and-blocks-fallbacks", TestHybridExecutor);
+                Run("share-direct-capability-controls-combined-routing",
+                    TestShareDirectRoutingPolicy);
+                Run("share-direct-four-recipients-preserve-resource-ownership",
+                    TestShareDirectFourRecipientExecution);
+                Run("provider-direct-iterator-cancellation-cleans-or-blocks",
+                    TestProviderDirectCancellationCleanup);
                 Run("supported-sticky-touch-classification-is-direct-delivery",
                     TestSupportedStickyTouchClassification);
                 Run("unsupported-sticky-touch-classification-fails-closed",
@@ -3485,6 +3491,251 @@ namespace KingmakerBuffPlanner.Tests
                     "A native-command enhancement was treated as optional animated fallback.");
         }
 
+        private static void TestShareDirectRoutingPolicy()
+        {
+            CastPlan supported = CreateShareDirectPlan(4, true);
+            if (supported.Steps.Count != 4 || supported.Steps.Any(step =>
+                    step.ExecutionStrategy !=
+                        CastExecutionStrategy.ProviderDirectRuleCast) ||
+                supported.Steps.Any(step => !step.ExecutionStrategyReason
+                    .Contains("provider-direct-cast:" +
+                        "brown-fur-direct-cast-v1")) ||
+                supported.Steps.Any(step => step.Reservation.Units != 1) ||
+                supported.Steps.Any(step =>
+                    step.EnhancementUsageByPool["reservoir|brown"] != 2) ||
+                supported.Steps[2].AnchorUnitId != "party-3" ||
+                supported.Steps[3].AnchorUnitId != "party-4")
+                throw new InvalidOperationException(
+                    "Supported Share plus Powerful Change did not preserve the provider-direct strategy, exact source cost, combined reservoir forecast, or third/fourth targets.");
+
+            CastPlan ordinary = CreateOrdinaryInstantPlan();
+            if (ordinary.Steps.Single().ExecutionStrategy !=
+                    CastExecutionStrategy.DirectRuleCast ||
+                ordinary.Steps.Single().EnhancementIds.Count != 0)
+                throw new InvalidOperationException(
+                    "An ordinary self/instant buff was changed by the Share direct-cast policy.");
+
+            CastPlan legacy = CreateLegacySharePlan();
+            var instant = new AlwaysInstantRuntime();
+            var animated = new AlwaysAnimatedRuntime();
+            var report = new ExecutionReport(legacy);
+            Drain(new HybridCastExecutor(instant, animated, false, true)
+                .Execute(legacy, report));
+            if (legacy.Steps.Single().ExecutionStrategy !=
+                    CastExecutionStrategy.NativeCommandRequired ||
+                instant.FireCount != 0 || animated.StartCount != 1 ||
+                report.Confirmed != 1 || !report.Records.Any(record =>
+                    record.Status == CastExecutionStatus.StrategySelected &&
+                    record.Detail.Contains(
+                        "share-transmutation-legacy-native-command")))
+                throw new InvalidOperationException(
+                    "An older provider contract silently bypassed the safe native-command route.");
+        }
+
+        private static void TestShareDirectFourRecipientExecution()
+        {
+            CastPlan share = CreateShareDirectPlan(4, true);
+            CastPlan ordinary = CreateOrdinaryInstantPlan();
+            var combined = new CastPlan(share.Steps.Concat(ordinary.Steps),
+                share.Outcomes.Concat(ordinary.Outcomes),
+                share.Diagnostics.Concat(ordinary.Diagnostics));
+            var runtime = new ProviderDirectSequenceRuntime(5, 8);
+            var animated = new AlwaysAnimatedRuntime();
+            var report = new ExecutionReport(combined);
+            Drain(new HybridCastExecutor(runtime, animated, false, true)
+                .Execute(combined, report));
+            if (runtime.FireCount != 5 ||
+                runtime.ProviderTransactionCount != 4 ||
+                runtime.OrdinaryFireCount != 1 ||
+                runtime.SourceSpendInvocations != 5 ||
+                runtime.SourceUsesRemaining != 0 ||
+                runtime.ReservoirDebit != 8 ||
+                runtime.ReservoirRemaining != 0 ||
+                runtime.EnhancementPrepareCount != 4 ||
+                runtime.EnhancementDisposeCount != 4 ||
+                runtime.CleanupCount != 0 || runtime.PrematureValidation ||
+                !runtime.EffectRecipients.Contains("party-3") ||
+                !runtime.EffectRecipients.Contains("party-4") ||
+                !runtime.EffectRecipients.Contains("brown") ||
+                animated.StartCount != 0 || report.Submitted != 5 ||
+                report.SpendInvocations != 5 ||
+                report.ResourcesSpent != 5 || report.Confirmed != 5 ||
+                report.Failed != 0)
+                throw new InvalidOperationException(
+                    "Four direct Share transactions or the subsequent ordinary buff advanced early, animated, missed an effect, or consumed the wrong source/reservoir owner.");
+
+            var explicitAnimated = new AlwaysAnimatedRuntime();
+            var animatedReport = new ExecutionReport(combined);
+            Drain(new AnimatedCastExecutor(explicitAnimated, true)
+                .Execute(combined, animatedReport));
+            if (explicitAnimated.StartCount != 5 ||
+                animatedReport.Queued != 5 ||
+                animatedReport.Confirmed != 5)
+                throw new InvalidOperationException(
+                    "Explicit Animated mode stopped using native command execution for Share assignments.");
+        }
+
+        private static void TestProviderDirectCancellationCleanup()
+        {
+            CastPlan plan = CreateShareDirectPlan(1, false);
+            var clean = new PendingProviderDirectRuntime(true);
+            var cleanReport = new ExecutionReport(plan);
+            System.Collections.IEnumerator work = new InstantCastExecutor(
+                clean, true, 1).Execute(plan, cleanReport);
+            if (!work.MoveNext())
+                throw new InvalidOperationException(
+                    "The cancellation fixture did not reach an active provider transaction.");
+            ((IDisposable)work).Dispose();
+            if (clean.CleanupCount != 1 || clean.Active ||
+                clean.EnhancementDisposeCount != 1 || cleanReport.Records.Any(
+                    record => record.Status ==
+                        CastExecutionStatus.ResidualStateUnsettled))
+                throw new InvalidOperationException(
+                    "Iterator cancellation did not clean the exact provider transaction before restoring enhancement state.");
+
+            var residual = new PendingProviderDirectRuntime(false);
+            var residualReport = new ExecutionReport(plan);
+            work = new InstantCastExecutor(residual, true, 1)
+                .Execute(plan, residualReport);
+            if (!work.MoveNext())
+                throw new InvalidOperationException(
+                    "The residual cancellation fixture did not become active.");
+            ((IDisposable)work).Dispose();
+            if (residual.CleanupCount != 1 || !residual.Active ||
+                residual.EnhancementDisposeCount != 1 ||
+                !residualReport.Records.Any(record => record.Status ==
+                    CastExecutionStatus.ResidualStateUnsettled &&
+                    record.Detail.Contains("iterator-finalizer")))
+                throw new InvalidOperationException(
+                    "A provider cleanup failure was reported as settled or successful after iterator cancellation.");
+
+            var hybridResidual = new PendingProviderDirectRuntime(false);
+            var hybridReport = new ExecutionReport(plan);
+            work = new HybridCastExecutor(hybridResidual,
+                new AlwaysAnimatedRuntime(), false, true)
+                .Execute(plan, hybridReport);
+            if (!work.MoveNext())
+                throw new InvalidOperationException(
+                    "The hybrid cancellation fixture did not become active.");
+            ((IDisposable)work).Dispose();
+            if (hybridResidual.CleanupCount != 1 || !hybridResidual.Active ||
+                hybridResidual.EnhancementDisposeCount != 1 ||
+                hybridReport.Confirmed != 0 ||
+                !hybridReport.Records.Any(record => record.Status ==
+                    CastExecutionStatus.ResidualStateUnsettled &&
+                    record.Detail.Contains("iterator-finalizer")))
+                throw new InvalidOperationException(
+                    "Hybrid cancellation discarded its inner transaction cleanup evidence.");
+
+            var terminalFailure = new TerminalProviderFailureRuntime();
+            var terminalReport = new ExecutionReport(plan);
+            Drain(new InstantCastExecutor(terminalFailure, true, 1)
+                .Execute(plan, terminalReport));
+            if (terminalReport.Confirmed != 0 || terminalReport.Failed != 1 ||
+                !terminalReport.Records.Any(record => record.Status ==
+                    CastExecutionStatus.FailedExecution && record.Detail
+                    .Contains("provider-terminal-cleanup-failed")))
+                throw new InvalidOperationException(
+                    "A settled provider cleanup failure was converted into a successful effect confirmation.");
+        }
+
+        private static CastPlan CreateShareDirectPlan(int targetCount,
+            bool includePowerfulChange)
+        {
+            const string resinousSkin =
+                "41ceee31b77741e99d3b0990bbe40a2a";
+            AbilityKey ability = Ability(resinousSkin, string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("resinous-skin-slots",
+                ResourcePoolKind.SpontaneousLevel, targetCount, targetCount,
+                null);
+            ProviderSnapshot provider = PlannerProvider("brown", "brown-book",
+                ability, pool.PoolKey, 1);
+            string[] targets = Enumerable.Range(1, targetCount)
+                .Select(index => "party-" + index).ToArray();
+            PartyProviderSnapshot snapshot = PlannerSnapshot(
+                new[] { provider }, new[] { pool },
+                new[] { "brown" }.Concat(targets).ToArray());
+            var option = new ProviderPlanningOption(provider,
+                new[] { "brown" }, new[] { "brown" }, 12, 120);
+            int reservoir = targetCount *
+                (includePowerfulChange ? 2 : 1);
+            CastEnhancementSnapshot share = ClassEnhancement("share", "brown",
+                ability, "brown-book", reservoir, "reservoir|brown",
+                "brown-fur-share-transmutation", true, false,
+                "brown-fur-direct-cast-v1");
+            CastEnhancementSnapshot powerful = ClassEnhancement(
+                "powerful-strength", "brown", ability, "brown-book",
+                reservoir, "reservoir|brown", "brown-fur-powerful-change",
+                false, false, "brown-fur-direct-cast-v1");
+            CastEnhancementSnapshot[] catalog = includePowerfulChange
+                ? new[] { share, powerful } : new[] { share };
+            string[] selected = catalog.Select(value => value.EnhancementId)
+                .ToArray();
+            var targeting = new EffectiveProviderOptionResolver(
+                new ICastTargetingModifier[] {
+                    new FixtureShareTargetingModifier("share", "brown",
+                        targets, CastExecutionStrategy.ProviderDirectRuleCast,
+                        "share-transmutation-provider-direct-cast-v1")
+                });
+            var request = new BuffCastRequest(new BuffSourceDefinition(
+                "resinous-skin-share", ability,
+                Leaf("72067851f2904755a372f4ea4818345e"),
+                CastGroupingKind.PerTarget), targets,
+                ExistingEffectPolicy.Overwrite, null, selected);
+            return new CastPlanner(targeting).Plan(snapshot, request,
+                new[] { option }, EmptyPolicy(),
+                new ActiveEffectSnapshot(null), catalog);
+        }
+
+        private static CastPlan CreateOrdinaryInstantPlan()
+        {
+            AbilityKey ability = Ability("ordinary-after-share",
+                string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("ordinary-slot",
+                ResourcePoolKind.SpontaneousLevel, 1, 1, null);
+            ProviderSnapshot provider = PlannerProvider("brown", "brown-book",
+                ability, pool.PoolKey, 1);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(
+                new[] { provider }, new[] { pool }, "brown");
+            var option = new ProviderPlanningOption(provider,
+                new[] { "brown" }, new[] { "brown" }, 12, 120);
+            return PlannerPlan(snapshot, ability, CastGroupingKind.PerTarget,
+                new[] { "brown" }, new[] { option }, EmptyPolicy(),
+                new ActiveEffectSnapshot(null));
+        }
+
+        private static CastPlan CreateLegacySharePlan()
+        {
+            AbilityKey ability = Ability(
+                "41ceee31b77741e99d3b0990bbe40a2a", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("legacy-share-slot",
+                ResourcePoolKind.SpontaneousLevel, 1, 1, null);
+            ProviderSnapshot provider = PlannerProvider("brown", "brown-book",
+                ability, pool.PoolKey, 1);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(
+                new[] { provider }, new[] { pool }, "brown", "party-1");
+            var option = new ProviderPlanningOption(provider,
+                new[] { "brown" }, new[] { "brown" }, 12, 120);
+            CastEnhancementSnapshot share = ClassEnhancement("share", "brown",
+                ability, "brown-book", 1, "reservoir|brown",
+                "brown-fur-share-transmutation", true, true, null);
+            var targeting = new EffectiveProviderOptionResolver(
+                new ICastTargetingModifier[] {
+                    new FixtureShareTargetingModifier("share", "brown",
+                        new[] { "party-1" },
+                        CastExecutionStrategy.NativeCommandRequired,
+                        "share-transmutation-legacy-native-command:contract-missing")
+                });
+            var request = new BuffCastRequest(new BuffSourceDefinition(
+                "legacy-share", ability,
+                Leaf("72067851f2904755a372f4ea4818345e"),
+                CastGroupingKind.PerTarget), new[] { "party-1" },
+                ExistingEffectPolicy.Overwrite, null, new[] { "share" });
+            return new CastPlanner(targeting).Plan(snapshot, request,
+                new[] { option }, EmptyPolicy(),
+                new ActiveEffectSnapshot(null), new[] { share });
+        }
+
         private static void TestUnconfirmedExecution()
         {
             AbilityKey ability = Ability("unconfirmed", string.Empty, 0);
@@ -4914,7 +5165,9 @@ namespace KingmakerBuffPlanner.Tests
 
         private static CastEnhancementSnapshot ClassEnhancement(string id,
             string caster, AbilityKey ability, string spellbook, int remaining,
-            string pool, string group, bool targeting)
+            string pool, string group, bool targeting,
+            bool requiresNativeCommand = true,
+            string directCastProviderId = null)
         {
             string name = id == "share" ? "Share Transmutation" :
                 id.StartsWith("powerful", StringComparison.Ordinal)
@@ -4922,8 +5175,9 @@ namespace KingmakerBuffPlanner.Tests
             return new CastEnhancementSnapshot(id, caster, id + "-toggle",
                 name, string.Empty, CastEnhancementCategory.ClassFeature,
                 0, 0, remaining, new[] { ability.BaseAbilityGuid }, name,
-                new[] { spellbook }, pool, true, group, 1, targeting,
-                group, "Arcane Reservoir");
+                new[] { spellbook }, pool, requiresNativeCommand, group, 1,
+                targeting, group, "Arcane Reservoir",
+                directCastProviderId);
         }
 
         private static string FindRepositoryRoot()
@@ -5023,13 +5277,26 @@ namespace KingmakerBuffPlanner.Tests
             private readonly string _enhancementId;
             private readonly string _casterId;
             private readonly string[] _legalIds;
+            private readonly CastExecutionStrategy _strategy;
+            private readonly string _reason;
 
             internal FixtureShareTargetingModifier(string enhancementId,
                 string casterId, IEnumerable<string> legalIds)
+                : this(enhancementId, casterId, legalIds,
+                    CastExecutionStrategy.AnimatedFallback,
+                    "legacy-share-fixture")
+            {
+            }
+
+            internal FixtureShareTargetingModifier(string enhancementId,
+                string casterId, IEnumerable<string> legalIds,
+                CastExecutionStrategy strategy, string reason)
             {
                 _enhancementId = enhancementId;
                 _casterId = casterId;
                 _legalIds = (legalIds ?? new string[0]).ToArray();
+                _strategy = strategy;
+                _reason = reason;
             }
 
             public ProviderPlanningOption Apply(
@@ -5041,7 +5308,7 @@ namespace KingmakerBuffPlanner.Tests
                 if (option.Provider.Key.CasterUnitId != _casterId) return null;
                 return new ProviderPlanningOption(option.Provider, _legalIds,
                     _legalIds, option.EffectiveCasterLevel,
-                    option.ExpectedDurationRounds, true);
+                    option.ExpectedDurationRounds, _strategy, _reason);
             }
         }
 
@@ -5200,11 +5467,15 @@ namespace KingmakerBuffPlanner.Tests
             { return InstantCastCompletion.Settled("fixture-clean"); }
         }
 
-        private sealed class AlwaysAnimatedRuntime : ICastRuntimeAdapter
+        private sealed class AlwaysAnimatedRuntime : ICastRuntimeAdapter,
+            ICastEnhancementRuntimeAdapter
         {
             internal int StartCount;
             public bool IsInCombat { get { return false; } }
             public CastRuntimeValidation Validate(CastStep step) { return CastRuntimeValidation.Pass(); }
+            public CastEnhancementPreparation PrepareEnhancements(
+                CastStep step)
+            { return CastEnhancementPreparation.Pass(null); }
             public IAnimatedCastOperation StartAnimated(CastStep step)
             {
                 StartCount++;
@@ -5242,6 +5513,211 @@ namespace KingmakerBuffPlanner.Tests
             { return InstantCastCompletion.Settled("fixture-settled"); }
             public InstantCastCompletion Cleanup(CastStep step)
             { return InstantCastCompletion.Settled("fixture-clean"); }
+        }
+
+        private sealed class ProviderDirectSequenceRuntime :
+            IInstantCastRuntimeAdapter, ICastEnhancementRuntimeAdapter
+        {
+            private CastStep _outstanding;
+
+            internal ProviderDirectSequenceRuntime(int sourceUses,
+                int reservoir)
+            {
+                SourceUsesRemaining = sourceUses;
+                ReservoirRemaining = reservoir;
+            }
+
+            internal int FireCount;
+            internal int ProviderTransactionCount;
+            internal int OrdinaryFireCount;
+            internal int SourceSpendInvocations;
+            internal int SourceUsesRemaining;
+            internal int ReservoirDebit;
+            internal int ReservoirRemaining;
+            internal int EnhancementPrepareCount;
+            internal int EnhancementDisposeCount;
+            internal int CleanupCount;
+            internal bool PrematureValidation;
+            internal readonly HashSet<string> EffectRecipients =
+                new HashSet<string>(StringComparer.Ordinal);
+
+            public bool IsInCombat { get { return false; } }
+
+            public CastEnhancementPreparation PrepareEnhancements(
+                CastStep step)
+            {
+                EnhancementPrepareCount++;
+                return CastEnhancementPreparation.Pass(
+                    new CallbackDisposable(() =>
+                        EnhancementDisposeCount++));
+            }
+
+            public CastRuntimeValidation Validate(CastStep step)
+            {
+                if (_outstanding != null)
+                {
+                    PrematureValidation = true;
+                    return CastRuntimeValidation.Fail(
+                        "prior-provider-transaction-active");
+                }
+                if (SourceUsesRemaining < step.Reservation.Units)
+                    return CastRuntimeValidation.Fail(
+                        "source-resource-exhausted");
+                int reservoir = step.EnhancementUsageByPool.Values.Sum();
+                return ReservoirRemaining < reservoir
+                    ? CastRuntimeValidation.Fail(
+                        "provider-reservoir-exhausted")
+                    : CastRuntimeValidation.Pass();
+            }
+
+            public InstantCastResult Fire(CastStep step)
+            {
+                if (_outstanding != null)
+                    throw new InvalidOperationException(
+                        "A later cast entered before provider completion.");
+                FireCount++;
+                SourceSpendInvocations++;
+                SourceUsesRemaining -= step.Reservation.Units;
+                if (SourceUsesRemaining < 0)
+                    throw new InvalidOperationException(
+                        "The source spell pool was overdrawn.");
+                if (step.ExecutionStrategy ==
+                    CastExecutionStrategy.ProviderDirectRuleCast)
+                {
+                    ProviderTransactionCount++;
+                    int cost = step.EnhancementUsageByPool.Values.Sum();
+                    ReservoirRemaining -= cost;
+                    ReservoirDebit += cost;
+                    if (ReservoirRemaining < 0)
+                        throw new InvalidOperationException(
+                            "The provider reservoir was overdrawn.");
+                    _outstanding = step;
+                    return new InstantCastResult(true, true, false, true,
+                        true, "provider-direct-rule-cast");
+                }
+                OrdinaryFireCount++;
+                AddEffects(step);
+                return new InstantCastResult(true, true, true, true, true,
+                    "ordinary-direct-rule-cast");
+            }
+
+            public bool EffectsObserved(CastStep step)
+            {
+                if (object.ReferenceEquals(_outstanding, step))
+                    AddEffects(step);
+                return step.ExpectedRecipientUnitIds.All(
+                    EffectRecipients.Contains);
+            }
+
+            public InstantCastCompletion InspectCompletion(CastStep step)
+            {
+                if (step.ExecutionStrategy !=
+                    CastExecutionStrategy.ProviderDirectRuleCast)
+                    return InstantCastCompletion.Settled(
+                        "ordinary-rule-cast-settled");
+                if (!object.ReferenceEquals(_outstanding, step))
+                    return step.ExpectedRecipientUnitIds.All(
+                            EffectRecipients.Contains)
+                        ? InstantCastCompletion.Settled(
+                            "provider-process-terminal")
+                        : InstantCastCompletion.Pending(
+                            "different-provider-transaction-active");
+                if (!step.ExpectedRecipientUnitIds.All(
+                        EffectRecipients.Contains))
+                    return InstantCastCompletion.Pending(
+                        "provider-effect-process-running");
+                _outstanding = null;
+                return InstantCastCompletion.Settled(
+                    "provider-effect-process-terminal");
+            }
+
+            public InstantCastCompletion Cleanup(CastStep step)
+            {
+                CleanupCount++;
+                if (object.ReferenceEquals(_outstanding, step))
+                    _outstanding = null;
+                return InstantCastCompletion.Settled(
+                    "provider-transaction-cleaned");
+            }
+
+            private void AddEffects(CastStep step)
+            {
+                foreach (string recipient in step.ExpectedRecipientUnitIds)
+                    EffectRecipients.Add(recipient);
+            }
+        }
+
+        private sealed class PendingProviderDirectRuntime :
+            IInstantCastRuntimeAdapter, ICastEnhancementRuntimeAdapter
+        {
+            private readonly bool _cleanupCompletes;
+
+            internal PendingProviderDirectRuntime(bool cleanupCompletes)
+            {
+                _cleanupCompletes = cleanupCompletes;
+            }
+
+            internal bool Active;
+            internal int CleanupCount;
+            internal int EnhancementDisposeCount;
+            public bool IsInCombat { get { return false; } }
+            public CastEnhancementPreparation PrepareEnhancements(
+                CastStep step)
+            {
+                return CastEnhancementPreparation.Pass(
+                    new CallbackDisposable(() =>
+                        EnhancementDisposeCount++));
+            }
+            public CastRuntimeValidation Validate(CastStep step)
+            { return CastRuntimeValidation.Pass(); }
+            public InstantCastResult Fire(CastStep step)
+            {
+                Active = true;
+                return new InstantCastResult(true, true, false, true, true,
+                    "provider-direct-pending");
+            }
+            public bool EffectsObserved(CastStep step) { return false; }
+            public InstantCastCompletion InspectCompletion(CastStep step)
+            {
+                return InstantCastCompletion.Pending(
+                    "provider-effect-process-running");
+            }
+            public InstantCastCompletion Cleanup(CastStep step)
+            {
+                CleanupCount++;
+                if (_cleanupCompletes) Active = false;
+                return Active ? InstantCastCompletion.Pending(
+                    "provider-cleanup-residual") :
+                    InstantCastCompletion.Settled(
+                        "provider-cleanup-complete");
+            }
+        }
+
+        private sealed class TerminalProviderFailureRuntime :
+            IInstantCastRuntimeAdapter, ICastEnhancementRuntimeAdapter
+        {
+            public bool IsInCombat { get { return false; } }
+            public CastEnhancementPreparation PrepareEnhancements(
+                CastStep step)
+            { return CastEnhancementPreparation.Pass(null); }
+            public CastRuntimeValidation Validate(CastStep step)
+            { return CastRuntimeValidation.Pass(); }
+            public InstantCastResult Fire(CastStep step)
+            {
+                return new InstantCastResult(true, true, true, true, true,
+                    "provider-rule-success");
+            }
+            public bool EffectsObserved(CastStep step) { return true; }
+            public InstantCastCompletion InspectCompletion(CastStep step)
+            {
+                return InstantCastCompletion.FailedSettled(
+                    "provider-terminal-cleanup-failed");
+            }
+            public InstantCastCompletion Cleanup(CastStep step)
+            {
+                return InstantCastCompletion.FailedSettled(
+                    "provider-terminal-cleanup-failed");
+            }
         }
 
         private sealed class StickySequenceRuntime : IInstantCastRuntimeAdapter

@@ -162,7 +162,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                 first.UsagePoolId, first.RequiresNativeCommand,
                 first.ExclusiveGroupId, first.UsageUnitsPerCast,
                 first.AffectsTargeting, first.NativeActivationGroupId,
-                first.UsagePoolDisplayName);
+                first.UsagePoolDisplayName, first.DirectCastProviderId);
         }
 
         private static bool TryDescribePersisted(string id, out CastEnhancementSnapshot snapshot)

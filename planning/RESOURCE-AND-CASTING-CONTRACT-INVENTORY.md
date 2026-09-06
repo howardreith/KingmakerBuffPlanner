@@ -1,5 +1,43 @@
 # Resource and Casting Contract Inventory
 
+## 0.0.19 provider-direct Share transaction
+
+The optional contract is capability version 1 and is accepted only when one
+loaded `KingmakerGunslinger` assembly exposes the exact public API, handle,
+status properties, Kingmaker parameter types, return types, and disposable
+lifecycle. No compile-time gameplay-mod reference is added. If any signature is
+missing or incompatible, Share and eligible Powerful Change snapshots retain
+`RequiresNativeCommand=true` and the legacy Animated route.
+
+For a supported Instant assignment the order is:
+
+1. Buff Planner resolves and activates the exact selected enhancement facts,
+   validates the exact source `AbilityData` and intended native-legal target,
+   then asks the provider to preflight.
+2. The provider re-observes live intent and validates Brown-Fur ownership,
+   genuine casting spellbook/source, selected blueprint/variant, qualified
+   Transmutation adapter, recipient relationship/range, requested Share and
+   Powerful Change, passive Supremacy, and available reservoir.
+3. `Begin` reserves a transaction keyed to the exact `AbilityData`, recipient,
+   and unique identity and opens the provider's normal targeting/Supremacy
+   scopes before `RuleCastSpell` is constructed.
+4. Provider Harmony hooks attach that exact rule/context/process, commit the
+   existing reservation, and debit one reservoir point for Share plus one for
+   selected Powerful Change. A rejected commit blocks the rule effect.
+5. Only after provider commit, Buff Planner applies the established native
+   UMD policy and invokes `Spend()` exactly once on the original source
+   `AbilityData`. It never spends a synthetic ability or reservoir resource.
+6. Effect confirmation and provider status are polled together. Provider state
+   survives `Rulebook.Trigger` return and is released only at process-terminal
+   completion; unresolved or failed cleanup blocks the next planned cast.
+
+Legitimate spell failure and UMD spending behavior remain the existing native
+policy. Direct commit rejection does not create the legacy
+`AbilityData.Spend()` suppression marker, so a later ordinary cast reusing that
+instance cannot be accidentally suppressed. Four-Share-plus-one-ordinary
+fixtures prove five exact source spends and, for Share plus Powerful Change,
+eight provider-owned reservoir points across the first four casts only.
+
 ## 0.0.18 sticky-touch source, delivery, and spend ownership
 
 Installed base-game contract: `Assembly-CSharp.dll` SHA-256

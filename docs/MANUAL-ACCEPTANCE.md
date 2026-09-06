@@ -1,5 +1,46 @@
 # Manual Acceptance
 
+## 0.0.19 Share Transmutation Instant routine
+
+Status: REQUIRED FOR LIVE GAMEPLAY CLAIM; NOT RUN. Use only an authorized
+`KBP_AUTOMATION_WORKING` save derived from the immutable matching baseline.
+
+1. Record candidate Planner/provider DLL hashes and MVIDs, Felix's exact
+   `AbilityData`/spellbook/variant identity, current Resinous Skin uses, Arcane
+   Reservoir total, Share/Powerful toggle state, party recipient IDs, and that
+   combat is inactive.
+2. Configure a routine as Instant. Select Share Transmutation for Resinous Skin
+   and select four legal other party members in a stable order. Leave Powerful
+   Change off for the first pass.
+3. Execute once. For all four steps, including the third and fourth, require
+   configured mode `instant`, strategy `ProviderDirectRuleCast`, reason
+   `share-transmutation-provider-direct-cast-v1` or the combined provider-direct
+   reason, one rule submission, no ordinary `UnitUseAbility` casting sequence,
+   and the normal Resinous Skin effect on only the intended recipient.
+4. After each cast verify the exact spell source loses one normal use and Arcane
+   Reservoir loses exactly one Share point. At routine end require four effects,
+   four spell uses, four reservoir points, no active provider transaction,
+   no selected one-shot toggle, and no residual targeting/modifier state.
+5. Add and execute an ordinary unrelated Instant buff immediately afterward.
+   Require its normal effect and source cost, no animation, no reservoir debit,
+   and no stale spend suppression or Share target redirection.
+6. Restore the Working save and repeat with Share plus a qualifying Powerful
+   Change score. Require both normal Share delivery and the provider's adjusted
+   ability-score enhancement on each recipient, one spell use, and exactly two
+   reservoir points per cast. If passive Transmutation Supremacy applies, also
+   verify its native range/duration behavior and terminal cleanup.
+7. Restore again, select explicit Animated mode, and repeat one Share cast.
+   Require the ordinary native animation/command and unchanged costs/effects.
+   Then cast manually outside Buff Planner and require the same native behavior.
+8. Exercise a self-cast with Share unselected and an ordinary non-Brown-Fur
+   Instant routine. Both must retain their prior targeting, costs, effects, and
+   execution strategies.
+
+Stop and retain logs on any provider rejection, unexpected Steam/account/cloud
+UI, missing effect, wrong target, wrong spell/reservoir delta, third/fourth cast
+failure, full casting delay in Instant mode, or residual transaction. Never
+substitute another save or infer success from an effect icon alone.
+
 ## 0.0.18 repeated Freedom of Movement execution
 
 Status: REQUIRED FOR LIVE GAMEPLAY CLAIM; NOT RUN. The protected environment

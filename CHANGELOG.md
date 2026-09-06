@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.0.19 - instant Share Transmutation integration
+
+- Adds a versioned, reflection-only bridge to the Brown-Fur provider's native
+  direct-cast transaction. Supported Share Transmutation assignments now use
+  `RuleCastSpell` in Instant mode without constructing or queuing a synthetic
+  `UnitUseAbility`.
+- Makes routing capability-aware at both the Share targeting modifier and the
+  complete selected-enhancement policy. Share plus a qualifying Powerful
+  Change selection uses one provider transaction; an older or incompatible
+  provider safely retains mandatory Animated execution with an explicit reason.
+- Preserves exact source `AbilityData.Spend()` ownership in Buff Planner and
+  exact Arcane Reservoir debit ownership in the provider. Provider preflight,
+  reservation, or commit rejection cannot fall through to an unenhanced cast
+  or consume the planned spell source.
+- Tracks provider completion through delayed native effect processes, reports
+  provider failure distinctly, disposes scoped enhancement state on iterator
+  cancellation, and prevents a later cast from starting while transaction
+  state remains unresolved.
+- Adds focused four-recipient coverage, including the third and fourth Share
+  casts and a subsequent ordinary instant buff, plus explicit Animated,
+  ordinary manual/provider, self-cast, combined-enhancement, rejection, and
+  cleanup regressions.
+
+This is a local candidate. Save-backed gameplay validation and public release
+publication have not been performed or inferred from deterministic tests.
+
 ## 0.0.18 - reliable instant sticky-touch delivery
 
 - Separates supported beneficial sticky-touch delivery from abilities that

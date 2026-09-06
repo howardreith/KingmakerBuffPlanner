@@ -75,13 +75,22 @@ namespace KingmakerBuffPlanner.GameAdapters
                                 new TargetWrapper(target));
                     }).Select(unit => unit.UnitId).Distinct(StringComparer.Ordinal)
                     .OrderBy(value => value, StringComparer.Ordinal).ToArray();
+                string directReason;
+                bool direct = BrownFurDirectCastCompatibility
+                    .TryValidateContract(out directReason);
                 Record("provider=" + option.Provider.Key.Canonical +
-                    ";share=accepted;legalTargets=" + string.Join(",", legal));
+                    ";share=accepted;directCast=" + direct +
+                    ";directReason=" + (direct ? "contract-v1" :
+                        directReason) + ";legalTargets=" +
+                    string.Join(",", legal));
                 return new ProviderPlanningOption(option.Provider, legal, legal,
                     option.EffectiveCasterLevel,
                     option.ExpectedDurationRounds,
-                    CastExecutionStrategy.NativeCommandRequired,
-                    "share-transmutation-native-command-required");
+                    direct ? CastExecutionStrategy.ProviderDirectRuleCast :
+                        CastExecutionStrategy.NativeCommandRequired,
+                    direct ? "share-transmutation-provider-direct-cast-v1" :
+                        "share-transmutation-legacy-native-command:" +
+                            directReason);
             }
             catch (Exception exception)
             {

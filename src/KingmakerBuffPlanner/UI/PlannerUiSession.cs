@@ -153,6 +153,10 @@ namespace KingmakerBuffPlanner.UI
                         ";category=" + enhancement.Category +
                         ";usagePool=" + enhancement.UsagePoolId +
                         ";requiresNativeCommand=" + enhancement.RequiresNativeCommand +
+                        ";directCastProvider=" +
+                            (string.IsNullOrWhiteSpace(
+                                enhancement.DirectCastProviderId) ? "none" :
+                                enhancement.DirectCastProviderId) +
                         (enhancement.Category == CastEnhancementCategory.MetamagicRod
                             ? ";spellLevelLimit=" + enhancement.MaximumSpellLevel
                             : ";qualifiedAbilities=" + enhancement.AbilityWhiteList.Count) + ".");
@@ -366,21 +370,29 @@ namespace KingmakerBuffPlanner.UI
             _log.Info("Routine plan: " + DescribePlan(preview.Plan));
             IEnumerator work = executor.Execute(preview.Plan, LastExecutionReport);
             Exception failure = null;
-            while (true)
+            try
             {
-                bool moved = false;
-                object current = null;
-                try
+                while (true)
                 {
-                    moved = work.MoveNext();
-                    if (moved) current = work.Current;
+                    bool moved = false;
+                    object current = null;
+                    try
+                    {
+                        moved = work.MoveNext();
+                        if (moved) current = work.Current;
+                    }
+                    catch (Exception exception)
+                    {
+                        failure = exception;
+                    }
+                    if (!moved || failure != null) break;
+                    yield return current;
                 }
-                catch (Exception exception)
-                {
-                    failure = exception;
-                }
-                if (!moved || failure != null) break;
-                yield return current;
+            }
+            finally
+            {
+                IDisposable disposable = work as IDisposable;
+                if (disposable != null) disposable.Dispose();
             }
             IsExecuting = false;
             if (failure != null)
