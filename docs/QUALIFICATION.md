@@ -1,5 +1,40 @@
 # Qualification
 
+## 0.0.19 Instant Share Transmutation candidate
+
+Status: MECHANICAL VALIDATION IN PROGRESS; SAVE-BACKED GAMEPLAY NOT RUN.
+
+| Evidence | Result |
+|---|---|
+| Primary starting branch / HEAD | clean `main` / `622760c9aeb1d2f583652bb71d391956b4a6576b` |
+| Primary feature branch / implementation HEAD / version | `codex/share-transmutation-instant` / `95b723da35046f5b1fa1c229ee3e318a0aaedf38` / 0.0.19 |
+| Provider starting branch / HEAD | clean `master` / `6874dc15a27ded132456dbdd480f47c794543a05` |
+| Provider feature branch / API HEAD | `codex/share-transmutation-instant` / `a788d2269fcc4aaa24f8c49f820257ceb9cf7403` |
+| Planner behavior runner | PASS=148 FAIL=0 |
+| Planner source validator | PASS=42 FAIL=0 |
+| Planner runtime-harness / package / deployment WhatIf | PASS=8/8, 4/4, 5/5 |
+| Provider complete domain suite | PASS=1393 FAIL=0 |
+| Provider 0.0.115 focused source validator | PASS |
+| Provider exact-reference production compile | PASS |
+| Provider compiled consumer contract | PASS=87 FAIL=0 |
+| Provider strict package / determinism | PASS; 2 identical packages; ZIP `2490193efc17e6a27b07beaddba71fd149bfe62ef29c4ca167698e52032316f6`; DLL `090e6478844bcac7825ef04f43099ff41139e26aaf3b490ef327c991cd281dc6`; MVID `98c59878-ac0b-4b3b-9716-132a7e409450` |
+| Planner working candidate (pre-clean release) | ZIP `deab9ed286a94c11d99410556ef99bff9005563be96ea1b85e1f3cde19103df2`; DLL `b494a5963db7405cbd304daca4b6c2487500e3427dbbdd994529852d7f23f7ca`; MVID `73cff075-c258-4c47-bcca-fd7129125511` |
+| Installed `Assembly-CSharp.dll` | SHA-256 `3b6450ffec440e296e586f71c711b195aed144b28d53e1cbb29406d18fef5afb`; MVID `07fa1e4d-8618-41b3-9b8d-faa17d3b26f7` |
+| Live Mods / protected saves | product/provider not staged; baseline=0/working=0; NOT RUN |
+
+The exact provider contract inspector previously passed 87/87 against the
+exact-reference provider output. Final versioned source aggregate,
+deterministic release package, hashes, MVIDs, and commit identities will replace
+this in-progress boundary after clean builds. No installed-game UMM/Harmony
+compatibility issue is represented as a source failure: the provider's guarded
+exact-reference build is authoritative, while its generic installed-reference
+build sees a newer local UMM/Harmony stack targeting .NET 4.8.
+
+No live installation, Mods staging, save access, game launch, push, tag, or
+public release has occurred. The absent protected save pair prevents claiming
+that Felix/Resinous Skin was observed physically; deterministic and assembly
+contract evidence is not relabeled runtime evidence.
+
 ## 0.0.18 public release verification
 
 The non-fast-forward release merge is

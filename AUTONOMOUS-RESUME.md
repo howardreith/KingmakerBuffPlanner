@@ -1,5 +1,30 @@
 # Autonomous Resume
 
+## 0.0.19 Instant Share Transmutation - 2026-09-06
+
+- Continue on primary/provider branch `codex/share-transmutation-instant`.
+  Primary base/current HEAD are
+  `622760c9aeb1d2f583652bb71d391956b4a6576b` /
+  `95b723da35046f5b1fa1c229ee3e318a0aaedf38`, version 0.0.19. Provider
+  base/current HEAD are `6874dc15a27ded132456dbdd480f47c794543a05` /
+  `a788d2269fcc4aaa24f8c49f820257ceb9cf7403`; its 0.0.115 release-default
+  roll-forward is uncommitted pending explicit scope authorization.
+- Core implementation and regressions are complete. Planner gates pass 148/148
+  behavior, 42/42 source, 8/8 harness purity, 4/4 package, and 5/5 deployment
+  WhatIf; provider gates pass 1393/1393 domain,
+  focused source validation, and exact-reference compile.
+- Provider strict build-output/package validation and two deterministic package
+  creations pass using its manifest-matching tracked bundle only in generated
+  workspace output. The all-in-one builder's legacy external Unity path remains
+  absent; no external Unity tree, live Mods, or saves were touched. Primary
+  clean release packaging follows after the provider worktree is finalized and
+  removed.
+- Exact next action: finish the authorized provider package gate, capture
+  package/DLL/MVID hashes, commit both coherent branches, run primary clean
+  source/contract/deterministic release gates, and record final identities.
+- Runtime gameplay remains NOT RUN: no exact protected
+  `KBP_AUTOMATION_BASELINE` / `KBP_AUTOMATION_WORKING` pair is available.
+
 ## 0.0.18 public release completion - 2026-09-01
 
 - Exact release/tag commit is

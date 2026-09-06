@@ -1,61 +1,48 @@
-# Kingmaker Buff Planner 0.0.18
+# Kingmaker Buff Planner 0.0.19
 
-This candidate fixes repeated Freedom of Movement execution in Instant mode
-through a structural sticky-touch transaction. Freedom of Movement is the
-regression canary; no spell name, spell GUID, caster, spellbook, target count,
-or party size is hardcoded in production behavior.
+This candidate fixes Share Transmutation ignoring Instant mode. Resinous Skin
+is the reported reproduction spell, but neither its name nor its GUID, Felix,
+or any party position appears in production routing.
 
-## True instant sticky-touch delivery
+## Provider-owned direct transaction
 
-A safe beneficial sticky-touch carrier with one valid friendly delivery
-blueprint is now classified as `StickyTouchDeliveryRuleCast`, not as inherently
-animated-only. Instant execution derives the delivery `AbilityData` from the
-exact planned source instance, preserves its caster, spellbook, reservation,
-variant, metamagic, and calculated context, and submits one `RuleCastSpell` for
-that delivery.
+When the installed Brown-Fur provider exposes the exact version-1 direct-cast
+contract, Share Transmutation and eligible Share-plus-Powerful Change casts use
+the provider's existing transaction without a queued animated command. The
+provider validates the real caster, exact spell source and selected variant,
+recipient, native Share legality, live selections, qualified effect adapters,
+and available Arcane Reservoir before Buff Planner submits `RuleCastSpell`.
 
-Resource ownership remains with the exact source `AbilityData`. The executor
-calls native `Spend()` once on that source after rule submission, never spends
-the derived delivery instance, and never casts or charges both carrier and
-delivery. Prepared reservation tokens and linked opposition slots therefore
-remain exact; spontaneous spell pools lose one use per successful planned
-cast.
+The transaction is attached to the exact `AbilityData`, target, rule, context,
+and execution process. Provider targeting, modifier adjustment, passive
+Transmutation Supremacy, one-shot consumption, debit, rollback, and scoped
+cleanup remain provider-owned. Buff Planner invokes `Spend()` once on the exact
+planned spell source after provider commit; it never debits Arcane Reservoir.
 
-## Reliable repeated targets
+Provider rejection cannot fall through to an ordinary unenhanced cast or
+consume the spell source. A delayed effect process remains tracked until it is
+terminal. Cleanup failure is reported as failure and unresolved state blocks
+the next planned cast.
 
-The executor now uses a state-based completion boundary. It confirms the
-expected target effect and proves that no matching held touch or generated
-delivery command remains before the next transaction may begin. Failure,
-timeout, exception, or cancellation cleans up cast-scoped state and releases
-enhancement leases.
+## Capability-aware fallback
 
-Diagnostics distinguish strategy selection, rule submission, native rule
-success, UMD/spell failure, `Spend()` invocation, observed resource delta,
-effect confirmation, and residual touch state. Stable routine, step, source,
-provider, unit, reservation-token, and carrier/delivery identifiers accompany
-those results.
-
-## Deliberate Animated mode
-
-Animated mode remains available, and native-command-required enhancements still
-force it. A sticky-touch animated operation now owns the complete native
-lifecycle: carrier command, generated delivery command when applicable,
-expected effect, and settled held-touch state. It cannot report success after
-only the carrier command.
+Both Share's targeting strategy and the complete selected-enhancement set use
+the same provider capability. Explicit Animated mode and ordinary native/manual
+casting retain the existing `UnitUseAbility` path. If the provider is absent,
+older, duplicated, or signature-incompatible, Share remains on the safe legacy
+Animated route with a structured reason; it is never silently made free or
+reported as instant.
 
 ## Validation boundary
 
-The focused suite passes 42/42 source contracts, 145/145 behavior/protocol
-tests, 8/8 runtime-harness filesystem tests, 4/4 package-fixture checks, and
-5/5 deployment-WhatIf checks. Regression coverage includes four consecutive
-prepared and spontaneous targets, exact reservation tokens, delayed effects,
-UMD spend policy, no double spend, animated two-stage completion, and cleanup
-after failures and exceptions.
+Focused deterministic coverage exercises four sequential Share recipients,
+the third and fourth cast, a subsequent ordinary instant buff, exact source and
+reservoir ownership, combined Share plus Powerful Change, self-casting,
+explicit Animated behavior, provider reservation/commit failure, delayed
+completion, iterator cancellation, and cleanup failure. Exact final build and
+package identities are recorded in `docs/QUALIFICATION.md` after the clean
+release build.
 
-Save-backed gameplay qualification is still blocked: the guarded resolver
-finds no exact `KBP_AUTOMATION_BASELINE` or `KBP_AUTOMATION_WORKING` save. No
-ordinary player save was substituted, so the observed frequency of the live
-third-target failure and the real Freedom of Movement canary remain manual
-verification items. The owner reviewed this explicit evidence boundary,
-accepted the mechanically qualified candidate, and authorized publication of
-version 0.0.18.
+Save-backed gameplay qualification is not claimed. No live mod installation,
+game launch, or save mutation is authorized by this candidate build, and public
+release publication requires separate owner authorization.

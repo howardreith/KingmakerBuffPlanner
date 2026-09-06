@@ -1,5 +1,55 @@
 # Implementation Report
 
+## 0.0.19 Instant Share Transmutation integration
+
+The reported path was an Instant routine whose Share-enabled personal
+Transmutation spell reached an ally through ordinary animation. The local
+baseline confirms why: the Share snapshot set `RequiresNativeCommand=true`,
+the Share targeting modifier independently returned
+`NativeCommandRequired`, and `HybridCastExecutor` treated either as mandatory
+Animated. Directly triggering `RuleCastSpell` was not a valid flag-only fix,
+because the provider enrolled Brown-Fur transactions from a
+`UnitUseAbility` constructor and later rule hooks only attached to an existing
+transaction.
+
+The companion provider now exposes a narrow public version-1 handle. `Validate`
+and `Begin` reuse the existing live intent observation and cast policy. Begin
+reserves through the existing coordinator and retains Share targeting and
+Supremacy scopes before the exact rule is constructed. Harmony rule hooks bind
+the exact `AbilityData`, recipient, rule, execution context, and process;
+commit uses the existing exact reservoir debit and Powerful Change modifier
+path. Process-terminal release performs the same transaction-scoped cleanup.
+Pre-rule cancellation rolls back only that reservation; commit rejection blocks
+the rule and creates no source-spend suppression residue.
+
+Buff Planner discovers this contract only by bounded reflection and publishes
+the direct capability on applicable Share and Powerful Change snapshots. A
+complete-set policy prevents stale flags or mixed providers from disagreeing.
+Instant execution prepares the native toggles, revalidates, begins the provider
+transaction, triggers one rule, calls `CompleteRule`, and only then invokes
+native `Spend()` on the original source when provider commit and the established
+UMD policy allow it. The provider's reservoir is never planner-debited.
+
+Behavior coverage uses production policy/coordinator models: supported Share
+selects Instant direct execution; four recipients get four effects and four
+exact spell-source spends; Share-plus-Powerful costs eight reservoir points
+across those casts; a fifth ordinary buff still executes; explicit Animated,
+self/ordinary Instant, and native/manual provider paths remain unchanged;
+legacy provider capability remains Animated; rejection cannot cast or spend;
+delayed completion, cancellation, and cleanup failure retain or report state.
+
+Work began from clean primary/provider baselines
+`622760c9aeb1d2f583652bb71d391956b4a6576b` and
+`6874dc15a27ded132456dbdd480f47c794543a05` on isolated
+`codex/share-transmutation-instant` branches. Primary implementation commit is
+`95b723da35046f5b1fa1c229ee3e318a0aaedf38`; provider API commit is
+`a788d2269fcc4aaa24f8c49f820257ceb9cf7403`. Results are planner 148/148
+behavior, 42/42 source, 8/8 harness purity, 4/4 package, and 5/5 deployment
+WhatIf; provider 1393/1393 domain, focused source validation, exact-reference
+compile, 87/87 compiled-contract inspection, strict package validation, and two
+deterministic packages. Final clean Planner artifact identities belong in
+`docs/QUALIFICATION.md`; save-backed gameplay is not inferred.
+
 ## 0.0.18 public release artifact
 
 Exact release/tag commit `1477979fa8b44e220adc3ece0afc85581a8b5811`

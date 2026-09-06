@@ -1,5 +1,38 @@
 # Architecture
 
+## 0.0.19 provider-direct enhancement execution
+
+`CastEnhancementSnapshot.DirectCastProviderId` is the domain capability marker;
+it contains no provider type. After all assignment-aware targeting modifiers
+run, `CastEnhancementExecutionPolicy` evaluates the complete selected set. Any
+remaining native-command requirement wins. Exactly one compatible direct
+provider may select `ProviderDirectRuleCast`; multiple providers, sticky touch,
+or a stale legacy requirement fail safely to native-command execution. This
+keeps Share plus Powerful Change consistent while leaving rods and unrelated
+enhancements unchanged.
+
+`BrownFurDirectCastCompatibility` is a bounded reflection adapter. It accepts
+one provider assembly and exact contract version, public type shape, methods,
+Kingmaker parameter/return types, read-only status surface, and `IDisposable`
+handle. No provider assembly is referenced at compile time. Contract absence or
+mismatch never broadens targeting and yields a structured legacy Animated
+reason.
+
+`KingmakerInstantCastAdapter` performs provider preflight and reserves the
+provider transaction while the exact enhancement activation lease is armed. It
+then triggers one rule on the exact planned source, reports provider commit
+separately, and invokes the source's native `Spend()` only after commit. The
+provider alone owns reservoir debit and its existing Share, Powerful Change,
+Supremacy, modifier, rollback, and one-shot semantics.
+
+The execution engine polls effect confirmation and provider completion as
+separate facts. The provider retains exact rule/context/process scopes beyond
+the synchronous rule return. Iterator finalization requests cast-scoped cleanup;
+an unresolved process or cleanup failure produces residual state and stops later
+steps instead of being reported as success. Explicit Animated mode never
+constructs this Instant executor, and ordinary manual casting remains wholly
+provider-native.
+
 ## 0.0.18 structural sticky-touch execution
 
 Execution capability is normalized in the domain plan instead of being

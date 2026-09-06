@@ -43,8 +43,10 @@ Detailed instructions and qualification boundaries are in
 - Direct portrait assignment and deterministic resource-aware planning.
 - Animated and Instant execution engines.
 - Provider consolidation with automatic caster/resource selection.
-- Metamagic-rod and fail-soft Powerful Change discovery with a visible
-  enhancement chooser.
+- Metamagic-rod and fail-soft Brown-Fur Powerful Change / Share Transmutation
+  discovery with a visible enhancement chooser. A compatible provider's
+  versioned direct-cast contract supports Instant Share; older providers retain
+  safe Animated execution.
 - Four-column vertical catalog with real blueprint icons, search, categories,
   and routine-local **Selected only**.
 - Player-facing selected, covered, unavailable, invalid, and neutral target

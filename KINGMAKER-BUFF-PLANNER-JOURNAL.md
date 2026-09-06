@@ -1,5 +1,39 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-09-06 - 0.0.19 Instant Share Transmutation implementation
+
+Status: IMPLEMENTED AND DETERMINISTICALLY REGRESSED; CLEAN RELEASE/PACKAGE
+IDENTITIES PENDING.
+
+- Primary branch/base/HEAD:
+  `codex/share-transmutation-instant` /
+  `622760c9aeb1d2f583652bb71d391956b4a6576b` /
+  `95b723da35046f5b1fa1c229ee3e318a0aaedf38`; version 0.0.19.
+- Provider branch/base/HEAD:
+  `codex/share-transmutation-instant` /
+  `6874dc15a27ded132456dbdd480f47c794543a05` /
+  `a788d2269fcc4aaa24f8c49f820257ceb9cf7403`; 0.0.115 release metadata remains
+  uncommitted pending explicit authorization.
+- Root cause: two independent Share native-command requirements forced the
+  hybrid Instant profile through the animated executor. An effect appearing on
+  the target was rejected as proof because direct `RuleCastSpell` previously
+  lacked the provider's constructor-created transaction enrollment.
+- Implementation: exact versioned optional direct API; provider-owned
+  reservation/commit/targeting/modifier/process cleanup; capability-aware
+  combined-enhancement routing; exact source spend after provider commit;
+  structured strategy, provider, failure, and residual-state diagnostics.
+- Commands: planner runner 148/148; planner source validator 42/42; harness
+  purity 8/8; package 4/4; deployment WhatIf purity 5/5;
+  provider full domain 1393/1393; provider focused source validation PASS;
+  provider exact-reference compile PASS. Evidence is under
+  `.provider-direct-cast-worktree/artifacts/local-runtime/0.0.115/exact-build/`.
+- Rejected approaches: spell/caster special case, flag-only repair, fake
+  command construction, global animation acceleration, duplicate Brown-Fur
+  policy, planner reservoir debit, and early transaction disposal.
+- Runtime remains NOT RUN because protected baseline/working saves are absent.
+  Exact next action is final clean validation and packaging, followed by manual
+  multi-recipient acceptance when an authorized save pair exists.
+
 ## 2026-09-01 - 0.0.18 public release completion
 
 Status: MERGED, GUARDED-PUSHED, ANNOTATED-TAGGED, PUBLICLY RELEASED, AND
