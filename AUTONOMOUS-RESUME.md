@@ -1,5 +1,19 @@
 # Autonomous Resume
 
+## 2026-09-06 paired public release complete
+
+Owner-authorized releases are public and independently download-verified:
+Planner 0.0.19 at `583b1e984f8e02720b09362f41082bfbd077a186` on
+`main`; provider 0.0.115 at `473f83bd901602ebe610cfdf291f11ce4a3faa57`
+on `master`. Release gates PASS; gameplay NOT RUN. The final guarded resolver
+reports `The exact Kingmaker save root is unavailable.` No game, Mods,
+installed dependency, or save was changed. Earlier in-progress/authorization
+blockers below are historical and superseded. Full commands, counts, hashes,
+MVIDs, package paths, and release links are in `docs/QUALIFICATION.md`.
+Exact next action: commit/guarded-push this documentation-only completion
+record and fast-forward the defaults; then only the protected-save procedure
+in `docs/MANUAL-ACCEPTANCE.md` remains for a future gameplay claim.
+
 ## 2026-09-06 paired release authorization
 
 The owner explicitly authorized committing all task changes, merging to both

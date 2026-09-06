@@ -1,5 +1,95 @@
 # Qualification
 
+## 0.0.19 / 0.0.115 paired public release verification
+
+Status: PUBLICATION AND MECHANICAL GATES PASS; SAVE-BACKED GAMEPLAY NOT RUN.
+
+Both repositories were clean at intake and preserved without reset or
+destructive history operations. Planner's final feature branch was
+`codex/kingmaker-buff-planner-share-transmutation-instant` at
+`2c895678723d816f435b6d6d5b67ce979c798b41`; provider's
+`codex/share-transmutation-instant` was
+`636d70bfd64db922a7d42070144302723002553c`. The owner-authorized
+non-fast-forward default merges are the exact release commits:
+
+| Product | Default / release commit | Annotated tag object |
+|---|---|---|
+| [Buff Planner 0.0.19](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.0.19) | main / `583b1e984f8e02720b09362f41082bfbd077a186` | `b38591263811be1b1eaf7f89f025777853b3e390` |
+| [Gunslinger 0.0.115](https://github.com/howardreith/KingmakerGunslingerAndOtherTabletopRules/releases/tag/v0.0.115) | master / `473f83bd901602ebe610cfdf291f11ce4a3faa57` | `f3e9a5a216417ef1280a18b698ba48c988e7d325` |
+
+Publication timestamps are respectively `2026-09-06T16:19:51Z` and
+`2026-09-06T16:19:32Z`; both are draft=false, prerelease=false. The
+completion records committed afterward do not move either tag or rebuild
+the published assets.
+
+### Exact commands and results
+
+All PowerShell release commands used Windows PowerShell 5.1. Provider Python
+was the existing Python312 installation; private references were
+`C:/Dev/KingmakerGunslingerLab/private/extracted-references/KingmakerGunslinger-private-build-references`.
+Installed UMM/Harmony were neither downgraded nor replaced.
+
+| Command / evidence | Result |
+|---|---|
+| Planner `scripts/Test-SourceOnly.ps1`, repeated by publisher | PASS: source 42/42, behavior/protocol 148/148, runtime filesystem 8/8, package 4/4, deployment WhatIf 5/5, aggregate 1/1 |
+| Planner `scripts/Build.ps1 -Configuration Debug` | PASS=1 FAIL=0 |
+| Planner `scripts/Build-Release.ps1`, repeated by publisher | PASS=3 FAIL=0; clean deterministic builds 2/2; strict package 4/4 |
+| Provider `scripts/Build-Local.ps1 -ReferenceBundleDir <above>`, repeated twice by publisher | PASS: focused source/dispatch, complete domain 1393/1393, clean net47 Release compile, supply icons, strict output, SoundBank, 135-file package |
+| Planner `scripts/Inspect-BrownFurShareContracts.ps1 -AssemblyPath <provider artifacts/bin/Release/KingmakerGunslinger/KingmakerGunslinger.dll> -ProductAssemblyPath artifacts/build/Release/KingmakerBuffPlanner.dll` | PASS=87 FAIL=0 against exact release DLLs |
+| Planner `scripts/Test-GuardedPush.ps1`; both default guards `-AllowDefaultBranch -WhatIf` | PASS=6 FAIL=0; clean state/HEAD preserved; real pushes verified exact remote hashes |
+| Planner `scripts/Publish-Release.ps1 -Publish -ConfirmHumanAcceptance` | PASS; source suite, two deterministic builds, package, tag, public upload |
+| Provider `scripts/Publish-Release.ps1 -ReferenceBundleDir <above> -Publish -ConfirmReleaseReady` | PASS; full pipeline twice, deterministic ZIP/DLL equality, package, tag, public upload |
+| `gh release download`, `gh api repos/.../releases/tags/v...`, each `scripts/validate-package.ps1 -PackagePath <download>` | PASS: downloaded/local/API-digest/checksum equality, strict package validation, exact tag commits |
+| Guarded `Get-KbpDisposableSavePair` | NOT RUN gameplay: `The exact Kingmaker save root is unavailable.` No launch or staging |
+| Historical provider `tools/test_validation_dispatch.py` | FAIL: stale expectation for active 0.0.58; unchanged, not the current version-aware release gate |
+| Provider generic installed-reference `scripts/build.ps1` | FAIL in this environment: newer installed UMM/Harmony references target net48; the existing provenance-checked net47 release route above PASSes |
+
+Publisher logs are `artifacts/share-release-publish.log` in each primary
+checkout. Planner exact-merge build/contract logs are
+`artifacts/share-release-merge-build.log` and
+`artifacts/share-release-contract.log`. Independent downloads reside in each
+checkout's `artifacts/release-verification/<version>`. Provider release and
+local-runtime manifests retain the exact compile provenance. The generated
+Planner Build-Release manifest still describes the local build stage; public
+status is established by the publisher log and GitHub verification, not by
+rewriting that immutable build-stage record.
+
+### Packages and identities
+
+Planner:
+`C:/Dev/KingmakerBuffPlannerLab/repo/KingmakerBuffPlanner/artifacts/release/0.0.19/KingmakerBuffPlanner-0.0.19.zip`
+(292,800 bytes).
+
+- ZIP SHA-256: `5ea68151fadb8d351debf60b554603f138081801d2e6b52918df7a2ed35ed9eb`
+- DLL SHA-256: `31f9a604c4d2bb7c048b7db470373b8d508c29471cca95ed9bc9adc7149e2d37`
+- DLL MVID: `56444044-8eeb-46c4-b9ec-f33c5ad8a65f`
+
+Provider:
+`C:/Dev/KingmakerGunslingerLab/repo/KingmakerGunslinger/artifacts/release/0.0.115/KingmakerGunslinger-0.0.115-share-transmutation-instant.zip`
+(23,048,955 bytes).
+
+- ZIP SHA-256: `b79aea789fadcf849b69700d3c63462b5f1041354ff36b26c10ba4f56f034555`
+- DLL SHA-256: `f93ddb0375fa37f266855579eee948fc35d1987d0ddf63247f0bbe31cf0dfa65`
+- DLL MVID: `88a6a42a-8648-4a7a-a0fa-4dd567701986`
+
+### Casting evidence boundary
+
+The confirmed cause and changed production files are in
+`docs/IMPLEMENTATION-REPORT.md`. Both forced-animated checks now evaluate
+the exact version-1 provider contract and whole selected enhancement set.
+Provider-owned validation/reservation precede the exact rule; reservoir debit,
+Powerful Change, Supremacy, delayed-process lifetime, and scoped cleanup stay
+provider-owned. Native source Spend/UMD semantics are retained. Hybrid iterator
+disposal now forwards inner residual/cleanup failure records.
+
+The deterministic Resinous Skin fixture uses blueprint
+`41ceee31b77741e99d3b0990bbe40a2a`; no production name/GUID special case
+exists. No live Felix AbilityData, spellbook, recipient, or resource delta is
+claimed as observed. Old/incompatible providers retain explicitly diagnosed
+Animated Share casting, and explicit Animated/manual behavior is unchanged.
+The exact four-recipient/ordinary-buff/cost/control procedure is
+`docs/MANUAL-ACCEPTANCE.md`; it remains necessary for gameplay qualification.
+
 ## 2026-09-06 paired release authorization
 
 The owner explicitly authorized committing all task changes, merging to both
