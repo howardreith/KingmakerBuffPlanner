@@ -49,7 +49,8 @@ namespace KingmakerBuffPlanner.Domain.Planning
             int usageUnitsPerCast = 1,
             bool affectsTargeting = false,
             string nativeActivationGroupId = null,
-            string usagePoolDisplayName = null)
+            string usagePoolDisplayName = null,
+            string directCastProviderId = null)
         {
             if (string.IsNullOrWhiteSpace(enhancementId)) throw new ArgumentException("Enhancement ID is required.", "enhancementId");
             if (string.IsNullOrWhiteSpace(casterUnitId)) throw new ArgumentException("Caster unit ID is required.", "casterUnitId");
@@ -91,6 +92,7 @@ namespace KingmakerBuffPlanner.Domain.Planning
                 nativeActivationGroupId;
             UsagePoolDisplayName = string.IsNullOrWhiteSpace(
                 usagePoolDisplayName) ? "Uses" : usagePoolDisplayName;
+            DirectCastProviderId = directCastProviderId ?? string.Empty;
         }
 
         public string EnhancementId { get; private set; }
@@ -112,6 +114,7 @@ namespace KingmakerBuffPlanner.Domain.Planning
         public bool AffectsTargeting { get; private set; }
         public string NativeActivationGroupId { get; private set; }
         public string UsagePoolDisplayName { get; private set; }
+        public string DirectCastProviderId { get; private set; }
 
         public bool IsApplicable(ProviderSnapshot provider)
         {

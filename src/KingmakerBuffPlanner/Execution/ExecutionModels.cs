@@ -209,25 +209,32 @@ namespace KingmakerBuffPlanner.Execution
     public sealed class InstantCastCompletion
     {
         private InstantCastCompletion(bool complete,
-            bool residualDeliveryState, string detail)
+            bool residualDeliveryState, bool failed, string detail)
         {
             Complete = complete;
             ResidualDeliveryState = residualDeliveryState;
+            Failed = failed;
             Detail = detail ?? string.Empty;
         }
 
         public bool Complete { get; private set; }
         public bool ResidualDeliveryState { get; private set; }
+        public bool Failed { get; private set; }
         public string Detail { get; private set; }
 
         public static InstantCastCompletion Settled(string detail)
         {
-            return new InstantCastCompletion(true, false, detail);
+            return new InstantCastCompletion(true, false, false, detail);
+        }
+
+        public static InstantCastCompletion FailedSettled(string detail)
+        {
+            return new InstantCastCompletion(true, false, true, detail);
         }
 
         public static InstantCastCompletion Pending(string detail)
         {
-            return new InstantCastCompletion(false, true, detail);
+            return new InstantCastCompletion(false, true, false, detail);
         }
     }
 

@@ -213,6 +213,9 @@ namespace KingmakerBuffPlanner.Compatibility
                 blueprint.Name;
             string description = blueprint == null ? string.Empty :
                 blueprint.Description;
+            string directReason;
+            bool direct = BrownFurDirectCastCompatibility
+                .TryValidateContract(out directReason);
             return new CastEnhancementSnapshot(
                 BrownFurPowerfulChangeProfile.EnhancementId(casterUnitId,
                     contract.ActivatableGuid), casterUnitId,
@@ -221,9 +224,11 @@ namespace KingmakerBuffPlanner.Compatibility
                 eligibleAbilityGuids,
                 "Powerful Change: " + contract.Score,
                 new[] { BrownFurPowerfulChangeProfile.CastingSpellbookGuid },
-                BrownFurPowerfulChangeProfile.UsagePoolId(casterUnitId), true,
+                BrownFurPowerfulChangeProfile.UsagePoolId(casterUnitId),
+                !direct,
                 "brown-fur-powerful-change", 1, false,
-                "brown-fur-powerful-change", "Arcane Reservoir");
+                "brown-fur-powerful-change", "Arcane Reservoir",
+                direct ? BrownFurDirectCastCompatibility.ProviderId : null);
         }
 
         private static bool TryResolveToggle(UnitEntityData unit,

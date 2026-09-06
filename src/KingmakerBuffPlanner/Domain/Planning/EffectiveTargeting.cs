@@ -97,6 +97,9 @@ namespace KingmakerBuffPlanner.Domain.Planning
                     effective = modifier.Apply(context, effective);
                     if (effective == null) break;
                 }
+                if (effective != null)
+                    effective = CastEnhancementExecutionPolicy.Apply(
+                        context, effective);
                 if (effective != null) result.Add(effective);
             }
             return new ReadOnlyCollection<ProviderPlanningOption>(result);
@@ -106,6 +109,78 @@ namespace KingmakerBuffPlanner.Domain.Planning
         {
             return new ReadOnlyCollection<ProviderPlanningOption>(
                 new List<ProviderPlanningOption>());
+        }
+    }
+
+    /// <summary>
+    /// Resolves execution requirements for the complete selected enhancement
+    /// set after targeting modifiers have produced the effective option.
+    /// A provider-direct capability is assignment scoped; any legacy native
+    /// requirement still wins and preserves the safe animated path.
+    /// </summary>
+    internal static class CastEnhancementExecutionPolicy
+    {
+        internal static ProviderPlanningOption Apply(
+            EffectiveProviderOptionContext context,
+            ProviderPlanningOption option)
+        {
+            if (context == null) throw new ArgumentNullException("context");
+            if (option == null) return null;
+            CastEnhancementSnapshot[] selected = context.SelectedEnhancements
+                .ToArray();
+            CastEnhancementSnapshot[] native = selected.Where(value =>
+                value.RequiresNativeCommand).ToArray();
+            if (native.Length != 0)
+            {
+                if (option.ExecutionStrategy ==
+                    CastExecutionStrategy.NativeCommandRequired)
+                    return option;
+                return WithStrategy(option,
+                    CastExecutionStrategy.NativeCommandRequired,
+                    "enhancement-native-command-required:" + string.Join(
+                        ",", native.Select(value => value.EnhancementId)
+                            .OrderBy(value => value,
+                                StringComparer.Ordinal).ToArray()));
+            }
+
+            string[] providers = selected.Select(value =>
+                    value.DirectCastProviderId)
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Distinct(StringComparer.Ordinal).OrderBy(value => value,
+                    StringComparer.Ordinal).ToArray();
+            if (providers.Length == 0) return option;
+            if (option.ExecutionStrategy ==
+                    CastExecutionStrategy.AnimatedFallback ||
+                option.ExecutionStrategy ==
+                    CastExecutionStrategy.NativeCommandRequired)
+                return option;
+            if (providers.Length != 1 || option.ExecutionStrategy ==
+                    CastExecutionStrategy.StickyTouchDeliveryRuleCast)
+                return WithStrategy(option,
+                    CastExecutionStrategy.NativeCommandRequired,
+                    providers.Length != 1
+                        ? "multiple-direct-cast-providers-native-command-required"
+                        : "provider-direct-sticky-touch-native-command-required");
+            return WithStrategy(option,
+                CastExecutionStrategy.ProviderDirectRuleCast,
+                "provider-direct-cast:" + providers[0] +
+                ";enhancements:" + string.Join(",", selected.Select(value =>
+                    value.EnhancementId).OrderBy(value => value,
+                        StringComparer.Ordinal).ToArray()) +
+                ";base:" + option.ExecutionStrategyReason);
+        }
+
+        private static ProviderPlanningOption WithStrategy(
+            ProviderPlanningOption option, CastExecutionStrategy strategy,
+            string reason)
+        {
+            return new ProviderPlanningOption(option.Provider,
+                option.ReachableTargetIds, option.LegalAnchorIds,
+                option.EffectiveCasterLevel, option.ExpectedDurationRounds,
+                strategy, reason, option.RecipientIdsByAnchor.ToDictionary(
+                    pair => pair.Key,
+                    pair => (IEnumerable<string>)pair.Value,
+                    StringComparer.Ordinal));
         }
     }
 }

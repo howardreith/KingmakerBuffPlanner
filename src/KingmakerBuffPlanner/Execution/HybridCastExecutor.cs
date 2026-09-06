@@ -89,7 +89,15 @@ namespace KingmakerBuffPlanner.Execution
                 var singlePlan = new CastPlan(new[] { step }, new TargetPlanOutcome[0], new string[0]);
                 var partial = new ExecutionReport(singlePlan);
                 IEnumerator work = executor.Execute(singlePlan, partial);
-                while (work.MoveNext()) yield return work.Current;
+                try
+                {
+                    while (work.MoveNext()) yield return work.Current;
+                }
+                finally
+                {
+                    IDisposable disposable = work as IDisposable;
+                    if (disposable != null) disposable.Dispose();
+                }
                 foreach (CastExecutionRecord record in partial.Records)
                     report.Add(index, step, record.Status, record.Detail);
                 priorTransactionUnsettled = partial.Records.Any(record =>
