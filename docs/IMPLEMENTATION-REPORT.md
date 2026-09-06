@@ -2,6 +2,13 @@
 
 ## 2026-09-06 failed human validation: routing diagnosis
 
+Product-bearing checkpoint: `de57d90b38711c4c641d470900339bd8815a3fa8`.
+Final candidate ZIP/DLL/MVID and exact command counts are recorded in the
+investigation report's delivery checkpoint. The package remains diagnostic-only;
+final bridge 21/21, exact metadata 87/87, deterministic builds 2/2, candidate
+deployment purity 5/5 and release installer purity 5/5 all pass. No gameplay
+coverage is promoted. The reproducing-machine cast log remains the next action.
+
 Instant Share remains unresolved; gameplay **NOT VERIFIED**. On local machine
 DATA the installed Planner 0.0.19 / Gunslinger 0.0.115 DLLs match both released
 hashes and MVIDs. Executing the real production bridge accepts that pair and

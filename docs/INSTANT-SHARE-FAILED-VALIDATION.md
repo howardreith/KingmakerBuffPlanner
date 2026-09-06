@@ -1,5 +1,71 @@
 # Instant Share failed human validation — 2026-09-06
 
+## Diagnostic candidate delivery checkpoint
+
+Product-bearing commit: `de57d90b38711c4c641d470900339bd8815a3fa8`.
+Branch: `codex/kingmaker-buff-planner/instant-share-routing-diagnosis`.
+Version remains **0.0.19**; this is a separately named local diagnostic build,
+not a replacement release or a confirmed casting fix. The paired provider is
+the installed/released Gunslinger **0.0.115**, whose contract-v1 acceptance was
+executed. No provider update or dependency change is required for this probe.
+
+Candidate ZIP:
+`artifacts/instant-share-diagnosis/candidate/KingmakerBuffPlanner-0.0.19-instant-share-diagnostics.zip`.
+
+| Candidate identity | Exact value |
+| --- | --- |
+| ZIP SHA-256 | ce1f13aac799747b891f4dde5af4593514bf9b464cf4e2d8ce94f616c05a1668 |
+| DLL SHA-256 | 9ea78daf5d8914abe9a35c608fea27920bf7d0611cfb384e73ea69077bb3a70a |
+| Loaded-candidate MVID expected in the reproduction log | 5541178e-3fb3-4530-b58d-6324de862e7e |
+| Build source commit | de57d90b38711c4c641d470900339bd8815a3fa8 |
+
+Final commands and exact counts:
+
+- `scripts/Test-SourceOnly.ps1`: source PASS=42 FAIL=0; behavior
+  PASS=150 FAIL=0; harness PASS=8 FAIL=0; package PASS=4 FAIL=0;
+  deployment WhatIf PASS=5 FAIL=0; aggregate PASS=1 FAIL=0.
+  Evidence: `final-source-tests.log`.
+- `scripts/Build.ps1 -Configuration Debug` and Release: PASS=1 FAIL=0 each.
+- `scripts/Build-Local.ps1`, twice at the exact product commit:
+  Release compile PASS=1 FAIL=0 and package PASS=4 FAIL=0 each;
+  local package PASS=1 FAIL=0 each; deterministic builds PASS=2 FAIL=0.
+  Evidence: `candidate-package-first.log`, `candidate-package-second.log`,
+  `deterministic-package.log`, and `candidate/source-build-manifest.json`.
+- `scripts/Test-BrownFurProductionBridge.ps1 -ProductAssemblyPath <candidate DLL> -ProviderAssemblyPath <installed 0.0.115 DLL> -IncompatibleProviderAssemblyPath <preserved actual 0.0.114 DLL> -RequireRoutingDiagnostics`:
+  PASS=21 FAIL=0 assertions, PASS=3 FAIL=0 isolated process cases.
+  Evidence: `final-package-bridge.log` and `final-package-bridge/`.
+- `scripts/Inspect-BrownFurShareContracts.ps1 -AssemblyPath <installed 0.0.115 DLL> -ProductAssemblyPath <candidate DLL>`:
+  PASS=87 FAIL=0, evidence `final-metadata-contract.log`.
+- `scripts/Test-DeploymentWhatIf.ps1` against the candidate package:
+  PASS=5 FAIL=0, evidence `candidate-deployment-whatif.log`.
+- `scripts/Test-InstallWhatIf.ps1 -ExpectedPriorVersion 0.0.19` against
+  the retained public release manifest: PASS=5 FAIL=0,
+  evidence `release-install-whatif.log`. This is release-installer purity,
+  not an installation of the candidate.
+- `scripts/Test-GuardedPush.ps1`: PASS=6 FAIL=0,
+  evidence `guarded-push-whatif.log`.
+- `git diff --check`: no whitespace errors.
+
+The installer-purity test initially failed because its old literal prior
+version was 0.0.16, while the owner's actual installation is now 0.0.19.
+It now accepts an explicit `ExpectedPriorVersion` input, retaining its old
+default and all five filesystem/identity assertions. A proposed candidate
+manifest input was rejected by the installer's release-root restriction; that
+restriction was retained and the unnecessary manifest parameter removed.
+Neither rejected invocation staged anything. The candidate instead passed
+the existing deployment WhatIf workflow. The documentation mission mirror
+also rejected an unsynchronized checkpoint during editing; both required
+copies were synchronized byte-for-byte and the unchanged validator passed.
+
+Prior generated runtime release artifacts were preserved and hash-compared at
+`preserved-release-runtime/` before rebuilding the same-version local output.
+The installed DLLs, other Mods, public release assets and saves were untouched.
+
+These results close the local executable capability/diagnostic gap. They do
+not close the missing Unity/Mono cast-routing observation. Exact next action
+remains the reproducing-machine log capture described below. Gameplay:
+**NOT VERIFIED**.
+
 ## Finding and evidence boundary
 
 The reported casting defect remains unresolved. Gameplay is **NOT VERIFIED**.
