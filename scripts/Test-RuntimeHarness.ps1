@@ -167,6 +167,89 @@ try {
         throw 'Compatibility transaction did not restore the exact original manifest.'
     }
     $passed++
+
+    # --- Guarded automation-fixture bootstrap ---
+    Add-Type -AssemblyName System.IO.Compression
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    function New-TestSaveArchive {
+        param([string]$Path, [string]$Name, [string]$GameName = 'Disposable Automation Campaign', [string]$GameId = '11111111-2222-3333-4444-555555555555')
+        $archive = [IO.Compression.ZipFile]::Open($Path,
+            [IO.Compression.ZipArchiveMode]::Create, [Text.Encoding]::UTF8)
+        try {
+            $headerEntry = $archive.CreateEntry('header.json')
+            $writer = [IO.StreamWriter]::new($headerEntry.Open(), [Text.Encoding]::UTF8)
+            try {
+                $writer.Write('{"Name":"' + $Name + '","GameName":"' + $GameName +
+                    '","GameId":"' + $GameId + '","Area":"Jamandi Aldori''s Mansion"}')
+            } finally { $writer.Dispose() }
+            $partyEntry = $archive.CreateEntry('party.json')
+            $writer = [IO.StreamWriter]::new($partyEntry.Open(), [Text.Encoding]::UTF8)
+            try { $writer.Write('{"members":[]}') } finally { $writer.Dispose() }
+        } finally { $archive.Dispose() }
+    }
+
+    $saveRoot = Join-Path $root 'saves'
+    $fixtureBackup = Join-Path $root 'fixture-backup'
+    New-Item -ItemType Directory -Path $saveRoot | Out-Null
+    New-TestSaveArchive -Path (Join-Path $saveRoot 'Manual_400_PlayerCampaign.zks') -Name 'PlayerCampaign' -GameName 'Valued Campaign'
+    $seedPath = Join-Path $saveRoot 'Manual_401_KBP_AUTOMATION_SEED.zks'
+    New-TestSaveArchive -Path $seedPath -Name 'KBP_AUTOMATION_SEED'
+    $playerBefore = Get-KbpSha256 (Join-Path $saveRoot 'Manual_400_PlayerCampaign.zks')
+    $seedBefore = Get-KbpSha256 $seedPath
+
+    $bootstrapScript = Join-Path $repo 'scripts\New-KbpAutomationFixture.ps1'
+    & $bootstrapScript -RunId 'harness-bootstrap' -SaveRoot $saveRoot -BackupRoot $fixtureBackup -Confirm:$false | Out-Null
+    $baselinePath = Join-Path $saveRoot 'Manual_402_KBP_AUTOMATION_BASELINE.zks'
+    $workingPath = Join-Path $saveRoot 'Manual_403_KBP_AUTOMATION_WORKING.zks'
+    if (-not (Test-Path -LiteralPath $baselinePath) -or -not (Test-Path -LiteralPath $workingPath) -or
+        -not (Test-Path -LiteralPath (Join-Path $fixtureBackup 'fixture-manifest.json'))) {
+        throw 'Fixture bootstrap did not create the sealed pair and manifest.'
+    }
+    function Read-TestHeaderName {
+        param([string]$Path)
+        $archive = [IO.Compression.ZipFile]::OpenRead($Path)
+        try {
+            $reader = [IO.StreamReader]::new($archive.GetEntry('header.json').Open())
+            try { return ((($reader.ReadToEnd()) | ConvertFrom-Json).Name) } finally { $reader.Dispose() }
+        } finally { $archive.Dispose() }
+    }
+    if ((Read-TestHeaderName $baselinePath) -cne 'KBP_AUTOMATION_BASELINE' -or
+        (Read-TestHeaderName $workingPath) -cne 'KBP_AUTOMATION_WORKING') {
+        throw 'Fixture pair headers were not rewritten to the harness contract names.'
+    }
+    if ((Get-KbpSha256 $seedPath) -cne $seedBefore -or
+        (Get-KbpSha256 (Join-Path $saveRoot 'Manual_400_PlayerCampaign.zks')) -cne $playerBefore) {
+        throw 'Fixture bootstrap mutated the seed or an ordinary save.'
+    }
+    $manifest = Read-KbpJson (Join-Path $fixtureBackup 'fixture-manifest.json')
+    if ($manifest.seed.sha256 -cne $seedBefore -or
+        $manifest.baseline.sha256 -cne (Get-KbpSha256 $baselinePath)) {
+        throw 'Fixture manifest provenance hashes are not exact.'
+    }
+    $passed++
+
+    $refused = $false
+    try { & $bootstrapScript -RunId 'harness-bootstrap-2' -SaveRoot $saveRoot -BackupRoot (Join-Path $root 'fixture-backup-2') -Confirm:$false | Out-Null }
+    catch { $refused = $true }
+    if (-not $refused) { throw 'A second fixture bootstrap did not refuse.' }
+    $passed++
+
+    & $bootstrapScript -RunId 'harness-teardown' -SaveRoot $saveRoot -Teardown -Confirm:$false | Out-Null
+    if ((Test-Path -LiteralPath $baselinePath) -or (Test-Path -LiteralPath $workingPath) -or
+        -not (Test-Path -LiteralPath $seedPath) -or
+        (Get-KbpSha256 $seedPath) -cne $seedBefore -or
+        (Get-KbpSha256 (Join-Path $saveRoot 'Manual_400_PlayerCampaign.zks')) -cne $playerBefore) {
+        throw 'Teardown did not remove exactly the disposable pair.'
+    }
+    $passed++
+
+    $emptyRoot = Join-Path $root 'saves-empty'
+    New-Item -ItemType Directory -Path $emptyRoot | Out-Null
+    $refused = $false
+    try { & $bootstrapScript -RunId 'harness-no-seed' -SaveRoot $emptyRoot -Confirm:$false | Out-Null }
+    catch { $refused = $true }
+    if (-not $refused) { throw 'Bootstrap without a seed did not refuse.' }
+    $passed++
 }
 finally {
     if (Test-Path -LiteralPath $root) {

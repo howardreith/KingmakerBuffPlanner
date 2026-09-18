@@ -331,3 +331,59 @@ above plus the open manual checklist.
   the live inventory promotes the scan donors — propagating unverified
   donor assumptions is explicitly out of scope per the mission.
 - No merge, no tag, no guarded push, no publication.
+
+
+## Continuation mission — 2026-09-18 (checkpoint 1-4 records)
+
+- Checkpoint 1: branch pushed through the guarded helper
+  (`f1256b929be1fc6f3de46fed19c750c55a1c80bc` verified on origin); draft PR
+  https://github.com/howardreith/KingmakerBuffPlanner/pull/1 opened with the
+  implementation gaps and unrun live lanes stated up front. Candidate hash
+  `0d1a1af3...` verified against the release manifest; package source
+  `ac0b91b` differs from handoff HEAD `f1256b9` only by documentation-only
+  commits (verified: 28 lines across two .md files), so the executable
+  source tree is identical.
+- Checkpoint 2: the audit confirmed the mission's finding — assignment
+  editing existed only at model level. Implemented the player-facing editor
+  in the Casting Order view (add/remove rows, Automatic/pinned caster
+  cycling, per-assignment enhancements with REQUIRED/OPTIONAL toggles in
+  the chooser, per-target remove/move/split) with resolved providers and
+  exact expected recipients surfaced per row; the material-change gate
+  (caster/item, enhancement/omission, cost, order, coverage vs the reviewed
+  baseline, routine-scoped) now refuses execution until renewed review; and
+  the editor test exposed and fixed a real planner defect (optional-policy
+  targeting modifiers were silently dropped even with charges available).
+  Suite 161/161 (commit `461d999`).
+- Checkpoint 4 (rod identity, concretely resolved as BLOCKED by native
+  contract): assembly evidence from the installed Assembly-CSharp —
+  `Kingmaker.Items.ItemEntity` derives directly from `System.Object` with
+  NO durable instance identity member (full member inventory captured by
+  compile-verified reflection probe); items live in
+  `Kingmaker.Items.ItemsCollection.m_Items` (a plain list, also
+  `System.Object`-rooted) with `InventorySlotIndex` positioning and
+  `TryMerge`/`CanBeMerged` stacking. `ActivatableAbility.ResourceCount`
+  lives on the unit fact keyed by owner+blueprint. Kingmaker 2.1.7b exposes
+  no per-rod-instance identity that survives save/reload; collection
+  position/slot/ordinal are exactly the identities the mission forbids.
+  Conclusion: exact physical-rod pinning is impossible without inventing
+  identity; legacy pooled "any matching rod for the caster" semantics are
+  the honest behavior and remain the only one offered. T03 is BLOCKED-BY-
+  CONTRACT, not silently dropped.
+- Checkpoint 3 (fixture bootstrap): `scripts/New-KbpAutomationFixture.ps1`
+  added — a guarded, source-tested (harness 12/12) bootstrap that seals a
+  deliberately disposable `Manual_<n>_KBP_AUTOMATION_SEED.zks` (header Name
+  exactly `KBP_AUTOMATION_SEED`) into the immutable
+  `KBP_AUTOMATION_BASELINE` + mutable `KBP_AUTOMATION_WORKING` pair with
+  only header.json's Name rewritten, byte-archives the seed and sealed
+  baseline offline with a hash manifest, proves every other save
+  byte-identical before and after, refuses any pre-existing automation
+  artifact, and offers an exact-contract teardown. The ONLY remaining
+  dependency is the human-only step below.
+- HUMAN-ONLY PREREQUISITE (live lanes): in a Kingmaker session the user
+  controls, create one deliberately disposable campaign (New Game, any
+  quick character) and save once with the exact name
+  `KBP_AUTOMATION_SEED` at any controllable moment. Do not rename or copy
+  an existing ordinary campaign for this. Then run
+  `powershell -ExecutionPolicy Bypass -File scripts/New-KbpAutomationFixture.ps1 -Confirm:$false`;
+  success = "Fixture bootstrap PASS" with sealed baseline/working hashes,
+  after which Checkpoint 5 live runs are unblocked.
