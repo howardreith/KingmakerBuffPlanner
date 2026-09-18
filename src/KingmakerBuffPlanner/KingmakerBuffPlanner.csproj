@@ -167,6 +167,7 @@
     <Compile Include="UI\SequentialForecastPlanner.cs" />
     <Compile Include="UI\PlannerReviewState.cs" />
     <Compile Include="UI\PlannerReviewCoordinator.cs" />
+    <Compile Include="UI\AssignmentEligibility.cs" />
     <Compile Include="UI\SpellbookHandoffStateMachine.cs" />
     <Compile Include="UI\BuffPlannerSpellbookEntryController.cs" />
     <Compile Include="UI\NativeThemeModel.cs" />

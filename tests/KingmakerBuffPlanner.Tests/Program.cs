@@ -192,6 +192,9 @@ namespace KingmakerBuffPlanner.Tests
                 Run("forecast-consumes-prepared-tokens-exactly", TestForecastPreparedTokens);
                 Run("forecast-projects-only-justified-effects", TestForecastEffectProjection);
                 Run("portrait-path-resolves-child-intent-separately", TestPortraitChildIntent);
+                Run("same-provider-targeting-survives-both-orders", TestSameProviderTargeting);
+                Run("picker-toggle-never-drops-sibling-coverage", TestPickerToggleCoverage);
+                Run("forecast-caster-effects-land-on-caster", TestForecastCasterIdentity);
                 Run("unsupported-configured-requests-block-partial-apply", TestUnresolvableCoverage);
                 Run("spellbook-handoff-invokes-opener-and-awaits-presentation", TestSpellbookHandoff);
                 Run("cast-enhancement-execution-is-fail-closed-and-cleaned-up", TestCastEnhancementExecution);
@@ -5542,6 +5545,220 @@ namespace KingmakerBuffPlanner.Tests
                         "The flat casting-order layout overlapped or dropped rows for " +
                         targetCount + " targets.");
             }
+        }
+
+        // N1: one provider under two assignments with different effective
+        // targeting (plain self-cast vs Share) — the self-only option must
+        // never suppress the shared reach, in EITHER creation order, and the
+        // picker uses assignment-specific legality with pins enforced by the
+        // production resolver.
+        private static void TestSameProviderTargeting()
+        {
+            AbilityKey ability = Ability("n1-echolocation", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("n1-slots",
+                ResourcePoolKind.SpontaneousLevel, 8, 8, null);
+            ProviderSnapshot felix = PlannerProvider("felix", "felix-book",
+                ability, pool.PoolKey, 1);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(
+                new[] { felix }, new[] { pool }, "felix", "tias", "raine");
+            var felixOption = new ProviderPlanningOption(felix,
+                new[] { "felix" }, new[] { "felix" }, 5, 50);
+            CastEnhancementSnapshot share = ClassEnhancement("share", "felix",
+                ability, "felix-book", 3, "reservoir|felix",
+                "brown-fur-share-transmutation", true);
+            var targeting = new EffectiveProviderOptionResolver(
+                new ICastTargetingModifier[] {
+                    new FixtureShareTargetingModifier("share", "felix",
+                        new[] { "felix", "tias", "raine" })
+                });
+            var effects = new Dictionary<string, EffectExpression> {
+                { ability.Canonical, new EffectLeafExpression(EffectKind.Buff,
+                    "n1-buff", EffectTarget.Caster, "ContextActionApplyBuff", "root/apply") }
+            };
+
+            foreach (bool shareFirst in new[] { false, true })
+            {
+                BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault(
+                    "n1-" + (shareFirst ? "s" : "p"));
+                var model = new PlannerSetupModel(profile, snapshot,
+                    new ActiveEffectSnapshot(null), effects,
+                    new[] { felixOption }, ignored => { }, new[] { share }, targeting);
+                SetupSourceRow source = model.SelectedSource;
+
+                model.ToggleTarget("long", "felix");
+                List<CastingAssignmentProfile> children = model
+                    .GetCastingAssignments("long", source.SourceId).ToList();
+                string firstId = children[0].AssignmentId;
+                CastingAssignmentProfile second = shareFirst
+                    ? model.SplitCastingAssignment("long", source.SourceId, firstId, "felix")
+                    : model.SplitCastingAssignment("long", source.SourceId, firstId, "felix");
+                model.SetAssignmentEnhancement("long", source.SourceId,
+                    second.AssignmentId, "share");
+                if (!shareFirst)
+                {
+                    // Reorder so the plain child runs FIRST explicitly.
+                    model.MoveCastingAssignmentEarlier("long", second.AssignmentId);
+                }
+
+                // Source-level legality: the shared reach must survive the
+                // plain child's self-only option for the SAME provider.
+                if (!model.IsTargetLegal(source, "long", "tias") ||
+                    !model.IsTargetLegal(source, "long", "raine") ||
+                    !model.IsTargetLegal(source, "long", "felix"))
+                    throw new InvalidOperationException(
+                        "The self-only option suppressed the Share reach (shareFirst=" +
+                        shareFirst + ").");
+
+                // Assignment-specific legality: the plain child cannot reach
+                // tias; the Share child can; a pinned caster removes the rest.
+                // The Share child is always the split child (`second`); the
+                // order variation only changes their relative Order.
+                string plainId = firstId;
+                string shareId = second.AssignmentId;
+                if (model.IsTargetLegalForAssignment(source, "long", plainId, "tias"))
+                    throw new InvalidOperationException(
+                        "The plain child's picker offered Share-only reach.");
+                if (!model.IsTargetLegalForAssignment(source, "long", shareId, "tias"))
+                    throw new InvalidOperationException(
+                        "The Share child's picker lost its own reach.");
+                // Pin the plain child to a different caster: resolver must
+                // remove every other candidate (pin enforcement).
+                CastingAssignmentProfile plainChild = model.FindCastingAssignment(
+                    "long", source.SourceId, plainId);
+                plainChild.CasterUnitId = "tias"; // no provider for tias
+                if (model.IsTargetLegalForAssignment(source, "long", plainId, "felix"))
+                    throw new InvalidOperationException(
+                        "A pinned caster did not remove other providers' reach.");
+                plainChild.CasterUnitId = null;
+            }
+        }
+
+        // N2: the picker toggle on a sibling-owned target refuses with the
+        // owner named instead of silently removing coverage; the selected
+        // child only ever gains or loses its own targets.
+        private static void TestPickerToggleCoverage()
+        {
+            AbilityKey ability = Ability("n2-spell", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("n2-slots",
+                ResourcePoolKind.Unlimited, 0, 0, null);
+            ProviderSnapshot felix = PlannerProvider("felix", "felix-book",
+                ability, pool.PoolKey, 0);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(
+                new[] { felix }, new[] { pool }, "felix", "tias", "raine");
+            var option = new ProviderPlanningOption(felix,
+                new[] { "felix", "tias", "raine" }, new[] { "felix" }, 4, 40);
+            var effects = new Dictionary<string, EffectExpression> {
+                { ability.Canonical, Leaf("n2-buff") }
+            };
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault("n2-picker");
+            int saves = 0;
+            var model = new PlannerSetupModel(profile, snapshot,
+                new ActiveEffectSnapshot(null), effects, new[] { option },
+                ignored => saves++);
+            SetupSourceRow source = model.SelectedSource;
+            model.ToggleTarget("long", "tias");
+            string rowAId = model.GetCastingAssignments("long", source.SourceId)
+                .First().AssignmentId;
+            CastingAssignmentProfile rowB = model.SplitCastingAssignment(
+                "long", source.SourceId, rowAId, "tias");
+            // Simulate the picker's exact callback: checking tias in row A
+            // (which no longer owns it; sibling row B does) must refuse.
+            bool refused = false;
+            try
+            {
+                model.ToggleAssignmentTarget("long", source.SourceId, rowAId, "tias");
+            }
+            catch (InvalidOperationException exception)
+            {
+                refused = true;
+                if (!exception.Message.Contains("already assigned"))
+                    throw new InvalidOperationException(
+                        "Sibling refusal lost the owner context: " + exception.Message);
+            }
+            if (!refused)
+                throw new InvalidOperationException(
+                    "Checking a sibling-owned target in another row did not refuse.");
+            // Coverage survived: tias still requested exactly once.
+            List<CastingAssignmentProfile> children = model
+                .GetCastingAssignments("long", source.SourceId).ToList();
+            if (children.Sum(child => child.TargetUnitIds.Count(id => id == "tias")) != 1)
+                throw new InvalidOperationException(
+                    "Picker toggle dropped requested coverage silently.");
+            // Row B gains its own target; deselect removes only from row B.
+            model.ToggleAssignmentTarget("long", source.SourceId, rowB.AssignmentId, "raine");
+            if (!rowB.TargetUnitIds.Contains("raine"))
+                throw new InvalidOperationException("Row B did not gain its own target.");
+            model.ToggleAssignmentTarget("long", source.SourceId, rowB.AssignmentId, "raine");
+            if (rowB.TargetUnitIds.Contains("raine") || saves < 3)
+                throw new InvalidOperationException(
+                    "Deselect did not remove from the selected child only.");
+        }
+
+        // N3: a caster-directed effect on a cast anchored at another unit
+        // projects onto the CASTER, not the anchor; a later request for that
+        // effect on the anchor must still cast.
+        private static void TestForecastCasterIdentity()
+        {
+            AbilityKey buffSpell = Ability("n3-anchor-spell", string.Empty, 0);
+            AbilityKey selfSpell = Ability("n3-self-spell", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("n3-slots",
+                ResourcePoolKind.Unlimited, 0, 0, null);
+            ProviderSnapshot casterA = PlannerProvider("caster-a", "book-a",
+                buffSpell, pool.PoolKey, 0);
+            ProviderSnapshot selfCaster = PlannerProvider("caster-a", "book-a",
+                selfSpell, pool.PoolKey, 0);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(
+                new[] { casterA, selfCaster }, new[] { pool },
+                "caster-a", "anchor-b");
+            var buffOption = new ProviderPlanningOption(casterA,
+                new[] { "caster-a", "anchor-b" }, new[] { "caster-a" }, 4, 40);
+            var selfOption = new ProviderPlanningOption(selfCaster,
+                new[] { "caster-a", "anchor-b" }, new[] { "caster-a" }, 4, 40);
+            // Anchor spell: a target effect on the anchor plus a DISTINCT
+            // caster-directed effect.
+            EffectExpression anchorEffects = new SequenceEffectExpression(
+                new EffectExpression[] {
+                    new EffectLeafExpression(EffectKind.Buff, "n3-target-buff",
+                        EffectTarget.CurrentTarget, "ContextActionApplyBuff", "root/a"),
+                    new EffectLeafExpression(EffectKind.Buff, "n3-caster-buff",
+                        EffectTarget.Caster, "ContextActionApplyBuff", "root/b")
+                });
+            var effects = new Dictionary<string, EffectExpression> {
+                { buffSpell.Canonical, anchorEffects },
+                { selfSpell.Canonical, Leaf("n3-caster-buff") }
+            };
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault("n3-caster");
+            profile.Routines.First(r => r.RoutineId == "long").Assignments.Add(Assignment(
+                buffSpell.Canonical, buffSpell, new[] { "anchor-b" }));
+            profile.Routines.First(r => r.RoutineId == "short").Assignments.Add(Assignment(
+                selfSpell.Canonical, selfSpell, new[] { "anchor-b" }));
+            SequentialForecastPlanner.Result result = SequentialForecastPlanner.Compute(
+                profile, new[] { "long", "short" }, snapshot,
+                new ActiveEffectSnapshot(null), effects,
+                new[] { buffOption, selfOption }, new CastEnhancementSnapshot[0]);
+            // The short routine requests n3-caster-buff on anchor-b: the long
+            // cast projected that effect onto caster-a (the caster), NOT the
+            // anchor — so anchor-b must still CAST.
+            int shortCasts = result.Occurrences[1].Plan.Steps.Count;
+            if (shortCasts != 1)
+                throw new InvalidOperationException(
+                    "A caster-directed effect was invented onto the anchor (short casts=" +
+                    shortCasts + ").");
+            // Self-cast on caster-a for the same effect skips for free.
+            BuffPlannerProfile selfProfile = BuffPlannerProfile.CreateDefault("n3-caster-self");
+            selfProfile.Routines.First(r => r.RoutineId == "long").Assignments.Add(Assignment(
+                buffSpell.Canonical, buffSpell, new[] { "anchor-b" }));
+            selfProfile.Routines.First(r => r.RoutineId == "short").Assignments.Add(Assignment(
+                selfSpell.Canonical, selfSpell, new[] { "caster-a" }));
+            SequentialForecastPlanner.Result selfResult = SequentialForecastPlanner.Compute(
+                selfProfile, new[] { "long", "short" }, snapshot,
+                new ActiveEffectSnapshot(null), effects,
+                new[] { buffOption, selfOption }, new CastEnhancementSnapshot[0]);
+            if (selfResult.Occurrences[1].Plan.Steps.Count != 0 ||
+                selfResult.Occurrences[1].Plan.Outcomes.Count(o =>
+                    o.Kind == TargetOutcomeKind.SkippedAlreadyActive) != 1)
+                throw new InvalidOperationException(
+                    "The caster's own later request did not skip for free.");
         }
 
         // R4: the ordinary source/portrait path resolves each child's pins,

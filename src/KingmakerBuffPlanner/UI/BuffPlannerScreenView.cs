@@ -668,18 +668,21 @@ namespace KingmakerBuffPlanner.UI
             {
                 string unitId = unit.UnitId;
                 bool assigned = current.TargetUnitIds.Contains(unitId);
-                bool legal = false;
+                // Assignment-specific legality: the selected child's own
+                // pins and enhancements decide, never another child's reach.
+                bool legal = model.IsTargetLegalForAssignment(source,
+                    ActiveRoutineId, assignmentId, unitId);
                 string reason = string.Empty;
-                try
-                {
-                    legal = model.IsTargetLegal(source, ActiveRoutineId, unitId);
-                }
-                catch (Exception) { legal = false; }
-                if (!legal && !assigned)
-                    reason = "not a legal target for this buff";
+                bool siblingOwned = !assigned && children.Any(child =>
+                    child.AssignmentId != assignmentId &&
+                    child.TargetUnitIds.Contains(unitId));
+                if (!legal && !assigned && !siblingOwned)
+                    reason = "not reachable by this assignment";
+                else if (siblingOwned)
+                    reason = "assigned to another assignment — use Move to transfer";
                 rows.Add(new AssignmentTargetRowViewModel(unitId,
                     string.IsNullOrWhiteSpace(unit.DisplayName) ? unitId : unit.DisplayName,
-                    assigned, legal, reason, () =>
+                    assigned, legal && !siblingOwned, reason, () =>
                     {
                         try
                         {

@@ -421,6 +421,90 @@ try {
     }
     $passed++
 
+    # --- N4: journal-before-move, rollback-failure lock retention,
+    # repeated recovery, escaped-manifest teardown ---
+
+    # Interruption immediately AFTER journaling but BEFORE the move: the
+    # journaled destination does not exist. Recovery must reconcile it as an
+    # unperformed operation — no error, no deletion, verified clean rollback.
+    foreach ($journal in @('baseline', 'working')) {
+        $jRoot = New-FixtureSeedRoot ('saves-n4-journal-' + $journal)
+        $jState = Join-Path $stateRoot ('n4-journal-' + $journal)
+        $jArchive = Join-Path $root ('archive-n4-journal-' + $journal)
+        $jSeedHash = Get-KbpSha256 (Join-Path $jRoot 'Manual_401_KBP_AUTOMATION_SEED.zks')
+        $failed = $false
+        try {
+            & $bootstrapScript -RunId ('n4-j-' + $journal) -SaveRoot $jRoot -StateRoot $jState `
+                -ArchiveRoot $jArchive -FailAfterJournal $journal -Confirm:$false | Out-Null
+        } catch { $failed = $true }
+        if (-not $failed) { throw "Journal-window injection ($journal) did not fail." }
+        $jRecord = Read-KbpJson (Join-Path $jState ('n4-j-' + $journal + '\transaction.json'))
+        if ($jRecord.status -cne 'RolledBack') {
+            throw "Journal-window failure ($journal) did not leave a rolled-back record."
+        }
+        if (@(Get-ChildItem -LiteralPath $jRoot -Filter '*KBP_AUTOMATION_BASELINE*').Count -ne 0 -or
+            @(Get-ChildItem -LiteralPath $jRoot -Filter '*KBP_AUTOMATION_WORKING*').Count -ne 0 -or
+            (Get-KbpSha256 (Join-Path $jRoot 'Manual_401_KBP_AUTOMATION_SEED.zks')) -cne $jSeedHash) {
+            throw "Journal-window recovery ($journal) left residue or touched the seed."
+        }
+        & $bootstrapScript -RunId ('n4-j-' + $journal) -SaveRoot $jRoot -StateRoot $jState `
+            -ArchiveRoot (Join-Path $root ('archive-n4-j-' + $journal + '-retry')) -Confirm:$false | Out-Null
+        if (-not (Test-Path -LiteralPath (Join-Path $jRoot 'Manual_402_KBP_AUTOMATION_BASELINE.zks'))) {
+            throw "Retry after journal-window recovery ($journal) did not complete."
+        }
+    }
+    $passed++
+
+    # Rollback failure keeps the lock and record recoverable; a second
+    # -Recover (repeated recovery) completes cleanly once the foreign
+    # blocker is gone.
+    $rbRoot = New-FixtureSeedRoot 'saves-n4-rollback'
+    $rbState = Join-Path $stateRoot 'n4-rollback'
+    $rbArchive = Join-Path $root 'archive-n4-rollback'
+    $failed = $false
+    try {
+        & $bootstrapScript -RunId 'n4-rb' -SaveRoot $rbRoot -StateRoot $rbState `
+            -ArchiveRoot $rbArchive -FailRollback -FailAfterStage Staged -Confirm:$false | Out-Null
+    } catch { $failed = $true }
+    if (-not $failed) { throw 'Rollback-failure injection did not fail.' }
+    $rbRecord = Read-KbpJson (Join-Path $rbState 'n4-rb\transaction.json')
+    if ($rbRecord.status -ceq 'RolledBack') {
+        throw 'Rollback reported success despite the injected failure.'
+    }
+    if (-not (Test-Path -LiteralPath (Join-Path $rbState 'fixture.lock'))) {
+        throw 'Failed rollback released the lock, stranding the transaction.'
+    }
+    # Remove the injected foreign blocker exactly, then recover.
+    Remove-Item (Join-Path $rbState 'n4-rb\staging\foreign-rollback-blocker.txt') -Force
+    & $bootstrapScript -RunId 'n4-rb' -SaveRoot $rbRoot -StateRoot $rbState -Recover -Confirm:$false | Out-Null
+    if ((Test-Path -LiteralPath (Join-Path $rbState 'n4-rb\staging')) -or
+        (Test-Path -LiteralPath (Join-Path $rbState 'fixture.lock'))) {
+        throw 'Repeated recovery did not complete the owned rollback.'
+    }
+    $passed++
+
+    # Escaped/absolute manifest path in teardown is refused whole-set via the
+    # containment validator.
+    $escRoot = New-FixtureSeedRoot 'saves-n4-escape'
+    $escState = Join-Path $stateRoot 'n4-escape'
+    $escArchive = Join-Path $root 'archive-n4-escape'
+    & $bootstrapScript -RunId 'n4-esc' -SaveRoot $escRoot -StateRoot $escState -ArchiveRoot $escArchive -Confirm:$false | Out-Null
+    $escManifestPath = Join-Path $escArchive 'fixture-manifest.json'
+    $escManifest = Read-KbpJson $escManifestPath
+    $escManifest.baseline.fileName = '..\..\saves-n4-escape\Manual_402_KBP_AUTOMATION_BASELINE.zks'
+    Write-KbpJsonAtomic $escManifestPath $escManifest
+    $refused = $false
+    try {
+        & $bootstrapScript -RunId 'n4-esc-teardown' -SaveRoot $escRoot -StateRoot $escState `
+            -ArchiveRoot $escArchive -Teardown -Confirm:$false | Out-Null
+    } catch { $refused = $true }
+    if (-not $refused -or
+        -not (Test-Path -LiteralPath (Join-Path $escRoot 'Manual_402_KBP_AUTOMATION_BASELINE.zks')) -or
+        -not (Test-Path -LiteralPath (Join-Path $escRoot 'Manual_403_KBP_AUTOMATION_WORKING.zks'))) {
+        throw 'Escaped manifest path did not refuse teardown whole-set.'
+    }
+    $passed++
+
     # Missing seed refuses; nothing created.
     $emptyRoot = Join-Path $root 'saves-empty'
     New-Item -ItemType Directory -Path $emptyRoot | Out-Null

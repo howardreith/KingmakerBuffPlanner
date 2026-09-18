@@ -305,10 +305,14 @@ namespace KingmakerBuffPlanner.UI
             {
                 if (leaf.Target == EffectTarget.Caster)
                 {
+                    // A caster-directed effect lands on the actual planned
+                    // caster, never on the cast anchor (an ally anchor with a
+                    // self-buff component must not grant that self-buff to
+                    // the ally in the forecast).
                     projections.Add(new ProjectedEffect
                     {
                         EffectId = leaf.EffectId, Kind = leaf.Kind,
-                        RecipientUnitId = step.AnchorUnitId
+                        RecipientUnitId = step.Provider.CasterUnitId
                     });
                 }
                 else if (leaf.Target == EffectTarget.CurrentTarget && step.TargetUnitIds.Count == 1)
@@ -339,7 +343,16 @@ namespace KingmakerBuffPlanner.UI
                 return;
             }
             var targeted = expression as TargetedEffectExpression;
-            if (targeted != null) { CollectJustified(targeted.Child, step, projections); return; }
+            if (targeted != null)
+            {
+                // A target wrapper re-scopes its child; without a proven
+                // recipient mapping for the wrapper's target we project
+                // nothing rather than invent coverage.
+                if (targeted.Target == EffectTarget.CurrentTarget &&
+                    step.TargetUnitIds.Count == 1)
+                    CollectJustified(targeted.Child, step, projections);
+                return;
+            }
             var referenced = expression as ReferencedAbilityExpression;
             if (referenced != null) { CollectJustified(referenced.Child, step, projections); return; }
             // ConditionalEffectExpression and unknown nodes: no projection.

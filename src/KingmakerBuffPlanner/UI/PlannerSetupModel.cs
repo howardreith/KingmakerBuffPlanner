@@ -490,68 +490,84 @@ namespace KingmakerBuffPlanner.UI
                 (enhancement.RemainingUses.Value == 1 ? " use" : " uses");
         }
 
+        // Resolves one request per child assignment so each child's pins,
+        // targets, and enhancement selections reach the resolver as that
+        // child's own cast constraints. Results keep assignment identity: a
+        // provider under two assignments appears twice with each
+        // assignment's effective targeting, never collapsed to the first.
+        private IReadOnlyList<AssignmentProviderOption> GetAssignmentProviderOptions(
+            SetupSourceRow source, string routineId)
+        {
+            EffectExpression expression;
+            if (!_effects.TryGetValue(source.SourceId, out expression))
+                return new ReadOnlyCollection<AssignmentProviderOption>(
+                    new List<AssignmentProviderOption>());
+            CastGroupingKind grouping;
+            if (!EffectExpressionTargetAnalysis.TryGetGrouping(expression, out grouping))
+                return new ReadOnlyCollection<AssignmentProviderOption>(
+                    new List<AssignmentProviderOption>());
+            SourceAssignmentProfile assignment = FindRoutine(routineId)
+                .Assignments.FirstOrDefault(value => value.SourceId == source.SourceId);
+            var children = new List<CastingAssignmentChild>();
+            if (assignment != null)
+            {
+                foreach (CastingAssignmentProfile child in assignment.CastingAssignments)
+                    children.Add(new CastingAssignmentChild(child.AssignmentId,
+                        child.Order, child.CasterUnitId, child.SpellbookGuid,
+                        child.ProviderKey, child.TargetUnitIds.ToList(),
+                        child.Enhancements.Select(selection =>
+                            new EnhancementRequest(selection.EnhancementId,
+                                selection.IsRequired)).ToList()));
+            }
+            else
+            {
+                // Unconfigured source: one unconstrained child so a fresh
+                // source stays legal to plan.
+                children.Add(new CastingAssignmentChild("unconfigured", 0,
+                    null, null, null, new string[0], new EnhancementRequest[0]));
+            }
+            return AssignmentEligibility.ResolveChildren(
+                new BuffSourceDefinition(source.SourceId, source.Abilities,
+                    expression, grouping),
+                assignment == null ? ExistingEffectPolicy.SkipAlreadyActive :
+                    assignment.ExistingEffectPolicy,
+                assignment == null ? (IReadOnlyCollection<string>)new string[0] :
+                    assignment.IgnoredPresenceMarkers.ToList(),
+                children, _targeting, Snapshot, _providerOptions, _enhancements);
+        }
+
+        // Source-level legality summary: a unit is legal when ANY child's own
+        // effective targeting reaches it. The first option for a provider
+        // never suppresses a later assignment's different targeting.
         public IReadOnlyList<ProviderPlanningOption> GetEffectiveProviderOptions(
             SetupSourceRow source, string routineId)
         {
             if (source == null) return new ReadOnlyCollection<ProviderPlanningOption>(
                 new List<ProviderPlanningOption>());
-            EffectExpression expression;
-            if (!_effects.TryGetValue(source.SourceId, out expression))
-                return new ReadOnlyCollection<ProviderPlanningOption>(
-                    new List<ProviderPlanningOption>());
-            SourceAssignmentProfile assignment = FindRoutine(routineId)
-                .Assignments.FirstOrDefault(value => value.SourceId ==
-                    source.SourceId);
-            CastGroupingKind grouping;
-            if (!EffectExpressionTargetAnalysis.TryGetGrouping(expression,
-                    out grouping))
-                return new ReadOnlyCollection<ProviderPlanningOption>(
-                    new List<ProviderPlanningOption>());
-            return GetChildAwareProviderOptions(source, routineId, expression,
-                grouping, assignment);
+            var aggregated = new List<ProviderPlanningOption>();
+            var seenReach = new HashSet<string>(StringComparer.Ordinal);
+            foreach (AssignmentProviderOption candidate in GetAssignmentProviderOptions(
+                    source, routineId))
+            {
+                // Aggregate presentation reach, not executable options: two
+                // entries for one provider contribute their distinct reach
+                // sets, and neither replaces the other.
+                foreach (string unitId in candidate.Option.ReachableTargetIds)
+                    seenReach.Add(unitId);
+                aggregated.Add(candidate.Option);
+            }
+            return new ReadOnlyCollection<ProviderPlanningOption>(aggregated);
         }
 
-        // Resolves one request per child assignment so each child's pins,
-        // targets, and enhancement selections reach the resolver as that
-        // child's own cast constraints — never a merged union that can turn
-        // two different rods or another child's Share into one incompatible
-        // selection. Legality aggregates the per-child option sets.
-        private IReadOnlyList<ProviderPlanningOption> GetChildAwareProviderOptions(
-            SetupSourceRow source, string routineId, EffectExpression expression,
-            CastGroupingKind grouping, SourceAssignmentProfile assignment)
+        // Assignment-specific legality for the target picker: only the
+        // selected child's own resolved options decide.
+        public bool IsTargetLegalForAssignment(SetupSourceRow source,
+            string routineId, string assignmentId, string unitId)
         {
-            var definition = new BuffSourceDefinition(
-                source.SourceId, source.Abilities, expression, grouping);
-            var combined = new List<ProviderPlanningOption>();
-            var seen = new HashSet<string>(StringComparer.Ordinal);
-            if (assignment != null)
-            {
-                foreach (CastingAssignmentProfile child in assignment.CastingAssignments)
-                {
-                    var request = new BuffCastRequest(definition,
-                        child.TargetUnitIds, assignment.ExistingEffectPolicy,
-                        assignment.IgnoredPresenceMarkers,
-                        child.Enhancements.Select(selection =>
-                            new EnhancementRequest(selection.EnhancementId,
-                                selection.IsRequired)),
-                        child.AssignmentId, child.CasterUnitId, child.ProviderKey,
-                        child.SpellbookGuid, child.Order);
-                    foreach (ProviderPlanningOption option in _targeting.Resolve(
-                            Snapshot, request, _providerOptions, _enhancements))
-                        if (seen.Add(option.Provider.Key.Canonical))
-                            combined.Add(option);
-                }
-            }
-            else
-            {
-                // No configured children yet: resolve the unconstrained
-                // request so a fresh source is still legal to plan.
-                var request = new BuffCastRequest(definition, new string[0],
-                    ExistingEffectPolicy.SkipAlreadyActive, new string[0]);
-                combined.AddRange(_targeting.Resolve(Snapshot, request,
-                    _providerOptions, _enhancements));
-            }
-            return new ReadOnlyCollection<ProviderPlanningOption>(combined);
+            if (source == null) return false;
+            return AssignmentEligibility.IsTargetLegalForAssignment(
+                GetAssignmentProviderOptions(source, routineId),
+                assignmentId, unitId);
         }
 
         private static string AggregateUsageSuffix(
@@ -931,8 +947,10 @@ namespace KingmakerBuffPlanner.UI
         }
 
         // Editor-side target addition/removal for one child assignment.
-        // Legal targets toggle in; removal always works, including for
-        // targets that have become invalid or vanished from the party.
+        // Deselect removes from the SELECTED child only; adding a legal
+        // unassigned target assigns it to that child; a target owned by a
+        // sibling refuses with the owner named — the explicit move operation
+        // transfers it atomically. Coverage never silently disappears.
         public void ToggleAssignmentTarget(string routineId, string sourceId,
             string assignmentId, string unitId)
         {
@@ -941,34 +959,27 @@ namespace KingmakerBuffPlanner.UI
             RoutineProfile routine = FindRoutine(routineId);
             CastingAssignmentProfile casting = FindCastingAssignment(
                 routineId, sourceId, assignmentId);
-            // Portrait state shows wanted regardless of which child holds a
-            // target. Deselect removes it from whichever child owns it
-            // (pinned routing is only removed explicitly, never converted);
-            // select adds to the Automatic child only when no sibling
-            // already owns it, so pinned routing is never silently moved.
-            SourceAssignmentProfile owner = routine.Assignments
-                .FirstOrDefault(item => item.SourceId == source.SourceId);
-            CastingAssignmentProfile owningChild = owner == null ? null :
-                owner.CastingAssignments.FirstOrDefault(child =>
-                    child.TargetUnitIds.Contains(unitId));
-            if (owningChild != null)
+            if (casting.TargetUnitIds.Contains(unitId))
             {
-                owningChild.TargetUnitIds.Remove(unitId);
+                casting.TargetUnitIds.Remove(unitId);
             }
             else
             {
                 if (!Snapshot.Units.Any(unit => unit.UnitId == unitId))
                     throw new ArgumentException("Unknown unit.", "unitId");
-                if (!IsTargetLegal(source, routineId, unitId))
-                    throw new InvalidOperationException(
-                        "The selected buff cannot target this character.");
-                // Never duplicate across siblings of the same source.
                 SourceAssignmentProfile parent = routine.Assignments
                     .First(value => value.SourceId == sourceId);
-                foreach (CastingAssignmentProfile sibling in parent.CastingAssignments
-                    .Where(child => child != casting && child.TargetUnitIds.Contains(unitId))
-                    .ToList())
-                    sibling.TargetUnitIds.Remove(unitId);
+                CastingAssignmentProfile owner = parent.CastingAssignments
+                    .FirstOrDefault(child => child != casting &&
+                        child.TargetUnitIds.Contains(unitId));
+                if (owner != null)
+                    throw new InvalidOperationException(
+                        "Target is already assigned to " + owner.AssignmentId +
+                        ". Use Move to transfer it explicitly.");
+                if (!IsTargetLegalForAssignment(source, routineId,
+                        assignmentId, unitId))
+                    throw new InvalidOperationException(
+                        "This assignment cannot target that character.");
                 casting.TargetUnitIds.Add(unitId);
             }
             PruneEmptyAssignment(routine, routine.Assignments
