@@ -1,5 +1,26 @@
 # AUTONOMOUS-RESUME — top section is current; planning/Z-NATIVE-ASSIGNMENTS-STATUS.md is the per-checkpoint tracker.
 
+## R1-R4 targeted repairs handoff — 2026-09-18 (LATEST)
+
+- Status: R1-R4 closed with production-path regressions (protocol 169/169,
+  harness 23/23). R1 real-save-use safety gate: PASS on isolated-root
+  evidence; the real save directory remains untouched pending a genuine
+  `KBP_AUTOMATION_SEED` (absence re-verified; do not fabricate one).
+- Candidate: package SHA-256
+  `43f911f1c3f06e2f00a4d6951ed75ac84e13574cc390748ebd272e7ed6e8697d`,
+  source `80847e6`, local-only, deterministic 2/2.
+- THE ONE HUMAN ACTION (unchanged): create a genuinely NEW disposable
+  campaign, save once named exactly `KBP_AUTOMATION_SEED` at a controllable
+  moment, fully exit Kingmaker. Then I run the repaired guarded bootstrap
+  (real process checks, lock/token binding, write-ahead publication,
+  manifest-bound teardown all harness-proven), establish normal-save/
+  profile protection, provision the casting fixture, and start the live
+  lanes (rendered smoke first).
+- Known incomplete feature: spellbook same-context return — awaiting the
+  live native-reopen contract inspection during the first spellbook run.
+
+# AUTONOMOUS-RESUME — top section is current; planning/Z-NATIVE-ASSIGNMENTS-STATUS.md is the per-checkpoint tracker.
+
 ## PR1 repair follow-up handoff — 2026-09-18 (LATEST)
 
 - Status: ALL SIX SOURCE FINDINGS REPAIRED with regressions (F1 bootstrap

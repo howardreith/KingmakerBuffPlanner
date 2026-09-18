@@ -1180,3 +1180,13 @@ The repaired bootstrap has NOT been run against the real save directory and
 will not be until a `KBP_AUTOMATION_SEED` created by the user exists; the
 guard, staging, rollback, recovery, and teardown paths are proven only in
 the isolated harness fixture roots so far.
+
+### 0.1.0 candidate rebuild after R1-R4 repairs — 2026-09-18
+
+Supersedes all earlier 0.1.0 hashes. Deterministic 2/2. Source commit
+`80847e6`; package SHA-256
+`43f911f1c3f06e2f00a4d6951ed75ac84e13574cc390748ebd272e7ed6e8697d`;
+see `artifacts/release/0.1.0/release-manifest.json` for the DLL hash and
+MVID. Gates: source 42/42, protocol 169/169, harness 23/23, package 4/4,
+WhatIf 5/5. Local-only; no live lanes run (still no
+`KBP_AUTOMATION_SEED`; absence re-verified before this record).

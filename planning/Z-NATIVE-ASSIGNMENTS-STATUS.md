@@ -401,3 +401,29 @@ package 4/4, WhatIf 5/5. Live lanes remain unrun: no
 record); the repaired bootstrap refuses until one is created by the
 user. Theme donor promotion, rendered layout, spellbook placement, and
 casting/resource acceptance remain live-only.
+
+
+## Targeted-repairs continuation (R1-R4) — 2026-09-18
+
+- R1 real-save-use safety gate: **PASS** — exercised only against isolated
+  temporary roots so far; the real save directory has NOT been touched
+  because no `KBP_AUTOMATION_SEED` exists (re-verified this pass). Gate
+  basis: production script itself, 23/23 harness assertions covering
+  live-process recovery refusal, run/token-bound lock release, containment
+  + role + campaign-provenance validation before every removal, foreign/
+  substituted/escaped/unknown-state refusals, byte-for-byte WhatIf purity
+  of all three modes (locks, transaction JSON, archives, timestamps), and
+  write-ahead publication with after-move interruption recovery. When a
+  genuine seed exists, run the repaired helper against the real directory.
+- R2 fixed: preview computation is side-effect-free; acknowledgment is an
+  explicit post-binding presentation call via PlannerReviewCoordinator.
+- R3 fixed: prepared tokens consumed exactly (linked included) with
+  aggregate derived from token state; effect projection justified-only
+  (conditionals unproven, kinds/recipients preserved).
+- R4 fixed: per-child resolver requests (no union merge), pinned-routing
+  protection in the portrait strip, reconciled select-all/clear, target
+  display names, non-overlapping header bands.
+- Gates after repairs: source 42/42, protocol 169/169, harness 23/23,
+  package 4/4, WhatIf 5/5. Candidate rebuilt deterministically (see
+  QUALIFICATION for identity). Spellbook same-context return remains the
+  known incomplete feature, pending the live native-reopen contract.
