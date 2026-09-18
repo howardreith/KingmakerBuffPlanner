@@ -175,6 +175,7 @@ namespace KingmakerBuffPlanner.Tests
                 Run("cast-enhancement-selection-is-assignment-scoped", TestCastEnhancementSelection);
                 Run("casting-section-presents-caster-and-enhancement-choices", TestCastingSectionPresentation);
                 Run("casting-section-layout-keeps-button-labels-visible", TestCastingSectionLayout);
+                Run("chooser-scroll-layout-owns-content-bounds", TestChooserScrollLayout);
                 Run("cast-enhancement-execution-is-fail-closed-and-cleaned-up", TestCastEnhancementExecution);
                 Run("consumed-one-shot-enhancement-is-not-rearmed", TestOneShotEnhancementRestoration);
                 Run("execution-preflight-runs-under-the-native-activation-lease",
@@ -4609,6 +4610,85 @@ namespace KingmakerBuffPlanner.Tests
                 CastingPanelLayoutContract.SettingsCloseLabel != "CLOSE" ||
                 string.IsNullOrWhiteSpace(CastingPanelLayoutContract.SettingsCloseLabel))
                 throw new InvalidOperationException("Casting button geometry or shared CLOSE label is not render-safe.");
+        }
+
+        // Chooser scroll geometry must be exact so the final option row is
+        // reachable by wheel and scrollbar (mission acceptance T16); the
+        // arithmetic mirrors the shared factory layout (padding 4, spacing 4)
+        // and the fixed row heights both modal choosers install.
+        private static void TestChooserScrollLayout()
+        {
+            const float row = ChooserScrollLayoutContract.EnhancementRowHeight;
+            const float policyRow = CastingPanelLayoutContract.MinimumCasterPolicyRowHeight;
+
+            if (ChooserScrollLayoutContract.ContentHeight(0, row) != 0f ||
+                ChooserScrollLayoutContract.ContentHeight(1, row) != 8f + row ||
+                ChooserScrollLayoutContract.ContentHeight(2, row) != 8f + (2f * row) + 4f)
+                throw new InvalidOperationException("Chooser content height does not match padding 4 + rows + spacing 4.");
+
+            float thirty = ChooserScrollLayoutContract.ContentHeight(30, row);
+            float hundred = ChooserScrollLayoutContract.ContentHeight(100, row);
+            if (thirty != 8f + (30f * row) + (29f * 4f) ||
+                hundred != 8f + (100f * row) + (99f * 4f) ||
+                ChooserScrollLayoutContract.ContentHeight(30, policyRow) <= thirty + 30f * 20f)
+                throw new InvalidOperationException("Row-count scaling or caster-policy row height drifted.");
+
+            // Viewport showing ~5 rows: overflow must produce a positive,
+            // bounded scroll range so the final row is reachable.
+            float viewport = 5f * row;
+            float maxOffset = ChooserScrollLayoutContract.MaxScrollOffset(viewport, hundred);
+            if (maxOffset != hundred - viewport || maxOffset <= 0f)
+                throw new InvalidOperationException("Overflowing chooser has no reachable scroll range.");
+            if (ChooserScrollLayoutContract.MaxScrollOffset(viewport, viewport) != 0f ||
+                ChooserScrollLayoutContract.MaxScrollOffset(0f, hundred) != 0f ||
+                ChooserScrollLayoutContract.MaxScrollOffset(viewport, 0f) != 0f)
+                throw new InvalidOperationException("Non-overflowing or empty choosers must not scroll.");
+
+            if (ChooserScrollLayoutContract.ClampScrollOffset(-10f, viewport, hundred) != 0f ||
+                ChooserScrollLayoutContract.ClampScrollOffset(maxOffset + 25f, viewport, hundred) != maxOffset ||
+                ChooserScrollLayoutContract.ClampScrollOffset(maxOffset * 0.5f, viewport, hundred) != maxOffset * 0.5f)
+                throw new InvalidOperationException("Refresh offset clamping is not bounded by the content size.");
+
+            // A refresh that shrinks the list must pull the offset back inside
+            // the new bounds instead of stranding the view below the content.
+            float shrunk = ChooserScrollLayoutContract.ClampScrollOffset(
+                maxOffset, viewport, ChooserScrollLayoutContract.ContentHeight(6, row));
+            if (shrunk != ChooserScrollLayoutContract.MaxScrollOffset(
+                    viewport, ChooserScrollLayoutContract.ContentHeight(6, row)))
+                throw new InvalidOperationException("Offset survived a list shrink outside the new bounds.");
+
+            // Fresh open reveals the selected row; visible rows do not move.
+            float content6 = ChooserScrollLayoutContract.ContentHeight(6, row);
+            if (ChooserScrollLayoutContract.OffsetRevealingRow(
+                    0, 0f, viewport, content6, row) != 0f ||
+                ChooserScrollLayoutContract.OffsetRevealingRow(
+                    4, 0f, viewport, content6, row) != 20f)
+                throw new InvalidOperationException("Selected-row reveal is not anchored to the row bounds.");
+            // Row 5 bottom = 4 + 6*(row+4) - 4 = 6*row+24; aligning it to the
+            // viewport bottom lands 4px above the absolute maximum offset,
+            // which is correct: revealing the row must not overscroll.
+            if (ChooserScrollLayoutContract.OffsetRevealingRow(
+                    5, 0f, viewport, content6, row) != row + 24f ||
+                ChooserScrollLayoutContract.OffsetRevealingRow(
+                    5, 0f, viewport, content6, row) >=
+                    ChooserScrollLayoutContract.MaxScrollOffset(viewport, content6) + 1f)
+                throw new InvalidOperationException("Last-row reveal did not reach its own bottom bound.");
+            if (ChooserScrollLayoutContract.OffsetRevealingRow(
+                    -1, 999f, viewport, content6, row) !=
+                ChooserScrollLayoutContract.ClampScrollOffset(999f, viewport, content6))
+                throw new InvalidOperationException("Reveal without a selected row must only clamp.");
+
+            // Scrollbar handle size reflects the visible ratio and stays
+            // draggable for very long lists.
+            if (ChooserScrollLayoutContract.ScrollbarHandleRatio(viewport, viewport) != 1f ||
+                ChooserScrollLayoutContract.ScrollbarHandleRatio(0f, hundred) != 1f ||
+                Math.Abs(ChooserScrollLayoutContract.ScrollbarHandleRatio(viewport, content6) -
+                    viewport / content6) > 0.0001f ||
+                ChooserScrollLayoutContract.ScrollbarHandleRatio(viewport, hundred) !=
+                    ChooserScrollLayoutContract.MinimumHandleRatio ||
+                ChooserScrollLayoutContract.ScrollbarHandleRatio(1f, 100000f) !=
+                    ChooserScrollLayoutContract.MinimumHandleRatio)
+                throw new InvalidOperationException("Scrollbar handle ratio is not the viewport/content fraction.");
         }
         private static void TestCastEnhancementSelection()
         {

@@ -536,6 +536,65 @@ namespace KingmakerBuffPlanner.UI
 
     }
 
+    public static class ChooserScrollLayoutContract
+    {
+        // Must mirror the shared factory scroll view: VerticalLayoutGroup
+        // padding 4/4/4/4 and spacing 4 on content, and the fixed per-row
+        // LayoutElement heights the two modal choosers install.
+        public const float RowSpacing = 4f;
+        public const float ContentPadding = 4f;
+        public const float EnhancementRowHeight = 68f;
+        public const float ScrollbarWidth = 18f;
+        public const float MinimumHandleRatio = 0.1f;
+
+        public static float ContentHeight(int rowCount, float rowHeight)
+        {
+            if (rowCount <= 0 || rowHeight <= 0f) return 0f;
+            return (ContentPadding * 2f) + (rowCount * rowHeight) +
+                ((rowCount - 1) * RowSpacing);
+        }
+
+        public static float MaxScrollOffset(float viewportHeight, float contentHeight)
+        {
+            if (viewportHeight <= 0f || contentHeight <= 0f) return 0f;
+            float offset = contentHeight - viewportHeight;
+            return offset > 0f ? offset : 0f;
+        }
+
+        public static float ClampScrollOffset(float offset, float viewportHeight,
+            float contentHeight)
+        {
+            if (offset < 0f) return 0f;
+            float maximum = MaxScrollOffset(viewportHeight, contentHeight);
+            return offset > maximum ? maximum : offset;
+        }
+
+        public static float ScrollbarHandleRatio(float viewportHeight, float contentHeight)
+        {
+            if (contentHeight <= 0f || viewportHeight <= 0f) return 1f;
+            float ratio = viewportHeight / contentHeight;
+            if (ratio < MinimumHandleRatio) return MinimumHandleRatio;
+            return ratio > 1f ? 1f : ratio;
+        }
+
+        // Returns the scroll offset (distance the content top is pulled up
+        // inside the viewport) that reveals the given zero-based row, changing
+        // the offset only when the row sits outside the visible window.
+        public static float OffsetRevealingRow(int rowIndex, float currentOffset,
+            float viewportHeight, float contentHeight, float rowHeight)
+        {
+            if (rowIndex < 0) return ClampScrollOffset(currentOffset,
+                viewportHeight, contentHeight);
+            float rowTop = ContentPadding + (rowIndex * (rowHeight + RowSpacing));
+            float rowBottom = rowTop + rowHeight;
+            float offset = currentOffset;
+            if (rowTop < offset) offset = rowTop;
+            else if (rowBottom > offset + viewportHeight)
+                offset = rowBottom - viewportHeight;
+            return ClampScrollOffset(offset, viewportHeight, contentHeight);
+        }
+    }
+
     public static class CastingPanelLayoutContract
     {
         public const int ButtonFontSize = 17;

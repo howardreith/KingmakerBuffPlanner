@@ -72,7 +72,51 @@ mission (all under `src/KingmakerBuffPlanner/`):
 
 ## Checkpoint A — enhancement chooser overflow repair
 
-Status: IN PROGRESS (see journal + resume for the completed record).
+Status: SOURCE/BUILD COMPLETE — live rendered gate BLOCKED (fixture absent).
+
+- Root cause (deterministic): both modal choosers consumed
+  `KingmakerUiFactory.CreateScrollView` without any content-height owner. The
+  shared `VerticalLayoutGroup` stacks rows but never resizes the content rect,
+  so `content.sizeDelta` stayed zero and the overflowing rows were laid out
+  below the masked viewport with no bounded scroll range and no visible
+  scrollbar. `BuffGrid` (explicit measured sizing) and `PlannerDescriptionModal`
+  (`ContentSizeFitter.PreferredSize`) each already own their height; the two
+  choosers owned nothing.
+- Repair (commit follows this record): new pure
+  `ChooserScrollLayoutContract` (`UI/PlannerPresentationModels.cs`) computing
+  content height (padding 4 + rows + spacing 4), max/clamped scroll offsets,
+  selected-row reveal offset, and scrollbar handle ratio; both choosers now
+  size the content rect explicitly (single owner: the view), clamp/preserve
+  the offset across refresh rebuilds (toggle → `RefreshAll` → reopen keeps
+  `activeSelf` true, so refresh is detected from activation state), reveal
+  the first selected row on fresh open, and drive a new optional scrollbar.
+- Factory audit (shared consumers of `CreateScrollView`):
+  1. `BuffGrid` — unaffected; additive optional parameter defaults to no
+     scrollbar; it already destroys the shared layout group and self-measures.
+  2. `PlannerDescriptionModal` — unaffected; keeps its ContentSizeFitter
+     owners; no scrollbar requested.
+  3. `PlannerEnhancementChooserView` — repaired (row height 68f contract).
+  4. `PlannerCasterPolicyChooserView` — same defect, repaired identically
+     (row height = `CastingPanelLayoutContract.MinimumCasterPolicyRowHeight`);
+     every policy action rebuilds rows through `RefreshCasterPolicyChooser`,
+     and the offset now survives those rebuilds.
+- Scrollbar wiring: `CreateScrollView(name, parent, theme, out content,
+  scrollbarWidth=0)` gains an optional right-gutter `Scrollbar`
+  (BottomToTop, Permanent visibility); viewport right inset widens only when
+  the scrollbar is requested. Value is synced by the owning `ScrollRect`;
+  handle size is set by the chooser after content sizing (one driver each).
+- Evidence (deterministic): `chooser-scroll-layout-owns-content-bounds`
+  covers 0/1/2/30/100-row content heights, bounded offsets, shrink clamping,
+  selected-row/last-row reveal bounds, no-selection clamping, and handle
+  ratio including the minimum-draggable floor. Suite:
+  source 42/42, protocol 151/151, harness 8/8, package 4/4, WhatIf 5/5,
+  Release build PASS (DLL sha256
+  `681a0aeb7442aa55c504dcc8579da730125ea910b7fe3e5befd79b19836720b5`).
+- BLOCKED lane: rendered content/viewport measurements, wheel/scrollbar reach
+  evidence, and world-input-leak checks require the guarded live campaign
+  harness; the `KBP_AUTOMATION` save pair is absent. Structural input
+  isolation is unchanged (full-screen blocker, Escape close, fullscreen input
+  lease), and no claim of live visual acceptance is made.
 
 ## Checkpoint B — native theme foundation
 

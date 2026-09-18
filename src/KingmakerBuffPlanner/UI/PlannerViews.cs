@@ -762,6 +762,9 @@ namespace KingmakerBuffPlanner.UI
     {
         private readonly PlannerUiTheme _theme;
         private readonly RectTransform _content;
+        private readonly ScrollRect _scroll;
+        private readonly RectTransform _viewport;
+        private readonly Scrollbar _scrollbar;
         private readonly Action<string> _select;
         private readonly Action<string> _showTooltip;
         private readonly List<GameObject> _rows = new List<GameObject>();
@@ -798,9 +801,12 @@ namespace KingmakerBuffPlanner.UI
                 theme, "CLOSE", Hide);
             KingmakerUiFactory.SetAnchors((RectTransform)close.transform,
                 0.83f, 0.88f, 0.95f, 0.97f);
-            ScrollRect scroll = KingmakerUiFactory.CreateScrollView("EnhancementChoices",
-                frame, theme, out _content);
-            KingmakerUiFactory.SetAnchors((RectTransform)scroll.transform,
+            _scroll = KingmakerUiFactory.CreateScrollView("EnhancementChoices",
+                frame, theme, out _content,
+                ChooserScrollLayoutContract.ScrollbarWidth);
+            _viewport = _scroll.viewport;
+            _scrollbar = _scroll.verticalScrollbar;
+            KingmakerUiFactory.SetAnchors((RectTransform)_scroll.transform,
                 0.05f, 0.08f, 0.95f, 0.79f);
             PlannerDescriptionEscape escape = Root.gameObject.AddComponent<PlannerDescriptionEscape>();
             escape.Close = Hide;
@@ -809,17 +815,28 @@ namespace KingmakerBuffPlanner.UI
 
         internal RectTransform Root { get; private set; }
         internal bool IsOpen { get { return Root.gameObject.activeSelf; } }
+        internal ScrollRect Scroll { get { return _scroll; } }
+        internal RectTransform Content { get { return _content; } }
+        internal RectTransform Viewport { get { return _viewport; } }
 
         internal void Show(SelectedCastingViewModel model)
         {
+            // A refresh while the chooser is already open (an option was just
+            // toggled) must keep the scroll offset; a fresh open reveals the
+            // first selected row instead of starting at an arbitrary place.
+            bool refresh = Root.gameObject.activeSelf;
+            float previousOffset = refresh ? _content.anchoredPosition.y : 0f;
+            int selectedRow = -1;
             ClearRows();
             _subtitle.text = model.CasterText + " | " + model.CandidateCount +
                 (model.CandidateCount == 1 ? " applicable option" : " applicable options");
+            int rowIndex = 0;
             foreach (EnhancementChoiceViewModel choice in model.Choices)
             {
                 string selection = choice.CheckboxStyle
                     ? (choice.Selected ? "[x] " : "[ ] ")
                     : (choice.Selected ? "SELECTED | " : string.Empty);
+                if (choice.Selected && selectedRow < 0) selectedRow = rowIndex;
                 string text = selection + choice.Title +
                     "\n" + choice.Summary;
                 Button button = KingmakerUiFactory.CreateButton("EnhancementChoice", _content,
@@ -829,7 +846,8 @@ namespace KingmakerBuffPlanner.UI
                         _select(choice.EnhancementId);
                     });
                 RectTransform rect = (RectTransform)button.transform;
-                KingmakerUiFactory.AddLayout(rect, 68f);
+                KingmakerUiFactory.AddLayout(rect,
+                    ChooserScrollLayoutContract.EnhancementRowHeight);
                 Text label = KingmakerUiFactory.SetButtonLabel(button, text);
                 label.alignment = TextAnchor.MiddleLeft;
                 label.horizontalOverflow = HorizontalWrapMode.Wrap;
@@ -843,9 +861,29 @@ namespace KingmakerBuffPlanner.UI
                 tooltip.Text = choice.Description;
                 tooltip.Show = _showTooltip;
                 _rows.Add(button.gameObject);
+                rowIndex++;
             }
             Root.SetAsLastSibling();
             Root.gameObject.SetActive(true);
+            Canvas.ForceUpdateCanvases();
+            // The content rect height has exactly one owner: this view, sized
+            // from the fixed per-row contract. The shared VerticalLayoutGroup
+            // only stacks rows; it never resizes the content itself, and no
+            // ContentSizeFitter competes for the height.
+            float viewportHeight = Mathf.Max(0f, _viewport.rect.height);
+            float contentHeight = ChooserScrollLayoutContract.ContentHeight(
+                _rows.Count, ChooserScrollLayoutContract.EnhancementRowHeight);
+            _content.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, contentHeight);
+            float offset = refresh
+                ? ChooserScrollLayoutContract.ClampScrollOffset(
+                    previousOffset, viewportHeight, contentHeight)
+                : ChooserScrollLayoutContract.OffsetRevealingRow(
+                    selectedRow, 0f, viewportHeight, contentHeight,
+                    ChooserScrollLayoutContract.EnhancementRowHeight);
+            _content.anchoredPosition = new Vector2(0f, offset);
+            if (_scrollbar != null)
+                _scrollbar.size = ChooserScrollLayoutContract.ScrollbarHandleRatio(
+                    viewportHeight, contentHeight);
             KingmakerUiFactory.ForceLayoutAndSnap(Root);
         }
 
@@ -871,6 +909,9 @@ namespace KingmakerBuffPlanner.UI
     {
         private readonly PlannerUiTheme _theme;
         private readonly RectTransform _content;
+        private readonly ScrollRect _scroll;
+        private readonly RectTransform _viewport;
+        private readonly Scrollbar _scrollbar;
         private readonly Action<string, bool> _setEnabled;
         private readonly Action<string> _moveEarlier;
         private readonly Action<string> _moveLater;
@@ -937,10 +978,13 @@ namespace KingmakerBuffPlanner.UI
             KingmakerUiFactory.SetAnchors(
                 (RectTransform)close.transform,
                 0.85f, 0.89f, 0.965f, 0.97f);
-            ScrollRect scroll = KingmakerUiFactory.CreateScrollView(
-                "CasterPolicyRows", frame, theme, out _content);
+            _scroll = KingmakerUiFactory.CreateScrollView(
+                "CasterPolicyRows", frame, theme, out _content,
+                ChooserScrollLayoutContract.ScrollbarWidth);
+            _viewport = _scroll.viewport;
+            _scrollbar = _scroll.verticalScrollbar;
             KingmakerUiFactory.SetAnchors(
-                (RectTransform)scroll.transform,
+                (RectTransform)_scroll.transform,
                 0.035f, 0.055f, 0.965f, 0.79f);
             PlannerDescriptionEscape escape =
                 Root.gameObject.AddComponent<PlannerDescriptionEscape>();
@@ -950,12 +994,20 @@ namespace KingmakerBuffPlanner.UI
 
         internal RectTransform Root { get; private set; }
         internal bool IsOpen { get { return Root.gameObject.activeSelf; } }
+        internal ScrollRect Scroll { get { return _scroll; } }
+        internal RectTransform Content { get { return _content; } }
+        internal RectTransform Viewport { get { return _viewport; } }
 
         internal void Show(
             CasterPolicyViewModel model,
             Func<string, Sprite> portrait,
             bool interactable)
         {
+            // Every policy action (enable/order/maximum) rebuilds these rows
+            // through RefreshCasterPolicyChooser; that refresh must keep the
+            // offset so the row just acted on stays in view.
+            bool refresh = Root.gameObject.activeSelf;
+            float previousOffset = refresh ? _content.anchoredPosition.y : 0f;
             ClearRows();
             _subtitle.text = model.Summary +
                 "\nMaximum per run applies only to this buff in one routine execution.";
@@ -965,6 +1017,20 @@ namespace KingmakerBuffPlanner.UI
                     ? null : portrait(provider.CasterUnitId), interactable);
             Root.SetAsLastSibling();
             Root.gameObject.SetActive(true);
+            Canvas.ForceUpdateCanvases();
+            // Same single-owner rule as the enhancement chooser: this view
+            // sizes the content rect from the fixed row contract; the shared
+            // layout group only stacks rows.
+            float viewportHeight = Mathf.Max(0f, _viewport.rect.height);
+            float contentHeight = ChooserScrollLayoutContract.ContentHeight(
+                _rows.Count, CastingPanelLayoutContract.MinimumCasterPolicyRowHeight);
+            _content.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, contentHeight);
+            float offset = ChooserScrollLayoutContract.ClampScrollOffset(
+                previousOffset, viewportHeight, contentHeight);
+            _content.anchoredPosition = new Vector2(0f, offset);
+            if (_scrollbar != null)
+                _scrollbar.size = ChooserScrollLayoutContract.ScrollbarHandleRatio(
+                    viewportHeight, contentHeight);
             KingmakerUiFactory.ForceLayoutAndSnap(Root);
         }
 
