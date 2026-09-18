@@ -180,6 +180,9 @@ namespace KingmakerBuffPlanner.Tests
                 Run("control-caption-fit-grows-only-from-design-floor", TestControlCaptionFit);
                 Run("casting-assignments-route-mixed-casters-exactly", TestCastingAssignmentRouting);
                 Run("assignment-order-and-shortage-allocate-explicitly", TestAssignmentOrderAndShortage);
+                Run("partial-apply-gate-distinguishes-coverage-from-casts", TestPartialExecutionGate);
+                Run("casting-order-rows-and-resource-lines-derive-from-plan", TestCastingOrderPresentation);
+                Run("sequence-forecast-carries-balances-per-selected-routine", TestSequenceForecast);
                 Run("cast-enhancement-execution-is-fail-closed-and-cleaned-up", TestCastEnhancementExecution);
                 Run("consumed-one-shot-enhancement-is-not-rearmed", TestOneShotEnhancementRestoration);
                 Run("execution-preflight-runs-under-the-native-activation-lease",
@@ -5022,6 +5025,179 @@ namespace KingmakerBuffPlanner.Tests
         // (never catalog order) decides who gets the limited charges, nine
         // requested casts against three charges report 9/3/3/6, already-active
         // skips reserve nothing, and optional policy labels its omissions.
+        private static void TestPartialExecutionGate()
+        {
+            // A plan with unmet targets is blocked for default Apply and its
+            // summary separates requested coverage from successful casts; a
+            // complete plan (including free already-active skips) is not.
+            AbilityKey ability = Ability("gate-spell", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("gate-slots",
+                ResourcePoolKind.Unlimited, 0, 0, null);
+            ProviderSnapshot caster = PlannerProvider("caster", "book",
+                ability, pool.PoolKey, 0);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(
+                new[] { caster }, new[] { pool }, "caster", "fine", "blocked");
+            var option = new ProviderPlanningOption(caster,
+                new[] { "caster", "fine" }, new[] { "caster" }, 4, 40);
+            CastPlan complete = new CastPlanner().Plan(snapshot,
+                new BuffCastRequest(new BuffSourceDefinition("gate", ability,
+                    Leaf("gate-buff"), CastGroupingKind.PerTarget),
+                    new[] { "fine" }, ExistingEffectPolicy.Overwrite, null),
+                new[] { option }, EmptyPolicy(), new ActiveEffectSnapshot(null));
+            PartialExecutionGate.Decision open = PartialExecutionGate.Evaluate(complete);
+            if (open.Blocked || open.RequestedTargets != 1 || open.PlannedCasts != 1 ||
+                !open.Summary.Contains("1 planned cast"))
+                throw new InvalidOperationException("A complete routine was gated or miscounted.");
+
+            var active = new Dictionary<string, IEnumerable<ActiveEffectMarker>>();
+            active["fine"] = new[] { new ActiveEffectMarker(EffectKind.Buff, "gate-buff") };
+            CastPlan withSkip = new CastPlanner().Plan(snapshot,
+                new BuffCastRequest(new BuffSourceDefinition("gate", ability,
+                    Leaf("gate-buff"), CastGroupingKind.PerTarget),
+                    new[] { "fine", "blocked" }, ExistingEffectPolicy.SkipAlreadyActive, null),
+                new[] { option }, EmptyPolicy(),
+                ActiveEffectSnapshot.FromTypedEffects(active));
+            PartialExecutionGate.Decision mixed = PartialExecutionGate.Evaluate(withSkip);
+            if (!mixed.Blocked || mixed.RequestedTargets != 2 || mixed.SkippedActive != 1 ||
+                mixed.Unfulfilled != 1 || mixed.PlannedCasts != 0 ||
+                !mixed.Summary.Contains("blocked ("))
+                throw new InvalidOperationException(
+                    "The gate did not report requested coverage separately from cast success.");
+            // The refusal wording used by both the planner Apply and the HUD
+            // quick-run names the ready-only escape hatch explicitly.
+            string refusal = mixed.Summary +
+                " Apply blocked to avoid running only part of Long; use Apply Ready Casts Only to run the ready subset.";
+            if (!refusal.Contains("Requested 2 targets") ||
+                !refusal.Contains("Apply Ready Casts Only"))
+                throw new InvalidOperationException("Refusal summary lost its coverage counts or escape hatch.");
+        }
+
+        private static void TestCastingOrderPresentation()
+        {
+            // The 9/3/3/6 fixture must be navigable and explained: numbered
+            // rows in explicit order, resolved caster text, pin visibility,
+            // and one resource line whose summary states the exact counts.
+            AbilityKey ability = Ability("order-spell", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("order-slots",
+                ResourcePoolKind.SpontaneousLevel, 9, 9, null);
+            ProviderSnapshot caster = PlannerProvider("caster", "book",
+                ability, pool.PoolKey, 1);
+            string[] nine = Enumerable.Range(1, 9)
+                .Select(index => "target-" + index).ToArray();
+            PartyProviderSnapshot snapshot = PlannerSnapshot(
+                new[] { caster }, new[] { pool },
+                new[] { "caster" }.Concat(nine).ToArray());
+            var option = new ProviderPlanningOption(caster,
+                new[] { "caster" }.Concat(nine), new[] { "caster" }, 4, 40);
+            CastEnhancementSnapshot rod = ClassEnhancement("order-rod", "caster",
+                ability, "book", 3, "order-pool", "order-rod-group", false);
+            var effects = new Dictionary<string, EffectExpression> {
+                { ability.Canonical, new EffectLeafExpression(EffectKind.Buff,
+                    "order-buff", EffectTarget.Caster, "ContextActionApplyBuff", "root/apply") }
+            };
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault("order-view");
+            SourceAssignmentProfile parent = Assignment(
+                ability.Canonical, ability, new string[0]);
+            parent.CastingAssignments[0].TargetUnitIds = new List<string>(nine);
+            parent.CastingAssignments[0].Enhancements.Add(
+                new EnhancementSelectionProfile { EnhancementId = "order-rod" });
+            profile.Routines[0].Assignments.Add(parent);
+            RoutinePlanResult result = new RoutinePlanService().Plan(profile, "long",
+                snapshot, new ActiveEffectSnapshot(null), effects,
+                new[] { option }, new[] { rod });
+
+            IReadOnlyList<CastingAssignmentRowViewModel> rows =
+                CastingAssignmentRowViewModel.CreateRoutineRows(profile, "long",
+                    sourceId => "Order Spell", unitId => unitId,
+                    enhancementId => "Order Rod", result.Plan);
+            CastingAssignmentRowViewModel row = rows.Single();
+            if (row.Number != 1 || !row.Automatic || row.CasterText != "Automatic" ||
+                row.TargetNames.Count != 9 ||
+                !row.EnhancementTexts[0].StartsWith("Order Rod", StringComparison.Ordinal) ||
+                row.PlannedCasts != 3 || row.FulfilledTargets != 3 ||
+                row.UnfulfilledTargets != 6 || row.CanMoveEarlier || row.CanMoveLater)
+                throw new InvalidOperationException("Casting-order row did not derive from the plan result.");
+            if (!row.Status.Contains("6 unmet"))
+                throw new InvalidOperationException("Row status hid the shortage: " + row.Status);
+
+            ResourcePoolAllocation allocation = result.Plan.AllocationFor("enhancement:order-pool");
+            var line = new ResourceUsageLineViewModel(allocation, "Uses (Order Rod)",
+                "Long", new[] { "Short", "Important" });
+            if (!line.Summary.Contains("requested 9") ||
+                !line.Summary.Contains("available 3") ||
+                !line.Summary.Contains("allocated 3") ||
+                !line.Summary.Contains("unmet 6") ||
+                !line.Summary.Contains("forecast remaining 0") ||
+                !line.Summary.Contains("Short, Important (their own runs)"))
+                throw new InvalidOperationException("Resource line lost the 9/3/3/6 accounting or competing-demand label: " +
+                    line.Summary);
+
+            // Missing pins survive as visible unresolved intent: a pinned
+            // assignment that cannot resolve keeps its row with a diagnostic.
+            parent.CastingAssignments[0].CasterUnitId = "target-9";
+            RoutinePlanResult pinnedPlan = new RoutinePlanService().Plan(profile, "long",
+                snapshot, new ActiveEffectSnapshot(null), effects,
+                new[] { option }, new[] { rod });
+            IReadOnlyList<CastingAssignmentRowViewModel> pinnedRows =
+                CastingAssignmentRowViewModel.CreateRoutineRows(profile, "long",
+                    sourceId => "Order Spell", unitId => unitId,
+                    enhancementId => "Order Rod", pinnedPlan.Plan);
+            if (pinnedRows.Count != 1 || !pinnedRows[0].PinUnresolved ||
+                !pinnedRows[0].Status.Contains("Pinned caster unavailable"))
+                throw new InvalidOperationException("A missing pin did not survive as visible unresolved intent.");
+        }
+
+        private static void TestSequenceForecast()
+        {
+            // Two routine occurrences against the same snapshot: balances carry
+            // forward in the selected order and each step is labeled one run.
+            AbilityKey ability = Ability("forecast-spell", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("forecast-slots",
+                ResourcePoolKind.SpontaneousLevel, 4, 4, null);
+            ProviderSnapshot caster = PlannerProvider("caster", "book",
+                ability, pool.PoolKey, 1);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(
+                new[] { caster }, new[] { pool }, "caster", "a", "b");
+            var option = new ProviderPlanningOption(caster,
+                new[] { "caster", "a", "b" }, new[] { "caster" }, 4, 40);
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault("forecast");
+            SourceAssignmentProfile parent = Assignment(
+                ability.Canonical, ability, new[] { "a" });
+            profile.Routines[0].Assignments.Add(parent);
+            profile.Routines[1].Assignments.Add(Assignment(
+                ability.Canonical, ability, new[] { "b" }));
+            var effects = new Dictionary<string, EffectExpression> {
+                { ability.Canonical, new EffectLeafExpression(EffectKind.Buff,
+                    "forecast-buff", EffectTarget.Caster, "ContextActionApplyBuff", "root/apply") }
+            };
+            RoutinePlanResult first = new RoutinePlanService().Plan(profile, "long",
+                snapshot, new ActiveEffectSnapshot(null), effects, new[] { option });
+            RoutinePlanResult second = new RoutinePlanService().Plan(profile, "important",
+                snapshot, new ActiveEffectSnapshot(null), effects, new[] { option });
+            RoutineSequenceForecast forecast = RoutineSequenceForecast.Compute(
+                new List<KeyValuePair<string, CastPlan>> {
+                    new KeyValuePair<string, CastPlan>("Long", first.Plan),
+                    new KeyValuePair<string, CastPlan>("Important", second.Plan)
+                });
+            if (forecast.Steps.Count != 2 ||
+                forecast.Steps[0].PlannedCasts != 1 ||
+                forecast.Steps[1].PlannedCasts != 1 ||
+                !forecast.ForecastRemainingByPool.ContainsKey("forecast-slots") ||
+                forecast.ForecastRemainingByPool["forecast-slots"] != 2)
+                throw new InvalidOperationException("The forecast did not carry native balances forward.");
+            // Independent per-routine previews never invent extra charges:
+            // each sees the full native balance on its own, and only the
+            // combined forecast subtracts both allocations.
+            ResourcePoolAllocation independent = first.Plan.AllocationFor("forecast-slots");
+            if (independent == null || independent.AllocatedUsage != 1 ||
+                independent.ForecastRemaining != 3)
+                throw new InvalidOperationException(
+                    "A single-routine preview did not see the full native balance.");
+            if (!RoutineSequenceForecast.AssumptionText.Contains("One run per selected routine"))
+                throw new InvalidOperationException(
+                    "The forecast lost its one-run-per-routine assumption label.");
+        }
+
         private static void TestAssignmentOrderAndShortage()
         {
             AbilityKey ability = Ability("charge-spell", string.Empty, 0);
@@ -6143,10 +6319,17 @@ namespace KingmakerBuffPlanner.Tests
         {
             private readonly QuickExecutionResult _result;
             internal int StartCount;
+            internal int ReadyOnlyStartCount;
             internal FakeRoutineRunner(QuickExecutionResult result) { _result = result; }
             public bool TryStart(string routineId, Action<QuickExecutionResult> completed)
             {
                 StartCount++;
+                completed(_result);
+                return true;
+            }
+            public bool TryStartReadyOnly(string routineId, Action<QuickExecutionResult> completed)
+            {
+                ReadyOnlyStartCount++;
                 completed(_result);
                 return true;
             }

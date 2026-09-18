@@ -22,6 +22,7 @@ namespace KingmakerBuffPlanner.UI
         private readonly BuffPlannerUiLifecycleDiagnostics _diagnostics;
         private readonly Action _close;
         private readonly Action<string> _execute;
+        private readonly Action<string> _executeReadyOnly;
         private readonly PlannerUiTheme _theme;
         private readonly CatalogFilterState _filters = new CatalogFilterState();
         private PlannerScreenViewModel _viewModel;
@@ -44,19 +45,23 @@ namespace KingmakerBuffPlanner.UI
         private PlannerCasterPolicyChooserView _casterPolicyChooser;
         private PlannerSettingsView _settings;
         private PlannerDescriptionModal _description;
+        private PlannerCastingOrderView _castingOrder;
         private PlannerNativeThemeSurface _nativeTheme;
         private Button _executeButton;
+        private Button _readyOnlyButton;
         private bool _disposed;
         private string _lastEnhancementRenderEvidence = string.Empty;
 
         internal BuffPlannerScreenView(StaticCanvas nativeCanvas, PlannerUiSession session,
-            BuffPlannerUiLifecycleDiagnostics diagnostics, Action close, Action<string> execute)
+            BuffPlannerUiLifecycleDiagnostics diagnostics, Action close, Action<string> execute,
+            Action<string> executeReadyOnly = null)
         {
             if (nativeCanvas == null) throw new ArgumentNullException("nativeCanvas");
             _session = session ?? throw new ArgumentNullException("session");
             _diagnostics = diagnostics ?? throw new ArgumentNullException("diagnostics");
             _close = close ?? throw new ArgumentNullException("close");
             _execute = execute ?? throw new ArgumentNullException("execute");
+            _executeReadyOnly = executeReadyOnly;
             _theme = PlannerUiTheme.Resolve(nativeCanvas);
             _viewModel = new PlannerScreenViewModel(session, _filters);
             try
@@ -186,6 +191,24 @@ namespace KingmakerBuffPlanner.UI
             _executeButton.interactable = ready;
             Text executeLabel = _executeButton.GetComponentInChildren<Text>(true);
             if (executeLabel != null) executeLabel.text = "APPLY " + ActiveRoutineId.ToUpperInvariant();
+            // The ready-only escape hatch exists exactly when the routine is
+            // incomplete; a complete routine never shows it.
+            bool incomplete = false;
+            if (_readyOnlyButton != null)
+            {
+                if (model != null && _session.LastPreview != null)
+                {
+                    try
+                    {
+                        incomplete = PartialExecutionGate.Evaluate(
+                            _session.LastPreview.Plan).Blocked;
+                    }
+                    catch { incomplete = false; }
+                }
+                _readyOnlyButton.interactable = ready && incomplete &&
+                    _executeReadyOnly != null;
+                _readyOnlyButton.gameObject.SetActive(_executeReadyOnly != null);
+            }
             KingmakerUiFactory.ForceLayoutAndSnap(_root);
         }
 
@@ -513,6 +536,20 @@ namespace KingmakerBuffPlanner.UI
                     RefreshCasterPolicyChooser();
                 },
                 ShowTooltip, ApplyNativeThemeTo);
+            _castingOrder = new PlannerCastingOrderView(_root, _theme,
+                routineId => _session.GetCastingOrderRows(routineId),
+                routineId => _session.GetResourceUsageLines(routineId),
+                routineIds => _session.ForecastSequence(routineIds),
+                assignmentId =>
+                {
+                    _session.Model.MoveCastingAssignmentEarlier(ActiveRoutineId, assignmentId);
+                },
+                assignmentId =>
+                {
+                    _session.Model.MoveCastingAssignmentLater(ActiveRoutineId, assignmentId);
+                },
+                () => OpenCastingOrder(),
+                ShowTooltip, ApplyNativeThemeTo);
             BuildFooter(frame);
             _settings = new PlannerSettingsView(frame, _theme, () =>
             {
@@ -555,11 +592,23 @@ namespace KingmakerBuffPlanner.UI
             Button settings = KingmakerUiFactory.CreateButton("Settings", header, _theme,
                 "Settings", () => _settings.Show(!_settings.IsOpen));
             KingmakerUiFactory.SetAnchors((RectTransform)settings.transform,
-                0.82f, 0.14f, 0.93f, 0.86f);
+                0.70f, 0.14f, 0.81f, 0.86f);
+            Button castingOrder = KingmakerUiFactory.CreateButton("CastingOrder", header, _theme,
+                "Order", OpenCastingOrder);
+            KingmakerUiFactory.SetAnchors((RectTransform)castingOrder.transform,
+                0.82f, 0.14f, 0.91f, 0.86f);
             Button close = KingmakerUiFactory.CreateButton("Close", header, _theme,
                 "X", () => _close());
             KingmakerUiFactory.SetAnchors((RectTransform)close.transform,
-                0.94f, 0.14f, 0.99f, 0.86f);
+                0.92f, 0.14f, 0.99f, 0.86f);
+        }
+
+        private void OpenCastingOrder()
+        {
+            if (_castingOrder == null || _session.Model == null) return;
+            _enhancementChooser.Hide();
+            _casterPolicyChooser.Hide();
+            _castingOrder.Show(ActiveRoutineId);
         }
 
         private void BuildFooter(RectTransform frame)
@@ -578,11 +627,18 @@ namespace KingmakerBuffPlanner.UI
             Button close = KingmakerUiFactory.CreateButton("Close", footer, _theme,
                 "CLOSE", () => _close());
             KingmakerUiFactory.SetAnchors((RectTransform)close.transform,
-                0.72f, 0.12f, 0.82f, 0.88f);
+                0.72f, 0.12f, 0.80f, 0.88f);
+            _readyOnlyButton = KingmakerUiFactory.CreateButton("ExecuteReadyOnly", footer,
+                _theme, "APPLY READY ONLY", () =>
+                {
+                    if (_executeReadyOnly != null) _executeReadyOnly(ActiveRoutineId);
+                });
+            KingmakerUiFactory.SetAnchors((RectTransform)_readyOnlyButton.transform,
+                0.81f, 0.08f, 0.905f, 0.92f);
             _executeButton = KingmakerUiFactory.CreateButton("Execute", footer, _theme,
                 "APPLY LONG", () => _execute(ActiveRoutineId));
             KingmakerUiFactory.SetAnchors((RectTransform)_executeButton.transform,
-                0.83f, 0.08f, 0.985f, 0.92f);
+                0.91f, 0.08f, 0.985f, 0.92f);
         }
 
         private void ShowTooltip(string value)

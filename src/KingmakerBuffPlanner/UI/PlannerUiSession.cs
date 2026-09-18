@@ -268,12 +268,115 @@ namespace KingmakerBuffPlanner.UI
             return LastPreview;
         }
 
+        // Current-routine resource lines with competing configured demand from
+        // the other routines. Competing lines are demand, not reservations:
+        // every routine plan is computed against the same live snapshot.
+        internal IReadOnlyList<ResourceUsageLineViewModel> GetResourceUsageLines(string routineId)
+        {
+            if (Model == null) throw new InvalidOperationException("A campaign planner snapshot is required.");
+            RoutinePlanResult current = PreviewRoutine(routineId);
+            var competing = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+            foreach (RoutineProfile routine in Model.Profile.Routines.Where(r =>
+                r.RoutineId != routineId && r.Assignments.Count != 0))
+            {
+                RoutinePlanResult other;
+                try { other = PreviewRoutine(routine.RoutineId); }
+                catch { continue; }
+                foreach (ResourcePoolAllocation allocation in other.Plan.ResourceAllocations)
+                {
+                    if (allocation.RequestedUsage == 0 && allocation.AllocatedUsage == 0) continue;
+                    List<string> names;
+                    if (!competing.TryGetValue(allocation.PoolKey, out names))
+                        competing[allocation.PoolKey] = names = new List<string>();
+                    names.Add(routine.Name);
+                }
+            }
+            var lines = new List<ResourceUsageLineViewModel>();
+            string routineName = RoutineDisplayName(routineId);
+            foreach (ResourcePoolAllocation allocation in current.Plan.ResourceAllocations)
+            {
+                List<string> names;
+                competing.TryGetValue(allocation.PoolKey, out names);
+                lines.Add(new ResourceUsageLineViewModel(allocation,
+                    ResourcePoolDisplayName(allocation.PoolKey), routineName,
+                    new List<string>((names ?? new List<string>())
+                        .Distinct(StringComparer.Ordinal)
+                        .OrderBy(value => value, StringComparer.Ordinal).ToList())));
+            }
+            return lines;
+        }
+
+        // Read-only combined forecast: one occurrence per selected routine in
+        // the selected order. Note the last previewed routine stays in
+        // LastPreview; callers re-preview their current routine afterwards.
+        internal RoutineSequenceForecast ForecastSequence(IReadOnlyList<string> routineIdsInOrder)
+        {
+            if (routineIdsInOrder == null) throw new ArgumentNullException("routineIdsInOrder");
+            var plans = new List<KeyValuePair<string, CastPlan>>();
+            foreach (string routineId in routineIdsInOrder.Distinct(StringComparer.Ordinal))
+                plans.Add(new KeyValuePair<string, CastPlan>(
+                    RoutineDisplayName(routineId), PreviewRoutine(routineId).Plan));
+            return RoutineSequenceForecast.Compute(plans);
+        }
+
+        private string ResourcePoolDisplayName(string allocationPoolKey)
+        {
+            const string enhancementPrefix = "enhancement:";
+            if (allocationPoolKey != null &&
+                allocationPoolKey.StartsWith(enhancementPrefix, StringComparison.Ordinal))
+            {
+                string usagePool = allocationPoolKey.Substring(enhancementPrefix.Length);
+                CastEnhancementSnapshot enhancement = _enhancements == null ? null :
+                    _enhancements.FirstOrDefault(value =>
+                        value.UsagePoolId == usagePool);
+                return enhancement == null ? usagePool :
+                    enhancement.UsagePoolDisplayName + " (" + enhancement.EffectDisplayName + ")";
+            }
+            ResourcePoolSnapshot pool = _snapshot == null ? null :
+                _snapshot.ResourcePools.FirstOrDefault(value => value.PoolKey == allocationPoolKey);
+            return pool == null ? allocationPoolKey : pool.PoolKey;
+        }
+
+        internal IReadOnlyList<CastingAssignmentRowViewModel> GetCastingOrderRows(string routineId)
+        {
+            if (Model == null) throw new InvalidOperationException("A campaign planner snapshot is required.");
+            RoutinePlanResult preview = PreviewRoutine(routineId);
+            return CastingAssignmentRowViewModel.CreateRoutineRows(
+                Model.Profile, routineId,
+                sourceId =>
+                {
+                    SetupSourceRow source = Model.Sources.FirstOrDefault(value => value.SourceId == sourceId);
+                    return source == null ? sourceId : source.DisplayName;
+                },
+                unitId =>
+                {
+                    UnitSnapshot unit = Model.Snapshot.Units.FirstOrDefault(value => value.UnitId == unitId);
+                    return unit == null ? unitId : unit.DisplayName;
+                },
+                enhancementId =>
+                {
+                    CastEnhancementSnapshot enhancement = Model.GetEnhancement(enhancementId);
+                    return enhancement == null ? enhancementId : enhancement.DisplayName;
+                },
+                preview.Plan);
+        }
+
         internal IEnumerator ExecuteRoutine(string routineId)
         {
-            return ExecuteRoutine(routineId, null);
+            return ExecuteRoutine(routineId, null, false);
         }
 
         internal IEnumerator ExecuteRoutine(string routineId, Action<QuickExecutionResult> completed)
+        {
+            return ExecuteRoutine(routineId, completed, false);
+        }
+
+        // readyOnlyExplicit is the mission's explicit "Apply Ready Casts Only"
+        // path. Without it, an incomplete routine (any unmet target) is never
+        // silently executed as its ready subset — the HUD quick-run shares
+        // this exact rule through the same gate.
+        internal IEnumerator ExecuteRoutine(string routineId,
+            Action<QuickExecutionResult> completed, bool readyOnlyExplicit)
         {
             string routineName = RoutineDisplayName(routineId);
             _log.Info("[KBP-QUICK] pointer/listener accepted;group=" + routineId + ".");
@@ -347,6 +450,26 @@ namespace KingmakerBuffPlanner.UI
                 _log.Info("[KBP-QUICK] deliberately refused;group=" + routineId +
                     ";reason=" + Status + ".");
                 yield break;
+            }
+            PartialExecutionGate.Decision gate = PartialExecutionGate.Evaluate(preview.Plan);
+            if (gate.Blocked && !readyOnlyExplicit)
+            {
+                LastExecutionReport = new ExecutionReport(preview.Plan);
+                Status = gate.Summary + " Apply blocked to avoid running only part of " +
+                    routineName + "; use Apply Ready Casts Only to run the ready subset.";
+                Complete(completed, new QuickExecutionResult(routineId, routineName,
+                    QuickExecutionDisposition.Refused, Status,
+                    gate.PlannedCasts, 0, 0));
+                _log.Info("[KBP-QUICK] partial-apply gate refused;group=" + routineId +
+                    ";requested=" + gate.RequestedTargets + ";unfulfilled=" +
+                    gate.Unfulfilled + ".");
+                yield break;
+            }
+            if (readyOnlyExplicit)
+            {
+                _log.Info("[KBP-QUICK] explicit ready-only execution;group=" + routineId +
+                    ";requested=" + gate.RequestedTargets + ";planned=" + gate.PlannedCasts +
+                    ";unfulfilled=" + gate.Unfulfilled + ";skipped=" + gate.SkippedActive + ".");
             }
             LastExecutionReport = new ExecutionReport(preview.Plan);
             ICastExecutor executor;

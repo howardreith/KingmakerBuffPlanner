@@ -243,7 +243,40 @@ Status: SOURCE/BUILD COMPLETE — live lanes BLOCKED (fixture absent).
 
 ## Checkpoint D — assignment editor and resource UX
 
-Status: NOT STARTED.
+Status: SOURCE/BUILD COMPLETE — rendered/live lanes BLOCKED (fixture absent).
+
+- Partial execution (`UI/AssignmentPresentationModels.cs` +
+  `UI/PlannerUiSession.cs` + `UI/BuffPlannerUiContracts.cs`): the pure
+  `PartialExecutionGate` separates requested coverage from successful casts.
+  Default Apply — planner button and HUD quick-run share the same gate —
+  refuses an incomplete routine with counts and unmet reasons; only the
+  explicit "APPLY READY CASTS ONLY" button (visible exactly while the preview
+  is incomplete) takes the `readyOnlyExplicit` lane, and that lane logs
+  requested/planned/unfulfilled/skipped honestly.
+- Assignment editor surface (`UI/PlannerViews.cs` `PlannerCastingOrderView`,
+  opened by the header "Order" button): numbered child assignments in explicit
+  routine-wide order with Earlier/Later controls (model ops from C), caster
+  text (Automatic vs pinned + spellbook/provider), target names, enhancement
+  selections with optional-policy labels, resolved status (planned counts /
+  unmet / pinned-unavailable), per-pool resource lines with
+  available/requested/allocated/unmet/forecast plus competing configured
+  demand from other routines labeled "(their own runs)", and the read-only
+  combined forecast (`RoutineSequenceForecast`: one run per selected routine
+  L/I/S toggles, balances carried in the selected order, assumptions stated).
+  All content derives from the planner's plan results — the view holds no
+  competing calculations. Rows rebuild through the native-theme surface.
+- Simple automatic portrait assignment is unchanged (C's Automatic-child
+  routing); the casting-order view is additive.
+- D-gate proofs: `partial-apply-gate-distinguishes-coverage-from-casts` (T13),
+  `casting-order-rows-and-resource-lines-derive-from-plan` (9/3/3/6 line
+  wording, row derivation, missing-pin visibility; T08),
+  `sequence-forecast-carries-balances-per-selected-routine` (T11 — carried
+  balances, independent previews see full native balance, assumption label).
+- Suite: source 42/42, protocol 158/158, harness 8/8, package 4/4, WhatIf
+  5/5, Release build PASS (DLL sha256
+  `100850e84efb40ba2a5957ed45873256e9585b8f18b81b2e6a10255a247cf3e7`).
+- BLOCKED: rendered navigation of the 9/3/3/6 fixture, reorder interaction,
+  and forecast rendering require the live campaign harness.
 
 ## Checkpoint E — spellbook lifecycle integration
 

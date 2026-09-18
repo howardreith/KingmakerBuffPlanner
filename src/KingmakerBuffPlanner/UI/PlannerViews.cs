@@ -1161,6 +1161,268 @@ namespace KingmakerBuffPlanner.UI
             _rows.Clear();
         }
     }
+    // Casting Order view: numbered child assignments with explicit
+    // Earlier/Later controls, resolved provider/pin status, per-pool resource
+    // accounting, competing demand, and the read-only combined forecast. All
+    // content is rendered from the planner's authoritative results; the view
+    // keeps no competing calculations of its own.
+    internal sealed class PlannerCastingOrderView
+    {
+        private const float RowHeight = 84f;
+
+        private readonly PlannerUiTheme _theme;
+        private readonly RectTransform _content;
+        private readonly ScrollRect _scroll;
+        private readonly RectTransform _viewport;
+        private readonly Scrollbar _scrollbar;
+        private readonly Text _resources;
+        private readonly Text _forecast;
+        private readonly Button _closeButton;
+        private readonly Action<string> _showTooltip;
+        private readonly Action<RectTransform> _rowsBound;
+        private readonly Func<string, IReadOnlyList<CastingAssignmentRowViewModel>> _rows;
+        private readonly Func<string, IReadOnlyList<ResourceUsageLineViewModel>> _resourceLines;
+        private readonly Func<IReadOnlyList<string>, RoutineSequenceForecast> _sequenceForecast;
+        private readonly Action<string> _moveEarlier;
+        private readonly Action<string> _moveLater;
+        private readonly Action _refresh;
+        private readonly List<GameObject> _rowObjects = new List<GameObject>();
+        private readonly List<Button> _routineToggles = new List<Button>();
+        private readonly HashSet<string> _forecastSelected = new HashSet<string>(
+            StringComparer.Ordinal);
+        private string _routineId;
+
+        internal PlannerCastingOrderView(
+            RectTransform parent,
+            PlannerUiTheme theme,
+            Func<string, IReadOnlyList<CastingAssignmentRowViewModel>> rows,
+            Func<string, IReadOnlyList<ResourceUsageLineViewModel>> resourceLines,
+            Func<IReadOnlyList<string>, RoutineSequenceForecast> sequenceForecast,
+            Action<string> moveEarlier,
+            Action<string> moveLater,
+            Action refresh,
+            Action<string> showTooltip,
+            Action<RectTransform> rowsBound = null)
+        {
+            _theme = theme;
+            _rows = rows;
+            _resourceLines = resourceLines;
+            _sequenceForecast = sequenceForecast;
+            _moveEarlier = moveEarlier;
+            _moveLater = moveLater;
+            _refresh = refresh;
+            _showTooltip = showTooltip;
+            _rowsBound = rowsBound;
+            Root = KingmakerUiFactory.CreateRect("CastingOrderView", parent);
+            KingmakerUiFactory.Stretch(Root);
+            Image blocker = Root.gameObject.AddComponent<Image>();
+            blocker.color = new Color(0.035f, 0.025f, 0.02f, 0.72f);
+            blocker.raycastTarget = true;
+            Button outside = Root.gameObject.AddComponent<Button>();
+            outside.onClick.AddListener(Hide);
+
+            RectTransform frame = KingmakerUiFactory.CreateRect("CastingOrderFrame", Root);
+            KingmakerUiFactory.SetAnchors(frame, 0.08f, 0.05f, 0.92f, 0.95f);
+            KingmakerUiFactory.AddFramedPanel(frame, theme.ParchmentRaised,
+                theme.BurgundyPrimary, 2f).raycastTarget = true;
+            Text title = KingmakerUiFactory.CreateText("CastingOrderTitle", frame, theme,
+                "CASTING ORDER & RESOURCES", 24, TextAnchor.MiddleLeft);
+            title.fontStyle = FontStyle.Bold;
+            title.color = theme.BurgundyPrimary;
+            KingmakerUiFactory.SetAnchors(title.rectTransform, 0.03f, 0.955f, 0.70f, 0.99f);
+            _closeButton = KingmakerUiFactory.CreateButton("CloseCastingOrder", frame,
+                theme, "CLOSE", Hide);
+            KingmakerUiFactory.SetAnchors((RectTransform)_closeButton.transform,
+                0.86f, 0.955f, 0.985f, 0.99f);
+            BuildRoutineToggles(frame);
+            _scroll = KingmakerUiFactory.CreateScrollView("CastingOrderRows",
+                frame, theme, out _content,
+                ChooserScrollLayoutContract.ScrollbarWidth);
+            _viewport = _scroll.viewport;
+            _scrollbar = _scroll.verticalScrollbar;
+            KingmakerUiFactory.SetAnchors((RectTransform)_scroll.transform,
+                0.03f, 0.40f, 0.97f, 0.95f);
+            _resources = KingmakerUiFactory.CreateText("CastingOrderResources", frame, theme,
+                string.Empty, 14, TextAnchor.UpperLeft);
+            _resources.color = theme.DarkBrownText;
+            _resources.horizontalOverflow = HorizontalWrapMode.Wrap;
+            _resources.verticalOverflow = VerticalWrapMode.Overflow;
+            KingmakerUiFactory.SetAnchors(_resources.rectTransform, 0.03f, 0.24f, 0.97f, 0.40f);
+            _forecast = KingmakerUiFactory.CreateText("CastingOrderForecast", frame, theme,
+                string.Empty, 13, TextAnchor.UpperLeft);
+            _forecast.color = theme.MutedBrownText;
+            _forecast.horizontalOverflow = HorizontalWrapMode.Wrap;
+            _forecast.verticalOverflow = VerticalWrapMode.Overflow;
+            KingmakerUiFactory.SetAnchors(_forecast.rectTransform, 0.03f, 0.015f, 0.97f, 0.24f);
+            PlannerDescriptionEscape escape = Root.gameObject.AddComponent<PlannerDescriptionEscape>();
+            escape.Close = Hide;
+            Root.gameObject.SetActive(false);
+        }
+
+        private void BuildRoutineToggles(RectTransform frame)
+        {
+            RectTransform bar = KingmakerUiFactory.CreateRect("ForecastToggles", frame);
+            KingmakerUiFactory.SetAnchors(bar, 0.03f, 0.905f, 0.97f, 0.955f);
+            Text label = KingmakerUiFactory.CreateText("ForecastLabel", bar, _theme,
+                "FORECAST (one run per selected routine):", 13, TextAnchor.MiddleLeft);
+            label.color = _theme.MutedBrownText;
+            KingmakerUiFactory.SetAnchors(label.rectTransform, 0f, 0.1f, 0.42f, 0.9f);
+            string[] routines = { "long", "important", "short" };
+            for (int index = 0; index < routines.Length; index++)
+            {
+                string routineId = routines[index];
+                Button toggle = KingmakerUiFactory.CreateButton(
+                    "ForecastToggle." + routineId, bar, _theme, routineId.ToUpperInvariant(),
+                    () =>
+                    {
+                        if (_forecastSelected.Contains(routineId))
+                            _forecastSelected.Remove(routineId);
+                        else _forecastSelected.Add(routineId);
+                        BindForecast();
+                    });
+                KingmakerUiFactory.SetAnchors((RectTransform)toggle.transform,
+                    0.44f + index * 0.16f, 0.05f, 0.58f + index * 0.16f, 0.95f);
+                _routineToggles.Add(toggle);
+            }
+        }
+
+        internal RectTransform Root { get; private set; }
+        internal bool IsOpen { get { return Root.gameObject.activeSelf; } }
+
+        internal void Show(string routineId)
+        {
+            _routineId = routineId;
+            bool refresh = Root.gameObject.activeSelf;
+            float previousOffset = refresh ? _content.anchoredPosition.y : 0f;
+            BindRows(refresh, previousOffset);
+            BindResources();
+            BindForecast();
+            Root.SetAsLastSibling();
+            Root.gameObject.SetActive(true);
+            KingmakerUiFactory.ForceLayoutAndSnap(Root);
+            KingmakerUiFactory.FitButtonToCaption(
+                (RectTransform)_closeButton.transform, 96f, 34f);
+            if (_rowsBound != null) _rowsBound(Root);
+        }
+
+        internal void Hide()
+        {
+            Root.gameObject.SetActive(false);
+            if (_showTooltip != null) _showTooltip(string.Empty);
+        }
+
+        private void BindRows(bool refresh, float previousOffset)
+        {
+            foreach (GameObject row in _rowObjects)
+            {
+                if (row == null) continue;
+                row.SetActive(false);
+                UnityEngine.Object.Destroy(row);
+            }
+            _rowObjects.Clear();
+            IReadOnlyList<CastingAssignmentRowViewModel> rows = _rows(_routineId);
+            foreach (CastingAssignmentRowViewModel row in rows)
+                BuildRow(row);
+            float viewportHeight = Mathf.Max(0f, _viewport.rect.height);
+            float contentHeight = ChooserScrollLayoutContract.ContentHeight(
+                _rowObjects.Count, RowHeight);
+            _content.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, contentHeight);
+            _content.anchoredPosition = new Vector2(0f, ChooserScrollLayoutContract
+                .ClampScrollOffset(previousOffset, viewportHeight, contentHeight));
+            if (_scrollbar != null)
+                _scrollbar.size = ChooserScrollLayoutContract.ScrollbarHandleRatio(
+                    viewportHeight, contentHeight);
+        }
+
+        private void BuildRow(CastingAssignmentRowViewModel model)
+        {
+            RectTransform row = KingmakerUiFactory.CreateRect(
+                "Assignment." + model.AssignmentId, _content);
+            KingmakerUiFactory.AddLayout(row, RowHeight);
+            KingmakerUiFactory.AddFramedPanel(row,
+                model.PinUnresolved ? _theme.AmberWarning :
+                model.UnfulfilledTargets > 0 ? _theme.DisabledGray : _theme.ParchmentPanel,
+                _theme.MutedBrownText);
+            Text identity = KingmakerUiFactory.CreateText("Identity", row, _theme,
+                model.Number + ". " + model.SourceDisplayName + " — " + model.CasterText +
+                "\nTargets: " + (model.TargetNames.Count == 0
+                    ? "none" : string.Join(", ", model.TargetNames.ToArray())) +
+                "\nEnhancements: " + (model.EnhancementTexts.Count == 0
+                    ? "none" : string.Join(", ", model.EnhancementTexts.ToArray())),
+                14, TextAnchor.UpperLeft);
+            identity.horizontalOverflow = HorizontalWrapMode.Wrap;
+            identity.verticalOverflow = VerticalWrapMode.Overflow;
+            KingmakerUiFactory.SetAnchors(identity.rectTransform, 0.01f, 0.06f, 0.72f, 0.96f);
+            Text status = KingmakerUiFactory.CreateText("Status", row, _theme,
+                model.Status, 13, TextAnchor.UpperRight);
+            status.color = model.PinUnresolved || model.UnfulfilledTargets > 0
+                ? _theme.AmberWarning : _theme.GreenSuccess;
+            status.horizontalOverflow = HorizontalWrapMode.Wrap;
+            status.verticalOverflow = VerticalWrapMode.Overflow;
+            KingmakerUiFactory.SetAnchors(status.rectTransform, 0.72f, 0.36f, 0.985f, 0.96f);
+            Button earlier = KingmakerUiFactory.CreateButton("Earlier", row, _theme,
+                "EARLIER", () =>
+                {
+                    _moveEarlier(model.AssignmentId);
+                    _refresh();
+                });
+            KingmakerUiFactory.SetAnchors((RectTransform)earlier.transform,
+                0.72f, 0.06f, 0.85f, 0.34f);
+            earlier.interactable = model.CanMoveEarlier;
+            Button later = KingmakerUiFactory.CreateButton("Later", row, _theme,
+                "LATER", () =>
+                {
+                    _moveLater(model.AssignmentId);
+                    _refresh();
+                });
+            KingmakerUiFactory.SetAnchors((RectTransform)later.transform,
+                0.86f, 0.06f, 0.985f, 0.34f);
+            later.interactable = model.CanMoveLater;
+            _rowObjects.Add(row.gameObject);
+        }
+
+        private void BindResources()
+        {
+            IReadOnlyList<ResourceUsageLineViewModel> lines = _resourceLines(_routineId);
+            _resources.text = lines.Count == 0
+                ? "No limited resource usage in this routine."
+                : "RESOURCES — " + string.Join("\n", lines
+                    .Select(line => line.Summary).ToArray());
+        }
+
+        private void BindForecast()
+        {
+            for (int index = 0; index < _routineToggles.Count; index++)
+            {
+                Button toggle = _routineToggles[index];
+                if (toggle == null) continue;
+                toggle.image.color = _forecastSelected.Contains(
+                    new[] { "long", "important", "short" }[index])
+                    ? _theme.GreenSuccess : _theme.ParchmentRaised;
+            }
+            if (_forecastSelected.Count == 0)
+            {
+                _forecast.text = "Select routines above for a combined forecast. " +
+                    RoutineSequenceForecast.AssumptionText;
+                return;
+            }
+            RoutineSequenceForecast forecast = _sequenceForecast(_forecastSelected
+                .OrderBy(id => id, StringComparer.Ordinal).ToList());
+            var builder = new System.Text.StringBuilder("FORECAST — ");
+            foreach (RoutineSequenceForecast.RoutineStep step in forecast.Steps)
+                builder.Append(step.RoutineId).Append(": ")
+                    .Append(step.PlannedCasts).Append(" cast(s), ")
+                    .Append(step.Fulfilled).Append(" covered, ")
+                    .Append(step.Unfulfilled).Append(" unmet; ");
+            foreach (KeyValuePair<string, int> balance in forecast.ForecastRemainingByPool
+                .OrderBy(pair => pair.Key, StringComparer.Ordinal))
+                builder.Append("\n").Append(balance.Key).Append(" forecast remaining ")
+                    .Append(balance.Value);
+            builder.Append("\n").Append(RoutineSequenceForecast.AssumptionText);
+            _forecast.text = builder.ToString();
+        }
+    }
+
     internal sealed class PlannerSettingsView
     {
         private readonly Button _mode;

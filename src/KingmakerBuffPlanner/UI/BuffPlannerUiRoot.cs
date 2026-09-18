@@ -518,13 +518,23 @@ namespace KingmakerBuffPlanner.UI
             if (!_enabled || _session == null || _session.IsExecuting || _quickStartPending)
                 return false;
             _quickStartPending = true;
-            StartCoroutine(ExecuteQuickRoutine(routineId, completed));
+            StartCoroutine(ExecuteQuickRoutine(routineId, completed, false));
+            return true;
+        }
+
+        public bool TryStartReadyOnly(string routineId, Action<QuickExecutionResult> completed)
+        {
+            if (!_enabled || _session == null || _session.IsExecuting || _quickStartPending)
+                return false;
+            _quickStartPending = true;
+            StartCoroutine(ExecuteQuickRoutine(routineId, completed, true));
             return true;
         }
 
         private IEnumerator ExecuteQuickRoutine(
             string routineId,
-            Action<QuickExecutionResult> completed)
+            Action<QuickExecutionResult> completed,
+            bool readyOnlyExplicit)
         {
             bool completedCalled = false;
             Action<QuickExecutionResult> observedCompletion = result =>
@@ -534,7 +544,8 @@ namespace KingmakerBuffPlanner.UI
             };
             try
             {
-                IEnumerator routine = _session.ExecuteRoutine(routineId, observedCompletion);
+                IEnumerator routine = _session.ExecuteRoutine(routineId,
+                    observedCompletion, readyOnlyExplicit);
                 while (true)
                 {
                     bool moved = false;
@@ -574,7 +585,8 @@ namespace KingmakerBuffPlanner.UI
             _diagnostics = new BuffPlannerUiLifecycleDiagnostics();
             _quick = new BuffPlannerQuickExecuteController(this, _diagnostics, PresentQuickResult);
             _screen = new BuffPlannerScreenController(_session, _diagnostics, log,
-                routineId => _quick.Execute(routineId), PlayNativeSetupOpenSound);
+                routineId => _quick.Execute(routineId), PlayNativeSetupOpenSound,
+                routineId => _quick.Execute(routineId, true));
             _hud = new BuffPlannerHudButtonController(_session, _diagnostics, log,
                 () => { OpenSetup(); }, routineId => _quick.Execute(routineId));
             try
