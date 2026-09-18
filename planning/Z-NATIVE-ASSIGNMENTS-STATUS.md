@@ -354,21 +354,22 @@ above plus the open manual checklist.
   the editor test exposed and fixed a real planner defect (optional-policy
   targeting modifiers were silently dropped even with charges available).
   Suite 161/161 (commit `461d999`).
-- Checkpoint 4 (rod identity, concretely resolved as BLOCKED by native
-  contract): assembly evidence from the installed Assembly-CSharp —
-  `Kingmaker.Items.ItemEntity` derives directly from `System.Object` with
-  NO durable instance identity member (full member inventory captured by
-  compile-verified reflection probe); items live in
-  `Kingmaker.Items.ItemsCollection.m_Items` (a plain list, also
-  `System.Object`-rooted) with `InventorySlotIndex` positioning and
-  `TryMerge`/`CanBeMerged` stacking. `ActivatableAbility.ResourceCount`
-  lives on the unit fact keyed by owner+blueprint. Kingmaker 2.1.7b exposes
-  no per-rod-instance identity that survives save/reload; collection
-  position/slot/ordinal are exactly the identities the mission forbids.
-  Conclusion: exact physical-rod pinning is impossible without inventing
-  identity; legacy pooled "any matching rod for the caster" semantics are
-  the honest behavior and remain the only one offered. T03 is BLOCKED-BY-
-  CONTRACT, not silently dropped.
+- Checkpoint 4 (rod identity, bounded conclusion): assembly evidence from
+  the installed Assembly-CSharp (compile-verified reflection; MVID
+  07fa1e4d-8618-41b3-9b8d-faa17d3b26f7) — `Kingmaker.Items.ItemEntity`
+  and `Kingmaker.Items.ItemsCollection` expose no instance-identity
+  member (no Guid/UniqueId/persistent id; identity is blueprint + owner +
+  collection position with `TryMerge` stacking), and
+  `ActivatableAbility.ResourceCount` lives on the owner+blueprint fact.
+  **No qualified durable instance contract was found in the inspected
+  implementation.** This is not proof of absence in the engine: a base
+  type of `System.Object` alone does not prove it, and serialization or
+  deeper state may hold identity the managed surface does not expose.
+  Pooled "any matching rod for the caster" remains the honest behavior;
+  exact-item selection stays explicitly unresolved (not silently
+  dropped), pending a live fixture to test whether two identical rods
+  keep separate native charges and whether any durable binding exists.
+  No invented IDs, no slot/ordinal pins, no production rule changes.
 - Checkpoint 3 (fixture bootstrap): `scripts/New-KbpAutomationFixture.ps1`
   added — a guarded, source-tested (harness 12/12) bootstrap that seals a
   deliberately disposable `Manual_<n>_KBP_AUTOMATION_SEED.zks` (header Name
@@ -387,3 +388,16 @@ above plus the open manual checklist.
   `powershell -ExecutionPolicy Bypass -File scripts/New-KbpAutomationFixture.ps1 -Confirm:$false`;
   success = "Fixture bootstrap PASS" with sealed baseline/working hashes,
   after which Checkpoint 5 live runs are unblocked.
+
+
+## PR1 repair follow-up — 2026-09-18 (findings F1-F7)
+
+Reviewed HEAD `bd2f536`; continuation commits `4e0123c..20a472e` repair
+every source-level finding. Per-finding record (reproducer → fix →
+regression) lives in the commit messages; the tracker entries above are
+updated in place. Gates: source 42/42, protocol 165/165, harness 18/18,
+package 4/4, WhatIf 5/5. Live lanes remain unrun: no
+`KBP_AUTOMATION_SEED` exists on this machine (verified again before this
+record); the repaired bootstrap refuses until one is created by the
+user. Theme donor promotion, rendered layout, spellbook placement, and
+casting/resource acceptance remain live-only.

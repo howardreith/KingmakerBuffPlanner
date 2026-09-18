@@ -8,10 +8,13 @@
   pair and archives provenance once it exists. No other fixture route
   remains: lab `runtime-backups`/`runtime-evidence` no longer exist, and
   using any ordinary save is forbidden.
-- T03 exact rod identity: BLOCKED BY NATIVE CONTRACT, with assembly evidence
-  (no durable ItemEntity instance identity; positional/stacking storage;
-  per-owner+blueprint charge facts). Pooled semantics are the honest
-  behavior; UI and docs must not relabel them as exact control.
+- T03 exact rod identity: NO QUALIFIED DURABLE INSTANCE CONTRACT FOUND in
+  the inspected Assembly-CSharp surface (items expose no instance
+  identity; charges live on owner+blueprint facts). This is bounded to
+  the inspected implementation, not proven absent from the engine; live
+  fixture testing of two identical rods' native charge behavior and any
+  durable binding remains outstanding. Pooled semantics stay honestly
+  labeled; no invented IDs or slot/ordinal pins.
 - Theme donor promotion and spellbook placement/handoff/return verification
   remain live-lane-only (blocked with the fixture above), not source
   blockers.
