@@ -356,6 +356,27 @@ namespace KingmakerBuffPlanner.UI
             }
         }
 
+        // Grows an already-built button so its fully styled caption fits
+        // without shrinking below the readable size. Called only at rebuild
+        // boundaries after a forced layout pass, never per frame; the
+        // designed geometry is a floor, so captions can only gain room.
+        internal static void FitButtonToCaption(RectTransform rect,
+            float designMinimumWidth, float designMinimumHeight)
+        {
+            if (rect == null) return;
+            Button button = rect.GetComponent<Button>();
+            Text label = button == null ? null : button.GetComponentInChildren<Text>(true);
+            if (label == null) return;
+            float requiredWidth = ControlCaptionFit.ResolveExtent(designMinimumWidth,
+                ControlCaptionFit.RequiredWidth(label.preferredWidth, 5f));
+            float requiredHeight = ControlCaptionFit.ResolveExtent(designMinimumHeight,
+                ControlCaptionFit.RequiredHeight(label.preferredHeight, 1f));
+            if (requiredWidth > rect.rect.width)
+                rect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, requiredWidth);
+            if (requiredHeight > rect.rect.height)
+                rect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, requiredHeight);
+        }
+
         internal static void ForceLayoutAndSnap(RectTransform root)
         {
             if (root == null) return;

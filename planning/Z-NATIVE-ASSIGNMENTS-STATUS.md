@@ -120,7 +120,60 @@ Status: SOURCE/BUILD COMPLETE — live rendered gate BLOCKED (fixture absent).
 
 ## Checkpoint B — native theme foundation
 
-Status: NOT STARTED.
+Status: SOURCE/BUILD COMPLETE — UNQUALIFIED LIVE (fixture absent; game session
+detected running during qualification, not touched).
+
+- New Buff-Planner-owned capability layer (patterned after Dice Roller's
+  separation, no runtime dependency on it):
+  - `UI/NativeThemeModel.cs` — `NativeThemeCapability` (Paper, Buttons,
+    ButtonText, Body, Input, Scrollbar, Ornament, Sound — resolved
+    independently), `INativeThemeSource`, `NativeThemeResource`,
+    `NativeThemeResolution` with per-capability accept/reject, stale discard,
+    and a summary that records locator provenance.
+  - `UI/NativeThemeDonorLookup.cs` — bounded lookup (depth 32, 512 children,
+    2048 scan nodes) with ambiguity rejection.
+  - `UI/NativeThemeResolver.cs` — campaign locators. ProvenPath entries are
+    StaticCanvas paths live-qualified through 0.0.19 (BookBackground paper,
+    Button_LevelUp, Party/Character/Highlight ornament). BoundedScan entries
+    structurally discover donors under proven native screens
+    (CharacterScreen/Inventory/SpellBook) because no verified literal path is
+    recorded; the live inventory lane can promote them without consumer
+    changes.
+  - `UI/NativeThemeRecovery.cs` — bounded re-resolution (≤3 attempts/owner)
+    and `NativeThemeBindings` (apply-once per donor identity; failed apply →
+    readable parchment fallback for that capability only).
+  - `UI/ControlCaptionFit.cs` — pure grow-from-design-floor caption policy;
+    `KingmakerUiFactory.FitButtonToCaption` applies it at rebuild boundaries
+    only (chooser CLOSE/RESET buttons).
+  - `UI/PlannerNativeTheme.cs` — Unity adapter. Structural donor validation
+    (component presence, sliced/borderless-safe images, fonts, scrollbar
+    handle) — exact sprite-name/border/pPu contracts deliberately NOT asserted
+    until the live inventory proves them; complete-state button borrowing
+    uses SpriteSwap only when the donor supplies all four states, otherwise a
+    documented partial borrow keeps the tint transition.
+  - `UI/PlannerNativeThemeSurface.cs` — attaches to the planner root; one
+    bounded pass applies buttons/fonts/paper/input/scrollbar artwork to owned
+    controls, adds the single native click-sound route
+    (`UICommon.UISound.Play(UISoundType.ButtonClick)` — distinct from the
+    existing CharacterScreenOpen route, so no duplicate open/click cues),
+    re-covers rebuilt chooser rows via `ApplyTo`, and re-resolves on
+    OnEnable within recovery bounds. Theme evidence is appended to
+    `ThemeResolution` diagnostics (`native[...]` summary).
+- Representative surfaces themed: all owned buttons under the planner root
+  (including rebuilt chooser rows), paper frames, search input, chooser
+  scrollbars, native click sound. Full-surface reskin continues in F.
+- Evidence: protocol 153/153 including
+  `native-theme-resolves-and-falls-back-per-capability` (full/partial/
+  ambiguous/stale-node/stale-component resolution, bounded recovery, binding
+  apply/fallback) and `control-caption-fit-grows-only-from-design-floor`;
+  source 42/42; package 4/4; Release build PASS (DLL sha256
+  `d7c2be619544df61dbd626d8bd3b730ca49482cac9114fa4920e91668f712874`).
+- BLOCKED lanes: deployment WhatIf purity and source-only suite final gate
+  were interrupted when a Kingmaker process (PID 15696) started mid-run; the
+  guard behaved correctly and nothing was touched. Live donor inventory,
+  rendered state checks, and visual acceptance remain BLOCKED on the absent
+  `KBP_AUTOMATION` save pair. The theme is explicitly UNQUALIFIED-LIVE;
+  partial donors must not be reported as verified native artwork.
 
 ## Checkpoint C — assignment model, identities, migration, planner
 

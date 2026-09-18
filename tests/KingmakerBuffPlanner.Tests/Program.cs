@@ -176,6 +176,8 @@ namespace KingmakerBuffPlanner.Tests
                 Run("casting-section-presents-caster-and-enhancement-choices", TestCastingSectionPresentation);
                 Run("casting-section-layout-keeps-button-labels-visible", TestCastingSectionLayout);
                 Run("chooser-scroll-layout-owns-content-bounds", TestChooserScrollLayout);
+                Run("native-theme-resolves-and-falls-back-per-capability", TestNativeThemeResolution);
+                Run("control-caption-fit-grows-only-from-design-floor", TestControlCaptionFit);
                 Run("cast-enhancement-execution-is-fail-closed-and-cleaned-up", TestCastEnhancementExecution);
                 Run("consumed-one-shot-enhancement-is-not-rearmed", TestOneShotEnhancementRestoration);
                 Run("execution-preflight-runs-under-the-native-activation-lease",
@@ -4610,6 +4612,223 @@ namespace KingmakerBuffPlanner.Tests
                 CastingPanelLayoutContract.SettingsCloseLabel != "CLOSE" ||
                 string.IsNullOrWhiteSpace(CastingPanelLayoutContract.SettingsCloseLabel))
                 throw new InvalidOperationException("Casting button geometry or shared CLOSE label is not render-safe.");
+        }
+
+        private sealed class ThemeToken { internal bool Destroyed; }
+
+        private sealed class ThemeNode
+        {
+            internal string Name;
+            internal ThemeNode Parent;
+            internal readonly List<ThemeNode> Children = new List<ThemeNode>();
+            internal readonly Dictionary<NativeThemeComponent, object[]> Components =
+                new Dictionary<NativeThemeComponent, object[]>();
+            internal bool Destroyed;
+            internal ThemeNode Add(string name, params KeyValuePair<NativeThemeComponent, object>[] components)
+            {
+                var child = new ThemeNode { Name = name, Parent = this };
+                foreach (KeyValuePair<NativeThemeComponent, object> pair in components)
+                    child.Components[pair.Key] = new[] { pair.Value };
+                Children.Add(child);
+                return child;
+            }
+        }
+
+        private static KeyValuePair<NativeThemeComponent, object> Comp(
+            NativeThemeComponent component, ThemeToken token)
+        {
+            return new KeyValuePair<NativeThemeComponent, object>(component, token);
+        }
+
+        private sealed class FixtureThemeSource : INativeThemeSource
+        {
+            internal ThemeNode Owner;
+            internal bool SoundAvailable = true;
+            internal Action<NativeThemeCapability, object[]> ValidateHook = (c, v) => { };
+            public bool IsAlive(object value)
+            {
+                var node = value as ThemeNode;
+                if (node != null) return !node.Destroyed;
+                var token = value as ThemeToken;
+                return token != null && !token.Destroyed;
+            }
+            public bool SameNode(object first, object second) { return ReferenceEquals(first, second); }
+            public string Name(object node) { return ((ThemeNode)node).Name; }
+            public object Parent(object node) { return ((ThemeNode)node).Parent; }
+            public int ChildCount(object node) { return ((ThemeNode)node).Children.Count; }
+            public object Child(object node, int index) { return ((ThemeNode)node).Children[index]; }
+            public object[] Components(object node, NativeThemeComponent component)
+            {
+                object[] values;
+                return ((ThemeNode)node).Components.TryGetValue(component, out values)
+                    ? values : new object[0];
+            }
+            public NativeThemeResource SoundResource()
+            {
+                if (!SoundAvailable) throw new InvalidOperationException("no sound player");
+                return new NativeThemeResource
+                {
+                    Nodes = new object[0],
+                    Components = new object[] { new object() },
+                    Identity = "fixture sound"
+                };
+            }
+            public void Validate(NativeThemeCapability capability, object[] components)
+            {
+                ValidateHook(capability, components);
+            }
+        }
+
+        private static ThemeNode BuildDonorHierarchy(FixtureThemeSource source)
+        {
+            var owner = new ThemeNode { Name = "StaticCanvas" };
+            ThemeNode serviceWindow = owner.Add("ServiceWindow");
+            ThemeNode character = serviceWindow.Add("CharacterScreen");
+            character.Add("BookBackground", Comp(NativeThemeComponent.Image, new ThemeToken()));
+            ThemeNode levelBox = character.Add("LevelBox");
+            ThemeNode button = levelBox.Add("Button_LevelUp",
+                Comp(NativeThemeComponent.Button, new ThemeToken()));
+            button.Add("Label", Comp(NativeThemeComponent.Text, new ThemeToken()));
+            character.Add("BodyText", Comp(NativeThemeComponent.Text, new ThemeToken()));
+            ThemeNode inventory = serviceWindow.Add("Inventory");
+            inventory.Add("Search", Comp(NativeThemeComponent.InputField, new ThemeToken()));
+            ThemeNode spellbook = serviceWindow.Add("SpellBook");
+            spellbook.Add("Scrollbar Vertical",
+                Comp(NativeThemeComponent.Scrollbar, new ThemeToken()));
+            ThemeNode party = owner.Add("Party");
+            ThemeNode partyCharacter = party.Add("Character");
+            partyCharacter.Add("Highlight", Comp(NativeThemeComponent.Image, new ThemeToken()));
+            source.Owner = owner;
+            return owner;
+        }
+
+        private static void TestNativeThemeResolution()
+        {
+            var source = new FixtureThemeSource();
+            ThemeNode owner = BuildDonorHierarchy(source);
+
+            NativeThemeResolution full = NativeThemeResolver.Resolve(owner, source);
+            foreach (NativeThemeCapability capability in NativeThemeResolution.Capabilities)
+                if (!full.IsAvailable(capability))
+                    throw new InvalidOperationException("Complete donor hierarchy rejected " +
+                        capability + ": " + full.Failure(capability));
+            string summary = full.Summary;
+            if (!summary.Contains("Paper=ok(proven)") || !summary.Contains("Buttons=ok(proven)") ||
+                !summary.Contains("ButtonText=ok(scan)") || !summary.Contains("Scrollbar=ok(scan)"))
+                throw new InvalidOperationException("Resolution summary lost locator provenance: " + summary);
+
+            // One missing donor (the button's label text) must reject exactly
+            // that capability and leave every other surface native.
+            var partial = new FixtureThemeSource();
+            BuildDonorHierarchy(partial);
+            ThemeNode label = FindByName(partial.Owner, "Label");
+            label.Parent.Children.Remove(label);
+            NativeThemeResolution degraded = NativeThemeResolver.Resolve(partial.Owner, partial);
+            if (degraded.IsAvailable(NativeThemeCapability.ButtonText))
+                throw new InvalidOperationException("Removing the label text kept ButtonText.");
+            if (!degraded.IsAvailable(NativeThemeCapability.Buttons))
+                throw new InvalidOperationException("Removing the label text also dropped the button artwork donor.");
+            foreach (NativeThemeCapability capability in NativeThemeResolution.Capabilities)
+                if (capability != NativeThemeCapability.ButtonText &&
+                    !degraded.IsAvailable(capability))
+                    throw new InvalidOperationException("Unrelated capability " + capability +
+                        " fell back with only the label text missing.");
+
+            // Ambiguous siblings must reject instead of guessing.
+            var ambiguous = new FixtureThemeSource();
+            BuildDonorHierarchy(ambiguous);
+            ThemeNode characterScreen = FindByName(ambiguous.Owner, "CharacterScreen");
+            characterScreen.Add("BookBackground", Comp(NativeThemeComponent.Image, new ThemeToken()));
+            NativeThemeResolution ambiguousResolution = NativeThemeResolver.Resolve(
+                ambiguous.Owner, ambiguous);
+            if (ambiguousResolution.IsAvailable(NativeThemeCapability.Paper))
+                throw new InvalidOperationException("Ambiguous paper donor was accepted.");
+
+            // A destroyed cached donor is discarded so a bounded retry can
+            // rebuild only that capability; a destroyed borrowed component
+            // (not just its node) is equally stale.
+            ((ThemeNode)full.Get(NativeThemeCapability.Paper).Nodes[0]).Destroyed = true;
+            if (!full.DiscardStale(source) || full.IsAvailable(NativeThemeCapability.Paper))
+                throw new InvalidOperationException("Stale paper donor survived discard.");
+            if (!full.IsAvailable(NativeThemeCapability.Buttons))
+                throw new InvalidOperationException("Discard removed an unrelated live capability.");
+            NativeThemeResource bodyResource = full.Get(NativeThemeCapability.Body);
+            if (bodyResource == null)
+                throw new InvalidOperationException("Body capability vanished before component-stale check.");
+            NativeThemeResource afterComponentStale = bodyResource;
+            ((ThemeToken)afterComponentStale.Components[0]).Destroyed = true;
+            if (!full.DiscardStale(source) || full.IsAvailable(NativeThemeCapability.Body))
+                throw new InvalidOperationException("Destroyed borrowed component survived discard.");
+
+            // Bounded recovery: at most MaximumAttempts re-resolves per owner.
+            var recovery = new NativeThemeRecovery();
+            recovery.Bind(owner);
+            int attempts = 0;
+            while (recovery.TryBegin(true)) { attempts++; recovery.Complete(); }
+            if (attempts != NativeThemeRecovery.MaximumAttempts)
+                throw new InvalidOperationException("Recovery attempts were not bounded: " + attempts);
+            ThemeNode second = new ThemeNode { Name = "second-owner" };
+            recovery.Bind(second);
+            if (!recovery.TryBegin(true))
+                throw new InvalidOperationException("Binding a new owner did not reset attempts.");
+
+            // Bindings apply once per capability, re-apply on donor change, and
+            // run the readable fallback when an apply fails. Built on a fresh
+            // hierarchy because the stale checks above destroyed shared donors.
+            var bindingFixture = new FixtureThemeSource();
+            BuildDonorHierarchy(bindingFixture);
+            NativeThemeResolution bindingSource = NativeThemeResolver.Resolve(
+                bindingFixture.Owner, bindingFixture);
+            var applied = new List<NativeThemeCapability>();
+            var fellBack = new List<NativeThemeCapability>();
+            var bindings = new NativeThemeBindings(reason => { });
+            foreach (NativeThemeCapability capability in NativeThemeResolution.Capabilities)
+                bindings.Add(capability, components => applied.Add(capability),
+                    delegate { fellBack.Add(capability); });
+            bindings.Apply(bindingSource);
+            if (applied.Count != NativeThemeResolution.Capabilities.Length ||
+                fellBack.Count != 0)
+                throw new InvalidOperationException("Initial binding pass did not apply every capability.");
+            applied.Clear();
+            bindings.Apply(bindingSource);
+            if (applied.Count != 0)
+                throw new InvalidOperationException("Unchanged donors were re-applied.");
+            var failing = new FixtureThemeSource();
+            BuildDonorHierarchy(failing);
+            failing.ValidateHook = (capability, components) =>
+            {
+                if (capability == NativeThemeCapability.Buttons)
+                    throw new InvalidOperationException("donor contract changed");
+            };
+            NativeThemeResolution rejected = NativeThemeResolver.Resolve(failing.Owner, failing);
+            bindings.Apply(rejected);
+            if (!fellBack.Contains(NativeThemeCapability.Buttons))
+                throw new InvalidOperationException("Failed apply did not run the parchment fallback.");
+        }
+
+        private static ThemeNode FindByName(ThemeNode root, string name)
+        {
+            if (root.Name == name) return root;
+            foreach (ThemeNode child in root.Children)
+            {
+                ThemeNode found = FindByName(child, name);
+                if (found != null) return found;
+            }
+            return null;
+        }
+
+        private static void TestControlCaptionFit()
+        {
+            if (ControlCaptionFit.RequiredWidth(100f, 5f) != 112f ||
+                ControlCaptionFit.RequiredHeight(20f, 1f) != 24f)
+                throw new InvalidOperationException("Caption fit dropped its insets or safety margin.");
+            if (ControlCaptionFit.ResolveExtent(96f, 80f) != 96f ||
+                ControlCaptionFit.ResolveExtent(96f, 140f) != 140f)
+                throw new InvalidOperationException("Caption fit must grow from the design floor only.");
+            if (ControlCaptionFit.ResolveExtent(96f, float.NaN) != 96f ||
+                ControlCaptionFit.ResolveExtent(96f, -5f) != 96f ||
+                ControlCaptionFit.ResolveExtent(96f, float.PositiveInfinity) != 96f)
+                throw new InvalidOperationException("Invalid measurements must keep the design floor.");
         }
 
         // Chooser scroll geometry must be exact so the final option row is

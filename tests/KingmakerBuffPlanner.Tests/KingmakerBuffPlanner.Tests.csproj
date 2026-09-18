@@ -65,6 +65,11 @@
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CatalogUiDiagnostics.cs"><Link>UI\CatalogUiDiagnostics.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\BuffGridMetrics.cs"><Link>UI\BuffGridMetrics.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\PlannerHotkeyBinding.cs"><Link>UI\PlannerHotkeyBinding.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\NativeThemeModel.cs"><Link>UI\NativeThemeModel.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\NativeThemeDonorLookup.cs"><Link>UI\NativeThemeDonorLookup.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\NativeThemeResolver.cs"><Link>UI\NativeThemeResolver.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\NativeThemeRecovery.cs"><Link>UI\NativeThemeRecovery.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\ControlCaptionFit.cs"><Link>UI\ControlCaptionFit.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\RuntimeTesting\RuntimePaths.cs">
       <Link>RuntimeTesting\RuntimePaths.cs</Link>
     </Compile>

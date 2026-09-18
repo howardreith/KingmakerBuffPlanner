@@ -163,6 +163,13 @@
     <Compile Include="UI\PlannerPointerOwnership.cs" />
     <Compile Include="UI\PlannerUiSession.cs" />
     <Compile Include="UI\BuffPlannerUiRoot.cs" />
+    <Compile Include="UI\NativeThemeModel.cs" />
+    <Compile Include="UI\NativeThemeDonorLookup.cs" />
+    <Compile Include="UI\NativeThemeResolver.cs" />
+    <Compile Include="UI\NativeThemeRecovery.cs" />
+    <Compile Include="UI\ControlCaptionFit.cs" />
+    <Compile Include="UI\PlannerNativeTheme.cs" />
+    <Compile Include="UI\PlannerNativeThemeSurface.cs" />
     <Compile Include="$(IntermediateOutputPath)BuildInfo.Generated.cs" />
   </ItemGroup>
   <ItemGroup>

@@ -44,6 +44,7 @@ namespace KingmakerBuffPlanner.UI
         private PlannerCasterPolicyChooserView _casterPolicyChooser;
         private PlannerSettingsView _settings;
         private PlannerDescriptionModal _description;
+        private PlannerNativeThemeSurface _nativeTheme;
         private Button _executeButton;
         private bool _disposed;
         private string _lastEnhancementRenderEvidence = string.Empty;
@@ -253,6 +254,13 @@ namespace KingmakerBuffPlanner.UI
             OpenCasterPolicyChooser();
         }
 
+        // Rebuilt chooser rows are plain owned controls; re-cover them with
+        // the already-resolved native theme without a fresh donor resolve.
+        private void ApplyNativeThemeTo(RectTransform scope)
+        {
+            if (_nativeTheme != null) _nativeTheme.ApplyTo(scope);
+        }
+
         private void RecordEnhancementRenderEvidence()
         {
             if (_selected == null || _session.Model == null) return;
@@ -322,7 +330,9 @@ namespace KingmakerBuffPlanner.UI
                 CastingModeControlCount = allText.Count(text =>
                     text.text.StartsWith("Casting mode: ", StringComparison.Ordinal)),
                 RetiredPrimaryLabelCount = allText.Count(text => IsRetired(text.text)),
-                ThemeResolution = _theme.ResolutionSummary,
+                ThemeResolution = _theme.ResolutionSummary +
+                    (_nativeTheme == null ? string.Empty :
+                        "; native[" + _nativeTheme.Summary + "]"),
                 TextRenderingEvidence = BuildTextRenderingEvidence(),
                 NestedCanvasScalerCount = _root.GetComponentsInChildren<CanvasScaler>(true).Length,
                 FractionalRectCount = pixelSnapRects.Count(HasFractionalGeometry),
@@ -473,7 +483,7 @@ namespace KingmakerBuffPlanner.UI
                     _session.Model.SetEnhancement(ActiveRoutineId, enhancementId);
                     RefreshAll(true);
                     OpenEnhancementChooser();
-                }, ShowTooltip);
+                }, ShowTooltip, ApplyNativeThemeTo);
             _casterPolicyChooser = new PlannerCasterPolicyChooserView(
                 _root, _theme,
                 (providerKey, enabled) =>
@@ -502,7 +512,7 @@ namespace KingmakerBuffPlanner.UI
                     _session.Model.ResetSelectedSourceProvidersToAutomatic();
                     RefreshCasterPolicyChooser();
                 },
-                ShowTooltip);
+                ShowTooltip, ApplyNativeThemeTo);
             BuildFooter(frame);
             _settings = new PlannerSettingsView(frame, _theme, () =>
             {
@@ -523,6 +533,7 @@ namespace KingmakerBuffPlanner.UI
                 RefreshAll(true);
             }, () => _settings.Show(false));
             _description = new PlannerDescriptionModal(_root, _theme);
+            _nativeTheme = PlannerNativeThemeSurface.Attach(_root);
             _root.SetAsLastSibling();
             _root.gameObject.SetActive(true);
             PlannerPointerOwnership.Register(_root);

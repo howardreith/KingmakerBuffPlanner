@@ -767,15 +767,19 @@ namespace KingmakerBuffPlanner.UI
         private readonly Scrollbar _scrollbar;
         private readonly Action<string> _select;
         private readonly Action<string> _showTooltip;
+        private readonly Action<RectTransform> _rowsBound;
         private readonly List<GameObject> _rows = new List<GameObject>();
         private readonly Text _subtitle;
+        private readonly Button _closeButton;
 
         internal PlannerEnhancementChooserView(RectTransform parent, PlannerUiTheme theme,
-            Action<string> select, Action<string> showTooltip)
+            Action<string> select, Action<string> showTooltip,
+            Action<RectTransform> rowsBound = null)
         {
             _theme = theme;
             _select = select;
             _showTooltip = showTooltip;
+            _rowsBound = rowsBound;
             Root = KingmakerUiFactory.CreateRect("EnhancementChooser", parent);
             KingmakerUiFactory.Stretch(Root);
             Image blocker = Root.gameObject.AddComponent<Image>();
@@ -799,6 +803,7 @@ namespace KingmakerBuffPlanner.UI
             KingmakerUiFactory.SetAnchors(_subtitle.rectTransform, 0.05f, 0.81f, 0.82f, 0.89f);
             Button close = KingmakerUiFactory.CreateButton("CloseEnhancementChooser", frame,
                 theme, "CLOSE", Hide);
+            _closeButton = close;
             KingmakerUiFactory.SetAnchors((RectTransform)close.transform,
                 0.83f, 0.88f, 0.95f, 0.97f);
             _scroll = KingmakerUiFactory.CreateScrollView("EnhancementChoices",
@@ -885,6 +890,9 @@ namespace KingmakerBuffPlanner.UI
                 _scrollbar.size = ChooserScrollLayoutContract.ScrollbarHandleRatio(
                     viewportHeight, contentHeight);
             KingmakerUiFactory.ForceLayoutAndSnap(Root);
+            KingmakerUiFactory.FitButtonToCaption(
+                (RectTransform)_closeButton.transform, 96f, 34f);
+            if (_rowsBound != null) _rowsBound(Root);
         }
 
         internal void Hide()
@@ -918,6 +926,7 @@ namespace KingmakerBuffPlanner.UI
         private readonly Action<string, int?> _setMaximum;
         private readonly Action _reset;
         private readonly Action<string> _showTooltip;
+        private readonly Action<RectTransform> _rowsBound;
         private readonly List<GameObject> _rows = new List<GameObject>();
         private readonly Text _subtitle;
         private readonly Button _resetButton;
@@ -930,7 +939,8 @@ namespace KingmakerBuffPlanner.UI
             Action<string> moveLater,
             Action<string, int?> setMaximum,
             Action reset,
-            Action<string> showTooltip)
+            Action<string> showTooltip,
+            Action<RectTransform> rowsBound = null)
         {
             _theme = theme;
             _setEnabled = setEnabled;
@@ -939,6 +949,7 @@ namespace KingmakerBuffPlanner.UI
             _setMaximum = setMaximum;
             _reset = reset;
             _showTooltip = showTooltip;
+            _rowsBound = rowsBound;
             Root = KingmakerUiFactory.CreateRect("CasterPolicyChooser", parent);
             KingmakerUiFactory.Stretch(Root);
             Image blocker = Root.gameObject.AddComponent<Image>();
@@ -1032,6 +1043,9 @@ namespace KingmakerBuffPlanner.UI
                 _scrollbar.size = ChooserScrollLayoutContract.ScrollbarHandleRatio(
                     viewportHeight, contentHeight);
             KingmakerUiFactory.ForceLayoutAndSnap(Root);
+            KingmakerUiFactory.FitButtonToCaption(
+                (RectTransform)_resetButton.transform, 150f, 34f);
+            if (_rowsBound != null) _rowsBound(Root);
         }
 
         internal void Hide()
