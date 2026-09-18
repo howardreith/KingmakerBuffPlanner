@@ -8,6 +8,7 @@ using Kingmaker.UI;
 using Kingmaker.UI.Common;
 using Kingmaker.UnitLogic.Abilities.Blueprints;
 using KingmakerBuffPlanner.Domain.Identity;
+using KingmakerBuffPlanner.Persistence;
 using KingmakerBuffPlanner.Planning;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -549,7 +550,35 @@ namespace KingmakerBuffPlanner.UI
                     _session.Model.MoveCastingAssignmentLater(ActiveRoutineId, assignmentId);
                 },
                 () => OpenCastingOrder(),
-                ShowTooltip, ApplyNativeThemeTo);
+                ShowTooltip, ApplyNativeThemeTo,
+                AddSelectedSourceAssignment,
+                assignmentId =>
+                {
+                    _session.Model.RemoveCastingAssignment(ActiveRoutineId,
+                        _session.Model.SelectedSourceId, assignmentId);
+                },
+                assignmentId =>
+                {
+                    _session.Model.CycleCastingAssignmentCaster(ActiveRoutineId,
+                        _session.Model.SelectedSourceId, assignmentId);
+                },
+                (assignmentId, unitId) =>
+                {
+                    _session.Model.RemoveTargetFromAssignment(ActiveRoutineId,
+                        _session.Model.SelectedSourceId, assignmentId, unitId);
+                },
+                (assignmentId, unitId) =>
+                {
+                    _session.Model.SplitCastingAssignment(ActiveRoutineId,
+                        _session.Model.SelectedSourceId, assignmentId, unitId);
+                },
+                (fromAssignmentId, toAssignmentId, unitId) =>
+                {
+                    _session.Model.MoveTargetToAssignment(ActiveRoutineId,
+                        _session.Model.SelectedSourceId, fromAssignmentId,
+                        toAssignmentId, unitId);
+                },
+                OpenAssignmentEnhancementChooser);
             BuildFooter(frame);
             _settings = new PlannerSettingsView(frame, _theme, () =>
             {
@@ -609,6 +638,52 @@ namespace KingmakerBuffPlanner.UI
             _enhancementChooser.Hide();
             _casterPolicyChooser.Hide();
             _castingOrder.Show(ActiveRoutineId);
+        }
+
+        private void AddSelectedSourceAssignment()
+        {
+            PlannerSetupModel model = _session.Model;
+            if (model == null || model.SelectedSource == null) return;
+            model.AddCastingAssignment(ActiveRoutineId, model.SelectedSourceId);
+        }
+
+        private void OpenAssignmentEnhancementChooser(string sourceId, string assignmentId)
+        {
+            PlannerSetupModel model = _session.Model;
+            SetupSourceRow source = model == null ? null : model.SelectedSource;
+            if (source == null || source.SourceId != sourceId) return;
+            _casterPolicyChooser.Hide();
+            _castingOrder.Hide();
+            RoutinePlanResult preview = null;
+            try { preview = _session.PreviewRoutine(ActiveRoutineId); }
+            catch { preview = null; }
+            var selectedIds = model.GetAssignmentEnhancementIds(
+                ActiveRoutineId, sourceId, assignmentId).ToList();
+            var selections = selectedIds.Select(id =>
+            {
+                CastingAssignmentProfile assignment = model.FindCastingAssignment(
+                    ActiveRoutineId, sourceId, assignmentId);
+                EnhancementSelectionProfile match = assignment.Enhancements
+                    .FirstOrDefault(selection => selection.EnhancementId == id);
+                return new EnhancementSelectionSummary(id, match == null || match.IsRequired);
+            }).ToList();
+            _enhancementChooser.ShowForAssignment(
+                SelectedCastingViewModel.Create(source, model, ActiveRoutineId, preview),
+                sourceId, assignmentId, selections,
+                (sourceKey, assignmentKey, enhancementId) =>
+                {
+                    model.SetAssignmentEnhancement(ActiveRoutineId, sourceKey,
+                        assignmentKey, enhancementId);
+                    RefreshAll(true);
+                    OpenAssignmentEnhancementChooser(sourceKey, assignmentKey);
+                },
+                (sourceKey, assignmentKey, enhancementId, required) =>
+                {
+                    model.SetCastingAssignmentEnhancementPolicy(ActiveRoutineId, sourceKey,
+                        assignmentKey, enhancementId, required);
+                    RefreshAll(true);
+                    OpenAssignmentEnhancementChooser(sourceKey, assignmentKey);
+                });
         }
 
         private void BuildFooter(RectTransform frame)

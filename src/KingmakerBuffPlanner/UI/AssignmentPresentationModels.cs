@@ -63,6 +63,72 @@ namespace KingmakerBuffPlanner.UI
         }
     }
 
+    // Assignment-scoped enhancement selection state for chooser binding.
+    public sealed class EnhancementSelectionSummary
+    {
+        internal EnhancementSelectionSummary(string enhancementId, bool required)
+        {
+            EnhancementId = enhancementId;
+            Required = required;
+        }
+
+        public string EnhancementId { get; private set; }
+        public bool Required { get; private set; }
+    }
+
+    // Detects materially different plans between the preview the player
+    // confirmed and the freshly computed one immediately before execution.
+    // Material dimensions: resolved caster/provider (the item), enhancement
+    // and omission sets, reserved cost, allocation order, and target
+    // coverage. Cosmetic differences (diagnostic wording, marker lists) are
+    // not material. The partial-execution gate alone does not cover this;
+    // both must pass before anything executes.
+    public static class PlanMaterialChangeDetector
+    {
+        public static string DescribeMaterialChange(CastPlan confirmed, CastPlan current)
+        {
+            if (confirmed == null || current == null) return null;
+            List<string> confirmedSteps = Steps(confirmed);
+            List<string> currentSteps = Steps(current);
+            if (!confirmedSteps.SequenceEqual(currentSteps))
+            {
+                int index = 0;
+                while (index < confirmedSteps.Count && index < currentSteps.Count &&
+                    confirmedSteps[index] == currentSteps[index]) index++;
+                string expected = index < confirmedSteps.Count ? confirmedSteps[index] : "<end>";
+                string actual = index < currentSteps.Count ? currentSteps[index] : "<end>";
+                return "cast " + (index + 1) + " changed: [" + expected + "] -> [" + actual + "]";
+            }
+            List<string> confirmedCoverage = Coverage(confirmed);
+            List<string> currentCoverage = Coverage(current);
+            if (!confirmedCoverage.SequenceEqual(currentCoverage))
+            {
+                var lost = confirmedCoverage.Except(currentCoverage, StringComparer.Ordinal).ToList();
+                var gained = currentCoverage.Except(confirmedCoverage, StringComparer.Ordinal).ToList();
+                return "coverage changed: lost [" + string.Join(",", lost.ToArray()) +
+                    "] gained [" + string.Join(",", gained.ToArray()) + "]";
+            }
+            return null;
+        }
+
+        private static List<string> Steps(CastPlan plan)
+        {
+            return plan.Steps.Select(step =>
+                step.AssignmentId + "|" + step.Provider.Canonical + "|" +
+                string.Join("+", step.EnhancementIds.ToArray()) + "|-" +
+                string.Join("+", step.OmittedEnhancementIds.ToArray()) + "|" +
+                (step.Reservation == null ? 0 : step.Reservation.Units)).ToList();
+        }
+
+        private static List<string> Coverage(CastPlan plan)
+        {
+            return plan.Outcomes
+                .Select(outcome => outcome.AssignmentId + "|" + outcome.UnitId + "|" +
+                    (int)outcome.Kind)
+                .OrderBy(value => value, StringComparer.Ordinal).ToList();
+        }
+    }
+
     public sealed class CastingAssignmentRowViewModel
     {
         internal CastingAssignmentRowViewModel(int number, string sourceDisplayName,
@@ -81,6 +147,8 @@ namespace KingmakerBuffPlanner.UI
             PinUnresolved = pinUnresolved;
             Automatic = automatic;
             TargetNames = targetNames;
+            TargetUnitIds = new ReadOnlyCollection<string>(
+                assignment.TargetUnitIds.ToList());
             EnhancementTexts = enhancementTexts;
             PlannedCasts = plannedCasts;
             FulfilledTargets = fulfilledTargets;
@@ -98,12 +166,16 @@ namespace KingmakerBuffPlanner.UI
         public bool PinUnresolved { get; private set; }
         public bool Automatic { get; private set; }
         public IReadOnlyList<string> TargetNames { get; private set; }
+        public IReadOnlyList<string> TargetUnitIds { get; private set; }
         public IReadOnlyList<string> EnhancementTexts { get; private set; }
         public int PlannedCasts { get; private set; }
         public int FulfilledTargets { get; private set; }
         public int UnfulfilledTargets { get; private set; }
         public bool CanMoveEarlier { get; private set; }
         public bool CanMoveLater { get; private set; }
+        public bool Editable { get; internal set; }
+        public IReadOnlyList<string> ResolvedProviderTexts { get; internal set; }
+        public IReadOnlyList<string> RecipientNames { get; internal set; }
 
         public string Status =>
             PinUnresolved ? "Pinned caster unavailable" :
@@ -116,7 +188,9 @@ namespace KingmakerBuffPlanner.UI
             Func<string, string> sourceDisplayName,
             Func<string, string> unitDisplayName,
             Func<string, string> enhancementDisplayName,
-            CastPlan plan)
+            CastPlan plan,
+            string selectedSourceId = null,
+            Func<string, string> providerDisplayName = null)
         {
             if (profile == null) throw new ArgumentNullException("profile");
             RoutineProfile routine = profile.Routines.FirstOrDefault(r => r.RoutineId == routineId);
@@ -127,6 +201,25 @@ namespace KingmakerBuffPlanner.UI
                     child => new { Parent = assignment, Child = child }))
                 .OrderBy(pair => pair.Child.Order)
                 .ThenBy(pair => pair.Child.AssignmentId, StringComparer.Ordinal).ToList();
+            var recipientsByAssignment = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+            var providersByAssignment = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+            if (plan != null)
+            {
+                foreach (CastStep step in plan.Steps)
+                {
+                    List<string> providers;
+                    if (!providersByAssignment.TryGetValue(step.AssignmentId, out providers))
+                        providersByAssignment[step.AssignmentId] = providers = new List<string>();
+                    providers.Add(providerDisplayName == null
+                        ? step.Provider.CasterUnitId : providerDisplayName(step.Provider.CasterUnitId));
+                    List<string> recipients;
+                    if (!recipientsByAssignment.TryGetValue(step.AssignmentId, out recipients))
+                        recipientsByAssignment[step.AssignmentId] = recipients = new List<string>();
+                    foreach (string recipient in step.ExpectedRecipientUnitIds)
+                        recipients.Add(unitDisplayName == null
+                            ? recipient : unitDisplayName(recipient));
+                }
+            }
             for (int index = 0; index < ordered.Count; index++)
             {
                 var pair = ordered[index];
@@ -158,6 +251,10 @@ namespace KingmakerBuffPlanner.UI
                 int unfulfilled = plan == null ? 0 : plan.Outcomes.Count(o =>
                     o.AssignmentId == child.AssignmentId &&
                     o.Kind == TargetOutcomeKind.Unfulfilled);
+                List<string> providers;
+                providersByAssignment.TryGetValue(child.AssignmentId, out providers);
+                List<string> recipients;
+                recipientsByAssignment.TryGetValue(child.AssignmentId, out recipients);
                 rows.Add(new CastingAssignmentRowViewModel(index + 1,
                     sourceDisplayName == null ? pair.Parent.SourceId
                         : sourceDisplayName(pair.Parent.SourceId),
@@ -166,7 +263,16 @@ namespace KingmakerBuffPlanner.UI
                     new ReadOnlyCollection<string>(targetNames),
                     new ReadOnlyCollection<string>(enhancementTexts),
                     plannedCasts, fulfilled, unfulfilled,
-                    index > 0, index < ordered.Count - 1, child.IsAutomatic));
+                    index > 0, index < ordered.Count - 1, child.IsAutomatic)
+                {
+                    Editable = selectedSourceId != null &&
+                        string.Equals(pair.Parent.SourceId, selectedSourceId,
+                            StringComparison.Ordinal),
+                    ResolvedProviderTexts = new ReadOnlyCollection<string>(
+                        (providers ?? new List<string>()).Distinct().ToList()),
+                    RecipientNames = new ReadOnlyCollection<string>(
+                        (recipients ?? new List<string>()).Distinct().ToList())
+                });
             }
             return new ReadOnlyCollection<CastingAssignmentRowViewModel>(rows);
         }

@@ -771,6 +771,14 @@ namespace KingmakerBuffPlanner.UI
         private readonly List<GameObject> _rows = new List<GameObject>();
         private readonly Text _subtitle;
         private readonly Button _closeButton;
+        // Assignment-scoped editing context: when set, selections route to
+        // that child assignment and each selected row gains a required/
+        // optional policy toggle.
+        private string _assignmentSourceId;
+        private string _assignmentId;
+        private Action<string, string, string> _assignmentSelect;
+        private Action<string, string, string, bool> _assignmentPolicy;
+        private IReadOnlyList<EnhancementSelectionSummary> _assignmentSelections;
 
         internal PlannerEnhancementChooserView(RectTransform parent, PlannerUiTheme theme,
             Action<string> select, Action<string> showTooltip,
@@ -824,6 +832,29 @@ namespace KingmakerBuffPlanner.UI
         internal RectTransform Content { get { return _content; } }
         internal RectTransform Viewport { get { return _viewport; } }
 
+        internal void ShowForAssignment(SelectedCastingViewModel model,
+            string sourceId, string assignmentId,
+            IReadOnlyList<EnhancementSelectionSummary> selections,
+            Action<string, string, string> select,
+            Action<string, string, string, bool> policy)
+        {
+            _assignmentSourceId = sourceId;
+            _assignmentId = assignmentId;
+            _assignmentSelections = selections;
+            _assignmentSelect = select;
+            _assignmentPolicy = policy;
+            Show(model);
+        }
+
+        internal void ClearAssignmentScope()
+        {
+            _assignmentSourceId = null;
+            _assignmentId = null;
+            _assignmentSelections = null;
+            _assignmentSelect = null;
+            _assignmentPolicy = null;
+        }
+
         internal void Show(SelectedCastingViewModel model)
         {
             // A refresh while the chooser is already open (an option was just
@@ -833,39 +864,92 @@ namespace KingmakerBuffPlanner.UI
             float previousOffset = refresh ? _content.anchoredPosition.y : 0f;
             int selectedRow = -1;
             ClearRows();
-            _subtitle.text = model.CasterText + " | " + model.CandidateCount +
+            string scope = _assignmentId == null ? string.Empty
+                : " | assignment " + _assignmentId;
+            _subtitle.text = model.CasterText + scope + " | " + model.CandidateCount +
                 (model.CandidateCount == 1 ? " applicable option" : " applicable options");
             int rowIndex = 0;
             foreach (EnhancementChoiceViewModel choice in model.Choices)
             {
+                bool assignmentSelected = false;
+                bool assignmentRequired = true;
+                if (_assignmentId != null && _assignmentSelections != null)
+                {
+                    EnhancementSelectionSummary match = _assignmentSelections
+                        .FirstOrDefault(candidate => candidate.EnhancementId == choice.EnhancementId);
+                    assignmentSelected = match != null;
+                    assignmentRequired = match == null || match.Required;
+                }
+                bool selected = _assignmentId == null ? choice.Selected : assignmentSelected;
                 string selection = choice.CheckboxStyle
-                    ? (choice.Selected ? "[x] " : "[ ] ")
-                    : (choice.Selected ? "SELECTED | " : string.Empty);
-                if (choice.Selected && selectedRow < 0) selectedRow = rowIndex;
+                    ? (selected ? "[x] " : "[ ] ")
+                    : (selected ? "SELECTED | " : string.Empty);
+                if (selected && selectedRow < 0) selectedRow = rowIndex;
+                string policy = _assignmentId != null && selected
+                    ? (assignmentRequired ? " | required" : " | optional")
+                    : string.Empty;
                 string text = selection + choice.Title +
-                    "\n" + choice.Summary;
-                Button button = KingmakerUiFactory.CreateButton("EnhancementChoice", _content,
-                    _theme, text, () =>
+                    "\n" + choice.Summary + policy;
+                Button button;
+                if (_assignmentId == null)
+                {
+                    button = KingmakerUiFactory.CreateButton("EnhancementChoice", _content,
+                        _theme, text, () =>
+                        {
+                            if (!choice.Available) return;
+                            _select(choice.EnhancementId);
+                        });
+                    KingmakerUiFactory.AddLayout((RectTransform)button.transform,
+                        ChooserScrollLayoutContract.EnhancementRowHeight);
+                }
+                else
+                {
+                    // Assignment mode rows are containers so the choice and
+                    // its policy toggle share one layout row.
+                    RectTransform container = KingmakerUiFactory.CreateRect(
+                        "EnhancementChoiceRow", _content);
+                    KingmakerUiFactory.AddLayout(container,
+                        ChooserScrollLayoutContract.EnhancementRowHeight);
+                    button = KingmakerUiFactory.CreateButton("EnhancementChoice", container,
+                        _theme, text, () =>
+                        {
+                            if (!choice.Available) return;
+                            if (_assignmentSelect != null)
+                                _assignmentSelect(_assignmentSourceId, _assignmentId,
+                                    choice.EnhancementId);
+                        });
+                    KingmakerUiFactory.SetAnchors((RectTransform)button.transform,
+                        0f, 0f, 0.84f, 1f);
+                    if (selected && _assignmentPolicy != null)
                     {
-                        if (!choice.Available) return;
-                        _select(choice.EnhancementId);
-                    });
-                RectTransform rect = (RectTransform)button.transform;
-                KingmakerUiFactory.AddLayout(rect,
-                    ChooserScrollLayoutContract.EnhancementRowHeight);
+                        bool requiredSnapshot = assignmentRequired;
+                        Button policyToggle = KingmakerUiFactory.CreateButton(
+                            "Policy." + choice.EnhancementId, container, _theme,
+                            requiredSnapshot ? "REQUIRED" : "OPTIONAL", () =>
+                            {
+                                _assignmentPolicy(_assignmentSourceId, _assignmentId,
+                                    choice.EnhancementId, !requiredSnapshot);
+                            });
+                        KingmakerUiFactory.SetAnchors((RectTransform)policyToggle.transform,
+                            0.845f, 0.05f, 0.995f, 0.95f);
+                        Text policyLabel = policyToggle.GetComponentInChildren<Text>(true);
+                        if (policyLabel != null) policyLabel.fontSize = 11;
+                    }
+                    _rows.Add(container.gameObject);
+                }
                 Text label = KingmakerUiFactory.SetButtonLabel(button, text);
                 label.alignment = TextAnchor.MiddleLeft;
                 label.horizontalOverflow = HorizontalWrapMode.Wrap;
                 label.resizeTextForBestFit = true;
                 label.resizeTextMinSize = 12;
                 label.resizeTextMaxSize = 16;
-                if (choice.Selected)
+                if (selected)
                     button.image.color = _theme.GreenSuccess;
                 button.interactable = choice.Available;
                 PlannerHoverTooltip tooltip = button.gameObject.AddComponent<PlannerHoverTooltip>();
                 tooltip.Text = choice.Description;
                 tooltip.Show = _showTooltip;
-                _rows.Add(button.gameObject);
+                if (_assignmentId == null) _rows.Add(button.gameObject);
                 rowIndex++;
             }
             Root.SetAsLastSibling();
@@ -898,6 +982,7 @@ namespace KingmakerBuffPlanner.UI
         internal void Hide()
         {
             Root.gameObject.SetActive(false);
+            ClearAssignmentScope();
             if (_showTooltip != null) _showTooltip(string.Empty);
         }
 
@@ -1163,12 +1248,15 @@ namespace KingmakerBuffPlanner.UI
     }
     // Casting Order view: numbered child assignments with explicit
     // Earlier/Later controls, resolved provider/pin status, per-pool resource
-    // accounting, competing demand, and the read-only combined forecast. All
-    // content is rendered from the planner's authoritative results; the view
-    // keeps no competing calculations of its own.
+    // accounting, competing demand, the read-only combined forecast, and the
+    // player-facing assignment editor (add/remove rows, pin casters, move or
+    // split targets, per-assignment enhancements). All content derives from
+    // the planner's authoritative results; the view keeps no competing
+    // calculations of its own.
     internal sealed class PlannerCastingOrderView
     {
         private const float RowHeight = 84f;
+        private const float EditableRowHeight = 132f;
 
         private readonly PlannerUiTheme _theme;
         private readonly RectTransform _content;
@@ -1178,6 +1266,7 @@ namespace KingmakerBuffPlanner.UI
         private readonly Text _resources;
         private readonly Text _forecast;
         private readonly Button _closeButton;
+        private readonly Button _addButton;
         private readonly Action<string> _showTooltip;
         private readonly Action<RectTransform> _rowsBound;
         private readonly Func<string, IReadOnlyList<CastingAssignmentRowViewModel>> _rows;
@@ -1186,8 +1275,16 @@ namespace KingmakerBuffPlanner.UI
         private readonly Action<string> _moveEarlier;
         private readonly Action<string> _moveLater;
         private readonly Action _refresh;
+        private readonly Action _addAssignment;
+        private readonly Action<string> _removeAssignment;
+        private readonly Action<string> _cycleCaster;
+        private readonly Action<string, string> _removeTarget;
+        private readonly Action<string, string> _splitTarget;
+        private readonly Action<string, string, string> _moveTarget;
+        private readonly Action<string, string> _openAssignmentEnhancements;
         private readonly List<GameObject> _rowObjects = new List<GameObject>();
         private readonly List<Button> _routineToggles = new List<Button>();
+        private readonly List<float> _rowHeights = new List<float>();
         private readonly HashSet<string> _forecastSelected = new HashSet<string>(
             StringComparer.Ordinal);
         private string _routineId;
@@ -1202,7 +1299,14 @@ namespace KingmakerBuffPlanner.UI
             Action<string> moveLater,
             Action refresh,
             Action<string> showTooltip,
-            Action<RectTransform> rowsBound = null)
+            Action<RectTransform> rowsBound = null,
+            Action addAssignment = null,
+            Action<string> removeAssignment = null,
+            Action<string> cycleCaster = null,
+            Action<string, string> removeTarget = null,
+            Action<string, string> splitTarget = null,
+            Action<string, string, string> moveTarget = null,
+            Action<string, string> openAssignmentEnhancements = null)
         {
             _theme = theme;
             _rows = rows;
@@ -1211,6 +1315,13 @@ namespace KingmakerBuffPlanner.UI
             _moveEarlier = moveEarlier;
             _moveLater = moveLater;
             _refresh = refresh;
+            _addAssignment = addAssignment;
+            _removeAssignment = removeAssignment;
+            _cycleCaster = cycleCaster;
+            _removeTarget = removeTarget;
+            _splitTarget = splitTarget;
+            _moveTarget = moveTarget;
+            _openAssignmentEnhancements = openAssignmentEnhancements;
             _showTooltip = showTooltip;
             _rowsBound = rowsBound;
             Root = KingmakerUiFactory.CreateRect("CastingOrderView", parent);
@@ -1229,7 +1340,15 @@ namespace KingmakerBuffPlanner.UI
                 "CASTING ORDER & RESOURCES", 24, TextAnchor.MiddleLeft);
             title.fontStyle = FontStyle.Bold;
             title.color = theme.BurgundyPrimary;
-            KingmakerUiFactory.SetAnchors(title.rectTransform, 0.03f, 0.955f, 0.70f, 0.99f);
+            KingmakerUiFactory.SetAnchors(title.rectTransform, 0.03f, 0.955f, 0.56f, 0.99f);
+            _addButton = KingmakerUiFactory.CreateButton("AddAssignment", frame,
+                theme, "ADD ASSIGNMENT", () =>
+                {
+                    if (_addAssignment != null) _addAssignment();
+                });
+            KingmakerUiFactory.SetAnchors((RectTransform)_addButton.transform,
+                0.57f, 0.955f, 0.73f, 0.99f);
+            _addButton.interactable = false;
             _closeButton = KingmakerUiFactory.CreateButton("CloseCastingOrder", frame,
                 theme, "CLOSE", Hide);
             KingmakerUiFactory.SetAnchors((RectTransform)_closeButton.transform,
@@ -1320,12 +1439,17 @@ namespace KingmakerBuffPlanner.UI
                 UnityEngine.Object.Destroy(row);
             }
             _rowObjects.Clear();
+            _rowHeights.Clear();
             IReadOnlyList<CastingAssignmentRowViewModel> rows = _rows(_routineId);
             foreach (CastingAssignmentRowViewModel row in rows)
-                BuildRow(row);
+                BuildRow(row, rows);
+            if (_addButton != null)
+                _addButton.interactable = _addAssignment != null && rows.Any(row => row.Editable);
             float viewportHeight = Mathf.Max(0f, _viewport.rect.height);
-            float contentHeight = ChooserScrollLayoutContract.ContentHeight(
-                _rowObjects.Count, RowHeight);
+            float body = _rowHeights.Count == 0 ? 0f : _rowHeights.Sum();
+            float contentHeight = _rowHeights.Count == 0 ? 0f :
+                (ChooserScrollLayoutContract.ContentPadding * 2f) + body +
+                (ChooserScrollLayoutContract.RowSpacing * (_rowHeights.Count - 1));
             _content.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, contentHeight);
             _content.anchoredPosition = new Vector2(0f, ChooserScrollLayoutContract
                 .ClampScrollOffset(previousOffset, viewportHeight, contentHeight));
@@ -1334,17 +1458,26 @@ namespace KingmakerBuffPlanner.UI
                     viewportHeight, contentHeight);
         }
 
-        private void BuildRow(CastingAssignmentRowViewModel model)
+        private void BuildRow(CastingAssignmentRowViewModel model,
+            IReadOnlyList<CastingAssignmentRowViewModel> allRows)
         {
+            float height = model.Editable ? EditableRowHeight : RowHeight;
+            _rowHeights.Add(height);
             RectTransform row = KingmakerUiFactory.CreateRect(
                 "Assignment." + model.AssignmentId, _content);
-            KingmakerUiFactory.AddLayout(row, RowHeight);
+            KingmakerUiFactory.AddLayout(row, height);
             KingmakerUiFactory.AddFramedPanel(row,
                 model.PinUnresolved ? _theme.AmberWarning :
                 model.UnfulfilledTargets > 0 ? _theme.DisabledGray : _theme.ParchmentPanel,
                 _theme.MutedBrownText);
+            string routing = model.ResolvedProviderTexts.Count == 0
+                ? string.Empty
+                : "\nVia " + string.Join(", ", model.ResolvedProviderTexts.ToArray()) +
+                    " → " + (model.RecipientNames.Count == 0 ? "no recipients"
+                        : string.Join(", ", model.RecipientNames.ToArray()));
             Text identity = KingmakerUiFactory.CreateText("Identity", row, _theme,
                 model.Number + ". " + model.SourceDisplayName + " — " + model.CasterText +
+                (model.Editable ? string.Empty : routing) +
                 "\nTargets: " + (model.TargetNames.Count == 0
                     ? "none" : string.Join(", ", model.TargetNames.ToArray())) +
                 "\nEnhancements: " + (model.EnhancementTexts.Count == 0
@@ -1352,14 +1485,17 @@ namespace KingmakerBuffPlanner.UI
                 14, TextAnchor.UpperLeft);
             identity.horizontalOverflow = HorizontalWrapMode.Wrap;
             identity.verticalOverflow = VerticalWrapMode.Overflow;
-            KingmakerUiFactory.SetAnchors(identity.rectTransform, 0.01f, 0.06f, 0.72f, 0.96f);
+            KingmakerUiFactory.SetAnchors(identity.rectTransform, 0.01f, 0.52f, 0.72f, 0.96f);
             Text status = KingmakerUiFactory.CreateText("Status", row, _theme,
-                model.Status, 13, TextAnchor.UpperRight);
+                model.Status + (model.Editable ? routing : string.Empty), 13, TextAnchor.UpperRight);
             status.color = model.PinUnresolved || model.UnfulfilledTargets > 0
                 ? _theme.AmberWarning : _theme.GreenSuccess;
             status.horizontalOverflow = HorizontalWrapMode.Wrap;
             status.verticalOverflow = VerticalWrapMode.Overflow;
-            KingmakerUiFactory.SetAnchors(status.rectTransform, 0.72f, 0.36f, 0.985f, 0.96f);
+            KingmakerUiFactory.SetAnchors(status.rectTransform, 0.72f, 0.72f, 0.985f, 0.96f);
+            if (model.Editable) BuildEditableControls(row, model, allRows);
+            float earlierBottom = model.Editable ? 0.03f : 0.06f;
+            float earlierTop = model.Editable ? 0.30f : 0.34f;
             Button earlier = KingmakerUiFactory.CreateButton("Earlier", row, _theme,
                 "EARLIER", () =>
                 {
@@ -1367,7 +1503,7 @@ namespace KingmakerBuffPlanner.UI
                     _refresh();
                 });
             KingmakerUiFactory.SetAnchors((RectTransform)earlier.transform,
-                0.72f, 0.06f, 0.85f, 0.34f);
+                0.72f, earlierBottom, 0.85f, earlierTop);
             earlier.interactable = model.CanMoveEarlier;
             Button later = KingmakerUiFactory.CreateButton("Later", row, _theme,
                 "LATER", () =>
@@ -1376,9 +1512,94 @@ namespace KingmakerBuffPlanner.UI
                     _refresh();
                 });
             KingmakerUiFactory.SetAnchors((RectTransform)later.transform,
-                0.86f, 0.06f, 0.985f, 0.34f);
+                0.86f, earlierBottom, 0.985f, earlierTop);
             later.interactable = model.CanMoveLater;
             _rowObjects.Add(row.gameObject);
+        }
+
+        // The per-row editor for the currently selected source: caster pin
+        // cycling, per-assignment enhancements, per-target remove/move/split,
+        // and row removal. Every action goes through the setup model's atomic
+        // operations; the view rebinds from the authoritative result.
+        private void BuildEditableControls(RectTransform row,
+            CastingAssignmentRowViewModel model,
+            IReadOnlyList<CastingAssignmentRowViewModel> allRows)
+        {
+            Button caster = KingmakerUiFactory.CreateButton("Caster", row, _theme,
+                "CASTER", () =>
+                {
+                    if (_cycleCaster != null) _cycleCaster(model.AssignmentId);
+                    _refresh();
+                });
+            KingmakerUiFactory.SetAnchors((RectTransform)caster.transform,
+                0.72f, 0.38f, 0.85f, 0.68f);
+            Button enhance = KingmakerUiFactory.CreateButton("Enhance", row, _theme,
+                "ENHANCE", () =>
+                {
+                    if (_openAssignmentEnhancements != null)
+                        _openAssignmentEnhancements(model.SourceId, model.AssignmentId);
+                });
+            KingmakerUiFactory.SetAnchors((RectTransform)enhance.transform,
+                0.86f, 0.38f, 0.985f, 0.68f);
+            Button removeRow = KingmakerUiFactory.CreateButton("RemoveRow", row, _theme,
+                "REMOVE", () =>
+                {
+                    if (_removeAssignment != null) _removeAssignment(model.AssignmentId);
+                    _refresh();
+                });
+            KingmakerUiFactory.SetAnchors((RectTransform)removeRow.transform,
+                0.01f, 0.38f, 0.12f, 0.68f);
+            // Target strip: each explicit target gets atomic remove, move to
+            // the next sibling assignment of the same source (cycling), and
+            // split into its own new assignment.
+            List<CastingAssignmentRowViewModel> siblings = allRows
+                .Where(candidate => candidate.SourceId == model.SourceId)
+                .OrderBy(candidate => candidate.Order)
+                .ToList();
+            for (int index = 0; index < model.TargetUnitIds.Count; index++)
+            {
+                string unitId = model.TargetUnitIds[index];
+                CastingAssignmentRowViewModel current = model;
+                int siblingIndex = siblings.FindIndex(candidate =>
+                    candidate.AssignmentId == current.AssignmentId);
+                CastingAssignmentRowViewModel destination = siblings.Count < 2 ? null
+                    : siblings[(siblingIndex + 1) % siblings.Count];
+                float left = 0.13f + index * 0.29f;
+                Button target = KingmakerUiFactory.CreateButton(
+                    "Target." + unitId, row, _theme,
+                    (model.TargetNames[index]) + (destination == null ? string.Empty :
+                        "\n⇄ " + destination.Number), () => { });
+                target.interactable = false;
+                KingmakerUiFactory.SetAnchors((RectTransform)target.transform,
+                    Mathf.Min(left, 0.70f), 0.38f, Mathf.Min(left + 0.13f, 0.71f), 0.68f);
+                Text targetLabel = target.GetComponentInChildren<Text>(true);
+                if (targetLabel != null) targetLabel.fontSize = 12;
+                MiniRowButton(row, "Move." + unitId, "⇄", 0.265f + index * 0.29f,
+                    destination != null, () =>
+                    {
+                        if (_moveTarget != null && destination != null)
+                            _moveTarget(model.AssignmentId, destination.AssignmentId, unitId);
+                        _refresh();
+                    });
+                MiniRowButton(row, "Split." + unitId, "SPLIT", 0.535f + index * 0.29f,
+                    true, () =>
+                    {
+                        if (_splitTarget != null) _splitTarget(model.AssignmentId, unitId);
+                        _refresh();
+                    });
+            }
+        }
+
+        private void MiniRowButton(RectTransform row, string name, string label,
+            float left, bool enabled, Action action)
+        {
+            Button button = KingmakerUiFactory.CreateButton(name, row, _theme, label,
+                () => action());
+            KingmakerUiFactory.SetAnchors((RectTransform)button.transform,
+                Mathf.Min(left, 0.83f), 0.38f, Mathf.Min(left + 0.10f, 0.84f), 0.68f);
+            button.interactable = enabled;
+            Text buttonLabel = button.GetComponentInChildren<Text>(true);
+            if (buttonLabel != null) buttonLabel.fontSize = 11;
         }
 
         private void BindResources()

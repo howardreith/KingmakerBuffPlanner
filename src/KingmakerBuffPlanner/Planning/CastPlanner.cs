@@ -365,15 +365,14 @@ namespace KingmakerBuffPlanner.Planning
         // END of the request order one at a time, and the whole remaining
         // set is revalidated against this provider before any omission is
         // accepted. Targeting modifiers (for example Share) are never
-        // omissible because dropping one can make the recipient illegal.
+        // omissible — an optional policy cannot drop the modifier that makes
+        // the recipient legal, so they stay in the set whenever their charges
+        // exist and block the cast when they do not.
         private static EnhancementSetResolution ResolveEnhancementSet(
             PlanContext context, ProviderPlanningOption option)
         {
             List<EnhancementRequest> selections = context.Request.EnhancementSelections
-                .Where(selection => context.Enhancements.ContainsKey(selection.EnhancementId)
-                    ? selection.Required ||
-                        !context.Enhancements[selection.EnhancementId].AffectsTargeting
-                    : selection.Required)
+                .Where(selection => context.Enhancements.ContainsKey(selection.EnhancementId))
                 .ToList();
             List<string> missing = context.Request.EnhancementSelections
                 .Where(selection => !context.Enhancements.ContainsKey(selection.EnhancementId))

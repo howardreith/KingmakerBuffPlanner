@@ -45,6 +45,9 @@ namespace KingmakerBuffPlanner.UI
         internal string Status { get; private set; }
         internal bool IsExecuting { get; private set; }
         internal RoutinePlanResult LastPreview { get; private set; }
+        // Routine identity of LastPreview; the material-change gate only
+        // compares a confirmation baseline for the same routine.
+        internal string LastPreviewRoutineId { get; private set; }
         internal ExecutionReport LastExecutionReport { get; private set; }
         internal string ProfileStatus { get; private set; }
         internal PartyCatalogDiscoveryDiagnostics CatalogDiscovery { get; private set; }
@@ -262,6 +265,7 @@ namespace KingmakerBuffPlanner.UI
             LastPreview = new RoutinePlanService().Plan(Model.Profile, routineId, _snapshot,
                 _activeEffects, _effects, _providerOptions, _enhancements,
                 _targeting);
+            LastPreviewRoutineId = routineId;
             if (_shareTargeting != null)
                 foreach (string diagnostic in _shareTargeting.DrainDiagnostics())
                     _log.Info("[KBP-SHARE-TARGETING] " + diagnostic + ".");
@@ -358,7 +362,13 @@ namespace KingmakerBuffPlanner.UI
                     CastEnhancementSnapshot enhancement = Model.GetEnhancement(enhancementId);
                     return enhancement == null ? enhancementId : enhancement.DisplayName;
                 },
-                preview.Plan);
+                preview.Plan,
+                Model.SelectedSourceId,
+                casterUnitId =>
+                {
+                    UnitSnapshot unit = Model.Snapshot.Units.FirstOrDefault(value => value.UnitId == casterUnitId);
+                    return unit == null ? casterUnitId : unit.DisplayName;
+                });
         }
 
         internal IEnumerator ExecuteRoutine(string routineId)
@@ -399,6 +409,13 @@ namespace KingmakerBuffPlanner.UI
                     ";reason=" + unavailable + ".");
                 yield break;
             }
+            // The plan the player last reviewed is the confirmation baseline;
+            // after the refresh below, a materially different fresh plan
+            // (caster/item, enhancement, cost, order, coverage) requires
+            // renewed review instead of silent execution. The baseline only
+            // applies to the same routine.
+            RoutinePlanResult confirmedPreview = LastPreview;
+            string confirmedRoutineId = LastPreviewRoutineId;
             RoutineProfile configuredRoutine = Model.Profile.Routines.First(r =>
                 r.RoutineId == routineId);
             _log.Info("[KBP-QUICK] assignments resolved;group=" + routineId +
@@ -449,6 +466,23 @@ namespace KingmakerBuffPlanner.UI
                     QuickExecutionDisposition.Refused, Status, 0, 0, 0));
                 _log.Info("[KBP-QUICK] deliberately refused;group=" + routineId +
                     ";reason=" + Status + ".");
+                yield break;
+            }
+            string materialChange = confirmedPreview != null &&
+                string.Equals(confirmedRoutineId, routineId, StringComparison.Ordinal)
+                ? PlanMaterialChangeDetector.DescribeMaterialChange(
+                    confirmedPreview.Plan, preview.Plan)
+                : null;
+            if (materialChange != null)
+            {
+                LastExecutionReport = new ExecutionReport(preview.Plan);
+                Status = "The plan changed since your last review (" + materialChange +
+                    "). Review the updated preview before applying.";
+                Complete(completed, new QuickExecutionResult(routineId, routineName,
+                    QuickExecutionDisposition.Refused, Status,
+                    preview.Plan.Steps.Count, 0, 0));
+                _log.Info("[KBP-QUICK] material-change gate refused;group=" + routineId +
+                    ";change=" + materialChange + ".");
                 yield break;
             }
             PartialExecutionGate.Decision gate = PartialExecutionGate.Evaluate(preview.Plan);

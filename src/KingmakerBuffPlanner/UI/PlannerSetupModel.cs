@@ -790,6 +790,104 @@ namespace KingmakerBuffPlanner.UI
             _save(Profile);
         }
 
+        // Assignment-scoped enhancement selection: the same exclusivity and
+        // applicability rules as the simple workflow, applied to one child
+        // assignment instead of the source's Automatic child.
+        public void SetAssignmentEnhancement(string routineId, string sourceId,
+            string assignmentId, string enhancementId)
+        {
+            SetupSourceRow source = Sources.FirstOrDefault(value => value.SourceId == sourceId);
+            if (source == null) throw new ArgumentException("Unknown source.", "sourceId");
+            FindRoutine(routineId);
+            CastingAssignmentProfile casting = FindCastingAssignment(
+                routineId, sourceId, assignmentId);
+            if (!string.IsNullOrWhiteSpace(enhancementId) && !GetApplicableEnhancements()
+                .Any(value => value.EnhancementId == enhancementId))
+                throw new InvalidOperationException(
+                    "The enhancement is not currently applicable and available.");
+            var selected = new List<string>(casting.Enhancements
+                .Select(selection => selection.EnhancementId));
+            if (string.IsNullOrWhiteSpace(enhancementId)) selected.Clear();
+            else if (selected.Contains(enhancementId)) selected.Remove(enhancementId);
+            else
+            {
+                CastEnhancementSnapshot next = GetEnhancement(enhancementId);
+                selected.RemoveAll(id =>
+                {
+                    CastEnhancementSnapshot current = GetEnhancement(id);
+                    return current != null && current.ExclusiveGroupId == next.ExclusiveGroupId;
+                });
+                selected.Add(enhancementId);
+                if (!CastEnhancementSnapshot.AreCompatible(selected.Select(GetEnhancement)))
+                    throw new InvalidOperationException(
+                        "The selected enhancement combination is incompatible.");
+            }
+            casting.Enhancements = selected.Distinct(StringComparer.Ordinal)
+                .Select(id => new EnhancementSelectionProfile
+                {
+                    EnhancementId = id,
+                    Required = casting.Enhancements
+                        .Where(existing => existing.EnhancementId == id)
+                        .Select(existing => existing.Required)
+                        .DefaultIfEmpty(true).First()
+                }).ToList();
+            _save(Profile);
+        }
+
+        public IReadOnlyList<string> GetAssignmentEnhancementIds(string routineId,
+            string sourceId, string assignmentId)
+        {
+            CastingAssignmentProfile casting = FindCastingAssignment(
+                routineId, sourceId, assignmentId);
+            return new ReadOnlyCollection<string>(casting.Enhancements
+                .Select(selection => selection.EnhancementId)
+                .OrderBy(value => value, StringComparer.Ordinal).ToList());
+        }
+
+        // Cycles Automatic -> each party candidate -> Automatic. Pinning never
+        // rewrites targets or enhancements; an unavailable pin stays visible
+        // and unresolved.
+        public void CycleCastingAssignmentCaster(string routineId, string sourceId,
+            string assignmentId)
+        {
+            RoutineProfile routine = FindRoutine(routineId);
+            SetupSourceRow source = Sources.FirstOrDefault(value => value.SourceId == sourceId);
+            if (source == null) throw new ArgumentException("Unknown source.", "sourceId");
+            CastingAssignmentProfile casting = FindCastingAssignment(
+                routineId, sourceId, assignmentId);
+            List<string> candidates = Snapshot.Units
+                .Where(unit => source.Providers.Any(provider =>
+                    provider.Key.CasterUnitId == unit.UnitId))
+                .Select(unit => unit.UnitId)
+                .OrderBy(unitId => unitId, StringComparer.Ordinal).ToList();
+            string current = casting.CasterUnitId;
+            string next = null;
+            if (current == null) next = candidates.Count == 0 ? null : candidates[0];
+            else
+            {
+                int index = candidates.IndexOf(current);
+                next = index < 0 || index + 1 >= candidates.Count ? null : candidates[index + 1];
+            }
+            casting.CasterUnitId = next;
+            casting.SpellbookGuid = null;
+            casting.ProviderKey = null;
+            _save(Profile);
+        }
+
+        public void RemoveCastingAssignment(string routineId, string sourceId,
+            string assignmentId)
+        {
+            RoutineProfile routine = FindRoutine(routineId);
+            SourceAssignmentProfile parent = routine.Assignments
+                .FirstOrDefault(value => value.SourceId == sourceId);
+            CastingAssignmentProfile casting = FindCastingAssignment(
+                routineId, sourceId, assignmentId);
+            parent.CastingAssignments.Remove(casting);
+            if (parent.CastingAssignments.Count == 0)
+                routine.Assignments.Remove(parent);
+            _save(Profile);
+        }
+
         // Reordering swaps explicit order values; catalog sorting, filtering,
         // and reopening cannot influence these numbers.
         public void MoveCastingAssignmentEarlier(string routineId, string assignmentId)
