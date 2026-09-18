@@ -124,6 +124,20 @@ namespace KingmakerBuffPlanner.Domain.Planning
         public CastGroupingKind Grouping { get; private set; }
     }
 
+    public sealed class EnhancementRequest
+    {
+        public EnhancementRequest(string enhancementId, bool required)
+        {
+            if (string.IsNullOrWhiteSpace(enhancementId))
+                throw new ArgumentException("Enhancement ID is required.", "enhancementId");
+            EnhancementId = enhancementId;
+            Required = required;
+        }
+
+        public string EnhancementId { get; private set; }
+        public bool Required { get; private set; }
+    }
+
     public sealed class BuffCastRequest
     {
         public BuffCastRequest(
@@ -132,25 +146,68 @@ namespace KingmakerBuffPlanner.Domain.Planning
             ExistingEffectPolicy existingEffectPolicy,
             IEnumerable<string> ignoredEffectIds,
             IEnumerable<string> enhancementIds = null)
+            : this(source, targetUnitIds, existingEffectPolicy, ignoredEffectIds,
+                (enhancementIds ?? new string[0]).Select(id => new EnhancementRequest(id, true)),
+                null, null, null, null, 0)
+        {
+        }
+
+        public BuffCastRequest(
+            BuffSourceDefinition source,
+            IEnumerable<string> targetUnitIds,
+            ExistingEffectPolicy existingEffectPolicy,
+            IEnumerable<string> ignoredEffectIds,
+            IEnumerable<EnhancementRequest> enhancements,
+            string assignmentId,
+            string casterUnitId,
+            string providerKeyConstraint,
+            string spellbookGuid,
+            int order)
         {
             Source = source ?? throw new ArgumentNullException("source");
+            // Target order is explicit configured order: it controls which
+            // recipients are allocated first and must survive round trips.
             TargetUnitIds = new ReadOnlyCollection<string>((targetUnitIds ?? throw new ArgumentNullException("targetUnitIds"))
-                .Where(v => !string.IsNullOrWhiteSpace(v)).Distinct(StringComparer.Ordinal)
-                .OrderBy(v => v, StringComparer.Ordinal).ToList());
+                .Where(v => !string.IsNullOrWhiteSpace(v))
+                .Distinct(StringComparer.Ordinal).ToList());
             ExistingEffectPolicy = existingEffectPolicy;
             IgnoredEffectIds = new ReadOnlyCollection<string>((ignoredEffectIds ?? new string[0])
                 .Where(v => !string.IsNullOrWhiteSpace(v)).Distinct(StringComparer.Ordinal)
                 .OrderBy(v => v, StringComparer.Ordinal).ToList());
-            EnhancementIds = new ReadOnlyCollection<string>((enhancementIds ?? new string[0])
-                .Where(v => !string.IsNullOrWhiteSpace(v))
-                .OrderBy(v => v, StringComparer.Ordinal).ToList());
+            EnhancementSelections = new ReadOnlyCollection<EnhancementRequest>(
+                (enhancements ?? new EnhancementRequest[0])
+                    .Where(value => value != null)
+                    .GroupBy(value => value.EnhancementId, StringComparer.Ordinal)
+                    .Select(group => group.OrderBy(value => value.Required ? 0 : 1).First())
+                    .ToList());
+            AssignmentId = string.IsNullOrWhiteSpace(assignmentId) ? source.SourceId : assignmentId;
+            // A pin is a hard eligibility constraint, never a preference.
+            CasterUnitId = string.IsNullOrWhiteSpace(casterUnitId) ? null : casterUnitId;
+            ProviderKeyConstraint = string.IsNullOrWhiteSpace(providerKeyConstraint)
+                ? null : providerKeyConstraint;
+            SpellbookGuid = string.IsNullOrWhiteSpace(spellbookGuid) ? null : spellbookGuid;
+            Order = order;
         }
 
         public BuffSourceDefinition Source { get; private set; }
         public IReadOnlyList<string> TargetUnitIds { get; private set; }
         public ExistingEffectPolicy ExistingEffectPolicy { get; private set; }
         public IReadOnlyList<string> IgnoredEffectIds { get; private set; }
-        public IReadOnlyList<string> EnhancementIds { get; private set; }
+        public IReadOnlyList<EnhancementRequest> EnhancementSelections { get; private set; }
+        public string AssignmentId { get; private set; }
+        public string CasterUnitId { get; private set; }
+        public string ProviderKeyConstraint { get; private set; }
+        public string SpellbookGuid { get; private set; }
+        public int Order { get; private set; }
+        public IReadOnlyList<string> EnhancementIds
+        {
+            get
+            {
+                return EnhancementSelections
+                    .Select(value => value.EnhancementId)
+                    .OrderBy(v => v, StringComparer.Ordinal).ToList();
+            }
+        }
     }
 
     public sealed class ProviderPlanningOption
@@ -332,10 +389,11 @@ namespace KingmakerBuffPlanner.Domain.Planning
 
     public sealed class TargetPlanOutcome
     {
-        internal TargetPlanOutcome(string sourceId, string unitId, TargetOutcomeKind kind,
-            string reason, IEnumerable<string> markers)
+        internal TargetPlanOutcome(string sourceId, string assignmentId, string unitId,
+            TargetOutcomeKind kind, string reason, IEnumerable<string> markers)
         {
             SourceId = sourceId ?? string.Empty;
+            AssignmentId = assignmentId ?? sourceId ?? string.Empty;
             UnitId = unitId;
             Kind = kind;
             Reason = reason ?? string.Empty;
@@ -343,6 +401,7 @@ namespace KingmakerBuffPlanner.Domain.Planning
         }
 
         public string SourceId { get; private set; }
+        public string AssignmentId { get; private set; }
         public string UnitId { get; private set; }
         public TargetOutcomeKind Kind { get; private set; }
         public string Reason { get; private set; }
@@ -353,6 +412,7 @@ namespace KingmakerBuffPlanner.Domain.Planning
     {
         internal CastStep(
             string sourceId,
+            string assignmentId,
             ProviderKey provider,
             string anchorUnitId,
             IEnumerable<string> targetUnitIds,
@@ -364,9 +424,11 @@ namespace KingmakerBuffPlanner.Domain.Planning
             CastExecutionStrategy executionStrategy,
             string executionStrategyReason,
             IEnumerable<string> enhancementIds = null,
-            IDictionary<string, int> enhancementUsageByPool = null)
+            IDictionary<string, int> enhancementUsageByPool = null,
+            IEnumerable<string> omittedEnhancementIds = null)
         {
             SourceId = sourceId ?? string.Empty;
+            AssignmentId = assignmentId ?? sourceId ?? string.Empty;
             Provider = provider;
             AnchorUnitId = anchorUnitId;
             TargetUnitIds = new ReadOnlyCollection<string>(targetUnitIds.OrderBy(v => v, StringComparer.Ordinal).ToList());
@@ -382,12 +444,18 @@ namespace KingmakerBuffPlanner.Domain.Planning
             EnhancementIds = new ReadOnlyCollection<string>((enhancementIds ?? new string[0])
                 .Where(value => !string.IsNullOrWhiteSpace(value)).Distinct(StringComparer.Ordinal)
                 .OrderBy(value => value, StringComparer.Ordinal).ToList());
+            // Only explicitly permitted omissions appear here; required
+            // enhancements never appear because their absence blocks the cast.
+            OmittedEnhancementIds = new ReadOnlyCollection<string>((omittedEnhancementIds ?? new string[0])
+                .Where(value => !string.IsNullOrWhiteSpace(value)).Distinct(StringComparer.Ordinal)
+                .OrderBy(value => value, StringComparer.Ordinal).ToList());
             EnhancementUsageByPool = new ReadOnlyDictionary<string, int>(
                 new Dictionary<string, int>(enhancementUsageByPool ??
                     new Dictionary<string, int>(), StringComparer.Ordinal));
         }
 
         public string SourceId { get; private set; }
+        public string AssignmentId { get; private set; }
         public ProviderKey Provider { get; private set; }
         public string AnchorUnitId { get; private set; }
         public IReadOnlyList<string> TargetUnitIds { get; private set; }
@@ -399,6 +467,7 @@ namespace KingmakerBuffPlanner.Domain.Planning
         public CastExecutionStrategy ExecutionStrategy { get; private set; }
         public string ExecutionStrategyReason { get; private set; }
         public IReadOnlyList<string> EnhancementIds { get; private set; }
+        public IReadOnlyList<string> OmittedEnhancementIds { get; private set; }
         public IReadOnlyDictionary<string, int> EnhancementUsageByPool
         { get; private set; }
     }
@@ -415,17 +484,64 @@ namespace KingmakerBuffPlanner.Domain.Planning
         public int Count { get; private set; }
     }
 
+    // One authoritative per-pool accounting line. The same structure covers
+    // native resource pools and enhancement usage pools; UI summaries and
+    // execution preparation read this instead of keeping their own counters.
+    public sealed class ResourcePoolAllocation
+    {
+        internal ResourcePoolAllocation(
+            string poolKey,
+            ResourcePoolKind kind,
+            int availableNow,
+            int requestedUsage,
+            int allocatedUsage,
+            IEnumerable<string> traces)
+        {
+            PoolKey = poolKey;
+            Kind = kind;
+            AvailableNow = availableNow;
+            RequestedUsage = requestedUsage;
+            AllocatedUsage = allocatedUsage;
+            UnmetDemand = Math.Max(0, requestedUsage - allocatedUsage);
+            ForecastRemaining = Math.Max(0, availableNow - allocatedUsage);
+            Traces = new ReadOnlyCollection<string>((traces ?? new string[0])
+                .Distinct(StringComparer.Ordinal).OrderBy(v => v, StringComparer.Ordinal).ToList());
+        }
+
+        public string PoolKey { get; private set; }
+        public ResourcePoolKind Kind { get; private set; }
+        public int AvailableNow { get; private set; }
+        public int RequestedUsage { get; private set; }
+        public int AllocatedUsage { get; private set; }
+        public int UnmetDemand { get; private set; }
+        public int ForecastRemaining { get; private set; }
+        public IReadOnlyList<string> Traces { get; private set; }
+    }
+
     public sealed class CastPlan
     {
-        internal CastPlan(IEnumerable<CastStep> steps, IEnumerable<TargetPlanOutcome> outcomes, IEnumerable<string> diagnostics)
+        internal CastPlan(IEnumerable<CastStep> steps, IEnumerable<TargetPlanOutcome> outcomes,
+            IEnumerable<string> diagnostics,
+            IEnumerable<ResourcePoolAllocation> resourceAllocations = null)
         {
             Steps = new ReadOnlyCollection<CastStep>(steps.ToList());
-            Outcomes = new ReadOnlyCollection<TargetPlanOutcome>(outcomes.OrderBy(o => o.UnitId, StringComparer.Ordinal).ToList());
+            Outcomes = new ReadOnlyCollection<TargetPlanOutcome>(outcomes
+                .OrderBy(o => o.AssignmentId, StringComparer.Ordinal)
+                .ThenBy(o => o.UnitId, StringComparer.Ordinal).ToList());
             Diagnostics = new ReadOnlyCollection<string>(diagnostics.ToList());
+            ResourceAllocations = new ReadOnlyCollection<ResourcePoolAllocation>(
+                (resourceAllocations ?? new ResourcePoolAllocation[0]).ToList());
         }
 
         public IReadOnlyList<CastStep> Steps { get; private set; }
         public IReadOnlyList<TargetPlanOutcome> Outcomes { get; private set; }
         public IReadOnlyList<string> Diagnostics { get; private set; }
+        public IReadOnlyList<ResourcePoolAllocation> ResourceAllocations { get; private set; }
+
+        public ResourcePoolAllocation AllocationFor(string poolKey)
+        {
+            return ResourceAllocations.FirstOrDefault(allocation =>
+                string.Equals(allocation.PoolKey, poolKey, StringComparison.Ordinal));
+        }
     }
 }

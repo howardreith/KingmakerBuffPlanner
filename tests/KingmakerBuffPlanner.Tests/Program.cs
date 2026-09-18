@@ -178,6 +178,8 @@ namespace KingmakerBuffPlanner.Tests
                 Run("chooser-scroll-layout-owns-content-bounds", TestChooserScrollLayout);
                 Run("native-theme-resolves-and-falls-back-per-capability", TestNativeThemeResolution);
                 Run("control-caption-fit-grows-only-from-design-floor", TestControlCaptionFit);
+                Run("casting-assignments-route-mixed-casters-exactly", TestCastingAssignmentRouting);
+                Run("assignment-order-and-shortage-allocate-explicitly", TestAssignmentOrderAndShortage);
                 Run("cast-enhancement-execution-is-fail-closed-and-cleaned-up", TestCastEnhancementExecution);
                 Run("consumed-one-shot-enhancement-is-not-rearmed", TestOneShotEnhancementRestoration);
                 Run("execution-preflight-runs-under-the-native-activation-lease",
@@ -1085,17 +1087,10 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException(
                     "An exhausted directly owned child vanished or appeared castable.");
 
-            profile.Routines[0].Assignments.Add(new SourceAssignmentProfile
-            {
-                SourceId = "variant|parent-guid|ungranted-guid",
-                Ability = AbilityKeyProfile.FromKey(Ability(
-                    "parent-guid", "ungranted-guid", 0)),
-                WantedTargetUnitIds = new List<string> { "unit-owner" },
-                ExistingEffectPolicy =
-                    ExistingEffectPolicy.SkipAlreadyActive,
-                IgnoredPresenceMarkers = new List<string>(),
-                SelectedEnhancementIds = new List<string>()
-            });
+            profile.Routines[0].Assignments.Add(Assignment(
+                "variant|parent-guid|ungranted-guid",
+                Ability("parent-guid", "ungranted-guid", 0),
+                new[] { "unit-owner" }));
             var reloaded = new PlannerSetupModel(
                 profile, snapshot, new ActiveEffectSnapshot(null),
                 effects, new[] { option }, ignored => { });
@@ -1230,15 +1225,9 @@ namespace KingmakerBuffPlanner.Tests
             string sourceId = CatalogSourceIdentity.For(
                 child, Leaf("resist-fire-effect"));
             BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault(campaign);
-            profile.Routines[0].Assignments.Add(new SourceAssignmentProfile
-            {
-                SourceId = sourceId,
-                Ability = AbilityKeyProfile.FromKey(child),
-                WantedTargetUnitIds = new List<string> { "target-a" },
-                ExistingEffectPolicy = ExistingEffectPolicy.Overwrite,
-                IgnoredPresenceMarkers = new List<string>(),
-                SelectedEnhancementIds = new List<string>()
-            });
+            profile.Routines[0].Assignments.Add(Assignment(
+                sourceId, child, new[] { "target-a" }, null,
+                ExistingEffectPolicy.Overwrite));
             string modPath = Path.Combine(root, "variant-profile-roundtrip");
             Directory.CreateDirectory(modPath);
             var repository = new ProfileRepository(modPath);
@@ -1259,15 +1248,9 @@ namespace KingmakerBuffPlanner.Tests
             BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault(
                 "legacy-ambiguous-variant");
             AbilityKey parent = Ability(VariantParent().BlueprintGuid, string.Empty, 0);
-            profile.Routines[0].Assignments.Add(new SourceAssignmentProfile
-            {
-                SourceId = parent.Canonical,
-                Ability = AbilityKeyProfile.FromKey(parent),
-                WantedTargetUnitIds = new List<string> { "target-a" },
-                ExistingEffectPolicy = ExistingEffectPolicy.Overwrite,
-                IgnoredPresenceMarkers = new List<string>(),
-                SelectedEnhancementIds = new List<string>()
-            });
+            profile.Routines[0].Assignments.Add(Assignment(
+                parent.Canonical, parent, new[] { "target-a" }, null,
+                ExistingEffectPolicy.Overwrite));
             VariantModelFixture fixture = CreateVariantFixture(profile, false);
             SourceAssignmentProfile retained =
                 profile.Routines[0].Assignments.Single();
@@ -1982,13 +1965,41 @@ namespace KingmakerBuffPlanner.Tests
 
         private static SourceAssignmentProfile Assignment(AbilityKey ability, string target)
         {
+            return Assignment(ability.Canonical, ability, new[] { target });
+        }
+
+        // Builds the schema-5 assignment shape used by every fixture: one
+        // source parent whose single Automatic child carries the legacy
+        // fixture targets and required-by-default enhancement selections.
+        private static SourceAssignmentProfile Assignment(string sourceId,
+            AbilityKey ability, IEnumerable<string> targets,
+            IEnumerable<string> enhancements = null,
+            ExistingEffectPolicy policy = ExistingEffectPolicy.SkipAlreadyActive)
+        {
             return new SourceAssignmentProfile
             {
-                SourceId = ability.Canonical,
+                SourceId = sourceId,
                 Ability = AbilityKeyProfile.FromKey(ability),
-                WantedTargetUnitIds = new List<string> { target },
-                ExistingEffectPolicy = ExistingEffectPolicy.SkipAlreadyActive,
-                IgnoredPresenceMarkers = new List<string>()
+                ExistingEffectPolicy = policy,
+                IgnoredPresenceMarkers = new List<string>(),
+                CastingAssignments = new List<CastingAssignmentProfile>
+                {
+                    new CastingAssignmentProfile
+                    {
+                        AssignmentId = "auto-" + sourceId,
+                        Order = 0,
+                        CasterUnitId = null,
+                        SpellbookGuid = null,
+                        ProviderKey = null,
+                        TargetUnitIds = new List<string>(targets ?? new string[0]),
+                        Enhancements = (enhancements ?? new string[0])
+                            .Select(id => new EnhancementSelectionProfile
+                            {
+                                EnhancementId = id,
+                                Required = true
+                            }).ToList()
+                    }
+                }
             };
         }
 
@@ -2000,22 +2011,12 @@ namespace KingmakerBuffPlanner.Tests
             ProviderSnapshot provider = PlannerProvider("unit-a", "book", supported, "routine-free", 0);
             PartyProviderSnapshot snapshot = PlannerSnapshot(new[] { provider }, new[] { pool }, "unit-a");
             BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault("routine-campaign");
-            profile.Routines[0].Assignments.Add(new SourceAssignmentProfile
-            {
-                SourceId = supported.Canonical,
-                Ability = AbilityKeyProfile.FromKey(supported),
-                WantedTargetUnitIds = new List<string> { "unit-a" },
-                ExistingEffectPolicy = ExistingEffectPolicy.Overwrite,
-                IgnoredPresenceMarkers = new List<string>()
-            });
-            profile.Routines[0].Assignments.Add(new SourceAssignmentProfile
-            {
-                SourceId = unsupported.Canonical,
-                Ability = AbilityKeyProfile.FromKey(unsupported),
-                WantedTargetUnitIds = new List<string> { "unit-a" },
-                ExistingEffectPolicy = ExistingEffectPolicy.Overwrite,
-                IgnoredPresenceMarkers = new List<string>()
-            });
+            profile.Routines[0].Assignments.Add(Assignment(
+                supported.Canonical, supported, new[] { "unit-a" }, null,
+                ExistingEffectPolicy.Overwrite));
+            profile.Routines[0].Assignments.Add(Assignment(
+                unsupported.Canonical, unsupported, new[] { "unit-a" }, null,
+                ExistingEffectPolicy.Overwrite));
             var option = new ProviderPlanningOption(provider, new[] { "unit-a" },
                 new[] { "unit-a" }, 1, 10, true);
             RoutinePlanResult result = new RoutinePlanService().Plan(profile, "long", snapshot,
@@ -2072,12 +2073,36 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("Profile backup retention exceeded its bound.");
         }
 
+        // Rebuilds a genuine historical schema-4 document: flat target and
+        // enhancement lists on each source assignment, no casting children.
+        // Migration tests must feed real old data, not a current profile with
+        // a rewritten version number.
+        private static JObject LegacyV4Document(BuffPlannerProfile profile)
+        {
+            JObject document = JObject.Parse(JsonConvert.SerializeObject(profile));
+            document["schemaVersion"] = 4;
+            foreach (JObject routine in ((JArray)document["routines"]).OfType<JObject>())
+                foreach (JObject assignment in ((JArray)routine["assignments"]).OfType<JObject>())
+                {
+                    JArray children = (JArray)assignment["castingAssignments"];
+                    JObject child = children != null && children.Count > 0
+                        ? (JObject)children[0] : null;
+                    assignment["wantedTargetUnitIds"] = child == null
+                        ? new JArray() : child["targetUnitIds"] ?? new JArray();
+                    assignment["selectedEnhancementIds"] = child == null
+                        ? new JArray() : new JArray(((JArray)child["enhancements"])
+                            .OfType<JObject>().Select(selection => selection["enhancementId"]));
+                    assignment.Remove("castingAssignments");
+                }
+            return document;
+        }
+
         private static void TestProfileMigration(string root)
         {
             string modPath = Path.Combine(root, "profile-migration");
             Directory.CreateDirectory(modPath);
             var repository = new ProfileRepository(modPath);
-            JObject document = JObject.FromObject(ProfileFixture("campaign:migration"));
+            JObject document = LegacyV4Document(ProfileFixture("campaign:migration"));
             document["schemaVersion"] = 1;
             document.Remove("ui");
             document.Remove("execution");
@@ -2085,10 +2110,63 @@ namespace KingmakerBuffPlanner.Tests
             Directory.CreateDirectory(Path.GetDirectoryName(path));
             File.WriteAllText(path, document.ToString());
             ProfileLoadResult migrated = repository.Load("campaign:migration");
-            if (!migrated.Migrated || migrated.Profile.SchemaVersion != 4 ||
+            if (!migrated.Migrated || migrated.Profile.SchemaVersion != 5 ||
                 migrated.Profile.Ui.Scale != 1.0f || migrated.Profile.Execution.Mode != "animated" ||
                 migrated.Profile.Ui.Hotkey != "Ctrl+Shift+B")
                 throw new InvalidOperationException("Schema-one profile was not migrated with safe defaults.");
+            SourceAssignmentProfile legacy = migrated.Profile.Routines[0].Assignments[0];
+            if (legacy.CastingAssignments.Count != 1 ||
+                !legacy.CastingAssignments[0].TargetUnitIds
+                    .SequenceEqual(new[] { "unit-z", "unit-a" }) ||
+                legacy.CastingAssignments[0].AssignmentId != "legacy-source-persisted" ||
+                !legacy.CastingAssignments[0].Enhancements.Single().IsRequired)
+                throw new InvalidOperationException(
+                    "Schema-four targets or enhancements did not migrate into one legacy-equivalent automatic child.");
+            // The exact pre-migration original is archived outside the
+            // rotating backup chain (mission: rotating saves cannot erase it).
+            string archive = Path.Combine(Path.GetDirectoryName(path),
+                "kbp-pre-schema-" + Path.GetFileName(path)
+                    .Replace("kingmaker-buff-planner-", string.Empty)
+                    .Replace(".json", string.Empty) + ".orig");
+            if (!File.Exists(archive) || JObject.Parse(File.ReadAllText(archive))
+                    .Value<int?>("schemaVersion") != 1)
+                throw new InvalidOperationException(
+                    "The pre-migration original was not archived before the first save.");
+
+            // Legacy allocation ran in source-ID order; migration makes exactly
+            // that order explicit per child so v5 allocation reproduces v4.
+            BuffPlannerProfile multiSource = BuffPlannerProfile.CreateDefault(
+                "campaign:migration-order");
+            multiSource.Routines[0].Assignments.Add(Assignment(
+                "source-bravo", Ability("bravo", string.Empty, 0), new[] { "unit-a" }));
+            multiSource.Routines[0].Assignments.Add(Assignment(
+                "source-alpha", Ability("alpha", string.Empty, 0), new[] { "unit-b" }));
+            JObject multiDocument = LegacyV4Document(multiSource);
+            string multiPath = repository.GetProfilePath("campaign:migration-order");
+            File.WriteAllText(multiPath, multiDocument.ToString());
+            ProfileLoadResult multiResult = repository.Load("campaign:migration-order");
+            List<CastingAssignmentProfile> order = multiResult.Profile.Routines[0]
+                .Assignments.SelectMany(value => value.CastingAssignments)
+                .OrderBy(child => child.Order).ToList();
+            if (order.Count != 2 ||
+                order[0].AssignmentId != "legacy-source-alpha" ||
+                order[1].AssignmentId != "legacy-source-bravo" ||
+                order[0].Order != 0 || order[1].Order != 1)
+                throw new InvalidOperationException(
+                    "Migration did not preserve legacy source-ID order as explicit assignment order.");
+            // Saving the migrated profile and loading again is idempotent:
+            // IDs and orders are never regenerated (the repository itself
+            // never auto-saves; callers own the write).
+            repository.Save(multiResult.Profile);
+            ProfileLoadResult again = repository.Load("campaign:migration-order");
+            List<CastingAssignmentProfile> reloaded = again.Profile.Routines[0]
+                .Assignments.SelectMany(value => value.CastingAssignments)
+                .OrderBy(child => child.Order).ToList();
+            if (again.Migrated || reloaded.Count != 2 ||
+                reloaded[0].AssignmentId != "legacy-source-alpha" ||
+                reloaded[1].AssignmentId != "legacy-source-bravo")
+                throw new InvalidOperationException(
+                    "Migration was not idempotent across a save and reload.");
         }
 
         private static void TestGridProfileMigration(string root)
@@ -2096,7 +2174,7 @@ namespace KingmakerBuffPlanner.Tests
             string modPath = Path.Combine(root, "profile-grid-migration");
             Directory.CreateDirectory(modPath);
             var repository = new ProfileRepository(modPath);
-            JObject document = JObject.FromObject(ProfileFixture("campaign:grid-migration"));
+            JObject document = LegacyV4Document(ProfileFixture("campaign:grid-migration"));
             document["schemaVersion"] = 2;
             document["hiddenSourceIds"] = new JArray("hidden-a", "hidden-b");
             ((JObject)document["ui"])["hotkey"] = "F10";
@@ -2107,12 +2185,19 @@ namespace KingmakerBuffPlanner.Tests
             Directory.CreateDirectory(Path.GetDirectoryName(path));
             File.WriteAllText(path, document.ToString());
             ProfileLoadResult migrated = repository.Load("campaign:grid-migration");
-            if (!migrated.Migrated || migrated.Profile.SchemaVersion != 4 ||
+            if (!migrated.Migrated || migrated.Profile.SchemaVersion != 5 ||
                 migrated.Profile.Ui.Hotkey != "Ctrl+Shift+B" ||
                 migrated.Profile.HiddenSourceIds.Count != 0 || migrated.Profile.Execution.RecastExisting)
-                throw new InvalidOperationException("Grid UI migration did not reveal hidden entries or replace F10.");
+                throw new InvalidOperationException("Grid UI migration did not reveal hidden entries or replace F10." +
+                    " observed: migrated=" + migrated.Migrated +
+                    ";schema=" + migrated.Profile.SchemaVersion +
+                    ";hotkey=" + migrated.Profile.Ui.Hotkey +
+                    ";hidden=" + migrated.Profile.HiddenSourceIds.Count +
+                    ";recast=" + migrated.Profile.Execution.RecastExisting +
+                    ";warning=" + migrated.Warning);
             if (migrated.Profile.Routines[0].Assignments.Count != 1 ||
                 migrated.Profile.Routines[0].Assignments[0].WantedTargetUnitIds.Count != 2 ||
+                migrated.Profile.Routines[0].Assignments[0].CastingAssignments.Count != 1 ||
                 migrated.Profile.Routines[0].Assignments[0].SelectedEnhancementIds.Count != 0)
                 throw new InvalidOperationException("Grid UI migration did not preserve routine targets.");
         }
@@ -2133,7 +2218,7 @@ namespace KingmakerBuffPlanner.Tests
             repository.Save(duplicate);
             string duplicatePath = repository.GetProfilePath("campaign:duplicate");
             string duplicateJson = File.ReadAllText(duplicatePath).Replace(
-                "\"schemaVersion\": 4,", "\"schemaVersion\": 4,\r\n  \"schemaVersion\": 4,");
+                "\"schemaVersion\": 5,", "\"schemaVersion\": 5,\r\n  \"schemaVersion\": 5,");
             File.WriteAllText(duplicatePath, duplicateJson);
             ProfileLoadResult rejected = repository.Load("campaign:duplicate");
             if (!rejected.Warning.Contains("duplicate-property"))
@@ -2143,15 +2228,12 @@ namespace KingmakerBuffPlanner.Tests
         private static BuffPlannerProfile ProfileFixture(string campaignId)
         {
             BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault(campaignId);
-            profile.Routines[0].Assignments.Add(new SourceAssignmentProfile
-            {
-                SourceId = "source-persisted",
-                Ability = AbilityKeyProfile.FromKey(Ability("persisted", "variant", 8)),
-                WantedTargetUnitIds = new List<string> { "unit-z", "unit-a" },
-                ExistingEffectPolicy = ExistingEffectPolicy.SkipAlreadyActive,
-                IgnoredPresenceMarkers = new List<string> { "shared-marker" },
-                SelectedEnhancementIds = new List<string> { "metamagic-rod|unit-a|persisted" }
-            });
+            profile.Routines[0].Assignments.Add(Assignment(
+                "source-persisted", Ability("persisted", "variant", 8),
+                new[] { "unit-z", "unit-a" },
+                new[] { "metamagic-rod|unit-a|persisted" }));
+            profile.Routines[0].Assignments[0].IgnoredPresenceMarkers =
+                new List<string> { "shared-marker" };
             profile.ProviderPreferences.Add(new ProviderPreferenceProfile
             {
                 ProviderKey = "unit-a|book|provider",
@@ -2456,7 +2538,7 @@ namespace KingmakerBuffPlanner.Tests
                 loaded.Profile.ProviderPreferences.Single(preference =>
                     preference.ProviderKey.StartsWith(
                         "stale-unit|", StringComparison.Ordinal));
-            if (loaded.Profile.SchemaVersion != 4 ||
+            if (loaded.Profile.SchemaVersion != 5 ||
                 felix.Priority != 0 || felix.MaximumCasts != 3 ||
                 felix.Banned || !akasa.Banned ||
                 stale.MaximumCasts != 17)
@@ -3065,14 +3147,8 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("An invalid personal target mutated the assignment.");
 
             profile.Routines.First(routine => routine.RoutineId == "long").Assignments.Add(
-                new SourceAssignmentProfile
-                {
-                    SourceId = modelA.SelectedSource.SourceId,
-                    Ability = AbilityKeyProfile.FromKey(personalAbility),
-                    WantedTargetUnitIds = new List<string> { "unit-b" },
-                    ExistingEffectPolicy = ExistingEffectPolicy.Overwrite,
-                    IgnoredPresenceMarkers = new List<string>()
-                });
+                Assignment(modelA.SelectedSource.SourceId, personalAbility,
+                    new[] { "unit-b" }, null, ExistingEffectPolicy.Overwrite));
             RoutinePlanResult stale = new RoutinePlanService().Plan(profile, "long", snapshotA,
                 new ActiveEffectSnapshot(null), effects, new[] { personalA });
             if (stale.Plan.Steps.Count != 0 || stale.Plan.Outcomes.Count != 1 ||
@@ -4831,6 +4907,247 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("Invalid measurements must keep the design floor.");
         }
 
+        // Mission checkpoint C, canonical mixed-caster example: one catalog
+        // source, three child assignments, one resolved plan. Leinna casts on
+        // herself unenhanced; Felix casts on himself unenhanced and on Tias
+        // and Raine through Share. Four casts, Share only where configured.
+        private static void TestCastingAssignmentRouting()
+        {
+            AbilityKey ability = Ability("echolocation", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("echo-slots",
+                ResourcePoolKind.SpontaneousLevel, 8, 8, null);
+            ProviderSnapshot leinna = PlannerProvider("leinna", "leinna-book",
+                ability, pool.PoolKey, 1);
+            ProviderSnapshot felix = PlannerProvider("felix", "felix-book",
+                ability, pool.PoolKey, 1);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(
+                new[] { leinna, felix }, new[] { pool },
+                "leinna", "felix", "tias", "raine");
+            var leinnaOption = new ProviderPlanningOption(leinna,
+                new[] { "leinna" }, new[] { "leinna" }, 4, 40);
+            var felixOption = new ProviderPlanningOption(felix,
+                new[] { "felix" }, new[] { "felix" }, 5, 50);
+            CastEnhancementSnapshot share = ClassEnhancement("share", "felix",
+                ability, "felix-book", 3, "reservoir|felix",
+                "brown-fur-share-transmutation", true);
+            var targeting = new EffectiveProviderOptionResolver(
+                new ICastTargetingModifier[] {
+                    new FixtureShareTargetingModifier("share", "felix",
+                        new[] { "felix", "tias", "raine" })
+                });
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault(
+                "assignment-routing");
+            SourceAssignmentProfile parent = Assignment(
+                ability.Canonical, ability, new string[0]);
+            parent.CastingAssignments[0].TargetUnitIds = new List<string> { "leinna" };
+            parent.CastingAssignments.Add(new CastingAssignmentProfile
+            {
+                AssignmentId = "cast-2",
+                Order = 1,
+                CasterUnitId = "felix",
+                TargetUnitIds = new List<string> { "felix" },
+                Enhancements = new List<EnhancementSelectionProfile>()
+            });
+            parent.CastingAssignments.Add(new CastingAssignmentProfile
+            {
+                AssignmentId = "cast-3",
+                Order = 2,
+                CasterUnitId = "felix",
+                TargetUnitIds = new List<string> { "tias", "raine" },
+                Enhancements = new List<EnhancementSelectionProfile>
+                {
+                    new EnhancementSelectionProfile { EnhancementId = "share", Required = true }
+                }
+            });
+            profile.Routines[0].Assignments.Add(parent);
+
+            RoutinePlanResult result = new RoutinePlanService().Plan(profile, "long",
+                snapshot, new ActiveEffectSnapshot(null),
+                new Dictionary<string, EffectExpression> {
+                    { ability.Canonical, new EffectLeafExpression(EffectKind.Buff,
+                        "echo-buff", EffectTarget.Caster, "ContextActionApplyBuff", "root/apply") }
+                }, new[] { leinnaOption, felixOption }, new[] { share }, targeting);
+            CastPlan plan = result.Plan;
+            if (plan.Steps.Count != 4)
+                throw new InvalidOperationException("The mixed-caster example must produce four casts, not " +
+                    plan.Steps.Count + ".");
+            CastStep leinnaSelf = plan.Steps.SingleOrDefault(step =>
+                step.AssignmentId == "auto-" + ability.Canonical);
+            CastStep felixSelf = plan.Steps.SingleOrDefault(step =>
+                step.AssignmentId == "cast-2");
+            List<CastStep> felixShare = plan.Steps.Where(step =>
+                step.AssignmentId == "cast-3").ToList();
+            if (leinnaSelf == null || felixSelf == null || felixShare.Count != 2 ||
+                leinnaSelf.Provider.CasterUnitId != "leinna" ||
+                felixSelf.Provider.CasterUnitId != "felix" ||
+                felixShare.Any(step => step.Provider.CasterUnitId != "felix"))
+                throw new InvalidOperationException("Casts were not routed to the configured casters.");
+            if (leinnaSelf.EnhancementIds.Count != 0 ||
+                felixSelf.EnhancementIds.Count != 0 ||
+                felixShare.Any(step => !step.EnhancementIds.Contains("share")))
+                throw new InvalidOperationException(
+                    "Share leaked outside the two configured non-self casts or was missing from them.");
+            if (!felixShare.All(step => step.TargetUnitIds.Count == 1) ||
+                felixShare.Any(step => step.TargetUnitIds.Contains("felix")))
+                throw new InvalidOperationException("Share casts did not cover exactly the explicit non-self targets.");
+            if (plan.Outcomes.Count != 4 ||
+                plan.Outcomes.Any(outcome => outcome.Kind != TargetOutcomeKind.Fulfilled))
+                throw new InvalidOperationException("Some configured targets were not fulfilled.");
+            ResourcePoolAllocation reservoir = plan.AllocationFor("enhancement:reservoir|felix");
+            if (reservoir == null || reservoir.AvailableNow != 3 ||
+                reservoir.AllocatedUsage != 2 || reservoir.UnmetDemand != 0 ||
+                reservoir.Traces.Count != 1 || reservoir.Traces[0] != "cast-3")
+                throw new InvalidOperationException("Enhancement reservoir accounting did not trace to its assignment.");
+
+            // A pin is a hard constraint: pinning a party member with no
+            // provider for this spell leaves the cast unresolved instead of
+            // falling back to an available caster.
+            parent.CastingAssignments[0].CasterUnitId = "tias";
+            RoutinePlanResult pinned = new RoutinePlanService().Plan(profile, "long",
+                snapshot, new ActiveEffectSnapshot(null),
+                new Dictionary<string, EffectExpression> {
+                    { ability.Canonical, new EffectLeafExpression(EffectKind.Buff,
+                        "echo-buff", EffectTarget.Caster, "ContextActionApplyBuff", "root/apply") }
+                }, new[] { leinnaOption, felixOption }, new[] { share }, targeting);
+            TargetPlanOutcome leinnaOutcome = pinned.Plan.Outcomes.Single(outcome =>
+                outcome.AssignmentId == "auto-" + ability.Canonical);
+            if (leinnaOutcome.Kind != TargetOutcomeKind.Unfulfilled ||
+                !pinned.Plan.Diagnostics.Any(line => line.Contains(
+                    "pin-unresolved:auto-" + ability.Canonical + ":pinned-caster-unavailable:tias")))
+                throw new InvalidOperationException(
+                    "An unavailable pinned caster silently fell back to another caster.");
+        }
+
+        // Mission checkpoint C shortage and order fixtures: assignment order
+        // (never catalog order) decides who gets the limited charges, nine
+        // requested casts against three charges report 9/3/3/6, already-active
+        // skips reserve nothing, and optional policy labels its omissions.
+        private static void TestAssignmentOrderAndShortage()
+        {
+            AbilityKey ability = Ability("charge-spell", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("charge-slots",
+                ResourcePoolKind.SpontaneousLevel, 9, 9, null);
+            ProviderSnapshot caster = PlannerProvider("caster", "book",
+                ability, pool.PoolKey, 1);
+            string[] nine = Enumerable.Range(1, 9)
+                .Select(index => "target-" + index).ToArray();
+            PartyProviderSnapshot snapshot = PlannerSnapshot(
+                new[] { caster }, new[] { pool },
+                new[] { "caster" }.Concat(nine).ToArray());
+            var option = new ProviderPlanningOption(caster,
+                new[] { "caster" }.Concat(nine), new[] { "caster" }, 4, 40);
+            CastEnhancementSnapshot charges = ClassEnhancement("rod", "caster",
+                ability, "book", 3, "charge-pool", "rod-group", false);
+            var effects = new Dictionary<string, EffectExpression> {
+                { ability.Canonical, new EffectLeafExpression(EffectKind.Buff,
+                    "charge-buff", EffectTarget.Caster, "ContextActionApplyBuff", "root/apply") }
+            };
+
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault("shortage");
+            SourceAssignmentProfile parent = Assignment(
+                ability.Canonical, ability, new string[0]);
+            parent.CastingAssignments[0].TargetUnitIds = new List<string>(nine);
+            parent.CastingAssignments[0].Enhancements.Add(
+                new EnhancementSelectionProfile { EnhancementId = "rod", Required = true });
+            profile.Routines[0].Assignments.Add(parent);
+            RoutinePlanResult required = new RoutinePlanService().Plan(profile, "long",
+                snapshot, new ActiveEffectSnapshot(null), effects,
+                new[] { option }, new[] { charges });
+            ResourcePoolAllocation allocation = required.Plan.AllocationFor("enhancement:charge-pool");
+            if (allocation == null || allocation.AvailableNow != 3 ||
+                allocation.RequestedUsage != 9 || allocation.AllocatedUsage != 3 ||
+                allocation.UnmetDemand != 6 || allocation.ForecastRemaining != 0)
+                throw new InvalidOperationException("Required shortage must report requested 9 / available 3 / " +
+                    "allocated 3 / unmet 6; observed " +
+                    (allocation == null ? "<none>" : allocation.RequestedUsage + "/" +
+                        allocation.AvailableNow + "/" + allocation.AllocatedUsage + "/" +
+                        allocation.UnmetDemand) + ".");
+            if (required.Plan.Outcomes.Count(outcome => outcome.Kind == TargetOutcomeKind.Fulfilled) != 3 ||
+                required.Plan.Outcomes.Count(outcome => outcome.Kind == TargetOutcomeKind.Unfulfilled) != 6)
+                throw new InvalidOperationException("The first three targets did not receive the charges.");
+            List<string> fulfilledOrder = required.Plan.Outcomes
+                .Where(outcome => outcome.Kind == TargetOutcomeKind.Fulfilled)
+                .Select(outcome => outcome.UnitId).ToList();
+            if (!fulfilledOrder.SequenceEqual(nine.Take(3).ToList()))
+                throw new InvalidOperationException("Charges were not allocated in explicit target order.");
+
+            // Optional policy: the same shortage plans the last six casts
+            // explicitly without the enhancement, labeled as omissions.
+            parent.CastingAssignments[0].Enhancements[0].Required = false;
+            RoutinePlanResult optional = new RoutinePlanService().Plan(profile, "long",
+                snapshot, new ActiveEffectSnapshot(null), effects,
+                new[] { option }, new[] { charges });
+            if (optional.Plan.Steps.Count != 9 ||
+                optional.Plan.Steps.Count(step => step.EnhancementIds.Contains("rod")) != 3 ||
+                optional.Plan.Steps.Count(step => step.OmittedEnhancementIds.Contains("rod")) != 6)
+                throw new InvalidOperationException("Optional shortage did not split enhanced from explicitly-unenhanced casts.");
+            ResourcePoolAllocation optionalAllocation = optional.Plan.AllocationFor("enhancement:charge-pool");
+            if (optionalAllocation.AllocatedUsage != 3 || optionalAllocation.UnmetDemand != 6)
+                throw new InvalidOperationException("Optional policy changed the demand accounting.");
+            if (optional.Plan.Outcomes.Any(outcome => outcome.Kind == TargetOutcomeKind.Unfulfilled))
+                throw new InvalidOperationException("Optional policy still blocked casts it was permitted to omit for.");
+
+            // Already-active targets never request or reserve a charge.
+            var active = new Dictionary<string, IEnumerable<string>>();
+            active["target-1"] = new[] { "charge-buff" };
+            parent.CastingAssignments[0].TargetUnitIds = new List<string>(nine);
+            RoutinePlanResult skipped = new RoutinePlanService().Plan(profile, "long",
+                snapshot, ActiveEffectSnapshot.FromTypedEffects(
+                    active.ToDictionary(pair => pair.Key,
+                        pair => pair.Value.Select(id => new ActiveEffectMarker(EffectKind.Buff, id)))),
+                effects, new[] { option }, new[] { charges });
+            ResourcePoolAllocation skippedAllocation = skipped.Plan.AllocationFor("enhancement:charge-pool");
+            TargetPlanOutcome skip = skipped.Plan.Outcomes.Single(outcome => outcome.UnitId == "target-1");
+            if (skip.Kind != TargetOutcomeKind.SkippedAlreadyActive ||
+                skippedAllocation.RequestedUsage != 8 || skippedAllocation.AllocatedUsage != 3)
+                throw new InvalidOperationException("An already-active skip consumed demand or a charge.");
+
+            // Explicit assignment order, not source-ID or dictionary order,
+            // controls who wins a one-charge race between two assignments.
+            AbilityKey raceAbility = Ability("race-spell", string.Empty, 0);
+            var racePool = new ResourcePoolSnapshot("race-slots",
+                ResourcePoolKind.SpontaneousLevel, 2, 2, null);
+            ProviderSnapshot raceCaster = PlannerProvider("z-caster", "z-book",
+                raceAbility, racePool.PoolKey, 1);
+            PartyProviderSnapshot raceSnapshot = PlannerSnapshot(
+                new[] { raceCaster }, new[] { racePool }, "z-caster", "early", "late");
+            var raceOption = new ProviderPlanningOption(raceCaster,
+                new[] { "z-caster", "early", "late" }, new[] { "z-caster" }, 4, 40);
+            CastEnhancementSnapshot raceCharge = ClassEnhancement("race-rod", "z-caster",
+                raceAbility, "z-book", 1, "race-pool", "race-rod-group", false);
+            BuffPlannerProfile raceProfile = BuffPlannerProfile.CreateDefault("race");
+            SourceAssignmentProfile raceParent = Assignment(
+                "a-" + raceAbility.Canonical, raceAbility, new string[0]);
+            // The alphabetically-first source runs LATER: explicit order wins.
+            raceParent.CastingAssignments[0].AssignmentId = "late-one";
+            raceParent.CastingAssignments[0].Order = 1;
+            raceParent.CastingAssignments[0].TargetUnitIds = new List<string> { "late" };
+            raceParent.CastingAssignments[0].Enhancements.Add(
+                new EnhancementSelectionProfile { EnhancementId = "race-rod" });
+            raceParent.CastingAssignments.Add(new CastingAssignmentProfile
+            {
+                AssignmentId = "early-one",
+                Order = 0,
+                TargetUnitIds = new List<string> { "early" },
+                Enhancements = new List<EnhancementSelectionProfile>
+                {
+                    new EnhancementSelectionProfile { EnhancementId = "race-rod" }
+                }
+            });
+            raceProfile.Routines[0].Assignments.Add(raceParent);
+            RoutinePlanResult race = new RoutinePlanService().Plan(raceProfile, "long",
+                raceSnapshot, new ActiveEffectSnapshot(null),
+                new Dictionary<string, EffectExpression> {
+                    { raceAbility.Canonical, new EffectLeafExpression(EffectKind.Buff,
+                        "race-buff", EffectTarget.Caster, "ContextActionApplyBuff", "root/apply") }
+                }, new[] { raceOption }, new[] { raceCharge });
+            CastStep winner = race.Plan.Steps.Single();
+            if (winner.AssignmentId != "early-one" || winner.TargetUnitIds[0] != "early" ||
+                race.Plan.Outcomes.Any(outcome => outcome.UnitId == "late" &&
+                    outcome.Kind == TargetOutcomeKind.Fulfilled))
+                throw new InvalidOperationException("Catalog order overrode the explicit assignment order.");
+        }
+
         // Chooser scroll geometry must be exact so the final option row is
         // reachable by wheel and scrollbar (mission acceptance T16); the
         // arithmetic mirrors the shared factory layout (padding 4, spacing 4)
@@ -5135,14 +5452,8 @@ namespace KingmakerBuffPlanner.Tests
             BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault(
                 "conflicting-area");
             profile.Routines.First(value => value.RoutineId == "long")
-                .Assignments.Add(new SourceAssignmentProfile {
-                    SourceId = ability.Canonical,
-                    Ability = AbilityKeyProfile.FromKey(ability),
-                    WantedTargetUnitIds = new List<string> { "caster" },
-                    ExistingEffectPolicy = ExistingEffectPolicy.Overwrite,
-                    IgnoredPresenceMarkers = new List<string>(),
-                    SelectedEnhancementIds = new List<string>()
-                });
+                .Assignments.Add(Assignment(ability.Canonical, ability,
+                    new[] { "caster" }, null, ExistingEffectPolicy.Overwrite));
             RoutinePlanResult plan = new RoutinePlanService().Plan(profile,
                 "long", snapshot, new ActiveEffectSnapshot(null),
                 new Dictionary<string, EffectExpression> {
@@ -5207,12 +5518,37 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException(
                     "The buff-card status bypassed routine-aware Share targeting.");
             model.SetEnhancement("long", share.EnhancementId);
+            // Disabling Share makes the ally illegal, but the configured
+            // target must survive as repairable intent instead of being
+            // silently pruned (mission T08), stay visibly unfulfillable in
+            // planning, and remain explicitly removable.
+            RoutineProfile longRoutine = profile.Routines.First(
+                value => value.RoutineId == "long");
+            SourceAssignmentProfile retained = longRoutine.Assignments.Single(
+                value => value.SourceId == source.SourceId);
             if (model.IsTargetLegal(source, "long", "ally") ||
-                profile.Routines.First(value => value.RoutineId == "long")
-                    .Assignments.Any(value => value.SourceId == source.SourceId) ||
-                saves != 3)
+                !model.IsTargetWanted("long", source.SourceId, "ally") ||
+                !retained.WantedTargetUnitIds.Contains("ally"))
                 throw new InvalidOperationException(
-                    "Disabling Share did not atomically prune the stale ally target.");
+                    "Disabling Share silently pruned the stale ally target instead of preserving repairable intent.");
+            RoutinePlanResult disabled = new RoutinePlanService().Plan(profile, "long",
+                snapshot, new ActiveEffectSnapshot(null),
+                new Dictionary<string, EffectExpression> {
+                    { ability.Canonical, new EffectLeafExpression(
+                        EffectKind.Buff, "personal-buff", EffectTarget.Caster,
+                        "ContextActionApplyBuff", "root/apply") }
+                }, options, new[] { share }, targeting);
+            if (disabled.Plan.Steps.Count != 0 ||
+                disabled.Plan.Outcomes.Count(value => value.Kind ==
+                    TargetOutcomeKind.Unfulfilled && value.UnitId == "ally") != 1)
+                throw new InvalidOperationException(
+                    "The Share-disabled stale ally target did not surface as an explicit unfulfilled outcome.");
+            model.RemoveTargetFromAssignment("long", source.SourceId,
+                retained.AutomaticAssignment.AssignmentId, "ally");
+            if (model.IsTargetWanted("long", source.SourceId, "ally") ||
+                longRoutine.Assignments.Any(value => value.SourceId == source.SourceId))
+                throw new InvalidOperationException(
+                    "The invalid target was not cleanly removable.");
         }
 
         private static void TestEnhancementCompatibilityAndSharedCost()
@@ -5250,15 +5586,49 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException(
                     "Explicit enhancement exclusivity groups were not enforced.");
 
+            // Duplicate enhancement selections on one request dedupe
+            // deterministically (idempotent compile of the same configured
+            // intent); persisted duplicates are rejected at load instead of
+            // reaching the planner twice.
             var duplicateRequest = new BuffCastRequest(new BuffSourceDefinition(
                 "duplicate-enhancement", ability, Leaf("duplicate-buff"),
                 CastGroupingKind.PerTarget), new[] { "ally" },
                 ExistingEffectPolicy.Overwrite, null,
                 new[] { share.EnhancementId, share.EnhancementId });
+            if (duplicateRequest.EnhancementIds.Count != 1)
+                throw new InvalidOperationException(
+                    "Duplicate enhancement selections did not dedupe deterministically.");
             CastPlan duplicatePlan = new CastPlanner().Plan(snapshot,
                 duplicateRequest, new[] { option }, EmptyPolicy(),
                 new ActiveEffectSnapshot(null), new[] { share });
-            if (duplicatePlan.Steps.Count != 0)
+            if (duplicatePlan.Steps.Count != 1 ||
+                duplicatePlan.Steps.Single().EnhancementUsageByPool["reservoir|brown"] != 1)
+                throw new InvalidOperationException(
+                    "A deduped duplicate selection did not plan exactly one reserved use.");
+            BuffPlannerProfile duplicateProfile = BuffPlannerProfile.CreateDefault(
+                "duplicate-persisted");
+            SourceAssignmentProfile duplicateAssignment = Assignment(
+                ability.Canonical, ability, new[] { "ally" });
+            duplicateAssignment.CastingAssignments[0].Enhancements.Add(
+                new EnhancementSelectionProfile { EnhancementId = share.EnhancementId });
+            duplicateAssignment.CastingAssignments[0].Enhancements.Add(
+                new EnhancementSelectionProfile { EnhancementId = share.EnhancementId });
+            duplicateProfile.Routines[0].Assignments.Add(duplicateAssignment);
+            var duplicateModel = new PlannerSetupModel(duplicateProfile, snapshot,
+                new ActiveEffectSnapshot(null),
+                new Dictionary<string, EffectExpression> { { ability.Canonical, Leaf("x") } },
+                new[] { option }, ignored => { });
+            bool rejectedDuplicate = false;
+            try
+            {
+                new ProfileRepository(Path.Combine(Path.GetTempPath(),
+                    "kbp-duplicate-rejected")).Save(duplicateProfile);
+            }
+            catch (InvalidDataException)
+            {
+                rejectedDuplicate = true;
+            }
+            if (!rejectedDuplicate)
                 throw new InvalidOperationException(
                     "Duplicate persisted enhancement IDs were silently accepted.");
 
@@ -5408,13 +5778,8 @@ namespace KingmakerBuffPlanner.Tests
             BuffPlannerProfile old = BuffPlannerProfile.CreateDefault(
                 "old-single-enhancement-profile");
             old.Routines.First(value => value.RoutineId == "long")
-                .Assignments.Add(new SourceAssignmentProfile {
-                    SourceId = ability.Canonical,
-                    Ability = AbilityKeyProfile.FromKey(ability),
-                    WantedTargetUnitIds = new List<string>(),
-                    IgnoredPresenceMarkers = new List<string>(),
-                    SelectedEnhancementIds = new List<string> { "share" }
-                });
+                .Assignments.Add(Assignment(ability.Canonical, ability,
+                    new string[0], new[] { "share" }));
             repository.Save(old);
             if (repository.Load(old.CampaignId).Profile.Routines.First(value =>
                     value.RoutineId == "long").Assignments.Single()

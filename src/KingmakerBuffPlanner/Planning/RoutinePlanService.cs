@@ -50,6 +50,7 @@ namespace KingmakerBuffPlanner.Planning
             if (routine == null) throw new ArgumentException("Unknown routine.", "routineId");
             var requests = new List<BuffCastRequest>();
             var unsupported = new List<string>();
+            var animatedFallback = new HashSet<string>(StringComparer.Ordinal);
             var abilitiesBySource = new Dictionary<string, IReadOnlyList<Domain.Identity.AbilityKey>>(StringComparer.Ordinal);
             foreach (SourceAssignmentProfile assignment in routine.Assignments
                 .OrderBy(a => a.SourceId, StringComparer.Ordinal))
@@ -70,11 +71,23 @@ namespace KingmakerBuffPlanner.Planning
                     unsupported.Add(assignment.SourceId);
                     continue;
                 }
-                requests.Add(new BuffCastRequest(
-                    new BuffSourceDefinition(assignment.SourceId, abilities, expression, grouping),
-                    assignment.WantedTargetUnitIds, assignment.ExistingEffectPolicy,
-                    assignment.IgnoredPresenceMarkers, assignment.SelectedEnhancementIds));
                 abilitiesBySource[assignment.SourceId] = abilities;
+                var definition = new BuffSourceDefinition(assignment.SourceId, abilities, expression, grouping);
+                // Every child casting assignment becomes its own request with
+                // its own identity, pins, ordered targets, and enhancement
+                // selections; requests for one source never overwrite or
+                // conflate each other.
+                foreach (CastingAssignmentProfile casting in assignment.CastingAssignments)
+                {
+                    requests.Add(new BuffCastRequest(definition,
+                        casting.TargetUnitIds, assignment.ExistingEffectPolicy,
+                        assignment.IgnoredPresenceMarkers,
+                        casting.Enhancements.Select(selection =>
+                            new EnhancementRequest(selection.EnhancementId,
+                                selection.IsRequired)),
+                        casting.AssignmentId, casting.CasterUnitId,
+                        casting.ProviderKey, casting.SpellbookGuid, casting.Order));
+                }
             }
             ProviderSelectionPolicy policy = BuildPolicy(profile.ProviderPreferences);
             CastPlan plan = new CastPlanner(targeting).PlanRoutine(snapshot, requests,
@@ -82,11 +95,15 @@ namespace KingmakerBuffPlanner.Planning
             var fallbackProviderAbilities = new HashSet<string>(optionList
                 .Where(o => o.RequiresAnimatedExecution)
                 .Select(o => o.Provider.Key.Ability.Canonical), StringComparer.Ordinal);
-            return new RoutinePlanResult(plan, unsupported, routine.Assignments
-                .Where(a => abilitiesBySource.ContainsKey(a.SourceId) &&
-                    abilitiesBySource[a.SourceId].Any(ability =>
+            foreach (SourceAssignmentProfile assignment in routine.Assignments)
+            {
+                IReadOnlyList<Domain.Identity.AbilityKey> abilities;
+                if (abilitiesBySource.TryGetValue(assignment.SourceId, out abilities) &&
+                    abilities.Any(ability =>
                         fallbackProviderAbilities.Contains(ability.Canonical)))
-                .Select(a => a.SourceId));
+                    animatedFallback.Add(assignment.SourceId);
+            }
+            return new RoutinePlanResult(plan, unsupported, animatedFallback);
         }
 
         private static IReadOnlyList<Domain.Identity.AbilityKey> ResolveAbilities(

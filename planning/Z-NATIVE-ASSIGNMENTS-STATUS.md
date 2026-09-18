@@ -177,7 +177,69 @@ detected running during qualification, not touched).
 
 ## Checkpoint C — assignment model, identities, migration, planner
 
-Status: NOT STARTED.
+Status: SOURCE/BUILD COMPLETE — live lanes BLOCKED (fixture absent).
+
+- Schema 5 (`Persistence/ProfileModels.cs`): `SourceAssignmentProfile` keeps
+  source-level policy (ability, existing-effect policy, ignored markers) and
+  nests `CastingAssignmentProfile` children (`assignmentId` stable identity,
+  routine-wide `order`, `casterUnitId`/`spellbookGuid`/`providerKey` pins
+  (null = Automatic), ordered `targetUnitIds`, `enhancements` with
+  required-by-default policy). Source-level target/enhancement summaries are
+  derived read-only ([JsonIgnore]) from children — one writable copy.
+- Migration v4→v5 (`Persistence/ProfileRepository.cs`): each source becomes
+  exactly one legacy-equivalent Automatic child (`legacy-<sourceId>`, targets,
+  required enhancement selections), with the legacy source-ID allocation order
+  made explicit as child order. The exact pre-migration original is archived
+  once as `UserSettings/kbp-pre-schema-<hash>.orig` outside the rotating .bak
+  chain (short name keeps MAX_PATH safe; directory ensured). Repository
+  validation enforces unique assignment IDs, unique routine-wide order values,
+  unique child targets, and unique child enhancement IDs; duplicate enhancement
+  requests dedupe deterministically at compile time.
+- Domain/planning (`Domain/Planning/PlanningModels.cs`, `Planning/CastPlanner.cs`,
+  `Planning/RoutinePlanService.cs`): `BuffCastRequest` carries
+  `AssignmentId`, `Order`, caster/spellbook/provider pins, ordered targets,
+  and `EnhancementRequest` selections (required/optional); `TargetPlanOutcome`,
+  `CastStep`, and execution records carry `AssignmentId` (plus omitted
+  enhancement IDs on steps/records). Allocation runs in explicit assignment
+  order with stable tie-breaks — never source-ID/catalog order. Pins are hard
+  pre-ranking constraints with `pin-unresolved` diagnostics (no silent
+  fallback). Optional-enhancement policy drops only non-targeting modifiers
+  from the end of the request order and revalidates the whole remaining set;
+  Share/AffectsTargeting selections are never omissible. One
+  `ResourcePoolAllocation` accounting per native/enhancement pool
+  (available/requested/allocated/unmet/forecast + assignment traces) is built
+  by the planner and consumed by everything downstream; enhancement usage
+  pools colliding with native pool keys are diagnosed, never double-spent.
+  `PlannerSetupModel` routes the simple workflow through the single Automatic
+  child and exposes assignment-level editing (add/split/atomic move/remove
+  target/pin/provider/enhancement policy/reorder) plus derived summaries;
+  enhancement changes never prune targets (repairable intent instead).
+- C-gate proofs (deterministic, `tests/KingmakerBuffPlanner.Tests/Program.cs`):
+  - `casting-assignments-route-mixed-casters-exactly` — the canonical
+    Leinna/Felix example produces four correctly routed casts with Share only
+    on the two configured non-self casts, reservoir accounting traces to
+    `cast-3`, and an unavailable pinned caster stays unresolved with a
+    pin diagnostic (T01/T02).
+  - `assignment-order-and-shortage-allocate-explicitly` — nine enhanced casts
+    against three charges report requested 9 / available 3 / allocated 3 /
+    unmet 6 / forecast 0 with the first three explicit targets funded; the
+    optional policy plans the last six labeled as omissions without changing
+    accounting; already-active skips reserve nothing; the one-charge race is
+    won by the lower explicit order against catalog order (T04/T05/T07).
+  - `profile-migrates-schema-one` — v1/v2/v4 documents (genuine historical
+    shapes) migrate to schema 5 preserving targets/enhancements as one
+    automatic child, archive the original, preserve legacy multi-source order
+    explicitly, and stay idempotent across save/reload (T10).
+  - `effective-targeting-is-routine-and-assignment-aware` now proves the
+    no-silent-prune contract: a Share-disabled stale target remains configured,
+    surfaces unfulfilled, and is cleanly removable (T08).
+- Suite: source 42/42, protocol 155/155, harness 8/8, package 4/4, WhatIf
+  5/5, Release build PASS (DLL sha256
+  `5428911716f13e5690d2a9388e1c61e81c9a83965f9cb891ff54781929cae493`).
+- BLOCKED: exact-item rod identity (T03 durable instance binding) cannot be
+  proven without the installed-game contract probe; legacy pooled selections
+  remain pooled (no guessed exact pins) and identical-rod separation is
+  documented as unproven until a live inventory exists.
 
 ## Checkpoint D — assignment editor and resource UX
 
