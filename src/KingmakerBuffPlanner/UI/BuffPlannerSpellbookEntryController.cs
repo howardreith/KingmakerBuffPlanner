@@ -24,6 +24,8 @@ namespace KingmakerBuffPlanner.UI
         private readonly Action<string> _log;
         private readonly Func<bool> _openPlanner;
         private readonly Func<bool> _plannerOpen;
+        private readonly Func<bool> _plannerPresentationReady;
+        private readonly Action _recoverNativeUi;
         private readonly PlannerUiTheme _theme;
         private readonly SpellbookHandoffStateMachine _handoff =
             new SpellbookHandoffStateMachine();
@@ -35,11 +37,19 @@ namespace KingmakerBuffPlanner.UI
 
         internal BuffPlannerSpellbookEntryController(
             Action<string> log, Func<bool> openPlanner, Func<bool> plannerOpen,
-            PlannerUiTheme theme)
+            PlannerUiTheme theme,
+            Func<bool> plannerPresentationReady = null,
+            Action recoverNativeUi = null)
         {
             _log = log ?? (value => { });
             _openPlanner = openPlanner ?? throw new ArgumentNullException("openPlanner");
             _plannerOpen = plannerOpen ?? throw new ArgumentNullException("plannerOpen");
+            // The screen lifecycle opens presentation-first with deferred
+            // readiness, so "is open" alone is not success.
+            _plannerPresentationReady = plannerPresentationReady ?? plannerOpen;
+            // Recovery when the handoff fails after the native closure: ask
+            // for the native escape veil so the player lands in a usable UI.
+            _recoverNativeUi = recoverNativeUi ?? delegate { };
             _theme = theme ?? PlannerUiTheme.Resolve(null);
         }
 
@@ -68,24 +78,45 @@ namespace KingmakerBuffPlanner.UI
         {
             bool fullScreenActive = Game.Instance != null &&
                 Game.Instance.IsModeActive(GameModeType.FullScreenUi);
-            if (_handoff.Observe(fullScreenActive))
+            if (_handoff.ObserveRelease(fullScreenActive))
+            {
+                // Native ownership released: invoke the opener exactly once,
+                // then wait out the deferred presentation lifecycle.
+                bool accepted = false;
+                try { accepted = _openPlanner(); }
+                catch (Exception exception)
+                {
+                    _log("[KBP-SPELLBOOK] opener threw: " + exception.Message);
+                }
+                _handoff.ObserveOpenResult(accepted);
+                if (_handoff.State == SpellbookHandoffState.Failed)
+                    FailHandoffAfterClosure();
+                return;
+            }
+            if (_handoff.ObservePresentation(_plannerPresentationReady()))
             {
                 _handoffActive = false;
                 RestoreButton();
-                if (_plannerOpen())
-                {
-                    _log("[KBP-SPELLBOOK] handoff completed;planner=open.");
-                    return;
-                }
-                _handoff.Rollback("planner-open-refused");
+                _log("[KBP-SPELLBOOK] handoff completed;planner=presentation-ready.");
+                return;
             }
             if (_handoff.State == SpellbookHandoffState.Failed)
+                FailHandoffAfterClosure();
+        }
+
+        private void FailHandoffAfterClosure()
+        {
+            _handoffActive = false;
+            RestoreButton();
+            // The spellbook already closed natively; recover to a usable
+            // native interface instead of leaving the player in limbo.
+            try { _recoverNativeUi(); }
+            catch (Exception exception)
             {
-                _handoffActive = false;
-                RestoreButton();
-                _log("[KBP-SPELLBOOK] handoff failed;reason=" + _handoff.Failure +
-                    ";spellbook remains usable.");
+                _log("[KBP-SPELLBOOK] native recovery failed: " + exception.Message);
             }
+            _log("[KBP-SPELLBOOK] handoff failed;reason=" + _handoff.Failure +
+                ";native-ui-recovery-requested.");
         }
 
         private void ObserveSpellbook()

@@ -594,7 +594,10 @@ namespace KingmakerBuffPlanner.UI
                 value => _log.Info(value),
                 () => OpenSetup(),
                 () => _screen != null && _screen.IsOpen,
-                PlannerUiTheme.Resolve(null));
+                PlannerUiTheme.Resolve(null),
+                () => _screen != null && _screen.LifecycleState ==
+                    PlannerScreenLifecycleState.Open,
+                RequestNativeEscapeVeil);
             try
             {
                 _eventSubscription = EventBus.Subscribe((object)this);
@@ -612,6 +615,26 @@ namespace KingmakerBuffPlanner.UI
         private bool OpenSetup()
         {
             return _screen != null && _screen.Open();
+        }
+
+        private void RequestNativeEscapeVeil()
+        {
+            // Recovery after a failed handoff whose native spellbook already
+            // closed: land the player in a usable interface. No verified
+            // offline contract exists for re-opening the native spellbook,
+            // so recovery opens the planner itself through our own owned
+            // machinery (mode is free at this point) and logs the exact
+            // missing native contract rather than guessing an API.
+            _log.Info("[KBP-SPELLBOOK] recovery: opening planner directly; " +
+                "return-to-spellbook awaits a verified native reopen contract.");
+            try
+            {
+                OpenSetup();
+            }
+            catch (Exception exception)
+            {
+                _log.Error("[KBP-SPELLBOOK] planner recovery open failed.", exception);
+            }
         }
 
         private bool PlayNativeSetupOpenSound()

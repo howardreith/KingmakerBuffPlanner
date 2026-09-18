@@ -189,6 +189,7 @@ namespace KingmakerBuffPlanner.Tests
                 Run("assignment-editor-intent-regressions", TestAssignmentEditorIntent);
                 Run("review-state-and-material-signatures", TestReviewStateAndSignatures);
                 Run("unsupported-configured-requests-block-partial-apply", TestUnresolvableCoverage);
+                Run("spellbook-handoff-invokes-opener-and-awaits-presentation", TestSpellbookHandoff);
                 Run("cast-enhancement-execution-is-fail-closed-and-cleaned-up", TestCastEnhancementExecution);
                 Run("consumed-one-shot-enhancement-is-not-rearmed", TestOneShotEnhancementRestoration);
                 Run("execution-preflight-runs-under-the-native-activation-lease",
@@ -5705,41 +5706,85 @@ namespace KingmakerBuffPlanner.Tests
         }
 
         private static void TestSpellbookHandoff()
-        {            // The handoff only opens the planner after native ownership is
-            // released, waits a bounded number of frames, rolls back cleanly,
-            // and never lets a completed handoff be rolled back.
+        {
             var machine = new SpellbookHandoffStateMachine();
             machine.Begin();
             if (machine.State != SpellbookHandoffState.WaitingModeRelease)
                 throw new InvalidOperationException("Handoff did not start waiting.");
+
+            // No opener invocation while the native mode is still owned.
             bool opened = false;
             for (int frame = 0; frame < SpellbookHandoffStateMachine.MaximumWaitFrames - 1; frame++)
             {
-                opened |= machine.Observe(true);
+                opened |= machine.ObserveRelease(true);
                 if (machine.State != SpellbookHandoffState.WaitingModeRelease)
                     throw new InvalidOperationException("Handoff gave up before its bounded wait expired.");
             }
             if (opened)
-                throw new InvalidOperationException("Handoff opened the planner while the mode was still owned.");
-            if (machine.Observe(true) || machine.State != SpellbookHandoffState.Failed ||
+                throw new InvalidOperationException("The opener ran while the mode was still owned.");
+            if (machine.ObserveRelease(true) || machine.State != SpellbookHandoffState.Failed ||
                 machine.Failure != "mode-release-timeout")
                 throw new InvalidOperationException("Handoff wait was not bounded by the documented frame limit.");
 
+            // Full sequence: release -> opener invoked exactly once ->
+            // deferred presentation -> success. Success is only reported by
+            // the presentation observation, not by the open call itself.
+            machine.Reset();
             machine.Begin();
-            if (!machine.Observe(false) || machine.State != SpellbookHandoffState.Completed)
-                throw new InvalidOperationException("Released mode did not complete the handoff.");
+            if (!machine.ObserveRelease(false) ||
+                machine.State != SpellbookHandoffState.OpeningPlanner)
+                throw new InvalidOperationException("Released mode did not arm the opener.");
+            machine.ObserveOpenResult(true);
+            if (machine.State != SpellbookHandoffState.WaitingPresentation ||
+                machine.OpenAttempts != 1)
+                throw new InvalidOperationException("Open result did not enter deferred presentation wait.");
+            bool completed = false;
+            for (int frame = 0; frame < 10; frame++)
+            {
+                completed |= machine.ObservePresentation(false);
+                if (machine.State != SpellbookHandoffState.WaitingPresentation)
+                    throw new InvalidOperationException("Presentation wait ended early.");
+            }
+            if (completed)
+                throw new InvalidOperationException("Success was reported before presentation was ready.");
+            if (!machine.ObservePresentation(true) ||
+                machine.State != SpellbookHandoffState.Completed)
+                throw new InvalidOperationException("Ready presentation did not complete the handoff.");
             machine.Rollback("late-failure");
             if (machine.State != SpellbookHandoffState.Completed)
-                throw new InvalidOperationException("A completed handoff was rolled back after opening.");
+                throw new InvalidOperationException("A completed handoff was rolled back after success.");
+
+            // Open refusal fails immediately and is recoverable.
+            machine.Reset();
+            machine.Begin();
+            machine.ObserveRelease(false);
+            machine.ObserveOpenResult(false);
+            if (machine.State != SpellbookHandoffState.Failed ||
+                machine.Failure != "planner-open-refused" ||
+                machine.OpenAttempts != 1)
+                throw new InvalidOperationException("Open refusal did not fail the handoff.");
+
+            // Presentation timeout is bounded and recoverable (failure after
+            // native closure must be a state we can recover from).
+            machine.Reset();
+            machine.Begin();
+            machine.ObserveRelease(false);
+            machine.ObserveOpenResult(true);
+            for (int frame = 0; frame < SpellbookHandoffStateMachine.MaximumWaitFrames; frame++)
+                machine.ObservePresentation(false);
+            if (machine.State != SpellbookHandoffState.Failed ||
+                machine.Failure != "presentation-timeout")
+                throw new InvalidOperationException("Presentation wait was not bounded.");
+            machine.Rollback("recovered");
+            if (machine.State != SpellbookHandoffState.Failed ||
+                machine.Failure != "recovered")
+                throw new InvalidOperationException("Rollback after failed state did not record its reason.");
 
             machine.Reset();
             machine.Begin();
             machine.Rollback("native-close-refused");
-            if (machine.State != SpellbookHandoffState.Failed ||
-                machine.Failure != "native-close-refused")
-                throw new InvalidOperationException("Rollback did not record its reason.");
-            if (machine.Observe(false))
-                throw new InvalidOperationException("A failed handoff still opened the planner.");
+            if (machine.ObserveRelease(false))
+                throw new InvalidOperationException("A failed handoff still invoked the opener.");
         }
 
         private static void TestSequenceForecast()
