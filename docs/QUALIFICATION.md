@@ -1190,3 +1190,13 @@ see `artifacts/release/0.1.0/release-manifest.json` for the DLL hash and
 MVID. Gates: source 42/42, protocol 169/169, harness 23/23, package 4/4,
 WhatIf 5/5. Local-only; no live lanes run (still no
 `KBP_AUTOMATION_SEED`; absence re-verified before this record).
+
+### 0.1.0 candidate rebuild after N1-N4 — 2026-09-18
+
+Supersedes all earlier hashes. Deterministic 2/2. Source commit
+`ebeaab6`; package SHA-256
+`562cb2699cca7b0921b7697f226829cfd5f5ed807b506a664058bf004ebd2b91`;
+see `artifacts/release/0.1.0/release-manifest.json` for the DLL hash and
+MVID. Gates: source 42/42, protocol 172/172, harness 26/23->26, package
+4/4, WhatIf 5/5. Local-only; live lanes remain unrun (no
+`KBP_AUTOMATION_SEED`; absence re-verified before this record).

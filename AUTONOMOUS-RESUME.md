@@ -1,5 +1,27 @@
 # AUTONOMOUS-RESUME — top section is current; planning/Z-NATIVE-ASSIGNMENTS-STATUS.md is the per-checkpoint tracker.
 
+## N1-N4 review continuation handoff — 2026-09-18 (LATEST)
+
+- Status: all four 92f13fc-review findings closed with production-path
+  regressions (protocol 172/172, harness 26/26). The fixture helper's
+  write-ahead recovery is now complete across the journal-before-move
+  window, rollback failure retains the lock for -Recover, and teardown
+  validates containment/role/campaign/hash before deleting anything.
+- Candidate: package SHA-256
+  `562cb2699cca7b0921b7697f226829cfd5f5ed807b506a664058bf004ebd2b91`,
+  source `ebeaab6`, local-only, deterministic 2/2.
+- THE ONE HUMAN ACTION (unchanged): create a genuinely NEW disposable
+  campaign, save once named exactly `KBP_AUTOMATION_SEED` at a
+  controllable moment, fully exit Kingmaker. Then I run the repaired
+  guarded bootstrap, establish normal-save/profile protection, provision
+  the casting fixture, and run the first short rendered/input smoke
+  (planner open/close, button states, overflow chooser wheel+scrollbar,
+  assignment add/edit/remove, spellbook open) before the wider matrix.
+- Known incomplete feature: spellbook same-context return — qualify the
+  native reopen contract during the first isolated spellbook run.
+
+# AUTONOMOUS-RESUME — top section is current; planning/Z-NATIVE-ASSIGNMENTS-STATUS.md is the per-checkpoint tracker.
+
 ## R1-R4 targeted repairs handoff — 2026-09-18 (LATEST)
 
 - Status: R1-R4 closed with production-path regressions (protocol 169/169,

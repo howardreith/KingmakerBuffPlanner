@@ -427,3 +427,37 @@ casting/resource acceptance remain live-only.
   package 4/4, WhatIf 5/5. Candidate rebuilt deterministically (see
   QUALIFICATION for identity). Spellbook same-context return remains the
   known incomplete feature, pending the live native-reopen contract.
+
+
+## N1-N4 review continuation — 2026-09-18
+
+- All four findings from the 92f13fc review closed with production-path
+  regressions. Commit `ebeaab6`.
+- N1: per-assignment identity preserved end to end
+  (`AssignmentProviderOption`/`AssignmentEligibility`); source summaries
+  aggregate reach instead of first-option collapse; picker legality is
+  assignment-specific; the production resolver enforces
+  caster/spellbook/provider pins before ranking. Both creation orders
+  proven (`same-provider-targeting-survives-both-orders`).
+- N2: picker toggle removes from the selected child only; sibling-owned
+  targets refuse with the owner named and the picker labels them;
+  coverage never silently disappears
+  (`picker-toggle-never-drops-sibling-coverage`).
+- N3: caster-directed forecast effects project onto
+  `Provider.CasterUnitId`, never the anchor; target wrappers project
+  only with provable recipients
+  (`forecast-caster-effects-land-on-caster`).
+- N4: journaled-but-absent destinations reconcile as unperformed;
+  rollback tolerates completed cleanup and binds staging to the exact
+  run directory; the original failure always repropagates (a swallowed
+  stage failure previously printed PASS); the lock is retained on
+  rollback failure for -Recover and released only against verified
+  ownership; teardown validates the whole set through the containment
+  validator (including escape refusal and mandatory campaign identity)
+  before deleting. Harness 26/26: journal-window (baseline+working),
+  rollback-failure lock retention + repeated recovery, escaped-manifest
+  teardown refusal, plus all prior suites.
+- Gates: source 42/42, protocol 172/172, harness 26/26, package 4/4,
+  WhatIf 5/5. No `KBP_AUTOMATION_SEED` exists (re-verified); no live
+  lanes run. Spellbook same-context return remains the known incomplete
+  feature pending the live native-reopen contract.
