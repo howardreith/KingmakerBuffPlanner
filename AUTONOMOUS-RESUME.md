@@ -1,3 +1,36 @@
+# AUTONOMOUS-RESUME — top section is current; planning/Z-NATIVE-ASSIGNMENTS-STATUS.md is the per-checkpoint tracker.
+
+## Z continuation mission handoff — 2026-09-18 (LATEST)
+
+- Status: REVIEWABLE + COMPLETION WORK DONE, live lanes awaiting ONE
+  human-only seed save. Draft PR #1:
+  https://github.com/howardreith/KingmakerBuffPlanner/pull/1 (branch pushed
+  through the guarded helper; further commits below pushed after this
+  record). All Checkpoint 1/2/4 items complete; Checkpoint 3 complete except
+  the human seed; Checkpoint 5 NOT RUN pending the seed; Checkpoint 6 rebuilt.
+- Branch `codex/kingmaker-buff-planner-z-native-assignments`; continuation
+  commits: editor+gate `461d999`, fixture bootstrap + rod record `09a366e`,
+  records commit (this one). Deterministic gates: source 42/42, protocol
+  161/161, harness 12/12, package 4/4, WhatIf 5/5.
+- Candidate (supersedes 0d1a1af3): package SHA-256
+  `a9bf3ad363deed4187feb7c937c56491001b2ea8799095d9014d66475907d35b` at
+  `artifacts/release/0.1.0/KingmakerBuffPlanner-0.1.0.zip`, source commit
+  `09a366e`, DLL `679c2544...`, MVID `e6c10be8-5602-4076-ac3d-0aa6c36f4ec7`,
+  local-only.
+- Exact-rod identity: BLOCKED BY NATIVE CONTRACT (assembly evidence recorded
+  in the status doc): ItemEntity/ItemsCollection are object-rooted with no
+  durable instance identity; pooled per-caster semantics are correct and
+  remain the only offered behavior. Do not "fix" T03 by inventing identity.
+- THE ONE HUMAN ACTION (unblocks every live lane): in a Kingmaker session
+  the user controls, create a deliberately disposable campaign and save once
+  with the exact name `KBP_AUTOMATION_SEED` (any controllable moment). Then
+  run `powershell -ExecutionPolicy Bypass -File
+  scripts/New-KbpAutomationFixture.ps1 -Confirm:$false` and expect
+  "Fixture bootstrap PASS". Then execute Checkpoint 5 lanes from the status
+  doc (donor inventory -> rendered chooser -> assignment editor ->
+  spellbook -> casting/resource runs -> regressions) with the approved
+  harness, restoring after each run.
+
 # AUTONOMOUS-RESUME — see planning/Z-NATIVE-ASSIGNMENTS-STATUS.md for the live checkpoint tracker of the active Z native-assignments mission.
 
 ## Z native-assignments mission handoff — 2026-09-18 (LATEST)

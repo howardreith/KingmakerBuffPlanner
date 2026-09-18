@@ -1,5 +1,23 @@
 # AUTONOMOUS-BLOCKERS — top section is current
 
+## Z continuation blockers — 2026-09-18
+
+- LIVE LANES: waiting on ONE human-only seed save (`KBP_AUTOMATION_SEED`,
+  deliberately disposable campaign). The guarded bootstrap
+  (`scripts/New-KbpAutomationFixture.ps1`, harness-tested 12/12) seals the
+  pair and archives provenance once it exists. No other fixture route
+  remains: lab `runtime-backups`/`runtime-evidence` no longer exist, and
+  using any ordinary save is forbidden.
+- T03 exact rod identity: BLOCKED BY NATIVE CONTRACT, with assembly evidence
+  (no durable ItemEntity instance identity; positional/stacking storage;
+  per-owner+blueprint charge facts). Pooled semantics are the honest
+  behavior; UI and docs must not relabel them as exact control.
+- Theme donor promotion and spellbook placement/handoff/return verification
+  remain live-lane-only (blocked with the fixture above), not source
+  blockers.
+
+# AUTONOMOUS-BLOCKERS — top section is current
+
 ## Z native-assignments blockers — 2026-09-18
 
 - LIVE LANES BLOCKED: the authorized `KBP_AUTOMATION_BASELINE`/

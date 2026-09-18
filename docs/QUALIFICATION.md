@@ -1144,3 +1144,23 @@ SHA-256 `08f48a343fb96163fd539e97a6623de020831efa6827455b43e18d9e05d9b3ea`;
 MVID `86a94f76-7676-48bf-adfb-92b731dbfc92`; two deterministic builds
 reproduced the ZIP and DLL byte-identically. Publication status: local-only;
 no merge, tag, guarded push, or release.
+
+### 0.1.0 candidate rebuild after continuation fixes — 2026-09-18
+
+The earlier candidate (`0d1a1af3...`, source `ac0b91b`) is superseded: the
+continuation added the player-facing assignment editor, the material-change
+review gate, and a planner defect fix (optional targeting modifiers). New
+deterministic candidate (2/2 reproduced): package
+`artifacts/release/0.1.0/KingmakerBuffPlanner-0.1.0.zip` SHA-256
+`a9bf3ad363deed4187feb7c937c56491001b2ea8799095d9014d66475907d35b`; see
+`artifacts/release/0.1.0/release-manifest.json` for the exact commit, DLL
+hash, and MVID. Publication status remains local-only.
+
+Schema-migration rollback (validated in isolated profile copies by
+`profile-migrates-schema-one`): restore by copying
+`UserSettings/kbp-pre-schema-<id>.orig` over the campaign's
+`kingmaker-buff-planner-<id>.json` while the game is closed; the archived
+original is the schema-4 recovery material and an older DLL reads it
+natively. Normal campaign profiles are untouched by fixture testing because
+profiles are keyed per campaign and the disposable fixture campaign gets a
+fresh default profile.
