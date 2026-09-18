@@ -188,6 +188,7 @@ namespace KingmakerBuffPlanner.Tests
                 Run("material-plan-change-requires-renewed-review", TestPlanMaterialChangeDetector);
                 Run("assignment-editor-intent-regressions", TestAssignmentEditorIntent);
                 Run("review-state-and-material-signatures", TestReviewStateAndSignatures);
+                Run("unsupported-configured-requests-block-partial-apply", TestUnresolvableCoverage);
                 Run("cast-enhancement-execution-is-fail-closed-and-cleaned-up", TestCastEnhancementExecution);
                 Run("consumed-one-shot-enhancement-is-not-rearmed", TestOneShotEnhancementRestoration);
                 Run("execution-preflight-runs-under-the-native-activation-lease",
@@ -5654,6 +5655,53 @@ namespace KingmakerBuffPlanner.Tests
             if (materialChangeText == null)
                 throw new InvalidOperationException(
                     "A material-component cost change was not material.");
+        }
+
+        // F5: a routine with one ready buff plus one saved buff whose source
+        // cannot be resolved must not execute the supported subset silently.
+        // Default Apply submits zero casts; explicit ready-only may run the
+        // valid subset and must report the unresolved configured requests.
+        private static void TestUnresolvableCoverage()
+        {
+            AbilityKey ready = Ability("ready-spell", string.Empty, 0);
+            AbilityKey gone = Ability("gone-spell", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("unresolvable-slots",
+                ResourcePoolKind.Unlimited, 0, 0, null);
+            ProviderSnapshot caster = PlannerProvider("caster", "book",
+                ready, pool.PoolKey, 0);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(
+                new[] { caster }, new[] { pool }, "caster", "ally");
+            var option = new ProviderPlanningOption(caster,
+                new[] { "caster", "ally" }, new[] { "caster" }, 4, 40);
+            var effects = new Dictionary<string, EffectExpression> {
+                { ready.Canonical, Leaf("ready-buff") }
+                // 'gone' has no effects entry and no provider: unresolvable.
+            };
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault("unresolvable");
+            profile.Routines[0].Assignments.Add(Assignment(
+                ready.Canonical, ready, new[] { "ally" }));
+            profile.Routines[0].Assignments.Add(Assignment(
+                gone.Canonical, gone, new[] { "ally" }));
+            RoutinePlanResult result = new RoutinePlanService().Plan(profile, "long",
+                snapshot, new ActiveEffectSnapshot(null), effects, new[] { option });
+
+            if (result.Plan.Steps.Count != 1)
+                throw new InvalidOperationException("The ready buff did not plan.");
+            if (result.UnsupportedSourceIds.Count != 1 ||
+                result.UnsupportedSourceIds[0] != gone.Canonical)
+                throw new InvalidOperationException("The gone source was not flagged unsupported.");
+            if (result.Plan.UnresolvableRequests.Count != 1 ||
+                result.Plan.UnresolvableRequests[0].UnitId != "ally" ||
+                !result.Plan.UnresolvableRequests[0].Reason.Contains("source-unresolvable"))
+                throw new InvalidOperationException(
+                    "The gone source's configured targets vanished from requested coverage.");
+
+            PartialExecutionGate.Decision gate = PartialExecutionGate.Evaluate(result.Plan);
+            if (!gate.Blocked || gate.RequestedTargets != 2 || gate.PlannedCasts != 1 ||
+                gate.Unfulfilled != 1 || !gate.UnmetReasons[0].Contains("saved buff unavailable"))
+                throw new InvalidOperationException(
+                    "The partial gate did not count the unresolved configured request: " +
+                    gate.Summary);
         }
 
         private static void TestSpellbookHandoff()

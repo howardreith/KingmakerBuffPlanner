@@ -533,7 +533,8 @@ namespace KingmakerBuffPlanner.Domain.Planning
     {
         internal CastPlan(IEnumerable<CastStep> steps, IEnumerable<TargetPlanOutcome> outcomes,
             IEnumerable<string> diagnostics,
-            IEnumerable<ResourcePoolAllocation> resourceAllocations = null)
+            IEnumerable<ResourcePoolAllocation> resourceAllocations = null,
+            IEnumerable<TargetPlanOutcome> unresolvableRequests = null)
         {
             Steps = new ReadOnlyCollection<CastStep>(steps.ToList());
             Outcomes = new ReadOnlyCollection<TargetPlanOutcome>(outcomes
@@ -542,12 +543,20 @@ namespace KingmakerBuffPlanner.Domain.Planning
             Diagnostics = new ReadOnlyCollection<string>(diagnostics.ToList());
             ResourceAllocations = new ReadOnlyCollection<ResourcePoolAllocation>(
                 (resourceAllocations ?? new ResourcePoolAllocation[0]).ToList());
+            // Configured child/target requests whose saved source cannot be
+            // resolved at all (missing mod, unknown variant, ambiguous graph)
+            // stay in requested-coverage accounting instead of vanishing.
+            UnresolvableRequests = new ReadOnlyCollection<TargetPlanOutcome>(
+                (unresolvableRequests ?? new TargetPlanOutcome[0])
+                .OrderBy(o => o.AssignmentId, StringComparer.Ordinal)
+                .ThenBy(o => o.UnitId, StringComparer.Ordinal).ToList());
         }
 
         public IReadOnlyList<CastStep> Steps { get; private set; }
         public IReadOnlyList<TargetPlanOutcome> Outcomes { get; private set; }
         public IReadOnlyList<string> Diagnostics { get; private set; }
         public IReadOnlyList<ResourcePoolAllocation> ResourceAllocations { get; private set; }
+        public IReadOnlyList<TargetPlanOutcome> UnresolvableRequests { get; private set; }
 
         public ResourcePoolAllocation AllocationFor(string poolKey)
         {

@@ -57,8 +57,11 @@ namespace KingmakerBuffPlanner.UI
             var unmet = plan.Outcomes
                 .Where(o => o.Kind == TargetOutcomeKind.Unfulfilled)
                 .Select(o => o.UnitId + " (" + o.Reason + ")")
+                .Concat(plan.UnresolvableRequests.Select(o =>
+                    o.UnitId + " (saved buff unavailable: " + o.Reason + ")"))
                 .OrderBy(value => value, StringComparer.Ordinal).ToList();
-            return new Decision(unmet.Count != 0, plan.Outcomes.Count, fulfilled,
+            return new Decision(unmet.Count != 0,
+                plan.Outcomes.Count + plan.UnresolvableRequests.Count, fulfilled,
                 skipped, unmet.Count, plan.Steps.Count, unmet);
         }
     }
