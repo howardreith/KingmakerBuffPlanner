@@ -63,6 +63,95 @@ namespace KingmakerBuffPlanner.UI
         }
     }
 
+    // One party unit row inside the per-assignment target picker. Toggle is
+    // captured per row; assignment is the source of truth for [x] state.
+    public sealed class AssignmentTargetRowViewModel
+    {
+        internal AssignmentTargetRowViewModel(string unitId, string displayName,
+            bool assigned, bool canAssign, string reason, Action toggle)
+        {
+            UnitId = unitId;
+            DisplayName = displayName;
+            Assigned = assigned;
+            CanAssign = canAssign;
+            Reason = reason ?? string.Empty;
+            _toggle = toggle;
+        }
+
+        private readonly Action _toggle;
+        public string UnitId { get; private set; }
+        public string DisplayName { get; private set; }
+        public bool Assigned { get; private set; }
+        public bool CanAssign { get; private set; }
+        public string Reason { get; private set; }
+
+        public void Toggle() { _toggle(); }
+    }
+
+    // Flat, non-overlapping row plan for the casting-order editor: one
+    // header row per assignment followed by one row per explicit target, so
+    // any number of targets gets its own actionable controls instead of
+    // stacking into clamped coordinates.
+    public static class CastingOrderLayout
+    {
+        public const float HeaderRowHeight = 76f;
+        public const float TargetRowHeight = 34f;
+
+        public sealed class RowPlan
+        {
+            internal RowPlan(int index, string assignmentId, string unitId,
+                float top, float height)
+            {
+                Index = index;
+                AssignmentId = assignmentId;
+                UnitId = unitId;
+                Top = top;
+                Height = height;
+            }
+
+            public int Index { get; private set; }
+            public string AssignmentId { get; private set; }
+            public string UnitId { get; private set; }
+            public bool IsTargetRow { get { return UnitId != null; } }
+            public float Top { get; private set; }
+            internal float Height { get; private set; }
+            public float Bottom { get { return Top + Height; } }
+        }
+
+        public static IReadOnlyList<RowPlan> PlanRows(
+            IEnumerable<CastingAssignmentRowViewModel> rows)
+        {
+            if (rows == null) throw new ArgumentNullException("rows");
+            var plan = new List<RowPlan>();
+            float top = 0f;
+            int index = 0;
+            foreach (CastingAssignmentRowViewModel row in rows)
+            {
+                plan.Add(new RowPlan(index++, row.AssignmentId, null, top, HeaderRowHeight));
+                top += HeaderRowHeight;
+                foreach (string unitId in row.TargetUnitIds)
+                {
+                    plan.Add(new RowPlan(index++, row.AssignmentId, unitId,
+                        top, TargetRowHeight));
+                    top += TargetRowHeight;
+                }
+            }
+            return new ReadOnlyCollection<RowPlan>(plan);
+        }
+
+        public static float TotalHeight(IReadOnlyList<RowPlan> plan)
+        {
+            return plan.Count == 0 ? 0f : plan[plan.Count - 1].Bottom;
+        }
+
+        public static bool RowsAreDistinct(IReadOnlyList<RowPlan> plan)
+        {
+            for (int index = 1; index < plan.Count; index++)
+                if (plan[index].Top < plan[index - 1].Bottom) return false;
+            return true;
+        }
+    }
+
     // Assignment-scoped enhancement selection state for chooser binding.
     public sealed class EnhancementSelectionSummary
     {

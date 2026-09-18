@@ -186,6 +186,7 @@ namespace KingmakerBuffPlanner.Tests
                 Run("spellbook-handoff-waits-bounded-and-rolls-back", TestSpellbookHandoff);
                 Run("assignment-editor-model-supports-player-flows", TestAssignmentEditorModel);
                 Run("material-plan-change-requires-renewed-review", TestPlanMaterialChangeDetector);
+                Run("assignment-editor-intent-regressions", TestAssignmentEditorIntent);
                 Run("cast-enhancement-execution-is-fail-closed-and-cleaned-up", TestCastEnhancementExecution);
                 Run("consumed-one-shot-enhancement-is-not-rearmed", TestOneShotEnhancementRestoration);
                 Run("execution-preflight-runs-under-the-native-activation-lease",
@@ -5394,6 +5395,146 @@ namespace KingmakerBuffPlanner.Tests
                 reordered, reorderedSwapped);
             if (orderChange == null)
                 throw new InvalidOperationException("An allocation-order change was not material.");
+        }
+
+        // Editor-intent regressions from the PR review: unique automatic ids
+        // after pinning, no cross-child duplicates, clear-keeps-enhancements,
+        // split-preserves-configuration, unavailable-enhancement removal, the
+        // first assignment from an empty source, save/reload of the edited
+        // setup, and the flat non-overlapping target layout.
+        private static void TestAssignmentEditorIntent()
+        {
+            AbilityKey ability = Ability("intent-spell", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("intent-slots",
+                ResourcePoolKind.Unlimited, 0, 0, null);
+            ProviderSnapshot felix = PlannerProvider("felix", "felix-book",
+                ability, pool.PoolKey, 0);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(
+                new[] { felix }, new[] { pool }, "felix", "tias", "raine");
+            var option = new ProviderPlanningOption(felix,
+                new[] { "felix", "tias", "raine" }, new[] { "felix" }, 4, 40);
+            CastEnhancementSnapshot share = ClassEnhancement("share", "felix",
+                ability, "felix-book", 3, "reservoir|felix",
+                "brown-fur-share-transmutation", true);
+            var effects = new Dictionary<string, EffectExpression> {
+                { ability.Canonical, new EffectLeafExpression(EffectKind.Buff,
+                    "intent-buff", EffectTarget.Caster, "ContextActionApplyBuff", "root/apply") }
+            };
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault("intent");
+            var model = new PlannerSetupModel(profile, snapshot,
+                new ActiveEffectSnapshot(null), effects, new[] { option },
+                ignored => { }, new[] { share });
+            SetupSourceRow source = model.SelectedSource;
+
+            // First assignment from a completely empty source/routine.
+            CastingAssignmentProfile first = model.AddCastingAssignment("long", source.SourceId);
+            if (model.GetCastingAssignments("long", source.SourceId).Count != 1 ||
+                model.GetRoutineCastingOrder("long").Count != 1)
+                throw new InvalidOperationException(
+                    "Creating the first assignment from an empty source failed.");
+
+            // Pin the original automatic child, then portrait-toggle: the new
+            // automatic child must get a unique id and absorb the target.
+            model.ToggleAssignmentTarget("long", source.SourceId,
+                first.AssignmentId, "felix");
+            model.CycleCastingAssignmentCaster("long", source.SourceId, first.AssignmentId);
+            model.ToggleTarget("long", "tias");
+            List<CastingAssignmentProfile> children = model
+                .GetCastingAssignments("long", source.SourceId).ToList();
+            if (children.Count != 2 ||
+                children.Select(child => child.AssignmentId).Distinct(StringComparer.Ordinal)
+                    .Count() != 2)
+                throw new InvalidOperationException(
+                    "A pinned original automatic child caused an id reuse or merge.");
+            CastingAssignmentProfile automatic = children.First(child => child.IsAutomatic);
+            if (!automatic.TargetUnitIds.Contains("tias") ||
+                children.Any(child => child != automatic &&
+                    child.TargetUnitIds.Contains("tias")))
+                throw new InvalidOperationException(
+                    "A portrait toggle duplicated a target across children.");
+
+            // Split preserves pins and enhancement intent, and stays directly
+            // after its origin in the explicit order.
+            model.SetAssignmentEnhancement("long", source.SourceId,
+                automatic.AssignmentId, "share");
+            CastingAssignmentProfile split = model.SplitCastingAssignment(
+                "long", source.SourceId, automatic.AssignmentId, "tias");
+            if (split.Enhancements.Count != 1 ||
+                split.Enhancements[0].EnhancementId != "share" ||
+                !automatic.Enhancements.Select(e => e.EnhancementId).Contains("share"))
+                throw new InvalidOperationException(
+                    "Split dropped the origin row's enhancement intent instead of copying it.");
+            List<CastingAssignmentProfile> ordered = model.GetRoutineCastingOrder("long").ToList();
+            int splitIndex = ordered.FindIndex(child => child.AssignmentId == split.AssignmentId);
+            int originIndex = ordered.FindIndex(child =>
+                child.AssignmentId == automatic.AssignmentId);
+            if (splitIndex != originIndex + 1)
+                throw new InvalidOperationException(
+                    "Split row did not keep the position immediately after its origin.");
+
+            // Clearing all valid targets keeps configured enhancements.
+            model.SetAllValidTargets("long", false);
+            children = model.GetCastingAssignments("long", source.SourceId).ToList();
+            if (children.Count == 0)
+                throw new InvalidOperationException(
+                    "Clearing targets silently discarded configured enhancement intent.");
+
+            // An unavailable saved enhancement stays individually removable
+            // without first becoming applicable again.
+            model.SetAssignmentEnhancement("long", source.SourceId,
+                automatic.AssignmentId, "share");
+            var reloadedModel = new PlannerSetupModel(profile, snapshot,
+                new ActiveEffectSnapshot(null), effects, new[] { option },
+                ignored => { });
+            CastingAssignmentProfile reloadedAutomatic = reloadedModel
+                .GetCastingAssignments("long", source.SourceId)
+                .First(child => child.Enhancements.Any(selection =>
+                    selection.EnhancementId == "share"));
+            string reloadedId = reloadedAutomatic.AssignmentId;
+            reloadedModel.SetAssignmentEnhancement("long", source.SourceId,
+                reloadedId, "share");
+            if (reloadedModel.GetAssignmentEnhancementIds("long", source.SourceId, reloadedId)
+                    .Contains("share"))
+                throw new InvalidOperationException(
+                    "An unavailable saved enhancement could not be removed without applicability.");
+
+            // Save/reload round-trip of the edited configuration.
+            string modPath = Path.Combine(Path.GetTempPath(),
+                "kbp-intent-roundtrip-" + Guid.NewGuid().ToString("N"));
+            var repository = new ProfileRepository(modPath);
+            repository.Save(profile);
+            BuffPlannerProfile loaded = repository.Load(profile.CampaignId).Profile;
+            int configured = profile.Routines[0].Assignments
+                .SelectMany(a => a.CastingAssignments).Count();
+            int loadedCount = loaded.Routines[0].Assignments
+                .SelectMany(a => a.CastingAssignments).Count();
+            if (loadedCount != configured)
+                throw new InvalidOperationException(
+                    "The edited multi-assignment configuration did not round-trip.");
+
+            // Flat target layout: every explicit target owns its own row for
+            // 1, 2, 6, and 10 targets without overlap.
+            foreach (int targetCount in new[] { 1, 2, 6, 10 })
+            {
+                var rowModel = new CastingAssignmentRowViewModel(1, "S", "s",
+                    new CastingAssignmentProfile
+                    {
+                        AssignmentId = "a", Order = 0,
+                        TargetUnitIds = Enumerable.Range(1, targetCount)
+                            .Select(index => "u" + index).ToList(),
+                        Enhancements = new List<EnhancementSelectionProfile>()
+                    }, "Automatic", false,
+                    Enumerable.Range(1, targetCount).Select(index => "u" + index).ToList(),
+                    new string[0], 0, 0, 0, false, false, true);
+                IReadOnlyList<CastingOrderLayout.RowPlan> plan =
+                    CastingOrderLayout.PlanRows(new[] { rowModel });
+                if (plan.Count != 1 + targetCount ||
+                    !CastingOrderLayout.RowsAreDistinct(plan) ||
+                    plan.Count(row => row.IsTargetRow) != targetCount)
+                    throw new InvalidOperationException(
+                        "The flat casting-order layout overlapped or dropped rows for " +
+                        targetCount + " targets.");
+            }
         }
 
         private static void TestSpellbookHandoff()

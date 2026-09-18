@@ -222,7 +222,7 @@ namespace KingmakerBuffPlanner.UI
     {
         internal EnhancementChoiceViewModel(string enhancementId, string title, string summary,
             string description, bool selected, bool available,
-            bool checkboxStyle = false)
+            bool checkboxStyle = false, bool affectsTargeting = false)
         {
             EnhancementId = enhancementId ?? string.Empty;
             Title = title ?? string.Empty;
@@ -231,6 +231,7 @@ namespace KingmakerBuffPlanner.UI
             Selected = selected;
             Available = available;
             CheckboxStyle = checkboxStyle;
+            AffectsTargeting = affectsTargeting;
         }
 
         public string EnhancementId { get; private set; }
@@ -240,6 +241,7 @@ namespace KingmakerBuffPlanner.UI
         public bool Selected { get; private set; }
         public bool Available { get; private set; }
         public bool CheckboxStyle { get; private set; }
+        public bool AffectsTargeting { get; private set; }
     }
 
     public sealed class ProviderPolicyRowViewModel
@@ -531,7 +533,7 @@ namespace KingmakerBuffPlanner.UI
             if (!available) description = "Unavailable: " + description;
             return new EnhancementChoiceViewModel(value.EnhancementId, value.DisplayName,
                 summary, description, selected, available,
-                value.AffectsTargeting);
+                value.AffectsTargeting, value.AffectsTargeting);
         }
 
     }

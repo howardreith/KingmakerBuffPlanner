@@ -193,9 +193,37 @@ namespace KingmakerBuffPlanner.UI
                 .FirstOrDefault(item => item.SourceId == source.SourceId);
             CastingAssignmentProfile casting = AutomaticChild(routine, assignment, source);
             if (casting == null) return;
+            if (assignment == null)
+            {
+                // AutomaticChild created the parent; track it locally.
+                assignment = routine.Assignments.First(item =>
+                    item.SourceId == source.SourceId);
+            }
             if (casting.TargetUnitIds.Contains(unitId))
+            {
                 casting.TargetUnitIds.Remove(unitId);
-            else casting.TargetUnitIds.Add(unitId);
+            }
+            else
+            {
+                // A target already on another child of this source must move,
+                // not duplicate: the simple portrait view is authoritative.
+                foreach (CastingAssignmentProfile sibling in assignment.CastingAssignments
+                    .Where(child => child != casting && child.TargetUnitIds.Contains(unitId))
+                    .ToList())
+                    sibling.TargetUnitIds.Remove(unitId);
+                PruneEmptyAssignment(routine, assignment);
+                // Re-resolve: pruning may have rebuilt the automatic child.
+                assignment = routine.Assignments
+                    .FirstOrDefault(item => item.SourceId == source.SourceId);
+                if (assignment == null)
+                {
+                    assignment = CreateAssignment(source);
+                    routine.Assignments.Add(assignment);
+                }
+                casting = AutomaticChild(routine, assignment, source);
+                if (casting == null) return;
+                casting.TargetUnitIds.Add(unitId);
+            }
             PruneEmptyAssignment(routine, assignment);
             _save(Profile);
         }
@@ -271,9 +299,11 @@ namespace KingmakerBuffPlanner.UI
             if (next.Count == 0)
             {
                 if (assignment == null) return;
-                foreach (CastingAssignmentProfile casting in assignment.CastingAssignments
-                    .Where(child => child.IsAutomatic).ToList())
-                    assignment.CastingAssignments.Remove(casting);
+                // Clearing targets clears targets: enhancements and pins on
+                // the automatic child stay configured as intent.
+                foreach (CastingAssignmentProfile casting in assignment.CastingAssignments)
+                    if (casting.IsAutomatic)
+                        casting.TargetUnitIds = new List<string>();
                 PruneEmptyAssignment(routine, assignment);
                 _save(Profile);
                 return;
@@ -689,11 +719,18 @@ namespace KingmakerBuffPlanner.UI
             {
                 AssignmentId = NextManualAssignmentId(routine),
                 Order = casting.Order,
-                CasterUnitId = null,
-                SpellbookGuid = null,
-                ProviderKey = null,
+                // Splitting divides the target list, not the configuration:
+                // pins and enhancement selections carry to the new row.
+                CasterUnitId = casting.CasterUnitId,
+                SpellbookGuid = casting.SpellbookGuid,
+                ProviderKey = casting.ProviderKey,
                 TargetUnitIds = new List<string> { unitId },
-                Enhancements = new List<EnhancementSelectionProfile>()
+                Enhancements = casting.Enhancements
+                    .Select(selection => new EnhancementSelectionProfile
+                    {
+                        EnhancementId = selection.EnhancementId,
+                        Required = selection.Required
+                    }).ToList()
             };
             casting.TargetUnitIds.Remove(unitId);
             // The split child allocates immediately after its origin so the
@@ -801,8 +838,13 @@ namespace KingmakerBuffPlanner.UI
             FindRoutine(routineId);
             CastingAssignmentProfile casting = FindCastingAssignment(
                 routineId, sourceId, assignmentId);
-            if (!string.IsNullOrWhiteSpace(enhancementId) && !GetApplicableEnhancements()
-                .Any(value => value.EnhancementId == enhancementId))
+            // Removal never requires the enhancement to be available again;
+            // only adding a new selection checks current applicability.
+            bool isRemoval = casting.Enhancements.Any(selection =>
+                selection.EnhancementId == enhancementId);
+            if (!isRemoval && !string.IsNullOrWhiteSpace(enhancementId) &&
+                !GetApplicableEnhancements()
+                    .Any(value => value.EnhancementId == enhancementId))
                 throw new InvalidOperationException(
                     "The enhancement is not currently applicable and available.");
             var selected = new List<string>(casting.Enhancements
@@ -831,6 +873,42 @@ namespace KingmakerBuffPlanner.UI
                         .Select(existing => existing.Required)
                         .DefaultIfEmpty(true).First()
                 }).ToList();
+            _save(Profile);
+        }
+
+        // Editor-side target addition/removal for one child assignment.
+        // Legal targets toggle in; removal always works, including for
+        // targets that have become invalid or vanished from the party.
+        public void ToggleAssignmentTarget(string routineId, string sourceId,
+            string assignmentId, string unitId)
+        {
+            SetupSourceRow source = Sources.FirstOrDefault(value => value.SourceId == sourceId);
+            if (source == null) throw new ArgumentException("Unknown source.", "sourceId");
+            RoutineProfile routine = FindRoutine(routineId);
+            CastingAssignmentProfile casting = FindCastingAssignment(
+                routineId, sourceId, assignmentId);
+            if (casting.TargetUnitIds.Contains(unitId))
+            {
+                casting.TargetUnitIds.Remove(unitId);
+            }
+            else
+            {
+                if (!Snapshot.Units.Any(unit => unit.UnitId == unitId))
+                    throw new ArgumentException("Unknown unit.", "unitId");
+                if (!IsTargetLegal(source, routineId, unitId))
+                    throw new InvalidOperationException(
+                        "The selected buff cannot target this character.");
+                // Never duplicate across siblings of the same source.
+                SourceAssignmentProfile parent = routine.Assignments
+                    .First(value => value.SourceId == sourceId);
+                foreach (CastingAssignmentProfile sibling in parent.CastingAssignments
+                    .Where(child => child != casting && child.TargetUnitIds.Contains(unitId))
+                    .ToList())
+                    sibling.TargetUnitIds.Remove(unitId);
+                casting.TargetUnitIds.Add(unitId);
+            }
+            PruneEmptyAssignment(routine, routine.Assignments
+                .First(value => value.SourceId == sourceId));
             _save(Profile);
         }
 
@@ -1084,7 +1162,16 @@ namespace KingmakerBuffPlanner.UI
 
         private static string NextAssignmentId(RoutineProfile routine, string sourceId)
         {
-            return "auto-" + sourceId;
+            // The original automatic child keeps the plain id; if it was
+            // pinned or another child already claimed it, later automatic
+            // children get a stable numeric suffix so ids stay unique.
+            var used = new HashSet<string>(routine.Assignments.SelectMany(
+                assignment => assignment.CastingAssignments.Select(child => child.AssignmentId)),
+                StringComparer.Ordinal);
+            string candidate = "auto-" + sourceId;
+            int suffix = 2;
+            while (used.Contains(candidate)) candidate = "auto-" + sourceId + "-" + suffix++;
+            return candidate;
         }
 
         private static int NextOrder(RoutineProfile routine)

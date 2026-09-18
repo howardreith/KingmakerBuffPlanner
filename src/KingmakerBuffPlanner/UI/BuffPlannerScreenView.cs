@@ -9,6 +9,7 @@ using Kingmaker.UI.Common;
 using Kingmaker.UnitLogic.Abilities.Blueprints;
 using KingmakerBuffPlanner.Domain.Identity;
 using KingmakerBuffPlanner.Persistence;
+using KingmakerBuffPlanner.Domain.Providers;
 using KingmakerBuffPlanner.Planning;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -47,6 +48,7 @@ namespace KingmakerBuffPlanner.UI
         private PlannerSettingsView _settings;
         private PlannerDescriptionModal _description;
         private PlannerCastingOrderView _castingOrder;
+        private PlannerAssignmentTargetChooserView _assignmentTargetChooser;
         private PlannerNativeThemeSurface _nativeTheme;
         private Button _executeButton;
         private Button _readyOnlyButton;
@@ -578,7 +580,10 @@ namespace KingmakerBuffPlanner.UI
                         _session.Model.SelectedSourceId, fromAssignmentId,
                         toAssignmentId, unitId);
                 },
-                OpenAssignmentEnhancementChooser);
+                OpenAssignmentEnhancementChooser,
+                OpenAssignmentTargetChooser);
+            _assignmentTargetChooser = new PlannerAssignmentTargetChooserView(
+                _root, _theme, () => OpenCastingOrder(), ShowTooltip, ApplyNativeThemeTo);
             BuildFooter(frame);
             _settings = new PlannerSettingsView(frame, _theme, () =>
             {
@@ -638,6 +643,48 @@ namespace KingmakerBuffPlanner.UI
             _enhancementChooser.Hide();
             _casterPolicyChooser.Hide();
             _castingOrder.Show(ActiveRoutineId);
+        }
+
+        private void OpenAssignmentTargetChooser(string sourceId, string assignmentId)
+        {
+            PlannerSetupModel model = _session.Model;
+            SetupSourceRow source = model == null ? null : model.SelectedSource;
+            if (source == null || source.SourceId != sourceId) return;
+            _castingOrder.Hide();
+            _enhancementChooser.Hide();
+            _casterPolicyChooser.Hide();
+            List<CastingAssignmentProfile> children = model
+                .GetCastingAssignments(ActiveRoutineId, sourceId).ToList();
+            CastingAssignmentProfile current = children.FirstOrDefault(child =>
+                child.AssignmentId == assignmentId);
+            if (current == null) return;
+            var rows = new List<AssignmentTargetRowViewModel>();
+            foreach (UnitSnapshot unit in model.Snapshot.Units)
+            {
+                string unitId = unit.UnitId;
+                bool assigned = current.TargetUnitIds.Contains(unitId);
+                bool legal = false;
+                string reason = string.Empty;
+                try
+                {
+                    legal = model.IsTargetLegal(source, ActiveRoutineId, unitId);
+                }
+                catch (Exception) { legal = false; }
+                if (!legal && !assigned)
+                    reason = "not a legal target for this buff";
+                rows.Add(new AssignmentTargetRowViewModel(unitId,
+                    string.IsNullOrWhiteSpace(unit.DisplayName) ? unitId : unit.DisplayName,
+                    assigned, legal, reason, () =>
+                    {
+                        try
+                        {
+                            model.ToggleAssignmentTarget(ActiveRoutineId, sourceId,
+                                assignmentId, unitId);
+                        }
+                        catch (InvalidOperationException) { }
+                    }));
+            }
+            _assignmentTargetChooser.Show(source.DisplayName + " — " + assignmentId, rows);
         }
 
         private void AddSelectedSourceAssignment()
