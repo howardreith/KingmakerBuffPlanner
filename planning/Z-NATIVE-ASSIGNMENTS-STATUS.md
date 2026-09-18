@@ -313,4 +313,21 @@ absent; placement/handoff/return not runtime-qualified).
 
 ## Checkpoint F — full reskin, regression qualification, candidate
 
-Status: NOT STARTED.
+Status: RECORDS/CANDIDATE COMPLETE — full native reskin and every live lane
+remain BLOCKED (fixture absent); regression matrix is the deterministic suite
+above plus the open manual checklist.
+
+- Version 0.1.0 chosen from actual repository metadata (0.0.19 published).
+- Docs updated: release notes draft, CHANGELOG, README, IMPLEMENTATION-REPORT,
+  QUALIFICATION, MANUAL-ACCEPTANCE, journal/resume/blockers, this tracker.
+- Candidate (local-only, commit `ac0b91ba44192779624ec2774e94351ac27e8388`):
+  package `artifacts/release/0.1.0/KingmakerBuffPlanner-0.1.0.zip` SHA-256
+  `0d1a1af312dc768b229c174a43982cdc469ab7746249527bfa237ded5e064b92`; DLL
+  SHA-256 `08f48a343fb96163fd539e97a6623de020831efa6827455b43e18d9e05d9b3ea`;
+  MVID `86a94f76-7676-48bf-adfb-92b731dbfc92`; deterministic builds 2/2.
+- Full reskin note: the B capability layer themes all planner-root buttons,
+  paper frames, search input, chooser scrollbars, and rebuilt rows; the
+  remaining surfaces intentionally keep the readable parchment style until
+  the live inventory promotes the scan donors — propagating unverified
+  donor assumptions is explicitly out of scope per the mission.
+- No merge, no tag, no guarded push, no publication.

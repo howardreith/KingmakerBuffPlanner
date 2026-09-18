@@ -1134,3 +1134,13 @@ at 1280x720/1920x1080/high-DPI, HUD quick-run partial-apply behavior in game,
 and performance comparison against the 0.0.19 baseline. A Kingmaker process
 started during qualification; the deployment guard refused correctly and
 nothing was touched.
+
+### 0.1.0 candidate identity (local-only)
+
+Source commit `ac0b91ba44192779624ec2774e94351ac27e8388`; package
+`artifacts/release/0.1.0/KingmakerBuffPlanner-0.1.0.zip` SHA-256
+`0d1a1af312dc768b229c174a43982cdc469ab7746249527bfa237ded5e064b92`; DLL
+SHA-256 `08f48a343fb96163fd539e97a6623de020831efa6827455b43e18d9e05d9b3ea`;
+MVID `86a94f76-7676-48bf-adfb-92b731dbfc92`; two deterministic builds
+reproduced the ZIP and DLL byte-identically. Publication status: local-only;
+no merge, tag, guarded push, or release.
