@@ -1,5 +1,29 @@
 # AUTONOMOUS-RESUME — top section is current; planning/Z-NATIVE-ASSIGNMENTS-STATUS.md is the per-checkpoint tracker.
 
+## PR1 repair follow-up handoff — 2026-09-18 (LATEST)
+
+- Status: ALL SIX SOURCE FINDINGS REPAIRED with regressions (F1 bootstrap
+  guard bypass + recoverable transaction; F2 assignment editor; F3 real
+  sequential forecast; F4 acknowledged review state + full cost signature;
+  F5 unresolvable-request coverage; F6 spellbook opener/deferred
+  presentation/recovery). Gates: source 42/42, protocol 165/165, harness
+  18/18, package 4/4, WhatIf 5/5.
+- Candidate: package SHA-256
+  `79142e31cc39f829509804898e667023b5bdad7458068f697cd44bbb39d3a2fa`,
+  source `4ccd119`, DLL `75a81b22`, MVID `8ef72d40-681a-4ac3-aa56-6e4a9623c70c`,
+  local-only. Draft PR #1 body updated.
+- Spellbook same-context return: EXPLICIT GAP, not a live-test placeholder —
+  no verified offline native spellbook-reopen contract exists; recovery
+  lands in the planner instead and logs the missing contract.
+- THE ONE HUMAN ACTION (unchanged): create a genuinely NEW disposable
+  campaign, save once named exactly `KBP_AUTOMATION_SEED` at a controllable
+  moment, fully exit Kingmaker. Then run the REPAIRED
+  `scripts/New-KbpAutomationFixture.ps1 -Confirm:$false` (guard now really
+  checks for a running game). Then provision the casting fixture through
+  the disposable-fixture process and run the live lanes.
+
+# AUTONOMOUS-RESUME — top section is current; planning/Z-NATIVE-ASSIGNMENTS-STATUS.md is the per-checkpoint tracker.
+
 ## Z continuation mission handoff — 2026-09-18 (LATEST)
 
 - Status: REVIEWABLE + COMPLETION WORK DONE, live lanes awaiting ONE

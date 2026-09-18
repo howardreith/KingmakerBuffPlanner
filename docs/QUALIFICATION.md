@@ -1164,3 +1164,19 @@ original is the schema-4 recovery material and an older DLL reads it
 natively. Normal campaign profiles are untouched by fixture testing because
 profiles are keyed per campaign and the disposable fixture campaign gets a
 fresh default profile.
+
+### 0.1.0 candidate rebuild after PR1 repairs — 2026-09-18
+
+Supersedes every earlier 0.1.0 hash. Deterministic 2/2. Source commit
+`4ccd1197562fbfa2b196eb631267686e65403868`; package
+`artifacts/release/0.1.0/KingmakerBuffPlanner-0.1.0.zip` SHA-256
+`79142e31cc39f829509804898e667023b5bdad7458068f697cd44bbb39d3a2fa`; DLL
+SHA-256 `75a81b2251fcbc47064ed3260a02be8dc73c83eee86781ec0c1c1afcd411664c`;
+MVID `8ef72d40-681a-4ac3-aa56-6e4a9623c70c`. Gates: source 42/42, protocol
+165/165, harness 18/18 (bootstrap guard reproduction included), package 4/4,
+deployment WhatIf 5/5. Publication status: local-only.
+
+The repaired bootstrap has NOT been run against the real save directory and
+will not be until a `KBP_AUTOMATION_SEED` created by the user exists; the
+guard, staging, rollback, recovery, and teardown paths are proven only in
+the isolated harness fixture roots so far.
