@@ -1,3 +1,24 @@
+# AUTONOMOUS-BLOCKERS — top section is current
+
+## Z native-assignments blockers — 2026-09-18
+
+- LIVE LANES BLOCKED: the authorized `KBP_AUTOMATION_BASELINE`/
+  `KBP_AUTOMATION_WORKING` pair is absent; only `Manual_298_KMG_*` and
+  `Manual_299_KMG_*` remain and belong to another product (protected). All
+  save-backed qualification for the 0.1.0 candidate is BLOCKED, not deferred
+  to speculation. A Kingmaker process also started during qualification; the
+  deployment guard refused correctly and nothing was touched.
+- Theme donors UNQUALIFIED-LIVE: BoundedScan locators (button label text,
+  body text, input, scrollbar) need one live inventory capture to promote to
+  proven paths; exact sprite-name/border contracts deliberately unasserted
+  until then.
+- Spellbook entry: native-close affordance lookup assumes a child Button
+  named `Close`; placement, duplicate prevention across owners, and the
+  same-context return trip are unverified and unclaimed.
+- T03 exact rod-instance identity: cannot be proven without the installed
+  game's live item contracts; legacy pooled selections remain pooled and no
+  exact-item pin is claimed.
+
 # Autonomous Blockers
 
 ## 2026-09-06 failed human validation: routing diagnosis

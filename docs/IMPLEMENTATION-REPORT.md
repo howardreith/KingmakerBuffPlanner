@@ -728,3 +728,43 @@ Phase 10 now has a composed routine service with one shared ledger across source
 Phase 11 has strict schema-1 compatibility profiles, exact directory/file identity validation, transaction-owned optional-mod staging, profile-bound request/result contracts, exact blueprint ownership, representative optional assertions, strict UMM ID/version and duplicate identity checks, and deterministic ordered Harmony patch inventories. On commit `57ed740`, native-only passed twice at 12/12 and exact Call of the Wild 1.14.4c-2.1 passed twice at 26/26. The optional catalog has 7,342 owned abilities, 4,937 candidates, 2,096 included, and zero unsupported. Tabletop Added Rules and the combined profile are explicitly unavailable locally; save-backed compatibility execution remains deferred because no authorized `KBP_` fixture exists.
 
 Phase 12 adds clean-head deterministic release packaging, a lab-local guarded push policy with a mutation-free repository test, current install/use documentation, draft local-only release notes, and a composed no-save core scenario. Commit `3af45f3` passed that scenario twice at 22/22 with byte-identical catalog and Harmony evidence plus the complete UI lifecycle/layout gate. The exhaustive Definition-of-Done matrix retains every missing save-backed core row as unmet.
+
+
+## Z native-assignments mission — 2026-09-18
+
+Implemented on branch `codex/kingmaker-buff-planner-z-native-assignments` from
+the pushed diagnosis HEAD `164737e` (preserving its Share diagnostics work),
+with `main` at the mission anchor `fd0e6dc`. Version bumped from actual
+repository metadata: 0.0.19 to 0.1.0.
+
+- Checkpoint A: enhancement and caster-policy chooser overflow repaired by
+  giving each chooser's scroll content exactly one height owner
+  (`ChooserScrollLayoutContract`), wiring an optional right-gutter scrollbar
+  into the shared factory without changing the BuffGrid/DescriptionModal
+  contracts, preserving offsets across toggle rebuilds, and revealing the
+  first selected row on fresh open.
+- Checkpoint B: Buff-Planner-owned native theme capability layer
+  (`NativeThemeModel/DonorLookup/Resolver/Recovery`, `ControlCaptionFit`,
+  `PlannerNativeTheme`, `PlannerNativeThemeSurface`): proven StaticCanvas
+  paths for paper/buttons/ornament, bounded structural scans for the rest,
+  per-capability accept/reject with locator provenance, stale donor discard,
+  bounded recovery, full-state-only SpriteSwap borrowing, one native
+  click-sound route, and grow-only caption fit at rebuild boundaries.
+- Checkpoint C: schema-5 child casting assignments with stable identity,
+  explicit routine-wide order, hard pins, ordered targets, and
+  required-by-default enhancement selections; allocation in explicit order
+  with one authoritative per-pool accounting and assignment traces;
+  lossless v4 migration with an out-of-rotation archive of the exact
+  original; no silent pruning of configured intent; assignment-level editing
+  APIs on `PlannerSetupModel`.
+- Checkpoint D: `PartialExecutionGate` shared by planner Apply and HUD
+  quick-run; explicit Apply Ready Casts Only; Casting Order & Resources view
+  (numbered rows, Earlier/Later, per-pool lines with competing demand,
+  combined one-run-per-routine forecast with stated assumptions).
+- Checkpoint E: owned spellbook button with bounded single-path discovery,
+  out-of-layout attachment, handoff through the spellbook's own close
+  affordance, pure bounded state machine, and rollback.
+- Gates: source 42/42, protocol 159/159, harness 8/8, package 4/4,
+  deployment WhatIf 5/5, deterministic Release build PASS. Live runtime,
+  visual, and spellbook lanes are BLOCKED on the absent `KBP_AUTOMATION`
+  fixture pair and are not claimed anywhere.

@@ -1111,3 +1111,26 @@ Phase 12 composed no-save core qualification PASS twice:
 | `phase12-no-save-core-2` | 22/22 | same byte-for-byte | same | exact PASS |
 
 Both fresh processes used clean commit `3af45f3329df300dc0616da9393480abee8547ce`, package SHA-256 `c2ea8a3dbbfb1cbe670be422b33e11a8afddfeaac4ae27902d69f8c5f6febc19`, DLL SHA-256 `a4b56a59104f5ddcac8a4184ebc4f779216f83aaeb4c0b7e199da9dcfa650413`, and MVID `193901f8-0863-4622-8885-f35880e5daf9`. Each composed identity, full catalog/expression reconciliation, ordered Harmony inventory, and UI lifecycle/layout checks in one process. This is the applicable NO-SAVE core, not executor equivalence; the save-backed core remains unmet.
+
+
+## 0.1.0 candidate qualification — 2026-09-18
+
+Deterministic: source validation 42/42; protocol 159/159 including the
+mission gate fixtures (mixed-caster four-cast routing with Share only on
+configured non-self targets; 9/3/3/6 shortage accounting; explicit-order
+allocation beating catalog order; lossless idempotent schema-5 migration
+with archived original; no-prune intent preservation; partial-apply gate;
+forecast balance carry; bounded spellbook handoff); runtime harness
+filesystem 8/8; package validation 4/4; deployment WhatIf purity 5/5;
+deterministic Release build PASS.
+
+BLOCKED (not claimed): every save-backed live lane. The authorized
+`KBP_AUTOMATION_BASELINE`/`KBP_AUTOMATION_WORKING` pair is absent from this
+machine (only `KMG_` fixtures belonging to another product remain, protected).
+Affected open lanes: rendered chooser measurements, native theme live
+qualification and donor inventory promotion, exact rod-instance identity,
+9/3/3/6 rendered navigation, spellbook placement/handoff/return, visual matrix
+at 1280x720/1920x1080/high-DPI, HUD quick-run partial-apply behavior in game,
+and performance comparison against the 0.0.19 baseline. A Kingmaker process
+started during qualification; the deployment guard refused correctly and
+nothing was touched.

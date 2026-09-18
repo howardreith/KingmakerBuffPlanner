@@ -1,3 +1,35 @@
+# AUTONOMOUS-RESUME — see planning/Z-NATIVE-ASSIGNMENTS-STATUS.md for the live checkpoint tracker of the active Z native-assignments mission.
+
+## Z native-assignments mission handoff — 2026-09-18 (LATEST)
+
+- Status: 0.1.0 CANDIDATE PREPARED, all checkpoints source/build complete;
+  every save-backed live lane BLOCKED (authorized `KBP_AUTOMATION` fixture
+  pair absent; only protected `KMG_` fixtures remain). Not fully complete;
+  do not label the mission complete while mandatory live acceptance is
+  unproven.
+- Branch: `codex/kingmaker-buff-planner-z-native-assignments` (local, unpushed
+  beyond the inherited diagnosis branch base `164737e`). No merge to main, no
+  tag, no release, no guarded push run for this work.
+- Checkpoints: A overflow repair `a588538`; B theme foundation `3721932`;
+  C schema-5 assignments `27156d2`; D casting order/partial apply `dc192a0`;
+  E spellbook entry `ef8b1b3`; F records/version/package (final commit).
+- Gates: source 42/42, protocol 159/159, harness 8/8, package 4/4,
+  deployment WhatIf 5/5, deterministic Release build PASS. Candidate
+  package/hashes: see `docs/QUALIFICATION.md` 0.1.0 section and
+  `artifacts/release/0.1.0/`.
+- Open blockers: (1) no authorized `KBP_AUTOMATION_BASELINE`/`WORKING` save
+  pair — blocks every live lane including rendered chooser/theme/spellbook
+  qualification and T03 exact rod identity; (2) theme donor inventory
+  promotion (BoundedScan locators need a live capture); (3) spellbook
+  native-close affordance assumption (`Close` button name) unverified live;
+  (4) same-context return-to-spellbook not implemented (no verified native
+  reopen API).
+- Exact next safe action: recreate/import the authorized fixture pair through
+  the guarded process, then run the live qualification lanes starting with
+  `ui-polish`-style donor inventory capture to promote the scan locators,
+  followed by rendered chooser/spellbook acceptance per
+  `docs/MANUAL-ACCEPTANCE.md` 0.1.0 checklist.
+
 # Autonomous Resume
 
 ## 2026-09-06 failed human validation: routing diagnosis

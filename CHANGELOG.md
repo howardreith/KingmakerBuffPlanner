@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.1.0 - precise casting assignments and one allocation result
+
+- Adds schema-5 child casting assignments beneath each catalog source: stable
+  identity, explicit routine-wide order, caster/spellbook/provider pins as
+  hard constraints, ordered explicit targets, and required-by-default
+  enhancement selections with an explicit omit-when-unavailable policy that
+  never drops targeting modifiers such as Share.
+- Makes allocation run in the explicit assignment order with one
+  authoritative per-pool accounting (available, requested, allocated, unmet,
+  forecast) traced to assignments; budgets per actual cast, never reserves
+  for already-active skips, and diagnoses enhancement/native pool-key
+  collisions instead of double-spending.
+- Migrates schema-4 profiles losslessly to one legacy-equivalent automatic
+  assignment per source, archives the exact pre-migration original outside
+  the rotating backup chain, keeps migration idempotent, and never silently
+  prunes configured intent when casters, items, or enhancements become
+  unavailable.
+- Adds the Casting Order and Resource Usage view with Earlier/Later controls,
+  competing configured demand from other routines, and the read-only combined
+  forecast carrying balances across one occurrence of each selected routine.
+- Blocks implicit partial application behind a gate shared by planner Apply
+  and the HUD quick-run; adds the explicit Apply Ready Casts Only control.
+- Adds an owned spellbook Buff Planner button with a bounded guarded handoff
+  through the spellbook's own close affordance (live placement pending).
+- Repairs enhancement and caster-policy chooser overflow with owned content
+  height, a visible scrollbar, reachable final rows, and refresh-stable
+  scroll positions.
+- Adds the native theme capability foundation: independent parchment, button,
+  text, input, scrollbar, ornament, and sound donors with bounded recovery,
+  partial-donor fallback, full-state-only sprite borrowing, measured
+  captions, and one native click-sound route.
+
 ## 0.0.19 - instant Share Transmutation integration
 
 - Adds a versioned, reflection-only bridge to the Brown-Fur provider's native

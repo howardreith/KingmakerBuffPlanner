@@ -1567,3 +1567,29 @@ Status: ROOT CAUSE PROVEN; 0.0.4 SOURCE PASS; LIVE QUALIFICATION PENDING
 - Rejected: reverting scoped discovery, restoring a global search, deleting deferred validation, or attributing the defect to non-UI systems.
 - Uncertainty: fresh campaign qualification depends on an exact authorized `KBP_AUTOMATION_BASELINE` / `KBP_AUTOMATION_WORKING` pair; fixture availability will be re-audited after deterministic repair.
 - Exact next action: implement explicit install/candidate outcomes, suspended unload state, bounded retry, and hosting-chain liveness; then add deterministic tests.
+
+# 2026-09-18 - Z native-assignments mission (0.1.0 candidate)
+
+- Branch `codex/kingmaker-buff-planner-z-native-assignments` from pushed
+  diagnosis HEAD `164737e`; `main` at anchor `fd0e6dc`; baseline suite green
+  (42/42, 150/150, 8/8, 4/4, 5/5).
+- A: chooser overflow repaired (single height owner + optional scrollbar +
+  refresh-stable offsets); kept separately reviewable in `a588538`.
+- B: native theme capability layer with bounded donors, partial fallback,
+  full-state-only sprite borrowing, one click-sound route; UNQUALIFIED-LIVE.
+  A Kingmaker process started mid-qualification; the deployment guard stopped
+  the run correctly and was not bypassed.
+- C: schema-5 child assignments (identity/order/pins/targets/enhancement
+  policy), explicit-order allocation, one per-pool accounting with traces,
+  lossless archived migration, no silent pruning; canonical fixtures proven
+  (four-cast mixed example, 9/3/3/6, pin refusal, legacy order).
+- D: PartialExecutionGate shared by Apply and HUD quick-run plus explicit
+  Apply Ready Casts Only; Casting Order & Resources view with competing
+  demand and one-run-per-routine forecast.
+- E: owned spellbook button with bounded guarded handoff through the native
+  close affordance; pure state machine proven; all live spellbook lanes
+  BLOCKED on the absent `KBP_AUTOMATION` fixture.
+- F: version 0.1.0 from actual metadata; docs updated; candidate package
+  built deterministically (see QUALIFICATION for hashes).
+- Final gates: source 42/42, protocol 159/159, harness 8/8, package 4/4,
+  WhatIf 5/5, Release PASS. No merge, tag, push, or publication.
