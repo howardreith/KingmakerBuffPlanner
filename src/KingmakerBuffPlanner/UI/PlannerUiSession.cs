@@ -48,6 +48,8 @@ namespace KingmakerBuffPlanner.UI
         // Routine identity of LastPreview; the material-change gate only
         // compares a confirmation baseline for the same routine.
         internal string LastPreviewRoutineId { get; private set; }
+        private readonly PlannerReviewState _review = new PlannerReviewState();
+        private bool _plannerVisible;
         internal ExecutionReport LastExecutionReport { get; private set; }
         internal string ProfileStatus { get; private set; }
         internal PartyCatalogDiscoveryDiagnostics CatalogDiscovery { get; private set; }
@@ -266,6 +268,13 @@ namespace KingmakerBuffPlanner.UI
                 _activeEffects, _effects, _providerOptions, _enhancements,
                 _targeting);
             LastPreviewRoutineId = routineId;
+            // A computed preview becomes the reviewed baseline only when the
+            // planner is open and rendering it to the player. Incidental
+            // previews (resource inspection, forecasts) and refusals never
+            // acknowledge anything.
+            _review.ObserveCampaign(Model.Profile.CampaignId);
+            if (_plannerVisible)
+                _review.Acknowledge(Model.Profile.CampaignId, routineId, LastPreview.Plan);
             if (_shareTargeting != null)
                 foreach (string diagnostic in _shareTargeting.DrainDiagnostics())
                     _log.Info("[KBP-SHARE-TARGETING] " + diagnostic + ".");
@@ -308,6 +317,13 @@ namespace KingmakerBuffPlanner.UI
                         .OrderBy(value => value, StringComparer.Ordinal).ToList())));
             }
             return lines;
+        }
+
+        // The planner screen calls this when it becomes visible/closed so
+        // previews rendered to the player are acknowledged as reviewed.
+        internal void SetPlannerVisible(bool visible)
+        {
+            _plannerVisible = visible;
         }
 
         // Read-only combined forecast: each selected routine occurrence is
@@ -424,13 +440,13 @@ namespace KingmakerBuffPlanner.UI
                     ";reason=" + unavailable + ".");
                 yield break;
             }
-            // The plan the player last reviewed is the confirmation baseline;
-            // after the refresh below, a materially different fresh plan
-            // (caster/item, enhancement, cost, order, coverage) requires
-            // renewed review instead of silent execution. The baseline only
-            // applies to the same routine.
-            RoutinePlanResult confirmedPreview = LastPreview;
-            string confirmedRoutineId = LastPreviewRoutineId;
+            // The acknowledged review baseline gates execution: after the
+            // refresh below, a materially different fresh plan (caster/item,
+            // anchor, targets, recipients, enhancement omissions, full cost
+            // vector, order, coverage) requires renewed review instead of
+            // silent execution. Only an explicitly acknowledged plan counts.
+            CastPlan reviewedPlan = _review.ReviewedPlan(
+                Model.Profile.CampaignId, routineId);
             RoutineProfile configuredRoutine = Model.Profile.Routines.First(r =>
                 r.RoutineId == routineId);
             _log.Info("[KBP-QUICK] assignments resolved;group=" + routineId +
@@ -483,10 +499,9 @@ namespace KingmakerBuffPlanner.UI
                     ";reason=" + Status + ".");
                 yield break;
             }
-            string materialChange = confirmedPreview != null &&
-                string.Equals(confirmedRoutineId, routineId, StringComparison.Ordinal)
+            string materialChange = reviewedPlan != null
                 ? PlanMaterialChangeDetector.DescribeMaterialChange(
-                    confirmedPreview.Plan, preview.Plan)
+                    reviewedPlan, preview.Plan)
                 : null;
             if (materialChange != null)
             {
@@ -520,6 +535,9 @@ namespace KingmakerBuffPlanner.UI
                     ";requested=" + gate.RequestedTargets + ";planned=" + gate.PlannedCasts +
                     ";unfulfilled=" + gate.Unfulfilled + ";skipped=" + gate.SkippedActive + ".");
             }
+            // The native state is about to change by design; the reviewed
+            // baseline for this routine is spent with it.
+            _review.Invalidate(routineId);
             LastExecutionReport = new ExecutionReport(preview.Plan);
             ICastExecutor executor;
             var fallbackWarnings = new HashSet<string>(StringComparer.Ordinal);

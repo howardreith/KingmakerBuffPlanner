@@ -202,11 +202,27 @@ namespace KingmakerBuffPlanner.UI
 
         private static List<string> Steps(CastPlan plan)
         {
+            // Ordered per-cast signature: assignment, resolved provider (the
+            // caster/item), anchor, ordered direct targets, recipients, the
+            // complete cost vector (pool, units, token identities, material,
+            // enhancement usage quantities), enhancement and omission sets,
+            // and the execution strategy.
             return plan.Steps.Select(step =>
                 step.AssignmentId + "|" + step.Provider.Canonical + "|" +
+                (step.AnchorUnitId ?? string.Empty) + "|" +
+                string.Join(">", step.TargetUnitIds.ToArray()) + "|" +
+                string.Join(">", step.ExpectedRecipientUnitIds.ToArray()) + "|" +
+                (step.Reservation == null ? "-" :
+                    step.Reservation.PoolKey + ":" + step.Reservation.Units + ":" +
+                    string.Join("+", step.Reservation.TokenIds.ToArray())) + "|" +
+                (step.MaterialReservation == null ? "-" :
+                    step.MaterialReservation.ItemGuid + ":" + step.MaterialReservation.Count) + "|" +
                 string.Join("+", step.EnhancementIds.ToArray()) + "|-" +
                 string.Join("+", step.OmittedEnhancementIds.ToArray()) + "|" +
-                (step.Reservation == null ? 0 : step.Reservation.Units)).ToList();
+                string.Join(";", step.EnhancementUsageByPool
+                    .OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                    .Select(pair => pair.Key + ":" + pair.Value).ToArray()) + "|" +
+                step.ExecutionStrategy).ToList();
         }
 
         private static List<string> Coverage(CastPlan plan)

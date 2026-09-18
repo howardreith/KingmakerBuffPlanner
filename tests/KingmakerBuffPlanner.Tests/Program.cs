@@ -187,6 +187,7 @@ namespace KingmakerBuffPlanner.Tests
                 Run("assignment-editor-model-supports-player-flows", TestAssignmentEditorModel);
                 Run("material-plan-change-requires-renewed-review", TestPlanMaterialChangeDetector);
                 Run("assignment-editor-intent-regressions", TestAssignmentEditorIntent);
+                Run("review-state-and-material-signatures", TestReviewStateAndSignatures);
                 Run("cast-enhancement-execution-is-fail-closed-and-cleaned-up", TestCastEnhancementExecution);
                 Run("consumed-one-shot-enhancement-is-not-rearmed", TestOneShotEnhancementRestoration);
                 Run("execution-preflight-runs-under-the-native-activation-lease",
@@ -5535,6 +5536,124 @@ namespace KingmakerBuffPlanner.Tests
                         "The flat casting-order layout overlapped or dropped rows for " +
                         targetCount + " targets.");
             }
+        }
+
+        // F4 regressions: acknowledged review state scoping/invalidation and
+        // the enriched material signature (target order, anchors/recipients,
+        // cost vector, enhancement quantities) catching changes the old
+        // signature missed.
+        private static void TestReviewStateAndSignatures()
+        {
+            var review = new PlannerReviewState();
+            AbilityKey ability = Ability("review-spell", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("review-slots",
+                ResourcePoolKind.SpontaneousLevel, 4, 4, null);
+            ProviderSnapshot caster = PlannerProvider("caster", "book",
+                ability, pool.PoolKey, 1);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(
+                new[] { caster }, new[] { pool }, "caster", "a1", "a2");
+            var option = new ProviderPlanningOption(caster,
+                new[] { "caster", "a1", "a2" }, new[] { "caster" }, 4, 40);
+            var effects = new Dictionary<string, EffectExpression> {
+                { ability.Canonical, Leaf("review-buff") }
+            };
+            CastPlan PlanInTargetOrder(string first, string second)
+            {
+                return new CastPlanner().Plan(snapshot,
+                    new BuffCastRequest(new BuffSourceDefinition("review", ability,
+                        Leaf("review-buff"), CastGroupingKind.PerTarget),
+                        new[] { first, second }, ExistingEffectPolicy.Overwrite, null,
+                        new[] { new EnhancementRequest("rod", true) },
+                        "auto", null, null, null, 0),
+                    new[] { option }, EmptyPolicy(), new ActiveEffectSnapshot(null),
+                    new[] { ClassEnhancement("rod", "caster", ability, "book", 4,
+                        "rod-pool", "rod-group", false) });
+            }
+
+            CastPlan baseline = PlanInTargetOrder("a1", "a2");
+            CastPlan swapped = PlanInTargetOrder("a2", "a1");
+            // Same target union, same provider — only per-cast order changed.
+            if (PlanMaterialChangeDetector.DescribeMaterialChange(baseline, swapped) == null)
+                throw new InvalidOperationException(
+                    "A per-cast target-order swap with the same coverage passed undetected.");
+
+            // Review state: scoping, campaign switch, post-execution invalidation.
+            review.Acknowledge("campaign-a", "long", baseline);
+            if (!review.HasReviewed("campaign-a", "long") ||
+                review.HasReviewed("campaign-a", "short") ||
+                review.HasReviewed("campaign-b", "long"))
+                throw new InvalidOperationException("Review state is not routine/campaign scoped.");
+            review.ObserveCampaign("campaign-b");
+            if (review.HasReviewed("campaign-a", "long") || review.HasReviewed("campaign-b", "long"))
+                throw new InvalidOperationException("A campaign switch did not invalidate review.");
+            review.Acknowledge("campaign-b", "long", baseline);
+            review.Invalidate("short");
+            if (!review.HasReviewed("campaign-b", "long"))
+                throw new InvalidOperationException("Invalidating another routine cleared review.");
+            review.Invalidate("long");
+            if (review.HasReviewed("campaign-b", "long"))
+                throw new InvalidOperationException("Post-execution invalidation failed.");
+            if (review.ReviewedPlan("campaign-b", "long") != null)
+                throw new InvalidOperationException("Reviewed plan leaked after invalidation.");
+
+            // Enhancement usage quantity change with identical IDs and base
+            // cost must be material.
+            CastEnhancementSnapshot RodWithUnits(int unitsPerCast)
+            {
+                return new CastEnhancementSnapshot("rod", "caster", "rod-guid",
+                    "Rod", string.Empty, CastEnhancementCategory.MetamagicRod,
+                    2, 9, 4, new[] { ability.BaseAbilityGuid }, "Metamagic",
+                    null, "rod-pool", false, "rod-group", unitsPerCast,
+                    false, "rod-group", "Uses");
+            }
+            CastPlan WithRod(CastEnhancementSnapshot rod)
+            {
+                return new CastPlanner().Plan(snapshot,
+                    new BuffCastRequest(new BuffSourceDefinition("review", ability,
+                        Leaf("review-buff"), CastGroupingKind.PerTarget),
+                        new[] { "a1" }, ExistingEffectPolicy.Overwrite, null,
+                        new[] { new EnhancementRequest("rod", true) },
+                        "auto", null, null, null, 0),
+                    new[] { option }, EmptyPolicy(), new ActiveEffectSnapshot(null),
+                    new[] { rod });
+            }
+            string quantityChange = PlanMaterialChangeDetector.DescribeMaterialChange(
+                WithRod(RodWithUnits(1)), WithRod(RodWithUnits(2)));
+            if (quantityChange == null)
+                throw new InvalidOperationException(
+                    "A doubled enhancement charge per cast with identical IDs was not material.");
+
+            // Material component cost change with the same base spell-slot
+            // units is material.
+            var materialPool = new ResourcePoolSnapshot("mat-slots",
+                ResourcePoolKind.Unlimited, 0, 0, null);
+            ProviderSnapshot materialCaster = new ProviderSnapshot(
+                new ProviderKey("caster", "book", ability, "level-1"),
+                ability.BaseAbilityGuid, 1, materialPool.PoolKey, 0,
+                null, new MaterialRequirementSnapshot("dust", 1, 5));
+            PartyProviderSnapshot materialSnapshot = PlannerSnapshot(
+                new[] { materialCaster }, new[] { materialPool }, "caster", "a1");
+            var materialOption = new ProviderPlanningOption(materialCaster,
+                new[] { "caster", "a1" }, new[] { "caster" }, 4, 40);
+            CastPlan WithMaterial(int required)
+            {
+                ProviderSnapshot provider = new ProviderSnapshot(
+                    new ProviderKey("caster", "book", ability, "level-1"),
+                    ability.BaseAbilityGuid, 1, materialPool.PoolKey, 0,
+                    null, new MaterialRequirementSnapshot("dust", required, 5));
+                return new CastPlanner().Plan(materialSnapshot,
+                    new BuffCastRequest(new BuffSourceDefinition("review", ability,
+                        Leaf("review-buff"), CastGroupingKind.PerTarget),
+                        new[] { "a1" }, ExistingEffectPolicy.Overwrite, null),
+                    new[] { new ProviderPlanningOption(provider,
+                        new[] { "caster", "a1" }, new[] { "caster" }, 4, 40) },
+                    EmptyPolicy(), new ActiveEffectSnapshot(null));
+            }
+            string materialChangeText = PlanMaterialChangeDetector.DescribeMaterialChange(
+                WithMaterial(1), WithMaterial(2));
+            if (materialChangeText == null)
+                throw new InvalidOperationException(
+                    "A material-component cost change was not material.");
         }
 
         private static void TestSpellbookHandoff()
