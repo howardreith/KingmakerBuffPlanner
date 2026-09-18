@@ -48,8 +48,7 @@ namespace KingmakerBuffPlanner.UI
         // Routine identity of LastPreview; the material-change gate only
         // compares a confirmation baseline for the same routine.
         internal string LastPreviewRoutineId { get; private set; }
-        private readonly PlannerReviewState _review = new PlannerReviewState();
-        private bool _plannerVisible;
+        private readonly PlannerReviewCoordinator _review = new PlannerReviewCoordinator();
         internal ExecutionReport LastExecutionReport { get; private set; }
         internal string ProfileStatus { get; private set; }
         internal PartyCatalogDiscoveryDiagnostics CatalogDiscovery { get; private set; }
@@ -268,13 +267,12 @@ namespace KingmakerBuffPlanner.UI
                 _activeEffects, _effects, _providerOptions, _enhancements,
                 _targeting);
             LastPreviewRoutineId = routineId;
-            // A computed preview becomes the reviewed baseline only when the
-            // planner is open and rendering it to the player. Incidental
-            // previews (resource inspection, forecasts) and refusals never
-            // acknowledge anything.
-            _review.ObserveCampaign(Model.Profile.CampaignId);
-            if (_plannerVisible)
-                _review.Acknowledge(Model.Profile.CampaignId, routineId, LastPreview.Plan);
+            // Computing a preview NEVER acknowledges review. Resource
+            // inspection, forecasts, and preflight computation all route
+            // through here; acknowledgment happens only when the planner
+            // view binds the exact visible plan to the player and calls
+            // AcknowledgeDisplayedPlan for that routine.
+            _review.PlanComputed(Model.Profile.CampaignId, routineId);
             if (_shareTargeting != null)
                 foreach (string diagnostic in _shareTargeting.DrainDiagnostics())
                     _log.Info("[KBP-SHARE-TARGETING] " + diagnostic + ".");
@@ -319,11 +317,18 @@ namespace KingmakerBuffPlanner.UI
             return lines;
         }
 
-        // The planner screen calls this when it becomes visible/closed so
-        // previews rendered to the player are acknowledged as reviewed.
-        internal void SetPlannerVisible(bool visible)
+        // The planner screen calls this after binding a specific routine's
+        // preview into its visible controls — the only acknowledgment of
+        // review. The previously open-plan flag never established that the
+        // player saw this exact plan.
+        internal void AcknowledgeDisplayedPlan(string routineId)
         {
-            _plannerVisible = visible;
+            if (Model == null || LastPreview == null ||
+                !string.Equals(LastPreviewRoutineId, routineId,
+                    StringComparison.Ordinal))
+                return;
+            _review.Presented(Model.Profile.CampaignId, routineId,
+                LastPreview.Plan);
         }
 
         // Read-only combined forecast: each selected routine occurrence is
@@ -445,7 +450,7 @@ namespace KingmakerBuffPlanner.UI
             // anchor, targets, recipients, enhancement omissions, full cost
             // vector, order, coverage) requires renewed review instead of
             // silent execution. Only an explicitly acknowledged plan counts.
-            CastPlan reviewedPlan = _review.ReviewedPlan(
+            CastPlan reviewedPlan = _review.BaselineFor(
                 Model.Profile.CampaignId, routineId);
             RoutineProfile configuredRoutine = Model.Profile.Routines.First(r =>
                 r.RoutineId == routineId);
@@ -537,7 +542,7 @@ namespace KingmakerBuffPlanner.UI
             }
             // The native state is about to change by design; the reviewed
             // baseline for this routine is spent with it.
-            _review.Invalidate(routineId);
+            _review.Spent(routineId);
             LastExecutionReport = new ExecutionReport(preview.Plan);
             ICastExecutor executor;
             var fallbackWarnings = new HashSet<string>(StringComparer.Ordinal);

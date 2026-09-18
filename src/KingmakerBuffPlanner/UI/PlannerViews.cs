@@ -1653,14 +1653,14 @@ namespace KingmakerBuffPlanner.UI
                     14, TextAnchor.MiddleLeft);
                 identity.horizontalOverflow = HorizontalWrapMode.Wrap;
                 identity.verticalOverflow = VerticalWrapMode.Overflow;
-                KingmakerUiFactory.SetAnchors(identity.rectTransform, 0.01f, 0.52f, 0.70f, 0.96f);
+                KingmakerUiFactory.SetAnchors(identity.rectTransform, 0.01f, 0.74f, 0.99f, 0.96f);
                 Text status = KingmakerUiFactory.CreateText("Status", row, _theme,
                     model.Status, 13, TextAnchor.UpperRight);
                 status.color = model.PinUnresolved || model.UnfulfilledTargets > 0
                     ? _theme.AmberWarning : _theme.GreenSuccess;
                 status.horizontalOverflow = HorizontalWrapMode.Wrap;
                 status.verticalOverflow = VerticalWrapMode.Overflow;
-                KingmakerUiFactory.SetAnchors(status.rectTransform, 0.71f, 0.52f, 0.99f, 0.96f);
+                KingmakerUiFactory.SetAnchors(status.rectTransform, 0.71f, 0.74f, 0.99f, 0.96f);
                 if (model.Editable)
                 {
                     Button targets = KingmakerUiFactory.CreateButton("Targets", row, _theme,
@@ -1734,6 +1734,8 @@ namespace KingmakerBuffPlanner.UI
                 enhancements.horizontalOverflow = HorizontalWrapMode.Wrap;
                 enhancements.verticalOverflow = VerticalWrapMode.Overflow;
                 KingmakerUiFactory.SetAnchors(enhancements.rectTransform, 0.01f, 0.50f, 0.99f, 0.72f);
+                // Identity/status live in 0.74..0.96; the enhancement band
+                // 0.50..0.72 never intersects them.
             }
             _rowObjects.Add(row.gameObject);
         }
@@ -1742,7 +1744,9 @@ namespace KingmakerBuffPlanner.UI
             CastingAssignmentRowViewModel model, CastingOrderLayout.RowPlan rowPlan)
         {
             string unitId = rowPlan.UnitId;
-            string displayName = unitId;
+            int unitIndex = ((IList<string>)model.TargetUnitIds).IndexOf(unitId);
+            string displayName = unitIndex >= 0 && unitIndex < model.TargetNames.Count
+                ? model.TargetNames[unitIndex] : unitId;
             Text label = KingmakerUiFactory.CreateText("TargetName", row, _theme,
                 "• " + displayName, 13, TextAnchor.MiddleLeft);
             KingmakerUiFactory.SetAnchors(label.rectTransform, 0.01f, 0.1f, 0.40f, 0.9f);

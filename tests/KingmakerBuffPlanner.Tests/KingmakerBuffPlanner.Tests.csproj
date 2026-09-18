@@ -68,6 +68,7 @@
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\AssignmentPresentationModels.cs"><Link>UI\AssignmentPresentationModels.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\SequentialForecastPlanner.cs"><Link>UI\SequentialForecastPlanner.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\PlannerReviewState.cs"><Link>UI\PlannerReviewState.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\PlannerReviewCoordinator.cs"><Link>UI\PlannerReviewCoordinator.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\SpellbookHandoffStateMachine.cs"><Link>UI\SpellbookHandoffStateMachine.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\NativeThemeModel.cs"><Link>UI\NativeThemeModel.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\NativeThemeDonorLookup.cs"><Link>UI\NativeThemeDonorLookup.cs</Link></Compile>

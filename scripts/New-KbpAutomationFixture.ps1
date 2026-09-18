@@ -13,7 +13,10 @@ param(
     [switch]$Recover,
     # Test-only failure injection. Never pass in production.
     [ValidateSet('SeedValidated', 'Staged', 'Archived', 'ManifestWritten', 'Published')]
-    [string]$FailAfterStage
+    [string]$FailAfterStage,
+    # Test-only: interrupt immediately after a final publication move.
+    [ValidateSet('baseline', 'working')]
+    [string]$FailAfterMove
 )
 
 Set-StrictMode -Version Latest
@@ -148,14 +151,120 @@ function Get-KbpTransaction {
     return (Read-KbpJson $transactionPath)
 }
 
-function Invoke-KbpOwnedRollback {
-    param($Transaction)
-    foreach ($owned in @($Transaction.publishedPaths)) {
-        if ($owned -and (Test-Path -LiteralPath $owned -PathType Leaf)) {
-            Remove-Item -LiteralPath $owned -Force
+# Every public mode mutates only under this single gate. WhatIf performs
+# read-only validation and returns before any direct I/O — locks,
+# transaction JSON, staging directories, archives, and recovery records
+# included, because those helpers use direct .NET I/O that WhatIf
+# preferences never suppress.
+function Assert-KbpFixtureDeploymentIdle {
+    $lab2 = Split-Path -Parent (Split-Path -Parent $repo)
+    $deploymentLock = Join-Path $lab2 'runtime-state\deployment.lock'
+    if (Test-Path -LiteralPath $deploymentLock -PathType Leaf) {
+        throw "A runtime deployment transaction is active: $deploymentLock. Coordinate before fixture mutation."
+    }
+}
+
+# Journal-first publication: the destination enters publishedPaths and is
+# persisted before the file moves, closing the move/journal interruption
+# window. The post-move existence check turns a silent partial into a
+# recoverable failure.
+function Publish-KbpStagedFixture {
+    param([string]$StagedPath, [string]$DestinationPath)
+    $list = @($transaction.publishedPaths) + @($DestinationPath)
+    $transaction.publishedPaths = $list
+    Write-KbpJsonAtomic $transactionPath $transaction
+    [IO.File]::Move($StagedPath, $DestinationPath)
+    if (-not (Test-Path -LiteralPath $DestinationPath -PathType Leaf)) {
+        throw "Publication verification failed: $DestinationPath"
+    }
+}
+
+function Assert-KbpFixturePreconditions {
+    Assert-KbpFixtureGameClosed
+    Assert-KbpFixtureDeploymentIdle
+}
+
+# Containment + identity validation for any path about to be removed by
+# rollback or recovery. Records are JSON on disk; nothing in them is
+# trusted until the path is proven to be our owned artifact.
+function Assert-KbpOwnedArtifactPath {
+    param([string]$Path, [string]$Role, [string]$GameId)
+    if ([string]::IsNullOrWhiteSpace($Path)) { throw 'Owned artifact path is empty.' }
+    $fullSave = [IO.Path]::GetFullPath($SaveRoot).TrimEnd('\')
+    $fullState = [IO.Path]::GetFullPath($StateRoot).TrimEnd('\')
+    $full = [IO.Path]::GetFullPath($Path)
+    $inSave = $full.StartsWith($fullSave + '\', [StringComparison]::OrdinalIgnoreCase)
+    $inState = $full.StartsWith($fullState + '\', [StringComparison]::OrdinalIgnoreCase)
+    if (-not $inSave -and -not $inState) {
+        throw "Recorded artifact escapes the owned roots: $Path"
+    }
+    if ($inSave) {
+        if ($full -cnotmatch ('\\Manual_[0-9]+_KBP_AUTOMATION_' + $Role + '\.zks$')) {
+            throw "Recorded artifact does not match its role filename contract: $Path"
+        }
+        if (-not (Test-Path -LiteralPath $full -PathType Leaf)) {
+            throw "Recorded artifact is absent: $Path"
+        }
+        $header = Read-KbpSaveHeader -Path $full
+        if ([string]$header.Name -cne ('KBP_AUTOMATION_' + $Role)) {
+            throw "Artifact header does not match its role: $Path"
+        }
+        # Provenance: the stable campaign identity recorded for the run, not
+        # a display name. A substituted or foreign file at the same pathname
+        # is refused.
+        if (-not [string]::IsNullOrWhiteSpace($GameId) -and
+            [string]$header.GameId -cne $GameId) {
+            throw "Artifact campaign identity drifted from the run record: $Path"
         }
     }
-    if ($Transaction.stagingRoot -and (Test-Path -LiteralPath $Transaction.stagingRoot -PathType Container)) {
+    if ($inState -and -not (Test-Path -LiteralPath $full -PathType Container)) {
+        throw "Recorded state path is absent: $Path"
+    }
+}
+
+# StrictMode-safe record field read: absent fields are $null, and callers
+# decide whether absence is acceptable for that field.
+function Get-KbpRecordField {
+    param($Record, [string]$Name)
+    if ($null -eq $Record) { return $null }
+    if ($Record -is [System.Collections.IDictionary]) {
+        if ($Record.Contains($Name)) { return $Record[$Name] }
+        return $null
+    }
+    $property = $Record.PSObject.Properties[$Name]
+    if ($null -eq $property) { return $null }
+    return $property.Value
+}
+
+function Invoke-KbpOwnedRollback {
+    param($Transaction)
+    $gameId = [string](Get-KbpRecordField $Transaction 'gameId')
+    if ([string]::IsNullOrWhiteSpace($gameId)) {
+        throw 'Recovery record lacks campaign provenance; refusing to act on it. Re-run bootstrap after tearing down this state manually.'
+    }
+    foreach ($owned in @($Transaction.publishedPaths)) {
+        if (-not $owned) { continue }
+        $role = if ($owned -cmatch 'KBP_AUTOMATION_BASELINE') { 'BASELINE' } else { 'WORKING' }
+        # Validates containment, filename contract, header role, and campaign
+        # provenance before any removal; an unvalidated recorded path throws
+        # instead of being deleted.
+        Assert-KbpOwnedArtifactPath -Path $owned -Role $role -GameId $gameId
+        Remove-Item -LiteralPath $owned -Force
+    }
+    if ($Transaction.stagingRoot) {
+        Assert-KbpOwnedArtifactPath -Path $Transaction.stagingRoot -Role 'WORKING' -GameId $null
+        # Staging lives under StateRoot and was created empty by this run:
+        # refuse to recurse through foreign content.
+        $allowed = @('Manual_[0-9]+_KBP_AUTOMATION_BASELINE\.zks',
+            'Manual_[0-9]+_KBP_AUTOMATION_WORKING\.zks',
+            '^[0-9a-f]{32}\.partial$')
+        foreach ($item in @(Get-ChildItem -LiteralPath $Transaction.stagingRoot -Force)) {
+            $ok = $false
+            foreach ($pattern in $allowed) {
+                if ($item.Name -cmatch $pattern) { $ok = $true; break }
+            }
+            if (-not $ok) { throw "Unknown staging content refuses rollback: $($item.FullName)" }
+        }
         Remove-Item -LiteralPath $Transaction.stagingRoot -Force -Recurse
     }
     # Live transactions are ordered dictionaries; recovery records read
@@ -174,6 +283,8 @@ function Invoke-KbpOwnedRollback {
 
 # --- Recover mode: roll back a specific interrupted run only. ---
 if ($Recover) {
+    # Real process state first — recovery mutates the save directory too.
+    Assert-KbpFixturePreconditions
     if (-not (Test-Path -LiteralPath $lockPath)) {
         throw "No fixture lock exists; nothing to recover at $StateRoot."
     }
@@ -184,8 +295,19 @@ if ($Recover) {
     if ($existing.status -ceq 'Completed') {
         throw "Run $RunId already completed; use -Teardown instead."
     }
+    # The lock must belong to THIS transaction's run and carry its token:
+    # a foreign or ambiguous lock is preserved, never released.
+    if ([string](Get-KbpRecordField $lock 'runId') -cne [string](Get-KbpRecordField $existing 'runId') -or
+        [string](Get-KbpRecordField $lock 'token') -cne [string](Get-KbpRecordField $existing 'token')) {
+        throw "Fixture lock does not match the transaction record (lock run $($lock.runId) vs transaction run $($existing.runId)); refusing to release a foreign lock."
+    }
+    if (-not $PSCmdlet.ShouldProcess($runRoot,
+        "roll back owned partial artifacts of interrupted run $RunId")) {
+        Write-Host "Recovery WhatIf PASS: would roll back run $RunId; no artifact, record, or lock changed."
+        return
+    }
     Invoke-KbpOwnedRollback $existing
-    Remove-KbpOwnedLock $lockPath $lock.runId $lock.token
+    Remove-KbpOwnedLock $lockPath $existing.runId $existing.token
     Write-Host "Recovery PASS: rolled back owned partial artifacts of $RunId; lock released."
     return
 }
@@ -201,12 +323,8 @@ if ($Teardown) {
     if (-not (Test-Path -LiteralPath $ManifestPath -PathType Leaf)) {
         throw "Fixture manifest is missing: $ManifestPath"
     }
-    New-Item -ItemType Directory -Path $StateRoot -Force | Out-Null
-    New-KbpOwnedLock $lockPath $RunId ([Guid]::NewGuid().ToString('N'))
-    $lock = Read-KbpJson $lockPath
-    try {
-        Assert-KbpFixtureGameClosed
-        $manifest = Read-KbpJson $ManifestPath
+    Assert-KbpFixturePreconditions
+    $manifest = Read-KbpJson $ManifestPath
         if ($manifest.schemaVersion -ne 1 -or
             -not $manifest.baseline.fileName -or -not $manifest.baseline.sha256 -or
             -not $manifest.working.fileName) {
@@ -224,6 +342,13 @@ if ($Teardown) {
             if ([string]$header.Name -cne $fixture.Name) {
                 throw "Owned fixture header mismatch at $($fixture.Path): $($header.Name)"
             }
+            # The working save is legitimately mutable: its stable campaign
+            # identity from the manifest proves ownership beyond a display
+            # name or pathname.
+            if (-not [string]::IsNullOrWhiteSpace([string]$manifest.gameId) -and
+                [string]$header.GameId -cne [string]$manifest.gameId) {
+                throw "Working-save campaign identity drifted from the manifest: $($fixture.Path)"
+            }
             # The baseline is sealed and must still hash exactly; the working
             # fixture is legitimately mutable, so only its identity is proven.
             if ($null -ne $fixture.Hash -and $fixture.Hash -cne '') {
@@ -237,23 +362,31 @@ if ($Teardown) {
             -ExcludeNames @($manifest.baseline.fileName, $manifest.working.fileName)
         if (-not $PSCmdlet.ShouldProcess("$baselinePath; $workingPath",
             'Remove the manifest-owned disposable fixture pair')) {
-            Write-Host 'Fixture teardown WhatIf PASS; no save was removed.'
+            Write-Host 'Fixture teardown WhatIf PASS; no save, lock, or state changed.'
             return
         }
-        Remove-Item -LiteralPath $baselinePath -Force
-        Remove-Item -LiteralPath $workingPath -Force
+        # The mutation gate is behind us: take the lock now (never during a
+        # dry run) and hold it across the deletion.
+        New-Item -ItemType Directory -Path $StateRoot -Force | Out-Null
+        $teardownToken = [Guid]::NewGuid().ToString('N')
+        New-KbpOwnedLock $lockPath $RunId $teardownToken
+        $deleted = $false
+        try {
+            Remove-Item -LiteralPath $baselinePath -Force
+            Remove-Item -LiteralPath $workingPath -Force
+            $deleted = $true
+        }
+        finally {
+            if ($deleted) {
+                Remove-KbpOwnedLock $lockPath $RunId $teardownToken
+            }
+        }
         $protectedAfter = Get-KbpProtectedInventory -Root $SaveRoot `
             -ExcludeNames @($manifest.baseline.fileName, $manifest.working.fileName)
         if (($protectedBefore -join "`n") -cne ($protectedAfter -join "`n")) {
             throw 'Teardown touched a protected save; investigate immediately.'
         }
         Write-Host "Fixture teardown PASS: removed exactly the manifest-owned pair; $($protectedBefore.Count) other save(s) byte-identical."
-    }
-    finally {
-        if (Test-Path -LiteralPath $lockPath) {
-            Remove-KbpOwnedLock $lockPath $lock.runId $lock.token
-        }
-    }
     return
 }
 
@@ -284,12 +417,14 @@ if (Test-Path -LiteralPath $runRoot) {
 if (-not (Test-Path -LiteralPath $SaveRoot -PathType Container)) {
     throw "The exact Kingmaker save root is unavailable: $SaveRoot"
 }
-Assert-KbpFixtureGameClosed
+Assert-KbpFixturePreconditions
 
 $automationFiles = @(Get-ChildItem -LiteralPath $SaveRoot -Filter '*KBP_AUTOMATION*' -File |
     Where-Object { $_.Name -notmatch '^Manual_[0-9]+_KBP_AUTOMATION_SEED\.zks$' })
 if ($automationFiles.Count -ne 0) {
-    throw "Existing KBP_AUTOMATION artifact(s) present: $(($automationFiles | ForEach-Object Name) -join ', '). Tear down explicitly first."
+    throw ("Existing KBP_AUTOMATION artifact(s) present: " +
+        (($automationFiles | Select-Object -ExpandProperty Name) -join ', ') +
+        ". Tear down explicitly first.")
 }
 $seedFiles = @(Get-ChildItem -LiteralPath $SaveRoot -Filter '*_KBP_AUTOMATION_SEED.zks' -File)
 if ($seedFiles.Count -ne 1) {
@@ -335,6 +470,7 @@ $transaction = [ordered]@{
     schemaVersion = 1; runId = $RunId; token = $token
     status = 'Staging'; createdAtUtc = [DateTime]::UtcNow.ToString('o')
     saveRoot = $SaveRoot; seedPath = $seed.FullName
+    gameId = [string]$seedHeader.GameId; gameName = [string]$seedHeader.GameName
     baselineName = $baselineName; workingName = $workingName
     publishedPaths = @(); stagingRoot = $stagingRoot; archiveRoot = $ArchiveRoot
 }
@@ -385,6 +521,9 @@ try {
         gameName = [string]$seedHeader.GameName
         gameId = [string]$seedHeader.GameId
     }
+    if ([string]::IsNullOrWhiteSpace([string]$manifest.gameId)) {
+        throw 'Manifest lacks the stable campaign identity required for teardown provenance.'
+    }
     $manifestPath = Join-Path $ArchiveRoot 'fixture-manifest.json'
     if (Test-Path -LiteralPath $manifestPath) {
         throw 'A fixture manifest already exists for this archive; refusing to overwrite.'
@@ -397,11 +536,14 @@ try {
 
     # Real running-game recheck immediately before touching SaveRoot.
     Assert-KbpFixtureGameClosed
-    [IO.File]::Move($stagedBaseline, $baselinePath)
-    $transaction.publishedPaths = @($baselinePath)
-    Write-KbpJsonAtomic $transactionPath $transaction
-    [IO.File]::Move($stagedWorking, $workingPath)
-    $transaction.publishedPaths = @($baselinePath, $workingPath)
+    # Write-ahead ownership journal: each destination is recorded BEFORE its
+    # move, so an interruption at any point leaves the published file
+    # represented in the recovery record. Recovery validates identity before
+    # removing anything, so a bystander at the same pathname is refused.
+    Publish-KbpStagedFixture -StagedPath $stagedBaseline -DestinationPath $baselinePath
+    if ($FailAfterMove -ceq 'baseline') { throw "Injected failure after publishing baseline." }
+    Publish-KbpStagedFixture -StagedPath $stagedWorking -DestinationPath $workingPath
+    if ($FailAfterMove -ceq 'working') { throw "Injected failure after publishing working." }
     $transaction.status = 'Published'
     Write-KbpJsonAtomic $transactionPath $transaction
     if ($FailAfterStage -ceq 'Published') { throw "Injected failure after stage Published." }

@@ -49,9 +49,6 @@ namespace KingmakerBuffPlanner.UI
             _soundGate.BeginHiddenToVisible();
             try
             {
-                // The screen is becoming visible: previews rendered from here
-                // on are explicitly acknowledged as reviewed.
-                _session.SetPlannerVisible(true);
                 _session.Refresh();
                 if (StaticCanvas.Instance == null)
                     throw new InvalidOperationException("Kingmaker campaign UI is not available.");
@@ -75,7 +72,6 @@ namespace KingmakerBuffPlanner.UI
         {
             if (_state.State == PlannerScreenLifecycleState.Closed) return false;
             bool hadLease = _state.HasInputLease;
-            _session.SetPlannerVisible(false);
             try
             {
                 if (_view != null) _view.Dispose();

@@ -199,29 +199,27 @@ namespace KingmakerBuffPlanner.UI
                 assignment = routine.Assignments.First(item =>
                     item.SourceId == source.SourceId);
             }
-            if (casting.TargetUnitIds.Contains(unitId))
+            // Portrait state shows wanted regardless of which child holds a
+            // target. Deselect removes it from whichever child owns it
+            // (pinned routing is only removed explicitly, never converted);
+            // select adds to the Automatic child only when no sibling
+            // already owns it, so pinned routing is never silently moved.
+            SourceAssignmentProfile owner = routine.Assignments
+                .FirstOrDefault(item => item.SourceId == source.SourceId);
+            CastingAssignmentProfile owningChild = owner == null ? null :
+                owner.CastingAssignments.FirstOrDefault(child =>
+                    child.TargetUnitIds.Contains(unitId));
+            if (owningChild != null)
             {
-                casting.TargetUnitIds.Remove(unitId);
+                // A pinned row owns this target: the simple portrait strip
+                // never edits pinned routing. The explicit assignment editor
+                // or the per-assignment target picker moves or removes it.
+                if (!owningChild.IsAutomatic) return;
+                owningChild.TargetUnitIds.Remove(unitId);
             }
             else
             {
-                // A target already on another child of this source must move,
-                // not duplicate: the simple portrait view is authoritative.
-                foreach (CastingAssignmentProfile sibling in assignment.CastingAssignments
-                    .Where(child => child != casting && child.TargetUnitIds.Contains(unitId))
-                    .ToList())
-                    sibling.TargetUnitIds.Remove(unitId);
-                PruneEmptyAssignment(routine, assignment);
-                // Re-resolve: pruning may have rebuilt the automatic child.
-                assignment = routine.Assignments
-                    .FirstOrDefault(item => item.SourceId == source.SourceId);
-                if (assignment == null)
-                {
-                    assignment = CreateAssignment(source);
-                    routine.Assignments.Add(assignment);
-                }
-                casting = AutomaticChild(routine, assignment, source);
-                if (casting == null) return;
+                // No child owns the target: add it to the Automatic child.
                 casting.TargetUnitIds.Add(unitId);
             }
             PruneEmptyAssignment(routine, assignment);
@@ -292,21 +290,44 @@ namespace KingmakerBuffPlanner.UI
             RoutineProfile routine = FindRoutine(routineId);
             SourceAssignmentProfile assignment = routine.Assignments
                 .FirstOrDefault(item => item.SourceId == source.SourceId);
+            SourceAssignmentProfile parent = routine.Assignments
+                .FirstOrDefault(item => item.SourceId == source.SourceId);
+            HashSet<string> pinnedOwned = parent == null ? null : new HashSet<string>(
+                parent.CastingAssignments.Where(child => !child.IsAutomatic)
+                    .SelectMany(child => child.TargetUnitIds), StringComparer.Ordinal);
             List<string> next = selected ? Snapshot.Units
                 .Where(unit => IsTargetLegal(source, routineId, unit.UnitId))
-                .Select(unit => unit.UnitId).Distinct(StringComparer.Ordinal)
+                .Select(unit => unit.UnitId)
+                .Where(id => pinnedOwned == null || !pinnedOwned.Contains(id))
+                .Distinct(StringComparer.Ordinal)
                 .OrderBy(id => id, StringComparer.Ordinal).ToList() : new List<string>();
             if (next.Count == 0)
             {
                 if (assignment == null) return;
-                // Clearing targets clears targets: enhancements and pins on
-                // the automatic child stay configured as intent.
+                // Clearing targets clears only the Automatic child's targets:
+                // pinned routing and all enhancement intent survive.
                 foreach (CastingAssignmentProfile casting in assignment.CastingAssignments)
                     if (casting.IsAutomatic)
                         casting.TargetUnitIds = new List<string>();
                 PruneEmptyAssignment(routine, assignment);
                 _save(Profile);
                 return;
+            }
+            if (assignment != null)
+            {
+                // Select-all reconciles with pinned rows instead of
+                // duplicating their targets into the Automatic child.
+                CastingAssignmentProfile reconciledChild = AutomaticChild(routine, assignment, source);
+                if (reconciledChild != null)
+                {
+                    var reconciled = new List<string>(reconciledChild.TargetUnitIds
+                        .Where(id => pinnedOwned == null || !pinnedOwned.Contains(id)));
+                    foreach (string added in next.Where(id => !reconciled.Contains(id)))
+                        reconciled.Add(added);
+                    reconciledChild.TargetUnitIds = reconciled;
+                    _save(Profile);
+                    return;
+                }
             }
             CastingAssignmentProfile automatic = AutomaticChild(routine, assignment, source);
             if (automatic == null) return;
@@ -486,18 +507,51 @@ namespace KingmakerBuffPlanner.UI
                     out grouping))
                 return new ReadOnlyCollection<ProviderPlanningOption>(
                     new List<ProviderPlanningOption>());
-            var request = new BuffCastRequest(new BuffSourceDefinition(
-                    source.SourceId, source.Abilities, expression, grouping),
-                assignment == null ? (IEnumerable<string>)new string[0] :
-                    assignment.WantedTargetUnitIds,
-                assignment == null ? ExistingEffectPolicy.SkipAlreadyActive :
-                    assignment.ExistingEffectPolicy,
-                assignment == null ? (IEnumerable<string>)new string[0] :
-                    assignment.IgnoredPresenceMarkers,
-                assignment == null ? (IEnumerable<string>)new string[0] :
-                    assignment.SelectedEnhancementIds);
-            return _targeting.Resolve(Snapshot, request, _providerOptions,
-                _enhancements);
+            return GetChildAwareProviderOptions(source, routineId, expression,
+                grouping, assignment);
+        }
+
+        // Resolves one request per child assignment so each child's pins,
+        // targets, and enhancement selections reach the resolver as that
+        // child's own cast constraints — never a merged union that can turn
+        // two different rods or another child's Share into one incompatible
+        // selection. Legality aggregates the per-child option sets.
+        private IReadOnlyList<ProviderPlanningOption> GetChildAwareProviderOptions(
+            SetupSourceRow source, string routineId, EffectExpression expression,
+            CastGroupingKind grouping, SourceAssignmentProfile assignment)
+        {
+            var definition = new BuffSourceDefinition(
+                source.SourceId, source.Abilities, expression, grouping);
+            var combined = new List<ProviderPlanningOption>();
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            if (assignment != null)
+            {
+                foreach (CastingAssignmentProfile child in assignment.CastingAssignments)
+                {
+                    var request = new BuffCastRequest(definition,
+                        child.TargetUnitIds, assignment.ExistingEffectPolicy,
+                        assignment.IgnoredPresenceMarkers,
+                        child.Enhancements.Select(selection =>
+                            new EnhancementRequest(selection.EnhancementId,
+                                selection.IsRequired)),
+                        child.AssignmentId, child.CasterUnitId, child.ProviderKey,
+                        child.SpellbookGuid, child.Order);
+                    foreach (ProviderPlanningOption option in _targeting.Resolve(
+                            Snapshot, request, _providerOptions, _enhancements))
+                        if (seen.Add(option.Provider.Key.Canonical))
+                            combined.Add(option);
+                }
+            }
+            else
+            {
+                // No configured children yet: resolve the unconstrained
+                // request so a fresh source is still legal to plan.
+                var request = new BuffCastRequest(definition, new string[0],
+                    ExistingEffectPolicy.SkipAlreadyActive, new string[0]);
+                combined.AddRange(_targeting.Resolve(Snapshot, request,
+                    _providerOptions, _enhancements));
+            }
+            return new ReadOnlyCollection<ProviderPlanningOption>(combined);
         }
 
         private static string AggregateUsageSuffix(
@@ -887,9 +941,19 @@ namespace KingmakerBuffPlanner.UI
             RoutineProfile routine = FindRoutine(routineId);
             CastingAssignmentProfile casting = FindCastingAssignment(
                 routineId, sourceId, assignmentId);
-            if (casting.TargetUnitIds.Contains(unitId))
+            // Portrait state shows wanted regardless of which child holds a
+            // target. Deselect removes it from whichever child owns it
+            // (pinned routing is only removed explicitly, never converted);
+            // select adds to the Automatic child only when no sibling
+            // already owns it, so pinned routing is never silently moved.
+            SourceAssignmentProfile owner = routine.Assignments
+                .FirstOrDefault(item => item.SourceId == source.SourceId);
+            CastingAssignmentProfile owningChild = owner == null ? null :
+                owner.CastingAssignments.FirstOrDefault(child =>
+                    child.TargetUnitIds.Contains(unitId));
+            if (owningChild != null)
             {
-                casting.TargetUnitIds.Remove(unitId);
+                owningChild.TargetUnitIds.Remove(unitId);
             }
             else
             {

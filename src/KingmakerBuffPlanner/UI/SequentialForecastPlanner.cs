@@ -119,12 +119,27 @@ namespace KingmakerBuffPlanner.UI
                 // Carry forward only what this occurrence actually committed.
                 foreach (CastStep step in result.Plan.Steps)
                 {
-                    if (step.Reservation != null && step.Reservation.Units > 0 &&
-                        poolRemaining.ContainsKey(step.Reservation.PoolKey))
+                    if (step.Reservation != null && step.Reservation.Units > 0)
                     {
-                        poolRemaining[step.Reservation.PoolKey] =
-                            Math.Max(0, poolRemaining[step.Reservation.PoolKey] -
-                                step.Reservation.Units);
+                        if (poolRemaining.ContainsKey(step.Reservation.PoolKey))
+                        {
+                            poolRemaining[step.Reservation.PoolKey] =
+                                Math.Max(0, poolRemaining[step.Reservation.PoolKey] -
+                                    step.Reservation.Units);
+                        }
+                        // Prepared slots allocate by token availability in the
+                        // ledger, not by the aggregate: consume the exact
+                        // reserved tokens (linked companions included) so a
+                        // later occurrence cannot reuse a spent slot.
+                        Dictionary<string, bool> tokens;
+                        if (poolTokens.TryGetValue(step.Reservation.PoolKey, out tokens))
+                        {
+                            foreach (string tokenId in step.Reservation.TokenIds)
+                            {
+                                if (tokens.ContainsKey(tokenId))
+                                    tokens[tokenId] = false;
+                            }
+                        }
                     }
                     foreach (KeyValuePair<string, int> usage in step.EnhancementUsageByPool)
                     {
@@ -142,16 +157,20 @@ namespace KingmakerBuffPlanner.UI
                             materialRemaining[step.MaterialReservation.ItemGuid] =
                                 Math.Max(0, material - step.MaterialReservation.Count);
                     }
-                    // Project the granted effects forward so later routines
-                    // skip already-covered targets for free.
-                    foreach (string recipient in step.ExpectedRecipientUnitIds)
+                    // Project granted effects forward so later routines skip
+                    // already-covered targets for free — but only effects the
+                    // forecast assumptions justify. Conditional alternatives
+                    // are NOT a union: mutually exclusive branches stay
+                    // unproven, and kinds/targeting structure are preserved.
+                    foreach (ProjectedEffect projection in ProjectEffects(step))
                     {
                         HashSet<ActiveEffectMarker> markers;
-                        if (!carriedEffects.TryGetValue(recipient, out markers))
-                            carriedEffects[recipient] = markers =
+                        if (!carriedEffects.TryGetValue(projection.RecipientUnitId,
+                                out markers))
+                            carriedEffects[projection.RecipientUnitId] = markers =
                                 new HashSet<ActiveEffectMarker>();
-                        foreach (string effectId in LeafEffectIds(step.ExpectedEffects))
-                            markers.Add(new ActiveEffectMarker(EffectKind.Buff, effectId));
+                        markers.Add(new ActiveEffectMarker(projection.Kind,
+                            projection.EffectId));
                     }
                 }
             }
@@ -193,9 +212,10 @@ namespace KingmakerBuffPlanner.UI
                             token.SpellLevel, token.SlotKind,
                             tokens == null ? token.Available : SafeToken(tokens, token.TokenId),
                             token.IsPrimary, token.LinkedTokenIds)).ToList();
+                    int available = carriedTokens.Count(t => t.Available);
+                    poolRemaining[pool.PoolKey] = available;
                     pools.Add(new ResourcePoolSnapshot(pool.PoolKey, pool.Kind,
-                        carriedTokens.Count, carriedTokens.Count(t => t.Available),
-                        carriedTokens));
+                        carriedTokens.Count, available, carriedTokens));
                 }
                 else
                 {
@@ -258,34 +278,71 @@ namespace KingmakerBuffPlanner.UI
                 }).ToList();
         }
 
-        private static IEnumerable<string> LeafEffectIds(EffectExpression expression)
+        private sealed class ProjectedEffect
         {
-            var ids = new List<string>();
-            Collect(expression, ids);
-            return ids;
+            internal string EffectId;
+            internal EffectKind Kind;
+            internal string RecipientUnitId;
         }
 
-        private static void Collect(EffectExpression expression, List<string> ids)
+        // Effects justified under "successful cast" assumptions only:
+        // unconditional leaves with their real kind, scoped to the recipient
+        // their targeting structure names. Conditional alternatives and any
+        // unrecognized node stay unproven — later demand for them remains a
+        // conservative estimate instead of a free already-active skip.
+        private static IEnumerable<ProjectedEffect> ProjectEffects(CastStep step)
+        {
+            var projections = new List<ProjectedEffect>();
+            CollectJustified(step.ExpectedEffects, step, projections);
+            return projections;
+        }
+
+        private static void CollectJustified(EffectExpression expression,
+            CastStep step, List<ProjectedEffect> projections)
         {
             var leaf = expression as EffectLeafExpression;
-            if (leaf != null) { ids.Add(leaf.EffectId); return; }
+            if (leaf != null)
+            {
+                if (leaf.Target == EffectTarget.Caster)
+                {
+                    projections.Add(new ProjectedEffect
+                    {
+                        EffectId = leaf.EffectId, Kind = leaf.Kind,
+                        RecipientUnitId = step.AnchorUnitId
+                    });
+                }
+                else if (leaf.Target == EffectTarget.CurrentTarget && step.TargetUnitIds.Count == 1)
+                {
+                    projections.Add(new ProjectedEffect
+                    {
+                        EffectId = leaf.EffectId, Kind = leaf.Kind,
+                        RecipientUnitId = step.TargetUnitIds[0]
+                    });
+                }
+                else if (leaf.Target == EffectTarget.Party ||
+                    leaf.Target == EffectTarget.AlliedAreaRecipients)
+                {
+                    foreach (string candidate in step.ExpectedRecipientUnitIds)
+                        projections.Add(new ProjectedEffect
+                        {
+                            EffectId = leaf.EffectId, Kind = leaf.Kind,
+                            RecipientUnitId = candidate
+                        });
+                }
+                return;
+            }
             var sequence = expression as SequenceEffectExpression;
             if (sequence != null)
             {
-                foreach (EffectExpression child in sequence.Children) Collect(child, ids);
-                return;
-            }
-            var conditional = expression as ConditionalEffectExpression;
-            if (conditional != null)
-            {
-                Collect(conditional.WhenTrue, ids);
-                Collect(conditional.WhenFalse, ids);
+                foreach (EffectExpression child in sequence.Children)
+                    CollectJustified(child, step, projections);
                 return;
             }
             var targeted = expression as TargetedEffectExpression;
-            if (targeted != null) { Collect(targeted.Child, ids); return; }
+            if (targeted != null) { CollectJustified(targeted.Child, step, projections); return; }
             var referenced = expression as ReferencedAbilityExpression;
-            if (referenced != null) Collect(referenced.Child, ids);
+            if (referenced != null) { CollectJustified(referenced.Child, step, projections); return; }
+            // ConditionalEffectExpression and unknown nodes: no projection.
         }
     }
 }

@@ -188,6 +188,10 @@ namespace KingmakerBuffPlanner.Tests
                 Run("material-plan-change-requires-renewed-review", TestPlanMaterialChangeDetector);
                 Run("assignment-editor-intent-regressions", TestAssignmentEditorIntent);
                 Run("review-state-and-material-signatures", TestReviewStateAndSignatures);
+                Run("review-acknowledgment-follows-production-orchestration", TestReviewAcknowledgmentOrchestration);
+                Run("forecast-consumes-prepared-tokens-exactly", TestForecastPreparedTokens);
+                Run("forecast-projects-only-justified-effects", TestForecastEffectProjection);
+                Run("portrait-path-resolves-child-intent-separately", TestPortraitChildIntent);
                 Run("unsupported-configured-requests-block-partial-apply", TestUnresolvableCoverage);
                 Run("spellbook-handoff-invokes-opener-and-awaits-presentation", TestSpellbookHandoff);
                 Run("cast-enhancement-execution-is-fail-closed-and-cleaned-up", TestCastEnhancementExecution);
@@ -5538,6 +5542,389 @@ namespace KingmakerBuffPlanner.Tests
                         "The flat casting-order layout overlapped or dropped rows for " +
                         targetCount + " targets.");
             }
+        }
+
+        // R4: the ordinary source/portrait path resolves each child's pins,
+        // targets, and enhancement selections separately instead of merging
+        // them into one incompatible union; portraits never silently convert
+        // pinned routing; select-all/clear reconcile with pinned rows.
+        private static void TestPortraitChildIntent()
+        {
+            AbilityKey ability = Ability("portrait-spell", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("portrait-slots",
+                ResourcePoolKind.SpontaneousLevel, 8, 8, null);
+            ProviderSnapshot leinna = PlannerProvider("leinna", "leinna-book",
+                ability, pool.PoolKey, 1);
+            ProviderSnapshot felix = PlannerProvider("felix", "felix-book",
+                ability, pool.PoolKey, 1);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(
+                new[] { leinna, felix }, new[] { pool },
+                "leinna", "felix", "tias");
+            var leinnaOption = new ProviderPlanningOption(leinna,
+                new[] { "leinna" }, new[] { "leinna" }, 4, 40);
+            var felixOption = new ProviderPlanningOption(felix,
+                new[] { "felix" }, new[] { "felix" }, 5, 50);
+            // Two DIFFERENT caster-owned rods: an exclusive-group union would
+            // make them incompatible.
+            CastEnhancementSnapshot leinnaRod = ClassEnhancement("rod-l", "leinna",
+                ability, "leinna-book", 3, "pool-l", "rod-group", false);
+            CastEnhancementSnapshot felixRod = ClassEnhancement("rod-f", "felix",
+                ability, "felix-book", 3, "pool-f", "rod-group", false);
+            var effects = new Dictionary<string, EffectExpression> {
+                { ability.Canonical, new EffectLeafExpression(EffectKind.Buff,
+                    "portrait-buff", EffectTarget.Caster, "ContextActionApplyBuff", "root/apply") }
+            };
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault("portrait-intent");
+            var model = new PlannerSetupModel(profile, snapshot,
+                new ActiveEffectSnapshot(null), effects,
+                new[] { leinnaOption, felixOption }, ignored => { },
+                new[] { leinnaRod, felixRod });
+            SetupSourceRow source = model.SelectedSource;
+
+            // Two children, one rod each, one target each: the simple
+            // portrait strip starts both on the Automatic child, then the
+            // editor splits them.
+            model.ToggleTarget("long", "leinna");
+            model.ToggleTarget("long", "felix");
+            List<CastingAssignmentProfile> children = model
+                .GetCastingAssignments("long", source.SourceId).ToList();
+            string felixRowId = children[0].AssignmentId;
+            CastingAssignmentProfile felixRow = model.SplitCastingAssignment(
+                "long", source.SourceId, felixRowId, "felix");
+            felixRowId = felixRow.AssignmentId;
+            model.CycleCastingAssignmentCaster("long", source.SourceId, felixRowId);
+            model.SetAssignmentEnhancement("long", source.SourceId,
+                children.First(child => child.TargetUnitIds.Contains("leinna")).AssignmentId,
+                "rod-l");
+            model.SetAssignmentEnhancement("long", source.SourceId, felixRowId, "rod-f");
+
+            // The union would merge rod-l + rod-f (same exclusive group) into
+            // an impossible combined selection and kill all legality.
+            if (!model.IsTargetLegal(source, "long", "leinna") ||
+                !model.IsTargetLegal(source, "long", "felix"))
+                throw new InvalidOperationException(
+                    "The portrait path merged two children's rods into one incompatible union.");
+
+            // The plan still routes each child with its own rod.
+            RoutinePlanResult result = new RoutinePlanService().Plan(profile, "long",
+                snapshot, new ActiveEffectSnapshot(null), effects,
+                new[] { leinnaOption, felixOption }, new[] { leinnaRod, felixRod });
+            if (result.Plan.Steps.Count != 2 ||
+                !result.Plan.Steps.Any(step => step.EnhancementIds.Contains("rod-l") &&
+                    step.Provider.CasterUnitId == "leinna") ||
+                !result.Plan.Steps.Any(step => step.EnhancementIds.Contains("rod-f") &&
+                    step.Provider.CasterUnitId == "felix"))
+                throw new InvalidOperationException(
+                    "Child rods did not stay on their own casts.");
+
+            // Clicking a portrait held by a pinned row never edits that row
+            // from the simple strip — neither deselect nor select converts
+            // the pinned routing to Automatic.
+            children = model.GetCastingAssignments("long", source.SourceId).ToList();
+            string pinnedId = children.First(child =>
+                !child.IsAutomatic && child.TargetUnitIds.Contains("felix")).AssignmentId;
+            model.ToggleTarget("long", "felix");
+            model.ToggleTarget("long", "felix");
+            children = model.GetCastingAssignments("long", source.SourceId).ToList();
+            CastingAssignmentProfile stillPinned = children.First(child =>
+                child.AssignmentId == pinnedId);
+            if (!stillPinned.TargetUnitIds.Contains("felix") || stillPinned.IsAutomatic ||
+                children.Count(child => child.TargetUnitIds.Contains("felix")) != 1)
+                throw new InvalidOperationException(
+                    "A simple-strip toggle converted or duplicated pinned routing.");
+
+            // Select-all after a pinned assignment does not duplicate its
+            // targets into the Automatic child. The pinned row already holds
+            // 'leinna' or 'felix'; select-all must not copy it.
+            model.SetAllValidTargets("long", true);
+            children = model.GetCastingAssignments("long", source.SourceId).ToList();
+            foreach (string unitId in new[] { "leinna", "felix" })
+                if (children.Count(child => child.TargetUnitIds.Contains(unitId)) > 1)
+                    throw new InvalidOperationException(
+                        "Select-all duplicated a pinned row's target: " + unitId);
+            // Clearing removes only the Automatic child's targets.
+            model.SetAllValidTargets("long", false);
+            children = model.GetCastingAssignments("long", source.SourceId).ToList();
+            CastingAssignmentProfile survivor = children.FirstOrDefault(child =>
+                !child.IsAutomatic && child.TargetUnitIds.Count > 0);
+            if (survivor == null)
+                throw new InvalidOperationException(
+                    "Clear-all discarded pinned routing instead of reconciling.");
+        }
+
+        // R3a: prepared-slot tokens are consumed exactly (linked companions
+        // included) across occurrences; the second occurrence cannot reuse a
+        // spent slot even with different targets, an independent unused
+        // token stays usable, and reversing the order moves the shortfall.
+        private static void TestForecastPreparedTokens()
+        {
+            AbilityKey longAbility = Ability("prep-long", string.Empty, 0);
+            AbilityKey shortAbility = Ability("prep-short", string.Empty, 0);
+            // Case 1: exactly ONE prepared token shared by both routines.
+            var onlyToken = new ResourceTokenSnapshot("t-only",
+                longAbility, 1, PreparedSlotKind.Favorite, true, true, new string[0]);
+            var onePool = new ResourcePoolSnapshot("prep-one",
+                ResourcePoolKind.PreparedSlots, 1, 1, new[] { onlyToken });
+            ProviderSnapshot longCaster = new ProviderSnapshot(
+                new ProviderKey("caster", "book", longAbility, "level-2"),
+                longAbility.BaseAbilityGuid, 1, onePool.PoolKey, 1, new[] { "t-only" });
+            ProviderSnapshot shortCaster = new ProviderSnapshot(
+                new ProviderKey("caster", "book", shortAbility, "level-2"),
+                shortAbility.BaseAbilityGuid, 1, onePool.PoolKey, 1, new[] { "t-only" });
+            PartyProviderSnapshot oneSnapshot = PlannerSnapshot(
+                new[] { longCaster, shortCaster }, new[] { onePool },
+                "caster", "la", "sa");
+            var longOption = new ProviderPlanningOption(longCaster,
+                new[] { "caster", "la" }, new[] { "caster" }, 4, 40);
+            var shortOption = new ProviderPlanningOption(shortCaster,
+                new[] { "caster", "sa" }, new[] { "caster" }, 4, 40);
+            var effects = new Dictionary<string, EffectExpression> {
+                { longAbility.Canonical, Leaf("prep-long-buff") },
+                { shortAbility.Canonical, Leaf("prep-short-buff") }
+            };
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault("prep-forecast");
+            profile.Routines.First(r => r.RoutineId == "long").Assignments.Add(Assignment(
+                longAbility.Canonical, longAbility, new[] { "la" }));
+            profile.Routines.First(r => r.RoutineId == "short").Assignments.Add(Assignment(
+                shortAbility.Canonical, shortAbility, new[] { "sa" }));
+
+            SequentialForecastPlanner.Result forward = SequentialForecastPlanner.Compute(
+                profile, new[] { "long", "short" }, oneSnapshot,
+                new ActiveEffectSnapshot(null), effects,
+                new[] { longOption, shortOption }, new CastEnhancementSnapshot[0]);
+            if (forward.Occurrences[0].Plan.Steps.Count != 1 ||
+                forward.Occurrences[1].Plan.Steps.Count != 0 ||
+                forward.Occurrences[1].Plan.Outcomes.Count(o =>
+                    o.Kind == TargetOutcomeKind.Unfulfilled) != 1)
+                throw new InvalidOperationException(
+                    "A single prepared token was reused across occurrences: long=" +
+                    forward.Occurrences[0].Plan.Steps.Count + " short=" +
+                    forward.Occurrences[1].Plan.Steps.Count + ".");
+            if (forward.ForecastRemainingByNativePool["prep-one"] != 0)
+                throw new InvalidOperationException(
+                    "Final prepared availability should be zero after one spent token.");
+            SequentialForecastPlanner.Result reverse = SequentialForecastPlanner.Compute(
+                profile, new[] { "short", "long" }, oneSnapshot,
+                new ActiveEffectSnapshot(null), effects,
+                new[] { longOption, shortOption }, new CastEnhancementSnapshot[0]);
+            if (reverse.Occurrences[0].Plan.Steps.Count != 1 ||
+                reverse.Occurrences[1].Plan.Outcomes.Count(o =>
+                    o.Kind == TargetOutcomeKind.Unfulfilled) != 1)
+                throw new InvalidOperationException(
+                    "Reversing the sequence did not move the prepared-token shortfall.");
+
+            // Case 2: a linked pair consumed exactly once by the long cast,
+            // plus an independent free token that stays usable for short.
+            var primary = new ResourceTokenSnapshot("t-primary",
+                longAbility, 1, PreparedSlotKind.Favorite, true, true, new[] { "t-linked" });
+            var linked = new ResourceTokenSnapshot("t-linked",
+                longAbility, 1, PreparedSlotKind.Common, true, false, new string[0]);
+            var free = new ResourceTokenSnapshot("t-free",
+                shortAbility, 1, PreparedSlotKind.Favorite, true, true, new string[0]);
+            var pairPool = new ResourcePoolSnapshot("prep-pair",
+                ResourcePoolKind.PreparedSlots, 3, 3, new[] { primary, linked, free });
+            ProviderSnapshot pairLong = new ProviderSnapshot(
+                new ProviderKey("caster", "book", longAbility, "level-2"),
+                longAbility.BaseAbilityGuid, 1, pairPool.PoolKey, 1, new[] { "t-primary" });
+            ProviderSnapshot pairShort = new ProviderSnapshot(
+                new ProviderKey("caster", "book", shortAbility, "level-2"),
+                shortAbility.BaseAbilityGuid, 1, pairPool.PoolKey, 1, new[] { "t-free" });
+            PartyProviderSnapshot pairSnapshot = PlannerSnapshot(
+                new[] { pairLong, pairShort }, new[] { pairPool },
+                "caster", "la", "sa");
+            SequentialForecastPlanner.Result pair = SequentialForecastPlanner.Compute(
+                profile, new[] { "long", "short" }, pairSnapshot,
+                new ActiveEffectSnapshot(null), effects,
+                new[] {
+                    new ProviderPlanningOption(pairLong,
+                        new[] { "caster", "la" }, new[] { "caster" }, 4, 40),
+                    new ProviderPlanningOption(pairShort,
+                        new[] { "caster", "sa" }, new[] { "caster" }, 4, 40)
+                }, new CastEnhancementSnapshot[0]);
+            if (pair.Occurrences[0].Plan.Steps.Count != 1 ||
+                pair.Occurrences[0].Plan.Steps[0].Reservation.TokenIds.Count != 2 ||
+                pair.Occurrences[1].Plan.Steps.Count != 1 ||
+                pair.Occurrences[1].Plan.Outcomes.Any(o =>
+                    o.Kind == TargetOutcomeKind.Unfulfilled))
+                throw new InvalidOperationException(
+                    "Linked tokens were not consumed exactly once or the free token was not reusable.");
+        }
+
+        // R3b: conditional alternatives are not unions — a B request is not
+        // skipped because B appeared in an unknown branch of an earlier
+        // graph — while unconditional caster/party effects project with the
+        // correct recipient and kind.
+        private static void TestForecastEffectProjection()
+        {
+            AbilityKey conditionSpell = Ability("proj-cond", string.Empty, 0);
+            AbilityKey laterSpell = Ability("proj-later", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("proj-slots",
+                ResourcePoolKind.Unlimited, 0, 0, null);
+            ProviderSnapshot caster = PlannerProvider("caster", "book",
+                conditionSpell, pool.PoolKey, 0);
+            ProviderSnapshot laterCaster = PlannerProvider("caster", "book",
+                laterSpell, pool.PoolKey, 0);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(
+                new[] { caster, laterCaster }, new[] { pool }, "caster", "a1");
+            var option = new ProviderPlanningOption(caster,
+                new[] { "caster", "a1" }, new[] { "caster" }, 4, 40);
+            var laterOption = new ProviderPlanningOption(laterCaster,
+                new[] { "caster", "a1" }, new[] { "caster" }, 4, 40);
+            // Conditional A-or-B graph: neither branch is a guaranteed grant.
+            EffectExpression conditional = new ConditionalEffectExpression(
+                "unknown-condition", Leaf("cond-a"), Leaf("cond-b"));
+            var effects = new Dictionary<string, EffectExpression> {
+                { conditionSpell.Canonical, conditional },
+                { laterSpell.Canonical, Leaf("later-buff") }
+            };
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault("proj-forecast");
+            profile.Routines.First(r => r.RoutineId == "long").Assignments.Add(Assignment(
+                conditionSpell.Canonical, conditionSpell, new[] { "a1" }));
+            profile.Routines.First(r => r.RoutineId == "short").Assignments.Add(Assignment(
+                laterSpell.Canonical, laterSpell, new[] { "a1" }));
+            SequentialForecastPlanner.Result result = SequentialForecastPlanner.Compute(
+                profile, new[] { "long", "short" }, snapshot,
+                new ActiveEffectSnapshot(null), effects,
+                new[] { option, laterOption }, new CastEnhancementSnapshot[0]);
+            // The later request for effect later-buff must still CAST — the
+            // conditional graph's branches must not have granted anything.
+            if (result.Occurrences[1].Plan.Steps.Count != 1)
+                throw new InvalidOperationException(
+                    "A conditional branch projected as a guaranteed grant and skipped a later cast.");
+
+            // Unconditional leaf projection: same spell twice — the second
+            // occurrence's request for the same effect on the same target
+            // skips for free.
+            AbilityKey echo = Ability("proj-echo", string.Empty, 0);
+            ProviderSnapshot echoCaster = PlannerProvider("caster", "book",
+                echo, pool.PoolKey, 0);
+            PartyProviderSnapshot echoSnapshot = PlannerSnapshot(
+                new[] { echoCaster }, new[] { pool }, "caster", "a1");
+            var echoOption = new ProviderPlanningOption(echoCaster,
+                new[] { "caster", "a1" }, new[] { "caster" }, 4, 40);
+            var echoEffects = new Dictionary<string, EffectExpression> {
+                { echo.Canonical, Leaf("echo-buff") }
+            };
+            BuffPlannerProfile echoProfile = BuffPlannerProfile.CreateDefault("proj-echo");
+            echoProfile.Routines.First(r => r.RoutineId == "long").Assignments.Add(
+                Assignment(echo.Canonical, echo, new[] { "a1" }));
+            echoProfile.Routines.First(r => r.RoutineId == "short").Assignments.Add(
+                Assignment(echo.Canonical, echo, new[] { "a1" }));
+            SequentialForecastPlanner.Result echoResult = SequentialForecastPlanner.Compute(
+                echoProfile, new[] { "long", "short" }, echoSnapshot,
+                new ActiveEffectSnapshot(null), echoEffects,
+                new[] { echoOption }, new CastEnhancementSnapshot[0]);
+            if (echoResult.Occurrences[0].Plan.Steps.Count != 1 ||
+                echoResult.Occurrences[1].Plan.Steps.Count != 0 ||
+                echoResult.Occurrences[1].Plan.Outcomes.Count(o =>
+                    o.Kind == TargetOutcomeKind.SkippedAlreadyActive) != 1)
+                throw new InvalidOperationException(
+                    "Unconditional effect projection lost its free already-active skip.");
+        }
+
+        // R2: exercise the review-acknowledgment protocol in the exact call
+        // order the session performs — compute (PreviewRoutine), presentation
+        // (AcknowledgeDisplayedPlan from the view after binding), preflight
+        // compute inside ExecuteRoutine, and spend invalidation. Computing
+        // must never acknowledge; only presentation of the matching
+        // routine/campaign does.
+        private static void TestReviewAcknowledgmentOrchestration()
+        {
+            AbilityKey ability = Ability("review-orch-spell", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("review-orch-slots",
+                ResourcePoolKind.SpontaneousLevel, 4, 4, null);
+            ProviderSnapshot caster = PlannerProvider("caster", "book",
+                ability, pool.PoolKey, 1);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(
+                new[] { caster }, new[] { pool }, "caster", "a1", "a2");
+            var option = new ProviderPlanningOption(caster,
+                new[] { "caster", "a1", "a2" }, new[] { "caster" }, 4, 40);
+            var effects = new Dictionary<string, EffectExpression> {
+                { ability.Canonical, Leaf("review-orch-buff") }
+            };
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault("review-orch");
+            var service = new RoutinePlanService();
+
+            CastPlan ComputePlan(string routineId, string targets)
+            {
+                var request = new BuffCastRequest(new BuffSourceDefinition(
+                    "review-orch", ability, Leaf("review-orch-buff"),
+                    CastGroupingKind.PerTarget),
+                    targets.Split(','), ExistingEffectPolicy.Overwrite, null,
+                    null, routineId + "-assignment", null, null, null, 0);
+                return new CastPlanner().Plan(snapshot, request,
+                    new[] { option }, EmptyPolicy(), new ActiveEffectSnapshot(null));
+            }
+
+            var coordinator = new PlannerReviewCoordinator();
+
+            // 1. Display/acknowledge A; native state changes so preflight
+            //    computes B; the gate refuses; retry while still open
+            //    without a new presentation of B: still no B baseline.
+            CastPlan planA = ComputePlan("long", "a1");
+            coordinator.PlanComputed("review-orch", "long");            // PreviewRoutine(A)
+            coordinator.Presented("review-orch", "long", planA);        // view bound A
+            CastPlan planB = ComputePlan("long", "a1,a2");
+            coordinator.PlanComputed("review-orch", "long");            // preflight in ExecuteRoutine
+            string changeAB = PlanMaterialChangeDetector.DescribeMaterialChange(
+                coordinator.BaselineFor("review-orch", "long"), planB);
+            if (changeAB == null)
+                throw new InvalidOperationException("Test setup: B must differ materially from A.");
+            // Retry: compute again (another preflight), no presentation.
+            coordinator.PlanComputed("review-orch", "long");
+            if (coordinator.BaselineFor("review-orch", "long") != planA)
+                throw new InvalidOperationException(
+                    "Computation alone replaced the acknowledged baseline (the R2 defect).");
+            string changeRetry = PlanMaterialChangeDetector.DescribeMaterialChange(
+                coordinator.BaselineFor("review-orch", "long"), planB);
+            if (changeRetry == null)
+                throw new InvalidOperationException(
+                    "A refusal-retry without renewed presentation lost the material refusal.");
+
+            // 2. Resource inspection previews OTHER routines while the same
+            //    routine is displayed: they must not overwrite A's baseline.
+            coordinator.PlanComputed("review-orch", "short");           // GetResourceUsageLines
+            coordinator.PlanComputed("review-orch", "important");
+            if (!ReferenceEquals(coordinator.BaselineFor("review-orch", "long"), planA))
+                throw new InvalidOperationException(
+                    "Another routine's incidental preview overwrote the displayed baseline.");
+
+            // 3. Presentation for a routine whose plan was not just computed
+            //    (stale binding) does not acknowledge.
+            coordinator.Presented("review-orch", "short", planA);
+            if (coordinator.BaselineFor("review-orch", "short") != null)
+                throw new InvalidOperationException(
+                    "A stale presentation acknowledged the wrong routine.");
+
+            // 4. Explicit presentation of the revised plan, then unchanged
+            //    execution: no material change.
+            coordinator.PlanComputed("review-orch", "long");
+            coordinator.Presented("review-orch", "long", planB);
+            string afterReview = PlanMaterialChangeDetector.DescribeMaterialChange(
+                coordinator.BaselineFor("review-orch", "long"),
+                ComputePlan("long", "a1,a2"));
+            if (afterReview != null)
+                throw new InvalidOperationException(
+                    "Reviewing the revised plan did not authorize executing exactly it.");
+            coordinator.Spent("long");                                   // post-gate invalidation
+            if (coordinator.BaselineFor("review-orch", "long") != null)
+                throw new InvalidOperationException(
+                    "Post-spend invalidation failed after a legitimate execution.");
+
+            // 5. Campaign switch invalidates; a new campaign starts with no
+            //    baseline (deliberate missing-baseline behavior: the gate
+            //    passes only because nothing changed, never by silently
+            //    trusting an unreviewed plan).
+            coordinator.PlanComputed("review-orch-2", "long");
+            if (coordinator.BaselineFor("review-orch", "long") != null ||
+                coordinator.BaselineFor("review-orch-2", "long") != null)
+                throw new InvalidOperationException(
+                    "Campaign switch did not invalidate cleanly to an empty baseline.");
+            CastPlan planC = ComputePlan("long", "a1");
+            coordinator.Presented("review-orch-2", "long", planC);
+            if (coordinator.BaselineFor("review-orch-2", "long") != planC)
+                throw new InvalidOperationException(
+                    "A fresh campaign's presentation failed to establish its own baseline.");
         }
 
         // F4 regressions: acknowledged review state scoping/invalidation and

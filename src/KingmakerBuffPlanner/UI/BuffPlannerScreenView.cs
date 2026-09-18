@@ -213,6 +213,11 @@ namespace KingmakerBuffPlanner.UI
                 _readyOnlyButton.gameObject.SetActive(_executeReadyOnly != null);
             }
             KingmakerUiFactory.ForceLayoutAndSnap(_root);
+            // The visible controls now show exactly this plan: this is the
+            // presentation acknowledgment. Chooser/resource/forecast
+            // computations never reach here and never acknowledge.
+            if (model != null && !_session.IsExecuting)
+                _session.AcknowledgeDisplayedPlan(ActiveRoutineId);
         }
 
         private void RefreshCatalog(bool preserveScroll)
