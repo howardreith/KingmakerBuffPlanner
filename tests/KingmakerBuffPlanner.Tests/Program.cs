@@ -183,6 +183,7 @@ namespace KingmakerBuffPlanner.Tests
                 Run("partial-apply-gate-distinguishes-coverage-from-casts", TestPartialExecutionGate);
                 Run("casting-order-rows-and-resource-lines-derive-from-plan", TestCastingOrderPresentation);
                 Run("sequence-forecast-carries-balances-per-selected-routine", TestSequenceForecast);
+                Run("spellbook-handoff-waits-bounded-and-rolls-back", TestSpellbookHandoff);
                 Run("cast-enhancement-execution-is-fail-closed-and-cleaned-up", TestCastEnhancementExecution);
                 Run("consumed-one-shot-enhancement-is-not-rearmed", TestOneShotEnhancementRestoration);
                 Run("execution-preflight-runs-under-the-native-activation-lease",
@@ -5145,6 +5146,45 @@ namespace KingmakerBuffPlanner.Tests
             if (pinnedRows.Count != 1 || !pinnedRows[0].PinUnresolved ||
                 !pinnedRows[0].Status.Contains("Pinned caster unavailable"))
                 throw new InvalidOperationException("A missing pin did not survive as visible unresolved intent.");
+        }
+
+        private static void TestSpellbookHandoff()
+        {
+            // The handoff only opens the planner after native ownership is
+            // released, waits a bounded number of frames, rolls back cleanly,
+            // and never lets a completed handoff be rolled back.
+            var machine = new SpellbookHandoffStateMachine();
+            machine.Begin();
+            if (machine.State != SpellbookHandoffState.WaitingModeRelease)
+                throw new InvalidOperationException("Handoff did not start waiting.");
+            bool opened = false;
+            for (int frame = 0; frame < SpellbookHandoffStateMachine.MaximumWaitFrames - 1; frame++)
+            {
+                opened |= machine.Observe(true);
+                if (machine.State != SpellbookHandoffState.WaitingModeRelease)
+                    throw new InvalidOperationException("Handoff gave up before its bounded wait expired.");
+            }
+            if (opened)
+                throw new InvalidOperationException("Handoff opened the planner while the mode was still owned.");
+            if (machine.Observe(true) || machine.State != SpellbookHandoffState.Failed ||
+                machine.Failure != "mode-release-timeout")
+                throw new InvalidOperationException("Handoff wait was not bounded by the documented frame limit.");
+
+            machine.Begin();
+            if (!machine.Observe(false) || machine.State != SpellbookHandoffState.Completed)
+                throw new InvalidOperationException("Released mode did not complete the handoff.");
+            machine.Rollback("late-failure");
+            if (machine.State != SpellbookHandoffState.Completed)
+                throw new InvalidOperationException("A completed handoff was rolled back after opening.");
+
+            machine.Reset();
+            machine.Begin();
+            machine.Rollback("native-close-refused");
+            if (machine.State != SpellbookHandoffState.Failed ||
+                machine.Failure != "native-close-refused")
+                throw new InvalidOperationException("Rollback did not record its reason.");
+            if (machine.Observe(false))
+                throw new InvalidOperationException("A failed handoff still opened the planner.");
         }
 
         private static void TestSequenceForecast()

@@ -28,6 +28,7 @@ namespace KingmakerBuffPlanner.UI
         private BuffPlannerUiLifecycleDiagnostics _diagnostics;
         private BuffPlannerHudButtonController _hud;
         private BuffPlannerScreenController _screen;
+        private BuffPlannerSpellbookEntryController _spellbookEntry;
         private BuffPlannerQuickExecuteController _quick;
         private int _runtimeOpenCycles;
         private int _runtimeReconstructionCount;
@@ -589,6 +590,11 @@ namespace KingmakerBuffPlanner.UI
                 routineId => _quick.Execute(routineId, true));
             _hud = new BuffPlannerHudButtonController(_session, _diagnostics, log,
                 () => { OpenSetup(); }, routineId => _quick.Execute(routineId));
+            _spellbookEntry = new BuffPlannerSpellbookEntryController(
+                value => _log.Info(value),
+                () => OpenSetup(),
+                () => _screen != null && _screen.IsOpen,
+                PlannerUiTheme.Resolve(null));
             try
             {
                 _eventSubscription = EventBus.Subscribe((object)this);
@@ -624,6 +630,7 @@ namespace KingmakerBuffPlanner.UI
             _tickCount++;
             try
             {
+                if (_spellbookEntry != null) _spellbookEntry.Tick();
                 if (_screen.LifecycleState != PlannerScreenLifecycleState.Closed &&
                     Input.GetKeyDown(KeyCode.Escape)) _screen.Close();
                 long screenStartedAt = RuntimePerformanceDiagnostics.BeginOperation();
@@ -889,6 +896,8 @@ namespace KingmakerBuffPlanner.UI
             StopAllCoroutines();
             if (_runtimePhysicalProbe != null) _runtimePhysicalProbe.Dispose();
             _runtimePhysicalProbe = null;
+            if (_spellbookEntry != null) _spellbookEntry.Release();
+            _spellbookEntry = null;
             if (_eventSubscription != null)
             {
                 _eventSubscription.Dispose();

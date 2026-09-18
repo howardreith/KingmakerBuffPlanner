@@ -280,7 +280,36 @@ Status: SOURCE/BUILD COMPLETE — rendered/live lanes BLOCKED (fixture absent).
 
 ## Checkpoint E — spellbook lifecycle integration
 
-Status: NOT STARTED.
+Status: SOURCE/BUILD COMPLETE — ALL LIVE SPELLBOOK LANES BLOCKED (fixture
+absent; placement/handoff/return not runtime-qualified).
+
+- `UI/SpellbookHandoffStateMachine.cs` (pure): deterministic handoff
+  transitions — begin, bounded mode-release wait (90 frames), completed,
+  failed-with-reason; a completed handoff can never be rolled back and a
+  failed one never opens the planner.
+- `UI/BuffPlannerSpellbookEntryController.cs` (Unity): owned BUFF PLANNER
+  button attached to the native spellbook window (`ServiceWindow/SpellBook`,
+  the same proven StaticCanvas path family), out-of-layout
+  (`LayoutElement.ignoreLayout`, mirroring the live-qualified HUD row
+  precedent), keyed by window instance identity, discovered on a bounded
+  15-tick cadence via a single-path Find (no per-frame global scans). Only
+  the owned button is ever created/destroyed. Clicking runs the guarded
+  handoff: refuse when the planner is already open; when a full-screen mode
+  is active, request closure through the spellbook's OWN close button
+  (the planner never seizes the mode), wait the bounded release, then enter
+  the existing planner opening lifecycle (input lease, pause, selection).
+  Failure/timeout rolls back to a usable spellbook with the button restored.
+  Wire-up: `BuffPlannerUiRoot` ticks it beside the existing screen/HUD tick
+  and releases it in `ReleaseAll`. HUD/hotkey entry is untouched.
+- Proof: `spellbook-handoff-waits-bounded-and-rolls-back` (159/159 protocol).
+- BLOCKED and explicitly NOT claimed: rendered placement in verified free
+  header/footer space at supported resolutions, duplicate-prevention across
+  real spellbook owners, the same-context return trip after
+  close-without-casting, Escape/failure/scene-change navigation, and mod
+  disable behavior. The native-close affordance lookup (`Close` button name)
+  is a structural assumption pending the live inventory lane. The E gate
+  ("a button present in the hierarchy is not sufficient acceptance") is
+  therefore OPEN.
 
 ## Checkpoint F — full reskin, regression qualification, candidate
 
