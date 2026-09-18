@@ -5,6 +5,8 @@ using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UI;
 
+using KingmakerBuffPlanner.Domain.Planning;
+
 namespace KingmakerBuffPlanner.UI
 {
     internal sealed class PlannerRoutineTabsView
@@ -1394,11 +1396,12 @@ namespace KingmakerBuffPlanner.UI
         private readonly Text _forecast;
         private readonly Button _closeButton;
         private readonly Button _addButton;
+        private Button _reverseButton;
         private readonly Action<string> _showTooltip;
         private readonly Action<RectTransform> _rowsBound;
         private readonly Func<string, IReadOnlyList<CastingAssignmentRowViewModel>> _rows;
         private readonly Func<string, IReadOnlyList<ResourceUsageLineViewModel>> _resourceLines;
-        private readonly Func<IReadOnlyList<string>, RoutineSequenceForecast> _sequenceForecast;
+        private readonly Func<IReadOnlyList<string>, SequentialForecastPlanner.Result> _sequenceForecast;
         private readonly Action<string> _moveEarlier;
         private readonly Action<string> _moveLater;
         private readonly Action _refresh;
@@ -1417,8 +1420,8 @@ namespace KingmakerBuffPlanner.UI
         private readonly List<GameObject> _rowObjects = new List<GameObject>();
         private readonly List<Button> _routineToggles = new List<Button>();
         private readonly List<float> _rowHeights = new List<float>();
-        private readonly HashSet<string> _forecastSelected = new HashSet<string>(
-            StringComparer.Ordinal);
+        private readonly List<string> _forecastSequence = new List<string>();
+        private bool _forecastReversed;
         private string _routineId;
 
         internal PlannerCastingOrderView(
@@ -1426,7 +1429,7 @@ namespace KingmakerBuffPlanner.UI
             PlannerUiTheme theme,
             Func<string, IReadOnlyList<CastingAssignmentRowViewModel>> rows,
             Func<string, IReadOnlyList<ResourceUsageLineViewModel>> resourceLines,
-            Func<IReadOnlyList<string>, RoutineSequenceForecast> sequenceForecast,
+            Func<IReadOnlyList<string>, SequentialForecastPlanner.Result> sequenceForecast,
             Action<string> moveEarlier,
             Action<string> moveLater,
             Action refresh,
@@ -1533,15 +1536,27 @@ namespace KingmakerBuffPlanner.UI
                     "ForecastToggle." + routineId, bar, _theme, routineId.ToUpperInvariant(),
                     () =>
                     {
-                        if (_forecastSelected.Contains(routineId))
-                            _forecastSelected.Remove(routineId);
-                        else _forecastSelected.Add(routineId);
+                        // Selection order is the player's explicit sequence.
+                        if (_forecastSequence.Contains(routineId))
+                            _forecastSequence.Remove(routineId);
+                        else _forecastSequence.Add(routineId);
                         BindForecast();
                     });
                 KingmakerUiFactory.SetAnchors((RectTransform)toggle.transform,
-                    0.44f + index * 0.16f, 0.05f, 0.58f + index * 0.16f, 0.95f);
+                    0.44f + index * 0.14f, 0.05f, 0.57f + index * 0.14f, 0.95f);
                 _routineToggles.Add(toggle);
             }
+            Button reverse = KingmakerUiFactory.CreateButton(
+                "ForecastReverse", bar, _theme, "REVERSE",
+                () =>
+                {
+                    _forecastSequence.Reverse();
+                    _forecastReversed = !_forecastReversed;
+                    BindForecast();
+                });
+            KingmakerUiFactory.SetAnchors((RectTransform)reverse.transform,
+                0.87f, 0.05f, 0.995f, 0.95f);
+            _reverseButton = reverse;
         }
 
         internal RectTransform Root { get; private set; }
@@ -1786,33 +1801,46 @@ namespace KingmakerBuffPlanner.UI
 
         private void BindForecast()
         {
+            string[] orderNames = { "long", "important", "short" };
             for (int index = 0; index < _routineToggles.Count; index++)
             {
                 Button toggle = _routineToggles[index];
                 if (toggle == null) continue;
-                toggle.image.color = _forecastSelected.Contains(
-                    new[] { "long", "important", "short" }[index])
-                    ? _theme.GreenSuccess : _theme.ParchmentRaised;
+                int position = _forecastSequence.IndexOf(orderNames[index]);
+                toggle.image.color = position >= 0 ? _theme.GreenSuccess : _theme.ParchmentRaised;
+                Text toggleLabel = toggle.GetComponentInChildren<Text>(true);
+                if (toggleLabel != null)
+                    toggleLabel.text = orderNames[index].ToUpperInvariant() +
+                        (position >= 0 ? " " + (position + 1) : string.Empty);
             }
-            if (_forecastSelected.Count == 0)
+            if (_reverseButton != null)
+                _reverseButton.image.color = _forecastReversed
+                    ? _theme.GreenSuccess : _theme.ParchmentRaised;
+            if (_forecastSequence.Count == 0)
             {
-                _forecast.text = "Select routines above for a combined forecast. " +
-                    RoutineSequenceForecast.AssumptionText;
+                _forecast.text = "Select routines above in order for a combined " +
+                    "forecast. " + SequentialForecastPlanner.Result.AssumptionText;
                 return;
             }
-            RoutineSequenceForecast forecast = _sequenceForecast(_forecastSelected
-                .OrderBy(id => id, StringComparer.Ordinal).ToList());
+            SequentialForecastPlanner.Result forecast = _sequenceForecast(_forecastSequence);
             var builder = new System.Text.StringBuilder("FORECAST — ");
-            foreach (RoutineSequenceForecast.RoutineStep step in forecast.Steps)
-                builder.Append(step.RoutineId).Append(": ")
-                    .Append(step.PlannedCasts).Append(" cast(s), ")
-                    .Append(step.Fulfilled).Append(" covered, ")
-                    .Append(step.Unfulfilled).Append(" unmet; ");
-            foreach (KeyValuePair<string, int> balance in forecast.ForecastRemainingByPool
+            foreach (SequentialForecastPlanner.Occurrence occurrence in forecast.Occurrences)
+            {
+                int unmet = occurrence.Plan.Outcomes.Count(o =>
+                    o.Kind == TargetOutcomeKind.Unfulfilled);
+                builder.Append(occurrence.RoutineId).Append(": ")
+                    .Append(occurrence.Plan.Steps.Count).Append(" cast(s), ")
+                    .Append(occurrence.Plan.Outcomes.Count(o =>
+                        o.Kind == TargetOutcomeKind.Fulfilled)).Append(" covered, ")
+                    .Append(unmet).Append(" unmet; ");
+            }
+            foreach (KeyValuePair<string, int> balance in forecast.ForecastRemainingByNativePool
+                .Where(pair => pair.Value >= 0)
                 .OrderBy(pair => pair.Key, StringComparer.Ordinal))
                 builder.Append("\n").Append(balance.Key).Append(" forecast remaining ")
                     .Append(balance.Value);
-            builder.Append("\n").Append(RoutineSequenceForecast.AssumptionText);
+            builder.Append("\n").Append(
+                SequentialForecastPlanner.Result.AssumptionText);
             _forecast.text = builder.ToString();
         }
     }

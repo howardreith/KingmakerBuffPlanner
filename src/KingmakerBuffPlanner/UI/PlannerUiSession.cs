@@ -310,17 +310,32 @@ namespace KingmakerBuffPlanner.UI
             return lines;
         }
 
-        // Read-only combined forecast: one occurrence per selected routine in
-        // the selected order. Note the last previewed routine stays in
-        // LastPreview; callers re-preview their current routine afterwards.
-        internal RoutineSequenceForecast ForecastSequence(IReadOnlyList<string> routineIdsInOrder)
+        // Read-only combined forecast: each selected routine occurrence is
+        // planned by the production planner against the balances, tokens,
+        // materials, charges, and projected effects carried forward from the
+        // previous occurrence, in the caller's explicit order. This must not
+        // mutate the reviewed-plan state, so the shared LastPreview baseline
+        // is captured and restored around the computation.
+        internal SequentialForecastPlanner.Result ForecastSequence(
+            IReadOnlyList<string> routineIdsInOrder)
         {
             if (routineIdsInOrder == null) throw new ArgumentNullException("routineIdsInOrder");
-            var plans = new List<KeyValuePair<string, CastPlan>>();
-            foreach (string routineId in routineIdsInOrder.Distinct(StringComparer.Ordinal))
-                plans.Add(new KeyValuePair<string, CastPlan>(
-                    RoutineDisplayName(routineId), PreviewRoutine(routineId).Plan));
-            return RoutineSequenceForecast.Compute(plans);
+            if (Model == null || _snapshot == null || _activeEffects == null ||
+                _effects == null || _providerOptions == null)
+                throw new InvalidOperationException("A campaign planner snapshot is required.");
+            RoutinePlanResult previousPreview = LastPreview;
+            string previousRoutineId = LastPreviewRoutineId;
+            try
+            {
+                return SequentialForecastPlanner.Compute(Model.Profile,
+                    routineIdsInOrder, _snapshot, _activeEffects, _effects,
+                    _providerOptions, _enhancements, _targeting);
+            }
+            finally
+            {
+                LastPreview = previousPreview;
+                LastPreviewRoutineId = previousRoutineId;
+            }
         }
 
         private string ResourcePoolDisplayName(string allocationPoolKey)

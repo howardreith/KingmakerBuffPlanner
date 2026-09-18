@@ -164,6 +164,7 @@
     <Compile Include="UI\PlannerUiSession.cs" />
     <Compile Include="UI\BuffPlannerUiRoot.cs" />
     <Compile Include="UI\AssignmentPresentationModels.cs" />
+    <Compile Include="UI\SequentialForecastPlanner.cs" />
     <Compile Include="UI\SpellbookHandoffStateMachine.cs" />
     <Compile Include="UI\BuffPlannerSpellbookEntryController.cs" />
     <Compile Include="UI\NativeThemeModel.cs" />

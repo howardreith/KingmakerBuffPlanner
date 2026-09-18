@@ -365,6 +365,17 @@ namespace KingmakerBuffPlanner.Domain.Planning
                 ? effects
                 : new HashSet<ActiveEffectMarker>();
         }
+
+        // Typed per-unit copy for callers that carry state forward (for
+        // example a sequence forecast projecting granted effects).
+        public Dictionary<string, HashSet<ActiveEffectMarker>> ToUnitMarkers()
+        {
+            var copy = new Dictionary<string, HashSet<ActiveEffectMarker>>(
+                StringComparer.Ordinal);
+            foreach (KeyValuePair<string, ISet<ActiveEffectMarker>> pair in _effectsByUnit)
+                copy[pair.Key] = new HashSet<ActiveEffectMarker>(pair.Value);
+            return copy;
+        }
     }
 
     public sealed class ActiveEffectMarker : IEquatable<ActiveEffectMarker>

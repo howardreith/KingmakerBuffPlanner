@@ -66,6 +66,7 @@
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\BuffGridMetrics.cs"><Link>UI\BuffGridMetrics.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\PlannerHotkeyBinding.cs"><Link>UI\PlannerHotkeyBinding.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\AssignmentPresentationModels.cs"><Link>UI\AssignmentPresentationModels.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\SequentialForecastPlanner.cs"><Link>UI\SequentialForecastPlanner.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\SpellbookHandoffStateMachine.cs"><Link>UI\SpellbookHandoffStateMachine.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\NativeThemeModel.cs"><Link>UI\NativeThemeModel.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\NativeThemeDonorLookup.cs"><Link>UI\NativeThemeDonorLookup.cs</Link></Compile>

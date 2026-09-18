@@ -5577,53 +5577,104 @@ namespace KingmakerBuffPlanner.Tests
 
         private static void TestSequenceForecast()
         {
-            // Two routine occurrences against the same snapshot: balances carry
-            // forward in the selected order and each step is labeled one run.
-            AbilityKey ability = Ability("forecast-spell", string.Empty, 0);
+            // Real sequential planning: two routines each request three
+            // enhanced casts against three total rod charges. The second
+            // occurrence must show honest unmet demand, never six funded
+            // casts; reversing the sequence moves the shortfall; a granted
+            // effect from the first run makes the second run's same-target
+            // request a free already-active skip; and the input snapshot is
+            // never mutated.
+            AbilityKey longAbility = Ability("forecast-long", string.Empty, 0);
+            AbilityKey shortAbility = Ability("forecast-short", string.Empty, 0);
             var pool = new ResourcePoolSnapshot("forecast-slots",
-                ResourcePoolKind.SpontaneousLevel, 4, 4, null);
+                ResourcePoolKind.SpontaneousLevel, 6, 6, null);
             ProviderSnapshot caster = PlannerProvider("caster", "book",
-                ability, pool.PoolKey, 1);
+                longAbility, pool.PoolKey, 1);
+            ProviderSnapshot casterShort = PlannerProvider("caster", "book",
+                shortAbility, pool.PoolKey, 1);
+            string[] longTargets = { "a1", "a2", "a3" };
+            string[] shortTargets = { "b1", "b2", "b3" };
             PartyProviderSnapshot snapshot = PlannerSnapshot(
-                new[] { caster }, new[] { pool }, "caster", "a", "b");
-            var option = new ProviderPlanningOption(caster,
-                new[] { "caster", "a", "b" }, new[] { "caster" }, 4, 40);
-            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault("forecast");
-            SourceAssignmentProfile parent = Assignment(
-                ability.Canonical, ability, new[] { "a" });
-            profile.Routines[0].Assignments.Add(parent);
-            profile.Routines[1].Assignments.Add(Assignment(
-                ability.Canonical, ability, new[] { "b" }));
+                new[] { caster, casterShort }, new[] { pool },
+                new[] { "caster" }.Concat(longTargets).Concat(shortTargets).ToArray());
+            var longOption = new ProviderPlanningOption(caster,
+                new[] { "caster" }.Concat(longTargets), new[] { "caster" }, 4, 40);
+            var shortOption = new ProviderPlanningOption(casterShort,
+                new[] { "caster" }.Concat(shortTargets), new[] { "caster" }, 4, 40);
+            CastEnhancementSnapshot rod = ClassEnhancement("rod", "caster",
+                longAbility, "book", 3, "charge-pool", "rod-group", false);
+            // The rod is shared: same usage pool for the short routine's copy.
+            CastEnhancementSnapshot rodShort = ClassEnhancement("rod-short", "caster",
+                shortAbility, "book", 3, "charge-pool", "rod-group", false);
             var effects = new Dictionary<string, EffectExpression> {
-                { ability.Canonical, new EffectLeafExpression(EffectKind.Buff,
-                    "forecast-buff", EffectTarget.Caster, "ContextActionApplyBuff", "root/apply") }
+                { longAbility.Canonical, Leaf("long-buff") },
+                { shortAbility.Canonical, Leaf("short-buff") }
             };
-            RoutinePlanResult first = new RoutinePlanService().Plan(profile, "long",
-                snapshot, new ActiveEffectSnapshot(null), effects, new[] { option });
-            RoutinePlanResult second = new RoutinePlanService().Plan(profile, "important",
-                snapshot, new ActiveEffectSnapshot(null), effects, new[] { option });
-            RoutineSequenceForecast forecast = RoutineSequenceForecast.Compute(
-                new List<KeyValuePair<string, CastPlan>> {
-                    new KeyValuePair<string, CastPlan>("Long", first.Plan),
-                    new KeyValuePair<string, CastPlan>("Important", second.Plan)
-                });
-            if (forecast.Steps.Count != 2 ||
-                forecast.Steps[0].PlannedCasts != 1 ||
-                forecast.Steps[1].PlannedCasts != 1 ||
-                !forecast.ForecastRemainingByPool.ContainsKey("forecast-slots") ||
-                forecast.ForecastRemainingByPool["forecast-slots"] != 2)
-                throw new InvalidOperationException("The forecast did not carry native balances forward.");
-            // Independent per-routine previews never invent extra charges:
-            // each sees the full native balance on its own, and only the
-            // combined forecast subtracts both allocations.
-            ResourcePoolAllocation independent = first.Plan.AllocationFor("forecast-slots");
-            if (independent == null || independent.AllocatedUsage != 1 ||
-                independent.ForecastRemaining != 3)
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault("seq-forecast");
+            profile.Routines.First(r => r.RoutineId == "long").Assignments.Add(Assignment(
+                longAbility.Canonical, longAbility, longTargets, new[] { "rod" }));
+            profile.Routines.First(r => r.RoutineId == "short").Assignments.Add(Assignment(
+                shortAbility.Canonical, shortAbility, shortTargets, new[] { "rod-short" }));
+
+            SequentialForecastPlanner.Result forward = SequentialForecastPlanner.Compute(
+                profile, new[] { "long", "short" }, snapshot,
+                new ActiveEffectSnapshot(null), effects,
+                new[] { longOption, shortOption }, new[] { rod, rodShort });
+            int forwardShortUnmet = forward.Occurrences[1].Plan.Outcomes.Count(o =>
+                o.Kind == TargetOutcomeKind.Unfulfilled);
+            int forwardShortSteps = forward.Occurrences[1].Plan.Steps.Count;
+            if (forward.Occurrences[0].Plan.Steps.Count != 3 ||
+                forwardShortSteps != 0 || forwardShortUnmet != 3)
                 throw new InvalidOperationException(
-                    "A single-routine preview did not see the full native balance.");
-            if (!RoutineSequenceForecast.AssumptionText.Contains("One run per selected routine"))
+                    "Sequential forecast double-funded one shared charge pool: first=" +
+                    forward.Occurrences[0].Plan.Steps.Count + " casts, second=" +
+                    forwardShortSteps + " casts with " + forwardShortUnmet + " unmet.");
+
+            // Reversing the sequence moves the shortfall to the other routine.
+            SequentialForecastPlanner.Result reverse = SequentialForecastPlanner.Compute(
+                profile, new[] { "short", "long" }, snapshot,
+                new ActiveEffectSnapshot(null), effects,
+                new[] { longOption, shortOption }, new[] { rod, rodShort });
+            if (reverse.Occurrences[0].Plan.Steps.Count != 3 ||
+                reverse.Occurrences[1].Plan.Outcomes.Count(o =>
+                    o.Kind == TargetOutcomeKind.Unfulfilled) != 3)
                 throw new InvalidOperationException(
-                    "The forecast lost its one-run-per-routine assumption label.");
+                    "Reversing the sequence did not move the shortfall.");
+
+            // A granted effect from the first run skips the same target for
+            // free in the second run (projected already-active coverage).
+            AbilityKey echo = Ability("forecast-echo", string.Empty, 0);
+            ProviderSnapshot echoCaster = PlannerProvider("caster", "book",
+                echo, pool.PoolKey, 1);
+            PartyProviderSnapshot echoSnapshot = PlannerSnapshot(
+                new[] { echoCaster }, new[] { pool }, "caster", "a1");
+            var echoOption = new ProviderPlanningOption(echoCaster,
+                new[] { "caster", "a1" }, new[] { "caster" }, 4, 40);
+            var echoEffects = new Dictionary<string, EffectExpression> {
+                { echo.Canonical, Leaf("echo-buff") }
+            };
+            BuffPlannerProfile echoProfile = BuffPlannerProfile.CreateDefault("seq-echo");
+            echoProfile.Routines.First(r => r.RoutineId == "long").Assignments.Add(
+                Assignment(echo.Canonical, echo, new[] { "a1" }));
+            echoProfile.Routines.First(r => r.RoutineId == "short").Assignments.Add(
+                Assignment(echo.Canonical, echo, new[] { "a1" }));
+            SequentialForecastPlanner.Result echoResult = SequentialForecastPlanner.Compute(
+                echoProfile, new[] { "long", "short" }, echoSnapshot,
+                new ActiveEffectSnapshot(null), echoEffects,
+                new[] { echoOption }, new CastEnhancementSnapshot[0]);
+            if (echoResult.Occurrences[0].Plan.Steps.Count != 1 ||
+                echoResult.Occurrences[1].Plan.Steps.Count != 0 ||
+                echoResult.Occurrences[1].Plan.Outcomes.Count(o =>
+                    o.Kind == TargetOutcomeKind.SkippedAlreadyActive) != 1)
+                throw new InvalidOperationException(
+                    "A projected already-active effect did not skip for free in the later run.");
+
+            // The caller's snapshot is never mutated by forecasting.
+            if (snapshot.ResourcePools[0].Remaining != 6)
+                throw new InvalidOperationException(
+                    "Sequential forecasting mutated the caller's snapshot.");
+            if (!SequentialForecastPlanner.Result.AssumptionText.Contains("One run per selected routine"))
+                throw new InvalidOperationException("The forecast lost its assumption label.");
         }
 
         private static void TestAssignmentOrderAndShortage()
