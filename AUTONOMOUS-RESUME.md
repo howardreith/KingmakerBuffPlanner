@@ -1,5 +1,35 @@
 # AUTONOMOUS-RESUME — top section is current; planning/Z-NATIVE-ASSIGNMENTS-STATUS.md is the per-checkpoint tracker.
 
+## First live fixture + smoke attempt handoff — 2026-09-19 (LATEST)
+
+- Status: fixture bootstrap + teardown BOTH proven against the REAL save
+  directory with every other save byte-identical. One integration defect
+  (fixture/deployment state-root collision) and one environment change
+  (UMM 0.33.0) were found by the first real run and are fixed with
+  regressions (harness 27/27, source 42/42, protocol 172/172, package
+  4/4, WhatIf 5/5).
+- The smoke run itself failed INSIDE the game engine loading the new
+  seed: Player.PostLoad NRE during SaveManager.LoadRoutine. The seed was
+  saved at the start-prologue point (area entry
+  `..._startprologue.json`), which this engine cannot load from the main
+  menu — an engine-level save-point incompatibility, not a mod/harness
+  defect. The manifest-bound teardown removed the pair cleanly; the seed
+  file remains.
+- HUMAN ACTION NEEDED (smallest, two steps in one session):
+  1. From Kingmaker's main menu, try loading `KBP_AUTOMATION_SEED`
+     manually once. (Expected to fail with the same crash — this merely
+     confirms the diagnosis; either result is useful evidence.)
+  2. In the SAME disposable campaign, continue past the opening Jamandi
+     conversation until the party is freely controllable (you can walk
+     and open inventory), then save again named exactly
+     `KBP_AUTOMATION_SEED` (overwriting or as a new file is fine), and
+     fully exit Kingmaker.
+  Then I re-run the guarded bootstrap (pair indices continue at 306/307)
+  and immediately the live-ui-bootstrap smoke.
+- Branch pushed through the guarded helper; candidate local-only.
+
+# AUTONOMOUS-RESUME — top section is current; planning/Z-NATIVE-ASSIGNMENTS-STATUS.md is the per-checkpoint tracker.
+
 ## N1-N4 review continuation handoff — 2026-09-18 (LATEST)
 
 - Status: all four 92f13fc-review findings closed with production-path

@@ -461,3 +461,45 @@ casting/resource acceptance remain live-only.
   WhatIf 5/5. No `KBP_AUTOMATION_SEED` exists (re-verified); no live
   lanes run. Spellbook same-context return remains the known incomplete
   feature pending the live native-reopen contract.
+
+
+## First live fixture + smoke attempt — 2026-09-19
+
+- FIXTURE BOOTSTRAP (real save directory, first production use): PASS.
+  Seed `Manual_303_KBP_AUTOMATION_SEED.zks` (header Name exact, GameId
+  `df33d1ff-4ec8-4707-bfa0-5e059bf9a049`, area JamandisMansionThroneroom)
+  sealed into `Manual_304_KBP_AUTOMATION_BASELINE.zks` (sha256
+  `d095c02c3d12d511b20254e03b7e741f6b989c21600734c365990f11a3446edd`) and
+  `Manual_305_KBP_AUTOMATION_WORKING.zks` (sha256
+  `5f8e33363202ed9fdfa1268051962982df41328e2f22338380ba818ebde048bb`).
+  All 87 pre-existing saves verified byte-identical after; no lock/state
+  residue; manifest + offline archive at
+  `runtime-backups/automation-fixture/bootstrap-automation-fixture`.
+- Integration defect found and fixed by the first real run (`d4a095a`):
+  fixture transaction records lived under the deployment guard's state
+  root, so every guarded runtime run would refuse (guard only recognizes
+  Restored as terminal; fixture terminal is Completed). Fixture state now
+  defaults to its own `runtime-fixture-state` root; harness regression
+  added (27/27).
+- Environment change recorded (`0c2c28c`-era commit): installed UMM
+  updated 0.32.4 -> 0.33.0 between missions; the exact-match pin now
+  records the verified installed identity (file version 0.33.0, SHA-256
+  `63e5baf7b1738e4091b5fd17ccb738ecdb4d1dbf246061dfd55dc52835d52691`).
+- First live smoke run `n-fixtures-first-live-smoke-6`: the guarded launch,
+  staging, UMM dismissal, exact-pair proof, and load invocation all
+  executed; the Mods transaction restored exactly. The run FAILED inside
+  the game engine: `NullReferenceException at Kingmaker.Player.PostLoad()`
+  during `SaveManager.LoadRoutine` (LoadGameException), then repeated
+  WeatherSystem NREs. Evidence:
+  `runtime-evidence/n-fixtures-first-live-smoke-6/` + game output_log
+  lines 129-189 (exact pair proven; OnButtonSaveLoad invoked;
+  OnAreaBeginUnloading; engine crash). Diagnosis: the seed was saved at
+  the start-prologue moment (second area entry
+  `...jamandismansionthroneroom_startprologue.json`), a save point this
+  engine cannot load from the main menu. The historical
+  Repair-KbpAutomationWorkingSave contract targets a different sub-shape
+  and correctly refuses this one; no save-format fix is fabricated.
+- Fixture pair torn down through the manifest-bound path (exact pair
+  removed, 87 saves byte-identical, archive preserved). The seed file
+  itself remains for replacement.
+- NEXT HUMAN ACTION (smallest): see AUTONOMOUS-RESUME top section.
