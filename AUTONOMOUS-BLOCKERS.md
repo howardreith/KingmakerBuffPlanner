@@ -1,5 +1,23 @@
 # AUTONOMOUS-BLOCKERS — top section is current
 
+## RC2 recovery blockers — 2026-09-19
+
+- LIVE RENDER EVIDENCE: blocked by an owner-controlled Kingmaker process
+  (PID 1896) running during the bounded guarded attempt; installation and
+  `live-ui-bootstrap` were refused by the deployment guard exactly as
+  designed and nothing was touched. Rendered native appearance, the
+  visible spellbook button, and in-game chooser budget displays are
+  source-verified only; the owner's five-minute manual check (in the rc2
+  release notes) is the acceptance path. One bounded retry after the game
+  closes is permitted before publishing; do not loop on it.
+- Actual native charge spending for the scarce-rod case (A7) remains a
+  separate untested lane; allocation/reservation behavior is covered by
+  deterministic planner tests.
+- T03 exact rod identity: unchanged — no qualified durable instance
+  contract found in the inspected Assembly-CSharp surface; pooled
+  per-caster semantics stay honestly labeled.
+- Same-context spellbook return after close: still deferred by design.
+
 ## Z continuation blockers — 2026-09-18
 
 - LIVE LANES: waiting on ONE human-only seed save (`KBP_AUTOMATION_SEED`,

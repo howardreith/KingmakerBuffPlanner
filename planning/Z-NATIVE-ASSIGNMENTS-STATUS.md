@@ -3,6 +3,61 @@
 Single source of truth for mission progress. Linked from `AUTONOMOUS-RESUME.md`.
 Mission: `planning/Z-NATIVE-ASSIGNMENTS-MISSION.md`.
 
+## RC2 product recovery — 2026-09-19 (CURRENT)
+
+- Trigger: owner acceptance of v0.1.1-rc1 failed (native appearance
+  absent, spellbook entry absent, chooser implied unlimited rod
+  allocation, numeric metamagic labels). Live Mods folder holds 0.0.19 —
+  the owner rolled back after testing.
+- Source findings confirmed at `5da102f` and repaired (fix commit
+  `ab155c2`; version bump `5d94502`; install-guard prerelease CLR
+  derivation `3625534`):
+  - P1 `PlannerNativeThemeSurface.Attach` resolved native donors from its
+    own overlay root. Donor lookup is now StaticCanvas-scoped
+    (`PlannerNativeTheme.Resolve(nativeLookupRoot)`); `DiscardStale`
+    owner semantics follow the native scope.
+  - P2 paper targeted three direct child names; nested modal frames never
+    matched. Owned surfaces register explicitly
+    (`RegisterPaperSurface`), `ApplyPaper` disables fallback outlines and
+    neutralizes factory tints (status colors preserved), and `OnEnable`
+    adds a bounded missing-capability retry next to the stale retry.
+  - P3 spellbook entry: `SpellbookWindowLocator` (exact path - bounded
+    tolerant scan - refuse ambiguity) drives attachment; corner-anchored
+    design-sized caption-fitted button; theme resolved against the live
+    canvas; screen-rect logged on attach.
+  - P4 `EnhancementBudgetModel` exposes the plan's
+    `ResourcePoolAllocation` lines (`enhancement:<pool>`): native now /
+    requested / allocated / unmet / projected / affected casts; chooser
+    budget block + per-row notes + this-assignment coverage + card
+    warning + plan-summary shortage line; header caption
+    `Assignments & Resources`; selected-spell `Edit Assignments` action.
+  - P5 `CastEnhancementNaming` + `CallOfTheWildMetamagicNames`
+    (fail-soft reflection over `MetamagicFeats+MetamagicExtender`;
+    offline-verified constants) + item-derived fallback;
+    `PlannerSetupModel.EffectName` sanitizes digit-carrying names.
+- New regressions (6): native-theme-lookup-requires-native-root-not-owned-overlay;
+  spellbook-window-locator-is-exact-then-tolerant-and-refuses-ambiguity;
+  chooser-budget-derives-from-authoritative-plan (4- and 9-request rod);
+  chooser-budget-follows-reordered-assignment-priority;
+  metamagic-labels-never-show-raw-masks;
+  installed-call-of-the-wild-metamagic-name-contract-is-exact.
+- Gates: source 42/42; protocol 178/178; harness 27/27; package 4/4;
+  WhatIf 5/5; publisher gate 3/3; deterministic Release build 2/2.
+  Candidate `KingmakerBuffPlanner-0.1.1-rc2.zip` SHA-256
+  `f6aa4de188b08392acecdb04759ca0cebf2ad329732a5d8a014e0ea863981a00`.
+- Runtime lane: guarded install + `live-ui-bootstrap` attempted and
+  BLOCKED by an owner-controlled Kingmaker process (PID 1896); guards
+  refused with zero mutations (first install attempt also rolled back
+  exactly after the prerelease CLR-version guard defect, then fixed).
+  Rendered appearance / visible spellbook button / in-game budgets:
+  source-verified only, disclosed in the rc2 notes with a five-minute
+  owner check. A7 actual charge spending: untested lane.
+- Offline contract evidence: game `Kingmaker.UnitLogic.Abilities.Metamagic`
+  = {Empower 1, Maximize 2, Quicken 4, Extend 8, Heighten 16, Reach 32};
+  CotW `MetamagicExtender` constants cover the owner's observed numerics
+  (268435456 Persistent, 524288 Piercing, 33554432 Selective, 8192
+  ThrenodicSpell).
+
 ## Baseline intake — 2026-09-18
 
 - Implementation base: branch `codex/kingmaker-buff-planner-z-native-assignments`,

@@ -1,6 +1,54 @@
 # AUTONOMOUS-RESUME — top section is current; planning/Z-NATIVE-ASSIGNMENTS-STATUS.md is the per-checkpoint tracker.
 
-## Release closeout — 2026-09-19 (LATEST; supersedes all older instructions below)
+## RC2 product recovery — 2026-09-19 (LATEST; supersedes the rc1 closeout below)
+
+- Owner acceptance of v0.1.1-rc1 FAILED (flat panels, no spellbook button,
+  chooser showed per-spell `3 uses` and numeric metamagic labels such as
+  `268435456 Spell`). The live Mods folder holds 0.0.19 — the owner rolled
+  back to stable after testing rc1.
+- Root causes found in the rc1 source and repaired on
+  `codex/kingmaker-buff-planner-z-native-assignments` (fix commit `ab155c2`,
+  version bump `5d94502`, installer guard `3625534`):
+  - P1 theme lookup resolved `ServiceWindow/...` donors from the planner's
+    own overlay root (guaranteed failure); donors now resolve from the
+    StaticCanvas while application stays owned-scope.
+  - P2 paper reached only three direct child names (the nested
+    `EnhancementChooser/EnhancementChooserFrame` never matched); owned
+    surfaces are now registered explicitly, fallback tints/outlines yield,
+    and missing capabilities get a bounded retry.
+  - P3 spellbook button: exact-path + tolerant bounded-scan locator
+    (ambiguity refuses), corner-anchored caption-fitted natively-styled
+    button, placement logged; handoff machinery unchanged.
+  - P4 chooser/card budgets now derive from `ResourcePoolAllocation`
+    (`enhancement:<pool>` lines: native now/requested/allocated/unmet/
+    projected + affected casts + this-assignment coverage + reorder
+    behavior); no second charge counter.
+  - P5 metamagic naming: game enum → CallOfTheWild `MetamagicExtender`
+    display-name contract (fail-soft reflection; offline-verified values
+    Persistent=0x10000000, Piercing=0x80000, Selective=0x2000000,
+    ThrenodicSpell=0x2000) → item-derived descriptor; masks are
+    diagnostic-only.
+  - Header caption is now `Assignments & Resources`; selected spell gains
+    `Edit Assignments`.
+- Gates: source 42/42, protocol 178/178 (six new released-failure
+  regressions), harness 27/27, package 4/4, WhatIf 5/5, publisher gate
+  3/3, deterministic Release build 2/2.
+- Runtime lane: the guarded live-UI attempt was blocked because an
+  owner-controlled Kingmaker process was running (PID 1896); the guards
+  refused correctly, no state was touched. Earlier failed install attempt
+  (prerelease CLR-version parsing in the identity guard) rolled back
+  exactly; fixed in `3625534`. Rendered appearance, visible spellbook
+  entry, and in-game budget displays are therefore **source-verified but
+  not live-observed**; the release notes disclose this prominently.
+- Candidate: `KingmakerBuffPlanner-0.1.1-rc2.zip` SHA-256
+  `f6aa4de188b08392acecdb04759ca0cebf2ad329732a5d8a014e0ea863981a00`
+  (deterministic 2/2) at `artifacts/release/0.1.1-rc2/`.
+- NEXT: publish v0.1.1-rc2 prerelease through the guarded publisher
+  (authorization continues from rc1), verify the downloaded asset, update
+  PR #1, and hand the five-minute manual check to the owner. Stable/latest
+  and main stay untouched pending owner review.
+
+## Release closeout — 2026-09-19 (rc1; superseded by the RC2 recovery above)
 
 - **TESTING PREVIEW PUBLISHED:** https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.1.1-rc1
   (non-draft prerelease, --latest=false; stable v0.0.19 and the latest

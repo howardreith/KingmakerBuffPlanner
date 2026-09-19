@@ -1610,3 +1610,41 @@ Status: ROOT CAUSE PROVEN; 0.0.4 SOURCE PASS; LIVE QUALIFICATION PENDING
 - Machine state at handoff: Kingmaker closed; live Mods = owner original
   (0.0.19, 16 mods); zero unresolved transactions/locks; fixture pair
   304/305 + seed intact for future lanes.
+
+# 2026-09-19 - RC1 owner acceptance failed; RC2 product recovery
+
+- Owner installed v0.1.1-rc1 and reported: native appearance absent,
+  spellbook entry absent, chooser appeared to permit unlimited rod
+  allocation across spells, and rows showed numeric metamagic labels
+  (`268435456 Spell`, `524288 Spell`, `33554432 Spell`, `8192 Spell`).
+  Treated as failed owner acceptance; live Mods folder found at 0.0.19
+  (owner rolled back).
+- Source review at `5da102f` confirmed five production defects (P1-P5)
+  and they were repaired on `codex/kingmaker-buff-planner-z-native-assignments`
+  (fix `ab155c2`, version `5d94502`, install guard `3625534`):
+  native donor lookup now StaticCanvas-scoped with owned-scope
+  application; explicit owned paper-surface registry reaching nested
+  modal frames and rebuilt rows; bounded retry for missing donors;
+  tolerant/refusing spellbook window locator with a corner-anchored
+  caption-fitted natively-styled button; plan-derived chooser/card
+  enhancement budgets (native now/requested/allocated/unmet/projected,
+  affected casts, this-assignment coverage, reorder behavior, no second
+  counter); `Assignments & Resources` caption + selected-spell
+  `Edit Assignments`; CallOfTheWild `MetamagicExtender` fail-soft
+  display-name contract (offline-verified: 268435456=Persistent,
+  524288=Piercing, 33554432=Selective, 8192=ThrenodicSpell) with
+  item-derived fallback and digit-sanitizing `EffectName`.
+- Six released-failure regressions added; suite now protocol 178/178,
+  source 42/42, harness 27/27, package 4/4, WhatIf 5/5, publisher gate
+  3/3; deterministic Release build 2/2 produced
+  `KingmakerBuffPlanner-0.1.1-rc2.zip` SHA-256
+  `f6aa4de188b08392acecdb04759ca0cebf2ad329732a5d8a014e0ea863981a00`.
+- Runtime lane (bounded, one attempt): guarded install over the observed
+  prior 0.0.19 first exposed a prerelease CLR-version parsing defect in
+  the install identity guard (transaction rolled back exactly; fixed per
+  the source gate's derivation rule), then the corrected install and
+  `live-ui-bootstrap` were refused because an owner-controlled Kingmaker
+  process was running (PID 1896). Zero mutations; no game interaction.
+  Rendered appearance, visible spellbook button, and in-game budgets are
+  disclosed as source-verified only in the rc2 notes with a five-minute
+  owner check; A7 actual charge spending remains untested.
