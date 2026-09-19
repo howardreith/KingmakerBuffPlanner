@@ -3,6 +3,27 @@
 Single source of truth for mission progress. Linked from `AUTONOMOUS-RESUME.md`.
 Mission: `planning/Z-NATIVE-ASSIGNMENTS-MISSION.md`.
 
+## RC3 review corrections — 2026-09-19 (CURRENT)
+
+- rc2 source review findings C1-C4 repaired (see AUTONOMOUS-RESUME top
+  section for the per-finding mapping). New regressions:
+  `chooser-budget-note-is-spell-scoped-with-unit-labels` (four-spell
+  scarce-rod per-source funding, communal cast wording, already-active
+  labeling), `assignment-chooser-uses-assignment-selections-and-allows-removal`
+  (pinned-child state, caster-mismatch availability, exhausted-rod
+  individual removal with Share surviving, honest policy captions,
+  Automatic-scope unavailable removal),
+  `chooser-budget-text-stays-bounded` (300/160 caps, tooltip detail
+  preserved).
+- Tooling: `scripts/Restore-InstallLocal.ps1` +
+  `scripts/Test-RestoreInstallLocal.ps1` (isolated state 4/4; WhatIf
+  purity; profile preservation; evidence archive; refusals), wired into
+  `Test-SourceOnly.ps1`.
+- Gates: source 42/42; protocol 181/181; harness 27/27; rollback 4/4;
+  package 4/4; WhatIf 5/5; publisher gate 3/3. Version 0.1.1-rc3.
+- Live lanes: unchanged (owner sessions blocked the guarded runs;
+  source-verified only, disclosed).
+
 ## RC2 product recovery — 2026-09-19 (CURRENT)
 
 - Trigger: owner acceptance of v0.1.1-rc1 failed (native appearance

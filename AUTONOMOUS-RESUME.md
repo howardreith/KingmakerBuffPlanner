@@ -1,5 +1,41 @@
 # AUTONOMOUS-RESUME — top section is current; planning/Z-NATIVE-ASSIGNMENTS-STATUS.md is the per-checkpoint tracker.
 
+## RC3 review-correction pass — 2026-09-19 (LATEST; supersedes the RC2 section below)
+
+- A source review of published rc2 (at `a30c07e`/`c56befa`) confirmed four
+  findings; all are repaired on this branch (fix commit below):
+  - C1 spell-scoped coverage: `EnhancementBudgetModel.SpellCoverage`
+    matches both canonical and aggregate source identities and
+    distinguishes requested/funded/skipped targets, communal casts, and
+    allocated charges; the routine aggregate is never labeled "this
+    spell".
+  - C2 assignment-scoped chooser: `SelectedCastingViewModel.Create` now
+    reads THAT child's selections/policies and per-assignment provider
+    applicability; unavailable selected choices stay individually
+    removable in both scopes (`SetEnhancement` gained the same
+    is-removal bypass `SetAssignmentEnhancement` already had); policy
+    captions are honest (REQUIRED/OPTIONAL vs REQUIRED (targeting)).
+  - C3 bounded detail: sticky summary and row notes are length-bounded
+    (300/160) with full pool detail preserved on tooltips and in
+    Assignments & Resources.
+  - C4 real rollback: new guarded `scripts/Restore-InstallLocal.ps1`
+    (reads `runtime-state/installations/<id>/install.json`, preserves
+    post-install UserSettings edits, archives evidence, refuses
+    non-Installed records; isolated-state tests 4/4 wired into
+    Test-SourceOnly). The rc2 handoff's `Restore-Local.ps1 -RunId ...`
+    command was for the wrong transaction type — corrected everywhere.
+  - Review observations: theme late-donor retry triggers at chooser
+    rebuild boundaries; spellbook button borrows complete native button
+    states fail-soft; plan-summary rect no longer overlaps Edit
+    Assignments.
+- Gates: source 42/42; protocol 181/181 (three new regressions);
+  harness 27/27; Restore-InstallLocal 4/4; package 4/4; WhatIf 5/5;
+  publisher gate 3/3; deterministic Release build 2/2.
+- Version 0.1.1-rc3. NEXT: publish the rc3 prerelease through the
+  guarded publisher in a closed-game window, verify the downloaded
+  asset, update PR #1, and hand the five-minute check to the owner.
+  Stable/latest and main stay untouched pending owner review.
+
 ## RC2 product recovery — 2026-09-19 (LATEST; supersedes the rc1 closeout below)
 
 - Owner acceptance of v0.1.1-rc1 FAILED (flat panels, no spellbook button,

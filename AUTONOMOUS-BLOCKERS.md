@@ -1,5 +1,17 @@
 # AUTONOMOUS-BLOCKERS — top section is current
 
+## RC3 blockers — 2026-09-19
+
+- LIVE RENDER EVIDENCE: unchanged — guarded in-game runs were refused
+  while owner-controlled Kingmaker sessions were running; rendered
+  appearance, the visible spellbook button, and in-game chooser budgets
+  remain source-verified only, with the owner's five-minute check as the
+  acceptance path. One bounded closed-window retry per publication is
+  permitted; do not loop on it.
+- Actual native charge spending (A7) remains a separate untested lane.
+- T03 exact rod identity and same-context spellbook return: unchanged
+  (deferred by design / no durable contract).
+
 ## RC2 recovery blockers — 2026-09-19
 
 - LIVE RENDER EVIDENCE: blocked by an owner-controlled Kingmaker process

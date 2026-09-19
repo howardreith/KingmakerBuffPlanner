@@ -1665,3 +1665,27 @@ Status: ROOT CAUSE PROVEN; 0.0.4 SOURCE PASS; LIVE QUALIFICATION PENDING
 - Local machine: guarded install transaction `rc2fix-liveui-3` holds rc2
   (f6aa build of the same fixes) over the prior 0.0.19 with an exact
   backup; PR #1 body/title updated to the corrected preview.
+
+# 2026-09-19 - RC2 review corrections (rc3 candidate)
+
+- Review of published rc2 confirmed: "this spell" notes aggregated the
+  routine (C1), the assignment chooser built choices from the Automatic
+  child and could not remove unavailable selections with honest policy
+  captions (C2), budget detail could overflow its fixed areas (C3), and
+  the documented rollback command targeted the deployment-transaction
+  state instead of the installation record (C4). All repaired.
+- C1: SpellCoverage with canonical+aggregate identity matching and
+  unit-aware notes (targets funded/skipped, communal casts, charges).
+- C2: assignment-scoped Create (selections, policies, per-assignment
+  applicability via GetAssignmentProviderOptions), CanSelect/CanDeselect
+  on choices, removal-without-availability in SetEnhancement, honest
+  REQUIRED/OPTIONAL vs REQUIRED (targeting) captions wired to the view.
+- C3: bounded sticky summary (<=300) and row notes (<=160); full pool
+  detail on tooltips and in Assignments & Resources.
+- C4: guarded Restore-InstallLocal.ps1 preserving post-install profiles;
+  isolated-state tests 4/4 added to the suite; records corrected.
+- Observations: rebuild-boundary theme retry, complete native button
+  states on the spellbook entry, plan-summary/Edit-Assignments rect
+  separation.
+- Gates: source 42/42, protocol 181/181, harness 27/27, rollback 4/4,
+  package 4/4, WhatIf 5/5, publisher gate 3/3. Version 0.1.1-rc3.
