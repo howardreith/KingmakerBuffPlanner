@@ -8,6 +8,7 @@ using KingmakerBuffPlanner.Discovery;
 using KingmakerBuffPlanner.Compatibility;
 using KingmakerBuffPlanner.GameAdapters;
 using KingmakerBuffPlanner.Domain.Effects;
+using KingmakerBuffPlanner.Domain.Authoring;
 using KingmakerBuffPlanner.Domain.Identity;
 using KingmakerBuffPlanner.Domain.Providers;
 using KingmakerBuffPlanner.Domain.Planning;
@@ -277,6 +278,22 @@ namespace KingmakerBuffPlanner.Tests
                     TestAssignmentChooserScopedChoices);
                 Run("chooser-budget-text-stays-bounded",
                     TestChooserBudgetTextStaysBounded);
+                // Casting-first migration (charter A01-A04 and the Phase 1
+                // authoring/persistence contract).
+                Run("casting-a01-two-casters-three-independent",
+                    TestCastingA01TwoCastersThreeIndependent);
+                Run("casting-a02-three-recipients-three-invocations",
+                    TestCastingA02ThreeRecipientsThreeInvocations);
+                Run("casting-a03-group-one-invocation-six-beneficiaries",
+                    TestCastingA03GroupOneInvocationSixBeneficiaries);
+                Run("casting-a04-missed-coverage-no-auto-second-cast",
+                    TestCastingA04MissedCoverageNoAutoSecondCast);
+                Run("casting-authoring-scope-undo-and-read-only-compile",
+                    TestCastingAuthoringScopeUndoAndReadOnlyCompile);
+                Run("casting-blocked-readiness-reasons-are-distinct",
+                    TestCastingBlockedReadinessReasons);
+                Run("casting-roundtrip-and-load-states-are-exact",
+                    () => TestCastingRoundTripAndLoadStates(root));
             }
             finally
             {
@@ -9575,6 +9592,624 @@ namespace KingmakerBuffPlanner.Tests
                 { "expectedBlueprintGuids", new string[0] },
                 { "parameters", new Dictionary<string, object>() }
             };
+        }
+
+        // ------------------------------------------------------------------
+        // Casting-first migration: charter acceptance A01-A04 plus the
+        // Phase 1 authoring and persistence contract. All scenarios drive
+        // the real CastingAuthoringService and ExplicitCastingCompiler
+        // production types; fixtures are deterministic domain snapshots.
+        // ------------------------------------------------------------------
+
+        private static PlannedCasting DirectCasting(
+            string castingId,
+            string routineId,
+            string casterUnitId,
+            string targetUnitId,
+            string sourceId,
+            AbilityKey ability,
+            IEnumerable<AuthoredEnhancementSelection> enhancements = null,
+            string spellbookGuid = null,
+            CastingAuthoringState state = CastingAuthoringState.Ready)
+        {
+            return new PlannedCasting(
+                castingId, routineId, 0, sourceId, ability, casterUnitId, spellbookGuid,
+                CastingTargetMode.DirectTarget, targetUnitId, null, null, null,
+                enhancements, ExistingEffectPolicy.SkipAlreadyActive, null, state, null);
+        }
+
+        private static PlannedCasting GroupCasting(
+            string castingId,
+            string routineId,
+            string casterUnitId,
+            string sourceId,
+            AbilityKey ability,
+            IEnumerable<string> requiredCoverage,
+            IEnumerable<AuthoredEnhancementSelection> enhancements = null,
+            CastingTargetMode mode = CastingTargetMode.CasterCenteredOrigin,
+            string anchorUnitId = null,
+            CastingAuthoringState state = CastingAuthoringState.Ready,
+            MigrationProvenance provenance = null)
+        {
+            CastingOrigin origin = mode == CastingTargetMode.CasterCenteredOrigin
+                ? CastingOrigin.CasterCentered()
+                : CastingOrigin.Anchored(anchorUnitId);
+            return new PlannedCasting(
+                castingId, routineId, 0, sourceId, ability, casterUnitId, null,
+                mode, null, origin, requiredCoverage, null, enhancements,
+                ExistingEffectPolicy.SkipAlreadyActive, null, state, provenance);
+        }
+
+        private static CastingPlanDocument CastingDocument(params PlannedCasting[] castings)
+        {
+            // The document invariant requires per-routine contiguous orders;
+            // fixture castings are authored with order 0 and normalized here.
+            var positionInRoutine = new Dictionary<string, int>(StringComparer.Ordinal);
+            var normalized = new List<PlannedCasting>();
+            foreach (PlannedCasting casting in castings)
+            {
+                int prior;
+                int position = positionInRoutine.TryGetValue(casting.RoutineId, out prior)
+                    ? prior + 1 : 0;
+                positionInRoutine[casting.RoutineId] = position;
+                normalized.Add(new PlannedCasting(
+                    casting.CastingId, casting.RoutineId, position, casting.SourceId,
+                    casting.Ability, casting.CasterUnitId, casting.SpellbookGuid,
+                    casting.TargetMode, casting.DirectTargetUnitId, casting.Origin,
+                    casting.RequiredCoverageUnitIds, casting.TargetingModifiers,
+                    casting.Enhancements, casting.ExistingEffectPolicy,
+                    casting.IgnoredPresenceMarkers, casting.State, casting.Provenance));
+            }
+            return new CastingPlanDocument("fixture-campaign",
+                new[]
+                {
+                    new RoutineDefinition("long", "Long"),
+                    new RoutineDefinition("important", "Important"),
+                    new RoutineDefinition("short", "Short")
+                },
+                normalized);
+        }
+
+        private static readonly AbilityKey CastingBuffAbility =
+            Ability("a0000000000000000000000000000001", string.Empty, 0);
+
+        private static readonly AbilityKey CastingGroupAbility =
+            Ability("g0000000000000000000000000000001", string.Empty, 0);
+
+        private static Dictionary<string, EffectExpression> CastingEffects(
+            string directSourceId, string groupSourceId)
+        {
+            return new Dictionary<string, EffectExpression>(StringComparer.Ordinal)
+            {
+                { directSourceId, Leaf("buff-effect") },
+                { groupSourceId, new EffectLeafExpression(EffectKind.Buff,
+                    "group-effect", EffectTarget.Party, "fixture", "fixture/group") }
+            };
+        }
+
+        private static CastEnhancementSnapshot CastingEnhancement(
+            string enhancementId, string casterUnitId)
+        {
+            return new CastEnhancementSnapshot(
+                enhancementId, casterUnitId, "rod-" + enhancementId,
+                "Fixture " + enhancementId, string.Empty,
+                CastEnhancementCategory.MetamagicRod, 0x1, 10, 1, new string[0]);
+        }
+
+        // Two casters with independent pools plus friendly targets; each
+        // caster can cast `remaining` invocations of the given ability.
+        private static PartyProviderSnapshot CastingParty(
+            AbilityKey ability,
+            out List<ProviderPlanningOption> options,
+            out List<CastEnhancementSnapshot> enhancements,
+            string[] targets, int remainingPerCaster,
+            IDictionary<string, IEnumerable<string>> groupCoverageByAnchor = null)
+        {
+            string[] casters = { "unit-cleric", "unit-wizard" };
+            var units = new List<UnitSnapshot>();
+            foreach (string id in casters.Concat(targets))
+                units.Add(new UnitSnapshot(id, id, false, string.Empty,
+                    new TargetValidationSnapshot(true, true, true, true)));
+            var providers = new List<ProviderSnapshot>();
+            var pools = new List<ResourcePoolSnapshot>();
+            options = new List<ProviderPlanningOption>();
+            var all = casters.Concat(targets).Distinct(StringComparer.Ordinal).ToList();
+            for (int i = 0; i < casters.Length; i++)
+            {
+                string caster = casters[i];
+                string poolKey = "pool-" + caster;
+                pools.Add(new ResourcePoolSnapshot(poolKey,
+                    ResourcePoolKind.SpontaneousLevel, remainingPerCaster,
+                    remainingPerCaster, null));
+                // Exactly one provider option per caster for the requested
+                // ability: two same-ability options would be a genuine
+                // exact-source ambiguity the compiler must block on.
+                if (!string.Equals(ability.Canonical, CastingGroupAbility.Canonical,
+                        StringComparison.Ordinal))
+                {
+                    ProviderSnapshot direct = PlannerProvider(
+                        caster, "book-" + caster, ability, poolKey, 1);
+                    providers.Add(direct);
+                    options.Add(new ProviderPlanningOption(direct, all,
+                        new[] { caster }, 10, 100));
+                    continue;
+                }
+                ProviderSnapshot group = PlannerProvider(
+                    caster, "group-book-" + caster, ability, poolKey, 1);
+                providers.Add(group);
+                var coverage = new Dictionary<string, IEnumerable<string>>(
+                    StringComparer.Ordinal);
+                if (groupCoverageByAnchor != null &&
+                    groupCoverageByAnchor.ContainsKey(caster))
+                    coverage[caster] = groupCoverageByAnchor[caster];
+                options.Add(new ProviderPlanningOption(group, all,
+                    new[] { caster }, 10, 100,
+                    CastExecutionStrategy.DirectRuleCast, "fixture-direct", coverage));
+            }
+            enhancements = new List<CastEnhancementSnapshot>
+            {
+                CastingEnhancement("extend-cleric", "unit-cleric"),
+                CastingEnhancement("extend-wizard", "unit-wizard")
+            };
+            return new PartyProviderSnapshot(units, providers, pools);
+        }
+
+        private static ExplicitCastingPlan CompileCastingPlan(
+            CastingPlanDocument document, PartyProviderSnapshot snapshot,
+            List<ProviderPlanningOption> options,
+            List<CastEnhancementSnapshot> enhancements,
+            string directSourceId, string groupSourceId)
+        {
+            return new ExplicitCastingCompiler().Compile(
+                document, snapshot, options, CastingEffects(directSourceId, groupSourceId),
+                enhancements);
+        }
+
+        // A01: same buff, two casters, three targets, distinct enhancement
+        // sets — three independent castings where editing one changes only it.
+        private static void TestCastingA01TwoCastersThreeIndependent()
+        {
+            List<ProviderPlanningOption> options;
+            List<CastEnhancementSnapshot> enhancements;
+            PartyProviderSnapshot snapshot = CastingParty(
+                CastingBuffAbility,
+                out options, out enhancements,
+                new[] { "unit-t1", "unit-t2", "unit-t3" }, 3);
+            var service = new CastingAuthoringService(CastingDocument());
+            Assert(service.AddCasting(DirectCasting("cast-1", "long", "unit-cleric",
+                "unit-t1", "source-bulls", CastingBuffAbility,
+                new[] { new AuthoredEnhancementSelection("extend-cleric", true, null) }))
+                .Applied);
+            Assert(service.AddCasting(DirectCasting("cast-2", "long", "unit-wizard",
+                "unit-t2", "source-bulls", CastingBuffAbility,
+                new[] { new AuthoredEnhancementSelection("extend-wizard", true, "exact-rod-w") }))
+                .Applied);
+            Assert(service.AddCasting(DirectCasting("cast-3", "long", "unit-cleric",
+                "unit-t3", "source-bulls", CastingBuffAbility)).Applied);
+            ExplicitCastingPlan plan = CompileCastingPlan(
+                service.Document, snapshot, options, enhancements,
+                "source-bulls", "source-communal");
+            if (plan.Castings.Count != 3 || plan.ReadyInvocationCount != 3)
+                throw new InvalidOperationException(
+                    "Three authored castings must be three ready invocations.");
+            ResolvedCasting first = plan.CastingById("cast-1");
+            ResolvedCasting second = plan.CastingById("cast-2");
+            ResolvedCasting third = plan.CastingById("cast-3");
+            if (first.Provider.CasterUnitId != "unit-cleric" ||
+                second.Provider.CasterUnitId != "unit-wizard" ||
+                third.Provider.CasterUnitId != "unit-cleric")
+                throw new InvalidOperationException("Exact caster was not honored.");
+            if (first.AppliedEnhancementIds.Count != 1 ||
+                first.AppliedEnhancementIds[0] != "extend-cleric" ||
+                second.AppliedEnhancementIds[0] != "extend-wizard")
+                throw new InvalidOperationException(
+                    "Distinct per-casting enhancements were not preserved.");
+            PlannedCasting untouchedFirst = service.Document.Castings[0];
+            PlannedCasting untouchedThird = service.Document.Castings[2];
+            // Edit the middle casting only: change its enhancement set.
+            AuthoringEditResult edit = service.UpdateCasting(DirectCasting(
+                "cast-2", "long", "unit-wizard", "unit-t2", "source-bulls",
+                CastingBuffAbility));
+            if (!edit.Applied || edit.AffectedCastingIds.Count != 1 ||
+                edit.AffectedCastingIds[0] != "cast-2")
+                throw new InvalidOperationException(
+                    "Single-casting edit disclosed the wrong scope: " + edit.Reason);
+            if (!ReferenceEquals(untouchedFirst, service.Document.Castings[0]) ||
+                !ReferenceEquals(untouchedThird, service.Document.Castings[2]))
+                throw new InvalidOperationException(
+                    "An unrelated casting instance was rebuilt by a scoped edit.");
+            ExplicitCastingPlan revised = CompileCastingPlan(
+                service.Document, snapshot, options, enhancements,
+                "source-bulls", "source-communal");
+            if (revised.CastingById("cast-2").AppliedEnhancementIds.Count != 0 ||
+                revised.CastingById("cast-1").AppliedEnhancementIds.Count != 1 ||
+                revised.CastingById("cast-3").AppliedEnhancementIds.Count != 0)
+                throw new InvalidOperationException(
+                    "The edit leaked into sibling castings.");
+            // Editing focus never changes routine membership implicitly: the
+            // service refuses a routine change smuggled into an update.
+            if (service.UpdateCasting(DirectCasting(
+                    "cast-2", "short", "unit-wizard", "unit-t2", "source-bulls",
+                    CastingBuffAbility)).Applied)
+                throw new InvalidOperationException(
+                    "A routine move was accepted through a content edit.");
+        }
+
+        // A02: three recipients of a single-target ability are three records
+        // and three invocations, never one multi-target cast.
+        private static void TestCastingA02ThreeRecipientsThreeInvocations()
+        {
+            List<ProviderPlanningOption> options;
+            List<CastEnhancementSnapshot> enhancements;
+            PartyProviderSnapshot snapshot = CastingParty(
+                CastingBuffAbility,
+                out options, out enhancements,
+                new[] { "unit-t1", "unit-t2", "unit-t3" }, 3);
+            var service = new CastingAuthoringService(CastingDocument(
+                DirectCasting("cast-1", "long", "unit-cleric", "unit-t1",
+                    "source-bulls", CastingBuffAbility),
+                DirectCasting("cast-2", "long", "unit-cleric", "unit-t2",
+                    "source-bulls", CastingBuffAbility),
+                DirectCasting("cast-3", "long", "unit-cleric", "unit-t3",
+                    "source-bulls", CastingBuffAbility)));
+            ExplicitCastingPlan plan = CompileCastingPlan(
+                service.Document, snapshot, options, enhancements,
+                "source-bulls", "source-communal");
+            if (plan.Castings.Count != 3 || plan.ReadyInvocationCount != 3)
+                throw new InvalidOperationException(
+                    "Three recipients must produce exactly three invocations.");
+            foreach (ResolvedCasting casting in plan.Castings)
+            {
+                if (casting.TargetMode != CastingTargetMode.DirectTarget ||
+                    casting.PredictedBeneficiaryUnitIds.Count != 1 ||
+                    casting.PredictedBeneficiaryUnitIds[0] != casting.DirectTargetUnitId)
+                    throw new InvalidOperationException(
+                        "A direct casting gained or lost its single direct target.");
+                if (casting.CoverageIncomplete)
+                    throw new InvalidOperationException(
+                        "A direct casting must not report group coverage gaps.");
+            }
+            string[] intended = { "cast-1|unit-t1", "cast-2|unit-t2", "cast-3|unit-t3" };
+            foreach (string expectation in intended)
+            {
+                string[] parts = expectation.Split('|');
+                ResolvedCasting casting = plan.CastingById(parts[0]);
+                if (casting.DirectTargetUnitId != parts[1] ||
+                    casting.PredictedBeneficiaryUnitIds[0] != parts[1])
+                    throw new InvalidOperationException(
+                        "Recipient order or identity drifted for " + parts[0]);
+            }
+        }
+
+        // A03: one group cast covering six recipients — one authored origin,
+        // one invocation, six derived beneficiary connections.
+        private static void TestCastingA03GroupOneInvocationSixBeneficiaries()
+        {
+            string[] party = { "unit-t1", "unit-t2", "unit-t3", "unit-t4", "unit-t5", "unit-t6" };
+            var coverage = new Dictionary<string, IEnumerable<string>>(StringComparer.Ordinal)
+            {
+                { "unit-cleric", party }
+            };
+            List<ProviderPlanningOption> options;
+            List<CastEnhancementSnapshot> enhancements;
+            PartyProviderSnapshot snapshot = CastingParty(
+                CastingGroupAbility,
+                out options, out enhancements, party, 3, coverage);
+            var service = new CastingAuthoringService(CastingDocument(
+                GroupCasting("cast-group", "long", "unit-cleric", "source-communal",
+                    CastingGroupAbility, party)));
+            ExplicitCastingPlan plan = CompileCastingPlan(
+                service.Document, snapshot, options, enhancements,
+                "source-bulls", "source-communal");
+            if (plan.Castings.Count != 1 || plan.ReadyInvocationCount != 1)
+                throw new InvalidOperationException(
+                    "One group casting must remain exactly one invocation.");
+            ResolvedCasting group = plan.Castings[0];
+            if (group.PredictedBeneficiaryUnitIds.Count != 6)
+                throw new InvalidOperationException(
+                    "Six derived beneficiaries were expected, found " +
+                    group.PredictedBeneficiaryUnitIds.Count + ".");
+            if (group.CoverageIncomplete || group.CoverageGaps.Count != 0)
+                throw new InvalidOperationException(
+                    "Fully covered group reported coverage gaps.");
+            if (group.TargetMode != CastingTargetMode.CasterCenteredOrigin)
+                throw new InvalidOperationException("The authored origin was lost.");
+        }
+
+        // A04: one intended group recipient outside coverage stays visible as
+        // missed coverage; compilation never adds a second casting.
+        private static void TestCastingA04MissedCoverageNoAutoSecondCast()
+        {
+            string[] covered = { "unit-t1", "unit-t2", "unit-t3", "unit-t4", "unit-t5" };
+            var required = covered.Concat(new[] { "unit-rogue" }).ToArray();
+            var coverage = new Dictionary<string, IEnumerable<string>>(StringComparer.Ordinal)
+            {
+                { "unit-cleric", covered }
+            };
+            List<ProviderPlanningOption> options;
+            List<CastEnhancementSnapshot> enhancements;
+            PartyProviderSnapshot snapshot = CastingParty(
+                CastingGroupAbility,
+                out options, out enhancements, required, 3, coverage);
+            var service = new CastingAuthoringService(CastingDocument(
+                GroupCasting("cast-group", "long", "unit-cleric", "source-communal",
+                    CastingGroupAbility, required)));
+            ExplicitCastingPlan plan = CompileCastingPlan(
+                service.Document, snapshot, options, enhancements,
+                "source-bulls", "source-communal");
+            if (plan.Castings.Count != 1 || plan.ReadyInvocationCount != 1)
+                throw new InvalidOperationException(
+                    "Incomplete coverage silently produced a different cast count.");
+            ResolvedCasting group = plan.Castings[0];
+            if (!group.CoverageIncomplete || group.CoverageGaps.Count != 1 ||
+                group.CoverageGaps[0].UnitId != "unit-rogue" ||
+                group.CoverageGaps[0].Reason != "outside-predicted-coverage")
+                throw new InvalidOperationException(
+                    "The missed recipient was not disclosed as a coverage gap.");
+            if (group.PredictedBeneficiaryUnitIds.Contains("unit-rogue"))
+                throw new InvalidOperationException(
+                    "An uncovered recipient was counted as a predicted beneficiary.");
+            if (service.Document.Castings.Count != 1)
+                throw new InvalidOperationException(
+                    "Compilation mutated the authored document.");
+        }
+
+        private static void Assert(bool condition)
+        {
+            if (!condition) throw new InvalidOperationException("fixture assertion failed");
+        }
+
+        // Undo restores the exact prior document; refused commands never
+        // consume an undo slot; compiling never mutates the document.
+        private static void TestCastingAuthoringScopeUndoAndReadOnlyCompile()
+        {
+            List<ProviderPlanningOption> options;
+            List<CastEnhancementSnapshot> enhancements;
+            PartyProviderSnapshot snapshot = CastingParty(
+                CastingBuffAbility,
+                out options, out enhancements,
+                new[] { "unit-t1", "unit-t2", "unit-t3" }, 3);
+            var service = new CastingAuthoringService(CastingDocument());
+            Assert(service.AddCasting(DirectCasting("cast-1", "long", "unit-cleric",
+                "unit-t1", "source-bulls", CastingBuffAbility)).Applied);
+            Assert(service.AddCasting(DirectCasting("cast-2", "long", "unit-cleric",
+                "unit-t2", "source-bulls", CastingBuffAbility)).Applied);
+            Assert(service.AddCasting(DirectCasting("cast-3", "long", "unit-cleric",
+                "unit-t3", "source-bulls", CastingBuffAbility)).Applied);
+            CastingPlanDocument beforeEdit = service.Document;
+            ExplicitCastingPlan first = CompileCastingPlan(
+                service.Document, snapshot, options, enhancements,
+                "source-bulls", "source-communal");
+            if (!ReferenceEquals(beforeEdit, service.Document))
+                throw new InvalidOperationException("Compilation replaced the document.");
+            ExplicitCastingPlan second = CompileCastingPlan(
+                service.Document, snapshot, options, enhancements,
+                "source-bulls", "source-communal");
+            if (first.Castings.Count != second.Castings.Count ||
+                second.ReadyInvocationCount != first.ReadyInvocationCount)
+                throw new InvalidOperationException("Compilation was not deterministic.");
+            // A refused command must not create an undo entry: draining the
+            // history lands exactly on the pre-add document after three
+            // undos, and a fourth undo is impossible.
+            bool duplicateRefused = !service.AddCasting(DirectCasting("cast-3", "long",
+                "unit-cleric", "unit-t1", "source-bulls", CastingBuffAbility)).Applied;
+            Assert(service.Undo() && service.Undo() && service.Undo());
+            if (service.Document.Castings.Count != 0 || service.Undo() || !duplicateRefused)
+                throw new InvalidOperationException(
+                    "Refused command consumed an undo slot or undo overshot.");
+            // A fresh authoring session covers edit undo, disclosed removal
+            // scope, and an explicit cross-routine move.
+            var editor = new CastingAuthoringService(CastingDocument(
+                DirectCasting("cast-1", "long", "unit-cleric", "unit-t1",
+                    "source-bulls", CastingBuffAbility),
+                DirectCasting("cast-2", "long", "unit-cleric", "unit-t2",
+                    "source-bulls", CastingBuffAbility),
+                DirectCasting("cast-3", "long", "unit-cleric", "unit-t3",
+                    "source-bulls", CastingBuffAbility)));
+            CastingPlanDocument beforeUpdate = editor.Document;
+            Assert(editor.UpdateCasting(DirectCasting("cast-2", "long", "unit-cleric",
+                "unit-t2", "source-bulls", CastingBuffAbility,
+                new[] { new AuthoredEnhancementSelection("extend-cleric", true, null) }))
+                .Applied);
+            Assert(editor.Undo());
+            if (!ReferenceEquals(beforeUpdate, editor.Document))
+                throw new InvalidOperationException("Undo did not restore the prior document.");
+            // Removing a middle casting shifts the later sibling and says so.
+            AuthoringEditResult removal = editor.RemoveCasting("cast-2");
+            if (!removal.Applied || removal.AffectedCastingIds.Count != 2 ||
+                !removal.AffectedCastingIds.Contains("cast-2") ||
+                !removal.AffectedCastingIds.Contains("cast-3"))
+                throw new InvalidOperationException(
+                    "Sibling order shift was not disclosed with the removal.");
+            if (editor.Document.Castings.Count != 2 ||
+                editor.Document.Castings[1].CastingId != "cast-3" ||
+                editor.Document.Castings[1].Order != 1)
+                throw new InvalidOperationException("Orders were not renormalized.");
+            // Explicit cross-routine move with disclosed scope: the moved
+            // casting plus the long-routine sibling whose order shifts up.
+            AuthoringEditResult move = editor.MoveCasting("cast-1", "short", 0);
+            if (!move.Applied || move.AffectedCastingIds.Count != 2 ||
+                !move.AffectedCastingIds.Contains("cast-1") ||
+                !move.AffectedCastingIds.Contains("cast-3"))
+                throw new InvalidOperationException("Cross-routine move failed: " + move.Reason);
+            if (editor.Document.Castings[0].CastingId != "cast-3" ||
+                editor.Document.Castings[1].RoutineId != "short" ||
+                editor.Document.Castings[0].Order != 0 ||
+                editor.Document.Castings[1].Order != 0)
+                throw new InvalidOperationException(
+                    "Persisted order did not follow routine declaration order.");
+        }
+
+        // Blocked reasons are distinct and capability stays visible when a
+        // capable caster is currently uncastable.
+        private static void TestCastingBlockedReadinessReasons()
+        {
+            List<ProviderPlanningOption> options;
+            List<CastEnhancementSnapshot> enhancements;
+            PartyProviderSnapshot snapshot = CastingParty(
+                CastingBuffAbility,
+                out options, out enhancements, new[] { "unit-t1" }, 0);
+            var service = new CastingAuthoringService(CastingDocument(
+                DirectCasting("cast-exhausted", "long", "unit-cleric", "unit-t1",
+                    "source-bulls", CastingBuffAbility),
+                DirectCasting("cast-missing", "long", "unit-ghost", "unit-t1",
+                    "source-bulls", CastingBuffAbility),
+                DirectCasting("cast-draft", "long", "unit-cleric", "unit-t1",
+                    "source-bulls", CastingBuffAbility, null, null, CastingAuthoringState.Draft),
+                GroupCasting("cast-mode", "long", "unit-cleric", "source-bulls",
+                    CastingBuffAbility, new[] { "unit-t1" })));
+            ExplicitCastingPlan plan = CompileCastingPlan(
+                service.Document, snapshot, options, enhancements,
+                "source-bulls", "source-communal");
+            if (plan.ReadyInvocationCount != 0)
+                throw new InvalidOperationException("No casting here should be ready.");
+            ResolvedCasting exhausted = plan.CastingById("cast-exhausted");
+            if (exhausted.Readiness != ResolvedCastingReadiness.Blocked ||
+                exhausted.ReadinessReasons.Count != 1 ||
+                !exhausted.ReadinessReasons[0].StartsWith("resource-pool-exhausted",
+                    StringComparison.Ordinal))
+                throw new InvalidOperationException(
+                    "Exhausted pool did not produce its distinct reason: " +
+                    string.Join(",", exhausted.ReadinessReasons));
+            if (!exhausted.CapableCasterUnitIds.Contains("unit-cleric"))
+                throw new InvalidOperationException(
+                    "Capability disappeared together with readiness.");
+            ResolvedCasting missing = plan.CastingById("cast-missing");
+            if (missing.Readiness != ResolvedCastingReadiness.Blocked ||
+                missing.ReadinessReasons[0] != "caster-not-in-party:unit-ghost")
+                throw new InvalidOperationException(
+                    "Missing caster did not produce its distinct reason.");
+            ResolvedCasting draft = plan.CastingById("cast-draft");
+            if (draft.Readiness != ResolvedCastingReadiness.Draft)
+                throw new InvalidOperationException("Draft state was not preserved.");
+            ResolvedCasting mode = plan.CastingById("cast-mode");
+            if (mode.Readiness != ResolvedCastingReadiness.Blocked ||
+                !mode.ReadinessReasons.Any(value => value.StartsWith(
+                    "target-mode-mismatch", StringComparison.Ordinal)))
+                throw new InvalidOperationException(
+                    "Ability/targeting mismatch did not block the casting.");
+            // A Ready casting without a caster cannot even be authored.
+            bool threw = false;
+            try
+            {
+                DirectCasting("cast-invalid", "long", null, "unit-t1",
+                    "source-bulls", CastingBuffAbility);
+            }
+            catch (ArgumentException)
+            {
+                threw = true;
+            }
+            if (!threw)
+                throw new InvalidOperationException(
+                    "A Ready casting without a caster was accepted by the domain model.");
+        }
+
+        // Schema-6 round trip preserves identity, order, and intent; load
+        // states stay distinct; saves refuse to bury unreadable primaries.
+        private static void TestCastingRoundTripAndLoadStates(string root)
+        {
+            string boundary = Path.Combine(root, "casting-plan");
+            Directory.CreateDirectory(boundary);
+            var provenance = new MigrationProvenance("legacy-42", 5, "long", "split");
+            var document = CastingDocument(
+                DirectCasting("cast-1", "long", "unit-cleric", "unit-t1",
+                    "source-bulls", CastingBuffAbility,
+                    new[] { new AuthoredEnhancementSelection("extend-cleric", true, "rod-7") }),
+                DirectCasting("cast-2", "long", "unit-wizard", "unit-t2",
+                    "source-bulls", CastingBuffAbility),
+                GroupCasting("cast-3", "short", "unit-cleric", "source-communal",
+                    CastingGroupAbility, new[] { "unit-t1", "unit-t2", "unit-t3" },
+                    null, CastingTargetMode.AnchoredOrigin, "unit-t1",
+                    CastingAuthoringState.Draft, provenance));
+            var repository = new CastingPlanRepository(boundary);
+            CastingPlanProfile profile = CastingPlanProfile.FromDocument(document);
+            repository.Save(profile);
+            CastingPlanLoadResult loaded = repository.Load("fixture-campaign");
+            if (loaded.Status != CastingPlanLoadStatus.Loaded)
+                throw new InvalidOperationException(
+                    "Fresh save did not load: " + loaded.Status + " " + loaded.Warning);
+            CastingPlanDocument roundTripped = loaded.Profile.ToDocument();
+            if (roundTripped.Castings.Count != 3)
+                throw new InvalidOperationException("Casting count drifted.");
+            string[] expectedOrder = { "cast-1", "cast-2", "cast-3" };
+            int[] expectedRoutineOrders = { 0, 1, 0 };
+            for (int i = 0; i < expectedOrder.Length; i++)
+            {
+                if (roundTripped.Castings[i].CastingId != expectedOrder[i] ||
+                    roundTripped.Castings[i].Order != expectedRoutineOrders[i])
+                    throw new InvalidOperationException(
+                        "Persisted order or derived order drifted at " + i);
+            }
+            PlannedCasting first = roundTripped.Castings[0];
+            if (first.Enhancements.Count != 1 ||
+                first.Enhancements[0].EnhancementId != "extend-cleric" ||
+                !first.Enhancements[0].Required ||
+                first.Enhancements[0].ExactSourceRef != "rod-7")
+                throw new InvalidOperationException(
+                    "Enhancement selection detail drifted through persistence.");
+            PlannedCasting third = roundTripped.Castings[2];
+            if (third.TargetMode != CastingTargetMode.AnchoredOrigin ||
+                third.Origin.AnchorUnitId != "unit-t1" ||
+                third.State != CastingAuthoringState.Draft ||
+                third.Provenance == null ||
+                third.Provenance.LegacyAssignmentId != "legacy-42" ||
+                third.Provenance.LegacySchemaVersion != 5)
+                throw new InvalidOperationException(
+                    "Group origin, draft state, or migration provenance drifted.");
+            if (third.RequiredCoverageUnitIds.Count != 3)
+                throw new InvalidOperationException("Required coverage drifted.");
+            string original = File.ReadAllText(repository.GetProfilePath("fixture-campaign"));
+            repository.Save(CastingPlanProfile.FromDocument(roundTripped));
+            if (File.ReadAllText(repository.GetProfilePath("fixture-campaign")) != original)
+                throw new InvalidOperationException(
+                    "Serialization is not deterministic across round trips.");
+            // Distinct failure states: absent, corrupt, and newer schema.
+            var absent = new CastingPlanRepository(Path.Combine(boundary, "empty"));
+            if (absent.Load("fixture-campaign").Status != CastingPlanLoadStatus.Absent)
+                throw new InvalidOperationException("Absent profile was not reported.");
+            // A corrupt primary with a valid backup recovers the backup and
+            // reports the corrupt primary in its warning.
+            string path = repository.GetProfilePath("fixture-campaign");
+            File.WriteAllText(path, "{ not json");
+            CastingPlanLoadResult recovered = repository.Load("fixture-campaign");
+            if (recovered.Status != CastingPlanLoadStatus.RecoveredFromBackup ||
+                recovered.Profile == null ||
+                !recovered.Warning.Contains("schema-version-missing"))
+                throw new InvalidOperationException(
+                    "Backup recovery did not report the corrupt primary: " +
+                    recovered.Status + " " + recovered.Warning);
+            // A refused save never buries the unreadable primary.
+            bool refused = false;
+            try { repository.Save(CastingPlanProfile.FromDocument(document)); }
+            catch (InvalidDataException) { refused = true; }
+            if (!refused)
+                throw new InvalidOperationException(
+                    "Save buried an unreadable primary instead of refusing.");
+            // With every copy unreadable the honest state is Corrupt, never
+            // a fabricated default profile.
+            for (int i = 1; i <= 3; i++)
+            {
+                string backup = path + ".bak" + i;
+                if (File.Exists(backup)) File.WriteAllText(backup, "{ broken");
+            }
+            CastingPlanLoadResult corrupt = repository.Load("fixture-campaign");
+            if (corrupt.Status != CastingPlanLoadStatus.Corrupt ||
+                corrupt.Profile != null)
+                throw new InvalidOperationException("Corruption was not reported: " +
+                    corrupt.Status + " " + corrupt.Warning);
+            File.WriteAllText(path,
+                "{ \"schemaVersion\": 7, \"campaignId\": \"fixture-campaign\" }");
+            CastingPlanLoadResult newer = repository.Load("fixture-campaign");
+            if (newer.Status != CastingPlanLoadStatus.UnsupportedSchema ||
+                !newer.Warning.Contains("schema-version-newer:7"))
+                throw new InvalidOperationException(
+                    "A newer schema was not reported distinctly.");
+            refused = false;
+            try { repository.Save(CastingPlanProfile.FromDocument(document)); }
+            catch (InvalidDataException) { refused = true; }
+            if (!refused)
+                throw new InvalidOperationException(
+                    "Save overwrote a newer-schema primary.");
         }
     }
 }

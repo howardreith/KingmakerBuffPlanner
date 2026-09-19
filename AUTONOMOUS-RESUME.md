@@ -1,6 +1,35 @@
-# AUTONOMOUS-RESUME — top section is current; planning/Z-NATIVE-ASSIGNMENTS-STATUS.md is the per-checkpoint tracker.
+# AUTONOMOUS-RESUME — top section is current; planning/CASTING-FIRST-MIGRATION-STATUS.md is the per-checkpoint tracker.
 
-## RC3 review-correction pass — 2026-09-19 (LATEST; supersedes the RC2 section below)
+## Casting-first migration Phase 1 checkpoint 1 — 2026-09-19 (LATEST)
+
+- The adopted casting-first charter is being implemented on branch
+  `codex/kingmaker-buff-planner-casting-first`, created clean from the
+  charter-reviewed commit `c182061354e9e761c09648ca779ab334588ba379`
+  (rc3, legacy schema 5 unchanged). Baseline receipt and per-checkpoint
+  detail: `planning/CASTING-FIRST-MIGRATION-STATUS.md`.
+- Implemented: canonical `PlannedCasting`/`CastingPlanDocument` domain
+  model (one Ready record = one invocation; explicit caster/origin/
+  coverage/enhancement/provenance); `CastingAuthoringService` (single
+  mutation authority, disclosed edit scopes, bounded Undo);
+  `ExplicitCastingCompiler` (one resolved casting per authored casting,
+  distinct readiness reasons, capability separate from readiness, honest
+  group coverage gaps — never auto-expansion); schema-6 candidate
+  persistence with Absent/Loaded/Recovered/UnsupportedSchema/Corrupt
+  load states and no default-overwrite.
+- Gates: source 42/42; protocol 188/188 (7 new: charter A01–A4 plus
+  authoring-scope/undo, blocked-readiness, round-trip/load-states);
+  harness 27/27; package 4/4; WhatIf 5/5; rollback 4/4; publisher 3/3.
+  Log: `artifacts/casting-first-checkpoint1-gate.log`. All A01–A04
+  evidence is deterministic domain-layer only — no runtime/visual claim.
+- IMPORTANT fixture change: the authorized automation save trio now
+  exists (SEED 303 / BASELINE 304 / WORKING 305, read-only verified);
+  the old "no automation pair" live-lane blocker is resolved for future
+  phases. Nothing was launched or staged in this checkpoint.
+- NEXT: Phase 2 — shared atomic budget reservation in the compiler,
+  then the schema-5→6 import converter with charter conversion rules
+  and import-report tests.
+
+## RC3 review-correction pass — 2026-09-19 (supersedes the RC2 section below for current work)
 
 - A source review of published rc2 (at `a30c07e`/`c56befa`) confirmed four
   findings; all are repaired on this branch (fix commit below):

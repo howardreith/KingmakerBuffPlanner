@@ -1,5 +1,47 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-09-19 casting-first migration: Phase 1 checkpoint 1
+
+Branch `codex/kingmaker-buff-planner-casting-first`, created clean from
+`c182061354e9e761c09648ca779ab334588ba379` (the exact charter-reviewed
+commit). Version 0.1.1-rc3; shipped schema 5 untouched. The adopted
+casting-first charter supersedes conflicting UI assumptions of earlier
+missions; compatible safety/regression rules remain in force.
+
+Baseline before edits: source 42/42; protocol 181/181; harness 27/27;
+package 4/4; WhatIf 5/5; rollback 4/4; publisher 3/3
+(`artifacts/baseline-source-gate.log`); zero pre-existing failures. The
+authorized automation save trio now exists (SEED 303 / BASELINE 304 /
+WORKING 305, read-only verification only).
+
+Implementation: `Domain/Authoring/CastingIntentModels.cs`,
+`Planning/CastingAuthoringService.cs`,
+`Planning/ExplicitCastingCompiler.cs`,
+`Persistence/CastingPlanProfileModels.cs`,
+`Persistence/CastingPlanRepository.cs` — the canonical per-casting
+record with explicit caster/origin/coverage/enhancement/provenance, a
+single mutation authority with disclosed edit scopes and bounded Undo,
+a compiler proving one-record-one-invocation with honest coverage gaps
+and distinct readiness reasons, and schema-6 candidate storage with the
+charter's distinct load states.
+
+Verification: `scripts/Test-SourceOnly.ps1` at this checkpoint — source
+42/42; protocol 188/188 (7 new, incl. charter A01–A04); harness 27/27;
+package 4/4; WhatIf 5/5; rollback 4/4; publisher 3/3
+(`artifacts/casting-first-checkpoint1-gate.log`). A01–A04 pass at the
+deterministic domain layer only; no runtime, visual, or migration claim.
+Rejected theories: first test round assumed a single provider option per
+caster was implicit (the exact-source ambiguity guard correctly refused
+duplicated candidates — fixtures now build exactly one option per
+ability/caster, and the guard itself is the intended product behavior).
+Defects fixed pre-commit: MoveCasting changed list position without
+rewriting routine membership. Uncertainty: none open in this layer;
+Phase 2 shared budgets, exact rod identity, and import conversion are
+unimplemented by design at this checkpoint.
+
+Next: Phase 2 shared atomic budget reservation, then the schema-5→6
+import converter with import-report tests.
+
 ## 2026-09-06 failed human validation: routing diagnosis
 
 Product-bearing checkpoint: `de57d90b38711c4c641d470900339bd8815a3fa8`.

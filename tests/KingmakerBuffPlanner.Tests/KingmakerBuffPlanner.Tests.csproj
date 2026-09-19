@@ -44,6 +44,7 @@
     <Compile Include="..\..\src\KingmakerBuffPlanner\Domain\Effects\EffectAggregateIdentity.cs"><Link>Domain\Effects\EffectAggregateIdentity.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Domain\Effects\CatalogSourceIdentity.cs"><Link>Domain\Effects\CatalogSourceIdentity.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Domain\Identity\StableKeys.cs"><Link>Domain\Identity\StableKeys.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Domain\Authoring\CastingIntentModels.cs"><Link>Domain\Authoring\CastingIntentModels.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Domain\Providers\ProviderSnapshots.cs"><Link>Domain\Providers\ProviderSnapshots.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Domain\Planning\PlanningModels.cs"><Link>Domain\Planning\PlanningModels.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Domain\Planning\CastEnhancements.cs"><Link>Domain\Planning\CastEnhancements.cs</Link></Compile>
@@ -56,10 +57,14 @@
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\MaterialComponentAvailability.cs"><Link>Execution\MaterialComponentAvailability.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\ResourceLedger.cs"><Link>Planning\ResourceLedger.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\RoutinePlanService.cs"><Link>Planning\RoutinePlanService.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\CastingAuthoringService.cs"><Link>Planning\CastingAuthoringService.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\ExplicitCastingCompiler.cs"><Link>Planning\ExplicitCastingCompiler.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\EffectPresenceEvaluator.cs"><Link>Planning\EffectPresenceEvaluator.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\CastPlanner.cs"><Link>Planning\CastPlanner.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Persistence\ProfileModels.cs"><Link>Persistence\ProfileModels.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Persistence\ProfileRepository.cs"><Link>Persistence\ProfileRepository.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Persistence\CastingPlanProfileModels.cs"><Link>Persistence\CastingPlanProfileModels.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Persistence\CastingPlanRepository.cs"><Link>Persistence\CastingPlanRepository.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Infrastructure\AtomicFile.cs"><Link>Infrastructure\AtomicFile.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\PlannerSetupModel.cs"><Link>UI\PlannerSetupModel.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\PlannerPresentationModels.cs"><Link>UI\PlannerPresentationModels.cs</Link></Compile>

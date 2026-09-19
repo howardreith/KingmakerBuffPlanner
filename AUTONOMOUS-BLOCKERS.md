@@ -1,5 +1,24 @@
 # AUTONOMOUS-BLOCKERS — top section is current
 
+## Casting-first migration blockers — 2026-09-19
+
+- RESOLVED (was the standing live-lane blocker): the authorized
+  automation save trio now exists in the real save directory
+  (SEED/BASELINE/WORKING at indices 303/304/305; read-only verified
+  during the Phase 1 checkpoint). Live lanes for donor inventory and
+  rendered smoke are actionable through the guarded harness when a
+  phase needs them. No live run has been performed yet in this mission.
+- T03 exact rod identity: still no qualified durable instance contract
+  in the inspected Assembly-CSharp surface (historical finding). The
+  new schema-6 model carries `ExactSourceRef` placeholders but the
+  compiler deliberately does not fake identity; blocked until a live
+  contract inspection (fixture now available) or an explicit decision
+  to keep pooled semantics honestly labeled.
+- Phase 2 known-open work (not blockers): shared atomic cross-casting
+  budget reservation; schema-5→6 import converter; both are the next
+  scheduled implementation steps, not external blockers.
+- All RC3 blockers below remain unchanged for the shipped rc3 product.
+
 ## RC3 blockers — 2026-09-19
 
 - LIVE RENDER EVIDENCE: unchanged — guarded in-game runs were refused
