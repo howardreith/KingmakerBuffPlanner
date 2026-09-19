@@ -110,6 +110,11 @@ namespace KingmakerBuffPlanner.UI
         internal void ApplyTo(RectTransform scope)
         {
             if (scope == null || _theme == null) return;
+            // Rebuild boundaries are also the bounded late-donor retry point:
+            // if capabilities are still missing (native windows appeared only
+            // after the planner opened), re-resolve here, capped by the same
+            // per-owner attempt budget as every other recovery path.
+            TryRecoverMissingDonors();
             NativeThemeResource buttons = _theme.Resources.Get(NativeThemeCapability.Buttons);
             if (buttons != null)
                 foreach (Button button in scope.GetComponentsInChildren<Button>(true))
@@ -119,6 +124,27 @@ namespace KingmakerBuffPlanner.UI
                 foreach (Text text in scope.GetComponentsInChildren<Text>(true))
                     PlannerNativeTheme.ApplyText((Text)body.Components[0], text);
             ApplyAll();
+        }
+
+        private void TryRecoverMissingDonors()
+        {
+            if (_theme == null || _bindings == null) return;
+            bool incomplete = _theme.Resources.AvailableCount !=
+                NativeThemeResolution.Capabilities.Length;
+            if (!_recovery.TryBegin(incomplete)) return;
+            try
+            {
+                _theme = PlannerNativeTheme.Resolve(_nativeLookupRoot);
+                ApplyAll();
+            }
+            catch (Exception exception)
+            {
+                Record("native-theme late-donor recovery failed: " + exception.Message);
+            }
+            finally
+            {
+                _recovery.Complete();
+            }
         }
 
         private void OnEnable()

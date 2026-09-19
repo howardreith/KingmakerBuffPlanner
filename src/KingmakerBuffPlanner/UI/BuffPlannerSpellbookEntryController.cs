@@ -189,6 +189,31 @@ namespace KingmakerBuffPlanner.UI
                 label.resizeTextMaxSize = 14;
             }
             _ownedButton.interactable = true;
+            // Complete native button states (normal/hover/pressed/disabled),
+            // not just a borrowed normal sprite: borrow through the same
+            // validated donor contract the planner surface uses. Fail-soft —
+            // the readable factory styling stays when donors are absent.
+            try
+            {
+                PlannerNativeTheme nativeTheme = PlannerNativeTheme.Resolve(canvas);
+                NativeThemeResource buttonDonor = nativeTheme.Resources.Get(
+                    NativeThemeCapability.Buttons);
+                if (buttonDonor != null)
+                    PlannerNativeTheme.ApplyButton((Button)buttonDonor.Components[0],
+                        _ownedButton);
+                NativeThemeResource bodyDonor = nativeTheme.Resources.Get(
+                    NativeThemeCapability.Body);
+                if (bodyDonor != null)
+                    foreach (Text buttonText in _ownedButton.GetComponentsInChildren<Text>(true))
+                        PlannerNativeTheme.ApplyText((Text)bodyDonor.Components[0], buttonText);
+                _log("[KBP-SPELLBOOK] native button states applied;summary=" +
+                    nativeTheme.Resources.Summary + ".");
+            }
+            catch (Exception exception)
+            {
+                _log("[KBP-SPELLBOOK] native button states unavailable;reason=" +
+                    exception.Message + ".");
+            }
             Canvas.ForceUpdateCanvases();
             KingmakerUiFactory.FitButtonToCaption(buttonRect, ButtonDesignWidth,
                 ButtonDesignHeight);

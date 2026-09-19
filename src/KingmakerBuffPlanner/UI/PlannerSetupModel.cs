@@ -428,8 +428,15 @@ namespace KingmakerBuffPlanner.UI
             RoutineProfile routine = FindRoutine(routineId);
             SourceAssignmentProfile assignment = routine.Assignments
                 .FirstOrDefault(value => value.SourceId == source.SourceId);
-            if (!string.IsNullOrWhiteSpace(enhancementId) && !GetApplicableEnhancements()
-                .Any(value => value.EnhancementId == enhancementId))
+            // Removal never requires the enhancement to be available again —
+            // an exhausted or vanished selection must stay individually
+            // removable; only adding a new selection checks applicability.
+            bool isRemoval = assignment != null && assignment.AutomaticAssignment != null &&
+                assignment.AutomaticAssignment.Enhancements.Any(selection =>
+                    selection.EnhancementId == enhancementId);
+            if (!isRemoval && !string.IsNullOrWhiteSpace(enhancementId) &&
+                !GetApplicableEnhancements()
+                    .Any(value => value.EnhancementId == enhancementId))
                 throw new InvalidOperationException("The enhancement is not currently applicable and available.");
             if (assignment == null && string.IsNullOrWhiteSpace(enhancementId)) return;
             CastingAssignmentProfile casting = AutomaticChild(routine, assignment, source);
@@ -511,7 +518,9 @@ namespace KingmakerBuffPlanner.UI
         // child's own cast constraints. Results keep assignment identity: a
         // provider under two assignments appears twice with each
         // assignment's effective targeting, never collapsed to the first.
-        private IReadOnlyList<AssignmentProviderOption> GetAssignmentProviderOptions(
+        // Assignment-scoped presentation (chooser availability for one
+        // child) reads this; it never mutates state.
+        internal IReadOnlyList<AssignmentProviderOption> GetAssignmentProviderOptions(
             SetupSourceRow source, string routineId)
         {
             EffectExpression expression;

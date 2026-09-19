@@ -271,6 +271,12 @@ namespace KingmakerBuffPlanner.Tests
                     TestMetamagicLabelsNeverShowRawMasks);
                 Run("installed-call-of-the-wild-metamagic-name-contract-is-exact",
                     TestInstalledCallOfTheWildMetamagicNames);
+                Run("chooser-budget-note-is-spell-scoped-with-unit-labels",
+                    TestChooserBudgetSpellScopedNotes);
+                Run("assignment-chooser-uses-assignment-selections-and-allows-removal",
+                    TestAssignmentChooserScopedChoices);
+                Run("chooser-budget-text-stays-bounded",
+                    TestChooserBudgetTextStaysBounded);
             }
             finally
             {
@@ -5113,7 +5119,7 @@ namespace KingmakerBuffPlanner.Tests
             if (selectedChoice.BudgetNote.IndexOf(
                     targetCount + " requested, 3 allocated", StringComparison.Ordinal) < 0 ||
                 selectedChoice.BudgetNote.IndexOf(
-                    "this spell: 3 allocated / " + targetCount + " requested",
+                    "this spell: 3/" + targetCount + " targets funded",
                     StringComparison.Ordinal) < 0)
                 throw new InvalidOperationException(
                     "The selected row lacked the pool and this-spell budget note: " +
@@ -5221,11 +5227,404 @@ namespace KingmakerBuffPlanner.Tests
             EnhancementChoiceViewModel choice = assignmentScoped.Choices.Single(
                 candidate => candidate.EnhancementId == rodId);
             if (choice.BudgetNote.IndexOf(
-                    "this assignment: 2 allocated / 2 requested",
+                    "this assignment: 2/2 targets funded",
                     StringComparison.Ordinal) < 0)
                 throw new InvalidOperationException(
                     "The assignment-scoped chooser lost its own coverage note: " +
                     choice.BudgetNote);
+        }
+
+        // C1 reproducer: "this spell" coverage must be scoped to the selected
+        // spell (or child assignment), never the routine aggregate, and must
+        // distinguish requested/funded/skipped targets from allocated casts
+        // and charges — including communal casts.
+        private static void TestChooserBudgetSpellScopedNotes()
+        {
+            AbilityKey[] abilities =
+            {
+                Ability("spell-a", string.Empty, 0),
+                Ability("spell-b", string.Empty, 0),
+                Ability("spell-c", string.Empty, 0),
+                Ability("spell-d", string.Empty, 0)
+            };
+            var pool = new ResourcePoolSnapshot("scoped-slots",
+                ResourcePoolKind.SpontaneousLevel, 8, 8, null);
+            string rodId = "metamagic-rod|felix|quicken-rod";
+            var providers = new List<ProviderSnapshot>();
+            var options = new List<ProviderPlanningOption>();
+            var effects = new Dictionary<string, EffectExpression>();
+            string[] targets = { "t-a", "t-b", "t-c", "t-d" };
+            for (int index = 0; index < abilities.Length; index++)
+            {
+                providers.Add(PlannerProvider("felix", "book-" + index,
+                    abilities[index], pool.PoolKey, 1));
+                options.Add(new ProviderPlanningOption(providers[index],
+                    new[] { "felix", targets[index] }, new[] { "felix", targets[index] }, 4, 40));
+                effects[abilities[index].Canonical] = Leaf("scoped-buff-" + index);
+            }
+            PartyProviderSnapshot snapshot = PlannerSnapshot(providers,
+                new[] { pool }, "felix", "t-a", "t-b", "t-c", "t-d");
+            var rod = new CastEnhancementSnapshot(rodId, "felix", "quicken-rod",
+                "Quicken Metamagic Rod", string.Empty, CastEnhancementCategory.MetamagicRod,
+                4, 3, 3, null, "Quicken");
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault(
+                "chooser-budget-spell-scoped");
+            for (int index = 0; index < abilities.Length; index++)
+            {
+                SourceAssignmentProfile parent = Assignment(abilities[index].Canonical,
+                    abilities[index], new[] { targets[index] },
+                    new[] { rodId });
+                profile.Routines.First(routine => routine.RoutineId == "short")
+                    .Assignments.Add(parent);
+            }
+            var active = new ActiveEffectSnapshot(null);
+            RoutinePlanResult preview = new RoutinePlanService().Plan(profile, "short",
+                snapshot, active, effects, options, new[] { rod });
+            ResourcePoolAllocation allocation = preview.Plan.AllocationFor(
+                "enhancement:" + rodId);
+            if (allocation == null || allocation.RequestedUsage != 4 ||
+                allocation.AllocatedUsage != 3 || allocation.UnmetDemand != 1)
+                throw new InvalidOperationException(
+                    "The shared pool did not show the mission's global 4/3/1 budget.");
+            var model = new PlannerSetupModel(profile, snapshot, active, effects,
+                options, ignored => { }, new[] { rod });
+            foreach (SetupSourceRow source in model.Sources)
+            {
+                SelectedCastingViewModel casting = SelectedCastingViewModel.Create(
+                    source, model, "short", preview);
+                EnhancementChoiceViewModel choice = casting.Choices.Single(
+                    candidate => candidate.EnhancementId == rodId);
+                if (!choice.Selected)
+                    throw new InvalidOperationException(
+                        "A spell selecting the rod showed it unselected: " + source.SourceId);
+                // spell-d is alphabetically last in the routine's allocation
+                // order, so it is exactly the unfunded one.
+                bool funded = source.Ability.BaseAbilityGuid != "spell-d";
+                string expected = funded
+                    ? "this spell: 1/1 targets funded (1 charge allocated)"
+                    : "this spell: 0/1 targets funded (0 charges allocated)";
+                if (choice.BudgetNote.IndexOf(expected, StringComparison.Ordinal) < 0)
+                    throw new InvalidOperationException(
+                        "The local note was not spell-scoped for " + source.SourceId +
+                        ": " + choice.BudgetNote);
+                if (choice.BudgetNote.IndexOf("3 allocated / 4 requested",
+                        StringComparison.Ordinal) >= 0)
+                    throw new InvalidOperationException(
+                        "A routine aggregate leaked into a this-spell note: " +
+                        choice.BudgetNote);
+            }
+
+            // Communal unit honesty: one party-wide spell, six targets, one
+            // communal cast, one charge.
+            AbilityKey communal = Ability("spell-communal", string.Empty, 0);
+            var communalPool = new ResourcePoolSnapshot("communal-slots",
+                ResourcePoolKind.SpontaneousLevel, 8, 8, null);
+            ProviderSnapshot communalProvider = PlannerProvider("felix", "communal-book",
+                communal, communalPool.PoolKey, 1);
+            string[] communalTargets = { "c1", "c2", "c3", "c4", "c5", "felix" };
+            PartyProviderSnapshot communalSnapshot = PlannerSnapshot(
+                new[] { communalProvider }, new[] { communalPool }, communalTargets);
+            var communalOption = new ProviderPlanningOption(communalProvider,
+                communalTargets, communalTargets, 4, 40);
+            var communalEffects = new Dictionary<string, EffectExpression>
+            {
+                { communal.Canonical, new EffectLeafExpression(EffectKind.Buff,
+                    "communal-buff", EffectTarget.Party, "fixture", "fixture/communal") }
+            };
+            BuffPlannerProfile communalProfile = BuffPlannerProfile.CreateDefault(
+                "chooser-budget-communal");
+            communalProfile.Routines.First(routine => routine.RoutineId == "short")
+                .Assignments.Add(Assignment(communal.Canonical, communal,
+                    communalTargets, new[] { rodId }));
+            RoutinePlanResult communalPreview = new RoutinePlanService().Plan(
+                communalProfile, "short", communalSnapshot,
+                new ActiveEffectSnapshot(null), communalEffects,
+                new[] { communalOption }, new[] { rod });
+            var communalModel = new PlannerSetupModel(communalProfile, communalSnapshot,
+                new ActiveEffectSnapshot(null), communalEffects,
+                new[] { communalOption }, ignored => { }, new[] { rod });
+            EnhancementChoiceViewModel communalChoice = SelectedCastingViewModel.Create(
+                communalModel.SelectedSource, communalModel, "short", communalPreview)
+                .Choices.Single(candidate => candidate.EnhancementId == rodId);
+            if (communalChoice.BudgetNote.IndexOf(
+                    "this spell: 1 communal cast covers its targets (1 charge allocated)",
+                    StringComparison.Ordinal) < 0)
+                throw new InvalidOperationException(
+                    "A communal cast was presented as one-cast-vs-many-targets: " +
+                    communalChoice.BudgetNote);
+
+            // Already-active targets are labeled as skips, not as funding.
+            var activeSnapshot = new ActiveEffectSnapshot(
+                new Dictionary<string, IEnumerable<string>> {
+                    { "c1", new[] { "communal-buff" } }
+                });
+            RoutinePlanResult skippedPreview = new RoutinePlanService().Plan(
+                communalProfile, "short", communalSnapshot, activeSnapshot,
+                communalEffects, new[] { communalOption }, new[] { rod });
+            var skippedModel = new PlannerSetupModel(communalProfile, communalSnapshot,
+                activeSnapshot, communalEffects,
+                new[] { communalOption }, ignored => { }, new[] { rod });
+            EnhancementChoiceViewModel skippedChoice = SelectedCastingViewModel.Create(
+                skippedModel.SelectedSource, skippedModel, "short", skippedPreview)
+                .Choices.Single(candidate => candidate.EnhancementId == rodId);
+            if (skippedChoice.BudgetNote.IndexOf("1 already active",
+                    StringComparison.Ordinal) < 0 ||
+                skippedChoice.BudgetNote.IndexOf("communal cast covers its targets",
+                    StringComparison.Ordinal) < 0)
+                throw new InvalidOperationException(
+                    "An already-active target was not labeled distinctly: " +
+                    skippedChoice.BudgetNote);
+        }
+
+        // C2 reproducer: the assignment-aware chooser builds choices, notes,
+        // and availability from THAT child's selections; unavailable selected
+        // enhancements stay individually removable; policy captions state the
+        // actual required/optional and targeting semantics.
+        private static void TestAssignmentChooserScopedChoices()
+        {
+            AbilityKey ability = Ability("scoped-chooser-spell", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("scoped-chooser-slots",
+                ResourcePoolKind.SpontaneousLevel, 8, 8, null);
+            ProviderSnapshot felix = PlannerProvider("felix", "felix-book", ability,
+                pool.PoolKey, 1);
+            ProviderSnapshot leinna = PlannerProvider("leinna", "leinna-book", ability,
+                pool.PoolKey, 1);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(
+                new[] { felix, leinna }, new[] { pool }, "felix", "leinna", "t1", "t2");
+            var felixOption = new ProviderPlanningOption(felix,
+                new[] { "felix", "t1", "t2" }, new[] { "felix", "t1", "t2" }, 4, 40);
+            var leinnaOption = new ProviderPlanningOption(leinna,
+                new[] { "leinna", "t1", "t2" }, new[] { "leinna", "t1", "t2" }, 4, 40);
+            string rodId = "metamagic-rod|felix|extend-rod";
+            var rod = new CastEnhancementSnapshot(rodId, "felix", "extend-rod",
+                "Extend Metamagic Rod", string.Empty, CastEnhancementCategory.MetamagicRod,
+                8, 3, 2, null, "Extend");
+            CastEnhancementSnapshot share = ClassEnhancement("share", "felix",
+                ability, "felix-book", 3, "reservoir|felix",
+                "brown-fur-share-transmutation", true);
+            var effects = new Dictionary<string, EffectExpression>
+            {
+                { ability.Canonical, Leaf("scoped-chooser-buff") }
+            };
+            var active = new ActiveEffectSnapshot(null);
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault(
+                "assignment-scoped-chooser");
+            SourceAssignmentProfile parent = Assignment(ability.Canonical, ability,
+                new string[0]);
+            parent.CastingAssignments.Add(new CastingAssignmentProfile
+            {
+                AssignmentId = "cast-2",
+                Order = 1,
+                CasterUnitId = "felix",
+                TargetUnitIds = new List<string> { "t1", "t2" },
+                Enhancements = new List<EnhancementSelectionProfile>
+                {
+                    new EnhancementSelectionProfile { EnhancementId = rodId, Required = true }
+                }
+            });
+            parent.CastingAssignments.Add(new CastingAssignmentProfile
+            {
+                AssignmentId = "cast-3",
+                Order = 2,
+                CasterUnitId = "leinna",
+                TargetUnitIds = new List<string> { },
+                Enhancements = new List<EnhancementSelectionProfile>()
+            });
+            profile.Routines.First(routine => routine.RoutineId == "short")
+                .Assignments.Add(parent);
+            var model = new PlannerSetupModel(profile, snapshot, active, effects,
+                new[] { felixOption, leinnaOption }, ignored => { },
+                new[] { rod, share });
+            SetupSourceRow source = model.SelectedSource;
+            RoutinePlanResult preview = new RoutinePlanService().Plan(profile, "short",
+                snapshot, active, effects, new[] { felixOption, leinnaOption },
+                new[] { rod, share });
+
+            // Pinned child selected the rod; the Automatic child did not.
+            SelectedCastingViewModel assignmentView = SelectedCastingViewModel.Create(
+                source, model, "short", preview, "cast-2");
+            EnhancementChoiceViewModel assignmentRod = assignmentView.Choices.Single(
+                candidate => candidate.EnhancementId == rodId);
+            if (!assignmentRod.Selected || !assignmentRod.Available ||
+                !assignmentRod.CanDeselect || !assignmentRod.CanSelect)
+                throw new InvalidOperationException(
+                    "The pinned child's selected rod was not presented as selected and removable.");
+            if (assignmentRod.BudgetNote.IndexOf("this assignment:",
+                    StringComparison.Ordinal) < 0)
+                throw new InvalidOperationException(
+                    "The assignment chooser lost its local scope: " + assignmentRod.BudgetNote);
+            if (assignmentRod.PolicyCaption != "REQUIRED" || !assignmentRod.CanTogglePolicy)
+                throw new InvalidOperationException(
+                    "An ordinary rod's policy caption was not honest: " +
+                    assignmentRod.PolicyCaption);
+            SelectedCastingViewModel automaticView = SelectedCastingViewModel.Create(
+                source, model, "short", preview);
+            if (automaticView.Choices.Single(candidate => candidate.EnhancementId == rodId)
+                    .Selected)
+                throw new InvalidOperationException(
+                    "The Automatic child inherited the pinned child's selection.");
+
+            // A caster-mismatched assignment scope makes the rod unavailable
+            // there even though the source-wide union includes it.
+            SelectedCastingViewModel foreignAssignment = SelectedCastingViewModel.Create(
+                source, model, "short", preview, "cast-3");
+            EnhancementChoiceViewModel foreignRod = foreignAssignment.Choices.Single(
+                candidate => candidate.EnhancementId == rodId);
+            if (foreignRod.Available || foreignRod.Selected ||
+                foreignRod.CanSelect || foreignRod.CanDeselect)
+                throw new InvalidOperationException(
+                    "A rod owned by another caster stayed selectable for a pinned child.");
+
+            // A targeting modifier can never present itself as optional.
+            model.SetAssignmentEnhancement("short", source.SourceId, "cast-2",
+                share.EnhancementId);
+            preview = new RoutinePlanService().Plan(profile, "short", snapshot, active,
+                effects, new[] { felixOption, leinnaOption }, new[] { rod, share });
+            SelectedCastingViewModel withShare = SelectedCastingViewModel.Create(
+                model.SelectedSource, model, "short", preview, "cast-2");
+            EnhancementChoiceViewModel shareChoice = withShare.Choices.Single(
+                candidate => candidate.EnhancementId == share.EnhancementId);
+            if (!shareChoice.Selected || shareChoice.PolicyCaption != "REQUIRED (targeting)" ||
+                shareChoice.CanTogglePolicy)
+                throw new InvalidOperationException(
+                    "A targeting modifier presented a toggleable or wrong policy: " +
+                    shareChoice.PolicyCaption);
+            EnhancementChoiceViewModel optionalRod = withShare.Choices.Single(
+                candidate => candidate.EnhancementId == rodId);
+            model.SetCastingAssignmentEnhancementPolicy("short", source.SourceId,
+                "cast-2", rodId, false);
+            withShare = SelectedCastingViewModel.Create(model.SelectedSource, model,
+                "short", preview, "cast-2");
+            optionalRod = withShare.Choices.Single(candidate =>
+                candidate.EnhancementId == rodId);
+            if (optionalRod.PolicyCaption != "OPTIONAL" || !optionalRod.CanTogglePolicy)
+                throw new InvalidOperationException(
+                    "An optional ordinary rod did not state its policy honestly: " +
+                    optionalRod.PolicyCaption);
+
+            // Exhaust only the pinned rod: it stays visible, selected, and
+            // individually removable; the unrelated Share choice survives.
+            var exhausted = new CastEnhancementSnapshot(rodId, "felix", "extend-rod",
+                rod.DisplayName, rod.Description, rod.Category,
+                rod.MetamagicMask, rod.MaximumSpellLevel, 0, null, "Extend");
+            var exhaustedModel = new PlannerSetupModel(profile, snapshot, active, effects,
+                new[] { felixOption, leinnaOption }, ignored => { },
+                new[] { exhausted, share });
+            SelectedCastingViewModel exhaustedView = SelectedCastingViewModel.Create(
+                exhaustedModel.SelectedSource, exhaustedModel, "short", preview, "cast-2");
+            EnhancementChoiceViewModel exhaustedRod = exhaustedView.Choices.Single(
+                candidate => candidate.EnhancementId == rodId);
+            if (!exhaustedRod.Selected || exhaustedRod.Available ||
+                !exhaustedRod.CanDeselect || exhaustedRod.CanSelect)
+                throw new InvalidOperationException(
+                    "An exhausted selected rod was not individually removable.");
+            EnhancementChoiceViewModel survivingShare = exhaustedView.Choices.Single(
+                candidate => candidate.EnhancementId == share.EnhancementId);
+            if (!survivingShare.Selected)
+                throw new InvalidOperationException(
+                    "An unrelated selection was disturbed by the exhausted rod.");
+            exhaustedModel.SetAssignmentEnhancement("short",
+                exhaustedModel.SelectedSource.SourceId, "cast-2", rodId);
+            if (exhaustedModel.GetAssignmentEnhancementIds("short",
+                    exhaustedModel.SelectedSource.SourceId, "cast-2")
+                    .Contains(rodId) ||
+                !exhaustedModel.GetAssignmentEnhancementIds("short",
+                    exhaustedModel.SelectedSource.SourceId, "cast-2")
+                    .Contains(share.EnhancementId))
+                throw new InvalidOperationException(
+                    "Individual removal also removed or failed to remove selections.");
+
+            // The ordinary Automatic workflow can also remove an unavailable
+            // selected enhancement without clearing anything else: select
+            // both while the rod is available, then reload the catalog with
+            // the rod exhausted and remove only it.
+            var selectingModel = new PlannerSetupModel(profile, snapshot, active, effects,
+                new[] { felixOption, leinnaOption }, ignored => { },
+                new[] { rod, share });
+            selectingModel.SetEnhancement("short", share.EnhancementId);
+            selectingModel.SetEnhancement("short", rodId);
+            var autoModel = new PlannerSetupModel(profile, snapshot, active, effects,
+                new[] { felixOption, leinnaOption }, ignored => { },
+                new[] { exhausted, share });
+            autoModel.SetEnhancement("short", exhausted.EnhancementId);
+            if (autoModel.GetSelectedEnhancementIds("short")
+                    .Contains(exhausted.EnhancementId) ||
+                !autoModel.GetSelectedEnhancementIds("short")
+                    .Contains(share.EnhancementId))
+                throw new InvalidOperationException(
+                    "Automatic-scope removal of an unavailable selection failed.");
+        }
+
+        // C3: the sticky summary and row notes are length-bounded regardless
+        // of pool count or name lengths; the full detail survives in the
+        // choice description (tooltip) rather than being silently truncated.
+        private static void TestChooserBudgetTextStaysBounded()
+        {
+            if (EnhancementBudgetModel.BoundText("short",
+                    EnhancementBudgetModel.MaximumSummaryLength) != "short" ||
+                EnhancementBudgetModel.BoundText(
+                    new string('x', EnhancementBudgetModel.MaximumSummaryLength + 50),
+                    EnhancementBudgetModel.MaximumSummaryLength).Length !=
+                EnhancementBudgetModel.MaximumSummaryLength)
+                throw new InvalidOperationException("BoundText lost its bound or its content.");
+            var lines = new List<EnhancementBudgetLineViewModel>();
+            string longName = new string('N', 80);
+            var affected = new List<string>();
+            for (int index = 0; index < 12; index++)
+                affected.Add(longName + " (target-" + index + ")");
+            for (int index = 0; index < 8; index++)
+                lines.Add(new EnhancementBudgetLineViewModel(
+                    "enhancement:pool-" + index, longName + " rod " + index, longName,
+                    "Named Spell", 3, 40 + index, 3, 37 + index, 0, "Short", affected));
+            string summary = EnhancementBudgetModel.SummaryText(lines, "short");
+            if (string.IsNullOrEmpty(summary) ||
+                summary.Length > EnhancementBudgetModel.MaximumSummaryLength)
+                throw new InvalidOperationException(
+                    "The sticky summary exceeded its renderable bound: " + summary.Length);
+            var pathological = new CastEnhancementSnapshot(
+                "rod-long", "felix", "long-guid", longName + " Metamagic Rod",
+                string.Empty, CastEnhancementCategory.MetamagicRod, 4, 3, 1, null, "Quicken");
+            string note = EnhancementBudgetModel.ChoiceNote(pathological, true, lines,
+                null, null, "short", "source-long", null);
+            if (note.Length > EnhancementBudgetModel.MaximumNoteLength)
+                throw new InvalidOperationException(
+                    "A row note exceeded its renderable bound: " + note.Length);
+            // Full pool detail is NOT lost by the bounds: the choice
+            // description (the row tooltip) carries the whole line text.
+            AbilityKey boundedAbility = Ability("bounded-spell", string.Empty, 0);
+            var boundedPool = new ResourcePoolSnapshot("bounded-slots",
+                ResourcePoolKind.SpontaneousLevel, 8, 8, null);
+            ProviderSnapshot boundedProvider = PlannerProvider("felix", "bounded-book",
+                boundedAbility, boundedPool.PoolKey, 1);
+            var boundedRod = new CastEnhancementSnapshot("rod-bounded", "felix",
+                "bounded-rod", "Bounded Quicken Rod", string.Empty,
+                CastEnhancementCategory.MetamagicRod, 4, 3, 3, null, "Quicken");
+            PartyProviderSnapshot boundedSnapshot = PlannerSnapshot(
+                new[] { boundedProvider }, new[] { boundedPool }, "felix", "t1");
+            var boundedOption = new ProviderPlanningOption(boundedProvider,
+                new[] { "felix", "t1" }, new[] { "felix", "t1" }, 4, 40);
+            var boundedEffects = new Dictionary<string, EffectExpression>
+            {
+                { boundedAbility.Canonical, Leaf("bounded-buff") }
+            };
+            BuffPlannerProfile boundedProfile = BuffPlannerProfile.CreateDefault("bounded");
+            boundedProfile.Routines.First(routine => routine.RoutineId == "short")
+                .Assignments.Add(Assignment(boundedAbility.Canonical, boundedAbility,
+                    new[] { "t1" }, new[] { "rod-bounded" }));
+            RoutinePlanResult boundedPreview = new RoutinePlanService().Plan(
+                boundedProfile, "short", boundedSnapshot, new ActiveEffectSnapshot(null),
+                boundedEffects, new[] { boundedOption }, new[] { boundedRod });
+            var boundedModel = new PlannerSetupModel(boundedProfile, boundedSnapshot,
+                new ActiveEffectSnapshot(null), boundedEffects, new[] { boundedOption },
+                ignored => { }, new[] { boundedRod });
+            EnhancementChoiceViewModel boundedChoice = SelectedCastingViewModel.Create(
+                boundedModel.SelectedSource, boundedModel, "short", boundedPreview)
+                .Choices.Single(candidate => candidate.EnhancementId == "rod-bounded");
+            if (boundedChoice.Description.IndexOf("projected after Short",
+                    StringComparison.Ordinal) < 0)
+                throw new InvalidOperationException(
+                    "The bounded summary dropped the full detail from the tooltip: " +
+                    boundedChoice.Description);
         }
 
         // P5 reproducer: unnamed extended metamagic masks never reach player

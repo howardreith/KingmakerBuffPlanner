@@ -706,7 +706,9 @@ namespace KingmakerBuffPlanner.UI
             _plan.color = theme.BurgundyPrimary;
             _plan.horizontalOverflow = HorizontalWrapMode.Wrap;
             _plan.verticalOverflow = VerticalWrapMode.Overflow;
-            KingmakerUiFactory.SetAnchors(_plan.rectTransform, 0.435f, 0.03f, 0.975f, 0.31f);
+            // Column-aligned with the target strip so the Edit Assignments
+            // action below never overlaps the plan text rectangle.
+            KingmakerUiFactory.SetAnchors(_plan.rectTransform, 0.435f, 0.03f, 0.84f, 0.31f);
         }
 
         internal RectTransform Root { get; private set; }
@@ -922,7 +924,7 @@ namespace KingmakerBuffPlanner.UI
                     : (selected ? "SELECTED | " : string.Empty);
                 if (selected && selectedRow < 0) selectedRow = rowIndex;
                 string policy = _assignmentId != null && selected
-                    ? (assignmentRequired ? " | required" : " | optional")
+                    ? " | " + choice.PolicyCaption
                     : string.Empty;
                 // The per-choice budget note is plan-derived (never a second
                 // counter): current pool allocation and this selection's
@@ -937,7 +939,9 @@ namespace KingmakerBuffPlanner.UI
                     button = KingmakerUiFactory.CreateButton("EnhancementChoice", _content,
                         _theme, text, () =>
                         {
-                            if (!choice.Available) return;
+                            // Adding needs availability; removing a configured
+                            // selection never does.
+                            if (!choice.CanSelect && !choice.CanDeselect) return;
                             _select(choice.EnhancementId);
                         });
                     KingmakerUiFactory.AddLayout((RectTransform)button.transform,
@@ -954,7 +958,7 @@ namespace KingmakerBuffPlanner.UI
                     button = KingmakerUiFactory.CreateButton("EnhancementChoice", container,
                         _theme, text, () =>
                         {
-                            if (!choice.Available) return;
+                            if (!choice.CanSelect && !choice.CanDeselect) return;
                             if (_assignmentSelect != null)
                                 _assignmentSelect(_assignmentSourceId, _assignmentId,
                                     choice.EnhancementId);
@@ -964,23 +968,26 @@ namespace KingmakerBuffPlanner.UI
                     if (selected && _assignmentPolicy != null)
                     {
                         bool requiredSnapshot = assignmentRequired;
-                        // A targeting modifier cannot be safely omissible: the
-                        // planner never drops it, so an optional policy would
-                        // promise something the plan cannot honor.
-                        bool canToggle = !choice.AffectsTargeting;
+                        string captionSnapshot = choice.PolicyCaption;
+                        // The caption states the actual policy and targeting
+                        // semantics; a targeting modifier cannot present
+                        // itself as optional because the planner never drops
+                        // it. Only non-targeting selections toggle.
                         Button policyToggle = KingmakerUiFactory.CreateButton(
                             "Policy." + choice.EnhancementId, container, _theme,
-                            "REQUIRED (targeting)", () =>
+                            captionSnapshot, () =>
                             {
-                                if (!canToggle) return;
+                                if (!choice.CanTogglePolicy) return;
                                 _assignmentPolicy(_assignmentSourceId, _assignmentId,
                                     choice.EnhancementId, !requiredSnapshot);
                             });
                         KingmakerUiFactory.SetAnchors((RectTransform)policyToggle.transform,
                             0.845f, 0.05f, 0.995f, 0.95f);
-                        policyToggle.interactable = canToggle;
+                        policyToggle.interactable = choice.CanTogglePolicy;
                         Text policyLabel = policyToggle.GetComponentInChildren<Text>(true);
                         if (policyLabel != null) policyLabel.fontSize = 10;
+                        KingmakerUiFactory.FitButtonToCaption(
+                            (RectTransform)policyToggle.transform, 110f, 30f);
                     }
                     _rows.Add(container.gameObject);
                 }
@@ -992,7 +999,10 @@ namespace KingmakerBuffPlanner.UI
                 label.resizeTextMaxSize = 16;
                 if (selected)
                     button.image.color = _theme.GreenSuccess;
-                button.interactable = choice.Available;
+                // Selected rows stay clickable so an exhausted or vanished
+                // selection can be removed individually; unavailable
+                // unselected rows remain inert.
+                button.interactable = choice.CanSelect || choice.CanDeselect;
                 PlannerHoverTooltip tooltip = button.gameObject.AddComponent<PlannerHoverTooltip>();
                 tooltip.Text = choice.Description;
                 tooltip.Show = _showTooltip;

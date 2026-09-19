@@ -223,7 +223,8 @@ namespace KingmakerBuffPlanner.UI
         internal EnhancementChoiceViewModel(string enhancementId, string title, string summary,
             string description, bool selected, bool available,
             bool checkboxStyle = false, bool affectsTargeting = false,
-            string budgetNote = null)
+            string budgetNote = null, bool canSelect = true, bool canDeselect = true,
+            string policyCaption = null, bool canTogglePolicy = false)
         {
             EnhancementId = enhancementId ?? string.Empty;
             Title = title ?? string.Empty;
@@ -234,6 +235,13 @@ namespace KingmakerBuffPlanner.UI
             CheckboxStyle = checkboxStyle;
             AffectsTargeting = affectsTargeting;
             BudgetNote = budgetNote ?? string.Empty;
+            // Adding requires current availability; removing a configured
+            // selection never does — an exhausted or vanished enhancement
+            // must stay individually removable.
+            CanSelect = canSelect && available;
+            CanDeselect = canDeselect && selected;
+            PolicyCaption = policyCaption ?? string.Empty;
+            CanTogglePolicy = canTogglePolicy;
         }
 
         public string EnhancementId { get; private set; }
@@ -245,6 +253,10 @@ namespace KingmakerBuffPlanner.UI
         public bool CheckboxStyle { get; private set; }
         public bool AffectsTargeting { get; private set; }
         public string BudgetNote { get; private set; }
+        public bool CanSelect { get; private set; }
+        public bool CanDeselect { get; private set; }
+        public string PolicyCaption { get; private set; }
+        public bool CanTogglePolicy { get; private set; }
     }
 
     // One routine-level budget line per shared enhancement usage pool, built
@@ -345,20 +357,192 @@ namespace KingmakerBuffPlanner.UI
             return lines;
         }
 
-        // Chooser/card summary block: every scarce pool with any configured
-        // demand in the active routine, each on its own line.
+        // Chooser sticky-summary budget: compact and length-bounded so any
+        // number of pools and any name lengths stay renderable in the fixed
+        // summary area. Full per-pool detail lives on each row's tooltip and
+        // in Assignments & Resources; it is never silently truncated away.
         public static string SummaryText(IReadOnlyList<EnhancementBudgetLineViewModel> lines,
             string routineId)
         {
             List<EnhancementBudgetLineViewModel> demanded = (lines ?? new EnhancementBudgetLineViewModel[0])
                 .Where(line => line.RequestedUses != 0 || line.AllocatedUses != 0).ToList();
             if (demanded.Count == 0) return string.Empty;
+            string routineLabel = RoutineLabel(routineId);
             var builder = new System.Text.StringBuilder();
-            builder.Append("Shared enhancement budgets — editing this plan never consumes charges (")
-                .Append(RoutineLabel(routineId)).Append(" is a template; native charges stay game-owned):");
-            foreach (EnhancementBudgetLineViewModel line in demanded)
-                builder.Append("\n").Append(line.Text);
-            return builder.ToString();
+            int worstUnmet = demanded.Max(line => line.UnmetUses);
+            if (worstUnmet == 0)
+            {
+                builder.Append("Shared enhancement budgets (").Append(routineLabel)
+                    .Append("): all requested charges funded across ")
+                    .Append(demanded.Count)
+                    .Append(demanded.Count == 1 ? " pool. Editing never consumes charges." :
+                        " pools. Editing never consumes charges.")
+                    .Append(" Row tooltips and Assignments & Resources carry each pool's detail.");
+            }
+            else
+            {
+                EnhancementBudgetLineViewModel worst = demanded
+                    .Where(line => line.UnmetUses == worstUnmet)
+                    .OrderByDescending(line => line.RequestedUses)
+                    .First();
+                builder.Append("Shared enhancement budgets (").Append(routineLabel)
+                    .Append("): ").Append(demanded.Count)
+                    .Append(demanded.Count == 1 ? " pool with demand; " : " pools with demand; ")
+                    .Append(worst.PoolLabel);
+                if (!string.IsNullOrEmpty(worst.OwnerName))
+                    builder.Append(" — ").Append(worst.OwnerName);
+                builder.Append(" is short ").Append(worst.UnmetUses)
+                    .Append(worst.UnmetUses == 1 ? " charge" : " charges")
+                    .Append(" of ").Append(worst.RequestedUses)
+                    .Append(" requested. Editing never consumes charges.")
+                    .Append(" Row tooltips and Assignments & Resources carry each pool's detail.");
+            }
+            return BoundText(builder.ToString(), MaximumSummaryLength);
+        }
+
+        // Row-level note for one enhancement choice, scoped to one spell (and
+        // one child assignment when the chooser was opened from it). All
+        // counts come from the same production plan; the note distinguishes
+        // requested targets, funded targets, already-active targets, and the
+        // casts/charges actually allocated to this scope.
+        public static string ChoiceNote(CastEnhancementSnapshot enhancement,
+            bool selected, IReadOnlyList<EnhancementBudgetLineViewModel> lines,
+            RoutinePlanResult preview, PlannerSetupModel model, string routineId,
+            string sourceId, string assignmentId)
+        {
+            if (enhancement == null) return string.Empty;
+            var parts = new List<string>();
+            EnhancementBudgetLineViewModel line = LineFor(lines, enhancement.UsagePoolId);
+            if (line != null && (line.RequestedUses != 0 || line.AllocatedUses != 0))
+                parts.Add(line.RoutineLabel + " pool: " + line.RequestedUses +
+                    " requested, " + line.AllocatedUses + " allocated" +
+                    (line.UnmetUses == 0 ? string.Empty : ", " + line.UnmetUses + " unmet"));
+            if (selected && preview != null && model != null &&
+                !string.IsNullOrEmpty(sourceId))
+            {
+                SpellCoverage coverage = SpellCoverage.For(preview, model, routineId,
+                    sourceId, assignmentId, enhancement);
+                parts.Add(coverage.Note);
+            }            else if (enhancement.UsageUnitsPerCast > 0)
+            {
+                parts.Add("selecting reserves " + enhancement.UsageUnitsPerCast +
+                    (enhancement.UsageUnitsPerCast == 1 ? " charge" : " charges") +
+                    " per enhanced cast");
+            }
+            return BoundText(string.Join(" | ", parts.ToArray()), MaximumNoteLength);
+        }
+
+        // Local accounting for one spell (optionally one child assignment)
+        // against the authoritative plan. Never a parallel allocation rule:
+        // every number is read back out of the plan's own steps/outcomes.
+        internal sealed class SpellCoverage
+        {
+            internal int RequestedTargets;
+            internal int FundedTargets;
+            internal int SkippedTargets;
+            internal int AllocatedCasts;
+            internal int AllocatedCharges;
+            internal bool Communal;
+            internal string ScopeLabel = "this spell";
+
+            internal string Note
+            {
+                get
+                {
+                    var builder = new System.Text.StringBuilder();
+                    if (Communal)
+                    {
+                        builder.Append(ScopeLabel).Append(": ")
+                            .Append(AllocatedCasts)
+                            .Append(AllocatedCasts == 1 ? " communal cast covers its targets"
+                                : " communal casts cover their targets")
+                            .Append(" (").Append(AllocatedCharges)
+                            .Append(AllocatedCharges == 1 ? " charge" : " charges")
+                            .Append(" allocated)");
+                    }
+                    else
+                    {
+                        builder.Append(ScopeLabel).Append(": ")
+                            .Append(FundedTargets).Append("/")
+                            .Append(RequestedTargets).Append(" targets funded")
+                            .Append(" (").Append(AllocatedCharges)
+                            .Append(AllocatedCharges == 1 ? " charge" : " charges")
+                            .Append(" allocated)");
+                    }
+                    if (SkippedTargets != 0)
+                        builder.Append("; ").Append(SkippedTargets).Append(" already active");
+                    return builder.ToString();
+                }
+            }
+
+            internal static SpellCoverage For(RoutinePlanResult preview,
+                PlannerSetupModel model, string routineId, string sourceId,
+                string assignmentId, CastEnhancementSnapshot enhancement)
+            {
+                var coverage = new SpellCoverage();
+                coverage.ScopeLabel = string.IsNullOrEmpty(assignmentId)
+                    ? "this spell" : "this assignment";
+                // Saved assignments may key on the ability's canonical id
+                // while the catalog row exposes the aggregate id; both refer
+                // to this spell, so coverage matches either identity.
+                var sourceKeys = new HashSet<string>(StringComparer.Ordinal);
+                if (!string.IsNullOrEmpty(sourceId)) sourceKeys.Add(sourceId);
+                SetupSourceRow row = string.IsNullOrEmpty(sourceId) ? null :
+                    model.Sources.FirstOrDefault(item =>
+                        string.Equals(item.SourceId, sourceId, StringComparison.Ordinal));
+                if (row != null)
+                    foreach (AbilityKey key in row.Abilities)
+                        sourceKeys.Add(key.Canonical);
+                RoutineProfile routine = model.Profile.Routines.FirstOrDefault(item =>
+                    item.RoutineId == routineId);
+                if (routine == null) return coverage;
+                var requestingTargets = new HashSet<string>(StringComparer.Ordinal);
+                foreach (SourceAssignmentProfile assignment in routine.Assignments)
+                {
+                    if (!sourceKeys.Contains(assignment.SourceId))
+                        continue;
+                    foreach (CastingAssignmentProfile casting in assignment.CastingAssignments)
+                    {
+                        if (!string.IsNullOrEmpty(assignmentId) &&
+                            casting.AssignmentId != assignmentId) continue;
+                        if (!casting.Enhancements.Any(selection =>
+                                selection.EnhancementId == enhancement.EnhancementId)) continue;
+                        foreach (string target in casting.TargetUnitIds)
+                            requestingTargets.Add(target);
+                    }
+                }
+                coverage.RequestedTargets = requestingTargets.Count;
+                var fundedTargets = new HashSet<string>(StringComparer.Ordinal);
+                foreach (CastStep step in preview.Plan.Steps)
+                {
+                    if (!sourceKeys.Contains(step.SourceId))
+                        continue;
+                    if (!string.IsNullOrEmpty(assignmentId) &&
+                        step.AssignmentId != assignmentId) continue;
+                    if (!step.EnhancementIds.Contains(enhancement.EnhancementId)) continue;
+                    coverage.AllocatedCasts++;
+                    int charges;
+                    if (step.EnhancementUsageByPool.TryGetValue(
+                            enhancement.UsagePoolId, out charges))
+                        coverage.AllocatedCharges += charges;
+                    if (step.MassCast) coverage.Communal = true;
+                    foreach (string recipient in step.ExpectedRecipientUnitIds)
+                        if (requestingTargets.Contains(recipient))
+                            fundedTargets.Add(recipient);
+                }
+                coverage.FundedTargets = fundedTargets.Count;
+                foreach (TargetPlanOutcome outcome in preview.Plan.Outcomes)
+                {
+                    if (!sourceKeys.Contains(outcome.SourceId))
+                        continue;
+                    if (!string.IsNullOrEmpty(assignmentId) &&
+                        outcome.AssignmentId != assignmentId) continue;
+                    if (!requestingTargets.Contains(outcome.UnitId)) continue;
+                    if (outcome.Kind == TargetOutcomeKind.SkippedAlreadyActive)
+                        coverage.SkippedTargets++;
+                }
+                return coverage;
+            }
         }
 
         public static EnhancementBudgetLineViewModel LineFor(
@@ -370,67 +554,17 @@ namespace KingmakerBuffPlanner.UI
                 StringComparison.Ordinal));
         }
 
-        // Row-level note for one enhancement choice. Selected rows add this
-        // assignment's own coverage; unselected rows state the pool's current
-        // plan state plus the per-cast charge this selection would reserve —
-        // impact previews come from the production planner only.
-        public static string ChoiceNote(CastEnhancementSnapshot enhancement,
-            bool selected, IReadOnlyList<EnhancementBudgetLineViewModel> lines,
-            RoutinePlanResult preview, PlannerSetupModel model, string routineId,
-            string assignmentId)
-        {
-            if (enhancement == null) return string.Empty;
-            var parts = new List<string>();
-            EnhancementBudgetLineViewModel line = LineFor(lines, enhancement.UsagePoolId);
-            if (line != null && (line.RequestedUses != 0 || line.AllocatedUses != 0))
-                parts.Add(line.RoutineLabel + " pool: " + line.RequestedUses +
-                    " requested, " + line.AllocatedUses + " allocated" +
-                    (line.UnmetUses == 0 ? string.Empty : ", " + line.UnmetUses + " unmet"));
-            if (selected && preview != null && model != null)
-            {
-                int allocated;
-                int requested;
-                AssignmentCoverage(preview, model, routineId, enhancement.EnhancementId,
-                    assignmentId, out allocated, out requested);
-                parts.Add("this " + (string.IsNullOrEmpty(assignmentId) ? "spell" : "assignment") +
-                    ": " + allocated + " allocated / " + requested + " requested");
-            }
-            else if (enhancement.UsageUnitsPerCast > 0)
-            {
-                parts.Add("selecting reserves " + enhancement.UsageUnitsPerCast +
-                    (enhancement.UsageUnitsPerCast == 1 ? " charge" : " charges") +
-                    " per enhanced cast");
-            }
-            return string.Join(" | ", parts.ToArray());
-        }
+        // Presentation-length bounds (C3): the sticky summary and the row
+        // note must stay renderable inside their fixed areas regardless of
+        // pool count or name lengths. Full unbounded detail always remains
+        // available on the row tooltip and in Assignments & Resources.
+        internal const int MaximumSummaryLength = 300;
+        internal const int MaximumNoteLength = 160;
 
-        private static void AssignmentCoverage(RoutinePlanResult preview,
-            PlannerSetupModel model, string routineId, string enhancementId,
-            string assignmentId, out int allocatedCasts, out int requestedTargets)
+        internal static string BoundText(string value, int maximum)
         {
-            allocatedCasts = 0;
-            requestedTargets = 0;
-            RoutineProfile routine = model.Profile.Routines.FirstOrDefault(item =>
-                item.RoutineId == routineId);
-            if (routine == null) return;
-            foreach (SourceAssignmentProfile assignment in routine.Assignments)
-            {
-                foreach (CastingAssignmentProfile casting in assignment.CastingAssignments)
-                {
-                    if (!string.IsNullOrEmpty(assignmentId) &&
-                        casting.AssignmentId != assignmentId) continue;
-                    if (!casting.Enhancements.Any(selection =>
-                            selection.EnhancementId == enhancementId)) continue;
-                    requestedTargets += casting.TargetUnitIds.Count;
-                }
-            }
-            foreach (CastStep step in preview.Plan.Steps)
-            {
-                if (!step.EnhancementIds.Contains(enhancementId)) continue;
-                if (!string.IsNullOrEmpty(assignmentId) && step.AssignmentId != assignmentId)
-                    continue;
-                allocatedCasts++;
-            }
+            if (string.IsNullOrEmpty(value) || value.Length <= maximum) return value;
+            return value.Substring(0, Math.Max(0, maximum - 1)) + "…";
         }
 
         private static List<string> BuildAffectedLabels(RoutinePlanResult preview,
@@ -752,15 +886,36 @@ namespace KingmakerBuffPlanner.UI
                     CasterPolicyViewModel.Empty(),
                     new EnhancementBudgetLineViewModel[0], string.Empty, false, null);
 
-            IReadOnlyList<string> selectedIds = model.GetSelectedEnhancementIds(routineId);
-            IReadOnlyList<CastEnhancementSnapshot> applicable = model.GetApplicableEnhancements();
+            // One authoritative selection scope: the Automatic child for the
+            // ordinary chooser, the exact child assignment for the
+            // assignment-aware chooser. Choices, selected state, notes, and
+            // the unavailable loop all read this list — never the Automatic
+            // state when a specific assignment was asked for.
+            IReadOnlyList<string> selectedIds = string.IsNullOrEmpty(assignmentId)
+                ? model.GetSelectedEnhancementIds(routineId)
+                : model.GetAssignmentEnhancementIds(routineId, source.SourceId,
+                    assignmentId);
+            Dictionary<string, bool> requiredBySelection =
+                SelectionPolicies(model, routineId, source.SourceId, assignmentId);
+            IReadOnlyList<CastEnhancementSnapshot> applicable =
+                model.GetApplicableEnhancements();
             IReadOnlyList<EnhancementBudgetLineViewModel> budgetLines =
                 EnhancementBudgetModel.Lines(preview, model, routineId);
             var choices = new List<EnhancementChoiceViewModel> {
                 NoneChoice(selectedIds.Count == 0) };
-            choices.AddRange(applicable.Select(value => Choice(value,
-                selectedIds.Contains(value.EnhancementId), true, model, routineId,
-                preview, budgetLines, assignmentId)));
+            choices.AddRange(applicable.Select(value =>
+            {
+                bool selected = selectedIds.Contains(value.EnhancementId);
+                return Choice(value, selected,
+                    // Assignment scope: a choice is offered as available only
+                    // when THIS child's own providers qualify for it, not the
+                    // source-wide union.
+                    string.IsNullOrEmpty(assignmentId) ||
+                        IsApplicableToAssignment(value, model, source, routineId,
+                            assignmentId),
+                    model, routineId, preview, budgetLines, source.SourceId,
+                    assignmentId, requiredBySelection);
+            }));
             foreach (string unavailableId in selectedIds.Where(id =>
                 !applicable.Any(value => value.EnhancementId == id)))
             {
@@ -769,10 +924,13 @@ namespace KingmakerBuffPlanner.UI
                 choices.Add(selected == null
                     ? new EnhancementChoiceViewModel(unavailableId,
                         "Unavailable enhancement", "Unavailable",
-                        "Persisted enhancement source: " + unavailableId,
-                        true, false)
+                        "Persisted enhancement source: " + unavailableId +
+                        ". Click to remove this persisted selection.",
+                        true, false, false, false, string.Empty,
+                        false, true)
                     : Choice(selected, true, false, model, routineId,
-                        preview, budgetLines, assignmentId));
+                        preview, budgetLines, source.SourceId,
+                        assignmentId, requiredBySelection));
             }
 
             CasterPolicyViewModel casterPolicy = CasterPolicyViewModel.Create(
@@ -806,6 +964,45 @@ namespace KingmakerBuffPlanner.UI
                 warning, assignmentId);
         }
 
+        private static Dictionary<string, bool> SelectionPolicies(
+            PlannerSetupModel model, string routineId, string sourceId, string assignmentId)
+        {
+            var policies = new Dictionary<string, bool>(StringComparer.Ordinal);
+            RoutineProfile routine = model.Profile.Routines.FirstOrDefault(item =>
+                item.RoutineId == routineId);
+            if (routine == null) return policies;
+            foreach (SourceAssignmentProfile assignment in routine.Assignments)
+            {
+                if (!string.Equals(assignment.SourceId, sourceId, StringComparison.Ordinal))
+                    continue;
+                foreach (CastingAssignmentProfile casting in assignment.CastingAssignments)
+                {
+                    if (!string.IsNullOrEmpty(assignmentId) &&
+                        casting.AssignmentId != assignmentId) continue;
+                    foreach (EnhancementSelectionProfile selection in casting.Enhancements)
+                        policies[selection.EnhancementId] =
+                            selection.Required == null || selection.Required.Value;
+                }
+            }
+            return policies;
+        }
+
+        // Availability for one child assignment: the enhancement must be
+        // applicable to at least one provider that THIS assignment's own
+        // pins/targeting resolve to — the same resolver the planner uses.
+        private static bool IsApplicableToAssignment(CastEnhancementSnapshot enhancement,
+            PlannerSetupModel model, SetupSourceRow source, string routineId,
+            string assignmentId)
+        {
+            foreach (AssignmentProviderOption candidate in model.GetAssignmentProviderOptions(
+                    source, routineId))
+                if (string.Equals(candidate.AssignmentId, assignmentId,
+                        StringComparison.Ordinal) &&
+                    enhancement.IsApplicable(candidate.Option.Provider))
+                    return true;
+            return false;
+        }
+
         private static EnhancementChoiceViewModel NoneChoice(bool selected)
         {
             return new EnhancementChoiceViewModel(string.Empty, "None", "Unenhanced cast",
@@ -815,7 +1012,8 @@ namespace KingmakerBuffPlanner.UI
         private static EnhancementChoiceViewModel Choice(CastEnhancementSnapshot value,
             bool selected, bool available, PlannerSetupModel model, string routineId,
             RoutinePlanResult preview,
-            IReadOnlyList<EnhancementBudgetLineViewModel> budgetLines, string assignmentId)
+            IReadOnlyList<EnhancementBudgetLineViewModel> budgetLines, string sourceId,
+            string assignmentId, Dictionary<string, bool> requiredBySelection)
         {
             string uses = value.RemainingUses == null ? "Uses not limited" :
                 value.RemainingUses.Value + (value.RemainingUses.Value == 1 ? " use" : " uses");
@@ -835,10 +1033,23 @@ namespace KingmakerBuffPlanner.UI
                 description += "\n" + line.Text;
             if (!available) description = "Unavailable: " + description;
             string budgetNote = EnhancementBudgetModel.ChoiceNote(value, selected,
-                budgetLines, preview, model, routineId, assignmentId);
+                budgetLines, preview, model, routineId, sourceId, assignmentId);
+            // Policy caption honesty: a targeting modifier can never be
+            // optional (the planner never drops it), so it states that;
+            // everything else states its actual required/optional policy and
+            // may toggle when an assignment scope is editing it.
+            bool required;
+            if (!requiredBySelection.TryGetValue(value.EnhancementId, out required))
+                required = true;
+            string policyCaption = value.AffectsTargeting
+                ? "REQUIRED (targeting)"
+                : (required ? "REQUIRED" : "OPTIONAL");
+            bool canTogglePolicy = !string.IsNullOrEmpty(assignmentId) && selected &&
+                !value.AffectsTargeting;
             return new EnhancementChoiceViewModel(value.EnhancementId, value.DisplayName,
                 summary, description, selected, available,
-                value.AffectsTargeting, value.AffectsTargeting, budgetNote);
+                value.AffectsTargeting, value.AffectsTargeting, budgetNote,
+                true, true, policyCaption, canTogglePolicy);
         }
 
     }
