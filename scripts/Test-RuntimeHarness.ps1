@@ -505,6 +505,32 @@ try {
     }
     $passed++
 
+    # N-live-1: a COMPLETED fixture transaction in the fixture state root
+    # must never block the deployment guard's scan, and fixture state must
+    # default OUTSIDE the deployment state root entirely.
+    $deploymentStateRoot = Join-Path $root 'deployment-state'
+    $lab3 = Split-Path -Parent (Split-Path -Parent $repo)
+    if ((Join-Path $lab3 'runtime-fixture-state') -eq
+        (Join-Path $lab3 'runtime-state')) {
+        throw 'Fixture state root collides with the deployment state root.'
+    }
+    # Simulate the exact production integration: a completed fixture
+    # transaction sitting in its own root while a deployment scan runs.
+    New-Item -ItemType Directory -Path (Join-Path $deploymentStateRoot 'fixture-run') -Force | Out-Null
+    Write-KbpJsonAtomic (Join-Path $deploymentStateRoot 'fixture-run\transaction.json') ([ordered]@{
+        schemaVersion = 1; runId = 'fixture-run'; token = 'tok'
+        status = 'Completed'
+    })
+    # The deployment guard scans only ITS state root; a completed fixture
+    # transaction under a fixture root is invisible to it, and the guard
+    # finds no unresolved deployment transaction.
+    $scan = @(Get-ChildItem -LiteralPath $deploymentStateRoot -Filter 'transaction.json' -File -Recurse |
+        Where-Object { (Read-KbpJson $_.FullName).status -cne 'Completed' })
+    if (@($scan).Count -ne 0) {
+        throw 'A completed fixture transaction was treated as unresolved deployment state.'
+    }
+    $passed++
+
     # Missing seed refuses; nothing created.
     $emptyRoot = Join-Path $root 'saves-empty'
     New-Item -ItemType Directory -Path $emptyRoot | Out-Null

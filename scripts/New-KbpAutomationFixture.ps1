@@ -59,7 +59,12 @@ if ([string]::IsNullOrWhiteSpace($ArchiveRoot)) {
     $ArchiveRoot = Join-Path $lab ("runtime-backups\automation-fixture\" + $RunId)
 }
 if ([string]::IsNullOrWhiteSpace($StateRoot)) {
-    $StateRoot = Join-Path $lab 'runtime-state\automation-fixture'
+    # Fixture lifecycle state lives in its OWN root, distinct from the
+    # deployment transaction state root the runtime harness guards: a
+    # completed fixture transaction must never appear in (or block) a
+    # deployment scan, and a deployment lock must never be mistaken for
+    # fixture activity.
+    $StateRoot = Join-Path $lab 'runtime-fixture-state'
 }
 $lockPath = Join-Path $StateRoot 'fixture.lock'
 $runRoot = Join-Path $StateRoot $RunId
