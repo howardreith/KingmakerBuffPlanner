@@ -1,82 +1,79 @@
-# Kingmaker Buff Planner 0.1.0 — Draft Release Notes
+# Kingmaker Buff Planner 0.1.1-rc1 — Testing Preview
 
-## Precise casting assignments
+**This is a testing preview for the owner's inspection, not a stable release.**
+No automated candidate gameplay session has yet completed on this machine:
+guarded launches staged and restored the mod correctly, but the automated
+environment could not finish loading the disposable campaign save (see
+Known Limitations). Source, build, package, and migration gates all pass;
+the newest feature work is documented below and exercised by 172 protocol
+tests and 27 harness tests through production callers.
 
-One catalog entry can now hold several casting assignments. Each child
-assignment has its own stable identity, an explicit position in the routine's
-casting order, a pinned or automatic caster (with optional spellbook or exact
-provider constraints), its own ordered target list, and its own enhancement
-selections with a required-by-default policy and an explicit "cast without
-this enhancement when unavailable" opt-in. Pins are hard constraints: an
-unavailable pinned caster stays visible and unresolved instead of silently
-falling back to another caster.
+## What you can try
 
-Example: Leinna casts Echolocation on herself unenhanced while Felix casts it
-on himself unenhanced and on Tias and Raine through Share Transmutation —
-four casts from one catalog entry, with Share charged only for the two
-configured non-self casts.
+- **Precise casting assignments.** One buff can hold several casting
+  assignments, each with its own caster pin, explicit targets, and
+  enhancements — for example Leinna self-cast, Felix self-cast, and Felix
+  casting on Tias and Raine through Share, all from one catalog entry.
+  Pins are hard constraints: an unavailable pinned caster stays visible and
+  unresolved instead of silently switching casters.
+- **Casting Order & Resources.** The header's Order button opens numbered
+  assignments with Earlier/Later, per-target remove/move/split, a
+  per-assignment target picker, caster cycling, per-assignment enhancement
+  selection with required/optional policy, resolved providers/recipients,
+  per-pool accounting (available/requested/allocated/unmet/forecast), and
+  an explicit combined forecast that carries balances across routines in
+  the order you select.
+- **Honest partial application.** Apply (and the HUD quick-run) refuse to
+  run only part of an incomplete routine and report the gap; an explicit
+  "APPLY READY ONLY" control runs the ready subset and reports unmet
+  requests.
+- **Overflow repair.** Enhancement and caster-policy choosers scroll
+  correctly with a visible scrollbar; the last option is reachable and the
+  position survives toggles.
+- **Spellbook entry (preview).** An owned Buff Planner button appears in
+  the spellbook and hands off to the planner through the game's own close
+  flow with bounded waits and rollback.
 
-## One authoritative allocation result
+## Exact tests performed
 
-The planner now allocates strictly in the explicit assignment order — catalog
-sorting, filtering, and reopening cannot change it — and produces one
-per-pool accounting line (available now, requested, allocated, unmet, forecast
-remaining) with traces back to the assignments that demanded them. The
-canonical shortage is reported exactly: nine enhanced casts against three
-charges show requested 9 / available 3 / allocated 3 / unmet 6, with the first
-three explicit targets funded.
+- Source validation 42/42; protocol tests 172/172 (mixed-caster routing,
+  shortage accounting 9/3/3/6, child-aware targeting, sibling-safe moves,
+  prepared-token forecast consumption, justified-only effect projection,
+  caster-identity projection, unsupported-request coverage, review
+  acknowledgment orchestration, migration round-trips, unresolvable-request
+  protection); runtime harness filesystem tests 27/27 (fixture bootstrap/
+  recovery/teardown safety, write-ahead publication windows, WhatIf purity);
+  package validation 4/4; deployment WhatIf purity 5/5; guarded publisher
+  gate tests 3/3; deterministic Release build reproduced twice.
+- Guarded runtime launches staged and restored the live Mods tree exactly;
+  save-load automation did not complete (disclosed below).
 
-## Casting Order and Resource Usage view
+## Known limitations
 
-A new Order button in the planner header opens the casting-order surface:
-numbered assignments with Earlier/Later controls, resolved caster and pin
-status, per-pool resource lines with competing configured demand from the
-other routines, and a read-only combined forecast that carries balances
-forward across one occurrence of each selected routine in the selected order
-with its assumptions stated.
+- **No automated gameplay acceptance yet.** The disposable campaign save
+  references blueprints provided by several installed mods; loading it
+  under the harness's minimal mod configuration fails inside the game's
+  load routine, and booting the full installed mod set inside the
+  automated environment did not finish within the harness windows. Your
+  own installation loads the save (you verified this manually). Manual
+  testing in your normal setup is therefore the acceptance path for this
+  preview.
+- **Spellbook return is one-way for now:** closing the planner returns to
+  normal gameplay, not to the exact spellbook character/page you opened
+  from. Reopening the spellbook manually is required.
+- **Rod selection is pooled per caster:** "any matching rod for the
+  original caster". The installed game exposes no qualified durable
+  identity for one specific physical rod, so choosing between two
+  otherwise identical rods is not offered.
+- Theme borrows native parchment/button artwork where the running game
+  provides it and falls back to readable parchment styling elsewhere;
+  fallback styling is not verified native artwork.
 
-## Explicit partial application
+## Installation and rollback
 
-Default Apply — and the HUD quick-run, which shares the same gate — refuses to
-run only part of an incomplete routine. The refusal reports requested
-coverage, planned casts, already-active skips, and unmet reasons. A dedicated
-Apply Ready Casts Only control appears exactly while the routine is incomplete
-and is the only way to run the ready subset.
-
-## Spellbook entry (experimental)
-
-An owned Buff Planner button attaches to the native spellbook window and
-hands off into the planner through the spellbook's own close affordance with
-a bounded wait and rollback. The HUD controls and hotkey are unchanged.
-Rendered placement and the return-to-spellbook trip are still being qualified
-and may change.
-
-## Schema 5 migration
-
-Profiles migrate losslessly from schema 4: each existing source becomes one
-legacy-equivalent automatic assignment with the same targets, enhancements,
-effect policy, and former allocation order. The exact pre-migration original
-is archived once outside the rotating backup chain, migration is idempotent,
-and a failed migration never overwrites the original. Configured intent is
-never silently pruned when casters, items, or enhancements become
-unavailable; it stays visible, diagnosable, and removable.
-
-## Repairs
-
-- Enhancement and caster-policy chooser overflow: content height now has a
-  single measured owner, a native-styled scrollbar is wired, the final option
-  is reachable by wheel and drag, and the scroll position survives toggle
-  refreshes.
-- Theme foundation: parchment/button/text/input/scrollbar/ornament/sound
-  capabilities resolve independently with bounded recovery and readable
-  fallbacks; full-state native button borrowing only when the donor supplies
-  every state.
-
-## Qualification status
-
-Source validation 42/42, protocol tests 159/159, runtime harness filesystem
-8/8, package validation 4/4, deployment WhatIf purity 5/5, deterministic
-Release build PASS. Save-backed live qualification is BLOCKED: the authorized
-`KBP_AUTOMATION_BASELINE`/`KBP_AUTOMATION_WORKING` fixture pair is absent from
-this machine. Rendered spellbook placement, live theme qualification, exact
-rod-instance identity, and live visual acceptance are explicitly unclaimed.
+Install the ZIP through Unity Mod Manager (Pathfinder: Kingmaker). The
+previous release remains available on the releases page; to roll back,
+install the older ZIP again. Profiles migrate automatically on first load
+and keep an archived copy of the pre-migration file next to the profile;
+restoring an older DLL does not un-migrate a profile — use the archived
+original if you need the old format back.

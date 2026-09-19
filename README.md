@@ -1,6 +1,6 @@
 # Kingmaker Buff Planner
 
-**Release:** `0.1.0` adds precise casting assignments (pinned casters, explicit
+**Release:** `0.1.1-rc1` (testing preview) adds precise casting assignments (pinned casters, explicit
 targets and enhancements per assignment), one authoritative resource
 allocation result with a Casting Order view, explicit partial-apply control,
 a spellbook entry button, and an overflow-free enhancement chooser. Profiles

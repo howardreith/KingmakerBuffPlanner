@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.1.1-rc1 - testing preview
+
+- Testing preview of the precise casting assignments feature set described
+  in 0.1.0 below, plus: per-assignment identity preserved end to end
+  (same provider under different assignments keeps each assignment's
+  effective targeting, in both creation orders), assignment-specific
+  picker legality with resolver-enforced pins, sibling-owned picker
+  refusals that never drop coverage, caster-true forecast projection,
+  complete write-ahead fixture recovery, and the spellbook opener repair
+  (opener invoked after native release, deferred presentation awaited,
+  recovery to a usable interface).
+- Automated gameplay acceptance remains unrun: the disposable save's mod
+  dependencies are absent from the harness's minimal staging, and the full
+  installed mod set does not finish booting inside the automated
+  environment. Manual testing is the acceptance path for this preview.
+
 ## 0.1.0 - precise casting assignments and one allocation result
 
 - Adds schema-5 child casting assignments beneath each catalog source: stable
