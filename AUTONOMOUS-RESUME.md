@@ -31,10 +31,22 @@
 - Gates: source 42/42; protocol 181/181 (three new regressions);
   harness 27/27; Restore-InstallLocal 4/4; package 4/4; WhatIf 5/5;
   publisher gate 3/3; deterministic Release build 2/2.
-- Version 0.1.1-rc3. NEXT: publish the rc3 prerelease through the
-  guarded publisher in a closed-game window, verify the downloaded
-  asset, update PR #1, and hand the five-minute check to the owner.
-  Stable/latest and main stay untouched pending owner review.
+- PUBLISHED: https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.1.1-rc3
+  (non-draft prerelease; v0.0.19 keeps Latest; main unmerged). Asset
+  `KingmakerBuffPlanner-0.1.1-rc3.zip` SHA-256
+  `52ab5d94b77c559ce90bb9742cc4efd05355b6d3ea50ebcbaa42bc5b35bf0313`,
+  re-downloaded and verified (hash + package validation 4/4). Tag
+  `v0.1.1-rc3` == source `2aad5d4` == pushed branch HEAD. PR #1 updated.
+- Local machine: the guarded transaction `rc3-published-install-1`
+  installed the EXACT published rc3 package over the prior local rc2
+  (which had replaced 0.0.19; the 0.0.19 original remains archived
+  under `runtime-backups/install-rc2fix-liveui-3`). Rollback chain:
+  `Restore-InstallLocal.ps1 -InstallId rc3-published-install-1` (back to
+  rc2), then `-InstallId rc2fix-liveui-3` (back to 0.0.19) — each
+  preserves post-install UserSettings profiles. No other mods/saves
+  touched; no locks or unresolved transactions.
+- NEXT: owner runs the rc3 five-minute check and reports. Stable
+  promotion remains merge review + default-branch publish.
 
 ## RC2 product recovery — 2026-09-19 (LATEST; supersedes the rc1 closeout below)
 

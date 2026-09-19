@@ -21,6 +21,11 @@ Mission: `planning/Z-NATIVE-ASSIGNMENTS-MISSION.md`.
   `Test-SourceOnly.ps1`.
 - Gates: source 42/42; protocol 181/181; harness 27/27; rollback 4/4;
   package 4/4; WhatIf 5/5; publisher gate 3/3. Version 0.1.1-rc3.
+- PUBLISHED `KingmakerBuffPlanner-0.1.1-rc3.zip` SHA-256
+  `52ab5d94b77c559ce90bb9742cc4efd05355b6d3ea50ebcbaa42bc5b35bf0313`
+  at source `2aad5d4`; re-downloaded and package-validated. Local Mods
+  now hold the EXACT published rc3 (transaction `rc3-published-install-1`
+  over the rc2/0.0.19 chain, profiles preserved).
 - Live lanes: unchanged (owner sessions blocked the guarded runs;
   source-verified only, disclosed).
 

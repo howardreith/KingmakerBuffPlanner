@@ -1689,3 +1689,20 @@ Status: ROOT CAUSE PROVEN; 0.0.4 SOURCE PASS; LIVE QUALIFICATION PENDING
   separation.
 - Gates: source 42/42, protocol 181/181, harness 27/27, rollback 4/4,
   package 4/4, WhatIf 5/5, publisher gate 3/3. Version 0.1.1-rc3.
+
+# 2026-09-19 - v0.1.1-rc3 published
+
+- Guarded publisher (prerelease, feature-branch switch) at final HEAD
+  `2aad5d4`: source 42/42, protocol 181/181, harness 27/27,
+  Restore-InstallLocal 4/4, WhatIf 5/5, publisher gate 3/3,
+  deterministic Release build 2/2. Tag `v0.1.1-rc3` == HEAD == origin
+  branch head; v0.0.19 keeps Latest; main unmerged.
+- Asset `KingmakerBuffPlanner-0.1.1-rc3.zip` SHA-256
+  `52ab5d94b77c559ce90bb9742cc4efd05355b6d3ea50ebcbaa42bc5b35bf0313`
+  re-downloaded; hash matches; package validation 4/4 on the downloaded
+  copy. One publisher attempt aborted at the running-game guard while
+  the owner played; the retry ran in a closed window.
+- Local Mods now hold the EXACT published rc3 via guarded transaction
+  `rc3-published-install-1` (prior rc2 backed up; 0.0.19 original still
+  archived under the rc2 transaction). Rollback chain documented in
+  AUTONOMOUS-RESUME. PR #1 body/title updated to rc3.
