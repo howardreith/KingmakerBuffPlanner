@@ -503,3 +503,51 @@ casting/resource acceptance remain live-only.
   removed, 87 saves byte-identical, archive preserved). The seed file
   itself remains for replacement.
 - NEXT HUMAN ACTION (smallest): see AUTONOMOUS-RESUME top section.
+
+
+## Seed-2 fixture and load A/B — 2026-09-19 (second session)
+
+- Pre-mutation verification: no Kingmaker process; prior transactions all
+  settled (deployment 2 Restored, fixture 1 Completed); no locks; live
+  Mods = user original (16 dirs, KBP 0.0.19). Replacement seed recorded:
+  `Manual_303_KBP_AUTOMATION_SEED.zks` sha256
+  `2fdce5b62206d51e67ba04b8b497a9bec24b5036f03bfab04974adbcfaff7b8d`,
+  same campaign GameId `df33d1ff-...`, human-verified loading with movement
+  and inventory. UMM enabled state: only CallOfTheWild (true) and
+  KingmakerBuffPlanner (true) have Params.xml entries.
+- Bootstrap-2 PASS (real directory): derived indices 304/305 from actual
+  state; baseline sha256
+  `f13de02d7c59a70a34d335a413f0d90fc7e63cdcb327224ecf5885ed6e1f8300`,
+  working `41a19e0ac196bea6ce1466dacdcd4cd6717b06a1b2b372e8a10e85cdfebcbae5`;
+  all 87 pre-existing saves byte-identical.
+- Load A/B (evidence per run under runtime-evidence/):
+  1. `seed2-first-load-proof-1` (native-only): FAILED — engine
+     `Player.PostLoad` NRE at a DIFFERENT offset (0x00022) than seed-1;
+     same campaign-load-completion timeout class.
+  2. `seed2-load-full-config-1/2` (new full-user profile, all 15 mods):
+     the game boots all mods (log shows every mod initializing) but never
+     completes first-idle-update within 240-420s windows in this
+     environment; harness-owned processes terminated; exact restoration
+     verified after each. Automated full-config lane NOT VIABLE here.
+  3. `seed2-load-cotw-3` (call-of-the-wild): failed a DIFFERENT gate —
+     my RuntimeTestHost counted zero loaded optional mods under UMM 0.33
+     (candidate UMM-0.33 counting defect in the host, independent of the
+     save question). Save-load itself again timed out.
+- FIRST CAUSAL DIFFERENCE (evidence-backed): the save references 1076
+  distinct GUIDs; cross-referencing the installed mod content shows at
+  least 246 are provided by SIX absent-under-native-only mods:
+  CallOfTheWild 106, CraftMagicItems 70, ZFavoredClass 35,
+  KingmakerGunslinger 30, TweakOrTreat 3, BagOfTricks 2
+  (`artifacts/save-mod-dependencies.json`). The Player.PostLoad failure
+  under native-only is consistent with missing save dependencies, NOT an
+  engine-only defect — the earlier "engine-level incompatibility"
+  conclusion for seed-1 is superseded: seed-1's save had the same class
+  of mod references (same campaign).
+- Environment drift handled this session: full-user profile added
+  (15 mods, exact identities, validation PASS); call-of-the-wild profile
+  re-pinned to the installed CallOfTheWild identity; UMM 0.33.0 pin from
+  the prior session.
+- NEXT: (1) fix RuntimeTestHost optional-mod counting under UMM 0.33;
+  (2) seed-dependencies profile staging exactly the six GUID providers
+  and retry the load; (3) if still failing, next factor is UMM
+  enabled-state/overlay handling; then the rendered smoke.
