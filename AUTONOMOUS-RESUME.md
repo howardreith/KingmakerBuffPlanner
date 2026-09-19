@@ -40,13 +40,22 @@
   exactly; fixed in `3625534`. Rendered appearance, visible spellbook
   entry, and in-game budget displays are therefore **source-verified but
   not live-observed**; the release notes disclose this prominently.
-- Candidate: `KingmakerBuffPlanner-0.1.1-rc2.zip` SHA-256
-  `f6aa4de188b08392acecdb04759ca0cebf2ad329732a5d8a014e0ea863981a00`
-  (deterministic 2/2) at `artifacts/release/0.1.1-rc2/`.
-- NEXT: publish v0.1.1-rc2 prerelease through the guarded publisher
-  (authorization continues from rc1), verify the downloaded asset, update
-  PR #1, and hand the five-minute manual check to the owner. Stable/latest
-  and main stay untouched pending owner review.
+- PUBLISHED: https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.1.1-rc2
+  (non-draft prerelease; v0.0.19 keeps the Latest channel; main unmerged).
+  Asset `KingmakerBuffPlanner-0.1.1-rc2.zip` SHA-256
+  `c5f888b91252bfa0dcf4f286a934772c6d15b692e8632b6c30b5db4e85ff649e`,
+  re-downloaded and verified (hash match + package validation 4/4).
+  Tag `v0.1.1-rc2` == source `a30c07e` == pushed branch HEAD. The
+  publisher rebuilt at the final records commit (an earlier deterministic
+  build of the same fixes hashed f6aa4de1...); PR #1 body updated.
+- Local machine state: the guarded install transaction `rc2fix-liveui-3`
+  has rc2 installed over the prior 0.0.19 (backup at
+  `runtime-backups/install-rc2fix-liveui-3`); it is the f6aa build of the
+  same fixes (commit `5d94502`). Restorable via `Restore-Local.ps1 -RunId
+  rc2fix-liveui-3` or by reinstalling the published ZIP. No other mods,
+  saves, or settings were touched; no locks or unresolved transactions.
+- NEXT: owner runs the five-minute check in the release notes and reports;
+  stable promotion remains merge review + default-branch publish.
 
 ## Release closeout — 2026-09-19 (rc1; superseded by the RC2 recovery above)
 

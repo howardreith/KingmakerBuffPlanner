@@ -8,8 +8,9 @@
   designed and nothing was touched. Rendered native appearance, the
   visible spellbook button, and in-game chooser budget displays are
   source-verified only; the owner's five-minute manual check (in the rc2
-  release notes) is the acceptance path. One bounded retry after the game
-  closes is permitted before publishing; do not loop on it.
+  release notes) is the acceptance path. v0.1.1-rc2 was published in a
+  closed-window retry after two owner sessions blocked earlier attempts;
+  the guards refused correctly both times with zero mutations.
 - Actual native charge spending for the scarce-rod case (A7) remains a
   separate untested lane; allocation/reservation behavior is covered by
   deterministic planner tests.

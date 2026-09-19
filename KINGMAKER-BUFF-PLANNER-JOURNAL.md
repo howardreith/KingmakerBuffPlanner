@@ -1648,3 +1648,20 @@ Status: ROOT CAUSE PROVEN; 0.0.4 SOURCE PASS; LIVE QUALIFICATION PENDING
   Rendered appearance, visible spellbook button, and in-game budgets are
   disclosed as source-verified only in the rc2 notes with a five-minute
   owner check; A7 actual charge spending remains untested.
+
+# 2026-09-19 - v0.1.1-rc2 published
+
+- Guarded publisher (prerelease, feature-branch switch): source 42/42,
+  protocol 178/178, harness 27/27, WhatIf 5/5, publisher gate 3/3,
+  deterministic Release build 2/2 at final HEAD `a30c07e`. Tag
+  `v0.1.1-rc2` == HEAD == origin branch head; v0.0.19 keeps Latest; main
+  unmerged. Two earlier publisher attempts aborted at the running-game
+  guard while the owner played; the third ran in a closed window.
+- Asset `KingmakerBuffPlanner-0.1.1-rc2.zip` SHA-256
+  `c5f888b91252bfa0dcf4f286a934772c6d15b692e8632b6c30b5db4e85ff649e`
+  re-downloaded from the release page; hash matches; package validation
+  4/4 on the downloaded copy. Release notes disclose the unverified
+  rendered/live lanes and carry the five-minute owner check.
+- Local machine: guarded install transaction `rc2fix-liveui-3` holds rc2
+  (f6aa build of the same fixes) over the prior 0.0.19 with an exact
+  backup; PR #1 body/title updated to the corrected preview.

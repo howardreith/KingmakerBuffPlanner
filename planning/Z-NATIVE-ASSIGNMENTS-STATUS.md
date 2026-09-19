@@ -43,8 +43,12 @@ Mission: `planning/Z-NATIVE-ASSIGNMENTS-MISSION.md`.
   installed-call-of-the-wild-metamagic-name-contract-is-exact.
 - Gates: source 42/42; protocol 178/178; harness 27/27; package 4/4;
   WhatIf 5/5; publisher gate 3/3; deterministic Release build 2/2.
-  Candidate `KingmakerBuffPlanner-0.1.1-rc2.zip` SHA-256
-  `f6aa4de188b08392acecdb04759ca0cebf2ad329732a5d8a014e0ea863981a00`.
+  PUBLISHED `KingmakerBuffPlanner-0.1.1-rc2.zip` SHA-256
+  `c5f888b91252bfa0dcf4f286a934772c6d15b692e8632b6c30b5db4e85ff649e`
+  (publisher rebuilt at final records HEAD `a30c07e`; re-downloaded and
+  package-validated). An earlier deterministic build of the same fixes
+  (commit `5d94502`) hashed f6aa4de1... and is the copy currently
+  installed locally by transaction `rc2fix-liveui-3`.
 - Runtime lane: guarded install + `live-ui-bootstrap` attempted and
   BLOCKED by an owner-controlled Kingmaker process (PID 1896); guards
   refused with zero mutations (first install attempt also rolled back
