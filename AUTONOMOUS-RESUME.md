@@ -1,4 +1,320 @@
+# AUTONOMOUS-RESUME — top section is current; planning/Z-NATIVE-ASSIGNMENTS-STATUS.md is the per-checkpoint tracker.
+
+## RC3 review-correction pass — 2026-09-19 (LATEST; supersedes the RC2 section below)
+
+- A source review of published rc2 (at `a30c07e`/`c56befa`) confirmed four
+  findings; all are repaired on this branch (fix commit below):
+  - C1 spell-scoped coverage: `EnhancementBudgetModel.SpellCoverage`
+    matches both canonical and aggregate source identities and
+    distinguishes requested/funded/skipped targets, communal casts, and
+    allocated charges; the routine aggregate is never labeled "this
+    spell".
+  - C2 assignment-scoped chooser: `SelectedCastingViewModel.Create` now
+    reads THAT child's selections/policies and per-assignment provider
+    applicability; unavailable selected choices stay individually
+    removable in both scopes (`SetEnhancement` gained the same
+    is-removal bypass `SetAssignmentEnhancement` already had); policy
+    captions are honest (REQUIRED/OPTIONAL vs REQUIRED (targeting)).
+  - C3 bounded detail: sticky summary and row notes are length-bounded
+    (300/160) with full pool detail preserved on tooltips and in
+    Assignments & Resources.
+  - C4 real rollback: new guarded `scripts/Restore-InstallLocal.ps1`
+    (reads `runtime-state/installations/<id>/install.json`, preserves
+    post-install UserSettings edits, archives evidence, refuses
+    non-Installed records; isolated-state tests 4/4 wired into
+    Test-SourceOnly). The rc2 handoff's `Restore-Local.ps1 -RunId ...`
+    command was for the wrong transaction type — corrected everywhere.
+  - Review observations: theme late-donor retry triggers at chooser
+    rebuild boundaries; spellbook button borrows complete native button
+    states fail-soft; plan-summary rect no longer overlaps Edit
+    Assignments.
+- Gates: source 42/42; protocol 181/181 (three new regressions);
+  harness 27/27; Restore-InstallLocal 4/4; package 4/4; WhatIf 5/5;
+  publisher gate 3/3; deterministic Release build 2/2.
+- Version 0.1.1-rc3. NEXT: publish the rc3 prerelease through the
+  guarded publisher in a closed-game window, verify the downloaded
+  asset, update PR #1, and hand the five-minute check to the owner.
+  Stable/latest and main stay untouched pending owner review.
+
+## RC2 product recovery — 2026-09-19 (LATEST; supersedes the rc1 closeout below)
+
+- Owner acceptance of v0.1.1-rc1 FAILED (flat panels, no spellbook button,
+  chooser showed per-spell `3 uses` and numeric metamagic labels such as
+  `268435456 Spell`). The live Mods folder holds 0.0.19 — the owner rolled
+  back to stable after testing rc1.
+- Root causes found in the rc1 source and repaired on
+  `codex/kingmaker-buff-planner-z-native-assignments` (fix commit `ab155c2`,
+  version bump `5d94502`, installer guard `3625534`):
+  - P1 theme lookup resolved `ServiceWindow/...` donors from the planner's
+    own overlay root (guaranteed failure); donors now resolve from the
+    StaticCanvas while application stays owned-scope.
+  - P2 paper reached only three direct child names (the nested
+    `EnhancementChooser/EnhancementChooserFrame` never matched); owned
+    surfaces are now registered explicitly, fallback tints/outlines yield,
+    and missing capabilities get a bounded retry.
+  - P3 spellbook button: exact-path + tolerant bounded-scan locator
+    (ambiguity refuses), corner-anchored caption-fitted natively-styled
+    button, placement logged; handoff machinery unchanged.
+  - P4 chooser/card budgets now derive from `ResourcePoolAllocation`
+    (`enhancement:<pool>` lines: native now/requested/allocated/unmet/
+    projected + affected casts + this-assignment coverage + reorder
+    behavior); no second charge counter.
+  - P5 metamagic naming: game enum → CallOfTheWild `MetamagicExtender`
+    display-name contract (fail-soft reflection; offline-verified values
+    Persistent=0x10000000, Piercing=0x80000, Selective=0x2000000,
+    ThrenodicSpell=0x2000) → item-derived descriptor; masks are
+    diagnostic-only.
+  - Header caption is now `Assignments & Resources`; selected spell gains
+    `Edit Assignments`.
+- Gates: source 42/42, protocol 178/178 (six new released-failure
+  regressions), harness 27/27, package 4/4, WhatIf 5/5, publisher gate
+  3/3, deterministic Release build 2/2.
+- Runtime lane: the guarded live-UI attempt was blocked because an
+  owner-controlled Kingmaker process was running (PID 1896); the guards
+  refused correctly, no state was touched. Earlier failed install attempt
+  (prerelease CLR-version parsing in the identity guard) rolled back
+  exactly; fixed in `3625534`. Rendered appearance, visible spellbook
+  entry, and in-game budget displays are therefore **source-verified but
+  not live-observed**; the release notes disclose this prominently.
+- PUBLISHED: https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.1.1-rc2
+  (non-draft prerelease; v0.0.19 keeps the Latest channel; main unmerged).
+  Asset `KingmakerBuffPlanner-0.1.1-rc2.zip` SHA-256
+  `c5f888b91252bfa0dcf4f286a934772c6d15b692e8632b6c30b5db4e85ff649e`,
+  re-downloaded and verified (hash match + package validation 4/4).
+  Tag `v0.1.1-rc2` == source `a30c07e` == pushed branch HEAD. The
+  publisher rebuilt at the final records commit (an earlier deterministic
+  build of the same fixes hashed f6aa4de1...); PR #1 body updated.
+- Local machine state: the guarded install transaction `rc2fix-liveui-3`
+  has rc2 installed over the prior 0.0.19 (backup at
+  `runtime-backups/install-rc2fix-liveui-3`); it is the f6aa build of the
+  same fixes (commit `5d94502`). Restorable via `Restore-Local.ps1 -RunId
+  rc2fix-liveui-3` or by reinstalling the published ZIP. No other mods,
+  saves, or settings were touched; no locks or unresolved transactions.
+- NEXT: owner runs the five-minute check in the release notes and reports;
+  stable promotion remains merge review + default-branch publish.
+
+## Release closeout — 2026-09-19 (rc1; superseded by the RC2 recovery above)
+
+- **TESTING PREVIEW PUBLISHED:** https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.1.1-rc1
+  (non-draft prerelease, --latest=false; stable v0.0.19 and the latest
+  channel untouched). Asset
+  `KingmakerBuffPlanner-0.1.1-rc1.zip` SHA-256
+  `ea1fa19e839df4a5c5ddaf095d15a2933acec3f573b6ff3868430028c50b4c7b`,
+  verified against a fresh download (hash match + package validation 4/4).
+  Tag `v0.1.1-rc1` == source `5da102f` on the feature branch, pushed.
+  Main-branch merge deferred to owner review.
+- Gates at publish: source 42/42, protocol 172/172, harness 27/27,
+  package 4/4, WhatIf 5/5, publisher gate 3/3, deterministic build 2/2.
+- Live runtime acceptance: UNVERIFIED, disclosed in the release notes.
+  Automated save-load remains blocked by the fixture save's mod
+  dependencies under minimal staging (GUID evidence in the tracker) and
+  by full-config boots not finishing inside the automated environment.
+  The owner's own configuration loads the seed (owner-verified).
+  **Do not request another seed; do not resume the engine-only
+  investigation — that theory is superseded by the GUID dependency
+  evidence. Manual owner testing is the acceptance path.**
+- Known preview limitations (also in the release notes): one-way
+  spellbook return; pooled-per-caster rod selection; theme fallback is
+  not verified native artwork.
+- NEXT ACTIONS (only after owner feedback): address owner-reported
+  defects; stable promotion path = merge review + default-branch publish
+  through the guarded publisher (feature-branch switch is prerelease-only).
+
+# AUTONOMOUS-RESUME — top section is current; planning/Z-NATIVE-ASSIGNMENTS-STATUS.md is the per-checkpoint tracker.
+
+## First live fixture + smoke attempt handoff — 2026-09-19 (LATEST)
+
+- Status: fixture bootstrap + teardown BOTH proven against the REAL save
+  directory with every other save byte-identical. One integration defect
+  (fixture/deployment state-root collision) and one environment change
+  (UMM 0.33.0) were found by the first real run and are fixed with
+  regressions (harness 27/27, source 42/42, protocol 172/172, package
+  4/4, WhatIf 5/5).
+- The smoke run itself failed INSIDE the game engine loading the new
+  seed: Player.PostLoad NRE during SaveManager.LoadRoutine. The seed was
+  saved at the start-prologue point (area entry
+  `..._startprologue.json`), which this engine cannot load from the main
+  menu — an engine-level save-point incompatibility, not a mod/harness
+  defect. The manifest-bound teardown removed the pair cleanly; the seed
+  file remains.
+- HUMAN ACTION NEEDED (smallest, two steps in one session):
+  1. From Kingmaker's main menu, try loading `KBP_AUTOMATION_SEED`
+     manually once. (Expected to fail with the same crash — this merely
+     confirms the diagnosis; either result is useful evidence.)
+  2. In the SAME disposable campaign, continue past the opening Jamandi
+     conversation until the party is freely controllable (you can walk
+     and open inventory), then save again named exactly
+     `KBP_AUTOMATION_SEED` (overwriting or as a new file is fine), and
+     fully exit Kingmaker.
+  Then I re-run the guarded bootstrap (pair indices continue at 306/307)
+  and immediately the live-ui-bootstrap smoke.
+- Branch pushed through the guarded helper; candidate local-only.
+
+# AUTONOMOUS-RESUME — top section is current; planning/Z-NATIVE-ASSIGNMENTS-STATUS.md is the per-checkpoint tracker.
+
+## N1-N4 review continuation handoff — 2026-09-18 (LATEST)
+
+- Status: all four 92f13fc-review findings closed with production-path
+  regressions (protocol 172/172, harness 26/26). The fixture helper's
+  write-ahead recovery is now complete across the journal-before-move
+  window, rollback failure retains the lock for -Recover, and teardown
+  validates containment/role/campaign/hash before deleting anything.
+- Candidate: package SHA-256
+  `562cb2699cca7b0921b7697f226829cfd5f5ed807b506a664058bf004ebd2b91`,
+  source `ebeaab6`, local-only, deterministic 2/2.
+- THE ONE HUMAN ACTION (unchanged): create a genuinely NEW disposable
+  campaign, save once named exactly `KBP_AUTOMATION_SEED` at a
+  controllable moment, fully exit Kingmaker. Then I run the repaired
+  guarded bootstrap, establish normal-save/profile protection, provision
+  the casting fixture, and run the first short rendered/input smoke
+  (planner open/close, button states, overflow chooser wheel+scrollbar,
+  assignment add/edit/remove, spellbook open) before the wider matrix.
+- Known incomplete feature: spellbook same-context return — qualify the
+  native reopen contract during the first isolated spellbook run.
+
+# AUTONOMOUS-RESUME — top section is current; planning/Z-NATIVE-ASSIGNMENTS-STATUS.md is the per-checkpoint tracker.
+
+## R1-R4 targeted repairs handoff — 2026-09-18 (LATEST)
+
+- Status: R1-R4 closed with production-path regressions (protocol 169/169,
+  harness 23/23). R1 real-save-use safety gate: PASS on isolated-root
+  evidence; the real save directory remains untouched pending a genuine
+  `KBP_AUTOMATION_SEED` (absence re-verified; do not fabricate one).
+- Candidate: package SHA-256
+  `43f911f1c3f06e2f00a4d6951ed75ac84e13574cc390748ebd272e7ed6e8697d`,
+  source `80847e6`, local-only, deterministic 2/2.
+- THE ONE HUMAN ACTION (unchanged): create a genuinely NEW disposable
+  campaign, save once named exactly `KBP_AUTOMATION_SEED` at a controllable
+  moment, fully exit Kingmaker. Then I run the repaired guarded bootstrap
+  (real process checks, lock/token binding, write-ahead publication,
+  manifest-bound teardown all harness-proven), establish normal-save/
+  profile protection, provision the casting fixture, and start the live
+  lanes (rendered smoke first).
+- Known incomplete feature: spellbook same-context return — awaiting the
+  live native-reopen contract inspection during the first spellbook run.
+
+# AUTONOMOUS-RESUME — top section is current; planning/Z-NATIVE-ASSIGNMENTS-STATUS.md is the per-checkpoint tracker.
+
+## PR1 repair follow-up handoff — 2026-09-18 (LATEST)
+
+- Status: ALL SIX SOURCE FINDINGS REPAIRED with regressions (F1 bootstrap
+  guard bypass + recoverable transaction; F2 assignment editor; F3 real
+  sequential forecast; F4 acknowledged review state + full cost signature;
+  F5 unresolvable-request coverage; F6 spellbook opener/deferred
+  presentation/recovery). Gates: source 42/42, protocol 165/165, harness
+  18/18, package 4/4, WhatIf 5/5.
+- Candidate: package SHA-256
+  `79142e31cc39f829509804898e667023b5bdad7458068f697cd44bbb39d3a2fa`,
+  source `4ccd119`, DLL `75a81b22`, MVID `8ef72d40-681a-4ac3-aa56-6e4a9623c70c`,
+  local-only. Draft PR #1 body updated.
+- Spellbook same-context return: EXPLICIT GAP, not a live-test placeholder —
+  no verified offline native spellbook-reopen contract exists; recovery
+  lands in the planner instead and logs the missing contract.
+- THE ONE HUMAN ACTION (unchanged): create a genuinely NEW disposable
+  campaign, save once named exactly `KBP_AUTOMATION_SEED` at a controllable
+  moment, fully exit Kingmaker. Then run the REPAIRED
+  `scripts/New-KbpAutomationFixture.ps1 -Confirm:$false` (guard now really
+  checks for a running game). Then provision the casting fixture through
+  the disposable-fixture process and run the live lanes.
+
+# AUTONOMOUS-RESUME — top section is current; planning/Z-NATIVE-ASSIGNMENTS-STATUS.md is the per-checkpoint tracker.
+
+## Z continuation mission handoff — 2026-09-18 (LATEST)
+
+- Status: REVIEWABLE + COMPLETION WORK DONE, live lanes awaiting ONE
+  human-only seed save. Draft PR #1:
+  https://github.com/howardreith/KingmakerBuffPlanner/pull/1 (branch pushed
+  through the guarded helper; further commits below pushed after this
+  record). All Checkpoint 1/2/4 items complete; Checkpoint 3 complete except
+  the human seed; Checkpoint 5 NOT RUN pending the seed; Checkpoint 6 rebuilt.
+- Branch `codex/kingmaker-buff-planner-z-native-assignments`; continuation
+  commits: editor+gate `461d999`, fixture bootstrap + rod record `09a366e`,
+  records commit (this one). Deterministic gates: source 42/42, protocol
+  161/161, harness 12/12, package 4/4, WhatIf 5/5.
+- Candidate (supersedes 0d1a1af3): package SHA-256
+  `a9bf3ad363deed4187feb7c937c56491001b2ea8799095d9014d66475907d35b` at
+  `artifacts/release/0.1.0/KingmakerBuffPlanner-0.1.0.zip`, source commit
+  `09a366e`, DLL `679c2544...`, MVID `e6c10be8-5602-4076-ac3d-0aa6c36f4ec7`,
+  local-only.
+- Exact-rod identity: BLOCKED BY NATIVE CONTRACT (assembly evidence recorded
+  in the status doc): ItemEntity/ItemsCollection are object-rooted with no
+  durable instance identity; pooled per-caster semantics are correct and
+  remain the only offered behavior. Do not "fix" T03 by inventing identity.
+- THE ONE HUMAN ACTION (unblocks every live lane): in a Kingmaker session
+  the user controls, create a deliberately disposable campaign and save once
+  with the exact name `KBP_AUTOMATION_SEED` (any controllable moment). Then
+  run `powershell -ExecutionPolicy Bypass -File
+  scripts/New-KbpAutomationFixture.ps1 -Confirm:$false` and expect
+  "Fixture bootstrap PASS". Then execute Checkpoint 5 lanes from the status
+  doc (donor inventory -> rendered chooser -> assignment editor ->
+  spellbook -> casting/resource runs -> regressions) with the approved
+  harness, restoring after each run.
+
+# AUTONOMOUS-RESUME — see planning/Z-NATIVE-ASSIGNMENTS-STATUS.md for the live checkpoint tracker of the active Z native-assignments mission.
+
+## Z native-assignments mission handoff — 2026-09-18 (LATEST)
+
+- Status: 0.1.0 CANDIDATE PREPARED, all checkpoints source/build complete;
+  every save-backed live lane BLOCKED (authorized `KBP_AUTOMATION` fixture
+  pair absent; only protected `KMG_` fixtures remain). Not fully complete;
+  do not label the mission complete while mandatory live acceptance is
+  unproven.
+- Branch: `codex/kingmaker-buff-planner-z-native-assignments` (local, unpushed
+  beyond the inherited diagnosis branch base `164737e`). No merge to main, no
+  tag, no release, no guarded push run for this work.
+- Checkpoints: A overflow repair `a588538`; B theme foundation `3721932`;
+  C schema-5 assignments `27156d2`; D casting order/partial apply `dc192a0`;
+  E spellbook entry `ef8b1b3`; F records/version/package (final commit).
+- Gates: source 42/42, protocol 159/159, harness 8/8, package 4/4,
+  deployment WhatIf 5/5, deterministic Release build PASS. Candidate
+  package/hashes: see `docs/QUALIFICATION.md` 0.1.0 section and
+  `artifacts/release/0.1.0/`.
+- Open blockers: (1) no authorized `KBP_AUTOMATION_BASELINE`/`WORKING` save
+  pair — blocks every live lane including rendered chooser/theme/spellbook
+  qualification and T03 exact rod identity; (2) theme donor inventory
+  promotion (BoundedScan locators need a live capture); (3) spellbook
+  native-close affordance assumption (`Close` button name) unverified live;
+  (4) same-context return-to-spellbook not implemented (no verified native
+  reopen API).
+- Exact next safe action: recreate/import the authorized fixture pair through
+  the guarded process, then run the live qualification lanes starting with
+  `ui-polish`-style donor inventory capture to promote the scan locators,
+  followed by rendered chooser/spellbook acceptance per
+  `docs/MANUAL-ACCEPTANCE.md` 0.1.0 checklist.
+
 # Autonomous Resume
+
+## 2026-09-06 failed human validation: routing diagnosis
+
+Product-bearing checkpoint: `de57d90b38711c4c641d470900339bd8815a3fa8`.
+Final candidate ZIP/DLL/MVID and exact command counts are recorded in the
+investigation report's delivery checkpoint. The package remains diagnostic-only;
+final bridge 21/21, exact metadata 87/87, deterministic builds 2/2, candidate
+deployment purity 5/5 and release installer purity 5/5 all pass. No gameplay
+coverage is promoted. The reproducing-machine cast log remains the next action.
+
+Instant Share remains unresolved; gameplay **NOT VERIFIED**. On local machine
+DATA the installed Planner 0.0.19 / Gunslinger 0.0.115 DLLs match both released
+hashes and MVIDs. Executing the real production bridge accepts that pair and
+rejects the actual older 0.0.114 provider. No affected casting log or running
+game is available; the exact Kingmaker save root is absent.
+
+Active branch: `codex/kingmaker-buff-planner-instant-share-routing-diagnosis`;
+starting/audited HEAD: `fd0e6dc1c32dfc929a56dbc575163e641b150746`;
+version remains 0.0.19. Diagnostic-only source adds pre-cast routing evidence,
+loaded-pair identity, provider-direct phase records and visible fallback
+outcomes. The native transaction and resource policies are unchanged.
+Focused gates: source 42/42, behavior 150/150, harness 8/8, package 4/4,
+deployment WhatIf 5/5; candidate production bridge 21/21 assertions in 3/3
+processes. No failed checks are counted as passes.
+
+Commands, exact identity tables, evidence under
+`artifacts/instant-share-diagnosis/`, rejected theories, and limits are in
+[the investigation report](docs/INSTANT-SHARE-FAILED-VALIDATION.md). This supersedes any interpretation of the historical public
+release records below as proof that Instant Share worked in Howie's game.
+Exact next action: capture one affected cast from the reproducing machine and
+identify its capability/selected-executor/Fire discriminator. A diagnostic
+candidate is not a gameplay fix or authorization trigger for a new public release.
 
 ## 2026-09-06 paired public release complete
 

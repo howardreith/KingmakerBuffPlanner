@@ -1,5 +1,37 @@
 # Qualification
 
+## 2026-09-06 failed human validation: routing diagnosis
+
+Product-bearing checkpoint: `de57d90b38711c4c641d470900339bd8815a3fa8`.
+Final candidate ZIP/DLL/MVID and exact command counts are recorded in the
+investigation report's delivery checkpoint. The package remains diagnostic-only;
+final bridge 21/21, exact metadata 87/87, deterministic builds 2/2, candidate
+deployment purity 5/5 and release installer purity 5/5 all pass. No gameplay
+coverage is promoted. The reproducing-machine cast log remains the next action.
+
+Instant Share remains unresolved; gameplay **NOT VERIFIED**. On local machine
+DATA the installed Planner 0.0.19 / Gunslinger 0.0.115 DLLs match both released
+hashes and MVIDs. Executing the real production bridge accepts that pair and
+rejects the actual older 0.0.114 provider. No affected casting log or running
+game is available; the exact Kingmaker save root is absent.
+
+Active branch: `codex/kingmaker-buff-planner-instant-share-routing-diagnosis`;
+starting/audited HEAD: `fd0e6dc1c32dfc929a56dbc575163e641b150746`;
+version remains 0.0.19. Diagnostic-only source adds pre-cast routing evidence,
+loaded-pair identity, provider-direct phase records and visible fallback
+outcomes. The native transaction and resource policies are unchanged.
+Focused gates: source 42/42, behavior 150/150, harness 8/8, package 4/4,
+deployment WhatIf 5/5; candidate production bridge 21/21 assertions in 3/3
+processes. No failed checks are counted as passes.
+
+Commands, exact identity tables, evidence under
+`artifacts/instant-share-diagnosis/`, rejected theories, and limits are in
+[the investigation report](INSTANT-SHARE-FAILED-VALIDATION.md). This supersedes any interpretation of the historical public
+release records below as proof that Instant Share worked in Howie's game.
+Exact next action: capture one affected cast from the reproducing machine and
+identify its capability/selected-executor/Fire discriminator. A diagnostic
+candidate is not a gameplay fix or authorization trigger for a new public release.
+
 ## 0.0.19 / 0.0.115 paired public release verification
 
 Status: PUBLICATION AND MECHANICAL GATES PASS; SAVE-BACKED GAMEPLAY NOT RUN.
@@ -1079,3 +1111,105 @@ Phase 12 composed no-save core qualification PASS twice:
 | `phase12-no-save-core-2` | 22/22 | same byte-for-byte | same | exact PASS |
 
 Both fresh processes used clean commit `3af45f3329df300dc0616da9393480abee8547ce`, package SHA-256 `c2ea8a3dbbfb1cbe670be422b33e11a8afddfeaac4ae27902d69f8c5f6febc19`, DLL SHA-256 `a4b56a59104f5ddcac8a4184ebc4f779216f83aaeb4c0b7e199da9dcfa650413`, and MVID `193901f8-0863-4622-8885-f35880e5daf9`. Each composed identity, full catalog/expression reconciliation, ordered Harmony inventory, and UI lifecycle/layout checks in one process. This is the applicable NO-SAVE core, not executor equivalence; the save-backed core remains unmet.
+
+
+## 0.1.0 candidate qualification — 2026-09-18
+
+Deterministic: source validation 42/42; protocol 159/159 including the
+mission gate fixtures (mixed-caster four-cast routing with Share only on
+configured non-self targets; 9/3/3/6 shortage accounting; explicit-order
+allocation beating catalog order; lossless idempotent schema-5 migration
+with archived original; no-prune intent preservation; partial-apply gate;
+forecast balance carry; bounded spellbook handoff); runtime harness
+filesystem 8/8; package validation 4/4; deployment WhatIf purity 5/5;
+deterministic Release build PASS.
+
+BLOCKED (not claimed): every save-backed live lane. The authorized
+`KBP_AUTOMATION_BASELINE`/`KBP_AUTOMATION_WORKING` pair is absent from this
+machine (only `KMG_` fixtures belonging to another product remain, protected).
+Affected open lanes: rendered chooser measurements, native theme live
+qualification and donor inventory promotion, exact rod-instance identity,
+9/3/3/6 rendered navigation, spellbook placement/handoff/return, visual matrix
+at 1280x720/1920x1080/high-DPI, HUD quick-run partial-apply behavior in game,
+and performance comparison against the 0.0.19 baseline. A Kingmaker process
+started during qualification; the deployment guard refused correctly and
+nothing was touched.
+
+### 0.1.0 candidate identity (local-only)
+
+Source commit `ac0b91ba44192779624ec2774e94351ac27e8388`; package
+`artifacts/release/0.1.0/KingmakerBuffPlanner-0.1.0.zip` SHA-256
+`0d1a1af312dc768b229c174a43982cdc469ab7746249527bfa237ded5e064b92`; DLL
+SHA-256 `08f48a343fb96163fd539e97a6623de020831efa6827455b43e18d9e05d9b3ea`;
+MVID `86a94f76-7676-48bf-adfb-92b731dbfc92`; two deterministic builds
+reproduced the ZIP and DLL byte-identically. Publication status: local-only;
+no merge, tag, guarded push, or release.
+
+### 0.1.0 candidate rebuild after continuation fixes — 2026-09-18
+
+The earlier candidate (`0d1a1af3...`, source `ac0b91b`) is superseded: the
+continuation added the player-facing assignment editor, the material-change
+review gate, and a planner defect fix (optional targeting modifiers). New
+deterministic candidate (2/2 reproduced): package
+`artifacts/release/0.1.0/KingmakerBuffPlanner-0.1.0.zip` SHA-256
+`a9bf3ad363deed4187feb7c937c56491001b2ea8799095d9014d66475907d35b`; see
+`artifacts/release/0.1.0/release-manifest.json` for the exact commit, DLL
+hash, and MVID. Publication status remains local-only.
+
+Schema-migration rollback (validated in isolated profile copies by
+`profile-migrates-schema-one`): restore by copying
+`UserSettings/kbp-pre-schema-<id>.orig` over the campaign's
+`kingmaker-buff-planner-<id>.json` while the game is closed; the archived
+original is the schema-4 recovery material and an older DLL reads it
+natively. Normal campaign profiles are untouched by fixture testing because
+profiles are keyed per campaign and the disposable fixture campaign gets a
+fresh default profile.
+
+### 0.1.0 candidate rebuild after PR1 repairs — 2026-09-18
+
+Supersedes every earlier 0.1.0 hash. Deterministic 2/2. Source commit
+`4ccd1197562fbfa2b196eb631267686e65403868`; package
+`artifacts/release/0.1.0/KingmakerBuffPlanner-0.1.0.zip` SHA-256
+`79142e31cc39f829509804898e667023b5bdad7458068f697cd44bbb39d3a2fa`; DLL
+SHA-256 `75a81b2251fcbc47064ed3260a02be8dc73c83eee86781ec0c1c1afcd411664c`;
+MVID `8ef72d40-681a-4ac3-aa56-6e4a9623c70c`. Gates: source 42/42, protocol
+165/165, harness 18/18 (bootstrap guard reproduction included), package 4/4,
+deployment WhatIf 5/5. Publication status: local-only.
+
+The repaired bootstrap has NOT been run against the real save directory and
+will not be until a `KBP_AUTOMATION_SEED` created by the user exists; the
+guard, staging, rollback, recovery, and teardown paths are proven only in
+the isolated harness fixture roots so far.
+
+### 0.1.0 candidate rebuild after R1-R4 repairs — 2026-09-18
+
+Supersedes all earlier 0.1.0 hashes. Deterministic 2/2. Source commit
+`80847e6`; package SHA-256
+`43f911f1c3f06e2f00a4d6951ed75ac84e13574cc390748ebd272e7ed6e8697d`;
+see `artifacts/release/0.1.0/release-manifest.json` for the DLL hash and
+MVID. Gates: source 42/42, protocol 169/169, harness 23/23, package 4/4,
+WhatIf 5/5. Local-only; no live lanes run (still no
+`KBP_AUTOMATION_SEED`; absence re-verified before this record).
+
+### 0.1.0 candidate rebuild after N1-N4 — 2026-09-18
+
+Supersedes all earlier hashes. Deterministic 2/2. Source commit
+`ebeaab6`; package SHA-256
+`562cb2699cca7b0921b7697f226829cfd5f5ed807b506a664058bf004ebd2b91`;
+see `artifacts/release/0.1.0/release-manifest.json` for the DLL hash and
+MVID. Gates: source 42/42, protocol 172/172, harness 26/23->26, package
+4/4, WhatIf 5/5. Local-only; live lanes remain unrun (no
+`KBP_AUTOMATION_SEED`; absence re-verified before this record).
+
+### 0.1.1-rc1 testing preview — published 2026-09-19
+
+Release https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.1.1-rc1
+(non-draft prerelease, --latest=false; stable channel unchanged). Source
+commit `5da102f36dbc982660f74e47c17a45bfe7012ac0` == tag `v0.1.1-rc1`;
+ZIP SHA-256
+`ea1fa19e839df4a5c5ddaf095d15a2933acec3f573b6ff3868430028c50b4c7b`;
+deterministic build 2/2; gates at publish: source 42/42, protocol 172/172,
+harness 27/27, package 4/4, WhatIf 5/5, publisher gate 3/3. The published
+asset was re-downloaded and its hash and package structure verified.
+Live gameplay acceptance remains UNVERIFIED and is disclosed in the
+release notes; manual owner testing is the acceptance path.

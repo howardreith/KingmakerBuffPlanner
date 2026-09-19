@@ -495,6 +495,18 @@ namespace KingmakerBuffPlanner.Compatibility
         private const string StatusTypeName =
             "KingmakerGunslinger.BrownFur.BrownFurDirectCastStatus";
 
+        internal static Assembly[] LoadedProviderAssemblies()
+        {
+            return AppDomain.CurrentDomain.GetAssemblies().Where(value =>
+                value.GetName().Name == ProviderAssemblyName).ToArray();
+        }
+
+        internal static IEnumerable<Type> DiagnosticContractTypes(Assembly assembly)
+        {
+            return new[] { assembly.GetType(ApiTypeName, false),
+                assembly.GetType(HandleTypeName, false) }.Where(value => value != null);
+        }
+
         internal static bool TryValidateContract(out string reason)
         {
             BrownFurDirectCastContract contract;

@@ -6,6 +6,7 @@ using System.Reflection;
 using KingmakerBuffPlanner.RuntimeTesting;
 using KingmakerBuffPlanner.Discovery;
 using KingmakerBuffPlanner.Compatibility;
+using KingmakerBuffPlanner.GameAdapters;
 using KingmakerBuffPlanner.Domain.Effects;
 using KingmakerBuffPlanner.Domain.Identity;
 using KingmakerBuffPlanner.Domain.Providers;
@@ -175,6 +176,28 @@ namespace KingmakerBuffPlanner.Tests
                 Run("cast-enhancement-selection-is-assignment-scoped", TestCastEnhancementSelection);
                 Run("casting-section-presents-caster-and-enhancement-choices", TestCastingSectionPresentation);
                 Run("casting-section-layout-keeps-button-labels-visible", TestCastingSectionLayout);
+                Run("chooser-scroll-layout-owns-content-bounds", TestChooserScrollLayout);
+                Run("native-theme-resolves-and-falls-back-per-capability", TestNativeThemeResolution);
+                Run("control-caption-fit-grows-only-from-design-floor", TestControlCaptionFit);
+                Run("casting-assignments-route-mixed-casters-exactly", TestCastingAssignmentRouting);
+                Run("assignment-order-and-shortage-allocate-explicitly", TestAssignmentOrderAndShortage);
+                Run("partial-apply-gate-distinguishes-coverage-from-casts", TestPartialExecutionGate);
+                Run("casting-order-rows-and-resource-lines-derive-from-plan", TestCastingOrderPresentation);
+                Run("sequence-forecast-carries-balances-per-selected-routine", TestSequenceForecast);
+                Run("spellbook-handoff-waits-bounded-and-rolls-back", TestSpellbookHandoff);
+                Run("assignment-editor-model-supports-player-flows", TestAssignmentEditorModel);
+                Run("material-plan-change-requires-renewed-review", TestPlanMaterialChangeDetector);
+                Run("assignment-editor-intent-regressions", TestAssignmentEditorIntent);
+                Run("review-state-and-material-signatures", TestReviewStateAndSignatures);
+                Run("review-acknowledgment-follows-production-orchestration", TestReviewAcknowledgmentOrchestration);
+                Run("forecast-consumes-prepared-tokens-exactly", TestForecastPreparedTokens);
+                Run("forecast-projects-only-justified-effects", TestForecastEffectProjection);
+                Run("portrait-path-resolves-child-intent-separately", TestPortraitChildIntent);
+                Run("same-provider-targeting-survives-both-orders", TestSameProviderTargeting);
+                Run("picker-toggle-never-drops-sibling-coverage", TestPickerToggleCoverage);
+                Run("forecast-caster-effects-land-on-caster", TestForecastCasterIdentity);
+                Run("unsupported-configured-requests-block-partial-apply", TestUnresolvableCoverage);
+                Run("spellbook-handoff-invokes-opener-and-awaits-presentation", TestSpellbookHandoff);
                 Run("cast-enhancement-execution-is-fail-closed-and-cleaned-up", TestCastEnhancementExecution);
                 Run("consumed-one-shot-enhancement-is-not-rearmed", TestOneShotEnhancementRestoration);
                 Run("execution-preflight-runs-under-the-native-activation-lease",
@@ -208,6 +231,8 @@ namespace KingmakerBuffPlanner.Tests
                 Run("instant-executor-revalidates-batches-and-reports", TestInstantExecutor);
                 Run("submitted-without-effect-is-not-success", TestUnconfirmedExecution);
                 Run("hybrid-executor-routes-and-blocks-fallbacks", TestHybridExecutor);
+                Run("routing-evidence-precedes-cast-and-survives-cancellation", TestRoutingEvidence);
+                Run("instant-fallback-distinguishes-effect-confirmation", TestInstantFallbackFeedback);
                 Run("share-direct-capability-controls-combined-routing",
                     TestShareDirectRoutingPolicy);
                 Run("share-direct-four-recipients-preserve-resource-ownership",
@@ -234,6 +259,24 @@ namespace KingmakerBuffPlanner.Tests
                     TestAnimatedStickyTouchLifecycle);
                 Run("sticky-touch-failure-cleanup-does-not-block-later-work",
                     TestStickyTouchFailureCleanup);
+                Run("native-theme-lookup-requires-native-root-not-owned-overlay",
+                    TestNativeThemeLookupScope);
+                Run("spellbook-window-locator-is-exact-then-tolerant-and-refuses-ambiguity",
+                    TestSpellbookWindowLocator);
+                Run("chooser-budget-derives-from-authoritative-plan",
+                    TestChooserBudgetFromAuthoritativePlan);
+                Run("chooser-budget-follows-reordered-assignment-priority",
+                    TestChooserBudgetReorderedPriority);
+                Run("metamagic-labels-never-show-raw-masks",
+                    TestMetamagicLabelsNeverShowRawMasks);
+                Run("installed-call-of-the-wild-metamagic-name-contract-is-exact",
+                    TestInstalledCallOfTheWildMetamagicNames);
+                Run("chooser-budget-note-is-spell-scoped-with-unit-labels",
+                    TestChooserBudgetSpellScopedNotes);
+                Run("assignment-chooser-uses-assignment-selections-and-allows-removal",
+                    TestAssignmentChooserScopedChoices);
+                Run("chooser-budget-text-stays-bounded",
+                    TestChooserBudgetTextStaysBounded);
             }
             finally
             {
@@ -1080,17 +1123,10 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException(
                     "An exhausted directly owned child vanished or appeared castable.");
 
-            profile.Routines[0].Assignments.Add(new SourceAssignmentProfile
-            {
-                SourceId = "variant|parent-guid|ungranted-guid",
-                Ability = AbilityKeyProfile.FromKey(Ability(
-                    "parent-guid", "ungranted-guid", 0)),
-                WantedTargetUnitIds = new List<string> { "unit-owner" },
-                ExistingEffectPolicy =
-                    ExistingEffectPolicy.SkipAlreadyActive,
-                IgnoredPresenceMarkers = new List<string>(),
-                SelectedEnhancementIds = new List<string>()
-            });
+            profile.Routines[0].Assignments.Add(Assignment(
+                "variant|parent-guid|ungranted-guid",
+                Ability("parent-guid", "ungranted-guid", 0),
+                new[] { "unit-owner" }));
             var reloaded = new PlannerSetupModel(
                 profile, snapshot, new ActiveEffectSnapshot(null),
                 effects, new[] { option }, ignored => { });
@@ -1225,15 +1261,9 @@ namespace KingmakerBuffPlanner.Tests
             string sourceId = CatalogSourceIdentity.For(
                 child, Leaf("resist-fire-effect"));
             BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault(campaign);
-            profile.Routines[0].Assignments.Add(new SourceAssignmentProfile
-            {
-                SourceId = sourceId,
-                Ability = AbilityKeyProfile.FromKey(child),
-                WantedTargetUnitIds = new List<string> { "target-a" },
-                ExistingEffectPolicy = ExistingEffectPolicy.Overwrite,
-                IgnoredPresenceMarkers = new List<string>(),
-                SelectedEnhancementIds = new List<string>()
-            });
+            profile.Routines[0].Assignments.Add(Assignment(
+                sourceId, child, new[] { "target-a" }, null,
+                ExistingEffectPolicy.Overwrite));
             string modPath = Path.Combine(root, "variant-profile-roundtrip");
             Directory.CreateDirectory(modPath);
             var repository = new ProfileRepository(modPath);
@@ -1254,15 +1284,9 @@ namespace KingmakerBuffPlanner.Tests
             BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault(
                 "legacy-ambiguous-variant");
             AbilityKey parent = Ability(VariantParent().BlueprintGuid, string.Empty, 0);
-            profile.Routines[0].Assignments.Add(new SourceAssignmentProfile
-            {
-                SourceId = parent.Canonical,
-                Ability = AbilityKeyProfile.FromKey(parent),
-                WantedTargetUnitIds = new List<string> { "target-a" },
-                ExistingEffectPolicy = ExistingEffectPolicy.Overwrite,
-                IgnoredPresenceMarkers = new List<string>(),
-                SelectedEnhancementIds = new List<string>()
-            });
+            profile.Routines[0].Assignments.Add(Assignment(
+                parent.Canonical, parent, new[] { "target-a" }, null,
+                ExistingEffectPolicy.Overwrite));
             VariantModelFixture fixture = CreateVariantFixture(profile, false);
             SourceAssignmentProfile retained =
                 profile.Routines[0].Assignments.Single();
@@ -1977,13 +2001,41 @@ namespace KingmakerBuffPlanner.Tests
 
         private static SourceAssignmentProfile Assignment(AbilityKey ability, string target)
         {
+            return Assignment(ability.Canonical, ability, new[] { target });
+        }
+
+        // Builds the schema-5 assignment shape used by every fixture: one
+        // source parent whose single Automatic child carries the legacy
+        // fixture targets and required-by-default enhancement selections.
+        private static SourceAssignmentProfile Assignment(string sourceId,
+            AbilityKey ability, IEnumerable<string> targets,
+            IEnumerable<string> enhancements = null,
+            ExistingEffectPolicy policy = ExistingEffectPolicy.SkipAlreadyActive)
+        {
             return new SourceAssignmentProfile
             {
-                SourceId = ability.Canonical,
+                SourceId = sourceId,
                 Ability = AbilityKeyProfile.FromKey(ability),
-                WantedTargetUnitIds = new List<string> { target },
-                ExistingEffectPolicy = ExistingEffectPolicy.SkipAlreadyActive,
-                IgnoredPresenceMarkers = new List<string>()
+                ExistingEffectPolicy = policy,
+                IgnoredPresenceMarkers = new List<string>(),
+                CastingAssignments = new List<CastingAssignmentProfile>
+                {
+                    new CastingAssignmentProfile
+                    {
+                        AssignmentId = "auto-" + sourceId,
+                        Order = 0,
+                        CasterUnitId = null,
+                        SpellbookGuid = null,
+                        ProviderKey = null,
+                        TargetUnitIds = new List<string>(targets ?? new string[0]),
+                        Enhancements = (enhancements ?? new string[0])
+                            .Select(id => new EnhancementSelectionProfile
+                            {
+                                EnhancementId = id,
+                                Required = true
+                            }).ToList()
+                    }
+                }
             };
         }
 
@@ -1995,22 +2047,12 @@ namespace KingmakerBuffPlanner.Tests
             ProviderSnapshot provider = PlannerProvider("unit-a", "book", supported, "routine-free", 0);
             PartyProviderSnapshot snapshot = PlannerSnapshot(new[] { provider }, new[] { pool }, "unit-a");
             BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault("routine-campaign");
-            profile.Routines[0].Assignments.Add(new SourceAssignmentProfile
-            {
-                SourceId = supported.Canonical,
-                Ability = AbilityKeyProfile.FromKey(supported),
-                WantedTargetUnitIds = new List<string> { "unit-a" },
-                ExistingEffectPolicy = ExistingEffectPolicy.Overwrite,
-                IgnoredPresenceMarkers = new List<string>()
-            });
-            profile.Routines[0].Assignments.Add(new SourceAssignmentProfile
-            {
-                SourceId = unsupported.Canonical,
-                Ability = AbilityKeyProfile.FromKey(unsupported),
-                WantedTargetUnitIds = new List<string> { "unit-a" },
-                ExistingEffectPolicy = ExistingEffectPolicy.Overwrite,
-                IgnoredPresenceMarkers = new List<string>()
-            });
+            profile.Routines[0].Assignments.Add(Assignment(
+                supported.Canonical, supported, new[] { "unit-a" }, null,
+                ExistingEffectPolicy.Overwrite));
+            profile.Routines[0].Assignments.Add(Assignment(
+                unsupported.Canonical, unsupported, new[] { "unit-a" }, null,
+                ExistingEffectPolicy.Overwrite));
             var option = new ProviderPlanningOption(provider, new[] { "unit-a" },
                 new[] { "unit-a" }, 1, 10, true);
             RoutinePlanResult result = new RoutinePlanService().Plan(profile, "long", snapshot,
@@ -2067,12 +2109,36 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("Profile backup retention exceeded its bound.");
         }
 
+        // Rebuilds a genuine historical schema-4 document: flat target and
+        // enhancement lists on each source assignment, no casting children.
+        // Migration tests must feed real old data, not a current profile with
+        // a rewritten version number.
+        private static JObject LegacyV4Document(BuffPlannerProfile profile)
+        {
+            JObject document = JObject.Parse(JsonConvert.SerializeObject(profile));
+            document["schemaVersion"] = 4;
+            foreach (JObject routine in ((JArray)document["routines"]).OfType<JObject>())
+                foreach (JObject assignment in ((JArray)routine["assignments"]).OfType<JObject>())
+                {
+                    JArray children = (JArray)assignment["castingAssignments"];
+                    JObject child = children != null && children.Count > 0
+                        ? (JObject)children[0] : null;
+                    assignment["wantedTargetUnitIds"] = child == null
+                        ? new JArray() : child["targetUnitIds"] ?? new JArray();
+                    assignment["selectedEnhancementIds"] = child == null
+                        ? new JArray() : new JArray(((JArray)child["enhancements"])
+                            .OfType<JObject>().Select(selection => selection["enhancementId"]));
+                    assignment.Remove("castingAssignments");
+                }
+            return document;
+        }
+
         private static void TestProfileMigration(string root)
         {
             string modPath = Path.Combine(root, "profile-migration");
             Directory.CreateDirectory(modPath);
             var repository = new ProfileRepository(modPath);
-            JObject document = JObject.FromObject(ProfileFixture("campaign:migration"));
+            JObject document = LegacyV4Document(ProfileFixture("campaign:migration"));
             document["schemaVersion"] = 1;
             document.Remove("ui");
             document.Remove("execution");
@@ -2080,10 +2146,63 @@ namespace KingmakerBuffPlanner.Tests
             Directory.CreateDirectory(Path.GetDirectoryName(path));
             File.WriteAllText(path, document.ToString());
             ProfileLoadResult migrated = repository.Load("campaign:migration");
-            if (!migrated.Migrated || migrated.Profile.SchemaVersion != 4 ||
+            if (!migrated.Migrated || migrated.Profile.SchemaVersion != 5 ||
                 migrated.Profile.Ui.Scale != 1.0f || migrated.Profile.Execution.Mode != "animated" ||
                 migrated.Profile.Ui.Hotkey != "Ctrl+Shift+B")
                 throw new InvalidOperationException("Schema-one profile was not migrated with safe defaults.");
+            SourceAssignmentProfile legacy = migrated.Profile.Routines[0].Assignments[0];
+            if (legacy.CastingAssignments.Count != 1 ||
+                !legacy.CastingAssignments[0].TargetUnitIds
+                    .SequenceEqual(new[] { "unit-z", "unit-a" }) ||
+                legacy.CastingAssignments[0].AssignmentId != "legacy-source-persisted" ||
+                !legacy.CastingAssignments[0].Enhancements.Single().IsRequired)
+                throw new InvalidOperationException(
+                    "Schema-four targets or enhancements did not migrate into one legacy-equivalent automatic child.");
+            // The exact pre-migration original is archived outside the
+            // rotating backup chain (mission: rotating saves cannot erase it).
+            string archive = Path.Combine(Path.GetDirectoryName(path),
+                "kbp-pre-schema-" + Path.GetFileName(path)
+                    .Replace("kingmaker-buff-planner-", string.Empty)
+                    .Replace(".json", string.Empty) + ".orig");
+            if (!File.Exists(archive) || JObject.Parse(File.ReadAllText(archive))
+                    .Value<int?>("schemaVersion") != 1)
+                throw new InvalidOperationException(
+                    "The pre-migration original was not archived before the first save.");
+
+            // Legacy allocation ran in source-ID order; migration makes exactly
+            // that order explicit per child so v5 allocation reproduces v4.
+            BuffPlannerProfile multiSource = BuffPlannerProfile.CreateDefault(
+                "campaign:migration-order");
+            multiSource.Routines[0].Assignments.Add(Assignment(
+                "source-bravo", Ability("bravo", string.Empty, 0), new[] { "unit-a" }));
+            multiSource.Routines[0].Assignments.Add(Assignment(
+                "source-alpha", Ability("alpha", string.Empty, 0), new[] { "unit-b" }));
+            JObject multiDocument = LegacyV4Document(multiSource);
+            string multiPath = repository.GetProfilePath("campaign:migration-order");
+            File.WriteAllText(multiPath, multiDocument.ToString());
+            ProfileLoadResult multiResult = repository.Load("campaign:migration-order");
+            List<CastingAssignmentProfile> order = multiResult.Profile.Routines[0]
+                .Assignments.SelectMany(value => value.CastingAssignments)
+                .OrderBy(child => child.Order).ToList();
+            if (order.Count != 2 ||
+                order[0].AssignmentId != "legacy-source-alpha" ||
+                order[1].AssignmentId != "legacy-source-bravo" ||
+                order[0].Order != 0 || order[1].Order != 1)
+                throw new InvalidOperationException(
+                    "Migration did not preserve legacy source-ID order as explicit assignment order.");
+            // Saving the migrated profile and loading again is idempotent:
+            // IDs and orders are never regenerated (the repository itself
+            // never auto-saves; callers own the write).
+            repository.Save(multiResult.Profile);
+            ProfileLoadResult again = repository.Load("campaign:migration-order");
+            List<CastingAssignmentProfile> reloaded = again.Profile.Routines[0]
+                .Assignments.SelectMany(value => value.CastingAssignments)
+                .OrderBy(child => child.Order).ToList();
+            if (again.Migrated || reloaded.Count != 2 ||
+                reloaded[0].AssignmentId != "legacy-source-alpha" ||
+                reloaded[1].AssignmentId != "legacy-source-bravo")
+                throw new InvalidOperationException(
+                    "Migration was not idempotent across a save and reload.");
         }
 
         private static void TestGridProfileMigration(string root)
@@ -2091,7 +2210,7 @@ namespace KingmakerBuffPlanner.Tests
             string modPath = Path.Combine(root, "profile-grid-migration");
             Directory.CreateDirectory(modPath);
             var repository = new ProfileRepository(modPath);
-            JObject document = JObject.FromObject(ProfileFixture("campaign:grid-migration"));
+            JObject document = LegacyV4Document(ProfileFixture("campaign:grid-migration"));
             document["schemaVersion"] = 2;
             document["hiddenSourceIds"] = new JArray("hidden-a", "hidden-b");
             ((JObject)document["ui"])["hotkey"] = "F10";
@@ -2102,12 +2221,19 @@ namespace KingmakerBuffPlanner.Tests
             Directory.CreateDirectory(Path.GetDirectoryName(path));
             File.WriteAllText(path, document.ToString());
             ProfileLoadResult migrated = repository.Load("campaign:grid-migration");
-            if (!migrated.Migrated || migrated.Profile.SchemaVersion != 4 ||
+            if (!migrated.Migrated || migrated.Profile.SchemaVersion != 5 ||
                 migrated.Profile.Ui.Hotkey != "Ctrl+Shift+B" ||
                 migrated.Profile.HiddenSourceIds.Count != 0 || migrated.Profile.Execution.RecastExisting)
-                throw new InvalidOperationException("Grid UI migration did not reveal hidden entries or replace F10.");
+                throw new InvalidOperationException("Grid UI migration did not reveal hidden entries or replace F10." +
+                    " observed: migrated=" + migrated.Migrated +
+                    ";schema=" + migrated.Profile.SchemaVersion +
+                    ";hotkey=" + migrated.Profile.Ui.Hotkey +
+                    ";hidden=" + migrated.Profile.HiddenSourceIds.Count +
+                    ";recast=" + migrated.Profile.Execution.RecastExisting +
+                    ";warning=" + migrated.Warning);
             if (migrated.Profile.Routines[0].Assignments.Count != 1 ||
                 migrated.Profile.Routines[0].Assignments[0].WantedTargetUnitIds.Count != 2 ||
+                migrated.Profile.Routines[0].Assignments[0].CastingAssignments.Count != 1 ||
                 migrated.Profile.Routines[0].Assignments[0].SelectedEnhancementIds.Count != 0)
                 throw new InvalidOperationException("Grid UI migration did not preserve routine targets.");
         }
@@ -2128,7 +2254,7 @@ namespace KingmakerBuffPlanner.Tests
             repository.Save(duplicate);
             string duplicatePath = repository.GetProfilePath("campaign:duplicate");
             string duplicateJson = File.ReadAllText(duplicatePath).Replace(
-                "\"schemaVersion\": 4,", "\"schemaVersion\": 4,\r\n  \"schemaVersion\": 4,");
+                "\"schemaVersion\": 5,", "\"schemaVersion\": 5,\r\n  \"schemaVersion\": 5,");
             File.WriteAllText(duplicatePath, duplicateJson);
             ProfileLoadResult rejected = repository.Load("campaign:duplicate");
             if (!rejected.Warning.Contains("duplicate-property"))
@@ -2138,15 +2264,12 @@ namespace KingmakerBuffPlanner.Tests
         private static BuffPlannerProfile ProfileFixture(string campaignId)
         {
             BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault(campaignId);
-            profile.Routines[0].Assignments.Add(new SourceAssignmentProfile
-            {
-                SourceId = "source-persisted",
-                Ability = AbilityKeyProfile.FromKey(Ability("persisted", "variant", 8)),
-                WantedTargetUnitIds = new List<string> { "unit-z", "unit-a" },
-                ExistingEffectPolicy = ExistingEffectPolicy.SkipAlreadyActive,
-                IgnoredPresenceMarkers = new List<string> { "shared-marker" },
-                SelectedEnhancementIds = new List<string> { "metamagic-rod|unit-a|persisted" }
-            });
+            profile.Routines[0].Assignments.Add(Assignment(
+                "source-persisted", Ability("persisted", "variant", 8),
+                new[] { "unit-z", "unit-a" },
+                new[] { "metamagic-rod|unit-a|persisted" }));
+            profile.Routines[0].Assignments[0].IgnoredPresenceMarkers =
+                new List<string> { "shared-marker" };
             profile.ProviderPreferences.Add(new ProviderPreferenceProfile
             {
                 ProviderKey = "unit-a|book|provider",
@@ -2451,7 +2574,7 @@ namespace KingmakerBuffPlanner.Tests
                 loaded.Profile.ProviderPreferences.Single(preference =>
                     preference.ProviderKey.StartsWith(
                         "stale-unit|", StringComparison.Ordinal));
-            if (loaded.Profile.SchemaVersion != 4 ||
+            if (loaded.Profile.SchemaVersion != 5 ||
                 felix.Priority != 0 || felix.MaximumCasts != 3 ||
                 felix.Banned || !akasa.Banned ||
                 stale.MaximumCasts != 17)
@@ -3060,14 +3183,8 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("An invalid personal target mutated the assignment.");
 
             profile.Routines.First(routine => routine.RoutineId == "long").Assignments.Add(
-                new SourceAssignmentProfile
-                {
-                    SourceId = modelA.SelectedSource.SourceId,
-                    Ability = AbilityKeyProfile.FromKey(personalAbility),
-                    WantedTargetUnitIds = new List<string> { "unit-b" },
-                    ExistingEffectPolicy = ExistingEffectPolicy.Overwrite,
-                    IgnoredPresenceMarkers = new List<string>()
-                });
+                Assignment(modelA.SelectedSource.SourceId, personalAbility,
+                    new[] { "unit-b" }, null, ExistingEffectPolicy.Overwrite));
             RoutinePlanResult stale = new RoutinePlanService().Plan(profile, "long", snapshotA,
                 new ActiveEffectSnapshot(null), effects, new[] { personalA });
             if (stale.Plan.Steps.Count != 0 || stale.Plan.Outcomes.Count != 1 ||
@@ -3489,6 +3606,63 @@ namespace KingmakerBuffPlanner.Tests
                 report.Confirmed != 2 || report.Failed != 0)
                 throw new InvalidOperationException(
                     "A native-command enhancement was treated as optional animated fallback.");
+        }
+
+        private static void TestRoutingEvidence()
+        {
+            CastPlan plan = CreateShareDirectPlan(4, false);
+            var instant = new AlwaysInstantRuntime();
+            var animated = new AlwaysAnimatedRuntime();
+            var report = new ExecutionReport(plan);
+            var routes = new List<string>();
+            int nativeChecks = 0;
+            System.Collections.IEnumerator work = new HybridCastExecutor(instant, animated, false, true,
+                step => { nativeChecks++; return true; },
+                (index, step, useAnimated, detail) =>
+                {
+                    if (index != 0 || !useAnimated || instant.FireCount != 0 ||
+                        animated.StartCount != 0 || report.Records.Count != 1 ||
+                        report.Records[0].Status != CastExecutionStatus.ExecutorSelected)
+                        throw new InvalidOperationException("Routing was not recorded before starting the cast.");
+                    routes.Add(detail);
+                }).Execute(plan, report);
+            work.MoveNext();
+            ((IDisposable)work).Dispose();
+            if (nativeChecks != 1 || routes.Count != 1 ||
+                !routes[0].Contains("planned-strategy:ProviderDirectRuleCast") ||
+                !routes[0].Contains("actual-executor:Animated") ||
+                !routes[0].Contains("native-callback:True") ||
+                !routes[0].Contains("native-strategy:False") ||
+                report.Records.Count(record => record.Status ==
+                    CastExecutionStatus.ExecutorSelected) != 1)
+                throw new InvalidOperationException("Cancellation lost the decisive native callback override.");
+
+            plan = CreateLegacySharePlan();
+            report = new ExecutionReport(plan);
+            routes.Clear();
+            Drain(new HybridCastExecutor(new AlwaysInstantRuntime(),
+                new AlwaysAnimatedRuntime(), false, true, null,
+                (index, step, useAnimated, detail) => routes.Add(detail))
+                .Execute(plan, report));
+            if (routes.Count != 1 || !routes[0].Contains("native-callback:False") ||
+                !routes[0].Contains("native-strategy:True") ||
+                !routes[0].Contains("actual-executor:Animated"))
+                throw new InvalidOperationException("Legacy strategy fallback was confused with a callback override.");
+        }
+
+        private static void TestInstantFallbackFeedback()
+        {
+            var fallback = new QuickExecutionResult("long", "Long",
+                QuickExecutionDisposition.Completed, "Animated Share fallback.", 4, 4, 4, true);
+            var direct = new QuickExecutionResult("long", "Long",
+                QuickExecutionDisposition.Completed, "Effects confirmed.", 4, 4, 4);
+            var failed = new QuickExecutionResult("long", "Long",
+                QuickExecutionDisposition.Failed, "Cast interrupted.", 4, 1, 0, true);
+            if (fallback.Disposition != QuickExecutionDisposition.CompletedWithFallback ||
+                !fallback.UsedAnimatedFallback || fallback.Confirmed != 4 ||
+                direct.Disposition != QuickExecutionDisposition.Completed ||
+                direct.UsedAnimatedFallback || failed.Disposition != QuickExecutionDisposition.Failed)
+                throw new InvalidOperationException("Fallback erased effect confirmation or claimed Instant completion.");
         }
 
         private static void TestShareDirectRoutingPolicy()
@@ -4551,6 +4725,2785 @@ namespace KingmakerBuffPlanner.Tests
                 string.IsNullOrWhiteSpace(CastingPanelLayoutContract.SettingsCloseLabel))
                 throw new InvalidOperationException("Casting button geometry or shared CLOSE label is not render-safe.");
         }
+
+        private sealed class ThemeToken { internal bool Destroyed; }
+
+        private sealed class ThemeNode
+        {
+            internal string Name;
+            internal ThemeNode Parent;
+            internal readonly List<ThemeNode> Children = new List<ThemeNode>();
+            internal readonly Dictionary<NativeThemeComponent, object[]> Components =
+                new Dictionary<NativeThemeComponent, object[]>();
+            internal bool Destroyed;
+            internal ThemeNode Add(string name, params KeyValuePair<NativeThemeComponent, object>[] components)
+            {
+                var child = new ThemeNode { Name = name, Parent = this };
+                foreach (KeyValuePair<NativeThemeComponent, object> pair in components)
+                    child.Components[pair.Key] = new[] { pair.Value };
+                Children.Add(child);
+                return child;
+            }
+        }
+
+        private static KeyValuePair<NativeThemeComponent, object> Comp(
+            NativeThemeComponent component, ThemeToken token)
+        {
+            return new KeyValuePair<NativeThemeComponent, object>(component, token);
+        }
+
+        private sealed class FixtureThemeSource : INativeThemeSource
+        {
+            internal ThemeNode Owner;
+            internal bool SoundAvailable = true;
+            internal Action<NativeThemeCapability, object[]> ValidateHook = (c, v) => { };
+            public bool IsAlive(object value)
+            {
+                var node = value as ThemeNode;
+                if (node != null) return !node.Destroyed;
+                var token = value as ThemeToken;
+                return token != null && !token.Destroyed;
+            }
+            public bool SameNode(object first, object second) { return ReferenceEquals(first, second); }
+            public string Name(object node) { return ((ThemeNode)node).Name; }
+            public object Parent(object node) { return ((ThemeNode)node).Parent; }
+            public int ChildCount(object node) { return ((ThemeNode)node).Children.Count; }
+            public object Child(object node, int index) { return ((ThemeNode)node).Children[index]; }
+            public object[] Components(object node, NativeThemeComponent component)
+            {
+                object[] values;
+                return ((ThemeNode)node).Components.TryGetValue(component, out values)
+                    ? values : new object[0];
+            }
+            public NativeThemeResource SoundResource()
+            {
+                if (!SoundAvailable) throw new InvalidOperationException("no sound player");
+                return new NativeThemeResource
+                {
+                    Nodes = new object[0],
+                    Components = new object[] { new ThemeToken() },
+                    Identity = "fixture sound"
+                };
+            }
+            public void Validate(NativeThemeCapability capability, object[] components)
+            {
+                ValidateHook(capability, components);
+            }
+        }
+
+        private static ThemeNode BuildDonorHierarchy(FixtureThemeSource source)
+        {
+            var owner = new ThemeNode { Name = "StaticCanvas" };
+            ThemeNode serviceWindow = owner.Add("ServiceWindow");
+            ThemeNode character = serviceWindow.Add("CharacterScreen");
+            character.Add("BookBackground", Comp(NativeThemeComponent.Image, new ThemeToken()));
+            ThemeNode levelBox = character.Add("LevelBox");
+            ThemeNode button = levelBox.Add("Button_LevelUp",
+                Comp(NativeThemeComponent.Button, new ThemeToken()));
+            button.Add("Label", Comp(NativeThemeComponent.Text, new ThemeToken()));
+            character.Add("BodyText", Comp(NativeThemeComponent.Text, new ThemeToken()));
+            ThemeNode inventory = serviceWindow.Add("Inventory");
+            inventory.Add("Search", Comp(NativeThemeComponent.InputField, new ThemeToken()));
+            ThemeNode spellbook = serviceWindow.Add("SpellBook");
+            spellbook.Add("Scrollbar Vertical",
+                Comp(NativeThemeComponent.Scrollbar, new ThemeToken()));
+            ThemeNode party = owner.Add("Party");
+            ThemeNode partyCharacter = party.Add("Character");
+            partyCharacter.Add("Highlight", Comp(NativeThemeComponent.Image, new ThemeToken()));
+            source.Owner = owner;
+            return owner;
+        }
+
+        private static void TestNativeThemeResolution()
+        {
+            var source = new FixtureThemeSource();
+            ThemeNode owner = BuildDonorHierarchy(source);
+
+            NativeThemeResolution full = NativeThemeResolver.Resolve(owner, source);
+            foreach (NativeThemeCapability capability in NativeThemeResolution.Capabilities)
+                if (!full.IsAvailable(capability))
+                    throw new InvalidOperationException("Complete donor hierarchy rejected " +
+                        capability + ": " + full.Failure(capability));
+            string summary = full.Summary;
+            if (!summary.Contains("Paper=ok(proven)") || !summary.Contains("Buttons=ok(proven)") ||
+                !summary.Contains("ButtonText=ok(scan)") || !summary.Contains("Scrollbar=ok(scan)"))
+                throw new InvalidOperationException("Resolution summary lost locator provenance: " + summary);
+
+            // One missing donor (the button's label text) must reject exactly
+            // that capability and leave every other surface native.
+            var partial = new FixtureThemeSource();
+            BuildDonorHierarchy(partial);
+            ThemeNode label = FindByName(partial.Owner, "Label");
+            label.Parent.Children.Remove(label);
+            NativeThemeResolution degraded = NativeThemeResolver.Resolve(partial.Owner, partial);
+            if (degraded.IsAvailable(NativeThemeCapability.ButtonText))
+                throw new InvalidOperationException("Removing the label text kept ButtonText.");
+            if (!degraded.IsAvailable(NativeThemeCapability.Buttons))
+                throw new InvalidOperationException("Removing the label text also dropped the button artwork donor.");
+            foreach (NativeThemeCapability capability in NativeThemeResolution.Capabilities)
+                if (capability != NativeThemeCapability.ButtonText &&
+                    !degraded.IsAvailable(capability))
+                    throw new InvalidOperationException("Unrelated capability " + capability +
+                        " fell back with only the label text missing.");
+
+            // Ambiguous siblings must reject instead of guessing.
+            var ambiguous = new FixtureThemeSource();
+            BuildDonorHierarchy(ambiguous);
+            ThemeNode characterScreen = FindByName(ambiguous.Owner, "CharacterScreen");
+            characterScreen.Add("BookBackground", Comp(NativeThemeComponent.Image, new ThemeToken()));
+            NativeThemeResolution ambiguousResolution = NativeThemeResolver.Resolve(
+                ambiguous.Owner, ambiguous);
+            if (ambiguousResolution.IsAvailable(NativeThemeCapability.Paper))
+                throw new InvalidOperationException("Ambiguous paper donor was accepted.");
+
+            // A destroyed cached donor is discarded so a bounded retry can
+            // rebuild only that capability; a destroyed borrowed component
+            // (not just its node) is equally stale.
+            ((ThemeNode)full.Get(NativeThemeCapability.Paper).Nodes[0]).Destroyed = true;
+            if (!full.DiscardStale(source) || full.IsAvailable(NativeThemeCapability.Paper))
+                throw new InvalidOperationException("Stale paper donor survived discard.");
+            if (!full.IsAvailable(NativeThemeCapability.Buttons))
+                throw new InvalidOperationException("Discard removed an unrelated live capability.");
+            NativeThemeResource bodyResource = full.Get(NativeThemeCapability.Body);
+            if (bodyResource == null)
+                throw new InvalidOperationException("Body capability vanished before component-stale check.");
+            NativeThemeResource afterComponentStale = bodyResource;
+            ((ThemeToken)afterComponentStale.Components[0]).Destroyed = true;
+            if (!full.DiscardStale(source) || full.IsAvailable(NativeThemeCapability.Body))
+                throw new InvalidOperationException("Destroyed borrowed component survived discard.");
+
+            // Bounded recovery: at most MaximumAttempts re-resolves per owner.
+            var recovery = new NativeThemeRecovery();
+            recovery.Bind(owner);
+            int attempts = 0;
+            while (recovery.TryBegin(true)) { attempts++; recovery.Complete(); }
+            if (attempts != NativeThemeRecovery.MaximumAttempts)
+                throw new InvalidOperationException("Recovery attempts were not bounded: " + attempts);
+            ThemeNode second = new ThemeNode { Name = "second-owner" };
+            recovery.Bind(second);
+            if (!recovery.TryBegin(true))
+                throw new InvalidOperationException("Binding a new owner did not reset attempts.");
+
+            // Bindings apply once per capability, re-apply on donor change, and
+            // run the readable fallback when an apply fails. Built on a fresh
+            // hierarchy because the stale checks above destroyed shared donors.
+            var bindingFixture = new FixtureThemeSource();
+            BuildDonorHierarchy(bindingFixture);
+            NativeThemeResolution bindingSource = NativeThemeResolver.Resolve(
+                bindingFixture.Owner, bindingFixture);
+            var applied = new List<NativeThemeCapability>();
+            var fellBack = new List<NativeThemeCapability>();
+            var bindings = new NativeThemeBindings(reason => { });
+            foreach (NativeThemeCapability capability in NativeThemeResolution.Capabilities)
+                bindings.Add(capability, components => applied.Add(capability),
+                    delegate { fellBack.Add(capability); });
+            bindings.Apply(bindingSource);
+            if (applied.Count != NativeThemeResolution.Capabilities.Length ||
+                fellBack.Count != 0)
+                throw new InvalidOperationException("Initial binding pass did not apply every capability.");
+            applied.Clear();
+            bindings.Apply(bindingSource);
+            if (applied.Count != 0)
+                throw new InvalidOperationException("Unchanged donors were re-applied.");
+            var failing = new FixtureThemeSource();
+            BuildDonorHierarchy(failing);
+            failing.ValidateHook = (capability, components) =>
+            {
+                if (capability == NativeThemeCapability.Buttons)
+                    throw new InvalidOperationException("donor contract changed");
+            };
+            NativeThemeResolution rejected = NativeThemeResolver.Resolve(failing.Owner, failing);
+            bindings.Apply(rejected);
+            if (!fellBack.Contains(NativeThemeCapability.Buttons))
+                throw new InvalidOperationException("Failed apply did not run the parchment fallback.");
+        }
+
+        private static ThemeNode FindByName(ThemeNode root, string name)
+        {
+            if (root.Name == name) return root;
+            foreach (ThemeNode child in root.Children)
+            {
+                ThemeNode found = FindByName(child, name);
+                if (found != null) return found;
+            }
+            return null;
+        }
+
+        // P1 reproducer: native ServiceWindow donor paths resolve only from
+        // a native-canvas root. The released surface resolved from the
+        // planner's own overlay root, so every donor rejected and the flat
+        // fallback stayed on screen.
+        private static void TestNativeThemeLookupScope()
+        {
+            var source = new FixtureThemeSource();
+            ThemeNode nativeRoot = BuildDonorHierarchy(source);
+            ThemeNode plannerRoot = new ThemeNode { Name = "FullScreenOverlayRoot" };
+            plannerRoot.Add("ServiceFrame");
+
+            NativeThemeResolution ownedScoped = NativeThemeResolver.Resolve(
+                plannerRoot, source);
+            if (ownedScoped.IsAvailable(NativeThemeCapability.Paper) ||
+                ownedScoped.IsAvailable(NativeThemeCapability.Buttons) ||
+                ownedScoped.IsAvailable(NativeThemeCapability.Body))
+                throw new InvalidOperationException(
+                    "An owned-overlay lookup root resolved native ServiceWindow donors.");
+
+            NativeThemeResolution nativeScoped = NativeThemeResolver.Resolve(
+                nativeRoot, source);
+            foreach (NativeThemeCapability capability in NativeThemeResolution.Capabilities)
+                if (!nativeScoped.IsAvailable(capability))
+                    throw new InvalidOperationException(
+                        "Native-canvas lookup root rejected " + capability + ": " +
+                        nativeScoped.Failure(capability));
+
+            // The two legitimate scopes stay distinct in stale checks too:
+            // live donors under the native owner survive, and a donor that
+            // moved into the owned overlay is discarded instead of applied.
+            if (nativeScoped.DiscardStale(source))
+                throw new InvalidOperationException(
+                    "Live native-canvas donors were discarded from their own scope.");
+            var staleFixture = new FixtureThemeSource();
+            ThemeNode staleRoot = BuildDonorHierarchy(staleFixture);
+            NativeThemeResolution staleScoped = NativeThemeResolver.Resolve(
+                staleRoot, staleFixture);
+            ThemeNode movedPaper = FindByName(staleRoot, "BookBackground");
+            movedPaper.Parent.Children.Remove(movedPaper);
+            plannerRoot.Children.Add(movedPaper);
+            movedPaper.Parent = plannerRoot;
+            if (!staleScoped.DiscardStale(staleFixture) ||
+                staleScoped.IsAvailable(NativeThemeCapability.Paper))
+                throw new InvalidOperationException(
+                    "A donor moved into the owned overlay survived the native-scope stale check.");
+        }
+
+        // P3 reproducer: the spellbook entry must find the real native
+        // window through the exact proven path, tolerate a renamed window
+        // with a bounded unique scan, and refuse ambiguity loudly.
+        private static void TestSpellbookWindowLocator()
+        {
+            var source = new FixtureThemeSource();
+            ThemeNode canvas = new ThemeNode { Name = "StaticCanvas" };
+            ThemeNode serviceWindow = canvas.Add("ServiceWindow");
+            ThemeNode spellbook = serviceWindow.Add("SpellBook");
+            spellbook.Add("Container_Book");
+
+            string reason;
+            SpellbookWindowLocator.Result exact = SpellbookWindowLocator.Find(
+                canvas, source, out reason);
+            if (exact == null || !ReferenceEquals(exact.Window, spellbook) ||
+                !exact.Locator.Contains("path"))
+                throw new InvalidOperationException(
+                    "The exact spellbook path did not resolve: " + reason);
+
+            var renamedSource = new FixtureThemeSource();
+            ThemeNode renamedCanvas = new ThemeNode { Name = "StaticCanvas" };
+            ThemeNode renamedService = renamedCanvas.Add("ServiceWindow");
+            ThemeNode renamedWindow = renamedService.Add("SpellBookScreen");
+            renamedWindow.Add("Container_Book");
+            SpellbookWindowLocator.Result scan = SpellbookWindowLocator.Find(
+                renamedCanvas, renamedSource, out reason);
+            if (scan == null || !ReferenceEquals(scan.Window, renamedWindow) ||
+                !scan.Locator.Contains("scan"))
+                throw new InvalidOperationException(
+                    "A uniquely renamed spellbook window was not discovered: " + reason);
+
+            renamedService.Add("PartySpellBookList");
+            SpellbookWindowLocator.Result ambiguous = SpellbookWindowLocator.Find(
+                renamedCanvas, renamedSource, out reason);
+            if (ambiguous != null || reason == null ||
+                reason.IndexOf("ambiguous", StringComparison.Ordinal) < 0)
+                throw new InvalidOperationException(
+                    "Ambiguous spellbook candidates were not refused: " + reason);
+
+            var bareSource = new FixtureThemeSource();
+            ThemeNode bareCanvas = new ThemeNode { Name = "StaticCanvas" };
+            SpellbookWindowLocator.Result absent = SpellbookWindowLocator.Find(
+                bareCanvas, bareSource, out reason);
+            if (absent != null || reason == null ||
+                reason.IndexOf("service-window-missing", StringComparison.Ordinal) < 0)
+                throw new InvalidOperationException(
+                    "A canvas without ServiceWindow was not reported as missing: " + reason);
+        }
+
+        // P4 reproducer (A5): one three-charge rod, four otherwise eligible
+        // requests in one routine — the ordinary chooser view model exposes
+        // requested/allocated/unmet/projected from the same production plan,
+        // with no second charge counter.
+        private static void TestChooserBudgetFromAuthoritativePlan()
+        {
+            RunRodBudgetCase(4, "felix", "short");
+            // A6's larger case: nine eligible requests against one rod.
+            RunRodBudgetCase(9, "felix", "short");
+        }
+
+        private static void RunRodBudgetCase(int targetCount, string casterId, string routineId)
+        {
+            AbilityKey ability = Ability("budget-spell-" + targetCount, string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("slots-" + targetCount,
+                ResourcePoolKind.SpontaneousLevel, 12, 12, null);
+            ProviderSnapshot caster = PlannerProvider(casterId, casterId + "-book",
+                ability, pool.PoolKey, 1);
+            var unitIds = new List<string> { casterId };
+            for (int index = 1; index <= targetCount; index++)
+                unitIds.Add("ally-" + index);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(
+                new[] { caster }, new[] { pool }, unitIds.ToArray());
+            var option = new ProviderPlanningOption(caster, unitIds.ToArray(),
+                unitIds.ToArray(), 4, 40);
+            string rodId = "metamagic-rod|" + casterId + "|quicken-rod";
+            var rod = new CastEnhancementSnapshot(rodId, casterId, "quicken-rod",
+                "Quicken Metamagic Rod", string.Empty, CastEnhancementCategory.MetamagicRod,
+                4, 3, 3, null, "Quicken");
+            var idleRod = new CastEnhancementSnapshot(
+                "metamagic-rod|" + casterId + "|extend-rod", casterId, "extend-rod",
+                "Extend Metamagic Rod", string.Empty, CastEnhancementCategory.MetamagicRod,
+                8, 3, 2, null, "Extend");
+            var effects = new Dictionary<string, EffectExpression>
+            {
+                { ability.Canonical, Leaf("budget-buff-" + targetCount) }
+            };
+            var active = new ActiveEffectSnapshot(null);
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault(
+                "chooser-budget-" + targetCount);
+            var model = new PlannerSetupModel(profile, snapshot, active, effects,
+                new[] { option }, ignored => { }, new[] { rod, idleRod });
+            SetupSourceRow source = model.SelectedSource;
+            for (int index = 1; index <= targetCount; index++)
+                model.ToggleTarget(routineId, "ally-" + index);
+            model.SetEnhancement(routineId, rodId);
+
+            RoutinePlanResult preview = new RoutinePlanService().Plan(profile, routineId,
+                snapshot, active, effects, new[] { option }, new[] { rod, idleRod });
+            ResourcePoolAllocation allocation = preview.Plan.AllocationFor(
+                "enhancement:" + rodId);
+            int expectedUnmet = targetCount - 3;
+            if (allocation == null || allocation.AvailableNow != 3 ||
+                allocation.RequestedUsage != targetCount ||
+                allocation.AllocatedUsage != 3 ||
+                allocation.UnmetDemand != expectedUnmet ||
+                allocation.ForecastRemaining != 0)
+                throw new InvalidOperationException(
+                    "Authoritative plan allocation was not the scarce-rod budget: " +
+                    (allocation == null ? "missing" : allocation.RequestedUsage + "/" +
+                        allocation.AllocatedUsage + "/" + allocation.UnmetDemand + "/" +
+                        allocation.ForecastRemaining));
+
+            SelectedCastingViewModel casting = SelectedCastingViewModel.Create(
+                source, model, routineId, preview);
+            if (casting.BudgetLines.Count != 1)
+                throw new InvalidOperationException(
+                    "Expected exactly one demanded enhancement pool line.");
+            EnhancementBudgetLineViewModel line = casting.BudgetLines[0];
+            if (line.NativeChargesNow != 3 || line.RequestedUses != targetCount ||
+                line.AllocatedUses != 3 || line.UnmetUses != expectedUnmet ||
+                line.ProjectedRemaining != 0 || line.OwnerName != casterId ||
+                !line.Text.Contains(targetCount + " requested | 3 allocated | " +
+                    expectedUnmet + " unmet") ||
+                !line.Text.Contains("projected after " +
+                    char.ToUpperInvariant(routineId[0]) + routineId.Substring(1) + ": 0") ||
+                !line.Text.Contains("Quicken Metamagic Rod"))
+                throw new InvalidOperationException(
+                    "The budget line did not expose the mission's distinctions: " + line.Text);
+            if (string.IsNullOrEmpty(casting.EnhancementBudgetText) ||
+                casting.EnhancementBudgetText.IndexOf(
+                    "never consumes charges", StringComparison.Ordinal) < 0)
+                throw new InvalidOperationException(
+                    "The template/no-consumption explanation was missing.");
+            if (!casting.EnhancementWarning ||
+                casting.EnhancementLabel.IndexOf(expectedUnmet + " charge", StringComparison.Ordinal) < 0)
+                throw new InvalidOperationException(
+                    "Unmet demand did not surface on the ordinary card label: " +
+                    casting.EnhancementLabel);
+            EnhancementChoiceViewModel selectedChoice = casting.Choices.Single(
+                choice => choice.EnhancementId == rodId);
+            if (selectedChoice.BudgetNote.IndexOf(
+                    targetCount + " requested, 3 allocated", StringComparison.Ordinal) < 0 ||
+                selectedChoice.BudgetNote.IndexOf(
+                    "this spell: 3/" + targetCount + " targets funded",
+                    StringComparison.Ordinal) < 0)
+                throw new InvalidOperationException(
+                    "The selected row lacked the pool and this-spell budget note: " +
+                    selectedChoice.BudgetNote);
+            EnhancementChoiceViewModel unselectedChoice = casting.Choices.Single(
+                choice => choice.EnhancementId == idleRod.EnhancementId);
+            if (unselectedChoice.Selected ||
+                unselectedChoice.BudgetNote.IndexOf(
+                    "selecting reserves 1 charge per enhanced cast",
+                    StringComparison.Ordinal) < 0)
+                throw new InvalidOperationException(
+                    "An unselected choice did not state its reservation cost: " +
+                    unselectedChoice.BudgetNote);
+
+            var planSummary = new SelectedBuffPlanSummaryViewModel(source, model,
+                routineId, preview);
+            if (planSummary.Text.IndexOf("Unmet enhancement demand",
+                    StringComparison.Ordinal) < 0 ||
+                planSummary.Text.IndexOf("Quicken Metamagic Rod", StringComparison.Ordinal) < 0)
+                throw new InvalidOperationException(
+                    "The main card summary hid the resolved shortage: " + planSummary.Text);
+        }
+
+        // A6: reordering assignments moves the scarce charge to the new
+        // higher-priority cast immediately, through the same production plan.
+        private static void TestChooserBudgetReorderedPriority()
+        {
+            AbilityKey ability = Ability("reorder-budget-spell", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("reorder-slots",
+                ResourcePoolKind.SpontaneousLevel, 8, 8, null);
+            ProviderSnapshot felix = PlannerProvider("felix", "felix-book", ability,
+                pool.PoolKey, 1);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(
+                new[] { felix }, new[] { pool }, "felix", "t1", "t2", "t3", "t4");
+            var option = new ProviderPlanningOption(felix,
+                new[] { "felix", "t1", "t2", "t3", "t4" },
+                new[] { "felix", "t1", "t2", "t3", "t4" }, 4, 40);
+            string rodId = "metamagic-rod|felix|quicken-rod";
+            var rod = new CastEnhancementSnapshot(rodId, "felix", "quicken-rod",
+                "Quicken Metamagic Rod", string.Empty, CastEnhancementCategory.MetamagicRod,
+                4, 3, 3, null, "Quicken");
+            var effects = new Dictionary<string, EffectExpression>
+            {
+                { ability.Canonical, Leaf("reorder-budget-buff") }
+            };
+            var active = new ActiveEffectSnapshot(null);
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault(
+                "chooser-budget-reorder");
+            SourceAssignmentProfile parent = Assignment(ability.Canonical, ability,
+                new string[0]);
+            parent.CastingAssignments[0].TargetUnitIds = new List<string> { "t1", "t2" };
+            parent.CastingAssignments[0].Enhancements = new List<EnhancementSelectionProfile>
+            {
+                new EnhancementSelectionProfile { EnhancementId = rodId, Required = true }
+            };
+            parent.CastingAssignments.Add(new CastingAssignmentProfile
+            {
+                AssignmentId = "cast-2",
+                Order = 1,
+                TargetUnitIds = new List<string> { "t3", "t4" },
+                Enhancements = new List<EnhancementSelectionProfile>
+                {
+                    new EnhancementSelectionProfile { EnhancementId = rodId, Required = true }
+                }
+            });
+            profile.Routines.First(routine => routine.RoutineId == "short")
+                .Assignments.Add(parent);
+
+            RoutinePlanResult first = new RoutinePlanService().Plan(profile, "short",
+                snapshot, active, effects, new[] { option }, new[] { rod });
+            ResourcePoolAllocation allocation = first.Plan.AllocationFor(
+                "enhancement:" + rodId);
+            if (allocation == null || allocation.RequestedUsage != 4 ||
+                allocation.AllocatedUsage != 3 || allocation.UnmetDemand != 1)
+                throw new InvalidOperationException(
+                    "Two ordered assignments did not share one rod budget.");
+            if (first.Plan.Steps.Count(step => step.AssignmentId == "auto-" + ability.Canonical) != 2 ||
+                first.Plan.Steps.Count(step => step.AssignmentId == "cast-2") != 1 ||
+                !first.Plan.Outcomes.Any(outcome => outcome.UnitId == "t4" &&
+                    outcome.Kind == TargetOutcomeKind.Unfulfilled))
+                throw new InvalidOperationException(
+                    "The earlier assignment did not win the scarce charges.");
+
+            parent.CastingAssignments[0].Order = 1;
+            parent.CastingAssignments[1].Order = 0;
+            RoutinePlanResult second = new RoutinePlanService().Plan(profile, "short",
+                snapshot, active, effects, new[] { option }, new[] { rod });
+            ResourcePoolAllocation reordered = second.Plan.AllocationFor(
+                "enhancement:" + rodId);
+            if (reordered == null || reordered.RequestedUsage != 4 ||
+                reordered.AllocatedUsage != 3 || reordered.UnmetDemand != 1)
+                throw new InvalidOperationException(
+                    "Reordering changed the shared budget totals unexpectedly.");
+            if (second.Plan.Steps.Count(step => step.AssignmentId == "cast-2") != 2 ||
+                second.Plan.Steps.Count(step => step.AssignmentId == "auto-" + ability.Canonical) != 1 ||
+                !second.Plan.Outcomes.Any(outcome => outcome.UnitId == "t2" &&
+                    outcome.Kind == TargetOutcomeKind.Unfulfilled))
+                throw new InvalidOperationException(
+                    "The freed charge did not move to the new higher-priority assignment.");
+
+            var model = new PlannerSetupModel(profile, snapshot, active, effects,
+                new[] { option }, ignored => { }, new[] { rod });
+            SelectedCastingViewModel assignmentScoped = SelectedCastingViewModel.Create(
+                model.SelectedSource, model, "short", second, "cast-2");
+            EnhancementChoiceViewModel choice = assignmentScoped.Choices.Single(
+                candidate => candidate.EnhancementId == rodId);
+            if (choice.BudgetNote.IndexOf(
+                    "this assignment: 2/2 targets funded",
+                    StringComparison.Ordinal) < 0)
+                throw new InvalidOperationException(
+                    "The assignment-scoped chooser lost its own coverage note: " +
+                    choice.BudgetNote);
+        }
+
+        // C1 reproducer: "this spell" coverage must be scoped to the selected
+        // spell (or child assignment), never the routine aggregate, and must
+        // distinguish requested/funded/skipped targets from allocated casts
+        // and charges — including communal casts.
+        private static void TestChooserBudgetSpellScopedNotes()
+        {
+            AbilityKey[] abilities =
+            {
+                Ability("spell-a", string.Empty, 0),
+                Ability("spell-b", string.Empty, 0),
+                Ability("spell-c", string.Empty, 0),
+                Ability("spell-d", string.Empty, 0)
+            };
+            var pool = new ResourcePoolSnapshot("scoped-slots",
+                ResourcePoolKind.SpontaneousLevel, 8, 8, null);
+            string rodId = "metamagic-rod|felix|quicken-rod";
+            var providers = new List<ProviderSnapshot>();
+            var options = new List<ProviderPlanningOption>();
+            var effects = new Dictionary<string, EffectExpression>();
+            string[] targets = { "t-a", "t-b", "t-c", "t-d" };
+            for (int index = 0; index < abilities.Length; index++)
+            {
+                providers.Add(PlannerProvider("felix", "book-" + index,
+                    abilities[index], pool.PoolKey, 1));
+                options.Add(new ProviderPlanningOption(providers[index],
+                    new[] { "felix", targets[index] }, new[] { "felix", targets[index] }, 4, 40));
+                effects[abilities[index].Canonical] = Leaf("scoped-buff-" + index);
+            }
+            PartyProviderSnapshot snapshot = PlannerSnapshot(providers,
+                new[] { pool }, "felix", "t-a", "t-b", "t-c", "t-d");
+            var rod = new CastEnhancementSnapshot(rodId, "felix", "quicken-rod",
+                "Quicken Metamagic Rod", string.Empty, CastEnhancementCategory.MetamagicRod,
+                4, 3, 3, null, "Quicken");
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault(
+                "chooser-budget-spell-scoped");
+            for (int index = 0; index < abilities.Length; index++)
+            {
+                SourceAssignmentProfile parent = Assignment(abilities[index].Canonical,
+                    abilities[index], new[] { targets[index] },
+                    new[] { rodId });
+                profile.Routines.First(routine => routine.RoutineId == "short")
+                    .Assignments.Add(parent);
+            }
+            var active = new ActiveEffectSnapshot(null);
+            RoutinePlanResult preview = new RoutinePlanService().Plan(profile, "short",
+                snapshot, active, effects, options, new[] { rod });
+            ResourcePoolAllocation allocation = preview.Plan.AllocationFor(
+                "enhancement:" + rodId);
+            if (allocation == null || allocation.RequestedUsage != 4 ||
+                allocation.AllocatedUsage != 3 || allocation.UnmetDemand != 1)
+                throw new InvalidOperationException(
+                    "The shared pool did not show the mission's global 4/3/1 budget.");
+            var model = new PlannerSetupModel(profile, snapshot, active, effects,
+                options, ignored => { }, new[] { rod });
+            foreach (SetupSourceRow source in model.Sources)
+            {
+                SelectedCastingViewModel casting = SelectedCastingViewModel.Create(
+                    source, model, "short", preview);
+                EnhancementChoiceViewModel choice = casting.Choices.Single(
+                    candidate => candidate.EnhancementId == rodId);
+                if (!choice.Selected)
+                    throw new InvalidOperationException(
+                        "A spell selecting the rod showed it unselected: " + source.SourceId);
+                // spell-d is alphabetically last in the routine's allocation
+                // order, so it is exactly the unfunded one.
+                bool funded = source.Ability.BaseAbilityGuid != "spell-d";
+                string expected = funded
+                    ? "this spell: 1/1 targets funded (1 charge allocated)"
+                    : "this spell: 0/1 targets funded (0 charges allocated)";
+                if (choice.BudgetNote.IndexOf(expected, StringComparison.Ordinal) < 0)
+                    throw new InvalidOperationException(
+                        "The local note was not spell-scoped for " + source.SourceId +
+                        ": " + choice.BudgetNote);
+                if (choice.BudgetNote.IndexOf("3 allocated / 4 requested",
+                        StringComparison.Ordinal) >= 0)
+                    throw new InvalidOperationException(
+                        "A routine aggregate leaked into a this-spell note: " +
+                        choice.BudgetNote);
+            }
+
+            // Communal unit honesty: one party-wide spell, six targets, one
+            // communal cast, one charge.
+            AbilityKey communal = Ability("spell-communal", string.Empty, 0);
+            var communalPool = new ResourcePoolSnapshot("communal-slots",
+                ResourcePoolKind.SpontaneousLevel, 8, 8, null);
+            ProviderSnapshot communalProvider = PlannerProvider("felix", "communal-book",
+                communal, communalPool.PoolKey, 1);
+            string[] communalTargets = { "c1", "c2", "c3", "c4", "c5", "felix" };
+            PartyProviderSnapshot communalSnapshot = PlannerSnapshot(
+                new[] { communalProvider }, new[] { communalPool }, communalTargets);
+            var communalOption = new ProviderPlanningOption(communalProvider,
+                communalTargets, communalTargets, 4, 40);
+            var communalEffects = new Dictionary<string, EffectExpression>
+            {
+                { communal.Canonical, new EffectLeafExpression(EffectKind.Buff,
+                    "communal-buff", EffectTarget.Party, "fixture", "fixture/communal") }
+            };
+            BuffPlannerProfile communalProfile = BuffPlannerProfile.CreateDefault(
+                "chooser-budget-communal");
+            communalProfile.Routines.First(routine => routine.RoutineId == "short")
+                .Assignments.Add(Assignment(communal.Canonical, communal,
+                    communalTargets, new[] { rodId }));
+            RoutinePlanResult communalPreview = new RoutinePlanService().Plan(
+                communalProfile, "short", communalSnapshot,
+                new ActiveEffectSnapshot(null), communalEffects,
+                new[] { communalOption }, new[] { rod });
+            var communalModel = new PlannerSetupModel(communalProfile, communalSnapshot,
+                new ActiveEffectSnapshot(null), communalEffects,
+                new[] { communalOption }, ignored => { }, new[] { rod });
+            EnhancementChoiceViewModel communalChoice = SelectedCastingViewModel.Create(
+                communalModel.SelectedSource, communalModel, "short", communalPreview)
+                .Choices.Single(candidate => candidate.EnhancementId == rodId);
+            if (communalChoice.BudgetNote.IndexOf(
+                    "this spell: 1 communal cast covers its targets (1 charge allocated)",
+                    StringComparison.Ordinal) < 0)
+                throw new InvalidOperationException(
+                    "A communal cast was presented as one-cast-vs-many-targets: " +
+                    communalChoice.BudgetNote);
+
+            // Already-active targets are labeled as skips, not as funding.
+            var activeSnapshot = new ActiveEffectSnapshot(
+                new Dictionary<string, IEnumerable<string>> {
+                    { "c1", new[] { "communal-buff" } }
+                });
+            RoutinePlanResult skippedPreview = new RoutinePlanService().Plan(
+                communalProfile, "short", communalSnapshot, activeSnapshot,
+                communalEffects, new[] { communalOption }, new[] { rod });
+            var skippedModel = new PlannerSetupModel(communalProfile, communalSnapshot,
+                activeSnapshot, communalEffects,
+                new[] { communalOption }, ignored => { }, new[] { rod });
+            EnhancementChoiceViewModel skippedChoice = SelectedCastingViewModel.Create(
+                skippedModel.SelectedSource, skippedModel, "short", skippedPreview)
+                .Choices.Single(candidate => candidate.EnhancementId == rodId);
+            if (skippedChoice.BudgetNote.IndexOf("1 already active",
+                    StringComparison.Ordinal) < 0 ||
+                skippedChoice.BudgetNote.IndexOf("communal cast covers its targets",
+                    StringComparison.Ordinal) < 0)
+                throw new InvalidOperationException(
+                    "An already-active target was not labeled distinctly: " +
+                    skippedChoice.BudgetNote);
+        }
+
+        // C2 reproducer: the assignment-aware chooser builds choices, notes,
+        // and availability from THAT child's selections; unavailable selected
+        // enhancements stay individually removable; policy captions state the
+        // actual required/optional and targeting semantics.
+        private static void TestAssignmentChooserScopedChoices()
+        {
+            AbilityKey ability = Ability("scoped-chooser-spell", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("scoped-chooser-slots",
+                ResourcePoolKind.SpontaneousLevel, 8, 8, null);
+            ProviderSnapshot felix = PlannerProvider("felix", "felix-book", ability,
+                pool.PoolKey, 1);
+            ProviderSnapshot leinna = PlannerProvider("leinna", "leinna-book", ability,
+                pool.PoolKey, 1);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(
+                new[] { felix, leinna }, new[] { pool }, "felix", "leinna", "t1", "t2");
+            var felixOption = new ProviderPlanningOption(felix,
+                new[] { "felix", "t1", "t2" }, new[] { "felix", "t1", "t2" }, 4, 40);
+            var leinnaOption = new ProviderPlanningOption(leinna,
+                new[] { "leinna", "t1", "t2" }, new[] { "leinna", "t1", "t2" }, 4, 40);
+            string rodId = "metamagic-rod|felix|extend-rod";
+            var rod = new CastEnhancementSnapshot(rodId, "felix", "extend-rod",
+                "Extend Metamagic Rod", string.Empty, CastEnhancementCategory.MetamagicRod,
+                8, 3, 2, null, "Extend");
+            CastEnhancementSnapshot share = ClassEnhancement("share", "felix",
+                ability, "felix-book", 3, "reservoir|felix",
+                "brown-fur-share-transmutation", true);
+            var effects = new Dictionary<string, EffectExpression>
+            {
+                { ability.Canonical, Leaf("scoped-chooser-buff") }
+            };
+            var active = new ActiveEffectSnapshot(null);
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault(
+                "assignment-scoped-chooser");
+            SourceAssignmentProfile parent = Assignment(ability.Canonical, ability,
+                new string[0]);
+            parent.CastingAssignments.Add(new CastingAssignmentProfile
+            {
+                AssignmentId = "cast-2",
+                Order = 1,
+                CasterUnitId = "felix",
+                TargetUnitIds = new List<string> { "t1", "t2" },
+                Enhancements = new List<EnhancementSelectionProfile>
+                {
+                    new EnhancementSelectionProfile { EnhancementId = rodId, Required = true }
+                }
+            });
+            parent.CastingAssignments.Add(new CastingAssignmentProfile
+            {
+                AssignmentId = "cast-3",
+                Order = 2,
+                CasterUnitId = "leinna",
+                TargetUnitIds = new List<string> { },
+                Enhancements = new List<EnhancementSelectionProfile>()
+            });
+            profile.Routines.First(routine => routine.RoutineId == "short")
+                .Assignments.Add(parent);
+            var model = new PlannerSetupModel(profile, snapshot, active, effects,
+                new[] { felixOption, leinnaOption }, ignored => { },
+                new[] { rod, share });
+            SetupSourceRow source = model.SelectedSource;
+            RoutinePlanResult preview = new RoutinePlanService().Plan(profile, "short",
+                snapshot, active, effects, new[] { felixOption, leinnaOption },
+                new[] { rod, share });
+
+            // Pinned child selected the rod; the Automatic child did not.
+            SelectedCastingViewModel assignmentView = SelectedCastingViewModel.Create(
+                source, model, "short", preview, "cast-2");
+            EnhancementChoiceViewModel assignmentRod = assignmentView.Choices.Single(
+                candidate => candidate.EnhancementId == rodId);
+            if (!assignmentRod.Selected || !assignmentRod.Available ||
+                !assignmentRod.CanDeselect || !assignmentRod.CanSelect)
+                throw new InvalidOperationException(
+                    "The pinned child's selected rod was not presented as selected and removable.");
+            if (assignmentRod.BudgetNote.IndexOf("this assignment:",
+                    StringComparison.Ordinal) < 0)
+                throw new InvalidOperationException(
+                    "The assignment chooser lost its local scope: " + assignmentRod.BudgetNote);
+            if (assignmentRod.PolicyCaption != "REQUIRED" || !assignmentRod.CanTogglePolicy)
+                throw new InvalidOperationException(
+                    "An ordinary rod's policy caption was not honest: " +
+                    assignmentRod.PolicyCaption);
+            SelectedCastingViewModel automaticView = SelectedCastingViewModel.Create(
+                source, model, "short", preview);
+            if (automaticView.Choices.Single(candidate => candidate.EnhancementId == rodId)
+                    .Selected)
+                throw new InvalidOperationException(
+                    "The Automatic child inherited the pinned child's selection.");
+
+            // A caster-mismatched assignment scope makes the rod unavailable
+            // there even though the source-wide union includes it.
+            SelectedCastingViewModel foreignAssignment = SelectedCastingViewModel.Create(
+                source, model, "short", preview, "cast-3");
+            EnhancementChoiceViewModel foreignRod = foreignAssignment.Choices.Single(
+                candidate => candidate.EnhancementId == rodId);
+            if (foreignRod.Available || foreignRod.Selected ||
+                foreignRod.CanSelect || foreignRod.CanDeselect)
+                throw new InvalidOperationException(
+                    "A rod owned by another caster stayed selectable for a pinned child.");
+
+            // A targeting modifier can never present itself as optional.
+            model.SetAssignmentEnhancement("short", source.SourceId, "cast-2",
+                share.EnhancementId);
+            preview = new RoutinePlanService().Plan(profile, "short", snapshot, active,
+                effects, new[] { felixOption, leinnaOption }, new[] { rod, share });
+            SelectedCastingViewModel withShare = SelectedCastingViewModel.Create(
+                model.SelectedSource, model, "short", preview, "cast-2");
+            EnhancementChoiceViewModel shareChoice = withShare.Choices.Single(
+                candidate => candidate.EnhancementId == share.EnhancementId);
+            if (!shareChoice.Selected || shareChoice.PolicyCaption != "REQUIRED (targeting)" ||
+                shareChoice.CanTogglePolicy)
+                throw new InvalidOperationException(
+                    "A targeting modifier presented a toggleable or wrong policy: " +
+                    shareChoice.PolicyCaption);
+            EnhancementChoiceViewModel optionalRod = withShare.Choices.Single(
+                candidate => candidate.EnhancementId == rodId);
+            model.SetCastingAssignmentEnhancementPolicy("short", source.SourceId,
+                "cast-2", rodId, false);
+            withShare = SelectedCastingViewModel.Create(model.SelectedSource, model,
+                "short", preview, "cast-2");
+            optionalRod = withShare.Choices.Single(candidate =>
+                candidate.EnhancementId == rodId);
+            if (optionalRod.PolicyCaption != "OPTIONAL" || !optionalRod.CanTogglePolicy)
+                throw new InvalidOperationException(
+                    "An optional ordinary rod did not state its policy honestly: " +
+                    optionalRod.PolicyCaption);
+
+            // Exhaust only the pinned rod: it stays visible, selected, and
+            // individually removable; the unrelated Share choice survives.
+            var exhausted = new CastEnhancementSnapshot(rodId, "felix", "extend-rod",
+                rod.DisplayName, rod.Description, rod.Category,
+                rod.MetamagicMask, rod.MaximumSpellLevel, 0, null, "Extend");
+            var exhaustedModel = new PlannerSetupModel(profile, snapshot, active, effects,
+                new[] { felixOption, leinnaOption }, ignored => { },
+                new[] { exhausted, share });
+            SelectedCastingViewModel exhaustedView = SelectedCastingViewModel.Create(
+                exhaustedModel.SelectedSource, exhaustedModel, "short", preview, "cast-2");
+            EnhancementChoiceViewModel exhaustedRod = exhaustedView.Choices.Single(
+                candidate => candidate.EnhancementId == rodId);
+            if (!exhaustedRod.Selected || exhaustedRod.Available ||
+                !exhaustedRod.CanDeselect || exhaustedRod.CanSelect)
+                throw new InvalidOperationException(
+                    "An exhausted selected rod was not individually removable.");
+            EnhancementChoiceViewModel survivingShare = exhaustedView.Choices.Single(
+                candidate => candidate.EnhancementId == share.EnhancementId);
+            if (!survivingShare.Selected)
+                throw new InvalidOperationException(
+                    "An unrelated selection was disturbed by the exhausted rod.");
+            exhaustedModel.SetAssignmentEnhancement("short",
+                exhaustedModel.SelectedSource.SourceId, "cast-2", rodId);
+            if (exhaustedModel.GetAssignmentEnhancementIds("short",
+                    exhaustedModel.SelectedSource.SourceId, "cast-2")
+                    .Contains(rodId) ||
+                !exhaustedModel.GetAssignmentEnhancementIds("short",
+                    exhaustedModel.SelectedSource.SourceId, "cast-2")
+                    .Contains(share.EnhancementId))
+                throw new InvalidOperationException(
+                    "Individual removal also removed or failed to remove selections.");
+
+            // The ordinary Automatic workflow can also remove an unavailable
+            // selected enhancement without clearing anything else: select
+            // both while the rod is available, then reload the catalog with
+            // the rod exhausted and remove only it.
+            var selectingModel = new PlannerSetupModel(profile, snapshot, active, effects,
+                new[] { felixOption, leinnaOption }, ignored => { },
+                new[] { rod, share });
+            selectingModel.SetEnhancement("short", share.EnhancementId);
+            selectingModel.SetEnhancement("short", rodId);
+            var autoModel = new PlannerSetupModel(profile, snapshot, active, effects,
+                new[] { felixOption, leinnaOption }, ignored => { },
+                new[] { exhausted, share });
+            autoModel.SetEnhancement("short", exhausted.EnhancementId);
+            if (autoModel.GetSelectedEnhancementIds("short")
+                    .Contains(exhausted.EnhancementId) ||
+                !autoModel.GetSelectedEnhancementIds("short")
+                    .Contains(share.EnhancementId))
+                throw new InvalidOperationException(
+                    "Automatic-scope removal of an unavailable selection failed.");
+        }
+
+        // C3: the sticky summary and row notes are length-bounded regardless
+        // of pool count or name lengths; the full detail survives in the
+        // choice description (tooltip) rather than being silently truncated.
+        private static void TestChooserBudgetTextStaysBounded()
+        {
+            if (EnhancementBudgetModel.BoundText("short",
+                    EnhancementBudgetModel.MaximumSummaryLength) != "short" ||
+                EnhancementBudgetModel.BoundText(
+                    new string('x', EnhancementBudgetModel.MaximumSummaryLength + 50),
+                    EnhancementBudgetModel.MaximumSummaryLength).Length !=
+                EnhancementBudgetModel.MaximumSummaryLength)
+                throw new InvalidOperationException("BoundText lost its bound or its content.");
+            var lines = new List<EnhancementBudgetLineViewModel>();
+            string longName = new string('N', 80);
+            var affected = new List<string>();
+            for (int index = 0; index < 12; index++)
+                affected.Add(longName + " (target-" + index + ")");
+            for (int index = 0; index < 8; index++)
+                lines.Add(new EnhancementBudgetLineViewModel(
+                    "enhancement:pool-" + index, longName + " rod " + index, longName,
+                    "Named Spell", 3, 40 + index, 3, 37 + index, 0, "Short", affected));
+            string summary = EnhancementBudgetModel.SummaryText(lines, "short");
+            if (string.IsNullOrEmpty(summary) ||
+                summary.Length > EnhancementBudgetModel.MaximumSummaryLength)
+                throw new InvalidOperationException(
+                    "The sticky summary exceeded its renderable bound: " + summary.Length);
+            var pathological = new CastEnhancementSnapshot(
+                "rod-long", "felix", "long-guid", longName + " Metamagic Rod",
+                string.Empty, CastEnhancementCategory.MetamagicRod, 4, 3, 1, null, "Quicken");
+            string note = EnhancementBudgetModel.ChoiceNote(pathological, true, lines,
+                null, null, "short", "source-long", null);
+            if (note.Length > EnhancementBudgetModel.MaximumNoteLength)
+                throw new InvalidOperationException(
+                    "A row note exceeded its renderable bound: " + note.Length);
+            // Full pool detail is NOT lost by the bounds: the choice
+            // description (the row tooltip) carries the whole line text.
+            AbilityKey boundedAbility = Ability("bounded-spell", string.Empty, 0);
+            var boundedPool = new ResourcePoolSnapshot("bounded-slots",
+                ResourcePoolKind.SpontaneousLevel, 8, 8, null);
+            ProviderSnapshot boundedProvider = PlannerProvider("felix", "bounded-book",
+                boundedAbility, boundedPool.PoolKey, 1);
+            var boundedRod = new CastEnhancementSnapshot("rod-bounded", "felix",
+                "bounded-rod", "Bounded Quicken Rod", string.Empty,
+                CastEnhancementCategory.MetamagicRod, 4, 3, 3, null, "Quicken");
+            PartyProviderSnapshot boundedSnapshot = PlannerSnapshot(
+                new[] { boundedProvider }, new[] { boundedPool }, "felix", "t1");
+            var boundedOption = new ProviderPlanningOption(boundedProvider,
+                new[] { "felix", "t1" }, new[] { "felix", "t1" }, 4, 40);
+            var boundedEffects = new Dictionary<string, EffectExpression>
+            {
+                { boundedAbility.Canonical, Leaf("bounded-buff") }
+            };
+            BuffPlannerProfile boundedProfile = BuffPlannerProfile.CreateDefault("bounded");
+            boundedProfile.Routines.First(routine => routine.RoutineId == "short")
+                .Assignments.Add(Assignment(boundedAbility.Canonical, boundedAbility,
+                    new[] { "t1" }, new[] { "rod-bounded" }));
+            RoutinePlanResult boundedPreview = new RoutinePlanService().Plan(
+                boundedProfile, "short", boundedSnapshot, new ActiveEffectSnapshot(null),
+                boundedEffects, new[] { boundedOption }, new[] { boundedRod });
+            var boundedModel = new PlannerSetupModel(boundedProfile, boundedSnapshot,
+                new ActiveEffectSnapshot(null), boundedEffects, new[] { boundedOption },
+                ignored => { }, new[] { boundedRod });
+            EnhancementChoiceViewModel boundedChoice = SelectedCastingViewModel.Create(
+                boundedModel.SelectedSource, boundedModel, "short", boundedPreview)
+                .Choices.Single(candidate => candidate.EnhancementId == "rod-bounded");
+            if (boundedChoice.Description.IndexOf("projected after Short",
+                    StringComparison.Ordinal) < 0)
+                throw new InvalidOperationException(
+                    "The bounded summary dropped the full detail from the tooltip: " +
+                    boundedChoice.Description);
+        }
+
+        // P5 reproducer: unnamed extended metamagic masks never reach player
+        // text as integers; the provider contract or the item name supplies
+        // the readable effect name.
+        private static void TestMetamagicLabelsNeverShowRawMasks()
+        {
+            if (CastEnhancementNaming.EffectDisplayName(4, "Quicken Metamagic Rod",
+                    mask => "Quicken") != "Quicken")
+                throw new InvalidOperationException(
+                    "A named game-enum mask stopped passing through.");
+            if (CastEnhancementNaming.EffectDisplayName(9, "Rod",
+                    mask => "Empower, Maximize") != "Empower, Maximize")
+                throw new InvalidOperationException(
+                    "A named game-enum combination stopped passing through.");
+            if (CastEnhancementNaming.EffectDisplayName(268435456,
+                    "Persistent Metamagic Rod", mask => "Persistent") != "Persistent" ||
+                CastEnhancementNaming.EffectDisplayName(8192, "Rod",
+                    mask => "Threnodic") != "Threnodic")
+                throw new InvalidOperationException(
+                    "The provider display-name contract was not honored.");
+            // The provider absent: the item's own name is the descriptor.
+            if (CastEnhancementNaming.EffectDisplayName(268435456,
+                    "Persistent Metamagic Rod", mask => null) != "Persistent" ||
+                CastEnhancementNaming.EffectDisplayName(8192,
+                    "Metamagic Rod, Threnodic", mask => null) != "Threnodic" ||
+                CastEnhancementNaming.EffectDisplayName(33554432,
+                    "Lesser Selective Rod", mask => null) != "Selective")
+                throw new InvalidOperationException(
+                    "The item-derived fallback lost the owner's rod names.");
+            if (CastEnhancementNaming.EffectDisplayName(524288, "Rod", mask => null)
+                    != "Metamagic")
+                throw new InvalidOperationException(
+                    "An undescriptive fallback did not stay neutral.");
+            // A legacy numeric resolver result (the released defect shape)
+            // still yields readable text and never a digit.
+            string legacy = CastEnhancementNaming.EffectDisplayName(524288,
+                "Piercing Metamagic Rod", mask => "524288");
+            if (legacy != "Piercing" || legacy.Any(char.IsDigit))
+                throw new InvalidOperationException(
+                    "A numeric string leaked into the effect name: " + legacy);
+
+            var legacyNumeric = new CastEnhancementSnapshot("rod-legacy", "felix",
+                "legacy-guid", "Piercing Metamagic Rod", string.Empty,
+                CastEnhancementCategory.MetamagicRod, 524288, 3, 1, null, "524288");
+            if (PlannerSetupModel.EffectName(legacyNumeric) != "Piercing Spell")
+                throw new InvalidOperationException(
+                    "EffectName kept a raw mask suffix: " +
+                    PlannerSetupModel.EffectName(legacyNumeric));
+            var named = new CastEnhancementSnapshot("rod-named", "felix", "named-guid",
+                "Quicken Metamagic Rod", string.Empty, CastEnhancementCategory.MetamagicRod,
+                4, 3, 3, null, "Quicken");
+            if (PlannerSetupModel.EffectName(named) != "Quicken Spell")
+                throw new InvalidOperationException(
+                    "EffectName dropped the ordinary Spell suffix.");
+            var alreadySuffixed = new CastEnhancementSnapshot("rod-suffixed", "felix",
+                "suffixed-guid", "Threnodic Rod", string.Empty,
+                CastEnhancementCategory.MetamagicRod, 8192, 3, 1, null, "Threnodic Spell");
+            if (PlannerSetupModel.EffectName(alreadySuffixed) != "Threnodic Spell")
+                throw new InvalidOperationException(
+                    "EffectName double-suffixed a prepared effect name.");
+        }
+
+        // A11's installed-contract lane: the provider assembly that produced
+        // the owner's numeric labels resolves through the same fail-soft
+        // contract the shipped adapter uses.
+        private static void TestInstalledCallOfTheWildMetamagicNames()
+        {
+            string game = Environment.GetEnvironmentVariable("KBP_TEST_GAME_PATH");
+            string path = string.IsNullOrWhiteSpace(game) ? string.Empty : Path.Combine(
+                game, "Mods", "CallOfTheWild", "CallOfTheWild.dll");
+            if (!File.Exists(path)) return;
+            Assembly provider = Assembly.LoadFrom(path);
+            if (provider == null) return;
+            if (CallOfTheWildMetamagicNames.Describe(268435456) != "Persistent" ||
+                CallOfTheWildMetamagicNames.Describe(524288) != "Piercing" ||
+                CallOfTheWildMetamagicNames.Describe(33554432) != "Selective" ||
+                CallOfTheWildMetamagicNames.Describe(8192) != "Threnodic")
+                throw new InvalidOperationException(
+                    "The installed provider's extended metamagic names did not resolve: " +
+                    CallOfTheWildMetamagicNames.ContractSummary);
+            if (CallOfTheWildMetamagicNames.Describe(4) != null)
+                throw new InvalidOperationException(
+                    "A base-game mask resolved through the provider contract.");
+            if (string.IsNullOrEmpty(CallOfTheWildMetamagicNames.ContractSummary) ||
+                CallOfTheWildMetamagicNames.ContractSummary.IndexOf(
+                    "loaded:", StringComparison.Ordinal) != 0)
+                throw new InvalidOperationException(
+                    "The provider contract summary was not recorded: " +
+                    CallOfTheWildMetamagicNames.ContractSummary);
+        }
+
+        private static void TestControlCaptionFit()
+        {
+            if (ControlCaptionFit.RequiredWidth(100f, 5f) != 112f ||
+                ControlCaptionFit.RequiredHeight(20f, 1f) != 24f)
+                throw new InvalidOperationException("Caption fit dropped its insets or safety margin.");
+            if (ControlCaptionFit.ResolveExtent(96f, 80f) != 96f ||
+                ControlCaptionFit.ResolveExtent(96f, 140f) != 140f)
+                throw new InvalidOperationException("Caption fit must grow from the design floor only.");
+            if (ControlCaptionFit.ResolveExtent(96f, float.NaN) != 96f ||
+                ControlCaptionFit.ResolveExtent(96f, -5f) != 96f ||
+                ControlCaptionFit.ResolveExtent(96f, float.PositiveInfinity) != 96f)
+                throw new InvalidOperationException("Invalid measurements must keep the design floor.");
+        }
+
+        // Mission checkpoint C, canonical mixed-caster example: one catalog
+        // source, three child assignments, one resolved plan. Leinna casts on
+        // herself unenhanced; Felix casts on himself unenhanced and on Tias
+        // and Raine through Share. Four casts, Share only where configured.
+        private static void TestCastingAssignmentRouting()
+        {
+            AbilityKey ability = Ability("echolocation", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("echo-slots",
+                ResourcePoolKind.SpontaneousLevel, 8, 8, null);
+            ProviderSnapshot leinna = PlannerProvider("leinna", "leinna-book",
+                ability, pool.PoolKey, 1);
+            ProviderSnapshot felix = PlannerProvider("felix", "felix-book",
+                ability, pool.PoolKey, 1);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(
+                new[] { leinna, felix }, new[] { pool },
+                "leinna", "felix", "tias", "raine");
+            var leinnaOption = new ProviderPlanningOption(leinna,
+                new[] { "leinna" }, new[] { "leinna" }, 4, 40);
+            var felixOption = new ProviderPlanningOption(felix,
+                new[] { "felix" }, new[] { "felix" }, 5, 50);
+            CastEnhancementSnapshot share = ClassEnhancement("share", "felix",
+                ability, "felix-book", 3, "reservoir|felix",
+                "brown-fur-share-transmutation", true);
+            var targeting = new EffectiveProviderOptionResolver(
+                new ICastTargetingModifier[] {
+                    new FixtureShareTargetingModifier("share", "felix",
+                        new[] { "felix", "tias", "raine" })
+                });
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault(
+                "assignment-routing");
+            SourceAssignmentProfile parent = Assignment(
+                ability.Canonical, ability, new string[0]);
+            parent.CastingAssignments[0].TargetUnitIds = new List<string> { "leinna" };
+            parent.CastingAssignments.Add(new CastingAssignmentProfile
+            {
+                AssignmentId = "cast-2",
+                Order = 1,
+                CasterUnitId = "felix",
+                TargetUnitIds = new List<string> { "felix" },
+                Enhancements = new List<EnhancementSelectionProfile>()
+            });
+            parent.CastingAssignments.Add(new CastingAssignmentProfile
+            {
+                AssignmentId = "cast-3",
+                Order = 2,
+                CasterUnitId = "felix",
+                TargetUnitIds = new List<string> { "tias", "raine" },
+                Enhancements = new List<EnhancementSelectionProfile>
+                {
+                    new EnhancementSelectionProfile { EnhancementId = "share", Required = true }
+                }
+            });
+            profile.Routines[0].Assignments.Add(parent);
+
+            RoutinePlanResult result = new RoutinePlanService().Plan(profile, "long",
+                snapshot, new ActiveEffectSnapshot(null),
+                new Dictionary<string, EffectExpression> {
+                    { ability.Canonical, new EffectLeafExpression(EffectKind.Buff,
+                        "echo-buff", EffectTarget.Caster, "ContextActionApplyBuff", "root/apply") }
+                }, new[] { leinnaOption, felixOption }, new[] { share }, targeting);
+            CastPlan plan = result.Plan;
+            if (plan.Steps.Count != 4)
+                throw new InvalidOperationException("The mixed-caster example must produce four casts, not " +
+                    plan.Steps.Count + ".");
+            CastStep leinnaSelf = plan.Steps.SingleOrDefault(step =>
+                step.AssignmentId == "auto-" + ability.Canonical);
+            CastStep felixSelf = plan.Steps.SingleOrDefault(step =>
+                step.AssignmentId == "cast-2");
+            List<CastStep> felixShare = plan.Steps.Where(step =>
+                step.AssignmentId == "cast-3").ToList();
+            if (leinnaSelf == null || felixSelf == null || felixShare.Count != 2 ||
+                leinnaSelf.Provider.CasterUnitId != "leinna" ||
+                felixSelf.Provider.CasterUnitId != "felix" ||
+                felixShare.Any(step => step.Provider.CasterUnitId != "felix"))
+                throw new InvalidOperationException("Casts were not routed to the configured casters.");
+            if (leinnaSelf.EnhancementIds.Count != 0 ||
+                felixSelf.EnhancementIds.Count != 0 ||
+                felixShare.Any(step => !step.EnhancementIds.Contains("share")))
+                throw new InvalidOperationException(
+                    "Share leaked outside the two configured non-self casts or was missing from them.");
+            if (!felixShare.All(step => step.TargetUnitIds.Count == 1) ||
+                felixShare.Any(step => step.TargetUnitIds.Contains("felix")))
+                throw new InvalidOperationException("Share casts did not cover exactly the explicit non-self targets.");
+            if (plan.Outcomes.Count != 4 ||
+                plan.Outcomes.Any(outcome => outcome.Kind != TargetOutcomeKind.Fulfilled))
+                throw new InvalidOperationException("Some configured targets were not fulfilled.");
+            ResourcePoolAllocation reservoir = plan.AllocationFor("enhancement:reservoir|felix");
+            if (reservoir == null || reservoir.AvailableNow != 3 ||
+                reservoir.AllocatedUsage != 2 || reservoir.UnmetDemand != 0 ||
+                reservoir.Traces.Count != 1 || reservoir.Traces[0] != "cast-3")
+                throw new InvalidOperationException("Enhancement reservoir accounting did not trace to its assignment.");
+
+            // A pin is a hard constraint: pinning a party member with no
+            // provider for this spell leaves the cast unresolved instead of
+            // falling back to an available caster.
+            parent.CastingAssignments[0].CasterUnitId = "tias";
+            RoutinePlanResult pinned = new RoutinePlanService().Plan(profile, "long",
+                snapshot, new ActiveEffectSnapshot(null),
+                new Dictionary<string, EffectExpression> {
+                    { ability.Canonical, new EffectLeafExpression(EffectKind.Buff,
+                        "echo-buff", EffectTarget.Caster, "ContextActionApplyBuff", "root/apply") }
+                }, new[] { leinnaOption, felixOption }, new[] { share }, targeting);
+            TargetPlanOutcome leinnaOutcome = pinned.Plan.Outcomes.Single(outcome =>
+                outcome.AssignmentId == "auto-" + ability.Canonical);
+            if (leinnaOutcome.Kind != TargetOutcomeKind.Unfulfilled ||
+                !pinned.Plan.Diagnostics.Any(line => line.Contains(
+                    "pin-unresolved:auto-" + ability.Canonical + ":pinned-caster-unavailable:tias")))
+                throw new InvalidOperationException(
+                    "An unavailable pinned caster silently fell back to another caster.");
+        }
+
+        // Mission checkpoint C shortage and order fixtures: assignment order
+        // (never catalog order) decides who gets the limited charges, nine
+        // requested casts against three charges report 9/3/3/6, already-active
+        // skips reserve nothing, and optional policy labels its omissions.
+        private static void TestPartialExecutionGate()
+        {
+            // A plan with unmet targets is blocked for default Apply and its
+            // summary separates requested coverage from successful casts; a
+            // complete plan (including free already-active skips) is not.
+            AbilityKey ability = Ability("gate-spell", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("gate-slots",
+                ResourcePoolKind.Unlimited, 0, 0, null);
+            ProviderSnapshot caster = PlannerProvider("caster", "book",
+                ability, pool.PoolKey, 0);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(
+                new[] { caster }, new[] { pool }, "caster", "fine", "blocked");
+            var option = new ProviderPlanningOption(caster,
+                new[] { "caster", "fine" }, new[] { "caster" }, 4, 40);
+            CastPlan complete = new CastPlanner().Plan(snapshot,
+                new BuffCastRequest(new BuffSourceDefinition("gate", ability,
+                    Leaf("gate-buff"), CastGroupingKind.PerTarget),
+                    new[] { "fine" }, ExistingEffectPolicy.Overwrite, null),
+                new[] { option }, EmptyPolicy(), new ActiveEffectSnapshot(null));
+            PartialExecutionGate.Decision open = PartialExecutionGate.Evaluate(complete);
+            if (open.Blocked || open.RequestedTargets != 1 || open.PlannedCasts != 1 ||
+                !open.Summary.Contains("1 planned cast"))
+                throw new InvalidOperationException("A complete routine was gated or miscounted.");
+
+            var active = new Dictionary<string, IEnumerable<ActiveEffectMarker>>();
+            active["fine"] = new[] { new ActiveEffectMarker(EffectKind.Buff, "gate-buff") };
+            CastPlan withSkip = new CastPlanner().Plan(snapshot,
+                new BuffCastRequest(new BuffSourceDefinition("gate", ability,
+                    Leaf("gate-buff"), CastGroupingKind.PerTarget),
+                    new[] { "fine", "blocked" }, ExistingEffectPolicy.SkipAlreadyActive, null),
+                new[] { option }, EmptyPolicy(),
+                ActiveEffectSnapshot.FromTypedEffects(active));
+            PartialExecutionGate.Decision mixed = PartialExecutionGate.Evaluate(withSkip);
+            if (!mixed.Blocked || mixed.RequestedTargets != 2 || mixed.SkippedActive != 1 ||
+                mixed.Unfulfilled != 1 || mixed.PlannedCasts != 0 ||
+                !mixed.Summary.Contains("blocked ("))
+                throw new InvalidOperationException(
+                    "The gate did not report requested coverage separately from cast success.");
+            // The refusal wording used by both the planner Apply and the HUD
+            // quick-run names the ready-only escape hatch explicitly.
+            string refusal = mixed.Summary +
+                " Apply blocked to avoid running only part of Long; use Apply Ready Casts Only to run the ready subset.";
+            if (!refusal.Contains("Requested 2 targets") ||
+                !refusal.Contains("Apply Ready Casts Only"))
+                throw new InvalidOperationException("Refusal summary lost its coverage counts or escape hatch.");
+        }
+
+        private static void TestCastingOrderPresentation()
+        {
+            // The 9/3/3/6 fixture must be navigable and explained: numbered
+            // rows in explicit order, resolved caster text, pin visibility,
+            // and one resource line whose summary states the exact counts.
+            AbilityKey ability = Ability("order-spell", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("order-slots",
+                ResourcePoolKind.SpontaneousLevel, 9, 9, null);
+            ProviderSnapshot caster = PlannerProvider("caster", "book",
+                ability, pool.PoolKey, 1);
+            string[] nine = Enumerable.Range(1, 9)
+                .Select(index => "target-" + index).ToArray();
+            PartyProviderSnapshot snapshot = PlannerSnapshot(
+                new[] { caster }, new[] { pool },
+                new[] { "caster" }.Concat(nine).ToArray());
+            var option = new ProviderPlanningOption(caster,
+                new[] { "caster" }.Concat(nine), new[] { "caster" }, 4, 40);
+            CastEnhancementSnapshot rod = ClassEnhancement("order-rod", "caster",
+                ability, "book", 3, "order-pool", "order-rod-group", false);
+            var effects = new Dictionary<string, EffectExpression> {
+                { ability.Canonical, new EffectLeafExpression(EffectKind.Buff,
+                    "order-buff", EffectTarget.Caster, "ContextActionApplyBuff", "root/apply") }
+            };
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault("order-view");
+            SourceAssignmentProfile parent = Assignment(
+                ability.Canonical, ability, new string[0]);
+            parent.CastingAssignments[0].TargetUnitIds = new List<string>(nine);
+            parent.CastingAssignments[0].Enhancements.Add(
+                new EnhancementSelectionProfile { EnhancementId = "order-rod" });
+            profile.Routines[0].Assignments.Add(parent);
+            RoutinePlanResult result = new RoutinePlanService().Plan(profile, "long",
+                snapshot, new ActiveEffectSnapshot(null), effects,
+                new[] { option }, new[] { rod });
+
+            IReadOnlyList<CastingAssignmentRowViewModel> rows =
+                CastingAssignmentRowViewModel.CreateRoutineRows(profile, "long",
+                    sourceId => "Order Spell", unitId => unitId,
+                    enhancementId => "Order Rod", result.Plan);
+            CastingAssignmentRowViewModel row = rows.Single();
+            if (row.Number != 1 || !row.Automatic || row.CasterText != "Automatic" ||
+                row.TargetNames.Count != 9 ||
+                !row.EnhancementTexts[0].StartsWith("Order Rod", StringComparison.Ordinal) ||
+                row.PlannedCasts != 3 || row.FulfilledTargets != 3 ||
+                row.UnfulfilledTargets != 6 || row.CanMoveEarlier || row.CanMoveLater)
+                throw new InvalidOperationException("Casting-order row did not derive from the plan result.");
+            if (!row.Status.Contains("6 unmet"))
+                throw new InvalidOperationException("Row status hid the shortage: " + row.Status);
+
+            ResourcePoolAllocation allocation = result.Plan.AllocationFor("enhancement:order-pool");
+            var line = new ResourceUsageLineViewModel(allocation, "Uses (Order Rod)",
+                "Long", new[] { "Short", "Important" });
+            if (!line.Summary.Contains("requested 9") ||
+                !line.Summary.Contains("available 3") ||
+                !line.Summary.Contains("allocated 3") ||
+                !line.Summary.Contains("unmet 6") ||
+                !line.Summary.Contains("forecast remaining 0") ||
+                !line.Summary.Contains("Short, Important (their own runs)"))
+                throw new InvalidOperationException("Resource line lost the 9/3/3/6 accounting or competing-demand label: " +
+                    line.Summary);
+
+            // Missing pins survive as visible unresolved intent: a pinned
+            // assignment that cannot resolve keeps its row with a diagnostic.
+            parent.CastingAssignments[0].CasterUnitId = "target-9";
+            RoutinePlanResult pinnedPlan = new RoutinePlanService().Plan(profile, "long",
+                snapshot, new ActiveEffectSnapshot(null), effects,
+                new[] { option }, new[] { rod });
+            IReadOnlyList<CastingAssignmentRowViewModel> pinnedRows =
+                CastingAssignmentRowViewModel.CreateRoutineRows(profile, "long",
+                    sourceId => "Order Spell", unitId => unitId,
+                    enhancementId => "Order Rod", pinnedPlan.Plan);
+            if (pinnedRows.Count != 1 || !pinnedRows[0].PinUnresolved ||
+                !pinnedRows[0].Status.Contains("Pinned caster unavailable"))
+                throw new InvalidOperationException("A missing pin did not survive as visible unresolved intent.");
+        }
+
+        // Reproduces the canonical Echolocation setup through exactly the
+        // model APIs the casting-order editor calls — the same add/cycle/
+        // enhance/move/split/remove sequence a player performs in the UI.
+        // Constructing the profile directly proves planning; this proves the
+        // editor's service surface.
+        private static void TestAssignmentEditorModel()
+        {
+            AbilityKey ability = Ability("editor-echolocation", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("editor-slots",
+                ResourcePoolKind.SpontaneousLevel, 8, 8, null);
+            ProviderSnapshot leinna = PlannerProvider("leinna", "leinna-book",
+                ability, pool.PoolKey, 1);
+            ProviderSnapshot felix = PlannerProvider("felix", "felix-book",
+                ability, pool.PoolKey, 1);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(
+                new[] { leinna, felix }, new[] { pool },
+                "leinna", "felix", "tias", "raine");
+            var leinnaOption = new ProviderPlanningOption(leinna,
+                new[] { "leinna" }, new[] { "leinna" }, 4, 40);
+            var felixOption = new ProviderPlanningOption(felix,
+                new[] { "felix" }, new[] { "felix" }, 5, 50);
+            CastEnhancementSnapshot share = ClassEnhancement("share", "felix",
+                ability, "felix-book", 3, "reservoir|felix",
+                "brown-fur-share-transmutation", true);
+            var targeting = new EffectiveProviderOptionResolver(
+                new ICastTargetingModifier[] {
+                    new FixtureShareTargetingModifier("share", "felix",
+                        new[] { "felix", "tias", "raine" })
+                });
+            var effects = new Dictionary<string, EffectExpression> {
+                { ability.Canonical, new EffectLeafExpression(EffectKind.Buff,
+                    "editor-buff", EffectTarget.Caster, "ContextActionApplyBuff", "root/apply") }
+            };
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault("editor-flow");
+            int saves = 0;
+            var model = new PlannerSetupModel(profile, snapshot,
+                new ActiveEffectSnapshot(null), effects,
+                new[] { leinnaOption, felixOption }, ignored => saves++,
+                new[] { share }, targeting);
+            SetupSourceRow source = model.SelectedSource;
+
+            // Simple workflow first: one Automatic child via portrait toggle.
+            // Share must be selected before non-caster targets are legal for
+            // this personal-range spell, exactly as in the game UI.
+            model.ToggleTarget("long", "leinna");
+            model.SetEnhancement("long", "share");
+            model.ToggleTarget("long", "felix");
+            model.ToggleTarget("long", "tias");
+            model.ToggleTarget("long", "raine");
+            if (model.GetCastingAssignments("long", source.SourceId).Count != 1)
+                throw new InvalidOperationException(
+                    "The simple workflow no longer edits a single Automatic child.");
+
+            // Add the pinned Felix rows through the cycle control.
+            CastingAssignmentProfile felixSelf = model.AddCastingAssignment(
+                "long", source.SourceId);
+            model.CycleCastingAssignmentCaster("long", source.SourceId,
+                felixSelf.AssignmentId);
+            CastingAssignmentProfile shareRow = model.AddCastingAssignment(
+                "long", source.SourceId);
+            model.CycleCastingAssignmentCaster("long", source.SourceId,
+                shareRow.AssignmentId);
+            if (felixSelf.CasterUnitId != "felix" || shareRow.CasterUnitId != "felix")
+                throw new InvalidOperationException(
+                    "Caster cycling did not pass through Leinna to Felix.");
+            // Distribute the explicit targets atomically: Felix self into the
+            // plain pinned row; Tias and Raine into the Share row.
+            string automaticId = model.GetCastingAssignments("long", source.SourceId)[0]
+                .AssignmentId;
+            model.MoveTargetToAssignment("long", source.SourceId, automaticId,
+                felixSelf.AssignmentId, "felix");
+            model.SetAssignmentEnhancement("long", source.SourceId,
+                shareRow.AssignmentId, "share");
+            model.MoveTargetToAssignment("long", source.SourceId, automaticId,
+                shareRow.AssignmentId, "tias");
+            model.MoveTargetToAssignment("long", source.SourceId, automaticId,
+                shareRow.AssignmentId, "raine");
+            // Share now lives only on the pinned row; toggling it off the
+            // Automatic row restores the plain self-cast.
+            model.SetEnhancement("long", "share");
+            model.SetCastingAssignmentEnhancementPolicy("long", source.SourceId,
+                shareRow.AssignmentId, "share", false);
+            if (!model.GetAssignmentEnhancementIds("long", source.SourceId,
+                    shareRow.AssignmentId).SequenceEqual(new[] { "share" }) ||
+                model.FindCastingAssignment("long", source.SourceId,
+                    shareRow.AssignmentId).Enhancements[0].Required != false)
+                throw new InvalidOperationException(
+                    "Per-assignment enhancement selection or policy did not persist.");
+            // A duplicate explicit move must refuse instead of duplicating.
+            bool refused = false;
+            try
+            {
+                model.MoveTargetToAssignment("long", source.SourceId,
+                    felixSelf.AssignmentId, shareRow.AssignmentId, "tias");
+            }
+            catch (ArgumentException) { refused = true; }
+            if (!refused)
+                throw new InvalidOperationException(
+                    "Moving an already-assigned target did not refuse atomically.");
+
+            RoutinePlanResult result = new RoutinePlanService().Plan(profile, "long",
+                snapshot, new ActiveEffectSnapshot(null), effects,
+                new[] { leinnaOption, felixOption }, new[] { share }, targeting);
+            List<CastStep> shareSteps = result.Plan.Steps.Where(step =>
+                step.EnhancementIds.Contains("share")).ToList();
+            if (result.Plan.Steps.Count != 4 || shareSteps.Count != 2 ||
+                !shareSteps.All(step => step.Provider.CasterUnitId == "felix") ||
+                !shareSteps.Any(step => step.TargetUnitIds[0] == "tias") ||
+                !shareSteps.Any(step => step.TargetUnitIds[0] == "raine") ||
+                result.Plan.Steps.Any(step => !step.EnhancementIds.Contains("share") &&
+                    step.TargetUnitIds.Any(id => id == "tias" || id == "raine")))
+                throw new InvalidOperationException(
+                    "The editor-built configuration did not plan the expected casts.");
+
+            // Removal stays clean and never touches sibling rows: removing
+            // one target keeps the pinned row and its other target, then the
+            // whole row can be removed explicitly.
+            model.RemoveTargetFromAssignment("long", source.SourceId,
+                shareRow.AssignmentId, "tias");
+            if (model.IsTargetWanted("long", source.SourceId, "tias") ||
+                !model.IsTargetWanted("long", source.SourceId, "raine") ||
+                !model.GetCastingAssignments("long", source.SourceId)
+                    .Any(child => child.AssignmentId == shareRow.AssignmentId))
+                throw new InvalidOperationException(
+                    "Single-target removal leaked state into sibling rows.");
+            model.RemoveCastingAssignment("long", source.SourceId,
+                shareRow.AssignmentId);
+            model.RemoveCastingAssignment("long", source.SourceId,
+                felixSelf.AssignmentId);
+            if (model.GetCastingAssignments("long", source.SourceId).Count != 1 ||
+                !model.IsTargetWanted("long", source.SourceId, "leinna") ||
+                saves < 10)
+                throw new InvalidOperationException(
+                    "Row removal or edit persistence regressed.");
+        }
+
+        private static void TestPlanMaterialChangeDetector()
+        {
+            AbilityKey ability = Ability("material-spell", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("material-slots",
+                ResourcePoolKind.SpontaneousLevel, 4, 4, null);
+            ProviderSnapshot casterA = PlannerProvider("caster-a", "book-a",
+                ability, pool.PoolKey, 1);
+            ProviderSnapshot casterB = PlannerProvider("caster-b", "book-b",
+                ability, pool.PoolKey, 1);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(
+                new[] { casterA, casterB }, new[] { pool },
+                "caster-a", "caster-b", "ally-1", "ally-2");
+            var optionA = new ProviderPlanningOption(casterA,
+                new[] { "caster-a", "ally-1", "ally-2" }, new[] { "caster-a" }, 4, 40);
+            var optionB = new ProviderPlanningOption(casterB,
+                new[] { "caster-b", "ally-1", "ally-2" }, new[] { "caster-b" }, 4, 40);
+            var effects = new Dictionary<string, EffectExpression> {
+                { ability.Canonical, new EffectLeafExpression(EffectKind.Buff,
+                    "material-buff", EffectTarget.Caster, "ContextActionApplyBuff", "root/apply") }
+            };
+            CastPlan baseline = new CastPlanner().Plan(snapshot,
+                new BuffCastRequest(new BuffSourceDefinition("material", ability,
+                    Leaf("material-buff"), CastGroupingKind.PerTarget),
+                    new[] { "ally-1" }, ExistingEffectPolicy.Overwrite, null),
+                new[] { optionA, optionB }, EmptyPolicy(), new ActiveEffectSnapshot(null));
+            CastPlan same = new CastPlanner().Plan(snapshot,
+                new BuffCastRequest(new BuffSourceDefinition("material", ability,
+                    Leaf("material-buff"), CastGroupingKind.PerTarget),
+                    new[] { "ally-1" }, ExistingEffectPolicy.Overwrite, null),
+                new[] { optionA, optionB }, EmptyPolicy(), new ActiveEffectSnapshot(null));
+            if (PlanMaterialChangeDetector.DescribeMaterialChange(baseline, same) != null)
+                throw new InvalidOperationException("Identical plans were reported as materially changed.");
+
+            // Caster/provider change is material.
+            var banned = new ProviderSelectionPolicy(new[] { casterA.Key.Canonical },
+                null, null);
+            CastPlan otherCaster = new CastPlanner().Plan(snapshot,
+                new BuffCastRequest(new BuffSourceDefinition("material", ability,
+                    Leaf("material-buff"), CastGroupingKind.PerTarget),
+                    new[] { "ally-1" }, ExistingEffectPolicy.Overwrite, null),
+                new[] { optionA, optionB }, banned, new ActiveEffectSnapshot(null));
+            string casterChange = PlanMaterialChangeDetector.DescribeMaterialChange(
+                baseline, otherCaster);
+            if (casterChange == null || !casterChange.Contains("caster-b"))
+                throw new InvalidOperationException("A caster change was not material: " + casterChange);
+
+            // Coverage change is material with identical step sequences:
+            // the second target flips from unfulfilled to already-active skip
+            // while the single planned cast is unchanged.
+            var reachA = new ProviderPlanningOption(casterA,
+                new[] { "caster-a", "ally-1" }, new[] { "caster-a" }, 4, 40);
+            var active = new Dictionary<string, IEnumerable<ActiveEffectMarker>>();
+            active["ally-2"] = new[] { new ActiveEffectMarker(EffectKind.Buff, "material-buff") };
+            CastPlan withSkip = new CastPlanner().Plan(snapshot,
+                new BuffCastRequest(new BuffSourceDefinition("material", ability,
+                    Leaf("material-buff"), CastGroupingKind.PerTarget),
+                    new[] { "ally-1", "ally-2" }, ExistingEffectPolicy.SkipAlreadyActive, null),
+                new[] { reachA }, EmptyPolicy(),
+                ActiveEffectSnapshot.FromTypedEffects(active));
+            CastPlan withoutSkip = new CastPlanner().Plan(snapshot,
+                new BuffCastRequest(new BuffSourceDefinition("material", ability,
+                    Leaf("material-buff"), CastGroupingKind.PerTarget),
+                    new[] { "ally-1", "ally-2" }, ExistingEffectPolicy.SkipAlreadyActive, null),
+                new[] { reachA }, EmptyPolicy(), new ActiveEffectSnapshot(null));
+            string coverageChange = PlanMaterialChangeDetector.DescribeMaterialChange(
+                withoutSkip, withSkip);
+            if (coverageChange == null || !coverageChange.Contains("coverage changed"))
+                throw new InvalidOperationException("A coverage change was not material: " + coverageChange);
+
+            // Order change is material even with identical steps.
+            CastPlan reordered = new CastPlanner().PlanRoutine(snapshot,
+                new[] {
+                    new BuffCastRequest(new BuffSourceDefinition("material-b", ability,
+                        Leaf("material-buff"), CastGroupingKind.PerTarget),
+                        new[] { "ally-2" }, ExistingEffectPolicy.Overwrite, null,
+                        new[] { new EnhancementRequest("rod", true) },
+                        "second", null, null, null, 1),
+                    new BuffCastRequest(new BuffSourceDefinition("material-a", ability,
+                        Leaf("material-buff"), CastGroupingKind.PerTarget),
+                        new[] { "ally-1" }, ExistingEffectPolicy.Overwrite, null,
+                        new[] { new EnhancementRequest("rod", true) },
+                        "first", null, null, null, 0)
+                }, new[] { optionA, optionB }, EmptyPolicy(),
+                new ActiveEffectSnapshot(null), new[] {
+                    ClassEnhancement("rod", "caster-a", ability, "book-a", 4,
+                        "rod-pool", "rod-group", false)
+                });
+            CastPlan reorderedSwapped = new CastPlanner().PlanRoutine(snapshot,
+                new[] {
+                    new BuffCastRequest(new BuffSourceDefinition("material-b", ability,
+                        Leaf("material-buff"), CastGroupingKind.PerTarget),
+                        new[] { "ally-2" }, ExistingEffectPolicy.Overwrite, null,
+                        new[] { new EnhancementRequest("rod", true) },
+                        "second", null, null, null, 0),
+                    new BuffCastRequest(new BuffSourceDefinition("material-a", ability,
+                        Leaf("material-buff"), CastGroupingKind.PerTarget),
+                        new[] { "ally-1" }, ExistingEffectPolicy.Overwrite, null,
+                        new[] { new EnhancementRequest("rod", true) },
+                        "first", null, null, null, 1)
+                }, new[] { optionA, optionB }, EmptyPolicy(),
+                new ActiveEffectSnapshot(null), new[] {
+                    ClassEnhancement("rod", "caster-a", ability, "book-a", 4,
+                        "rod-pool", "rod-group", false)
+                });
+            string orderChange = PlanMaterialChangeDetector.DescribeMaterialChange(
+                reordered, reorderedSwapped);
+            if (orderChange == null)
+                throw new InvalidOperationException("An allocation-order change was not material.");
+        }
+
+        // Editor-intent regressions from the PR review: unique automatic ids
+        // after pinning, no cross-child duplicates, clear-keeps-enhancements,
+        // split-preserves-configuration, unavailable-enhancement removal, the
+        // first assignment from an empty source, save/reload of the edited
+        // setup, and the flat non-overlapping target layout.
+        private static void TestAssignmentEditorIntent()
+        {
+            AbilityKey ability = Ability("intent-spell", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("intent-slots",
+                ResourcePoolKind.Unlimited, 0, 0, null);
+            ProviderSnapshot felix = PlannerProvider("felix", "felix-book",
+                ability, pool.PoolKey, 0);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(
+                new[] { felix }, new[] { pool }, "felix", "tias", "raine");
+            var option = new ProviderPlanningOption(felix,
+                new[] { "felix", "tias", "raine" }, new[] { "felix" }, 4, 40);
+            CastEnhancementSnapshot share = ClassEnhancement("share", "felix",
+                ability, "felix-book", 3, "reservoir|felix",
+                "brown-fur-share-transmutation", true);
+            var effects = new Dictionary<string, EffectExpression> {
+                { ability.Canonical, new EffectLeafExpression(EffectKind.Buff,
+                    "intent-buff", EffectTarget.Caster, "ContextActionApplyBuff", "root/apply") }
+            };
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault("intent");
+            var model = new PlannerSetupModel(profile, snapshot,
+                new ActiveEffectSnapshot(null), effects, new[] { option },
+                ignored => { }, new[] { share });
+            SetupSourceRow source = model.SelectedSource;
+
+            // First assignment from a completely empty source/routine.
+            CastingAssignmentProfile first = model.AddCastingAssignment("long", source.SourceId);
+            if (model.GetCastingAssignments("long", source.SourceId).Count != 1 ||
+                model.GetRoutineCastingOrder("long").Count != 1)
+                throw new InvalidOperationException(
+                    "Creating the first assignment from an empty source failed.");
+
+            // Pin the original automatic child, then portrait-toggle: the new
+            // automatic child must get a unique id and absorb the target.
+            model.ToggleAssignmentTarget("long", source.SourceId,
+                first.AssignmentId, "felix");
+            model.CycleCastingAssignmentCaster("long", source.SourceId, first.AssignmentId);
+            model.ToggleTarget("long", "tias");
+            List<CastingAssignmentProfile> children = model
+                .GetCastingAssignments("long", source.SourceId).ToList();
+            if (children.Count != 2 ||
+                children.Select(child => child.AssignmentId).Distinct(StringComparer.Ordinal)
+                    .Count() != 2)
+                throw new InvalidOperationException(
+                    "A pinned original automatic child caused an id reuse or merge.");
+            CastingAssignmentProfile automatic = children.First(child => child.IsAutomatic);
+            if (!automatic.TargetUnitIds.Contains("tias") ||
+                children.Any(child => child != automatic &&
+                    child.TargetUnitIds.Contains("tias")))
+                throw new InvalidOperationException(
+                    "A portrait toggle duplicated a target across children.");
+
+            // Split preserves pins and enhancement intent, and stays directly
+            // after its origin in the explicit order.
+            model.SetAssignmentEnhancement("long", source.SourceId,
+                automatic.AssignmentId, "share");
+            CastingAssignmentProfile split = model.SplitCastingAssignment(
+                "long", source.SourceId, automatic.AssignmentId, "tias");
+            if (split.Enhancements.Count != 1 ||
+                split.Enhancements[0].EnhancementId != "share" ||
+                !automatic.Enhancements.Select(e => e.EnhancementId).Contains("share"))
+                throw new InvalidOperationException(
+                    "Split dropped the origin row's enhancement intent instead of copying it.");
+            List<CastingAssignmentProfile> ordered = model.GetRoutineCastingOrder("long").ToList();
+            int splitIndex = ordered.FindIndex(child => child.AssignmentId == split.AssignmentId);
+            int originIndex = ordered.FindIndex(child =>
+                child.AssignmentId == automatic.AssignmentId);
+            if (splitIndex != originIndex + 1)
+                throw new InvalidOperationException(
+                    "Split row did not keep the position immediately after its origin.");
+
+            // Clearing all valid targets keeps configured enhancements.
+            model.SetAllValidTargets("long", false);
+            children = model.GetCastingAssignments("long", source.SourceId).ToList();
+            if (children.Count == 0)
+                throw new InvalidOperationException(
+                    "Clearing targets silently discarded configured enhancement intent.");
+
+            // An unavailable saved enhancement stays individually removable
+            // without first becoming applicable again.
+            model.SetAssignmentEnhancement("long", source.SourceId,
+                automatic.AssignmentId, "share");
+            var reloadedModel = new PlannerSetupModel(profile, snapshot,
+                new ActiveEffectSnapshot(null), effects, new[] { option },
+                ignored => { });
+            CastingAssignmentProfile reloadedAutomatic = reloadedModel
+                .GetCastingAssignments("long", source.SourceId)
+                .First(child => child.Enhancements.Any(selection =>
+                    selection.EnhancementId == "share"));
+            string reloadedId = reloadedAutomatic.AssignmentId;
+            reloadedModel.SetAssignmentEnhancement("long", source.SourceId,
+                reloadedId, "share");
+            if (reloadedModel.GetAssignmentEnhancementIds("long", source.SourceId, reloadedId)
+                    .Contains("share"))
+                throw new InvalidOperationException(
+                    "An unavailable saved enhancement could not be removed without applicability.");
+
+            // Save/reload round-trip of the edited configuration.
+            string modPath = Path.Combine(Path.GetTempPath(),
+                "kbp-intent-roundtrip-" + Guid.NewGuid().ToString("N"));
+            var repository = new ProfileRepository(modPath);
+            repository.Save(profile);
+            BuffPlannerProfile loaded = repository.Load(profile.CampaignId).Profile;
+            int configured = profile.Routines[0].Assignments
+                .SelectMany(a => a.CastingAssignments).Count();
+            int loadedCount = loaded.Routines[0].Assignments
+                .SelectMany(a => a.CastingAssignments).Count();
+            if (loadedCount != configured)
+                throw new InvalidOperationException(
+                    "The edited multi-assignment configuration did not round-trip.");
+
+            // Flat target layout: every explicit target owns its own row for
+            // 1, 2, 6, and 10 targets without overlap.
+            foreach (int targetCount in new[] { 1, 2, 6, 10 })
+            {
+                var rowModel = new CastingAssignmentRowViewModel(1, "S", "s",
+                    new CastingAssignmentProfile
+                    {
+                        AssignmentId = "a", Order = 0,
+                        TargetUnitIds = Enumerable.Range(1, targetCount)
+                            .Select(index => "u" + index).ToList(),
+                        Enhancements = new List<EnhancementSelectionProfile>()
+                    }, "Automatic", false,
+                    Enumerable.Range(1, targetCount).Select(index => "u" + index).ToList(),
+                    new string[0], 0, 0, 0, false, false, true);
+                IReadOnlyList<CastingOrderLayout.RowPlan> plan =
+                    CastingOrderLayout.PlanRows(new[] { rowModel });
+                if (plan.Count != 1 + targetCount ||
+                    !CastingOrderLayout.RowsAreDistinct(plan) ||
+                    plan.Count(row => row.IsTargetRow) != targetCount)
+                    throw new InvalidOperationException(
+                        "The flat casting-order layout overlapped or dropped rows for " +
+                        targetCount + " targets.");
+            }
+        }
+
+        // N1: one provider under two assignments with different effective
+        // targeting (plain self-cast vs Share) — the self-only option must
+        // never suppress the shared reach, in EITHER creation order, and the
+        // picker uses assignment-specific legality with pins enforced by the
+        // production resolver.
+        private static void TestSameProviderTargeting()
+        {
+            AbilityKey ability = Ability("n1-echolocation", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("n1-slots",
+                ResourcePoolKind.SpontaneousLevel, 8, 8, null);
+            ProviderSnapshot felix = PlannerProvider("felix", "felix-book",
+                ability, pool.PoolKey, 1);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(
+                new[] { felix }, new[] { pool }, "felix", "tias", "raine");
+            var felixOption = new ProviderPlanningOption(felix,
+                new[] { "felix" }, new[] { "felix" }, 5, 50);
+            CastEnhancementSnapshot share = ClassEnhancement("share", "felix",
+                ability, "felix-book", 3, "reservoir|felix",
+                "brown-fur-share-transmutation", true);
+            var targeting = new EffectiveProviderOptionResolver(
+                new ICastTargetingModifier[] {
+                    new FixtureShareTargetingModifier("share", "felix",
+                        new[] { "felix", "tias", "raine" })
+                });
+            var effects = new Dictionary<string, EffectExpression> {
+                { ability.Canonical, new EffectLeafExpression(EffectKind.Buff,
+                    "n1-buff", EffectTarget.Caster, "ContextActionApplyBuff", "root/apply") }
+            };
+
+            foreach (bool shareFirst in new[] { false, true })
+            {
+                BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault(
+                    "n1-" + (shareFirst ? "s" : "p"));
+                var model = new PlannerSetupModel(profile, snapshot,
+                    new ActiveEffectSnapshot(null), effects,
+                    new[] { felixOption }, ignored => { }, new[] { share }, targeting);
+                SetupSourceRow source = model.SelectedSource;
+
+                model.ToggleTarget("long", "felix");
+                List<CastingAssignmentProfile> children = model
+                    .GetCastingAssignments("long", source.SourceId).ToList();
+                string firstId = children[0].AssignmentId;
+                CastingAssignmentProfile second = shareFirst
+                    ? model.SplitCastingAssignment("long", source.SourceId, firstId, "felix")
+                    : model.SplitCastingAssignment("long", source.SourceId, firstId, "felix");
+                model.SetAssignmentEnhancement("long", source.SourceId,
+                    second.AssignmentId, "share");
+                if (!shareFirst)
+                {
+                    // Reorder so the plain child runs FIRST explicitly.
+                    model.MoveCastingAssignmentEarlier("long", second.AssignmentId);
+                }
+
+                // Source-level legality: the shared reach must survive the
+                // plain child's self-only option for the SAME provider.
+                if (!model.IsTargetLegal(source, "long", "tias") ||
+                    !model.IsTargetLegal(source, "long", "raine") ||
+                    !model.IsTargetLegal(source, "long", "felix"))
+                    throw new InvalidOperationException(
+                        "The self-only option suppressed the Share reach (shareFirst=" +
+                        shareFirst + ").");
+
+                // Assignment-specific legality: the plain child cannot reach
+                // tias; the Share child can; a pinned caster removes the rest.
+                // The Share child is always the split child (`second`); the
+                // order variation only changes their relative Order.
+                string plainId = firstId;
+                string shareId = second.AssignmentId;
+                if (model.IsTargetLegalForAssignment(source, "long", plainId, "tias"))
+                    throw new InvalidOperationException(
+                        "The plain child's picker offered Share-only reach.");
+                if (!model.IsTargetLegalForAssignment(source, "long", shareId, "tias"))
+                    throw new InvalidOperationException(
+                        "The Share child's picker lost its own reach.");
+                // Pin the plain child to a different caster: resolver must
+                // remove every other candidate (pin enforcement).
+                CastingAssignmentProfile plainChild = model.FindCastingAssignment(
+                    "long", source.SourceId, plainId);
+                plainChild.CasterUnitId = "tias"; // no provider for tias
+                if (model.IsTargetLegalForAssignment(source, "long", plainId, "felix"))
+                    throw new InvalidOperationException(
+                        "A pinned caster did not remove other providers' reach.");
+                plainChild.CasterUnitId = null;
+            }
+        }
+
+        // N2: the picker toggle on a sibling-owned target refuses with the
+        // owner named instead of silently removing coverage; the selected
+        // child only ever gains or loses its own targets.
+        private static void TestPickerToggleCoverage()
+        {
+            AbilityKey ability = Ability("n2-spell", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("n2-slots",
+                ResourcePoolKind.Unlimited, 0, 0, null);
+            ProviderSnapshot felix = PlannerProvider("felix", "felix-book",
+                ability, pool.PoolKey, 0);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(
+                new[] { felix }, new[] { pool }, "felix", "tias", "raine");
+            var option = new ProviderPlanningOption(felix,
+                new[] { "felix", "tias", "raine" }, new[] { "felix" }, 4, 40);
+            var effects = new Dictionary<string, EffectExpression> {
+                { ability.Canonical, Leaf("n2-buff") }
+            };
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault("n2-picker");
+            int saves = 0;
+            var model = new PlannerSetupModel(profile, snapshot,
+                new ActiveEffectSnapshot(null), effects, new[] { option },
+                ignored => saves++);
+            SetupSourceRow source = model.SelectedSource;
+            model.ToggleTarget("long", "tias");
+            string rowAId = model.GetCastingAssignments("long", source.SourceId)
+                .First().AssignmentId;
+            CastingAssignmentProfile rowB = model.SplitCastingAssignment(
+                "long", source.SourceId, rowAId, "tias");
+            // Simulate the picker's exact callback: checking tias in row A
+            // (which no longer owns it; sibling row B does) must refuse.
+            bool refused = false;
+            try
+            {
+                model.ToggleAssignmentTarget("long", source.SourceId, rowAId, "tias");
+            }
+            catch (InvalidOperationException exception)
+            {
+                refused = true;
+                if (!exception.Message.Contains("already assigned"))
+                    throw new InvalidOperationException(
+                        "Sibling refusal lost the owner context: " + exception.Message);
+            }
+            if (!refused)
+                throw new InvalidOperationException(
+                    "Checking a sibling-owned target in another row did not refuse.");
+            // Coverage survived: tias still requested exactly once.
+            List<CastingAssignmentProfile> children = model
+                .GetCastingAssignments("long", source.SourceId).ToList();
+            if (children.Sum(child => child.TargetUnitIds.Count(id => id == "tias")) != 1)
+                throw new InvalidOperationException(
+                    "Picker toggle dropped requested coverage silently.");
+            // Row B gains its own target; deselect removes only from row B.
+            model.ToggleAssignmentTarget("long", source.SourceId, rowB.AssignmentId, "raine");
+            if (!rowB.TargetUnitIds.Contains("raine"))
+                throw new InvalidOperationException("Row B did not gain its own target.");
+            model.ToggleAssignmentTarget("long", source.SourceId, rowB.AssignmentId, "raine");
+            if (rowB.TargetUnitIds.Contains("raine") || saves < 3)
+                throw new InvalidOperationException(
+                    "Deselect did not remove from the selected child only.");
+        }
+
+        // N3: a caster-directed effect on a cast anchored at another unit
+        // projects onto the CASTER, not the anchor; a later request for that
+        // effect on the anchor must still cast.
+        private static void TestForecastCasterIdentity()
+        {
+            AbilityKey buffSpell = Ability("n3-anchor-spell", string.Empty, 0);
+            AbilityKey selfSpell = Ability("n3-self-spell", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("n3-slots",
+                ResourcePoolKind.Unlimited, 0, 0, null);
+            ProviderSnapshot casterA = PlannerProvider("caster-a", "book-a",
+                buffSpell, pool.PoolKey, 0);
+            ProviderSnapshot selfCaster = PlannerProvider("caster-a", "book-a",
+                selfSpell, pool.PoolKey, 0);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(
+                new[] { casterA, selfCaster }, new[] { pool },
+                "caster-a", "anchor-b");
+            var buffOption = new ProviderPlanningOption(casterA,
+                new[] { "caster-a", "anchor-b" }, new[] { "caster-a" }, 4, 40);
+            var selfOption = new ProviderPlanningOption(selfCaster,
+                new[] { "caster-a", "anchor-b" }, new[] { "caster-a" }, 4, 40);
+            // Anchor spell: a target effect on the anchor plus a DISTINCT
+            // caster-directed effect.
+            EffectExpression anchorEffects = new SequenceEffectExpression(
+                new EffectExpression[] {
+                    new EffectLeafExpression(EffectKind.Buff, "n3-target-buff",
+                        EffectTarget.CurrentTarget, "ContextActionApplyBuff", "root/a"),
+                    new EffectLeafExpression(EffectKind.Buff, "n3-caster-buff",
+                        EffectTarget.Caster, "ContextActionApplyBuff", "root/b")
+                });
+            var effects = new Dictionary<string, EffectExpression> {
+                { buffSpell.Canonical, anchorEffects },
+                { selfSpell.Canonical, Leaf("n3-caster-buff") }
+            };
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault("n3-caster");
+            profile.Routines.First(r => r.RoutineId == "long").Assignments.Add(Assignment(
+                buffSpell.Canonical, buffSpell, new[] { "anchor-b" }));
+            profile.Routines.First(r => r.RoutineId == "short").Assignments.Add(Assignment(
+                selfSpell.Canonical, selfSpell, new[] { "anchor-b" }));
+            SequentialForecastPlanner.Result result = SequentialForecastPlanner.Compute(
+                profile, new[] { "long", "short" }, snapshot,
+                new ActiveEffectSnapshot(null), effects,
+                new[] { buffOption, selfOption }, new CastEnhancementSnapshot[0]);
+            // The short routine requests n3-caster-buff on anchor-b: the long
+            // cast projected that effect onto caster-a (the caster), NOT the
+            // anchor — so anchor-b must still CAST.
+            int shortCasts = result.Occurrences[1].Plan.Steps.Count;
+            if (shortCasts != 1)
+                throw new InvalidOperationException(
+                    "A caster-directed effect was invented onto the anchor (short casts=" +
+                    shortCasts + ").");
+            // Self-cast on caster-a for the same effect skips for free.
+            BuffPlannerProfile selfProfile = BuffPlannerProfile.CreateDefault("n3-caster-self");
+            selfProfile.Routines.First(r => r.RoutineId == "long").Assignments.Add(Assignment(
+                buffSpell.Canonical, buffSpell, new[] { "anchor-b" }));
+            selfProfile.Routines.First(r => r.RoutineId == "short").Assignments.Add(Assignment(
+                selfSpell.Canonical, selfSpell, new[] { "caster-a" }));
+            SequentialForecastPlanner.Result selfResult = SequentialForecastPlanner.Compute(
+                selfProfile, new[] { "long", "short" }, snapshot,
+                new ActiveEffectSnapshot(null), effects,
+                new[] { buffOption, selfOption }, new CastEnhancementSnapshot[0]);
+            if (selfResult.Occurrences[1].Plan.Steps.Count != 0 ||
+                selfResult.Occurrences[1].Plan.Outcomes.Count(o =>
+                    o.Kind == TargetOutcomeKind.SkippedAlreadyActive) != 1)
+                throw new InvalidOperationException(
+                    "The caster's own later request did not skip for free.");
+        }
+
+        // R4: the ordinary source/portrait path resolves each child's pins,
+        // targets, and enhancement selections separately instead of merging
+        // them into one incompatible union; portraits never silently convert
+        // pinned routing; select-all/clear reconcile with pinned rows.
+        private static void TestPortraitChildIntent()
+        {
+            AbilityKey ability = Ability("portrait-spell", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("portrait-slots",
+                ResourcePoolKind.SpontaneousLevel, 8, 8, null);
+            ProviderSnapshot leinna = PlannerProvider("leinna", "leinna-book",
+                ability, pool.PoolKey, 1);
+            ProviderSnapshot felix = PlannerProvider("felix", "felix-book",
+                ability, pool.PoolKey, 1);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(
+                new[] { leinna, felix }, new[] { pool },
+                "leinna", "felix", "tias");
+            var leinnaOption = new ProviderPlanningOption(leinna,
+                new[] { "leinna" }, new[] { "leinna" }, 4, 40);
+            var felixOption = new ProviderPlanningOption(felix,
+                new[] { "felix" }, new[] { "felix" }, 5, 50);
+            // Two DIFFERENT caster-owned rods: an exclusive-group union would
+            // make them incompatible.
+            CastEnhancementSnapshot leinnaRod = ClassEnhancement("rod-l", "leinna",
+                ability, "leinna-book", 3, "pool-l", "rod-group", false);
+            CastEnhancementSnapshot felixRod = ClassEnhancement("rod-f", "felix",
+                ability, "felix-book", 3, "pool-f", "rod-group", false);
+            var effects = new Dictionary<string, EffectExpression> {
+                { ability.Canonical, new EffectLeafExpression(EffectKind.Buff,
+                    "portrait-buff", EffectTarget.Caster, "ContextActionApplyBuff", "root/apply") }
+            };
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault("portrait-intent");
+            var model = new PlannerSetupModel(profile, snapshot,
+                new ActiveEffectSnapshot(null), effects,
+                new[] { leinnaOption, felixOption }, ignored => { },
+                new[] { leinnaRod, felixRod });
+            SetupSourceRow source = model.SelectedSource;
+
+            // Two children, one rod each, one target each: the simple
+            // portrait strip starts both on the Automatic child, then the
+            // editor splits them.
+            model.ToggleTarget("long", "leinna");
+            model.ToggleTarget("long", "felix");
+            List<CastingAssignmentProfile> children = model
+                .GetCastingAssignments("long", source.SourceId).ToList();
+            string felixRowId = children[0].AssignmentId;
+            CastingAssignmentProfile felixRow = model.SplitCastingAssignment(
+                "long", source.SourceId, felixRowId, "felix");
+            felixRowId = felixRow.AssignmentId;
+            model.CycleCastingAssignmentCaster("long", source.SourceId, felixRowId);
+            model.SetAssignmentEnhancement("long", source.SourceId,
+                children.First(child => child.TargetUnitIds.Contains("leinna")).AssignmentId,
+                "rod-l");
+            model.SetAssignmentEnhancement("long", source.SourceId, felixRowId, "rod-f");
+
+            // The union would merge rod-l + rod-f (same exclusive group) into
+            // an impossible combined selection and kill all legality.
+            if (!model.IsTargetLegal(source, "long", "leinna") ||
+                !model.IsTargetLegal(source, "long", "felix"))
+                throw new InvalidOperationException(
+                    "The portrait path merged two children's rods into one incompatible union.");
+
+            // The plan still routes each child with its own rod.
+            RoutinePlanResult result = new RoutinePlanService().Plan(profile, "long",
+                snapshot, new ActiveEffectSnapshot(null), effects,
+                new[] { leinnaOption, felixOption }, new[] { leinnaRod, felixRod });
+            if (result.Plan.Steps.Count != 2 ||
+                !result.Plan.Steps.Any(step => step.EnhancementIds.Contains("rod-l") &&
+                    step.Provider.CasterUnitId == "leinna") ||
+                !result.Plan.Steps.Any(step => step.EnhancementIds.Contains("rod-f") &&
+                    step.Provider.CasterUnitId == "felix"))
+                throw new InvalidOperationException(
+                    "Child rods did not stay on their own casts.");
+
+            // Clicking a portrait held by a pinned row never edits that row
+            // from the simple strip — neither deselect nor select converts
+            // the pinned routing to Automatic.
+            children = model.GetCastingAssignments("long", source.SourceId).ToList();
+            string pinnedId = children.First(child =>
+                !child.IsAutomatic && child.TargetUnitIds.Contains("felix")).AssignmentId;
+            model.ToggleTarget("long", "felix");
+            model.ToggleTarget("long", "felix");
+            children = model.GetCastingAssignments("long", source.SourceId).ToList();
+            CastingAssignmentProfile stillPinned = children.First(child =>
+                child.AssignmentId == pinnedId);
+            if (!stillPinned.TargetUnitIds.Contains("felix") || stillPinned.IsAutomatic ||
+                children.Count(child => child.TargetUnitIds.Contains("felix")) != 1)
+                throw new InvalidOperationException(
+                    "A simple-strip toggle converted or duplicated pinned routing.");
+
+            // Select-all after a pinned assignment does not duplicate its
+            // targets into the Automatic child. The pinned row already holds
+            // 'leinna' or 'felix'; select-all must not copy it.
+            model.SetAllValidTargets("long", true);
+            children = model.GetCastingAssignments("long", source.SourceId).ToList();
+            foreach (string unitId in new[] { "leinna", "felix" })
+                if (children.Count(child => child.TargetUnitIds.Contains(unitId)) > 1)
+                    throw new InvalidOperationException(
+                        "Select-all duplicated a pinned row's target: " + unitId);
+            // Clearing removes only the Automatic child's targets.
+            model.SetAllValidTargets("long", false);
+            children = model.GetCastingAssignments("long", source.SourceId).ToList();
+            CastingAssignmentProfile survivor = children.FirstOrDefault(child =>
+                !child.IsAutomatic && child.TargetUnitIds.Count > 0);
+            if (survivor == null)
+                throw new InvalidOperationException(
+                    "Clear-all discarded pinned routing instead of reconciling.");
+        }
+
+        // R3a: prepared-slot tokens are consumed exactly (linked companions
+        // included) across occurrences; the second occurrence cannot reuse a
+        // spent slot even with different targets, an independent unused
+        // token stays usable, and reversing the order moves the shortfall.
+        private static void TestForecastPreparedTokens()
+        {
+            AbilityKey longAbility = Ability("prep-long", string.Empty, 0);
+            AbilityKey shortAbility = Ability("prep-short", string.Empty, 0);
+            // Case 1: exactly ONE prepared token shared by both routines.
+            var onlyToken = new ResourceTokenSnapshot("t-only",
+                longAbility, 1, PreparedSlotKind.Favorite, true, true, new string[0]);
+            var onePool = new ResourcePoolSnapshot("prep-one",
+                ResourcePoolKind.PreparedSlots, 1, 1, new[] { onlyToken });
+            ProviderSnapshot longCaster = new ProviderSnapshot(
+                new ProviderKey("caster", "book", longAbility, "level-2"),
+                longAbility.BaseAbilityGuid, 1, onePool.PoolKey, 1, new[] { "t-only" });
+            ProviderSnapshot shortCaster = new ProviderSnapshot(
+                new ProviderKey("caster", "book", shortAbility, "level-2"),
+                shortAbility.BaseAbilityGuid, 1, onePool.PoolKey, 1, new[] { "t-only" });
+            PartyProviderSnapshot oneSnapshot = PlannerSnapshot(
+                new[] { longCaster, shortCaster }, new[] { onePool },
+                "caster", "la", "sa");
+            var longOption = new ProviderPlanningOption(longCaster,
+                new[] { "caster", "la" }, new[] { "caster" }, 4, 40);
+            var shortOption = new ProviderPlanningOption(shortCaster,
+                new[] { "caster", "sa" }, new[] { "caster" }, 4, 40);
+            var effects = new Dictionary<string, EffectExpression> {
+                { longAbility.Canonical, Leaf("prep-long-buff") },
+                { shortAbility.Canonical, Leaf("prep-short-buff") }
+            };
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault("prep-forecast");
+            profile.Routines.First(r => r.RoutineId == "long").Assignments.Add(Assignment(
+                longAbility.Canonical, longAbility, new[] { "la" }));
+            profile.Routines.First(r => r.RoutineId == "short").Assignments.Add(Assignment(
+                shortAbility.Canonical, shortAbility, new[] { "sa" }));
+
+            SequentialForecastPlanner.Result forward = SequentialForecastPlanner.Compute(
+                profile, new[] { "long", "short" }, oneSnapshot,
+                new ActiveEffectSnapshot(null), effects,
+                new[] { longOption, shortOption }, new CastEnhancementSnapshot[0]);
+            if (forward.Occurrences[0].Plan.Steps.Count != 1 ||
+                forward.Occurrences[1].Plan.Steps.Count != 0 ||
+                forward.Occurrences[1].Plan.Outcomes.Count(o =>
+                    o.Kind == TargetOutcomeKind.Unfulfilled) != 1)
+                throw new InvalidOperationException(
+                    "A single prepared token was reused across occurrences: long=" +
+                    forward.Occurrences[0].Plan.Steps.Count + " short=" +
+                    forward.Occurrences[1].Plan.Steps.Count + ".");
+            if (forward.ForecastRemainingByNativePool["prep-one"] != 0)
+                throw new InvalidOperationException(
+                    "Final prepared availability should be zero after one spent token.");
+            SequentialForecastPlanner.Result reverse = SequentialForecastPlanner.Compute(
+                profile, new[] { "short", "long" }, oneSnapshot,
+                new ActiveEffectSnapshot(null), effects,
+                new[] { longOption, shortOption }, new CastEnhancementSnapshot[0]);
+            if (reverse.Occurrences[0].Plan.Steps.Count != 1 ||
+                reverse.Occurrences[1].Plan.Outcomes.Count(o =>
+                    o.Kind == TargetOutcomeKind.Unfulfilled) != 1)
+                throw new InvalidOperationException(
+                    "Reversing the sequence did not move the prepared-token shortfall.");
+
+            // Case 2: a linked pair consumed exactly once by the long cast,
+            // plus an independent free token that stays usable for short.
+            var primary = new ResourceTokenSnapshot("t-primary",
+                longAbility, 1, PreparedSlotKind.Favorite, true, true, new[] { "t-linked" });
+            var linked = new ResourceTokenSnapshot("t-linked",
+                longAbility, 1, PreparedSlotKind.Common, true, false, new string[0]);
+            var free = new ResourceTokenSnapshot("t-free",
+                shortAbility, 1, PreparedSlotKind.Favorite, true, true, new string[0]);
+            var pairPool = new ResourcePoolSnapshot("prep-pair",
+                ResourcePoolKind.PreparedSlots, 3, 3, new[] { primary, linked, free });
+            ProviderSnapshot pairLong = new ProviderSnapshot(
+                new ProviderKey("caster", "book", longAbility, "level-2"),
+                longAbility.BaseAbilityGuid, 1, pairPool.PoolKey, 1, new[] { "t-primary" });
+            ProviderSnapshot pairShort = new ProviderSnapshot(
+                new ProviderKey("caster", "book", shortAbility, "level-2"),
+                shortAbility.BaseAbilityGuid, 1, pairPool.PoolKey, 1, new[] { "t-free" });
+            PartyProviderSnapshot pairSnapshot = PlannerSnapshot(
+                new[] { pairLong, pairShort }, new[] { pairPool },
+                "caster", "la", "sa");
+            SequentialForecastPlanner.Result pair = SequentialForecastPlanner.Compute(
+                profile, new[] { "long", "short" }, pairSnapshot,
+                new ActiveEffectSnapshot(null), effects,
+                new[] {
+                    new ProviderPlanningOption(pairLong,
+                        new[] { "caster", "la" }, new[] { "caster" }, 4, 40),
+                    new ProviderPlanningOption(pairShort,
+                        new[] { "caster", "sa" }, new[] { "caster" }, 4, 40)
+                }, new CastEnhancementSnapshot[0]);
+            if (pair.Occurrences[0].Plan.Steps.Count != 1 ||
+                pair.Occurrences[0].Plan.Steps[0].Reservation.TokenIds.Count != 2 ||
+                pair.Occurrences[1].Plan.Steps.Count != 1 ||
+                pair.Occurrences[1].Plan.Outcomes.Any(o =>
+                    o.Kind == TargetOutcomeKind.Unfulfilled))
+                throw new InvalidOperationException(
+                    "Linked tokens were not consumed exactly once or the free token was not reusable.");
+        }
+
+        // R3b: conditional alternatives are not unions — a B request is not
+        // skipped because B appeared in an unknown branch of an earlier
+        // graph — while unconditional caster/party effects project with the
+        // correct recipient and kind.
+        private static void TestForecastEffectProjection()
+        {
+            AbilityKey conditionSpell = Ability("proj-cond", string.Empty, 0);
+            AbilityKey laterSpell = Ability("proj-later", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("proj-slots",
+                ResourcePoolKind.Unlimited, 0, 0, null);
+            ProviderSnapshot caster = PlannerProvider("caster", "book",
+                conditionSpell, pool.PoolKey, 0);
+            ProviderSnapshot laterCaster = PlannerProvider("caster", "book",
+                laterSpell, pool.PoolKey, 0);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(
+                new[] { caster, laterCaster }, new[] { pool }, "caster", "a1");
+            var option = new ProviderPlanningOption(caster,
+                new[] { "caster", "a1" }, new[] { "caster" }, 4, 40);
+            var laterOption = new ProviderPlanningOption(laterCaster,
+                new[] { "caster", "a1" }, new[] { "caster" }, 4, 40);
+            // Conditional A-or-B graph: neither branch is a guaranteed grant.
+            EffectExpression conditional = new ConditionalEffectExpression(
+                "unknown-condition", Leaf("cond-a"), Leaf("cond-b"));
+            var effects = new Dictionary<string, EffectExpression> {
+                { conditionSpell.Canonical, conditional },
+                { laterSpell.Canonical, Leaf("later-buff") }
+            };
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault("proj-forecast");
+            profile.Routines.First(r => r.RoutineId == "long").Assignments.Add(Assignment(
+                conditionSpell.Canonical, conditionSpell, new[] { "a1" }));
+            profile.Routines.First(r => r.RoutineId == "short").Assignments.Add(Assignment(
+                laterSpell.Canonical, laterSpell, new[] { "a1" }));
+            SequentialForecastPlanner.Result result = SequentialForecastPlanner.Compute(
+                profile, new[] { "long", "short" }, snapshot,
+                new ActiveEffectSnapshot(null), effects,
+                new[] { option, laterOption }, new CastEnhancementSnapshot[0]);
+            // The later request for effect later-buff must still CAST — the
+            // conditional graph's branches must not have granted anything.
+            if (result.Occurrences[1].Plan.Steps.Count != 1)
+                throw new InvalidOperationException(
+                    "A conditional branch projected as a guaranteed grant and skipped a later cast.");
+
+            // Unconditional leaf projection: same spell twice — the second
+            // occurrence's request for the same effect on the same target
+            // skips for free.
+            AbilityKey echo = Ability("proj-echo", string.Empty, 0);
+            ProviderSnapshot echoCaster = PlannerProvider("caster", "book",
+                echo, pool.PoolKey, 0);
+            PartyProviderSnapshot echoSnapshot = PlannerSnapshot(
+                new[] { echoCaster }, new[] { pool }, "caster", "a1");
+            var echoOption = new ProviderPlanningOption(echoCaster,
+                new[] { "caster", "a1" }, new[] { "caster" }, 4, 40);
+            var echoEffects = new Dictionary<string, EffectExpression> {
+                { echo.Canonical, Leaf("echo-buff") }
+            };
+            BuffPlannerProfile echoProfile = BuffPlannerProfile.CreateDefault("proj-echo");
+            echoProfile.Routines.First(r => r.RoutineId == "long").Assignments.Add(
+                Assignment(echo.Canonical, echo, new[] { "a1" }));
+            echoProfile.Routines.First(r => r.RoutineId == "short").Assignments.Add(
+                Assignment(echo.Canonical, echo, new[] { "a1" }));
+            SequentialForecastPlanner.Result echoResult = SequentialForecastPlanner.Compute(
+                echoProfile, new[] { "long", "short" }, echoSnapshot,
+                new ActiveEffectSnapshot(null), echoEffects,
+                new[] { echoOption }, new CastEnhancementSnapshot[0]);
+            if (echoResult.Occurrences[0].Plan.Steps.Count != 1 ||
+                echoResult.Occurrences[1].Plan.Steps.Count != 0 ||
+                echoResult.Occurrences[1].Plan.Outcomes.Count(o =>
+                    o.Kind == TargetOutcomeKind.SkippedAlreadyActive) != 1)
+                throw new InvalidOperationException(
+                    "Unconditional effect projection lost its free already-active skip.");
+        }
+
+        // R2: exercise the review-acknowledgment protocol in the exact call
+        // order the session performs — compute (PreviewRoutine), presentation
+        // (AcknowledgeDisplayedPlan from the view after binding), preflight
+        // compute inside ExecuteRoutine, and spend invalidation. Computing
+        // must never acknowledge; only presentation of the matching
+        // routine/campaign does.
+        private static void TestReviewAcknowledgmentOrchestration()
+        {
+            AbilityKey ability = Ability("review-orch-spell", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("review-orch-slots",
+                ResourcePoolKind.SpontaneousLevel, 4, 4, null);
+            ProviderSnapshot caster = PlannerProvider("caster", "book",
+                ability, pool.PoolKey, 1);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(
+                new[] { caster }, new[] { pool }, "caster", "a1", "a2");
+            var option = new ProviderPlanningOption(caster,
+                new[] { "caster", "a1", "a2" }, new[] { "caster" }, 4, 40);
+            var effects = new Dictionary<string, EffectExpression> {
+                { ability.Canonical, Leaf("review-orch-buff") }
+            };
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault("review-orch");
+            var service = new RoutinePlanService();
+
+            CastPlan ComputePlan(string routineId, string targets)
+            {
+                var request = new BuffCastRequest(new BuffSourceDefinition(
+                    "review-orch", ability, Leaf("review-orch-buff"),
+                    CastGroupingKind.PerTarget),
+                    targets.Split(','), ExistingEffectPolicy.Overwrite, null,
+                    null, routineId + "-assignment", null, null, null, 0);
+                return new CastPlanner().Plan(snapshot, request,
+                    new[] { option }, EmptyPolicy(), new ActiveEffectSnapshot(null));
+            }
+
+            var coordinator = new PlannerReviewCoordinator();
+
+            // 1. Display/acknowledge A; native state changes so preflight
+            //    computes B; the gate refuses; retry while still open
+            //    without a new presentation of B: still no B baseline.
+            CastPlan planA = ComputePlan("long", "a1");
+            coordinator.PlanComputed("review-orch", "long");            // PreviewRoutine(A)
+            coordinator.Presented("review-orch", "long", planA);        // view bound A
+            CastPlan planB = ComputePlan("long", "a1,a2");
+            coordinator.PlanComputed("review-orch", "long");            // preflight in ExecuteRoutine
+            string changeAB = PlanMaterialChangeDetector.DescribeMaterialChange(
+                coordinator.BaselineFor("review-orch", "long"), planB);
+            if (changeAB == null)
+                throw new InvalidOperationException("Test setup: B must differ materially from A.");
+            // Retry: compute again (another preflight), no presentation.
+            coordinator.PlanComputed("review-orch", "long");
+            if (coordinator.BaselineFor("review-orch", "long") != planA)
+                throw new InvalidOperationException(
+                    "Computation alone replaced the acknowledged baseline (the R2 defect).");
+            string changeRetry = PlanMaterialChangeDetector.DescribeMaterialChange(
+                coordinator.BaselineFor("review-orch", "long"), planB);
+            if (changeRetry == null)
+                throw new InvalidOperationException(
+                    "A refusal-retry without renewed presentation lost the material refusal.");
+
+            // 2. Resource inspection previews OTHER routines while the same
+            //    routine is displayed: they must not overwrite A's baseline.
+            coordinator.PlanComputed("review-orch", "short");           // GetResourceUsageLines
+            coordinator.PlanComputed("review-orch", "important");
+            if (!ReferenceEquals(coordinator.BaselineFor("review-orch", "long"), planA))
+                throw new InvalidOperationException(
+                    "Another routine's incidental preview overwrote the displayed baseline.");
+
+            // 3. Presentation for a routine whose plan was not just computed
+            //    (stale binding) does not acknowledge.
+            coordinator.Presented("review-orch", "short", planA);
+            if (coordinator.BaselineFor("review-orch", "short") != null)
+                throw new InvalidOperationException(
+                    "A stale presentation acknowledged the wrong routine.");
+
+            // 4. Explicit presentation of the revised plan, then unchanged
+            //    execution: no material change.
+            coordinator.PlanComputed("review-orch", "long");
+            coordinator.Presented("review-orch", "long", planB);
+            string afterReview = PlanMaterialChangeDetector.DescribeMaterialChange(
+                coordinator.BaselineFor("review-orch", "long"),
+                ComputePlan("long", "a1,a2"));
+            if (afterReview != null)
+                throw new InvalidOperationException(
+                    "Reviewing the revised plan did not authorize executing exactly it.");
+            coordinator.Spent("long");                                   // post-gate invalidation
+            if (coordinator.BaselineFor("review-orch", "long") != null)
+                throw new InvalidOperationException(
+                    "Post-spend invalidation failed after a legitimate execution.");
+
+            // 5. Campaign switch invalidates; a new campaign starts with no
+            //    baseline (deliberate missing-baseline behavior: the gate
+            //    passes only because nothing changed, never by silently
+            //    trusting an unreviewed plan).
+            coordinator.PlanComputed("review-orch-2", "long");
+            if (coordinator.BaselineFor("review-orch", "long") != null ||
+                coordinator.BaselineFor("review-orch-2", "long") != null)
+                throw new InvalidOperationException(
+                    "Campaign switch did not invalidate cleanly to an empty baseline.");
+            CastPlan planC = ComputePlan("long", "a1");
+            coordinator.Presented("review-orch-2", "long", planC);
+            if (coordinator.BaselineFor("review-orch-2", "long") != planC)
+                throw new InvalidOperationException(
+                    "A fresh campaign's presentation failed to establish its own baseline.");
+        }
+
+        // F4 regressions: acknowledged review state scoping/invalidation and
+        // the enriched material signature (target order, anchors/recipients,
+        // cost vector, enhancement quantities) catching changes the old
+        // signature missed.
+        private static void TestReviewStateAndSignatures()
+        {
+            var review = new PlannerReviewState();
+            AbilityKey ability = Ability("review-spell", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("review-slots",
+                ResourcePoolKind.SpontaneousLevel, 4, 4, null);
+            ProviderSnapshot caster = PlannerProvider("caster", "book",
+                ability, pool.PoolKey, 1);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(
+                new[] { caster }, new[] { pool }, "caster", "a1", "a2");
+            var option = new ProviderPlanningOption(caster,
+                new[] { "caster", "a1", "a2" }, new[] { "caster" }, 4, 40);
+            var effects = new Dictionary<string, EffectExpression> {
+                { ability.Canonical, Leaf("review-buff") }
+            };
+            CastPlan PlanInTargetOrder(string first, string second)
+            {
+                return new CastPlanner().Plan(snapshot,
+                    new BuffCastRequest(new BuffSourceDefinition("review", ability,
+                        Leaf("review-buff"), CastGroupingKind.PerTarget),
+                        new[] { first, second }, ExistingEffectPolicy.Overwrite, null,
+                        new[] { new EnhancementRequest("rod", true) },
+                        "auto", null, null, null, 0),
+                    new[] { option }, EmptyPolicy(), new ActiveEffectSnapshot(null),
+                    new[] { ClassEnhancement("rod", "caster", ability, "book", 4,
+                        "rod-pool", "rod-group", false) });
+            }
+
+            CastPlan baseline = PlanInTargetOrder("a1", "a2");
+            CastPlan swapped = PlanInTargetOrder("a2", "a1");
+            // Same target union, same provider — only per-cast order changed.
+            if (PlanMaterialChangeDetector.DescribeMaterialChange(baseline, swapped) == null)
+                throw new InvalidOperationException(
+                    "A per-cast target-order swap with the same coverage passed undetected.");
+
+            // Review state: scoping, campaign switch, post-execution invalidation.
+            review.Acknowledge("campaign-a", "long", baseline);
+            if (!review.HasReviewed("campaign-a", "long") ||
+                review.HasReviewed("campaign-a", "short") ||
+                review.HasReviewed("campaign-b", "long"))
+                throw new InvalidOperationException("Review state is not routine/campaign scoped.");
+            review.ObserveCampaign("campaign-b");
+            if (review.HasReviewed("campaign-a", "long") || review.HasReviewed("campaign-b", "long"))
+                throw new InvalidOperationException("A campaign switch did not invalidate review.");
+            review.Acknowledge("campaign-b", "long", baseline);
+            review.Invalidate("short");
+            if (!review.HasReviewed("campaign-b", "long"))
+                throw new InvalidOperationException("Invalidating another routine cleared review.");
+            review.Invalidate("long");
+            if (review.HasReviewed("campaign-b", "long"))
+                throw new InvalidOperationException("Post-execution invalidation failed.");
+            if (review.ReviewedPlan("campaign-b", "long") != null)
+                throw new InvalidOperationException("Reviewed plan leaked after invalidation.");
+
+            // Enhancement usage quantity change with identical IDs and base
+            // cost must be material.
+            CastEnhancementSnapshot RodWithUnits(int unitsPerCast)
+            {
+                return new CastEnhancementSnapshot("rod", "caster", "rod-guid",
+                    "Rod", string.Empty, CastEnhancementCategory.MetamagicRod,
+                    2, 9, 4, new[] { ability.BaseAbilityGuid }, "Metamagic",
+                    null, "rod-pool", false, "rod-group", unitsPerCast,
+                    false, "rod-group", "Uses");
+            }
+            CastPlan WithRod(CastEnhancementSnapshot rod)
+            {
+                return new CastPlanner().Plan(snapshot,
+                    new BuffCastRequest(new BuffSourceDefinition("review", ability,
+                        Leaf("review-buff"), CastGroupingKind.PerTarget),
+                        new[] { "a1" }, ExistingEffectPolicy.Overwrite, null,
+                        new[] { new EnhancementRequest("rod", true) },
+                        "auto", null, null, null, 0),
+                    new[] { option }, EmptyPolicy(), new ActiveEffectSnapshot(null),
+                    new[] { rod });
+            }
+            string quantityChange = PlanMaterialChangeDetector.DescribeMaterialChange(
+                WithRod(RodWithUnits(1)), WithRod(RodWithUnits(2)));
+            if (quantityChange == null)
+                throw new InvalidOperationException(
+                    "A doubled enhancement charge per cast with identical IDs was not material.");
+
+            // Material component cost change with the same base spell-slot
+            // units is material.
+            var materialPool = new ResourcePoolSnapshot("mat-slots",
+                ResourcePoolKind.Unlimited, 0, 0, null);
+            ProviderSnapshot materialCaster = new ProviderSnapshot(
+                new ProviderKey("caster", "book", ability, "level-1"),
+                ability.BaseAbilityGuid, 1, materialPool.PoolKey, 0,
+                null, new MaterialRequirementSnapshot("dust", 1, 5));
+            PartyProviderSnapshot materialSnapshot = PlannerSnapshot(
+                new[] { materialCaster }, new[] { materialPool }, "caster", "a1");
+            var materialOption = new ProviderPlanningOption(materialCaster,
+                new[] { "caster", "a1" }, new[] { "caster" }, 4, 40);
+            CastPlan WithMaterial(int required)
+            {
+                ProviderSnapshot provider = new ProviderSnapshot(
+                    new ProviderKey("caster", "book", ability, "level-1"),
+                    ability.BaseAbilityGuid, 1, materialPool.PoolKey, 0,
+                    null, new MaterialRequirementSnapshot("dust", required, 5));
+                return new CastPlanner().Plan(materialSnapshot,
+                    new BuffCastRequest(new BuffSourceDefinition("review", ability,
+                        Leaf("review-buff"), CastGroupingKind.PerTarget),
+                        new[] { "a1" }, ExistingEffectPolicy.Overwrite, null),
+                    new[] { new ProviderPlanningOption(provider,
+                        new[] { "caster", "a1" }, new[] { "caster" }, 4, 40) },
+                    EmptyPolicy(), new ActiveEffectSnapshot(null));
+            }
+            string materialChangeText = PlanMaterialChangeDetector.DescribeMaterialChange(
+                WithMaterial(1), WithMaterial(2));
+            if (materialChangeText == null)
+                throw new InvalidOperationException(
+                    "A material-component cost change was not material.");
+        }
+
+        // F5: a routine with one ready buff plus one saved buff whose source
+        // cannot be resolved must not execute the supported subset silently.
+        // Default Apply submits zero casts; explicit ready-only may run the
+        // valid subset and must report the unresolved configured requests.
+        private static void TestUnresolvableCoverage()
+        {
+            AbilityKey ready = Ability("ready-spell", string.Empty, 0);
+            AbilityKey gone = Ability("gone-spell", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("unresolvable-slots",
+                ResourcePoolKind.Unlimited, 0, 0, null);
+            ProviderSnapshot caster = PlannerProvider("caster", "book",
+                ready, pool.PoolKey, 0);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(
+                new[] { caster }, new[] { pool }, "caster", "ally");
+            var option = new ProviderPlanningOption(caster,
+                new[] { "caster", "ally" }, new[] { "caster" }, 4, 40);
+            var effects = new Dictionary<string, EffectExpression> {
+                { ready.Canonical, Leaf("ready-buff") }
+                // 'gone' has no effects entry and no provider: unresolvable.
+            };
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault("unresolvable");
+            profile.Routines[0].Assignments.Add(Assignment(
+                ready.Canonical, ready, new[] { "ally" }));
+            profile.Routines[0].Assignments.Add(Assignment(
+                gone.Canonical, gone, new[] { "ally" }));
+            RoutinePlanResult result = new RoutinePlanService().Plan(profile, "long",
+                snapshot, new ActiveEffectSnapshot(null), effects, new[] { option });
+
+            if (result.Plan.Steps.Count != 1)
+                throw new InvalidOperationException("The ready buff did not plan.");
+            if (result.UnsupportedSourceIds.Count != 1 ||
+                result.UnsupportedSourceIds[0] != gone.Canonical)
+                throw new InvalidOperationException("The gone source was not flagged unsupported.");
+            if (result.Plan.UnresolvableRequests.Count != 1 ||
+                result.Plan.UnresolvableRequests[0].UnitId != "ally" ||
+                !result.Plan.UnresolvableRequests[0].Reason.Contains("source-unresolvable"))
+                throw new InvalidOperationException(
+                    "The gone source's configured targets vanished from requested coverage.");
+
+            PartialExecutionGate.Decision gate = PartialExecutionGate.Evaluate(result.Plan);
+            if (!gate.Blocked || gate.RequestedTargets != 2 || gate.PlannedCasts != 1 ||
+                gate.Unfulfilled != 1 || !gate.UnmetReasons[0].Contains("saved buff unavailable"))
+                throw new InvalidOperationException(
+                    "The partial gate did not count the unresolved configured request: " +
+                    gate.Summary);
+        }
+
+        private static void TestSpellbookHandoff()
+        {
+            var machine = new SpellbookHandoffStateMachine();
+            machine.Begin();
+            if (machine.State != SpellbookHandoffState.WaitingModeRelease)
+                throw new InvalidOperationException("Handoff did not start waiting.");
+
+            // No opener invocation while the native mode is still owned.
+            bool opened = false;
+            for (int frame = 0; frame < SpellbookHandoffStateMachine.MaximumWaitFrames - 1; frame++)
+            {
+                opened |= machine.ObserveRelease(true);
+                if (machine.State != SpellbookHandoffState.WaitingModeRelease)
+                    throw new InvalidOperationException("Handoff gave up before its bounded wait expired.");
+            }
+            if (opened)
+                throw new InvalidOperationException("The opener ran while the mode was still owned.");
+            if (machine.ObserveRelease(true) || machine.State != SpellbookHandoffState.Failed ||
+                machine.Failure != "mode-release-timeout")
+                throw new InvalidOperationException("Handoff wait was not bounded by the documented frame limit.");
+
+            // Full sequence: release -> opener invoked exactly once ->
+            // deferred presentation -> success. Success is only reported by
+            // the presentation observation, not by the open call itself.
+            machine.Reset();
+            machine.Begin();
+            if (!machine.ObserveRelease(false) ||
+                machine.State != SpellbookHandoffState.OpeningPlanner)
+                throw new InvalidOperationException("Released mode did not arm the opener.");
+            machine.ObserveOpenResult(true);
+            if (machine.State != SpellbookHandoffState.WaitingPresentation ||
+                machine.OpenAttempts != 1)
+                throw new InvalidOperationException("Open result did not enter deferred presentation wait.");
+            bool completed = false;
+            for (int frame = 0; frame < 10; frame++)
+            {
+                completed |= machine.ObservePresentation(false);
+                if (machine.State != SpellbookHandoffState.WaitingPresentation)
+                    throw new InvalidOperationException("Presentation wait ended early.");
+            }
+            if (completed)
+                throw new InvalidOperationException("Success was reported before presentation was ready.");
+            if (!machine.ObservePresentation(true) ||
+                machine.State != SpellbookHandoffState.Completed)
+                throw new InvalidOperationException("Ready presentation did not complete the handoff.");
+            machine.Rollback("late-failure");
+            if (machine.State != SpellbookHandoffState.Completed)
+                throw new InvalidOperationException("A completed handoff was rolled back after success.");
+
+            // Open refusal fails immediately and is recoverable.
+            machine.Reset();
+            machine.Begin();
+            machine.ObserveRelease(false);
+            machine.ObserveOpenResult(false);
+            if (machine.State != SpellbookHandoffState.Failed ||
+                machine.Failure != "planner-open-refused" ||
+                machine.OpenAttempts != 1)
+                throw new InvalidOperationException("Open refusal did not fail the handoff.");
+
+            // Presentation timeout is bounded and recoverable (failure after
+            // native closure must be a state we can recover from).
+            machine.Reset();
+            machine.Begin();
+            machine.ObserveRelease(false);
+            machine.ObserveOpenResult(true);
+            for (int frame = 0; frame < SpellbookHandoffStateMachine.MaximumWaitFrames; frame++)
+                machine.ObservePresentation(false);
+            if (machine.State != SpellbookHandoffState.Failed ||
+                machine.Failure != "presentation-timeout")
+                throw new InvalidOperationException("Presentation wait was not bounded.");
+            machine.Rollback("recovered");
+            if (machine.State != SpellbookHandoffState.Failed ||
+                machine.Failure != "recovered")
+                throw new InvalidOperationException("Rollback after failed state did not record its reason.");
+
+            machine.Reset();
+            machine.Begin();
+            machine.Rollback("native-close-refused");
+            if (machine.ObserveRelease(false))
+                throw new InvalidOperationException("A failed handoff still invoked the opener.");
+        }
+
+        private static void TestSequenceForecast()
+        {
+            // Real sequential planning: two routines each request three
+            // enhanced casts against three total rod charges. The second
+            // occurrence must show honest unmet demand, never six funded
+            // casts; reversing the sequence moves the shortfall; a granted
+            // effect from the first run makes the second run's same-target
+            // request a free already-active skip; and the input snapshot is
+            // never mutated.
+            AbilityKey longAbility = Ability("forecast-long", string.Empty, 0);
+            AbilityKey shortAbility = Ability("forecast-short", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("forecast-slots",
+                ResourcePoolKind.SpontaneousLevel, 6, 6, null);
+            ProviderSnapshot caster = PlannerProvider("caster", "book",
+                longAbility, pool.PoolKey, 1);
+            ProviderSnapshot casterShort = PlannerProvider("caster", "book",
+                shortAbility, pool.PoolKey, 1);
+            string[] longTargets = { "a1", "a2", "a3" };
+            string[] shortTargets = { "b1", "b2", "b3" };
+            PartyProviderSnapshot snapshot = PlannerSnapshot(
+                new[] { caster, casterShort }, new[] { pool },
+                new[] { "caster" }.Concat(longTargets).Concat(shortTargets).ToArray());
+            var longOption = new ProviderPlanningOption(caster,
+                new[] { "caster" }.Concat(longTargets), new[] { "caster" }, 4, 40);
+            var shortOption = new ProviderPlanningOption(casterShort,
+                new[] { "caster" }.Concat(shortTargets), new[] { "caster" }, 4, 40);
+            CastEnhancementSnapshot rod = ClassEnhancement("rod", "caster",
+                longAbility, "book", 3, "charge-pool", "rod-group", false);
+            // The rod is shared: same usage pool for the short routine's copy.
+            CastEnhancementSnapshot rodShort = ClassEnhancement("rod-short", "caster",
+                shortAbility, "book", 3, "charge-pool", "rod-group", false);
+            var effects = new Dictionary<string, EffectExpression> {
+                { longAbility.Canonical, Leaf("long-buff") },
+                { shortAbility.Canonical, Leaf("short-buff") }
+            };
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault("seq-forecast");
+            profile.Routines.First(r => r.RoutineId == "long").Assignments.Add(Assignment(
+                longAbility.Canonical, longAbility, longTargets, new[] { "rod" }));
+            profile.Routines.First(r => r.RoutineId == "short").Assignments.Add(Assignment(
+                shortAbility.Canonical, shortAbility, shortTargets, new[] { "rod-short" }));
+
+            SequentialForecastPlanner.Result forward = SequentialForecastPlanner.Compute(
+                profile, new[] { "long", "short" }, snapshot,
+                new ActiveEffectSnapshot(null), effects,
+                new[] { longOption, shortOption }, new[] { rod, rodShort });
+            int forwardShortUnmet = forward.Occurrences[1].Plan.Outcomes.Count(o =>
+                o.Kind == TargetOutcomeKind.Unfulfilled);
+            int forwardShortSteps = forward.Occurrences[1].Plan.Steps.Count;
+            if (forward.Occurrences[0].Plan.Steps.Count != 3 ||
+                forwardShortSteps != 0 || forwardShortUnmet != 3)
+                throw new InvalidOperationException(
+                    "Sequential forecast double-funded one shared charge pool: first=" +
+                    forward.Occurrences[0].Plan.Steps.Count + " casts, second=" +
+                    forwardShortSteps + " casts with " + forwardShortUnmet + " unmet.");
+
+            // Reversing the sequence moves the shortfall to the other routine.
+            SequentialForecastPlanner.Result reverse = SequentialForecastPlanner.Compute(
+                profile, new[] { "short", "long" }, snapshot,
+                new ActiveEffectSnapshot(null), effects,
+                new[] { longOption, shortOption }, new[] { rod, rodShort });
+            if (reverse.Occurrences[0].Plan.Steps.Count != 3 ||
+                reverse.Occurrences[1].Plan.Outcomes.Count(o =>
+                    o.Kind == TargetOutcomeKind.Unfulfilled) != 3)
+                throw new InvalidOperationException(
+                    "Reversing the sequence did not move the shortfall.");
+
+            // A granted effect from the first run skips the same target for
+            // free in the second run (projected already-active coverage).
+            AbilityKey echo = Ability("forecast-echo", string.Empty, 0);
+            ProviderSnapshot echoCaster = PlannerProvider("caster", "book",
+                echo, pool.PoolKey, 1);
+            PartyProviderSnapshot echoSnapshot = PlannerSnapshot(
+                new[] { echoCaster }, new[] { pool }, "caster", "a1");
+            var echoOption = new ProviderPlanningOption(echoCaster,
+                new[] { "caster", "a1" }, new[] { "caster" }, 4, 40);
+            var echoEffects = new Dictionary<string, EffectExpression> {
+                { echo.Canonical, Leaf("echo-buff") }
+            };
+            BuffPlannerProfile echoProfile = BuffPlannerProfile.CreateDefault("seq-echo");
+            echoProfile.Routines.First(r => r.RoutineId == "long").Assignments.Add(
+                Assignment(echo.Canonical, echo, new[] { "a1" }));
+            echoProfile.Routines.First(r => r.RoutineId == "short").Assignments.Add(
+                Assignment(echo.Canonical, echo, new[] { "a1" }));
+            SequentialForecastPlanner.Result echoResult = SequentialForecastPlanner.Compute(
+                echoProfile, new[] { "long", "short" }, echoSnapshot,
+                new ActiveEffectSnapshot(null), echoEffects,
+                new[] { echoOption }, new CastEnhancementSnapshot[0]);
+            if (echoResult.Occurrences[0].Plan.Steps.Count != 1 ||
+                echoResult.Occurrences[1].Plan.Steps.Count != 0 ||
+                echoResult.Occurrences[1].Plan.Outcomes.Count(o =>
+                    o.Kind == TargetOutcomeKind.SkippedAlreadyActive) != 1)
+                throw new InvalidOperationException(
+                    "A projected already-active effect did not skip for free in the later run.");
+
+            // The caller's snapshot is never mutated by forecasting.
+            if (snapshot.ResourcePools[0].Remaining != 6)
+                throw new InvalidOperationException(
+                    "Sequential forecasting mutated the caller's snapshot.");
+            if (!SequentialForecastPlanner.Result.AssumptionText.Contains("One run per selected routine"))
+                throw new InvalidOperationException("The forecast lost its assumption label.");
+        }
+
+        private static void TestAssignmentOrderAndShortage()
+        {
+            AbilityKey ability = Ability("charge-spell", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("charge-slots",
+                ResourcePoolKind.SpontaneousLevel, 9, 9, null);
+            ProviderSnapshot caster = PlannerProvider("caster", "book",
+                ability, pool.PoolKey, 1);
+            string[] nine = Enumerable.Range(1, 9)
+                .Select(index => "target-" + index).ToArray();
+            PartyProviderSnapshot snapshot = PlannerSnapshot(
+                new[] { caster }, new[] { pool },
+                new[] { "caster" }.Concat(nine).ToArray());
+            var option = new ProviderPlanningOption(caster,
+                new[] { "caster" }.Concat(nine), new[] { "caster" }, 4, 40);
+            CastEnhancementSnapshot charges = ClassEnhancement("rod", "caster",
+                ability, "book", 3, "charge-pool", "rod-group", false);
+            var effects = new Dictionary<string, EffectExpression> {
+                { ability.Canonical, new EffectLeafExpression(EffectKind.Buff,
+                    "charge-buff", EffectTarget.Caster, "ContextActionApplyBuff", "root/apply") }
+            };
+
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault("shortage");
+            SourceAssignmentProfile parent = Assignment(
+                ability.Canonical, ability, new string[0]);
+            parent.CastingAssignments[0].TargetUnitIds = new List<string>(nine);
+            parent.CastingAssignments[0].Enhancements.Add(
+                new EnhancementSelectionProfile { EnhancementId = "rod", Required = true });
+            profile.Routines[0].Assignments.Add(parent);
+            RoutinePlanResult required = new RoutinePlanService().Plan(profile, "long",
+                snapshot, new ActiveEffectSnapshot(null), effects,
+                new[] { option }, new[] { charges });
+            ResourcePoolAllocation allocation = required.Plan.AllocationFor("enhancement:charge-pool");
+            if (allocation == null || allocation.AvailableNow != 3 ||
+                allocation.RequestedUsage != 9 || allocation.AllocatedUsage != 3 ||
+                allocation.UnmetDemand != 6 || allocation.ForecastRemaining != 0)
+                throw new InvalidOperationException("Required shortage must report requested 9 / available 3 / " +
+                    "allocated 3 / unmet 6; observed " +
+                    (allocation == null ? "<none>" : allocation.RequestedUsage + "/" +
+                        allocation.AvailableNow + "/" + allocation.AllocatedUsage + "/" +
+                        allocation.UnmetDemand) + ".");
+            if (required.Plan.Outcomes.Count(outcome => outcome.Kind == TargetOutcomeKind.Fulfilled) != 3 ||
+                required.Plan.Outcomes.Count(outcome => outcome.Kind == TargetOutcomeKind.Unfulfilled) != 6)
+                throw new InvalidOperationException("The first three targets did not receive the charges.");
+            List<string> fulfilledOrder = required.Plan.Outcomes
+                .Where(outcome => outcome.Kind == TargetOutcomeKind.Fulfilled)
+                .Select(outcome => outcome.UnitId).ToList();
+            if (!fulfilledOrder.SequenceEqual(nine.Take(3).ToList()))
+                throw new InvalidOperationException("Charges were not allocated in explicit target order.");
+
+            // Optional policy: the same shortage plans the last six casts
+            // explicitly without the enhancement, labeled as omissions.
+            parent.CastingAssignments[0].Enhancements[0].Required = false;
+            RoutinePlanResult optional = new RoutinePlanService().Plan(profile, "long",
+                snapshot, new ActiveEffectSnapshot(null), effects,
+                new[] { option }, new[] { charges });
+            if (optional.Plan.Steps.Count != 9 ||
+                optional.Plan.Steps.Count(step => step.EnhancementIds.Contains("rod")) != 3 ||
+                optional.Plan.Steps.Count(step => step.OmittedEnhancementIds.Contains("rod")) != 6)
+                throw new InvalidOperationException("Optional shortage did not split enhanced from explicitly-unenhanced casts.");
+            ResourcePoolAllocation optionalAllocation = optional.Plan.AllocationFor("enhancement:charge-pool");
+            if (optionalAllocation.AllocatedUsage != 3 || optionalAllocation.UnmetDemand != 6)
+                throw new InvalidOperationException("Optional policy changed the demand accounting.");
+            if (optional.Plan.Outcomes.Any(outcome => outcome.Kind == TargetOutcomeKind.Unfulfilled))
+                throw new InvalidOperationException("Optional policy still blocked casts it was permitted to omit for.");
+
+            // Already-active targets never request or reserve a charge.
+            var active = new Dictionary<string, IEnumerable<string>>();
+            active["target-1"] = new[] { "charge-buff" };
+            parent.CastingAssignments[0].TargetUnitIds = new List<string>(nine);
+            RoutinePlanResult skipped = new RoutinePlanService().Plan(profile, "long",
+                snapshot, ActiveEffectSnapshot.FromTypedEffects(
+                    active.ToDictionary(pair => pair.Key,
+                        pair => pair.Value.Select(id => new ActiveEffectMarker(EffectKind.Buff, id)))),
+                effects, new[] { option }, new[] { charges });
+            ResourcePoolAllocation skippedAllocation = skipped.Plan.AllocationFor("enhancement:charge-pool");
+            TargetPlanOutcome skip = skipped.Plan.Outcomes.Single(outcome => outcome.UnitId == "target-1");
+            if (skip.Kind != TargetOutcomeKind.SkippedAlreadyActive ||
+                skippedAllocation.RequestedUsage != 8 || skippedAllocation.AllocatedUsage != 3)
+                throw new InvalidOperationException("An already-active skip consumed demand or a charge.");
+
+            // Explicit assignment order, not source-ID or dictionary order,
+            // controls who wins a one-charge race between two assignments.
+            AbilityKey raceAbility = Ability("race-spell", string.Empty, 0);
+            var racePool = new ResourcePoolSnapshot("race-slots",
+                ResourcePoolKind.SpontaneousLevel, 2, 2, null);
+            ProviderSnapshot raceCaster = PlannerProvider("z-caster", "z-book",
+                raceAbility, racePool.PoolKey, 1);
+            PartyProviderSnapshot raceSnapshot = PlannerSnapshot(
+                new[] { raceCaster }, new[] { racePool }, "z-caster", "early", "late");
+            var raceOption = new ProviderPlanningOption(raceCaster,
+                new[] { "z-caster", "early", "late" }, new[] { "z-caster" }, 4, 40);
+            CastEnhancementSnapshot raceCharge = ClassEnhancement("race-rod", "z-caster",
+                raceAbility, "z-book", 1, "race-pool", "race-rod-group", false);
+            BuffPlannerProfile raceProfile = BuffPlannerProfile.CreateDefault("race");
+            SourceAssignmentProfile raceParent = Assignment(
+                "a-" + raceAbility.Canonical, raceAbility, new string[0]);
+            // The alphabetically-first source runs LATER: explicit order wins.
+            raceParent.CastingAssignments[0].AssignmentId = "late-one";
+            raceParent.CastingAssignments[0].Order = 1;
+            raceParent.CastingAssignments[0].TargetUnitIds = new List<string> { "late" };
+            raceParent.CastingAssignments[0].Enhancements.Add(
+                new EnhancementSelectionProfile { EnhancementId = "race-rod" });
+            raceParent.CastingAssignments.Add(new CastingAssignmentProfile
+            {
+                AssignmentId = "early-one",
+                Order = 0,
+                TargetUnitIds = new List<string> { "early" },
+                Enhancements = new List<EnhancementSelectionProfile>
+                {
+                    new EnhancementSelectionProfile { EnhancementId = "race-rod" }
+                }
+            });
+            raceProfile.Routines[0].Assignments.Add(raceParent);
+            RoutinePlanResult race = new RoutinePlanService().Plan(raceProfile, "long",
+                raceSnapshot, new ActiveEffectSnapshot(null),
+                new Dictionary<string, EffectExpression> {
+                    { raceAbility.Canonical, new EffectLeafExpression(EffectKind.Buff,
+                        "race-buff", EffectTarget.Caster, "ContextActionApplyBuff", "root/apply") }
+                }, new[] { raceOption }, new[] { raceCharge });
+            CastStep winner = race.Plan.Steps.Single();
+            if (winner.AssignmentId != "early-one" || winner.TargetUnitIds[0] != "early" ||
+                race.Plan.Outcomes.Any(outcome => outcome.UnitId == "late" &&
+                    outcome.Kind == TargetOutcomeKind.Fulfilled))
+                throw new InvalidOperationException("Catalog order overrode the explicit assignment order.");
+        }
+
+        // Chooser scroll geometry must be exact so the final option row is
+        // reachable by wheel and scrollbar (mission acceptance T16); the
+        // arithmetic mirrors the shared factory layout (padding 4, spacing 4)
+        // and the fixed row heights both modal choosers install.
+        private static void TestChooserScrollLayout()
+        {
+            const float row = ChooserScrollLayoutContract.EnhancementRowHeight;
+            const float policyRow = CastingPanelLayoutContract.MinimumCasterPolicyRowHeight;
+
+            if (ChooserScrollLayoutContract.ContentHeight(0, row) != 0f ||
+                ChooserScrollLayoutContract.ContentHeight(1, row) != 8f + row ||
+                ChooserScrollLayoutContract.ContentHeight(2, row) != 8f + (2f * row) + 4f)
+                throw new InvalidOperationException("Chooser content height does not match padding 4 + rows + spacing 4.");
+
+            float thirty = ChooserScrollLayoutContract.ContentHeight(30, row);
+            float hundred = ChooserScrollLayoutContract.ContentHeight(100, row);
+            if (thirty != 8f + (30f * row) + (29f * 4f) ||
+                hundred != 8f + (100f * row) + (99f * 4f) ||
+                ChooserScrollLayoutContract.ContentHeight(30, policyRow) <= thirty + 30f * 20f)
+                throw new InvalidOperationException("Row-count scaling or caster-policy row height drifted.");
+
+            // Viewport showing ~5 rows: overflow must produce a positive,
+            // bounded scroll range so the final row is reachable.
+            float viewport = 5f * row;
+            float maxOffset = ChooserScrollLayoutContract.MaxScrollOffset(viewport, hundred);
+            if (maxOffset != hundred - viewport || maxOffset <= 0f)
+                throw new InvalidOperationException("Overflowing chooser has no reachable scroll range.");
+            if (ChooserScrollLayoutContract.MaxScrollOffset(viewport, viewport) != 0f ||
+                ChooserScrollLayoutContract.MaxScrollOffset(0f, hundred) != 0f ||
+                ChooserScrollLayoutContract.MaxScrollOffset(viewport, 0f) != 0f)
+                throw new InvalidOperationException("Non-overflowing or empty choosers must not scroll.");
+
+            if (ChooserScrollLayoutContract.ClampScrollOffset(-10f, viewport, hundred) != 0f ||
+                ChooserScrollLayoutContract.ClampScrollOffset(maxOffset + 25f, viewport, hundred) != maxOffset ||
+                ChooserScrollLayoutContract.ClampScrollOffset(maxOffset * 0.5f, viewport, hundred) != maxOffset * 0.5f)
+                throw new InvalidOperationException("Refresh offset clamping is not bounded by the content size.");
+
+            // A refresh that shrinks the list must pull the offset back inside
+            // the new bounds instead of stranding the view below the content.
+            float shrunk = ChooserScrollLayoutContract.ClampScrollOffset(
+                maxOffset, viewport, ChooserScrollLayoutContract.ContentHeight(6, row));
+            if (shrunk != ChooserScrollLayoutContract.MaxScrollOffset(
+                    viewport, ChooserScrollLayoutContract.ContentHeight(6, row)))
+                throw new InvalidOperationException("Offset survived a list shrink outside the new bounds.");
+
+            // Fresh open reveals the selected row; visible rows do not move.
+            float content6 = ChooserScrollLayoutContract.ContentHeight(6, row);
+            if (ChooserScrollLayoutContract.OffsetRevealingRow(
+                    0, 0f, viewport, content6, row) != 0f ||
+                ChooserScrollLayoutContract.OffsetRevealingRow(
+                    4, 0f, viewport, content6, row) != 20f)
+                throw new InvalidOperationException("Selected-row reveal is not anchored to the row bounds.");
+            // Row 5 bottom = 4 + 6*(row+4) - 4 = 6*row+24; aligning it to the
+            // viewport bottom lands 4px above the absolute maximum offset,
+            // which is correct: revealing the row must not overscroll.
+            if (ChooserScrollLayoutContract.OffsetRevealingRow(
+                    5, 0f, viewport, content6, row) != row + 24f ||
+                ChooserScrollLayoutContract.OffsetRevealingRow(
+                    5, 0f, viewport, content6, row) >=
+                    ChooserScrollLayoutContract.MaxScrollOffset(viewport, content6) + 1f)
+                throw new InvalidOperationException("Last-row reveal did not reach its own bottom bound.");
+            if (ChooserScrollLayoutContract.OffsetRevealingRow(
+                    -1, 999f, viewport, content6, row) !=
+                ChooserScrollLayoutContract.ClampScrollOffset(999f, viewport, content6))
+                throw new InvalidOperationException("Reveal without a selected row must only clamp.");
+
+            // Scrollbar handle size reflects the visible ratio and stays
+            // draggable for very long lists.
+            if (ChooserScrollLayoutContract.ScrollbarHandleRatio(viewport, viewport) != 1f ||
+                ChooserScrollLayoutContract.ScrollbarHandleRatio(0f, hundred) != 1f ||
+                Math.Abs(ChooserScrollLayoutContract.ScrollbarHandleRatio(viewport, content6) -
+                    viewport / content6) > 0.0001f ||
+                ChooserScrollLayoutContract.ScrollbarHandleRatio(viewport, hundred) !=
+                    ChooserScrollLayoutContract.MinimumHandleRatio ||
+                ChooserScrollLayoutContract.ScrollbarHandleRatio(1f, 100000f) !=
+                    ChooserScrollLayoutContract.MinimumHandleRatio)
+                throw new InvalidOperationException("Scrollbar handle ratio is not the viewport/content fraction.");
+        }
         private static void TestCastEnhancementSelection()
         {
             AbilityKey ability = Ability("selection-spell", string.Empty, 0);
@@ -4777,14 +7730,8 @@ namespace KingmakerBuffPlanner.Tests
             BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault(
                 "conflicting-area");
             profile.Routines.First(value => value.RoutineId == "long")
-                .Assignments.Add(new SourceAssignmentProfile {
-                    SourceId = ability.Canonical,
-                    Ability = AbilityKeyProfile.FromKey(ability),
-                    WantedTargetUnitIds = new List<string> { "caster" },
-                    ExistingEffectPolicy = ExistingEffectPolicy.Overwrite,
-                    IgnoredPresenceMarkers = new List<string>(),
-                    SelectedEnhancementIds = new List<string>()
-                });
+                .Assignments.Add(Assignment(ability.Canonical, ability,
+                    new[] { "caster" }, null, ExistingEffectPolicy.Overwrite));
             RoutinePlanResult plan = new RoutinePlanService().Plan(profile,
                 "long", snapshot, new ActiveEffectSnapshot(null),
                 new Dictionary<string, EffectExpression> {
@@ -4849,12 +7796,37 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException(
                     "The buff-card status bypassed routine-aware Share targeting.");
             model.SetEnhancement("long", share.EnhancementId);
+            // Disabling Share makes the ally illegal, but the configured
+            // target must survive as repairable intent instead of being
+            // silently pruned (mission T08), stay visibly unfulfillable in
+            // planning, and remain explicitly removable.
+            RoutineProfile longRoutine = profile.Routines.First(
+                value => value.RoutineId == "long");
+            SourceAssignmentProfile retained = longRoutine.Assignments.Single(
+                value => value.SourceId == source.SourceId);
             if (model.IsTargetLegal(source, "long", "ally") ||
-                profile.Routines.First(value => value.RoutineId == "long")
-                    .Assignments.Any(value => value.SourceId == source.SourceId) ||
-                saves != 3)
+                !model.IsTargetWanted("long", source.SourceId, "ally") ||
+                !retained.WantedTargetUnitIds.Contains("ally"))
                 throw new InvalidOperationException(
-                    "Disabling Share did not atomically prune the stale ally target.");
+                    "Disabling Share silently pruned the stale ally target instead of preserving repairable intent.");
+            RoutinePlanResult disabled = new RoutinePlanService().Plan(profile, "long",
+                snapshot, new ActiveEffectSnapshot(null),
+                new Dictionary<string, EffectExpression> {
+                    { ability.Canonical, new EffectLeafExpression(
+                        EffectKind.Buff, "personal-buff", EffectTarget.Caster,
+                        "ContextActionApplyBuff", "root/apply") }
+                }, options, new[] { share }, targeting);
+            if (disabled.Plan.Steps.Count != 0 ||
+                disabled.Plan.Outcomes.Count(value => value.Kind ==
+                    TargetOutcomeKind.Unfulfilled && value.UnitId == "ally") != 1)
+                throw new InvalidOperationException(
+                    "The Share-disabled stale ally target did not surface as an explicit unfulfilled outcome.");
+            model.RemoveTargetFromAssignment("long", source.SourceId,
+                retained.AutomaticAssignment.AssignmentId, "ally");
+            if (model.IsTargetWanted("long", source.SourceId, "ally") ||
+                longRoutine.Assignments.Any(value => value.SourceId == source.SourceId))
+                throw new InvalidOperationException(
+                    "The invalid target was not cleanly removable.");
         }
 
         private static void TestEnhancementCompatibilityAndSharedCost()
@@ -4892,15 +7864,49 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException(
                     "Explicit enhancement exclusivity groups were not enforced.");
 
+            // Duplicate enhancement selections on one request dedupe
+            // deterministically (idempotent compile of the same configured
+            // intent); persisted duplicates are rejected at load instead of
+            // reaching the planner twice.
             var duplicateRequest = new BuffCastRequest(new BuffSourceDefinition(
                 "duplicate-enhancement", ability, Leaf("duplicate-buff"),
                 CastGroupingKind.PerTarget), new[] { "ally" },
                 ExistingEffectPolicy.Overwrite, null,
                 new[] { share.EnhancementId, share.EnhancementId });
+            if (duplicateRequest.EnhancementIds.Count != 1)
+                throw new InvalidOperationException(
+                    "Duplicate enhancement selections did not dedupe deterministically.");
             CastPlan duplicatePlan = new CastPlanner().Plan(snapshot,
                 duplicateRequest, new[] { option }, EmptyPolicy(),
                 new ActiveEffectSnapshot(null), new[] { share });
-            if (duplicatePlan.Steps.Count != 0)
+            if (duplicatePlan.Steps.Count != 1 ||
+                duplicatePlan.Steps.Single().EnhancementUsageByPool["reservoir|brown"] != 1)
+                throw new InvalidOperationException(
+                    "A deduped duplicate selection did not plan exactly one reserved use.");
+            BuffPlannerProfile duplicateProfile = BuffPlannerProfile.CreateDefault(
+                "duplicate-persisted");
+            SourceAssignmentProfile duplicateAssignment = Assignment(
+                ability.Canonical, ability, new[] { "ally" });
+            duplicateAssignment.CastingAssignments[0].Enhancements.Add(
+                new EnhancementSelectionProfile { EnhancementId = share.EnhancementId });
+            duplicateAssignment.CastingAssignments[0].Enhancements.Add(
+                new EnhancementSelectionProfile { EnhancementId = share.EnhancementId });
+            duplicateProfile.Routines[0].Assignments.Add(duplicateAssignment);
+            var duplicateModel = new PlannerSetupModel(duplicateProfile, snapshot,
+                new ActiveEffectSnapshot(null),
+                new Dictionary<string, EffectExpression> { { ability.Canonical, Leaf("x") } },
+                new[] { option }, ignored => { });
+            bool rejectedDuplicate = false;
+            try
+            {
+                new ProfileRepository(Path.Combine(Path.GetTempPath(),
+                    "kbp-duplicate-rejected")).Save(duplicateProfile);
+            }
+            catch (InvalidDataException)
+            {
+                rejectedDuplicate = true;
+            }
+            if (!rejectedDuplicate)
                 throw new InvalidOperationException(
                     "Duplicate persisted enhancement IDs were silently accepted.");
 
@@ -5050,13 +8056,8 @@ namespace KingmakerBuffPlanner.Tests
             BuffPlannerProfile old = BuffPlannerProfile.CreateDefault(
                 "old-single-enhancement-profile");
             old.Routines.First(value => value.RoutineId == "long")
-                .Assignments.Add(new SourceAssignmentProfile {
-                    SourceId = ability.Canonical,
-                    Ability = AbilityKeyProfile.FromKey(ability),
-                    WantedTargetUnitIds = new List<string>(),
-                    IgnoredPresenceMarkers = new List<string>(),
-                    SelectedEnhancementIds = new List<string> { "share" }
-                });
+                .Assignments.Add(Assignment(ability.Canonical, ability,
+                    new string[0], new[] { "share" }));
             repository.Save(old);
             if (repository.Load(old.CampaignId).Profile.Routines.First(value =>
                     value.RoutineId == "long").Assignments.Single()
@@ -5420,10 +8421,17 @@ namespace KingmakerBuffPlanner.Tests
         {
             private readonly QuickExecutionResult _result;
             internal int StartCount;
+            internal int ReadyOnlyStartCount;
             internal FakeRoutineRunner(QuickExecutionResult result) { _result = result; }
             public bool TryStart(string routineId, Action<QuickExecutionResult> completed)
             {
                 StartCount++;
+                completed(_result);
+                return true;
+            }
+            public bool TryStartReadyOnly(string routineId, Action<QuickExecutionResult> completed)
+            {
+                ReadyOnlyStartCount++;
                 completed(_result);
                 return true;
             }

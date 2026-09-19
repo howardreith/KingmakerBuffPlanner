@@ -89,6 +89,19 @@ namespace KingmakerBuffPlanner.Domain.Planning
                 .OrderBy(value => value.Provider.Key.Canonical,
                     StringComparer.Ordinal))
             {
+                // Pins are hard eligibility constraints, enforced by the same
+                // resolver the planner uses: a pinned caster, spellbook, or
+                // exact provider removes every other candidate before any
+                // ranking or targeting work.
+                if (request.CasterUnitId != null && !string.Equals(
+                        candidate.Provider.Key.CasterUnitId, request.CasterUnitId,
+                        StringComparison.Ordinal)) continue;
+                if (request.SpellbookGuid != null && !string.Equals(
+                        candidate.Provider.Key.SpellbookGuid, request.SpellbookGuid,
+                        StringComparison.Ordinal)) continue;
+                if (request.ProviderKeyConstraint != null && !string.Equals(
+                        candidate.Provider.Key.Canonical, request.ProviderKeyConstraint,
+                        StringComparison.Ordinal)) continue;
                 if (selected.Any(value => !value.IsApplicable(
                         candidate.Provider))) continue;
                 ProviderPlanningOption effective = candidate;

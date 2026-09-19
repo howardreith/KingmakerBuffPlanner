@@ -1,5 +1,37 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-09-06 failed human validation: routing diagnosis
+
+Product-bearing checkpoint: `de57d90b38711c4c641d470900339bd8815a3fa8`.
+Final candidate ZIP/DLL/MVID and exact command counts are recorded in the
+investigation report's delivery checkpoint. The package remains diagnostic-only;
+final bridge 21/21, exact metadata 87/87, deterministic builds 2/2, candidate
+deployment purity 5/5 and release installer purity 5/5 all pass. No gameplay
+coverage is promoted. The reproducing-machine cast log remains the next action.
+
+Instant Share remains unresolved; gameplay **NOT VERIFIED**. On local machine
+DATA the installed Planner 0.0.19 / Gunslinger 0.0.115 DLLs match both released
+hashes and MVIDs. Executing the real production bridge accepts that pair and
+rejects the actual older 0.0.114 provider. No affected casting log or running
+game is available; the exact Kingmaker save root is absent.
+
+Active branch: `codex/kingmaker-buff-planner-instant-share-routing-diagnosis`;
+starting/audited HEAD: `fd0e6dc1c32dfc929a56dbc575163e641b150746`;
+version remains 0.0.19. Diagnostic-only source adds pre-cast routing evidence,
+loaded-pair identity, provider-direct phase records and visible fallback
+outcomes. The native transaction and resource policies are unchanged.
+Focused gates: source 42/42, behavior 150/150, harness 8/8, package 4/4,
+deployment WhatIf 5/5; candidate production bridge 21/21 assertions in 3/3
+processes. No failed checks are counted as passes.
+
+Commands, exact identity tables, evidence under
+`artifacts/instant-share-diagnosis/`, rejected theories, and limits are in
+[the investigation report](docs/INSTANT-SHARE-FAILED-VALIDATION.md). This supersedes any interpretation of the historical public
+release records below as proof that Instant Share worked in Howie's game.
+Exact next action: capture one affected cast from the reproducing machine and
+identify its capability/selected-executor/Fire discriminator. A diagnostic
+candidate is not a gameplay fix or authorization trigger for a new public release.
+
 ## 2026-09-06 paired public release complete
 
 Owner-authorized releases are public and independently download-verified:
@@ -1535,3 +1567,125 @@ Status: ROOT CAUSE PROVEN; 0.0.4 SOURCE PASS; LIVE QUALIFICATION PENDING
 - Rejected: reverting scoped discovery, restoring a global search, deleting deferred validation, or attributing the defect to non-UI systems.
 - Uncertainty: fresh campaign qualification depends on an exact authorized `KBP_AUTOMATION_BASELINE` / `KBP_AUTOMATION_WORKING` pair; fixture availability will be re-audited after deterministic repair.
 - Exact next action: implement explicit install/candidate outcomes, suspended unload state, bounded retry, and hosting-chain liveness; then add deterministic tests.
+
+# 2026-09-18 - Z native-assignments mission (0.1.0 candidate)
+
+- Branch `codex/kingmaker-buff-planner-z-native-assignments` from pushed
+  diagnosis HEAD `164737e`; `main` at anchor `fd0e6dc`; baseline suite green
+  (42/42, 150/150, 8/8, 4/4, 5/5).
+- A: chooser overflow repaired (single height owner + optional scrollbar +
+  refresh-stable offsets); kept separately reviewable in `a588538`.
+- B: native theme capability layer with bounded donors, partial fallback,
+  full-state-only sprite borrowing, one click-sound route; UNQUALIFIED-LIVE.
+  A Kingmaker process started mid-qualification; the deployment guard stopped
+  the run correctly and was not bypassed.
+- C: schema-5 child assignments (identity/order/pins/targets/enhancement
+  policy), explicit-order allocation, one per-pool accounting with traces,
+  lossless archived migration, no silent pruning; canonical fixtures proven
+  (four-cast mixed example, 9/3/3/6, pin refusal, legacy order).
+- D: PartialExecutionGate shared by Apply and HUD quick-run plus explicit
+  Apply Ready Casts Only; Casting Order & Resources view with competing
+  demand and one-run-per-routine forecast.
+- E: owned spellbook button with bounded guarded handoff through the native
+  close affordance; pure state machine proven; all live spellbook lanes
+  BLOCKED on the absent `KBP_AUTOMATION` fixture.
+- F: version 0.1.0 from actual metadata; docs updated; candidate package
+  built deterministically (see QUALIFICATION for hashes).
+- Final gates: source 42/42, protocol 159/159, harness 8/8, package 4/4,
+  WhatIf 5/5, Release PASS. No merge, tag, push, or publication.
+
+# 2026-09-19 - 0.1.1-rc1 testing preview published
+
+- Owner authorized push/tag/publish. One focused pass confirmed the five
+  product surfaces are wired to production callers (theme surface applied
+  at planner root + rebuilt rows; chooser/order scroll contracts; full
+  assignment editor; planner-authoritative accounting + sequential
+  forecast; spellbook opener lifecycle with disclosed one-way return).
+  Runtime-test host verified inert without the explicit launch flag and
+  validated request file under the lab evidence root.
+- Release engineering: prerelease versioning with validator support;
+  guarded publisher feature-branch prerelease switch (narrow, tested);
+  honest preview notes. All gates green; guarded push; published; asset
+  re-downloaded, hash-matched, package-validated.
+- Machine state at handoff: Kingmaker closed; live Mods = owner original
+  (0.0.19, 16 mods); zero unresolved transactions/locks; fixture pair
+  304/305 + seed intact for future lanes.
+
+# 2026-09-19 - RC1 owner acceptance failed; RC2 product recovery
+
+- Owner installed v0.1.1-rc1 and reported: native appearance absent,
+  spellbook entry absent, chooser appeared to permit unlimited rod
+  allocation across spells, and rows showed numeric metamagic labels
+  (`268435456 Spell`, `524288 Spell`, `33554432 Spell`, `8192 Spell`).
+  Treated as failed owner acceptance; live Mods folder found at 0.0.19
+  (owner rolled back).
+- Source review at `5da102f` confirmed five production defects (P1-P5)
+  and they were repaired on `codex/kingmaker-buff-planner-z-native-assignments`
+  (fix `ab155c2`, version `5d94502`, install guard `3625534`):
+  native donor lookup now StaticCanvas-scoped with owned-scope
+  application; explicit owned paper-surface registry reaching nested
+  modal frames and rebuilt rows; bounded retry for missing donors;
+  tolerant/refusing spellbook window locator with a corner-anchored
+  caption-fitted natively-styled button; plan-derived chooser/card
+  enhancement budgets (native now/requested/allocated/unmet/projected,
+  affected casts, this-assignment coverage, reorder behavior, no second
+  counter); `Assignments & Resources` caption + selected-spell
+  `Edit Assignments`; CallOfTheWild `MetamagicExtender` fail-soft
+  display-name contract (offline-verified: 268435456=Persistent,
+  524288=Piercing, 33554432=Selective, 8192=ThrenodicSpell) with
+  item-derived fallback and digit-sanitizing `EffectName`.
+- Six released-failure regressions added; suite now protocol 178/178,
+  source 42/42, harness 27/27, package 4/4, WhatIf 5/5, publisher gate
+  3/3; deterministic Release build 2/2 produced
+  `KingmakerBuffPlanner-0.1.1-rc2.zip` SHA-256
+  `f6aa4de188b08392acecdb04759ca0cebf2ad329732a5d8a014e0ea863981a00`.
+- Runtime lane (bounded, one attempt): guarded install over the observed
+  prior 0.0.19 first exposed a prerelease CLR-version parsing defect in
+  the install identity guard (transaction rolled back exactly; fixed per
+  the source gate's derivation rule), then the corrected install and
+  `live-ui-bootstrap` were refused because an owner-controlled Kingmaker
+  process was running (PID 1896). Zero mutations; no game interaction.
+  Rendered appearance, visible spellbook button, and in-game budgets are
+  disclosed as source-verified only in the rc2 notes with a five-minute
+  owner check; A7 actual charge spending remains untested.
+
+# 2026-09-19 - v0.1.1-rc2 published
+
+- Guarded publisher (prerelease, feature-branch switch): source 42/42,
+  protocol 178/178, harness 27/27, WhatIf 5/5, publisher gate 3/3,
+  deterministic Release build 2/2 at final HEAD `a30c07e`. Tag
+  `v0.1.1-rc2` == HEAD == origin branch head; v0.0.19 keeps Latest; main
+  unmerged. Two earlier publisher attempts aborted at the running-game
+  guard while the owner played; the third ran in a closed window.
+- Asset `KingmakerBuffPlanner-0.1.1-rc2.zip` SHA-256
+  `c5f888b91252bfa0dcf4f286a934772c6d15b692e8632b6c30b5db4e85ff649e`
+  re-downloaded from the release page; hash matches; package validation
+  4/4 on the downloaded copy. Release notes disclose the unverified
+  rendered/live lanes and carry the five-minute owner check.
+- Local machine: guarded install transaction `rc2fix-liveui-3` holds rc2
+  (f6aa build of the same fixes) over the prior 0.0.19 with an exact
+  backup; PR #1 body/title updated to the corrected preview.
+
+# 2026-09-19 - RC2 review corrections (rc3 candidate)
+
+- Review of published rc2 confirmed: "this spell" notes aggregated the
+  routine (C1), the assignment chooser built choices from the Automatic
+  child and could not remove unavailable selections with honest policy
+  captions (C2), budget detail could overflow its fixed areas (C3), and
+  the documented rollback command targeted the deployment-transaction
+  state instead of the installation record (C4). All repaired.
+- C1: SpellCoverage with canonical+aggregate identity matching and
+  unit-aware notes (targets funded/skipped, communal casts, charges).
+- C2: assignment-scoped Create (selections, policies, per-assignment
+  applicability via GetAssignmentProviderOptions), CanSelect/CanDeselect
+  on choices, removal-without-availability in SetEnhancement, honest
+  REQUIRED/OPTIONAL vs REQUIRED (targeting) captions wired to the view.
+- C3: bounded sticky summary (<=300) and row notes (<=160); full pool
+  detail on tooltips and in Assignments & Resources.
+- C4: guarded Restore-InstallLocal.ps1 preserving post-install profiles;
+  isolated-state tests 4/4 added to the suite; records corrected.
+- Observations: rebuild-boundary theme retry, complete native button
+  states on the spellbook entry, plan-summary/Edit-Assignments rect
+  separation.
+- Gates: source 42/42, protocol 181/181, harness 27/27, rollback 4/4,
+  package 4/4, WhatIf 5/5, publisher gate 3/3. Version 0.1.1-rc3.

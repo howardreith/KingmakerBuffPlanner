@@ -1,8 +1,10 @@
 # Kingmaker Buff Planner
 
-**Release:** `0.0.16` improves caster-spellbook normalization, persistent-buff
-catalog semantics, communal coverage, routine membership clarity, and native
-lower-left HUD integration.
+**Release:** `0.1.1-rc1` (testing preview) adds precise casting assignments (pinned casters, explicit
+targets and enhancements per assignment), one authoritative resource
+allocation result with a Casting Order view, explicit partial-apply control,
+a spellbook entry button, and an overflow-free enhancement chooser. Profiles
+migrate automatically from older versions.
 
 Kingmaker Buff Planner is a standalone Unity Mod Manager mod for **Pathfinder:
 Kingmaker Enhanced Plus Edition 2.1.7b**.
@@ -27,7 +29,17 @@ Mods\KingmakerBuffPlanner\Info.json
 Mods\KingmakerBuffPlanner\KingmakerBuffPlanner.dll
 ```
 
-Load a campaign, then use Ctrl+Shift+B or the lower-left planner controls.
+Load a campaign, then use Ctrl+Shift+B, the lower-left planner controls, or
+the Buff Planner button in the spellbook window. Existing profiles migrate
+automatically the first time they load; the exact pre-migration original is
+archived beside the profile as `kbp-pre-schema-<id>.orig`.
+
+The simple workflow is unchanged: pick a buff, click portraits, Apply. For
+finer control use the header's Order button to open Casting Order & Resources:
+numbered assignments with Earlier/Later controls, per-pool resource
+accounting, and a combined forecast across selected routines. When a routine
+cannot cover every requested target, Apply explains the gap and offers Apply
+Ready Casts Only as the explicit way to run the ready subset.
 Configure Long, Important, and Short routines in the setup window and preview
 resource and target diagnostics before running them.
 

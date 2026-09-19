@@ -11,6 +11,7 @@ namespace KingmakerBuffPlanner.UI
         private readonly ModLog _log;
         private readonly PlannerScreenStateMachine _state;
         private readonly Action<string> _quickExecute;
+        private readonly Action<string> _quickExecuteReadyOnly;
         private readonly Func<bool> _onSetupVisible;
         private readonly SetupOpenSoundGate _soundGate = new SetupOpenSoundGate();
         private BuffPlannerScreenView _view;
@@ -23,12 +24,14 @@ namespace KingmakerBuffPlanner.UI
             BuffPlannerUiLifecycleDiagnostics diagnostics,
             ModLog log,
             Action<string> quickExecute,
-            Func<bool> onSetupVisible = null)
+            Func<bool> onSetupVisible = null,
+            Action<string> quickExecuteReadyOnly = null)
         {
             _session = session ?? throw new ArgumentNullException("session");
             _diagnostics = diagnostics ?? throw new ArgumentNullException("diagnostics");
             _log = log ?? throw new ArgumentNullException("log");
             _quickExecute = quickExecute ?? throw new ArgumentNullException("quickExecute");
+            _quickExecuteReadyOnly = quickExecuteReadyOnly;
             _onSetupVisible = onSetupVisible;
             _state = new PlannerScreenStateMachine(() => BuffPlannerInputLease.Acquire(
                 new KingmakerPlannerInputBoundary()));
@@ -50,7 +53,7 @@ namespace KingmakerBuffPlanner.UI
                 if (StaticCanvas.Instance == null)
                     throw new InvalidOperationException("Kingmaker campaign UI is not available.");
                 _view = new BuffPlannerScreenView(StaticCanvas.Instance, _session,
-                    _diagnostics, () => Close(), _quickExecute);
+                    _diagnostics, () => Close(), _quickExecute, _quickExecuteReadyOnly);
                 _readiness.Reset();
                 _validationTick = 0;
                 LastFailure = "candidate-awaiting-deferred-readiness";

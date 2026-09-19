@@ -55,7 +55,10 @@ namespace KingmakerBuffPlanner.Persistence
                 try
                 {
                     bool migrated;
-                    BuffPlannerProfile profile = Deserialize(File.ReadAllText(path), campaignId, out migrated);
+                    string original = File.ReadAllText(path);
+                    BuffPlannerProfile profile = Deserialize(original, campaignId, out migrated);
+                    if (migrated)
+                        ArchivePreMigrationOriginal(path, original);
                     return new ProfileLoadResult(profile, i != 0, migrated, path, warning);
                 }
                 catch (Exception exception)
@@ -65,6 +68,25 @@ namespace KingmakerBuffPlanner.Persistence
             }
             return new ProfileLoadResult(BuffPlannerProfile.CreateDefault(campaignId), false, false,
                 string.Empty, warning);
+        }
+
+        // The rotating .bak chain is overwritten by ordinary saves; a schema
+        // migration preserves the exact original once, outside that chain,
+        // so a failed migration always leaves a recoverable pre-migration file.
+        // The rotating .bak chain is overwritten by ordinary saves; a schema
+        // migration preserves the exact original once, outside that chain,
+        // so a failed migration always leaves a recoverable pre-migration
+        // file. The short name keeps the full path far below MAX_PATH even
+        // under deep settings directories.
+        private void ArchivePreMigrationOriginal(string primary, string original)
+        {
+            string archive = Path.Combine(Path.GetDirectoryName(primary),
+                "kbp-pre-schema-" + Path.GetFileName(primary)
+                    .Replace("kingmaker-buff-planner-", string.Empty)
+                    .Replace(".json", string.Empty) + ".orig");
+            if (File.Exists(archive)) return;
+            Directory.CreateDirectory(Path.GetDirectoryName(archive));
+            AtomicFile.WriteUtf8(archive, original);
         }
 
         public void Save(BuffPlannerProfile profile)
@@ -149,14 +171,36 @@ namespace KingmakerBuffPlanner.Persistence
                 if (string.IsNullOrWhiteSpace(routine.Name) || routine.Assignments == null)
                     throw new InvalidDataException("invalid-routine");
                 RequireUnique(routine.Assignments.Select(a => a == null ? null : a.SourceId), "source-id");
+                var assignmentIds = new List<string>();
+                var assignmentOrders = new List<int>();
                 foreach (SourceAssignmentProfile assignment in routine.Assignments)
                 {
-                    if (assignment.Ability == null || assignment.WantedTargetUnitIds == null ||
-                        assignment.IgnoredPresenceMarkers == null || assignment.SelectedEnhancementIds == null)
+                    if (assignment.Ability == null || assignment.IgnoredPresenceMarkers == null ||
+                        assignment.CastingAssignments == null)
                         throw new InvalidDataException("invalid-assignment");
-                    RequireUnique(assignment.SelectedEnhancementIds, "enhancement-id");
                     assignment.Ability.ToKey();
+                    foreach (CastingAssignmentProfile casting in assignment.CastingAssignments)
+                    {
+                        if (casting == null || string.IsNullOrWhiteSpace(casting.AssignmentId) ||
+                            casting.TargetUnitIds == null || casting.Enhancements == null)
+                            throw new InvalidDataException("invalid-casting-assignment");
+                        assignmentIds.Add(casting.AssignmentId);
+                        assignmentOrders.Add(casting.Order);
+                        RequireUnique(casting.TargetUnitIds, "assignment-target-unit-id");
+                        RequireUnique(casting.Enhancements.Select(e =>
+                            e == null ? null : e.EnhancementId), "assignment-enhancement-id");
+                        foreach (EnhancementSelectionProfile selection in casting.Enhancements)
+                            if (selection == null ||
+                                string.IsNullOrWhiteSpace(selection.EnhancementId))
+                                throw new InvalidDataException("invalid-enhancement-selection");
+                    }
                 }
+                RequireUnique(assignmentIds, "assignment-id");
+                // The routine-wide allocation order must be an explicit total
+                // order: duplicates would make allocation depend on iteration
+                // details instead of configuration.
+                if (assignmentOrders.Distinct().Count() != assignmentOrders.Count)
+                    throw new InvalidDataException("duplicate-assignment-order");
             }
             if (profile.Ui.Scale < 0.5f || profile.Ui.Scale > 3.0f)
                 throw new InvalidDataException("ui-scale");
@@ -279,6 +323,50 @@ namespace KingmakerBuffPlanner.Persistence
                 }
                 document["schemaVersion"] = 4;
                 version = 4;
+                migrated = true;
+            }
+            if (version == 4)
+            {
+                JArray routines = document["routines"] as JArray;
+                if (routines == null) throw new InvalidDataException("routines-missing");
+                foreach (JObject routine in routines.OfType<JObject>())
+                {
+                    JArray assignments = routine["assignments"] as JArray;
+                    if (assignments == null) throw new InvalidDataException("assignments-missing");
+                    // Legacy planning allocated sources in source-ID order;
+                    // migration makes exactly that order explicit per child so
+                    // v5 allocation reproduces v4 results without guessing.
+                    int order = 0;
+                    foreach (JObject assignment in assignments.OfType<JObject>()
+                        .OrderBy(item => (string)item["sourceId"], StringComparer.Ordinal))
+                    {
+                        JArray targets = assignment["wantedTargetUnitIds"] as JArray;
+                        JArray enhancements = assignment["selectedEnhancementIds"] as JArray;
+                        var children = new JArray();
+                        var child = new JObject
+                        {
+                            ["assignmentId"] = "legacy-" + (string)assignment["sourceId"],
+                            ["order"] = order++,
+                            ["casterUnitId"] = null,
+                            ["spellbookGuid"] = null,
+                            ["providerKey"] = null,
+                            ["targetUnitIds"] = targets ?? new JArray(),
+                            ["enhancements"] = new JArray(
+                                (enhancements ?? new JArray()).OfType<JValue>()
+                                .Select(value => new JObject
+                                {
+                                    ["enhancementId"] = value,
+                                    ["required"] = true
+                                }))
+                        };
+                        children.Add(child);
+                        assignment["castingAssignments"] = children;
+                        assignment.Remove("wantedTargetUnitIds");
+                        assignment.Remove("selectedEnhancementIds");
+                    }
+                }
+                document["schemaVersion"] = 5;
+                version = 5;
                 migrated = true;
             }
             if (version != BuffPlannerProfile.CurrentSchemaVersion)

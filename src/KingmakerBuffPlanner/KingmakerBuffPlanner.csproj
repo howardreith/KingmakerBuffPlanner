@@ -106,11 +106,13 @@
     <Compile Include="Execution\InstantCastExecutor.cs" />
     <Compile Include="Execution\MaterialComponentAvailability.cs" />
     <Compile Include="Execution\HybridCastExecutor.cs" />
+    <Compile Include="Diagnostics\ShareCastDiagnostics.cs" />
     <Compile Include="Compatibility\BrownFurPowerfulChangeProfile.cs" />
     <Compile Include="Compatibility\BrownFurPowerfulChangeCompatibility.cs" />
     <Compile Include="Compatibility\BrownFurShareTransmutationProfile.cs" />
     <Compile Include="Compatibility\BrownFurShareTransmutationCompatibility.cs" />
     <Compile Include="Compatibility\SpellbookRoleResolver.cs" />
+    <Compile Include="Compatibility\CallOfTheWildMetamagicNames.cs" />
     <Compile Include="GameAdapters\KingmakerActionGraphAdapter.cs" />
     <Compile Include="GameAdapters\KingmakerAreaCoverageResolver.cs" />
     <Compile Include="GameAdapters\KingmakerActiveEffectSnapshotBuilder.cs" />
@@ -118,6 +120,7 @@
     <Compile Include="GameAdapters\KingmakerAnimatedCastAdapter.cs" />
     <Compile Include="GameAdapters\KingmakerBuffSourceDiscovery.cs" />
     <Compile Include="GameAdapters\KingmakerCastEnhancementAdapter.cs" />
+    <Compile Include="GameAdapters\CastEnhancementNaming.cs" />
     <Compile Include="GameAdapters\KingmakerPowerfulChangeBlueprintAnalyzer.cs" />
     <Compile Include="GameAdapters\KingmakerInstantCastAdapter.cs" />
     <Compile Include="GameAdapters\KingmakerPartySnapshotBuilder.cs" />
@@ -162,6 +165,21 @@
     <Compile Include="UI\PlannerPointerOwnership.cs" />
     <Compile Include="UI\PlannerUiSession.cs" />
     <Compile Include="UI\BuffPlannerUiRoot.cs" />
+    <Compile Include="UI\AssignmentPresentationModels.cs" />
+    <Compile Include="UI\SequentialForecastPlanner.cs" />
+    <Compile Include="UI\PlannerReviewState.cs" />
+    <Compile Include="UI\PlannerReviewCoordinator.cs" />
+    <Compile Include="UI\AssignmentEligibility.cs" />
+    <Compile Include="UI\SpellbookHandoffStateMachine.cs" />
+    <Compile Include="UI\SpellbookWindowLocator.cs" />
+    <Compile Include="UI\BuffPlannerSpellbookEntryController.cs" />
+    <Compile Include="UI\NativeThemeModel.cs" />
+    <Compile Include="UI\NativeThemeDonorLookup.cs" />
+    <Compile Include="UI\NativeThemeResolver.cs" />
+    <Compile Include="UI\NativeThemeRecovery.cs" />
+    <Compile Include="UI\ControlCaptionFit.cs" />
+    <Compile Include="UI\PlannerNativeTheme.cs" />
+    <Compile Include="UI\PlannerNativeThemeSurface.cs" />
     <Compile Include="$(IntermediateOutputPath)BuildInfo.Generated.cs" />
   </ItemGroup>
   <ItemGroup>

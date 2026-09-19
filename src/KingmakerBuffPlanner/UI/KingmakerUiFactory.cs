@@ -249,7 +249,8 @@ namespace KingmakerBuffPlanner.UI
             string name,
             Transform parent,
             PlannerUiTheme theme,
-            out RectTransform content)
+            out RectTransform content,
+            float scrollbarWidth = 0f)
         {
             RectTransform root = CreateRect(name, parent);
             AddFramedPanel(root, theme.ParchmentPanel, theme.GoldAccent);
@@ -260,7 +261,8 @@ namespace KingmakerBuffPlanner.UI
             scroll.scrollSensitivity = 28f;
 
             RectTransform viewport = CreateRect("Viewport", root);
-            Stretch(viewport, 3, 3, 3, 3);
+            float rightInset = scrollbarWidth > 0f ? 3f + scrollbarWidth : 3f;
+            Stretch(viewport, 3, rightInset, 3, 3);
             Image viewportImage = AddPanel(viewport, Color.white);
             // Mask uses the graphic's alpha-clipped pixels to write its stencil.
             // showMaskGraphic=false already suppresses the visible color, so the
@@ -283,7 +285,38 @@ namespace KingmakerBuffPlanner.UI
             layout.childForceExpandHeight = false;
             scroll.viewport = viewport;
             scroll.content = content;
+            if (scrollbarWidth > 0f)
+            {
+                scroll.verticalScrollbar = CreateVerticalScrollbar(
+                    root, theme, scrollbarWidth);
+                scroll.verticalScrollbarVisibility =
+                    ScrollRect.ScrollbarVisibility.Permanent;
+            }
             return scroll;
+        }
+
+        // The scrollbar is intentionally a static visual here: value is synced
+        // by the owning ScrollRect and handle size is set by the caller after
+        // it sizes the content, so exactly one component drives each property.
+        private static Scrollbar CreateVerticalScrollbar(
+            RectTransform root, PlannerUiTheme theme, float width)
+        {
+            RectTransform barRect = CreateRect("VerticalScrollbar", root);
+            SetAnchors(barRect, 1f, 0f, 1f, 1f, -(width + 3f), 3f, 3f, 3f);
+            Image track = AddPanel(barRect, theme.ParchmentPanel);
+            track.raycastTarget = true;
+            RectTransform sliding = CreateRect("SlidingArea", barRect);
+            Stretch(sliding, 2, 2, 2, 2);
+            RectTransform handleRect = CreateRect("Handle", sliding);
+            Stretch(handleRect);
+            Image handle = AddPanel(handleRect, theme.BurgundyPrimary);
+            handle.raycastTarget = true;
+            Scrollbar bar = barRect.gameObject.AddComponent<Scrollbar>();
+            bar.direction = Scrollbar.Direction.BottomToTop;
+            bar.targetGraphic = handle;
+            bar.handleRect = handleRect;
+            bar.value = 1f;
+            return bar;
         }
 
         internal static void Stretch(RectTransform rect, float left = 0, float right = 0,
@@ -321,6 +354,27 @@ namespace KingmakerBuffPlanner.UI
                 child.SetActive(false);
                 UnityEngine.Object.Destroy(child);
             }
+        }
+
+        // Grows an already-built button so its fully styled caption fits
+        // without shrinking below the readable size. Called only at rebuild
+        // boundaries after a forced layout pass, never per frame; the
+        // designed geometry is a floor, so captions can only gain room.
+        internal static void FitButtonToCaption(RectTransform rect,
+            float designMinimumWidth, float designMinimumHeight)
+        {
+            if (rect == null) return;
+            Button button = rect.GetComponent<Button>();
+            Text label = button == null ? null : button.GetComponentInChildren<Text>(true);
+            if (label == null) return;
+            float requiredWidth = ControlCaptionFit.ResolveExtent(designMinimumWidth,
+                ControlCaptionFit.RequiredWidth(label.preferredWidth, 5f));
+            float requiredHeight = ControlCaptionFit.ResolveExtent(designMinimumHeight,
+                ControlCaptionFit.RequiredHeight(label.preferredHeight, 1f));
+            if (requiredWidth > rect.rect.width)
+                rect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, requiredWidth);
+            if (requiredHeight > rect.rect.height)
+                rect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, requiredHeight);
         }
 
         internal static void ForceLayoutAndSnap(RectTransform root)

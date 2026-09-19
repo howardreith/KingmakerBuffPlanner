@@ -6,6 +6,7 @@ using Kingmaker;
 using Kingmaker.Blueprints;
 using Kingmaker.UnitLogic.Abilities.Blueprints;
 using KingmakerBuffPlanner.Discovery;
+using KingmakerBuffPlanner.Diagnostics;
 using KingmakerBuffPlanner.Domain.Effects;
 using KingmakerBuffPlanner.Domain.Planning;
 using KingmakerBuffPlanner.Domain.Providers;
@@ -44,6 +45,10 @@ namespace KingmakerBuffPlanner.UI
         internal string Status { get; private set; }
         internal bool IsExecuting { get; private set; }
         internal RoutinePlanResult LastPreview { get; private set; }
+        // Routine identity of LastPreview; the material-change gate only
+        // compares a confirmation baseline for the same routine.
+        internal string LastPreviewRoutineId { get; private set; }
+        private readonly PlannerReviewCoordinator _review = new PlannerReviewCoordinator();
         internal ExecutionReport LastExecutionReport { get; private set; }
         internal string ProfileStatus { get; private set; }
         internal PartyCatalogDiscoveryDiagnostics CatalogDiscovery { get; private set; }
@@ -261,18 +266,163 @@ namespace KingmakerBuffPlanner.UI
             LastPreview = new RoutinePlanService().Plan(Model.Profile, routineId, _snapshot,
                 _activeEffects, _effects, _providerOptions, _enhancements,
                 _targeting);
+            LastPreviewRoutineId = routineId;
+            // Computing a preview NEVER acknowledges review. Resource
+            // inspection, forecasts, and preflight computation all route
+            // through here; acknowledgment happens only when the planner
+            // view binds the exact visible plan to the player and calls
+            // AcknowledgeDisplayedPlan for that routine.
+            _review.PlanComputed(Model.Profile.CampaignId, routineId);
             if (_shareTargeting != null)
                 foreach (string diagnostic in _shareTargeting.DrainDiagnostics())
                     _log.Info("[KBP-SHARE-TARGETING] " + diagnostic + ".");
             return LastPreview;
         }
 
+        // Current-routine resource lines with competing configured demand from
+        // the other routines. Competing lines are demand, not reservations:
+        // every routine plan is computed against the same live snapshot.
+        internal IReadOnlyList<ResourceUsageLineViewModel> GetResourceUsageLines(string routineId)
+        {
+            if (Model == null) throw new InvalidOperationException("A campaign planner snapshot is required.");
+            RoutinePlanResult current = PreviewRoutine(routineId);
+            var competing = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+            foreach (RoutineProfile routine in Model.Profile.Routines.Where(r =>
+                r.RoutineId != routineId && r.Assignments.Count != 0))
+            {
+                RoutinePlanResult other;
+                try { other = PreviewRoutine(routine.RoutineId); }
+                catch { continue; }
+                foreach (ResourcePoolAllocation allocation in other.Plan.ResourceAllocations)
+                {
+                    if (allocation.RequestedUsage == 0 && allocation.AllocatedUsage == 0) continue;
+                    List<string> names;
+                    if (!competing.TryGetValue(allocation.PoolKey, out names))
+                        competing[allocation.PoolKey] = names = new List<string>();
+                    names.Add(routine.Name);
+                }
+            }
+            var lines = new List<ResourceUsageLineViewModel>();
+            string routineName = RoutineDisplayName(routineId);
+            foreach (ResourcePoolAllocation allocation in current.Plan.ResourceAllocations)
+            {
+                List<string> names;
+                competing.TryGetValue(allocation.PoolKey, out names);
+                lines.Add(new ResourceUsageLineViewModel(allocation,
+                    ResourcePoolDisplayName(allocation.PoolKey), routineName,
+                    new List<string>((names ?? new List<string>())
+                        .Distinct(StringComparer.Ordinal)
+                        .OrderBy(value => value, StringComparer.Ordinal).ToList())));
+            }
+            return lines;
+        }
+
+        // The planner screen calls this after binding a specific routine's
+        // preview into its visible controls — the only acknowledgment of
+        // review. The previously open-plan flag never established that the
+        // player saw this exact plan.
+        internal void AcknowledgeDisplayedPlan(string routineId)
+        {
+            if (Model == null || LastPreview == null ||
+                !string.Equals(LastPreviewRoutineId, routineId,
+                    StringComparison.Ordinal))
+                return;
+            _review.Presented(Model.Profile.CampaignId, routineId,
+                LastPreview.Plan);
+        }
+
+        // Read-only combined forecast: each selected routine occurrence is
+        // planned by the production planner against the balances, tokens,
+        // materials, charges, and projected effects carried forward from the
+        // previous occurrence, in the caller's explicit order. This must not
+        // mutate the reviewed-plan state, so the shared LastPreview baseline
+        // is captured and restored around the computation.
+        internal SequentialForecastPlanner.Result ForecastSequence(
+            IReadOnlyList<string> routineIdsInOrder)
+        {
+            if (routineIdsInOrder == null) throw new ArgumentNullException("routineIdsInOrder");
+            if (Model == null || _snapshot == null || _activeEffects == null ||
+                _effects == null || _providerOptions == null)
+                throw new InvalidOperationException("A campaign planner snapshot is required.");
+            RoutinePlanResult previousPreview = LastPreview;
+            string previousRoutineId = LastPreviewRoutineId;
+            try
+            {
+                return SequentialForecastPlanner.Compute(Model.Profile,
+                    routineIdsInOrder, _snapshot, _activeEffects, _effects,
+                    _providerOptions, _enhancements, _targeting);
+            }
+            finally
+            {
+                LastPreview = previousPreview;
+                LastPreviewRoutineId = previousRoutineId;
+            }
+        }
+
+        private string ResourcePoolDisplayName(string allocationPoolKey)
+        {
+            const string enhancementPrefix = "enhancement:";
+            if (allocationPoolKey != null &&
+                allocationPoolKey.StartsWith(enhancementPrefix, StringComparison.Ordinal))
+            {
+                string usagePool = allocationPoolKey.Substring(enhancementPrefix.Length);
+                CastEnhancementSnapshot enhancement = _enhancements == null ? null :
+                    _enhancements.FirstOrDefault(value =>
+                        value.UsagePoolId == usagePool);
+                return enhancement == null ? usagePool :
+                    enhancement.UsagePoolDisplayName + " (" + enhancement.EffectDisplayName + ")";
+            }
+            ResourcePoolSnapshot pool = _snapshot == null ? null :
+                _snapshot.ResourcePools.FirstOrDefault(value => value.PoolKey == allocationPoolKey);
+            return pool == null ? allocationPoolKey : pool.PoolKey;
+        }
+
+        internal IReadOnlyList<CastingAssignmentRowViewModel> GetCastingOrderRows(string routineId)
+        {
+            if (Model == null) throw new InvalidOperationException("A campaign planner snapshot is required.");
+            RoutinePlanResult preview = PreviewRoutine(routineId);
+            return CastingAssignmentRowViewModel.CreateRoutineRows(
+                Model.Profile, routineId,
+                sourceId =>
+                {
+                    SetupSourceRow source = Model.Sources.FirstOrDefault(value => value.SourceId == sourceId);
+                    return source == null ? sourceId : source.DisplayName;
+                },
+                unitId =>
+                {
+                    UnitSnapshot unit = Model.Snapshot.Units.FirstOrDefault(value => value.UnitId == unitId);
+                    return unit == null ? unitId : unit.DisplayName;
+                },
+                enhancementId =>
+                {
+                    CastEnhancementSnapshot enhancement = Model.GetEnhancement(enhancementId);
+                    return enhancement == null ? enhancementId : enhancement.DisplayName;
+                },
+                preview.Plan,
+                Model.SelectedSourceId,
+                casterUnitId =>
+                {
+                    UnitSnapshot unit = Model.Snapshot.Units.FirstOrDefault(value => value.UnitId == casterUnitId);
+                    return unit == null ? casterUnitId : unit.DisplayName;
+                });
+        }
+
         internal IEnumerator ExecuteRoutine(string routineId)
         {
-            return ExecuteRoutine(routineId, null);
+            return ExecuteRoutine(routineId, null, false);
         }
 
         internal IEnumerator ExecuteRoutine(string routineId, Action<QuickExecutionResult> completed)
+        {
+            return ExecuteRoutine(routineId, completed, false);
+        }
+
+        // readyOnlyExplicit is the mission's explicit "Apply Ready Casts Only"
+        // path. Without it, an incomplete routine (any unmet target) is never
+        // silently executed as its ready subset — the HUD quick-run shares
+        // this exact rule through the same gate.
+        internal IEnumerator ExecuteRoutine(string routineId,
+            Action<QuickExecutionResult> completed, bool readyOnlyExplicit)
         {
             string routineName = RoutineDisplayName(routineId);
             _log.Info("[KBP-QUICK] pointer/listener accepted;group=" + routineId + ".");
@@ -295,6 +445,13 @@ namespace KingmakerBuffPlanner.UI
                     ";reason=" + unavailable + ".");
                 yield break;
             }
+            // The acknowledged review baseline gates execution: after the
+            // refresh below, a materially different fresh plan (caster/item,
+            // anchor, targets, recipients, enhancement omissions, full cost
+            // vector, order, coverage) requires renewed review instead of
+            // silent execution. Only an explicitly acknowledged plan counts.
+            CastPlan reviewedPlan = _review.BaselineFor(
+                Model.Profile.CampaignId, routineId);
             RoutineProfile configuredRoutine = Model.Profile.Routines.First(r =>
                 r.RoutineId == routineId);
             _log.Info("[KBP-QUICK] assignments resolved;group=" + routineId +
@@ -347,18 +504,92 @@ namespace KingmakerBuffPlanner.UI
                     ";reason=" + Status + ".");
                 yield break;
             }
+            string materialChange = reviewedPlan != null
+                ? PlanMaterialChangeDetector.DescribeMaterialChange(
+                    reviewedPlan, preview.Plan)
+                : null;
+            if (materialChange != null)
+            {
+                LastExecutionReport = new ExecutionReport(preview.Plan);
+                Status = "The plan changed since your last review (" + materialChange +
+                    "). Review the updated preview before applying.";
+                Complete(completed, new QuickExecutionResult(routineId, routineName,
+                    QuickExecutionDisposition.Refused, Status,
+                    preview.Plan.Steps.Count, 0, 0));
+                _log.Info("[KBP-QUICK] material-change gate refused;group=" + routineId +
+                    ";change=" + materialChange + ".");
+                yield break;
+            }
+            PartialExecutionGate.Decision gate = PartialExecutionGate.Evaluate(preview.Plan);
+            if (gate.Blocked && !readyOnlyExplicit)
+            {
+                LastExecutionReport = new ExecutionReport(preview.Plan);
+                Status = gate.Summary + " Apply blocked to avoid running only part of " +
+                    routineName + "; use Apply Ready Casts Only to run the ready subset.";
+                Complete(completed, new QuickExecutionResult(routineId, routineName,
+                    QuickExecutionDisposition.Refused, Status,
+                    gate.PlannedCasts, 0, 0));
+                _log.Info("[KBP-QUICK] partial-apply gate refused;group=" + routineId +
+                    ";requested=" + gate.RequestedTargets + ";unfulfilled=" +
+                    gate.Unfulfilled + ".");
+                yield break;
+            }
+            if (readyOnlyExplicit)
+            {
+                _log.Info("[KBP-QUICK] explicit ready-only execution;group=" + routineId +
+                    ";requested=" + gate.RequestedTargets + ";planned=" + gate.PlannedCasts +
+                    ";unfulfilled=" + gate.Unfulfilled + ";skipped=" + gate.SkippedActive + ".");
+            }
+            // The native state is about to change by design; the reviewed
+            // baseline for this routine is spent with it.
+            _review.Spent(routineId);
             LastExecutionReport = new ExecutionReport(preview.Plan);
             ICastExecutor executor;
+            var fallbackWarnings = new HashSet<string>(StringComparer.Ordinal);
             if (Model.Profile.Execution.Mode == "instant")
             {
-                var nativeEnhancements = new HashSet<string>(_enhancements
+                CastEnhancementSnapshot[] executionEnhancements = _enhancements;
+                var nativeEnhancements = new HashSet<string>(executionEnhancements
                     .Where(value => value.RequiresNativeCommand)
                     .Select(value => value.EnhancementId), StringComparer.Ordinal);
+                string providerVersion;
+                bool directCapable;
+                string directReason;
+                ShareCastDiagnostics.Capture(_log.Info, out providerVersion,
+                    out directCapable, out directReason);
                 executor = new HybridCastExecutor(
-                    new KingmakerInstantCastAdapter(), new KingmakerAnimatedCastAdapter(),
+                    new KingmakerInstantCastAdapter(_log.Info), new KingmakerAnimatedCastAdapter(),
                     Model.Profile.Execution.AllowAnimatedFallback,
                     Model.Profile.Execution.OutOfCombatOnly,
-                    step => step.EnhancementIds.Any(nativeEnhancements.Contains));
+                    step => step.EnhancementIds.Any(nativeEnhancements.Contains),
+                    (index, step, animated, route) =>
+                    {
+                        CastEnhancementSnapshot[] selected = executionEnhancements.Where(value =>
+                            step.EnhancementIds.Contains(value.EnhancementId)).ToArray();
+                        _log.Info("[KBP-ROUTE] group=" + routineId + ";step=" + index +
+                            ";provider=" + step.Provider.Canonical + ";source=" + step.SourceId +
+                            ";targets=" + string.Join(",", step.TargetUnitIds.ToArray()) +
+                            ";selected-enhancements=" + string.Join(",", step.EnhancementIds.ToArray()) +
+                            ";native-enhancements=" + string.Join(",", selected.Where(value =>
+                                value.RequiresNativeCommand).Select(value => value.EnhancementId).ToArray()) +
+                            ";direct-providers=" + string.Join(",", selected.Select(value =>
+                                value.DirectCastProviderId).ToArray()) + ";" + route);
+                        if (!animated) return;
+                        bool share = selected.Any(value => value.AffectsTargeting);
+                        string cause = share && !directCapable
+                            ? "Gunslinger " + providerVersion +
+                                " has no compatible Instant Share capability (" + directReason + ")."
+                            : selected.Any(value => value.RequiresNativeCommand)
+                                ? string.Join(", ", selected.Where(value => value.RequiresNativeCommand)
+                                    .Select(value => value.DisplayName).ToArray()) +
+                                    " requires native animated casting."
+                                : step.ExecutionStrategyReason;
+                        string warning = "Warning: " + (share ? "Share Transmutation" : "This cast") +
+                            " is using animated casting in Instant mode. " + cause;
+                        fallbackWarnings.Add(warning);
+                        Status = warning;
+                        _log.Info("[KBP-INSTANT-FALLBACK] " + warning);
+                    });
             }
             else executor = new AnimatedCastExecutor(new KingmakerAnimatedCastAdapter(),
                 Model.Profile.Execution.OutOfCombatOnly);
@@ -397,12 +628,14 @@ namespace KingmakerBuffPlanner.UI
             IsExecuting = false;
             if (failure != null)
             {
-                Status = "Routine execution failed: " + failure.Message;
+                Status = "Routine execution failed: " + failure.Message +
+                    (fallbackWarnings.Count == 0 ? "" : " " +
+                        string.Join(" ", fallbackWarnings.OrderBy(value => value).ToArray()));
                 _log.Error("Routine execution failed.", failure);
                 Complete(completed, new QuickExecutionResult(routineId, routineName,
                     QuickExecutionDisposition.Failed, Status,
                     LastExecutionReport.Planned, LastExecutionReport.Submitted,
-                    LastExecutionReport.Confirmed));
+                    LastExecutionReport.Confirmed, fallbackWarnings.Count != 0));
                 yield break;
             }
             ExecutionReport report = LastExecutionReport;
@@ -416,6 +649,9 @@ namespace KingmakerBuffPlanner.UI
                 "; spent=" + report.ResourcesSpent + "; failed=" + report.Failed +
                 "; skipped=" + report.Skipped + "; unfulfilled=" + report.Unfulfilled + "." +
                 variantReselection;
+            if (fallbackWarnings.Count != 0)
+                Status = "Instant mode was not fully satisfied. " +
+                    string.Join(" ", fallbackWarnings.OrderBy(value => value).ToArray()) + " " + Status;
             CastExecutionRecord firstFailure = report.Records.FirstOrDefault(record =>
                 record.Status == CastExecutionStatus.FailedValidation ||
                 record.Status == CastExecutionStatus.FailedSubmission ||
@@ -443,7 +679,8 @@ namespace KingmakerBuffPlanner.UI
                     string.Join(",", record.ResourceTokenIds.ToArray()) + ";detail=" + record.Detail);
             Complete(completed, new QuickExecutionResult(routineId, routineName,
                 confirmed ? QuickExecutionDisposition.Completed : QuickExecutionDisposition.Failed,
-                Status, report.Planned, report.Submitted, report.Confirmed));
+                Status, report.Planned, report.Submitted, report.Confirmed,
+                fallbackWarnings.Count != 0));
             _log.Info("[KBP-QUICK] confirmed result produced;group=" + routineId +
                 ";confirmed=" + report.Confirmed + ";failed=" + report.Failed +
                 ";message=" + Status + ".");

@@ -23,7 +23,8 @@ namespace KingmakerBuffPlanner.Execution
         FailedSubmission,
         FailedExecution,
         TimedOutUnconfirmed,
-        ResidualStateUnsettled
+        ResidualStateUnsettled,
+        ExecutorSelected
     }
 
     public sealed class CastExecutionRecord
@@ -32,6 +33,7 @@ namespace KingmakerBuffPlanner.Execution
         {
             StepIndex = stepIndex;
             SourceId = step.SourceId;
+            AssignmentId = step.AssignmentId;
             ProviderKey = step.Provider.Canonical;
             AbilityKey = step.Provider.Ability.Canonical;
             CasterUnitId = step.Provider.CasterUnitId;
@@ -42,6 +44,8 @@ namespace KingmakerBuffPlanner.Execution
             ResourceTokenIds = new ReadOnlyCollection<string>(step.Reservation == null
                 ? new List<string>() : step.Reservation.TokenIds.ToList());
             EnhancementIds = new ReadOnlyCollection<string>(step.EnhancementIds.ToList());
+            OmittedEnhancementIds = new ReadOnlyCollection<string>(
+                step.OmittedEnhancementIds.ToList());
             ExecutionStrategy = step.ExecutionStrategy;
             ExecutionStrategyReason = step.ExecutionStrategyReason;
             Status = status;
@@ -50,6 +54,7 @@ namespace KingmakerBuffPlanner.Execution
 
         public int StepIndex { get; private set; }
         public string SourceId { get; private set; }
+        public string AssignmentId { get; private set; }
         public string ProviderKey { get; private set; }
         public string AbilityKey { get; private set; }
         public string CasterUnitId { get; private set; }
@@ -58,6 +63,7 @@ namespace KingmakerBuffPlanner.Execution
         public string ResourcePoolKey { get; private set; }
         public IReadOnlyList<string> ResourceTokenIds { get; private set; }
         public IReadOnlyList<string> EnhancementIds { get; private set; }
+        public IReadOnlyList<string> OmittedEnhancementIds { get; private set; }
         public CastExecutionStrategy ExecutionStrategy { get; private set; }
         public string ExecutionStrategyReason { get; private set; }
         public CastExecutionStatus Status { get; private set; }

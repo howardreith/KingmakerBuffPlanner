@@ -28,6 +28,7 @@ namespace KingmakerBuffPlanner.UI
         private BuffPlannerUiLifecycleDiagnostics _diagnostics;
         private BuffPlannerHudButtonController _hud;
         private BuffPlannerScreenController _screen;
+        private BuffPlannerSpellbookEntryController _spellbookEntry;
         private BuffPlannerQuickExecuteController _quick;
         private int _runtimeOpenCycles;
         private int _runtimeReconstructionCount;
@@ -518,13 +519,23 @@ namespace KingmakerBuffPlanner.UI
             if (!_enabled || _session == null || _session.IsExecuting || _quickStartPending)
                 return false;
             _quickStartPending = true;
-            StartCoroutine(ExecuteQuickRoutine(routineId, completed));
+            StartCoroutine(ExecuteQuickRoutine(routineId, completed, false));
+            return true;
+        }
+
+        public bool TryStartReadyOnly(string routineId, Action<QuickExecutionResult> completed)
+        {
+            if (!_enabled || _session == null || _session.IsExecuting || _quickStartPending)
+                return false;
+            _quickStartPending = true;
+            StartCoroutine(ExecuteQuickRoutine(routineId, completed, true));
             return true;
         }
 
         private IEnumerator ExecuteQuickRoutine(
             string routineId,
-            Action<QuickExecutionResult> completed)
+            Action<QuickExecutionResult> completed,
+            bool readyOnlyExplicit)
         {
             bool completedCalled = false;
             Action<QuickExecutionResult> observedCompletion = result =>
@@ -534,7 +545,8 @@ namespace KingmakerBuffPlanner.UI
             };
             try
             {
-                IEnumerator routine = _session.ExecuteRoutine(routineId, observedCompletion);
+                IEnumerator routine = _session.ExecuteRoutine(routineId,
+                    observedCompletion, readyOnlyExplicit);
                 while (true)
                 {
                     bool moved = false;
@@ -574,9 +586,18 @@ namespace KingmakerBuffPlanner.UI
             _diagnostics = new BuffPlannerUiLifecycleDiagnostics();
             _quick = new BuffPlannerQuickExecuteController(this, _diagnostics, PresentQuickResult);
             _screen = new BuffPlannerScreenController(_session, _diagnostics, log,
-                routineId => _quick.Execute(routineId), PlayNativeSetupOpenSound);
+                routineId => _quick.Execute(routineId), PlayNativeSetupOpenSound,
+                routineId => _quick.Execute(routineId, true));
             _hud = new BuffPlannerHudButtonController(_session, _diagnostics, log,
                 () => { OpenSetup(); }, routineId => _quick.Execute(routineId));
+            _spellbookEntry = new BuffPlannerSpellbookEntryController(
+                value => _log.Info(value),
+                () => OpenSetup(),
+                () => _screen != null && _screen.IsOpen,
+                PlannerUiTheme.Resolve(null),
+                () => _screen != null && _screen.LifecycleState ==
+                    PlannerScreenLifecycleState.Open,
+                RequestNativeEscapeVeil);
             try
             {
                 _eventSubscription = EventBus.Subscribe((object)this);
@@ -596,6 +617,26 @@ namespace KingmakerBuffPlanner.UI
             return _screen != null && _screen.Open();
         }
 
+        private void RequestNativeEscapeVeil()
+        {
+            // Recovery after a failed handoff whose native spellbook already
+            // closed: land the player in a usable interface. No verified
+            // offline contract exists for re-opening the native spellbook,
+            // so recovery opens the planner itself through our own owned
+            // machinery (mode is free at this point) and logs the exact
+            // missing native contract rather than guessing an API.
+            _log.Info("[KBP-SPELLBOOK] recovery: opening planner directly; " +
+                "return-to-spellbook awaits a verified native reopen contract.");
+            try
+            {
+                OpenSetup();
+            }
+            catch (Exception exception)
+            {
+                _log.Error("[KBP-SPELLBOOK] planner recovery open failed.", exception);
+            }
+        }
+
         private bool PlayNativeSetupOpenSound()
         {
             if (Game.Instance == null || Game.Instance.UI == null ||
@@ -612,6 +653,7 @@ namespace KingmakerBuffPlanner.UI
             _tickCount++;
             try
             {
+                if (_spellbookEntry != null) _spellbookEntry.Tick();
                 if (_screen.LifecycleState != PlannerScreenLifecycleState.Closed &&
                     Input.GetKeyDown(KeyCode.Escape)) _screen.Close();
                 long screenStartedAt = RuntimePerformanceDiagnostics.BeginOperation();
@@ -877,6 +919,8 @@ namespace KingmakerBuffPlanner.UI
             StopAllCoroutines();
             if (_runtimePhysicalProbe != null) _runtimePhysicalProbe.Dispose();
             _runtimePhysicalProbe = null;
+            if (_spellbookEntry != null) _spellbookEntry.Release();
+            _spellbookEntry = null;
             if (_eventSubscription != null)
             {
                 _eventSubscription.Dispose();

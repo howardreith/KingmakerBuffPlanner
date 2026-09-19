@@ -1,5 +1,37 @@
 # Manual Acceptance
 
+## 2026-09-06 failed human validation: routing diagnosis
+
+Product-bearing checkpoint: `de57d90b38711c4c641d470900339bd8815a3fa8`.
+Final candidate ZIP/DLL/MVID and exact command counts are recorded in the
+investigation report's delivery checkpoint. The package remains diagnostic-only;
+final bridge 21/21, exact metadata 87/87, deterministic builds 2/2, candidate
+deployment purity 5/5 and release installer purity 5/5 all pass. No gameplay
+coverage is promoted. The reproducing-machine cast log remains the next action.
+
+Instant Share remains unresolved; gameplay **NOT VERIFIED**. On local machine
+DATA the installed Planner 0.0.19 / Gunslinger 0.0.115 DLLs match both released
+hashes and MVIDs. Executing the real production bridge accepts that pair and
+rejects the actual older 0.0.114 provider. No affected casting log or running
+game is available; the exact Kingmaker save root is absent.
+
+Active branch: `codex/kingmaker-buff-planner-instant-share-routing-diagnosis`;
+starting/audited HEAD: `fd0e6dc1c32dfc929a56dbc575163e641b150746`;
+version remains 0.0.19. Diagnostic-only source adds pre-cast routing evidence,
+loaded-pair identity, provider-direct phase records and visible fallback
+outcomes. The native transaction and resource policies are unchanged.
+Focused gates: source 42/42, behavior 150/150, harness 8/8, package 4/4,
+deployment WhatIf 5/5; candidate production bridge 21/21 assertions in 3/3
+processes. No failed checks are counted as passes.
+
+Commands, exact identity tables, evidence under
+`artifacts/instant-share-diagnosis/`, rejected theories, and limits are in
+[the investigation report](INSTANT-SHARE-FAILED-VALIDATION.md). This supersedes any interpretation of the historical public
+release records below as proof that Instant Share worked in Howie's game.
+Exact next action: capture one affected cast from the reproducing machine and
+identify its capability/selected-executor/Fire discriminator. A diagnostic
+candidate is not a gameplay fix or authorization trigger for a new public release.
+
 ## 0.0.19 Share Transmutation Instant routine
 
 Status: REQUIRED FOR LIVE GAMEPLAY CLAIM; NOT RUN. Use only an authorized
@@ -581,3 +613,27 @@ When an authorized `KBP_AUTOMATION_WORKING` fixture is available, also verify:
 - native-only and optional-mod source visibility without duplicate or foreign dependencies.
 
 The no-save native-only and exact Call of the Wild load/catalog/Harmony portions above are already automated and passed twice. Manual acceptance remains limited to the save-backed rows requiring an authorized `KBP_AUTOMATION_WORKING` fixture; Tabletop Added Rules is unavailable locally.
+
+
+## 0.1.0 manual acceptance checklist (pending live fixture)
+
+1. Open the enhancement chooser on a buff with more options than fit: scroll
+   by wheel and by dragging the scrollbar to the final row; toggle an option
+   and confirm the position survives the refresh.
+2. Configure the mixed-caster example (one source; Leinna self; Felix self;
+   Felix pinned for Tias+Raine with Share): Casting Order shows four numbered
+   assignments and the preview reports four casts with Share on exactly the
+   two non-self targets.
+3. Force a charge shortage (nine enhanced single-target casts, three charges
+   remaining): the resource line reads requested 9 / available 3 / allocated
+   3 / unmet 6; Apply refuses with the summary; Apply Ready Casts Only runs
+   the three ready casts and reports the six unmet targets.
+4. Reorder assignments with Earlier/Later and confirm the allocated targets
+   change accordingly; sort/filter the catalog and confirm they do not.
+5. Pin a caster who is unconscious or absent: the row stays, reports the pin,
+   and the target is removable.
+6. Open the planner from the spellbook button; close without casting; verify
+   usable navigation in both directions, no duplicate buttons after repeated
+   opens, and HUD/hotkey still working.
+7. Load a pre-0.1.0 profile: configuration survives verbatim; the original is
+   archived as `kbp-pre-schema-<id>.orig`; reloading does not regenerate IDs.
