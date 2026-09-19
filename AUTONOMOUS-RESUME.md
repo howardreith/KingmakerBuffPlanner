@@ -1,5 +1,34 @@
 # AUTONOMOUS-RESUME — top section is current; planning/Z-NATIVE-ASSIGNMENTS-STATUS.md is the per-checkpoint tracker.
 
+## Release closeout — 2026-09-19 (LATEST; supersedes all older instructions below)
+
+- **TESTING PREVIEW PUBLISHED:** https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.1.1-rc1
+  (non-draft prerelease, --latest=false; stable v0.0.19 and the latest
+  channel untouched). Asset
+  `KingmakerBuffPlanner-0.1.1-rc1.zip` SHA-256
+  `ea1fa19e839df4a5c5ddaf095d15a2933acec3f573b6ff3868430028c50b4c7b`,
+  verified against a fresh download (hash match + package validation 4/4).
+  Tag `v0.1.1-rc1` == source `5da102f` on the feature branch, pushed.
+  Main-branch merge deferred to owner review.
+- Gates at publish: source 42/42, protocol 172/172, harness 27/27,
+  package 4/4, WhatIf 5/5, publisher gate 3/3, deterministic build 2/2.
+- Live runtime acceptance: UNVERIFIED, disclosed in the release notes.
+  Automated save-load remains blocked by the fixture save's mod
+  dependencies under minimal staging (GUID evidence in the tracker) and
+  by full-config boots not finishing inside the automated environment.
+  The owner's own configuration loads the seed (owner-verified).
+  **Do not request another seed; do not resume the engine-only
+  investigation — that theory is superseded by the GUID dependency
+  evidence. Manual owner testing is the acceptance path.**
+- Known preview limitations (also in the release notes): one-way
+  spellbook return; pooled-per-caster rod selection; theme fallback is
+  not verified native artwork.
+- NEXT ACTIONS (only after owner feedback): address owner-reported
+  defects; stable promotion path = merge review + default-branch publish
+  through the guarded publisher (feature-branch switch is prerelease-only).
+
+# AUTONOMOUS-RESUME — top section is current; planning/Z-NATIVE-ASSIGNMENTS-STATUS.md is the per-checkpoint tracker.
+
 ## First live fixture + smoke attempt handoff — 2026-09-19 (LATEST)
 
 - Status: fixture bootstrap + teardown BOTH proven against the REAL save

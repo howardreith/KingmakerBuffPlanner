@@ -1200,3 +1200,16 @@ see `artifacts/release/0.1.0/release-manifest.json` for the DLL hash and
 MVID. Gates: source 42/42, protocol 172/172, harness 26/23->26, package
 4/4, WhatIf 5/5. Local-only; live lanes remain unrun (no
 `KBP_AUTOMATION_SEED`; absence re-verified before this record).
+
+### 0.1.1-rc1 testing preview — published 2026-09-19
+
+Release https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.1.1-rc1
+(non-draft prerelease, --latest=false; stable channel unchanged). Source
+commit `5da102f36dbc982660f74e47c17a45bfe7012ac0` == tag `v0.1.1-rc1`;
+ZIP SHA-256
+`ea1fa19e839df4a5c5ddaf095d15a2933acec3f573b6ff3868430028c50b4c7b`;
+deterministic build 2/2; gates at publish: source 42/42, protocol 172/172,
+harness 27/27, package 4/4, WhatIf 5/5, publisher gate 3/3. The published
+asset was re-downloaded and its hash and package structure verified.
+Live gameplay acceptance remains UNVERIFIED and is disclosed in the
+release notes; manual owner testing is the acceptance path.

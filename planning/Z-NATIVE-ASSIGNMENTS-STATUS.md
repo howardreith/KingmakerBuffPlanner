@@ -551,3 +551,23 @@ casting/resource acceptance remain live-only.
   (2) seed-dependencies profile staging exactly the six GUID providers
   and retry the load; (3) if still failing, next factor is UMM
   enabled-state/overlay handling; then the rendered smoke.
+
+
+## Release closeout — 2026-09-19
+
+- Testing preview **published and verified**:
+  https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.1.1-rc1
+  (non-draft prerelease, latest channel unchanged; stable v0.0.19 intact).
+  ZIP SHA-256
+  `ea1fa19e839df4a5c5ddaf095d15a2933acec3f573b6ff3868430028c50b4c7b`,
+  re-downloaded and validated 4/4. Tag == source `5da102f` (feature
+  branch, pushed via the guarded helper).
+- Engineering added this session: prerelease versioning (CLR 0.1.1.0 /
+  semver 0.1.1-rc1) with source-validator support; guarded publisher
+  `-AllowFeatureBranchPrerelease` (prerelease-only, pushed-HEAD required,
+  stable versions still default-branch-only; 3/3 gate regression);
+  honest preview release notes separating implemented/tested/limited/unrun.
+- No further seed, profile synthesis, or engine investigation is
+  authorized or needed; the fixture save's GUID dependency evidence
+  supersedes the engine-only theory. Manual owner testing is the
+  acceptance path for this preview.

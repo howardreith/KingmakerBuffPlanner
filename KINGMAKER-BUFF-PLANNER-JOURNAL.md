@@ -1593,3 +1593,20 @@ Status: ROOT CAUSE PROVEN; 0.0.4 SOURCE PASS; LIVE QUALIFICATION PENDING
   built deterministically (see QUALIFICATION for hashes).
 - Final gates: source 42/42, protocol 159/159, harness 8/8, package 4/4,
   WhatIf 5/5, Release PASS. No merge, tag, push, or publication.
+
+# 2026-09-19 - 0.1.1-rc1 testing preview published
+
+- Owner authorized push/tag/publish. One focused pass confirmed the five
+  product surfaces are wired to production callers (theme surface applied
+  at planner root + rebuilt rows; chooser/order scroll contracts; full
+  assignment editor; planner-authoritative accounting + sequential
+  forecast; spellbook opener lifecycle with disclosed one-way return).
+  Runtime-test host verified inert without the explicit launch flag and
+  validated request file under the lab evidence root.
+- Release engineering: prerelease versioning with validator support;
+  guarded publisher feature-branch prerelease switch (narrow, tested);
+  honest preview notes. All gates green; guarded push; published; asset
+  re-downloaded, hash-matched, package-validated.
+- Machine state at handoff: Kingmaker closed; live Mods = owner original
+  (0.0.19, 16 mods); zero unresolved transactions/locks; fixture pair
+  304/305 + seed intact for future lanes.
