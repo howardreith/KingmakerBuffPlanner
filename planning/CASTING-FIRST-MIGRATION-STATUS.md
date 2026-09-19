@@ -5,7 +5,81 @@ Linked from `AUTONOMOUS-RESUME.md`. Specification: the adopted
 `Kingmaker-Buff-Planner-Casting-First-Migration-Charter.md` (casting-first
 migration and native scroll UI charter v1.0, 2026-09-19).
 
-## Phase 1 checkpoint 1 — casting contract core — 2026-09-19 (CURRENT)
+## Phase 2 checkpoint 2 — schema-5 → schema-6 import converter — 2026-09-19 (CURRENT)
+
+**Branch** `codex/kingmaker-buff-planner-casting-first`, on top of Phase 1
+checkpoint `4398588`. Version remains `0.1.1-rc3`.
+
+### Implemented (production code)
+
+- `Persistence/CastingPlanImporter.cs` — the charter §7.2 converter:
+  - **Pinned single-target children** split into one casting per
+    recipient preserving target order, enhancements (with pooled-rod
+    provenance note, no invented exact identity), source-level
+    existing-effect policy and ignored markers (moved into each
+    casting), and relative routine order driven by the legacy explicit
+    per-routine child order.
+  - **Automatic children** become Draft castings with targets preserved
+    and an unresolved caster — never today's best caster silently
+    pinned.
+  - **Group children** import as exactly one Draft group casting with
+    required coverage preserved and origin/count marked
+    pending-review in provenance (even with a pinned caster).
+  - **Idempotency**: casting IDs derive deterministically from legacy
+    provenance (`m5:<assignmentId>:<recipient|group>`); re-import onto a
+    document already holding those identities reuses them (mapping
+    disposition `reused`) and merging routine-interleaved legacy work
+    keeps the routine-major persisted-order invariant with re-derived
+    orders.
+  - **Target-less legacy children** cannot become castings in the
+    explicit model; they stay visible as `unresolved-no-recipient`
+    mappings plus warnings instead of phantom records or silent drops.
+  - **Report**: legacy routine/child counts, resulting castings,
+    ready/draft split, unresolved casters, group reviews, pooled
+    enhancements, provider-policy notices, per-child mappings,
+    de-duplicated warnings.
+- `Domain/Authoring` gained `PlannedCasting.WithOrder` (internal); the
+  authoring service and test fixtures now share it instead of
+  duplicating the rebuild constructor.
+
+### Verified behavior (deterministic domain layer)
+
+New tests: `casting-import-splits-pinned-single-target`,
+`casting-import-automatic-becomes-review-drafts`,
+`casting-import-group-preserves-coverage-for-review`,
+`casting-import-is-idempotent-and-orderly`,
+`casting-import-report-counts-honestly` (A12 import half; A13's
+corruption/rollback side is covered by the checkpoint-1 repository
+tests).
+
+Full gate: **source 42/42; protocol 193/193; harness 27/27; package
+4/4; WhatIf 5/5; rollback 4/4; publisher 3/3**
+(`artifacts/casting-first-checkpoint2-gate.log`). Evidence layer:
+deterministic domain fixtures over the real
+`CastingPlanImporter`/`BuffPlannerProfile` types — no player profile
+was read or converted, and no migration of live data has run.
+
+### Defects found and fixed during the checkpoint
+
+- First converter draft produced all import orders as 0 (document
+  invariant caught it) and attempted a phantom DirectTarget casting
+  for target-less children (domain invariant caught it); both were
+  redesigned before commit rather than weakening the invariants.
+
+### Acceptance matrix standing (A01–A20)
+
+A01–A04: PASS (domain layer, checkpoint 1). A12 import half: PASS
+(domain layer, this checkpoint; live migration rehearsal remains).
+A05–A11, A13–A20: NOT RUN. Runtime/visual evidence: none claimed.
+
+### Next executable step
+
+Phase 2 continuation: shared atomic budget reservation in
+`ExplicitCastingCompiler` (full cost vectors across native and
+enhancement pools, no partial reservations on failure — A07/A08),
+then exact-source identity plumbing for enhancement selections.
+
+## Phase 1 checkpoint 1 — casting contract core — 2026-09-19 (commit `4398588`)
 
 **Branch** `codex/kingmaker-buff-planner-casting-first` (descendant of
 `codex/kingmaker-buff-planner-z-native-assignments` at

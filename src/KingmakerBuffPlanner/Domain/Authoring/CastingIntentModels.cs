@@ -237,6 +237,18 @@ namespace KingmakerBuffPlanner.Domain.Authoring
                     "An anchored casting must select an anchor unit.", "origin");
         }
 
+        internal static PlannedCasting WithOrder(PlannedCasting casting, int order)
+        {
+            if (casting.Order == order) return casting;
+            return new PlannedCasting(
+                casting.CastingId, casting.RoutineId, order, casting.SourceId,
+                casting.Ability, casting.CasterUnitId, casting.SpellbookGuid,
+                casting.TargetMode, casting.DirectTargetUnitId, casting.Origin,
+                casting.RequiredCoverageUnitIds, casting.TargetingModifiers,
+                casting.Enhancements, casting.ExistingEffectPolicy,
+                casting.IgnoredPresenceMarkers, casting.State, casting.Provenance);
+        }
+
         internal static IReadOnlyList<T> DistinctBy<T>(
             IEnumerable<T> values, Func<T, string> key, string label)
         {

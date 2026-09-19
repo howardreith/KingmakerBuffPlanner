@@ -1,6 +1,23 @@
 # AUTONOMOUS-RESUME — top section is current; planning/CASTING-FIRST-MIGRATION-STATUS.md is the per-checkpoint tracker.
 
-## Casting-first migration Phase 1 checkpoint 1 — 2026-09-19 (LATEST)
+## Casting-first migration Phase 2 checkpoint 2 — 2026-09-19 (LATEST)
+
+- Schema-5 → schema-6 import converter implemented
+  (`Persistence/CastingPlanImporter.cs`) per charter §7.2: pinned
+  single-target children split per recipient with order/enhancements/
+  policy preserved; automatic children become review drafts (no silent
+  best-caster pinning); group children import as one draft with
+  coverage preserved and origin/count pending review; deterministic
+  provenance-derived IDs make re-import idempotent; target-less
+  children stay visible as unresolved mappings; full import report
+  with per-child disposition. No live profile was read or converted.
+- Gates: source 42/42; protocol 193/193 (5 new import tests);
+  harness 27/27; package 4/4; WhatIf 5/5; rollback 4/4; publisher
+  3/3. Log: `artifacts/casting-first-checkpoint2-gate.log`.
+- NEXT: shared atomic budget reservation in ExplicitCastingCompiler
+  (A07/A08), then exact-source identity plumbing.
+
+## Casting-first migration Phase 1 checkpoint 1 — 2026-09-19 (commit `4398588`)
 
 - The adopted casting-first charter is being implemented on branch
   `codex/kingmaker-buff-planner-casting-first`, created clean from the

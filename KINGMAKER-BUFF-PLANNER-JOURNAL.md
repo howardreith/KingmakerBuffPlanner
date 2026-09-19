@@ -1,5 +1,30 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-09-19 casting-first migration: Phase 2 checkpoint 2 (import)
+
+On top of Phase 1 (`4398588`). Implemented the charter 7.2 schema-5 to
+schema-6 converter: `Persistence/CastingPlanImporter.cs` with
+provenance-derived deterministic IDs (`m5:<assignment>:<recipient|group>`),
+pinned per-recipient splits preserving order/enhancements/policy,
+automatic-to-review-draft conversion, group coverage preserved with
+origin/count pending review, idempotent re-import (reuse, never
+duplicate), routine-major persisted-order maintenance on merge, and
+unresolved-no-recipient mappings for target-less children. Import
+report counts originals/results/reviews/notices with per-child
+dispositions.
+
+Verification: `scripts/Test-SourceOnly.ps1` — source 42/42; protocol
+193/193 (5 new import tests); harness 27/27; package 4/4; WhatIf 5/5;
+rollback 4/4; publisher 3/3
+(`artifacts/casting-first-checkpoint2-gate.log`). Domain-layer evidence
+only; no live profile was read or converted. Defects fixed pre-commit:
+import orders initially all zero (document invariant caught it) and a
+phantom DirectTarget casting for target-less children (domain invariant
+caught it); invariants were kept and the converter redesigned.
+
+Next: shared atomic budget reservation (A07/A08), then exact-source
+identity plumbing.
+
 ## 2026-09-19 casting-first migration: Phase 1 checkpoint 1
 
 Branch `codex/kingmaker-buff-planner-casting-first`, created clean from

@@ -65,6 +65,7 @@
     <Compile Include="..\..\src\KingmakerBuffPlanner\Persistence\ProfileRepository.cs"><Link>Persistence\ProfileRepository.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Persistence\CastingPlanProfileModels.cs"><Link>Persistence\CastingPlanProfileModels.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Persistence\CastingPlanRepository.cs"><Link>Persistence\CastingPlanRepository.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Persistence\CastingPlanImporter.cs"><Link>Persistence\CastingPlanImporter.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Infrastructure\AtomicFile.cs"><Link>Infrastructure\AtomicFile.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\PlannerSetupModel.cs"><Link>UI\PlannerSetupModel.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\PlannerPresentationModels.cs"><Link>UI\PlannerPresentationModels.cs</Link></Compile>

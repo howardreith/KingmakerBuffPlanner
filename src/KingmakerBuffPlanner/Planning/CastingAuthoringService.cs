@@ -265,14 +265,7 @@ namespace KingmakerBuffPlanner.Planning
 
         private static PlannedCasting WithOrder(PlannedCasting casting, int order)
         {
-            if (casting.Order == order) return casting;
-            return new PlannedCasting(
-                casting.CastingId, casting.RoutineId, order, casting.SourceId,
-                casting.Ability, casting.CasterUnitId, casting.SpellbookGuid,
-                casting.TargetMode, casting.DirectTargetUnitId, casting.Origin,
-                casting.RequiredCoverageUnitIds, casting.TargetingModifiers,
-                casting.Enhancements, casting.ExistingEffectPolicy,
-                casting.IgnoredPresenceMarkers, casting.State, casting.Provenance);
+            return PlannedCasting.WithOrder(casting, order);
         }
 
         private static PlannedCasting WithRoutine(PlannedCasting casting, string routineId)
