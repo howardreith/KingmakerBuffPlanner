@@ -5,7 +5,64 @@ Linked from `AUTONOMOUS-RESUME.md`. Specification: the adopted
 `Kingmaker-Buff-Planner-Casting-First-Migration-Charter.md` (casting-first
 migration and native scroll UI charter v1.0, 2026-09-19).
 
-## Phase 2 checkpoint 2 — schema-5 → schema-6 import converter — 2026-09-19 (CURRENT)
+## Phase 2 checkpoint 3 — shared atomic budget reservation — 2026-09-19 (CURRENT)
+
+**Branch** `codex/kingmaker-buff-planner-casting-first`, on top of
+checkpoint 2 (`df6d04b`). Version remains `0.1.1-rc3`.
+
+### Implemented (production code)
+
+- `Planning/CastingBudget.cs` — the charter §5.1 shared-budget layer:
+  - `CastingBudgetLedger` normalizes native slots (shared units and
+    linked prepared-token pairs via the existing `ResourceLedger`),
+    enhancement usage pools (shared reservoirs take the minimum of
+    reported balances, never a per-item sum; all-unknown pools stay
+    null/unknown — unknown is never zero), and material components
+    (per-item availability decremented across castings).
+  - Each Ready casting's **complete cost vector reserves atomically**:
+    every component is validated before any balance mutates; the native
+    reservation commits first so a late native surprise cannot follow an
+    already-committed enhancement or material charge. A deficit blocks
+    the casting (`enhancement-pool-exhausted`,
+    `resource-pool-exhausted`, `prepared-slots-exhausted`,
+    `material-unavailable` with have<need detail) and reserves nothing
+    anywhere.
+  - `CastingBudgetLine` per pool: available now (nullable for unknown),
+    requested/allocated demand, unmet demand, forecast remaining, and
+    traces naming the responsible casting IDs; unfunded demand is
+    recorded so deficits and competing castings stay visible.
+- `ExplicitCastingCompiler` now runs the budget pass over Ready castings
+  in persisted order; `ResolvedCasting.Cost` carries each casting's
+  reserved cost lines and `ExplicitCastingPlan.BudgetLines`/
+  `BudgetLineFor` expose the authoritative per-pool read model.
+
+### Verified behavior (deterministic domain layer)
+
+New tests: `casting-a07-shared-enhancement-pool-is-atomic` (A07),
+`casting-a08-complete-cost-reservation-leaks-nothing` (A08: linked
+prepared pairs + material + rod; the rod-deficient candidate reserves
+nothing and later castings still receive tokens and materials).
+
+Full gate: **source 42/42; protocol 195/195; harness 27/27; package
+4/4; WhatIf 5/5; rollback 4/4; publisher 3/3**
+(`artifacts/casting-first-checkpoint3-gate.log`). Domain-layer evidence
+only; no live reservation or native spending is claimed (A07's live
+lane remains open per the rc3 blockers).
+
+### Acceptance matrix standing (A01–A20)
+
+A01–A04, A07, A08: PASS (domain layer). A12 import half: PASS (domain
+layer, checkpoint 2). A05, A06, A09–A11, A13–A20: NOT RUN.
+
+### Next executable step
+
+Exact-source identity plumbing for enhancement selections (persisted
+`ExactSourceRef` validation, still honestly pooled until a durable
+contract exists), then the selected-run / one-pass routine forecast
+views on the same budget lines (A09), ahead of the Phase 3 native
+donor inventory which is now unblocked by the automation fixture.
+
+## Phase 2 checkpoint 2 — schema-5 → schema-6 import converter — 2026-09-19 (commit `df6d04b`)
 
 **Branch** `codex/kingmaker-buff-planner-casting-first`, on top of Phase 1
 checkpoint `4398588`. Version remains `0.1.1-rc3`.

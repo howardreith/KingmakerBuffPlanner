@@ -1,5 +1,27 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-09-19 casting-first migration: Phase 2 checkpoint 3 (budgets)
+
+On top of checkpoint 2 (`df6d04b`). Implemented the charter 5.1 shared
+atomic budget reservation: `Planning/CastingBudget.cs` normalizes native
+slots (linked prepared pairs), enhancement usage reservoirs
+(minimum-of-reported-balances; unknown stays null), and materials into
+one compile-local ledger. `ExplicitCastingCompiler` reserves each Ready
+casting's complete cost vector atomically in persisted order; failures
+block with have<need reasons and reserve nothing. `ResolvedCasting.Cost`
+plus per-pool `CastingBudgetLine`s with casting traces form the
+authoritative budget read model.
+
+Verification: `scripts/Test-SourceOnly.ps1` — source 42/42; protocol
+195/195 (A07 shared-reservoir atomicity and A08 linked-tokens/material/
+rod no-leakage are new); harness 27/27; package 4/4; WhatIf 5/5;
+rollback 4/4; publisher 3/3
+(`artifacts/casting-first-checkpoint3-gate.log`). Domain layer only;
+live native charge spending remains a separate untested lane.
+
+Next: exact-source identity plumbing, routine forecast views (A09), and
+the Phase 3 native donor inventory.
+
 ## 2026-09-19 casting-first migration: Phase 2 checkpoint 2 (import)
 
 On top of Phase 1 (`4398588`). Implemented the charter 7.2 schema-5 to

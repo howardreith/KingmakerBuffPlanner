@@ -60,7 +60,8 @@ namespace KingmakerBuffPlanner.Planning
             ResolvedCastingReadiness readiness,
             IReadOnlyList<string> readinessReasons,
             IReadOnlyList<string> capableCasterUnitIds,
-            MigrationProvenance provenance)
+            MigrationProvenance provenance,
+            IReadOnlyList<CastingCostLine> cost = null)
         {
             CastingId = castingId;
             RoutineId = routineId;
@@ -85,6 +86,26 @@ namespace KingmakerBuffPlanner.Planning
             ReadinessReasons = readinessReasons;
             CapableCasterUnitIds = capableCasterUnitIds;
             Provenance = provenance;
+            Cost = new ReadOnlyCollection<CastingCostLine>(
+                (cost ?? new CastingCostLine[0]).ToList());
+        }
+
+        // The complete cost vector this casting reserved atomically: native
+        // pool charge, enhancement usage pools, and material components.
+        public IReadOnlyList<CastingCostLine> Cost { get; private set; }
+
+        internal ResolvedCasting WithBudgetResult(
+            ResolvedCastingReadiness readiness,
+            IReadOnlyList<string> readinessReasons,
+            IReadOnlyList<CastingCostLine> cost)
+        {
+            return new ResolvedCasting(
+                CastingId, RoutineId, Order, SourceId, Ability, CasterUnitId,
+                Provider, TargetMode, DirectTargetUnitId, Origin,
+                RequiredCoverageUnitIds, PredictedBeneficiaryUnitIds, CoverageGaps,
+                TargetingModifiers, Enhancements, AppliedEnhancementIds,
+                OmittedEnhancementIds, ExistingEffectPolicy, IgnoredPresenceMarkers,
+                readiness, readinessReasons, CapableCasterUnitIds, Provenance, cost);
         }
 
         public string CastingId { get; private set; }
@@ -119,16 +140,25 @@ namespace KingmakerBuffPlanner.Planning
     public sealed class ExplicitCastingPlan
     {
         internal ExplicitCastingPlan(
-            IEnumerable<ResolvedCasting> castings, IEnumerable<string> diagnostics)
+            IEnumerable<ResolvedCasting> castings,
+            IEnumerable<string> diagnostics,
+            IEnumerable<CastingBudgetLine> budgetLines = null)
         {
             Castings = new ReadOnlyCollection<ResolvedCasting>(castings.ToList());
             Diagnostics = new ReadOnlyCollection<string>(diagnostics.ToList());
+            BudgetLines = new ReadOnlyCollection<CastingBudgetLine>(
+                (budgetLines ?? new CastingBudgetLine[0]).ToList());
         }
 
         // Exactly one resolved casting per planned casting, in persisted
         // order. Compilation never adds or removes castings.
         public IReadOnlyList<ResolvedCasting> Castings { get; private set; }
         public IReadOnlyList<string> Diagnostics { get; private set; }
+
+        // One authoritative line per pool touched by this plan: available
+        // now, requested and allocated demand, deficits, and the responsible
+        // casting IDs. Unknown balances stay null, never zero.
+        public IReadOnlyList<CastingBudgetLine> BudgetLines { get; private set; }
 
         public int ReadyInvocationCount
         {
@@ -143,20 +173,27 @@ namespace KingmakerBuffPlanner.Planning
             return Castings.FirstOrDefault(value =>
                 string.Equals(value.CastingId, castingId, StringComparison.Ordinal));
         }
+
+        public CastingBudgetLine BudgetLineFor(string poolKey)
+        {
+            return BudgetLines.FirstOrDefault(line =>
+                string.Equals(line.PoolKey, poolKey, StringComparison.Ordinal));
+        }
     }
 
     // Compiles the canonical casting document against a party snapshot into
     // the shared resolved plan. Deterministic and side-effect free: opening,
     // browsing, previewing, or recompiling never mutates the document and
-    // never reserves resources.
+    // never touches live game state (reservations live in the compile-local
+    // budget ledger).
     //
-    // Phase 1 scope: exact caster/source/variant resolution, target-mode
+    // Scope: exact caster/source/variant resolution, target-mode
     // verification against the ability's structural contract, honest group
-    // coverage without expansion, per-casting enhancement availability, and
-    // capability separated from current readiness. Cross-casting shared
-    // budget reservation (atomic multi-pool cost vectors) and exact item
-    // identity are deliberately NOT claimed here; they arrive with the
-    // shared-budget phase and the persisted exact-source contract.
+    // coverage without expansion, per-casting enhancement availability,
+    // capability separated from current readiness, and atomic shared-budget
+    // reservation across native pools (including linked prepared tokens),
+    // enhancement usage pools, and materials. Exact physical item identity
+    // (durable rod instance binding) is deliberately NOT claimed yet.
     public sealed class ExplicitCastingCompiler
     {
         public ExplicitCastingPlan Compile(
@@ -173,11 +210,56 @@ namespace KingmakerBuffPlanner.Planning
             var enhancementList = (enhancements ?? new CastEnhancementSnapshot[0]).ToList();
             var castings = new List<ResolvedCasting>();
             var diagnostics = new List<string>();
+            var matchedEnhancements = new Dictionary<string, List<CastEnhancementSnapshot>>(
+                StringComparer.Ordinal);
+            var providers = new Dictionary<string, ProviderSnapshot>(
+                StringComparer.Ordinal);
             foreach (PlannedCasting casting in document.Castings)
-                castings.Add(CompileOne(
-                    casting, snapshot, options, effectsBySource, enhancementList, diagnostics));
-            AddDuplicateRequestWarnings(castings, diagnostics);
-            return new ExplicitCastingPlan(castings, diagnostics);
+            {
+                List<CastEnhancementSnapshot> matched;
+                ProviderSnapshot provider;
+                castings.Add(CompileOne(casting, snapshot, options, effectsBySource,
+                    enhancementList, diagnostics, out matched, out provider));
+                matchedEnhancements[casting.CastingId] = matched;
+                providers[casting.CastingId] = provider;
+            }
+            // Shared budget pass: every Ready casting reserves its complete
+            // cost vector atomically in persisted order; a deficit blocks the
+            // casting and reserves nothing anywhere.
+            var ledger = new CastingBudgetLedger(snapshot, enhancementList);
+            var finalized = new List<ResolvedCasting>();
+            foreach (ResolvedCasting casting in castings)
+            {
+                if (casting.Readiness != ResolvedCastingReadiness.Ready)
+                {
+                    finalized.Add(casting);
+                    continue;
+                }
+                List<CastEnhancementSnapshot> matched;
+                matchedEnhancements.TryGetValue(casting.CastingId, out matched);
+                ProviderSnapshot provider;
+                providers.TryGetValue(casting.CastingId, out provider);
+                IReadOnlyList<CastingDemand> demands = ledger.DemandsFor(
+                    provider, matched);
+                IReadOnlyList<CastingCostLine> cost;
+                string reason;
+                if (ledger.TryReserveAtomically(
+                        casting.CastingId, provider, demands, out cost, out reason))
+                {
+                    finalized.Add(casting.WithBudgetResult(
+                        casting.Readiness, casting.ReadinessReasons, cost));
+                    continue;
+                }
+                ledger.RecordUnfunded(casting.CastingId, demands);
+                var reasons = casting.ReadinessReasons
+                    .Concat(new[] { reason })
+                    .Distinct(StringComparer.Ordinal)
+                    .OrderBy(value => value, StringComparer.Ordinal).ToList();
+                finalized.Add(casting.WithBudgetResult(
+                    ResolvedCastingReadiness.Blocked, reasons, new CastingCostLine[0]));
+            }
+            AddDuplicateRequestWarnings(finalized, diagnostics);
+            return new ExplicitCastingPlan(finalized, diagnostics, ledger.BuildReport());
         }
 
         private static ResolvedCasting CompileOne(
@@ -186,7 +268,9 @@ namespace KingmakerBuffPlanner.Planning
             List<ProviderPlanningOption> options,
             IDictionary<string, EffectExpression> effectsBySource,
             List<CastEnhancementSnapshot> enhancements,
-            List<string> diagnostics)
+            List<string> diagnostics,
+            out List<CastEnhancementSnapshot> matchedEnhancements,
+            out ProviderSnapshot providerSnapshot)
         {
             var reasons = new List<string>();
             var capableCasters = snapshot.Providers
@@ -225,8 +309,10 @@ namespace KingmakerBuffPlanner.Planning
             }
             var applied = new List<string>();
             var omitted = new List<string>();
+            var matched = new List<CastEnhancementSnapshot>();
             if (option != null)
-                ResolveEnhancements(casting, option, enhancements, applied, omitted, reasons);
+                ResolveEnhancements(casting, option, enhancements, applied, omitted,
+                    matched, reasons);
             else
                 foreach (AuthoredEnhancementSelection selection in casting.Enhancements)
                     if (selection.Required)
@@ -245,6 +331,8 @@ namespace KingmakerBuffPlanner.Planning
                 .Select(value => value.ModifierId))
                 diagnostics.Add("targeting-modifier-unvalidated:" + modifier +
                     ":" + casting.CastingId);
+            matchedEnhancements = matched;
+            providerSnapshot = option == null ? null : option.Provider;
             return new ResolvedCasting(
                 casting.CastingId, casting.RoutineId, casting.Order, casting.SourceId,
                 casting.Ability, casting.CasterUnitId,
@@ -450,9 +538,9 @@ namespace KingmakerBuffPlanner.Planning
             List<CastEnhancementSnapshot> enhancements,
             List<string> applied,
             List<string> omitted,
+            List<CastEnhancementSnapshot> matched,
             List<string> reasons)
         {
-            var matched = new List<CastEnhancementSnapshot>();
             foreach (AuthoredEnhancementSelection selection in casting.Enhancements)
             {
                 CastEnhancementSnapshot snapshot = enhancements.FirstOrDefault(value =>

@@ -1,6 +1,25 @@
 # AUTONOMOUS-RESUME — top section is current; planning/CASTING-FIRST-MIGRATION-STATUS.md is the per-checkpoint tracker.
 
-## Casting-first migration Phase 2 checkpoint 2 — 2026-09-19 (LATEST)
+## Casting-first migration Phase 2 checkpoint 3 — 2026-09-19 (LATEST)
+
+- Shared atomic budget reservation implemented per charter 5.1:
+  `Planning/CastingBudget.cs` (native pools incl. linked prepared-token
+  pairs, enhancement usage reservoirs with minimum-of-balances shared
+  semantics, materials) wired into `ExplicitCastingCompiler` as a
+  persisted-order budget pass. Each Ready casting's complete cost vector
+  reserves atomically — a deficit blocks the casting and reserves
+  nothing anywhere; `ResolvedCasting.Cost` and per-pool
+  `CastingBudgetLine`s (available/requested/allocated/unmet/forecast
+  with responsible casting traces) are the authoritative read model.
+- Gates: source 42/42; protocol 195/195 (A07 + A08 new); harness 27/27;
+  package 4/4; WhatIf 5/5; rollback 4/4; publisher 3/3. Log:
+  `artifacts/casting-first-checkpoint3-gate.log`. Domain-layer evidence
+  only — live native spending (A07 live lane) remains unclaimed.
+- NEXT: exact-source identity plumbing, then routine forecast views
+  (A09), then the Phase 3 native donor inventory (now unblocked by the
+  automation fixture).
+
+## Casting-first migration Phase 2 checkpoint 2 — 2026-09-19
 
 - Schema-5 → schema-6 import converter implemented
   (`Persistence/CastingPlanImporter.cs`) per charter §7.2: pinned

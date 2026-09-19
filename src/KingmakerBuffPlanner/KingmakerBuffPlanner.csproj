@@ -136,6 +136,7 @@
     <Compile Include="Planning\RoutinePlanService.cs" />
     <Compile Include="Planning\CastingAuthoringService.cs" />
     <Compile Include="Planning\ExplicitCastingCompiler.cs" />
+    <Compile Include="Planning\CastingBudget.cs" />
     <Compile Include="Planning\EffectPresenceEvaluator.cs" />
     <Compile Include="Planning\CastPlanner.cs" />
     <Compile Include="Persistence\ProfileModels.cs" />

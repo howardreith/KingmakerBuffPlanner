@@ -304,6 +304,10 @@ namespace KingmakerBuffPlanner.Tests
                     TestCastingImportIdempotent);
                 Run("casting-import-report-counts-honestly",
                     TestCastingImportReport);
+                Run("casting-a07-shared-enhancement-pool-is-atomic",
+                    TestCastingA07SharedEnhancementPool);
+                Run("casting-a08-complete-cost-reservation-leaks-nothing",
+                    TestCastingA08CompleteCostReservation);
             }
             finally
             {
@@ -10456,6 +10460,158 @@ namespace KingmakerBuffPlanner.Tests
                     "unresolved-no-recipient")
                 throw new InvalidOperationException(
                     "The target-less child was not reported as unresolved.");
+        }
+
+        // A07: two enhancements sharing one class-resource pool contribute
+        // their combined demand; an unfundable combined cost blocks the
+        // casting without reserving anything anywhere.
+        private static void TestCastingA07SharedEnhancementPool()
+        {
+            List<ProviderPlanningOption> options;
+            List<CastEnhancementSnapshot> enhancements;
+            PartyProviderSnapshot snapshot = CastingParty(
+                CastingBuffAbility,
+                out options, out enhancements,
+                new[] { "unit-t1", "unit-t2" }, 3);
+            enhancements.Add(new CastEnhancementSnapshot(
+                "score-a", "unit-cleric", "feat-a", "Score A", string.Empty,
+                CastEnhancementCategory.ClassFeature, 0, 10, 1,
+                new[] { CastingBuffAbility.BaseAbilityGuid },
+                null, new[] { "book-unit-cleric" }, "reservoir", false, "score-a", 1));
+            enhancements.Add(new CastEnhancementSnapshot(
+                "score-b", "unit-cleric", "feat-b", "Score B", string.Empty,
+                CastEnhancementCategory.ClassFeature, 0, 10, 1,
+                new[] { CastingBuffAbility.BaseAbilityGuid },
+                null, new[] { "book-unit-cleric" }, "reservoir", false, "score-b", 1));
+            var service = new CastingAuthoringService(CastingDocument(
+                DirectCasting("cast-shared", "long", "unit-cleric", "unit-t1",
+                    "source-bulls", CastingBuffAbility,
+                    new[]
+                    {
+                        new AuthoredEnhancementSelection("score-a", true, null),
+                        new AuthoredEnhancementSelection("score-b", true, null)
+                    }),
+                DirectCasting("cast-plain", "long", "unit-cleric", "unit-t2",
+                    "source-bulls", CastingBuffAbility)));
+            ExplicitCastingPlan plan = CompileCastingPlan(
+                service.Document, snapshot, options, enhancements,
+                "source-bulls", "source-communal");
+            ResolvedCasting shared = plan.CastingById("cast-shared");
+            if (shared.Readiness != ResolvedCastingReadiness.Blocked ||
+                !shared.ReadinessReasons.Contains("enhancement-pool-exhausted:reservoir:1<2"))
+                throw new InvalidOperationException(
+                    "Combined shared-pool demand was not the blocking reason: " +
+                    string.Join(",", shared.ReadinessReasons));
+            if (shared.Cost.Count != 0)
+                throw new InvalidOperationException(
+                    "A blocked casting carried reserved cost lines.");
+            CastingBudgetLine reservoir = plan.BudgetLineFor("reservoir");
+            if (reservoir == null ||
+                reservoir.AvailableNow != 1 ||
+                reservoir.RequestedUsage != 2 ||
+                reservoir.AllocatedUsage != 0 ||
+                reservoir.UnmetDemand != 2 ||
+                reservoir.ForecastRemaining != 1)
+                throw new InvalidOperationException(
+                    "The shared reservoir line does not expose the deficit.");
+            // No reservation leakage: the native pool still funds the
+            // unrelated later casting in full.
+            ResolvedCasting plain = plan.CastingById("cast-plain");
+            if (plain.Readiness != ResolvedCastingReadiness.Ready ||
+                plain.Cost.Any(line => line.Category == CastingCostCategory.NativePool &&
+                    line.Units != 1))
+                throw new InvalidOperationException(
+                    "The failed combined reservation leaked into later castings.");
+            CastingBudgetLine native = plan.BudgetLineFor("pool-unit-cleric");
+            if (native.AllocatedUsage != 1)
+                throw new InvalidOperationException(
+                    "Native allocation was disturbed by the failed reservation.");
+        }
+
+        // A08: linked prepared slots, materials, and rod demand form one
+        // atomic complete-cost reservation; a failed candidate spends and
+        // reserves nothing.
+        private static void TestCastingA08CompleteCostReservation()
+        {
+            AbilityKey ability = CastingBuffAbility;
+            const string poolKey = "prepared-book";
+            var pool = new ResourcePoolSnapshot(poolKey,
+                ResourcePoolKind.PreparedSlots, 4, 4, new ResourceTokenSnapshot[]
+                {
+                    new ResourceTokenSnapshot("t1", ability, 1, PreparedSlotKind.Common,
+                        true, true, new[] { "t2" }),
+                    new ResourceTokenSnapshot("t2", ability, 1, PreparedSlotKind.Common,
+                        true, false, new string[0]),
+                    new ResourceTokenSnapshot("t3", ability, 1, PreparedSlotKind.Common,
+                        true, true, new[] { "t4" }),
+                    new ResourceTokenSnapshot("t4", ability, 1, PreparedSlotKind.Common,
+                        true, false, new string[0])
+                });
+            var material = new MaterialRequirementSnapshot("diamond", 1, 2);
+            ProviderSnapshot provider = new ProviderSnapshot(
+                new ProviderKey("unit-cleric", "book-prepared", ability, string.Empty),
+                ability.BaseAbilityGuid, 1, poolKey, 0, new[] { "t1", "t3" }, material);
+            var snapshot = new PartyProviderSnapshot(new[]
+                {
+                    new UnitSnapshot("unit-cleric", "Cleric", false, string.Empty,
+                        new TargetValidationSnapshot(true, true, true, true)),
+                    new UnitSnapshot("unit-t1", "T1", false, string.Empty,
+                        new TargetValidationSnapshot(true, true, true, true))
+                },
+                new[] { provider }, new[] { pool });
+            var option = new ProviderPlanningOption(provider,
+                new[] { "unit-cleric", "unit-t1" }, new[] { "unit-cleric" }, 10, 100);
+            var enhancements = new List<CastEnhancementSnapshot>
+            {
+                new CastEnhancementSnapshot("rod-extend", "unit-cleric", "rod-guid",
+                    "Rod", string.Empty, CastEnhancementCategory.MetamagicRod,
+                    0x1, 10, 1, new string[0], null, null, "rod-pool")
+            };
+            var service = new CastingAuthoringService(CastingDocument(
+                DirectCasting("cast-first", "long", "unit-cleric", "unit-t1",
+                    "source-bulls", ability,
+                    new[] { new AuthoredEnhancementSelection("rod-extend", true, null) }),
+                DirectCasting("cast-failing", "long", "unit-cleric", "unit-t1",
+                    "source-bulls", ability,
+                    new[] { new AuthoredEnhancementSelection("rod-extend", true, null) }),
+                DirectCasting("cast-after", "long", "unit-cleric", "unit-t1",
+                    "source-bulls", ability)));
+            ExplicitCastingPlan plan = new ExplicitCastingCompiler().Compile(
+                service.Document, snapshot, new[] { option },
+                CastingEffects("source-bulls", "source-communal"), enhancements);
+            if (plan.ReadyInvocationCount != 2)
+                throw new InvalidOperationException(
+                    "Exactly the funded castings must be ready.");
+            ResolvedCasting failing = plan.CastingById("cast-failing");
+            if (failing.Readiness != ResolvedCastingReadiness.Blocked ||
+                !failing.ReadinessReasons.Contains("enhancement-pool-exhausted:rod-pool:0<1") ||
+                failing.Cost.Count != 0)
+                throw new InvalidOperationException(
+                    "The rod-deficient candidate was not blocked cleanly: " +
+                    string.Join(",", failing.ReadinessReasons));
+            // The failed candidate spent nothing: the later casting still
+            // received its linked token pair and material component.
+            ResolvedCasting after = plan.CastingById("cast-after");
+            CastingCostLine native = after.Cost.FirstOrDefault(
+                line => line.Category == CastingCostCategory.NativePool);
+            if (native == null || !native.TokenIds.Contains("t3") ||
+                !native.TokenIds.Contains("t4"))
+                throw new InvalidOperationException(
+                    "The linked prepared pair was consumed by the failed candidate.");
+            if (!after.Cost.Any(line => line.Category == CastingCostCategory.Material &&
+                    line.ItemGuid == "diamond" && line.Units == 1))
+                throw new InvalidOperationException(
+                    "The material component was not reserved by the funded casting.");
+            CastingBudgetLine rod = plan.BudgetLineFor("rod-pool");
+            if (rod.RequestedUsage != 2 || rod.AllocatedUsage != 1 || rod.UnmetDemand != 1)
+                throw new InvalidOperationException("Rod budget line is wrong.");
+            CastingBudgetLine diamonds = plan.BudgetLineFor("diamond");
+            if (diamonds.AllocatedUsage != 2 || diamonds.ForecastRemaining != 0)
+                throw new InvalidOperationException("Material budget line is wrong.");
+            CastingBudgetLine prepared = plan.BudgetLineFor(poolKey);
+            if (prepared.AllocatedUsage != 4 || prepared.ForecastRemaining != 0)
+                throw new InvalidOperationException(
+                    "Linked prepared tokens were not accounted as consumed pairs.");
         }
     }
 }
