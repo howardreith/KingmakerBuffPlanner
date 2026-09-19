@@ -5,7 +5,61 @@ Linked from `AUTONOMOUS-RESUME.md`. Specification: the adopted
 `Kingmaker-Buff-Planner-Casting-First-Migration-Charter.md` (casting-first
 migration and native scroll UI charter v1.0, 2026-09-19).
 
-## Phase 2 checkpoint 3 — shared atomic budget reservation — 2026-09-19 (CURRENT)
+## Phase 2 checkpoint 4 — forecast views and apply gate — 2026-09-19 (CURRENT)
+
+**Branch** `codex/kingmaker-buff-planner-casting-first`, on top of
+checkpoint 3 (`3d1bc0b`). Version remains `0.1.1-rc3`.
+
+### Implemented (production code)
+
+- `Planning/CastingForecast.cs` (A09): `CastingForecastService` builds
+  preview forecasts over the same resolved representation — a
+  routine-scoped view budgets exactly one routine (fresh ledger per
+  view; previewing several routines separately never multiplies
+  charges), and the one-pass view budgets every routine in declared
+  sequence against one shared ledger with balances carried forward.
+  Both views expose their assumption labels (no-rest,
+  no-elapsed-game-time, resources carried within the view,
+  predictions-not-observations). `ExplicitCastingCompiler.Compile`
+  gained an optional `budgetRoutineScope` for the selected-run view;
+  out-of-scope castings keep compile-time readiness and reserve
+  nothing.
+- `Planning/CastingExecutionGate.cs` (§5.2, A10/A11): a stateless,
+  deterministic apply policy over the compiled plan. Ordinary Apply
+  counts every saved casting and refuses when any request is blocked
+  (`blocked-casting:<id>:<reason>`); drafts are disclosed as omissions
+  (`draft-not-enabled`). The explicit `ReadyCastsOnly` mode executes
+  ready work while listing every omitted casting with its reasons and
+  preserving the saved plan. Evaluation is pure — a preview or refused
+  attempt never authorizes the next by having been computed.
+
+### Verified behavior (deterministic domain layer)
+
+New tests: `casting-a09-forecast-views-share-budgets-correctly`,
+`casting-a10-required-enhancement-policy` (required-unavailable blocks
+without downgrade; optional intent omits with disclosure; import keeps
+legacy optional as optional),
+`casting-a11-apply-gate-cannot-hide-omitted-work`.
+
+Full gate: **source 42/42; protocol 198/198; harness 27/27; package
+4/4; WhatIf 5/5; rollback 4/4; publisher 3/3**
+(`artifacts/casting-first-checkpoint4-gate.log`). Domain layer only.
+
+### Acceptance matrix standing (A01–A20)
+
+A01–A04, A07–A11 (A10/A11 at the policy layer), A12 import half: PASS
+(domain layer). A05 (Share modifier eligibility), A06 (exact rods —
+blocked on durable identity contract), A13–A20: NOT RUN. Runtime,
+visual, and live migration evidence: none claimed.
+
+### Next executable step
+
+Phase 3 preparation: native donor inventory via the now-available
+automation fixture (guarded harness lanes), or — while live access is
+unavailable — A05 targeting-modifier resolution modeling on the same
+compiler seams.
+
+## Phase 2 checkpoint 3 — shared atomic budget reservation — 2026-09-19 (commit `3d1bc0b`)
 
 **Branch** `codex/kingmaker-buff-planner-casting-first`, on top of
 checkpoint 2 (`df6d04b`). Version remains `0.1.1-rc3`.

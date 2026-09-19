@@ -308,6 +308,12 @@ namespace KingmakerBuffPlanner.Tests
                     TestCastingA07SharedEnhancementPool);
                 Run("casting-a08-complete-cost-reservation-leaks-nothing",
                     TestCastingA08CompleteCostReservation);
+                Run("casting-a09-forecast-views-share-budgets-correctly",
+                    TestCastingA09ForecastViews);
+                Run("casting-a10-required-enhancement-policy",
+                    TestCastingA10EnhancementPolicy);
+                Run("casting-a11-apply-gate-cannot-hide-omitted-work",
+                    TestCastingA11ApplyGate);
             }
             finally
             {
@@ -10612,6 +10618,205 @@ namespace KingmakerBuffPlanner.Tests
             if (prepared.AllocatedUsage != 4 || prepared.ForecastRemaining != 0)
                 throw new InvalidOperationException(
                     "Linked prepared tokens were not accounted as consumed pairs.");
+        }
+
+        // A09: routine views and the ordered one-pass sequence share one
+        // budget per view; independent previews never multiply charges and
+        // never approve execution.
+        private static void TestCastingA09ForecastViews()
+        {
+            List<ProviderPlanningOption> options;
+            List<CastEnhancementSnapshot> enhancements;
+            // Pool funds exactly two of the three authored casts.
+            PartyProviderSnapshot snapshot = CastingParty(
+                CastingBuffAbility,
+                out options, out enhancements,
+                new[] { "unit-t1", "unit-t2", "unit-t3" }, 2);
+            var document = CastingDocument(
+                DirectCasting("long-1", "long", "unit-cleric", "unit-t1",
+                    "source-bulls", CastingBuffAbility),
+                DirectCasting("short-1", "short", "unit-cleric", "unit-t2",
+                    "source-bulls", CastingBuffAbility),
+                DirectCasting("short-2", "short", "unit-cleric", "unit-t3",
+                    "source-bulls", CastingBuffAbility));
+            var service = new CastingForecastService();
+            CastingForecast onePass = service.ForecastOnePass(
+                document, snapshot, options,
+                CastingEffects("source-bulls", "source-communal"), enhancements);
+            if (onePass.ScopeRoutineId != null ||
+                onePass.RoutineSequence.Count != 3 ||
+                onePass.RoutineSequence[0] != "long" ||
+                onePass.RoutineSequence[2] != "short")
+                throw new InvalidOperationException(
+                    "One-pass sequence does not follow routine declaration order.");
+            if (onePass.Plan.CastingById("long-1").IsExecutable != true ||
+                onePass.Plan.CastingById("short-1").IsExecutable != true ||
+                onePass.Plan.CastingById("short-2").Readiness !=
+                    ResolvedCastingReadiness.Blocked)
+                throw new InvalidOperationException(
+                    "One-pass balances were not carried forward across routines.");
+            CastingBudgetLine pool = onePass.Plan.BudgetLineFor("pool-unit-cleric");
+            if (pool.AvailableNow != 2 || pool.RequestedUsage != 3 ||
+                pool.AllocatedUsage != 2 || pool.UnmetDemand != 1 ||
+                pool.ForecastRemaining != 0)
+                throw new InvalidOperationException(
+                    "One-pass budget line does not expose the shared deficit.");
+            // An independent short-routine preview uses its own ledger: both
+            // short casts are fundable there, and previewing it did not
+            // consume anything for any other view.
+            CastingForecast shortView = service.ForecastRoutine(
+                document, "short", snapshot, options,
+                CastingEffects("source-bulls", "source-communal"), enhancements);
+            if (shortView.ScopeRoutineId != "short" ||
+                shortView.InScopeCastings.Count != 2 ||
+                shortView.ReadyInvocations != 2)
+                throw new InvalidOperationException(
+                    "The routine preview did not budget its own routine alone.");
+            CastingBudgetLine shortPool = shortView.Plan.BudgetLineFor("pool-unit-cleric");
+            if (shortPool.RequestedUsage != 2 || shortPool.AllocatedUsage != 2)
+                throw new InvalidOperationException(
+                    "Routine preview budget included foreign castings.");
+            // Re-running the one-pass view reproduces identical results:
+            // previews are pure and approve nothing.
+            CastingForecast repeat = service.ForecastOnePass(
+                document, snapshot, options,
+                CastingEffects("source-bulls", "source-communal"), enhancements);
+            if (repeat.Plan.ReadyInvocationCount != onePass.Plan.ReadyInvocationCount ||
+                repeat.Plan.BudgetLineFor("pool-unit-cleric").AllocatedUsage != 2)
+                throw new InvalidOperationException(
+                    "Preview repetition changed or accumulated charges.");
+            foreach (string assumption in new[]
+                { "no-rest", "no-elapsed-game-time" })
+                if (!onePass.Assumptions.Contains(assumption))
+                    throw new InvalidOperationException(
+                        "Forecast assumptions are not visible.");
+        }
+
+        // A10: a required enhancement that is unavailable blocks its casting
+        // without any downgrade; explicit legacy optional intent is preserved
+        // by import and disclosed as omitted instead of quietly dropped.
+        private static void TestCastingA10EnhancementPolicy()
+        {
+            List<ProviderPlanningOption> options;
+            List<CastEnhancementSnapshot> enhancements;
+            PartyProviderSnapshot snapshot = CastingParty(
+                CastingBuffAbility,
+                out options, out enhancements,
+                new[] { "unit-t1" }, 3);
+            var service = new CastingAuthoringService(CastingDocument(
+                DirectCasting("cast-required", "long", "unit-cleric", "unit-t1",
+                    "source-bulls", CastingBuffAbility,
+                    new[] { new AuthoredEnhancementSelection("extend-cleric", true, null) }),
+                DirectCasting("cast-optional", "long", "unit-cleric", "unit-t1",
+                    "source-bulls", CastingBuffAbility,
+                    new[] { new AuthoredEnhancementSelection("missing-feat", false, null) })));
+            ExplicitCastingPlan plan = CompileCastingPlan(
+                service.Document, snapshot, options,
+                new List<CastEnhancementSnapshot>(),
+                "source-bulls", "source-communal");
+            ResolvedCasting required = plan.CastingById("cast-required");
+            if (required.Readiness != ResolvedCastingReadiness.Blocked ||
+                !required.ReadinessReasons.Contains("enhancement-unavailable:extend-cleric"))
+                throw new InvalidOperationException(
+                    "A missing required enhancement was downgraded silently.");
+            ResolvedCasting optional = plan.CastingById("cast-optional");
+            if (optional.Readiness != ResolvedCastingReadiness.Ready ||
+                optional.OmittedEnhancementIds.Count != 1 ||
+                !optional.OmittedEnhancementIds[0].StartsWith("missing-feat:",
+                    StringComparison.Ordinal))
+                throw new InvalidOperationException(
+                    "Optional intent was not disclosed as omitted.");
+            // Legacy optional intent imports as optional, never reinterpreted
+            // as required or dropped.
+            BuffPlannerProfile legacy = LegacyProfile();
+            CastingAssignmentProfile child = PinnedChild("legacy-opt", 0, "unit-cleric",
+                "unit-t1");
+            child.Enhancements.Add(new EnhancementSelectionProfile
+            {
+                EnhancementId = "old-rod",
+                Required = false
+            });
+            legacy.Routines[0].Assignments.Add(LegacyAssignment(
+                "source-bulls", CastingBuffAbility, child));
+            CastingImportResult imported = new CastingPlanImporter().Import(legacy);
+            PlannedCasting importedCasting = imported.Document.Castings[0];
+            if (importedCasting.Enhancements.Count != 1 ||
+                importedCasting.Enhancements[0].Required)
+                throw new InvalidOperationException(
+                    "Import reinterpreted legacy optional intent as required.");
+        }
+
+        // A11: ordinary Apply cannot hide omitted work — blocked castings
+        // refuse it; drafts and blocked castings are always disclosed; the
+        // Ready-Casts-Only fallback is explicit and preserves the plan.
+        private static void TestCastingA11ApplyGate()
+        {
+            List<ProviderPlanningOption> options;
+            List<CastEnhancementSnapshot> enhancements;
+            PartyProviderSnapshot snapshot = CastingParty(
+                CastingBuffAbility,
+                out options, out enhancements,
+                new[] { "unit-t1" }, 3);
+            var service = new CastingAuthoringService(CastingDocument(
+                DirectCasting("cast-ready", "long", "unit-cleric", "unit-t1",
+                    "source-bulls", CastingBuffAbility),
+                DirectCasting("cast-ghost", "long", "unit-ghost", "unit-t1",
+                    "source-bulls", CastingBuffAbility),
+                DirectCasting("cast-draft", "long", "unit-cleric", "unit-t1",
+                    "source-bulls", CastingBuffAbility, null, null,
+                    CastingAuthoringState.Draft)));
+            ExplicitCastingPlan plan = CompileCastingPlan(
+                service.Document, snapshot, options, enhancements,
+                "source-bulls", "source-communal");
+            var gate = new CastingExecutionGate();
+            CastingApplyDecision ordinary = gate.Evaluate(
+                plan, CastingApplyMode.Ordinary);
+            if (ordinary.Allowed || ordinary.BlockingReasons.Count != 1 ||
+                !ordinary.BlockingReasons[0].StartsWith("blocked-casting:cast-ghost:",
+                    StringComparison.Ordinal))
+                throw new InvalidOperationException(
+                    "Ordinary Apply did not refuse blocked work.");
+            if (ordinary.ExecutableCastingIds.Count != 1 ||
+                ordinary.ExecutableCastingIds[0] != "cast-ready")
+                throw new InvalidOperationException(
+                    "Refusal misreported executable castings.");
+            if (ordinary.Omissions.Count != 2)
+                throw new InvalidOperationException(
+                    "Refusal did not disclose every omitted casting.");
+            // The explicit fallback executes ready work but still counts and
+            // explains everything it omits.
+            CastingApplyDecision readyOnly = gate.Evaluate(
+                plan, CastingApplyMode.ReadyCastsOnly);
+            if (!readyOnly.Allowed ||
+                readyOnly.ExecutableCastingIds.Count != 1 ||
+                readyOnly.Omissions.Count != 2)
+                throw new InvalidOperationException(
+                    "Ready-Casts-Only did not disclose its omissions.");
+            CastingOmission draft = readyOnly.Omissions.FirstOrDefault(
+                omission => omission.CastingId == "cast-draft");
+            if (draft == null || !draft.Reasons.Contains("draft-not-enabled"))
+                throw new InvalidOperationException(
+                    "The draft omission lacks its reason.");
+            CastingOmission ghost = readyOnly.Omissions.FirstOrDefault(
+                omission => omission.CastingId == "cast-ghost");
+            if (ghost == null || !ghost.Reasons.Contains("caster-not-in-party:unit-ghost"))
+                throw new InvalidOperationException(
+                    "The blocked omission lacks its reason.");
+            // Gate evaluation is pure: re-evaluating the same plan reproduces
+            // the identical decision and mutates nothing (a refused attempt
+            // never authorizes the next by having been computed).
+            CastingApplyDecision repeated = gate.Evaluate(
+                plan, CastingApplyMode.Ordinary);
+            if (repeated.Allowed || repeated.Omissions.Count != 2 ||
+                repeated.ExecutableCastingIds.Count !=
+                    ordinary.ExecutableCastingIds.Count ||
+                repeated.BlockingReasons.Count != ordinary.BlockingReasons.Count)
+                throw new InvalidOperationException(
+                    "Gate evaluation is not deterministic.");
+            if (service.Document.Castings.Count != 3 ||
+                service.Document.Castings[0].CastingId != "cast-ready")
+                throw new InvalidOperationException(
+                    "Evaluation disturbed the saved plan.");
         }
     }
 }

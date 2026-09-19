@@ -1,6 +1,22 @@
 # AUTONOMOUS-RESUME — top section is current; planning/CASTING-FIRST-MIGRATION-STATUS.md is the per-checkpoint tracker.
 
-## Casting-first migration Phase 2 checkpoint 3 — 2026-09-19 (LATEST)
+## Casting-first migration Phase 2 checkpoint 4 — 2026-09-19 (LATEST)
+
+- Forecast views and the apply gate implemented: routine-scoped and
+  one-pass `CastingForecastService` previews (fresh ledger per routine
+  view, one shared carried-forward ledger for the sequence, assumption
+  labels, A09) plus the stateless `CastingExecutionGate` (ordinary
+  Apply refuses blocked work; explicit Ready-Casts-Only discloses every
+  omission with reasons and preserves the plan; evaluation never
+  authorizes by repetition, A10/A11).
+- Gates: source 42/42; protocol 198/198; harness 27/27; package 4/4;
+  WhatIf 5/5; rollback 4/4; publisher 3/3. Log:
+  `artifacts/casting-first-checkpoint4-gate.log`. Domain layer only.
+- NEXT: Phase 3 native donor inventory through the guarded harness
+  (automation fixture now present), or A05 modifier-resolution modeling
+  while live access is unavailable.
+
+## Casting-first migration Phase 2 checkpoint 3 — 2026-09-19
 
 - Shared atomic budget reservation implemented per charter 5.1:
   `Planning/CastingBudget.cs` (native pools incl. linked prepared-token

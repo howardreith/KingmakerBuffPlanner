@@ -201,7 +201,8 @@ namespace KingmakerBuffPlanner.Planning
             PartyProviderSnapshot snapshot,
             IEnumerable<ProviderPlanningOption> providerOptions,
             IDictionary<string, EffectExpression> effectsBySource,
-            IEnumerable<CastEnhancementSnapshot> enhancements = null)
+            IEnumerable<CastEnhancementSnapshot> enhancements = null,
+            string budgetRoutineScope = null)
         {
             if (document == null) throw new ArgumentNullException("document");
             if (snapshot == null) throw new ArgumentNullException("snapshot");
@@ -225,12 +226,17 @@ namespace KingmakerBuffPlanner.Planning
             }
             // Shared budget pass: every Ready casting reserves its complete
             // cost vector atomically in persisted order; a deficit blocks the
-            // casting and reserves nothing anywhere.
+            // casting and reserves nothing anywhere. A routine scope limits
+            // reservation to one routine's castings for a selected-run
+            // preview; out-of-scope castings keep their compile-time
+            // readiness and are explicitly not budget-checked in that view.
             var ledger = new CastingBudgetLedger(snapshot, enhancementList);
             var finalized = new List<ResolvedCasting>();
             foreach (ResolvedCasting casting in castings)
             {
-                if (casting.Readiness != ResolvedCastingReadiness.Ready)
+                if (casting.Readiness != ResolvedCastingReadiness.Ready ||
+                    (budgetRoutineScope != null &&
+                     casting.RoutineId != budgetRoutineScope))
                 {
                     finalized.Add(casting);
                     continue;

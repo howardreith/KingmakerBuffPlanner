@@ -1,5 +1,24 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-09-19 casting-first migration: Phase 2 checkpoint 4 (forecast + gate)
+
+On top of checkpoint 3 (`3d1bc0b`). Implemented A09 forecast views
+(`Planning/CastingForecast.cs`: per-routine previews with fresh
+ledgers, one-pass sequence with a single carried-forward shared ledger,
+visible assumptions; `Compile` gained `budgetRoutineScope`) and the
+section 5.2 apply gate (`Planning/CastingExecutionGate.cs`: ordinary
+Apply refuses blocked requests, drafts disclosed as omissions,
+explicit Ready-Casts-Only with full omission disclosure, pure
+deterministic evaluation).
+
+Verification: `scripts/Test-SourceOnly.ps1` — source 42/42; protocol
+198/198 (A09/A10/A11 new); harness 27/27; package 4/4; WhatIf 5/5;
+rollback 4/4; publisher 3/3
+(`artifacts/casting-first-checkpoint4-gate.log`). Domain layer only.
+
+Next: Phase 3 native donor inventory (fixture available) or A05
+modifier-resolution modeling offline.
+
 ## 2026-09-19 casting-first migration: Phase 2 checkpoint 3 (budgets)
 
 On top of checkpoint 2 (`df6d04b`). Implemented the charter 5.1 shared
