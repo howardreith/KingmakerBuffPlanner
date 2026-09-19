@@ -200,8 +200,12 @@ function Assert-KbpRuntimeResult {
         assemblySha256 = [pscustomobject]@{ expected = $BuildManifest.dllSha256; observed = $Result.assemblySha256 }
         gameVersion = [pscustomobject]@{ expected = '2.1.7'; observed = $Result.gameVersion }
         gameExecutableSha256 = [pscustomobject]@{ expected = '94a779c5423199fcb0470bd89884a3b3875dee2072eb1a7b1d7bc8e67accb1a1'; observed = $Result.gameExecutableSha256 }
-        ummVersion = [pscustomobject]@{ expected = '0.32.4.0'; observed = $Result.ummVersion }
-        ummSha256 = [pscustomobject]@{ expected = '1387468bc3af41c50fe51859a3bb7af4922891aa8f13a6187e7a348ceaabfd88'; observed = $Result.ummSha256 }
+        # UMM was updated on this machine from 0.32.4 to 0.33.0 between
+        # missions (2026-09-18); the pin records the verified installed
+        # identity (file version + SHA-256 of UnityModManager.dll) so the
+        # exact-match contract continues against the real environment.
+        ummVersion = [pscustomobject]@{ expected = '0.33.0.0'; observed = $Result.ummVersion }
+        ummSha256 = [pscustomobject]@{ expected = '63e5baf7b1738e4091b5fd17ccb738ecdb4d1dbf246061dfd55dc52835d52691'; observed = $Result.ummSha256 }
         harmonyVersion = [pscustomobject]@{ expected = '1.2.0.1'; observed = $Result.harmonyVersion }
         harmonySha256 = [pscustomobject]@{ expected = 'aa1cd48317254985d8b700cc74953477d1b40c3022ce9aa4c95ed2b8327e1292'; observed = $Result.harmonySha256 }
     }
