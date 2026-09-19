@@ -28,11 +28,14 @@ function Assert-KbpPlannerPrimaryIdentity([string]$Path, [string]$ExpectedVersio
     }
     $info = Read-KbpJson $infoPath
     $assemblyName = [Reflection.AssemblyName]::GetAssemblyName($dllPath)
+    # Same derivation the source gate enforces: a prerelease like 0.1.1-rc2
+    # carries CLR assembly version 0.1.1.0 (numeric base + .0).
+    $numericExpected = ($ExpectedVersion -split '-')[0] + '.0'
     if ($info.Id -cne 'KingmakerBuffPlanner' -or
         $info.AssemblyName -cne 'KingmakerBuffPlanner.dll' -or
         $info.Version -cne $ExpectedVersion -or
         $assemblyName.Name -cne 'KingmakerBuffPlanner' -or
-        $assemblyName.Version.ToString() -cne ($ExpectedVersion + '.0')) {
+        $assemblyName.Version.ToString() -cne $numericExpected) {
         throw "Planner installation identity/version is invalid at $Path."
     }
 }
