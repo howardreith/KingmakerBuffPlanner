@@ -6,11 +6,13 @@ using Kingmaker.Blueprints.Items;
 using Kingmaker.Blueprints.Items.Equipment;
 using Kingmaker.Designers.Mechanics.Facts;
 using Kingmaker.EntitySystem.Entities;
+using Kingmaker.UnitLogic.Abilities;
 using Kingmaker.UnitLogic.ActivatableAbilities;
 using KingmakerBuffPlanner.Compatibility;
 using KingmakerBuffPlanner.Domain.Planning;
 using KingmakerBuffPlanner.Domain.Providers;
 using KingmakerBuffPlanner.Execution;
+using UnityEngine;
 
 namespace KingmakerBuffPlanner.GameAdapters
 {
@@ -189,21 +191,31 @@ namespace KingmakerBuffPlanner.GameAdapters
                 (int)mechanics.Metamagic, mechanics.MaxSpellLevel, 0,
                 (mechanics.AbilitiesWhiteList ?? new Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility[0])
                     .Where(value => value != null).Select(value => value.AssetGuid),
-                Humanize(mechanics.Metamagic.ToString()));
+                RodEffectName((int)mechanics.Metamagic, item.Name));
             return true;
         }
 
-        private static string Humanize(string value)
+        // Effect naming contract: the game enum's own names first, then the
+        // installed provider's display-name contract, then the item-derived
+        // descriptor. Raw masks are logged as diagnostics only.
+        private static string RodEffectName(int metamagicMask, string itemDisplayName)
         {
-            if (string.IsNullOrWhiteSpace(value)) return "Metamagic";
-            var result = new System.Text.StringBuilder(value.Length + 4);
-            for (int index = 0; index < value.Length; index++)
-            {
-                if (index != 0 && char.IsUpper(value[index]) && !char.IsUpper(value[index - 1]))
-                    result.Append(' ');
-                result.Append(value[index]);
-            }
-            return result.ToString();
+            string effect = CastEnhancementNaming.EffectDisplayName(
+                metamagicMask, itemDisplayName, NamedMetamagic);
+            if (CastEnhancementNaming.IsReadableName(((Metamagic)metamagicMask).ToString()))
+                return effect;
+            Debug.Log("[KBP-METAMAGIC] unnamed mask;value=" + metamagicMask +
+                ";item='" + itemDisplayName + "';provider=" +
+                CallOfTheWildMetamagicNames.ContractSummary +
+                ";resolved='" + effect + "'.");
+            return effect;
+        }
+
+        private static string NamedMetamagic(int metamagicMask)
+        {
+            string native = ((Metamagic)metamagicMask).ToString();
+            if (CastEnhancementNaming.IsReadableName(native)) return native;
+            return CallOfTheWildMetamagicNames.Describe(metamagicMask);
         }
 
         private static IEnumerable<Entry> RodEntries(UnitEntityData unit)
@@ -225,7 +237,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                     (int)mechanics.Metamagic, mechanics.MaxSpellLevel, remaining,
                     (mechanics.AbilitiesWhiteList ?? new Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility[0])
                         .Where(value => value != null).Select(value => value.AssetGuid),
-                    Humanize(mechanics.Metamagic.ToString()));
+                    RodEffectName((int)mechanics.Metamagic, name));
                 yield return new Entry(ability, snapshot, false);
             }
         }

@@ -112,6 +112,7 @@
     <Compile Include="Compatibility\BrownFurShareTransmutationProfile.cs" />
     <Compile Include="Compatibility\BrownFurShareTransmutationCompatibility.cs" />
     <Compile Include="Compatibility\SpellbookRoleResolver.cs" />
+    <Compile Include="Compatibility\CallOfTheWildMetamagicNames.cs" />
     <Compile Include="GameAdapters\KingmakerActionGraphAdapter.cs" />
     <Compile Include="GameAdapters\KingmakerAreaCoverageResolver.cs" />
     <Compile Include="GameAdapters\KingmakerActiveEffectSnapshotBuilder.cs" />
@@ -119,6 +120,7 @@
     <Compile Include="GameAdapters\KingmakerAnimatedCastAdapter.cs" />
     <Compile Include="GameAdapters\KingmakerBuffSourceDiscovery.cs" />
     <Compile Include="GameAdapters\KingmakerCastEnhancementAdapter.cs" />
+    <Compile Include="GameAdapters\CastEnhancementNaming.cs" />
     <Compile Include="GameAdapters\KingmakerPowerfulChangeBlueprintAnalyzer.cs" />
     <Compile Include="GameAdapters\KingmakerInstantCastAdapter.cs" />
     <Compile Include="GameAdapters\KingmakerPartySnapshotBuilder.cs" />
@@ -169,6 +171,7 @@
     <Compile Include="UI\PlannerReviewCoordinator.cs" />
     <Compile Include="UI\AssignmentEligibility.cs" />
     <Compile Include="UI\SpellbookHandoffStateMachine.cs" />
+    <Compile Include="UI\SpellbookWindowLocator.cs" />
     <Compile Include="UI\BuffPlannerSpellbookEntryController.cs" />
     <Compile Include="UI\NativeThemeModel.cs" />
     <Compile Include="UI\NativeThemeDonorLookup.cs" />

@@ -12,25 +12,29 @@ namespace KingmakerBuffPlanner.UI
     // guarded handoff into the planner. The button is created and destroyed
     // only by this controller, is marked with an owned component, never
     // joins the native layout, and never touches native listeners. Discovery
-    // is a bounded single-path lookup on a fixed cadence — no per-frame
-    // global hierarchy search. Rendered placement and the same-context
-    // return trip require the live campaign lane and remain unqualified.
+    // is a bounded exact-path/tolerant-scan lookup on a fixed cadence — no
+    // per-frame global hierarchy search. Rendered placement and the
+    // same-context return trip require the live campaign lane and remain
+    // unqualified.
     internal sealed class BuffPlannerSpellbookEntryController
     {
-        internal const string SpellBookPath = "ServiceWindow/SpellBook";
         internal const string ButtonName = "BuffPlannerSpellbookButton";
         private const int TickCadence = 15;
+        private const float ButtonDesignWidth = 170f;
+        private const float ButtonDesignHeight = 36f;
 
         private readonly Action<string> _log;
         private readonly Func<bool> _openPlanner;
         private readonly Func<bool> _plannerOpen;
         private readonly Func<bool> _plannerPresentationReady;
         private readonly Action _recoverNativeUi;
-        private readonly PlannerUiTheme _theme;
         private readonly SpellbookHandoffStateMachine _handoff =
             new SpellbookHandoffStateMachine();
+        private PlannerUiTheme _theme;
+        private int _themeCanvasInstanceId;
         private int _tickSkip;
         private int _spellbookInstanceId;
+        private string _spellbookLocator;
         private Transform _spellbook;
         private Button _ownedButton;
         private bool _handoffActive;
@@ -122,19 +126,25 @@ namespace KingmakerBuffPlanner.UI
         private void ObserveSpellbook()
         {
             StaticCanvas canvas = StaticCanvas.Instance;
-            Transform window = canvas == null
-                ? null
-                : canvas.transform.Find(SpellBookPath);
+            if (canvas == null) return;
+            string reason;
+            SpellbookWindowLocator.Result found = SpellbookWindowLocator.Find(
+                canvas.transform, new UnityNodeAccess(), out reason);
+            Transform window = found == null ? null : found.Window as Transform;
             if (window == null || !window.gameObject.activeInHierarchy)
             {
-                // The native window destroyed with the scene takes our button
-                // with it; forget the dead reference and wait for the next
-                // window instance instead of recreating anything here.
+                // Either the window has not been created yet in this scene, or
+                // it was destroyed with the scene taking our button with it;
+                // forget the dead reference and wait for the next window
+                // instance instead of recreating anything here.
                 if (_ownedButton != null && _ownedButton.gameObject != null)
                     UnityEngine.Object.Destroy(_ownedButton.gameObject);
                 _ownedButton = null;
                 _spellbook = null;
                 _spellbookInstanceId = 0;
+                if (!string.IsNullOrEmpty(reason) && reason.StartsWith(
+                        "spellbook-window-ambiguous", StringComparison.Ordinal))
+                    _log("[KBP-SPELLBOOK] discovery refused;reason=" + reason + ".");
                 return;
             }
             int instanceId = window.GetInstanceID();
@@ -143,13 +153,15 @@ namespace KingmakerBuffPlanner.UI
                 DetachOwnedButton();
                 _spellbook = window;
                 _spellbookInstanceId = instanceId;
-                AttachOwnedButton();
+                _spellbookLocator = found.Locator;
+                AttachOwnedButton(canvas);
             }
         }
 
-        private void AttachOwnedButton()
+        private void AttachOwnedButton(StaticCanvas canvas)
         {
             if (_spellbook == null || _ownedButton != null) return;
+            ResolveThemeForCanvas(canvas);
             _ownedButton = KingmakerUiFactory.CreateButton(ButtonName, _spellbook, _theme,
                 "BUFF PLANNER", BeginHandoff);
             // Out-of-layout, like the HUD row: a planner-owned control must
@@ -158,11 +170,48 @@ namespace KingmakerBuffPlanner.UI
             LayoutElement layout = _ownedButton.gameObject.AddComponent<LayoutElement>();
             layout.ignoreLayout = true;
             RectTransform buttonRect = (RectTransform)_ownedButton.transform;
-            KingmakerUiFactory.SetAnchors(buttonRect, 0.965f, 0.925f, 0.995f, 0.975f);
+            // Corner anchoring with an explicit design size: percentage
+            // anchors of the native window produced a sliver-sized,
+            // caption-clipped control in RC1 regardless of the window's own
+            // rect, so the button's size no longer depends on the parent's
+            // geometry at all.
+            buttonRect.anchorMin = new Vector2(1f, 1f);
+            buttonRect.anchorMax = new Vector2(1f, 1f);
+            buttonRect.pivot = new Vector2(1f, 1f);
+            buttonRect.anchoredPosition = new Vector2(-20f, -18f);
+            buttonRect.sizeDelta = new Vector2(ButtonDesignWidth, ButtonDesignHeight);
             Text label = _ownedButton.GetComponentInChildren<Text>(true);
-            if (label != null) label.fontSize = 13;
+            if (label != null)
+            {
+                label.fontSize = 14;
+                label.resizeTextForBestFit = true;
+                label.resizeTextMinSize = 11;
+                label.resizeTextMaxSize = 14;
+            }
+            _ownedButton.interactable = true;
+            Canvas.ForceUpdateCanvases();
+            KingmakerUiFactory.FitButtonToCaption(buttonRect, ButtonDesignWidth,
+                ButtonDesignHeight);
+            var corners = new Vector3[4];
+            buttonRect.GetWorldCorners(corners);
             _log("[KBP-SPELLBOOK] owned button attached;window=" + _spellbookInstanceId +
-                ";path=" + SpellBookPath + ".");
+                ";locator=" + _spellbookLocator +
+                ";theme=" + (_theme == null ? "missing" : _theme.ResolutionSummary) +
+                ";screenRect=" + corners[0].x.ToString("F0") + "," + corners[0].y.ToString("F0") +
+                "-" + corners[2].x.ToString("F0") + "," + corners[2].y.ToString("F0") +
+                ";screen=" + Screen.width + "x" + Screen.height + ".");
+        }
+
+        // The boot-time theme resolves with no campaign canvas and therefore
+        // no native artwork; the button re-resolves against the live
+        // StaticCanvas so it borrows the native button sprite family.
+        private void ResolveThemeForCanvas(StaticCanvas canvas)
+        {
+            int canvasId = canvas == null || canvas.transform == null
+                ? 0 : canvas.transform.GetInstanceID();
+            if (_themeCanvasInstanceId == canvasId && _theme != null) return;
+            _theme = PlannerUiTheme.Resolve(canvas);
+            _themeCanvasInstanceId = canvasId;
         }
 
         private void DetachOwnedButton()
@@ -228,6 +277,39 @@ namespace KingmakerBuffPlanner.UI
             DetachOwnedButton();
             _spellbook = null;
             _spellbookInstanceId = 0;
+        }
+
+        // Structural node access for the bounded locator: transforms only,
+        // no component enumeration and no donor validation.
+        private sealed class UnityNodeAccess : INativeThemeSource
+        {
+            public bool IsAlive(object value)
+            {
+                return value is UnityEngine.Object && (UnityEngine.Object)value != null;
+            }
+            public bool SameNode(object first, object second)
+            {
+                return (UnityEngine.Object)first == (UnityEngine.Object)second;
+            }
+            public string Name(object node) { return ((Transform)node).name; }
+            public object Parent(object node) { return ((Transform)node).parent; }
+            public int ChildCount(object node) { return ((Transform)node).childCount; }
+            public object Child(object node, int index)
+            {
+                return ((Transform)node).GetChild(index);
+            }
+            public object[] Components(object node, NativeThemeComponent component)
+            {
+                throw new NotSupportedException("Locator does not enumerate components.");
+            }
+            public NativeThemeResource SoundResource()
+            {
+                throw new NotSupportedException("Locator does not resolve donors.");
+            }
+            public void Validate(NativeThemeCapability capability, object[] components)
+            {
+                throw new NotSupportedException("Locator does not validate donors.");
+            }
         }
     }
 }

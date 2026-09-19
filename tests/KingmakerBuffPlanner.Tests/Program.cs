@@ -6,6 +6,7 @@ using System.Reflection;
 using KingmakerBuffPlanner.RuntimeTesting;
 using KingmakerBuffPlanner.Discovery;
 using KingmakerBuffPlanner.Compatibility;
+using KingmakerBuffPlanner.GameAdapters;
 using KingmakerBuffPlanner.Domain.Effects;
 using KingmakerBuffPlanner.Domain.Identity;
 using KingmakerBuffPlanner.Domain.Providers;
@@ -258,6 +259,18 @@ namespace KingmakerBuffPlanner.Tests
                     TestAnimatedStickyTouchLifecycle);
                 Run("sticky-touch-failure-cleanup-does-not-block-later-work",
                     TestStickyTouchFailureCleanup);
+                Run("native-theme-lookup-requires-native-root-not-owned-overlay",
+                    TestNativeThemeLookupScope);
+                Run("spellbook-window-locator-is-exact-then-tolerant-and-refuses-ambiguity",
+                    TestSpellbookWindowLocator);
+                Run("chooser-budget-derives-from-authoritative-plan",
+                    TestChooserBudgetFromAuthoritativePlan);
+                Run("chooser-budget-follows-reordered-assignment-priority",
+                    TestChooserBudgetReorderedPriority);
+                Run("metamagic-labels-never-show-raw-masks",
+                    TestMetamagicLabelsNeverShowRawMasks);
+                Run("installed-call-of-the-wild-metamagic-name-contract-is-exact",
+                    TestInstalledCallOfTheWildMetamagicNames);
             }
             finally
             {
@@ -4762,7 +4775,7 @@ namespace KingmakerBuffPlanner.Tests
                 return new NativeThemeResource
                 {
                     Nodes = new object[0],
-                    Components = new object[] { new object() },
+                    Components = new object[] { new ThemeToken() },
                     Identity = "fixture sound"
                 };
             }
@@ -4908,6 +4921,401 @@ namespace KingmakerBuffPlanner.Tests
                 if (found != null) return found;
             }
             return null;
+        }
+
+        // P1 reproducer: native ServiceWindow donor paths resolve only from
+        // a native-canvas root. The released surface resolved from the
+        // planner's own overlay root, so every donor rejected and the flat
+        // fallback stayed on screen.
+        private static void TestNativeThemeLookupScope()
+        {
+            var source = new FixtureThemeSource();
+            ThemeNode nativeRoot = BuildDonorHierarchy(source);
+            ThemeNode plannerRoot = new ThemeNode { Name = "FullScreenOverlayRoot" };
+            plannerRoot.Add("ServiceFrame");
+
+            NativeThemeResolution ownedScoped = NativeThemeResolver.Resolve(
+                plannerRoot, source);
+            if (ownedScoped.IsAvailable(NativeThemeCapability.Paper) ||
+                ownedScoped.IsAvailable(NativeThemeCapability.Buttons) ||
+                ownedScoped.IsAvailable(NativeThemeCapability.Body))
+                throw new InvalidOperationException(
+                    "An owned-overlay lookup root resolved native ServiceWindow donors.");
+
+            NativeThemeResolution nativeScoped = NativeThemeResolver.Resolve(
+                nativeRoot, source);
+            foreach (NativeThemeCapability capability in NativeThemeResolution.Capabilities)
+                if (!nativeScoped.IsAvailable(capability))
+                    throw new InvalidOperationException(
+                        "Native-canvas lookup root rejected " + capability + ": " +
+                        nativeScoped.Failure(capability));
+
+            // The two legitimate scopes stay distinct in stale checks too:
+            // live donors under the native owner survive, and a donor that
+            // moved into the owned overlay is discarded instead of applied.
+            if (nativeScoped.DiscardStale(source))
+                throw new InvalidOperationException(
+                    "Live native-canvas donors were discarded from their own scope.");
+            var staleFixture = new FixtureThemeSource();
+            ThemeNode staleRoot = BuildDonorHierarchy(staleFixture);
+            NativeThemeResolution staleScoped = NativeThemeResolver.Resolve(
+                staleRoot, staleFixture);
+            ThemeNode movedPaper = FindByName(staleRoot, "BookBackground");
+            movedPaper.Parent.Children.Remove(movedPaper);
+            plannerRoot.Children.Add(movedPaper);
+            movedPaper.Parent = plannerRoot;
+            if (!staleScoped.DiscardStale(staleFixture) ||
+                staleScoped.IsAvailable(NativeThemeCapability.Paper))
+                throw new InvalidOperationException(
+                    "A donor moved into the owned overlay survived the native-scope stale check.");
+        }
+
+        // P3 reproducer: the spellbook entry must find the real native
+        // window through the exact proven path, tolerate a renamed window
+        // with a bounded unique scan, and refuse ambiguity loudly.
+        private static void TestSpellbookWindowLocator()
+        {
+            var source = new FixtureThemeSource();
+            ThemeNode canvas = new ThemeNode { Name = "StaticCanvas" };
+            ThemeNode serviceWindow = canvas.Add("ServiceWindow");
+            ThemeNode spellbook = serviceWindow.Add("SpellBook");
+            spellbook.Add("Container_Book");
+
+            string reason;
+            SpellbookWindowLocator.Result exact = SpellbookWindowLocator.Find(
+                canvas, source, out reason);
+            if (exact == null || !ReferenceEquals(exact.Window, spellbook) ||
+                !exact.Locator.Contains("path"))
+                throw new InvalidOperationException(
+                    "The exact spellbook path did not resolve: " + reason);
+
+            var renamedSource = new FixtureThemeSource();
+            ThemeNode renamedCanvas = new ThemeNode { Name = "StaticCanvas" };
+            ThemeNode renamedService = renamedCanvas.Add("ServiceWindow");
+            ThemeNode renamedWindow = renamedService.Add("SpellBookScreen");
+            renamedWindow.Add("Container_Book");
+            SpellbookWindowLocator.Result scan = SpellbookWindowLocator.Find(
+                renamedCanvas, renamedSource, out reason);
+            if (scan == null || !ReferenceEquals(scan.Window, renamedWindow) ||
+                !scan.Locator.Contains("scan"))
+                throw new InvalidOperationException(
+                    "A uniquely renamed spellbook window was not discovered: " + reason);
+
+            renamedService.Add("PartySpellBookList");
+            SpellbookWindowLocator.Result ambiguous = SpellbookWindowLocator.Find(
+                renamedCanvas, renamedSource, out reason);
+            if (ambiguous != null || reason == null ||
+                reason.IndexOf("ambiguous", StringComparison.Ordinal) < 0)
+                throw new InvalidOperationException(
+                    "Ambiguous spellbook candidates were not refused: " + reason);
+
+            var bareSource = new FixtureThemeSource();
+            ThemeNode bareCanvas = new ThemeNode { Name = "StaticCanvas" };
+            SpellbookWindowLocator.Result absent = SpellbookWindowLocator.Find(
+                bareCanvas, bareSource, out reason);
+            if (absent != null || reason == null ||
+                reason.IndexOf("service-window-missing", StringComparison.Ordinal) < 0)
+                throw new InvalidOperationException(
+                    "A canvas without ServiceWindow was not reported as missing: " + reason);
+        }
+
+        // P4 reproducer (A5): one three-charge rod, four otherwise eligible
+        // requests in one routine — the ordinary chooser view model exposes
+        // requested/allocated/unmet/projected from the same production plan,
+        // with no second charge counter.
+        private static void TestChooserBudgetFromAuthoritativePlan()
+        {
+            RunRodBudgetCase(4, "felix", "short");
+            // A6's larger case: nine eligible requests against one rod.
+            RunRodBudgetCase(9, "felix", "short");
+        }
+
+        private static void RunRodBudgetCase(int targetCount, string casterId, string routineId)
+        {
+            AbilityKey ability = Ability("budget-spell-" + targetCount, string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("slots-" + targetCount,
+                ResourcePoolKind.SpontaneousLevel, 12, 12, null);
+            ProviderSnapshot caster = PlannerProvider(casterId, casterId + "-book",
+                ability, pool.PoolKey, 1);
+            var unitIds = new List<string> { casterId };
+            for (int index = 1; index <= targetCount; index++)
+                unitIds.Add("ally-" + index);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(
+                new[] { caster }, new[] { pool }, unitIds.ToArray());
+            var option = new ProviderPlanningOption(caster, unitIds.ToArray(),
+                unitIds.ToArray(), 4, 40);
+            string rodId = "metamagic-rod|" + casterId + "|quicken-rod";
+            var rod = new CastEnhancementSnapshot(rodId, casterId, "quicken-rod",
+                "Quicken Metamagic Rod", string.Empty, CastEnhancementCategory.MetamagicRod,
+                4, 3, 3, null, "Quicken");
+            var idleRod = new CastEnhancementSnapshot(
+                "metamagic-rod|" + casterId + "|extend-rod", casterId, "extend-rod",
+                "Extend Metamagic Rod", string.Empty, CastEnhancementCategory.MetamagicRod,
+                8, 3, 2, null, "Extend");
+            var effects = new Dictionary<string, EffectExpression>
+            {
+                { ability.Canonical, Leaf("budget-buff-" + targetCount) }
+            };
+            var active = new ActiveEffectSnapshot(null);
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault(
+                "chooser-budget-" + targetCount);
+            var model = new PlannerSetupModel(profile, snapshot, active, effects,
+                new[] { option }, ignored => { }, new[] { rod, idleRod });
+            SetupSourceRow source = model.SelectedSource;
+            for (int index = 1; index <= targetCount; index++)
+                model.ToggleTarget(routineId, "ally-" + index);
+            model.SetEnhancement(routineId, rodId);
+
+            RoutinePlanResult preview = new RoutinePlanService().Plan(profile, routineId,
+                snapshot, active, effects, new[] { option }, new[] { rod, idleRod });
+            ResourcePoolAllocation allocation = preview.Plan.AllocationFor(
+                "enhancement:" + rodId);
+            int expectedUnmet = targetCount - 3;
+            if (allocation == null || allocation.AvailableNow != 3 ||
+                allocation.RequestedUsage != targetCount ||
+                allocation.AllocatedUsage != 3 ||
+                allocation.UnmetDemand != expectedUnmet ||
+                allocation.ForecastRemaining != 0)
+                throw new InvalidOperationException(
+                    "Authoritative plan allocation was not the scarce-rod budget: " +
+                    (allocation == null ? "missing" : allocation.RequestedUsage + "/" +
+                        allocation.AllocatedUsage + "/" + allocation.UnmetDemand + "/" +
+                        allocation.ForecastRemaining));
+
+            SelectedCastingViewModel casting = SelectedCastingViewModel.Create(
+                source, model, routineId, preview);
+            if (casting.BudgetLines.Count != 1)
+                throw new InvalidOperationException(
+                    "Expected exactly one demanded enhancement pool line.");
+            EnhancementBudgetLineViewModel line = casting.BudgetLines[0];
+            if (line.NativeChargesNow != 3 || line.RequestedUses != targetCount ||
+                line.AllocatedUses != 3 || line.UnmetUses != expectedUnmet ||
+                line.ProjectedRemaining != 0 || line.OwnerName != casterId ||
+                !line.Text.Contains(targetCount + " requested | 3 allocated | " +
+                    expectedUnmet + " unmet") ||
+                !line.Text.Contains("projected after " +
+                    char.ToUpperInvariant(routineId[0]) + routineId.Substring(1) + ": 0") ||
+                !line.Text.Contains("Quicken Metamagic Rod"))
+                throw new InvalidOperationException(
+                    "The budget line did not expose the mission's distinctions: " + line.Text);
+            if (string.IsNullOrEmpty(casting.EnhancementBudgetText) ||
+                casting.EnhancementBudgetText.IndexOf(
+                    "never consumes charges", StringComparison.Ordinal) < 0)
+                throw new InvalidOperationException(
+                    "The template/no-consumption explanation was missing.");
+            if (!casting.EnhancementWarning ||
+                casting.EnhancementLabel.IndexOf(expectedUnmet + " charge", StringComparison.Ordinal) < 0)
+                throw new InvalidOperationException(
+                    "Unmet demand did not surface on the ordinary card label: " +
+                    casting.EnhancementLabel);
+            EnhancementChoiceViewModel selectedChoice = casting.Choices.Single(
+                choice => choice.EnhancementId == rodId);
+            if (selectedChoice.BudgetNote.IndexOf(
+                    targetCount + " requested, 3 allocated", StringComparison.Ordinal) < 0 ||
+                selectedChoice.BudgetNote.IndexOf(
+                    "this spell: 3 allocated / " + targetCount + " requested",
+                    StringComparison.Ordinal) < 0)
+                throw new InvalidOperationException(
+                    "The selected row lacked the pool and this-spell budget note: " +
+                    selectedChoice.BudgetNote);
+            EnhancementChoiceViewModel unselectedChoice = casting.Choices.Single(
+                choice => choice.EnhancementId == idleRod.EnhancementId);
+            if (unselectedChoice.Selected ||
+                unselectedChoice.BudgetNote.IndexOf(
+                    "selecting reserves 1 charge per enhanced cast",
+                    StringComparison.Ordinal) < 0)
+                throw new InvalidOperationException(
+                    "An unselected choice did not state its reservation cost: " +
+                    unselectedChoice.BudgetNote);
+
+            var planSummary = new SelectedBuffPlanSummaryViewModel(source, model,
+                routineId, preview);
+            if (planSummary.Text.IndexOf("Unmet enhancement demand",
+                    StringComparison.Ordinal) < 0 ||
+                planSummary.Text.IndexOf("Quicken Metamagic Rod", StringComparison.Ordinal) < 0)
+                throw new InvalidOperationException(
+                    "The main card summary hid the resolved shortage: " + planSummary.Text);
+        }
+
+        // A6: reordering assignments moves the scarce charge to the new
+        // higher-priority cast immediately, through the same production plan.
+        private static void TestChooserBudgetReorderedPriority()
+        {
+            AbilityKey ability = Ability("reorder-budget-spell", string.Empty, 0);
+            var pool = new ResourcePoolSnapshot("reorder-slots",
+                ResourcePoolKind.SpontaneousLevel, 8, 8, null);
+            ProviderSnapshot felix = PlannerProvider("felix", "felix-book", ability,
+                pool.PoolKey, 1);
+            PartyProviderSnapshot snapshot = PlannerSnapshot(
+                new[] { felix }, new[] { pool }, "felix", "t1", "t2", "t3", "t4");
+            var option = new ProviderPlanningOption(felix,
+                new[] { "felix", "t1", "t2", "t3", "t4" },
+                new[] { "felix", "t1", "t2", "t3", "t4" }, 4, 40);
+            string rodId = "metamagic-rod|felix|quicken-rod";
+            var rod = new CastEnhancementSnapshot(rodId, "felix", "quicken-rod",
+                "Quicken Metamagic Rod", string.Empty, CastEnhancementCategory.MetamagicRod,
+                4, 3, 3, null, "Quicken");
+            var effects = new Dictionary<string, EffectExpression>
+            {
+                { ability.Canonical, Leaf("reorder-budget-buff") }
+            };
+            var active = new ActiveEffectSnapshot(null);
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault(
+                "chooser-budget-reorder");
+            SourceAssignmentProfile parent = Assignment(ability.Canonical, ability,
+                new string[0]);
+            parent.CastingAssignments[0].TargetUnitIds = new List<string> { "t1", "t2" };
+            parent.CastingAssignments[0].Enhancements = new List<EnhancementSelectionProfile>
+            {
+                new EnhancementSelectionProfile { EnhancementId = rodId, Required = true }
+            };
+            parent.CastingAssignments.Add(new CastingAssignmentProfile
+            {
+                AssignmentId = "cast-2",
+                Order = 1,
+                TargetUnitIds = new List<string> { "t3", "t4" },
+                Enhancements = new List<EnhancementSelectionProfile>
+                {
+                    new EnhancementSelectionProfile { EnhancementId = rodId, Required = true }
+                }
+            });
+            profile.Routines.First(routine => routine.RoutineId == "short")
+                .Assignments.Add(parent);
+
+            RoutinePlanResult first = new RoutinePlanService().Plan(profile, "short",
+                snapshot, active, effects, new[] { option }, new[] { rod });
+            ResourcePoolAllocation allocation = first.Plan.AllocationFor(
+                "enhancement:" + rodId);
+            if (allocation == null || allocation.RequestedUsage != 4 ||
+                allocation.AllocatedUsage != 3 || allocation.UnmetDemand != 1)
+                throw new InvalidOperationException(
+                    "Two ordered assignments did not share one rod budget.");
+            if (first.Plan.Steps.Count(step => step.AssignmentId == "auto-" + ability.Canonical) != 2 ||
+                first.Plan.Steps.Count(step => step.AssignmentId == "cast-2") != 1 ||
+                !first.Plan.Outcomes.Any(outcome => outcome.UnitId == "t4" &&
+                    outcome.Kind == TargetOutcomeKind.Unfulfilled))
+                throw new InvalidOperationException(
+                    "The earlier assignment did not win the scarce charges.");
+
+            parent.CastingAssignments[0].Order = 1;
+            parent.CastingAssignments[1].Order = 0;
+            RoutinePlanResult second = new RoutinePlanService().Plan(profile, "short",
+                snapshot, active, effects, new[] { option }, new[] { rod });
+            ResourcePoolAllocation reordered = second.Plan.AllocationFor(
+                "enhancement:" + rodId);
+            if (reordered == null || reordered.RequestedUsage != 4 ||
+                reordered.AllocatedUsage != 3 || reordered.UnmetDemand != 1)
+                throw new InvalidOperationException(
+                    "Reordering changed the shared budget totals unexpectedly.");
+            if (second.Plan.Steps.Count(step => step.AssignmentId == "cast-2") != 2 ||
+                second.Plan.Steps.Count(step => step.AssignmentId == "auto-" + ability.Canonical) != 1 ||
+                !second.Plan.Outcomes.Any(outcome => outcome.UnitId == "t2" &&
+                    outcome.Kind == TargetOutcomeKind.Unfulfilled))
+                throw new InvalidOperationException(
+                    "The freed charge did not move to the new higher-priority assignment.");
+
+            var model = new PlannerSetupModel(profile, snapshot, active, effects,
+                new[] { option }, ignored => { }, new[] { rod });
+            SelectedCastingViewModel assignmentScoped = SelectedCastingViewModel.Create(
+                model.SelectedSource, model, "short", second, "cast-2");
+            EnhancementChoiceViewModel choice = assignmentScoped.Choices.Single(
+                candidate => candidate.EnhancementId == rodId);
+            if (choice.BudgetNote.IndexOf(
+                    "this assignment: 2 allocated / 2 requested",
+                    StringComparison.Ordinal) < 0)
+                throw new InvalidOperationException(
+                    "The assignment-scoped chooser lost its own coverage note: " +
+                    choice.BudgetNote);
+        }
+
+        // P5 reproducer: unnamed extended metamagic masks never reach player
+        // text as integers; the provider contract or the item name supplies
+        // the readable effect name.
+        private static void TestMetamagicLabelsNeverShowRawMasks()
+        {
+            if (CastEnhancementNaming.EffectDisplayName(4, "Quicken Metamagic Rod",
+                    mask => "Quicken") != "Quicken")
+                throw new InvalidOperationException(
+                    "A named game-enum mask stopped passing through.");
+            if (CastEnhancementNaming.EffectDisplayName(9, "Rod",
+                    mask => "Empower, Maximize") != "Empower, Maximize")
+                throw new InvalidOperationException(
+                    "A named game-enum combination stopped passing through.");
+            if (CastEnhancementNaming.EffectDisplayName(268435456,
+                    "Persistent Metamagic Rod", mask => "Persistent") != "Persistent" ||
+                CastEnhancementNaming.EffectDisplayName(8192, "Rod",
+                    mask => "Threnodic") != "Threnodic")
+                throw new InvalidOperationException(
+                    "The provider display-name contract was not honored.");
+            // The provider absent: the item's own name is the descriptor.
+            if (CastEnhancementNaming.EffectDisplayName(268435456,
+                    "Persistent Metamagic Rod", mask => null) != "Persistent" ||
+                CastEnhancementNaming.EffectDisplayName(8192,
+                    "Metamagic Rod, Threnodic", mask => null) != "Threnodic" ||
+                CastEnhancementNaming.EffectDisplayName(33554432,
+                    "Lesser Selective Rod", mask => null) != "Selective")
+                throw new InvalidOperationException(
+                    "The item-derived fallback lost the owner's rod names.");
+            if (CastEnhancementNaming.EffectDisplayName(524288, "Rod", mask => null)
+                    != "Metamagic")
+                throw new InvalidOperationException(
+                    "An undescriptive fallback did not stay neutral.");
+            // A legacy numeric resolver result (the released defect shape)
+            // still yields readable text and never a digit.
+            string legacy = CastEnhancementNaming.EffectDisplayName(524288,
+                "Piercing Metamagic Rod", mask => "524288");
+            if (legacy != "Piercing" || legacy.Any(char.IsDigit))
+                throw new InvalidOperationException(
+                    "A numeric string leaked into the effect name: " + legacy);
+
+            var legacyNumeric = new CastEnhancementSnapshot("rod-legacy", "felix",
+                "legacy-guid", "Piercing Metamagic Rod", string.Empty,
+                CastEnhancementCategory.MetamagicRod, 524288, 3, 1, null, "524288");
+            if (PlannerSetupModel.EffectName(legacyNumeric) != "Piercing Spell")
+                throw new InvalidOperationException(
+                    "EffectName kept a raw mask suffix: " +
+                    PlannerSetupModel.EffectName(legacyNumeric));
+            var named = new CastEnhancementSnapshot("rod-named", "felix", "named-guid",
+                "Quicken Metamagic Rod", string.Empty, CastEnhancementCategory.MetamagicRod,
+                4, 3, 3, null, "Quicken");
+            if (PlannerSetupModel.EffectName(named) != "Quicken Spell")
+                throw new InvalidOperationException(
+                    "EffectName dropped the ordinary Spell suffix.");
+            var alreadySuffixed = new CastEnhancementSnapshot("rod-suffixed", "felix",
+                "suffixed-guid", "Threnodic Rod", string.Empty,
+                CastEnhancementCategory.MetamagicRod, 8192, 3, 1, null, "Threnodic Spell");
+            if (PlannerSetupModel.EffectName(alreadySuffixed) != "Threnodic Spell")
+                throw new InvalidOperationException(
+                    "EffectName double-suffixed a prepared effect name.");
+        }
+
+        // A11's installed-contract lane: the provider assembly that produced
+        // the owner's numeric labels resolves through the same fail-soft
+        // contract the shipped adapter uses.
+        private static void TestInstalledCallOfTheWildMetamagicNames()
+        {
+            string game = Environment.GetEnvironmentVariable("KBP_TEST_GAME_PATH");
+            string path = string.IsNullOrWhiteSpace(game) ? string.Empty : Path.Combine(
+                game, "Mods", "CallOfTheWild", "CallOfTheWild.dll");
+            if (!File.Exists(path)) return;
+            Assembly provider = Assembly.LoadFrom(path);
+            if (provider == null) return;
+            if (CallOfTheWildMetamagicNames.Describe(268435456) != "Persistent" ||
+                CallOfTheWildMetamagicNames.Describe(524288) != "Piercing" ||
+                CallOfTheWildMetamagicNames.Describe(33554432) != "Selective" ||
+                CallOfTheWildMetamagicNames.Describe(8192) != "Threnodic")
+                throw new InvalidOperationException(
+                    "The installed provider's extended metamagic names did not resolve: " +
+                    CallOfTheWildMetamagicNames.ContractSummary);
+            if (CallOfTheWildMetamagicNames.Describe(4) != null)
+                throw new InvalidOperationException(
+                    "A base-game mask resolved through the provider contract.");
+            if (string.IsNullOrEmpty(CallOfTheWildMetamagicNames.ContractSummary) ||
+                CallOfTheWildMetamagicNames.ContractSummary.IndexOf(
+                    "loaded:", StringComparison.Ordinal) != 0)
+                throw new InvalidOperationException(
+                    "The provider contract summary was not recorded: " +
+                    CallOfTheWildMetamagicNames.ContractSummary);
         }
 
         private static void TestControlCaptionFit()

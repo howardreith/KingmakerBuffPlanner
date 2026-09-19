@@ -154,6 +154,13 @@ namespace KingmakerBuffPlanner.UI
         public BuffPlannerProfile Profile { get; private set; }
         public PartyProviderSnapshot Snapshot { get; private set; }
         public IReadOnlyList<SetupSourceRow> Sources { get; private set; }
+        // The full discovered enhancement catalog (not only the currently
+        // applicable subset): shared-pool budget lines must see every caster
+        // and rod that consumes the same native charges.
+        public IReadOnlyList<CastEnhancementSnapshot> Enhancements
+        {
+            get { return _enhancements; }
+        }
         public bool AssignmentMigrationApplied { get; private set; }
         public IReadOnlyList<VariantReselectionNotice> VariantReselectionNotices { get; private set; }
         public string SelectedSourceId { get; private set; }
@@ -476,7 +483,16 @@ namespace KingmakerBuffPlanner.UI
         internal static string EffectName(CastEnhancementSnapshot enhancement)
         {
             string value = enhancement == null ? string.Empty : enhancement.EffectDisplayName;
-            if (string.IsNullOrWhiteSpace(value) || value == "Metamagic") return "Metamagic";
+            // Defense in depth for the released numeric-label defect: a raw
+            // mask (or any digit-carrying string) never reaches player UI;
+            // the item's own name yields the descriptor instead.
+            if (!GameAdapters.CastEnhancementNaming.IsReadableName(value))
+                value = GameAdapters.CastEnhancementNaming.DeriveFromItemName(
+                    enhancement == null ? null : enhancement.DisplayName)
+                    ?? "Metamagic";
+            if (value == "Metamagic" || string.IsNullOrWhiteSpace(value) ||
+                string.Equals(value.Trim(), "Spell", StringComparison.OrdinalIgnoreCase))
+                return "Metamagic";
             if (enhancement.Category == CastEnhancementCategory.ClassFeature)
                 return value;
             return value.EndsWith(" Spell", StringComparison.OrdinalIgnoreCase)

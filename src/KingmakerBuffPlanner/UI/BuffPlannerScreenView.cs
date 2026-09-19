@@ -27,6 +27,7 @@ namespace KingmakerBuffPlanner.UI
         private readonly Action<string> _executeReadyOnly;
         private readonly PlannerUiTheme _theme;
         private readonly CatalogFilterState _filters = new CatalogFilterState();
+        private readonly StaticCanvas _nativeCanvas;
         private PlannerScreenViewModel _viewModel;
         private RectTransform _root;
         private Canvas _canvas;
@@ -60,6 +61,7 @@ namespace KingmakerBuffPlanner.UI
             Action<string> executeReadyOnly = null)
         {
             if (nativeCanvas == null) throw new ArgumentNullException("nativeCanvas");
+            _nativeCanvas = nativeCanvas;
             _session = session ?? throw new ArgumentNullException("session");
             _diagnostics = diagnostics ?? throw new ArgumentNullException("diagnostics");
             _close = close ?? throw new ArgumentNullException("close");
@@ -507,7 +509,8 @@ namespace KingmakerBuffPlanner.UI
             {
                 _session.Model.SetAllValidTargets(ActiveRoutineId, false);
                 RefreshAll(true);
-            }, OpenCasterPolicyChooser, OpenEnhancementChooser, ShowTooltip);
+            }, OpenCasterPolicyChooser, OpenEnhancementChooser, ShowTooltip,
+            OpenCastingOrder);
             _enhancementChooser = new PlannerEnhancementChooserView(_root, _theme,
                 enhancementId =>
                 {
@@ -609,7 +612,20 @@ namespace KingmakerBuffPlanner.UI
                 RefreshAll(true);
             }, () => _settings.Show(false));
             _description = new PlannerDescriptionModal(_root, _theme);
-            _nativeTheme = PlannerNativeThemeSurface.Attach(_root);
+            // Donor lookup is native-canvas scoped (P1: resolving from the
+            // planner root cannot reach ServiceWindow paths); application
+            // stays owned-scope on this root.
+            _nativeTheme = PlannerNativeThemeSurface.Attach(_root, _nativeCanvas);
+            // Every owned paper surface — main frame, blocker, nested modal
+            // frames — is registered explicitly so the book donor reaches the
+            // real rendered tree, not a few top-level names.
+            _nativeTheme.RegisterPaperSurface(frame);
+            _nativeTheme.RegisterPaperSurface(_enhancementChooser.PaperSurface);
+            _nativeTheme.RegisterPaperSurface(_casterPolicyChooser.PaperSurface);
+            _nativeTheme.RegisterPaperSurface(_castingOrder.PaperSurface);
+            _nativeTheme.RegisterPaperSurface(_assignmentTargetChooser.PaperSurface);
+            _nativeTheme.RegisterPaperSurface(_description.PaperSurface);
+            _nativeTheme.ApplyAll();
             _root.SetAsLastSibling();
             _root.gameObject.SetActive(true);
             PlannerPointerOwnership.Register(_root);
@@ -631,15 +647,23 @@ namespace KingmakerBuffPlanner.UI
             Button settings = KingmakerUiFactory.CreateButton("Settings", header, _theme,
                 "Settings", () => _settings.Show(!_settings.IsOpen));
             KingmakerUiFactory.SetAnchors((RectTransform)settings.transform,
-                0.70f, 0.14f, 0.81f, 0.86f);
-            Button castingOrder = KingmakerUiFactory.CreateButton("CastingOrder", header, _theme,
-                "Order", OpenCastingOrder);
+                0.46f, 0.14f, 0.57f, 0.86f);
+            // The header entry to the assignment/resource editor carries its
+            // full caption instead of the undiscoverable "Order"; the wider
+            // anchors plus caption fitting keep it readable at every
+            // supported resolution.
+            Button castingOrder = KingmakerUiFactory.CreateButton("CastingOrder", header,
+                _theme, "Assignments & Resources", OpenCastingOrder);
             KingmakerUiFactory.SetAnchors((RectTransform)castingOrder.transform,
-                0.82f, 0.14f, 0.91f, 0.86f);
+                0.585f, 0.14f, 0.895f, 0.86f);
             Button close = KingmakerUiFactory.CreateButton("Close", header, _theme,
                 "X", () => _close());
             KingmakerUiFactory.SetAnchors((RectTransform)close.transform,
-                0.92f, 0.14f, 0.99f, 0.86f);
+                0.91f, 0.14f, 0.99f, 0.86f);
+            KingmakerUiFactory.FitButtonToCaption(
+                (RectTransform)castingOrder.transform, 220f, 34f);
+            KingmakerUiFactory.FitButtonToCaption(
+                (RectTransform)settings.transform, 96f, 34f);
         }
 
         private void OpenCastingOrder()
@@ -723,7 +747,8 @@ namespace KingmakerBuffPlanner.UI
                 return new EnhancementSelectionSummary(id, match == null || match.IsRequired);
             }).ToList();
             _enhancementChooser.ShowForAssignment(
-                SelectedCastingViewModel.Create(source, model, ActiveRoutineId, preview),
+                SelectedCastingViewModel.Create(source, model, ActiveRoutineId, preview,
+                    assignmentId),
                 sourceId, assignmentId, selections,
                 (sourceKey, assignmentKey, enhancementId) =>
                 {
@@ -1041,6 +1066,7 @@ namespace KingmakerBuffPlanner.UI
 
     internal sealed class PlannerDescriptionModal
     {
+        private readonly RectTransform _frame;
         private readonly Image _icon;
         private readonly Text _fallback;
         private readonly Text _name;
@@ -1052,15 +1078,15 @@ namespace KingmakerBuffPlanner.UI
         {
             Root = KingmakerUiFactory.CreateRect("DescriptionModal", parent);
             KingmakerUiFactory.Stretch(Root);
-            Image backdrop = KingmakerUiFactory.AddPanel(Root,
-                new Color(0.05f, 0.035f, 0.025f, 0.82f));
+            Image backdrop = Root.gameObject.AddComponent<Image>();
+            backdrop.color = new Color(0.05f, 0.035f, 0.025f, 0.82f);
             backdrop.raycastTarget = true;
-            RectTransform frame = KingmakerUiFactory.CreateRect("DescriptionFrame", Root);
-            KingmakerUiFactory.SetAnchors(frame, 0.19f, 0.08f, 0.81f, 0.92f);
-            KingmakerUiFactory.AddFramedPanel(frame, theme.ParchmentRaised,
+            _frame = KingmakerUiFactory.CreateRect("DescriptionFrame", Root);
+            KingmakerUiFactory.SetAnchors(_frame, 0.19f, 0.08f, 0.81f, 0.92f);
+            KingmakerUiFactory.AddFramedPanel(_frame, theme.ParchmentRaised,
                 theme.GoldAccent, 3f);
 
-            RectTransform iconFrame = KingmakerUiFactory.CreateRect("AbilityIconFrame", frame);
+            RectTransform iconFrame = KingmakerUiFactory.CreateRect("AbilityIconFrame", _frame);
             KingmakerUiFactory.SetAnchors(iconFrame, 0.035f, 0.79f, 0.16f, 0.965f);
             KingmakerUiFactory.AddFramedPanel(iconFrame,
                 new Color(0.16f, 0.10f, 0.07f, 1f), theme.GoldAccent, 2f).raycastTarget = false;
@@ -1073,25 +1099,25 @@ namespace KingmakerBuffPlanner.UI
                 "?", 40, TextAnchor.MiddleCenter);
             KingmakerUiFactory.Stretch(_fallback.rectTransform);
 
-            _name = KingmakerUiFactory.CreateText("AbilityName", frame, theme,
+            _name = KingmakerUiFactory.CreateText("AbilityName", _frame, theme,
                 string.Empty, 25, TextAnchor.MiddleLeft);
             _name.fontStyle = FontStyle.Bold;
             _name.color = theme.BurgundyPrimary;
             _name.horizontalOverflow = HorizontalWrapMode.Wrap;
             _name.verticalOverflow = VerticalWrapMode.Overflow;
             KingmakerUiFactory.SetAnchors(_name.rectTransform, 0.18f, 0.82f, 0.86f, 0.965f);
-            _meta = KingmakerUiFactory.CreateText("AbilityMeta", frame, theme,
+            _meta = KingmakerUiFactory.CreateText("AbilityMeta", _frame, theme,
                 string.Empty, 15, TextAnchor.MiddleLeft);
             _meta.color = theme.MutedBrownText;
             KingmakerUiFactory.SetAnchors(_meta.rectTransform, 0.18f, 0.75f, 0.86f, 0.82f);
 
-            Button close = KingmakerUiFactory.CreateButton("CloseDescription", frame, theme,
+            Button close = KingmakerUiFactory.CreateButton("CloseDescription", _frame, theme,
                 "X", Hide);
             KingmakerUiFactory.SetAnchors((RectTransform)close.transform,
                 0.89f, 0.90f, 0.965f, 0.97f);
 
             RectTransform content;
-            _scroll = KingmakerUiFactory.CreateScrollView("DescriptionScroll", frame,
+            _scroll = KingmakerUiFactory.CreateScrollView("DescriptionScroll", _frame,
                 theme, out content);
             KingmakerUiFactory.SetAnchors((RectTransform)_scroll.transform,
                 0.035f, 0.055f, 0.965f, 0.73f);
@@ -1111,6 +1137,7 @@ namespace KingmakerBuffPlanner.UI
         }
 
         internal RectTransform Root { get; private set; }
+        internal RectTransform PaperSurface { get { return _frame; } }
         internal bool IsOpen { get { return Root.gameObject.activeSelf; } }
 
         internal void Show(SetupSourceRow source, BlueprintAbility ability, Sprite icon)

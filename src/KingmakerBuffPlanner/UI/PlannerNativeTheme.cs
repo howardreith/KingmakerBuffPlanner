@@ -23,11 +23,16 @@ namespace KingmakerBuffPlanner.UI
             Resources = resources;
         }
 
-        internal static PlannerNativeTheme Resolve(Component owner)
+        // Donor lookup and ownership are NATIVE-canvas scoped: every recorded
+        // path (ServiceWindow/... ) descends from the StaticCanvas, never from
+        // the planner's own overlay. The planner root remains only the
+        // application scope and must never be passed here — resolving from it
+        // walks the planner's own children and rejects every donor.
+        internal static PlannerNativeTheme Resolve(Component nativeLookupRoot)
         {
-            if (owner == null) throw new ArgumentNullException("owner");
+            if (nativeLookupRoot == null) throw new ArgumentNullException("nativeLookupRoot");
             return new PlannerNativeTheme(NativeThemeResolver.Resolve(
-                owner.transform, new UnitySource()));
+                nativeLookupRoot.transform, new UnitySource()));
         }
 
         private sealed class UnitySource : INativeThemeSource
@@ -149,12 +154,35 @@ namespace KingmakerBuffPlanner.UI
                 donor.spriteState.disabledSprite != null;
         }
 
+        // Factory fallback tints that the borrowed native artwork must
+        // replace; any other color is a deliberate status tint (selected
+        // rows, warnings) and survives theming untouched.
+        private static readonly Color[] FactoryFallbackTints =
+        {
+            new Color(0.985f, 0.925f, 0.795f, 0.96f),   // ParchmentRaised
+            new Color(0.965f, 0.890f, 0.725f, 0.88f),   // ParchmentPanel
+            new Color(0.965f, 0.865f, 0.665f, 0.70f),   // ServiceSurface
+            new Color(0.922f, 0.871f, 0.765f, 1f)       // ParchmentBackground
+        };
+
+        internal static bool IsFactoryFallbackTint(Color color)
+        {
+            foreach (Color fallback in FactoryFallbackTints)
+                if (Mathf.Approximately(color.r, fallback.r) &&
+                    Mathf.Approximately(color.g, fallback.g) &&
+                    Mathf.Approximately(color.b, fallback.b))
+                    return true;
+            return false;
+        }
+
         internal static void ApplyButton(Button donor, Button button)
         {
             if (button == null) return;
             if (HasCompleteSpriteStates(donor))
             {
                 ApplyImage((Image)donor.targetGraphic, button.image);
+                if (IsFactoryFallbackTint(button.image.color))
+                    button.image.color = Color.white;
                 button.image.raycastTarget = true;
                 button.targetGraphic = button.image;
                 button.spriteState = donor.spriteState;
