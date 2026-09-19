@@ -202,13 +202,16 @@ namespace KingmakerBuffPlanner.Planning
             IEnumerable<ProviderPlanningOption> providerOptions,
             IDictionary<string, EffectExpression> effectsBySource,
             IEnumerable<CastEnhancementSnapshot> enhancements = null,
-            string budgetRoutineScope = null)
+            string budgetRoutineScope = null,
+            IEnumerable<ICastingTargetingModifier> targetingModifiers = null)
         {
             if (document == null) throw new ArgumentNullException("document");
             if (snapshot == null) throw new ArgumentNullException("snapshot");
             if (effectsBySource == null) throw new ArgumentNullException("effectsBySource");
             var options = (providerOptions ?? new ProviderPlanningOption[0]).ToList();
             var enhancementList = (enhancements ?? new CastEnhancementSnapshot[0]).ToList();
+            var modifierList = (targetingModifiers ?? new ICastingTargetingModifier[0])
+                .Where(value => value != null).ToList();
             var castings = new List<ResolvedCasting>();
             var diagnostics = new List<string>();
             var matchedEnhancements = new Dictionary<string, List<CastEnhancementSnapshot>>(
@@ -220,7 +223,7 @@ namespace KingmakerBuffPlanner.Planning
                 List<CastEnhancementSnapshot> matched;
                 ProviderSnapshot provider;
                 castings.Add(CompileOne(casting, snapshot, options, effectsBySource,
-                    enhancementList, diagnostics, out matched, out provider));
+                    enhancementList, modifierList, diagnostics, out matched, out provider));
                 matchedEnhancements[casting.CastingId] = matched;
                 providers[casting.CastingId] = provider;
             }
@@ -274,6 +277,7 @@ namespace KingmakerBuffPlanner.Planning
             List<ProviderPlanningOption> options,
             IDictionary<string, EffectExpression> effectsBySource,
             List<CastEnhancementSnapshot> enhancements,
+            List<ICastingTargetingModifier> targetingModifiers,
             List<string> diagnostics,
             out List<CastEnhancementSnapshot> matchedEnhancements,
             out ProviderSnapshot providerSnapshot)
@@ -291,6 +295,9 @@ namespace KingmakerBuffPlanner.Planning
             VerifyAbilityTargetMode(casting, effectsBySource, reasons);
             IReadOnlyList<string> predicted = new string[0];
             var gaps = new List<CoverageGap>();
+            if (option != null)
+                option = ApplyTargetingModifiers(
+                    casting, targetingModifiers, option, reasons, diagnostics);
             if (option != null)
             {
                 if (!HasSpendableResources(option, snapshot, reasons))
@@ -329,13 +336,14 @@ namespace KingmakerBuffPlanner.Planning
                     : reasons.Count == 0
                         ? ResolvedCastingReadiness.Ready
                         : ResolvedCastingReadiness.Blocked;
-            // Targeting modifiers are echoed but not yet resolved: real
-            // eligibility arrives with the modifier-resolution phase, and an
-            // unresolved modifier is disclosed instead of guessed.
+            // Targeting modifiers change recipient eligibility only: an
+            // enabled modifier transforms the proven option or blocks with a
+            // repairable reason. With no host registry the selection stays
+            // an unvalidated diagnostic instead of being guessed.
             foreach (string modifier in casting.TargetingModifiers
-                .Where(value => value.Enabled)
+                .Where(value => !value.Enabled)
                 .Select(value => value.ModifierId))
-                diagnostics.Add("targeting-modifier-unvalidated:" + modifier +
+                diagnostics.Add("targeting-modifier-disabled:" + modifier +
                     ":" + casting.CastingId);
             matchedEnhancements = matched;
             providerSnapshot = option == null ? null : option.Provider;
@@ -351,6 +359,48 @@ namespace KingmakerBuffPlanner.Planning
                 reasons.Distinct(StringComparer.Ordinal)
                     .OrderBy(value => value, StringComparer.Ordinal).ToList(),
                 capableCasters, casting.Provenance);
+        }
+
+        // Applies the casting's enabled targeting modifiers in authored
+        // order. A modifier transforms the proven option (eligibility
+        // change); an unavailable modifier blocks the casting with a
+        // repairable reason; an unknown modifier id against a provided
+        // registry blocks rather than being silently ignored. With no
+        // registry at all, enabled selections stay unvalidated diagnostics.
+        private static ProviderPlanningOption ApplyTargetingModifiers(
+            PlannedCasting casting,
+            List<ICastingTargetingModifier> modifiers,
+            ProviderPlanningOption option,
+            List<string> reasons,
+            List<string> diagnostics)
+        {
+            foreach (TargetingModifierSelection selection in casting.TargetingModifiers)
+            {
+                if (!selection.Enabled) continue;
+                ICastingTargetingModifier modifier = modifiers.FirstOrDefault(
+                    value => string.Equals(value.ModifierId, selection.ModifierId,
+                        StringComparison.Ordinal));
+                if (modifier == null)
+                {
+                    if (modifiers.Count == 0)
+                    {
+                        diagnostics.Add("targeting-modifier-unvalidated:" +
+                            selection.ModifierId + ":" + casting.CastingId);
+                        continue;
+                    }
+                    reasons.Add("targeting-modifier-unknown:" + selection.ModifierId);
+                    return null;
+                }
+                CastingModifierResult result = modifier.Apply(casting, option);
+                if (!result.IsApplied)
+                {
+                    reasons.Add("targeting-modifier-unavailable:" +
+                        selection.ModifierId + ":" + result.UnavailableReason);
+                    return null;
+                }
+                option = result.Option;
+            }
+            return option;
         }
 
         private static ProviderPlanningOption ResolveOption(

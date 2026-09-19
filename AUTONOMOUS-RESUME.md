@@ -1,6 +1,25 @@
 # AUTONOMOUS-RESUME — top section is current; planning/CASTING-FIRST-MIGRATION-STATUS.md is the per-checkpoint tracker.
 
-## Casting-first migration Phase 2 checkpoint 4 — 2026-09-19 (LATEST)
+## Casting-first migration Phase 2 checkpoint 5 — 2026-09-19 (LATEST)
+
+- A05 targeting-modifier resolution implemented for the new model
+  (`Planning/CastingTargetingModifiers.cs` + compiler wiring): enabled
+  modifiers transform recipient eligibility on the proven option only;
+  unavailable modifiers block as repairable intent; unknown ids block
+  against a provided registry; no-registry stays unvalidated
+  diagnostics; disabled selections are neutral; application is pure.
+- Gates: source 42/42; protocol 199/199; harness 27/27; package 4/4;
+  WhatIf 5/5; rollback 4/4; publisher 3/3. Log:
+  `artifacts/casting-first-checkpoint5-gate.log`. Domain layer only.
+- Live lane verified actionable read-only (no game process; automation
+  trio present; clean tree). NEXT (critical path): Phase 3 donor
+  inventory — build the local-runtime package
+  (`scripts/Build-Local.ps1`), run the guarded
+  `ui-native-contract-probe` / `live-ui-bootstrap` lanes, restore after
+  each run. Remaining Phase 2: A06 exact-source identity (blocked on a
+  durable contract), A14 effect-satisfaction modeling.
+
+## Casting-first migration Phase 2 checkpoint 4 — 2026-09-19
 
 - Forecast views and the apply gate implemented: routine-scoped and
   one-pass `CastingForecastService` previews (fresh ledger per routine

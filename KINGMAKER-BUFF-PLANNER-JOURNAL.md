@@ -1,5 +1,26 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-09-19 casting-first migration: Phase 2 checkpoint 5 (modifiers)
+
+On top of checkpoint 4 (`f9cc4fe`). Implemented the A05 domain half:
+`ICastingTargetingModifier` for the new casting model plus compiler
+wiring — enabled modifiers transform the proven option's targeting
+only; unavailable modifiers block as repairable intent (fixing the
+selection restores the casting); unknown ids block against a provided
+registry; a missing registry keeps selections as unvalidated
+diagnostics; disabled selections change nothing; application is pure
+across compilations.
+
+Verification: `scripts/Test-SourceOnly.ps1` — source 42/42; protocol
+199/199; harness 27/27; package 4/4; WhatIf 5/5; rollback 4/4;
+publisher 3/3 (`artifacts/casting-first-checkpoint5-gate.log`).
+Domain layer only; one-shot native state restoration belongs to the
+execution phase. Live lane checked read-only this session: no
+Kingmaker process, automation save trio present, clean tree — the
+Phase 3 donor inventory (Build-Local + guarded ui-native-contract-probe
+/ live-ui-bootstrap with restore-after-each) is the recorded critical
+path. A06 and A14 remain open Phase 2 items.
+
 ## 2026-09-19 casting-first migration: Phase 2 checkpoint 4 (forecast + gate)
 
 On top of checkpoint 3 (`3d1bc0b`). Implemented A09 forecast views

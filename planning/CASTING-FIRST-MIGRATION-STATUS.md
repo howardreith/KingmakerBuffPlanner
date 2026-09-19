@@ -5,7 +5,63 @@ Linked from `AUTONOMOUS-RESUME.md`. Specification: the adopted
 `Kingmaker-Buff-Planner-Casting-First-Migration-Charter.md` (casting-first
 migration and native scroll UI charter v1.0, 2026-09-19).
 
-## Phase 2 checkpoint 4 — forecast views and apply gate — 2026-09-19 (CURRENT)
+## Phase 2 checkpoint 5 — targeting-modifier resolution — 2026-09-19 (CURRENT)
+
+**Branch** `codex/kingmaker-buff-planner-casting-first`, on top of
+checkpoint 4 (`f9cc4fe`). Version remains `0.1.1-rc3`.
+
+### Implemented (production code)
+
+- `Planning/CastingTargetingModifiers.cs` (A05 domain half): the
+  new-model `ICastingTargetingModifier` seam — a modifier may only
+  narrow or expand the proven option's targeting (reachability,
+  anchors, coverage), never the invocation count or the caster.
+  Implementations must be pure.
+- `ExplicitCastingCompiler` applies a casting's enabled modifiers in
+  authored order after option resolution: applied modifiers transform
+  eligibility; an unavailable modifier blocks the casting with a
+  repairable reason (`targeting-modifier-unavailable:<id>:<reason>` —
+  fixing the selection restores the casting, nothing is deleted); an
+  unknown id against a provided registry blocks
+  (`targeting-modifier-unknown`); with no host registry at all,
+  enabled selections stay `targeting-modifier-unvalidated` diagnostics
+  instead of being guessed. Disabled selections change nothing.
+
+### Verified behavior (deterministic domain layer)
+
+New test `casting-a05-targeting-modifiers-change-eligibility` covers
+legal-target eligibility, narrowed eligibility blocking an out-of-set
+recipient, unavailable-modifier repairable intent, disabled-selection
+neutrality, unknown-id blocking against a registry, and purity across
+recompilations (no leaked one-shot state in the domain layer).
+
+Full gate: **source 42/42; protocol 199/199; harness 27/27; package
+4/4; WhatIf 5/5; rollback 4/4; publisher 3/3**
+(`artifacts/casting-first-checkpoint5-gate.log`). Domain layer only;
+the one-shot native state restoration half of A05 belongs to the
+execution phase.
+
+### Acceptance matrix standing (A01–A20)
+
+A01–A05 (domain layer), A07–A11 (policy layer), A12 import half: PASS
+at the deterministic layer. A06 (exact rods — blocked on a durable
+identity contract) and A13–A20: NOT RUN. Runtime, visual, and live
+migration evidence: none claimed.
+
+### Next executable step
+
+The Phase 3 live lane is now the critical path and was verified
+actionable read-only this session: no Kingmaker process running, the
+automation save trio present (SEED 303 / BASELINE 304 / WORKING 305),
+and a clean worktree. The next session should build the local-runtime
+package (`scripts/Build-Local.ps1`), then run the guarded
+`ui-native-contract-probe` / `live-ui-bootstrap` lanes for the donor
+inventory capture per `docs/MANUAL-ACCEPTANCE.md`, restoring after each
+run. Remaining Phase 2 items: exact-source identity plumbing (A06,
+pending a durable contract decision) and effect-strength satisfaction
+modeling (A14).
+
+## Phase 2 checkpoint 4 — forecast views and apply gate — 2026-09-19 (commit `f9cc4fe`)
 
 **Branch** `codex/kingmaker-buff-planner-casting-first`, on top of
 checkpoint 3 (`3d1bc0b`). Version remains `0.1.1-rc3`.

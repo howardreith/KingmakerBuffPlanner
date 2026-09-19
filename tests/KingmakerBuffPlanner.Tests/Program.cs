@@ -314,6 +314,8 @@ namespace KingmakerBuffPlanner.Tests
                     TestCastingA10EnhancementPolicy);
                 Run("casting-a11-apply-gate-cannot-hide-omitted-work",
                     TestCastingA11ApplyGate);
+                Run("casting-a05-targeting-modifiers-change-eligibility",
+                    TestCastingA05TargetingModifiers);
             }
             finally
             {
@@ -10817,6 +10819,144 @@ namespace KingmakerBuffPlanner.Tests
                 service.Document.Castings[0].CastingId != "cast-ready")
                 throw new InvalidOperationException(
                     "Evaluation disturbed the saved plan.");
+        }
+
+        // A05: an enabled targeting modifier changes recipient eligibility
+        // without changing invocation counts; an unavailable modifier blocks
+        // as repairable intent; disabled selections leave eligibility alone;
+        // modifier application is pure across compilations.
+        private sealed class FixtureShareCastingModifier : ICastingTargetingModifier
+        {
+            private readonly string _requiredCaster;
+            private readonly string[] _legalTargets;
+
+            internal FixtureShareCastingModifier(string requiredCaster,
+                string[] legalTargets)
+            {
+                _requiredCaster = requiredCaster;
+                _legalTargets = legalTargets;
+            }
+
+            public string ModifierId { get { return "share"; } }
+
+            public CastingModifierResult Apply(
+                Domain.Authoring.PlannedCasting casting, ProviderPlanningOption option)
+            {
+                if (casting.CasterUnitId != _requiredCaster)
+                    return CastingModifierResult.Unavailable("caster-lacks-share-feature");
+                return CastingModifierResult.Applied(new ProviderPlanningOption(
+                    option.Provider, _legalTargets, option.LegalAnchorIds,
+                    option.EffectiveCasterLevel, option.ExpectedDurationRounds,
+                    option.ExecutionStrategy, option.ExecutionStrategyReason));
+            }
+        }
+
+        private static void TestCastingA05TargetingModifiers()
+        {
+            List<ProviderPlanningOption> options;
+            List<CastEnhancementSnapshot> enhancements;
+            PartyProviderSnapshot snapshot = CastingParty(
+                CastingBuffAbility,
+                out options, out enhancements,
+                new[] { "unit-t1", "unit-t2", "unit-t3" }, 3);
+            TargetingModifierSelection Enabled()
+            {
+                return new TargetingModifierSelection("share", true, null);
+            }
+            TargetingModifierSelection Disabled()
+            {
+                return new TargetingModifierSelection("share", false, null);
+            }
+            PlannedCasting WithModifier(PlannedCasting casting,
+                TargetingModifierSelection selection)
+            {
+                return new PlannedCasting(
+                    casting.CastingId, casting.RoutineId, casting.Order,
+                    casting.SourceId, casting.Ability, casting.CasterUnitId,
+                    casting.SpellbookGuid, casting.TargetMode,
+                    casting.DirectTargetUnitId, casting.Origin,
+                    casting.RequiredCoverageUnitIds,
+                    new[] { selection }, casting.Enhancements,
+                    casting.ExistingEffectPolicy, casting.IgnoredPresenceMarkers,
+                    casting.State, casting.Provenance);
+            }
+            var document = CastingDocument(
+                WithModifier(DirectCasting("cast-inside", "long", "unit-cleric",
+                    "unit-t1", "source-bulls", CastingBuffAbility), Enabled()),
+                WithModifier(DirectCasting("cast-outside", "long", "unit-cleric",
+                    "unit-t3", "source-bulls", CastingBuffAbility), Enabled()),
+                WithModifier(DirectCasting("cast-no-feature", "long", "unit-wizard",
+                    "unit-t1", "source-bulls", CastingBuffAbility), Enabled()),
+                WithModifier(DirectCasting("cast-disabled", "long", "unit-cleric",
+                    "unit-t3", "source-bulls", CastingBuffAbility), Disabled()));
+            var compiler = new ExplicitCastingCompiler();
+            var effects = CastingEffects("source-bulls", "source-communal");
+            var registry = new ICastingTargetingModifier[]
+            {
+                new FixtureShareCastingModifier("unit-cleric",
+                    new[] { "unit-t1", "unit-t2" })
+            };
+            ExplicitCastingPlan plan = compiler.Compile(
+                document, snapshot, options, effects, enhancements,
+                null, registry);
+            if (plan.CastingById("cast-inside").Readiness !=
+                    ResolvedCastingReadiness.Ready)
+                throw new InvalidOperationException(
+                    "A legal share target became ineligible.");
+            ResolvedCasting outside = plan.CastingById("cast-outside");
+            if (outside.Readiness != ResolvedCastingReadiness.Blocked ||
+                !outside.ReadinessReasons.Contains("target-unreachable:unit-t3"))
+                throw new InvalidOperationException(
+                    "Share did not narrow recipient eligibility: " +
+                    string.Join(",", outside.ReadinessReasons));
+            ResolvedCasting noFeature = plan.CastingById("cast-no-feature");
+            if (noFeature.Readiness != ResolvedCastingReadiness.Blocked ||
+                !noFeature.ReadinessReasons.Contains(
+                    "targeting-modifier-unavailable:share:caster-lacks-share-feature"))
+                throw new InvalidOperationException(
+                    "The unavailable modifier did not block as repairable intent.");
+            if (plan.CastingById("cast-disabled").Readiness !=
+                    ResolvedCastingReadiness.Ready)
+                throw new InvalidOperationException(
+                    "A disabled selection changed eligibility.");
+            // The invalidation is repairable: the same casting with the
+            // selection disabled compiles Ready on an otherwise identical
+            // document (nothing was deleted or permanently poisoned).
+            var repairedDocument = CastingDocument(
+                WithModifier(DirectCasting("cast-no-feature", "long", "unit-wizard",
+                    "unit-t1", "source-bulls", CastingBuffAbility), Disabled()));
+            ExplicitCastingPlan repaired = compiler.Compile(
+                repairedDocument, snapshot, options, effects, enhancements,
+                null, registry);
+            if (repaired.CastingById("cast-no-feature").Readiness !=
+                    ResolvedCastingReadiness.Ready)
+                throw new InvalidOperationException(
+                    "Repairing the selection did not restore the casting.");
+            // An unknown modifier id against a provided registry blocks
+            // instead of being silently ignored.
+            var unknown = CastingDocument(WithModifier(DirectCasting(
+                    "cast-unknown", "long", "unit-cleric", "unit-t1",
+                    "source-bulls", CastingBuffAbility),
+                new TargetingModifierSelection("ghost", true, null)));
+            ExplicitCastingPlan unknownPlan = compiler.Compile(
+                unknown, snapshot, options, effects, enhancements, null, registry);
+            if (unknownPlan.CastingById("cast-unknown").Readiness !=
+                    ResolvedCastingReadiness.Blocked ||
+                !unknownPlan.CastingById("cast-unknown").ReadinessReasons.Contains(
+                    "targeting-modifier-unknown:ghost"))
+                throw new InvalidOperationException(
+                    "An unknown modifier was not blocked against the registry.");
+            // Modifier application is pure: recompilation reproduces the
+            // identical readiness set (no leaked one-shot state).
+            ExplicitCastingPlan repeat = compiler.Compile(
+                document, snapshot, options, effects, enhancements,
+                null, registry);
+            for (int i = 0; i < plan.Castings.Count; i++)
+                if (plan.Castings[i].Readiness != repeat.Castings[i].Readiness ||
+                    plan.Castings[i].ReadinessReasons.Count !=
+                        repeat.Castings[i].ReadinessReasons.Count)
+                    throw new InvalidOperationException(
+                        "Modifier application leaked state across compilations.");
         }
     }
 }

@@ -62,6 +62,7 @@
     <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\CastingBudget.cs"><Link>Planning\CastingBudget.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\CastingForecast.cs"><Link>Planning\CastingForecast.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\CastingExecutionGate.cs"><Link>Planning\CastingExecutionGate.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\CastingTargetingModifiers.cs"><Link>Planning\CastingTargetingModifiers.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\EffectPresenceEvaluator.cs"><Link>Planning\EffectPresenceEvaluator.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\CastPlanner.cs"><Link>Planning\CastPlanner.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Persistence\ProfileModels.cs"><Link>Persistence\ProfileModels.cs</Link></Compile>
