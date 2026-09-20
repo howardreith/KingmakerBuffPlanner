@@ -172,15 +172,25 @@ public static class KbpPhysicalInput {
         if ([DateTime]::UtcNow -ge $deadline) { throw 'Runtime result timed out; launched Kingmaker was left running and restoration is blocked.' }
         if ([DateTime]::UtcNow -ge $nextWindowSampleUtc) {
             $nextWindowSampleUtc = [DateTime]::UtcNow.AddSeconds(5)
-            $windowObservations.Add([ordered]@{
-                atUtc = [DateTime]::UtcNow.ToString('o')
-                windowState = [KbpPhysicalInput]::WindowState($process.MainWindowHandle)
-                mainWindowTitle = $process.MainWindowTitle
-                responding = $process.Responding
-            })
+            # Passive observation only: a sampler failure must never abort the
+            # guarded run or block the result/restore paths.
+            try {
+                $sample = [ordered]@{
+                    atUtc = [DateTime]::UtcNow.ToString('o')
+                    windowState = [KbpPhysicalInput]::WindowState($process.MainWindowHandle)
+                    mainWindowTitle = $process.MainWindowTitle
+                    responding = $process.Responding
+                }
+            } catch {
+                $sample = [ordered]@{
+                    atUtc = [DateTime]::UtcNow.ToString('o')
+                    observationError = $_.Exception.Message
+                }
+            }
+            $windowObservations.Add($sample)
             if ($windowObservations.Count -gt 60) { $windowObservations.RemoveAt(0) }
-            $orchestration.windowObservations = @($windowObservations)
-            Write-KbpJsonAtomic (Join-Path $evidence 'orchestration.json') $orchestration
+            $orchestration['windowObservations'] = @($windowObservations)
+            try { Write-KbpJsonAtomic (Join-Path $evidence 'orchestration.json') $orchestration } catch { }
         }
         $ummMarker = Join-Path $evidence 'umm-overlay-ready.json'
         if ($Scenario -ceq 'live-ui-bootstrap' -and -not $ummDismissSent -and

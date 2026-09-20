@@ -69,5 +69,28 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 BlackFraction = black / (float)lumaSamples.Length
             };
         }
+
+        // Fraction of equally-sized sample arrays whose values differ by more
+        // than the per-sample tolerance. Deterministic same-frame captures
+        // hash identically, so any real presented-frame change is visible here.
+        internal const float ChangedSampleDelta = 0.01f;
+
+        internal static float ComputeChangedFraction(float[] before, float[] after)
+        {
+            if (before == null) throw new ArgumentNullException("before");
+            if (after == null) throw new ArgumentNullException("after");
+            if (before.Length == 0 || after.Length == 0)
+                throw new ArgumentException("At least one sample is required.");
+            if (before.Length != after.Length)
+                throw new ArgumentException("Sample arrays must have the same length.");
+            int changed = 0;
+            for (int i = 0; i < before.Length; i++)
+            {
+                float delta = before[i] - after[i];
+                if (delta < 0) delta = -delta;
+                if (delta > ChangedSampleDelta) changed++;
+            }
+            return changed / (float)before.Length;
+        }
     }
 }

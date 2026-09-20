@@ -69,6 +69,8 @@ namespace KingmakerBuffPlanner.Tests
                 Run("menu-diagnostic-parameters-must-be-empty", () => TestInvalidMenuDiagnosticParameters(root));
                 Run("menu-frame-luma-stats-classify-black-frames", TestMenuFrameStatsBlackClassification);
                 Run("menu-frame-luma-stats-summarize-mixed-frames", TestMenuFrameStatsMixedSummary);
+                Run("menu-frame-changed-fraction-measures-frame-deltas", TestMenuFrameChangedFraction);
+                Run("loaded-assembly-identity-resolves-mono-sidecar-caches", TestLoadedAssemblyIdentitySidecarResolution);
                 Run("duplicate-flag-rejected", () => TestDuplicateFlag(root));
                 Run("outside-path-rejected", TestOutsidePath);
                 Run("unknown-member-rejected", () => TestMutation(root, "unknown-member", AddUnknownMember));
@@ -9615,6 +9617,61 @@ namespace KingmakerBuffPlanner.Tests
             float expectedBlackFraction = 2f / 5f;
             if (Math.Abs(mixed.BlackFraction - expectedBlackFraction) > 0.0001f)
                 throw new InvalidOperationException("Mixed summary black fraction is wrong: " + mixed.Describe());
+        }
+
+        private static void TestMenuFrameChangedFraction()
+        {
+            float[] before = new float[] { 0.1f, 0.2f, 0.3f, 0.4f };
+            float[] identical = new float[] { 0.1f, 0.2f, 0.3f, 0.4f };
+            float[] sameWithinTolerance = new float[] { 0.105f, 0.195f, 0.3f, 0.4f };
+            float[] halfChanged = new float[] { 0.9f, 0.2f, 0.9f, 0.4f };
+            if (MenuFrameStats.ComputeChangedFraction(before, identical) != 0f)
+                throw new InvalidOperationException("Identical frames reported changes.");
+            if (MenuFrameStats.ComputeChangedFraction(before, sameWithinTolerance) != 0f)
+                throw new InvalidOperationException("Sub-tolerance deltas reported as changes.");
+            if (Math.Abs(MenuFrameStats.ComputeChangedFraction(before, halfChanged) - 0.5f) > 0.0001f)
+                throw new InvalidOperationException("Half-changed frames reported the wrong fraction.");
+            try
+            {
+                MenuFrameStats.ComputeChangedFraction(before, new float[] { 0.1f });
+                throw new InvalidOperationException("Mismatched sample lengths were accepted.");
+            }
+            catch (ArgumentException)
+            {
+            }
+        }
+
+        private static void TestLoadedAssemblyIdentitySidecarResolution()
+        {
+            string boundary = Path.Combine(Path.GetTempPath(),
+                "KbpLoadedAssemblyIdentity-" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                Directory.CreateDirectory(boundary);
+                string canonical = Path.Combine(boundary, "ExampleMod.dll");
+                File.WriteAllText(canonical, "assembly-bytes");
+                string sidecar = Path.Combine(boundary, "ExampleMod.dll.52778.cache");
+                File.WriteAllText(sidecar, "cached-image-bytes");
+                string resolved = LoadedAssemblyIdentity.ResolveCanonicalFile(sidecar);
+                if (!string.Equals(resolved, canonical, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException("Numeric mono sidecar did not resolve to the canonical assembly: " + resolved);
+                string noCanonical = Path.Combine(boundary, "Missing.dll.123.cache");
+                if (!string.Equals(LoadedAssemblyIdentity.ResolveCanonicalFile(noCanonical), noCanonical,
+                    StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException("Sidecar without a canonical file should stay unresolved.");
+                string nonNumeric = Path.Combine(boundary, "ExampleMod.dll.a1b2.cache");
+                if (!string.Equals(LoadedAssemblyIdentity.ResolveCanonicalFile(nonNumeric), nonNumeric,
+                    StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException("Non-numeric sidecar suffix should stay unresolved.");
+                string plain = Path.Combine(boundary, "ExampleMod.dll");
+                if (!string.Equals(LoadedAssemblyIdentity.ResolveCanonicalFile(plain), plain,
+                    StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException("Plain assembly path should pass through unchanged.");
+            }
+            finally
+            {
+                Directory.Delete(boundary, true);
+            }
         }
 
         private static void TestDuplicateFlag(string root)

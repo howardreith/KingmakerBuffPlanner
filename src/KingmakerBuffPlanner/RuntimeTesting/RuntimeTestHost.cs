@@ -455,6 +455,14 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     MenuWindowDescriptor = _menuDiagnostic == null ? null : _menuDiagnostic.MenuWindowDescriptor,
                     MenuWindowScreenshotSha256 = _menuDiagnostic == null
                         ? null : _menuDiagnostic.MenuWindowScreenshotSha256,
+                    MenuEscape1ScreenshotSha256 = _menuDiagnostic == null
+                        ? null : _menuDiagnostic.MenuEscape1ScreenshotSha256,
+                    MenuEscape1ChangedFraction = _menuDiagnostic == null ? 0 : _menuDiagnostic.MenuEscape1ChangedFraction,
+                    MenuEscape1Acknowledged = _menuDiagnostic != null && _menuDiagnostic.MenuEscape1Acknowledged,
+                    MenuEscape2ScreenshotSha256 = _menuDiagnostic == null
+                        ? null : _menuDiagnostic.MenuEscape2ScreenshotSha256,
+                    MenuEscape2ChangedFraction = _menuDiagnostic == null ? 0 : _menuDiagnostic.MenuEscape2ChangedFraction,
+                    MenuEscape2Acknowledged = _menuDiagnostic != null && _menuDiagnostic.MenuEscape2Acknowledged,
                     NativeUiContractSha256 = nativeUiContractHash,
                     NativeUiButtonCount = nativeUiContract == null ? 0 : nativeUiContract.Buttons.Count,
                     NativeUiCandidateAnchorCount = nativeUiContract == null
@@ -605,7 +613,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     }
                     Assembly loaded = loadedAssemblies[0];
                     loadedOptionalAssemblies++;
-                    string loadedHash = Hashing.Sha256(loaded.Location);
+                    string hashTarget = LoadedAssemblyIdentity.ResolveCanonicalFile(loaded.Location);
+                    if (!string.Equals(hashTarget, loaded.Location, StringComparison.OrdinalIgnoreCase))
+                        _log.Info("[KBP-BOOT] mono image sidecar detected;hashing canonical assembly;loaded=" +
+                            loaded.Location + ";canonical=" + hashTarget + ".");
+                    string loadedHash = Hashing.Sha256(hashTarget);
                     result.Assertions.Add(RuntimeTestAssertion.Pass(
                         "optional-assembly-loaded:" + expected.UmmId, expectedAssemblyName,
                         loaded.GetName().Name));
@@ -1760,6 +1772,12 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         [JsonProperty("menuWindowOpened", Order = 179)] public bool MenuWindowOpened { get; set; }
         [JsonProperty("menuWindowDescriptor", Order = 180)] public string MenuWindowDescriptor { get; set; }
         [JsonProperty("menuWindowScreenshotSha256", Order = 181)] public string MenuWindowScreenshotSha256 { get; set; }
+        [JsonProperty("menuEscape1ScreenshotSha256", Order = 182)] public string MenuEscape1ScreenshotSha256 { get; set; }
+        [JsonProperty("menuEscape1ChangedFraction", Order = 183)] public double MenuEscape1ChangedFraction { get; set; }
+        [JsonProperty("menuEscape1Acknowledged", Order = 184)] public bool MenuEscape1Acknowledged { get; set; }
+        [JsonProperty("menuEscape2ScreenshotSha256", Order = 185)] public string MenuEscape2ScreenshotSha256 { get; set; }
+        [JsonProperty("menuEscape2ChangedFraction", Order = 186)] public double MenuEscape2ChangedFraction { get; set; }
+        [JsonProperty("menuEscape2Acknowledged", Order = 187)] public bool MenuEscape2Acknowledged { get; set; }
     }
 
     internal sealed class RuntimeTestAssertion

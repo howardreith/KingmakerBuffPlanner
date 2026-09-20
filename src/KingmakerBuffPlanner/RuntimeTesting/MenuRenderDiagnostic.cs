@@ -19,16 +19,19 @@ namespace KingmakerBuffPlanner.RuntimeTesting
     // actually present a rendered main-menu frame (game-generated screenshot
     // captured after the frame finished, with luma statistics), and (2) for
     // the menu-input scenario, does one real physical click on the visible
-    // Load Game button open the native save/load window.
+    // Load Game button open the native save/load window. The UMM ShowOnStart
+    // overlay is dismissed first with the proven physical Escape sequence,
+    // and each Escape is verified against a captured frame diff.
     internal sealed class MenuRenderDiagnostic
     {
-        private const string MainMenuBoardTypeName = "Kingmaker.UI.MainMenuUI.MainMenuBoard";
         private const string SaveLoadWindowTypeName = "Kingmaker.UI.SaveLoadWindow.SaveLoadWindow";
         private const string SaveSlotTypeName = "Kingmaker.UI.SaveLoadWindow.SaveSlot";
+        private const string MainMenuBoardTypeName = "Kingmaker.UI.MainMenuUI.MainMenuBoard";
         // 21600 frames (~6 minutes at 60 fps) is the overall diagnostic budget;
         // the outer harness timeout governs the hard stop.
         private const int MaxUpdates = 21600;
         private const int MenuStabilityFrames = 180;
+        private const int EscapeSettleFrames = 90;
         private const int WindowSettleFrames = 120;
         private const int EngineCaptureWaitFrames = 600;
 
@@ -39,20 +42,12 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private int _updates;
         private int _state;
         private int _menuStableFrames;
-        private int _windowSettleFrames;
+        private int _settleFrames;
         private int _engineWaitFrames;
-        private bool _captureRequested;
-        private bool _captureCompleted;
-        private bool _windowCaptureRequested;
-        private bool _windowCaptureCompleted;
-        private MenuFrameLumaSummary _menuFrameLuma;
-        private string _menuFrameCaptureError;
-        private MenuFrameLumaSummary _windowFrameLuma;
-        private string _windowFrameCaptureError;
+        private MenuFrameCapture _lastCapture;
+        private MenuFrameCapture _menuCapture;
         private int _firstUpdateFrameCount = -1;
         private float _firstUpdateRealtime;
-        private int _menuReadyFrameCount = -1;
-        private float _menuReadyRealtime;
 
         internal MenuRenderDiagnostic(
             RuntimeTestRequest request,
@@ -72,8 +67,21 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         internal string MenuFrameEngineScreenshotSha256 { get; private set; }
         internal int MenuFrameWidth { get; private set; }
         internal int MenuFrameHeight { get; private set; }
-        internal MenuFrameLumaSummary MenuFrameLuma { get { return _menuFrameLuma; } }
-        internal string MenuFrameCaptureError { get { return _menuFrameCaptureError; } }
+        internal MenuFrameLumaSummary MenuFrameLuma
+        {
+            get { return _menuCapture == null ? null : _menuCapture.Summary; }
+        }
+        internal string MenuFrameCaptureError
+        {
+            get { return _menuCapture == null || _menuCapture.Failure == null
+                ? null : _menuCapture.Failure.GetType().Name + ": " + _menuCapture.Failure.Message; }
+        }
+        internal string MenuEscape1ScreenshotSha256 { get; private set; }
+        internal float MenuEscape1ChangedFraction { get; private set; }
+        internal bool MenuEscape1Acknowledged { get; private set; }
+        internal string MenuEscape2ScreenshotSha256 { get; private set; }
+        internal float MenuEscape2ChangedFraction { get; private set; }
+        internal bool MenuEscape2Acknowledged { get; private set; }
         internal string MenuWindowScreenshotSha256 { get; private set; }
         internal string MenuWindowCaptureError { get; private set; }
         internal bool MenuWindowOpened { get; private set; }
@@ -100,45 +108,29 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 if (FindActiveMainMenuBoard() == null) return;
                 _menuStableFrames++;
                 if (_menuStableFrames < MenuStabilityFrames) return;
-                _menuReadyFrameCount = Time.frameCount;
-                _menuReadyRealtime = Time.realtimeSinceStartup;
-                float elapsed = Math.Max(0.01f, _menuReadyRealtime - _firstUpdateRealtime);
-                int frameDelta = Math.Max(0, _menuReadyFrameCount - _firstUpdateFrameCount);
+                float elapsed = Math.Max(0.01f, Time.realtimeSinceStartup - _firstUpdateRealtime);
+                int frameDelta = Math.Max(0, Time.frameCount - _firstUpdateFrameCount);
                 FrameProgressSummary = "frames=" + frameDelta.ToString(CultureInfo.InvariantCulture) +
                     ";elapsedSeconds=" + elapsed.ToString("F2", CultureInfo.InvariantCulture) +
                     ";averageFps=" + (frameDelta / elapsed).ToString("F2", CultureInfo.InvariantCulture);
                 _log.Info("[KBP-MENU-DIAG] main menu board active and stable;" + FrameProgressSummary +
                     ";" + EnvironmentSample() + ".");
+                MenuFrameWidth = Screen.width;
+                MenuFrameHeight = Screen.height;
+                BeginCapture("menu-frame.png");
+                CaptureScreenshotThroughEngine(Path.Combine(
+                    _request.EvidenceDirectory, "menu-frame-engine.png"));
+                _log.Info("[KBP-MENU-DIAG] menu frame capture requested;resolution=" +
+                    MenuFrameWidth + "x" + MenuFrameHeight + ".");
                 _state = 1;
                 Stage = "capturing-menu-frame";
                 return;
             }
             if (_state == 1)
             {
-                if (!_captureRequested)
-                {
-                    _captureRequested = true;
-                    MenuDiagnosticCaptureHost.CaptureMenuFrame(
-                        Path.Combine(_request.EvidenceDirectory, "menu-frame.png"),
-                        delegate(MenuFrameLumaSummary summary, Exception failure)
-                        {
-                            _menuFrameLuma = summary;
-                            _menuFrameCaptureError = failure == null
-                                ? null : failure.GetType().Name + ": " + failure.Message;
-                            _captureCompleted = true;
-                        });
-                    CaptureScreenshotThroughEngine(Path.Combine(
-                        _request.EvidenceDirectory, "menu-frame-engine.png"));
-                    MenuFrameWidth = Screen.width;
-                    MenuFrameHeight = Screen.height;
-                    _log.Info("[KBP-MENU-DIAG] menu frame capture requested;resolution=" +
-                        MenuFrameWidth + "x" + MenuFrameHeight + ".");
-                }
-                if (!_captureCompleted) return;
-                if (_menuFrameCaptureError != null)
-                    throw new InvalidOperationException("Menu frame capture failed: " + _menuFrameCaptureError);
-                string menuPng = Path.Combine(_request.EvidenceDirectory, "menu-frame.png");
-                MenuFrameScreenshotSha256 = Hashing.Sha256(menuPng);
+                if (!ConsumeCapture("menu-frame.png")) return;
+                _menuCapture = _lastCapture;
+                MenuFrameScreenshotSha256 = Hashing.Sha256(_menuCapture.FullPath);
                 _state = 2;
                 Stage = "waiting-for-engine-capture";
                 return;
@@ -156,18 +148,80 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 _log.Info("[KBP-MENU-DIAG] menu frame captured;readPixelsSha256=" +
                     MenuFrameScreenshotSha256 + ";engineSha256=" +
                     (MenuFrameEngineScreenshotSha256 ?? "missing") + ";luma=" +
-                    (_menuFrameLuma == null ? "missing" : _menuFrameLuma.Describe()) + ".");
+                    (_menuCapture.Summary == null ? "missing" : _menuCapture.Summary.Describe()) + ".");
                 if (!_requireWindowProof)
                 {
                     IsComplete = true;
                     Stage = "menu-render-observed";
                     return;
                 }
+                _settleFrames = 0;
                 _state = 3;
-                Stage = "resolving-load-button";
+                Stage = "umm-dismiss-escape-1";
                 return;
             }
             if (_state == 3)
+            {
+                // UMM's ShowOnStart overlay covers the menu and would swallow
+                // the click; dismiss it with the proven physical Escape path.
+                _writePhysicalInput("menu-umm-dismiss-1", "key-escape", Vector2.zero);
+                _state = 4;
+                return;
+            }
+            if (_state == 4)
+            {
+                MenuEscape1Acknowledged = Acknowledged("menu-umm-dismiss-1");
+                if (!MenuEscape1Acknowledged) return;
+                _settleFrames++;
+                if (_settleFrames < EscapeSettleFrames) return;
+                BeginCapture("menu-after-escape-1.png");
+                _state = 5;
+                Stage = "capturing-after-escape-1";
+                return;
+            }
+            if (_state == 5)
+            {
+                if (!ConsumeCapture("menu-after-escape-1.png")) return;
+                MenuFrameCapture escape1 = _lastCapture;
+                MenuEscape1ScreenshotSha256 = Hashing.Sha256(escape1.FullPath);
+                MenuEscape1ChangedFraction = ComputeDiff(escape1);
+                _log.Info("[KBP-MENU-DIAG] escape-1 frame captured;sha256=" +
+                    MenuEscape1ScreenshotSha256 + ";changedFraction=" +
+                    MenuEscape1ChangedFraction.ToString("F5", CultureInfo.InvariantCulture) +
+                    ";luma=" + (escape1.Summary == null ? "missing" : escape1.Summary.Describe()) + ".");
+                _settleFrames = 0;
+                _writePhysicalInput("menu-umm-dismiss-2", "key-escape", Vector2.zero);
+                _state = 6;
+                Stage = "umm-dismiss-escape-2";
+                return;
+            }
+            if (_state == 6)
+            {
+                MenuEscape2Acknowledged = Acknowledged("menu-umm-dismiss-2");
+                if (!MenuEscape2Acknowledged) return;
+                _settleFrames++;
+                if (_settleFrames < EscapeSettleFrames) return;
+                BeginCapture("menu-after-escape-2.png");
+                _state = 7;
+                Stage = "capturing-after-escape-2";
+                return;
+            }
+            if (_state == 7)
+            {
+                if (!ConsumeCapture("menu-after-escape-2.png")) return;
+                MenuFrameCapture escape2 = _lastCapture;
+                MenuEscape2ScreenshotSha256 = Hashing.Sha256(escape2.FullPath);
+                MenuEscape2ChangedFraction = ComputeDiff(escape2);
+                WriteEscapeMarker();
+                _log.Info("[KBP-MENU-DIAG] escape-2 frame captured;sha256=" +
+                    MenuEscape2ScreenshotSha256 + ";changedFraction=" +
+                    MenuEscape2ChangedFraction.ToString("F5", CultureInfo.InvariantCulture) +
+                    ";luma=" + (escape2.Summary == null ? "missing" : escape2.Summary.Describe()) + ".");
+                _state = 8;
+                Stage = "resolving-load-button";
+                return;
+            }
+            if (_state == 8)
             {
                 List<MenuButtonCandidate> inventory = InventoryActiveButtons();
                 MenuButtonInventory = DescribeInventory(inventory);
@@ -183,56 +237,82 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     center.y.ToString("F1", CultureInfo.InvariantCulture) + ";renderMode=" + target.CanvasRenderMode;
                 _log.Info("[KBP-MENU-DIAG] requesting physical Load Game click;" + MenuClickTarget + ".");
                 _writePhysicalInput("menu-loadgame", "click", center);
-                _state = 4;
+                _state = 9;
                 Stage = "waiting-for-saveload-window";
                 return;
             }
-            if (_state == 4)
+            if (_state == 9)
             {
                 if ((_updates % 300) == 0)
                     _log.Info("[KBP-MENU-DIAG] waiting for save/load window;frames=" + _updates + ".");
-                MenuClickAcknowledged = File.Exists(Path.Combine(
-                    _request.EvidenceDirectory, "physical-input-menu-loadgame.ack.json"));
+                MenuClickAcknowledged = Acknowledged("menu-loadgame");
                 Component window = FindActiveSaveLoadWindow();
                 if (window == null) return;
                 MenuWindowOpened = true;
                 MenuWindowDescriptor = DescribeWindow(window);
                 _log.Info("[KBP-MENU-DIAG] save/load window is active after physical click;" +
                     MenuWindowDescriptor + ";clickAcknowledged=" + MenuClickAcknowledged + ".");
-                _state = 5;
+                _settleFrames = 0;
+                _state = 10;
                 Stage = "capturing-saveload-window";
                 return;
             }
-            if (_state == 5)
+            if (_state == 10)
             {
-                _windowSettleFrames++;
-                if (_windowSettleFrames < WindowSettleFrames) return;
-                if (!_windowCaptureRequested)
-                {
-                    _windowCaptureRequested = true;
-                    MenuDiagnosticCaptureHost.CaptureMenuFrame(
-                        Path.Combine(_request.EvidenceDirectory, "menu-saveload-window.png"),
-                        delegate(MenuFrameLumaSummary summary, Exception failure)
-                        {
-                            _windowFrameLuma = summary;
-                            _windowFrameCaptureError = failure == null
-                                ? null : failure.GetType().Name + ": " + failure.Message;
-                            _windowCaptureCompleted = true;
-                        });
-                    _log.Info("[KBP-MENU-DIAG] save/load window capture requested.");
-                }
-                if (!_windowCaptureCompleted) return;
-                if (_windowFrameCaptureError != null)
-                    throw new InvalidOperationException("Save/load window capture failed: " + _windowFrameCaptureError);
-                string windowPng = Path.Combine(_request.EvidenceDirectory, "menu-saveload-window.png");
-                MenuWindowScreenshotSha256 = Hashing.Sha256(windowPng);
+                _settleFrames++;
+                if (_settleFrames < WindowSettleFrames) return;
+                BeginCapture("menu-saveload-window.png");
+                _state = 11;
+                Stage = "awaiting-window-capture";
+                return;
+            }
+            if (_state == 11)
+            {
+                if (!ConsumeCapture("menu-saveload-window.png")) return;
+                MenuWindowScreenshotSha256 = Hashing.Sha256(_lastCapture.FullPath);
                 WriteWindowOpenedMarker();
                 _log.Info("[KBP-MENU-DIAG] save/load window captured;sha256=" +
                     MenuWindowScreenshotSha256 + ";luma=" +
-                    (_windowFrameLuma == null ? "missing" : _windowFrameLuma.Describe()) + ".");
+                    (_lastCapture.Summary == null ? "missing" : _lastCapture.Summary.Describe()) + ".");
                 IsComplete = true;
                 Stage = "menu-window-opened";
             }
+        }
+
+        private void BeginCapture(string fileName)
+        {
+            MenuDiagnosticCaptureHost.CaptureMenuFrame(
+                Path.Combine(_request.EvidenceDirectory, fileName),
+                delegate(MenuFrameCapture capture, Exception failure)
+                {
+                    capture.Failure = failure;
+                    _lastCapture = capture;
+                });
+        }
+
+        private bool ConsumeCapture(string fileName)
+        {
+            if (_lastCapture == null ||
+                !string.Equals(_lastCapture.FileName, fileName, StringComparison.OrdinalIgnoreCase) ||
+                _lastCapture.Handled) return false;
+            _lastCapture.Handled = true;
+            if (_lastCapture.Failure != null)
+                throw new InvalidOperationException("Frame capture failed for " + fileName + ": " +
+                    _lastCapture.Failure.GetType().Name + ": " + _lastCapture.Failure.Message);
+            return true;
+        }
+
+        private float ComputeDiff(MenuFrameCapture capture)
+        {
+            if (_menuCapture == null || _menuCapture.Samples == null || capture.Samples == null ||
+                _menuCapture.Samples.Length != capture.Samples.Length) return -1f;
+            return MenuFrameStats.ComputeChangedFraction(_menuCapture.Samples, capture.Samples);
+        }
+
+        private bool Acknowledged(string actionId)
+        {
+            return File.Exists(Path.Combine(
+                _request.EvidenceDirectory, "physical-input-" + actionId + ".ack.json"));
         }
 
         private static Component FindActiveMainMenuBoard()
@@ -320,31 +400,46 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private void WriteMenuRenderMarker()
         {
             string path = Path.Combine(_request.EvidenceDirectory, "menu-render.json");
-            string json = "{\"schemaVersion\":1,\"runId\":" + JsonConvertToString(_request.RunId) +
-                ",\"scenario\":" + JsonConvertToString(_request.Scenario) +
+            string json = "{\"schemaVersion\":1,\"runId\":" + JsonString(_request.RunId) +
+                ",\"scenario\":" + JsonString(_request.Scenario) +
                 ",\"stage\":\"menu-frame-captured\"" +
-                ",\"frameProgress\":" + JsonConvertToString(FrameProgressSummary ?? string.Empty) +
-                ",\"environment\":" + JsonConvertToString(EnvironmentSample()) +
-                ",\"readPixelsSha256\":" + JsonConvertToString(MenuFrameScreenshotSha256 ?? string.Empty) +
-                ",\"engineSha256\":" + JsonConvertToString(MenuFrameEngineScreenshotSha256 ?? string.Empty) +
-                ",\"luma\":" + JsonConvertToString(
-                    _menuFrameLuma == null ? string.Empty : _menuFrameLuma.Describe()) + "}";
+                ",\"frameProgress\":" + JsonString(FrameProgressSummary ?? string.Empty) +
+                ",\"environment\":" + JsonString(EnvironmentSample()) +
+                ",\"readPixelsSha256\":" + JsonString(MenuFrameScreenshotSha256 ?? string.Empty) +
+                ",\"engineSha256\":" + JsonString(MenuFrameEngineScreenshotSha256 ?? string.Empty) +
+                ",\"luma\":" + JsonString(
+                    _menuCapture == null || _menuCapture.Summary == null
+                        ? string.Empty : _menuCapture.Summary.Describe()) + "}";
+            AtomicFile.WriteUtf8(path, json + Environment.NewLine);
+        }
+
+        private void WriteEscapeMarker()
+        {
+            string path = Path.Combine(_request.EvidenceDirectory, "menu-escape-evidence.json");
+            string json = "{\"schemaVersion\":1,\"runId\":" + JsonString(_request.RunId) +
+                ",\"stage\":\"umm-dismiss-escapes-delivered\"" +
+                ",\"escape1\":{\"acknowledged\":" + (MenuEscape1Acknowledged ? "true" : "false") +
+                ",\"sha256\":" + JsonString(MenuEscape1ScreenshotSha256 ?? string.Empty) +
+                ",\"changedFraction\":" + MenuEscape1ChangedFraction.ToString("F5", CultureInfo.InvariantCulture) + "}" +
+                ",\"escape2\":{\"acknowledged\":" + (MenuEscape2Acknowledged ? "true" : "false") +
+                ",\"sha256\":" + JsonString(MenuEscape2ScreenshotSha256 ?? string.Empty) +
+                ",\"changedFraction\":" + MenuEscape2ChangedFraction.ToString("F5", CultureInfo.InvariantCulture) + "}}" ;
             AtomicFile.WriteUtf8(path, json + Environment.NewLine);
         }
 
         private void WriteWindowOpenedMarker()
         {
             string path = Path.Combine(_request.EvidenceDirectory, "menu-window-opened.json");
-            string json = "{\"schemaVersion\":1,\"runId\":" + JsonConvertToString(_request.RunId) +
+            string json = "{\"schemaVersion\":1,\"runId\":" + JsonString(_request.RunId) +
                 ",\"stage\":\"save-load-window-opened\"" +
-                ",\"clickTarget\":" + JsonConvertToString(MenuClickTarget ?? string.Empty) +
+                ",\"clickTarget\":" + JsonString(MenuClickTarget ?? string.Empty) +
                 ",\"clickAcknowledged\":" + (MenuClickAcknowledged ? "true" : "false") +
-                ",\"window\":" + JsonConvertToString(MenuWindowDescriptor ?? string.Empty) +
-                ",\"screenshotSha256\":" + JsonConvertToString(MenuWindowScreenshotSha256 ?? string.Empty) + "}";
+                ",\"window\":" + JsonString(MenuWindowDescriptor ?? string.Empty) +
+                ",\"screenshotSha256\":" + JsonString(MenuWindowScreenshotSha256 ?? string.Empty) + "}";
             AtomicFile.WriteUtf8(path, json + Environment.NewLine);
         }
 
-        private static string JsonConvertToString(string value)
+        private static string JsonString(string value)
         {
             return Newtonsoft.Json.JsonConvert.ToString(value ?? string.Empty);
         }
@@ -398,6 +493,16 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         }
     }
 
+    internal sealed class MenuFrameCapture
+    {
+        internal string FileName { get; set; }
+        internal string FullPath { get; set; }
+        internal MenuFrameLumaSummary Summary { get; set; }
+        internal float[] Samples { get; set; }
+        internal Exception Failure { get; set; }
+        internal bool Handled { get; set; }
+    }
+
     // Dedicated DontDestroyOnLoad host so the diagnostic's readback runs at
     // WaitForEndOfFrame: capturing after the frame finished presenting, which
     // is the timing Unity documents as required to include UI.
@@ -406,7 +511,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private static MenuDiagnosticCaptureHost _instance;
 
         internal static void CaptureMenuFrame(string path,
-            Action<MenuFrameLumaSummary, Exception> completion)
+            Action<MenuFrameCapture, Exception> completion)
         {
             if (_instance == null)
             {
@@ -418,10 +523,14 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         }
 
         private static IEnumerator CaptureRoutine(string path,
-            Action<MenuFrameLumaSummary, Exception> completion)
+            Action<MenuFrameCapture, Exception> completion)
         {
             yield return new WaitForEndOfFrame();
-            MenuFrameLumaSummary summary = null;
+            MenuFrameCapture capture = new MenuFrameCapture
+            {
+                FileName = Path.GetFileName(path),
+                FullPath = path
+            };
             Exception failure = null;
             try
             {
@@ -441,13 +550,14 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 byte[] png = texture.EncodeToPNG();
                 UnityEngine.Object.Destroy(texture);
                 File.WriteAllBytes(path, png);
-                summary = MenuFrameStats.Summarize(luma.ToArray());
+                capture.Samples = luma.ToArray();
+                capture.Summary = MenuFrameStats.Summarize(capture.Samples);
             }
             catch (Exception exception)
             {
                 failure = exception;
             }
-            completion(summary, failure);
+            completion(capture, failure);
         }
     }
 }
