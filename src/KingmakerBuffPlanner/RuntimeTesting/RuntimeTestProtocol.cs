@@ -176,7 +176,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
 
         internal static bool IsLiveUiScenario(string scenario)
         {
-            return string.Equals(scenario, "live-ui-bootstrap", StringComparison.Ordinal);
+            return string.Equals(scenario, "live-ui-bootstrap", StringComparison.Ordinal) ||
+                IsWorkspaceScenario(scenario);
+        }
+
+        internal static bool IsWorkspaceScenario(string scenario)
+        {
+            return string.Equals(scenario, "live-workspace-qual", StringComparison.Ordinal);
         }
 
         internal static bool IsNativeUiProbeScenario(string scenario)
@@ -210,7 +216,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             return string.Equals(scenario, "mod-load-smoke", StringComparison.Ordinal) ||
                 IsCatalogScenario(scenario) || IsUiScenario(scenario) ||
                 IsNativeUiProbeScenario(scenario) || IsPerformanceScenario(scenario) ||
-                IsMenuDiagnosticScenario(scenario);
+                IsMenuDiagnosticScenario(scenario) ||
+                IsWorkspaceScenario(scenario);
         }
 
         private static void ValidateParameters(RuntimeTestRequest request)

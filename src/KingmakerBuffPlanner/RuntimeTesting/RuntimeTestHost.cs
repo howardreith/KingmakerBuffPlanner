@@ -30,6 +30,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private bool _uiReconstructionRequested;
         private int _uiPostReconstructionUpdates;
         private LiveCampaignSaveLoader _liveSaveLoader;
+        private bool _workspaceSelectionApplied;
         private MenuRenderDiagnostic _menuDiagnostic;
         private int _liveUiPhase;
         private int _liveCycleCount;
@@ -129,6 +130,15 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 !RuntimeTestProtocol.IsLiveUiScenario(_request.Scenario))
             {
                 _uiSmokeUpdates++;
+            // Workspace scenario: route the planner to the casting-first
+            // workspace instead of the legacy screen.
+            if (RuntimeTestProtocol.IsWorkspaceScenario(_request.Scenario) &&
+                !_workspaceSelectionApplied)
+            {
+                UI.CastingWorkspaceDevSelection.Enabled = true;
+                _workspaceSelectionApplied = true;
+                _log.Info("[KBP-WORKSPACE] dev selection enabled for workspace scenario.");
+            }
                 if (StaticCanvas.Instance == null || UnityEngine.EventSystems.EventSystem.current == null)
                 {
                     if (_uiSmokeUpdates < 600) return false;
