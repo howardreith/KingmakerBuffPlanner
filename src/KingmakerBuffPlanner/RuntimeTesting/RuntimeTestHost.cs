@@ -141,12 +141,12 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (RuntimeTestProtocol.IsPerformanceScenario(_request.Scenario) &&
                 !RuntimePerformanceDiagnostics.IsDurationComplete)
                 return false;
-            if (RuntimeTestProtocol.IsUiScenario(_request.Scenario) &&
-                !RuntimeTestProtocol.IsLiveUiScenario(_request.Scenario))
-            {
-                _uiSmokeUpdates++;
             // Workspace scenario: route the planner to the casting-first
-            // workspace instead of the legacy screen.
+            // workspace instead of the legacy screen. This must run for the
+            // workspace scenario itself (a live-UI scenario); it previously
+            // sat inside the non-live UI-smoke gate, which is always false
+            // here, so the selection never applied and the legacy screen
+            // opened instead (run casting-ws-visual-183000).
             if (RuntimeTestProtocol.IsWorkspaceScenario(_request.Scenario) &&
                 !_workspaceSelectionApplied)
             {
@@ -154,6 +154,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 _workspaceSelectionApplied = true;
                 _log.Info("[KBP-WORKSPACE] dev selection enabled for workspace scenario.");
             }
+            if (RuntimeTestProtocol.IsUiScenario(_request.Scenario) &&
+                !RuntimeTestProtocol.IsLiveUiScenario(_request.Scenario))
+            {
+                _uiSmokeUpdates++;
                 if (StaticCanvas.Instance == null || UnityEngine.EventSystems.EventSystem.current == null)
                 {
                     if (_uiSmokeUpdates < 600) return false;
@@ -626,17 +630,19 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 if (RuntimeTestProtocol.IsWorkspaceScenario(_request.Scenario))
                 {
                     // The workspace scenario's own acceptance gate. The prior
-                    // run (casting-ws-final-171029) PASSED on identity checks
-                    // alone while its only screenshot was black; qualification
-                    // must fail closed until the workspace screen is proven
-                    // open AND both capture paths produced non-black evidence.
-                    bool workspaceOpen = _liveInitialCatalogEvidence.Contains("screenOpen=True") &&
-                        _liveInitialCatalogEvidence.Contains("workspace=active");
+                    // runs passed on identity checks alone (black frame) and
+                    // then on the LEGACY screen's IsScreenOpen (the dev
+                    // selection never applied); qualification must fail
+                    // closed until the workspace ROOT is proven open with
+                    // the legacy screen closed AND both capture paths
+                    // produced non-black evidence.
+                    bool workspaceOpen = _liveInitialCatalogEvidence.Contains("workspaceRoot=active") &&
+                        _liveInitialCatalogEvidence.Contains("legacyScreen=closed");
                     result.Assertions.Add(workspaceOpen
                         ? RuntimeTestAssertion.Pass("workspace-screen-open",
-                            "screenOpen=True;workspace=active", _liveInitialCatalogEvidence)
+                            "workspaceRoot=active;legacyScreen=closed", _liveInitialCatalogEvidence)
                         : RuntimeTestAssertion.Fail("workspace-screen-open",
-                            "screenOpen=True;workspace=active",
+                            "workspaceRoot=active;legacyScreen=closed",
                             string.IsNullOrWhiteSpace(_liveInitialCatalogEvidence)
                                 ? "missing" : _liveInitialCatalogEvidence));
                     bool frameCaptured = !string.IsNullOrWhiteSpace(_liveRenderScreenshotSha256);
@@ -1353,15 +1359,21 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             }
             if (_liveUiPhase == 1 && RuntimeTestProtocol.IsWorkspaceScenario(_request.Scenario))
             {
-                // Workspace scenario: verify the casting-first workspace is
-                // the screen that opened (not the legacy catalog screen),
-                // then capture the same dual-path frame evidence the menu
-                // diagnostic uses. A single async engine capture already
-                // proved insufficient here (casting-ws-final-171029 wrote a
-                // black png while every functional assertion passed), so the
-                // primary path is the end-of-frame ReadPixels capture with
-                // luma statistics and bounded black-frame retries.
-                if (!BuffPlannerUiRoot.IsScreenOpen) return false;
+                // Workspace scenario: the casting-first workspace view must
+                // be the screen that opened (workspace root present, legacy
+                // catalog screen closed — the legacy authoring path is never
+                // open at the same time), then capture the same dual-path
+                // frame evidence the menu diagnostic uses. A single async
+                // engine capture already proved insufficient here
+                // (casting-ws-final-171029 wrote a black png while every
+                // functional assertion passed), so the primary path is the
+                // end-of-frame ReadPixels capture with luma statistics and
+                // bounded black-frame retries. IsScreenOpen alone must never
+                // gate this: it reflects only the legacy screen, which is
+                // what opened in casting-ws-visual-183000 when the dev
+                // selection failed to apply.
+                if (!BuffPlannerUiRoot.IsCastingWorkspaceOpen) return false;
+                if (BuffPlannerUiRoot.IsScreenOpen) return false;
                 if (_uiSmokeUpdates < 2) return false;
                 _workspaceBlackAttempts = 0;
                 _workspaceEngineWaitStartedMillis = -1;
@@ -1414,8 +1426,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         ? "missing" : _workspaceFrameCapture.Summary.Describe();
                     WriteWorkspaceRenderMarker(lumaEvidence);
                     _liveInitialCatalogEvidence = "workspace-scenario:" +
-                        _request.Scenario + ";screenOpen=True;workspace=active;luma=" +
-                        lumaEvidence + ";blackRecaptures=" + _workspaceBlackAttempts;
+                        _request.Scenario +
+                        ";workspaceRoot=" + (BuffPlannerUiRoot.IsCastingWorkspaceOpen ? "active" : "missing") +
+                        ";legacyScreen=" + (BuffPlannerUiRoot.IsScreenOpen ? "open" : "closed") +
+                        ";luma=" + lumaEvidence + ";blackRecaptures=" + _workspaceBlackAttempts;
                     _completed = true;
                     _log.Info("[KBP-WORKSPACE] workspace frame captured;readPixelsSha256=" +
                         _liveRenderScreenshotSha256 + ";engineSha256=" +

@@ -129,6 +129,15 @@ namespace KingmakerBuffPlanner.UI
             get { return _instance != null && _instance._screen != null && _instance._screen.IsOpen; }
         }
 
+        // The casting-first workspace view is open. Distinct from
+        // IsScreenOpen, which reflects only the legacy catalog screen;
+        // qualification must never accept the legacy screen as workspace
+        // evidence.
+        internal static bool IsCastingWorkspaceOpen
+        {
+            get { return _instance != null && _instance._castingWorkspace != null; }
+        }
+
         internal static bool IsRuntimeReconstructionPending
         {
             get { return _instance != null && _instance._runtimeReconstructionPending; }
