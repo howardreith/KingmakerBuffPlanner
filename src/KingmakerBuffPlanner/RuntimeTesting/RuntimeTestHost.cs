@@ -25,6 +25,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private const int WorkspaceBlackFrameRecaptureMilliseconds = 1000;
         private const int WorkspaceBlackFrameRecaptureMaxAttempts = 30;
         private const int WorkspaceEngineCaptureWaitMilliseconds = 10000;
+        private const int WorkspaceOpenSettleMilliseconds = 750;
 
         private readonly RuntimeTestRequest _request;
         private readonly UnityModManager.ModEntry _modEntry;
@@ -77,6 +78,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private string _workspaceClosedScreenshotSha256;
         private int _workspaceClosedWaitUpdates;
         private bool _workspaceWasOpenAtCapture;
+        private long _workspaceOpenSeenMillis = -1;
         private readonly System.Diagnostics.Stopwatch _workspaceCaptureElapsed =
             new System.Diagnostics.Stopwatch();
         private string _workspaceEngineScreenshotSha256;
@@ -1399,7 +1401,19 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 // selection failed to apply.
                 if (!BuffPlannerUiRoot.IsCastingWorkspaceOpen) return false;
                 if (BuffPlannerUiRoot.IsScreenOpen) return false;
-                if (_uiSmokeUpdates < 2) return false;
+                if (_workspaceOpenSeenMillis < 0)
+                {
+                    _workspaceOpenSeenMillis = _workspaceCaptureElapsed.IsRunning
+                        ? _workspaceCaptureElapsed.ElapsedMilliseconds
+                        : 0;
+                    if (!_workspaceCaptureElapsed.IsRunning) _workspaceCaptureElapsed.Start();
+                    return false;
+                }
+                // Wall-clock settle so the nested canvas has rendered and
+                // batched at least one frame before capture; a two-update
+                // settle captured a HUD-only frame in casting-ws-root-200200.
+                if (_workspaceCaptureElapsed.ElapsedMilliseconds - _workspaceOpenSeenMillis <
+                    WorkspaceOpenSettleMilliseconds) return false;
                 _workspaceBlackAttempts = 0;
                 _workspaceEngineWaitStartedMillis = -1;
                 BeginWorkspaceCapture("workspace-frame.png");
