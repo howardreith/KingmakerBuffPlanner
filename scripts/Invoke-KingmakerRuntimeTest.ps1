@@ -1,6 +1,6 @@
 ﻿[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
 param(
-    [string]$Scenario = 'mod-load-smoke',
+    [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'live-ui-bootstrap', 'ui-native-contract-probe', 'final-no-save-core', 'performance-probe', 'launch-render-diagnostic', 'menu-input-diagnostic', 'live-workspace-qual')][string]$Scenario = 'mod-load-smoke',
     [ValidateSet('native-only', 'call-of-the-wild', 'human-reproduction', 'full-user')][string]$CompatibilityProfileId = 'native-only',
     [ValidateRange(5, 1800)][int]$TimeoutSeconds = 180,
     [ValidateRange(5, 300)][int]$LaunchTimeoutSeconds = 60,
@@ -40,7 +40,7 @@ $expectedOptionalMods = @($compatibilityProfile.mods | ForEach-Object {
         } else { $_.assemblySha256 }
     }
 })
-$savePair = if ($Scenario -ceq 'live-ui-bootstrap') { Get-KbpDisposableSavePair } else { $null }
+$savePair = if ($Scenario -ceq 'live-ui-bootstrap' -or $Scenario -ceq 'live-workspace-qual') { Get-KbpDisposableSavePair } else { $null }
 $steamSafety = Assert-KbpSteamSafety -SteamPath $SteamPath
 & (Join-Path $PSScriptRoot 'Deploy-Local.ps1') -PackagePath $package `
     -RunId 'runtime-whatif-preflight' -CompatibilityProfileId $CompatibilityProfileId `
@@ -111,7 +111,7 @@ try {
     }
     Write-KbpJsonAtomic (Join-Path $evidence 'orchestration.json') $orchestration
     $resultPath = Join-Path $evidence 'runtime-result.json'
-    $physicalInputScenario = ($Scenario -ceq 'live-ui-bootstrap') -or
+    $physicalInputScenario = ($Scenario -ceq 'live-ui-bootstrap') -or ($Scenario -ceq 'live-workspace-qual') -or
         ($Scenario -ceq 'menu-input-diagnostic')
     $plannerHotkeySent = $false
     $ummDismissSent = $false
@@ -219,7 +219,7 @@ public static class KbpPhysicalInput {
             try { Write-KbpJsonAtomic (Join-Path $evidence 'orchestration.json') $orchestration } catch { }
         }
         $ummMarker = Join-Path $evidence 'umm-overlay-ready.json'
-        if ($Scenario -ceq 'live-ui-bootstrap' -and -not $ummDismissSent -and
+        if (($Scenario -ceq 'live-ui-bootstrap' -or $Scenario -ceq 'live-workspace-qual') -and -not $ummDismissSent -and
             (Test-Path -LiteralPath $ummMarker -PathType Leaf)) {
             $process.Refresh()
             try {
@@ -243,7 +243,7 @@ public static class KbpPhysicalInput {
             }
         }
         $hotkeyMarker = Join-Path $evidence 'hotkey-ready.json'
-        if ($Scenario -ceq 'live-ui-bootstrap' -and $ummDismissSent -and
+        if (($Scenario -ceq 'live-ui-bootstrap' -or $Scenario -ceq 'live-workspace-qual') -and $ummDismissSent -and
             -not $ummDismissRecoverySent -and -not (Test-Path -LiteralPath $hotkeyMarker -PathType Leaf) -and
             [DateTime]::UtcNow -ge $ummDismissSentAtUtc.AddSeconds(2)) {
             # Depending on the active UMM overlay layer, the physical dismissal can also
@@ -263,7 +263,7 @@ public static class KbpPhysicalInput {
                 $orchestration.lastUmmRecoveryError = $_.Exception.Message
             }
         }
-        if ($Scenario -ceq 'live-ui-bootstrap' -and -not $plannerHotkeySent -and
+        if (($Scenario -ceq 'live-ui-bootstrap' -or $Scenario -ceq 'live-workspace-qual') -and -not $plannerHotkeySent -and
             (Test-Path -LiteralPath $hotkeyMarker -PathType Leaf)) {
             $process.Refresh()
             try {
