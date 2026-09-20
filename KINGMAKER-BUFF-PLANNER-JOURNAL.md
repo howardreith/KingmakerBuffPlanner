@@ -41,8 +41,8 @@
   df33d1ff-4ec8-4707-bfa0-5e059bf9a049, party 3) with zero save writes.
   Evidence: runtime-evidence/liveui-chain-*/saveload-chain-events.json
   and the [KBP-SAVE-LOAD] log lines. liveui-chain-3 was refused by the
-  running-game guard (owner session); liveui-chain-2's restoration is
-  pending the owner's session ending.
+  running-game guard (owner session); liveui-chain-2 was restored and
+  verified after that session closed.
 - Gates at each step: source 42/42, protocol 217/217, harness 27/27,
   package 4/4, WhatIf 5/5, fixture 3/3, rollback 4/4, publisher 3/3.
 

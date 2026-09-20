@@ -55,20 +55,36 @@
   deliveryFailed ack with error) — the programmatic onClick route is the
   qualified automation path; physical input remains timing-dependent.
 - liveui-chain-3 was REFUSED correctly: an owner-controlled Kingmaker
-  (PID 21420) is running. **PENDING: transaction liveui-chain-2 is
-  Active/unrestored (restore refused while the owner plays; the staged
-  build is the exact validated package and inert without the request
-  flag). Run `scripts/Restore-Local.ps1 -RunId liveui-chain-2
-  -Confirm:$false` as soon as the game closes.**
+  (PID 21420) was running. Transaction liveui-chain-2 was restored and
+  verified after that session closed (restore refused while the owner
+  played, per the running-game guard; no conflict bypassed). Note on the
+  staged build during that window: it is the full planner product —
+  normal play exercises the production HUD/hotkey surface — while the
+  runtime-test scenario host additionally requires the
+  -kbpRuntimeTestRequest flag. Normal-play safety and test-host
+  activation are separate questions; neither was claimed from the other.
+- AS OF HANDOFF: no active transactions, no deployment locks, tree
+  clean at the final records commit, local-runtime package built from
+  the final source HEAD. The runtime lane is ready for the next
+  full live-ui-bootstrap pass through the post-load workspace phases
+  (Pro-directed 2026-09-20): open/inspect the real workspace, authorized
+  authoring + isolated save/reopen checks, entry points/input
+  ownership/close-reopen lifecycle, fresh workspace screenshots, native
+  spell submission DISABLED, then close out and verify restoration.
+  Campaign loading is REPAIRED for the tested configuration (two
+  consecutive fresh-run receipts); do not reopen the loader
+  investigation unless the load itself regresses. Keep programmatic and
+  physical input evidence distinct; never fight the owner's foreground.
 - Gates: source 42/42; protocol 217/217; harness 27/27; package 4/4;
   WhatIf 5/5; fixture 3/3; rollback 4/4; publisher 3/3. HEAD `1449b1f`
   on codex/kingmaker-buff-planner-casting-first (commits d1e824b,
   83a7cbb, 79d314b, fe3d8f6, 0c4d81b, 524107e, 1449b1f + records).
-- NEXT: restore liveui-chain-2 when the game closes; then one full
-  live-ui-bootstrap pass (phases beyond the load now have wall-clock
-  budgets and retried input delivery) for the complete UI qualification
-  chain; treat the intermittent black presentation as its own diagnosis
-  (compare focused vs unfocused captures in one run).
+- NEXT (development continuation thread): run the full
+  live-ui-bootstrap pass (post-load workspace phases now have wall-clock
+  budgets and retried input delivery) and continue the casting-first
+  plan within its current authorization; treat the intermittent black
+  presentation as its own diagnosis (compare focused vs unfocused
+  captures in one run).
 
 ## Casting-first migration checkpoint 14 (campaign UI qualification attempts) — 2026-09-20
 
