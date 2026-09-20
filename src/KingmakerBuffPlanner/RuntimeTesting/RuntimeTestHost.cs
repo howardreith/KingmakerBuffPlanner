@@ -1284,6 +1284,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         _workspaceProgrammaticOpen = true;
                         _log.Info("[KBP-WORKSPACE] hotkey unavailable; opening planner programmatically.");
                         UI.BuffPlannerUiRoot.HandlePlannerHotkey();
+                        _liveUiPhase = 1;
+                        return false;
                     }
                     return false;
                 }
