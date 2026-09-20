@@ -1,6 +1,38 @@
 # AUTONOMOUS-RESUME — top section is current; planning/CASTING-FIRST-MIGRATION-STATUS.md is the per-checkpoint tracker.
 
-## Campaign-load repair — 2026-09-20 (LATEST)
+## Workspace visual honesty repair — 2026-09-20 (LATEST)
+
+- Run `casting-ws-final-171029` (live-workspace-qual, full-user 15-mod
+  profile) completed the full chain for the FIRST time: campaign load,
+  UMM close through verified `UI.Instance.ToggleWindow(false)`,
+  programmatic planner open, workspace screen open, transaction restored.
+  Evidence: runtime-evidence/casting-ws-final-171029/.
+- TWO honesty defects found in that PASS and repaired (checkpoint 11 in
+  the status tracker): (1) its 75 assertions were identity/mod-integrity
+  checks only — nothing asserted the workspace actually opened; (2) the
+  single async engine screenshot was BLACK (30 KB), matching the
+  documented intermittent focus-correlated black presentation
+  (launchdiag-1 vs menuinput-4/5 precedent), so it was not classifiable.
+- The workspace scenario now captures through the proven menu-diagnostic
+  machinery (end-of-frame ReadPixels + luma/blackFraction + bounded
+  30×1 s black retries + engine second path + environment marker with
+  focused/runInBackground) and carries real fail-closed assertions:
+  workspace-screen-open, workspace-frame-captured,
+  workspace-frame-engine-capture, workspace-frame-nonblack
+  (blackFraction<0.98; persistent black now FAILs at
+  workspace-visual-validation).
+- Gates at repair: source 42/42; protocol 217/217; harness 27/27;
+  fixture-inventory 3/3; rollback 4/4; publisher 3/3.
+- NEXT (exact action): guarded live-workspace-qual re-run with the
+  rebuilt capture gate to obtain classified visual evidence of the
+  actual workspace; if black persists across retries, the run FAILS by
+  design with luma + focus evidence for classification. Then extend the
+  scenario through the mission's interaction checklist (browse without
+  mutation, mixed-caster cards, edit+Undo, group coverage, resource
+  drill-down, save/reopen) — the screen opening alone is not the end of
+  qualification.
+
+## Campaign-load repair — 2026-09-20
 
 - **THE STANDING BLOCKER IS REPAIRED AND REPRODUCED.** The campaign load
   now completes through the game's own observed native chain in

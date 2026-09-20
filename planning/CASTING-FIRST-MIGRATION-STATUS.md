@@ -5,7 +5,41 @@ Linked from `AUTONOMOUS-RESUME.md`. Specification: the adopted
 `Kingmaker-Buff-Planner-Casting-First-Migration-Charter.md` (casting-first
 migration and native scroll UI charter v1.0, 2026-09-19).
 
-## Checkpoint 10 — decision-packet exposure + narrowed rod conclusion — 2026-09-20 (CURRENT)
+## Checkpoint 11 — first workspace run qualified honestly; visual gate rebuilt — 2026-09-20 (CURRENT)
+
+Run `casting-ws-final-171029` (live-workspace-qual, full-user 15-mod
+profile) completed the full chain for the first time: campaign loaded
+through the observed native chain, UMM closed through verified
+`UI.Instance.ToggleWindow(false)` (wasOpened=True → nowOpened=False),
+planner opened programmatically after the foreground-hotkey fallback,
+workspace screen open, evidence written, transaction restored with
+receipt. Two honesty defects in that PASS were then found and repaired:
+
+1. The 75 passing assertions were **identity/mod-integrity checks only**
+   — no assertion covered workspace-open or visual state; the
+   "workspace active" claim lived in stage text.
+2. The single async `ScreenCapture.CaptureScreenshot` produced a black
+   1920×1200 png (30 KB). Black presentation is the documented
+   intermittent focus-correlated state (launchdiag-1 non-black 1.67 MB;
+   menuinput-4/5 black on BOTH capture paths), so one engine-path frame
+   is not classifiable evidence.
+
+Repair (commit after this checkpoint): the workspace capture now uses
+the proven menu-diagnostic machinery — end-of-frame ReadPixels via
+`MenuDiagnosticCaptureHost` with luma/blackFraction stats and bounded
+black-frame retries (30 × 1 s), engine capture as the second path, a
+`workspace-render.json` marker recording `focused`/`runInBackground`/
+resolution/fullscreen plus both SHA-256 hashes — and the scenario gained
+real assertions that fail closed: `workspace-screen-open`,
+`workspace-frame-captured`, `workspace-frame-engine-capture`,
+`workspace-frame-nonblack` (blackFraction<0.98; a persistent black frame
+now FAILS the run at stage `workspace-visual-validation` instead of
+passing on integrity checks alone). Gates at this checkpoint: source
+42/42; protocol **217/217**; harness 27/27; fixture-inventory 3/3;
+rollback 4/4; publisher 3/3. Next: guarded live re-run to capture
+classified visual evidence of the actual workspace.
+
+## Checkpoint 10 — decision-packet exposure + narrowed rod conclusion — 2026-09-20
 
 On top of `e46f18e` (clean; no newer work). Gates re-run: source 42/42;
 protocol 210/210; harness 27/27; package 4/4; WhatIf 5/5;

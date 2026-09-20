@@ -19,6 +19,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
 {
     internal sealed class RuntimeTestHost
     {
+        // Wall-clock budgets for the workspace frame capture, matching the
+        // menu diagnostic: unfocused players spin far above 60 fps, and the
+        // engine screenshot is flushed asynchronously.
+        private const int WorkspaceBlackFrameRecaptureMilliseconds = 1000;
+        private const int WorkspaceBlackFrameRecaptureMaxAttempts = 30;
+        private const int WorkspaceEngineCaptureWaitMilliseconds = 10000;
+
         private readonly RuntimeTestRequest _request;
         private readonly UnityModManager.ModEntry _modEntry;
         private readonly ModLog _log;
@@ -60,6 +67,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private int _liveHudScreenshotWaitFrames;
         private LiveRowRenderDiagnostics _liveRenderDiagnostics;
         private NativeUiContract _nativeUiContract;
+        private MenuFrameCapture _workspaceLastCapture;
+        private MenuFrameCapture _workspaceFrameCapture;
+        private int _workspaceBlackAttempts;
+        private long _workspaceEngineWaitStartedMillis = -1;
+        private readonly System.Diagnostics.Stopwatch _workspaceCaptureElapsed =
+            new System.Diagnostics.Stopwatch();
+        private string _workspaceEngineScreenshotSha256;
 
         private RuntimeTestHost(
             RuntimeTestRequest request,
@@ -607,6 +621,51 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     {
                         result.Status = "FAIL";
                         result.Stage = "menu-diagnostic-validation";
+                    }
+                }
+                if (RuntimeTestProtocol.IsWorkspaceScenario(_request.Scenario))
+                {
+                    // The workspace scenario's own acceptance gate. The prior
+                    // run (casting-ws-final-171029) PASSED on identity checks
+                    // alone while its only screenshot was black; qualification
+                    // must fail closed until the workspace screen is proven
+                    // open AND both capture paths produced non-black evidence.
+                    bool workspaceOpen = _liveInitialCatalogEvidence.Contains("screenOpen=True") &&
+                        _liveInitialCatalogEvidence.Contains("workspace=active");
+                    result.Assertions.Add(workspaceOpen
+                        ? RuntimeTestAssertion.Pass("workspace-screen-open",
+                            "screenOpen=True;workspace=active", _liveInitialCatalogEvidence)
+                        : RuntimeTestAssertion.Fail("workspace-screen-open",
+                            "screenOpen=True;workspace=active",
+                            string.IsNullOrWhiteSpace(_liveInitialCatalogEvidence)
+                                ? "missing" : _liveInitialCatalogEvidence));
+                    bool frameCaptured = !string.IsNullOrWhiteSpace(_liveRenderScreenshotSha256);
+                    result.Assertions.Add(frameCaptured
+                        ? RuntimeTestAssertion.Pass("workspace-frame-captured",
+                            "end-of-frame png + sha256", _liveRenderScreenshotSha256)
+                        : RuntimeTestAssertion.Fail("workspace-frame-captured",
+                            "end-of-frame png + sha256", "missing"));
+                    bool engineCaptured = !string.IsNullOrEmpty(_workspaceEngineScreenshotSha256);
+                    result.Assertions.Add(engineCaptured
+                        ? RuntimeTestAssertion.Pass("workspace-frame-engine-capture",
+                            "engine png + sha256", _workspaceEngineScreenshotSha256)
+                        : RuntimeTestAssertion.Fail("workspace-frame-engine-capture",
+                            "engine png + sha256", "missing"));
+                    string lumaEvidence = _workspaceFrameCapture == null ||
+                        _workspaceFrameCapture.Summary == null
+                            ? "missing" : _workspaceFrameCapture.Summary.Describe();
+                    bool nonBlack = _workspaceFrameCapture != null &&
+                        _workspaceFrameCapture.Summary != null &&
+                        _workspaceFrameCapture.Summary.IsNonBlack;
+                    result.Assertions.Add(nonBlack
+                        ? RuntimeTestAssertion.Pass("workspace-frame-nonblack",
+                            "blackFraction<0.98", lumaEvidence)
+                        : RuntimeTestAssertion.Fail("workspace-frame-nonblack",
+                            "blackFraction<0.98", lumaEvidence));
+                    if (!workspaceOpen || !frameCaptured || !engineCaptured || !nonBlack)
+                    {
+                        result.Status = "FAIL";
+                        result.Stage = "workspace-visual-validation";
                     }
                 }
                 int loadedOptionalAssemblies = 0;
@@ -1296,29 +1355,76 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             {
                 // Workspace scenario: verify the casting-first workspace is
                 // the screen that opened (not the legacy catalog screen),
-                // capture a screenshot, and report success. Legacy catalog
-                // grouping is not a workspace obligation.
+                // then capture the same dual-path frame evidence the menu
+                // diagnostic uses. A single async engine capture already
+                // proved insufficient here (casting-ws-final-171029 wrote a
+                // black png while every functional assertion passed), so the
+                // primary path is the end-of-frame ReadPixels capture with
+                // luma statistics and bounded black-frame retries.
                 if (!BuffPlannerUiRoot.IsScreenOpen) return false;
-                _log.Info("[KBP-WORKSPACE] screen open; capturing workspace evidence.");
-                // Wait 2 frames for rendering to settle
                 if (_uiSmokeUpdates < 2) return false;
-                // Capture a screenshot of the workspace
-                try
+                _workspaceBlackAttempts = 0;
+                _workspaceEngineWaitStartedMillis = -1;
+                BeginWorkspaceCapture("workspace-frame.png");
+                CaptureScreenshot(Path.Combine(
+                    _request.EvidenceDirectory, "workspace-frame-engine.png"));
+                _log.Info("[KBP-WORKSPACE] screen open; workspace frame capture requested;environment=" +
+                    MenuRenderDiagnostic.EnvironmentSample() + ";attempt=1.");
+                _liveUiPhase = 17;
+                return false;
+            }
+            if (_liveUiPhase == 17)
+            {
+                if (!_workspaceCaptureElapsed.IsRunning) _workspaceCaptureElapsed.Start();
+                if (!ConsumeWorkspaceCapture("workspace-frame.png")) return false;
+                if (_workspaceFrameCapture.Summary != null &&
+                    !_workspaceFrameCapture.Summary.IsNonBlack &&
+                    _workspaceBlackAttempts < WorkspaceBlackFrameRecaptureMaxAttempts)
                 {
-                    string screenshotPath = System.IO.Path.Combine(
-                        _request.EvidenceDirectory, "workspace-render.png");
-                    UnityEngine.ScreenCapture.CaptureScreenshot(screenshotPath);
-                    _log.Info("[KBP-WORKSPACE] screenshot capture requested;path=" + screenshotPath);
+                    // Black presentation is a documented intermittent state
+                    // (launchdiag-1 captured a presented menu; menuinput-4/5
+                    // captured black from both paths). Retry on wall clock.
+                    _workspaceBlackAttempts++;
+                    _log.Info("[KBP-WORKSPACE] workspace frame black;recapture scheduled;attempt=" +
+                        (_workspaceBlackAttempts + 1) + ";luma=" +
+                        _workspaceFrameCapture.Summary.Describe() + ".");
+                    System.Threading.Thread.Sleep(WorkspaceBlackFrameRecaptureMilliseconds);
+                    BeginWorkspaceCapture("workspace-frame.png");
+                    return false;
                 }
-                catch (Exception screenshotException)
+                _liveRenderScreenshotSha256 = Hashing.Sha256(_workspaceFrameCapture.FullPath);
+                _liveUiPhase = 18;
+                return false;
+            }
+            if (_liveUiPhase == 18)
+            {
+                // The engine capture is written asynchronously by Unity; wait
+                // briefly, then record whatever the engine produced.
+                if (!_workspaceCaptureElapsed.IsRunning) _workspaceCaptureElapsed.Start();
+                if (_workspaceEngineWaitStartedMillis < 0)
+                    _workspaceEngineWaitStartedMillis = _workspaceCaptureElapsed.ElapsedMilliseconds;
+                string engineHash;
+                if (TryHashScreenshot(Path.Combine(
+                        _request.EvidenceDirectory, "workspace-frame-engine.png"), out engineHash) ||
+                    _workspaceCaptureElapsed.ElapsedMilliseconds - _workspaceEngineWaitStartedMillis >=
+                        WorkspaceEngineCaptureWaitMilliseconds)
                 {
-                    _log.Error("[KBP-WORKSPACE] screenshot capture failed", screenshotException);
+                    _workspaceEngineScreenshotSha256 = engineHash ?? string.Empty;
+                    string lumaEvidence = _workspaceFrameCapture.Summary == null
+                        ? "missing" : _workspaceFrameCapture.Summary.Describe();
+                    WriteWorkspaceRenderMarker(lumaEvidence);
+                    _liveInitialCatalogEvidence = "workspace-scenario:" +
+                        _request.Scenario + ";screenOpen=True;workspace=active;luma=" +
+                        lumaEvidence + ";blackRecaptures=" + _workspaceBlackAttempts;
+                    _completed = true;
+                    _log.Info("[KBP-WORKSPACE] workspace frame captured;readPixelsSha256=" +
+                        _liveRenderScreenshotSha256 + ";engineSha256=" +
+                        (_workspaceEngineScreenshotSha256.Length == 0
+                            ? "missing" : _workspaceEngineScreenshotSha256) +
+                        ";blackRecaptures=" + _workspaceBlackAttempts + ";luma=" + lumaEvidence + ".");
+                    return true;
                 }
-                _liveInitialCatalogEvidence = "workspace-scenario:" +
-                    _request.Scenario + ";screenOpen=True;workspace=active";
-                _completed = true;
-                _log.Info("[KBP-WORKSPACE] workspace scenario completed; screen open and evidence captured.");
-                return true;
+                return false;
             }
             if (_liveUiPhase == 1)
             {
@@ -1645,6 +1751,48 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (capture == null)
                 throw new MissingMethodException("Unity screenshot capture API is unavailable.");
             capture.Invoke(null, new object[] { path });
+        }
+
+        private void BeginWorkspaceCapture(string fileName)
+        {
+            MenuDiagnosticCaptureHost.CaptureMenuFrame(
+                Path.Combine(_request.EvidenceDirectory, fileName),
+                delegate(MenuFrameCapture capture, Exception failure)
+                {
+                    capture.Failure = failure;
+                    _workspaceLastCapture = capture;
+                });
+        }
+
+        private bool ConsumeWorkspaceCapture(string fileName)
+        {
+            if (_workspaceLastCapture == null ||
+                !string.Equals(_workspaceLastCapture.FileName, fileName, StringComparison.OrdinalIgnoreCase) ||
+                _workspaceLastCapture.Handled) return false;
+            _workspaceLastCapture.Handled = true;
+            _workspaceFrameCapture = _workspaceLastCapture;
+            if (_workspaceFrameCapture.Failure != null)
+                throw new InvalidOperationException("Workspace frame capture failed for " + fileName +
+                    ": " + _workspaceFrameCapture.Failure.GetType().Name + ": " +
+                    _workspaceFrameCapture.Failure.Message);
+            return true;
+        }
+
+        private void WriteWorkspaceRenderMarker(string lumaEvidence)
+        {
+            string path = Path.Combine(_request.EvidenceDirectory, "workspace-render.json");
+            string json = "{\"schemaVersion\":1,\"runId\":" + JsonConvert.ToString(_request.RunId) +
+                ",\"scenario\":" + JsonConvert.ToString(_request.Scenario) +
+                ",\"stage\":\"workspace-frame-captured\"" +
+                ",\"environment\":" + JsonConvert.ToString(
+                    MenuRenderDiagnostic.EnvironmentSample()) +
+                ",\"readPixelsSha256\":" + JsonConvert.ToString(
+                    _liveRenderScreenshotSha256 ?? string.Empty) +
+                ",\"engineSha256\":" + JsonConvert.ToString(
+                    _workspaceEngineScreenshotSha256 ?? string.Empty) +
+                ",\"luma\":" + JsonConvert.ToString(lumaEvidence ?? string.Empty) +
+                ",\"blackRecaptures\":" + _workspaceBlackAttempts + "}";
+            AtomicFile.WriteUtf8(path, json + Environment.NewLine);
         }
 
         private static bool TryHashScreenshot(string path, out string sha256)

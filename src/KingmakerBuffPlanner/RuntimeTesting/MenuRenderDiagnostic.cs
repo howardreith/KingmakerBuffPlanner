@@ -446,7 +446,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             capture.Invoke(null, new object[] { path });
         }
 
-        private string EnvironmentSample()
+        internal static string EnvironmentSample()
         {
             return "scene=" + SceneManager.GetActiveScene().name +
                 ";resolution=" + Screen.width + "x" + Screen.height +
