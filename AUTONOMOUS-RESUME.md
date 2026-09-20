@@ -1,6 +1,34 @@
 # AUTONOMOUS-RESUME — top section is current; planning/CASTING-FIRST-MIGRATION-STATUS.md is the per-checkpoint tracker.
 
-## Casting-first migration checkpoint 12 (all approvals applied; ready to launch) — 2026-09-20 (LATEST)
+## Casting-first migration checkpoint 13 (bootstrap launched; campaign load engine-stalled) — 2026-09-20 (LATEST)
+
+- All three fixture approvals applied and verified. Protocol fix
+  (stale 4→3 mod count for human-reproduction) committed `1099601`;
+  all 210 tests pass.
+- **RUN casting-first-bootstrap-3** (game launched, ran, exited, restored
+  verified; Mods 1033 files): the scenario passed entry-point/version/
+  commit assertions, found the exact WORKING save
+  (Manual_305_KBP_AUTOMATION_WORKING, gameId df33d1ff..., area
+  JamandisMansion), invoked SaveSlot.OnButtonSaveLoad, and the area
+  began unloading — then the ENGINE stalled during the area transition.
+  WeatherSystemBehaviour.Update() NRE spam every frame; the
+  SaveManager.AddCallbackAfterLoad callback never fired; the loader
+  timed out at campaign-load-completion (~120s of the 600s budget).
+  Result: FAIL/unhandled-exception. Evidence:
+  runtime-evidence/casting-first-bootstrap-3/runtime-result.json.
+- **This is the same class of engine-level area-transition failure seen
+  with the START-PROLOGUE seed in earlier sessions** — not a mod,
+  fixture, or protocol defect. The automated campaign load cannot
+  complete with this save in this game version (2.1.7b) and mod set.
+- **OWNER ACTION NEEDED:** verify whether the WORKING save loads
+  manually from Kingmaker's main menu (Load Game → KBP_AUTOMATION_WORKING).
+  If it loads manually, the issue is automated-load timing. If it does
+  not, a new WORKING save is needed at a later campaign point. Either
+  way, the campaign-context UI qualification lane is blocked on this.
+- All source work remains green (protocol 210/210; full gate).
+  Commit: `1099601`. Package: `fea8b690...`. Restoration verified.
+
+## Casting-first migration checkpoint 12 (all approvals applied; ready to launch) — 2026-09-20
 
 - Owner approved CallOfTheWild (988e6130...) and CheatMenu (7960517c...)
   rebindings; applied with exact verification. A correction was noted:
