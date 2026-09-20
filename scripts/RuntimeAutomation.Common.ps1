@@ -218,10 +218,14 @@ function Assert-KbpRuntimeResult {
     if ($mismatches.Count -ne 0) { throw "Runtime result identity/hash mismatch: $($mismatches -join '; ')" }
     if ($Result.status -notin @('PASS', 'FAIL', 'BLOCKED')) { throw 'Runtime result status is invalid.' }
     if (@($Result.assertions).Count -lt 5) { throw 'Runtime result assertion list is incomplete.' }
-    if ([int]$Result.optionalLoadedAssemblyCount -ne @($Request.expectedOptionalMods).Count) {
+    if ($Result.status -ceq 'PASS' -and
+        [int]$Result.optionalLoadedAssemblyCount -ne @($Request.expectedOptionalMods).Count) {
+        # Failure-path results terminate before optional identity evaluation;
+        # the count contract is only asserted for completed runs.
         throw 'Loaded optional assembly count does not match the requested profile.'
     }
-    if ([int]$Result.optionalLoadedUmmEntryCount -ne @($Request.expectedOptionalMods).Count) {
+    if ($Result.status -ceq 'PASS' -and
+        [int]$Result.optionalLoadedUmmEntryCount -ne @($Request.expectedOptionalMods).Count) {
         throw 'Loaded optional UMM entry count does not match the requested profile.'
     }
     if ($Result.status -ceq 'BLOCKED') {

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
@@ -27,14 +27,15 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private const string SaveLoadWindowTypeName = "Kingmaker.UI.SaveLoadWindow.SaveLoadWindow";
         private const string SaveSlotTypeName = "Kingmaker.UI.SaveLoadWindow.SaveSlot";
         private const string MainMenuBoardTypeName = "Kingmaker.UI.MainMenuUI.MainMenuBoard";
-        // 21600 frames (~6 minutes at 60 fps) is the overall diagnostic budget;
-        // the outer harness timeout governs the hard stop.
-        private const int MaxUpdates = 21600;
+        // Wall-clock budgets: an unfocused Unity player can spin far above
+        // 60 fps, so frame counts must never govern timeouts or settles.
         private const int MaxElapsedSeconds = 420;
-        private const int MenuStabilityFrames = 180;
-        private const int EscapeSettleFrames = 90;
-        private const int WindowSettleFrames = 120;
-        private const int EngineCaptureWaitFrames = 600;
+        private const int MenuStabilityMilliseconds = 5000;
+        private const int BlackFrameRecaptureMilliseconds = 1000;
+        private const int BlackFrameRecaptureMaxAttempts = 30;
+        private const int EscapeSettleMilliseconds = 1500;
+        private const int WindowSettleMilliseconds = 2000;
+        private const int EngineCaptureWaitMilliseconds = 10000;
 
         private readonly RuntimeTestRequest _request;
         private readonly ModLog _log;
@@ -42,16 +43,16 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private readonly Action<string, string, Vector2> _writePhysicalInput;
         private readonly System.Diagnostics.Stopwatch _elapsed =
             System.Diagnostics.Stopwatch.StartNew();
-        private int _updates;
-        private int _lastFrameCount = -1;
+        private long _stabilityStartedMillis = -1;
+        private long _settleStartedMillis = -1;
+        private long _engineWaitStartedMillis = -1;
+        private int _blackFrameAttempts;
         private int _state;
-        private int _menuStableFrames;
-        private int _settleFrames;
-        private int _engineWaitFrames;
         private MenuFrameCapture _lastCapture;
         private MenuFrameCapture _menuCapture;
         private int _firstUpdateFrameCount = -1;
         private float _firstUpdateRealtime;
+        private int _lastFrameCount = -1;
 
         internal MenuRenderDiagnostic(
             RuntimeTestRequest request,
@@ -102,8 +103,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             // diagnostic advances once per frame and budgets by wall clock.
             if (Time.frameCount == _lastFrameCount) return;
             _lastFrameCount = Time.frameCount;
-            _updates++;
-            if (_updates > MaxUpdates || _elapsed.Elapsed.TotalSeconds > MaxElapsedSeconds)
+            if (_elapsed.Elapsed.TotalSeconds > MaxElapsedSeconds)
                 throw new TimeoutException("Menu diagnostic timed out at " + Stage +
                     ";elapsedSeconds=" + _elapsed.Elapsed.TotalSeconds.ToString(
                         "F1", CultureInfo.InvariantCulture) + ".");
@@ -114,10 +114,19 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             }
             if (_state == 0)
             {
-                if ((_updates % 300) == 1) LogEnvironmentSample();
-                if (FindActiveMainMenuBoard() == null) return;
-                _menuStableFrames++;
-                if (_menuStableFrames < MenuStabilityFrames) return;
+                if ((_elapsed.ElapsedMilliseconds % 5000) < 17) LogEnvironmentSample();
+                if (FindActiveMainMenuBoard() == null)
+                {
+                    _stabilityStartedMillis = -1;
+                    return;
+                }
+                if (_stabilityStartedMillis < 0)
+                {
+                    _stabilityStartedMillis = _elapsed.ElapsedMilliseconds;
+                    return;
+                }
+                if (_elapsed.ElapsedMilliseconds - _stabilityStartedMillis <
+                    MenuStabilityMilliseconds) return;
                 float elapsed = Math.Max(0.01f, Time.realtimeSinceStartup - _firstUpdateRealtime);
                 int frameDelta = Math.Max(0, Time.frameCount - _firstUpdateFrameCount);
                 FrameProgressSummary = "frames=" + frameDelta.ToString(CultureInfo.InvariantCulture) +
@@ -127,11 +136,12 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     ";" + EnvironmentSample() + ".");
                 MenuFrameWidth = Screen.width;
                 MenuFrameHeight = Screen.height;
+                _blackFrameAttempts = 0;
                 BeginCapture("menu-frame.png");
                 CaptureScreenshotThroughEngine(Path.Combine(
                     _request.EvidenceDirectory, "menu-frame-engine.png"));
                 _log.Info("[KBP-MENU-DIAG] menu frame capture requested;resolution=" +
-                    MenuFrameWidth + "x" + MenuFrameHeight + ".");
+                    MenuFrameWidth + "x" + MenuFrameHeight + ";attempt=1.");
                 _state = 1;
                 Stage = "capturing-menu-frame";
                 return;
@@ -140,6 +150,18 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             {
                 if (!ConsumeCapture("menu-frame.png")) return;
                 _menuCapture = _lastCapture;
+                if (_menuCapture.Summary != null && !_menuCapture.Summary.IsNonBlack &&
+                    _blackFrameAttempts < BlackFrameRecaptureMaxAttempts)
+                {
+                    // The main menu fades in from black; an early capture can
+                    // legitimately be black. Wait and recapture the same file.
+                    _blackFrameAttempts++;
+                    _log.Info("[KBP-MENU-DIAG] menu frame black;recapture scheduled;attempt=" +
+                        (_blackFrameAttempts + 1) + ".");
+                    System.Threading.Thread.Sleep(BlackFrameRecaptureMilliseconds);
+                    BeginCapture("menu-frame.png");
+                    return;
+                }
                 MenuFrameScreenshotSha256 = Hashing.Sha256(_menuCapture.FullPath);
                 _state = 2;
                 Stage = "waiting-for-engine-capture";
@@ -149,15 +171,17 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             {
                 // The engine capture is written asynchronously by Unity; wait
                 // briefly, then record whatever the engine produced.
-                _engineWaitFrames++;
+                if (_engineWaitStartedMillis < 0) _engineWaitStartedMillis = _elapsed.ElapsedMilliseconds;
                 string enginePng = Path.Combine(_request.EvidenceDirectory, "menu-frame-engine.png");
                 if (File.Exists(enginePng) && new FileInfo(enginePng).Length >= 1000)
                     MenuFrameEngineScreenshotSha256 = Hashing.Sha256(enginePng);
-                else if (_engineWaitFrames < EngineCaptureWaitFrames) return;
+                else if (_elapsed.ElapsedMilliseconds - _engineWaitStartedMillis <
+                    EngineCaptureWaitMilliseconds) return;
                 WriteMenuRenderMarker();
                 _log.Info("[KBP-MENU-DIAG] menu frame captured;readPixelsSha256=" +
                     MenuFrameScreenshotSha256 + ";engineSha256=" +
-                    (MenuFrameEngineScreenshotSha256 ?? "missing") + ";luma=" +
+                    (MenuFrameEngineScreenshotSha256 ?? "missing") + ";blackRecaptures=" +
+                    _blackFrameAttempts + ";luma=" +
                     (_menuCapture.Summary == null ? "missing" : _menuCapture.Summary.Describe()) + ".");
                 if (!_requireWindowProof)
                 {
@@ -165,7 +189,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     Stage = "menu-render-observed";
                     return;
                 }
-                _settleFrames = 0;
+                _settleStartedMillis = -1;
                 _state = 3;
                 Stage = "umm-dismiss-escape-1";
                 return;
@@ -182,8 +206,14 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             {
                 MenuEscape1Acknowledged = Acknowledged("menu-umm-dismiss-1");
                 if (!MenuEscape1Acknowledged) return;
-                _settleFrames++;
-                if (_settleFrames < EscapeSettleFrames) return;
+                if (_settleStartedMillis < 0)
+                {
+                    _settleStartedMillis = _elapsed.ElapsedMilliseconds;
+                    return;
+                }
+                if (_elapsed.ElapsedMilliseconds - _settleStartedMillis <
+                    EscapeSettleMilliseconds) return;
+                _blackFrameAttempts = 0;
                 BeginCapture("menu-after-escape-1.png");
                 _state = 5;
                 Stage = "capturing-after-escape-1";
@@ -199,7 +229,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     MenuEscape1ScreenshotSha256 + ";changedFraction=" +
                     MenuEscape1ChangedFraction.ToString("F5", CultureInfo.InvariantCulture) +
                     ";luma=" + (escape1.Summary == null ? "missing" : escape1.Summary.Describe()) + ".");
-                _settleFrames = 0;
+                _settleStartedMillis = -1;
                 _writePhysicalInput("menu-umm-dismiss-2", "key-escape", Vector2.zero);
                 _state = 6;
                 Stage = "umm-dismiss-escape-2";
@@ -209,8 +239,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             {
                 MenuEscape2Acknowledged = Acknowledged("menu-umm-dismiss-2");
                 if (!MenuEscape2Acknowledged) return;
-                _settleFrames++;
-                if (_settleFrames < EscapeSettleFrames) return;
+                if (_settleStartedMillis < 0)
+                {
+                    _settleStartedMillis = _elapsed.ElapsedMilliseconds;
+                    return;
+                }
+                if (_elapsed.ElapsedMilliseconds - _settleStartedMillis <
+                    EscapeSettleMilliseconds) return;
                 BeginCapture("menu-after-escape-2.png");
                 _state = 7;
                 Stage = "capturing-after-escape-2";
@@ -257,8 +292,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             }
             if (_state == 9)
             {
-                if ((_updates % 300) == 0)
-                    _log.Info("[KBP-MENU-DIAG] waiting for save/load window;frames=" + _updates + ".");
+                if ((_elapsed.ElapsedMilliseconds % 5000) < 17)
+                    _log.Info("[KBP-MENU-DIAG] waiting for save/load window;" +
+                        "elapsedSeconds=" + _elapsed.Elapsed.TotalSeconds.ToString(
+                            "F1", CultureInfo.InvariantCulture) + ".");
                 MenuClickAcknowledged = Acknowledged("menu-loadgame");
                 Component window = FindActiveSaveLoadWindow();
                 if (window == null) return;
@@ -266,15 +303,21 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 MenuWindowDescriptor = DescribeWindow(window);
                 _log.Info("[KBP-MENU-DIAG] save/load window is active after physical click;" +
                     MenuWindowDescriptor + ";clickAcknowledged=" + MenuClickAcknowledged + ".");
-                _settleFrames = 0;
+                _settleStartedMillis = -1;
                 _state = 10;
                 Stage = "capturing-saveload-window";
                 return;
             }
             if (_state == 10)
             {
-                _settleFrames++;
-                if (_settleFrames < WindowSettleFrames) return;
+                if (_settleStartedMillis < 0)
+                {
+                    _settleStartedMillis = _elapsed.ElapsedMilliseconds;
+                    return;
+                }
+                if (_elapsed.ElapsedMilliseconds - _settleStartedMillis <
+                    WindowSettleMilliseconds) return;
+                _blackFrameAttempts = 0;
                 BeginCapture("menu-saveload-window.png");
                 _state = 11;
                 Stage = "awaiting-window-capture";
@@ -415,7 +458,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
 
         private void LogEnvironmentSample()
         {
-            _log.Info("[KBP-MENU-DIAG] waiting for main menu;frames=" + _updates + ";frameCount=" +
+            _log.Info("[KBP-MENU-DIAG] waiting for main menu;elapsedSeconds=" +
+                _elapsed.Elapsed.TotalSeconds.ToString("F1",
+                    CultureInfo.InvariantCulture) + ";frameCount=" +
                 Time.frameCount + ";" + EnvironmentSample() + ".");
         }
 
