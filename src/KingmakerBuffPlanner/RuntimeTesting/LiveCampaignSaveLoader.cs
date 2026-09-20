@@ -42,48 +42,29 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (_state == 0)
             {
                 RegisterAfterLoadCallback();
-                // Wait for the save manager to have a loaded save list,
-                // then find the WORKING SaveInfo directly from it and
-                // invoke the game's programmatic load path. UI SaveSlot
-                // components only exist when the save window is open.
+                // Load the WORKING and BASELINE SaveInfo objects directly
+                // from the SaveManager by their known filenames, then
+                // invoke the game's programmatic main-menu load path.
                 if (Game.Instance == null) return;
                 object manager = ReadMember(Game.Instance, "SaveManager");
                 if (manager == null) return;
-                object areUpToDate = ReadMember(manager, "AreSavesUpToDate");
-                if (!(areUpToDate is bool) || !(bool)areUpToDate) return;
-                // Get the save list from the manager
-                System.Collections.IEnumerable saveList = ReadMember(manager, "Saves")
-                    as System.Collections.IEnumerable;
-                if (saveList == null)
+                string workingFile = Parameter("workingFileName");
+                string baselineFile = Parameter("baselineFileName");
+                if (string.IsNullOrWhiteSpace(workingFile) ||
+                    string.IsNullOrWhiteSpace(baselineFile)) return;
+                MethodInfo loadZip = manager.GetType().GetMethod("LoadZipSave",
+                    BindingFlags.Instance | BindingFlags.Public,
+                    null, new[] { typeof(string) }, null);
+                if (loadZip == null)
+                    throw new MissingMethodException("SaveManager.LoadZipSave(String)");
+                object workingInfo = loadZip.Invoke(manager, new object[] { workingFile });
+                object baselineInfo = loadZip.Invoke(manager, new object[] { baselineFile });
+                if (workingInfo == null || baselineInfo == null)
                 {
-                    // Try the field name used by the installed build
-                    saveList = ReadMember(manager, "m_Saves") as System.Collections.IEnumerable;
+                    // The save files are not indexed yet; wait for the
+                    // manager to discover them.
+                    return;
                 }
-                if (saveList == null) return;
-                object workingInfo = null;
-                object baselineInfo = null;
-                string expectedWorking = Parameter("workingSaveName");
-                string expectedBaseline = Parameter("baselineSaveName");
-                foreach (object save in saveList)
-                {
-                    if (save == null) continue;
-                    string name = Convert.ToString(ReadMember(save, "Name"));
-                    if (string.Equals(name, expectedWorking, StringComparison.Ordinal))
-                    {
-                        if (workingInfo != null)
-                            throw new AmbiguousMatchException(
-                                "Multiple working saves named " + expectedWorking);
-                        workingInfo = save;
-                    }
-                    else if (string.Equals(name, expectedBaseline, StringComparison.Ordinal))
-                    {
-                        if (baselineInfo != null)
-                            throw new AmbiguousMatchException(
-                                "Multiple baseline saves named " + expectedBaseline);
-                        baselineInfo = save;
-                    }
-                }
-                if (workingInfo == null || baselineInfo == null) return;
                 WorkingDescriptor = Describe(workingInfo);
                 BaselineDescriptor = Describe(baselineInfo);
                 _log.Info("[KBP-BOOT] exact disposable saves proven;working=" + WorkingDescriptor +
