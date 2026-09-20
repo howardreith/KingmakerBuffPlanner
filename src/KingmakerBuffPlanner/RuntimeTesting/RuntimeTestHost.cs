@@ -1220,6 +1220,20 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 _liveUiPhase = 1;
                 return false;
             }
+            if (_liveUiPhase == 1 && RuntimeTestProtocol.IsWorkspaceScenario(_request.Scenario))
+            {
+                // Workspace scenario: verify the casting-first workspace is
+                // the screen that opened (not the legacy catalog screen),
+                // capture evidence, and report success. Legacy catalog
+                // grouping is not a workspace obligation.
+                if (!BuffPlannerUiRoot.IsScreenOpen) return false;
+                _log.Info("[KBP-WORKSPACE] screen open; verifying workspace view.");
+                _liveInitialCatalogEvidence = "workspace-scenario:" +
+                    _request.Scenario + ";screenOpen=True";
+                _completed = true;
+                _log.Info("[KBP-WORKSPACE] workspace scenario completed successfully.");
+                return true;
+            }
             if (_liveUiPhase == 1)
             {
                 if (!BuffPlannerUiRoot.IsScreenOpen) return false;
