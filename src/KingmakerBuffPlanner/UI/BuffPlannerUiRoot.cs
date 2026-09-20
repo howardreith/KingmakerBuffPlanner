@@ -138,6 +138,49 @@ namespace KingmakerBuffPlanner.UI
             get { return _instance != null && _instance._castingWorkspace != null; }
         }
 
+        // Runtime presentation evidence for the workspace root: whether the
+        // GameObject hierarchy is actually active, sized, and carrying
+        // renderable text. A non-null view field alone proved insufficient
+        // (run casting-ws-root-200200: object present, screen showed only
+        // the game HUD).
+        internal static string CastingWorkspacePresentationEvidence()
+        {
+            CastingWorkspaceScreenView view =
+                _instance == null ? null : _instance._castingWorkspace;
+            if (view == null) return "workspace=missing";
+            GameObject root = view.RootObject;
+            if (root == null) return "workspace=root-null";
+            RectTransform rect = (RectTransform)root.transform;
+            var sb = new System.Text.StringBuilder();
+            sb.Append("workspace=present")
+                .Append(";activeSelf=").Append(root.activeSelf)
+                .Append(";activeInHierarchy=").Append(root.activeInHierarchy)
+                .Append(";childCount=").Append(root.transform.childCount)
+                .Append(";rect=").Append(rect.rect.width.ToString("F0"))
+                .Append("x").Append(rect.rect.height.ToString("F0"))
+                .Append(";parent=").Append(root.transform.parent == null
+                    ? "null" : root.transform.parent.name);
+            Canvas canvas = root.GetComponent<Canvas>();
+            if (canvas != null)
+                sb.Append(";canvasEnabled=").Append(canvas.enabled)
+                    .Append(";sortingOrder=").Append(canvas.sortingOrder)
+                    .Append(";overrideSorting=").Append(canvas.overrideSorting);
+            CanvasGroup group = root.GetComponent<CanvasGroup>();
+            if (group != null)
+                sb.Append(";alpha=").Append(group.alpha.ToString("F2"))
+                    .Append(";blocksRaycasts=").Append(group.blocksRaycasts)
+                    .Append(";interactable=").Append(group.interactable);
+            UnityEngine.UI.Text[] texts =
+                root.GetComponentsInChildren<UnityEngine.UI.Text>(true);
+            int renderableTexts = 0;
+            foreach (UnityEngine.UI.Text text in texts)
+                if (text != null && text.gameObject.activeInHierarchy &&
+                    text.font != null && text.enabled) renderableTexts++;
+            sb.Append(";texts=").Append(texts.Length)
+                .Append(";renderableTexts=").Append(renderableTexts);
+            return sb.ToString();
+        }
+
         internal static bool IsRuntimeReconstructionPending
         {
             get { return _instance != null && _instance._runtimeReconstructionPending; }

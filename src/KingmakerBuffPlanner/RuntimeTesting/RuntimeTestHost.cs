@@ -71,6 +71,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private MenuFrameCapture _workspaceFrameCapture;
         private int _workspaceBlackAttempts;
         private long _workspaceEngineWaitStartedMillis = -1;
+        private string _workspacePresentationEvidence;
         private readonly System.Diagnostics.Stopwatch _workspaceCaptureElapsed =
             new System.Diagnostics.Stopwatch();
         private string _workspaceEngineScreenshotSha256;
@@ -669,7 +670,25 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                             "blackFraction<0.98", lumaEvidence)
                         : RuntimeTestAssertion.Fail("workspace-frame-nonblack",
                             "blackFraction<0.98", lumaEvidence));
-                    if (!workspaceOpen || !frameCaptured || !engineCaptured || !nonBlack)
+                    // A non-null view field plus a non-black frame proved
+                    // insufficient (casting-ws-root-200200: object present,
+                    // frame showed only the game HUD). The hierarchy itself
+                    // must be active, sized, alpha-visible, and carrying
+                    // renderable text.
+                    string presentation = _workspacePresentationEvidence ?? "missing";
+                    bool presented = presentation.Contains("workspace=present") &&
+                        presentation.Contains("activeInHierarchy=True") &&
+                        presentation.Contains("canvasEnabled=True") &&
+                        !presentation.Contains("alpha=0.00") &&
+                        presentation.Contains("renderableTexts=") &&
+                        !presentation.Contains("renderableTexts=0");
+                    result.Assertions.Add(presented
+                        ? RuntimeTestAssertion.Pass("workspace-hierarchy-presents",
+                            "active;alpha>0;renderableTexts>0", presentation)
+                        : RuntimeTestAssertion.Fail("workspace-hierarchy-presents",
+                            "active;alpha>0;renderableTexts>0", presentation));
+                    if (!workspaceOpen || !frameCaptured || !engineCaptured ||
+                        !nonBlack || !presented)
                     {
                         result.Status = "FAIL";
                         result.Stage = "workspace-visual-validation";
@@ -1425,12 +1444,15 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     _workspaceEngineScreenshotSha256 = engineHash ?? string.Empty;
                     string lumaEvidence = _workspaceFrameCapture.Summary == null
                         ? "missing" : _workspaceFrameCapture.Summary.Describe();
+                    _workspacePresentationEvidence =
+                        BuffPlannerUiRoot.CastingWorkspacePresentationEvidence();
                     WriteWorkspaceRenderMarker(lumaEvidence);
                     _liveInitialCatalogEvidence = "workspace-scenario:" +
                         _request.Scenario +
                         ";workspaceRoot=" + (BuffPlannerUiRoot.IsCastingWorkspaceOpen ? "active" : "missing") +
                         ";legacyScreen=" + (BuffPlannerUiRoot.IsScreenOpen ? "open" : "closed") +
-                        ";luma=" + lumaEvidence + ";blackRecaptures=" + _workspaceBlackAttempts;
+                        ";luma=" + lumaEvidence + ";blackRecaptures=" + _workspaceBlackAttempts +
+                        ";" + _workspacePresentationEvidence;
                     _completed = true;
                     _log.Info("[KBP-WORKSPACE] workspace frame captured;readPixelsSha256=" +
                         _liveRenderScreenshotSha256 + ";engineSha256=" +
@@ -1801,6 +1823,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 ",\"stage\":\"workspace-frame-captured\"" +
                 ",\"environment\":" + JsonConvert.ToString(
                     MenuRenderDiagnostic.EnvironmentSample()) +
+                ",\"presentation\":" + JsonConvert.ToString(
+                    _workspacePresentationEvidence ?? string.Empty) +
                 ",\"readPixelsSha256\":" + JsonConvert.ToString(
                     _liveRenderScreenshotSha256 ?? string.Empty) +
                 ",\"engineSha256\":" + JsonConvert.ToString(
