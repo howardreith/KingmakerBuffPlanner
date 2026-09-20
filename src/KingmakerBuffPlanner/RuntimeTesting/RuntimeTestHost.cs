@@ -105,6 +105,20 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         internal bool Update()
         {
             if (_completed) return true;
+            // Workspace scenario: route the planner to the casting-first
+            // workspace instead of the legacy screen. This must precede the
+            // live-UI dispatch below (which returns until the phase machine
+            // completes) and must not sit inside the non-live UI-smoke gate
+            // — both mistakes left the selection unapplied and the legacy
+            // screen opened instead (runs casting-ws-visual-183000 and
+            // casting-ws-root-190500).
+            if (RuntimeTestProtocol.IsWorkspaceScenario(_request.Scenario) &&
+                !_workspaceSelectionApplied)
+            {
+                UI.CastingWorkspaceDevSelection.Enabled = true;
+                _workspaceSelectionApplied = true;
+                _log.Info("[KBP-WORKSPACE] dev selection enabled for workspace scenario.");
+            }
             if (RuntimeTestProtocol.IsLiveUiScenario(_request.Scenario))
             {
                 try
@@ -141,19 +155,6 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (RuntimeTestProtocol.IsPerformanceScenario(_request.Scenario) &&
                 !RuntimePerformanceDiagnostics.IsDurationComplete)
                 return false;
-            // Workspace scenario: route the planner to the casting-first
-            // workspace instead of the legacy screen. This must run for the
-            // workspace scenario itself (a live-UI scenario); it previously
-            // sat inside the non-live UI-smoke gate, which is always false
-            // here, so the selection never applied and the legacy screen
-            // opened instead (run casting-ws-visual-183000).
-            if (RuntimeTestProtocol.IsWorkspaceScenario(_request.Scenario) &&
-                !_workspaceSelectionApplied)
-            {
-                UI.CastingWorkspaceDevSelection.Enabled = true;
-                _workspaceSelectionApplied = true;
-                _log.Info("[KBP-WORKSPACE] dev selection enabled for workspace scenario.");
-            }
             if (RuntimeTestProtocol.IsUiScenario(_request.Scenario) &&
                 !RuntimeTestProtocol.IsLiveUiScenario(_request.Scenario))
             {
