@@ -98,10 +98,10 @@
       "version": "0.0.133",
       "assemblyName": "KingmakerGunslinger.dll",
       "infoSha256": "a59520f24356d17fc559644c0d7769fbd64fc23997c7e7449f3479f3a232e418",
-      "assemblySha256": "4f0cf61017cfd473bfb73eaac855db6eb1c85ea87a64399ab42a5832b92c6134",
-      "directoryManifestSha256": "fb278dbcabb8166bf40b044861897ce6e6e07fab7f68632e40f1e0d14b198eef",
+      "assemblySha256": "f03a0a67ba9c790fb578ec6f61d24aea81ea80e0f49a18827d0ea44e2bb5060b",
+      "directoryManifestSha256": "b8e4dd51e70b31bfbcd48744301023d71945114e572d82e52e6d0b4c65ebfb7c",
       "fileCount": 230,
-      "totalBytes": 45615109
+      "totalBytes": 45635589
     },
     {
       "ummId": "KingmakerLastAzlantiPreserver",
