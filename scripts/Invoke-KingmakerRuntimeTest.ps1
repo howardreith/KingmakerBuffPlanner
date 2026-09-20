@@ -46,9 +46,20 @@ $steamSafety = Assert-KbpSteamSafety -SteamPath $SteamPath
     -RunId 'runtime-whatif-preflight' -CompatibilityProfileId $CompatibilityProfileId `
     -WhatIf -Confirm:$false
 $WhatIfPreference = $requestedWhatIf
-if (-not $PSCmdlet.ShouldProcess(
-    'Steam App ID 640820 and exact live Mods transaction',
-    "run guarded $Scenario for version $version")) {
+$shouldProceed = $true
+try {
+    $shouldProceed = $PSCmdlet.ShouldProcess(
+        'Steam App ID 640820 and exact live Mods transaction',
+        "run guarded $Scenario for version $version")
+}
+catch [NullReferenceException] {
+    # powershell.exe -File leaves a top-level script's $PSCmdlet unable to
+    # service ShouldProcess (NullReferenceException; reproduced minimal,
+    # works under -Command). Fall back to the WhatIf contract this guard
+    # implements; every validator above still ran.
+    $shouldProceed = -not [bool]$WhatIfPreference
+}
+if (-not $shouldProceed) {
     Write-Host 'Runtime WhatIf preflight PASS; no evidence, deployment, process, game, mod, or save mutation occurred.'
     return
 }
