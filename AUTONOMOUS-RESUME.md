@@ -1,6 +1,76 @@
 # AUTONOMOUS-RESUME — top section is current; planning/CASTING-FIRST-MIGRATION-STATUS.md is the per-checkpoint tracker.
 
-## Casting-first migration checkpoint 14 (campaign UI qualification attempts) — 2026-09-20 (LATEST)
+## Campaign-load repair — 2026-09-20 (LATEST)
+
+- **THE STANDING BLOCKER IS REPAIRED AND REPRODUCED.** The campaign load
+  now completes through the game's own observed native chain in
+  consecutive fresh guarded runs (liveui-chain-1 and liveui-chain-2, both
+  full-user 15-mod profile, exact WORKING save
+  Manual_305_KBP_AUTOMATION_WORKING, gameId df33d1ff...): exact Load Game
+  button resolved by hierarchy/sibling/components/TMP-label/wired
+  listeners; Button.onClick.Invoke() with a Harmony-observed
+  MainMenuButtons.OnButtonLoadGame count of exactly one; ListOfSaves
+  catalog captured (84 descriptors); exact working+baseline descriptors
+  by identity fields; exact SaveSlot -> owning SaveLoadWindow ->
+  ListOfSaves by object references; SaveSlot.OnButtonSaveLoad on the
+  exact slot; then OBSERVED: SaveLoadWindow.HandleHardcodeMainMenuSaveLoad
+  (same descriptor), MainMenu.LoadGame (same descriptor), SaveManager
+  after-load callback, stable fingerprint (exact gameId, party 3). The
+  read-only saver suppressed the single header update and commit (zero
+  disk writes); native saver restored. Evidence:
+  runtime-evidence/liveui-chain-1/ and liveui-chain-2/
+  (saveload-chain-events.json + output_log [KBP-SAVE-LOAD] lines).
+- Root causes fixed this session (each with reproduced evidence):
+  1. The old loader waited for an ALREADY-ACTIVE SaveLoadWindow
+     (FindObjectOfType excludes inactive) and invoked methods by name
+     without observing downstream effects — replaced by the
+     Gunslinger-working-save-smoke-derived observed chain
+     (src/RuntimeTesting/LiveCampaignSaveLoader.cs,
+     MainMenuLoadContracts.cs, GuardedReadOnlySaver.cs; commit c114940).
+  2. PowerShell 5.1's array-subexpression binder crashes on
+     List[object] ("Argument types do not match"), killing every harness
+     wait loop before the first observation persisted; reproduced
+     standalone; fixed with ToArray() (commit 0c4d81b).
+  3. Update-count budgets expire in seconds because an unfocused Unity
+     player with runInBackground spins far above 60 fps (observed
+     ~800-1750 dispatches/s); all budgets are now wall-clock
+     (commits 524107e, 1449b1f).
+  4. Mono serves persisted image sidecars (Assembly.dll.<pid>.cache) for
+     some mods; identity hashing now resolves the canonical assembly
+     (LoadedAssemblyIdentity; the full-user profile pins were verified
+     byte-exact on disk — no drift).
+  5. Physical-input delivery failures (Windows foreground lock while the
+     owner interacts) aborted runs; deliveries now retry and record
+     errors instead.
+- Render diagnostics: launchdiag-1 proved the automated session presents
+  a rendered main menu (identical ReadPixels + engine captures, 1.67 MB,
+  blackFraction 0.05, UMM overlay visible over it). menuinput-4/5 later
+  captured fully black frames from BOTH capture paths while the game was
+  foregrounded — the black presentation is INTERMITTENT and correlates
+  with focus; NOT classified (display-path vs presentation), evidence
+  retained. The owner's remote black screen therefore has in-game
+  capture proof of both states.
+- Physical click at the exact Load Game button could not be delivered
+  while the owner was actively using the machine (foreground lock,
+  deliveryFailed ack with error) — the programmatic onClick route is the
+  qualified automation path; physical input remains timing-dependent.
+- liveui-chain-3 was REFUSED correctly: an owner-controlled Kingmaker
+  (PID 21420) is running. **PENDING: transaction liveui-chain-2 is
+  Active/unrestored (restore refused while the owner plays; the staged
+  build is the exact validated package and inert without the request
+  flag). Run `scripts/Restore-Local.ps1 -RunId liveui-chain-2
+  -Confirm:$false` as soon as the game closes.**
+- Gates: source 42/42; protocol 217/217; harness 27/27; package 4/4;
+  WhatIf 5/5; fixture 3/3; rollback 4/4; publisher 3/3. HEAD `1449b1f`
+  on codex/kingmaker-buff-planner-casting-first (commits d1e824b,
+  83a7cbb, 79d314b, fe3d8f6, 0c4d81b, 524107e, 1449b1f + records).
+- NEXT: restore liveui-chain-2 when the game closes; then one full
+  live-ui-bootstrap pass (phases beyond the load now have wall-clock
+  budgets and retried input delivery) for the complete UI qualification
+  chain; treat the intermittent black presentation as its own diagnosis
+  (compare focused vs unfocused captures in one run).
+
+## Casting-first migration checkpoint 14 (campaign UI qualification attempts) — 2026-09-20
 
 - ROOT CAUSE CHAIN IDENTIFIED across multiple guarded runs:
   1. Runtime protocol rejected full-user profile → FIXED (accepted, 15 mods)

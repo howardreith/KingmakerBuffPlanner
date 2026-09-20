@@ -1,5 +1,51 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-09-20 campaign-load repair (Gunslinger-reference adaptation)
+
+- Followed the review-directed reframe: prove launch/render/menu-input
+  before touching the loader, then repair by comparison against the
+  qualified KingmakerGunslinger working-save-smoke autonomous route
+  (11/11 on 2026-08-28, run 20260828T1304368014092Z-working-save-smoke).
+- New guarded diagnostic scenarios (launch-render-diagnostic,
+  menu-input-diagnostic) capture the presented frame after the frame
+  finishes (WaitForEndOfFrame ReadPixels) plus an engine ScreenCapture
+  cross-check with luma statistics, record the actual game command line,
+  session id, and sampled window state, and request physical input
+  through the existing channel.
+- launchdiag-1: the automated session RENDERS the main menu (identical
+  read-pixels and engine hashes, 1.67 MB, blackFraction 0.05) with the
+  UMM ShowOnStart overlay over it; game command line is exactly
+  Kingmaker.exe -kbpRuntimeTestRequest <file>; session 2; 1920x1200
+  fullscreen; runInBackground=True. The owner's remote black screen is
+  therefore not "the game does not render" — and menuinput-4/5 later
+  captured genuinely black frames from both in-game paths with focus
+  present, so the black presentation is intermittent and unclassified.
+- Three harness defects found by the new diagnostics and fixed with
+  reproduced evidence: the PowerShell 5.1 List array-subexpression crash
+  that killed every wait loop (0c4d81b), update-count budgets expiring
+  in seconds at the unfocused player's ~800+ dispatches/s (524107e,
+  1449b1f), and physical-input delivery aborting runs on foreground-lock
+  failures (now retried and recorded). Optional-assembly "mismatches"
+  were proven to be Mono image sidecars; hashing resolves the canonical
+  file and the profile pins were verified byte-exact.
+- LiveCampaignSaveLoader rewritten as the observed native chain adapted
+  from the reference (c114940): exact button identity, onClick.Invoke
+  with handler-count proof, catalog capture, descriptor identity,
+  receiver-bound slot/window/list resolution by object references,
+  slot-action invocation, downstream handler/load-entry/callback
+  observation with strict sequencing, read-only native saver, save-write
+  sentinels, per-stage wall-clock budgets, and a stable fingerprint.
+- RESULT: liveui-chain-1 and liveui-chain-2 (consecutive fresh guarded
+  full-user runs) each loaded the exact WORKING campaign through the
+  complete observed chain to a stable fingerprint (gameId
+  df33d1ff-4ec8-4707-bfa0-5e059bf9a049, party 3) with zero save writes.
+  Evidence: runtime-evidence/liveui-chain-*/saveload-chain-events.json
+  and the [KBP-SAVE-LOAD] log lines. liveui-chain-3 was refused by the
+  running-game guard (owner session); liveui-chain-2's restoration is
+  pending the owner's session ending.
+- Gates at each step: source 42/42, protocol 217/217, harness 27/27,
+  package 4/4, WhatIf 5/5, fixture 3/3, rollback 4/4, publisher 3/3.
+
 ## 2026-09-20 casting-first migration: checkpoint 9 (qualification continuation)
 
 Reconciled at `9a2e5738...` (clean). Bundle applicability proven
