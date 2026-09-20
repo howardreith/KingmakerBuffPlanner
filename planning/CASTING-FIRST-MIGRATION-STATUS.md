@@ -5,7 +5,110 @@ Linked from `AUTONOMOUS-RESUME.md`. Specification: the adopted
 `Kingmaker-Buff-Planner-Casting-First-Migration-Charter.md` (casting-first
 migration and native scroll UI charter v1.0, 2026-09-19).
 
-## Phase 2 checkpoint 5 — targeting-modifier resolution — 2026-09-19 (CURRENT)
+## Phase 2 checkpoint 6 — continuation contract checks C1–C5 — 2026-09-19 (CURRENT)
+
+**Branch** `codex/kingmaker-buff-planner-casting-first`, reconciled at
+`061968d4b7ec3b7c1247feab72c065b4a7fd4d41` (checkpoint 5, clean tree,
+single worktree) before this checkpoint. Reviewable evidence:
+`artifacts/review-bundles/casting-first-checkpoints-1-6/` (format-patch
+bundle for checkpoints 1–5 + this checkpoint's commit, with manifest).
+
+### C1 — unvalidated required modifiers (DEFECT REPRODUCED AND REPAIRED)
+
+The checkpoint-5 behavior was a confirmed defect: with no host registry,
+an enabled modifier emitted a `targeting-modifier-unvalidated` diagnostic
+and the casting STAYED EXECUTABLE — silent execution of the unmodified
+spell, even when the recipient was legal for the base spell. Repaired:
+`targeting-modifier-unresolved:<id>` now blocks. The unknown-id (against a
+registry) and known-but-unavailable cases were already correct. Test
+`casting-c1-unvalidated-modifiers-never-execute-unmodified` exercises all
+three conditions through the compiler-to-gate path, both recipient
+legalities, Ordinary refusal, Ready-Casts-Only omission without
+submission, and registry repair preserving CastingId with no duplicate.
+
+### C2 — unresolved draft is not an implicit opt-out (GAP REPAIRED)
+
+Added `CastingAuthoringState.Disabled` (explicit player parking, distinct
+from unresolved `Draft`) and `ResolvedCastingReadiness.Disabled`/
+`AlreadySatisfied`. The gate gained a routine scope: a saved Draft in
+scope blocks Ordinary Apply (`unresolved-saved-request`) — requiring
+explicit resolution, disabling, or the deliberate Ready Casts Only
+action; a Disabled record is disclosed (`explicitly-disabled`) and never
+blocks; out-of-scope records are ignored entirely. Test
+`casting-c2-draft-is-not-an-implicit-opt-out` covers scoped/unscoped
+runs, disabled disclosure, and unrelated-run isolation. A11 updated to
+the corrected contract (draft now blocks Ordinary).
+
+### C3 — presented-plan acceptance (MISSING LAYER IMPLEMENTED)
+
+The pure gate proved nothing about presentation; new
+`Planning/CastingReviewCoordinator.cs` implements the deterministic core:
+`CastingPlanSignature.For(plan)` captures material contents (identity,
+order, exact source, targets/origin, coverage, enabled modifiers,
+enhancement selections, cost vectors, readiness);
+Present/Accept/TrySubmit enforce that only presented-and-accepted
+contents matching the submitted plan may execute. Material changes
+refuse (`material-change-requires-review`); refusal authorizes nothing;
+a same-contents refresh keeps acceptance (no ceremonial loop);
+incidental previews never present. Test
+`casting-c3-presented-plan-gates-submission` covers edit-between-
+presentation-and-submission, refused-then-retry, refresh, and preview
+isolation. The workspace view and executor still must call it (marked
+unintegrated; Apply stays safely disabled until then).
+
+### C4 — modifier costs in the complete cost vector (MISSING, IMPLEMENTED)
+
+`ICastingTargetingModifier.UsageDemands` added; applied modifiers'
+verified pool demands merge into the same per-pool grouping in
+`CastingBudgetLedger.DemandsFor`, so a modifier and a class feature
+spending one reservoir validate as combined demand atomically. Test
+`casting-c4-modifier-costs-enter-the-atomic-vector`: each affordable
+alone, combined blocked with `enhancement-pool-exhausted:reservoir:1<2`,
+zero leakage, deficit line exposed. Unknown modifier costs can no longer
+be free (unvalidated modifiers block, so their cost is unresolved, not
+zero). Native setup/execution/restoration of cost-charging modifiers
+remains execution-phase work (A05 native half open).
+
+### C5 — forecast effect projection (MISSING, IMPLEMENTED)
+
+One-pass forecasts now carry structural effect presence forward:
+`Compile(..., projectEffects: true)` marks a SkipAlreadyActive casting
+`AlreadySatisfied` (no invocation, no reservation) when a
+proven-equal earlier executing casting covered all its beneficiaries.
+Equivalence is deliberately minimal — identical ability identity and no
+strength-affecting enhancements on either side; enhanced or Overwrite
+requests still cast. Test
+`casting-c5-projection-carries-effects-forward`: overlap satisfaction,
+Always-Recast remains a casting, enhanced requests gain no invented
+satisfaction, authored-order reversal flips the executing casting with
+identical totals, and independent previews mutate neither the document
+nor later results. Assumption label added
+(`projected-effects-are-structural-presence-only`).
+
+### Verification at this checkpoint
+
+Full gate: **source 42/42; protocol 204/204** (5 new C-tests; A11/A05
+updated to repaired contracts); harness 27/27; package 4/4; WhatIf 5/5;
+rollback 4/4; publisher 3/3
+(`artifacts/casting-first-checkpoint6-gate.log`). Deterministic
+domain/policy layer only.
+
+### Acceptance-matrix adjustments
+
+A05: domain+policy layers pass; native cost/state cleanup open. A09:
+forecast layer passes; presented-plan integration is implemented at the
+coordinator layer but not wired to a view/executor (open). A11: policy
+layer passes with the corrected draft contract. A06, A12 (live accept),
+A13 (live rollback), A14 (beyond structural), A15–A20: open.
+
+### Next executable step
+
+The guarded native donor investigation (Build-Local package + the
+`ui-native-contract-probe` / `live-ui-bootstrap` lanes with restore
+receipts), then the connected parchment workspace on the canonical
+model; isolated A13 persistence/recovery tests advance alongside.
+
+## Phase 2 checkpoint 5 — targeting-modifier resolution — 2026-09-19 (commit `061968d`)
 
 **Branch** `codex/kingmaker-buff-planner-casting-first`, on top of
 checkpoint 4 (`f9cc4fe`). Version remains `0.1.1-rc3`.

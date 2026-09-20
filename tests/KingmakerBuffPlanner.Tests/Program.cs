@@ -316,6 +316,18 @@ namespace KingmakerBuffPlanner.Tests
                     TestCastingA11ApplyGate);
                 Run("casting-a05-targeting-modifiers-change-eligibility",
                     TestCastingA05TargetingModifiers);
+                // Continuation contract checks C1-C5 through the same
+                // production compiler/gate/forecast services.
+                Run("casting-c1-unvalidated-modifiers-never-execute-unmodified",
+                    TestCastingC1UnvalidatedModifiers);
+                Run("casting-c2-draft-is-not-an-implicit-opt-out",
+                    TestCastingC2DraftNotAnOptOut);
+                Run("casting-c4-modifier-costs-enter-the-atomic-vector",
+                    TestCastingC4ModifierCosts);
+                Run("casting-c5-projection-carries-effects-forward",
+                    TestCastingC5EffectProjection);
+                Run("casting-c3-presented-plan-gates-submission",
+                    TestCastingC3PresentedPlan);
             }
             finally
             {
@@ -9632,12 +9644,13 @@ namespace KingmakerBuffPlanner.Tests
             AbilityKey ability,
             IEnumerable<AuthoredEnhancementSelection> enhancements = null,
             string spellbookGuid = null,
-            CastingAuthoringState state = CastingAuthoringState.Ready)
+            CastingAuthoringState state = CastingAuthoringState.Ready,
+            ExistingEffectPolicy existingEffectPolicy = ExistingEffectPolicy.SkipAlreadyActive)
         {
             return new PlannedCasting(
                 castingId, routineId, 0, sourceId, ability, casterUnitId, spellbookGuid,
                 CastingTargetMode.DirectTarget, targetUnitId, null, null, null,
-                enhancements, ExistingEffectPolicy.SkipAlreadyActive, null, state, null);
+                enhancements, existingEffectPolicy, null, state, null);
         }
 
         private static PlannedCasting GroupCasting(
@@ -10773,11 +10786,16 @@ namespace KingmakerBuffPlanner.Tests
             var gate = new CastingExecutionGate();
             CastingApplyDecision ordinary = gate.Evaluate(
                 plan, CastingApplyMode.Ordinary);
-            if (ordinary.Allowed || ordinary.BlockingReasons.Count != 1 ||
-                !ordinary.BlockingReasons[0].StartsWith("blocked-casting:cast-ghost:",
-                    StringComparison.Ordinal))
+            // The blocked request AND the saved unresolved draft both
+            // refuse the ordinary apply: neither is an implicit opt-out.
+            if (ordinary.Allowed || ordinary.BlockingReasons.Count != 2 ||
+                !ordinary.BlockingReasons.Any(value => value.StartsWith(
+                    "blocked-casting:cast-ghost:", StringComparison.Ordinal)) ||
+                !ordinary.BlockingReasons.Any(value => value.StartsWith(
+                    "unresolved-saved-request-casting:cast-draft",
+                    StringComparison.Ordinal)))
                 throw new InvalidOperationException(
-                    "Ordinary Apply did not refuse blocked work.");
+                    "Ordinary Apply did not refuse blocked and unresolved work.");
             if (ordinary.ExecutableCastingIds.Count != 1 ||
                 ordinary.ExecutableCastingIds[0] != "cast-ready")
                 throw new InvalidOperationException(
@@ -10796,7 +10814,7 @@ namespace KingmakerBuffPlanner.Tests
                     "Ready-Casts-Only did not disclose its omissions.");
             CastingOmission draft = readyOnly.Omissions.FirstOrDefault(
                 omission => omission.CastingId == "cast-draft");
-            if (draft == null || !draft.Reasons.Contains("draft-not-enabled"))
+            if (draft == null || !draft.Reasons.Contains("unresolved-saved-request"))
                 throw new InvalidOperationException(
                     "The draft omission lacks its reason.");
             CastingOmission ghost = readyOnly.Omissions.FirstOrDefault(
@@ -10829,12 +10847,14 @@ namespace KingmakerBuffPlanner.Tests
         {
             private readonly string _requiredCaster;
             private readonly string[] _legalTargets;
+            private readonly ModifierUsageDemand[] _demands;
 
             internal FixtureShareCastingModifier(string requiredCaster,
-                string[] legalTargets)
+                string[] legalTargets, params ModifierUsageDemand[] demands)
             {
                 _requiredCaster = requiredCaster;
                 _legalTargets = legalTargets;
+                _demands = demands ?? new ModifierUsageDemand[0];
             }
 
             public string ModifierId { get { return "share"; } }
@@ -10848,6 +10868,13 @@ namespace KingmakerBuffPlanner.Tests
                     option.Provider, _legalTargets, option.LegalAnchorIds,
                     option.EffectiveCasterLevel, option.ExpectedDurationRounds,
                     option.ExecutionStrategy, option.ExecutionStrategyReason));
+            }
+
+            public System.Collections.Generic.IReadOnlyList<ModifierUsageDemand>
+                UsageDemands(Domain.Authoring.PlannedCasting casting,
+                    ProviderPlanningOption option)
+            {
+                return _demands;
             }
         }
 
@@ -10957,6 +10984,443 @@ namespace KingmakerBuffPlanner.Tests
                         repeat.Castings[i].ReadinessReasons.Count)
                     throw new InvalidOperationException(
                         "Modifier application leaked state across compilations.");
+        }
+
+        // ------------------------------------------------------------------
+        // Continuation contract checks C1-C5, exercised through the same
+        // production compiler, gate, and forecast services.
+        // ------------------------------------------------------------------
+
+        // C1: an enabled modifier without a validated host contract must
+        // never become permission to execute the unmodified spell — even
+        // when the recipient is legal for the base spell — and ordinary
+        // Apply must block; repairing the registry restores the record.
+        private static void TestCastingC1UnvalidatedModifiers()
+        {
+            List<ProviderPlanningOption> options;
+            List<CastEnhancementSnapshot> enhancements;
+            PartyProviderSnapshot snapshot = CastingParty(
+                CastingBuffAbility,
+                out options, out enhancements,
+                new[] { "unit-t1", "unit-t2" }, 3);
+            TargetingModifierSelection ShareEnabled()
+            {
+                return new TargetingModifierSelection("share", true, null);
+            }
+            var document = CastingDocument(
+                DirectCasting("cast-mod-legal", "long", "unit-cleric", "unit-t1",
+                    "source-bulls", CastingBuffAbility),
+                DirectCasting("cast-plain", "long", "unit-cleric", "unit-t2",
+                    "source-bulls", CastingBuffAbility));
+            // The modifier selection is added by rebuilding the first
+            // casting with the selection enabled; unit-t1 stays legal under
+            // base targeting, so a silent downgrade would succeed here.
+            var withModifier = CastingDocument(
+                new PlannedCasting(
+                    "cast-mod-legal", "long", 0, "source-bulls", CastingBuffAbility,
+                    "unit-cleric", null, CastingTargetMode.DirectTarget, "unit-t1",
+                    null, null, new[] { ShareEnabled() }, null,
+                    ExistingEffectPolicy.SkipAlreadyActive, null,
+                    CastingAuthoringState.Ready, null),
+                DirectCasting("cast-plain", "long", "unit-cleric", "unit-t2",
+                    "source-bulls", CastingBuffAbility));
+            var compiler = new ExplicitCastingCompiler();
+            var effects = CastingEffects("source-bulls", "source-communal");
+            ExplicitCastingPlan unresolved = compiler.Compile(
+                withModifier, snapshot, options, effects, enhancements);
+            ResolvedCasting blocked = unresolved.CastingById("cast-mod-legal");
+            if (blocked.Readiness != ResolvedCastingReadiness.Blocked ||
+                !blocked.ReadinessReasons.Contains(
+                    "targeting-modifier-unresolved:share") ||
+                blocked.Cost.Count != 0 ||
+                blocked.IsExecutable)
+                throw new InvalidOperationException(
+                    "An unvalidated required modifier allowed execution: " +
+                    string.Join(",", blocked.ReadinessReasons));
+            // A casting with no modifier is unaffected by the absent
+            // registry.
+            if (unresolved.CastingById("cast-plain").Readiness !=
+                    ResolvedCastingReadiness.Ready)
+                throw new InvalidOperationException(
+                    "An absent registry blocked a modifier-free casting.");
+            // Compiler-to-gate path: ordinary Apply refuses; Ready Casts
+            // Only omits the record with its reason and never submits it.
+            var gate = new CastingExecutionGate();
+            CastingApplyDecision ordinary = gate.Evaluate(
+                unresolved, CastingApplyMode.Ordinary);
+            if (ordinary.Allowed ||
+                !ordinary.BlockingReasons.Any(value => value.StartsWith(
+                    "blocked-casting:cast-mod-legal", StringComparison.Ordinal)))
+                throw new InvalidOperationException(
+                    "Ordinary Apply accepted an unvalidated modifier request.");
+            CastingApplyDecision readyOnly = gate.Evaluate(
+                unresolved, CastingApplyMode.ReadyCastsOnly);
+            if (!readyOnly.Allowed ||
+                readyOnly.ExecutableCastingIds.Count != 1 ||
+                readyOnly.ExecutableCastingIds[0] != "cast-plain" ||
+                readyOnly.Omissions.Any(omission => omission.CastingId ==
+                    "cast-mod-legal" && !omission.Reasons.Contains(
+                        "targeting-modifier-unresolved:share")))
+                throw new InvalidOperationException(
+                    "Ready Casts Only submitted or hid the unresolved record.");
+            // Repair: the same document with a registry restores readiness
+            // with the same CastingId and no duplicate record.
+            var registry = new ICastingTargetingModifier[]
+            {
+                new FixtureShareCastingModifier("unit-cleric",
+                    new[] { "unit-cleric", "unit-t1", "unit-t2" })
+            };
+            ExplicitCastingPlan repaired = compiler.Compile(
+                withModifier, snapshot, options, effects, enhancements,
+                null, registry);
+            if (repaired.Castings.Count != 2 ||
+                repaired.CastingById("cast-mod-legal").Readiness !=
+                    ResolvedCastingReadiness.Ready)
+                throw new InvalidOperationException(
+                    "Repairing the registry did not restore the record.");
+            // The original document (no modifier at all) was never blocked.
+            ExplicitCastingPlan plain = compiler.Compile(
+                document, snapshot, options, effects, enhancements);
+            if (plain.ReadyInvocationCount != 2)
+                throw new InvalidOperationException(
+                    "A modifier-free plan was disturbed.");
+        }
+
+        // C2: a saved unresolved draft is not an implicit opt-out; an
+        // explicitly disabled or out-of-scope record never blocks a run.
+        private static void TestCastingC2DraftNotAnOptOut()
+        {
+            List<ProviderPlanningOption> options;
+            List<CastEnhancementSnapshot> enhancements;
+            PartyProviderSnapshot snapshot = CastingParty(
+                CastingBuffAbility,
+                out options, out enhancements,
+                new[] { "unit-t1" }, 3);
+            var document = CastingDocument(
+                DirectCasting("cast-ready", "long", "unit-cleric", "unit-t1",
+                    "source-bulls", CastingBuffAbility),
+                DirectCasting("cast-draft", "long", "unit-cleric", "unit-t1",
+                    "source-bulls", CastingBuffAbility, null, null,
+                    CastingAuthoringState.Draft),
+                DirectCasting("cast-parked", "long", "unit-cleric", "unit-t1",
+                    "source-bulls", CastingBuffAbility, null, null,
+                    CastingAuthoringState.Disabled),
+                DirectCasting("cast-other", "short", "unit-cleric", "unit-t1",
+                    "source-bulls", CastingBuffAbility, null, null,
+                    CastingAuthoringState.Draft));
+            ExplicitCastingPlan plan = CompileCastingPlan(
+                document, snapshot, options, enhancements,
+                "source-bulls", "source-communal");
+            if (plan.CastingById("cast-parked").Readiness !=
+                    ResolvedCastingReadiness.Disabled)
+                throw new InvalidOperationException(
+                    "An explicitly disabled casting lost its distinct state.");
+            var gate = new CastingExecutionGate();
+            // Selected run (long): the unresolved draft blocks ordinary
+            // Apply; the parked record is disclosed but never blocks.
+            CastingApplyDecision ordinary = gate.Evaluate(
+                plan, CastingApplyMode.Ordinary, "long");
+            if (ordinary.Allowed || ordinary.BlockingReasons.Count != 1 ||
+                !ordinary.BlockingReasons[0].StartsWith(
+                    "unresolved-saved-request-casting:cast-draft",
+                    StringComparison.Ordinal))
+                throw new InvalidOperationException(
+                    "A saved unresolved draft silently opted out of Apply.");
+            CastingOmission parked = ordinary.Omissions.FirstOrDefault(
+                omission => omission.CastingId == "cast-parked");
+            if (ordinary.Omissions.Count != 2 || parked == null ||
+                !parked.Reasons.Contains("explicitly-disabled"))
+                throw new InvalidOperationException(
+                    "The explicitly disabled record was not disclosed as such.");
+            // Out-of-scope work never blocks an unrelated valid run.
+            if (gate.Evaluate(plan, CastingApplyMode.Ordinary, "important").Allowed !=
+                    true)
+                throw new InvalidOperationException(
+                    "Out-of-scope work blocked an unrelated empty run.");
+            // The short routine's own draft still blocks the short run.
+            if (gate.Evaluate(plan, CastingApplyMode.Ordinary, "short").Allowed)
+                throw new InvalidOperationException(
+                    "Scoping ignored the short routine's unresolved record.");
+            // The deliberate Ready Casts Only action executes the ready work
+            // and names exactly what it omits.
+            CastingApplyDecision readyOnly = gate.Evaluate(
+                plan, CastingApplyMode.ReadyCastsOnly, "long");
+            if (!readyOnly.Allowed ||
+                readyOnly.ExecutableCastingIds.Count != 1 ||
+                readyOnly.Omissions.Count != 2)
+                throw new InvalidOperationException(
+                    "Ready Casts Only lost the omissions or the executable set.");
+            // Full-scope (one-pass) ordinary Apply counts every draft.
+            CastingApplyDecision onePass = gate.Evaluate(
+                plan, CastingApplyMode.Ordinary);
+            if (onePass.Allowed || onePass.BlockingReasons.Count != 2)
+                throw new InvalidOperationException(
+                    "One-pass Apply ignored an unresolved record.");
+        }
+
+        // C4: a cost-charging targeting modifier enters the same atomic cost
+        // vector; each feature alone is affordable but the combination is
+        // not, and the failure leaks no reservations.
+        private static void TestCastingC4ModifierCosts()
+        {
+            List<ProviderPlanningOption> options;
+            List<CastEnhancementSnapshot> enhancements;
+            PartyProviderSnapshot snapshot = CastingParty(
+                CastingBuffAbility,
+                out options, out enhancements,
+                new[] { "unit-t1", "unit-t2" }, 3);
+            enhancements.Add(new CastEnhancementSnapshot(
+                "score-a", "unit-cleric", "feat-a", "Score A", string.Empty,
+                CastEnhancementCategory.ClassFeature, 0, 10, 1,
+                new[] { CastingBuffAbility.BaseAbilityGuid },
+                null, new[] { "book-unit-cleric" }, "reservoir", false, "score-a", 1));
+            var registry = new ICastingTargetingModifier[]
+            {
+                new FixtureShareCastingModifier("unit-cleric",
+                    new[] { "unit-cleric", "unit-t1", "unit-t2" },
+                    new ModifierUsageDemand("reservoir", 1))
+            };
+            var compiler = new ExplicitCastingCompiler();
+            var effects = CastingEffects("source-bulls", "source-communal");
+            TargetingModifierSelection ShareEnabled()
+            {
+                return new TargetingModifierSelection("share", true, null);
+            }
+            // Combined demand: the modifier and the class feature each cost
+            // one reservoir unit; the pool holds one.
+            var combined = CastingDocument(
+                new PlannedCasting(
+                    "cast-both", "long", 0, "source-bulls", CastingBuffAbility,
+                    "unit-cleric", null, CastingTargetMode.DirectTarget, "unit-t1",
+                    null, null, new[] { ShareEnabled() },
+                    new[] { new AuthoredEnhancementSelection("score-a", true, null) },
+                    ExistingEffectPolicy.SkipAlreadyActive, null,
+                    CastingAuthoringState.Ready, null),
+                DirectCasting("cast-plain", "long", "unit-cleric", "unit-t2",
+                    "source-bulls", CastingBuffAbility));
+            ExplicitCastingPlan combinedPlan = compiler.Compile(
+                combined, snapshot, options, effects, enhancements, null, registry);
+            ResolvedCasting both = combinedPlan.CastingById("cast-both");
+            if (both.Readiness != ResolvedCastingReadiness.Blocked ||
+                !both.ReadinessReasons.Contains(
+                    "enhancement-pool-exhausted:reservoir:1<2") ||
+                both.Cost.Count != 0)
+                throw new InvalidOperationException(
+                    "Combined modifier+feature demand was not atomic: " +
+                    string.Join(",", both.ReadinessReasons));
+            // No leakage: the later plain casting still reserves its native
+            // slot and the reservoir line exposes the deficit.
+            if (combinedPlan.CastingById("cast-plain").Readiness !=
+                    ResolvedCastingReadiness.Ready)
+                throw new InvalidOperationException(
+                    "The failed combination leaked reservations.");
+            CastingBudgetLine reservoir = combinedPlan.BudgetLineFor("reservoir");
+            if (reservoir.RequestedUsage != 2 || reservoir.AllocatedUsage != 0 ||
+                reservoir.UnmetDemand != 2)
+                throw new InvalidOperationException(
+                    "The reservoir deficit was not exposed.");
+            // Each feature alone is affordable.
+            var modifierOnly = CastingDocument(
+                new PlannedCasting(
+                    "cast-mod", "long", 0, "source-bulls", CastingBuffAbility,
+                    "unit-cleric", null, CastingTargetMode.DirectTarget, "unit-t1",
+                    null, null, new[] { ShareEnabled() }, null,
+                    ExistingEffectPolicy.SkipAlreadyActive, null,
+                    CastingAuthoringState.Ready, null));
+            ExplicitCastingPlan modifierPlan = compiler.Compile(
+                modifierOnly, snapshot, options, effects, enhancements,
+                null, registry);
+            if (modifierPlan.CastingById("cast-mod").Readiness !=
+                    ResolvedCastingReadiness.Ready ||
+                !modifierPlan.CastingById("cast-mod").Cost.Any(line =>
+                    line.PoolKey == "reservoir" && line.Units == 1))
+                throw new InvalidOperationException(
+                    "The affordable modifier-alone demand was not reserved.");
+            var featureOnly = CastingDocument(
+                DirectCasting("cast-feat", "long", "unit-cleric", "unit-t1",
+                    "source-bulls", CastingBuffAbility,
+                    new[] { new AuthoredEnhancementSelection("score-a", true, null) }));
+            ExplicitCastingPlan featurePlan = compiler.Compile(
+                featureOnly, snapshot, options, effects, enhancements,
+                null, registry);
+            if (featurePlan.CastingById("cast-feat").Readiness !=
+                    ResolvedCastingReadiness.Ready)
+                throw new InvalidOperationException(
+                    "The affordable feature-alone demand was blocked.");
+        }
+
+        // C5: the one-pass forecast carries structural effect presence
+        // forward per the per-casting existing-effect policy, without
+        // inventing satisfaction for enhanced or reordered requests.
+        private static void TestCastingC5EffectProjection()
+        {
+            List<ProviderPlanningOption> options;
+            List<CastEnhancementSnapshot> enhancements;
+            PartyProviderSnapshot snapshot = CastingParty(
+                CastingBuffAbility,
+                out options, out enhancements,
+                new[] { "unit-t1" }, 3);
+            var service = new CastingForecastService();
+            var document = CastingDocument(
+                DirectCasting("cast-first", "long", "unit-cleric", "unit-t1",
+                    "source-bulls", CastingBuffAbility),
+                DirectCasting("cast-second", "long", "unit-cleric", "unit-t1",
+                    "source-bulls", CastingBuffAbility));
+            CastingForecast onePass = service.ForecastOnePass(
+                document, snapshot, options,
+                CastingEffects("source-bulls", "source-communal"), enhancements);
+            if (onePass.Plan.CastingById("cast-first").Readiness !=
+                    ResolvedCastingReadiness.Ready ||
+                onePass.Plan.CastingById("cast-second").Readiness !=
+                    ResolvedCastingReadiness.AlreadySatisfied ||
+                onePass.ReadyInvocations != 1)
+                throw new InvalidOperationException(
+                    "A proven-equal earlier result did not satisfy later demand.");
+            if (onePass.Plan.BudgetLineFor("pool-unit-cleric").AllocatedUsage != 1)
+                throw new InvalidOperationException(
+                    "A satisfied casting still reserved resources.");
+            // Always-recast remains a casting.
+            var overwrite = CastingDocument(
+                DirectCasting("cast-first", "long", "unit-cleric", "unit-t1",
+                    "source-bulls", CastingBuffAbility),
+                DirectCasting("cast-second", "long", "unit-cleric", "unit-t1",
+                    "source-bulls", CastingBuffAbility, null, null,
+                    CastingAuthoringState.Ready, ExistingEffectPolicy.Overwrite));
+            CastingForecast overwriteForecast = service.ForecastOnePass(
+                overwrite, snapshot, options,
+                CastingEffects("source-bulls", "source-communal"), enhancements);
+            if (overwriteForecast.ReadyInvocations != 2)
+                throw new InvalidOperationException(
+                    "An always-recast request was silently satisfied.");
+            // Enhanced requests never inherit plain-cast satisfaction.
+            var enhanced = CastingDocument(
+                DirectCasting("cast-first", "long", "unit-cleric", "unit-t1",
+                    "source-bulls", CastingBuffAbility),
+                DirectCasting("cast-second", "long", "unit-cleric", "unit-t1",
+                    "source-bulls", CastingBuffAbility,
+                    new[] { new AuthoredEnhancementSelection("extend-cleric", true, null) }));
+            CastingForecast enhancedForecast = service.ForecastOnePass(
+                enhanced, snapshot, options,
+                CastingEffects("source-bulls", "source-communal"), enhancements);
+            if (enhancedForecast.ReadyInvocations != 2 ||
+                enhancedForecast.Plan.CastingById("cast-second").Readiness !=
+                    ResolvedCastingReadiness.Ready)
+                throw new InvalidOperationException(
+                    "Unknown strength equivalence invented a satisfaction claim.");
+            // Reversing the explicitly authored order reverses which
+            // casting executes, with the same total demand.
+            var reversed = CastingDocument(
+                DirectCasting("cast-first", "long", "unit-cleric", "unit-t1",
+                    "source-bulls", CastingBuffAbility),
+                DirectCasting("cast-second", "long", "unit-cleric", "unit-t1",
+                    "source-bulls", CastingBuffAbility));
+            var authoring = new CastingAuthoringService(reversed);
+            if (!authoring.MoveCasting("cast-second", "long", 0).Applied)
+                throw new InvalidOperationException("Fixture reorder failed.");
+            CastingForecast reversedForecast = service.ForecastOnePass(
+                authoring.Document, snapshot, options,
+                CastingEffects("source-bulls", "source-communal"), enhancements);
+            if (reversedForecast.ReadyInvocations != 1 ||
+                reversedForecast.Plan.CastingById("cast-first").Readiness !=
+                    ResolvedCastingReadiness.AlreadySatisfied ||
+                reversedForecast.Plan.CastingById("cast-second").Readiness !=
+                    ResolvedCastingReadiness.Ready)
+                throw new InvalidOperationException(
+                    "Authored order did not drive the projection.");
+            // Independent routine previews mutate neither the saved document
+            // nor later one-pass results.
+            CastingForecast routineView = service.ForecastRoutine(
+                document, "long", snapshot, options,
+                CastingEffects("source-bulls", "source-communal"), enhancements);
+            if (document.Castings.Count != 2 ||
+                document.Castings[0].CastingId != "cast-first" ||
+                document.Castings[0].State != CastingAuthoringState.Ready)
+                throw new InvalidOperationException(
+                    "A preview disturbed the saved document.");
+            CastingForecast repeated = service.ForecastOnePass(
+                document, snapshot, options,
+                CastingEffects("source-bulls", "source-communal"), enhancements);
+            if (repeated.Plan.ReadyInvocationCount != 1)
+                throw new InvalidOperationException(
+                    "One-pass projection was not deterministic.");
+        }
+
+        // C3: only presented and accepted material contents may submit; a
+        // material change, an unpresented plan, or a mere preview never
+        // approves execution, while a harmless refresh keeps acceptance.
+        private static void TestCastingC3PresentedPlan()
+        {
+            List<ProviderPlanningOption> options;
+            List<CastEnhancementSnapshot> enhancements;
+            PartyProviderSnapshot snapshot = CastingParty(
+                CastingBuffAbility,
+                out options, out enhancements,
+                new[] { "unit-t1" }, 3);
+            var authoring = new CastingAuthoringService(CastingDocument(
+                DirectCasting("cast-a", "long", "unit-cleric", "unit-t1",
+                    "source-bulls", CastingBuffAbility),
+                DirectCasting("cast-b", "short", "unit-cleric", "unit-t1",
+                    "source-bulls", CastingBuffAbility)));
+            var compiler = new ExplicitCastingCompiler();
+            var effects = CastingEffects("source-bulls", "source-communal");
+            ExplicitCastingPlan plan = compiler.Compile(
+                authoring.Document, snapshot, options, effects, enhancements);
+            CastingPlanSignature first = CastingPlanSignature.For(plan);
+            var coordinator = new CastingReviewCoordinator();
+            if (coordinator.TrySubmit(first).Allowed)
+                throw new InvalidOperationException(
+                    "An unpresented plan was submittable.");
+            coordinator.Present(first);
+            if (coordinator.TrySubmit(first).Allowed ||
+                coordinator.Status != CastingReviewStatus.Presented)
+                throw new InvalidOperationException(
+                    "Presentation alone approved execution.");
+            if (!coordinator.Accept(first).Allowed)
+                throw new InvalidOperationException("Acceptance was refused.");
+            if (!coordinator.TrySubmit(first).Allowed)
+                throw new InvalidOperationException(
+                    "An accepted matching plan was refused.");
+            // A safe unchanged quick-run needs no ceremonial loop.
+            coordinator.Present(first);
+            if (coordinator.Status != CastingReviewStatus.Accepted ||
+                !coordinator.TrySubmit(first).Allowed)
+                throw new InvalidOperationException(
+                    "A harmless refresh demanded reconfirmation.");
+            // Material change between acceptance and submission: an edited
+            // plan may not ride the old acceptance.
+            if (!authoring.UpdateCasting(DirectCasting("cast-a", "long",
+                    "unit-cleric", "unit-t1", "source-bulls", CastingBuffAbility,
+                    new[] { new AuthoredEnhancementSelection("extend-cleric", true, null) }))
+                .Applied)
+                throw new InvalidOperationException("Fixture edit failed.");
+            ExplicitCastingPlan edited = compiler.Compile(
+                authoring.Document, snapshot, options, effects, enhancements);
+            CastingPlanSignature second = CastingPlanSignature.For(edited);
+            if (second.Matches(first))
+                throw new InvalidOperationException(
+                    "A material edit did not change the signature.");
+            CastingReviewDecision refused = coordinator.TrySubmit(second);
+            if (refused.Allowed || refused.Reason != "material-change-requires-review")
+                throw new InvalidOperationException(
+                    "An unseen material change was submittable.");
+            // A refused attempt does not authorize the next one: only fresh
+            // presentation and acceptance of the new material does.
+            coordinator.Present(second);
+            if (coordinator.TrySubmit(second).Allowed)
+                throw new InvalidOperationException(
+                    "Presentation of changed contents approved them.");
+            if (!coordinator.Accept(second).Allowed ||
+                !coordinator.TrySubmit(second).Allowed)
+                throw new InvalidOperationException(
+                    "Re-acceptance of the new material was refused.");
+            // An incidental preview of another routine is not a presentation
+            // and does not disturb the accepted run.
+            var forecastService = new CastingForecastService();
+            forecastService.ForecastRoutine(
+                authoring.Document, "short", snapshot, options, effects, enhancements);
+            if (!coordinator.TrySubmit(second).Allowed)
+                throw new InvalidOperationException(
+                    "An incidental preview disturbed acceptance.");
         }
     }
 }

@@ -64,7 +64,8 @@ namespace KingmakerBuffPlanner.Planning
             "no-rest",
             "no-elapsed-game-time",
             "resources-carried-forward-within-the-view",
-            "coverage-and-strength-are-predictions"
+            "coverage-and-strength-are-predictions",
+            "projected-effects-are-structural-presence-only"
         };
 
         private readonly ExplicitCastingCompiler _compiler =
@@ -96,11 +97,15 @@ namespace KingmakerBuffPlanner.Planning
             PartyProviderSnapshot snapshot,
             IEnumerable<ProviderPlanningOption> providerOptions,
             IDictionary<string, EffectExpression> effectsBySource,
-            IEnumerable<CastEnhancementSnapshot> enhancements = null)
+            IEnumerable<CastEnhancementSnapshot> enhancements = null,
+            IEnumerable<ICastingTargetingModifier> targetingModifiers = null)
         {
             if (document == null) throw new ArgumentNullException("document");
+            // The one-pass sequence carries structural effect presence
+            // forward between routines as well as resource balances.
             ExplicitCastingPlan plan = _compiler.Compile(
-                document, snapshot, providerOptions, effectsBySource, enhancements);
+                document, snapshot, providerOptions, effectsBySource, enhancements,
+                null, targetingModifiers, true);
             return new CastingForecast(
                 null,
                 document.Routines.Select(value => value.RoutineId).ToList(),

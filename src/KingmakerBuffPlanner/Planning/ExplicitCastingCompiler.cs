@@ -14,7 +14,9 @@ namespace KingmakerBuffPlanner.Planning
     {
         Ready,
         Blocked,
-        Draft
+        Draft,
+        Disabled,
+        AlreadySatisfied
     }
 
     // One intended recipient of a group casting that the resolved targeting
@@ -203,7 +205,8 @@ namespace KingmakerBuffPlanner.Planning
             IDictionary<string, EffectExpression> effectsBySource,
             IEnumerable<CastEnhancementSnapshot> enhancements = null,
             string budgetRoutineScope = null,
-            IEnumerable<ICastingTargetingModifier> targetingModifiers = null)
+            IEnumerable<ICastingTargetingModifier> targetingModifiers = null,
+            bool projectEffects = false)
         {
             if (document == null) throw new ArgumentNullException("document");
             if (snapshot == null) throw new ArgumentNullException("snapshot");
@@ -218,14 +221,20 @@ namespace KingmakerBuffPlanner.Planning
                 StringComparer.Ordinal);
             var providers = new Dictionary<string, ProviderSnapshot>(
                 StringComparer.Ordinal);
+            var modifierDemandsByCasting =
+                new Dictionary<string, List<ModifierUsageDemand>>(
+                    StringComparer.Ordinal);
             foreach (PlannedCasting casting in document.Castings)
             {
                 List<CastEnhancementSnapshot> matched;
                 ProviderSnapshot provider;
+                List<ModifierUsageDemand> modifierDemands;
                 castings.Add(CompileOne(casting, snapshot, options, effectsBySource,
-                    enhancementList, modifierList, diagnostics, out matched, out provider));
+                    enhancementList, modifierList, diagnostics, out matched,
+                    out provider, out modifierDemands));
                 matchedEnhancements[casting.CastingId] = matched;
                 providers[casting.CastingId] = provider;
+                modifierDemandsByCasting[casting.CastingId] = modifierDemands;
             }
             // Shared budget pass: every Ready casting reserves its complete
             // cost vector atomically in persisted order; a deficit blocks the
@@ -233,7 +242,17 @@ namespace KingmakerBuffPlanner.Planning
             // reservation to one routine's castings for a selected-run
             // preview; out-of-scope castings keep their compile-time
             // readiness and are explicitly not budget-checked in that view.
+            // Effect projection (one-pass sequence views) carries structural
+            // effect presence forward: a SkipAlreadyActive casting whose
+            // recipients a proven-equal earlier executing casting already
+            // covered becomes AlreadySatisfied - one fewer invocation and
+            // one fewer reservation. Equivalence is deliberately minimal:
+            // identical ability identity and no strength-affecting
+            // enhancements on either side; anything else stays an honest
+            // unknown that still casts.
             var ledger = new CastingBudgetLedger(snapshot, enhancementList);
+            var grantedByUnit = new Dictionary<string, HashSet<string>>(
+                StringComparer.Ordinal);
             var finalized = new List<ResolvedCasting>();
             foreach (ResolvedCasting casting in castings)
             {
@@ -248,8 +267,21 @@ namespace KingmakerBuffPlanner.Planning
                 matchedEnhancements.TryGetValue(casting.CastingId, out matched);
                 ProviderSnapshot provider;
                 providers.TryGetValue(casting.CastingId, out provider);
+                List<ModifierUsageDemand> modifierDemands;
+                modifierDemandsByCasting.TryGetValue(
+                    casting.CastingId, out modifierDemands);
+                if (projectEffects &&
+                    casting.ExistingEffectPolicy == ExistingEffectPolicy.SkipAlreadyActive &&
+                    IsStructurallySatisfied(casting, matched, grantedByUnit))
+                {
+                    finalized.Add(casting.WithBudgetResult(
+                        ResolvedCastingReadiness.AlreadySatisfied,
+                        new[] { "already-satisfied-structural" },
+                        new CastingCostLine[0]));
+                    continue;
+                }
                 IReadOnlyList<CastingDemand> demands = ledger.DemandsFor(
-                    provider, matched);
+                    provider, matched, modifierDemands);
                 IReadOnlyList<CastingCostLine> cost;
                 string reason;
                 if (ledger.TryReserveAtomically(
@@ -257,6 +289,8 @@ namespace KingmakerBuffPlanner.Planning
                 {
                     finalized.Add(casting.WithBudgetResult(
                         casting.Readiness, casting.ReadinessReasons, cost));
+                    if (projectEffects)
+                        ProjectEffects(casting, matched, grantedByUnit);
                     continue;
                 }
                 ledger.RecordUnfunded(casting.CastingId, demands);
@@ -280,7 +314,8 @@ namespace KingmakerBuffPlanner.Planning
             List<ICastingTargetingModifier> targetingModifiers,
             List<string> diagnostics,
             out List<CastEnhancementSnapshot> matchedEnhancements,
-            out ProviderSnapshot providerSnapshot)
+            out ProviderSnapshot providerSnapshot,
+            out List<ModifierUsageDemand> modifierDemands)
         {
             var reasons = new List<string>();
             var capableCasters = snapshot.Providers
@@ -295,9 +330,10 @@ namespace KingmakerBuffPlanner.Planning
             VerifyAbilityTargetMode(casting, effectsBySource, reasons);
             IReadOnlyList<string> predicted = new string[0];
             var gaps = new List<CoverageGap>();
+            modifierDemands = new List<ModifierUsageDemand>();
             if (option != null)
                 option = ApplyTargetingModifiers(
-                    casting, targetingModifiers, option, reasons, diagnostics);
+                    casting, targetingModifiers, option, reasons, modifierDemands);
             if (option != null)
             {
                 if (!HasSpendableResources(option, snapshot, reasons))
@@ -333,9 +369,11 @@ namespace KingmakerBuffPlanner.Planning
             ResolvedCastingReadiness readiness =
                 casting.State == CastingAuthoringState.Draft
                     ? ResolvedCastingReadiness.Draft
-                    : reasons.Count == 0
-                        ? ResolvedCastingReadiness.Ready
-                        : ResolvedCastingReadiness.Blocked;
+                    : casting.State == CastingAuthoringState.Disabled
+                        ? ResolvedCastingReadiness.Disabled
+                        : reasons.Count == 0
+                            ? ResolvedCastingReadiness.Ready
+                            : ResolvedCastingReadiness.Blocked;
             // Targeting modifiers change recipient eligibility only: an
             // enabled modifier transforms the proven option or blocks with a
             // repairable reason. With no host registry the selection stays
@@ -364,16 +402,18 @@ namespace KingmakerBuffPlanner.Planning
         // Applies the casting's enabled targeting modifiers in authored
         // order. A modifier transforms the proven option (eligibility
         // change); an unavailable modifier blocks the casting with a
-        // repairable reason; an unknown modifier id against a provided
-        // registry blocks rather than being silently ignored. With no
-        // registry at all, enabled selections stay unvalidated diagnostics.
+        // repairable reason; an unknown or unvalidated enabled selection
+        // blocks rather than becoming permission to execute the unmodified
+        // spell. A casting that requests no modifier is unaffected by an
+        // absent registry.
         private static ProviderPlanningOption ApplyTargetingModifiers(
             PlannedCasting casting,
             List<ICastingTargetingModifier> modifiers,
             ProviderPlanningOption option,
             List<string> reasons,
-            List<string> diagnostics)
+            List<ModifierUsageDemand> modifierDemands)
         {
+            var applied = new List<ICastingTargetingModifier>();
             foreach (TargetingModifierSelection selection in casting.TargetingModifiers)
             {
                 if (!selection.Enabled) continue;
@@ -382,13 +422,16 @@ namespace KingmakerBuffPlanner.Planning
                         StringComparison.Ordinal));
                 if (modifier == null)
                 {
-                    if (modifiers.Count == 0)
-                    {
-                        diagnostics.Add("targeting-modifier-unvalidated:" +
-                            selection.ModifierId + ":" + casting.CastingId);
-                        continue;
-                    }
-                    reasons.Add("targeting-modifier-unknown:" + selection.ModifierId);
+                    // An enabled modifier the host cannot validate is not
+                    // permission to execute the unmodified spell: the casting
+                    // blocks as repairable intent either way. With no
+                    // registry at all the block is explicitly "unresolved"
+                    // (the selection remains editable and repairs when a
+                    // registry appears); against a registry an unknown id is
+                    // a dead selection that can never repair.
+                    reasons.Add(modifiers.Count == 0
+                        ? "targeting-modifier-unresolved:" + selection.ModifierId
+                        : "targeting-modifier-unknown:" + selection.ModifierId);
                     return null;
                 }
                 CastingModifierResult result = modifier.Apply(casting, option);
@@ -399,8 +442,56 @@ namespace KingmakerBuffPlanner.Planning
                     return null;
                 }
                 option = result.Option;
+                applied.Add(modifier);
             }
+            // Every applied modifier's verified cost enters the same atomic
+            // cost vector; an unresolved modifier never reaches here, so an
+            // unknown cost is never treated as free.
+            foreach (ICastingTargetingModifier modifier in applied)
+                modifierDemands.AddRange(modifier.UsageDemands(casting, option));
             return option;
+        }
+
+        // Structural satisfaction is only claimed for identical ability
+        // identity with no strength-affecting enhancements requested or
+        // granted: anything else is an unknown equivalence that must keep
+        // casting rather than inventing satisfaction or saving resources.
+        private static bool IsStructurallySatisfied(
+            ResolvedCasting casting,
+            IReadOnlyList<CastEnhancementSnapshot> matchedEnhancements,
+            Dictionary<string, HashSet<string>> grantedByUnit)
+        {
+            if (matchedEnhancements != null && matchedEnhancements.Count != 0)
+                return false;
+            if (casting.PredictedBeneficiaryUnitIds.Count == 0)
+                return false;
+            foreach (string unitId in casting.PredictedBeneficiaryUnitIds)
+            {
+                HashSet<string> granted;
+                if (!grantedByUnit.TryGetValue(unitId, out granted) ||
+                    !granted.Contains(casting.Ability.Canonical))
+                    return false;
+            }
+            return true;
+        }
+
+        private static void ProjectEffects(
+            ResolvedCasting casting,
+            IReadOnlyList<CastEnhancementSnapshot> matchedEnhancements,
+            Dictionary<string, HashSet<string>> grantedByUnit)
+        {
+            if (matchedEnhancements != null && matchedEnhancements.Count != 0)
+                return;
+            foreach (string unitId in casting.PredictedBeneficiaryUnitIds)
+            {
+                HashSet<string> granted;
+                if (!grantedByUnit.TryGetValue(unitId, out granted))
+                {
+                    granted = new HashSet<string>(StringComparer.Ordinal);
+                    grantedByUnit[unitId] = granted;
+                }
+                granted.Add(casting.Ability.Canonical);
+            }
         }
 
         private static ProviderPlanningOption ResolveOption(

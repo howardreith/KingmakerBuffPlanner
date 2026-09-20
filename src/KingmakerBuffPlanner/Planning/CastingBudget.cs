@@ -160,11 +160,14 @@ namespace KingmakerBuffPlanner.Planning
         }
 
         // The complete cost vector of one casting: its native pool charge,
-        // the summed demand of its selected enhancements per usage pool, and
-        // its material component.
+        // the summed demand of its selected enhancements and applied
+        // targeting modifiers per usage pool, and its material component.
+        // Modifier demands merge into the same pool grouping so features
+        // sharing a reservoir validate as combined demand, atomically.
         public IReadOnlyList<CastingDemand> DemandsFor(
             ProviderSnapshot provider,
-            IEnumerable<CastEnhancementSnapshot> selectedEnhancements)
+            IEnumerable<CastEnhancementSnapshot> selectedEnhancements,
+            IEnumerable<ModifierUsageDemand> modifierDemands = null)
         {
             var demands = new List<CastingDemand>();
             ResourcePoolKind kind;
@@ -174,13 +177,23 @@ namespace KingmakerBuffPlanner.Planning
                 demands.Add(new CastingDemand(
                     CastingCostCategory.NativePool, provider.ResourcePoolKey,
                     Math.Max(1, provider.UnitsPerCast), string.Empty));
+            var poolUnits = new Dictionary<string, int>(StringComparer.Ordinal);
             foreach (IGrouping<string, CastEnhancementSnapshot> group in
                 (selectedEnhancements ?? new CastEnhancementSnapshot[0])
                     .Where(value => value != null)
                     .GroupBy(value => value.UsagePoolId, StringComparer.Ordinal))
+                poolUnits[group.Key] =
+                    group.Sum(value => value.UsageUnitsPerCast);
+            foreach (ModifierUsageDemand demand in
+                (modifierDemands ?? new ModifierUsageDemand[0])
+                    .Where(value => value != null))
+                poolUnits[demand.UsagePoolId] =
+                    (poolUnits.TryGetValue(demand.UsagePoolId, out var prior)
+                        ? prior : 0) + demand.Units;
+            foreach (KeyValuePair<string, int> pool in poolUnits)
                 demands.Add(new CastingDemand(
-                    CastingCostCategory.EnhancementPool, group.Key,
-                    group.Sum(value => value.UsageUnitsPerCast), string.Empty));
+                    CastingCostCategory.EnhancementPool, pool.Key,
+                    pool.Value, string.Empty));
             MaterialRequirementSnapshot materialComponent =
                 provider == null ? null : provider.MaterialComponent;
             if (materialComponent != null)

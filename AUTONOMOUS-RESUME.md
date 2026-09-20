@@ -1,6 +1,27 @@
 # AUTONOMOUS-RESUME — top section is current; planning/CASTING-FIRST-MIGRATION-STATUS.md is the per-checkpoint tracker.
 
-## Casting-first migration Phase 2 checkpoint 5 — 2026-09-19 (LATEST)
+## Casting-first migration Phase 2 checkpoint 6 (C1-C5) — 2026-09-19 (LATEST)
+
+- Continuation mission reconciled at `061968d4...` (clean; five
+  checkpoints preserved). C1-C5 verified against the real services; one
+  defect and one gap repaired, three missing layers implemented:
+  C1 no-registry modifiers now BLOCK (was silent unmodified execution);
+  C2 Disabled state + gate routine scoping (saved drafts block Ordinary
+  Apply; disabled/out-of-scope never block); C3 CastingReviewCoordinator
+  (presented/accepted/submitted signatures; material change refuses;
+  refresh keeps acceptance); C4 modifier UsageDemands merged into the
+  atomic cost vector; C5 structural effect projection in one-pass
+  forecasts (AlreadySatisfied; conservative equivalence).
+- Gates: source 42/42; protocol 204/204; harness 27/27; package 4/4;
+  WhatIf 5/5; rollback 4/4; publisher 3/3
+  (`artifacts/casting-first-checkpoint6-gate.log`). Reviewable bundle:
+  `artifacts/review-bundles/casting-first-checkpoints-1-6/` (patches +
+  manifest; checkpoint 6 commit applies on top).
+- NEXT: guarded native donor investigation (Build-Local +
+  ui-native-contract-probe / live-ui-bootstrap with restore), then the
+  connected parchment workspace; isolated A13 persistence tests alongside.
+
+## Casting-first migration Phase 2 checkpoint 5 — 2026-09-19
 
 - A05 targeting-modifier resolution implemented for the new model
   (`Planning/CastingTargetingModifiers.cs` + compiler wiring): enabled

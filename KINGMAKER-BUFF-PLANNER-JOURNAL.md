@@ -1,5 +1,28 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-09-19 casting-first migration: Phase 2 checkpoint 6 (C1-C5)
+
+Reconciled at `061968d4b7ec3b7c1247feab72c065b4a7fd4d41` (clean, single
+worktree, checkpoints 1-5 preserved). The continuation's C1-C5 were
+verification questions; inspection against the production services found
+one reproduced defect (C1: an absent modifier registry left the casting
+executable as a silent unmodified downgrade), one repaired gap (C2: saved
+drafts never blocked Ordinary Apply and no explicit-disabled state
+existed; gate also gained routine scoping), and three missing layers now
+implemented (C3 CastingReviewCoordinator presented-plan signatures; C4
+modifier UsageDemands inside the atomic cost vector; C5 structural
+effect projection with AlreadySatisfied and conservative equivalence).
+Tests casting-c1..c5 added through the compiler/gate/forecast path;
+A11/A05 updated to the repaired contracts.
+
+Verification: `scripts/Test-SourceOnly.ps1` — source 42/42; protocol
+204/204; harness 27/27; package 4/4; WhatIf 5/5; rollback 4/4;
+publisher 3/3 (`artifacts/casting-first-checkpoint6-gate.log`).
+Reviewable patch bundle with manifest at
+`artifacts/review-bundles/casting-first-checkpoints-1-6/`. Deterministic
+layer only; view/executor wiring of the review coordinator and the
+native donor/workspace milestone remain open.
+
 ## 2026-09-19 casting-first migration: Phase 2 checkpoint 5 (modifiers)
 
 On top of checkpoint 4 (`f9cc4fe`). Implemented the A05 domain half:

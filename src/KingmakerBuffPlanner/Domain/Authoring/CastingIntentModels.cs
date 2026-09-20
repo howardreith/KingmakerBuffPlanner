@@ -18,12 +18,16 @@ namespace KingmakerBuffPlanner.Domain.Authoring
     }
 
     // Draft records authored intent that is not executable yet; only Ready
-    // records may execute. Blocking conditions are compiler output, never a
-    // third persisted state.
+    // records may execute. Disabled is the player's explicit parking of a
+    // record: it stays visible with identity and intent but never blocks a
+    // run — unlike a saved Draft, which is an unresolved request that
+    // ordinary Apply must not silently skip. Blocking conditions are
+    // compiler output, never a persisted state.
     public enum CastingAuthoringState
     {
         Draft,
-        Ready
+        Ready,
+        Disabled
     }
 
     public sealed class CastingOrigin
