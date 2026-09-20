@@ -103,7 +103,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 throw new InvalidDataException("duplicate-expected-blueprint-guid");
             if ((request.ProfileId == "native-only" && request.ExpectedOptionalMods.Count != 0) ||
                 (request.ProfileId == "call-of-the-wild" && request.ExpectedOptionalMods.Count != 1) ||
-                (request.ProfileId == "human-reproduction" && request.ExpectedOptionalMods.Count != 4))
+                (request.ProfileId == "human-reproduction" && request.ExpectedOptionalMods.Count != 3))
                 throw new InvalidDataException("profile-mod-expectation");
             if ((request.ProfileId == "native-only" && request.ExpectedBlueprintGuids.Count != 0) ||
                 (request.ProfileId == "call-of-the-wild" && request.ExpectedBlueprintGuids.Count < 3))
