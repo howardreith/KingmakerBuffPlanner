@@ -159,6 +159,10 @@
     <Compile Include="RuntimeTesting\RuntimePerformanceDiagnostics.cs" />
     <Compile Include="RuntimeTesting\RuntimeTestProtocol.cs" />
     <Compile Include="UI\PlannerSetupModel.cs" />
+    <Compile Include="UI\CastingWorkspaceModels.cs" />
+    <Compile Include="UI\CastingWorkspaceSession.cs" />
+    <Compile Include="UI\CastingWorkspaceScreenView.cs" />
+    <Compile Include="UI\CastingWorkspaceDevSelection.cs" />
     <Compile Include="UI\PlannerPresentationModels.cs" />
     <Compile Include="UI\PlannerScreenViewModel.cs" />
     <Compile Include="UI\BuffGridMetrics.cs" />

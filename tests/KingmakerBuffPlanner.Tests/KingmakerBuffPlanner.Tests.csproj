@@ -75,6 +75,8 @@
     <Compile Include="..\..\src\KingmakerBuffPlanner\Infrastructure\AtomicFile.cs"><Link>Infrastructure\AtomicFile.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Infrastructure\Hashing.cs"><Link>Infrastructure\Hashing.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\PlannerSetupModel.cs"><Link>UI\PlannerSetupModel.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingWorkspaceModels.cs"><Link>UI\CastingWorkspaceModels.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingWorkspaceSession.cs"><Link>UI\CastingWorkspaceSession.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\PlannerPresentationModels.cs"><Link>UI\PlannerPresentationModels.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\BuffPlannerUiContracts.cs"><Link>UI\BuffPlannerUiContracts.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CatalogUiDiagnostics.cs"><Link>UI\CatalogUiDiagnostics.cs</Link></Compile>

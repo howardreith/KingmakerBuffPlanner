@@ -28,6 +28,7 @@ namespace KingmakerBuffPlanner.UI
         private BuffPlannerUiLifecycleDiagnostics _diagnostics;
         private BuffPlannerHudButtonController _hud;
         private BuffPlannerScreenController _screen;
+        private CastingWorkspaceScreenView _castingWorkspace;
         private BuffPlannerSpellbookEntryController _spellbookEntry;
         private BuffPlannerQuickExecuteController _quick;
         private int _runtimeOpenCycles;
@@ -96,6 +97,7 @@ namespace KingmakerBuffPlanner.UI
                 return;
             }
             _instance.RequestHudInstall("planner-hotkey", false);
+            _instance.CloseCastingWorkspace();
             if (_instance._screen.LifecycleState != PlannerScreenLifecycleState.Closed)
             {
                 _instance._screen.Close();
@@ -614,7 +616,70 @@ namespace KingmakerBuffPlanner.UI
 
         private bool OpenSetup()
         {
+            if (CastingWorkspaceDevSelection.Enabled)
+                return OpenCastingWorkspace();
             return _screen != null && _screen.Open();
+        }
+
+        // Session-scoped development selection: the casting-first workspace
+        // renders instead of the legacy screen for this whole session. It
+        // consumes the same discovery data through the legacy session's
+        // model (one snapshot, one option set, one effect map) and owns its
+        // candidate records through its own session; the legacy authoring
+        // path is never open at the same time. Native submission stays
+        // explicitly disabled at its dispatch boundary.
+        private bool OpenCastingWorkspace()
+        {
+            if (_castingWorkspace != null) return false;
+            try
+            {
+                if (StaticCanvas.Instance == null)
+                {
+                    LogUiUnavailable("casting-workspace: campaign UI unavailable");
+                    return false;
+                }
+                _session.Refresh();
+                string campaignId = _session.Model == null ||
+                    _session.Model.Profile == null
+                        ? "unknown-campaign"
+                        : _session.Model.Profile.CampaignId;
+                var workspaceSession = new CastingWorkspaceSession(
+                    _modPath, campaignId);
+                _castingWorkspace = new CastingWorkspaceScreenView(
+                    StaticCanvas.Instance, workspaceSession,
+                    BuildCastingWorkspaceInputs, CloseCastingWorkspace);
+                _castingWorkspace.RefreshView();
+                _log.Info("[KBP-WORKSPACE] casting-first workspace opened;" +
+                    "campaign=" + campaignId +
+                    ";dispatch=" + workspaceSession.DispatchDisposition);
+                return true;
+            }
+            catch (Exception exception)
+            {
+                CloseCastingWorkspace();
+                _log.Error("[KBP-WORKSPACE] open failed.", exception);
+                LogUiUnavailable("casting-workspace:" + exception.Message);
+                return false;
+            }
+        }
+
+        private void CloseCastingWorkspace()
+        {
+            if (_castingWorkspace == null) return;
+            _castingWorkspace.Dispose();
+            _castingWorkspace = null;
+        }
+
+        private CastingWorkspaceInputs BuildCastingWorkspaceInputs()
+        {
+            if (_session.Model == null)
+                throw new InvalidOperationException(
+                    "Discovery has not produced a party model yet.");
+            return new CastingWorkspaceInputs(
+                _session.Model.Snapshot,
+                _session.ProviderOptions,
+                _session.Model.EffectsBySource,
+                _session.Model.Enhancements);
         }
 
         private void RequestNativeEscapeVeil()

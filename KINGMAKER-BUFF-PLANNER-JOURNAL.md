@@ -1,5 +1,22 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-09-19 casting-first migration: Phase 4 checkpoint 8 (workspace)
+
+Reconciled at `81c46486...` (checkpoints 1-7 preserved). Fixture drift
+diagnosed read-only under the manifest's own rules: the live BagOfTricks
+directory is byte-identical to both September guarded-install transaction
+manifests; the stale Aug-23 aggregate is short exactly one unrecoverable
+182-byte mutable file; bootstrap stays blocked with the owner-rebind or
+per-file-evidence prerequisite named. The connected workspace was then
+delivered: CastingWorkspaceSession binding the real authoring/compiler/
+gate/forecast/persistence/review services with an explicitly disabled
+native-dispatch boundary; the Unity CastingWorkspaceScreenView behind a
+session-scoped dev selection consuming the same discovery data as the
+legacy screen. Integration tests cover the mixed-caster three-card flow,
+group coverage honesty, review/apply policy, and save/reopen protection
+(protocol 208/208; full gate green). The view is compiled but not
+visually qualified; native lanes remain blocked as diagnosed.
+
 ## 2026-09-19 casting-first migration: Phase 2 checkpoint 7 (A13 + live lanes)
 
 On top of `29f1ac8`. Implemented the A13 isolated migration boundary

@@ -330,6 +330,13 @@ namespace KingmakerBuffPlanner.Tests
                     TestCastingC3PresentedPlan);
                 Run("casting-a13-migration-boundary-is-recoverable",
                     () => TestCastingA13MigrationBoundary(root));
+                // Connected workspace session (production caller path).
+                Run("casting-workspace-mixed-caster-flow",
+                    () => TestCastingWorkspaceMixedCasterFlow(root));
+                Run("casting-workspace-review-and-apply-policy",
+                    () => TestCastingWorkspaceReviewApply(root));
+                Run("casting-workspace-save-reopen-and-protection",
+                    () => TestCastingWorkspacePersistence(root));
             }
             finally
             {
@@ -11345,6 +11352,359 @@ namespace KingmakerBuffPlanner.Tests
             if (repeated.Plan.ReadyInvocationCount != 1)
                 throw new InvalidOperationException(
                     "One-pass projection was not deterministic.");
+        }
+
+        // ------------------------------------------------------------------
+        // Connected workspace: the production CastingWorkspaceSession is
+        // the real caller path for the authoring service, compiler, gate,
+        // persistence, and review coordinator. Deterministic game-boundary
+        // inputs stand in for the adapters; no planner service is mocked.
+        // ------------------------------------------------------------------
+
+        private static CastingWorkspaceInputs WorkspaceInputs(
+            out PartyProviderSnapshot snapshot,
+            IDictionary<string, IEnumerable<string>> groupCoverage = null,
+            AbilityKey ability = null)
+        {
+            List<ProviderPlanningOption> options;
+            List<CastEnhancementSnapshot> enhancements;
+            snapshot = CastingParty(
+                ability ?? CastingBuffAbility,
+                out options, out enhancements,
+                new[] { "unit-t1", "unit-t2", "unit-t3", "unit-t4", "unit-t5",
+                    "unit-rogue" },
+                3, groupCoverage);
+            return new CastingWorkspaceInputs(
+                snapshot, options,
+                CastingEffects("source-bulls", "source-communal"),
+                enhancements);
+        }
+
+        // The charter's showcase flow: two casters, three independent
+        // single-target cards with distinct settings, caster-focus changes
+        // without reassignment, a group card with an explicit origin and an
+        // honest coverage gap, and costs/readiness from the shared plan.
+        private static void TestCastingWorkspaceMixedCasterFlow(string root)
+        {
+            string modPath = Path.Combine(root, "casting-workspace");
+            Directory.CreateDirectory(modPath);
+            PartyProviderSnapshot snapshot;
+            CastingWorkspaceInputs inputs = WorkspaceInputs(out snapshot);
+            var session = new CastingWorkspaceSession(modPath, "workspace-campaign");
+            if (session.LoadStatus != CastingPlanLoadStatus.Absent)
+                throw new InvalidOperationException(
+                    "An absent candidate was not reported.");
+            // Browsing never mutates: selection changes leave the exact
+            // document instance untouched.
+            CastingPlanDocument beforeBrowse = session.Document;
+            session.SelectBuff("source-bulls");
+            session.SelectRoutine("long");
+            session.SelectCaster("unit-cleric");
+            WorkspaceView view = session.BuildView(inputs);
+            if (!ReferenceEquals(beforeBrowse, session.Document) ||
+                session.Document.Castings.Count != 0 ||
+                view.EditingScope != WorkspaceEditingScope.ConfigureNextCasting)
+                throw new InvalidOperationException(
+                    "Browsing mutated the document.");
+            // Three single-target castings from two casters with distinct
+            // per-casting settings.
+            session.Draft.SourceId = "source-bulls";
+            session.Draft.Ability = CastingBuffAbility;
+            session.Draft.TargetMode = CastingTargetMode.DirectTarget;
+            session.Draft.CasterUnitId = "unit-cleric";
+            session.Draft.DirectTargetUnitId = "unit-t1";
+            session.Draft.State = CastingAuthoringState.Ready;
+            session.Draft.Enhancements.Add(
+                new AuthoredEnhancementSelection("extend-cleric", true, null));
+            if (!session.AddCastingFromDraft().Applied)
+                throw new InvalidOperationException("cast-1 was refused.");
+            session.Draft.CasterUnitId = "unit-wizard";
+            session.Draft.DirectTargetUnitId = "unit-t2";
+            session.Draft.Enhancements.Clear();
+            session.Draft.Enhancements.Add(
+                new AuthoredEnhancementSelection("extend-wizard", true, null));
+            if (!session.AddCastingFromDraft().Applied)
+                throw new InvalidOperationException("cast-2 was refused.");
+            session.Draft.CasterUnitId = "unit-cleric";
+            session.Draft.DirectTargetUnitId = "unit-t3";
+            session.Draft.Enhancements.Clear();
+            if (!session.AddCastingFromDraft().Applied)
+                throw new InvalidOperationException("cast-3 was refused.");
+            view = session.BuildView(inputs);
+            if (view.Cards.Count != 3 ||
+                view.CardById("cast-1") == null || view.CardById("cast-2") == null ||
+                view.CardById("cast-3") == null)
+                throw new InvalidOperationException(
+                    "Three recipients did not become three cards.");
+            if (view.CardById("cast-1").CasterUnitId != "unit-cleric" ||
+                view.CardById("cast-2").CasterUnitId != "unit-wizard" ||
+                view.CardById("cast-1").EnhancementLabels.Count != 1 ||
+                view.CardById("cast-2").EnhancementLabels.Count != 1 ||
+                view.CardById("cast-3").EnhancementLabels.Count != 0)
+                throw new InvalidOperationException(
+                    "Per-casting settings were collapsed.");
+            if (!view.Cards.All(card => card.Readiness ==
+                    ResolvedCastingReadiness.Ready) ||
+                view.Cards.Any(card => card.CostLabels.Count == 0))
+                throw new InvalidOperationException(
+                    "Readiness or costs are not from the shared plan.");
+            // Switching caster focus changes nothing but focus.
+            CastingPlanDocument beforeFocusChange = session.Document;
+            session.SelectCaster("unit-wizard");
+            view = session.BuildView(inputs);
+            if (!ReferenceEquals(beforeFocusChange, session.Document) ||
+                view.Cards.Count != 3 ||
+                view.CardById("cast-2").CasterUnitId != "unit-wizard" ||
+                !view.Casters.First(row => row.UnitId == "unit-wizard").SelectedFocus)
+                throw new InvalidOperationException(
+                    "Caster focus change reassigned existing work.");
+            // Capability is separated from readiness in the caster lane.
+            WorkspaceCasterRow cleric =
+                view.Casters.First(row => row.UnitId == "unit-cleric");
+            if (!cleric.Capable)
+                throw new InvalidOperationException(
+                    "A capable caster was listed as incapable.");
+            // Explicit single-card editing scope with Undo.
+            session.FocusCasting("cast-2");
+            view = session.BuildView(inputs);
+            if (view.EditingScope != WorkspaceEditingScope.EditingSingleCasting ||
+                !view.EditingScopeLabel.Contains("cast-2") ||
+                !view.CardById("cast-2").EditingFocus)
+                throw new InvalidOperationException(
+                    "The editing scope is not prominently single-card.");
+            if (!session.UpdateFocusedCasting(new PlannedCasting(
+                    "cast-2", "long", 1, "source-bulls", CastingBuffAbility,
+                    "unit-wizard", null, CastingTargetMode.DirectTarget,
+                    "unit-rogue", null, null, null, null,
+                    ExistingEffectPolicy.SkipAlreadyActive, null,
+                    CastingAuthoringState.Ready, null)).Applied)
+                throw new InvalidOperationException("The card edit was refused.");
+            view = session.BuildView(inputs);
+            if (view.CardById("cast-2").DirectTargetUnitId != "unit-rogue" ||
+                view.CardById("cast-1").DirectTargetUnitId != "unit-t1" ||
+                view.CardById("cast-3").DirectTargetUnitId != "unit-t3")
+                throw new InvalidOperationException(
+                    "The edit leaked into neighboring cards.");
+            Assert(session.Undo());
+            view = session.BuildView(inputs);
+            if (view.CardById("cast-2").DirectTargetUnitId != "unit-t2")
+                throw new InvalidOperationException("Undo did not restore the card.");
+            // A mismatched replacement cannot edit a focused card.
+            if (session.UpdateFocusedCasting(new PlannedCasting(
+                    "cast-1", "long", 0, "source-bulls", CastingBuffAbility,
+                    "unit-cleric", null, CastingTargetMode.DirectTarget,
+                    "unit-t1", null, null, null, null,
+                    ExistingEffectPolicy.SkipAlreadyActive, null,
+                    CastingAuthoringState.Ready, null)).Applied)
+                throw new InvalidOperationException(
+                    "An unfocused replacement edited a card.");
+            session.FocusCasting(null);
+            // One group casting: explicit origin, derived beneficiaries, and
+            // a visible coverage gap that never becomes a second casting.
+            var coverage = new Dictionary<string, IEnumerable<string>>(
+                StringComparer.Ordinal)
+            {
+                { "unit-cleric", new[]
+                    { "unit-t1", "unit-t2", "unit-t3", "unit-t4", "unit-t5" } }
+            };
+            PartyProviderSnapshot groupSnapshot;
+            CastingWorkspaceInputs groupInputs =
+                WorkspaceInputs(out groupSnapshot, coverage, CastingGroupAbility);
+            var groupSession = new CastingWorkspaceSession(
+                Path.Combine(root, "casting-workspace-group"), "workspace-campaign");
+            groupSession.Draft.SourceId = "source-communal";
+            groupSession.Draft.Ability = CastingGroupAbility;
+            groupSession.Draft.TargetMode = CastingTargetMode.CasterCenteredOrigin;
+            groupSession.Draft.CasterUnitId = "unit-cleric";
+            groupSession.Draft.State = CastingAuthoringState.Ready;
+            groupSession.Draft.Origin = CastingOrigin.CasterCentered();
+            groupSession.Draft.RequiredCoverageUnitIds.AddRange(new[]
+                { "unit-t1", "unit-t2", "unit-t3", "unit-t4", "unit-t5",
+                    "unit-rogue" });
+            if (!groupSession.AddCastingFromDraft().Applied)
+                throw new InvalidOperationException("The group casting was refused.");
+            view = groupSession.BuildView(groupInputs);
+            if (view.Cards.Count != 1 ||
+                !view.Cards[0].OriginLabel.Contains("caster") ||
+                view.Cards[0].PredictedBeneficiaryUnitIds.Count != 5 ||
+                view.Cards[0].CoverageGapUnitIds.Count != 1 ||
+                view.Cards[0].CoverageGapUnitIds[0] != "unit-rogue" ||
+                view.Cards[0].CostLabels.Count != 1)
+                throw new InvalidOperationException(
+                    "Group origin, beneficiaries, or the honest gap is wrong.");
+            if (groupSession.Document.Castings.Count != 1)
+                throw new InvalidOperationException(
+                    "Missed coverage created an extra casting.");
+        }
+
+        // The view/session really uses the review coordinator: presentation
+        // and acceptance gate Apply; unseen changes, refused attempts,
+        // refreshes, and incidental previews never approve a submission; the
+        // disabled dispatch boundary proves policy without gameplay claims.
+        private static void TestCastingWorkspaceReviewApply(string root)
+        {
+            string modPath = Path.Combine(root, "casting-workspace-review");
+            Directory.CreateDirectory(modPath);
+            PartyProviderSnapshot snapshot;
+            CastingWorkspaceInputs inputs = WorkspaceInputs(out snapshot);
+            var session = new CastingWorkspaceSession(modPath, "workspace-campaign");
+            session.Draft.SourceId = "source-bulls";
+            session.Draft.Ability = CastingBuffAbility;
+            session.Draft.TargetMode = CastingTargetMode.DirectTarget;
+            session.Draft.CasterUnitId = "unit-cleric";
+            session.Draft.DirectTargetUnitId = "unit-t1";
+            session.Draft.State = CastingAuthoringState.Ready;
+            Assert(session.AddCastingFromDraft().Applied);
+            // Without presentation, Apply is refused.
+            WorkspaceApplyResult unpresented = session.Apply(
+                CastingApplyMode.Ordinary, "long", inputs);
+            if (unpresented.Allowed || unpresented.ReviewReason != "nothing-presented")
+                throw new InvalidOperationException(
+                    "An unpresented plan was submittable.");
+            // Present without acceptance is still refused.
+            session.PresentForReview(inputs);
+            WorkspaceApplyResult unaccepted = session.Apply(
+                CastingApplyMode.Ordinary, "long", inputs);
+            if (unaccepted.Allowed || unaccepted.ReviewReason != "not-accepted")
+                throw new InvalidOperationException(
+                    "Presentation alone approved execution.");
+            // An incidental view build or preview between presentation and
+            // acceptance authorizes nothing and disturbs nothing.
+            session.BuildView(inputs);
+            session.CompilePlan(inputs);
+            // Acceptance + Apply: the review coordinator permits, the gate
+            // permits, and the DISABLED dispatch boundary refuses native
+            // submission with its explicit reason while recording identity.
+            if (!session.AcceptPresentedPlan(inputs))
+                throw new InvalidOperationException("Acceptance was refused.");
+            WorkspaceApplyResult applied = session.Apply(
+                CastingApplyMode.Ordinary, "long", inputs);
+            if (applied.Allowed || applied.Dispatch == null ||
+                applied.Dispatch.Submitted ||
+                applied.ReviewReason != session.DispatchDisposition ||
+                !applied.ReviewReason.Contains("native-submission-disabled"))
+                throw new InvalidOperationException(
+                    "Native submission was not explicitly disabled: " +
+                    applied.ReviewReason);
+            if (applied.GateDecision.ExecutableCastingIds.Count != 1)
+                throw new InvalidOperationException(
+                    "The gate lost the executable set at submission.");
+            var boundary = (DisabledCastingDispatchBoundary)
+                typeof(CastingWorkspaceSession)
+                    .GetField("_dispatch", BindingFlags.NonPublic | BindingFlags.Instance)
+                    .GetValue(session);
+            if (boundary.RecordedSubmissions.Count != 1 ||
+                !boundary.RecordedSubmissions[0].Contains("cast-1"))
+                throw new InvalidOperationException(
+                    "The dispatch boundary did not record the submission identity.");
+            // A harmless refresh of the same contents keeps acceptance (no
+            // ceremonial loop) and a safe quick-run reaches the boundary
+            // again.
+            session.PresentForReview(inputs);
+            WorkspaceApplyResult quickRun = session.Apply(
+                CastingApplyMode.Ordinary, "long", inputs);
+            if (!quickRun.ReviewReason.Contains("native-submission-disabled") ||
+                boundary.RecordedSubmissions.Count != 2)
+                throw new InvalidOperationException(
+                    "A safe quick-run demanded ceremony or was lost.");
+            // An unseen material change between acceptance and submission
+            // refuses until re-presented and re-accepted.
+            session.Draft.DirectTargetUnitId = "unit-t2";
+            Assert(session.AddCastingFromDraft().Applied);
+            WorkspaceApplyResult changed = session.Apply(
+                CastingApplyMode.Ordinary, "long", inputs);
+            if (changed.Allowed ||
+                changed.ReviewReason != "material-change-requires-review")
+                throw new InvalidOperationException(
+                    "An unseen material change was submittable.");
+            // A refused gate attempt authorizes nothing by itself.
+            session.Draft.CasterUnitId = "unit-ghost";
+            session.Draft.DirectTargetUnitId = "unit-t3";
+            Assert(session.AddCastingFromDraft().Applied);
+            WorkspaceApplyResult refused = session.Apply(
+                CastingApplyMode.Ordinary, "long", inputs);
+            if (refused.Allowed)
+                throw new InvalidOperationException(
+                    "A blocked request passed ordinary Apply.");
+            // Ready Casts Only is a separate deliberate choice that still
+            // routes through review: after re-presentation and acceptance it
+            // submits only ready work and discloses its omissions.
+            // Re-presentation and re-acceptance of the changed material is
+            // the only route forward after the material-change refusal.
+            session.PresentForReview(inputs);
+            if (!session.AcceptPresentedPlan(inputs))
+                throw new InvalidOperationException(
+                    "Re-acceptance of the presented material was refused.");
+            WorkspaceApplyResult readyOnly = session.Apply(
+                CastingApplyMode.ReadyCastsOnly, "long", inputs);
+            if (!readyOnly.ReviewReason.Contains("native-submission-disabled") ||
+                readyOnly.GateDecision.ExecutableCastingIds.Count != 2 ||
+                readyOnly.GateDecision.Omissions.Count != 1 ||
+                !readyOnly.GateDecision.Omissions[0].CastingId.Contains("cast-"))
+                throw new InvalidOperationException(
+                    "Ready Casts Only lost its omissions or executable set.");
+        }
+
+        // Save/reopen through the production candidate repository retains
+        // identities, order, edits, disabled state, and unresolved intent;
+        // unresolved stored data blocks overwriting instead of being
+        // replaced by a default.
+        private static void TestCastingWorkspacePersistence(string root)
+        {
+            string modPath = Path.Combine(root, "casting-workspace-persist");
+            Directory.CreateDirectory(modPath);
+            PartyProviderSnapshot snapshot;
+            CastingWorkspaceInputs inputs = WorkspaceInputs(out snapshot);
+            var session = new CastingWorkspaceSession(modPath, "workspace-campaign");
+            session.Draft.SourceId = "source-bulls";
+            session.Draft.Ability = CastingBuffAbility;
+            session.Draft.TargetMode = CastingTargetMode.DirectTarget;
+            session.Draft.CasterUnitId = "unit-cleric";
+            session.Draft.DirectTargetUnitId = "unit-t1";
+            session.Draft.State = CastingAuthoringState.Ready;
+            Assert(session.AddCastingFromDraft().Applied);
+            session.Draft.DirectTargetUnitId = "unit-t2";
+            session.Draft.CasterUnitId = null;
+            session.Draft.State = CastingAuthoringState.Draft;
+            Assert(session.AddCastingFromDraft().Applied);
+            session.FocusCasting("cast-1");
+            Assert(session.SetFocusedCastingState(CastingAuthoringState.Disabled)
+                .Applied);
+            session.Save();
+            // Reopen: identities, order, disabled state, and the unresolved
+            // draft survive the production persistence round trip.
+            var reopened = new CastingWorkspaceSession(modPath, "workspace-campaign");
+            if (reopened.LoadStatus != CastingPlanLoadStatus.Loaded ||
+                reopened.Document.Castings.Count != 2)
+                throw new InvalidOperationException(
+                    "The candidate did not reopen: " + reopened.LoadStatus);
+            if (reopened.Document.Castings[0].CastingId != "cast-1" ||
+                reopened.Document.Castings[0].State != CastingAuthoringState.Disabled ||
+                reopened.Document.Castings[1].CastingId != "cast-2" ||
+                reopened.Document.Castings[1].CasterUnitId != null ||
+                reopened.Document.Castings[1].State != CastingAuthoringState.Draft)
+                throw new InvalidOperationException(
+                    "Ids, order, disabled state, or unresolved intent drifted.");
+            WorkspaceView view = reopened.BuildView(inputs);
+            if (view.CardById("cast-1").Readiness != ResolvedCastingReadiness.Disabled)
+                throw new InvalidOperationException(
+                    "The disabled card lost its distinct presentation.");
+            // Unresolved stored data never becomes a default overwrite: a
+            // corrupt candidate blocks persistence for that session.
+            var repository = new CastingPlanRepository(modPath);
+            File.WriteAllText(repository.GetProfilePath("workspace-campaign"),
+                "{ torn");
+            var blocked = new CastingWorkspaceSession(modPath, "workspace-campaign");
+            if (blocked.LoadStatus != CastingPlanLoadStatus.Corrupt ||
+                !blocked.PersistenceBlocked)
+                throw new InvalidOperationException(
+                    "Corruption was not surfaced as a blocked session.");
+            bool refused = false;
+            try { blocked.Save(); }
+            catch (InvalidOperationException) { refused = true; }
+            if (!refused || blocked.PersistenceBlocked == false)
+                throw new InvalidOperationException(
+                    "A blocked session was allowed to overwrite stored bytes.");
         }
 
         // A13 (isolated filesystem): the migration boundary archives the

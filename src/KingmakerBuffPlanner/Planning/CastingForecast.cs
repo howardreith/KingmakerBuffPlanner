@@ -76,7 +76,7 @@ namespace KingmakerBuffPlanner.Planning
             string routineId,
             PartyProviderSnapshot snapshot,
             IEnumerable<ProviderPlanningOption> providerOptions,
-            IDictionary<string, EffectExpression> effectsBySource,
+            IReadOnlyDictionary<string, EffectExpression> effectsBySource,
             IEnumerable<CastEnhancementSnapshot> enhancements = null)
         {
             if (document == null) throw new ArgumentNullException("document");
@@ -96,7 +96,7 @@ namespace KingmakerBuffPlanner.Planning
             CastingPlanDocument document,
             PartyProviderSnapshot snapshot,
             IEnumerable<ProviderPlanningOption> providerOptions,
-            IDictionary<string, EffectExpression> effectsBySource,
+            IReadOnlyDictionary<string, EffectExpression> effectsBySource,
             IEnumerable<CastEnhancementSnapshot> enhancements = null,
             IEnumerable<ICastingTargetingModifier> targetingModifiers = null)
         {

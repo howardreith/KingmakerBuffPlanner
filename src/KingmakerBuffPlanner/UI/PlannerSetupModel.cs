@@ -153,6 +153,12 @@ namespace KingmakerBuffPlanner.UI
 
         public BuffPlannerProfile Profile { get; private set; }
         public PartyProviderSnapshot Snapshot { get; private set; }
+        // Source-keyed effect expressions for consumers that compile plans
+        // from the same discovery data (the casting-first workspace).
+        public IReadOnlyDictionary<string, EffectExpression> EffectsBySource
+        {
+            get { return _effects; }
+        }
         public IReadOnlyList<SetupSourceRow> Sources { get; private set; }
         // The full discovered enhancement catalog (not only the currently
         // applicable subset): shared-pool budget lines must see every caster

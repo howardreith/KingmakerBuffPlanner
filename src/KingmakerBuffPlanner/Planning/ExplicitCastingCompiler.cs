@@ -202,7 +202,7 @@ namespace KingmakerBuffPlanner.Planning
             CastingPlanDocument document,
             PartyProviderSnapshot snapshot,
             IEnumerable<ProviderPlanningOption> providerOptions,
-            IDictionary<string, EffectExpression> effectsBySource,
+            IReadOnlyDictionary<string, EffectExpression> effectsBySource,
             IEnumerable<CastEnhancementSnapshot> enhancements = null,
             string budgetRoutineScope = null,
             IEnumerable<ICastingTargetingModifier> targetingModifiers = null,
@@ -309,7 +309,7 @@ namespace KingmakerBuffPlanner.Planning
             PlannedCasting casting,
             PartyProviderSnapshot snapshot,
             List<ProviderPlanningOption> options,
-            IDictionary<string, EffectExpression> effectsBySource,
+            IReadOnlyDictionary<string, EffectExpression> effectsBySource,
             List<CastEnhancementSnapshot> enhancements,
             List<ICastingTargetingModifier> targetingModifiers,
             List<string> diagnostics,
@@ -553,7 +553,7 @@ namespace KingmakerBuffPlanner.Planning
 
         private static void VerifyAbilityTargetMode(
             PlannedCasting casting,
-            IDictionary<string, EffectExpression> effectsBySource,
+            IReadOnlyDictionary<string, EffectExpression> effectsBySource,
             List<string> reasons)
         {
             EffectExpression expression;

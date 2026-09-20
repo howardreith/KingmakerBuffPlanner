@@ -1,6 +1,32 @@
 # AUTONOMOUS-RESUME — top section is current; planning/CASTING-FIRST-MIGRATION-STATUS.md is the per-checkpoint tracker.
 
-## Casting-first migration Phase 2 checkpoint 7 — 2026-09-19 (LATEST)
+## Casting-first migration Phase 4 checkpoint 8 (workspace) — 2026-09-19 (LATEST)
+
+- FIXTURE DIAGNOSED, NOT RESEALED: the live BagOfTricks directory is
+  byte-identical to BOTH September guarded-install transaction manifests
+  (all 40 sha256 match); the stale Aug-23 aggregate is off by exactly one
+  unrecoverable 182-byte mutable file. live-ui-bootstrap stays blocked;
+  prerequisite = owner rebind authority or the recommended additive
+  per-file-manifest comparator evidence. No guard weakened, nothing
+  resealed.
+- THE CONNECTED WORKSPACE: CastingWorkspaceSession (browse-never-mutates,
+  draft-for-next-only, explicit commands + Undo, shared-plan read models,
+  candidate persistence with corruption blocking) + review/Apply
+  integration (Present/Accept/Apply through gate + coordinator + an
+  explicitly DISABLED dispatch boundary that records identity and never
+  claims gameplay) + the Unity CastingWorkspaceScreenView on the
+  factory/theme seams behind CastingWorkspaceDevSelection (default off),
+  consuming the same discovery data as the legacy screen. View is
+  source-integrated and compiled; NOT visually qualified.
+- Gates: source 42/42; protocol 208/208 (3 workspace integration tests);
+  harness 27/27; package 4/4; WhatIf 5/5; rollback 4/4; publisher 3/3
+  (`artifacts/casting-first-checkpoint8-gate.log`). Bundle regenerated at
+  `artifacts/review-bundles/casting-first-migration/` (local only).
+- NEXT: additive per-file-manifest comparator evidence; owner-side seal
+  resolution then live-ui-bootstrap donors + workspace screenshots;
+  runtime-qualify the view; A06 exact-rod inspection.
+
+## Casting-first migration Phase 2 checkpoint 7 — 2026-09-19
 
 - A13 isolated boundary implemented: CastingPlanMigrationService
   (exact-original per-boundary archive, candidate-only writes,

@@ -5,7 +5,111 @@ Linked from `AUTONOMOUS-RESUME.md`. Specification: the adopted
 `Kingmaker-Buff-Planner-Casting-First-Migration-Charter.md` (casting-first
 migration and native scroll UI charter v1.0, 2026-09-19).
 
-## Phase 2 checkpoint 7 — migration boundary + guarded live-lane findings — 2026-09-19 (CURRENT)
+## Phase 4 checkpoint 8 — fixture diagnosis + the connected workspace — 2026-09-19 (CURRENT)
+
+**Branch** `codex/kingmaker-buff-planner-casting-first`, reconciled at
+`81c46486cebe6580f753b59334fe7615b1daadbb` (checkpoints 1–7 preserved, clean
+tree). Gate at this checkpoint: source 42/42; **protocol 208/208**; harness
+27/27; package 4/4; WhatIf 5/5; rollback 4/4; publisher 3/3
+(`artifacts/casting-first-checkpoint8-gate.log`). Review bundle regenerated
+at `artifacts/review-bundles/casting-first-migration/` (patches 0001–0007 +
+manifest; still local — no authorized push route for this branch).
+
+### Fixture drift: precise diagnosis, bootstrap stays blocked
+
+Read-only comparison under the manifest's own inventory rules
+(`Get-KbpDirectoryManifest`: path+length+sha256 per file):
+
+- The CURRENT live BagOfTricks directory is **byte-identical** (all 40
+  sha256 hashes match) to the per-file manifests recorded by BOTH guarded
+  install transactions `install-rc2fix-liveui-3` and
+  `install-rc3-published-install-1` (Sept 19 evidence).
+- The stale record is the profile aggregate (sealed Aug 23 at 41 files /
+  1,805,907 bytes / `34d89823…`): one 182-byte BagOfTricks-owned mutable
+  file disappeared between that owner-accepted rebind and the September
+  transactions, during owner gameplay. Its exact path is NOT recoverable
+  from preserved evidence (aggregates only; Aug-23-era per-file dumps were
+  cleaned), and no approved-bytes snapshot exists
+  (`fixtureRelativePath` absent for these mods).
+- Disposition per the continuation's rules: provenance CLASS is established
+  (mutable mod content churn, same class the owner's Aug-23 rebind
+  accepted; DLL and Info identities unchanged), but the exact file is
+  unproven and resealing is not authorized here → **live-ui-bootstrap
+  remains blocked**. Prerequisite: the owner's rebind authority over the
+  transaction-verified current state, or a comparator improvement that
+  archives per-file manifests at seal time (recommended follow-up; purely
+  additive evidence, no check weakened). No guard was bypassed, no
+  manifest regenerated, no fixture file invented.
+
+### The connected workspace (primary deliverable)
+
+- `UI/CastingWorkspaceSession.cs` — the production session connecting the
+  real services: browsing selection that never mutates; draft defaults
+  that only configure the NEXT casting; explicit commands
+  (Add/Update/Remove/Move/SetState/Undo) through the one mutation
+  authority; `BuildView` read models (caster rows with capability vs
+  readiness, casting cards with target/origin/coverage/gaps/
+  enhancements/costs/readiness, budget drill-down with responsible
+  casting IDs) derived from the shared resolved plan — no second ledger;
+  save/reopen through the candidate repository; corrupt/unsupported
+  candidates block persistence instead of default-overwriting.
+- Review/Apply integration (the actual caller path):
+  `PresentForReview`/`AcceptPresentedPlan`/`Apply` route every submission
+  through `CastingExecutionGate` + `CastingReviewCoordinator`
+  (unpresented, unaccepted, and materially-changed plans refuse; a
+  harmless refresh keeps acceptance; an in-flight guard prevents double
+  submission) and terminate at `DisabledCastingDispatchBoundary`, which
+  refuses native submission with
+  `native-submission-disabled:no-qualified-casting-first-executor` while
+  recording the exact submission identity — policy proof, never gameplay.
+- `UI/CastingWorkspaceScreenView.cs` — the Unity parchment surface
+  (header with routine/readiness summary, caster lane, casting-card lane
+  with per-card Edit, inspector with editing-scope label and
+  Enable/Disable/Remove, footer with budget conflicts, Accept, Review &
+  Apply, Ready Casts Only) using the existing factory/theme seams and the
+  verified `PlayClick` route. Source-integrated and compiled; **not
+  visually or audibly qualified** (no runtime capture was possible this
+  checkpoint). Wired behind `CastingWorkspaceDevSelection` (session-
+  scoped, default off) at `BuffPlannerUiRoot.OpenSetup()`, consuming the
+  same discovery data as the legacy screen through newly exposed
+  read-only model properties; legacy and new authoring paths are never
+  active together.
+
+### Verified behavior (integration layer, deterministic inputs)
+
+Tests through the real session (game-boundary inputs are deterministic
+fixtures; no planner service is mocked):
+`casting-workspace-mixed-caster-flow` (three independent cards from two
+casters with distinct settings; focus changes without reassignment;
+single-card edit + Undo; mismatched replacement refused; one group card
+with caster origin, 5 predicted beneficiaries, 1 honest gap, and no extra
+casting), `casting-workspace-review-and-apply-policy` (unpresented/
+unaccepted refusals; incidental previews approve nothing; safe quick-run
+without ceremony; unseen material change refuses; Ready Casts Only after
+re-presentation with disclosed omissions; dispatch disabled with recorded
+identity), `casting-workspace-save-reopen-and-protection` (round trip
+retains ids/order/disabled/unresolved; corrupt candidate blocks
+overwriting).
+
+### Acceptance-matrix adjustments
+
+A01–A05, A07–A11, A12 import half, A13 isolated half: PASS at the
+deterministic layer (unchanged). The workspace session integration adds
+production-caller-path evidence for A09 (presented-plan) and the editing
+contracts. Still open: A06 (exact rods), A14 equivalence beyond
+structural, A15 execution, A16–A20 native/UI/runtime, live A12/A13
+rehearsal, and ALL visual/audio acceptance of the new view.
+
+### Next executable step
+
+1. Comparator follow-up: archive per-file manifests at seal/mismatch time
+   (additive), then resolve the BagOfTricks seal under owner authority and
+   re-run `live-ui-bootstrap` for the donor inventory + workspace
+   screenshots. 2. Runtime-qualify the workspace view (open/close, input
+   isolation, listener lifetime, Escape) through the guarded lane once (1)
+   unblocks. 3. Exact-rod durable-identity inspection (A06).
+
+## Phase 2 checkpoint 7 — migration boundary + guarded live-lane findings — 2026-09-19 (commit `81c4648`)
 
 **Branch** `codex/kingmaker-buff-planner-casting-first`, on top of
 checkpoint 6 (`29f1ac8`). Gate: source 42/42; **protocol 205/205**;
