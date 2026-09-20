@@ -1,5 +1,42 @@
 # AUTONOMOUS-BLOCKERS — top section is current
 
+## Workspace visual qualification blockers — 2026-09-20
+
+- **BLOCKING: intermittent fully-black game presentation in automated
+  sessions.** Run casting-ws-bisect-211500 proved by bisection that the
+  screen is 100% black with the workspace OPEN and also with it CLOSED
+  in the same session (identical luma min=max=0 across 121,264 samples,
+  both capture paths, 31 attempts) — the workspace is NOT the cause.
+  This matches the previously documented menuinput-4/5 intermittent
+  focus-correlated black presentation at the main menu. Sessions vary:
+  casting-ws-visual-183000 (focused=False) and casting-ws-root-200200
+  (focused=True) captured presented frames; casting-ws-present-204500
+  and casting-ws-bisect-211500 (both focused=True) were black
+  throughout. Leading hypothesis: display/presentation path of the
+  remotely-accessed console session (the owner works through RDP;
+  disconnected console sessions may present nothing) — NOT classified,
+  evidence retained in runtime-evidence/casting-ws-bisect-211500/.
+  Workspace visual qualification cannot proceed in a black session;
+  the fail-closed gates correctly FAIL such runs.
+- **OPEN (classification pending a presenting session):** in
+  casting-ws-root-200200 the game presented (HUD visible, mean luma
+  0.107) with the workspace hierarchy fully presented, yet no workspace
+  UI was drawn in the frame. Possibly the two-update settle captured
+  before the nested canvas drew (now 750 ms wall-clock settle); if a
+  presenting session still shows no workspace, the nested-canvas draw
+  path under StaticCanvas is the defect.
+- Workspace CONSTRUCTION is proven live: hierarchy active, 1920x1200
+  rect under StaticCanvas, nested canvas enabled (sortingOrder 1000,
+  alpha 1.00), 19 renderable texts; production open path logged
+  `casting-first workspace opened;dispatch=native-submission-disabled`
+  (run casting-ws-root-200200 output_log lines 3979-3983).
+- Harness defect (latent, recorded, not swept): nine top-level guarded
+  scripts call `$PSCmdlet.ShouldProcess` which NullReferenceExceptions
+  under `powershell.exe -File` when confirmation must be evaluated. The
+  runtime launcher is repaired (narrow catch + WhatIf-contract fallback)
+  with a three-layer regression test; the other eight remain
+  `-Command`-only until each gets the same repair plus its own gate.
+
 ## Casting-first migration blockers — 2026-09-19
 
 - RESOLVED (was the standing live-lane blocker): the authorized

@@ -1,36 +1,60 @@
 # AUTONOMOUS-RESUME — top section is current; planning/CASTING-FIRST-MIGRATION-STATUS.md is the per-checkpoint tracker.
 
-## Workspace visual honesty repair — 2026-09-20 (LATEST)
+## Workspace qualification honesty chain — 2026-09-20 (LATEST)
 
-- Run `casting-ws-final-171029` (live-workspace-qual, full-user 15-mod
-  profile) completed the full chain for the FIRST time: campaign load,
-  UMM close through verified `UI.Instance.ToggleWindow(false)`,
-  programmatic planner open, workspace screen open, transaction restored.
-  Evidence: runtime-evidence/casting-ws-final-171029/.
-- TWO honesty defects found in that PASS and repaired (checkpoint 11 in
-  the status tracker): (1) its 75 assertions were identity/mod-integrity
-  checks only — nothing asserted the workspace actually opened; (2) the
-  single async engine screenshot was BLACK (30 KB), matching the
-  documented intermittent focus-correlated black presentation
-  (launchdiag-1 vs menuinput-4/5 precedent), so it was not classifiable.
-- The workspace scenario now captures through the proven menu-diagnostic
-  machinery (end-of-frame ReadPixels + luma/blackFraction + bounded
-  30×1 s black retries + engine second path + environment marker with
-  focused/runInBackground) and carries real fail-closed assertions:
-  workspace-screen-open, workspace-frame-captured,
-  workspace-frame-engine-capture, workspace-frame-nonblack
-  (blackFraction<0.98; persistent black now FAILs at
-  workspace-visual-validation).
-- Gates at repair: source 42/42; protocol 217/217; harness 27/27;
-  fixture-inventory 3/3; rollback 4/4; publisher 3/3.
-- NEXT (exact action): guarded live-workspace-qual re-run with the
-  rebuilt capture gate to obtain classified visual evidence of the
-  actual workspace; if black persists across retries, the run FAILS by
-  design with luma + focus evidence for classification. Then extend the
-  scenario through the mission's interaction checklist (browse without
-  mutation, mixed-caster cards, edit+Undo, group coverage, resource
-  drill-down, save/reopen) — the screen opening alone is not the end of
-  qualification.
+Branch `codex/kingmaker-buff-planner-casting-first`, HEAD `41893a2`
+(clean). Gates: source 42/42; protocol 217/217; harness 27/27;
+deployment WhatIf 5/5; launcher -File WhatIf 3/3 (new); fixture 3/3;
+rollback 4/4; publisher 3/3.
+
+The session chased the workspace visual claim through five guarded
+runs; every earlier "workspace opened" claim is now corrected:
+
+1. **casting-ws-visual-183000** — PASS but the frame showed the LEGACY
+   catalog screen: the workspace dev-selection enable was dead code
+   (inside the non-live UI-smoke gate, always false for
+   live-workspace-qual). Captured PROVEN dual-path non-black machinery
+   though (blackFraction=0.0285, focused=False, zero retries, both
+   paths bit-identical) — the original 30 KB black png was a
+   capture-timing artifact, not an unfocus limitation.
+2. **casting-ws-root-190500** — honest FAIL after the enable's first
+   relocation STILL sat after Update()'s live-UI return; the tightened
+   phase gate refused the legacy screen (phase=1 timeout) and the
+   transaction restored verified.
+3. **7c76090** placed the enable at the top of Update();
+   **casting-ws-root-200200** then opened the REAL workspace through
+   the production hotkey path (log: `casting-first workspace
+   opened;dispatch=native-submission-disabled`), all assertions PASS
+   (workspaceRoot=active, legacyScreen=closed, non-black 0.3907) — but
+   the frame showed the plain game HUD: the workspace drew nothing
+   (hierarchy existed; two-update settle suspected too early).
+4. **casting-ws-present-204500** — FAIL by design: presentation
+   evidence captured (hierarchy FULLY presented: active, 1920x1200,
+   canvas enabled, alpha 1.00, 19 renderable texts) while the frame was
+   100% black across all 31 attempts.
+5. **casting-ws-bisect-211500** — FAIL by design, DECISIVE bisection:
+   open-workspace frame black AND closed-workspace frame black in the
+   same session → the workspace does NOT blacken the screen; this is
+   the documented intermittent black-presentation defect (menuinput-4/5
+   precedent), suspected RDP-console related. See AUTONOMOUS-BLOCKERS.
+
+Also repaired this session: `powershell.exe -File` +
+`$PSCmdlet.ShouldProcess` NullReferenceException crashed the runtime
+launcher after its read-only preflights (minimal repro: fails under
+-File, works under -Command); fixed with a narrow catch + WhatIf
+contract fallback (f3d6b48) and a three-layer regression test wired
+into Test-SourceOnly (9808102). Eight other guarded scripts carry the
+same latent defect (recorded, not swept).
+
+NEXT (exact action): run casting-ws-bisect-214500 (in flight at
+resume-writing; 750 ms wall-clock open settle) — in a presenting
+session its open/closed bisection classifies whether the workspace
+canvas draws; in a black session it re-confirms the presentation
+blocker. Then either fix the nested-canvas draw path under StaticCanvas
+or record the presentation blocker for the owner (RDP session state is
+theirs to control). The interaction checklist (browse, mixed-caster
+cards, edit+Undo, groups, resources, save/reopen) follows once one
+presented workspace frame exists.
 
 ## Campaign-load repair — 2026-09-20
 

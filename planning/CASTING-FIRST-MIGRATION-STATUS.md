@@ -5,7 +5,53 @@ Linked from `AUTONOMOUS-RESUME.md`. Specification: the adopted
 `Kingmaker-Buff-Planner-Casting-First-Migration-Charter.md` (casting-first
 migration and native scroll UI charter v1.0, 2026-09-19).
 
-## Checkpoint 11 — first workspace run qualified honestly; visual gate rebuilt — 2026-09-20 (CURRENT)
+## Checkpoint 12 — workspace visual honesty chain; five runs, every claim re-classified — 2026-09-20 (CURRENT)
+
+HEAD `41893a2`. Gates: source 42/42; protocol 217/217; harness 27/27;
+deployment WhatIf 5/5; **launcher -File WhatIf 3/3 (new)**; fixture
+3/3; rollback 4/4; publisher 3/3. Every run below used the guarded
+launcher, full-user 15-mod profile, and restored verified transactions.
+
+- **casting-ws-visual-183000** (PASS, then corrected): the first
+  honest dual-path capture (blackFraction 0.0285, zero retries, both
+  paths bit-identical, focused=False) proved the original 30 KB black
+  png was a capture-timing artifact — but the frame showed the LEGACY
+  catalog screen: the workspace dev-selection enable was dead code
+  inside the non-live UI-smoke gate. `workspace-screen-open` had also
+  been satisfiable by the legacy screen's `IsScreenOpen`.
+- **casting-ws-root-190500** (FAIL by design): first relocation of the
+  enable still sat after `Update()`'s live-UI return; the tightened
+  gate refused the legacy screen and timed out at phase=1.
+- **7c76090** placed the enable before the live-UI dispatch.
+  **casting-ws-root-200200** then opened the REAL workspace through
+  the production hotkey path (`casting-first workspace
+  opened;dispatch=native-submission-disabled`), legacy screen closed,
+  all assertions PASS — but the frame showed the plain game HUD: the
+  workspace drew nothing despite existing (two-update settle suspect;
+  now 750 ms wall-clock).
+- **casting-ws-present-204500** (FAIL by design): new
+  `workspace-hierarchy-presents` evidence captured a FULLY presented
+  hierarchy (active, 1920x1200 under StaticCanvas, canvas enabled,
+  alpha 1.00, 19 renderable texts) while the frame was 100% black over
+  all 31 attempts.
+- **casting-ws-bisect-211500** (FAIL by design, decisive): the
+  closed-workspace control frame was ALSO 100% black — the workspace
+  does not blacken the screen; the session hit the documented
+  intermittent black-presentation defect (menuinput-4/5 precedent;
+  suspected RDP-console related, NOT classified). Recorded in
+  AUTONOMOUS-BLOCKERS.
+- Harness repair on the way: `powershell.exe -File` crashes
+  `$PSCmdlet.ShouldProcess` with NullReferenceException (reproduced
+  minimally; works under -Command). Launcher repaired with a narrow
+  catch + WhatIf-contract fallback (f3d6b48) plus a three-layer
+  regression test in Test-SourceOnly (9808102). Eight sibling scripts
+  carry the latent defect, recorded not swept.
+- Next: casting-ws-bisect-214500 (750 ms settle) classifies the
+  workspace draw in a presenting session, or re-confirms the
+  presentation blocker; owner may need to control the console/RDP
+  session state for a presenting run.
+
+## Checkpoint 11 — first workspace run qualified honestly; visual gate rebuilt — 2026-09-20
 
 Run `casting-ws-final-171029` (live-workspace-qual, full-user 15-mod
 profile) completed the full chain for the first time: campaign loaded
