@@ -19,7 +19,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private readonly ModLog _log;
         private int _state;
         private int _updates;
-        private bool _afterLoad;
+        private volatile bool _afterLoad;
         private bool _callbackRegistered;
 
         internal LiveCampaignSaveLoader(RuntimeTestRequest request, ModLog log)
@@ -131,7 +131,27 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             }
             if (_state == 2)
             {
-                if (!_afterLoad || Game.Instance == null || Game.Instance.Player == null) return;
+                // Fallback: the callback may not fire if the save loading
+                // resets SaveManager callbacks during the scene transition.
+                // Also accept direct evidence that the campaign loaded.
+                bool callbackFired = _afterLoad;
+                bool campaignLoaded = false;
+                if (!callbackFired && Game.Instance != null && Game.Instance.Player != null)
+                {
+                    // Check we're not on the main menu (CurrentMode indicates
+                    // the game state)
+                    try
+                    {
+                        object mode = ReadMember(Game.Instance, "CurrentMode");
+                        campaignLoaded = mode != null &&
+                            !string.Equals(Convert.ToString(mode), "None",
+                                StringComparison.OrdinalIgnoreCase) &&
+                            !string.Equals(Convert.ToString(mode), "MainMenu",
+                                StringComparison.OrdinalIgnoreCase);
+                    }
+                    catch { campaignLoaded = false; }
+                }
+                if (!callbackFired && !campaignLoaded) return;
                 string gameId = Convert.ToString(ReadMember(Game.Instance.Player, "GameId"));
                 if (!string.Equals(gameId, Parameter("expectedGameId"), StringComparison.Ordinal))
                     throw new InvalidOperationException("Loaded game id mismatch: " + gameId + ".");
