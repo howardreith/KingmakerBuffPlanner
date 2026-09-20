@@ -28,6 +28,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private bool _uiReconstructionRequested;
         private int _uiPostReconstructionUpdates;
         private LiveCampaignSaveLoader _liveSaveLoader;
+        private MenuRenderDiagnostic _menuDiagnostic;
         private int _liveUiPhase;
         private int _liveCycleCount;
         private bool _liveCycleOpening;
@@ -96,6 +97,21 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 {
                     _completed = true;
                     _log.Error("Live UI runtime scenario failed.", exception);
+                    TryWriteFailure(_startedAtUtc, exception);
+                    if (_request.ExitAfterCompletion) Application.Quit();
+                    return true;
+                }
+            }
+            if (RuntimeTestProtocol.IsMenuDiagnosticScenario(_request.Scenario))
+            {
+                try
+                {
+                    if (!UpdateMenuDiagnosticScenario()) return false;
+                }
+                catch (Exception exception)
+                {
+                    _completed = true;
+                    _log.Error("Menu diagnostic runtime scenario failed.", exception);
                     TryWriteFailure(_startedAtUtc, exception);
                     if (_request.ExitAfterCompletion) Application.Quit();
                     return true;
@@ -420,6 +436,25 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         _liveRenderDiagnostics.NestedCanvasScalerCount,
                     UiFractionalRectCount = _liveRenderDiagnostics == null ? -1 :
                         _liveRenderDiagnostics.FractionalRectCount,
+                    MenuFrameScreenshotSha256 = _menuDiagnostic == null
+                        ? null : _menuDiagnostic.MenuFrameScreenshotSha256,
+                    MenuFrameEngineScreenshotSha256 = _menuDiagnostic == null
+                        ? null : _menuDiagnostic.MenuFrameEngineScreenshotSha256,
+                    MenuFrameWidth = _menuDiagnostic == null ? 0 : _menuDiagnostic.MenuFrameWidth,
+                    MenuFrameHeight = _menuDiagnostic == null ? 0 : _menuDiagnostic.MenuFrameHeight,
+                    MenuFrameLumaSummary = _menuDiagnostic == null || _menuDiagnostic.MenuFrameLuma == null
+                        ? null : _menuDiagnostic.MenuFrameLuma.Describe(),
+                    MenuFrameNonBlack = _menuDiagnostic != null && _menuDiagnostic.MenuFrameLuma != null &&
+                        _menuDiagnostic.MenuFrameLuma.IsNonBlack,
+                    MenuFrameProgressSummary = _menuDiagnostic == null
+                        ? null : _menuDiagnostic.FrameProgressSummary,
+                    MenuButtonInventory = _menuDiagnostic == null ? null : _menuDiagnostic.MenuButtonInventory,
+                    MenuClickTarget = _menuDiagnostic == null ? null : _menuDiagnostic.MenuClickTarget,
+                    MenuClickAcknowledged = _menuDiagnostic != null && _menuDiagnostic.MenuClickAcknowledged,
+                    MenuWindowOpened = _menuDiagnostic != null && _menuDiagnostic.MenuWindowOpened,
+                    MenuWindowDescriptor = _menuDiagnostic == null ? null : _menuDiagnostic.MenuWindowDescriptor,
+                    MenuWindowScreenshotSha256 = _menuDiagnostic == null
+                        ? null : _menuDiagnostic.MenuWindowScreenshotSha256,
                     NativeUiContractSha256 = nativeUiContractHash,
                     NativeUiButtonCount = nativeUiContract == null ? 0 : nativeUiContract.Buttons.Count,
                     NativeUiCandidateAnchorCount = nativeUiContract == null
@@ -483,6 +518,60 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     {
                         result.Status = "FAIL";
                         result.Stage = "native-ui-contract-validation";
+                    }
+                }
+                if (RuntimeTestProtocol.IsMenuDiagnosticScenario(_request.Scenario))
+                {
+                    bool frameCaptured = _menuDiagnostic != null &&
+                        !string.IsNullOrWhiteSpace(_menuDiagnostic.MenuFrameScreenshotSha256);
+                    result.Assertions.Add(frameCaptured
+                        ? RuntimeTestAssertion.Pass("menu-frame-captured", "end-of-frame png + sha256",
+                            _menuDiagnostic.MenuFrameScreenshotSha256)
+                        : RuntimeTestAssertion.Fail("menu-frame-captured", "end-of-frame png + sha256", "missing"));
+                    bool engineCaptured = _menuDiagnostic != null &&
+                        !string.IsNullOrWhiteSpace(_menuDiagnostic.MenuFrameEngineScreenshotSha256);
+                    result.Assertions.Add(engineCaptured
+                        ? RuntimeTestAssertion.Pass("menu-frame-engine-capture", "engine png + sha256",
+                            _menuDiagnostic.MenuFrameEngineScreenshotSha256)
+                        : RuntimeTestAssertion.Fail("menu-frame-engine-capture", "engine png + sha256", "missing"));
+                    string lumaEvidence = _menuDiagnostic == null || _menuDiagnostic.MenuFrameLuma == null
+                        ? "missing" : _menuDiagnostic.MenuFrameLuma.Describe();
+                    bool nonBlack = _menuDiagnostic != null && _menuDiagnostic.MenuFrameLuma != null &&
+                        _menuDiagnostic.MenuFrameLuma.IsNonBlack;
+                    result.Assertions.Add(nonBlack
+                        ? RuntimeTestAssertion.Pass("menu-frame-nonblack", "blackFraction<0.98", lumaEvidence)
+                        : RuntimeTestAssertion.Fail("menu-frame-nonblack", "blackFraction<0.98", lumaEvidence));
+                    bool frameProgressed = _menuDiagnostic != null &&
+                        !string.IsNullOrWhiteSpace(_menuDiagnostic.FrameProgressSummary);
+                    result.Assertions.Add(frameProgressed
+                        ? RuntimeTestAssertion.Pass("menu-frame-progress-observed", "frameCount advanced",
+                            _menuDiagnostic.FrameProgressSummary)
+                        : RuntimeTestAssertion.Fail("menu-frame-progress-observed", "frameCount advanced", "missing"));
+                    bool windowOpened = false;
+                    bool windowCaptured = false;
+                    if (RuntimeTestProtocol.IsMenuInputDiagnosticScenario(_request.Scenario))
+                    {
+                        windowOpened = _menuDiagnostic != null && _menuDiagnostic.MenuWindowOpened;
+                        result.Assertions.Add(windowOpened
+                            ? RuntimeTestAssertion.Pass("menu-loadgame-window-opened",
+                                "active SaveLoadWindow after physical click",
+                                _menuDiagnostic.MenuWindowDescriptor + ";clickAcknowledged=" +
+                                _menuDiagnostic.MenuClickAcknowledged)
+                            : RuntimeTestAssertion.Fail("menu-loadgame-window-opened",
+                                "active SaveLoadWindow after physical click", "missing"));
+                        windowCaptured = _menuDiagnostic != null &&
+                            !string.IsNullOrWhiteSpace(_menuDiagnostic.MenuWindowScreenshotSha256);
+                        result.Assertions.Add(windowCaptured
+                            ? RuntimeTestAssertion.Pass("menu-window-screenshot-captured", "png + sha256",
+                                _menuDiagnostic.MenuWindowScreenshotSha256)
+                            : RuntimeTestAssertion.Fail("menu-window-screenshot-captured", "png + sha256", "missing"));
+                    }
+                    if (!frameCaptured || !engineCaptured || !nonBlack || !frameProgressed ||
+                        (RuntimeTestProtocol.IsMenuInputDiagnosticScenario(_request.Scenario) &&
+                            (!windowOpened || !windowCaptured)))
+                    {
+                        result.Status = "FAIL";
+                        result.Stage = "menu-diagnostic-validation";
                     }
                 }
                 int loadedOptionalAssemblies = 0;
@@ -963,6 +1052,21 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 if (_request.ExitAfterCompletion) Application.Quit();
             }
 
+            return true;
+        }
+
+        private bool UpdateMenuDiagnosticScenario()
+        {
+            if (_menuDiagnostic == null)
+                _menuDiagnostic = new MenuRenderDiagnostic(
+                    _request, _log,
+                    RuntimeTestProtocol.IsMenuInputDiagnosticScenario(_request.Scenario),
+                    WritePhysicalInputRequest);
+            if (!_menuDiagnostic.IsComplete)
+            {
+                _menuDiagnostic.Update();
+                return false;
+            }
             return true;
         }
 
@@ -1643,6 +1747,19 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         [JsonProperty("uiNestedPlannerCanvasScalerCount", Order = 167)]
         public int UiNestedPlannerCanvasScalerCount { get; set; }
         [JsonProperty("uiFractionalRectCount", Order = 168)] public int UiFractionalRectCount { get; set; }
+        [JsonProperty("menuFrameScreenshotSha256", Order = 169)] public string MenuFrameScreenshotSha256 { get; set; }
+        [JsonProperty("menuFrameEngineScreenshotSha256", Order = 170)] public string MenuFrameEngineScreenshotSha256 { get; set; }
+        [JsonProperty("menuFrameWidth", Order = 171)] public int MenuFrameWidth { get; set; }
+        [JsonProperty("menuFrameHeight", Order = 172)] public int MenuFrameHeight { get; set; }
+        [JsonProperty("menuFrameLumaSummary", Order = 173)] public string MenuFrameLumaSummary { get; set; }
+        [JsonProperty("menuFrameNonBlack", Order = 174)] public bool MenuFrameNonBlack { get; set; }
+        [JsonProperty("menuFrameProgressSummary", Order = 175)] public string MenuFrameProgressSummary { get; set; }
+        [JsonProperty("menuButtonInventory", Order = 176)] public string MenuButtonInventory { get; set; }
+        [JsonProperty("menuClickTarget", Order = 177)] public string MenuClickTarget { get; set; }
+        [JsonProperty("menuClickAcknowledged", Order = 178)] public bool MenuClickAcknowledged { get; set; }
+        [JsonProperty("menuWindowOpened", Order = 179)] public bool MenuWindowOpened { get; set; }
+        [JsonProperty("menuWindowDescriptor", Order = 180)] public string MenuWindowDescriptor { get; set; }
+        [JsonProperty("menuWindowScreenshotSha256", Order = 181)] public string MenuWindowScreenshotSha256 { get; set; }
     }
 
     internal sealed class RuntimeTestAssertion

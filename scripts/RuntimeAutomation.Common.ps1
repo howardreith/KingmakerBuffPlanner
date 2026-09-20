@@ -100,7 +100,7 @@ function New-KbpRuntimeRequest {
         [ValidateSet('native-only', 'call-of-the-wild', 'human-reproduction', 'full-user')][string]$ProfileId = 'native-only',
         [object[]]$ExpectedOptionalMods = @(), [string[]]$ExpectedBlueprintGuids = @(),
         [hashtable]$Parameters = @{},
-        [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'live-ui-bootstrap', 'ui-native-contract-probe', 'final-no-save-core', 'performance-probe')][string]$Scenario = 'mod-load-smoke')
+        [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'live-ui-bootstrap', 'ui-native-contract-probe', 'final-no-save-core', 'performance-probe', 'launch-render-diagnostic', 'menu-input-diagnostic')][string]$Scenario = 'mod-load-smoke')
     return [ordered]@{
         schemaVersion = 1
         enabled = $true
@@ -357,6 +357,26 @@ function Assert-KbpRuntimeResult {
             })
         }
         finally { $bitmap.Dispose() }
+    }
+    if ($Request.scenario -in @('launch-render-diagnostic', 'menu-input-diagnostic') -and
+        $Result.stage -cne 'unhandled-exception') {
+        $menuFramePath = Join-Path $Request.evidenceDirectory 'menu-frame.png'
+        if (-not (Test-Path -LiteralPath $menuFramePath -PathType Leaf) -or
+            [string]::IsNullOrWhiteSpace([string]$Result.menuFrameScreenshotSha256) -or
+            [string]$Result.menuFrameScreenshotSha256 -cne (Get-KbpSha256 $menuFramePath)) {
+            throw 'Menu diagnostic read-pixels screenshot evidence is missing or inconsistent.'
+        }
+        $menuMarkerPath = Join-Path $Request.evidenceDirectory 'menu-render.json'
+        if (-not (Test-Path -LiteralPath $menuMarkerPath -PathType Leaf)) {
+            throw 'Menu diagnostic render marker evidence is missing.'
+        }
+        if ($Request.scenario -ceq 'menu-input-diagnostic' -and [bool]$Result.menuWindowOpened) {
+            $windowFramePath = Join-Path $Request.evidenceDirectory 'menu-saveload-window.png'
+            if (-not (Test-Path -LiteralPath $windowFramePath -PathType Leaf) -or
+                [string]$Result.menuWindowScreenshotSha256 -cne (Get-KbpSha256 $windowFramePath)) {
+                throw 'Menu diagnostic save-load-window screenshot evidence is missing or inconsistent.'
+            }
+        }
     }
     if ($Request.scenario -in @('native-buff-catalog', 'final-no-save-core')) {
         $catalogPath = Join-Path $Request.evidenceDirectory 'native-buff-catalog.json'

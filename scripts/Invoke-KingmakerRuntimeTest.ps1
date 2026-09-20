@@ -1,6 +1,6 @@
 [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
 param(
-    [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'live-ui-bootstrap', 'ui-native-contract-probe', 'final-no-save-core', 'performance-probe')][string]$Scenario = 'mod-load-smoke',
+    [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'live-ui-bootstrap', 'ui-native-contract-probe', 'final-no-save-core', 'performance-probe', 'launch-render-diagnostic', 'menu-input-diagnostic')][string]$Scenario = 'mod-load-smoke',
     [ValidateSet('native-only', 'call-of-the-wild', 'human-reproduction', 'full-user')][string]$CompatibilityProfileId = 'native-only',
     [ValidateRange(5, 1800)][int]$TimeoutSeconds = 180,
     [ValidateRange(5, 300)][int]$LaunchTimeoutSeconds = 60,
@@ -104,14 +104,20 @@ try {
     $orchestration.stage = 'waiting-for-result'
     $orchestration.kingmakerProcessId = $process.Id
     $orchestration.kingmakerStartedAtUtc = $process.StartTime.ToUniversalTime().ToString('o')
+    $processInfo = Get-CimInstance Win32_Process -Filter ("ProcessId = " + $process.Id) -ErrorAction SilentlyContinue
+    if ($null -ne $processInfo) {
+        $orchestration.kingmakerCommandLine = [string]$processInfo.CommandLine
+        $orchestration.kingmakerSessionId = [int]$processInfo.SessionId
+    }
     Write-KbpJsonAtomic (Join-Path $evidence 'orchestration.json') $orchestration
     $resultPath = Join-Path $evidence 'runtime-result.json'
+    $physicalInputScenario = ($Scenario -ceq 'live-ui-bootstrap') -or
+        ($Scenario -ceq 'menu-input-diagnostic')
     $plannerHotkeySent = $false
     $ummDismissSent = $false
     $ummDismissRecoverySent = $false
     $ummDismissSentAtUtc = [DateTime]::MinValue
-    if ($Scenario -ceq 'live-ui-bootstrap') {
-        Add-Type @'
+    Add-Type @'
 using System;
 using System.Runtime.InteropServices;
 public static class KbpPhysicalInput {
@@ -123,6 +129,8 @@ public static class KbpPhysicalInput {
   [DllImport("user32.dll")] static extern bool GetClientRect(IntPtr hWnd, out Rect rect);
   [DllImport("user32.dll")] static extern bool GetCursorPos(out Point point);
   [DllImport("user32.dll")] static extern bool ScreenToClient(IntPtr hWnd, ref Point point);
+  [DllImport("user32.dll")] static extern bool IsIconic(IntPtr hWnd);
+  [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
   [StructLayout(LayoutKind.Sequential)] public struct Point { public int X; public int Y; }
   [StructLayout(LayoutKind.Sequential)] public struct Rect { public int Left; public int Top; public int Right; public int Bottom; }
   public static void KeyDown(IntPtr window, byte key) {
@@ -149,14 +157,31 @@ public static class KbpPhysicalInput {
     if (!GetCursorPos(out point) || !ScreenToClient(window, ref point)) return "unavailable";
     return point.X.ToString() + "," + point.Y.ToString();
   }
+  public static string WindowState(IntPtr window) {
+    if (window == IntPtr.Zero) return "no-window";
+    return "minimized=" + IsIconic(window) + ";foreground=" + (GetForegroundWindow() == window);
+  }
 }
 '@
-    }
+    $windowObservations = New-Object System.Collections.Generic.List[object]
+    $nextWindowSampleUtc = [DateTime]::UtcNow
     $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds + 15)
     while (-not (Test-Path -LiteralPath $resultPath -PathType Leaf)) {
         $process.Refresh()
         if ($process.HasExited) { throw 'Kingmaker exited before committing the atomic runtime result.' }
         if ([DateTime]::UtcNow -ge $deadline) { throw 'Runtime result timed out; launched Kingmaker was left running and restoration is blocked.' }
+        if ([DateTime]::UtcNow -ge $nextWindowSampleUtc) {
+            $nextWindowSampleUtc = [DateTime]::UtcNow.AddSeconds(5)
+            $windowObservations.Add([ordered]@{
+                atUtc = [DateTime]::UtcNow.ToString('o')
+                windowState = [KbpPhysicalInput]::WindowState($process.MainWindowHandle)
+                mainWindowTitle = $process.MainWindowTitle
+                responding = $process.Responding
+            })
+            if ($windowObservations.Count -gt 60) { $windowObservations.RemoveAt(0) }
+            $orchestration.windowObservations = @($windowObservations)
+            Write-KbpJsonAtomic (Join-Path $evidence 'orchestration.json') $orchestration
+        }
         $ummMarker = Join-Path $evidence 'umm-overlay-ready.json'
         if ($Scenario -ceq 'live-ui-bootstrap' -and -not $ummDismissSent -and
             (Test-Path -LiteralPath $ummMarker -PathType Leaf)) {
@@ -201,7 +226,7 @@ public static class KbpPhysicalInput {
             $orchestration.plannerHotkeySentAtUtc = [DateTime]::UtcNow.ToString('o')
             Write-KbpJsonAtomic (Join-Path $evidence 'orchestration.json') $orchestration
         }
-        if ($Scenario -ceq 'live-ui-bootstrap') {
+        if ($physicalInputScenario) {
             $physicalRequests = @(Get-ChildItem -LiteralPath $evidence -Filter 'physical-input-*.json' `
                 -File -ErrorAction SilentlyContinue | Where-Object Name -NotLike '*.ack.json' |
                 Sort-Object Name)

@@ -189,11 +189,28 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             return string.Equals(scenario, "performance-probe", StringComparison.Ordinal);
         }
 
+        internal static bool IsLaunchRenderDiagnosticScenario(string scenario)
+        {
+            return string.Equals(scenario, "launch-render-diagnostic", StringComparison.Ordinal);
+        }
+
+        internal static bool IsMenuInputDiagnosticScenario(string scenario)
+        {
+            return string.Equals(scenario, "menu-input-diagnostic", StringComparison.Ordinal);
+        }
+
+        internal static bool IsMenuDiagnosticScenario(string scenario)
+        {
+            return IsLaunchRenderDiagnosticScenario(scenario) ||
+                IsMenuInputDiagnosticScenario(scenario);
+        }
+
         private static bool IsKnownScenario(string scenario)
         {
             return string.Equals(scenario, "mod-load-smoke", StringComparison.Ordinal) ||
                 IsCatalogScenario(scenario) || IsUiScenario(scenario) ||
-                IsNativeUiProbeScenario(scenario) || IsPerformanceScenario(scenario);
+                IsNativeUiProbeScenario(scenario) || IsPerformanceScenario(scenario) ||
+                IsMenuDiagnosticScenario(scenario);
         }
 
         private static void ValidateParameters(RuntimeTestRequest request)

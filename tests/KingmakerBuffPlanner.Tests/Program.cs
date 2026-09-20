@@ -64,6 +64,11 @@ namespace KingmakerBuffPlanner.Tests
                 Run("valid-final-core-request-is-accepted", () => TestValidFinalCoreRequest(root));
                 Run("valid-performance-request-is-accepted", () => TestValidPerformanceRequest(root));
                 Run("performance-parameters-are-exact", () => TestInvalidPerformanceRequest(root));
+                Run("valid-launch-render-diagnostic-request-is-accepted", () => TestValidLaunchRenderDiagnosticRequest(root));
+                Run("valid-menu-input-diagnostic-request-is-accepted", () => TestValidMenuInputDiagnosticRequest(root));
+                Run("menu-diagnostic-parameters-must-be-empty", () => TestInvalidMenuDiagnosticParameters(root));
+                Run("menu-frame-luma-stats-classify-black-frames", TestMenuFrameStatsBlackClassification);
+                Run("menu-frame-luma-stats-summarize-mixed-frames", TestMenuFrameStatsMixedSummary);
                 Run("duplicate-flag-rejected", () => TestDuplicateFlag(root));
                 Run("outside-path-rejected", TestOutsidePath);
                 Run("unknown-member-rejected", () => TestMutation(root, "unknown-member", AddUnknownMember));
@@ -9535,6 +9540,81 @@ namespace KingmakerBuffPlanner.Tests
                 };
             });
             AssertRejected(new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path });
+        }
+
+        private static void TestValidLaunchRenderDiagnosticRequest(string root)
+        {
+            string path = WriteRequest(root, "valid-launch-render", o =>
+                o["scenario"] = "launch-render-diagnostic");
+            string rejection;
+            RuntimeTestRequest request = ReadProtocol(
+                new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path }, out rejection);
+            if (request == null || rejection.Length != 0 ||
+                !RuntimeTestProtocol.IsLaunchRenderDiagnosticScenario(request.Scenario) ||
+                !RuntimeTestProtocol.IsMenuDiagnosticScenario(request.Scenario) ||
+                RuntimeTestProtocol.IsMenuInputDiagnosticScenario(request.Scenario) ||
+                request.Parameters.Count != 0)
+                throw new InvalidOperationException("Valid launch render diagnostic request was rejected: " + rejection);
+        }
+
+        private static void TestValidMenuInputDiagnosticRequest(string root)
+        {
+            string path = WriteRequest(root, "valid-menu-input", o =>
+                o["scenario"] = "menu-input-diagnostic");
+            string rejection;
+            RuntimeTestRequest request = ReadProtocol(
+                new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path }, out rejection);
+            if (request == null || rejection.Length != 0 ||
+                !RuntimeTestProtocol.IsMenuInputDiagnosticScenario(request.Scenario) ||
+                !RuntimeTestProtocol.IsMenuDiagnosticScenario(request.Scenario) ||
+                RuntimeTestProtocol.IsLaunchRenderDiagnosticScenario(request.Scenario) ||
+                request.Parameters.Count != 0)
+                throw new InvalidOperationException("Valid menu input diagnostic request was rejected: " + rejection);
+        }
+
+        private static void TestInvalidMenuDiagnosticParameters(string root)
+        {
+            string path = WriteRequest(root, "invalid-menu-parameters", o =>
+            {
+                o["scenario"] = "launch-render-diagnostic";
+                o["parameters"] = new Dictionary<string, object> { { "saveName", "KBP_AUTOMATION_WORKING" } };
+            });
+            AssertRejected(new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path });
+        }
+
+        private static void TestMenuFrameStatsBlackClassification()
+        {
+            MenuFrameLumaSummary black = MenuFrameStats.Summarize(new float[] { 0f, 0.001f, 0.005f, 0f });
+            if (black.IsNonBlack || black.BlackFraction > 1f ||
+                black.Minimum != 0f || black.Maximum < 0f)
+                throw new InvalidOperationException("Black frame was classified as non-black: " + black.Describe());
+            MenuFrameLumaSummary empty = null;
+            if (MenuFrameStats.IsNonBlack(empty))
+                throw new InvalidOperationException("Null summary was classified as non-black.");
+            try
+            {
+                MenuFrameStats.Summarize(new float[0]);
+                throw new InvalidOperationException("Empty sample list was accepted.");
+            }
+            catch (ArgumentException)
+            {
+            }
+        }
+
+        private static void TestMenuFrameStatsMixedSummary()
+        {
+            MenuFrameLumaSummary mixed = MenuFrameStats.Summarize(
+                new float[] { 0f, 0.01f, 0.5f, 0.75f, 1f });
+            if (!mixed.IsNonBlack)
+                throw new InvalidOperationException("Mixed frame was classified as black: " + mixed.Describe());
+            if (mixed.SampleCount != 5 || mixed.Minimum != 0f || mixed.Maximum != 1f)
+                throw new InvalidOperationException("Mixed summary extrema are wrong: " + mixed.Describe());
+            float expectedMean = (0f + 0.01f + 0.5f + 0.75f + 1f) / 5f;
+            if (Math.Abs(mixed.Mean - expectedMean) > 0.0001f)
+                throw new InvalidOperationException("Mixed summary mean is wrong: " + mixed.Describe());
+            float expectedBlackFraction = 2f / 5f;
+            if (Math.Abs(mixed.BlackFraction - expectedBlackFraction) > 0.0001f)
+                throw new InvalidOperationException("Mixed summary black fraction is wrong: " + mixed.Describe());
         }
 
         private static void TestDuplicateFlag(string root)

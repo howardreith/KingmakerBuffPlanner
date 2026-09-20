@@ -104,6 +104,9 @@
     <Compile Include="..\..\src\KingmakerBuffPlanner\RuntimeTesting\RuntimeTestProtocol.cs">
       <Link>RuntimeTesting\RuntimeTestProtocol.cs</Link>
     </Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\RuntimeTesting\MenuFrameStats.cs">
+      <Link>RuntimeTesting\MenuFrameStats.cs</Link>
+    </Compile>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
