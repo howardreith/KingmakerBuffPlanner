@@ -25,6 +25,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private readonly DateTime _startedAtUtc;
         private bool _completed;
         private int _uiSmokeUpdates;
+        private System.Diagnostics.Stopwatch _livePhaseElapsed;
+        private System.Diagnostics.Stopwatch _liveCameraSettleElapsed;
         private bool _uiReconstructionRequested;
         private int _uiPostReconstructionUpdates;
         private LiveCampaignSaveLoader _liveSaveLoader;
@@ -1156,8 +1158,15 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 return false;
             }
             _uiSmokeUpdates++;
-            if (_uiSmokeUpdates > 1800)
+            // Wall-clock budget: an unfocused Unity player can dispatch far
+            // more updates per second than 60, so update counts must never
+            // govern this timeout (the campaign load itself is budgeted by
+            // the save loader's per-stage stopwatch).
+            if (_livePhaseElapsed == null) _livePhaseElapsed = System.Diagnostics.Stopwatch.StartNew();
+            if (_livePhaseElapsed.Elapsed.TotalSeconds > 300)
                 throw new TimeoutException("Live UI scenario timed out;phase=" + _liveUiPhase +
+                    ";elapsedSeconds=" + _livePhaseElapsed.Elapsed.TotalSeconds.ToString("F1",
+                        System.Globalization.CultureInfo.InvariantCulture) +
                     ";snapshot=" + BuffPlannerUiRoot.GetSnapshot());
             if (_liveUiPhase == 0)
             {
@@ -1293,7 +1302,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             {
                 if (!PhysicalInputAcknowledged("settle-center")) return false;
                 _liveCameraSettleFrames++;
-                if (_liveCameraSettleFrames < 120) return false;
+                if (_liveCameraSettleElapsed == null)
+                    _liveCameraSettleElapsed = System.Diagnostics.Stopwatch.StartNew();
+                if (_liveCameraSettleElapsed.Elapsed.TotalSeconds < 2) return false;
                 BuffPlannerUiRoot.BeginPhysicalInputProbe();
                 QuickFlowDiagnostics baselineFlow =
                     BuffPlannerUiRoot.QuickFlowForRuntime("long");
