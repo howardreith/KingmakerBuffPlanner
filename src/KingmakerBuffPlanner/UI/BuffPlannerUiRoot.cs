@@ -588,10 +588,10 @@ namespace KingmakerBuffPlanner.UI
             _diagnostics = new BuffPlannerUiLifecycleDiagnostics();
             _quick = new BuffPlannerQuickExecuteController(this, _diagnostics, PresentQuickResult);
             _screen = new BuffPlannerScreenController(_session, _diagnostics, log,
-                ExecuteLegacyRoutine, PlayNativeSetupOpenSound,
+                routineId => ExecuteLegacyRoutine(routineId), PlayNativeSetupOpenSound,
                 routineId => ExecuteLegacyRoutine(routineId, true));
             _hud = new BuffPlannerHudButtonController(_session, _diagnostics, log,
-                () => { OpenSetup(); }, ExecuteLegacyRoutine);
+                () => { OpenSetup(); }, routineId => ExecuteLegacyRoutine(routineId));
             _spellbookEntry = new BuffPlannerSpellbookEntryController(
                 value => _log.Info(value),
                 () => OpenSetup(),
