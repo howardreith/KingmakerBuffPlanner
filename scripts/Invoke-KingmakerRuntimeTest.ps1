@@ -117,6 +117,7 @@ try {
     $ummDismissSent = $false
     $ummDismissRecoverySent = $false
     $ummDismissSentAtUtc = [DateTime]::MinValue
+    try {
     Add-Type @'
 using System;
 using System.Runtime.InteropServices;
@@ -176,6 +177,17 @@ public static class KbpPhysicalInput {
     $physicalDeliveryAttempts = @{}
     $nextWindowSampleUtc = [DateTime]::UtcNow
     $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds + 15)
+    }
+    catch {
+        # Preserve the exact pre-loop failure with its position and stack so
+        # the finally's own Write-Error can never displace the diagnosis.
+        $detail = $_.Exception.ToString() + [Environment]::NewLine +
+            $_.InvocationInfo.PositionMessage + [Environment]::NewLine +
+            (Get-PSCallStack | Out-String)
+        [IO.File]::WriteAllText((Join-Path $evidence 'harness-preloop-error.txt'), $detail)
+        throw
+    }
+    try {
     while (-not (Test-Path -LiteralPath $resultPath -PathType Leaf)) {
         $process.Refresh()
         if ($process.HasExited) { throw 'Kingmaker exited before committing the atomic runtime result.' }
@@ -310,6 +322,14 @@ public static class KbpPhysicalInput {
             }
         }
         Start-Sleep -Milliseconds 250
+    }
+    }
+    catch {
+        $detail = $_.Exception.ToString() + [Environment]::NewLine +
+            $_.InvocationInfo.PositionMessage + [Environment]::NewLine +
+            (Get-PSCallStack | Out-String)
+        [IO.File]::WriteAllText((Join-Path $evidence 'harness-loop-error.txt'), $detail)
+        throw
     }
     $result = Read-KbpJson $resultPath
     Assert-KbpRuntimeResult -Result $result -Request $request -BuildManifest $buildManifest
