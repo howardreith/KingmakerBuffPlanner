@@ -358,6 +358,20 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     WorkingSaveDescriptor = _liveSaveLoader == null ? null : _liveSaveLoader.WorkingDescriptor,
                     BaselineSaveDescriptor = _liveSaveLoader == null ? null : _liveSaveLoader.BaselineDescriptor,
                     WorkingSaveLoadActionCount = _liveSaveLoader == null ? 0 : _liveSaveLoader.LoadActionCount,
+                    SaveChainHandlerInvocations = _liveSaveLoader == null ? 0 : _liveSaveLoader.HandlerInvocationCount,
+                    SaveChainCatalogInvocations = _liveSaveLoader == null ? 0 : _liveSaveLoader.CatalogInvocationCount,
+                    SaveChainCatalogDescriptorCount = _liveSaveLoader == null ? 0 : _liveSaveLoader.CatalogDescriptorCount,
+                    SaveChainWorkingMatchCount = _liveSaveLoader == null ? 0 : _liveSaveLoader.WorkingMatchCount,
+                    SaveChainBaselineMatchCount = _liveSaveLoader == null ? 0 : _liveSaveLoader.BaselineMatchCount,
+                    SaveChainSlotReceiverCorrelated = _liveSaveLoader != null && _liveSaveLoader.SlotReceiverCorrelated,
+                    SaveChainWindowReceiverCorrelated = _liveSaveLoader != null && _liveSaveLoader.WindowReceiverCorrelated,
+                    SaveChainWindowArgumentCorrelated = _liveSaveLoader != null && _liveSaveLoader.WindowArgumentCorrelated,
+                    SaveChainLoadEntryCorrelated = _liveSaveLoader != null && _liveSaveLoader.LoadEntryCorrelated,
+                    SaveChainCompletionCallback = _liveSaveLoader != null && _liveSaveLoader.CompletionCallbackObserved,
+                    SaveChainNoUnexpectedWrite = _liveSaveLoader == null ||
+                        !_liveSaveLoader.UnexpectedSaveWriteObserved,
+                    SaveChainSequences = _liveSaveLoader == null ? null : _liveSaveLoader.ChainSequences,
+                    SaveChainFingerprint = _liveSaveLoader == null ? null : _liveSaveLoader.FingerprintEvidence,
                     UiInitialCatalogEvidence = _liveInitialCatalogEvidence,
                     UiCatalogEvidence = ui == null ? null : ui.CatalogEvidence,
                     UiCatalogVisibleViewModels = ui == null ? 0 : ui.CatalogVisibleViewModels,
@@ -968,6 +982,44 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                             "one/distinct working+baseline", _liveSaveLoader == null ? "missing" :
                             _liveSaveLoader.LoadActionCount + "/" + _liveSaveLoader.WorkingDescriptor +
                             "/" + _liveSaveLoader.BaselineDescriptor);
+                        AddUiAssertion(result, "save-chain-handler-observed",
+                            _liveSaveLoader != null && _liveSaveLoader.HandlerInvocationCount == 1,
+                            "1", _liveSaveLoader == null ? "missing" :
+                            _liveSaveLoader.HandlerInvocationCount.ToString());
+                        AddUiAssertion(result, "save-chain-catalog-and-descriptors",
+                            _liveSaveLoader != null && _liveSaveLoader.CatalogInvocationCount == 1 &&
+                            _liveSaveLoader.WorkingMatchCount == 1 &&
+                            _liveSaveLoader.BaselineMatchCount == 1,
+                            "1/1/1", _liveSaveLoader == null ? "missing" :
+                            _liveSaveLoader.CatalogInvocationCount + "/" +
+                            _liveSaveLoader.WorkingMatchCount + "/" +
+                            _liveSaveLoader.BaselineMatchCount + ";catalogDescriptors=" +
+                            _liveSaveLoader.CatalogDescriptorCount);
+                        AddUiAssertion(result, "save-chain-receiver-correlation",
+                            _liveSaveLoader != null && _liveSaveLoader.SlotReceiverCorrelated &&
+                            _liveSaveLoader.WindowReceiverCorrelated &&
+                            _liveSaveLoader.WindowArgumentCorrelated,
+                            "slot/window/windowArgument", _liveSaveLoader == null ? "missing" :
+                            _liveSaveLoader.SlotReceiverCorrelated + "/" +
+                            _liveSaveLoader.WindowReceiverCorrelated + "/" +
+                            _liveSaveLoader.WindowArgumentCorrelated);
+                        AddUiAssertion(result, "save-chain-load-entry-and-completion",
+                            _liveSaveLoader != null && _liveSaveLoader.LoadEntryCorrelated &&
+                            _liveSaveLoader.CompletionCallbackObserved &&
+                            !_liveSaveLoader.UnexpectedSaveWriteObserved &&
+                            !_liveSaveLoader.WrongThreadObserved &&
+                            !_liveSaveLoader.OrderingViolationObserved,
+                            "correlated/callback/no-write", _liveSaveLoader == null ? "missing" :
+                            _liveSaveLoader.LoadEntryCorrelated + "/" +
+                            _liveSaveLoader.CompletionCallbackObserved + "/" +
+                            !_liveSaveLoader.UnexpectedSaveWriteObserved + ";sequences=" +
+                            _liveSaveLoader.ChainSequences);
+                        AddUiAssertion(result, "save-chain-fingerprint",
+                            _liveSaveLoader != null &&
+                            !string.IsNullOrWhiteSpace(_liveSaveLoader.FingerprintEvidence),
+                            "stable gameId+party", _liveSaveLoader == null ||
+                            string.IsNullOrWhiteSpace(_liveSaveLoader.FingerprintEvidence)
+                                ? "missing" : _liveSaveLoader.FingerprintEvidence);
                     }
                     if (ui.RootCount != 1 || ui.RenderedOpenFrames == 0 || ui.OpenCloseCycles < 21 ||
                         ui.ScreenWidth <= 0 || ui.ScreenHeight <= 0 ||
@@ -1044,7 +1096,19 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                             ui.ScreenCreateCount != ui.ScreenDestroyCountAfterClose ||
                             string.IsNullOrWhiteSpace(ui.HudObjectEvidence) ||
                             !ui.HudObjectEvidence.Contains("corners=") ||
-                            _liveSaveLoader == null || _liveSaveLoader.LoadActionCount != 1)))
+                            _liveSaveLoader == null || _liveSaveLoader.LoadActionCount != 1 ||
+                            _liveSaveLoader.HandlerInvocationCount != 1 ||
+                            _liveSaveLoader.CatalogInvocationCount != 1 ||
+                            _liveSaveLoader.WorkingMatchCount != 1 ||
+                            _liveSaveLoader.BaselineMatchCount != 1 ||
+                            !_liveSaveLoader.SlotReceiverCorrelated ||
+                            !_liveSaveLoader.WindowReceiverCorrelated ||
+                            !_liveSaveLoader.WindowArgumentCorrelated ||
+                            !_liveSaveLoader.LoadEntryCorrelated ||
+                            !_liveSaveLoader.CompletionCallbackObserved ||
+                            _liveSaveLoader.UnexpectedSaveWriteObserved ||
+                            _liveSaveLoader.WrongThreadObserved ||
+                            _liveSaveLoader.OrderingViolationObserved)))
                     {
                         result.Status = "FAIL";
                         result.Stage = "ui-validation";
@@ -1778,6 +1842,19 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         [JsonProperty("menuEscape2ScreenshotSha256", Order = 185)] public string MenuEscape2ScreenshotSha256 { get; set; }
         [JsonProperty("menuEscape2ChangedFraction", Order = 186)] public double MenuEscape2ChangedFraction { get; set; }
         [JsonProperty("menuEscape2Acknowledged", Order = 187)] public bool MenuEscape2Acknowledged { get; set; }
+        [JsonProperty("saveChainHandlerInvocations", Order = 188)] public int SaveChainHandlerInvocations { get; set; }
+        [JsonProperty("saveChainCatalogInvocations", Order = 189)] public int SaveChainCatalogInvocations { get; set; }
+        [JsonProperty("saveChainCatalogDescriptorCount", Order = 190)] public int SaveChainCatalogDescriptorCount { get; set; }
+        [JsonProperty("saveChainWorkingMatchCount", Order = 191)] public int SaveChainWorkingMatchCount { get; set; }
+        [JsonProperty("saveChainBaselineMatchCount", Order = 192)] public int SaveChainBaselineMatchCount { get; set; }
+        [JsonProperty("saveChainSlotReceiverCorrelated", Order = 193)] public bool SaveChainSlotReceiverCorrelated { get; set; }
+        [JsonProperty("saveChainWindowReceiverCorrelated", Order = 194)] public bool SaveChainWindowReceiverCorrelated { get; set; }
+        [JsonProperty("saveChainWindowArgumentCorrelated", Order = 195)] public bool SaveChainWindowArgumentCorrelated { get; set; }
+        [JsonProperty("saveChainLoadEntryCorrelated", Order = 196)] public bool SaveChainLoadEntryCorrelated { get; set; }
+        [JsonProperty("saveChainCompletionCallback", Order = 197)] public bool SaveChainCompletionCallback { get; set; }
+        [JsonProperty("saveChainNoUnexpectedWrite", Order = 198)] public bool SaveChainNoUnexpectedWrite { get; set; }
+        [JsonProperty("saveChainSequences", Order = 199)] public string SaveChainSequences { get; set; }
+        [JsonProperty("saveChainFingerprint", Order = 200)] public string SaveChainFingerprint { get; set; }
     }
 
     internal sealed class RuntimeTestAssertion

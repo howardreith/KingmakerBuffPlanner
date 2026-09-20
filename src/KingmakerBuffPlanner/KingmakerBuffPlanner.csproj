@@ -166,6 +166,8 @@
     <Compile Include="RuntimeTesting\MenuRenderDiagnostic.cs" />
     <Compile Include="RuntimeTesting\MenuFrameStats.cs" />
     <Compile Include="RuntimeTesting\LoadedAssemblyIdentity.cs" />
+    <Compile Include="RuntimeTesting\MainMenuLoadContracts.cs" />
+    <Compile Include="RuntimeTesting\GuardedReadOnlySaver.cs" />
     <Compile Include="UI\PlannerSetupModel.cs" />
     <Compile Include="UI\CastingWorkspaceModels.cs" />
     <Compile Include="UI\CastingWorkspaceSession.cs" />

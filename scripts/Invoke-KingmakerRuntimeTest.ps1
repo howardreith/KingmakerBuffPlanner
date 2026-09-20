@@ -134,12 +134,12 @@ public static class KbpPhysicalInput {
   [StructLayout(LayoutKind.Sequential)] public struct Point { public int X; public int Y; }
   [StructLayout(LayoutKind.Sequential)] public struct Rect { public int Left; public int Top; public int Right; public int Bottom; }
   public static void KeyDown(IntPtr window, byte key) {
-    if (window == IntPtr.Zero || !SetForegroundWindow(window)) throw new InvalidOperationException("Kingmaker foreground activation failed.");
+    if (window == IntPtr.Zero || !Activate(window)) throw new InvalidOperationException("Kingmaker foreground activation failed.");
     keybd_event(key, 0, 0, UIntPtr.Zero);
   }
   public static void KeyUp(byte key) { keybd_event(key, 0, 2, UIntPtr.Zero); }
   public static void Move(IntPtr window, double x, double y, int unityWidth, int unityHeight) {
-    if (window == IntPtr.Zero || !SetForegroundWindow(window)) throw new InvalidOperationException("Kingmaker foreground activation failed.");
+    if (window == IntPtr.Zero || !Activate(window)) throw new InvalidOperationException("Kingmaker foreground activation failed.");
     Rect rect;
     if (!GetClientRect(window, out rect)) throw new InvalidOperationException("Kingmaker client bounds lookup failed.");
     if (unityWidth <= 0 || unityHeight <= 0) throw new InvalidOperationException("Unity screen bounds are invalid.");
@@ -147,6 +147,15 @@ public static class KbpPhysicalInput {
     int scaledY = (int)Math.Round(y * rect.Bottom / unityHeight);
     Point point = new Point { X = scaledX, Y = Math.Max(0, rect.Bottom - scaledY) };
     if (!ClientToScreen(window, ref point) || !SetCursorPos(point.X, point.Y)) throw new InvalidOperationException("Kingmaker cursor movement failed.");
+  }
+  private static bool Activate(IntPtr window) {
+    if (SetForegroundWindow(window)) return true;
+    // Foreground-lock workaround: a neutral ALT tap registers shell input,
+    // after which activation from a background process is permitted.
+    keybd_event(0x12, 0, 0, UIntPtr.Zero);
+    keybd_event(0x12, 0, 2, UIntPtr.Zero);
+    System.Threading.Thread.Sleep(50);
+    return SetForegroundWindow(window);
   }
   public static void Click() {
     mouse_event(0x0002, 0, 0, 0, UIntPtr.Zero);
@@ -164,6 +173,7 @@ public static class KbpPhysicalInput {
 }
 '@
     $windowObservations = New-Object System.Collections.Generic.List[object]
+    $physicalDeliveryAttempts = @{}
     $nextWindowSampleUtc = [DateTime]::UtcNow
     $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds + 15)
     while (-not (Test-Path -LiteralPath $resultPath -PathType Leaf)) {
@@ -237,6 +247,7 @@ public static class KbpPhysicalInput {
             Write-KbpJsonAtomic (Join-Path $evidence 'orchestration.json') $orchestration
         }
         if ($physicalInputScenario) {
+            if ($null -eq $physicalDeliveryAttempts) { $physicalDeliveryAttempts = @{} }
             $physicalRequests = @(Get-ChildItem -LiteralPath $evidence -Filter 'physical-input-*.json' `
                 -File -ErrorAction SilentlyContinue | Where-Object Name -NotLike '*.ack.json' |
                 Sort-Object Name)
@@ -245,28 +256,56 @@ public static class KbpPhysicalInput {
                 $ackPath = Join-Path $evidence ("physical-input-{0}.ack.json" -f $physical.actionId)
                 if (Test-Path -LiteralPath $ackPath -PathType Leaf) { continue }
                 $process.Refresh()
-                if ([string]$physical.action -eq 'key-escape') {
-                    [KbpPhysicalInput]::KeyDown($process.MainWindowHandle, [byte]0x1B)
-                    Start-Sleep -Milliseconds 100
-                    [KbpPhysicalInput]::KeyUp([byte]0x1B)
-                } else {
-                    [KbpPhysicalInput]::Move($process.MainWindowHandle,
-                        [double]$physical.x, [double]$physical.y,
-                        [int]$physical.unityScreenWidth, [int]$physical.unityScreenHeight)
-                    Start-Sleep -Milliseconds 250
-                    if ([string]$physical.action -eq 'click') {
-                        [KbpPhysicalInput]::Click()
-                    } elseif ([string]$physical.action -ne 'hover') {
-                        throw "Unknown physical input action: $($physical.action)"
+                $actionId = [string]$physical.actionId
+                if (-not $physicalDeliveryAttempts.ContainsKey($actionId)) { $physicalDeliveryAttempts[$actionId] = 0 }
+                $delivered = $false
+                $deliveryError = $null
+                for ($attempt = 1; $attempt -le 3 -and -not $delivered; $attempt++) {
+                    try {
+                        if ([string]$physical.action -eq 'key-escape') {
+                            [KbpPhysicalInput]::KeyDown($process.MainWindowHandle, [byte]0x1B)
+                            Start-Sleep -Milliseconds 100
+                            [KbpPhysicalInput]::KeyUp([byte]0x1B)
+                        } else {
+                            [KbpPhysicalInput]::Move($process.MainWindowHandle,
+                                [double]$physical.x, [double]$physical.y,
+                                [int]$physical.unityScreenWidth, [int]$physical.unityScreenHeight)
+                            Start-Sleep -Milliseconds 250
+                            if ([string]$physical.action -eq 'click') {
+                                [KbpPhysicalInput]::Click()
+                            } elseif ([string]$physical.action -ne 'hover') {
+                                throw "Unknown physical input action: $($physical.action)"
+                            }
+                        }
+                        $delivered = $true
+                    }
+                    catch {
+                        $deliveryError = $_.Exception.Message
+                        $physicalDeliveryAttempts[$actionId]++
+                        Start-Sleep -Milliseconds 250
                     }
                 }
+                if (-not $delivered -and [int]$physicalDeliveryAttempts[$actionId] -ge 20) {
+                    # The in-game waiter must not hang forever: after bounded
+                    # retries, acknowledge the failure explicitly so the
+                    # scenario can fail honestly with evidence.
+                    Write-KbpJsonAtomic $ackPath ([ordered]@{
+                        schemaVersion = 1; runId = $runId; actionId = $actionId
+                        action = [string]$physical.action; sentAtUtc = [DateTime]::UtcNow.ToString('o')
+                        processId = $process.Id; deliveryFailed = $true
+                        error = [string]$deliveryError
+                    })
+                    $orchestration.lastPhysicalDeliveryError = [string]$deliveryError
+                    continue
+                }
+                if (-not $delivered) { continue }
                 Write-KbpJsonAtomic $ackPath ([ordered]@{
-                    schemaVersion = 1; runId = $runId; actionId = [string]$physical.actionId
+                    schemaVersion = 1; runId = $runId; actionId = $actionId
                     action = [string]$physical.action; sentAtUtc = [DateTime]::UtcNow.ToString('o')
                     processId = $process.Id
                     windowsClientCursor = [KbpPhysicalInput]::ClientCursor($process.MainWindowHandle)
                 })
-                $orchestration.stage = "physical-$($physical.actionId)-sent"
+                $orchestration.stage = "physical-$actionId-sent"
                 Write-KbpJsonAtomic (Join-Path $evidence 'orchestration.json') $orchestration
             }
         }
@@ -293,6 +332,16 @@ public static class KbpPhysicalInput {
     Write-Host "Runtime result PASS: $resultPath"
 }
 finally {
+    try {
+        # In non-interactive hosts the finally's own Write-Error can displace
+        # the original terminating error from the output stream; persist the
+        # pending errors first so no failure cause is ever lost.
+        if (@($Error).Count -gt 0 -and $null -ne (Get-Variable -Name evidence -ErrorAction SilentlyContinue)) {
+            $lines = foreach ($entry in @($Error | Select-Object -First 5)) { $entry.ToString() }
+            [IO.File]::WriteAllLines((Join-Path $evidence 'harness-error.txt'), [string[]]$lines)
+        }
+    }
+    catch { }
     if ($transactionEntered) {
         if ($null -ne $process) {
             try { [void]$process.WaitForExit(30000) }

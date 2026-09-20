@@ -30,6 +30,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         // 21600 frames (~6 minutes at 60 fps) is the overall diagnostic budget;
         // the outer harness timeout governs the hard stop.
         private const int MaxUpdates = 21600;
+        private const int MaxElapsedSeconds = 420;
         private const int MenuStabilityFrames = 180;
         private const int EscapeSettleFrames = 90;
         private const int WindowSettleFrames = 120;
@@ -39,7 +40,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private readonly ModLog _log;
         private readonly bool _requireWindowProof;
         private readonly Action<string, string, Vector2> _writePhysicalInput;
+        private readonly System.Diagnostics.Stopwatch _elapsed =
+            System.Diagnostics.Stopwatch.StartNew();
         private int _updates;
+        private int _lastFrameCount = -1;
         private int _state;
         private int _menuStableFrames;
         private int _settleFrames;
@@ -94,9 +98,15 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         internal void Update()
         {
             if (IsComplete) return;
+            // UMM may dispatch OnUpdate several times per rendered frame; the
+            // diagnostic advances once per frame and budgets by wall clock.
+            if (Time.frameCount == _lastFrameCount) return;
+            _lastFrameCount = Time.frameCount;
             _updates++;
-            if (_updates > MaxUpdates)
-                throw new TimeoutException("Menu diagnostic timed out at " + Stage + ".");
+            if (_updates > MaxUpdates || _elapsed.Elapsed.TotalSeconds > MaxElapsedSeconds)
+                throw new TimeoutException("Menu diagnostic timed out at " + Stage +
+                    ";elapsedSeconds=" + _elapsed.Elapsed.TotalSeconds.ToString(
+                        "F1", CultureInfo.InvariantCulture) + ".");
             if (_firstUpdateFrameCount < 0)
             {
                 _firstUpdateFrameCount = Time.frameCount;
@@ -223,18 +233,22 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             }
             if (_state == 8)
             {
-                List<MenuButtonCandidate> inventory = InventoryActiveButtons();
-                MenuButtonInventory = DescribeInventory(inventory);
-                List<MenuButtonCandidate> loadButtons = inventory.Where(candidate =>
-                    candidate.Text.IndexOf("load", StringComparison.OrdinalIgnoreCase) >= 0).ToList();
-                if (loadButtons.Count != 1)
-                    throw new InvalidOperationException("Expected exactly one visible Load menu button, found " +
-                        loadButtons.Count + ";inventory=" + MenuButtonInventory);
-                MenuButtonCandidate target = loadButtons[0];
-                Vector2 center = target.ScreenCenter;
-                MenuClickTarget = target.Path + ";text=" + target.Text + ";center=" +
+                // Resolve the exact Load Game button with the proven contract
+                // (hierarchy, sibling, components, TMP label, wired listeners);
+                // display-text search cannot match Kingmaker's TextMeshPro menu.
+                MainMenuLoadContracts.LoadButtonEvidence evidence;
+                Button target = MainMenuLoadContracts.ResolveExactLoadButton(out evidence);
+                if (target == null)
+                    throw new InvalidOperationException("The exact Load Game button could not be resolved;inventory=" +
+                        DescribeInventory(InventoryActiveButtons()));
+                MenuButtonInventory = "path=" + evidence.HierarchyPath +
+                    ";siblings=" + evidence.SiblingIndex + "/" + evidence.SiblingCount +
+                    ";labels=" + string.Join("|", evidence.LabelIdentities.ToArray()) +
+                    ";listeners=" + string.Join("|", evidence.ListenerIdentities.ToArray());
+                Vector2 center = ComputeScreenCenter(target);
+                MenuClickTarget = evidence.HierarchyPath + ";center=" +
                     center.x.ToString("F1", CultureInfo.InvariantCulture) + "," +
-                    center.y.ToString("F1", CultureInfo.InvariantCulture) + ";renderMode=" + target.CanvasRenderMode;
+                    center.y.ToString("F1", CultureInfo.InvariantCulture);
                 _log.Info("[KBP-MENU-DIAG] requesting physical Load Game click;" + MenuClickTarget + ".");
                 _writePhysicalInput("menu-loadgame", "click", center);
                 _state = 9;
@@ -329,33 +343,41 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     component.gameObject.activeInHierarchy);
         }
 
-        private static List<MenuButtonCandidate> InventoryActiveButtons()
+        private static List<string> InventoryActiveButtons()
         {
-            var candidates = new List<MenuButtonCandidate>();
-            Button[] buttons = UnityEngine.Object.FindObjectsOfType<Button>();
-            foreach (Button button in buttons)
+            var candidates = new List<string>();
+            foreach (Button button in UnityEngine.Object.FindObjectsOfType<Button>())
             {
                 if (button == null || !button.gameObject.activeInHierarchy ||
                     !button.gameObject.scene.isLoaded) continue;
-                Text[] texts = button.GetComponentsInChildren<Text>(true);
-                var builder = new StringBuilder();
-                foreach (Text text in texts)
-                {
-                    if (text == null || string.IsNullOrEmpty(text.text)) continue;
-                    if (builder.Length > 0) builder.Append(' ');
-                    builder.Append(text.text.Trim());
-                }
-                candidates.Add(new MenuButtonCandidate(button, builder.ToString()));
+                candidates.Add(MainMenuLoadContracts.HierarchyPath(button.transform));
                 if (candidates.Count >= 40) break;
             }
             return candidates;
         }
 
-        private static string DescribeInventory(List<MenuButtonCandidate> inventory)
+        private static string DescribeInventory(List<string> inventory)
         {
-            return string.Join("|", inventory
-                .Select(candidate => candidate.Path + ";text=" + candidate.Text)
-                .ToArray());
+            return string.Join("|", inventory.ToArray());
+        }
+
+        private static Vector2 ComputeScreenCenter(Button button)
+        {
+            RectTransform rect = button.GetComponent<RectTransform>();
+            Canvas canvas = button.GetComponentInParent<Canvas>();
+            if (rect == null) return Vector2.zero;
+            Vector3[] corners = new Vector3[4];
+            rect.GetWorldCorners(corners);
+            if (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay)
+            {
+                Camera camera = canvas.worldCamera != null ? canvas.worldCamera : Camera.main;
+                if (camera == null) return Vector2.zero;
+                for (int i = 0; i < corners.Length; i++)
+                    corners[i] = camera.WorldToScreenPoint(corners[i]);
+            }
+            return new Vector2(
+                (corners[0].x + corners[2].x) * 0.5f,
+                (corners[0].y + corners[2].y) * 0.5f);
         }
 
         private static string DescribeWindow(Component window)
@@ -442,54 +464,6 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private static string JsonString(string value)
         {
             return Newtonsoft.Json.JsonConvert.ToString(value ?? string.Empty);
-        }
-
-        private sealed class MenuButtonCandidate
-        {
-            internal MenuButtonCandidate(Button button, string text)
-            {
-                Button = button;
-                Text = text;
-                RectTransform = button.GetComponent<RectTransform>();
-                Canvas canvas = button.GetComponentInParent<Canvas>();
-                CanvasRenderMode = canvas == null ? "no-canvas" : canvas.renderMode.ToString();
-                Vector2? center = ComputeScreenCenter(RectTransform, canvas);
-                ScreenCenter = center == null ? Vector2.zero : center.Value;
-                Path = BuildPath(button.transform);
-            }
-
-            internal Button Button { get; private set; }
-            internal string Text { get; private set; }
-            internal RectTransform RectTransform { get; private set; }
-            internal string CanvasRenderMode { get; private set; }
-            internal Vector2 ScreenCenter { get; private set; }
-            internal string Path { get; private set; }
-
-            private static Vector2? ComputeScreenCenter(RectTransform rect, Canvas canvas)
-            {
-                if (rect == null) return null;
-                Vector3[] corners = new Vector3[4];
-                rect.GetWorldCorners(corners);
-                if (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay)
-                {
-                    Camera camera = canvas.worldCamera != null ? canvas.worldCamera : Camera.main;
-                    if (camera == null) return null;
-                    for (int i = 0; i < corners.Length; i++)
-                        corners[i] = camera.WorldToScreenPoint(corners[i]);
-                }
-                return new Vector2(
-                    (corners[0].x + corners[2].x) * 0.5f,
-                    (corners[0].y + corners[2].y) * 0.5f);
-            }
-
-            private static string BuildPath(Transform transform)
-            {
-                var names = new List<string>();
-                for (Transform node = transform; node != null; node = node.parent)
-                    names.Add(node.name);
-                names.Reverse();
-                return string.Join("/", names.ToArray());
-            }
         }
     }
 
