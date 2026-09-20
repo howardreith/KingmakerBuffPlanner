@@ -1,6 +1,28 @@
 # AUTONOMOUS-RESUME — top section is current; planning/CASTING-FIRST-MIGRATION-STATUS.md is the per-checkpoint tracker.
 
-## Casting-first migration checkpoint 13 (bootstrap launched; campaign load engine-stalled) — 2026-09-20 (LATEST)
+## Casting-first migration checkpoint 14 (campaign UI qualification attempts) — 2026-09-20 (LATEST)
+
+- ROOT CAUSE CHAIN IDENTIFIED across multiple guarded runs:
+  1. Runtime protocol rejected full-user profile → FIXED (accepted, 15 mods)
+  2. Human-reproduction (3 mods) insufficient → Player.PostLoad()
+     InvalidOperationException (missing blueprint references)
+  3. SaveManager.LoadZipSave returns null → FIXED (read m_SavedGames list)
+  4. UI button interaction doesn't drive Kingmaker's UI state machine →
+     FIXED (HandleHardcodeMainMenuSaveLoad)
+  5. 30-second timeout too short for 15-mod campaign → FIXED (3 minutes)
+  6. CURRENT: HandleHardcodeMainMenuSaveLoad invokes, scene transition
+     starts (lightmaps), mods register blueprints, but the campaign load
+     does not complete and neither the callback nor Player-state fallback
+     fires within 3 minutes. CAUSE UNRESOLVED.
+- All source gates green (210/210 protocol; 42/42 source; full suite).
+  Package 9076e0a. Runs: casting-fulluser-final-1/2/3 (all restored
+  verified). Evidence: runtime-evidence/casting-fulluser-final-*/.
+- NEXT: determine whether HandleHardcodeMainMenuSaveLoad visually triggers
+  the loading process (owner observation needed) or silently fails; try
+  the game's own Continue button path; or accept manual-load as the
+  campaign-context route for workspace qualification.
+
+## Casting-first migration checkpoint 13 (bootstrap launched; campaign load engine-stalled) — 2026-09-20
 
 - All three fixture approvals applied and verified. Protocol fix
   (stale 4→3 mod count for human-reproduction) committed `1099601`;
