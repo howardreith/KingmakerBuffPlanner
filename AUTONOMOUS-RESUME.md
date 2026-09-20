@@ -1,6 +1,27 @@
 # AUTONOMOUS-RESUME — top section is current; planning/CASTING-FIRST-MIGRATION-STATUS.md is the per-checkpoint tracker.
 
-## Casting-first migration Phase 4 checkpoint 8 (workspace) — 2026-09-19 (LATEST)
+## Casting-first migration checkpoint 9 (runtime-qualification continuation) — 2026-09-20 (LATEST)
+
+- Bundle validated mechanically (git-am applicability to c182061
+  reproduces tree 119c24f1; SHA256SUMS added; LOCAL, not delivered).
+- Both narrow checks PROVEN with tests (no defects): sibling authored
+  intent preserved vs legitimate derived changes with byte-exact Undo;
+  disabled dispatch is attempt-only with in-flight release, plus a NEW
+  production guard refusing every legacy quick-execution entry while the
+  workspace is selected.
+- Prospective seal hardening added (per-file inventory functions + 3/3
+  gate tests; aggregate-only mismatches stay blocked); owner-approval
+  packet prepared (NOT granted — bootstrap still blocked); A06 inspected:
+  ItemEntity has no per-instance identity member (see
+  planning/EXACT-ROD-IDENTITY-INSPECTION.md) — pooled stays unresolved.
+- Gates: source 42/42; protocol 210/210; harness 27/27; package 4/4;
+  WhatIf 5/5; fixture-inventory 3/3; rollback 4/4; publisher 3/3
+  (`artifacts/casting-first-checkpoint9-gate.log`). Records corrected to
+  remove the inferential "mutable file" claim about the August delta.
+- NEXT: owner decides the BagOfTricks baseline (packet ready); then
+  bootstrap → donor inventory → workspace visual/input qualification.
+
+## Casting-first migration Phase 4 checkpoint 8 (workspace) — 2026-09-19
 
 - FIXTURE DIAGNOSED, NOT RESEALED: the live BagOfTricks directory is
   byte-identical to BOTH September guarded-install transaction manifests

@@ -337,6 +337,10 @@ namespace KingmakerBuffPlanner.Tests
                     () => TestCastingWorkspaceReviewApply(root));
                 Run("casting-workspace-save-reopen-and-protection",
                     () => TestCastingWorkspacePersistence(root));
+                Run("casting-workspace-sibling-intent-vs-derived-changes",
+                    TestCastingWorkspaceSiblingIntent);
+                Run("casting-workspace-disabled-dispatch-attempt-only",
+                    TestCastingWorkspaceDisabledDispatch);
             }
             finally
             {
@@ -11355,6 +11359,247 @@ namespace KingmakerBuffPlanner.Tests
         }
 
         // ------------------------------------------------------------------
+        // Narrow integration checks from the runtime-qualification
+        // continuation: authored sibling intent versus derived changes,
+        // and attempt-only semantics for the disabled dispatch boundary.
+        // ------------------------------------------------------------------
+
+        private sealed class ThrowingDispatchBoundary : ICastingDispatchBoundary
+        {
+            public int Attempts;
+
+            public string DispositionReason
+            {
+                get { return "throwing-fixture-boundary"; }
+            }
+
+            public CastingDispatchOutcome Submit(
+                ExplicitCastingPlan plan, CastingApplyDecision decision,
+                string scopeRoutineId)
+            {
+                Attempts++;
+                throw new InvalidOperationException("dispatch-fixture-failure");
+            }
+        }
+
+        // A sibling card's DERIVED readiness may change because a shared
+        // budget recalculated, but its AUTHORED intent (caster, source,
+        // target, enhancements, state, routine membership) is never
+        // rewritten by another card's edit or move; necessary order
+        // renumbering is disclosed; Undo restores the complete prior
+        // intent and order byte-for-byte.
+        private static void TestCastingWorkspaceSiblingIntent()
+        {
+            string modPath = Path.Combine(
+                Path.GetTempPath(), "KbpWorkspaceSibling-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(modPath);
+            try
+            {
+                PartyProviderSnapshot snapshot;
+                CastingWorkspaceInputs inputs = WorkspaceInputs(
+                    out snapshot, null, null, 2);
+                var session = new CastingWorkspaceSession(modPath, "sibling-campaign");
+                session.Draft.SourceId = "source-bulls";
+                session.Draft.Ability = CastingBuffAbility;
+                session.Draft.TargetMode = CastingTargetMode.DirectTarget;
+                session.Draft.CasterUnitId = "unit-cleric";
+                session.Draft.State = CastingAuthoringState.Ready;
+                // Two native charges fund exactly two of the three castings
+                // in one-pass order.
+                foreach (string target in new[] { "unit-t1", "unit-t2", "unit-t3" })
+                {
+                    session.Draft.DirectTargetUnitId = target;
+                    Assert(session.AddCastingFromDraft().Applied);
+                }
+                // Baseline: cast-1 and cast-2 reserve; cast-3 is blocked by
+                // the shared pool (a DERIVED state, authored intent intact).
+                ExplicitCastingPlan before = session.CompilePlan(inputs);
+                if (before.CastingById("cast-3").Readiness !=
+                        ResolvedCastingReadiness.Blocked ||
+                    before.CastingById("cast-3").CasterUnitId != "unit-cleric")
+                    throw new InvalidOperationException(
+                        "Fixture baseline is wrong.");
+                // Editing the MIDDLE card's authored target: neighbors keep
+                // their exact instances and authored fields; only the edited
+                // card changes; the sibling's derived readiness is allowed
+                // to recompute without counting as an edit.
+                var first = session.Document.Castings[0];
+                var third = session.Document.Castings[2];
+                session.FocusCasting("cast-2");
+                Assert(session.UpdateFocusedCasting(new PlannedCasting(
+                    "cast-2", "long", 1, "source-bulls", CastingBuffAbility,
+                    "unit-wizard", null, CastingTargetMode.DirectTarget,
+                    "unit-t2", null, null, null, null,
+                    ExistingEffectPolicy.SkipAlreadyActive, null,
+                    CastingAuthoringState.Ready, null)).Applied);
+                if (!ReferenceEquals(first, session.Document.Castings[0]) ||
+                    !ReferenceEquals(third, session.Document.Castings[2]))
+                    throw new InvalidOperationException(
+                        "A sibling casting instance was rewritten by a card edit.");
+                // A routine MOVE changes the mover's membership and the
+                // necessary order metadata of the remaining long-routine
+                // sibling — and frees shared budget so the sibling's derived
+                // readiness legitimately improves. The sibling's authored
+                // intent must remain untouched.
+                // The edit also legitimately improves the sibling's DERIVED
+                // readiness (the wizard draws from its own pool), which is
+                // not an authored change to the sibling.
+                if (session.CompilePlan(inputs).CastingById("cast-3").Readiness !=
+                        ResolvedCastingReadiness.Ready)
+                    throw new InvalidOperationException(
+                        "The legitimate derived readiness change was suppressed.");
+                string beforeJson = SerializeDocument(session);
+                session.FocusCasting("cast-2");
+                AuthoringEditResult move = session.MoveFocusedCasting("short", 0);
+                if (!move.Applied || move.AffectedCastingIds.Count != 2 ||
+                    !move.AffectedCastingIds.Contains("cast-3"))
+                    throw new InvalidOperationException(
+                        "The necessary sibling renumbering was not disclosed: " +
+                        move.Reason);
+                if (!ReferenceEquals(first, session.Document.Castings[0]))
+                    throw new InvalidOperationException(
+                        "The unmoved sibling was rebuilt.");
+                var renumbered = session.Document.Castings[1];
+                if (renumbered.CastingId != "cast-3" || renumbered.Order != 1 ||
+                    renumbered.CasterUnitId != "unit-cleric" ||
+                    renumbered.DirectTargetUnitId != "unit-t3")
+                    throw new InvalidOperationException(
+                        "Order metadata renumbering altered authored intent.");
+                ExplicitCastingPlan after = session.CompilePlan(inputs);
+                if (after.CastingById("cast-3").Readiness !=
+                        ResolvedCastingReadiness.Ready)
+                    throw new InvalidOperationException(
+                        "The legitimate derived budget improvement was lost.");
+                // Undo restores the complete prior intent AND order.
+                Assert(session.Undo());
+                if (SerializeDocument(session) != beforeJson)
+                    throw new InvalidOperationException(
+                        "Undo did not restore the exact prior document.");
+                ExplicitCastingPlan restored = session.CompilePlan(inputs);
+                if (restored.CastingById("cast-3").Readiness !=
+                        ResolvedCastingReadiness.Ready ||
+                    restored.CastingById("cast-2").CasterUnitId != "unit-wizard" ||
+                    restored.CastingById("cast-2").RoutineId != "long")
+                    throw new InvalidOperationException(
+                        "Undo did not restore the pre-move intent, order, or " +
+                        "derived state.");
+            }
+            finally
+            {
+                if (Directory.Exists(modPath)) Directory.Delete(modPath, true);
+            }
+        }
+
+        private static string SerializeDocument(CastingWorkspaceSession session)
+        {
+            return Newtonsoft.Json.JsonConvert.SerializeObject(
+                CastingPlanProfile.FromDocument(session.Document),
+                Newtonsoft.Json.Formatting.None);
+        }
+
+        // The disabled dispatch boundary records an ATTEMPT only: no native
+        // submission, no resource expenditure, no observed beneficiaries, no
+        // success state; a throwing boundary releases the in-flight guard so
+        // later Apply attempts still work; legacy execution is refused while
+        // the workspace is selected.
+        private static void TestCastingWorkspaceDisabledDispatch()
+        {
+            string modPath = Path.Combine(
+                Path.GetTempPath(), "KbpWorkspaceDispatch-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(modPath);
+            try
+            {
+                PartyProviderSnapshot snapshot;
+                CastingWorkspaceInputs inputs = WorkspaceInputs(out snapshot);
+                var boundary = new DisabledCastingDispatchBoundary();
+                var session = new CastingWorkspaceSession(
+                    modPath, "dispatch-campaign", boundary);
+                session.Draft.SourceId = "source-bulls";
+                session.Draft.Ability = CastingBuffAbility;
+                session.Draft.TargetMode = CastingTargetMode.DirectTarget;
+                session.Draft.CasterUnitId = "unit-cleric";
+                session.Draft.DirectTargetUnitId = "unit-t1";
+                session.Draft.State = CastingAuthoringState.Ready;
+                Assert(session.AddCastingFromDraft().Applied);
+                session.PresentForReview(inputs);
+                Assert(session.AcceptPresentedPlan(inputs));
+                // The limitation is visible BEFORE the player acts.
+                if (!session.DispatchDisposition.Contains("native-submission-disabled"))
+                    throw new InvalidOperationException(
+                        "The execution limitation is not visible up front.");
+                WorkspaceApplyResult result = session.Apply(
+                    CastingApplyMode.Ordinary, "long", inputs);
+                if (result.Allowed || result.Dispatch == null ||
+                    result.Dispatch.Submitted ||
+                    result.Dispatch.CastingIds.Count != 1 ||
+                    !result.ReviewReason.Contains("native-submission-disabled"))
+                    throw new InvalidOperationException(
+                        "The disabled path claimed a submission or hid identity.");
+                // The boundary is the game boundary: a recorded attempt is
+                // the ONLY trace. There is no expenditure, beneficiary, or
+                // success surface anywhere on the outcome.
+                if (boundary.RecordedSubmissions.Count != 1)
+                    throw new InvalidOperationException(
+                        "Attempt identity was not recorded.");
+                // A throwing boundary must release the in-flight guard so
+                // validation, editing, and later applies keep working.
+                var throwing = new ThrowingDispatchBoundary();
+                var recovering = new CastingWorkspaceSession(
+                    modPath, "dispatch-campaign-2", throwing);
+                recovering.Draft.SourceId = "source-bulls";
+                recovering.Draft.Ability = CastingBuffAbility;
+                recovering.Draft.TargetMode = CastingTargetMode.DirectTarget;
+                recovering.Draft.CasterUnitId = "unit-cleric";
+                recovering.Draft.DirectTargetUnitId = "unit-t1";
+                recovering.Draft.State = CastingAuthoringState.Ready;
+                Assert(recovering.AddCastingFromDraft().Applied);
+                recovering.PresentForReview(inputs);
+                Assert(recovering.AcceptPresentedPlan(inputs));
+                bool threw = false;
+                try { recovering.Apply(CastingApplyMode.Ordinary, "long", inputs); }
+                catch (InvalidOperationException) { threw = true; }
+                if (!threw || throwing.Attempts != 1)
+                    throw new InvalidOperationException(
+                        "The dispatch failure path was not exercised.");
+                // Recovery: a subsequent Apply is not swallowed by a stuck
+                // in-flight guard (it reaches review and the boundary).
+                bool reachedBoundary = false;
+                try
+                {
+                    recovering.Apply(CastingApplyMode.Ordinary, "long", inputs);
+                    reachedBoundary = throwing.Attempts == 2;
+                }
+                catch (InvalidOperationException)
+                {
+                    reachedBoundary = throwing.Attempts == 2;
+                }
+                if (!reachedBoundary)
+                    throw new InvalidOperationException(
+                        "The in-flight guard leaked across a failed submission.");
+                // Legacy execution entry points refuse while the workspace
+                // is selected; they are permitted again once it is not.
+                CastingWorkspaceDevSelection.Enabled = true;
+                try
+                {
+                    if (CastingWorkspaceDevSelection.LegacyExecutionPermitted)
+                        throw new InvalidOperationException(
+                            "Legacy execution was permitted beside the workspace.");
+                }
+                finally
+                {
+                    CastingWorkspaceDevSelection.Enabled = false;
+                }
+                if (!CastingWorkspaceDevSelection.LegacyExecutionPermitted)
+                    throw new InvalidOperationException(
+                        "Legacy execution was not restored after deselection.");
+            }
+            finally
+            {
+                if (Directory.Exists(modPath)) Directory.Delete(modPath, true);
+            }
+        }
+
+        // ------------------------------------------------------------------
         // Connected workspace: the production CastingWorkspaceSession is
         // the real caller path for the authoring service, compiler, gate,
         // persistence, and review coordinator. Deterministic game-boundary
@@ -11364,7 +11609,8 @@ namespace KingmakerBuffPlanner.Tests
         private static CastingWorkspaceInputs WorkspaceInputs(
             out PartyProviderSnapshot snapshot,
             IDictionary<string, IEnumerable<string>> groupCoverage = null,
-            AbilityKey ability = null)
+            AbilityKey ability = null,
+            int remainingPerCaster = 3)
         {
             List<ProviderPlanningOption> options;
             List<CastEnhancementSnapshot> enhancements;
@@ -11373,7 +11619,7 @@ namespace KingmakerBuffPlanner.Tests
                 out options, out enhancements,
                 new[] { "unit-t1", "unit-t2", "unit-t3", "unit-t4", "unit-t5",
                     "unit-rogue" },
-                3, groupCoverage);
+                remainingPerCaster, groupCoverage);
             return new CastingWorkspaceInputs(
                 snapshot, options,
                 CastingEffects("source-bulls", "source-communal"),

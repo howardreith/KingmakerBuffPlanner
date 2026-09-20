@@ -1,5 +1,26 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-09-20 casting-first migration: checkpoint 9 (qualification continuation)
+
+Reconciled at `9a2e5738...` (clean). Bundle applicability proven
+mechanically (git-am onto c182061 reproduces tree 119c24f1; SHA256SUMS;
+still local). Narrow integration checks carried as tests, both clean:
+sibling authored intent preserved while derived budget changes are
+legitimate and disclosed order renumbering is necessary-only, with
+byte-exact Undo; the disabled dispatch boundary records attempt identity
+only, releases in-flight state across failures, and a new guard refuses
+legacy quick-execution entry points while the workspace is selected.
+Prospective per-file seal functions + gate tests (3/3) added without
+changing any existing check; the aggregate-only August mismatch stays
+blocked and the records no longer characterize the unidentified 182-byte
+difference. Owner-approval packet prepared (planning/
+BAGOFTRICKS-FIXTURE-APPROVAL-PACKET.md) — NOT granted; bootstrap not
+repeated. A06 inspected read-only: ItemEntity exposes no per-instance
+identity member (planning/EXACT-ROD-IDENTITY-INSPECTION.md). Campaign UI
+qualification remains blocked on the owner fixture decision. Gates:
+source 42/42; protocol 210/210; harness 27/27; package 4/4; WhatIf 5/5;
+fixture-inventory 3/3; rollback 4/4; publisher 3/3.
+
 ## 2026-09-19 casting-first migration: Phase 4 checkpoint 8 (workspace)
 
 Reconciled at `81c46486...` (checkpoints 1-7 preserved). Fixture drift

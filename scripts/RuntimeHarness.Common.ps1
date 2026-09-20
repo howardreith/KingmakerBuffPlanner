@@ -70,6 +70,79 @@ function Get-KbpDirectoryContentIdentity([string]$Path) {
     }
 }
 
+# Prospective fixture-seal evidence: a complete per-file inventory bound to
+# a seal identity. Writing one at future seal creation makes later drift
+# exactly explainable (added/removed/changed paths with hashes and sizes).
+# This does not recover missing historical evidence and does not authorize
+# any current fixture: an aggregate-only mismatch without a bound inventory
+# stays blocked as insufficient historical evidence.
+function Write-KbpFixtureSealInventory(
+    [Parameter(Mandatory = $true)][string]$ModName,
+    [Parameter(Mandatory = $true)]$Identity,
+    [Parameter(Mandatory = $true)][string]$DestinationRoot)
+{
+    $safeName = if ($ModName -cmatch '^[A-Za-z0-9._-]{1,100}$') { $ModName } else { 'unsafe' }
+    $inventory = [ordered]@{
+        schemaVersion = 1
+        modName = $safeName
+        boundDirectoryManifestSha256 = [string]$Identity.directoryManifestSha256
+        fileCount = [int]$Identity.fileCount
+        totalBytes = [long]$Identity.totalBytes
+        files = @($Identity.manifest | Where-Object kind -ceq 'file' | ForEach-Object {
+            [ordered]@{ path = [string]$_.path; length = [long]$_.length; sha256 = [string]$_.sha256 }
+        })
+    }
+    $fileName = 'fixture-inventory-{0}-{1}.json' -f $safeName, ([string]$Identity.directoryManifestSha256).Substring(0, 12)
+    $directory = Join-Path $DestinationRoot 'fixture-inventories'
+    New-Item -ItemType Directory -Path $directory -Force | Out-Null
+    $path = Join-Path $directory $fileName
+    Write-KbpJsonAtomic $path $inventory
+    return $path
+}
+
+# Exact comparison of a live identity against a bound per-file inventory.
+# Returns a result object: status 'match', 'differs' (with exact added,
+# removed, and changed path details), or 'insufficient-historical-evidence'
+# when no per-file inventory exists — which callers must keep blocked under
+# the existing policy rather than treating as a pass.
+function Compare-KbpFixtureInventory(
+    [Parameter(Mandatory = $true)]$SealInventory,
+    [Parameter(Mandatory = $true)]$ActualIdentity)
+{
+    $actual = @{}
+    foreach ($file in ($ActualIdentity.manifest | Where-Object kind -ceq 'file')) {
+        $actual[[string]$file.path] = $file
+    }
+    $sealed = @{}
+    foreach ($file in @($SealInventory.files)) {
+        $sealed[[string]$file.path] = $file
+    }
+    $added = @($actual.Keys | Where-Object { -not $sealed.ContainsKey($_) } | Sort-Object)
+    $removed = @($sealed.Keys | Where-Object { -not $actual.ContainsKey($_) } | Sort-Object)
+    $changed = @($actual.Keys | Where-Object {
+        $sealed.ContainsKey($_) -and (
+            [long]$sealed[$_].length -ne [long]$actual[$_].length -or
+            [string]$sealed[$_].sha256 -cne [string]$actual[$_].sha256)
+    } | Sort-Object)
+    if ($added.Count -eq 0 -and $removed.Count -eq 0 -and $changed.Count -eq 0) {
+        return [pscustomobject]@{ status = 'match'; added = @(); removed = @(); changed = @() }
+    }
+    return [pscustomobject]@{
+        status = 'differs'
+        added = $added
+        removed = $removed
+        changed = $changed
+    }
+}
+
+function Get-KbpFixtureSealInventory([string]$InventoryRoot, [string]$ModName, [string]$BoundManifestSha256) {
+    if ([string]::IsNullOrWhiteSpace($InventoryRoot) -or -not (Test-Path -LiteralPath $InventoryRoot -PathType Container)) { return $null }
+    $fileName = 'fixture-inventory-{0}-{1}.json' -f $ModName, $BoundManifestSha256.Substring(0, 12)
+    $path = Join-Path (Join-Path $InventoryRoot 'fixture-inventories') $fileName
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return $null }
+    return Read-KbpJson $path
+}
+
 function Assert-KbpCompatibilityModIdentity($Expected, [string]$Path) {
     if ($Expected.directoryName -notmatch '^[A-Za-z0-9._-]{1,100}$') {
         throw 'Compatibility mod directory name is unsafe.'

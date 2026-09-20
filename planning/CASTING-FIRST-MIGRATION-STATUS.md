@@ -5,7 +5,99 @@ Linked from `AUTONOMOUS-RESUME.md`. Specification: the adopted
 `Kingmaker-Buff-Planner-Casting-First-Migration-Charter.md` (casting-first
 migration and native scroll UI charter v1.0, 2026-09-19).
 
-## Phase 4 checkpoint 8 — fixture diagnosis + the connected workspace — 2026-09-19 (CURRENT)
+## Checkpoint 9 — runtime-qualification continuation: review hardening, narrow checks, fixture packet — 2026-09-20 (CURRENT)
+
+**Branch** `codex/kingmaker-buff-planner-casting-first`, reconciled at
+`9a2e57388316ef1172927f56f715b8927f83a0d5` (clean, single worktree).
+Gate at this checkpoint: source 42/42; **protocol 210/210**; harness
+27/27; package 4/4; WhatIf 5/5; **fixture-inventory evidence 3/3** (new);
+rollback 4/4; publisher 3/3
+(`artifacts/casting-first-checkpoint9-gate.log`).
+
+### Review-bundle hardening (local, not delivered)
+
+The 8-patch bundle was validated mechanically: applying it with `git am`
+to the declared base `c182061` in an isolated disposable worktree
+reproduced the exact source tree `119c24f14fc4caebdd6966993f6df772f73f406f`;
+a SHA256SUMS manifest covers every patch. No authorized push/attachment
+route exists for this branch, so the bundle remains **local** to the DATA
+machine; the applicability proof above replaces path-only claims.
+
+### Narrow integration checks (both were verification questions; no defect)
+
+- **Sibling intent vs derived changes (3.1)** — proven by
+  `casting-workspace-sibling-intent-vs-derived-changes`: a card edit
+  leaves sibling casting instances reference-identical (authored intent
+  untouched) while a sibling's DERIVED readiness may legitimately change
+  (shared-budget recalculation after a caster edit/move); a routine move
+  changes only the mover's membership plus disclosed necessary order
+  renumbering; Undo restores the exact prior serialized document AND the
+  prior resolution state.
+- **Disabled dispatch is attempt-only (3.2)** — proven by
+  `casting-workspace-disabled-dispatch-attempt-only`: the boundary
+  records the reviewed identity and refuses (`Submitted=false`; the
+  outcome type exposes no expenditure/beneficiary/success surface), the
+  limitation is visible before the player acts, a throwing boundary
+  releases the in-flight guard so later applies still work, and — new
+  production guard — `CastingWorkspaceDevSelection.LegacyExecutionPermitted`
+  now refuses every legacy quick-execution entry (screen, HUD, hotkey,
+  spellbook) while the workspace is selected, with a logged reason.
+  Source wiring is compiled; runtime clickability remains unobserved.
+
+### Prospective fixture-seal hardening (2.2)
+
+`Write-KbpFixtureSealInventory` / `Compare-KbpFixtureInventory` /
+`Get-KbpFixtureSealInventory` added to the harness (narrow, additive;
+no existing check changed). `Test-FixtureInventoryEvidence.ps1` (wired
+into the source gate) proves: a detailed seal explains exact
+added/removed/changed paths; matching state reports a match; an
+aggregate-only mismatch without a bound inventory stays refused by the
+existing guard (insufficient historical evidence — never a pass, never
+invented from today's directory). This is prospective only: it does not
+recover the August difference and does not authorize the current fixture.
+
+### Owner-approval packet prepared (not granted)
+
+`planning/BAGOFTRICKS-FIXTURE-APPROVAL-PACKET.md`: current inventory
+identity (`c4487d11…`, 40 files, 1,805,725 bytes), both re-verified
+receipt identities (with the distinction that their approval covers
+installation and recorded bytes, not a fixture-use seal), the
+unreconstructable historical difference (no role/mutability claim), the
+exact three-field binding change proposed, permitted runtime scope,
+protected data, recovery procedure, and the explicit request for the
+owner's decision. Bootstrap stays blocked; the known-refused invocation
+was not repeated.
+
+### A06 exact-rod inspection (bounded, read-only)
+
+`planning/EXACT-ROD-IDENTITY-INSPECTION.md`: member-level reflection of
+the installed `Assembly-CSharp.dll` shows `ItemEntity` has NO per-instance
+identity member (only descriptors and provenance prose;
+`PreSave`/`PostLoad` hooks) and `ItemsCollection` is a positional list —
+a durable per-physical-rod identity is absent, not merely unproven, in
+the inspected surface. Pooled selections stay honestly unresolved;
+affected castings block; A06 remains blocked on a contract that does not
+exist in the inspected assembly.
+
+### Campaign UI qualification — status
+
+BLOCKED on the fixture decision (unchanged prerequisite; packet
+prepared). No game launch, deployment, screenshot, or audio check was
+performed this checkpoint; the workspace view remains
+source-integrated-but-not-visually-qualified. That is the precise
+remaining gate after the owner decision: bootstrap → donor inventory →
+workspace screenshots/input qualification at matching resolution.
+
+### Acceptance matrix (evidence layers, unchanged unless noted)
+
+Domain: A01–A05, A07–A11, A12-import, A13-isolated — PASS. Session
+integration: mixed-caster/group/review/persistence/sibling-intent/
+dispatch-attempt-only — PASS (deterministic). Unity observed
+interactions: NOT RUN. Visual/audio: NOT RUN. Native casting: NOT RUN.
+A06: BLOCKED (contract absent in inspected surface). Live A12/A13:
+BLOCKED (fixture decision).
+
+## Phase 4 checkpoint 8 — fixture diagnosis + the connected workspace — 2026-09-19 (commit `9a2e573`)
 
 **Branch** `codex/kingmaker-buff-planner-casting-first`, reconciled at
 `81c46486cebe6580f753b59334fe7615b1daadbb` (checkpoints 1–7 preserved, clean
@@ -25,21 +117,21 @@ Read-only comparison under the manifest's own inventory rules
   install transactions `install-rc2fix-liveui-3` and
   `install-rc3-published-install-1` (Sept 19 evidence).
 - The stale record is the profile aggregate (sealed Aug 23 at 41 files /
-  1,805,907 bytes / `34d89823…`): one 182-byte BagOfTricks-owned mutable
-  file disappeared between that owner-accepted rebind and the September
-  transactions, during owner gameplay. Its exact path is NOT recoverable
-  from preserved evidence (aggregates only; Aug-23-era per-file dumps were
-  cleaned), and no approved-bytes snapshot exists
-  (`fixtureRelativePath` absent for these mods).
-- Disposition per the continuation's rules: provenance CLASS is established
-  (mutable mod content churn, same class the owner's Aug-23 rebind
-  accepted; DLL and Info identities unchanged), but the exact file is
-  unproven and resealing is not authorized here → **live-ui-bootstrap
-  remains blocked**. Prerequisite: the owner's rebind authority over the
-  transaction-verified current state, or a comparator improvement that
-  archives per-file manifests at seal time (recommended follow-up; purely
-  additive evidence, no check weakened). No guard was bypassed, no
-  manifest regenerated, no fixture file invented.
+  1,805,907 bytes / `34d89823…`); the current inventory differs by one
+  file of 182 bytes. **This difference cannot be reconstructed from the
+  retained evidence** (the August record is aggregate-only; per-file dumps
+  from that era were not preserved; no approved-bytes snapshot exists —
+  `fixtureRelativePath` absent for these mods). No claim is made about
+  that file's role or mutability.
+- Disposition per the continuation's rules: the August difference stays
+  unexplained (age alone does not invalidate the seal; missing detail is
+  not permission to guess), and resealing is not authorized here →
+  **live-ui-bootstrap remains blocked**. Prerequisite: an explicit owner
+  decision — see the prepared approval packet
+  `planning/BAGOFTRICKS-FIXTURE-APPROVAL-PACKET.md` (new versioned
+  baseline bound to the transaction-verified current inventory, with
+  original seal retained). No guard was bypassed, no manifest
+  regenerated, no fixture file invented.
 
 ### The connected workspace (primary deliverable)
 

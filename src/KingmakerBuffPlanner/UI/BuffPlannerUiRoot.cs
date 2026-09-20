@@ -588,10 +588,10 @@ namespace KingmakerBuffPlanner.UI
             _diagnostics = new BuffPlannerUiLifecycleDiagnostics();
             _quick = new BuffPlannerQuickExecuteController(this, _diagnostics, PresentQuickResult);
             _screen = new BuffPlannerScreenController(_session, _diagnostics, log,
-                routineId => _quick.Execute(routineId), PlayNativeSetupOpenSound,
-                routineId => _quick.Execute(routineId, true));
+                ExecuteLegacyRoutine, PlayNativeSetupOpenSound,
+                routineId => ExecuteLegacyRoutine(routineId, true));
             _hud = new BuffPlannerHudButtonController(_session, _diagnostics, log,
-                () => { OpenSetup(); }, routineId => _quick.Execute(routineId));
+                () => { OpenSetup(); }, ExecuteLegacyRoutine);
             _spellbookEntry = new BuffPlannerSpellbookEntryController(
                 value => _log.Info(value),
                 () => OpenSetup(),
@@ -612,6 +612,22 @@ namespace KingmakerBuffPlanner.UI
                     "HUD host-transition observation remains active.",
                     exception);
             }
+        }
+
+        // Single guarded legacy-execution entry: while the casting-first
+        // workspace is selected, every legacy quick-run route (screen,
+        // HUD, hotkey, spellbook) refuses here instead of bypassing the
+        // workspace's explicitly disabled dispatch boundary.
+        private void ExecuteLegacyRoutine(string routineId, bool readyOnly = false)
+        {
+            if (!CastingWorkspaceDevSelection.LegacyExecutionPermitted)
+            {
+                _log.Info("[KBP-WORKSPACE] refused legacy quick execution;routine=" +
+                    routineId + ";reason=" +
+                    CastingWorkspaceDevSelection.LegacyExecutionRefusal);
+                return;
+            }
+            _quick.Execute(routineId, readyOnly);
         }
 
         private bool OpenSetup()
