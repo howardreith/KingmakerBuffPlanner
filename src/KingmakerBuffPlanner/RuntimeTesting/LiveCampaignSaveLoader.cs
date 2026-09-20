@@ -45,9 +45,30 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 // Load the WORKING and BASELINE SaveInfo objects directly
                 // from the SaveManager by their known filenames, then
                 // invoke the game's programmatic main-menu load path.
-                if (Game.Instance == null) return;
+                if (Game.Instance == null)
+                {
+                    if (_updates == 60 || _updates == 300 || _updates == 900)
+                        _log.Info("[KBP-BOOT] save loader waiting;frame=" + _updates + ";reason=game-null");
+                    return;
+                }
                 object manager = ReadMember(Game.Instance, "SaveManager");
-                if (manager == null) return;
+                if (manager == null)
+                {
+                    if (_updates == 60 || _updates == 300 || _updates == 900)
+                        _log.Info("[KBP-BOOT] save loader waiting;frame=" + _updates + ";reason=manager-null");
+                    return;
+                }
+                if (_updates == 60)
+                {
+                    object upToDate = ReadMember(manager, "AreSavesUpToDate");
+                    object hasSaves = manager.GetType().GetMethod("HasAnySaves",
+                        BindingFlags.Instance | BindingFlags.Public,
+                        null, new[] { typeof(bool) }, null)
+                        ?.Invoke(manager, new object[] { false });
+                    _log.Info("[KBP-BOOT] save loader state;frame=" + _updates +
+                        ";upToDate=" + upToDate + ";hasSaves=" + hasSaves +
+                        ";savePath=" + ReadMember(manager, "SavePath"));
+                }
                 string workingFile = Parameter("workingFileName");
                 string baselineFile = Parameter("baselineFileName");
                 if (string.IsNullOrWhiteSpace(workingFile) ||
@@ -61,8 +82,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 object baselineInfo = loadZip.Invoke(manager, new object[] { baselineFile });
                 if (workingInfo == null || baselineInfo == null)
                 {
-                    // The save files are not indexed yet; wait for the
-                    // manager to discover them.
+                    if (_updates == 60 || _updates == 300 || _updates == 900)
+                        _log.Info("[KBP-BOOT] save loader waiting;frame=" + _updates +
+                            ";working=" + (workingInfo != null) + ";baseline=" + (baselineInfo != null) +
+                            ";file=" + workingFile);
                     return;
                 }
                 WorkingDescriptor = Describe(workingInfo);
