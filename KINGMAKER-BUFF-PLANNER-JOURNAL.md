@@ -1,5 +1,19 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-09-19 casting-first migration: Phase 2 checkpoint 7 (A13 + live lanes)
+
+On top of `29f1ac8`. Implemented the A13 isolated migration boundary
+(CastingPlanMigrationService: per-boundary exact-original archive,
+candidate-only writes with reopen-validation, refuse-to-bury preserved,
+newer-candidate refusal) and exercised the guarded live lanes with the
+current source: the native-contract probe transaction deployed,
+launched, and restored verified, failing honestly because the scenario
+needs campaign UI that a main-menu run never has; live-ui-bootstrap was
+refused pre-deployment by the BagOfTricks fixture manifest mismatch
+(read-only diagnosis recorded: only the directory manifest drifted).
+Gates: source 42/42; protocol 205/205; harness 27/27; package 4/4;
+WhatIf 5/5; rollback 4/4; publisher 3/3.
+
 ## 2026-09-19 casting-first migration: Phase 2 checkpoint 6 (C1-C5)
 
 Reconciled at `061968d4b7ec3b7c1247feab72c065b4a7fd4d41` (clean, single

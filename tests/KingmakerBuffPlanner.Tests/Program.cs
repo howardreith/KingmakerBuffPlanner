@@ -328,6 +328,8 @@ namespace KingmakerBuffPlanner.Tests
                     TestCastingC5EffectProjection);
                 Run("casting-c3-presented-plan-gates-submission",
                     TestCastingC3PresentedPlan);
+                Run("casting-a13-migration-boundary-is-recoverable",
+                    () => TestCastingA13MigrationBoundary(root));
             }
             finally
             {
@@ -11343,6 +11345,87 @@ namespace KingmakerBuffPlanner.Tests
             if (repeated.Plan.ReadyInvocationCount != 1)
                 throw new InvalidOperationException(
                     "One-pass projection was not deterministic.");
+        }
+
+        // A13 (isolated filesystem): the migration boundary archives the
+        // exact legacy bytes once per boundary, writes only candidate
+        // storage, reopens and revalidates the candidate, keeps the legacy
+        // file byte-identical through every outcome, and recovers from an
+        // interrupted candidate write without touching the original.
+        private static void TestCastingA13MigrationBoundary(string root)
+        {
+            string boundary = Path.Combine(root, "casting-migration");
+            Directory.CreateDirectory(boundary);
+            var repository = new ProfileRepository(boundary);
+            BuffPlannerProfile legacy = LegacyProfile();
+            legacy.Routines[0].Assignments.Add(LegacyAssignment(
+                "source-bulls", CastingBuffAbility,
+                PinnedChild("legacy-bulls", 0, "unit-cleric", "unit-t1", "unit-t2")));
+            repository.Save(legacy);
+            string legacyPath = repository.GetProfilePath("legacy-campaign");
+            string originalBytes = File.ReadAllText(legacyPath);
+            var migration = new CastingPlanMigrationService(boundary);
+            CastingMigrationResult first = migration.Migrate("legacy-campaign");
+            if (first.Status != CastingMigrationStatus.Migrated ||
+                first.ImportReport == null ||
+                first.ImportReport.ResultingCastingCount != 2)
+                throw new InvalidOperationException(
+                    "Migration did not complete: " + first.Status + " " + first.Warning);
+            // The exact legacy bytes are archived once, outside the rotating
+            // chain, and the legacy file itself is untouched.
+            if (!File.Exists(first.ArchivePath) ||
+                File.ReadAllText(first.ArchivePath) != originalBytes ||
+                File.ReadAllText(legacyPath) != originalBytes)
+                throw new InvalidOperationException(
+                    "The exact original was not preserved byte-for-byte.");
+            // Candidate storage reopened and validated; the schema-5 file is
+            // unchanged and still authoritative for the old UI.
+            var candidateRepository = new CastingPlanRepository(boundary);
+            CastingPlanLoadResult candidate = candidateRepository.Load("legacy-campaign");
+            if (candidate.Status != CastingPlanLoadStatus.Loaded ||
+                candidate.Profile.ToDocument().Castings.Count != 2)
+                throw new InvalidOperationException(
+                    "The migrated candidate did not reopen.");
+            // Idempotent boundary: migrating again reuses provenance
+            // identities and archives nothing new.
+            CastingMigrationResult second = migration.Migrate("legacy-campaign");
+            if (second.Status != CastingMigrationStatus.Migrated ||
+                second.ImportReport.ResultingCastingCount != 2 ||
+                File.ReadAllText(second.ArchivePath) != originalBytes ||
+                candidateRepository.Load("legacy-campaign").Profile
+                    .ToDocument().Castings.Count != 2)
+                throw new InvalidOperationException(
+                    "Re-migration duplicated work or lost the archive boundary.");
+            // An interrupted candidate write (a torn primary) is reported as
+            // corruption with the legacy original still recoverable; a
+            // retry after removing the torn candidate succeeds.
+            string candidatePath = candidateRepository.GetProfilePath("legacy-campaign");
+            File.WriteAllText(candidatePath, "{ torn");
+            CastingMigrationResult torn = migration.Migrate("legacy-campaign");
+            if (torn.Status != CastingMigrationStatus.CandidateUnusable ||
+                File.ReadAllText(legacyPath) != originalBytes)
+                throw new InvalidOperationException(
+                    "A torn candidate was not reported or disturbed the original.");
+            File.Delete(candidatePath);
+            CastingMigrationResult retried = migration.Migrate("legacy-campaign");
+            if (retried.Status != CastingMigrationStatus.Migrated)
+                throw new InvalidOperationException(
+                    "Recovery after a torn candidate failed: " + retried.Warning);
+            // A newer-schema candidate is never buried by a migration.
+            File.WriteAllText(candidatePath,
+                "{ \"schemaVersion\": 9, \"campaignId\": \"legacy-campaign\" }");
+            CastingMigrationResult refused = migration.Migrate("legacy-campaign");
+            if (refused.Status != CastingMigrationStatus.NewerCandidateRefused ||
+                File.ReadAllText(legacyPath) != originalBytes)
+                throw new InvalidOperationException(
+                    "A newer-schema candidate was buried or the original disturbed.");
+            // An absent legacy profile is reported, not fabricated.
+            var empty = new CastingPlanMigrationService(
+                Path.Combine(boundary, "empty"));
+            if (empty.Migrate("legacy-campaign").Status !=
+                    CastingMigrationStatus.LegacyAbsent)
+                throw new InvalidOperationException(
+                    "An absent legacy profile was not reported.");
         }
 
         // C3: only presented and accepted material contents may submit; a

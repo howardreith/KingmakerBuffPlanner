@@ -5,7 +5,70 @@ Linked from `AUTONOMOUS-RESUME.md`. Specification: the adopted
 `Kingmaker-Buff-Planner-Casting-First-Migration-Charter.md` (casting-first
 migration and native scroll UI charter v1.0, 2026-09-19).
 
-## Phase 2 checkpoint 6 — continuation contract checks C1–C5 — 2026-09-19 (CURRENT)
+## Phase 2 checkpoint 7 — migration boundary + guarded live-lane findings — 2026-09-19 (CURRENT)
+
+**Branch** `codex/kingmaker-buff-planner-casting-first`, on top of
+checkpoint 6 (`29f1ac8`). Gate: source 42/42; **protocol 205/205**;
+harness 27/27; package 4/4; WhatIf 5/5; rollback 4/4; publisher 3/3
+(`artifacts/casting-first-checkpoint7-gate.log`).
+
+### A13 isolated migration boundary (implemented, deterministic layer)
+
+`Persistence/CastingPlanMigrationService.cs` + `Hashing.Sha256Text`:
+migrates schema-5 -> candidate schema-6 entirely inside candidate
+storage — hashes and archives the exact legacy bytes once per boundary
+(`kbp-casting-<24-char content hash>.orig`, non-rotating, MAX_PATH
+safe), imports (idempotent), saves through the guarded candidate
+repository, reopens and revalidates before reporting Migrated. The
+legacy schema-5 file is never modified in any outcome. A torn candidate
+primary is reported `CandidateUnusable` with recovery instructions (the
+repository's refuse-to-bury guard is preserved); a newer-schema
+candidate is `NewerCandidateRefused`; absent/unreadable legacy reported
+distinctly; nothing is fabricated over unresolved data. Test
+`casting-a13-migration-boundary-is-recoverable` covers the full flow,
+byte-exact archival, idempotent re-migration, torn-candidate recovery,
+newer-candidate refusal, and absent-legacy. Live installation/save-load
+rehearsal of rollback remains open.
+
+### Guarded live-lane findings (runtime evidence, separate layer)
+
+- Package built from CURRENT source (`29f1ac8`): local-runtime ZIP
+  SHA-256 `2b3138e4a48760a1b7e27c545c6eaee566d9dc55aabbaa3aee1414fc355b550d`,
+  DLL `f9dd84b3ef37df42707b824674277ef01c9a17aaea98ca60c5b7bdd13321acbc`;
+  WhatIf preflight PASS (no mutation).
+- **`ui-native-contract-probe` run `casting-first-nativeprobe-1`**: the
+  guarded transaction deployed, launched, and RESTORED VERIFIED
+  (`runtime-evidence/casting-first-nativeprobe-1/runtime-result.json`:
+  commit `29f1ac8`, MVID `c6cf326b-...`, game 2.1.7, UMM 0.33.0). The
+  scenario itself FAILED honestly: `Native UI contract is not ready` —
+  the probe requires campaign UI (`Game.Instance.UI.Canvas` +
+  StaticCanvas + EventSystem) which never appears at the main menu
+  (nativeCampaignUiAvailable=false, no EventSystem, ~62 s = boot + the
+  bounded 600-update wait). Conclusion: this lane needs a campaign
+  context, i.e. the save-loading lanes.
+- **`live-ui-bootstrap` (human-reproduction) REFUSED pre-deployment**:
+  `Compatibility fixture identity mismatch: BagOfTricks`. Read-only
+  diagnosis: the installed BagOfTricks DLL and Info.json hashes MATCH
+  the profile record; the mismatch is the directory manifest — record
+  expects 41 files / 1,805,907 bytes, installed holds 40 / 1,805,725
+  (one small mutable file removed since sealing). **Blocked operation:**
+  the guarded compatibility-fixture inventory refresh for
+  human-reproduction (re-bind the manifest to the current exact
+  directory identity, per the established read-only rebind workflow);
+  after that, re-run `live-ui-bootstrap`. No bypass attempted; nothing
+  was staged or mutated by the refusal.
+
+### Next executable step
+
+1. Refresh the human-reproduction fixture manifest through its guarded
+   workflow, then re-run `live-ui-bootstrap` for the campaign-context
+   donor inventory. 2. Build the connected parchment workspace on the
+   canonical model behind the session-scoped flag (Phase 4 start),
+   wiring `CastingReviewCoordinator` into its Apply. 3. Exact-rod
+   durable-identity inspection against installed item/serialization
+   contracts (A06).
+
+## Phase 2 checkpoint 6 — continuation contract checks C1–C5 — 2026-09-19 (commit `29f1ac8`)
 
 **Branch** `codex/kingmaker-buff-planner-casting-first`, reconciled at
 `061968d4b7ec3b7c1247feab72c065b4a7fd4d41` (checkpoint 5, clean tree,

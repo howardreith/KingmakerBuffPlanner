@@ -1,5 +1,6 @@
 using System.IO;
 using System.Security.Cryptography;
+using System.Text;
 
 namespace KingmakerBuffPlanner.Infrastructure
 {
@@ -11,6 +12,16 @@ namespace KingmakerBuffPlanner.Infrastructure
             using (var hash = SHA256.Create())
             {
                 return ToHex(hash.ComputeHash(stream));
+            }
+        }
+
+        // Deterministic content hash for exact-byte archival identity.
+        internal static string Sha256Text(string text)
+        {
+            using (var hash = SHA256.Create())
+            {
+                return ToHex(hash.ComputeHash(
+                    new UTF8Encoding(false).GetBytes(text ?? string.Empty)));
             }
         }
 

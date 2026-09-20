@@ -1,6 +1,26 @@
 # AUTONOMOUS-RESUME — top section is current; planning/CASTING-FIRST-MIGRATION-STATUS.md is the per-checkpoint tracker.
 
-## Casting-first migration Phase 2 checkpoint 6 (C1-C5) — 2026-09-19 (LATEST)
+## Casting-first migration Phase 2 checkpoint 7 — 2026-09-19 (LATEST)
+
+- A13 isolated boundary implemented: CastingPlanMigrationService
+  (exact-original per-boundary archive, candidate-only writes,
+  reopen-validate, torn-candidate CandidateUnusable, newer-candidate
+  refusal, legacy never modified); protocol 205/205; full gate green
+  (`artifacts/casting-first-checkpoint7-gate.log`).
+- Live lanes advanced with honest results: local-runtime package built
+  from `29f1ac8` (zip 2b3138e4...); ui-native-contract-probe ran and
+  restored verified but the scenario needs campaign UI (main menu has
+  none) — failed honestly; live-ui-bootstrap REFUSED pre-deployment by
+  the BagOfTricks fixture manifest mismatch (DLL/Info hashes match;
+  41/1,805,907 recorded vs 40/1,805,725 installed — one mutable file
+  removed). Blocked op: guarded fixture-manifest refresh, then re-run
+  bootstrap. Evidence:
+  runtime-evidence/casting-first-nativeprobe-1.
+- NEXT: fixture refresh + live-ui-bootstrap donor inventory; connected
+  parchment workspace wiring CastingReviewCoordinator (Phase 4 start);
+  exact-rod identity inspection (A06).
+
+## Casting-first migration Phase 2 checkpoint 6 (C1-C5) — 2026-09-19
 
 - Continuation mission reconciled at `061968d4...` (clean; five
   checkpoints preserved). C1-C5 verified against the real services; one
