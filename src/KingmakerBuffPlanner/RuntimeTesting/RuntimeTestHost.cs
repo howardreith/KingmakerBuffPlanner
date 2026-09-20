@@ -72,6 +72,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private int _workspaceBlackAttempts;
         private long _workspaceEngineWaitStartedMillis = -1;
         private string _workspacePresentationEvidence;
+        private string _workspaceLumaEvidence;
+        private string _workspaceClosedLuma;
+        private string _workspaceClosedScreenshotSha256;
+        private int _workspaceClosedWaitUpdates;
+        private bool _workspaceWasOpenAtCapture;
         private readonly System.Diagnostics.Stopwatch _workspaceCaptureElapsed =
             new System.Diagnostics.Stopwatch();
         private string _workspaceEngineScreenshotSha256;
@@ -1444,24 +1449,62 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     _workspaceEngineScreenshotSha256 = engineHash ?? string.Empty;
                     string lumaEvidence = _workspaceFrameCapture.Summary == null
                         ? "missing" : _workspaceFrameCapture.Summary.Describe();
+                    _workspaceLumaEvidence = lumaEvidence;
                     _workspacePresentationEvidence =
                         BuffPlannerUiRoot.CastingWorkspacePresentationEvidence();
-                    WriteWorkspaceRenderMarker(lumaEvidence);
-                    _liveInitialCatalogEvidence = "workspace-scenario:" +
-                        _request.Scenario +
-                        ";workspaceRoot=" + (BuffPlannerUiRoot.IsCastingWorkspaceOpen ? "active" : "missing") +
-                        ";legacyScreen=" + (BuffPlannerUiRoot.IsScreenOpen ? "open" : "closed") +
-                        ";luma=" + lumaEvidence + ";blackRecaptures=" + _workspaceBlackAttempts +
-                        ";" + _workspacePresentationEvidence;
-                    _completed = true;
-                    _log.Info("[KBP-WORKSPACE] workspace frame captured;readPixelsSha256=" +
-                        _liveRenderScreenshotSha256 + ";engineSha256=" +
-                        (_workspaceEngineScreenshotSha256.Length == 0
-                            ? "missing" : _workspaceEngineScreenshotSha256) +
-                        ";blackRecaptures=" + _workspaceBlackAttempts + ";luma=" + lumaEvidence + ".");
-                    return true;
+                    // Root state at CAPTURE time; the bisection below closes
+                    // the workspace, so phase 21 must not re-sample it.
+                    _workspaceWasOpenAtCapture = BuffPlannerUiRoot.IsCastingWorkspaceOpen;
+                    // Diagnostic bisection: capture the identical scene with
+                    // the workspace closed. If the closed frame is non-black
+                    // while the open frame stayed black, the workspace's own
+                    // presence blackens presentation; if both are black, the
+                    // intermittent game presentation defect is responsible.
+                    BuffPlannerUiRoot.CloseCastingWorkspaceForRuntime();
+                    _workspaceClosedWaitUpdates = 0;
+                    _log.Info("[KBP-WORKSPACE] workspace closed for bisection capture;luma=" +
+                        lumaEvidence + ";presentation=" + _workspacePresentationEvidence + ".");
+                    _liveUiPhase = 19;
                 }
                 return false;
+            }
+            if (_liveUiPhase == 19)
+            {
+                if (_workspaceClosedWaitUpdates < 4)
+                {
+                    _workspaceClosedWaitUpdates++;
+                    return false;
+                }
+                BeginWorkspaceCapture("workspace-closed-frame.png");
+                _liveUiPhase = 20;
+                return false;
+            }
+            if (_liveUiPhase == 20)
+            {
+                if (!ConsumeWorkspaceCapture("workspace-closed-frame.png")) return false;
+                _workspaceClosedLuma = _workspaceFrameCapture.Summary == null
+                    ? "missing" : _workspaceFrameCapture.Summary.Describe();
+                _workspaceClosedScreenshotSha256 =
+                    Hashing.Sha256(_workspaceFrameCapture.FullPath);
+                _liveUiPhase = 21;
+                return false;
+            }
+            if (_liveUiPhase == 21)
+            {
+                WriteWorkspaceRenderMarker(_workspaceLumaEvidence);
+                _liveInitialCatalogEvidence = "workspace-scenario:" +
+                    _request.Scenario +
+                    ";workspaceRoot=" + (_workspaceWasOpenAtCapture ? "active" : "missing") +
+                    ";legacyScreen=" + (BuffPlannerUiRoot.IsScreenOpen ? "open" : "closed") +
+                    ";luma=" + _workspaceLumaEvidence + ";blackRecaptures=" + _workspaceBlackAttempts +
+                    ";closedLuma=" + (_workspaceClosedLuma ?? "missing") +
+                    ";" + _workspacePresentationEvidence;
+                _completed = true;
+                _log.Info("[KBP-WORKSPACE] workspace capture sequence complete;openLuma=" +
+                    _workspaceLumaEvidence + ";closedLuma=" +
+                    (_workspaceClosedLuma ?? "missing") + ";presentation=" +
+                    _workspacePresentationEvidence + ".");
+                return true;
             }
             if (_liveUiPhase == 1)
             {
@@ -1825,6 +1868,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     MenuRenderDiagnostic.EnvironmentSample()) +
                 ",\"presentation\":" + JsonConvert.ToString(
                     _workspacePresentationEvidence ?? string.Empty) +
+                ",\"closedLuma\":" + JsonConvert.ToString(_workspaceClosedLuma ?? string.Empty) +
+                ",\"closedSha256\":" + JsonConvert.ToString(
+                    _workspaceClosedScreenshotSha256 ?? string.Empty) +
                 ",\"readPixelsSha256\":" + JsonConvert.ToString(
                     _liveRenderScreenshotSha256 ?? string.Empty) +
                 ",\"engineSha256\":" + JsonConvert.ToString(

@@ -138,6 +138,14 @@ namespace KingmakerBuffPlanner.UI
             get { return _instance != null && _instance._castingWorkspace != null; }
         }
 
+        // Runtime-only close seam for diagnostic bisection: closing the
+        // workspace without routing through HandlePlannerHotkey (whose
+        // toggle would immediately reopen it through OpenSetup).
+        internal static void CloseCastingWorkspaceForRuntime()
+        {
+            if (_instance != null) _instance.CloseCastingWorkspace();
+        }
+
         // Runtime presentation evidence for the workspace root: whether the
         // GameObject hierarchy is actually active, sized, and carrying
         // renderable text. A non-null view field alone proved insufficient
