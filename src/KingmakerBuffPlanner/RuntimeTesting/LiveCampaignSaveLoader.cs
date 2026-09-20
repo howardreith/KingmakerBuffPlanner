@@ -42,38 +42,59 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (_state == 0)
             {
                 RegisterAfterLoadCallback();
-                // Find the exact WORKING save slot, then load through the
-                // game's own programmatic main-menu path. Invoking UI button
-                // handlers directly does not drive Kingmaker's UI state
-                // machine — the load screen never opens.
-                Type slotType = typeof(Game).Assembly.GetType(SaveSlotTypeName, true);
-                List<Tuple<Component, object>> descriptors = Resources.FindObjectsOfTypeAll(slotType)
-                    .OfType<Component>()
-                    .Select(slot => Tuple.Create(slot, FindDescriptor(slot)))
-                    .Where(pair => pair.Item2 != null).ToList();
-                List<Tuple<Component, object>> working = descriptors.Where(pair => IsExact(pair.Item2,
-                    "workingSaveName", "workingFileName", true)).ToList();
-                List<Tuple<Component, object>> baseline = descriptors.Where(pair => IsExact(pair.Item2,
-                    "baselineSaveName", "baselineFileName", false)).ToList();
-                if (working.Count == 0 || baseline.Count == 0) return;
-                if (working.Count != 1 || baseline.Count != 1)
-                    throw new AmbiguousMatchException("Disposable save slot ambiguity: working=" +
-                        working.Count + ";baseline=" + baseline.Count + ".");
-                if (ReferenceEquals(working[0].Item2, baseline[0].Item2))
-                    throw new InvalidOperationException("Working and baseline descriptors are not distinct.");
-                WorkingDescriptor = Describe(working[0].Item2);
-                BaselineDescriptor = Describe(baseline[0].Item2);
+                // Wait for the save manager to have a loaded save list,
+                // then find the WORKING SaveInfo directly from it and
+                // invoke the game's programmatic load path. UI SaveSlot
+                // components only exist when the save window is open.
+                if (Game.Instance == null) return;
+                object manager = ReadMember(Game.Instance, "SaveManager");
+                if (manager == null) return;
+                object areUpToDate = ReadMember(manager, "AreSavesUpToDate");
+                if (!(areUpToDate is bool) || !(bool)areUpToDate) return;
+                // Get the save list from the manager
+                System.Collections.IEnumerable saveList = ReadMember(manager, "Saves")
+                    as System.Collections.IEnumerable;
+                if (saveList == null)
+                {
+                    // Try the field name used by the installed build
+                    saveList = ReadMember(manager, "m_Saves") as System.Collections.IEnumerable;
+                }
+                if (saveList == null) return;
+                object workingInfo = null;
+                object baselineInfo = null;
+                string expectedWorking = Parameter("workingSaveName");
+                string expectedBaseline = Parameter("baselineSaveName");
+                foreach (object save in saveList)
+                {
+                    if (save == null) continue;
+                    string name = Convert.ToString(ReadMember(save, "Name"));
+                    if (string.Equals(name, expectedWorking, StringComparison.Ordinal))
+                    {
+                        if (workingInfo != null)
+                            throw new AmbiguousMatchException(
+                                "Multiple working saves named " + expectedWorking);
+                        workingInfo = save;
+                    }
+                    else if (string.Equals(name, expectedBaseline, StringComparison.Ordinal))
+                    {
+                        if (baselineInfo != null)
+                            throw new AmbiguousMatchException(
+                                "Multiple baseline saves named " + expectedBaseline);
+                        baselineInfo = save;
+                    }
+                }
+                if (workingInfo == null || baselineInfo == null) return;
+                WorkingDescriptor = Describe(workingInfo);
+                BaselineDescriptor = Describe(baselineInfo);
                 _log.Info("[KBP-BOOT] exact disposable saves proven;working=" + WorkingDescriptor +
                     ";baseline=" + BaselineDescriptor +
                     ";invoking=RootSaveSlot.HandleHardcodeMainMenuSaveLoad.");
                 LoadActionCount++;
                 Type rootSlotType = typeof(Game).Assembly.GetType(
                     "Kingmaker.UI.SaveLoadWindow.RootSaveSlot", true);
-                Type saveInfoType = typeof(Game).Assembly.GetType(
-                    "Kingmaker.EntitySystem.Persistence.SaveInfo", true);
                 MethodInfo hardcode = rootSlotType.GetMethod("HandleHardcodeMainMenuSaveLoad",
                     BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-                    null, new[] { saveInfoType }, null);
+                    null, new[] { workingInfo.GetType() }, null);
                 if (hardcode == null)
                     throw new MissingMethodException(
                         "RootSaveSlot.HandleHardcodeMainMenuSaveLoad(SaveInfo)");
@@ -84,7 +105,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     GameObject host = new GameObject("KBP_TemporaryRootSaveSlot");
                     rootSlot = host.AddComponent(rootSlotType);
                 }
-                hardcode.Invoke(rootSlot, new[] { working[0].Item2 });
+                hardcode.Invoke(rootSlot, new[] { workingInfo });
                 _state = 2;
                 Stage = "campaign-load-completion";
                 return;
