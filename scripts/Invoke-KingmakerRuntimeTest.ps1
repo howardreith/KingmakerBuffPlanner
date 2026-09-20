@@ -211,7 +211,10 @@ public static class KbpPhysicalInput {
             }
             $windowObservations.Add($sample)
             if ($windowObservations.Count -gt 60) { $windowObservations.RemoveAt(0) }
-            $orchestration['windowObservations'] = @($windowObservations)
+            # Do NOT wrap the generic List in @(); PowerShell 5.1's array-
+            # subexpression binder fails on List[object] with
+            # "Argument types do not match" (captured in menuinput-3 evidence).
+            $orchestration['windowObservations'] = $windowObservations.ToArray()
             try { Write-KbpJsonAtomic (Join-Path $evidence 'orchestration.json') $orchestration } catch { }
         }
         $ummMarker = Join-Path $evidence 'umm-overlay-ready.json'
