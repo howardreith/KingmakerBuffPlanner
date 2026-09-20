@@ -180,7 +180,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 Vector2 center = target.ScreenCenter;
                 MenuClickTarget = target.Path + ";text=" + target.Text + ";center=" +
                     center.x.ToString("F1", CultureInfo.InvariantCulture) + "," +
-                    center.y.ToString("F1", CultureInfo.InvariantCulture) + ";renderMode=" + target.RenderMode;
+                    center.y.ToString("F1", CultureInfo.InvariantCulture) + ";renderMode=" + target.CanvasRenderMode;
                 _log.Info("[KBP-MENU-DIAG] requesting physical Load Game click;" + MenuClickTarget + ".");
                 _writePhysicalInput("menu-loadgame", "click", center);
                 _state = 4;
@@ -357,7 +357,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 Text = text;
                 RectTransform = button.GetComponent<RectTransform>();
                 Canvas canvas = button.GetComponentInParent<Canvas>();
-                RenderMode = canvas == null ? "no-canvas" : canvas.renderMode.ToString();
+                CanvasRenderMode = canvas == null ? "no-canvas" : canvas.renderMode.ToString();
                 Vector2? center = ComputeScreenCenter(RectTransform, canvas);
                 ScreenCenter = center == null ? Vector2.zero : center.Value;
                 Path = BuildPath(button.transform);
@@ -366,7 +366,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             internal Button Button { get; private set; }
             internal string Text { get; private set; }
             internal RectTransform RectTransform { get; private set; }
-            internal string RenderMode { get; private set; }
+            internal string CanvasRenderMode { get; private set; }
             internal Vector2 ScreenCenter { get; private set; }
             internal string Path { get; private set; }
 

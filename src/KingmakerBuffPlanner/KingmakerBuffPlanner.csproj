@@ -76,6 +76,11 @@
       <Private>False</Private>
       <ExternallyResolved>True</ExternallyResolved>
     </Reference>
+    <Reference Include="UnityEngine.ImageConversionModule">
+      <HintPath>$(KingmakerInstallDir)\Kingmaker_Data\Managed\UnityEngine.ImageConversionModule.dll</HintPath>
+      <Private>False</Private>
+      <ExternallyResolved>True</ExternallyResolved>
+    </Reference>
     <Reference Include="UnityEngine.TextRenderingModule">
       <HintPath>$(KingmakerInstallDir)\Kingmaker_Data\Managed\UnityEngine.TextRenderingModule.dll</HintPath>
       <Private>False</Private>
