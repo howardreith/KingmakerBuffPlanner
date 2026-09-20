@@ -42,17 +42,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (_state == 0)
             {
                 RegisterAfterLoadCallback();
-                GameObject loadObject = GameObject.Find(LoadButtonPath);
-                Button button = loadObject == null ? null : loadObject.GetComponent<Button>();
-                if (button == null || !button.gameObject.activeInHierarchy || !button.interactable) return;
-                _log.Info("[KBP-BOOT] live-save normal load action;path=" + LoadButtonPath + ".");
-                button.onClick.Invoke();
-                _state = 1;
-                Stage = "exact-working-save-slot";
-                return;
-            }
-            if (_state == 1)
-            {
+                // Find the exact WORKING save slot, then load through the
+                // game's own programmatic main-menu path. Invoking UI button
+                // handlers directly does not drive Kingmaker's UI state
+                // machine — the load screen never opens.
                 Type slotType = typeof(Game).Assembly.GetType(SaveSlotTypeName, true);
                 List<Tuple<Component, object>> descriptors = Resources.FindObjectsOfTypeAll(slotType)
                     .OfType<Component>()
@@ -70,15 +63,28 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     throw new InvalidOperationException("Working and baseline descriptors are not distinct.");
                 WorkingDescriptor = Describe(working[0].Item2);
                 BaselineDescriptor = Describe(baseline[0].Item2);
-                MethodInfo action = slotType.GetMethod("OnButtonSaveLoad",
-                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-                    null, Type.EmptyTypes, null);
-                if (action == null || action.ReturnType != typeof(void))
-                    throw new MissingMethodException(SaveSlotTypeName, "OnButtonSaveLoad()");
                 _log.Info("[KBP-BOOT] exact disposable saves proven;working=" + WorkingDescriptor +
-                    ";baseline=" + BaselineDescriptor + ";invoking=SaveSlot.OnButtonSaveLoad.");
+                    ";baseline=" + BaselineDescriptor +
+                    ";invoking=RootSaveSlot.HandleHardcodeMainMenuSaveLoad.");
                 LoadActionCount++;
-                action.Invoke(working[0].Item1, null);
+                Type rootSlotType = typeof(Game).Assembly.GetType(
+                    "Kingmaker.UI.SaveLoadWindow.RootSaveSlot", true);
+                Type saveInfoType = typeof(Game).Assembly.GetType(
+                    "Kingmaker.EntitySystem.Persistence.SaveInfo", true);
+                MethodInfo hardcode = rootSlotType.GetMethod("HandleHardcodeMainMenuSaveLoad",
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                    null, new[] { saveInfoType }, null);
+                if (hardcode == null)
+                    throw new MissingMethodException(
+                        "RootSaveSlot.HandleHardcodeMainMenuSaveLoad(SaveInfo)");
+                Component rootSlot = Resources.FindObjectsOfTypeAll(rootSlotType)
+                    .OfType<Component>().FirstOrDefault();
+                if (rootSlot == null)
+                {
+                    GameObject host = new GameObject("KBP_TemporaryRootSaveSlot");
+                    rootSlot = host.AddComponent(rootSlotType);
+                }
+                hardcode.Invoke(rootSlot, new[] { working[0].Item2 });
                 _state = 2;
                 Stage = "campaign-load-completion";
                 return;
