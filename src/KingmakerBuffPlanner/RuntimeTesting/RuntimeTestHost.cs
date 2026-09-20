@@ -1190,6 +1190,23 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     _liveUmmDismissMarkerWritten = true;
                     _log.Info("[KBP-BOOT] runtime requests physical Escape to dismiss " +
                         "ShowOnStart UMM overlay;marker=umm-overlay-ready.json.");
+                    // Also dismiss the UMM overlay programmatically: find
+                    // and deactivate the ShowOnStart panel so keyboard
+                    // input is not required.
+                    try
+                    {
+                        GameObject ummPanel = GameObject.Find("ShowOnStart");
+                        if (ummPanel != null && ummPanel.activeInHierarchy)
+                        {
+                            ummPanel.SetActive(false);
+                            _log.Info("[KBP-BOOT] UMM ShowOnStart panel dismissed programmatically.");
+                        }
+                    }
+                    catch (Exception dismissException)
+                    {
+                        _log.Info("[KBP-BOOT] UMM programmatic dismiss failed: " +
+                            dismissException.Message);
+                    }
                 }
                 if (StaticCanvas.Instance == null ||
                     UnityEngine.EventSystems.EventSystem.current == null) return false;
