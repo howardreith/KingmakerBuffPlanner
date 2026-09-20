@@ -1,6 +1,25 @@
 # AUTONOMOUS-RESUME — top section is current; planning/CASTING-FIRST-MIGRATION-STATUS.md is the per-checkpoint tracker.
 
-## Casting-first migration checkpoint 10 (decision packet exposed) — 2026-09-20 (LATEST)
+## Casting-first migration checkpoint 11 (owner approval applied; blocker on remaining mods) — 2026-09-20 (LATEST)
+
+- Owner approval RECORDED and APPLIED for BagOfTricks (three fields in
+  compatibility/profiles/human-reproduction.json; per-file inventory at
+  runtime-state/fixture-inventories/fixture-inventory-BagOfTricks-c4487d11b264.json;
+  record at planning/BAGOFTRICKS-APPROVED-BASELINE-RECORD.md).
+  BagOfTricks now PASSES the fixture guard.
+- GATES ALL GREEN on the changed source (source 42/42; protocol 210/210;
+  harness 27/27; package 4/4; WhatIf 5/5; fixture-inventory 3/3;
+  rollback 4/4; publisher 3/3).
+- **NEW BLOCKER:** CallOfTheWild and CheatMenu also fail the guard —
+  their profile aggregates (Aug 23) are stale relative to the current
+  live directories. Per-file comparison proves live == September
+  transaction receipts exactly (zero differences). Approval request
+  prepared at planning/CALLOFTHEWILD-CHEATMENU-APPROVAL-REQUEST.md with
+  exact values, inventories, and a proposed owner statement.
+- Campaign UI qualification is BLOCKED on this decision; no guarded run
+  was attempted (the guard would refuse before deployment).
+
+## Casting-first migration checkpoint 10 (decision packet exposed) — 2026-09-20
 
 - HEAD `6721d8e` on `e46f18e` (gates all green, unchanged counts). The
   exact-rod conclusion was narrowed to the inspected evidence with the
