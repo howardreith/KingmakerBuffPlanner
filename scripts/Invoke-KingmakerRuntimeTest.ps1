@@ -116,6 +116,7 @@ try {
     $plannerHotkeySent = $false
     $ummDismissSent = $false
     $ummDismissRecoverySent = $false
+    $ummDismissAttempts = 0
     $ummDismissSentAtUtc = [DateTime]::MinValue
     try {
     Add-Type @'
@@ -221,14 +222,25 @@ public static class KbpPhysicalInput {
         if ($Scenario -ceq 'live-ui-bootstrap' -and -not $ummDismissSent -and
             (Test-Path -LiteralPath $ummMarker -PathType Leaf)) {
             $process.Refresh()
-            [KbpPhysicalInput]::KeyDown($process.MainWindowHandle, [byte]0x1B)
-            Start-Sleep -Milliseconds 100
-            [KbpPhysicalInput]::KeyUp([byte]0x1B)
-            $ummDismissSent = $true
-            $ummDismissSentAtUtc = [DateTime]::UtcNow
-            $orchestration.stage = 'physical-umm-dismiss-sent'
-            $orchestration.ummDismissSentAtUtc = $ummDismissSentAtUtc.ToString('o')
-            Write-KbpJsonAtomic (Join-Path $evidence 'orchestration.json') $orchestration
+            try {
+                [KbpPhysicalInput]::KeyDown($process.MainWindowHandle, [byte]0x1B)
+                Start-Sleep -Milliseconds 100
+                [KbpPhysicalInput]::KeyUp([byte]0x1B)
+                $ummDismissSent = $true
+                $ummDismissSentAtUtc = [DateTime]::UtcNow
+                $orchestration.stage = 'physical-umm-dismiss-sent'
+                $orchestration.ummDismissSentAtUtc = $ummDismissSentAtUtc.ToString('o')
+                Write-KbpJsonAtomic (Join-Path $evidence 'orchestration.json') $orchestration
+            }
+            catch {
+                # Foreground-lock delivery failures retry on later polls and
+                # must never abort the guarded run.
+                $ummDismissAttempts++
+                $orchestration.lastUmmDismissError = $_.Exception.Message
+                if (($ummDismissAttempts % 10) -eq 1) {
+                    Write-KbpJsonAtomic (Join-Path $evidence 'orchestration.json') $orchestration
+                }
+            }
         }
         $hotkeyMarker = Join-Path $evidence 'hotkey-ready.json'
         if ($Scenario -ceq 'live-ui-bootstrap' -and $ummDismissSent -and
@@ -238,28 +250,40 @@ public static class KbpPhysicalInput {
             # open Kingmaker's Escape menu. One bounded follow-up closes that native veil;
             # production HUD ownership and input suppression remain unchanged.
             $process.Refresh()
-            [KbpPhysicalInput]::KeyDown($process.MainWindowHandle, [byte]0x1B)
-            Start-Sleep -Milliseconds 100
-            [KbpPhysicalInput]::KeyUp([byte]0x1B)
-            $ummDismissRecoverySent = $true
-            $orchestration.stage = 'physical-umm-dismiss-recovery-sent'
-            $orchestration.ummDismissRecoverySentAtUtc = [DateTime]::UtcNow.ToString('o')
-            Write-KbpJsonAtomic (Join-Path $evidence 'orchestration.json') $orchestration
+            try {
+                [KbpPhysicalInput]::KeyDown($process.MainWindowHandle, [byte]0x1B)
+                Start-Sleep -Milliseconds 100
+                [KbpPhysicalInput]::KeyUp([byte]0x1B)
+                $ummDismissRecoverySent = $true
+                $orchestration.stage = 'physical-umm-dismiss-recovery-sent'
+                $orchestration.ummDismissRecoverySentAtUtc = [DateTime]::UtcNow.ToString('o')
+                Write-KbpJsonAtomic (Join-Path $evidence 'orchestration.json') $orchestration
+            }
+            catch {
+                $orchestration.lastUmmRecoveryError = $_.Exception.Message
+            }
         }
         if ($Scenario -ceq 'live-ui-bootstrap' -and -not $plannerHotkeySent -and
             (Test-Path -LiteralPath $hotkeyMarker -PathType Leaf)) {
             $process.Refresh()
-            [KbpPhysicalInput]::KeyDown($process.MainWindowHandle, [byte]0x11)
-            [KbpPhysicalInput]::KeyDown($process.MainWindowHandle, [byte]0x10)
-            [KbpPhysicalInput]::KeyDown($process.MainWindowHandle, [byte]0x42)
-            Start-Sleep -Milliseconds 100
-            [KbpPhysicalInput]::KeyUp([byte]0x42)
-            [KbpPhysicalInput]::KeyUp([byte]0x10)
-            [KbpPhysicalInput]::KeyUp([byte]0x11)
-            $plannerHotkeySent = $true
-            $orchestration.stage = 'physical-planner-hotkey-sent'
-            $orchestration.plannerHotkeySentAtUtc = [DateTime]::UtcNow.ToString('o')
-            Write-KbpJsonAtomic (Join-Path $evidence 'orchestration.json') $orchestration
+            try {
+                [KbpPhysicalInput]::KeyDown($process.MainWindowHandle, [byte]0x11)
+                [KbpPhysicalInput]::KeyDown($process.MainWindowHandle, [byte]0x10)
+                [KbpPhysicalInput]::KeyDown($process.MainWindowHandle, [byte]0x42)
+                Start-Sleep -Milliseconds 100
+                [KbpPhysicalInput]::KeyUp([byte]0x42)
+                [KbpPhysicalInput]::KeyUp([byte]0x10)
+                [KbpPhysicalInput]::KeyUp([byte]0x11)
+                $plannerHotkeySent = $true
+                $orchestration.stage = 'physical-planner-hotkey-sent'
+                $orchestration.plannerHotkeySentAtUtc = [DateTime]::UtcNow.ToString('o')
+                Write-KbpJsonAtomic (Join-Path $evidence 'orchestration.json') $orchestration
+            }
+            catch {
+                # All three keydowns must land together or not at all; retry
+                # the whole chord on later polls.
+                $orchestration.lastHotkeyError = $_.Exception.Message
+            }
         }
         if ($physicalInputScenario) {
             if ($null -eq $physicalDeliveryAttempts) { $physicalDeliveryAttempts = @{} }
