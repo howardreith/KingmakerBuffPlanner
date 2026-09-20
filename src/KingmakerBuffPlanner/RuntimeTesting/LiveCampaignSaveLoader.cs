@@ -69,23 +69,38 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         ";upToDate=" + upToDate + ";hasSaves=" + hasSaves +
                         ";savePath=" + ReadMember(manager, "SavePath"));
                 }
-                string workingFile = Parameter("workingFileName");
-                string baselineFile = Parameter("baselineFileName");
-                if (string.IsNullOrWhiteSpace(workingFile) ||
-                    string.IsNullOrWhiteSpace(baselineFile)) return;
-                MethodInfo loadZip = manager.GetType().GetMethod("LoadZipSave",
-                    BindingFlags.Instance | BindingFlags.Public,
-                    null, new[] { typeof(string) }, null);
-                if (loadZip == null)
-                    throw new MissingMethodException("SaveManager.LoadZipSave(String)");
-                object workingInfo = loadZip.Invoke(manager, new object[] { workingFile });
-                object baselineInfo = loadZip.Invoke(manager, new object[] { baselineFile });
+                // Read the save list from the SaveManager's private field
+                System.Collections.IEnumerable savedGames =
+                    ReadMember(manager, "m_SavedGames") as System.Collections.IEnumerable;
+                if (savedGames == null) return;
+                string expectedWorking = Parameter("workingSaveName");
+                string expectedBaseline = Parameter("baselineSaveName");
+                object workingInfo = null;
+                object baselineInfo = null;
+                foreach (object save in savedGames)
+                {
+                    if (save == null) continue;
+                    string name = Convert.ToString(ReadMember(save, "Name"));
+                    if (string.Equals(name, expectedWorking, StringComparison.Ordinal))
+                    {
+                        if (workingInfo != null)
+                            throw new AmbiguousMatchException(
+                                "Multiple saves named " + expectedWorking);
+                        workingInfo = save;
+                    }
+                    else if (string.Equals(name, expectedBaseline, StringComparison.Ordinal))
+                    {
+                        if (baselineInfo != null)
+                            throw new AmbiguousMatchException(
+                                "Multiple saves named " + expectedBaseline);
+                        baselineInfo = save;
+                    }
+                }
                 if (workingInfo == null || baselineInfo == null)
                 {
                     if (_updates == 60 || _updates == 300 || _updates == 900)
                         _log.Info("[KBP-BOOT] save loader waiting;frame=" + _updates +
-                            ";working=" + (workingInfo != null) + ";baseline=" + (baselineInfo != null) +
-                            ";file=" + workingFile);
+                            ";working=" + (workingInfo != null) + ";baseline=" + (baselineInfo != null));
                     return;
                 }
                 WorkingDescriptor = Describe(workingInfo);
