@@ -52,7 +52,11 @@
       <HintPath>$(KingmakerInstallDir)\Kingmaker_Data\Managed\UnityModManager\0Harmony12.dll</HintPath>
       <Private>False</Private>
     </Reference>
-    <Reference Include="UnityEngine">
+        <Reference Include="UnityEngine.ScreenCaptureModule">
+      <HintPath>$(KingmakerInstallDir)\Kingmaker_Data\Managed\UnityEngine.ScreenCaptureModule.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+<Reference Include="UnityEngine">
       <HintPath>$(KingmakerInstallDir)\Kingmaker_Data\Managed\UnityEngine.dll</HintPath>
       <Private>False</Private>
       <ExternallyResolved>True</ExternallyResolved>

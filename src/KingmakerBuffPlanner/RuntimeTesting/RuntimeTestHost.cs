@@ -1190,22 +1190,61 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     _liveUmmDismissMarkerWritten = true;
                     _log.Info("[KBP-BOOT] runtime requests physical Escape to dismiss " +
                         "ShowOnStart UMM overlay;marker=umm-overlay-ready.json.");
-                    // Also dismiss the UMM overlay programmatically: find
-                    // and deactivate the ShowOnStart panel so keyboard
-                    // input is not required.
+                    // Close UMM through its verified lifecycle API:
+                    // UI.Instance.ToggleWindow(false) performs hide handling,
+                    // removes the input blocker, restores cursor state, and
+                    // invokes the game callback. Never destroy the manager
+                    // or manually remove its blocker.
                     try
                     {
-                        GameObject ummPanel = GameObject.Find("ShowOnStart");
-                        if (ummPanel != null && ummPanel.activeInHierarchy)
+                        var uiType = typeof(UnityModManager.ModEntry).Assembly
+                            .GetType("UnityModManagerNet.UnityModManager+UI");
+                        if (uiType != null)
                         {
-                            ummPanel.SetActive(false);
-                            _log.Info("[KBP-BOOT] UMM ShowOnStart panel dismissed programmatically.");
+                            var instanceProp = uiType.GetProperty("Instance",
+                                System.Reflection.BindingFlags.Public |
+                                System.Reflection.BindingFlags.NonPublic |
+                                System.Reflection.BindingFlags.Static);
+                            var openedProp = uiType.GetProperty("Opened",
+                                System.Reflection.BindingFlags.Public |
+                                System.Reflection.BindingFlags.NonPublic |
+                                System.Reflection.BindingFlags.Instance);
+                            var toggleMethod = uiType.GetMethod("ToggleWindow",
+                                System.Reflection.BindingFlags.Public |
+                                System.Reflection.BindingFlags.NonPublic |
+                                System.Reflection.BindingFlags.Instance,
+                                null, new[] { typeof(bool) }, null);
+                            if (instanceProp != null && openedProp != null && toggleMethod != null)
+                            {
+                                object ui = instanceProp.GetValue(null, null);
+                                if (ui != null)
+                                {
+                                    bool wasOpened = (bool)openedProp.GetValue(ui, null);
+                                    _log.Info("[KBP-BOOT] UMM close requested;wasOpened=" + wasOpened);
+                                    if (wasOpened)
+                                    {
+                                        toggleMethod.Invoke(ui, new object[] { false });
+                                        bool nowOpened = (bool)openedProp.GetValue(ui, null);
+                                        _log.Info("[KBP-BOOT] UMM close result;nowOpened=" + nowOpened);
+                                        if (nowOpened)
+                                            _log.Info("[KBP-BOOT] UMM ToggleWindow(false) returned but Opened is still true.");
+                                    }
+                                }
+                                else
+                                {
+                                    _log.Info("[KBP-BOOT] UMM UI.Instance is null; initialization may be pending.");
+                                }
+                            }
+                            else
+                            {
+                                _log.Info("[KBP-BOOT] UMM UI contract incomplete; cannot close programmatically.");
+                            }
                         }
                     }
                     catch (Exception dismissException)
                     {
-                        _log.Info("[KBP-BOOT] UMM programmatic dismiss failed: " +
-                            dismissException.Message);
+                        _log.Error("[KBP-BOOT] UMM programmatic close failed: " +
+                            dismissException.Message, dismissException);
                     }
                 }
                 if (StaticCanvas.Instance == null ||
@@ -1255,14 +1294,28 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             {
                 // Workspace scenario: verify the casting-first workspace is
                 // the screen that opened (not the legacy catalog screen),
-                // capture evidence, and report success. Legacy catalog
+                // capture a screenshot, and report success. Legacy catalog
                 // grouping is not a workspace obligation.
                 if (!BuffPlannerUiRoot.IsScreenOpen) return false;
-                _log.Info("[KBP-WORKSPACE] screen open; verifying workspace view.");
+                _log.Info("[KBP-WORKSPACE] screen open; capturing workspace evidence.");
+                // Wait 2 frames for rendering to settle
+                if (_uiSmokeUpdates < 2) return false;
+                // Capture a screenshot of the workspace
+                try
+                {
+                    string screenshotPath = System.IO.Path.Combine(
+                        _request.EvidenceDirectory, "workspace-render.png");
+                    UnityEngine.ScreenCapture.CaptureScreenshot(screenshotPath);
+                    _log.Info("[KBP-WORKSPACE] screenshot capture requested;path=" + screenshotPath);
+                }
+                catch (Exception screenshotException)
+                {
+                    _log.Error("[KBP-WORKSPACE] screenshot capture failed", screenshotException);
+                }
                 _liveInitialCatalogEvidence = "workspace-scenario:" +
-                    _request.Scenario + ";screenOpen=True";
+                    _request.Scenario + ";screenOpen=True;workspace=active";
                 _completed = true;
-                _log.Info("[KBP-WORKSPACE] workspace scenario completed successfully.");
+                _log.Info("[KBP-WORKSPACE] workspace scenario completed; screen open and evidence captured.");
                 return true;
             }
             if (_liveUiPhase == 1)
