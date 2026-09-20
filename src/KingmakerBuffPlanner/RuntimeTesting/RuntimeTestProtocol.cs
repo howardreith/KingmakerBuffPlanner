@@ -77,7 +77,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (!IsSafeIdentifier(request.RunId)) throw new InvalidDataException("run-id");
             if (!IsSafeIdentifier(request.ProfileId) ||
                 (request.ProfileId != "native-only" && request.ProfileId != "call-of-the-wild" &&
-                 request.ProfileId != "human-reproduction"))
+                 request.ProfileId != "human-reproduction" && request.ProfileId != "full-user"))
                 throw new InvalidDataException("profile-id");
             if (!IsKnownScenario(request.Scenario))
                 throw new InvalidDataException("scenario");
@@ -103,7 +103,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 throw new InvalidDataException("duplicate-expected-blueprint-guid");
             if ((request.ProfileId == "native-only" && request.ExpectedOptionalMods.Count != 0) ||
                 (request.ProfileId == "call-of-the-wild" && request.ExpectedOptionalMods.Count != 1) ||
-                (request.ProfileId == "human-reproduction" && request.ExpectedOptionalMods.Count != 3))
+                (request.ProfileId == "human-reproduction" && request.ExpectedOptionalMods.Count != 3) ||
+                (request.ProfileId == "full-user" && request.ExpectedOptionalMods.Count != 15))
                 throw new InvalidDataException("profile-mod-expectation");
             if ((request.ProfileId == "native-only" && request.ExpectedBlueprintGuids.Count != 0) ||
                 (request.ProfileId == "call-of-the-wild" && request.ExpectedBlueprintGuids.Count < 3))
