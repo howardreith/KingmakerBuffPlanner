@@ -44,89 +44,81 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (_state == 0)
             {
                 RegisterAfterLoadCallback();
-                // Load the WORKING and BASELINE SaveInfo objects directly
-                // from the SaveManager by their known filenames, then
-                // invoke the game's programmatic main-menu load path.
-                if (Game.Instance == null)
+                // Open the save/load window through the game's own UI, then
+                // find the WORKING slot and click its load button. Direct
+                // HandleHardcodeMainMenuSaveLoad is a no-op without the UI
+                // context; the game needs the window open to process saves.
+                Type windowType = typeof(Game).Assembly.GetType(
+                    "Kingmaker.UI.SaveLoadWindow.SaveLoadWindow", true);
+                Component window = UnityEngine.Object.FindObjectOfType(
+                    windowType) as Component;
+                if (window == null)
                 {
-                    if (_updates == 60 || _updates == 300 || _updates == 900)
-                        _log.Info("[KBP-BOOT] save loader waiting;frame=" + _updates + ";reason=game-null");
+                    if (_updates == 60)
+                        _log.Info("[KBP-BOOT] save loader: SaveLoadWindow not found yet");
                     return;
                 }
-                object manager = ReadMember(Game.Instance, "SaveManager");
-                if (manager == null)
+                MethodInfo openMethod = windowType.GetMethod("HandleOpenSaveLoadWindow",
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                    null, new[] { typeof(Game).Assembly.GetType("Kingmaker.UI.ScreenType") }, null);
+                if (openMethod == null)
+                    throw new MissingMethodException("SaveLoadWindow.HandleOpenSaveLoadWindow(ScreenType)");
+                object screenType = Enum.Parse(
+                    typeof(Game).Assembly.GetType("Kingmaker.UI.ScreenType"), "LoadGame");
+                _log.Info("[KBP-BOOT] save loader: opening save/load window");
+                openMethod.Invoke(window, new[] { screenType });
+                _state = 1;
+                Stage = "save-window-opened";
+                return;
+            }
+            if (_state == 1)
+            {
+                // Wait for the save slot UI to populate, then find the
+                // WORKING slot and invoke its load button handler.
+                Type slotType = typeof(Game).Assembly.GetType(SaveSlotTypeName, true);
+                Component[] slots = Resources.FindObjectsOfTypeAll(slotType)
+                    .OfType<Component>()
+                    .Where(value => value != null && value.gameObject != null &&
+                        value.gameObject.activeInHierarchy)
+                    .ToArray();
+                if (slots.Length == 0)
                 {
-                    if (_updates == 60 || _updates == 300 || _updates == 900)
-                        _log.Info("[KBP-BOOT] save loader waiting;frame=" + _updates + ";reason=manager-null");
+                    if (_updates % 300 == 0)
+                        _log.Info("[KBP-BOOT] save loader waiting for slots;frame=" + _updates);
                     return;
                 }
-                if (_updates == 60)
-                {
-                    object upToDate = ReadMember(manager, "AreSavesUpToDate");
-                    object hasSaves = manager.GetType().GetMethod("HasAnySaves",
-                        BindingFlags.Instance | BindingFlags.Public,
-                        null, new[] { typeof(bool) }, null)
-                        ?.Invoke(manager, new object[] { false });
-                    _log.Info("[KBP-BOOT] save loader state;frame=" + _updates +
-                        ";upToDate=" + upToDate + ";hasSaves=" + hasSaves +
-                        ";savePath=" + ReadMember(manager, "SavePath"));
-                }
-                // Read the save list from the SaveManager's private field
-                System.Collections.IEnumerable savedGames =
-                    ReadMember(manager, "m_SavedGames") as System.Collections.IEnumerable;
-                if (savedGames == null) return;
                 string expectedWorking = Parameter("workingSaveName");
                 string expectedBaseline = Parameter("baselineSaveName");
-                object workingInfo = null;
-                object baselineInfo = null;
-                foreach (object save in savedGames)
+                Component workingSlot = null;
+                Component baselineSlot = null;
+                foreach (Component slot in slots)
                 {
-                    if (save == null) continue;
-                    string name = Convert.ToString(ReadMember(save, "Name"));
+                    object info = ReadMember(slot, "SaveInfo");
+                    if (info == null) continue;
+                    string name = Convert.ToString(ReadMember(info, "Name"));
                     if (string.Equals(name, expectedWorking, StringComparison.Ordinal))
-                    {
-                        if (workingInfo != null)
-                            throw new AmbiguousMatchException(
-                                "Multiple saves named " + expectedWorking);
-                        workingInfo = save;
-                    }
+                        workingSlot = slot;
                     else if (string.Equals(name, expectedBaseline, StringComparison.Ordinal))
-                    {
-                        if (baselineInfo != null)
-                            throw new AmbiguousMatchException(
-                                "Multiple saves named " + expectedBaseline);
-                        baselineInfo = save;
-                    }
+                        baselineSlot = slot;
                 }
-                if (workingInfo == null || baselineInfo == null)
+                if (workingSlot == null)
                 {
-                    if (_updates == 60 || _updates == 300 || _updates == 900)
-                        _log.Info("[KBP-BOOT] save loader waiting;frame=" + _updates +
-                            ";working=" + (workingInfo != null) + ";baseline=" + (baselineInfo != null));
+                    if (_updates % 300 == 0)
+                        _log.Info("[KBP-BOOT] save loader: WORKING slot not found;visible=" + slots.Length);
                     return;
                 }
-                WorkingDescriptor = Describe(workingInfo);
-                BaselineDescriptor = Describe(baselineInfo);
-                _log.Info("[KBP-BOOT] exact disposable saves proven;working=" + WorkingDescriptor +
-                    ";baseline=" + BaselineDescriptor +
-                    ";invoking=RootSaveSlot.HandleHardcodeMainMenuSaveLoad.");
+                WorkingDescriptor = Describe(ReadMember(workingSlot, "SaveInfo"));
+                BaselineDescriptor = baselineSlot == null ? "not-found"
+                    : Describe(ReadMember(baselineSlot, "SaveInfo"));
+                _log.Info("[KBP-BOOT] exact saves found;working=" + WorkingDescriptor +
+                    ";invoking=SaveSlot.OnButtonSaveLoad.");
                 LoadActionCount++;
-                Type rootSlotType = typeof(Game).Assembly.GetType(
-                    "Kingmaker.UI.SaveLoadWindow.RootSaveSlot", true);
-                MethodInfo hardcode = rootSlotType.GetMethod("HandleHardcodeMainMenuSaveLoad",
+                MethodInfo loadMethod = slotType.GetMethod("OnButtonSaveLoad",
                     BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-                    null, new[] { workingInfo.GetType() }, null);
-                if (hardcode == null)
-                    throw new MissingMethodException(
-                        "RootSaveSlot.HandleHardcodeMainMenuSaveLoad(SaveInfo)");
-                Component rootSlot = Resources.FindObjectsOfTypeAll(rootSlotType)
-                    .OfType<Component>().FirstOrDefault();
-                if (rootSlot == null)
-                {
-                    GameObject host = new GameObject("KBP_TemporaryRootSaveSlot");
-                    rootSlot = host.AddComponent(rootSlotType);
-                }
-                hardcode.Invoke(rootSlot, new[] { workingInfo });
+                    null, Type.EmptyTypes, null);
+                if (loadMethod == null)
+                    throw new MissingMethodException("SaveSlot.OnButtonSaveLoad()");
+                loadMethod.Invoke(workingSlot, null);
                 _state = 2;
                 Stage = "campaign-load-completion";
                 return;
