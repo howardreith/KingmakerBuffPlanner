@@ -5,7 +5,31 @@ Linked from `AUTONOMOUS-RESUME.md`. Specification: the adopted
 `Kingmaker-Buff-Planner-Casting-First-Migration-Charter.md` (casting-first
 migration and native scroll UI charter v1.0, 2026-09-19).
 
-## Checkpoint 9 — runtime-qualification continuation: review hardening, narrow checks, fixture packet — 2026-09-20 (CURRENT)
+## Checkpoint 10 — decision-packet exposure + narrowed rod conclusion — 2026-09-20 (CURRENT)
+
+On top of `e46f18e` (clean; no newer work). Gates re-run: source 42/42;
+protocol 210/210; harness 27/27; package 4/4; WhatIf 5/5;
+fixture-inventory 3/3; rollback 4/4; publisher 3/3
+(`artifacts/casting-first-checkpoint10-gate.log`). Commit `6721d8e`
+narrows the exact-rod conclusion per the next-step decision packet:
+the serialization/reference path was inspected read-only (ItemEntity is
+a Newtonsoft-JSON persisted POCO — blueprint, count, POSITIONAL slot
+index, enchantments, facts; ItemsCollection is a positional list;
+`JsonUtility.UnitSerialization.Serialize` entry; no Owlcat/ZeroFormatter
+assemblies in this build), and the doc now separates runtime identity /
+within-save graph references / durable cross-save identity. Established:
+no usable native durable per-item identity in the inspected
+persisted-state contract — NOT a claim that every strategy is absent.
+The per-item persisted `Fact[]` is the named candidate requiring live
+proof (fact survival across save/load/reorder + permission to attach);
+not implemented. The fixture approval packet
+(SHA-256 40e1dab2b5ebe53157a33a298d429f07675894bf60bf3b3515e24f471b23af17
+at `e46f18e`) is reproduced INLINE in the checkpoint-10 handoff with the
+proposed owner statement — PROPOSED, NOT GRANTED. Bootstrap stays
+blocked; the campaign-UI lane awaits that decision. Bundle regenerated
+locally at HEAD (10 patches + SHA256SUMS; still LOCAL, not delivered).
+
+## Checkpoint 9 — runtime-qualification continuation: review hardening, narrow checks, fixture packet — 2026-09-20 (commit `e46f18e`)
 
 **Branch** `codex/kingmaker-buff-planner-casting-first`, reconciled at
 `9a2e57388316ef1172927f56f715b8927f83a0d5` (clean, single worktree).

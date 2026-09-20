@@ -1,6 +1,19 @@
 # AUTONOMOUS-RESUME — top section is current; planning/CASTING-FIRST-MIGRATION-STATUS.md is the per-checkpoint tracker.
 
-## Casting-first migration checkpoint 9 (runtime-qualification continuation) — 2026-09-20 (LATEST)
+## Casting-first migration checkpoint 10 (decision packet exposed) — 2026-09-20 (LATEST)
+
+- HEAD `6721d8e` on `e46f18e` (gates all green, unchanged counts). The
+  exact-rod conclusion was narrowed to the inspected evidence with the
+  serialization path examined (three identity tiers separated; per-item
+  persisted Fact[] recorded as the live-proof candidate). The
+  BagOfTricks fixture approval packet is reproduced INLINE in the
+  handoff with a PROPOSED — NOT YET GRANTED owner statement; bootstrap
+  and the campaign-UI lane await that explicit decision.
+- NEXT: on owner approval of the exact packet identities, apply only the
+  three approved binding changes, then bootstrap → donor inventory →
+  observed workspace interaction and screenshots.
+
+## Casting-first migration checkpoint 9 (runtime-qualification continuation) — 2026-09-20
 
 - Bundle validated mechanically (git-am applicability to c182061
   reproduces tree 119c24f1; SHA256SUMS added; LOCAL, not delivered).
