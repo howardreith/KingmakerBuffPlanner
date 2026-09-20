@@ -1,6 +1,27 @@
 # AUTONOMOUS-RESUME — top section is current; planning/CASTING-FIRST-MIGRATION-STATUS.md is the per-checkpoint tracker.
 
-## Casting-first migration checkpoint 11 (owner approval applied; blocker on remaining mods) — 2026-09-20 (LATEST)
+## Casting-first migration checkpoint 12 (all approvals applied; ready to launch) — 2026-09-20 (LATEST)
+
+- Owner approved CallOfTheWild (988e6130...) and CheatMenu (7960517c...)
+  rebindings; applied with exact verification. A correction was noted:
+  the earlier approval request showed abbreviated "from" hashes whose
+  full values differed from the file; the approved "to" values were
+  always correct and the actual "from" values were used for the diff.
+- C# 7.3 method-group conversion fixed in the legacy-execution guard
+  (BuffPlannerUiRoot lambdas); commit `393d514`.
+- CONSOLIDATED PREFLIGHT: all three mod identities PASS; save pair
+  present (304/305); no unresolved transactions; no deployment lock;
+  Steam safety PASS; local runtime package efe309b0... built from clean
+  HEAD; WhatIf preflight PASS (no mutation).
+- **REMAINING BLOCKER: Kingmaker process PID 5680 (user-owned).** The
+  guarded lane will launch the moment the game is closed. No game was
+  launched this checkpoint; the owner should close Kingmaker and notify
+  (or simply close it before the next continuation).
+- NEXT: on game-closed, run the guarded live-ui-bootstrap → campaign
+  context → CastingWorkspaceScreenView qualification with screenshots
+  and restoration receipts.
+
+## Casting-first migration checkpoint 11 (owner approval applied; blocker on remaining mods) — 2026-09-20
 
 - Owner approval RECORDED and APPLIED for BagOfTricks (three fields in
   compatibility/profiles/human-reproduction.json; per-file inventory at
