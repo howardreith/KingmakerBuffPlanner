@@ -9136,7 +9136,7 @@ namespace KingmakerBuffPlanner.Tests
             string path = WriteRequest(root, "valid-human-reproduction", o =>
             {
                 o["profileId"] = "human-reproduction";
-                o["expectedOptionalMods"] = Enumerable.Range(0, 4).Select(index =>
+                o["expectedOptionalMods"] = Enumerable.Range(0, 3).Select(index =>
                     (object)new Dictionary<string, object>
                     {
                         { "ummId", "Fixture" + index }, { "version", "1.0" },
@@ -9148,7 +9148,7 @@ namespace KingmakerBuffPlanner.Tests
             RuntimeTestRequest request = ReadProtocol(
                 new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path }, out rejection);
             if (request == null || rejection.Length != 0 ||
-                request.ProfileId != "human-reproduction" || request.ExpectedOptionalMods.Count != 4)
+                request.ProfileId != "human-reproduction" || request.ExpectedOptionalMods.Count != 3)
                 throw new InvalidOperationException("Valid human reproduction request was rejected: " + rejection);
         }
 
