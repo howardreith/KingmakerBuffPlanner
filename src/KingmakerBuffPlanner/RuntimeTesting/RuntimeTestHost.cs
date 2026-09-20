@@ -31,6 +31,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private int _uiPostReconstructionUpdates;
         private LiveCampaignSaveLoader _liveSaveLoader;
         private bool _workspaceSelectionApplied;
+        private bool _workspaceProgrammaticOpen;
         private MenuRenderDiagnostic _menuDiagnostic;
         private int _liveUiPhase;
         private int _liveCycleCount;
@@ -1216,7 +1217,20 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     _liveHotkeyMarkerWritten = true;
                     _log.Info("[KBP-BOOT] runtime requests physical planner hotkey;binding=Ctrl+Shift+B;marker=hotkey-ready.json.");
                 }
-                if (!Main.HotkeyArmed || Main.HotkeyKeydownCount < 1) return false;
+                if (!Main.HotkeyArmed || Main.HotkeyKeydownCount < 1)
+                {
+                    // Foreground activation may fail in the automated
+                    // context. After a bounded wait, open the planner
+                    // through the production open path so the workspace
+                    // can be validated without physical keyboard input.
+                    if (_uiSmokeUpdates > 300 && !_workspaceProgrammaticOpen)
+                    {
+                        _workspaceProgrammaticOpen = true;
+                        _log.Info("[KBP-WORKSPACE] hotkey unavailable; opening planner programmatically.");
+                        UI.BuffPlannerUiRoot.HandlePlannerHotkey();
+                    }
+                    return false;
+                }
                 _liveUiPhase = 1;
                 return false;
             }
