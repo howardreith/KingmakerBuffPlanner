@@ -2,22 +2,27 @@
 
 ## Workspace visual qualification blockers — 2026-09-20
 
-- **BLOCKING: intermittent fully-black game presentation in automated
-  sessions.** Run casting-ws-bisect-211500 proved by bisection that the
-  screen is 100% black with the workspace OPEN and also with it CLOSED
+- **BLOCKING (classified, causally pending one connected run): fully-black
+  game presentation in automated sessions while the owner's RDP session is
+  DISCONNECTED.** Run casting-ws-bisect-211500 proved by bisection that
+  the screen is 100% black with the workspace OPEN and also with it CLOSED
   in the same session (identical luma min=max=0 across 121,264 samples,
   both capture paths, 31 attempts) — the workspace is NOT the cause.
-  This matches the previously documented menuinput-4/5 intermittent
-  focus-correlated black presentation at the main menu. Sessions vary:
-  casting-ws-visual-183000 (focused=False) and casting-ws-root-200200
-  (focused=True) captured presented frames; casting-ws-present-204500
-  and casting-ws-bisect-211500 (both focused=True) were black
-  throughout. Leading hypothesis: display/presentation path of the
-  remotely-accessed console session (the owner works through RDP;
-  disconnected console sessions may present nothing) — NOT classified,
-  evidence retained in runtime-evidence/casting-ws-bisect-211500/.
-  Workspace visual qualification cannot proceed in a black session;
-  the fail-closed gates correctly FAIL such runs.
+  casting-ws-bisect-214500 repeated the same result. Session-state
+  evidence (qwinsta/quser, read-only): the owner's session (howard, ID 2,
+  where the harness and game run — rdpclip alive) is state=Disc since the
+  9/16 RDP logon, console session unoccupied; the only two presenting
+  runs this evening (casting-ws-visual-183000 at 17:30,
+  casting-ws-root-200200 at 20:02) predate 20:45, after which every run
+  is fully black. A disconnected RDP session presents nothing to the
+  display stack, so captures read a black framebuffer while game logic
+  and the UI hierarchy demonstrably run. **Owner action that unblocks:
+  connect the RDP session (or otherwise give session 2 an active
+  display) during one guarded live-workspace-qual run;** a presenting
+  frame then also settles the open question below. This also matches the
+  menuinput-4/5 historical black captures (same machine, same
+  conditions) and the owner's own remote observation of a black game
+  window.
 - **OPEN (classification pending a presenting session):** in
   casting-ws-root-200200 the game presented (HUD visible, mean luma
   0.107) with the workspace hierarchy fully presented, yet no workspace

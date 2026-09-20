@@ -46,15 +46,19 @@ contract fallback (f3d6b48) and a three-layer regression test wired
 into Test-SourceOnly (9808102). Eight other guarded scripts carry the
 same latent defect (recorded, not swept).
 
-NEXT (exact action): run casting-ws-bisect-214500 (in flight at
-resume-writing; 750 ms wall-clock open settle) — in a presenting
-session its open/closed bisection classifies whether the workspace
-canvas draws; in a black session it re-confirms the presentation
-blocker. Then either fix the nested-canvas draw path under StaticCanvas
-or record the presentation blocker for the owner (RDP session state is
-theirs to control). The interaction checklist (browse, mixed-caster
-cards, edit+Undo, groups, resources, save/reopen) follows once one
-presented workspace frame exists.
+NEXT (exact action): casting-ws-bisect-214500 also came back fully
+black (open AND closed), and qwinsta/quser classified the blocker: the
+owner's RDP session (ID 2, where the harness runs) is DISCONNECTED and
+every run after 20:45 is black while the two presenting runs predate
+it. **OWNER ACTION REQUIRED: connect the RDP session during one guarded
+live-workspace-qual run** — a presenting frame then (a) confirms the
+causal link and (b) settles whether the workspace canvas actually draws
+(the 200200 open question; the 750 ms settle is already in). Until
+then, workspace visual qualification is blocked by environment, not by
+code; the fail-closed gates FAIL black sessions correctly. The
+interaction checklist (browse, mixed-caster cards, edit+Undo, groups,
+resources, save/reopen) follows once one presented workspace frame
+exists.
 
 ## Campaign-load repair — 2026-09-20
 
