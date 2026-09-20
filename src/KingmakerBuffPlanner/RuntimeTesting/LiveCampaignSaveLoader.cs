@@ -38,7 +38,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         {
             if (IsComplete) return;
             _updates++;
-            if (_updates > 1800) throw new TimeoutException("Live save load timed out at " + Stage + ".");
+            // 10800 frames ≈ 3 minutes at 60fps: full-user campaigns with 15 mods
+            // need significantly longer than the previous 30-second window.
+            if (_updates > 10800) throw new TimeoutException("Live save load timed out at " + Stage + ".");
             if (_state == 0)
             {
                 RegisterAfterLoadCallback();
