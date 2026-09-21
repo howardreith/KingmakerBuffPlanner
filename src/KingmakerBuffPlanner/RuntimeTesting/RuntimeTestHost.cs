@@ -79,6 +79,12 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private int _workspaceClosedWaitUpdates;
         private bool _workspaceWasOpenAtCapture;
         private long _workspaceOpenSeenMillis = -1;
+        private bool _workspaceControlRequested;
+        private string _workspaceControlLuma;
+        private string _workspaceControlSha256;
+        private float[] _workspaceControlSamples;
+        private float[] _workspaceOpenSamples;
+        private float _workspaceChangedFraction = -1f;
         private readonly System.Diagnostics.Stopwatch _workspaceCaptureElapsed =
             new System.Diagnostics.Stopwatch();
         private string _workspaceEngineScreenshotSha256;
@@ -694,8 +700,32 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                             "active;alpha>0;renderableTexts>0", presentation)
                         : RuntimeTestAssertion.Fail("workspace-hierarchy-presents",
                             "active;alpha>0;renderableTexts>0", presentation));
+                    // Matched comparison: a control frame (workspace
+                    // closed, same session/build/resolution) must exist
+                    // and the open frame must differ from it visibly —
+                    // scene animation alone is far below this fraction,
+                    // while a full-screen overlay changes most samples.
+                    bool controlCaptured = !string.IsNullOrEmpty(_workspaceControlSha256) &&
+                        !string.IsNullOrEmpty(_workspaceControlLuma);
+                    result.Assertions.Add(controlCaptured
+                        ? RuntimeTestAssertion.Pass("workspace-control-frame-captured",
+                            "end-of-frame png + sha256 + luma",
+                            "controlLuma=" + _workspaceControlLuma)
+                        : RuntimeTestAssertion.Fail("workspace-control-frame-captured",
+                            "end-of-frame png + sha256 + luma", "missing"));
+                    string changeEvidence = "changedFraction=" + _workspaceChangedFraction.ToString(
+                        "F5", System.Globalization.CultureInfo.InvariantCulture) +
+                        ";openLuma=" + (_workspaceLumaEvidence ?? "missing") +
+                        ";controlLuma=" + (_workspaceControlLuma ?? "missing");
+                    bool visibleChange = controlCaptured &&
+                        _workspaceChangedFraction >= 0.05f;
+                    result.Assertions.Add(visibleChange
+                        ? RuntimeTestAssertion.Pass("workspace-vs-control-visible-change",
+                            "changedFraction>=0.05", changeEvidence)
+                        : RuntimeTestAssertion.Fail("workspace-vs-control-visible-change",
+                            "changedFraction>=0.05", changeEvidence));
                     if (!workspaceOpen || !frameCaptured || !engineCaptured ||
-                        !nonBlack || !presented)
+                        !nonBlack || !presented || !controlCaptured || !visibleChange)
                     {
                         result.Status = "FAIL";
                         result.Stage = "workspace-visual-validation";
@@ -1368,19 +1398,40 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 if (!Main.HotkeyArmed || Main.HotkeyKeydownCount < 1)
                 {
                     // Foreground activation may fail in the automated
-                    // context. After a bounded wait, open the planner
-                    // through the production open path so the workspace
-                    // can be validated without physical keyboard input.
-                    if (_uiSmokeUpdates > 300 && !_workspaceProgrammaticOpen)
+                    // context. After a bounded wait, capture a CONTROL
+                    // frame of the presented game first, then open the
+                    // planner through the production open path so the
+                    // workspace can be validated without physical
+                    // keyboard input.
+                    if (_uiSmokeUpdates > 300 && !_workspaceProgrammaticOpen &&
+                        !_workspaceControlRequested)
                     {
-                        _workspaceProgrammaticOpen = true;
-                        _log.Info("[KBP-WORKSPACE] hotkey unavailable; opening planner programmatically.");
-                        UI.BuffPlannerUiRoot.HandlePlannerHotkey();
-                        _liveUiPhase = 1;
+                        _workspaceControlRequested = true;
+                        _log.Info("[KBP-WORKSPACE] capturing control frame before programmatic open;" +
+                            MenuRenderDiagnostic.EnvironmentSample() + ".");
+                        BeginWorkspaceCapture("workspace-control-frame.png");
+                        _liveUiPhase = 22;
                         return false;
                     }
                     return false;
                 }
+                _liveUiPhase = 1;
+                return false;
+            }
+            if (_liveUiPhase == 22)
+            {
+                // Control frame captured with the workspace closed; now
+                // open through the production path.
+                if (!ConsumeWorkspaceCapture("workspace-control-frame.png")) return false;
+                _workspaceControlLuma = _workspaceFrameCapture.Summary == null
+                    ? "missing" : _workspaceFrameCapture.Summary.Describe();
+                _workspaceControlSha256 =
+                    Hashing.Sha256(_workspaceFrameCapture.FullPath);
+                _workspaceControlSamples = _workspaceFrameCapture.Samples;
+                _workspaceProgrammaticOpen = true;
+                _log.Info("[KBP-WORKSPACE] hotkey unavailable; opening planner programmatically;controlLuma=" +
+                    _workspaceControlLuma + ".");
+                UI.BuffPlannerUiRoot.HandlePlannerHotkey();
                 _liveUiPhase = 1;
                 return false;
             }
@@ -1466,6 +1517,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     _workspaceLumaEvidence = lumaEvidence;
                     _workspacePresentationEvidence =
                         BuffPlannerUiRoot.CastingWorkspacePresentationEvidence();
+                    _workspaceOpenSamples = _workspaceFrameCapture.Samples;
                     // Root state at CAPTURE time; the bisection below closes
                     // the workspace, so phase 21 must not re-sample it.
                     _workspaceWasOpenAtCapture = BuffPlannerUiRoot.IsCastingWorkspaceOpen;
@@ -1505,19 +1557,30 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             }
             if (_liveUiPhase == 21)
             {
+                _workspaceChangedFraction = _workspaceControlSamples == null ||
+                    _workspaceOpenSamples == null ||
+                    _workspaceControlSamples.Length != _workspaceOpenSamples.Length
+                        ? -1f
+                        : MenuFrameStats.ComputeChangedFraction(
+                            _workspaceControlSamples, _workspaceOpenSamples);
                 WriteWorkspaceRenderMarker(_workspaceLumaEvidence);
                 _liveInitialCatalogEvidence = "workspace-scenario:" +
                     _request.Scenario +
                     ";workspaceRoot=" + (_workspaceWasOpenAtCapture ? "active" : "missing") +
                     ";legacyScreen=" + (BuffPlannerUiRoot.IsScreenOpen ? "open" : "closed") +
                     ";luma=" + _workspaceLumaEvidence + ";blackRecaptures=" + _workspaceBlackAttempts +
+                    ";controlLuma=" + (_workspaceControlLuma ?? "missing") +
+                    ";changedFraction=" + _workspaceChangedFraction.ToString(
+                        "F5", System.Globalization.CultureInfo.InvariantCulture) +
                     ";closedLuma=" + (_workspaceClosedLuma ?? "missing") +
                     ";" + _workspacePresentationEvidence;
                 _completed = true;
                 _log.Info("[KBP-WORKSPACE] workspace capture sequence complete;openLuma=" +
-                    _workspaceLumaEvidence + ";closedLuma=" +
-                    (_workspaceClosedLuma ?? "missing") + ";presentation=" +
-                    _workspacePresentationEvidence + ".");
+                    _workspaceLumaEvidence + ";controlLuma=" + (_workspaceControlLuma ?? "missing") +
+                    ";closedLuma=" + (_workspaceClosedLuma ?? "missing") + ";changedFraction=" +
+                    _workspaceChangedFraction.ToString("F5",
+                        System.Globalization.CultureInfo.InvariantCulture) +
+                    ";presentation=" + _workspacePresentationEvidence + ".");
                 return true;
             }
             if (_liveUiPhase == 1)
@@ -1882,6 +1945,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     MenuRenderDiagnostic.EnvironmentSample()) +
                 ",\"presentation\":" + JsonConvert.ToString(
                     _workspacePresentationEvidence ?? string.Empty) +
+                ",\"controlLuma\":" + JsonConvert.ToString(_workspaceControlLuma ?? string.Empty) +
+                ",\"controlSha256\":" + JsonConvert.ToString(
+                    _workspaceControlSha256 ?? string.Empty) +
+                ",\"changedFraction\":" + _workspaceChangedFraction.ToString(
+                    "F5", System.Globalization.CultureInfo.InvariantCulture) +
                 ",\"closedLuma\":" + JsonConvert.ToString(_workspaceClosedLuma ?? string.Empty) +
                 ",\"closedSha256\":" + JsonConvert.ToString(
                     _workspaceClosedScreenshotSha256 ?? string.Empty) +
