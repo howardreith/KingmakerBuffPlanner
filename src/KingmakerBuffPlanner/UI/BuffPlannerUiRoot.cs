@@ -185,7 +185,8 @@ namespace KingmakerBuffPlanner.UI
                 if (text != null && text.gameObject.activeInHierarchy &&
                     text.font != null && text.enabled) renderableTexts++;
             sb.Append(";texts=").Append(texts.Length)
-                .Append(";renderableTexts=").Append(renderableTexts);
+                .Append(";renderableTexts=").Append(renderableTexts)
+                .Append(";rootLayer=").Append(root.layer);
             Canvas rootCanvas = canvas == null ? null : canvas.rootCanvas;
             sb.Append(";rootCanvas=").Append(rootCanvas == null
                     ? "null" : rootCanvas.name)

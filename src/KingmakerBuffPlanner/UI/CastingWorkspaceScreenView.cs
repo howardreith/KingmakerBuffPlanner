@@ -42,6 +42,7 @@ namespace KingmakerBuffPlanner.UI
         private Button _acceptButton;
         private Button _undoButton;
         private Vector2 _cardScrollPosition;
+        private int _uiLayer;
         private bool _disposed;
 
         internal CastingWorkspaceScreenView(
@@ -95,6 +96,7 @@ namespace KingmakerBuffPlanner.UI
             RebuildCards(view);
             RebuildInspector(view);
             RebuildFooter(view);
+            PropagateUiLayer();
         }
 
         private static RectTransform RectOf(Component component)
@@ -129,6 +131,13 @@ namespace KingmakerBuffPlanner.UI
             KingmakerUiFactory.Stretch(_root);
             _nativeTheme = PlannerNativeThemeSurface.Attach(_root, nativeCanvas);
             // Theme surface stays attached for owned paper styling.
+            // The native UI camera culls by layer: the game's own canvases
+            // sit on the native canvas's layer, while factory-created
+            // GameObjects default to layer 0 and are culled from every
+            // camera-bound path (the invisibility across runs 200200
+            // through 020500).
+            _uiLayer = nativeCanvas.gameObject.layer;
+            _root.gameObject.layer = _uiLayer;
             // Modal world-input blocker behind the frame.
             RectTransform blocker = KingmakerUiFactory.CreateRect("Blocker", _root);
             KingmakerUiFactory.AddPanel(blocker,
@@ -142,6 +151,17 @@ namespace KingmakerBuffPlanner.UI
             BuildHeader(frame);
             BuildLanes(frame);
             BuildFooter(frame);
+            PropagateUiLayer();
+        }
+
+        // Every factory-created GameObject defaults to layer 0; rebuilt rows
+        // add more. The native UI camera's culling mask includes the native
+        // canvas layer only, so the whole owned tree must carry it to render.
+        private void PropagateUiLayer()
+        {
+            if (_root == null) return;
+            foreach (Transform node in _root.GetComponentsInChildren<Transform>(true))
+                node.gameObject.layer = _uiLayer;
         }
 
         private void BuildHeader(RectTransform frame)
