@@ -28,6 +28,7 @@ namespace KingmakerBuffPlanner.UI
         private BuffPlannerUiLifecycleDiagnostics _diagnostics;
         private BuffPlannerHudButtonController _hud;
         private BuffPlannerScreenController _screen;
+        private BuffPlannerInputLease _workspaceInputLease;
         private CastingWorkspaceScreenView _castingWorkspace;
         private BuffPlannerSpellbookEntryController _spellbookEntry;
         private BuffPlannerQuickExecuteController _quick;
@@ -97,7 +98,15 @@ namespace KingmakerBuffPlanner.UI
                 return;
             }
             _instance.RequestHudInstall("planner-hotkey", false);
-            _instance.CloseCastingWorkspace();
+            // The hotkey TOGGLES the casting workspace: closing must not
+            // fall through to OpenSetup, which would destroy and silently
+            // reconstruct the candidate session (review R2).
+            if (_instance._castingWorkspace != null)
+            {
+                _instance.CloseCastingWorkspace();
+                _instance._log.Info("[KBP-BOOT] casting workspace close requested;source=PlannerHotkey.");
+                return;
+            }
             if (_instance._screen.LifecycleState != PlannerScreenLifecycleState.Closed)
             {
                 _instance._screen.Close();
@@ -745,6 +754,7 @@ namespace KingmakerBuffPlanner.UI
         private bool OpenCastingWorkspace()
         {
             if (_castingWorkspace != null) return false;
+            BuffPlannerInputLease lease = null;
             try
             {
                 if (StaticCanvas.Instance == null)
@@ -752,6 +762,10 @@ namespace KingmakerBuffPlanner.UI
                     LogUiUnavailable("casting-workspace: campaign UI unavailable");
                     return false;
                 }
+                // Acquire the established game-mode/selection input lease
+                // exactly once per open, before construction; a failed
+                // acquire self-restores and fails the open (review R2).
+                lease = BuffPlannerInputLease.Acquire(new KingmakerPlannerInputBoundary());
                 _session.Refresh();
                 string campaignId = _session.Model == null ||
                     _session.Model.Profile == null
@@ -762,6 +776,8 @@ namespace KingmakerBuffPlanner.UI
                 _castingWorkspace = new CastingWorkspaceScreenView(
                     StaticCanvas.Instance, workspaceSession,
                     BuildCastingWorkspaceInputs, CloseCastingWorkspace);
+                _workspaceInputLease = lease;
+                lease = null;
                 _castingWorkspace.RefreshView();
                 _log.Info("[KBP-WORKSPACE] casting-first workspace opened;" +
                     "campaign=" + campaignId +
@@ -770,6 +786,7 @@ namespace KingmakerBuffPlanner.UI
             }
             catch (Exception exception)
             {
+                if (lease != null) lease.Dispose();
                 CloseCastingWorkspace();
                 _log.Error("[KBP-WORKSPACE] open failed.", exception);
                 LogUiUnavailable("casting-workspace:" + exception.Message);
@@ -779,7 +796,16 @@ namespace KingmakerBuffPlanner.UI
 
         private void CloseCastingWorkspace()
         {
+            if (_workspaceInputLease != null)
+            {
+                _workspaceInputLease.Dispose();
+                _workspaceInputLease = null;
+            }
             if (_castingWorkspace == null) return;
+            // Deliberate unsaved-state policy: closing discards in-memory
+            // authoring edits; the next open reloads the last explicitly
+            // saved document. The session is never silently reconstructed
+            // while open.
             _castingWorkspace.Dispose();
             _castingWorkspace = null;
         }
@@ -833,6 +859,13 @@ namespace KingmakerBuffPlanner.UI
             try
             {
                 if (_spellbookEntry != null) _spellbookEntry.Tick();
+                if (_castingWorkspace != null && Input.GetKeyDown(KeyCode.Escape))
+                {
+                    // Escape closes the owned workspace before the legacy
+                    // screen is consulted; the two are never open together.
+                    CloseCastingWorkspace();
+                    _log.Info("[KBP-BOOT] casting workspace close requested;source=Escape.");
+                }
                 if (_screen.LifecycleState != PlannerScreenLifecycleState.Closed &&
                     Input.GetKeyDown(KeyCode.Escape)) _screen.Close();
                 long screenStartedAt = RuntimePerformanceDiagnostics.BeginOperation();
@@ -1087,6 +1120,7 @@ namespace KingmakerBuffPlanner.UI
 
         private void ReleasePlayerUi()
         {
+            CloseCastingWorkspace();
             if (_screen != null) _screen.Close();
             if (_hud != null) _hud.Dispose();
         }
@@ -1096,6 +1130,7 @@ namespace KingmakerBuffPlanner.UI
             if (_disposed) return;
             _disposed = true;
             StopAllCoroutines();
+            CloseCastingWorkspace();
             if (_runtimePhysicalProbe != null) _runtimePhysicalProbe.Dispose();
             _runtimePhysicalProbe = null;
             if (_spellbookEntry != null) _spellbookEntry.Release();

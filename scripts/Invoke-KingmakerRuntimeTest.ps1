@@ -162,9 +162,22 @@ public static class KbpPhysicalInput {
   [StructLayout(LayoutKind.Sequential)] public struct Rect { public int Left; public int Top; public int Right; public int Bottom; }
   public static void KeyDown(IntPtr window, byte key) {
     if (window == IntPtr.Zero || !Activate(window)) throw new InvalidOperationException("Kingmaker foreground activation failed.");
+    if (GetForegroundWindow() != window) throw new InvalidOperationException("Kingmaker is not the verified foreground target; refusing blind input.");
     keybd_event(key, 0, 0, UIntPtr.Zero);
+    lock (HeldKeys) { if (!HeldKeys.Contains(key)) HeldKeys.Add(key); }
   }
-  public static void KeyUp(byte key) { keybd_event(key, 0, 2, UIntPtr.Zero); }
+  public static void KeyUp(byte key) {
+    keybd_event(key, 0, 2, UIntPtr.Zero);
+    lock (HeldKeys) { HeldKeys.Remove(key); }
+  }
+  // Only keys THIS harness injected are tracked; release is idempotent and
+  // never touches unrelated user-owned state.
+  private static readonly System.Collections.Generic.List<byte> HeldKeys = new System.Collections.Generic.List<byte>();
+  public static void ReleaseTrackedKeys() {
+    byte[] keys;
+    lock (HeldKeys) { keys = HeldKeys.ToArray(); HeldKeys.Clear(); }
+    foreach (byte key in keys) { keybd_event(key, 0, 2, UIntPtr.Zero); }
+  }
   public static void Move(IntPtr window, double x, double y, int unityWidth, int unityHeight) {
     if (window == IntPtr.Zero || !Activate(window)) throw new InvalidOperationException("Kingmaker foreground activation failed.");
     Rect rect;
@@ -176,12 +189,10 @@ public static class KbpPhysicalInput {
     if (!ClientToScreen(window, ref point) || !SetCursorPos(point.X, point.Y)) throw new InvalidOperationException("Kingmaker cursor movement failed.");
   }
   private static bool Activate(IntPtr window) {
-    if (SetForegroundWindow(window)) return true;
-    // Foreground-lock workaround: a neutral ALT tap registers shell input,
-    // after which activation from a background process is permitted.
-    keybd_event(0x12, 0, 0, UIntPtr.Zero);
-    keybd_event(0x12, 0, 2, UIntPtr.Zero);
-    System.Threading.Thread.Sleep(50);
+    if (GetForegroundWindow() == window) return true;
+    // Foreground activation ONLY: no synthetic shell input of any kind.
+    // If the OS foreground lock refuses, delivery fails closed rather than
+    // injecting keys into whichever window currently owns focus.
     return SetForegroundWindow(window);
   }
   public static void Click() {
@@ -285,11 +296,13 @@ public static class KbpPhysicalInput {
                 Write-KbpJsonAtomic (Join-Path $evidence 'orchestration.json') $orchestration
             }
             catch {
+                [KbpPhysicalInput]::ReleaseTrackedKeys()
                 $orchestration.lastUmmRecoveryError = $_.Exception.Message
             }
         }
         if (($Scenario -ceq 'live-ui-bootstrap' -or $Scenario -ceq 'live-workspace-qual') -and -not $plannerHotkeySent -and
-            (Test-Path -LiteralPath $hotkeyMarker -PathType Leaf)) {
+            (Test-Path -LiteralPath $hotkeyMarker -PathType Leaf) -and
+            -not (Test-Path -LiteralPath (Join-Path $evidence 'programmatic-open.json') -PathType Leaf)) {
             $process.Refresh()
             try {
                 [KbpPhysicalInput]::KeyDown($process.MainWindowHandle, [byte]0x11)
@@ -305,8 +318,9 @@ public static class KbpPhysicalInput {
                 Write-KbpJsonAtomic (Join-Path $evidence 'orchestration.json') $orchestration
             }
             catch {
-                # All three keydowns must land together or not at all; retry
-                # the whole chord on later polls.
+                # Any key this harness still holds is released before the
+                # retry; all-or-nothing is an effect, never a leaked hold.
+                [KbpPhysicalInput]::ReleaseTrackedKeys()
                 $orchestration.lastHotkeyError = $_.Exception.Message
             }
         }
@@ -344,6 +358,7 @@ public static class KbpPhysicalInput {
                         $delivered = $true
                     }
                     catch {
+                        [KbpPhysicalInput]::ReleaseTrackedKeys()
                         $deliveryError = $_.Exception.Message
                         $physicalDeliveryAttempts[$actionId]++
                         Start-Sleep -Milliseconds 250

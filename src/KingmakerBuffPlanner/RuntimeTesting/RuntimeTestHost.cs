@@ -85,6 +85,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private float[] _workspaceControlSamples;
         private float[] _workspaceOpenSamples;
         private float _workspaceChangedFraction = -1f;
+        private string _workspaceOpenLumaSummary = "missing";
+        private bool _workspaceOpenNonBlack;
         private MenuFrameCapture _workspaceCameraOpenCapture;
         private MenuFrameCapture _workspaceCameraControlCapture;
         private string _workspaceCameraOpenLuma = "missing";
@@ -676,17 +678,17 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                             "engine png + sha256", _workspaceEngineScreenshotSha256)
                         : RuntimeTestAssertion.Fail("workspace-frame-engine-capture",
                             "engine png + sha256", "missing"));
-                    string lumaEvidence = _workspaceFrameCapture == null ||
-                        _workspaceFrameCapture.Summary == null
-                            ? "missing" : _workspaceFrameCapture.Summary.Describe();
-                    bool nonBlack = _workspaceFrameCapture != null &&
-                        _workspaceFrameCapture.Summary != null &&
-                        _workspaceFrameCapture.Summary.IsNonBlack;
+                    string lumaEvidence = _workspaceOpenLumaSummary;
+                    bool nonBlack = _workspaceOpenNonBlack;
                     result.Assertions.Add(nonBlack
                         ? RuntimeTestAssertion.Pass("workspace-frame-nonblack",
-                            "blackFraction<0.98", lumaEvidence)
+                            "blackFraction<0.98 (open frame " +
+                                (_liveRenderScreenshotSha256 ?? string.Empty) + ")",
+                            lumaEvidence)
                         : RuntimeTestAssertion.Fail("workspace-frame-nonblack",
-                            "blackFraction<0.98", lumaEvidence));
+                            "blackFraction<0.98 (open frame " +
+                                (_liveRenderScreenshotSha256 ?? string.Empty) + ")",
+                            lumaEvidence));
                     // A non-null view field plus a non-black frame proved
                     // insufficient (casting-ws-root-200200: object present,
                     // frame showed only the game HUD). The hierarchy itself
@@ -1390,6 +1392,21 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 // UMM. Capture the gameplay state that the planner is actually opening
                 // from, not the transient pre-dismiss menu state.
                 BuffPlannerUiRoot.CaptureRuntimeBaseline(true);
+                if (!_liveHotkeyMarkerWritten &&
+                    RuntimeTestProtocol.IsWorkspaceScenario(_request.Scenario) &&
+                    !_workspaceControlRequested)
+                {
+                    // The matched control frame is captured BEFORE the
+                    // hotkey request marker exists, so neither opening route
+                    // (physical or programmatic) can bypass it (review R6).
+                    _workspaceControlRequested = true;
+                    _log.Info("[KBP-WORKSPACE] capturing control frame before hotkey request;" +
+                        MenuRenderDiagnostic.EnvironmentSample() + ".");
+                    BeginWorkspaceCapture("workspace-control-frame.png");
+                    BeginWorkspaceCameraCapture("workspace-camera-control.png", true);
+                    _liveUiPhase = 24;
+                    return false;
+                }
                 if (!_liveHotkeyMarkerWritten)
                 {
                     AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory, "hotkey-ready.json"),
@@ -1402,20 +1419,12 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 if (!Main.HotkeyArmed || Main.HotkeyKeydownCount < 1)
                 {
                     // Foreground activation may fail in the automated
-                    // context. After a bounded wait, capture a CONTROL
-                    // frame of the presented game first, then open the
-                    // planner through the production open path so the
-                    // workspace can be validated without physical
-                    // keyboard input.
+                    // context. After a bounded wait (control frame already
+                    // captured at the hotkey-request point), open through
+                    // the production path without physical input.
                     if (_uiSmokeUpdates > 300 && !_workspaceProgrammaticOpen &&
-                        !_workspaceControlRequested)
+                        _workspaceControlRequested)
                     {
-                        _workspaceControlRequested = true;
-                        _log.Info("[KBP-WORKSPACE] capturing control frame before programmatic open;" +
-                            MenuRenderDiagnostic.EnvironmentSample() + ".");
-                        BeginWorkspaceCapture("workspace-control-frame.png");
-                        BeginWorkspaceCameraCapture(
-                            "workspace-camera-control.png", true);
                         _liveUiPhase = 22;
                         return false;
                     }
@@ -1424,17 +1433,37 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 _liveUiPhase = 1;
                 return false;
             }
-            if (_liveUiPhase == 22)
+            if (_liveUiPhase == 24)
             {
-                // Control frame captured with the workspace closed; now
-                // open through the production path.
+                // Control frame consumed; NOW the hotkey request marker is
+                // written and phase 0 resumes its normal armed/fallback flow.
                 if (!ConsumeWorkspaceCapture("workspace-control-frame.png")) return false;
                 _workspaceControlLuma = _workspaceFrameCapture.Summary == null
                     ? "missing" : _workspaceFrameCapture.Summary.Describe();
                 _workspaceControlSha256 =
                     Hashing.Sha256(_workspaceFrameCapture.FullPath);
                 _workspaceControlSamples = _workspaceFrameCapture.Samples;
+                AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory,
+                    "hotkey-ready.json"),
+                    "{\"runId\":\"" + _request.RunId + "\",\"armed\":" +
+                    (Main.HotkeyArmed ? "true" : "false") + ",\"binding\":\"Ctrl+Shift+B\",\"snapshot\":" +
+                    JsonConvert.ToString(BuffPlannerUiRoot.GetSnapshot()) + "}" + Environment.NewLine);
+                _liveHotkeyMarkerWritten = true;
+                _log.Info("[KBP-BOOT] runtime requests physical planner hotkey;binding=Ctrl+Shift+B;marker=hotkey-ready.json;controlCapturedFirst=True.");
+                _liveUiPhase = 0;
+                return false;
+            }
+            if (_liveUiPhase == 22)
+            {
+                // Control frame was already captured before the hotkey
+                // request (phase 24); open through the production path and
+                // mark the fallback so the launcher suppresses its pending
+                // physical chord (terminal coordination, review R5).
                 _workspaceProgrammaticOpen = true;
+                AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory,
+                    "programmatic-open.json"),
+                    "{\"runId\":\"" + _request.RunId +
+                    "\",\"stage\":\"programmatic-open\"}" + Environment.NewLine);
                 _log.Info("[KBP-WORKSPACE] hotkey unavailable; opening planner programmatically;controlLuma=" +
                     _workspaceControlLuma + ".");
                 UI.BuffPlannerUiRoot.HandlePlannerHotkey();
@@ -1526,6 +1555,14 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     _workspacePresentationEvidence =
                         BuffPlannerUiRoot.CastingWorkspacePresentationEvidence();
                     _workspaceOpenSamples = _workspaceFrameCapture.Samples;
+                    // Immutable open-frame record: later phases (bisection
+                    // close) reuse _workspaceFrameCapture, so the nonblack
+                    // assertion must read the OPEN frame's stored summary,
+                    // bound to the open hash (review C3).
+                    _workspaceOpenLumaSummary = _workspaceFrameCapture.Summary == null
+                        ? "missing" : _workspaceFrameCapture.Summary.Describe();
+                    _workspaceOpenNonBlack = _workspaceFrameCapture.Summary != null &&
+                        _workspaceFrameCapture.Summary.IsNonBlack;
                     // Root state at CAPTURE time; the bisection below closes
                     // the workspace, so phase 21 must not re-sample it.
                     _workspaceWasOpenAtCapture = BuffPlannerUiRoot.IsCastingWorkspaceOpen;

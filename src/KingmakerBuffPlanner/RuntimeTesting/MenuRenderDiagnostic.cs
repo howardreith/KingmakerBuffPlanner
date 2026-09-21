@@ -520,6 +520,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         internal float[] Samples { get; set; }
         internal Exception Failure { get; set; }
         internal bool Handled { get; set; }
+        internal string RestorationVerdict { get; set; }
     }
 
     // Dedicated DontDestroyOnLoad host so the diagnostic's readback runs at
@@ -559,6 +560,21 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             DontDestroyOnLoad(host);
         }
 
+        // Failure-injection seam for the restoration contract (review R4):
+        // the runtime scenario sets a mode before a capture; the routine
+        // throws at that point exactly once, and the restoration
+        // self-verification must still report clean.
+        internal enum CameraCaptureFailureMode
+        {
+            None,
+            AfterTargetAssignment,
+            DuringRender,
+            DuringReadback
+        }
+
+        internal static volatile CameraCaptureFailureMode InjectFailureMode =
+            CameraCaptureFailureMode.None;
+
         private static IEnumerator CameraCaptureRoutine(string path,
             Action<MenuFrameCapture, Exception> completion, ModLog log)
         {
@@ -569,11 +585,20 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 FullPath = path
             };
             Exception failure = null;
+            RenderTexture previousActive = RenderTexture.active;
+            List<KeyValuePair<Camera, RenderTexture>> restore = null;
+            RenderTexture temporary = null;
+            Texture2D read = null;
+            var cleanupFailures = new List<string>();
             try
             {
+                // Screen-targeting cameras only: cameras already rendering
+                // to their own offscreen targets keep those targets, so the
+                // diagnostic composition cannot disturb them (review R4).
                 Camera[] cameras = UnityEngine.Object.FindObjectsOfType<Camera>()
                     .Where(camera => camera != null && camera.enabled &&
-                        camera.gameObject.activeInHierarchy)
+                        camera.gameObject.activeInHierarchy &&
+                        camera.targetTexture == null)
                     .OrderBy(camera => camera.depth)
                     .ToArray();
                 var inventory = new StringBuilder();
@@ -583,15 +608,14 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     inventory.Append(camera.name).Append("/depth=")
                         .Append(camera.depth.ToString("F1",
                             CultureInfo.InvariantCulture))
-                        .Append("/mode=").Append(camera.targetTexture == null
-                            ? "screen" : "rt")
                         .Append("/rect=")
                         .Append(camera.pixelWidth.ToString(
                             CultureInfo.InvariantCulture)).Append("x")
                         .Append(camera.pixelHeight.ToString(
                             CultureInfo.InvariantCulture));
                 }
-                var canvases = new StringBuilder();                foreach (Canvas canvas in UnityEngine.Object
+                var canvases = new StringBuilder();
+                foreach (Canvas canvas in UnityEngine.Object
                     .FindObjectsOfType<Canvas>()
                     .Where(canvas => canvas != null && canvas.isActiveAndEnabled &&
                         canvas.transform.parent == null)
@@ -605,31 +629,41 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         .Append("/order=").Append(canvas.sortingOrder);
                 }
                 if (log != null)
-                    log.Info("[KBP-CAPTURE] camera-path inventory;cameras=" +
+                    log.Info("[KBP-CAPTURE] camera-path inventory;screenCameras=" +
                         inventory + ";canvases=" + canvases + ".");
                 int width = Screen.width;
                 int height = Screen.height;
-                RenderTexture texture = RenderTexture.GetTemporary(
+                temporary = RenderTexture.GetTemporary(
                     width, height, 24, RenderTextureFormat.ARGB32);
-                var restore = new List<KeyValuePair<Camera, RenderTexture>>();
+                restore = new List<KeyValuePair<Camera, RenderTexture>>();
                 foreach (Camera camera in cameras)
                 {
                     restore.Add(new KeyValuePair<Camera, RenderTexture>(
                         camera, camera.targetTexture));
-                    camera.targetTexture = texture;
+                    camera.targetTexture = temporary;
                 }
-                foreach (Camera camera in cameras) camera.Render();
-                foreach (KeyValuePair<Camera, RenderTexture> pair in restore)
-                    pair.Key.targetTexture = pair.Value;
-                RenderTexture.active = texture;
-                Texture2D read = new Texture2D(width, height, TextureFormat.RGB24, false);
+                CameraCaptureFailureMode injected = InjectFailureMode;
+                InjectFailureMode = CameraCaptureFailureMode.None;
+                if (injected == CameraCaptureFailureMode.AfterTargetAssignment)
+                    throw new InvalidOperationException(
+                        "injected:after-target-assignment");
+                for (int cameraIndex = 0; cameraIndex < cameras.Length; cameraIndex++)
+                {
+                    if (injected == CameraCaptureFailureMode.DuringRender &&
+                        cameraIndex == cameras.Length - 1)
+                        throw new InvalidOperationException("injected:during-render");
+                    cameras[cameraIndex].Render();
+                }
+                RenderTexture.active = temporary;
+                if (injected == CameraCaptureFailureMode.DuringReadback)
+                    throw new InvalidOperationException("injected:during-readback");
+                read = new Texture2D(width, height, TextureFormat.RGB24, false);
                 read.ReadPixels(new Rect(0, 0, width, height), 0, 0, false);
                 read.Apply(false, false);
-                RenderTexture.active = null;
-                RenderTexture.ReleaseTemporary(texture);
                 Color[] pixels = read.GetPixels();
                 byte[] png = read.EncodeToPNG();
                 UnityEngine.Object.Destroy(read);
+                read = null;
                 File.WriteAllBytes(path, png);
                 int stride = Math.Max(1, pixels.Length / 120000);
                 var luma = new List<float>();
@@ -645,6 +679,69 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             catch (Exception exception)
             {
                 failure = exception;
+            }
+            finally
+            {
+                // Restoration runs for every owned change even when another
+                // cleanup step fails; the primary error is preserved and
+                // secondary failures are recorded (review R4).
+                if (restore != null)
+                {
+                    foreach (KeyValuePair<Camera, RenderTexture> pair in restore)
+                    {
+                        try { pair.Key.targetTexture = pair.Value; }
+                        catch (Exception cleanup)
+                        {
+                            cleanupFailures.Add("target:" + pair.Key.name + ":" +
+                                cleanup.Message);
+                        }
+                    }
+                }
+                try { RenderTexture.active = previousActive; }
+                catch (Exception cleanup)
+                {
+                    cleanupFailures.Add("active:" + cleanup.Message);
+                }
+                if (temporary != null)
+                {
+                    try { RenderTexture.ReleaseTemporary(temporary); }
+                    catch (Exception cleanup)
+                    {
+                        cleanupFailures.Add("temporary:" + cleanup.Message);
+                    }
+                }
+                if (read != null)
+                {
+                    try { UnityEngine.Object.Destroy(read); }
+                    catch (Exception cleanup)
+                    {
+                        cleanupFailures.Add("read:" + cleanup.Message);
+                    }
+                }
+                // Self-verification: an unclean restoration is a reported
+                // failure, never silent state leakage.
+                bool targetsRestored = true;
+                if (restore != null)
+                {
+                    foreach (KeyValuePair<Camera, RenderTexture> pair in restore)
+                        if (pair.Key != null && pair.Key.targetTexture != pair.Value)
+                            targetsRestored = false;
+                }
+                bool activeRestored = RenderTexture.active == previousActive;
+                string verdict = "targetsRestored=" + targetsRestored +
+                    ";activeRestored=" + activeRestored +
+                    ";cleanupFailures=" + cleanupFailures.Count;
+                if (log != null)
+                    log.Info("[KBP-CAPTURE] camera-path restoration;" + verdict +
+                        (cleanupFailures.Count == 0 ? string.Empty
+                            : ";detail=" + string.Join("|", cleanupFailures.ToArray())) + ".");
+                if (!targetsRestored || !activeRestored || cleanupFailures.Count != 0)
+                {
+                    capture.RestorationVerdict = verdict;
+                    if (failure == null)
+                        failure = new InvalidOperationException(
+                            "camera capture restoration unclean;" + verdict);
+                }
             }
             completion(capture, failure);
         }
