@@ -55,10 +55,17 @@ try {
 }
 catch [NullReferenceException] {
     # powershell.exe -File cannot evaluate a confirmation decision in a
-    # top-level script (NullReferenceException; -WhatIf decisions and all
-    # -Command/direct invocations work). A decision that cannot be
-    # evaluated is a REFUSED decision: never fall through to staging.
-    $decisionFailure = $_.Exception
+    # top-level script (NullReferenceException; -Command/direct
+    # invocations work). A decision that cannot be evaluated is a
+    # REFUSED decision for real runs. A -WhatIf request is exempt only
+    # because its outcome is deterministically negative: honoring it can
+    # never create permission to stage, deploy, or launch.
+    if ([bool]$WhatIfPreference) {
+        $shouldProceed = $false
+    }
+    else {
+        $decisionFailure = $_.Exception
+    }
 }
 if ($null -ne $decisionFailure) {
     throw ("Runtime launch decision could not be evaluated under powershell.exe -File (" +
