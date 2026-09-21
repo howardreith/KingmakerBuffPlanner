@@ -51,12 +51,16 @@ and its current blocker is documented below.
 
 - **Launcher `-File` crash** — `scripts/Invoke-KingmakerRuntimeTest.ps1`:
   a top-level `$PSCmdlet.ShouldProcess` throws NullReferenceException
-  under `powershell.exe -File` when confirmation must be evaluated
+  under `powershell.exe -File` on both the WhatIf and confirmation paths
   (reproduced minimally; works under `-Command`/direct invocation).
-  Regression: `scripts/Test-RuntimeLauncherFileWhatIf.ps1` (three
-  layers, wired into `Test-SourceOnly.ps1`). NOTE per review: the
-  current catch falls back to the WhatIf contract; a fail-closed
-  refusal is the intended hardening — review the exact catch.
+  Guard contract: a decision that cannot be evaluated is a REFUSED
+  decision for real runs (error propagation, nothing staged); a `-WhatIf`
+  request is honored because its outcome is deterministically negative
+  and can never create permission. Regression:
+  `scripts/Test-RuntimeLauncherFileWhatIf.ps1` (four layers: pattern
+  refusal, guard-shape source check, `-File -WhatIf` purity, and a REAL
+  `-File` run proving non-zero exit plus zero mutation of every
+  protected root; wired into `Test-SourceOnly.ps1`).
 - **Workspace routing** —
   `src/KingmakerBuffPlanner/RuntimeTesting/RuntimeTestHost.cs`: the
   workspace dev-selection enable sat dead twice (inside the non-live
