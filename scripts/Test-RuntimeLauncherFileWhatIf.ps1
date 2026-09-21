@@ -34,9 +34,14 @@ if ($null -ne $decisionFailure) {
 if ($shouldProceed) { Write-Host 'PATTERN=proceeded' } else { Write-Host 'PATTERN=no-op' }
 '@ | Set-Content -LiteralPath $pattern -Encoding ASCII
 try {
+    # The refused child writes its error to stderr; under Stop PS 5.1
+    # turns the first redirected stderr line into a terminating error.
+    $ErrorActionPreference = 'Continue'
     $patternOutput = (& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $pattern 2>&1) -join ' '
-    if ($LASTEXITCODE -eq 0 -or $patternOutput -like '*PATTERN=proceeded*') {
-        throw "ShouldProcess -File pattern check must refuse; got exit $LASTEXITCODE.: $patternOutput"
+    $patternExit = $LASTEXITCODE
+    $ErrorActionPreference = 'Stop'
+    if ($patternExit -eq 0 -or $patternOutput -like '*PATTERN=proceeded*') {
+        throw "ShouldProcess -File pattern check must refuse; got exit $patternExit.: $patternOutput"
     }
     if ($patternOutput -notlike '*refusing*') {
         throw "ShouldProcess -File pattern check lacks refusal propagation.: $patternOutput"
