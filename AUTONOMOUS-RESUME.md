@@ -1,6 +1,47 @@
 # AUTONOMOUS-RESUME — top section is current; planning/CASTING-FIRST-MIGRATION-STATUS.md is the per-checkpoint tracker.
 
-## Review response: all findings addressed; live authoring PASSES — 2026-09-21 (LATEST)
+## Follow-up review answered; full display-path acceptance PASS — 2026-09-21 (LATEST)
+
+The second review (F1-F7 + C1 at head 196389f) is answered at `0a7229e`
+(pushed, verified): F1 Add self-resolves the exact ability+spellbook and
+re-resolves on (source,caster) change (a UI draft with no ability
+refuses with an explanation; deliberately unresolved intent keeps an
+explicit ability for the plan to disclose); F2 the live scenario drives
+REAL view buttons with no private draft fields and verifies browse,
+Undo, and reopen by FULL authored-intent signatures with a clean dirty
+state; F3 SetDraftTargeting is a validate-first coherent shape command
+wired to every targeting callback; F4 Done-navigation, focus cleanup,
+focused enhancement editing; F5 per-source labels and no silent
+truncation; F6 the session survives close/reopen with dirty tracking
+(teardown is the logged discard); F7 clicks revalidate foreground +
+cursor-inside-client immediately before injection and programmatic UMM
+close is a terminal state for every pending Escape; C1 Apply normalizes
+its scope once.
+
+**Run casting-ws-controls-051500: FULL PASS on the DISPLAY path** (the
+owner's RDP session was connected — rdp-tcp#1 Active): all nine
+workspace assertions green — non-black open frame (mean 0.73 vs control
+0.14, changedFraction 0.95), all three castings authored through real
+button invocations, undoIntentRestored=True, reopen preserved the full
+signature with dirty=False. Transaction restored and verified. Frames
+curated in docs/evidence.
+
+Gates: source 42/42; protocol **221/221**; harness 27/27; WhatIf 5/5;
+launcher -File 4/4; fixture 3/3; rollback 4/4; publisher 3/3.
+
+OPEN (honest): launcher physical-input seam acceptance (real pointer/
+keyboard delivery under supervision); §5 native aesthetic pass
+(parchment donors, states, scroll, tooltips, sound); caster GUID
+display names (UnitSnapshot plumbing); exact rods/native adapters;
+native casting remains disabled. Group-mode and large-catalog UI cases
+run at the protocol layer; live group authoring follows with the
+aesthetic pass.
+
+NEXT (exact action): push this checkpoint and update PR #2; then the
+UnitSnapshot display-name plumbing, the §5 native-presentation pass,
+and a supervised physical-input acceptance run with the owner connected.
+
+## Review response: all findings addressed; live authoring PASSES — 2026-09-21
 
 Branch `codex/kingmaker-buff-planner-casting-first` (draft PR #2,
 https://github.com/howardreith/KingmakerBuffPlanner/pull/2). The
