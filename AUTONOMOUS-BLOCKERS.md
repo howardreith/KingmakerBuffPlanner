@@ -2,27 +2,25 @@
 
 ## Workspace visual qualification blockers — 2026-09-20
 
-- **BLOCKING (classified, causally pending one connected run): fully-black
-  game presentation in automated sessions while the owner's RDP session is
-  DISCONNECTED.** Run casting-ws-bisect-211500 proved by bisection that
-  the screen is 100% black with the workspace OPEN and also with it CLOSED
-  in the same session (identical luma min=max=0 across 121,264 samples,
-  both capture paths, 31 attempts) — the workspace is NOT the cause.
-  casting-ws-bisect-214500 repeated the same result. Session-state
-  evidence (qwinsta/quser, read-only): the owner's session (howard, ID 2,
-  where the harness and game run — rdpclip alive) is state=Disc since the
-  9/16 RDP logon, console session unoccupied; the only two presenting
-  runs this evening (casting-ws-visual-183000 at 17:30,
-  casting-ws-root-200200 at 20:02) predate 20:45, after which every run
-  is fully black. A disconnected RDP session presents nothing to the
-  display stack, so captures read a black framebuffer while game logic
-  and the UI hierarchy demonstrably run. **Owner action that unblocks:
-  connect the RDP session (or otherwise give session 2 an active
-  display) during one guarded live-workspace-qual run;** a presenting
-  frame then also settles the open question below. This also matches the
-  menuinput-4/5 historical black captures (same machine, same
-  conditions) and the owner's own remote observation of a black game
-  window.
+- **BLOCKING (hypothesis intact, connected test not yet achieved):
+  fully-black captures whenever the owner's RDP session is disconnected
+  during the capture phase.** Bisection runs casting-ws-bisect-211500 /
+  -214500: open AND closed frames 100% black (workspace exonerated).
+  Run casting-ws-connected-224000 was STARTED with the session Active
+  (rdp-tcp#119), but the session disconnected DURING the run (state Disc
+  by completion; the rdp-tcp connection vanished) and all three captures
+  — control, open, closed — were 100% black (30 KB PNGs). Presenting
+  runs so far (17:30, 20:02) both occurred while the owner was
+  connected; every black run coincides with a disconnected session.
+  `Application.isFocused=True` in black runs does not discriminate
+  (stale focus is expected in a disconnected session). A VALID test
+  requires the owner connected and watching through the ~2-minute
+  capture window, then their observation of the game window decides the
+  lane: game rendered + black captures = automated capture-pipeline
+  repair; game also black on their screen = display/presentation
+  environment failure (stop launching; owner controls session/display
+  state). Owner observation also supplies separately labeled visual
+  evidence per the mission if captures stay broken.
 - **OPEN (classification pending a presenting session):** in
   casting-ws-root-200200 the game presented (HUD visible, mean luma
   0.107) with the workspace hierarchy fully presented, yet no workspace

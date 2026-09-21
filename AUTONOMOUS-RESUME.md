@@ -46,19 +46,21 @@ contract fallback (f3d6b48) and a three-layer regression test wired
 into Test-SourceOnly (9808102). Eight other guarded scripts carry the
 same latent defect (recorded, not swept).
 
-NEXT (exact action): casting-ws-bisect-214500 also came back fully
-black (open AND closed), and qwinsta/quser classified the blocker: the
-owner's RDP session (ID 2, where the harness runs) is DISCONNECTED and
-every run after 20:45 is black while the two presenting runs predate
-it. **OWNER ACTION REQUIRED: connect the RDP session during one guarded
-live-workspace-qual run** — a presenting frame then (a) confirms the
-causal link and (b) settles whether the workspace canvas actually draws
-(the 200200 open question; the 750 ms settle is already in). Until
-then, workspace visual qualification is blocked by environment, not by
-code; the fail-closed gates FAIL black sessions correctly. The
-interaction checklist (browse, mixed-caster cards, edit+Undo, groups,
-resources, save/reopen) follows once one presented workspace frame
-exists.
+NEXT (exact action): the connected-session test has NOT yet been
+achieved — casting-ws-connected-224000 started with the owner's RDP
+session Active but it disconnected mid-run; all three captures (control,
+open, closed) were fully black, consistent with the disconnection
+hypothesis. The matched-comparison scenario (control frame before the
+production open, changed-fraction gate, return capture) is implemented,
+gated, and green through source gates at `a2d4b30`. REQUIRED FROM OWNER:
+reconnect the RDP session and STAY connected through one ~8-minute
+guarded run while watching the game window; then report what was seen —
+game rendered (capture-pipeline repair lane) vs game also black
+(environment/display lane, stop launching). While connected, the owner's
+own screenshot of the game window is separately labeled visual evidence
+if automated captures stay broken. The interaction checklist (browse,
+mixed-caster cards, edit+Undo, groups, resources, save/reopen) follows
+once one presented workspace frame exists.
 
 ## Campaign-load repair — 2026-09-20
 
