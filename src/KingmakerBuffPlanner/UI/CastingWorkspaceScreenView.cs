@@ -146,7 +146,7 @@ namespace KingmakerBuffPlanner.UI
             _scopeLabel = KingmakerUiFactory.CreateText(
                 "Scope", header, _theme, "Configure next casting", 15, TextAnchor.MiddleRight);
             _scopeLabel.fontStyle = FontStyle.Bold;
-            KingmakerUiFactory.SetAnchors(_scopeLabel.rectTransform, 0f, 1f, 0f, 0f);
+            KingmakerUiFactory.SetAnchors(_scopeLabel.rectTransform, 0f, 0f, 1f, 0f);
             _scopeLabel.rectTransform.sizeDelta = new Vector2(0f, 18f);
             _scopeLabel.rectTransform.anchoredPosition = Vector2.zero;
         }
@@ -155,19 +155,19 @@ namespace KingmakerBuffPlanner.UI
         {
             // Caster lane (left).
             RectTransform casters = KingmakerUiFactory.CreateRect("Casters", frame);
-            KingmakerUiFactory.SetAnchors(casters, 0f, 0.28f, 0.06f, 0.88f);
+            KingmakerUiFactory.SetAnchors(casters, 0f, 0.06f, 0.28f, 0.88f);
             casters.offsetMin = new Vector2(10f, 0f);
             casters.offsetMax = new Vector2(-4f, 0f);
             _casterContent = BuildLanePanel(casters, "Casters");
             // Casting-card lane (center).
             RectTransform cards = KingmakerUiFactory.CreateRect("Cards", frame);
-            KingmakerUiFactory.SetAnchors(cards, 0.28f, 0.72f, 0.06f, 0.88f);
+            KingmakerUiFactory.SetAnchors(cards, 0.28f, 0.06f, 0.72f, 0.88f);
             cards.offsetMin = new Vector2(4f, 0f);
             cards.offsetMax = new Vector2(-4f, 0f);
             _cardContent = BuildLanePanel(cards, "Castings");
             // Inspector (right).
             RectTransform inspector = KingmakerUiFactory.CreateRect("Inspector", frame);
-            KingmakerUiFactory.SetAnchors(inspector, 0.72f, 1f, 0.06f, 0.88f);
+            KingmakerUiFactory.SetAnchors(inspector, 0.72f, 0.06f, 1f, 0.88f);
             inspector.offsetMin = new Vector2(4f, 0f);
             inspector.offsetMax = new Vector2(-10f, 0f);
             _inspectorContent = BuildLanePanel(inspector, "Inspector");
@@ -183,14 +183,14 @@ namespace KingmakerBuffPlanner.UI
             RectTransform content;
             KingmakerUiFactory.CreateScrollView(
                 "Scroll", lane, _theme, out content, 12f);
-            KingmakerUiFactory.SetAnchors(content, 0f, 1f, 0f, 1f);
+            KingmakerUiFactory.SetAnchors(content, 0f, 0f, 1f, 1f);
             return content;
         }
 
         private void BuildFooter(RectTransform frame)
         {
             RectTransform footer = KingmakerUiFactory.CreateRect("Footer", frame);
-            KingmakerUiFactory.SetAnchors(footer, 0f, 1f, 0f, 0.06f);
+            KingmakerUiFactory.SetAnchors(footer, 0f, 0f, 1f, 0.06f);
             footer.offsetMin = Vector2.zero;
             footer.offsetMax = Vector2.zero;
             _footerBudget = KingmakerUiFactory.CreateText(
@@ -200,7 +200,7 @@ namespace KingmakerBuffPlanner.UI
             _footerResult = KingmakerUiFactory.CreateText(
                 "Result", footer, _theme, string.Empty, 14, TextAnchor.MiddleLeft);
             _footerResult.color = _theme.MutedBrownText;
-            KingmakerUiFactory.SetAnchors(_footerResult.rectTransform, 0f, 0.55f, 1f, 1f);
+            KingmakerUiFactory.SetAnchors(_footerResult.rectTransform, 0f, 1f, 0.55f, 1f);
             _footerResult.rectTransform.sizeDelta = new Vector2(0f, 16f);
             _footerResult.rectTransform.anchoredPosition = Vector2.zero;
             _undoButton = KingmakerUiFactory.CreateButton(
@@ -209,7 +209,7 @@ namespace KingmakerBuffPlanner.UI
                     _session.Undo();
                     RefreshView();
                 }));
-            KingmakerUiFactory.SetAnchors(RectOf(_undoButton), 0.62f, 0.70f, 0.2f, 0.8f);
+            KingmakerUiFactory.SetAnchors(RectOf(_undoButton), 0.62f, 0.2f, 0.70f, 0.8f);
             _acceptButton = KingmakerUiFactory.CreateButton(
                 "Accept", footer, _theme, "Accept Plan", () => Click(() =>
                 {
@@ -218,11 +218,11 @@ namespace KingmakerBuffPlanner.UI
                         ? "Plan accepted."
                         : "Acceptance refused: plan changed or not presented.";
                 }));
-            KingmakerUiFactory.SetAnchors(RectOf(_acceptButton), 0.71f, 0.83f, 0.15f, 0.85f);
+            KingmakerUiFactory.SetAnchors(RectOf(_acceptButton), 0.71f, 0.15f, 0.83f, 0.85f);
             _applyButton = KingmakerUiFactory.CreateButton(
                 "Apply", footer, _theme, "Review & Apply", () => Click(() =>
                     RunApply(CastingApplyMode.Ordinary)));
-            KingmakerUiFactory.SetAnchors(RectOf(_applyButton), 0.84f, 0.97f, 0.15f, 0.85f);
+            KingmakerUiFactory.SetAnchors(RectOf(_applyButton), 0.84f, 0.15f, 0.97f, 0.85f);
             _readyOnlyButton = KingmakerUiFactory.CreateButton(
                 "ReadyOnly", footer, _theme, "Ready Casts Only", () => Click(() =>
                     RunApply(CastingApplyMode.ReadyCastsOnly)));
@@ -285,7 +285,7 @@ namespace KingmakerBuffPlanner.UI
                         _session.SelectCaster(row.UnitId);
                         RefreshView();
                     }));
-                KingmakerUiFactory.SetAnchors(RectOf(select), 0.72f, 0.98f, 0.15f, 0.85f);
+                KingmakerUiFactory.SetAnchors(RectOf(select), 0.72f, 0.15f, 0.98f, 0.85f);
                 if (row.ReadinessReasons.Count != 0)
                 {
                     Text reasons = KingmakerUiFactory.CreateText(
@@ -293,7 +293,7 @@ namespace KingmakerBuffPlanner.UI
                         string.Join(", ", row.ReadinessReasons), 12,
                         TextAnchor.MiddleLeft);
                     reasons.color = _theme.MutedBrownText;
-                    KingmakerUiFactory.SetAnchors(reasons.rectTransform, 0f, 0.7f, 0f, 0.34f);
+                    KingmakerUiFactory.SetAnchors(reasons.rectTransform, 0f, 0f, 0.7f, 0.34f);
                     reasons.rectTransform.offsetMin = new Vector2(8f, 2f);
                 }
             }
@@ -327,11 +327,11 @@ namespace KingmakerBuffPlanner.UI
                 Text status = KingmakerUiFactory.CreateText(
                     "Status", entry, _theme,
                     card.Readiness.ToString() + coverage, 14, TextAnchor.UpperRight);
-                KingmakerUiFactory.SetAnchors(status.rectTransform, 0.55f, 0.98f, 0.55f, 0.92f);
+                KingmakerUiFactory.SetAnchors(status.rectTransform, 0.55f, 0.55f, 0.98f, 0.92f);
                 Text detail = KingmakerUiFactory.CreateText(
                     "Detail", entry, _theme,
                     BuildCardDetail(card), 13, TextAnchor.UpperLeft);
-                KingmakerUiFactory.SetAnchors(detail.rectTransform, 0f, 1f, 0.22f, 0.55f);
+                KingmakerUiFactory.SetAnchors(detail.rectTransform, 0f, 0.22f, 1f, 0.55f);
                 detail.rectTransform.offsetMin = new Vector2(8f, 2f);
                 detail.rectTransform.offsetMax = new Vector2(-8f, -2f);
                 Button edit = KingmakerUiFactory.CreateButton(
@@ -340,7 +340,7 @@ namespace KingmakerBuffPlanner.UI
                         _session.FocusCasting(card.CastingId);
                         RefreshView();
                     }));
-                KingmakerUiFactory.SetAnchors(RectOf(edit), 0.86f, 0.98f, 0.08f, 0.4f);
+                KingmakerUiFactory.SetAnchors(RectOf(edit), 0.86f, 0.08f, 0.98f, 0.4f);
             }
             if (scroll != null) scroll.normalizedPosition = _cardScrollPosition;
         }
