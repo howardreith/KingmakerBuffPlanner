@@ -81,15 +81,17 @@ and its current blocker is documented below.
 | --- | --- |
 | Source/protocol tests | 217/217 PASS locally (`Test-SourceOnly.ps1`: source 42/42, harness 27/27, deployment WhatIf 5/5, launcher -File WhatIf 3/3, fixture 3/3, rollback 4/4, publisher 3/3) |
 | Live campaign qualification | Campaign load, UMM close, workspace open through the production hotkey path: PROVEN (run `casting-ws-root-200200`, game log) |
-| Visual capture | BLOCKED by fully-black presentation while the owner's RDP session is disconnected (classified via open/closed bisection + `qwinsta`/`quser`; see `AUTONOMOUS-BLOCKERS.md`) |
-| Interaction/execution | NOT RUN (follows visual capture); native submission stays disabled |
+| Visual capture | Backbuffer presentation dies with a disconnected session (classified by matched control/open/closed bisection); the camera-render capture lane bypasses the display path and produced the first rendered workspace frame (run `casting-ws-layer-030000`). Display-path acceptance still pending a connected session. |
+| Interaction/execution | NOT RUN (follows visual acceptance); native submission stays disabled |
 
 ## Published evidence images (game-window-only, authorized runs)
 
 | File | Original run artifact (identical SHA-256) | What it shows |
 | --- | --- | --- |
+| `docs/evidence/casting-ws-layer-030000-workspace-camera-frame.png` | `runtime-evidence/casting-ws-layer-030000/workspace-camera-frame.png` (`0a9a2fc9…`) | **The casting workspace rendered** — parchment panel, header "Casting Workspace", caster lane with three casters + Focus buttons, casting cards, inspector, footer Undo/Accept Plan/Review & Apply. Captured through the camera-render lane (display-independent) in a session whose backbuffer was black. Known defects visible: caster names show unit GUIDs (display names not reaching the row model); lane/card label truncation. |
+| `docs/evidence/casting-ws-layer-030000-camera-control.png` | `runtime-evidence/casting-ws-layer-030000/workspace-camera-control.png` (`ce4b468c…`) | Matched control frame, same session/build/resolution, workspace closed: game scene + HUD (mean luma 0.41 vs the open frame's 0.73). |
 | `docs/evidence/casting-ws-visual-183000-legacy-misroute-frame.png` | `runtime-evidence/casting-ws-visual-183000/workspace-frame.png` (`3c54fe28…`) | The run that PASSED identity checks while showing the LEGACY catalog screen — the misroute that the routing fixes address. Non-black dual-path capture (blackFraction 0.0285). |
-| `docs/evidence/casting-ws-root-200200-hud-only-open-workspace.png` | `runtime-evidence/casting-ws-root-200200/workspace-frame.png` (`f6aa382a…`) | The run where the REAL workspace opened (log-proven, `workspaceRoot=active`, legacy closed) yet the frame shows the plain game HUD — the open draw question, plus the basis of the later bisection. |
+| `docs/evidence/casting-ws-root-200200-hud-only-open-workspace.png` | `runtime-evidence/casting-ws-root-200200/workspace-frame.png` (`f6aa382a…`) | The run where the REAL workspace opened (log-proven, `workspaceRoot=active`, legacy closed) yet the frame shows the plain game HUD — later explained by the layer-culling defect fixed at `72209fc`. |
 
 No image edits: the published files are byte-identical copies of the
 run-time captures. Black-frame and missing-content checks were never

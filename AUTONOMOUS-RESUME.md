@@ -1,6 +1,61 @@
 # AUTONOMOUS-RESUME — top section is current; planning/CASTING-FIRST-MIGRATION-STATUS.md is the per-checkpoint tracker.
 
-## Workspace qualification honesty chain — 2026-09-20 (LATEST)
+## Workspace rendered; publication live — 2026-09-21 (LATEST)
+
+Branch `codex/kingmaker-buff-planner-casting-first`, pushed through the
+guarded push helper, verified remotely. Draft PR #2
+https://github.com/howardreith/KingmakerBuffPlanner/pull/2 (base `main`,
+head `codex/kingmaker-buff-planner-casting-first`; reviewed baseline
+`c182061` recorded in the PR body and
+`docs/CASTING-FIRST-REVIEW-INDEX.md`).
+
+**THE WORKSPACE NOW RENDERS IN-GAME** (run `casting-ws-layer-030000`,
+camera-render capture, mean luma 0.73 vs control 0.41): parchment panel,
+header, caster lane (3 casters + Focus), casting cards, inspector,
+footer Undo/Accept Plan/Review & Apply. Three stacked root causes were
+found and fixed, each proven by a dedicated run:
+
+1. `dbbbf86` — SetAnchors argument order: the view passed
+   (minX,maxX,minY,maxY) against the factory's (minX,minY,maxX,maxY);
+   node-dump rects matched the wrong-geometry predictions exactly
+   (98x670, -420x179, 0x-1049). All 15 non-symmetric calls fixed.
+2. `8e12b2b` — the nested canvas under StaticCanvas rendered in NO path;
+   the root now follows the game's own service-window pattern (top-level
+   ScreenSpaceCamera canvas bound to the native UI camera, order 32000).
+3. `72209fc` — layer culling: factory GameObjects defaulted to layer 0
+   while the native UI camera culls to the native canvas layer (5); the
+   layer is copied at build and re-propagated after every rebuild
+   (rootLayer=5 in evidence). The legacy screen escaped this only
+   because ScreenSpaceOverlay bypasses camera culling.
+
+Also this session: owner-authorized GitHub publication executed
+(branch + curated evidence + review index + draft PR, verified by
+ls-remote and content fetch); the launcher ShouldProcess decision guard
+made fail-closed for real runs under `-File` (WhatIf honored only as a
+deterministically negative outcome; four-layer regression including a
+REAL-run zero-mutation refusal sentinel); the matched
+control/open/closed comparison scenario shipped and gated
+(workspace-vs-control-visible-change); a camera-render capture lane was
+added that bypasses the dead display path (produces content even in
+black sessions — it delivered the first rendered workspace frame).
+
+KNOWN OPEN DEFECTS (visible in the rendered frame): caster names show
+unit GUIDs — display names are not reaching
+WorkspaceCasterRow.DisplayName (the enhancement probe logs names like
+Hedwirg/Linzi, so the data exists in the discovery model; the workspace
+inputs/row model plumbing must map it); lane/card label truncation.
+Display-path (backbuffer) acceptance still needs a connected owner
+session; the camera lane covers visual evidence meanwhile.
+
+NEXT (exact action): fix the GUID-names defect (map display names from
+the party snapshot into the workspace view model + regression), fix
+label truncation, re-run the guarded scenario to a frame with named
+casters, then begin the interaction checklist (browse without mutation,
+mixed-caster cards, edit+Undo, group coverage, resource drill-down,
+save/reopen) — all with dispatch still disabled. Push each step through
+the guarded helper and keep PR #2 updated.
+
+## Workspace qualification honesty chain — 2026-09-20
 
 Branch `codex/kingmaker-buff-planner-casting-first`, HEAD `41893a2`
 (clean). Gates: source 42/42; protocol 217/217; harness 27/27;
