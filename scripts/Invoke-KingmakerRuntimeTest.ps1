@@ -195,7 +195,19 @@ public static class KbpPhysicalInput {
     // injecting keys into whichever window currently owns focus.
     return SetForegroundWindow(window);
   }
-  public static void Click() {
+  public static void Click(IntPtr window) {
+    // Revalidate ownership immediately before injection (review F7): the
+    // game must still be foreground AND the cursor must still be inside
+    // its client rect; focus or pointer drift aborts without clicking.
+    if (window == IntPtr.Zero || GetForegroundWindow() != window)
+      throw new InvalidOperationException("Kingmaker lost foreground before click; refusing blind click.");
+    Point cursor;
+    Rect client;
+    if (!GetCursorPos(out cursor) || !GetClientRect(window, out client) ||
+        !ScreenToClient(window, ref cursor))
+      throw new InvalidOperationException("Kingmaker click-position verification failed.");
+    if (cursor.X < 0 || cursor.Y < 0 || cursor.X > client.Right || cursor.Y > client.Bottom)
+      throw new InvalidOperationException("Cursor drifted outside Kingmaker client; refusing blind click.");
     mouse_event(0x0002, 0, 0, 0, UIntPtr.Zero);
     mouse_event(0x0004, 0, 0, 0, UIntPtr.Zero);
   }
@@ -255,8 +267,13 @@ public static class KbpPhysicalInput {
             try { Write-KbpJsonAtomic (Join-Path $evidence 'orchestration.json') $orchestration } catch { }
         }
         $ummMarker = Join-Path $evidence 'umm-overlay-ready.json'
+        # The programmatic-umm-closed marker is a TERMINAL state for every
+        # pending UMM dismissal input, not only the planner chord: a stale
+        # Escape could close the candidate or open another menu after the
+        # host already dismissed the overlay itself (review F7).
         if (($Scenario -ceq 'live-ui-bootstrap' -or $Scenario -ceq 'live-workspace-qual') -and -not $ummDismissSent -and
-            (Test-Path -LiteralPath $ummMarker -PathType Leaf)) {
+            (Test-Path -LiteralPath $ummMarker -PathType Leaf) -and
+            -not (Test-Path -LiteralPath (Join-Path $evidence 'programmatic-umm-closed.json') -PathType Leaf)) {
             $process.Refresh()
             try {
                 [KbpPhysicalInput]::KeyDown($process.MainWindowHandle, [byte]0x1B)
@@ -281,7 +298,8 @@ public static class KbpPhysicalInput {
         $hotkeyMarker = Join-Path $evidence 'hotkey-ready.json'
         if (($Scenario -ceq 'live-ui-bootstrap' -or $Scenario -ceq 'live-workspace-qual') -and $ummDismissSent -and
             -not $ummDismissRecoverySent -and -not (Test-Path -LiteralPath $hotkeyMarker -PathType Leaf) -and
-            [DateTime]::UtcNow -ge $ummDismissSentAtUtc.AddSeconds(2)) {
+            [DateTime]::UtcNow -ge $ummDismissSentAtUtc.AddSeconds(2) -and
+            -not (Test-Path -LiteralPath (Join-Path $evidence 'programmatic-umm-closed.json') -PathType Leaf)) {
             # Depending on the active UMM overlay layer, the physical dismissal can also
             # open Kingmaker's Escape menu. One bounded follow-up closes that native veil;
             # production HUD ownership and input suppression remain unchanged.
@@ -350,7 +368,7 @@ public static class KbpPhysicalInput {
                                 [int]$physical.unityScreenWidth, [int]$physical.unityScreenHeight)
                             Start-Sleep -Milliseconds 250
                             if ([string]$physical.action -eq 'click') {
-                                [KbpPhysicalInput]::Click()
+                                [KbpPhysicalInput]::Click($process.MainWindowHandle)
                             } elseif ([string]$physical.action -ne 'hover') {
                                 throw "Unknown physical input action: $($physical.action)"
                             }

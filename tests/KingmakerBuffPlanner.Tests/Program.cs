@@ -354,6 +354,8 @@ namespace KingmakerBuffPlanner.Tests
                     () => TestCastingWorkspaceFreshBuffCapability(root));
                 Run("casting-workspace-draft-catalog-authoring",
                     () => TestCastingWorkspaceDraftCatalog(root));
+                Run("casting-workspace-targeting-shapes-and-dirty-state",
+                    () => TestCastingWorkspaceTargetingShapes(root));
             }
             finally
             {
@@ -11552,7 +11554,7 @@ namespace KingmakerBuffPlanner.Tests
                 foreach (string target in new[] { "unit-t1", "unit-t2", "unit-t3" })
                 {
                     session.Draft.DirectTargetUnitId = target;
-                    Assert(session.AddCastingFromDraft().Applied);
+                    Assert(session.AddCastingFromDraft(inputs).Applied);
                 }
                 // Baseline: cast-1 and cast-2 reserve; cast-3 is blocked by
                 // the shared pool (a DERIVED state, authored intent intact).
@@ -11663,7 +11665,7 @@ namespace KingmakerBuffPlanner.Tests
                 session.Draft.CasterUnitId = "unit-cleric";
                 session.Draft.DirectTargetUnitId = "unit-t1";
                 session.Draft.State = CastingAuthoringState.Ready;
-                Assert(session.AddCastingFromDraft().Applied);
+                Assert(session.AddCastingFromDraft(inputs).Applied);
                 session.PresentForReview(inputs);
                 Assert(session.AcceptPresentedPlan(inputs));
                 // The limitation is visible BEFORE the player acts.
@@ -11695,7 +11697,7 @@ namespace KingmakerBuffPlanner.Tests
                 recovering.Draft.CasterUnitId = "unit-cleric";
                 recovering.Draft.DirectTargetUnitId = "unit-t1";
                 recovering.Draft.State = CastingAuthoringState.Ready;
-                Assert(recovering.AddCastingFromDraft().Applied);
+                Assert(recovering.AddCastingFromDraft(inputs).Applied);
                 recovering.PresentForReview(inputs);
                 Assert(recovering.AcceptPresentedPlan(inputs));
                 bool threw = false;
@@ -11820,27 +11822,29 @@ namespace KingmakerBuffPlanner.Tests
                     "Browsing mutated the document.");
             // Three single-target castings from two casters with distinct
             // per-casting settings.
+            // Exactly the fields the visible controls set — the ability is
+            // resolved by the session itself (review F1: the UI never
+            // assigns Draft.Ability, so neither may the test).
             session.Draft.SourceId = "source-bulls";
-            session.Draft.Ability = CastingBuffAbility;
             session.Draft.TargetMode = CastingTargetMode.DirectTarget;
             session.Draft.CasterUnitId = "unit-cleric";
             session.Draft.DirectTargetUnitId = "unit-t1";
             session.Draft.State = CastingAuthoringState.Ready;
             session.Draft.Enhancements.Add(
                 new AuthoredEnhancementSelection("extend-cleric", true, null));
-            if (!session.AddCastingFromDraft().Applied)
+            if (!session.AddCastingFromDraft(inputs).Applied)
                 throw new InvalidOperationException("cast-1 was refused.");
             session.Draft.CasterUnitId = "unit-wizard";
             session.Draft.DirectTargetUnitId = "unit-t2";
             session.Draft.Enhancements.Clear();
             session.Draft.Enhancements.Add(
                 new AuthoredEnhancementSelection("extend-wizard", true, null));
-            if (!session.AddCastingFromDraft().Applied)
+            if (!session.AddCastingFromDraft(inputs).Applied)
                 throw new InvalidOperationException("cast-2 was refused.");
             session.Draft.CasterUnitId = "unit-cleric";
             session.Draft.DirectTargetUnitId = "unit-t3";
             session.Draft.Enhancements.Clear();
-            if (!session.AddCastingFromDraft().Applied)
+            if (!session.AddCastingFromDraft(inputs).Applied)
                 throw new InvalidOperationException("cast-3 was refused.");
             view = session.BuildView(inputs);
             if (view.Cards.Count != 3 ||
@@ -11859,7 +11863,11 @@ namespace KingmakerBuffPlanner.Tests
                     ResolvedCastingReadiness.Ready) ||
                 view.Cards.Any(card => card.CostLabels.Count == 0))
                 throw new InvalidOperationException(
-                    "Readiness or costs are not from the shared plan.");
+                    "Readiness or costs are not from the shared plan: " +
+                    string.Join(" | ", view.Cards.Select(card =>
+                        card.CastingId + ":" + card.Readiness + ":" +
+                        string.Join(",", card.ReadinessReasons.ToArray()) +
+                        ":costs=" + card.CostLabels.Count).ToArray()));
             // Switching caster focus changes nothing but focus.
             CastingPlanDocument beforeFocusChange = session.Document;
             session.SelectCaster("unit-wizard");
@@ -11933,7 +11941,7 @@ namespace KingmakerBuffPlanner.Tests
             groupSession.Draft.RequiredCoverageUnitIds.AddRange(new[]
                 { "unit-t1", "unit-t2", "unit-t3", "unit-t4", "unit-t5",
                     "unit-rogue" });
-            if (!groupSession.AddCastingFromDraft().Applied)
+            if (!groupSession.AddCastingFromDraft(groupInputs).Applied)
                 throw new InvalidOperationException("The group casting was refused.");
             view = groupSession.BuildView(groupInputs);
             if (view.Cards.Count != 1 ||
@@ -11973,12 +11981,12 @@ namespace KingmakerBuffPlanner.Tests
             session.Draft.CasterUnitId = "unit-cleric";
             session.Draft.DirectTargetUnitId = "unit-t1";
             session.Draft.State = CastingAuthoringState.Ready;
-            if (!session.AddCastingFromDraft().Applied)
+            if (!session.AddCastingFromDraft(inputs).Applied)
                 throw new InvalidOperationException("long cast was refused.");
             session.SelectRoutine("short");
             session.Draft.CasterUnitId = "unit-cleric";
             session.Draft.DirectTargetUnitId = "unit-t2";
-            if (!session.AddCastingFromDraft().Applied)
+            if (!session.AddCastingFromDraft(inputs).Applied)
                 throw new InvalidOperationException("short cast was refused.");
 
             session.SelectRoutine("short");
@@ -12016,7 +12024,7 @@ namespace KingmakerBuffPlanner.Tests
             // A materially changed plan is no longer the presented contract.
             session.Draft.CasterUnitId = "unit-cleric";
             session.Draft.DirectTargetUnitId = "unit-t3";
-            session.AddCastingFromDraft();
+            session.AddCastingFromDraft(inputs);
             WorkspaceApplyResult staleApply =
                 session.Apply(CastingApplyMode.Ordinary, "long", inputs);
             if (staleApply.Allowed)
@@ -12093,8 +12101,10 @@ namespace KingmakerBuffPlanner.Tests
                 browse.Draft.Targets.Count < 3)
                 throw new InvalidOperationException(
                     "The draft editor lacks recipient targets.");
+            // Exactly the fields the visible controls set — the ability is
+            // resolved by the session itself (review F1: the UI never
+            // assigns Draft.Ability, so neither may the test).
             session.Draft.SourceId = "source-bulls";
-            session.Draft.Ability = CastingBuffAbility;
             session.Draft.TargetMode = CastingTargetMode.DirectTarget;
             session.Draft.CasterUnitId = "unit-cleric";
             session.Draft.DirectTargetUnitId = "unit-t1";
@@ -12106,9 +12116,22 @@ namespace KingmakerBuffPlanner.Tests
                     option.Selected && option.EnhancementId == "extend-cleric"))
                 throw new InvalidOperationException(
                     "The enhancement toggle state is not echoed.");
-            if (!session.AddCastingFromDraft().Applied)
+            AuthoringEditResult added = session.AddCastingFromDraft(inputs);
+            if (!added.Applied)
                 throw new InvalidOperationException(
-                    "The control-sequence draft was refused.");
+                    "The control-sequence draft was refused: " + added.Reason);
+            // A UI draft with no ability under an unknown caster is an
+            // explained refusal, never a throw or a substitute casting
+            // (review F1). An explicitly supplied ability is deliberately
+            // retained and disclosed by the plan instead.
+            session.Draft.CasterUnitId = "unit-rogue";
+            session.Draft.Ability = null;
+            AuthoringEditResult refused = session.AddCastingFromDraft(inputs);
+            if (refused.Applied || !refused.Reason.StartsWith(
+                    "draft-ability-unresolved", StringComparison.Ordinal))
+                throw new InvalidOperationException(
+                    "An unresolvable draft did not refuse with an explanation: " +
+                    refused.Reason);
             WorkspaceView authored = session.BuildView(inputs);
             if (authored.Cards.Count != 1 ||
                 authored.Cards[0].CasterUnitId != "unit-cleric" ||
@@ -12116,6 +12139,85 @@ namespace KingmakerBuffPlanner.Tests
                 authored.Cards[0].EnhancementLabels.Count != 1)
                 throw new InvalidOperationException(
                     "The authored card does not reflect the editor's controls.");
+        }
+
+        // Review F3/F6 regression: coherent targeting-shape transitions
+        // through the session command, stale-ability invalidation on
+        // selection change, and dirty-state semantics around save.
+        private static void TestCastingWorkspaceTargetingShapes(string root)
+        {
+            string modPath = Path.Combine(root, "casting-workspace-shapes");
+            Directory.CreateDirectory(modPath);
+            PartyProviderSnapshot snapshot;
+            CastingWorkspaceInputs inputs = WorkspaceInputs(out snapshot);
+            var session = new CastingWorkspaceSession(modPath, "shapes-campaign");
+            if (session.IsDirty)
+                throw new InvalidOperationException(
+                    "A freshly loaded session must not be dirty.");
+            // Direct -> group -> direct never leaves incompatible fields.
+            if (!session.SetDraftTargeting(CastingTargetMode.DirectTarget,
+                    "unit-t1", null, null).Applied)
+                throw new InvalidOperationException("direct targeting refused.");
+            if (!session.SetDraftTargeting(
+                    CastingTargetMode.CasterCenteredOrigin, null, null,
+                    new[] { "unit-t1", "unit-t2" }).Applied)
+                throw new InvalidOperationException("group targeting refused.");
+            if (session.Draft.DirectTargetUnitId != null ||
+                session.Draft.Origin == null || !session.Draft.Origin.IsCasterCentered ||
+                session.Draft.RequiredCoverageUnitIds.Count != 2)
+                throw new InvalidOperationException(
+                    "Group targeting retained direct fields.");
+            if (!session.SetDraftTargeting(CastingTargetMode.AnchoredOrigin,
+                    null, "unit-cleric", null).Applied)
+                throw new InvalidOperationException("anchored targeting refused.");
+            if (session.Draft.Origin.IsCasterCentered ||
+                session.Draft.TargetMode != CastingTargetMode.AnchoredOrigin)
+                throw new InvalidOperationException(
+                    "Anchor selection did not set the anchored mode.");
+            if (!session.SetDraftTargeting(CastingTargetMode.DirectTarget,
+                    "unit-t2", null, null).Applied)
+                throw new InvalidOperationException("return to direct refused.");
+            if (session.Draft.Origin != null ||
+                session.Draft.RequiredCoverageUnitIds.Count != 0 ||
+                session.Draft.DirectTargetUnitId != "unit-t2")
+                throw new InvalidOperationException(
+                    "Return to direct retained group fields.");
+            if (session.SetDraftTargeting(CastingTargetMode.DirectTarget,
+                    null, null, null).Applied)
+                throw new InvalidOperationException(
+                    "A targetless direct shape was accepted.");
+            // Stale-ability invalidation on selection change (review F1).
+            session.SelectBuff("source-bulls");
+            session.Draft.CasterUnitId = "unit-cleric";
+            session.Draft.SourceId = "source-bulls";
+            // The view always refreshes (and compiles) before Add; the
+            // session's resolution needs those discovery inputs.
+            session.BuildView(inputs);
+            AuthoringEditResult resolved = session.AddCastingFromDraft(inputs);
+            if (!resolved.Applied)
+                throw new InvalidOperationException(
+                    "Self-resolution failed after shape transitions: " +
+                    resolved.Reason);
+            if (session.Document.Castings[0].Ability == null)
+                throw new InvalidOperationException(
+                    "The resolved ability was not authored.");
+            // Dirty until saved; clean after save; a material edit is dirty
+            // again (review F6).
+            if (!session.IsDirty)
+                throw new InvalidOperationException("An authored edit is not dirty.");
+            session.Save();
+            if (session.IsDirty)
+                throw new InvalidOperationException("A saved session is still dirty.");
+            session.FocusCasting(session.Document.Castings[0].CastingId);
+            session.SetFocusedCastingState(CastingAuthoringState.Disabled);
+            if (!session.IsDirty)
+                throw new InvalidOperationException(
+                    "A state edit after save is not dirty.");
+            if (!session.Undo())
+                throw new InvalidOperationException("Undo refused.");
+            if (session.IsDirty)
+                throw new InvalidOperationException(
+                    "Undo to the saved state is still dirty.");
         }
 
         private static void TestCastingWorkspaceReviewApply(string root)
@@ -12131,7 +12233,7 @@ namespace KingmakerBuffPlanner.Tests
             session.Draft.CasterUnitId = "unit-cleric";
             session.Draft.DirectTargetUnitId = "unit-t1";
             session.Draft.State = CastingAuthoringState.Ready;
-            Assert(session.AddCastingFromDraft().Applied);
+            Assert(session.AddCastingFromDraft(inputs).Applied);
             // Without presentation, Apply is refused.
             WorkspaceApplyResult unpresented = session.Apply(
                 CastingApplyMode.Ordinary, "long", inputs);
@@ -12187,7 +12289,7 @@ namespace KingmakerBuffPlanner.Tests
             // An unseen material change between acceptance and submission
             // refuses until re-presented and re-accepted.
             session.Draft.DirectTargetUnitId = "unit-t2";
-            Assert(session.AddCastingFromDraft().Applied);
+            Assert(session.AddCastingFromDraft(inputs).Applied);
             WorkspaceApplyResult changed = session.Apply(
                 CastingApplyMode.Ordinary, "long", inputs);
             if (changed.Allowed ||
@@ -12197,7 +12299,7 @@ namespace KingmakerBuffPlanner.Tests
             // A refused gate attempt authorizes nothing by itself.
             session.Draft.CasterUnitId = "unit-ghost";
             session.Draft.DirectTargetUnitId = "unit-t3";
-            Assert(session.AddCastingFromDraft().Applied);
+            Assert(session.AddCastingFromDraft(inputs).Applied);
             WorkspaceApplyResult refused = session.Apply(
                 CastingApplyMode.Ordinary, "long", inputs);
             if (refused.Allowed)
@@ -12239,11 +12341,11 @@ namespace KingmakerBuffPlanner.Tests
             session.Draft.CasterUnitId = "unit-cleric";
             session.Draft.DirectTargetUnitId = "unit-t1";
             session.Draft.State = CastingAuthoringState.Ready;
-            Assert(session.AddCastingFromDraft().Applied);
+            Assert(session.AddCastingFromDraft(inputs).Applied);
             session.Draft.DirectTargetUnitId = "unit-t2";
             session.Draft.CasterUnitId = null;
             session.Draft.State = CastingAuthoringState.Draft;
-            Assert(session.AddCastingFromDraft().Applied);
+            Assert(session.AddCastingFromDraft(inputs).Applied);
             session.FocusCasting("cast-1");
             Assert(session.SetFocusedCastingState(CastingAuthoringState.Disabled)
                 .Applied);

@@ -459,7 +459,7 @@ namespace KingmakerBuffPlanner.UI
                 return;
             }
             AddInspectorCaption("Retarget");
-            foreach (WorkspaceTargetOption target in view.Draft.Targets.Take(24))
+            foreach (WorkspaceTargetOption target in view.Draft.Targets)
             {
                 WorkspaceTargetOption captured = target;
                 bool selected = string.Equals(focused.DirectTargetUnitId,
@@ -522,7 +522,7 @@ namespace KingmakerBuffPlanner.UI
                 return;
             }
             AddInspectorCaption("Buff");
-            foreach (WorkspaceSourceOption source in draft.Sources.Take(24))
+            foreach (WorkspaceSourceOption source in draft.Sources)
             {
                 WorkspaceSourceOption captured = source;
                 Button pick = KingmakerUiFactory.CreateButton(
@@ -571,24 +571,22 @@ namespace KingmakerBuffPlanner.UI
                 direct ? "Mode: single target" : "Mode: group from origin",
                 () => Click(() =>
                 {
+                    // One coherent shape operation: the session command
+                    // clears/rebuilds the incompatible fields (review F3).
                     if (direct)
-                    {
-                        _session.Draft.TargetMode =
-                            Domain.Authoring.CastingTargetMode.CasterCenteredOrigin;
-                        _session.Draft.Origin =
-                            Domain.Authoring.CastingOrigin.CasterCentered();
-                    }
+                        _session.SetDraftTargeting(
+                            Domain.Authoring.CastingTargetMode.CasterCenteredOrigin,
+                            null, null, null);
                     else
-                    {
-                        _session.Draft.TargetMode =
-                            Domain.Authoring.CastingTargetMode.DirectTarget;
-                    }
+                        _session.SetDraftTargeting(
+                            Domain.Authoring.CastingTargetMode.DirectTarget,
+                            draft.DirectTargetUnitId, null, null);
                     RefreshView();
                 }));
             KingmakerUiFactory.AddLayout(RectOf(mode), 30f);
             if (direct)
             {
-                foreach (WorkspaceTargetOption target in draft.Targets.Take(24))
+                foreach (WorkspaceTargetOption target in draft.Targets)
                 {
                     WorkspaceTargetOption captured = target;
                     bool selected = string.Equals(draft.DirectTargetUnitId,
@@ -599,7 +597,9 @@ namespace KingmakerBuffPlanner.UI
                         (selected ? "[x] " : "[  ] ") + captured.DisplayName,
                         () => Click(() =>
                         {
-                            _session.Draft.DirectTargetUnitId = captured.UnitId;
+                            _session.SetDraftTargeting(
+                                Domain.Authoring.CastingTargetMode.DirectTarget,
+                                captured.UnitId, null, null);
                             RefreshView();
                         }));
                     KingmakerUiFactory.AddLayout(RectOf(pick), 30f);
@@ -613,12 +613,13 @@ namespace KingmakerBuffPlanner.UI
                         ? "[x] Origin: caster" : "[  ] Origin: caster",
                     () => Click(() =>
                     {
-                        _session.Draft.Origin =
-                            Domain.Authoring.CastingOrigin.CasterCentered();
+                        _session.SetDraftTargeting(
+                            Domain.Authoring.CastingTargetMode.CasterCenteredOrigin,
+                            null, null, null);
                         RefreshView();
                     }));
                 KingmakerUiFactory.AddLayout(RectOf(casterOrigin), 30f);
-                foreach (WorkspaceOriginOption origin in draft.Origins.Take(12))
+                foreach (WorkspaceOriginOption origin in draft.Origins)
                 {
                     WorkspaceOriginOption captured = origin;
                     Button pick = KingmakerUiFactory.CreateButton(
@@ -628,9 +629,9 @@ namespace KingmakerBuffPlanner.UI
                             "Origin: " + captured.AnchorUnitId,
                         () => Click(() =>
                         {
-                            _session.Draft.Origin =
-                                Domain.Authoring.CastingOrigin.Anchored(
-                                    captured.AnchorUnitId);
+                            _session.SetDraftTargeting(
+                                Domain.Authoring.CastingTargetMode.AnchoredOrigin,
+                                null, captured.AnchorUnitId, null);
                             RefreshView();
                         }));
                     KingmakerUiFactory.AddLayout(RectOf(pick), 30f);
@@ -647,7 +648,7 @@ namespace KingmakerBuffPlanner.UI
                 KingmakerUiFactory.AddLayout(none.rectTransform, 26f);
             }
             foreach (WorkspaceEnhancementOption enhancement in
-                draft.Enhancements.Take(12))
+                draft.Enhancements)
             {
                 WorkspaceEnhancementOption captured = enhancement;
                 Button toggle = KingmakerUiFactory.CreateButton(
@@ -686,7 +687,7 @@ namespace KingmakerBuffPlanner.UI
                 "AddCasting", _inspectorContent, _theme, "Add Casting",
                 () => Click(() =>
                 {
-                    AuthoringEditResult result = _session.AddCastingFromDraft();
+                    AuthoringEditResult result = _session.AddCastingFromDraft(_inputs());
                     if (!result.Applied)
                         _footerResult.text = "Add refused: " + result.Reason;
                     RefreshView();
@@ -708,7 +709,7 @@ namespace KingmakerBuffPlanner.UI
         {
             if (_routineBar == null) return;
             KingmakerUiFactory.DestroyChildren(_routineBar);
-            foreach (string routineId in view.RoutineIds.Take(8))
+            foreach (string routineId in view.RoutineIds)
             {
                 string captured = routineId;
                 bool selected = string.Equals(view.SelectedRoutineId, captured,

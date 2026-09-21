@@ -171,6 +171,29 @@ namespace KingmakerBuffPlanner.UI
             return _instance == null ? null : _instance.BuildCastingWorkspaceInputs();
         }
 
+        // Invokes the PRODUCTION onClick wiring of a named workspace button
+        // (review F2 control path). Returns null when the button does not
+        // exist; the caller records that honestly instead of silently
+        // falling back.
+        internal static string CastingWorkspaceInvokeControlForRuntime(
+            string buttonName)
+        {
+            CastingWorkspaceScreenView view =
+                _instance == null ? null : _instance._castingWorkspace;
+            GameObject root = view == null ? null : view.RootObject;
+            if (root == null) return "workspace-missing";
+            UnityEngine.UI.Button[] buttons =
+                root.GetComponentsInChildren<UnityEngine.UI.Button>(true);
+            foreach (UnityEngine.UI.Button button in buttons)
+                if (button != null && string.Equals(button.name, buttonName,
+                        StringComparison.Ordinal))
+                {
+                    button.onClick.Invoke();
+                    return "invoked";
+                }
+            return "control-missing:" + buttonName;
+        }
+
         // Runtime presentation evidence for the workspace root: whether the
         // GameObject hierarchy is actually active, sized, and carrying
         // renderable text. A non-null view field alone proved insufficient
@@ -787,8 +810,8 @@ namespace KingmakerBuffPlanner.UI
                     _session.Model.Profile == null
                         ? "unknown-campaign"
                         : _session.Model.Profile.CampaignId;
-                var workspaceSession = new CastingWorkspaceSession(
-                    _modPath, campaignId);
+                var workspaceSession = _castingWorkspaceSession ??
+                    new CastingWorkspaceSession(_modPath, campaignId);
                 _castingWorkspaceSession = workspaceSession;
                 _castingWorkspace = new CastingWorkspaceScreenView(
                     StaticCanvas.Instance, workspaceSession,
@@ -825,7 +848,10 @@ namespace KingmakerBuffPlanner.UI
             // while open.
             _castingWorkspace.Dispose();
             _castingWorkspace = null;
-            _castingWorkspaceSession = null;
+            // Unsaved intent is PRESERVED across an ordinary close/reopen
+            // (review F6): the session (document + undo history + dirty
+            // state) survives; only the view is disposed. Full teardown
+            // (ReleaseAll) is the defined discard point and logs it.
         }
 
         private DateTime _lastWorkspaceInputsRefreshUtc = DateTime.MinValue;
@@ -1168,6 +1194,15 @@ namespace KingmakerBuffPlanner.UI
             _disposed = true;
             StopAllCoroutines();
             CloseCastingWorkspace();
+            if (_castingWorkspaceSession != null)
+            {
+                // Defined shutdown policy: discarding the session drops any
+                // unsaved edits; this is the only silent-loss point and it
+                // is logged (review F6).
+                _log.Info("[KBP-WORKSPACE] session discarded at teardown;dirty=" +
+                    _castingWorkspaceSession.IsDirty + ".");
+                _castingWorkspaceSession = null;
+            }
             if (_runtimePhysicalProbe != null) _runtimePhysicalProbe.Dispose();
             _runtimePhysicalProbe = null;
             if (_spellbookEntry != null) _spellbookEntry.Release();

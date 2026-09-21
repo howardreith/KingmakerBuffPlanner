@@ -629,7 +629,7 @@ foreach ($physicalContract in @('umm-overlay-ready.json',
         'physical-umm-dismiss-sent', '[byte]0x1B', 'hotkey-ready.json',
         '[byte]0x11', '[byte]0x10', '[byte]0x42',
         'physical-input-*.json', 'ClientToScreen', 'SetCursorPos',
-        '[KbpPhysicalInput]::Click()')) {
+        '[KbpPhysicalInput]::Click($process.MainWindowHandle)')) {
     if (-not $runtimeHostSource.Contains($physicalContract) -and
         -not $runtimeScriptSource.Contains($physicalContract)) {
         throw "Live qualification must physically dismiss ShowOnStart UMM and then deliver the planner hotkey: $physicalContract"

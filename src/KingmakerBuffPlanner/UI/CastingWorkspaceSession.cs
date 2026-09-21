@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Collections.ObjectModel;
 using System.Linq;
 using KingmakerBuffPlanner.Domain.Authoring;
@@ -138,6 +139,9 @@ namespace KingmakerBuffPlanner.UI
     {
         private readonly CastingPlanRepository _repository;
         private readonly CastingExecutionGate _gate = new CastingExecutionGate();
+        private CastingWorkspaceInputs _lastInputs;
+        private string _savedIntentSignature = string.Empty;
+        private string _resolvedDraftKey = string.Empty;
         private readonly CastingForecastService _forecast =
             new CastingForecastService();
         private readonly CastingReviewCoordinator _review =
@@ -169,6 +173,7 @@ namespace KingmakerBuffPlanner.UI
                 case CastingPlanLoadStatus.RecoveredFromBackup:
                     _authoring = new CastingAuthoringService(
                         loaded.Profile.ToDocument());
+                    _savedIntentSignature = DocumentIntentSignature();
                     break;
                 case CastingPlanLoadStatus.Absent:
                     _authoring = new CastingAuthoringService(NewDocument());
@@ -221,8 +226,14 @@ namespace KingmakerBuffPlanner.UI
 
         public void SelectBuff(string sourceId)
         {
-            SelectedSourceId = string.IsNullOrWhiteSpace(sourceId)
+            string resolved = string.IsNullOrWhiteSpace(sourceId)
                 ? string.Empty : sourceId;
+            if (!string.Equals(resolved, SelectedSourceId,
+                    StringComparison.Ordinal))
+                // A stale ability under a different displayed source must
+                // never survive selection (review F1).
+                Draft.Ability = null;
+            SelectedSourceId = resolved;
         }
 
         public void SelectRoutine(string routineId)
@@ -237,8 +248,12 @@ namespace KingmakerBuffPlanner.UI
         // assignments and connections are untouched.
         public void SelectCaster(string casterUnitId)
         {
-            SelectedCasterUnitId = string.IsNullOrWhiteSpace(casterUnitId)
+            string resolved = string.IsNullOrWhiteSpace(casterUnitId)
                 ? null : casterUnitId;
+            if (!string.Equals(resolved, SelectedCasterUnitId,
+                    StringComparison.Ordinal))
+                Draft.Ability = null;
+            SelectedCasterUnitId = resolved;
         }
 
         public void FocusCasting(string castingId)
@@ -324,11 +339,21 @@ namespace KingmakerBuffPlanner.UI
                 foreach (string sourceId in sourceIds.OrderBy(
                          value => value, StringComparer.Ordinal))
                 {
-                    string display = inputs.ProviderOptions
-                        .Where(value => value != null && value.Provider != null)
-                        .Select(value => value.Provider.SourceDisplayName)
-                        .FirstOrDefault(name =>
-                            !string.IsNullOrWhiteSpace(name));
+                    // The label comes from THIS source's own providers only
+                    // (review F5): the first nonempty SourceDisplayName of
+                    // the whole list would give every buff the same name.
+                    EffectExpression labelExpression;
+                    string display = inputs.EffectsBySource.TryGetValue(
+                            sourceId, out labelExpression)
+                        ? inputs.ProviderOptions
+                            .Where(value => value != null &&
+                                value.Provider != null &&
+                                OptionServesExpression(inputs, value,
+                                    labelExpression))
+                            .Select(value => value.Provider.SourceDisplayName)
+                            .FirstOrDefault(name =>
+                                !string.IsNullOrWhiteSpace(name))
+                        : null;
                     sources.Add(new WorkspaceSourceOption(
                         sourceId, display,
                         string.Equals(sourceId, selectedSource,
@@ -338,8 +363,9 @@ namespace KingmakerBuffPlanner.UI
             string draftSource = string.IsNullOrEmpty(Draft.SourceId)
                 ? selectedSource : Draft.SourceId;
             string draftCaster = Draft.CasterUnitId ?? SelectedCasterUnitId;
+            int draftCandidates;
             ProviderPlanningOption draftOption = FindDraftOption(
-                inputs, draftSource, draftCaster);
+                inputs, draftSource, draftCaster, out draftCandidates);
             var targets = inputs.Snapshot.Units
                 .Select(unit => new WorkspaceTargetOption(
                     unit.UnitId, unit.DisplayName,
@@ -354,11 +380,13 @@ namespace KingmakerBuffPlanner.UI
                         string.Equals(Draft.Origin.AnchorUnitId, anchor,
                             StringComparison.Ordinal)));
             var enhancements = new List<WorkspaceEnhancementOption>();
-            if (inputs.Enhancements != null && Draft.Ability != null &&
+            AbilityKey enhancementAbility = Draft.Ability ??
+                DraftAbilityFor(inputs);
+            if (inputs.Enhancements != null && enhancementAbility != null &&
                 !string.IsNullOrEmpty(draftCaster))
             {
-                string baseGuid = Draft.Ability.BaseAbilityGuid;
-                string variantGuid = Draft.Ability.VariantGuid;
+                string baseGuid = enhancementAbility.BaseAbilityGuid;
+                string variantGuid = enhancementAbility.VariantGuid;
                 foreach (CastEnhancementSnapshot enhancement in inputs.Enhancements)
                 {
                     if (enhancement == null ||
@@ -396,25 +424,41 @@ namespace KingmakerBuffPlanner.UI
             if (inputs == null) return null;
             string draftSource = string.IsNullOrEmpty(Draft.SourceId)
                 ? SelectedSourceId : Draft.SourceId;
+            int candidates;
             ProviderPlanningOption option = FindDraftOption(
-                inputs, draftSource, Draft.CasterUnitId ?? SelectedCasterUnitId);
-            return option == null ? null : option.Provider.Key.Ability;
+                inputs, draftSource,
+                Draft.CasterUnitId ?? SelectedCasterUnitId, out candidates);
+            return candidates == 1 && option != null
+                ? option.Provider.Key.Ability : null;
         }
 
         private ProviderPlanningOption FindDraftOption(
-            CastingWorkspaceInputs inputs, string draftSource, string draftCaster)
+            CastingWorkspaceInputs inputs, string draftSource, string draftCaster,
+            out int candidateCount)
         {
+            candidateCount = 0;
             if (inputs.ProviderOptions == null ||
                 inputs.EffectsBySource == null ||
                 string.IsNullOrEmpty(draftCaster)) return null;
             EffectExpression sourceExpression;
             if (!inputs.EffectsBySource.TryGetValue(
                     draftSource, out sourceExpression)) return null;
-            return inputs.ProviderOptions.FirstOrDefault(
-                option => option != null && option.Provider != null &&
-                    string.Equals(option.Provider.Key.CasterUnitId,
-                        draftCaster, StringComparison.Ordinal) &&
-                    OptionServesExpression(inputs, option, sourceExpression));
+            ProviderPlanningOption match = null;
+            foreach (ProviderPlanningOption option in inputs.ProviderOptions)
+            {
+                if (option == null || option.Provider == null ||
+                    !string.Equals(option.Provider.Key.CasterUnitId,
+                        draftCaster, StringComparison.Ordinal) ||
+                    !OptionServesExpression(inputs, option, sourceExpression))
+                    continue;
+                candidateCount++;
+                if (match == null ||
+                    string.Compare(option.Provider.Key.Canonical,
+                        match.Provider.Key.Canonical,
+                        StringComparison.Ordinal) < 0)
+                    match = option;
+            }
+            return match;
         }
 
         private static bool OptionServesExpression(
@@ -460,14 +504,18 @@ namespace KingmakerBuffPlanner.UI
         {
             if (_submissionInFlight)
                 return RefusedInFlight(null);
+            // Normalize the optional scope ONCE (review C1): the compiler,
+            // gate, and dispatch must all see the same selected-run scope —
+            // a null scope must never mean whole-plan to one consumer and
+            // selected-routine to another.
+            string scope = string.IsNullOrEmpty(scopeRoutineId)
+                ? SelectedRoutineId : scopeRoutineId;
             // The decision is computed from the selected-run plan as it
             // exists right now — the same scope that was presented — not
             // from any earlier preview or a whole-document compile whose
             // cross-routine reservations the scope filter cannot undo.
-            ExplicitCastingPlan plan = Compile(inputs,
-                string.IsNullOrEmpty(scopeRoutineId) ? SelectedRoutineId : scopeRoutineId,
-                false);
-            CastingApplyDecision decision = _gate.Evaluate(plan, mode, scopeRoutineId);
+            ExplicitCastingPlan plan = Compile(inputs, scope, false);
+            CastingApplyDecision decision = _gate.Evaluate(plan, mode, scope);
             if (mode == CastingApplyMode.Ordinary && !decision.Allowed)
                 return RefusedInFlight(decision);
             CastingPlanSignature signature = CastingPlanSignature.For(plan);
@@ -479,7 +527,7 @@ namespace KingmakerBuffPlanner.UI
             {
                 _submissionInFlight = true;
                 CastingDispatchOutcome dispatch = _dispatch.Submit(
-                    plan, decision, scopeRoutineId);
+                    plan, decision, scope);
                 return new WorkspaceApplyResult(
                     dispatch.Submitted, dispatch.Submitted
                         ? string.Empty : dispatch.Reason,
@@ -495,11 +543,127 @@ namespace KingmakerBuffPlanner.UI
         // Authoring commands (explicit mutations with disclosed scope)
         // ------------------------------------------------------------------
 
-        public AuthoringEditResult AddCastingFromDraft()
+        public AuthoringEditResult AddCastingFromDraft(
+            CastingWorkspaceInputs inputs = null)
         {
-            PlannedCasting casting = Draft.Materialize(
-                NextCastingId(), SelectedRoutineId);
-            return _authoring.AddCasting(casting);
+            // The view supplies fresh discovery inputs at click time; a
+            // headless caller may pass them explicitly. Resolution never
+            // depends on a prior BuildView having happened.
+            if (inputs != null) _lastInputs = inputs;
+            // The visible controls set source and caster; the exact ability
+            // is resolved HERE through the same discovery the plan compiles
+            // from (review F1) — callers never compensate privately, and an
+            // unresolvable or ambiguous draft is an explained refusal, never
+            // a throw out of a UI callback or a substitute casting.
+            string draftKey = DraftResolutionKey();
+            if (Draft.Ability == null || !string.Equals(draftKey,
+                    _resolvedDraftKey, StringComparison.Ordinal))
+            {
+                // Re-resolve whenever the (source, caster) pair changed, not
+                // only when the ability is null: a stale ability or
+                // spellbook under a different selection must never survive
+                // to an authored record (review F1). Deliberately unresolved
+                // intent keeps an explicitly supplied ability (the plan
+                // marks it blocked); only a UI draft with no ability at all
+                // refuses with an explanation.
+                string refusal = ResolveDraftAbility();
+                if (refusal != null)
+                {
+                    if (Draft.Ability == null)
+                        return AuthoringEditResult.Refuse(refusal);
+                    Draft.SpellbookGuid = null;
+                }
+            }
+            try
+            {
+                PlannedCasting casting = Draft.Materialize(
+                    NextCastingId(), SelectedRoutineId);
+                return _authoring.AddCasting(casting);
+            }
+            catch (ArgumentException exception)
+            {
+                return AuthoringEditResult.Refuse("draft-invalid:" +
+                    exception.Message);
+            }
+            catch (InvalidOperationException exception)
+            {
+                return AuthoringEditResult.Refuse("draft-invalid:" +
+                    exception.Message);
+            }
+        }
+
+        // Returns null when the draft ability was resolved; otherwise an
+        // explained refusal reason. Resolution writes the ability and its
+        // spellbook so Materialize and the compiler see the same option.
+        private string ResolveDraftAbility()
+        {
+            if (_lastInputs == null)
+                return "draft-ability-unresolved:no-discovery-inputs";
+            string source = string.IsNullOrEmpty(Draft.SourceId)
+                ? SelectedSourceId : Draft.SourceId;
+            string caster = Draft.CasterUnitId ?? SelectedCasterUnitId;
+            if (string.IsNullOrEmpty(caster))
+                return "draft-ability-unresolved:no-caster-selected";
+            int candidates;
+            ProviderPlanningOption option = FindDraftOption(
+                _lastInputs, source, caster, out candidates);
+            if (candidates == 0)
+                return "draft-ability-unresolved:no-provider-for-source-and-caster";
+            if (candidates > 1)
+                return "draft-ability-unresolved:exact-source-ambiguous:" +
+                    candidates;
+            Draft.Ability = option.Provider.Key.Ability;
+            Draft.SpellbookGuid = option.Provider.Key.SpellbookGuid;
+            _resolvedDraftKey = DraftResolutionKey();
+            return null;
+        }
+
+        private string DraftResolutionKey()
+        {
+            string source = string.IsNullOrEmpty(Draft.SourceId)
+                ? SelectedSourceId : Draft.SourceId;
+            string caster = Draft.CasterUnitId ?? SelectedCasterUnitId;
+            return (source ?? string.Empty) + "" + (caster ?? string.Empty);
+        }
+
+        // One coherent targeting-shape operation (review F3): mode, origin,
+        // direct target, and coverage change together so the draft always
+        // satisfies ValidateTargetModeShape.
+        public AuthoringEditResult SetDraftTargeting(
+            CastingTargetMode mode,
+            string directTargetUnitId,
+            string originAnchorUnitId,
+            IEnumerable<string> requiredCoverageUnitIds)
+        {
+            // Validate first; a refused command must leave the draft
+            // exactly as it was (review F3).
+            if (!Enum.IsDefined(typeof(CastingTargetMode), mode))
+                return AuthoringEditResult.Refuse("targeting-mode-unsupported");
+            if (mode == CastingTargetMode.DirectTarget &&
+                string.IsNullOrWhiteSpace(directTargetUnitId))
+                return AuthoringEditResult.Refuse("targeting-requires-direct-target");
+            if (mode == CastingTargetMode.AnchoredOrigin &&
+                string.IsNullOrWhiteSpace(originAnchorUnitId))
+                return AuthoringEditResult.Refuse("targeting-requires-anchor");
+            Draft.TargetMode = mode;
+            Draft.DirectTargetUnitId = null;
+            Draft.RequiredCoverageUnitIds.Clear();
+            if (mode == CastingTargetMode.DirectTarget)
+            {
+                Draft.DirectTargetUnitId = directTargetUnitId;
+                Draft.Origin = null;
+                return AuthoringEditResult.Accept(
+                    "draft-targeting", new string[0]);
+            }
+            foreach (string unitId in requiredCoverageUnitIds ?? new string[0])
+                if (!string.IsNullOrWhiteSpace(unitId) &&
+                    !Draft.RequiredCoverageUnitIds.Contains(unitId))
+                    Draft.RequiredCoverageUnitIds.Add(unitId);
+            if (mode == CastingTargetMode.AnchoredOrigin)
+                Draft.Origin = CastingOrigin.Anchored(originAnchorUnitId);
+            else
+                Draft.Origin = CastingOrigin.CasterCentered();
+            return AuthoringEditResult.Accept("draft-targeting", new string[0]);
         }
 
         public AuthoringEditResult UpdateFocusedCasting(PlannedCasting replacement)
@@ -517,7 +681,13 @@ namespace KingmakerBuffPlanner.UI
         {
             if (EditingFocusCastingId == null)
                 return AuthoringEditResult.Refuse("no-editing-focus");
-            return _authoring.RemoveCasting(EditingFocusCastingId);
+            AuthoringEditResult result = _authoring.RemoveCasting(
+                EditingFocusCastingId);
+            if (result.Applied)
+                // A removed record must not leave a stale focus id behind
+                // (review F4).
+                EditingFocusCastingId = null;
+            return result;
         }
 
         public AuthoringEditResult MoveFocusedCasting(
@@ -553,6 +723,54 @@ namespace KingmakerBuffPlanner.UI
                     " " + LoadWarning);
             _repository.Save(CastingPlanProfile.FromDocument(
                 _authoring.Document, null, null));
+            _savedIntentSignature = DocumentIntentSignature();
+        }
+
+        // Full authored-intent signature (identity, order, routine, source,
+        // ability, caster, spellbook, targeting shape, coverage,
+        // enhancements, state) — the equality contract for browsing,
+        // Undo, and save/reopen verification (review F2). CastingIds alone
+        // prove nothing about preserved intent.
+        public string DocumentIntentSignature()
+        {
+            var parts = new List<string>();
+            foreach (PlannedCasting casting in _authoring.Document.Castings)
+            {
+                parts.Add(string.Join("|", new[]
+                {
+                    casting.CastingId,
+                    casting.RoutineId,
+                    casting.Order.ToString(CultureInfo.InvariantCulture),
+                    casting.SourceId,
+                    casting.Ability == null ? string.Empty : casting.Ability.Canonical,
+                    casting.CasterUnitId ?? string.Empty,
+                    casting.SpellbookGuid ?? string.Empty,
+                    casting.TargetMode.ToString(),
+                    casting.DirectTargetUnitId ?? string.Empty,
+                    casting.Origin == null ? string.Empty
+                        : casting.Origin.IsCasterCentered
+                            ? "caster"
+                            : "anchor:" + casting.Origin.AnchorUnitId,
+                    string.Join(";", casting.RequiredCoverageUnitIds.ToArray()),
+                    string.Join(";", casting.Enhancements
+                        .Select(value => value.EnhancementId + ":" +
+                            (value.Required ? "1" : "0") + ":" +
+                            (value.ExactSourceRef ?? string.Empty))
+                        .ToArray()),
+                    casting.State.ToString()
+                }));
+            }
+            return string.Join("||", parts.ToArray());
+        }
+
+        // True when authored intent differs from the last explicitly saved
+        // (or loaded) document — the dirty-state contract for close/reopen
+        // preservation (review F6).
+        public bool IsDirty
+        {
+            get { return !string.Equals(DocumentIntentSignature(),
+                _savedIntentSignature ?? string.Empty,
+                StringComparison.Ordinal); }
         }
 
         public CastingPlanLoadStatus Reload()
@@ -567,6 +785,9 @@ namespace KingmakerBuffPlanner.UI
                     _authoring = new CastingAuthoringService(
                         loaded.Profile.ToDocument());
                     PersistenceBlocked = false;
+                    // Focus cannot survive a document swap (review F4).
+                    EditingFocusCastingId = null;
+                    _savedIntentSignature = DocumentIntentSignature();
                     break;
                 default:
                     PersistenceBlocked = true;
@@ -583,6 +804,7 @@ namespace KingmakerBuffPlanner.UI
             CastingWorkspaceInputs inputs, string routineScope, bool projectEffects)
         {
             if (inputs == null) throw new ArgumentNullException("inputs");
+            _lastInputs = inputs;
             return _compiler.Compile(
                 _authoring.Document, inputs.Snapshot, inputs.ProviderOptions,
                 inputs.EffectsBySource, inputs.Enhancements,
