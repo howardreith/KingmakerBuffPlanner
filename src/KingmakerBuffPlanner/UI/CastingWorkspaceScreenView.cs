@@ -104,12 +104,27 @@ namespace KingmakerBuffPlanner.UI
 
         private void Build(StaticCanvas nativeCanvas)
         {
-            _root = KingmakerUiFactory.CreateRect(RootName, nativeCanvas.transform);
+            // Top-level canvas in the game's own service-window pattern
+            // (ScreenSpaceCamera bound to the native UI camera), matching
+            // FadeCanvas/StaticCanvas themselves. The previous structure —
+            // a nested canvas parented under StaticCanvas — demonstrably
+            // rendered in NO path (display or camera) across runs
+            // casting-ws-root-200200 and casting-ws-layout-011500, while
+            // the game's own camera-bound canvases render in both.
+            _root = KingmakerUiFactory.CreateRect(RootName, null);
+            Canvas nativeRootCanvas = nativeCanvas.GetComponent<Canvas>();
             Canvas canvas = _root.gameObject.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceCamera;
+            canvas.worldCamera = nativeRootCanvas == null
+                ? null : nativeRootCanvas.worldCamera;
+            canvas.planeDistance = nativeRootCanvas == null
+                ? 100f : nativeRootCanvas.planeDistance;
             canvas.overrideSorting = true;
-            canvas.sortingOrder = 1000;
+            canvas.sortingOrder = 32000;
             _root.gameObject.AddComponent<GraphicRaycaster>();
             CanvasGroup group = _root.gameObject.AddComponent<CanvasGroup>();
+            group.alpha = 1f;
+            group.interactable = true;
             group.blocksRaycasts = true;
             KingmakerUiFactory.Stretch(_root);
             _nativeTheme = PlannerNativeThemeSurface.Attach(_root, nativeCanvas);
