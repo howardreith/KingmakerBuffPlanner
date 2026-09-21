@@ -46,18 +46,25 @@ $steamSafety = Assert-KbpSteamSafety -SteamPath $SteamPath
     -RunId 'runtime-whatif-preflight' -CompatibilityProfileId $CompatibilityProfileId `
     -WhatIf -Confirm:$false
 $WhatIfPreference = $requestedWhatIf
-$shouldProceed = $true
+$shouldProceed = $false
+$decisionFailure = $null
 try {
     $shouldProceed = $PSCmdlet.ShouldProcess(
         'Steam App ID 640820 and exact live Mods transaction',
         "run guarded $Scenario for version $version")
 }
 catch [NullReferenceException] {
-    # powershell.exe -File leaves a top-level script's $PSCmdlet unable to
-    # service ShouldProcess (NullReferenceException; reproduced minimal,
-    # works under -Command). Fall back to the WhatIf contract this guard
-    # implements; every validator above still ran.
-    $shouldProceed = -not [bool]$WhatIfPreference
+    # powershell.exe -File cannot evaluate a confirmation decision in a
+    # top-level script (NullReferenceException; -WhatIf decisions and all
+    # -Command/direct invocations work). A decision that cannot be
+    # evaluated is a REFUSED decision: never fall through to staging.
+    $decisionFailure = $_.Exception
+}
+if ($null -ne $decisionFailure) {
+    throw ("Runtime launch decision could not be evaluated under powershell.exe -File (" +
+        $decisionFailure.Message + "). Invoke the launcher from PowerShell directly, e.g. " +
+        "& 'scripts/Invoke-KingmakerRuntimeTest.ps1' -Scenario <scenario>, so the guarded " +
+        "confirmation decision is honored. Nothing was staged, deployed, launched, or modified.")
 }
 if (-not $shouldProceed) {
     Write-Host 'Runtime WhatIf preflight PASS; no evidence, deployment, process, game, mod, or save mutation occurred.'
