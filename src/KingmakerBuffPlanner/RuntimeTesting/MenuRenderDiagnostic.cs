@@ -532,13 +532,121 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         internal static void CaptureMenuFrame(string path,
             Action<MenuFrameCapture, Exception> completion)
         {
-            if (_instance == null)
-            {
-                GameObject host = new GameObject("KBP-MenuDiagnosticCaptureHost");
-                _instance = host.AddComponent<MenuDiagnosticCaptureHost>();
-                DontDestroyOnLoad(host);
-            }
+            EnsureInstance();
             _instance.StartCoroutine(CaptureRoutine(path, completion));
+        }
+
+        // Display-independent capture: render every active camera into a
+        // temporary RenderTexture and read THAT, bypassing the presented
+        // backbuffer entirely. When a session's display path presents
+        // nothing (observed: fully-black backbuffer while game logic and
+        // canvases demonstrably run), camera rendering may still produce
+        // the frame. The canvas inventory is recorded so the render-mode
+        // limits of this path (screen-space-overlay UI does not render
+        // into camera targets) are explicit evidence, not surprises.
+        internal static void CaptureMenuFrameThroughCameras(string path,
+            Action<MenuFrameCapture, Exception> completion, ModLog log)
+        {
+            EnsureInstance();
+            _instance.StartCoroutine(CameraCaptureRoutine(path, completion, log));
+        }
+
+        private static void EnsureInstance()
+        {
+            if (_instance != null) return;
+            GameObject host = new GameObject("KBP-MenuDiagnosticCaptureHost");
+            _instance = host.AddComponent<MenuDiagnosticCaptureHost>();
+            DontDestroyOnLoad(host);
+        }
+
+        private static IEnumerator CameraCaptureRoutine(string path,
+            Action<MenuFrameCapture, Exception> completion, ModLog log)
+        {
+            yield return new WaitForEndOfFrame();
+            MenuFrameCapture capture = new MenuFrameCapture
+            {
+                FileName = Path.GetFileName(path),
+                FullPath = path
+            };
+            Exception failure = null;
+            try
+            {
+                Camera[] cameras = UnityEngine.Object.FindObjectsOfType<Camera>()
+                    .Where(camera => camera != null && camera.enabled &&
+                        camera.gameObject.activeInHierarchy)
+                    .OrderBy(camera => camera.depth)
+                    .ToArray();
+                var inventory = new StringBuilder();
+                foreach (Camera camera in cameras)
+                {
+                    if (inventory.Length > 0) inventory.Append('|');
+                    inventory.Append(camera.name).Append("/depth=")
+                        .Append(camera.depth.ToString("F1",
+                            CultureInfo.InvariantCulture))
+                        .Append("/mode=").Append(camera.targetTexture == null
+                            ? "screen" : "rt")
+                        .Append("/rect=")
+                        .Append(camera.pixelWidth.ToString(
+                            CultureInfo.InvariantCulture)).Append("x")
+                        .Append(camera.pixelHeight.ToString(
+                            CultureInfo.InvariantCulture));
+                }
+                var canvases = new StringBuilder();                foreach (Canvas canvas in UnityEngine.Object
+                    .FindObjectsOfType<Canvas>()
+                    .Where(canvas => canvas != null && canvas.isActiveAndEnabled &&
+                        canvas.transform.parent == null)
+                    .Take(8))
+                {
+                    if (canvases.Length > 0) canvases.Append('|');
+                    canvases.Append(canvas.name)
+                        .Append("/mode=").Append(canvas.renderMode)
+                        .Append("/camera=").Append(canvas.worldCamera == null
+                            ? "none" : canvas.worldCamera.name)
+                        .Append("/order=").Append(canvas.sortingOrder);
+                }
+                if (log != null)
+                    log.Info("[KBP-CAPTURE] camera-path inventory;cameras=" +
+                        inventory + ";canvases=" + canvases + ".");
+                int width = Screen.width;
+                int height = Screen.height;
+                RenderTexture texture = RenderTexture.GetTemporary(
+                    width, height, 24, RenderTextureFormat.ARGB32);
+                var restore = new List<KeyValuePair<Camera, RenderTexture>>();
+                foreach (Camera camera in cameras)
+                {
+                    restore.Add(new KeyValuePair<Camera, RenderTexture>(
+                        camera, camera.targetTexture));
+                    camera.targetTexture = texture;
+                }
+                foreach (Camera camera in cameras) camera.Render();
+                foreach (KeyValuePair<Camera, RenderTexture> pair in restore)
+                    pair.Key.targetTexture = pair.Value;
+                RenderTexture.active = texture;
+                Texture2D read = new Texture2D(width, height, TextureFormat.RGB24, false);
+                read.ReadPixels(new Rect(0, 0, width, height), 0, 0, false);
+                read.Apply(false, false);
+                RenderTexture.active = null;
+                RenderTexture.ReleaseTemporary(texture);
+                Color[] pixels = read.GetPixels();
+                byte[] png = read.EncodeToPNG();
+                UnityEngine.Object.Destroy(read);
+                File.WriteAllBytes(path, png);
+                int stride = Math.Max(1, pixels.Length / 120000);
+                var luma = new List<float>();
+                for (int i = 0; i < pixels.Length; i += stride)
+                {
+                    Color color = pixels[i];
+                    luma.Add(color.r * 0.2126f + color.g * 0.7152f +
+                        color.b * 0.0722f);
+                }
+                capture.Samples = luma.ToArray();
+                capture.Summary = MenuFrameStats.Summarize(capture.Samples);
+            }
+            catch (Exception exception)
+            {
+                failure = exception;
+            }
+            completion(capture, failure);
         }
 
         private static IEnumerator CaptureRoutine(string path,

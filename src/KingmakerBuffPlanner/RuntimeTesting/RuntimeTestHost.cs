@@ -85,6 +85,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private float[] _workspaceControlSamples;
         private float[] _workspaceOpenSamples;
         private float _workspaceChangedFraction = -1f;
+        private MenuFrameCapture _workspaceCameraOpenCapture;
+        private MenuFrameCapture _workspaceCameraControlCapture;
+        private string _workspaceCameraOpenLuma = "missing";
+        private string _workspaceCameraControlLuma = "missing";
         private readonly System.Diagnostics.Stopwatch _workspaceCaptureElapsed =
             new System.Diagnostics.Stopwatch();
         private string _workspaceEngineScreenshotSha256;
@@ -1410,6 +1414,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         _log.Info("[KBP-WORKSPACE] capturing control frame before programmatic open;" +
                             MenuRenderDiagnostic.EnvironmentSample() + ".");
                         BeginWorkspaceCapture("workspace-control-frame.png");
+                        BeginWorkspaceCameraCapture(
+                            "workspace-camera-control.png", true);
                         _liveUiPhase = 22;
                         return false;
                     }
@@ -1467,7 +1473,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     WorkspaceOpenSettleMilliseconds) return false;
                 _workspaceBlackAttempts = 0;
                 _workspaceEngineWaitStartedMillis = -1;
+                _workspaceCameraOpenCapture = null;
                 BeginWorkspaceCapture("workspace-frame.png");
+                BeginWorkspaceCameraCapture("workspace-camera-frame.png", false);
                 CaptureScreenshot(Path.Combine(
                     _request.EvidenceDirectory, "workspace-frame-engine.png"));
                 _log.Info("[KBP-WORKSPACE] screen open; workspace frame capture requested;environment=" +
@@ -1563,6 +1571,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         ? -1f
                         : MenuFrameStats.ComputeChangedFraction(
                             _workspaceControlSamples, _workspaceOpenSamples);
+                _workspaceCameraOpenLuma = DescribeCameraCapture(
+                    _workspaceCameraOpenCapture, "workspace-camera-frame.png");
+                _workspaceCameraControlLuma = DescribeCameraCapture(
+                    _workspaceCameraControlCapture, "workspace-camera-control.png");
                 WriteWorkspaceRenderMarker(_workspaceLumaEvidence);
                 _liveInitialCatalogEvidence = "workspace-scenario:" +
                     _request.Scenario +
@@ -1921,6 +1933,22 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 });
         }
 
+        private void BeginWorkspaceCameraCapture(string fileName, bool control)
+        {
+            // Display-independent diagnostic lane: camera-render capture
+            // that bypasses the presented backbuffer. Recorded honestly
+            // alongside the primary paths; not itself an acceptance gate
+            // until proven.
+            MenuDiagnosticCaptureHost.CaptureMenuFrameThroughCameras(
+                Path.Combine(_request.EvidenceDirectory, fileName),
+                delegate(MenuFrameCapture capture, Exception failure)
+                {
+                    capture.Failure = failure;
+                    if (control) _workspaceCameraControlCapture = capture;
+                    else _workspaceCameraOpenCapture = capture;
+                }, _log);
+        }
+
         private bool ConsumeWorkspaceCapture(string fileName)
         {
             if (_workspaceLastCapture == null ||
@@ -1933,6 +1961,20 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     ": " + _workspaceFrameCapture.Failure.GetType().Name + ": " +
                     _workspaceFrameCapture.Failure.Message);
             return true;
+        }
+
+        private static string DescribeCameraCapture(
+            MenuFrameCapture capture, string fileName)
+        {
+            if (capture == null || !string.Equals(capture.FileName, fileName,
+                    StringComparison.OrdinalIgnoreCase))
+                return "missing";
+            if (capture.Failure != null)
+                return "failed:" + capture.Failure.GetType().Name;
+            string luma = capture.Summary == null
+                ? "missing" : capture.Summary.Describe();
+            return luma + ";sha256=" + (File.Exists(capture.FullPath)
+                ? Hashing.Sha256(capture.FullPath) : "missing");
         }
 
         private void WriteWorkspaceRenderMarker(string lumaEvidence)
@@ -1951,6 +1993,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 ",\"changedFraction\":" + _workspaceChangedFraction.ToString(
                     "F5", System.Globalization.CultureInfo.InvariantCulture) +
                 ",\"closedLuma\":" + JsonConvert.ToString(_workspaceClosedLuma ?? string.Empty) +
+                ",\"cameraOpen\":" + JsonConvert.ToString(_workspaceCameraOpenLuma) +
+                ",\"cameraControl\":" + JsonConvert.ToString(_workspaceCameraControlLuma) +
                 ",\"closedSha256\":" + JsonConvert.ToString(
                     _workspaceClosedScreenshotSha256 ?? string.Empty) +
                 ",\"readPixelsSha256\":" + JsonConvert.ToString(
