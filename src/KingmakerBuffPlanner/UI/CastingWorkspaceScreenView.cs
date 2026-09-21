@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Kingmaker.UI;
 using KingmakerBuffPlanner.Domain.Authoring;
+using KingmakerBuffPlanner.Persistence;
 using UnityEngine;
 using UnityEngine.UI;
 using KingmakerBuffPlanner.Planning;
@@ -41,7 +43,10 @@ namespace KingmakerBuffPlanner.UI
         private Button _readyOnlyButton;
         private Button _acceptButton;
         private Button _undoButton;
+        private Button _saveButton;
+        private Button _reloadButton;
         private Vector2 _cardScrollPosition;
+        private RectTransform _routineBar;
         private int _uiLayer;
         private bool _disposed;
 
@@ -95,6 +100,7 @@ namespace KingmakerBuffPlanner.UI
             RebuildCasters(view);
             RebuildCards(view);
             RebuildInspector(view);
+            RebuildRoutineBar(view);
             RebuildFooter(view);
             PropagateUiLayer();
         }
@@ -149,6 +155,7 @@ namespace KingmakerBuffPlanner.UI
                 _theme.ParchmentPanel, _theme.GoldAccent, 2f);
             KingmakerUiFactory.Stretch(frame, 24, 24, 24, 60);
             BuildHeader(frame);
+            BuildRoutineBar(frame);
             BuildLanes(frame);
             BuildFooter(frame);
             PropagateUiLayer();
@@ -184,6 +191,12 @@ namespace KingmakerBuffPlanner.UI
             KingmakerUiFactory.SetAnchors(_scopeLabel.rectTransform, 0f, 0f, 1f, 0f);
             _scopeLabel.rectTransform.sizeDelta = new Vector2(0f, 18f);
             _scopeLabel.rectTransform.anchoredPosition = Vector2.zero;
+        }
+
+        private void BuildRoutineBar(RectTransform frame)
+        {
+            _routineBar = KingmakerUiFactory.CreateRect("RoutineBar", frame);
+            KingmakerUiFactory.SetAnchors(_routineBar, 0f, 0.90f, 1f, 0.945f);
         }
 
         private void BuildLanes(RectTransform frame)
@@ -238,6 +251,21 @@ namespace KingmakerBuffPlanner.UI
             KingmakerUiFactory.SetAnchors(_footerResult.rectTransform, 0f, 1f, 0.55f, 1f);
             _footerResult.rectTransform.sizeDelta = new Vector2(0f, 16f);
             _footerResult.rectTransform.anchoredPosition = Vector2.zero;
+            _saveButton = KingmakerUiFactory.CreateButton(
+                "Save", footer, _theme, "Save", () => Click(() =>
+                {
+                    _session.Save();
+                    _footerResult.text = "Candidate saved.";
+                }));
+            KingmakerUiFactory.SetAnchors(RectOf(_saveButton), 0.34f, 0.2f, 0.42f, 0.8f);
+            _reloadButton = KingmakerUiFactory.CreateButton(
+                "Reload", footer, _theme, "Reload", () => Click(() =>
+                {
+                    CastingPlanLoadStatus status = _session.Reload();
+                    _footerResult.text = "Reloaded: " + status;
+                    RefreshView();
+                }));
+            KingmakerUiFactory.SetAnchors(RectOf(_reloadButton), 0.43f, 0.2f, 0.51f, 0.8f);
             _undoButton = KingmakerUiFactory.CreateButton(
                 "Undo", footer, _theme, "Undo", () => Click(() =>
                 {
@@ -406,17 +434,44 @@ namespace KingmakerBuffPlanner.UI
                 TextAnchor.MiddleLeft);
             scope.fontStyle = FontStyle.Bold;
             KingmakerUiFactory.AddLayout(scope.rectTransform, 30f);
-            if (view.EditingScope != WorkspaceEditingScope.EditingSingleCasting)
+            if (view.EditingScope == WorkspaceEditingScope.EditingSingleCasting)
             {
-                Text hint = KingmakerUiFactory.CreateText(
-                    "Hint", _inspectorContent, _theme,
-                    "Draft below configures the NEXT casting; it never edits " +
-                    "existing cards.", 13, TextAnchor.UpperLeft);
-                hint.color = _theme.MutedBrownText;
-                KingmakerUiFactory.AddLayout(hint.rectTransform, 48f);
+                RebuildFocusedCastingEditor(view);
                 return;
             }
-            string focused = _session.EditingFocusCastingId;
+            RebuildDraftEditor(view);
+        }
+
+        private void RebuildFocusedCastingEditor(WorkspaceView view)
+        {
+            Domain.Authoring.PlannedCasting focused =
+                _session.Document.Castings.FirstOrDefault(casting =>
+                    casting != null && string.Equals(casting.CastingId,
+                        _session.EditingFocusCastingId, StringComparison.Ordinal));
+            if (focused == null)
+            {
+                Text missing = KingmakerUiFactory.CreateText(
+                    "Missing", _inspectorContent, _theme,
+                    "Focused casting is absent from the document.", 13,
+                    TextAnchor.UpperLeft);
+                missing.color = _theme.MutedBrownText;
+                KingmakerUiFactory.AddLayout(missing.rectTransform, 34f);
+                return;
+            }
+            AddInspectorCaption("Retarget");
+            foreach (WorkspaceTargetOption target in view.Draft.Targets.Take(24))
+            {
+                WorkspaceTargetOption captured = target;
+                bool selected = string.Equals(focused.DirectTargetUnitId,
+                    captured.UnitId, StringComparison.Ordinal);
+                Button pick = KingmakerUiFactory.CreateButton(
+                    "Target." + captured.UnitId, _inspectorContent, _theme,
+                    (selected ? "[x] " : "[  ] ") + captured.DisplayName,
+                    () => Click(() => ApplyFocusedEdit(
+                        focused.WithDirectTarget(captured.UnitId))));
+                KingmakerUiFactory.AddLayout(RectOf(pick), 30f);
+            }
+            AddInspectorCaption("Casting state");
             Button disable = KingmakerUiFactory.CreateButton(
                 "Disable", _inspectorContent, _theme, "Disable", () => Click(() =>
                 {
@@ -424,7 +479,7 @@ namespace KingmakerBuffPlanner.UI
                         Domain.Authoring.CastingAuthoringState.Disabled);
                     RefreshView();
                 }));
-            KingmakerUiFactory.AddLayout(RectOf(disable), 34f);
+            KingmakerUiFactory.AddLayout(RectOf(disable), 30f);
             Button enable = KingmakerUiFactory.CreateButton(
                 "Enable", _inspectorContent, _theme, "Mark Ready", () => Click(() =>
                 {
@@ -432,14 +487,248 @@ namespace KingmakerBuffPlanner.UI
                         Domain.Authoring.CastingAuthoringState.Ready);
                     RefreshView();
                 }));
-            KingmakerUiFactory.AddLayout(RectOf(enable), 34f);
+            KingmakerUiFactory.AddLayout(RectOf(enable), 30f);
             Button remove = KingmakerUiFactory.CreateButton(
                 "Remove", _inspectorContent, _theme, "Remove", () => Click(() =>
                 {
                     _session.RemoveFocusedCasting();
                     RefreshView();
                 }));
-            KingmakerUiFactory.AddLayout(RectOf(remove), 34f);
+            KingmakerUiFactory.AddLayout(RectOf(remove), 30f);
+        }
+
+        private void ApplyFocusedEdit(Domain.Authoring.PlannedCasting replacement)
+        {
+            AuthoringEditResult result = _session.UpdateFocusedCasting(replacement);
+            if (!result.Applied)
+                _footerResult.text = "Edit refused: " + result.Reason;
+            RefreshView();
+        }
+
+        // The next-casting draft editor: every control writes ONLY the
+        // session draft and canonical session commands — never a second
+        // ledger (review R1).
+        private void RebuildDraftEditor(WorkspaceView view)
+        {
+            WorkspaceDraftView draft = view.Draft;
+            if (draft == null)
+            {
+                Text missing = KingmakerUiFactory.CreateText(
+                    "Missing", _inspectorContent, _theme,
+                    "Discovery produced no catalogue for the draft editor.",
+                    13, TextAnchor.UpperLeft);
+                missing.color = _theme.MutedBrownText;
+                KingmakerUiFactory.AddLayout(missing.rectTransform, 48f);
+                return;
+            }
+            AddInspectorCaption("Buff");
+            foreach (WorkspaceSourceOption source in draft.Sources.Take(24))
+            {
+                WorkspaceSourceOption captured = source;
+                Button pick = KingmakerUiFactory.CreateButton(
+                    "Source." + captured.SourceId, _inspectorContent, _theme,
+                    (captured.Selected ? "[x] " : "[  ] ") + captured.DisplayName,
+                    () => Click(() =>
+                    {
+                        _session.SelectBuff(captured.SourceId);
+                        _session.Draft.SourceId = captured.SourceId;
+                        RefreshView();
+                    }));
+                KingmakerUiFactory.AddLayout(RectOf(pick), 30f);
+            }
+            AddInspectorCaption("Caster");
+            if (draft.CapableCasters.Count == 0)
+            {
+                Text none = KingmakerUiFactory.CreateText(
+                    "NoCaster", _inspectorContent, _theme,
+                    "No eligible caster for this buff.", 13, TextAnchor.MiddleLeft);
+                none.color = _theme.MutedBrownText;
+                KingmakerUiFactory.AddLayout(none.rectTransform, 26f);
+            }
+            foreach (WorkspaceCasterRow caster in draft.CapableCasters)
+            {
+                WorkspaceCasterRow captured = caster;
+                bool selected = string.Equals(draft.CasterUnitId,
+                    captured.UnitId, StringComparison.Ordinal);
+                Button pick = KingmakerUiFactory.CreateButton(
+                    "DraftCaster." + captured.UnitId, _inspectorContent, _theme,
+                    (selected ? "[x] " : "[  ] ") +
+                        (string.IsNullOrEmpty(captured.DisplayName)
+                            ? captured.UnitId : captured.DisplayName),
+                    () => Click(() =>
+                    {
+                        _session.SelectCaster(captured.UnitId);
+                        _session.Draft.CasterUnitId = captured.UnitId;
+                        RefreshView();
+                    }));
+                KingmakerUiFactory.AddLayout(RectOf(pick), 30f);
+            }
+            AddInspectorCaption("Targeting");
+            bool direct = draft.TargetMode ==
+                Domain.Authoring.CastingTargetMode.DirectTarget;
+            Button mode = KingmakerUiFactory.CreateButton(
+                "Mode", _inspectorContent, _theme,
+                direct ? "Mode: single target" : "Mode: group from origin",
+                () => Click(() =>
+                {
+                    if (direct)
+                    {
+                        _session.Draft.TargetMode =
+                            Domain.Authoring.CastingTargetMode.CasterCenteredOrigin;
+                        _session.Draft.Origin =
+                            Domain.Authoring.CastingOrigin.CasterCentered();
+                    }
+                    else
+                    {
+                        _session.Draft.TargetMode =
+                            Domain.Authoring.CastingTargetMode.DirectTarget;
+                    }
+                    RefreshView();
+                }));
+            KingmakerUiFactory.AddLayout(RectOf(mode), 30f);
+            if (direct)
+            {
+                foreach (WorkspaceTargetOption target in draft.Targets.Take(24))
+                {
+                    WorkspaceTargetOption captured = target;
+                    bool selected = string.Equals(draft.DirectTargetUnitId,
+                        captured.UnitId, StringComparison.Ordinal);
+                    Button pick = KingmakerUiFactory.CreateButton(
+                        "DraftTarget." + captured.UnitId, _inspectorContent,
+                        _theme,
+                        (selected ? "[x] " : "[  ] ") + captured.DisplayName,
+                        () => Click(() =>
+                        {
+                            _session.Draft.DirectTargetUnitId = captured.UnitId;
+                            RefreshView();
+                        }));
+                    KingmakerUiFactory.AddLayout(RectOf(pick), 30f);
+                }
+            }
+            else
+            {
+                Button casterOrigin = KingmakerUiFactory.CreateButton(
+                    "Origin.Caster", _inspectorContent, _theme,
+                    string.IsNullOrEmpty(draft.OriginAnchorUnitId)
+                        ? "[x] Origin: caster" : "[  ] Origin: caster",
+                    () => Click(() =>
+                    {
+                        _session.Draft.Origin =
+                            Domain.Authoring.CastingOrigin.CasterCentered();
+                        RefreshView();
+                    }));
+                KingmakerUiFactory.AddLayout(RectOf(casterOrigin), 30f);
+                foreach (WorkspaceOriginOption origin in draft.Origins.Take(12))
+                {
+                    WorkspaceOriginOption captured = origin;
+                    Button pick = KingmakerUiFactory.CreateButton(
+                        "Origin." + captured.AnchorUnitId, _inspectorContent,
+                        _theme,
+                        (captured.Selected ? "[x] " : "[  ] ") +
+                            "Origin: " + captured.AnchorUnitId,
+                        () => Click(() =>
+                        {
+                            _session.Draft.Origin =
+                                Domain.Authoring.CastingOrigin.Anchored(
+                                    captured.AnchorUnitId);
+                            RefreshView();
+                        }));
+                    KingmakerUiFactory.AddLayout(RectOf(pick), 30f);
+                }
+            }
+            AddInspectorCaption("Enhancements");
+            if (draft.Enhancements.Count == 0)
+            {
+                Text none = KingmakerUiFactory.CreateText(
+                    "NoEnhancement", _inspectorContent, _theme,
+                    "None available for this caster and ability.", 13,
+                    TextAnchor.MiddleLeft);
+                none.color = _theme.MutedBrownText;
+                KingmakerUiFactory.AddLayout(none.rectTransform, 26f);
+            }
+            foreach (WorkspaceEnhancementOption enhancement in
+                draft.Enhancements.Take(12))
+            {
+                WorkspaceEnhancementOption captured = enhancement;
+                Button toggle = KingmakerUiFactory.CreateButton(
+                    "Enhancement." + captured.EnhancementId, _inspectorContent,
+                    _theme,
+                    (captured.Selected ? "[x] " : "[  ] ") + captured.Label,
+                    () => Click(() =>
+                    {
+                        if (captured.Selected)
+                            _session.Draft.Enhancements.RemoveAll(selection =>
+                                selection != null && string.Equals(
+                                    selection.EnhancementId,
+                                    captured.EnhancementId,
+                                    StringComparison.Ordinal));
+                        else
+                            _session.Draft.Enhancements.Add(
+                                new Domain.Authoring.AuthoredEnhancementSelection(
+                                    captured.EnhancementId, true, null));
+                        RefreshView();
+                    }));
+                KingmakerUiFactory.AddLayout(RectOf(toggle), 30f);
+            }
+            AddInspectorCaption("State");
+            Button state = KingmakerUiFactory.CreateButton(
+                "State", _inspectorContent, _theme,
+                "State: " + draft.State, () => Click(() =>
+                {
+                    _session.Draft.State = draft.State ==
+                        Domain.Authoring.CastingAuthoringState.Ready
+                        ? Domain.Authoring.CastingAuthoringState.Draft
+                        : Domain.Authoring.CastingAuthoringState.Ready;
+                    RefreshView();
+                }));
+            KingmakerUiFactory.AddLayout(RectOf(state), 30f);
+            Button add = KingmakerUiFactory.CreateButton(
+                "AddCasting", _inspectorContent, _theme, "Add Casting",
+                () => Click(() =>
+                {
+                    AuthoringEditResult result = _session.AddCastingFromDraft();
+                    if (!result.Applied)
+                        _footerResult.text = "Add refused: " + result.Reason;
+                    RefreshView();
+                }));
+            KingmakerUiFactory.AddLayout(RectOf(add), 36f);
+        }
+
+        private void AddInspectorCaption(string caption)
+        {
+            Text label = KingmakerUiFactory.CreateText(
+                "Caption." + caption, _inspectorContent, _theme, caption, 14,
+                TextAnchor.MiddleLeft);
+            label.fontStyle = FontStyle.Bold;
+            label.color = _theme.MutedBrownText;
+            KingmakerUiFactory.AddLayout(label.rectTransform, 24f);
+        }
+
+        private void RebuildRoutineBar(WorkspaceView view)
+        {
+            if (_routineBar == null) return;
+            KingmakerUiFactory.DestroyChildren(_routineBar);
+            foreach (string routineId in view.RoutineIds.Take(8))
+            {
+                string captured = routineId;
+                bool selected = string.Equals(view.SelectedRoutineId, captured,
+                    StringComparison.Ordinal);
+                Button tab = KingmakerUiFactory.CreateButton(
+                    "Routine." + captured, _routineBar, _theme,
+                    (selected ? "[x] " : string.Empty) + captured,
+                    () => Click(() =>
+                    {
+                        _session.SelectRoutine(captured);
+                        RefreshView();
+                    }));
+                RectOf(tab).anchorMin = new Vector2(0f, 0.1f);
+                RectOf(tab).anchorMax = new Vector2(0f, 0.9f);
+                RectOf(tab).sizeDelta = new Vector2(170f, 0f);
+                RectOf(tab).anchoredPosition = new Vector2(
+                    16f + view.RoutineIds.TakeWhile(id =>
+                        !string.Equals(id, captured, StringComparison.Ordinal))
+                        .Count() * 178f, 0f);
+            }
         }
 
         private void RebuildFooter(WorkspaceView view)

@@ -352,6 +352,8 @@ namespace KingmakerBuffPlanner.Tests
                     () => TestCastingWorkspaceRoutineScopedApply(root));
                 Run("casting-workspace-fresh-buff-capability",
                     () => TestCastingWorkspaceFreshBuffCapability(root));
+                Run("casting-workspace-draft-catalog-authoring",
+                    () => TestCastingWorkspaceDraftCatalog(root));
             }
             finally
             {
@@ -12058,6 +12060,62 @@ namespace KingmakerBuffPlanner.Tests
             if (communal.Casters.Any(row => row.Capable))
                 throw new InvalidOperationException(
                     "Capability did not follow the selected source.");
+        }
+
+        // Review R1 support: the draft-editor read model must carry the
+        // complete authoring data (sources, capable casters, targets,
+        // enhancements) and the session must accept the exact sequence the
+        // view controls issue: buff → caster → mode → target → enhancement
+        // → state → add.
+        private static void TestCastingWorkspaceDraftCatalog(string root)
+        {
+            string modPath = Path.Combine(root, "casting-workspace-draft");
+            Directory.CreateDirectory(modPath);
+            PartyProviderSnapshot snapshot;
+            CastingWorkspaceInputs inputs = WorkspaceInputs(out snapshot);
+            var session = new CastingWorkspaceSession(modPath, "draft-campaign");
+            // The control sequence a player issues through the editor.
+            session.SelectRoutine("long");
+            session.SelectBuff("source-bulls");
+            session.SelectCaster("unit-cleric");
+            WorkspaceView browse = session.BuildView(inputs);
+            if (browse.Draft == null ||
+                browse.Draft.Sources.Count == 0 ||
+                !browse.Draft.Sources.Any(source => source.Selected &&
+                    source.SourceId == "source-bulls"))
+                throw new InvalidOperationException(
+                    "The draft catalogue does not present the selected buff.");
+            if (!browse.Draft.CapableCasters.Any(row => row.UnitId == "unit-cleric") ||
+                !browse.Draft.CapableCasters.Any(row => row.UnitId == "unit-wizard"))
+                throw new InvalidOperationException(
+                    "The draft editor lacks the eligible casters.");
+            if (!browse.Draft.Targets.Any(target => target.UnitId == "unit-t1") ||
+                browse.Draft.Targets.Count < 3)
+                throw new InvalidOperationException(
+                    "The draft editor lacks recipient targets.");
+            session.Draft.SourceId = "source-bulls";
+            session.Draft.Ability = CastingBuffAbility;
+            session.Draft.TargetMode = CastingTargetMode.DirectTarget;
+            session.Draft.CasterUnitId = "unit-cleric";
+            session.Draft.DirectTargetUnitId = "unit-t1";
+            session.Draft.State = CastingAuthoringState.Ready;
+            session.Draft.Enhancements.Add(
+                new AuthoredEnhancementSelection("extend-cleric", true, null));
+            WorkspaceView armed = session.BuildView(inputs);
+            if (!armed.Draft.Enhancements.Any(option =>
+                    option.Selected && option.EnhancementId == "extend-cleric"))
+                throw new InvalidOperationException(
+                    "The enhancement toggle state is not echoed.");
+            if (!session.AddCastingFromDraft().Applied)
+                throw new InvalidOperationException(
+                    "The control-sequence draft was refused.");
+            WorkspaceView authored = session.BuildView(inputs);
+            if (authored.Cards.Count != 1 ||
+                authored.Cards[0].CasterUnitId != "unit-cleric" ||
+                authored.Cards[0].DirectTargetUnitId != "unit-t1" ||
+                authored.Cards[0].EnhancementLabels.Count != 1)
+                throw new InvalidOperationException(
+                    "The authored card does not reflect the editor's controls.");
         }
 
         private static void TestCastingWorkspaceReviewApply(string root)

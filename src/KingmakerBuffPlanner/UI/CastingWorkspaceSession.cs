@@ -293,7 +293,140 @@ namespace KingmakerBuffPlanner.UI
                 _authoring.Document.Routines.Select(value => value.RoutineId)
                     .ToList(),
                 selectedGate, onePassGate, _review.Status, scope, scopeLabel,
-                plan.Diagnostics);
+                plan.Diagnostics,
+                BuildDraftView(inputs, selectedSource, casters));
+        }
+
+        private WorkspaceDraftView BuildDraftView(
+            CastingWorkspaceInputs inputs, string selectedSource,
+            List<WorkspaceCasterRow> casters)
+        {
+            var sources = new List<WorkspaceSourceOption>();
+            if (inputs.EffectsBySource != null && inputs.ProviderOptions != null)
+            {
+                var sourceIds = new HashSet<string>(StringComparer.Ordinal);
+                foreach (ProviderPlanningOption option in inputs.ProviderOptions)
+                {
+                    if (option == null || option.Provider == null) continue;
+                    AbilityKey ability = option.Provider.Key.Ability;
+                    EffectExpression abilityExpression = null;
+                    if (ability != null && inputs.EffectsBySource.TryGetValue(
+                            ability.Canonical, out abilityExpression))
+                    {
+                        foreach (KeyValuePair<string, EffectExpression> pair in
+                            inputs.EffectsBySource)
+                            if (!string.Equals(pair.Key, ability.Canonical,
+                                    StringComparison.Ordinal) &&
+                                ReferenceEquals(pair.Value, abilityExpression))
+                                sourceIds.Add(pair.Key);
+                    }
+                }
+                foreach (string sourceId in sourceIds.OrderBy(
+                         value => value, StringComparer.Ordinal))
+                {
+                    string display = inputs.ProviderOptions
+                        .Where(value => value != null && value.Provider != null)
+                        .Select(value => value.Provider.SourceDisplayName)
+                        .FirstOrDefault(name =>
+                            !string.IsNullOrWhiteSpace(name));
+                    sources.Add(new WorkspaceSourceOption(
+                        sourceId, display,
+                        string.Equals(sourceId, selectedSource,
+                            StringComparison.Ordinal)));
+                }
+            }
+            string draftSource = string.IsNullOrEmpty(Draft.SourceId)
+                ? selectedSource : Draft.SourceId;
+            string draftCaster = Draft.CasterUnitId ?? SelectedCasterUnitId;
+            ProviderPlanningOption draftOption = FindDraftOption(
+                inputs, draftSource, draftCaster);
+            var targets = inputs.Snapshot.Units
+                .Select(unit => new WorkspaceTargetOption(
+                    unit.UnitId, unit.DisplayName,
+                    string.Equals(unit.UnitId, Draft.DirectTargetUnitId,
+                        StringComparison.Ordinal)))
+                .ToList();
+            var origins = new List<WorkspaceOriginOption>();
+            if (draftOption != null)
+                foreach (string anchor in draftOption.LegalAnchorIds)
+                    origins.Add(new WorkspaceOriginOption(anchor,
+                        Draft.Origin != null && !Draft.Origin.IsCasterCentered &&
+                        string.Equals(Draft.Origin.AnchorUnitId, anchor,
+                            StringComparison.Ordinal)));
+            var enhancements = new List<WorkspaceEnhancementOption>();
+            if (inputs.Enhancements != null && Draft.Ability != null &&
+                !string.IsNullOrEmpty(draftCaster))
+            {
+                string baseGuid = Draft.Ability.BaseAbilityGuid;
+                string variantGuid = Draft.Ability.VariantGuid;
+                foreach (CastEnhancementSnapshot enhancement in inputs.Enhancements)
+                {
+                    if (enhancement == null ||
+                        !string.Equals(enhancement.CasterUnitId, draftCaster,
+                            StringComparison.Ordinal)) continue;
+                    bool qualified = enhancement.AbilityWhiteList.Count == 0 ||
+                        enhancement.AbilityWhiteList.Contains(baseGuid) ||
+                        enhancement.AbilityWhiteList.Contains(variantGuid);
+                    if (!qualified) continue;
+                    enhancements.Add(new WorkspaceEnhancementOption(
+                        enhancement.EnhancementId, enhancement.DisplayName,
+                        Draft.Enhancements.Any(selection => selection != null &&
+                            string.Equals(selection.EnhancementId,
+                                enhancement.EnhancementId,
+                                StringComparison.Ordinal))));
+                }
+            }
+            return new WorkspaceDraftView(
+                draftSource,
+                draftCaster ?? string.Empty,
+                Draft.TargetMode,
+                Draft.DirectTargetUnitId ?? string.Empty,
+                Draft.Origin == null || Draft.Origin.IsCasterCentered
+                    ? string.Empty : Draft.Origin.AnchorUnitId,
+                Draft.State,
+                sources,
+                casters.Where(row => row.Capable).ToList(),
+                targets, origins, enhancements);
+        }
+
+        // Resolves the exact discovered provider option serving the draft's
+        // current source and caster (the ability the Add control authors).
+        public AbilityKey DraftAbilityFor(CastingWorkspaceInputs inputs)
+        {
+            if (inputs == null) return null;
+            string draftSource = string.IsNullOrEmpty(Draft.SourceId)
+                ? SelectedSourceId : Draft.SourceId;
+            ProviderPlanningOption option = FindDraftOption(
+                inputs, draftSource, Draft.CasterUnitId ?? SelectedCasterUnitId);
+            return option == null ? null : option.Provider.Key.Ability;
+        }
+
+        private ProviderPlanningOption FindDraftOption(
+            CastingWorkspaceInputs inputs, string draftSource, string draftCaster)
+        {
+            if (inputs.ProviderOptions == null ||
+                inputs.EffectsBySource == null ||
+                string.IsNullOrEmpty(draftCaster)) return null;
+            EffectExpression sourceExpression;
+            if (!inputs.EffectsBySource.TryGetValue(
+                    draftSource, out sourceExpression)) return null;
+            return inputs.ProviderOptions.FirstOrDefault(
+                option => option != null && option.Provider != null &&
+                    string.Equals(option.Provider.Key.CasterUnitId,
+                        draftCaster, StringComparison.Ordinal) &&
+                    OptionServesExpression(inputs, option, sourceExpression));
+        }
+
+        private static bool OptionServesExpression(
+            CastingWorkspaceInputs inputs,
+            ProviderPlanningOption option,
+            EffectExpression sourceExpression)
+        {
+            EffectExpression abilityExpression;
+            return option.Provider.Key.Ability != null &&
+                inputs.EffectsBySource.TryGetValue(
+                    option.Provider.Key.Ability.Canonical, out abilityExpression) &&
+                ReferenceEquals(abilityExpression, sourceExpression);
         }
 
         // ------------------------------------------------------------------

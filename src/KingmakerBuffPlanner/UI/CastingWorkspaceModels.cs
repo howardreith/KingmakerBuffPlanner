@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using KingmakerBuffPlanner.Domain.Authoring;
 using KingmakerBuffPlanner.Domain.Providers;
 using KingmakerBuffPlanner.Planning;
 
@@ -121,6 +122,113 @@ namespace KingmakerBuffPlanner.UI
         public IReadOnlyList<string> ResponsibleCastingIds { get; private set; }
     }
 
+    // One selectable buff source in the draft editor's catalogue.
+    public sealed class WorkspaceSourceOption
+    {
+        internal WorkspaceSourceOption(
+            string sourceId, string displayName, bool selected)
+        {
+            SourceId = sourceId ?? string.Empty;
+            DisplayName = string.IsNullOrWhiteSpace(displayName)
+                ? SourceId : displayName;
+            Selected = selected;
+        }
+
+        public string SourceId { get; private set; }
+        public string DisplayName { get; private set; }
+        public bool Selected { get; private set; }
+    }
+
+    // One selectable recipient unit for a direct-target casting.
+    public sealed class WorkspaceTargetOption
+    {
+        internal WorkspaceTargetOption(
+            string unitId, string displayName, bool selected)
+        {
+            UnitId = unitId ?? string.Empty;
+            DisplayName = string.IsNullOrWhiteSpace(displayName)
+                ? UnitId : displayName;
+            Selected = selected;
+        }
+
+        public string UnitId { get; private set; }
+        public string DisplayName { get; private set; }
+        public bool Selected { get; private set; }
+    }
+
+    // One selectable group origin (anchor) for a group casting.
+    public sealed class WorkspaceOriginOption
+    {
+        internal WorkspaceOriginOption(
+            string anchorUnitId, bool selected)
+        {
+            AnchorUnitId = anchorUnitId ?? string.Empty;
+            Selected = selected;
+        }
+
+        public string AnchorUnitId { get; private set; }
+        public bool Selected { get; private set; }
+    }
+
+    // One toggleable per-casting enhancement for the draft.
+    public sealed class WorkspaceEnhancementOption
+    {
+        internal WorkspaceEnhancementOption(
+            string enhancementId, string label, bool selected)
+        {
+            EnhancementId = enhancementId ?? string.Empty;
+            Label = string.IsNullOrWhiteSpace(label) ? EnhancementId : label;
+            Selected = selected;
+        }
+
+        public string EnhancementId { get; private set; }
+        public string Label { get; private set; }
+        public bool Selected { get; private set; }
+    }
+
+    // The draft editor read model: everything the next-casting controls
+    // need, derived from the SAME discovery inputs the plan compiles from.
+    public sealed class WorkspaceDraftView
+    {
+        internal WorkspaceDraftView(
+            string sourceId,
+            string casterUnitId,
+            CastingTargetMode targetMode,
+            string directTargetUnitId,
+            string originAnchorUnitId,
+            Domain.Authoring.CastingAuthoringState state,
+            IReadOnlyList<WorkspaceSourceOption> sources,
+            IReadOnlyList<WorkspaceCasterRow> capableCasters,
+            IReadOnlyList<WorkspaceTargetOption> targets,
+            IReadOnlyList<WorkspaceOriginOption> origins,
+            IReadOnlyList<WorkspaceEnhancementOption> enhancements)
+        {
+            SourceId = sourceId ?? string.Empty;
+            CasterUnitId = casterUnitId ?? string.Empty;
+            TargetMode = targetMode;
+            DirectTargetUnitId = directTargetUnitId ?? string.Empty;
+            OriginAnchorUnitId = originAnchorUnitId ?? string.Empty;
+            State = state;
+            Sources = sources;
+            CapableCasters = capableCasters;
+            Targets = targets;
+            Origins = origins;
+            Enhancements = enhancements;
+        }
+
+        public string SourceId { get; private set; }
+        public string CasterUnitId { get; private set; }
+        public CastingTargetMode TargetMode { get; private set; }
+        public string DirectTargetUnitId { get; private set; }
+        public string OriginAnchorUnitId { get; private set; }
+        public Domain.Authoring.CastingAuthoringState State { get; private set; }
+        public IReadOnlyList<WorkspaceSourceOption> Sources { get; private set; }
+        public IReadOnlyList<WorkspaceCasterRow> CapableCasters { get; private set; }
+        public IReadOnlyList<WorkspaceTargetOption> Targets { get; private set; }
+        public IReadOnlyList<WorkspaceOriginOption> Origins { get; private set; }
+        public IReadOnlyList<WorkspaceEnhancementOption> Enhancements { get; private set; }
+    }
+
     // The full read model the Unity view renders after each refresh. Built
     // from the document plus the shared resolved plan; browsing never
     // mutates anything.
@@ -138,7 +246,8 @@ namespace KingmakerBuffPlanner.UI
             CastingReviewStatus reviewStatus,
             WorkspaceEditingScope editingScope,
             string editingScopeLabel,
-            IReadOnlyList<string> diagnostics)
+            IReadOnlyList<string> diagnostics,
+            WorkspaceDraftView draft)
         {
             SelectedSourceId = selectedSourceId ?? string.Empty;
             SelectedRoutineId = selectedRoutineId ?? string.Empty;
@@ -152,6 +261,7 @@ namespace KingmakerBuffPlanner.UI
             EditingScope = editingScope;
             EditingScopeLabel = editingScopeLabel ?? string.Empty;
             Diagnostics = diagnostics;
+            Draft = draft;
         }
 
         public string SelectedSourceId { get; private set; }
@@ -166,6 +276,7 @@ namespace KingmakerBuffPlanner.UI
         public WorkspaceEditingScope EditingScope { get; private set; }
         public string EditingScopeLabel { get; private set; }
         public IReadOnlyList<string> Diagnostics { get; private set; }
+        public WorkspaceDraftView Draft { get; private set; }
 
         public WorkspaceCastingCard CardById(string castingId)
         {

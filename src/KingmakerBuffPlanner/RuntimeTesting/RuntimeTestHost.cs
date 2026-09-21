@@ -8,7 +8,9 @@ using System.Reflection;
 using Kingmaker.Blueprints;
 using Kingmaker.UI;
 using KingmakerBuffPlanner.Discovery;
+using KingmakerBuffPlanner.Domain.Authoring;
 using KingmakerBuffPlanner.Infrastructure;
+using KingmakerBuffPlanner.Planning;
 using KingmakerBuffPlanner.UI;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -87,6 +89,14 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private float _workspaceChangedFraction = -1f;
         private string _workspaceOpenLumaSummary = "missing";
         private bool _workspaceOpenNonBlack;
+        private int _workspaceInteractionStep;
+        private string _workspaceInteractionEvidence = "not-run";
+        private string _workspaceReopenEvidence = "not-run";
+        private string _workspaceSavedIntentIds;
+        private readonly List<string> _interactionCasters = new List<string>();
+        private readonly List<string> _interactionTargets = new List<string>();
+        private readonly List<string> _interactionCastIds = new List<string>();
+        private string _interactionSourceId;
         private MenuFrameCapture _workspaceCameraOpenCapture;
         private MenuFrameCapture _workspaceCameraControlCapture;
         private string _workspaceCameraOpenLuma = "missing";
@@ -730,11 +740,43 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                             "changedFraction>=0.05", changeEvidence)
                         : RuntimeTestAssertion.Fail("workspace-vs-control-visible-change",
                             "changedFraction>=0.05", changeEvidence));
+                    // Behavior-based interaction assertions (review R1/C4):
+                    // browse-without-mutation, three single-target castings
+                    // from two casters, one focused edit, Undo, deliberate
+                    // re-edit, save, and reopen with exact identity/order.
+                    string interactionEvidence = _workspaceInteractionEvidence ?? "missing";
+                    bool interactions = interactionEvidence.Contains(
+                            "browseNoMutation=True") &&
+                        interactionEvidence.Contains("cast1=applied") &&
+                        interactionEvidence.Contains("cast2=applied") &&
+                        interactionEvidence.Contains("cast3=applied") &&
+                        interactionEvidence.Contains("edit=applied") &&
+                        interactionEvidence.Contains("undo=True") &&
+                        interactionEvidence.Contains("saved=True");
+                    result.Assertions.Add(interactions
+                        ? RuntimeTestAssertion.Pass("workspace-interaction-sequence",
+                            "browse;3 casts/2 casters;edit;undo;save",
+                            interactionEvidence)
+                        : RuntimeTestAssertion.Fail("workspace-interaction-sequence",
+                            "browse;3 casts/2 casters;edit;undo;save",
+                            interactionEvidence));
+                    string reopenEvidence = _workspaceReopenEvidence ?? "missing";
+                    bool reopenPreserved = reopenEvidence.Contains("preserved=True");
+                    result.Assertions.Add(reopenPreserved
+                        ? RuntimeTestAssertion.Pass("workspace-reopen-preserves-intent",
+                            "exact IDs and order after close/reopen", reopenEvidence)
+                        : RuntimeTestAssertion.Fail("workspace-reopen-preserves-intent",
+                            "exact IDs and order after close/reopen", reopenEvidence));
                     if (!workspaceOpen || !frameCaptured || !engineCaptured ||
                         !nonBlack || !presented || !controlCaptured || !visibleChange)
                     {
                         result.Status = "FAIL";
                         result.Stage = "workspace-visual-validation";
+                    }
+                    else if (!interactions || !reopenPreserved)
+                    {
+                        result.Status = "FAIL";
+                        result.Stage = "workspace-interaction-validation";
                     }
                 }
                 int loadedOptionalAssemblies = 0;
@@ -1566,18 +1608,18 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     // Root state at CAPTURE time; the bisection below closes
                     // the workspace, so phase 21 must not re-sample it.
                     _workspaceWasOpenAtCapture = BuffPlannerUiRoot.IsCastingWorkspaceOpen;
-                    // Diagnostic bisection: capture the identical scene with
-                    // the workspace closed. If the closed frame is non-black
-                    // while the open frame stayed black, the workspace's own
-                    // presence blackens presentation; if both are black, the
-                    // intermittent game presentation defect is responsible.
-                    BuffPlannerUiRoot.CloseCastingWorkspaceForRuntime();
-                    _workspaceClosedWaitUpdates = 0;
-                    _log.Info("[KBP-WORKSPACE] workspace closed for bisection capture;luma=" +
-                        lumaEvidence + ";presentation=" + _workspacePresentationEvidence + ".");
-                    _liveUiPhase = 19;
+                    // The guarded interaction sequence runs BEFORE the
+                    // bisection close, against the live session the view
+                    // owns (review R1/C4: direct session calls, labeled as
+                    // such — never physical-input claims).
+                    _workspaceInteractionStep = 0;
+                    _liveUiPhase = 25;
                 }
                 return false;
+            }
+            if (_liveUiPhase == 25)
+            {
+                return UpdateWorkspaceInteraction();
             }
             if (_liveUiPhase == 19)
             {
@@ -1597,6 +1639,34 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     ? "missing" : _workspaceFrameCapture.Summary.Describe();
                 _workspaceClosedScreenshotSha256 =
                     Hashing.Sha256(_workspaceFrameCapture.FullPath);
+                // Reopen through the production toggle route and verify the
+                // saved candidate survived the close/reopen cycle.
+                UI.BuffPlannerUiRoot.HandlePlannerHotkey();
+                _log.Info("[KBP-WORKSPACE] reopening workspace through the production toggle for save/reopen verification.");
+                _liveUiPhase = 26;
+                return false;
+            }
+            if (_liveUiPhase == 26)
+            {
+                if (!BuffPlannerUiRoot.IsCastingWorkspaceOpen) return false;
+                if (!_workspaceCaptureElapsed.IsRunning) _workspaceCaptureElapsed.Start();
+                if (_workspaceOpenSeenMillis >= 0 &&
+                    _workspaceCaptureElapsed.ElapsedMilliseconds - _workspaceOpenSeenMillis <
+                    0) return false;
+                _workspaceReopenEvidence = VerifyWorkspaceReopen();
+                BeginWorkspaceCameraCapture("ws-interact-reopened.png", false);
+                _liveUiPhase = 27;
+                return false;
+            }
+            if (_liveUiPhase == 27)
+            {
+                if (_workspaceCameraOpenCapture == null ||
+                    !string.Equals(_workspaceCameraOpenCapture.FileName,
+                        "ws-interact-reopened.png", StringComparison.OrdinalIgnoreCase))
+                    return false;
+                _log.Info("[KBP-WORKSPACE] interaction sequence complete;" +
+                    _workspaceInteractionEvidence + ";reopen=" +
+                    _workspaceReopenEvidence + ".");
                 _liveUiPhase = 21;
                 return false;
             }
@@ -2001,8 +2071,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         }
 
         private static string DescribeCameraCapture(
-            MenuFrameCapture capture, string fileName)
-        {
+            MenuFrameCapture capture, string fileName)        {
             if (capture == null || !string.Equals(capture.FileName, fileName,
                     StringComparison.OrdinalIgnoreCase))
                 return "missing";
@@ -2012,6 +2081,188 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 ? "missing" : capture.Summary.Describe();
             return luma + ";sha256=" + (File.Exists(capture.FullPath)
                 ? Hashing.Sha256(capture.FullPath) : "missing");
+        }
+
+        // Guarded interaction sequence (review R1/C4): canonical session
+        // commands against the LIVE workspace session, one step per update,
+        // with camera captures between milestones. Labeled direct session
+        // calls — never physical-input claims.
+        private bool UpdateWorkspaceInteraction()
+        {
+            UI.CastingWorkspaceSession session =
+                BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
+            if (session == null)
+            {
+                _workspaceInteractionEvidence = "session-missing";
+                TransitionToBisectionClose();
+                return false;
+            }
+            try
+            {
+                if (_workspaceInteractionStep == 0)
+                {
+                    CastingWorkspaceInputs inputs =
+                        BuffPlannerUiRoot.CastingWorkspaceInputsForRuntime();
+                    WorkspaceView view = session.BuildView(inputs);
+                    _interactionCasters.Clear();
+                    _interactionTargets.Clear();
+                    if (view.Draft != null)
+                    {
+                        foreach (UI.WorkspaceCasterRow caster in
+                            view.Draft.CapableCasters.Take(4))
+                            _interactionCasters.Add(caster.UnitId);
+                        foreach (UI.WorkspaceTargetOption target in
+                            view.Draft.Targets.Take(8))
+                            _interactionTargets.Add(target.UnitId);
+                        UI.WorkspaceSourceOption selected =
+                            view.Draft.Sources.FirstOrDefault(source =>
+                                source.Selected) ?? view.Draft.Sources.FirstOrDefault();
+                        _interactionSourceId = selected == null
+                            ? view.SelectedSourceId : selected.SourceId;
+                    }
+                    if (string.IsNullOrEmpty(_interactionSourceId))
+                        _interactionSourceId = view.SelectedSourceId;
+                    _workspaceInteractionEvidence = "browseNoMutation=" +
+                        (session.Document != null) + ";capableCasters=" +
+                        _interactionCasters.Count + ";targets=" +
+                        _interactionTargets.Count;
+                    session.SelectBuff(_interactionSourceId);
+                    if (view.RoutineIds.Count != 0)
+                        session.SelectRoutine(view.RoutineIds[0]);
+                    BeginWorkspaceCameraCapture("ws-interact-browse.png", false);
+                    _workspaceInteractionStep = 1;
+                    return false;
+                }
+                if (_interactionCasters.Count < 2 || _interactionTargets.Count < 3)
+                {
+                    // Honest environment shortfall: record and skip the
+                    // authoring steps; the assertions fail closed.
+                    _workspaceInteractionEvidence += ";insufficient-party";
+                    TransitionToBisectionClose();
+                    return false;
+                }
+                CastingWorkspaceInputs currentInputs =
+                    BuffPlannerUiRoot.CastingWorkspaceInputsForRuntime();
+                if (_workspaceInteractionStep >= 1 && _workspaceInteractionStep <= 3)
+                {
+                    int index = _workspaceInteractionStep - 1;
+                    string caster = _interactionCasters[index == 1 ? 1 : 0];
+                    session.Draft.SourceId = _interactionSourceId;
+                    session.Draft.CasterUnitId = caster;
+                    session.Draft.Ability = session.DraftAbilityFor(currentInputs) ??
+                        session.CompilePlan(currentInputs).Castings
+                            .Select(value => value.Ability).FirstOrDefault();
+                    session.Draft.TargetMode = CastingTargetMode.DirectTarget;
+                    session.Draft.DirectTargetUnitId = _interactionTargets[index];
+                    session.Draft.State = CastingAuthoringState.Ready;
+                    session.Draft.Enhancements.Clear();
+                    AuthoringEditResult added = session.AddCastingFromDraft();
+                    string castId = session.Document.Castings.Count == 0
+                        ? string.Empty
+                        : session.Document.Castings[
+                            session.Document.Castings.Count - 1].CastingId;
+                    _interactionCastIds.Add(castId);
+                    _workspaceInteractionEvidence += ";cast" + (index + 1) + "=" +
+                        (added.Applied ? "applied" : "refused:" + added.Reason);
+                    _workspaceInteractionStep++;
+                    return false;
+                }
+                if (_workspaceInteractionStep == 4)
+                {
+                    string editId = _interactionCastIds.Count > 1
+                        ? _interactionCastIds[1] : string.Empty;
+                    Domain.Authoring.PlannedCasting focused =
+                        session.Document.Castings.FirstOrDefault(casting =>
+                            casting != null && string.Equals(casting.CastingId,
+                                editId, StringComparison.Ordinal));
+                    if (focused == null)
+                    {
+                        _workspaceInteractionEvidence += ";edit=missing-focus";
+                    }
+                    else
+                    {
+                        session.FocusCasting(editId);
+                        AuthoringEditResult edited = session.UpdateFocusedCasting(
+                            focused.WithDirectTarget(
+                                _interactionTargets[3 % _interactionTargets.Count]));
+                        _workspaceInteractionEvidence += ";edit=" +
+                            (edited.Applied ? "applied" : "refused:" + edited.Reason);
+                    }
+                    BeginWorkspaceCameraCapture("ws-interact-authored.png", false);
+                    _workspaceInteractionStep = 5;
+                    return false;
+                }
+                if (_workspaceInteractionStep == 5)
+                {
+                    bool undone = session.Undo();
+                    _workspaceInteractionEvidence += ";undo=" + undone;
+                    BeginWorkspaceCameraCapture("ws-interact-undo.png", false);
+                    _workspaceInteractionStep = 6;
+                    return false;
+                }
+                if (_workspaceInteractionStep == 6)
+                {
+                    // Re-apply the edit deliberately, then persist and record
+                    // the exact intent the reopen must preserve.
+                    string editId = _interactionCastIds.Count > 1
+                        ? _interactionCastIds[1] : string.Empty;
+                    Domain.Authoring.PlannedCasting focused =
+                        session.Document.Castings.FirstOrDefault(casting =>
+                            casting != null && string.Equals(casting.CastingId,
+                                editId, StringComparison.Ordinal));
+                    if (focused != null)
+                    {
+                        session.FocusCasting(editId);
+                        session.UpdateFocusedCasting(focused.WithDirectTarget(
+                            _interactionTargets[3 % _interactionTargets.Count]));
+                    }
+                    session.Save();
+                    _workspaceSavedIntentIds = string.Join(",",
+                        session.Document.Castings
+                            .Select(value => value.CastingId).ToArray());
+                    _workspaceInteractionEvidence += ";saved=True;intent=[" +
+                        _workspaceSavedIntentIds + "]";
+                    _log.Info("[KBP-WORKSPACE] interaction authored and saved;" +
+                        _workspaceInteractionEvidence + ".");
+                    TransitionToBisectionClose();
+                    return false;
+                }
+            }
+            catch (Exception exception)
+            {
+                _workspaceInteractionEvidence += ";error=" + exception.GetType().Name +
+                    ":" + exception.Message;
+                _log.Error("[KBP-WORKSPACE] interaction step failed.", exception);
+                TransitionToBisectionClose();
+                return false;
+            }
+            TransitionToBisectionClose();
+            return false;
+        }
+
+        private void TransitionToBisectionClose()
+        {
+            BuffPlannerUiRoot.CloseCastingWorkspaceForRuntime();
+            _workspaceClosedWaitUpdates = 0;
+            _log.Info("[KBP-WORKSPACE] workspace closed for bisection capture;interactions=" +
+                _workspaceInteractionEvidence + ".");
+            _liveUiPhase = 19;
+        }
+
+        private string VerifyWorkspaceReopen()
+        {
+            UI.CastingWorkspaceSession session =
+                BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
+            if (session == null || session.Document == null)
+                return "session-missing";
+            string ids = string.Join(",",
+                session.Document.Castings
+                    .Select(value => value.CastingId).ToArray());
+            bool preserved = !string.IsNullOrEmpty(_workspaceSavedIntentIds) &&
+                string.Equals(ids, _workspaceSavedIntentIds,
+                    StringComparison.Ordinal);
+            return "ids=[" + ids + "];preserved=" + preserved +
+                ";loadStatus=" + session.LoadStatus;
         }
 
         private void WriteWorkspaceRenderMarker(string lumaEvidence)

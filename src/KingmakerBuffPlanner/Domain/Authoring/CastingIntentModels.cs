@@ -195,6 +195,28 @@ namespace KingmakerBuffPlanner.Domain.Authoring
             ValidateTargetModeShape();
         }
 
+        // View-level edit clones: single-field replacements that preserve
+        // identity, order, and every other authored intent exactly. The
+        // session's UpdateFocusedCasting still validates the replacement.
+        public PlannedCasting WithDirectTarget(string unitId)
+        {
+            return new PlannedCasting(CastingId, RoutineId, Order, SourceId,
+                Ability, CasterUnitId, SpellbookGuid, TargetMode, unitId,
+                Origin, RequiredCoverageUnitIds, TargetingModifiers,
+                Enhancements, ExistingEffectPolicy, IgnoredPresenceMarkers,
+                State, Provenance);
+        }
+
+        public PlannedCasting WithEnhancementSelections(
+            IEnumerable<AuthoredEnhancementSelection> selections)
+        {
+            return new PlannedCasting(CastingId, RoutineId, Order, SourceId,
+                Ability, CasterUnitId, SpellbookGuid, TargetMode,
+                DirectTargetUnitId, Origin, RequiredCoverageUnitIds,
+                TargetingModifiers, selections, ExistingEffectPolicy,
+                IgnoredPresenceMarkers, State, Provenance);
+        }
+
         public string CastingId { get; private set; }
         public string RoutineId { get; private set; }
         public int Order { get; private set; }

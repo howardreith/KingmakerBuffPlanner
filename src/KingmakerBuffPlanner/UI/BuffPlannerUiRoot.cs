@@ -29,6 +29,7 @@ namespace KingmakerBuffPlanner.UI
         private BuffPlannerHudButtonController _hud;
         private BuffPlannerScreenController _screen;
         private BuffPlannerInputLease _workspaceInputLease;
+        private CastingWorkspaceSession _castingWorkspaceSession;
         private CastingWorkspaceScreenView _castingWorkspace;
         private BuffPlannerSpellbookEntryController _spellbookEntry;
         private BuffPlannerQuickExecuteController _quick;
@@ -153,6 +154,21 @@ namespace KingmakerBuffPlanner.UI
         internal static void CloseCastingWorkspaceForRuntime()
         {
             if (_instance != null) _instance.CloseCastingWorkspace();
+        }
+
+        // Runtime seams for the guarded interaction scenario: the LIVE
+        // session owned by the open workspace view and fresh production
+        // inputs. The scenario issues canonical session commands (labeled
+        // direct session calls, never physical-input claims) and captures
+        // the rendered view states between steps.
+        internal static CastingWorkspaceSession CastingWorkspaceSessionForRuntime()
+        {
+            return _instance == null ? null : _instance._castingWorkspaceSession;
+        }
+
+        internal static CastingWorkspaceInputs CastingWorkspaceInputsForRuntime()
+        {
+            return _instance == null ? null : _instance.BuildCastingWorkspaceInputs();
         }
 
         // Runtime presentation evidence for the workspace root: whether the
@@ -773,6 +789,7 @@ namespace KingmakerBuffPlanner.UI
                         : _session.Model.Profile.CampaignId;
                 var workspaceSession = new CastingWorkspaceSession(
                     _modPath, campaignId);
+                _castingWorkspaceSession = workspaceSession;
                 _castingWorkspace = new CastingWorkspaceScreenView(
                     StaticCanvas.Instance, workspaceSession,
                     BuildCastingWorkspaceInputs, CloseCastingWorkspace);
@@ -808,6 +825,7 @@ namespace KingmakerBuffPlanner.UI
             // while open.
             _castingWorkspace.Dispose();
             _castingWorkspace = null;
+            _castingWorkspaceSession = null;
         }
 
         private DateTime _lastWorkspaceInputsRefreshUtc = DateTime.MinValue;
