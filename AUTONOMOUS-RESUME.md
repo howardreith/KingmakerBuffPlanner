@@ -1,6 +1,65 @@
 # AUTONOMOUS-RESUME — top section is current; planning/CASTING-FIRST-MIGRATION-STATUS.md is the per-checkpoint tracker.
 
-## Workspace rendered; publication live — 2026-09-21 (LATEST)
+## Review response: all findings addressed; live authoring PASSES — 2026-09-21 (LATEST)
+
+Branch `codex/kingmaker-buff-planner-casting-first` (draft PR #2,
+https://github.com/howardreith/KingmakerBuffPlanner/pull/2). The
+independent source review (request-changes, R1-R6 + C1-C4) has been
+answered commit-by-commit; every slice pushed through the guarded
+helper and verified remotely:
+
+- **R2/R4/R5/R6/C3** — `2e7b95f`: lifecycle (hotkey toggle, Escape,
+  disposal on ReleasePlayerUi/ReleaseAll, exactly-once
+  BuffPlannerInputLease, documented unsaved-edit policy); exception-safe
+  camera capture (per-change finally restoration, previous-active
+  restore, screen-camera-only set, self-verifying verdict,
+  failure-injection seam); launcher input ownership (no global Alt,
+  verified-foreground-before-inject, tracked-keys finally release,
+  programmatic-open marker suppressing the pending chord); control
+  capture before EITHER opening route; immutable open-frame record
+  bound to the nonblack assertion.
+- **R3/C1/C2** — `40f814e`: selected-routine-scoped compile through
+  BuildView/Present/Accept/Apply with the one-pass gate moved to the
+  labeled whole-document ForecastOnePass; capability and first-source
+  from discovered options (alias-instance contract); bounded 2s refresh
+  at the production input boundary. Regressions:
+  casting-workspace-routine-scoped-apply (the one-charge/two-routine
+  counterexample), casting-workspace-fresh-buff-capability.
+- **R1/C4** — `f637406`: complete draft editor (buff catalogue, capable
+  caster selection, direct/group targeting with recipient+origin
+  pickers, per-casting enhancement toggles, draft/ready state, Add
+  Casting), routine tabs, focused-casting retarget via single-field
+  PlannedCasting clones, Save/Reload; the live scenario drives the real
+  session through browse→3 casts→edit→Undo→re-edit→Save→close→reopen
+  with camera captures between milestones.
+  **Run casting-ws-author-033000: workspace-interaction-sequence PASS
+  (browseNoMutation=True; capableCasters=3; cast1/2/3=applied;
+  edit=applied; undo=True; saved=True; intent=[cast-1,cast-2,cast-3])
+  and workspace-reopen-preserves-intent PASS (exact IDs/order,
+  loadStatus=Loaded).** Frames curated in docs/evidence. The run's
+  visual gates failed ONLY on the backbuffer path (the classified
+  disconnected-session display defect; camera lane captured all
+  milestones).
+
+Gates at this checkpoint: source 42/42; protocol **220/220**; harness
+27/27; WhatIf 5/5; launcher -File 4/4; fixture 3/3; rollback 4/4;
+publisher 3/3.
+
+OPEN (honest): display-path visual acceptance needs a connected owner
+session (RDP active during one run); caster GUID display names (names
+exist in discovery — UnitSnapshot plumbing); native aesthetic pass
+(review §5: parchment/typography/states/scroll/tooltips/sound);
+physical-input acceptance of the launcher seam; exact rods/native
+adapters unchanged. Native submission stays disabled.
+
+NEXT (exact action): fix UnitSnapshot display-name plumbing (producer
+side in KingmakerPartySnapshotBuilder); re-run the guarded scenario for
+a named-caster frame; then the §5 native-presentation pass (borrowed
+parchment donors, state sets, Escape order, tooltips) and the
+physical-input acceptance run with the owner connected. Push each
+checkpoint; keep PR #2 draft.
+
+## Workspace rendered; publication live — 2026-09-21
 
 Branch `codex/kingmaker-buff-planner-casting-first`, pushed through the
 guarded push helper, verified remotely. Draft PR #2
