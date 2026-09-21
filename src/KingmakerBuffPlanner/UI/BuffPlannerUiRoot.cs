@@ -810,11 +810,30 @@ namespace KingmakerBuffPlanner.UI
             _castingWorkspace = null;
         }
 
+        private DateTime _lastWorkspaceInputsRefreshUtc = DateTime.MinValue;
+        private static readonly TimeSpan WorkspaceInputsRefreshMinimum =
+            TimeSpan.FromSeconds(2);
+
         private CastingWorkspaceInputs BuildCastingWorkspaceInputs()
         {
             if (_session.Model == null)
                 throw new InvalidOperationException(
                     "Discovery has not produced a party model yet.");
+            // Bounded freshness at the production input boundary (review
+            // C2): Apply/present/rebuild preflights re-run discovery at most
+            // once per two seconds — never per frame — and a failed refresh
+            // falls back to the existing model rather than failing the call.
+            if (DateTime.UtcNow - _lastWorkspaceInputsRefreshUtc >=
+                WorkspaceInputsRefreshMinimum)
+            {
+                _lastWorkspaceInputsRefreshUtc = DateTime.UtcNow;
+                try { _session.Refresh(); }
+                catch (Exception exception)
+                {
+                    _log.Error("[KBP-WORKSPACE] bounded input refresh failed;" +
+                        " using prior discovery state.", exception);
+                }
+            }
             return new CastingWorkspaceInputs(
                 _session.Model.Snapshot,
                 _session.ProviderOptions,

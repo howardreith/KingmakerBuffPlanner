@@ -348,6 +348,10 @@ namespace KingmakerBuffPlanner.Tests
                     TestCastingWorkspaceSiblingIntent);
                 Run("casting-workspace-disabled-dispatch-attempt-only",
                     TestCastingWorkspaceDisabledDispatch);
+                Run("casting-workspace-routine-scoped-apply",
+                    () => TestCastingWorkspaceRoutineScopedApply(root));
+                Run("casting-workspace-fresh-buff-capability",
+                    () => TestCastingWorkspaceFreshBuffCapability(root));
             }
             finally
             {
@@ -11759,8 +11763,31 @@ namespace KingmakerBuffPlanner.Tests
                 remainingPerCaster, groupCoverage);
             return new CastingWorkspaceInputs(
                 snapshot, options,
-                CastingEffects("source-bulls", "source-communal"),
+                CastingEffectsWithAbilityAlias(
+                    "source-bulls", "source-communal",
+                    ability ?? CastingBuffAbility),
                 enhancements);
+        }
+
+        // Mirrors the production alias contract (PlannerSetupModel aliases
+        // effects[sourceId] = effects[ability.Canonical] with the SAME
+        // instance), which the workspace uses to derive per-source caster
+        // capability from discovered options.
+        private static Dictionary<string, EffectExpression> CastingEffectsWithAbilityAlias(
+            string directSourceId, string groupSourceId, AbilityKey ability)
+        {
+            Dictionary<string, EffectExpression> effects =
+                CastingEffects(directSourceId, groupSourceId);
+            EffectExpression direct;
+            effects.TryGetValue(directSourceId, out direct);
+            EffectExpression group;
+            effects.TryGetValue(groupSourceId, out group);
+            if (ability != null && !string.Equals(ability.Canonical,
+                    CastingGroupAbility.Canonical, StringComparison.Ordinal))
+                effects[ability.Canonical] = direct;
+            else if (ability != null)
+                effects[ability.Canonical] = group;
+            return effects;
         }
 
         // The charter's showcase flow: two casters, three independent
@@ -11924,6 +11951,115 @@ namespace KingmakerBuffPlanner.Tests
         // and acceptance gate Apply; unseen changes, refused attempts,
         // refreshes, and incidental previews never approve a submission; the
         // disabled dispatch boundary proves policy without gameplay claims.
+        // Review R3 regression: the one-charge/two-routine counterexample.
+        // A whole-document compile reserves the single charge for the
+        // earlier Long casting and blocks Short; the selected-run scope
+        // must make either routine independently affordable while the
+        // explicitly one-pass gate still reports the honest conflict.
+        private static void TestCastingWorkspaceRoutineScopedApply(string root)
+        {
+            string modPath = Path.Combine(root, "casting-workspace-scoped");
+            Directory.CreateDirectory(modPath);
+            PartyProviderSnapshot snapshot;
+            CastingWorkspaceInputs inputs =
+                WorkspaceInputs(out snapshot, remainingPerCaster: 1);
+            var session = new CastingWorkspaceSession(modPath, "scoped-campaign");
+            session.SelectRoutine("long");
+            session.Draft.SourceId = "source-bulls";
+            session.Draft.Ability = CastingBuffAbility;
+            session.Draft.TargetMode = CastingTargetMode.DirectTarget;
+            session.Draft.CasterUnitId = "unit-cleric";
+            session.Draft.DirectTargetUnitId = "unit-t1";
+            session.Draft.State = CastingAuthoringState.Ready;
+            if (!session.AddCastingFromDraft().Applied)
+                throw new InvalidOperationException("long cast was refused.");
+            session.SelectRoutine("short");
+            session.Draft.CasterUnitId = "unit-cleric";
+            session.Draft.DirectTargetUnitId = "unit-t2";
+            if (!session.AddCastingFromDraft().Applied)
+                throw new InvalidOperationException("short cast was refused.");
+
+            session.SelectRoutine("short");
+            WorkspaceView shortView = session.BuildView(inputs);
+            if (shortView.CardById("cast-2") == null ||
+                shortView.CardById("cast-2").Readiness !=
+                    ResolvedCastingReadiness.Ready)
+                throw new InvalidOperationException(
+                    "The short routine's affordable casting was blocked by " +
+                    "the long routine's out-of-scope reservation.");
+            if (shortView.OnePassGate.Allowed ||
+                shortView.OnePassGate.BlockingReasons.Count == 0)
+                throw new InvalidOperationException(
+                    "The one-pass forecast hid the real one-charge conflict.");
+
+            session.PresentForReview(inputs);
+            WorkspaceApplyResult shortApply =
+                session.Apply(CastingApplyMode.Ordinary, "short", inputs);
+            if (shortApply.GateDecision == null ||
+                !shortApply.GateDecision.Allowed)
+                throw new InvalidOperationException(
+                    "The affordable selected run was refused at the gate.");
+            if (shortApply.Dispatch != null && shortApply.Dispatch.Submitted)
+                throw new InvalidOperationException(
+                    "Native submission escaped the disabled boundary.");
+            session.SelectRoutine("long");
+            session.PresentForReview(inputs);
+            WorkspaceApplyResult longApply =
+                session.Apply(CastingApplyMode.Ordinary, "long", inputs);
+            if (longApply.GateDecision == null ||
+                !longApply.GateDecision.Allowed)
+                throw new InvalidOperationException(
+                    "The long routine was not independently affordable.");
+
+            // A materially changed plan is no longer the presented contract.
+            session.Draft.CasterUnitId = "unit-cleric";
+            session.Draft.DirectTargetUnitId = "unit-t3";
+            session.AddCastingFromDraft();
+            WorkspaceApplyResult staleApply =
+                session.Apply(CastingApplyMode.Ordinary, "long", inputs);
+            if (staleApply.Allowed)
+                throw new InvalidOperationException(
+                    "An unpresented material change was accepted.");
+        }
+
+        // Review C1 regression: a freshly selected buff must show its
+        // eligible casters from the discovered options before any casting
+        // has been authored, and the initial selection must be a real
+        // catalogue source rather than blank.
+        private static void TestCastingWorkspaceFreshBuffCapability(string root)
+        {
+            string modPath = Path.Combine(root, "casting-workspace-fresh");
+            Directory.CreateDirectory(modPath);
+            PartyProviderSnapshot snapshot;
+            CastingWorkspaceInputs inputs = WorkspaceInputs(out snapshot);
+            var session = new CastingWorkspaceSession(modPath, "fresh-campaign");
+            if (session.Document.Castings.Count != 0)
+                throw new InvalidOperationException(
+                    "The fixture must start with an empty candidate.");
+            WorkspaceView view = session.BuildView(inputs);
+            if (view.SelectedSourceId != "source-bulls")
+                throw new InvalidOperationException(
+                    "The initial selection is not the discovered catalogue " +
+                    "source: " + view.SelectedSourceId);
+            WorkspaceCasterRow cleric =
+                view.Casters.First(row => row.UnitId == "unit-cleric");
+            WorkspaceCasterRow wizard =
+                view.Casters.First(row => row.UnitId == "unit-wizard");
+            WorkspaceCasterRow target =
+                view.Casters.First(row => row.UnitId == "unit-t1");
+            if (!cleric.Capable || !wizard.Capable)
+                throw new InvalidOperationException(
+                    "A fresh buff hid its eligible casters.");
+            if (target.Capable)
+                throw new InvalidOperationException(
+                    "A party member without a provider was marked capable.");
+            session.SelectBuff("source-communal");
+            WorkspaceView communal = session.BuildView(inputs);
+            if (communal.Casters.Any(row => row.Capable))
+                throw new InvalidOperationException(
+                    "Capability did not follow the selected source.");
+        }
+
         private static void TestCastingWorkspaceReviewApply(string root)
         {
             string modPath = Path.Combine(root, "casting-workspace-review");

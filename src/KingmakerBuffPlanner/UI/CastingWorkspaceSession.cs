@@ -254,7 +254,7 @@ namespace KingmakerBuffPlanner.UI
         // Read models
         // ------------------------------------------------------------------
 
-        // Compiles the shared resolved plan (calculated state only — this
+        // Compiles the whole-document plan (calculated state only — this
         // never presents or approves anything).
         public ExplicitCastingPlan CompilePlan(CastingWorkspaceInputs inputs)
         {
@@ -263,17 +263,25 @@ namespace KingmakerBuffPlanner.UI
 
         public WorkspaceView BuildView(CastingWorkspaceInputs inputs)
         {
-            ExplicitCastingPlan plan = Compile(inputs, null, false);
+            // The selected-run plan reserves resources for the SELECTED
+            // routine only; the explicitly labeled one-pass forecast is a
+            // separate whole-document construction with effect projection
+            // (review R3).
+            ExplicitCastingPlan plan = Compile(inputs, SelectedRoutineId, false);
             string selectedSource = string.IsNullOrEmpty(SelectedSourceId)
-                ? FirstSourceId() : SelectedSourceId;
-            var casters = BuildCasterRows(plan, inputs.Snapshot, selectedSource);
+                ? FirstSourceId(inputs) : SelectedSourceId;
+            var casters = BuildCasterRows(plan, inputs, selectedSource);
             var cards = BuildCards(plan, selectedSource);
             var budget = plan.BudgetLines
                 .Select(line => new WorkspaceBudgetRow(line)).ToList();
             CastingApplyDecision selectedGate = _gate.Evaluate(
                 plan, CastingApplyMode.Ordinary, SelectedRoutineId);
+            CastingForecast onePass = _forecast.ForecastOnePass(
+                _authoring.Document, inputs.Snapshot, inputs.ProviderOptions,
+                inputs.EffectsBySource, inputs.Enhancements,
+                inputs.TargetingModifiers);
             CastingApplyDecision onePassGate = _gate.Evaluate(
-                plan, CastingApplyMode.Ordinary);
+                onePass.Plan, CastingApplyMode.Ordinary);
             WorkspaceEditingScope scope = EditingFocusCastingId == null
                 ? WorkspaceEditingScope.ConfigureNextCasting
                 : WorkspaceEditingScope.EditingSingleCasting;
@@ -293,10 +301,11 @@ namespace KingmakerBuffPlanner.UI
         // ------------------------------------------------------------------
 
         // The view calls this when it actually renders a plan for review —
-        // computing a preview alone is not presentation.
+        // computing a preview alone is not presentation. The presented
+        // contract is the SELECTED-RUN scope Apply will submit.
         public CastingPlanSignature PresentForReview(CastingWorkspaceInputs inputs)
         {
-            ExplicitCastingPlan plan = Compile(inputs, null, false);
+            ExplicitCastingPlan plan = Compile(inputs, SelectedRoutineId, false);
             CastingPlanSignature signature = CastingPlanSignature.For(plan);
             _review.Present(signature);
             return signature;
@@ -307,7 +316,7 @@ namespace KingmakerBuffPlanner.UI
         // have materially changed since presentation.
         public bool AcceptPresentedPlan(CastingWorkspaceInputs inputs)
         {
-            ExplicitCastingPlan plan = Compile(inputs, null, false);
+            ExplicitCastingPlan plan = Compile(inputs, SelectedRoutineId, false);
             return _review.Accept(CastingPlanSignature.For(plan)).Allowed;
         }
 
@@ -318,9 +327,13 @@ namespace KingmakerBuffPlanner.UI
         {
             if (_submissionInFlight)
                 return RefusedInFlight(null);
-            // The decision is computed from the plan as it exists right now,
-            // not from any earlier preview.
-            ExplicitCastingPlan plan = Compile(inputs, null, false);
+            // The decision is computed from the selected-run plan as it
+            // exists right now — the same scope that was presented — not
+            // from any earlier preview or a whole-document compile whose
+            // cross-routine reservations the scope filter cannot undo.
+            ExplicitCastingPlan plan = Compile(inputs,
+                string.IsNullOrEmpty(scopeRoutineId) ? SelectedRoutineId : scopeRoutineId,
+                false);
             CastingApplyDecision decision = _gate.Evaluate(plan, mode, scopeRoutineId);
             if (mode == CastingApplyMode.Ordinary && !decision.Allowed)
                 return RefusedInFlight(decision);
@@ -449,26 +462,80 @@ namespace KingmakerBuffPlanner.UI
                 false, "submission-already-in-flight", decision, null);
         }
 
-        private string FirstSourceId()
+        private string FirstSourceId(CastingWorkspaceInputs inputs)
         {
             PlannedCasting first = _authoring.Document.Castings.FirstOrDefault();
-            return first == null ? string.Empty : first.SourceId;
+            if (first != null) return first.SourceId;
+            // With nothing authored, the initial selection is the first
+            // discovered catalogue source, not a blank buff list (review C1).
+            if (inputs == null || inputs.ProviderOptions == null ||
+                inputs.EffectsBySource == null || inputs.ProviderOptions.Count == 0)
+                return string.Empty;
+            ProviderPlanningOption firstOption = inputs.ProviderOptions
+                .Where(value => value != null && value.Provider != null)
+                .OrderBy(value => value.Provider.Key.Canonical, StringComparer.Ordinal)
+                .First();
+            AbilityKey ability = firstOption.Provider.Key.Ability;
+            EffectExpression abilityExpression;
+            if (ability == null ||
+                !inputs.EffectsBySource.TryGetValue(
+                    ability.Canonical, out abilityExpression))
+                return string.Empty;
+            foreach (KeyValuePair<string, EffectExpression> pair in
+                inputs.EffectsBySource.OrderBy(
+                    value => value.Key, StringComparer.Ordinal))
+                if (!string.Equals(pair.Key, ability.Canonical,
+                        StringComparison.Ordinal) &&
+                    ReferenceEquals(pair.Value, abilityExpression))
+                    return pair.Key;
+            return string.Empty;
+        }
+
+        // Eligible casters for a source derive from the DISCOVERED provider
+        // options, so a fresh buff shows its casters before anything is
+        // authored (review C1). The source/ability linkage uses the same
+        // alias-instance contract the legacy catalogue model establishes
+        // (PlannerSetupModel aliases effects[sourceId] = effects[ability]):
+        // a provider serves a source when its ability's expression IS the
+        // source's expression instance. Plan-derived readiness stays
+        // separate and untouched.
+        private static HashSet<string> CapableCasterUnitIdsForSource(
+            CastingWorkspaceInputs inputs, string selectedSource)
+        {
+            var capable = new HashSet<string>(StringComparer.Ordinal);
+            EffectExpression sourceExpression;
+            if (inputs == null || inputs.ProviderOptions == null ||
+                inputs.EffectsBySource == null ||
+                string.IsNullOrEmpty(selectedSource) ||
+                !inputs.EffectsBySource.TryGetValue(
+                    selectedSource, out sourceExpression))
+                return capable;
+            foreach (ProviderPlanningOption option in inputs.ProviderOptions)
+            {
+                if (option == null || option.Provider == null) continue;
+                AbilityKey ability = option.Provider.Key.Ability;
+                EffectExpression abilityExpression;
+                if (ability == null ||
+                    !inputs.EffectsBySource.TryGetValue(
+                        ability.Canonical, out abilityExpression) ||
+                    !ReferenceEquals(abilityExpression, sourceExpression)) continue;
+                capable.Add(option.Provider.Key.CasterUnitId);
+            }
+            return capable;
         }
 
         private List<WorkspaceCasterRow> BuildCasterRows(
-            ExplicitCastingPlan plan, PartyProviderSnapshot snapshot,
+            ExplicitCastingPlan plan, CastingWorkspaceInputs inputs,
             string selectedSource)
         {
             // Capability per caster for the selected buff, separated from
             // this plan's current readiness reasons for that caster.
+            HashSet<string> capableIds =
+                CapableCasterUnitIdsForSource(inputs, selectedSource);
             var rows = new List<WorkspaceCasterRow>();
-            foreach (UnitSnapshot unit in snapshot.Units)
+            foreach (UnitSnapshot unit in inputs.Snapshot.Units)
             {
-                bool capable = plan.Castings
-                    .Where(value => string.Equals(value.SourceId, selectedSource,
-                        StringComparison.Ordinal))
-                    .SelectMany(value => value.CapableCasterUnitIds)
-                    .Contains(unit.UnitId);
+                bool capable = capableIds.Contains(unit.UnitId);
                 List<string> reasons = plan.Castings
                     .Where(value => value.CasterUnitId == unit.UnitId)
                     .SelectMany(value => value.ReadinessReasons)
