@@ -595,7 +595,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     .FindObjectsOfType<Canvas>()
                     .Where(canvas => canvas != null && canvas.isActiveAndEnabled &&
                         canvas.transform.parent == null)
-                    .Take(8))
+                    .Take(24))
                 {
                     if (canvases.Length > 0) canvases.Append('|');
                     canvases.Append(canvas.name)

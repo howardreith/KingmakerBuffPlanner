@@ -186,7 +186,44 @@ namespace KingmakerBuffPlanner.UI
                     text.font != null && text.enabled) renderableTexts++;
             sb.Append(";texts=").Append(texts.Length)
                 .Append(";renderableTexts=").Append(renderableTexts);
+            Canvas rootCanvas = canvas == null ? null : canvas.rootCanvas;
+            sb.Append(";rootCanvas=").Append(rootCanvas == null
+                    ? "null" : rootCanvas.name)
+                .Append(";rootMode=").Append(rootCanvas == null
+                    ? "null" : rootCanvas.renderMode.ToString())
+                .Append(";rootOrder=").Append(rootCanvas == null
+                    ? "null" : rootCanvas.sortingOrder.ToString());
+            // Per-node dump (bounded): which graphics exist, their rect
+            // sizes, and their effective colors — the discriminator for
+            // "blocker renders but frame/texts invisible".
+            var nodes = new System.Text.StringBuilder();
+            AppendNodeDump(root.transform, 0, 3, nodes);
+            sb.Append(";nodes=").Append(nodes);
             return sb.ToString();
+        }
+
+        private static void AppendNodeDump(
+            Transform node, int depth, int maxDepth, System.Text.StringBuilder sink)
+        {
+            if (node == null || depth > maxDepth || sink.Length > 1600) return;
+            var rect = node as RectTransform;
+            sink.Append('/').Append(node.name);
+            if (node.gameObject.activeSelf) sink.Append("@on"); else sink.Append("@OFF");
+            if (rect != null)
+                sink.Append(rect.rect.width.ToString("F0")).Append("x")
+                    .Append(rect.rect.height.ToString("F0"));
+            UnityEngine.UI.Image image =
+                node.GetComponent<UnityEngine.UI.Image>();
+            if (image != null)
+                sink.Append(":Img").Append(image.enabled ? "+" : "-")
+                    .Append("a").Append(image.color.a.ToString("F2"));
+            UnityEngine.UI.Text text = node.GetComponent<UnityEngine.UI.Text>();
+            if (text != null)
+                sink.Append(":Txt").Append(text.enabled ? "+" : "-")
+                    .Append("a").Append(text.color.a.ToString("F2"))
+                    .Append("l").Append(text.text.Length);
+            for (int i = 0; i < node.childCount; i++)
+                AppendNodeDump(node.GetChild(i), depth + 1, maxDepth, sink);
         }
 
         internal static bool IsRuntimeReconstructionPending
