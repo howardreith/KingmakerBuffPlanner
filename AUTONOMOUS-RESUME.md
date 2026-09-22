@@ -1,6 +1,45 @@
 # AUTONOMOUS-RESUME — top section is current; planning/CASTING-FIRST-MIGRATION-STATUS.md is the per-checkpoint tracker.
 
-## G-review answered; corrected control-path acceptance PASS — 2026-09-21 (LATEST)
+## H-review answered; manual mode implemented; live rehearsal awaits a connected session — 2026-09-22 (LATEST)
+
+The fourth review (H1-H4 at c01f88bd) is answered at the pushed HEAD:
+H3 identity resolves BEFORE the input lease (unresolved/failed opens
+hold nothing); H2 the four group-callback defects fixed (remembered
+restore reachable, caster-centered coverage never demands an anchor,
+incoming coverage snapshotted before mutation so the draft's own list
+is safe, focused origins from the FOCUSED record's provider) with the
+seven specified regressions; H4 exact expected records (ability,
+spellbook, routine, state, enhancements) + canonical serialized sibling
+signature + state-aware control clicking. H1 live-workspace-manual is
+a REAL scenario end to end: launcher params (ManualHoldSeconds 30-1200,
+TimeoutSeconds >= hold+420, -ManualRehearseDone), protocol validation,
+zero synthetic input in-scenario, manual-ready.json acknowledged only
+with the workspace open + legacy closed, non-blocking hold, terminal
+manual-done.json / manual-stop.json markers (deadline ends
+manual-deadline and is NEVER acceptance), final capture + production
+close + restore. Protocol 225/225.
+
+LIVE REHEARSAL STATUS (honest): first attempt (rehearsal-1) exposed a
+real request bug — the hold parameter was clobbered by the save-pair
+parameter set, the request was rejected, and the game idled at the
+menu; the owned process was stopped and the transaction RESTORED
+VERIFIED. Bug fixed (0efa2fe). Second attempt reached the loaded
+campaign but the game's update loop throttled to ~20 ticks/645s because
+the owner's RDP session disconnected mid-run; transaction restored
+verified. The done-path rehearsal needs ONE connected-session run
+(-ManualRehearseDone) and is the same precondition as the supervised
+session itself.
+
+NEXT (exact action, owner required): with Howie connected — (1) Z runs
+the rehearsal: live-workspace-manual -ManualHoldSeconds 60
+-ManualRehearseDone -TimeoutSeconds 900; verify manual-ready.json +
+MANUAL-READY console line + done marker consumed + PASS
+manual-session-outcome + restored receipt. (2) The supervised session
+per docs/MANUAL-USABILITY-HANDOFF.md (hold 900), Z acknowledges the
+paused state before Howie touches anything, ends via the marker files.
+Then the §5 aesthetic pass and launcher seam qualification.
+
+## G-review answered; corrected control-path acceptance PASS — 2026-09-21
 
 The third review (G1-G5 at 8dcdef0) is answered at HEAD (pushed,
 verified): G3 campaign-bound session reuse via the pure
