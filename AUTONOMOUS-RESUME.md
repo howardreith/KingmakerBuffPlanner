@@ -1,6 +1,42 @@
 # AUTONOMOUS-RESUME — top section is current; planning/CASTING-FIRST-MIGRATION-STATUS.md is the per-checkpoint tracker.
 
-## I-review answered; manual success path PROVEN by rehearsal — 2026-09-22 (LATEST)
+## J-review repaired; implementer handoff Z → Claude — 2026-09-22 (LATEST)
+
+Implementation moved from Z to Claude (Z's quota exhausted); Pro remains
+the independent reviewer. Same branch, same draft PR #2, same authority
+scope; nothing was reset or restarted. Takeover reconciliation at
+`19ecbe8`: local == origin, clean tree, no Kingmaker process, no
+`deployment.lock`, latest transaction (`casting-ws-manual-rehearsal-6`)
+`Restored` with `restorationVerified=true`, and the live `Mods` tree
+independently re-compared to that transaction's original manifest
+(1109 entries, 0 differences). Baseline gate at `19ecbe8`: source
+42/42, protocol 226/226, harness 27/27; the launcher `-File` WhatIf
+layer refused because the local package had been built at `0551949`
+(the build-manifest/HEAD contract working as designed). The
+rehearsal-6 package was archived locally before rebuilding.
+
+J1 (automatic evidence adjacency mismatch) and J2 (manual terminal
+accepted the final capture by filename, ignoring failure and camera
+restoration) are repaired through Unity-free contracts in
+`src/KingmakerBuffPlanner/RuntimeTesting/WorkspaceScenarioContracts.cs`
+that the runtime host now calls; C3 (hold range/narrowing) aligned.
+Protocol 231/231 (five new regressions, each mutation-checked). See
+the CURRENT STATE section of `planning/CASTING-FIRST-MIGRATION-STATUS.md`
+and the dispositions table in `docs/CASTING-FIRST-REVIEW-INDEX.md`.
+Rehearsal-6 receipt: `docs/evidence/casting-ws-manual-rehearsal-6-receipt.md`
+(done-path rehearsal only; its build predates the J2 repair — the
+final capture's clean restoration was recovered from the game log).
+
+NEXT (exact action): build the local-runtime package at the pushed
+HEAD; one `-ManualRehearseDone` rehearsal of the repaired terminal path
+(verify the four separate manual assertions and restoration); then,
+when Howie confirms availability, the supervised manual session per
+`docs/MANUAL-USABILITY-HANDOFF.md` with Claude relaying done/stop via
+the run-bound marker. Afterward: fix the observed defects, then the §5
+native aesthetic pass and the remaining charter gates. Native casting
+stays disabled.
+
+## I-review answered; manual success path PROVEN by rehearsal — 2026-09-22 (history)
 
 The fifth review (I1-I5 at 5c927cb) is answered at pushed HEAD
 `0551949` (verified): I1 the pre-open control frame is captured and
