@@ -377,6 +377,8 @@ namespace KingmakerBuffPlanner.Tests
                     TestManualTerminalCoordinatorContract);
                 Run("runtime-host-scenario-contract-wiring",
                     TestRuntimeHostScenarioContractWiring);
+                Run("workspace-header-caption-and-lane-layout",
+                    () => TestWorkspaceHeaderAndLaneLayoutContract(root));
             }
             finally
             {
@@ -13359,6 +13361,43 @@ namespace KingmakerBuffPlanner.Tests
             catch (ArgumentException) { threw = true; }
             if (!threw)
                 throw new InvalidOperationException("A non-terminal Begin was accepted.");
+        }
+
+        // Workspace legibility defects seen in every live frame: the header
+        // showed the raw source key, and each lane's scroll view kept its
+        // default 100x100 centered rect.
+        private static void TestWorkspaceHeaderAndLaneLayoutContract(string root)
+        {
+            string modPath = Path.Combine(root, "casting-workspace-caption");
+            Directory.CreateDirectory(modPath);
+            PartyProviderSnapshot snapshot;
+            CastingWorkspaceInputs inputs = WorkspaceInputs(out snapshot);
+            var session = new CastingWorkspaceSession(modPath, "workspace-campaign");
+            session.SelectBuff("source-bulls");
+            WorkspaceView view = session.BuildView(inputs);
+            string caption = view.SelectedSourceCaption;
+            if (caption == "source-bulls" || caption.Length == 0)
+                throw new InvalidOperationException(
+                    "The header caption exposed the raw source key: " + caption);
+            WorkspaceSourceOption named = view.Draft == null ? null :
+                view.Draft.Sources.FirstOrDefault(s => s.SourceId == "source-bulls");
+            if (named != null && named.DisplayName != named.SourceId &&
+                caption != named.DisplayName)
+                throw new InvalidOperationException(
+                    "The header caption ignored the discovered display name.");
+
+            DirectoryInfo directory = new DirectoryInfo(Environment.CurrentDirectory);
+            while (directory != null && !File.Exists(Path.Combine(
+                directory.FullName, "KingmakerBuffPlanner.sln")))
+                directory = directory.Parent;
+            string screen = File.ReadAllText(Path.Combine(directory.FullName, "src",
+                "KingmakerBuffPlanner", "UI", "CastingWorkspaceScreenView.cs"));
+            if (!screen.Contains("KingmakerUiFactory.SetAnchors(RectOf(scroll), 0f, 0f, 1f, 1f,") ||
+                !screen.Contains("ContentSizeFitter.FitMode.PreferredSize") ||
+                screen.Contains("KingmakerUiFactory.SetAnchors(content, 0f, 0f, 1f, 1f);") ||
+                !screen.Contains("view.SelectedSourceCaption"))
+                throw new InvalidOperationException(
+                    "Workspace lanes no longer fill their columns or the header regressed.");
         }
 
         // The Unity-bound host cannot be compiled here, so its wiring to the

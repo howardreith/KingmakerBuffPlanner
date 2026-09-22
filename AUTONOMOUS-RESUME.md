@@ -27,9 +27,25 @@ Rehearsal-6 receipt: `docs/evidence/casting-ws-manual-rehearsal-6-receipt.md`
 (done-path rehearsal only; its build predates the J2 repair — the
 final capture's clean restoration was recovered from the game log).
 
-NEXT (exact action): build the local-runtime package at the pushed
-HEAD; one `-ManualRehearseDone` rehearsal of the repaired terminal path
-(verify the four separate manual assertions and restoration); then,
+RUNTIME (rehearsal, labeled — never human acceptance):
+`casting-ws-claude-rehearsal-20260922-194113` on the `9aba411` package
+(ZIP `f447a04b…`, DLL `71b72725…`, MVID `2747b002-15f5-44dd-8bcf-de3286637de9`)
+PASSED under Windows PowerShell 5.1: manual-ready, rehearsal done marker,
+`manual-final-capture` captured (nonBlack), `manual-camera-restoration`
+targetsRestored/activeRestored/0 cleanup failures, `manual-workspace-closed`
+(view closed, input lease released), owned exit, transaction Restored
+verified. Its final frame — like rehearsal-6 and the gseries-081000
+"acceptance" frame — showed every lane's scroll view collapsed to a
+100x100 box mid-lane and the raw `variant|<guid>|<guid>` key in the
+header: callback acceptance never checked layout. Repaired next (lane
+scroll views fill their columns with growing content; header shows the
+discovered buff name; caster names no longer run under Focus).
+
+The harness must run under Windows PowerShell 5.1 (`powershell.exe`);
+it now refuses PowerShell 7 (JSON date conversion broke manifest checks).
+
+NEXT (exact action): rebuild at the new HEAD and re-rehearse to confirm
+the lane layout in a live frame; then,
 when Howie confirms availability, the supervised manual session per
 `docs/MANUAL-USABILITY-HANDOFF.md` with Claude relaying done/stop via
 the run-bound marker. Afterward: fix the observed defects, then the §5
