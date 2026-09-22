@@ -256,9 +256,22 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (request.Parameters == null) throw new InvalidDataException("parameters");
             if (IsManualWorkspaceScenario(request.Scenario))
             {
-                // The manual scenario carries the WORKING-campaign save set
-                // (the launcher stages a save pair for it) plus exactly one
-                // additional parameter: the bounded hold.
+                // The manual scenario carries the EXACT live-save contract
+                // plus exactly one permitted extension, the bounded hold
+                // (review I4): no early return may bypass the guarded save
+                // validation.
+                string[] manualExact =
+                {
+                    "workingSaveName", "workingFileName", "workingSha256",
+                    "baselineSaveName", "baselineFileName", "baselineSha256",
+                    "expectedGameName", "expectedGameId", "executionMode",
+                    "manualHoldSeconds"
+                };
+                if (request.Parameters.Count != manualExact.Length ||
+                    manualExact.Any(name =>
+                        !request.Parameters.ContainsKey(name)))
+                    throw new InvalidDataException("manual-save-parameters");
+                ValidateLiveSaveParameters(request, manualExact.Length);
                 ReadManualHoldSeconds(request.Parameters);
                 return;
             }
@@ -298,13 +311,30 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 if (request.Parameters.Count != 0) throw new InvalidDataException("parameters");
                 return;
             }
+            string[] automaticExact =
+            {
+                "workingSaveName", "workingFileName", "workingSha256",
+                "baselineSaveName", "baselineFileName", "baselineSha256",
+                "expectedGameName", "expectedGameId", "executionMode"
+            };
+            if (request.Parameters.Count != automaticExact.Length)
+                throw new InvalidDataException("live-save-parameters");
+            ValidateLiveSaveParameters(request, automaticExact.Length);
+        }
+
+        // The guarded live-save contract shared by every scenario that
+        // stages the WORKING campaign (reviews I4): exact keys, required
+        // names, real SHA-256 values, distinct files, and a valid mode.
+        private static void ValidateLiveSaveParameters(
+            RuntimeTestRequest request, int expectedTotal)
+        {
             string[] exact =
             {
                 "workingSaveName", "workingFileName", "workingSha256",
                 "baselineSaveName", "baselineFileName", "baselineSha256",
                 "expectedGameName", "expectedGameId", "executionMode"
             };
-            if (request.Parameters.Count != exact.Length ||
+            if (request.Parameters.Count != expectedTotal ||
                 exact.Any(name => !request.Parameters.ContainsKey(name)))
                 throw new InvalidDataException("live-save-parameters");
             foreach (string name in exact)

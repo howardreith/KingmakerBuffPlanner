@@ -364,6 +364,8 @@ namespace KingmakerBuffPlanner.Tests
                     () => TestCastingWorkspaceGroupTransitions(root));
                 Run("runtime-manual-scenario-validation",
                     TestRuntimeManualScenarioValidation);
+                Run("runtime-manual-request-validation",
+                    () => TestManualScenarioRequestValidation(root));
             }
             finally
             {
@@ -9211,6 +9213,110 @@ namespace KingmakerBuffPlanner.Tests
                 request.Parameters.Count != 9 ||
                 (string)request.Parameters["executionMode"] != "animated")
                 throw new InvalidOperationException("Valid live UI request was rejected: " + rejection);
+        }
+
+        // Review I4: the manual scenario validates the COMPLETE live-save
+        // contract plus exactly one bounded hold, through the real TryRead
+        // path — no permissive early return survives request validation.
+        private static void TestManualScenarioRequestValidation(string root)
+        {
+            Action<Dictionary<string, object>> saveSet = o =>
+            {
+                o["scenario"] = "live-workspace-manual";
+                o["parameters"] = new Dictionary<string, object>
+                {
+                    { "workingSaveName", "KBP_AUTOMATION_WORKING" },
+                    { "workingFileName", "Manual_305_KBP_AUTOMATION_WORKING.zks" },
+                    { "workingSha256", new string('a', 64) },
+                    { "baselineSaveName", "KBP_AUTOMATION_BASELINE" },
+                    { "baselineFileName", "Manual_304_KBP_AUTOMATION_BASELINE.zks" },
+                    { "baselineSha256", new string('b', 64) },
+                    { "expectedGameName", "Yadmila" },
+                    { "expectedGameId", "3d556254-8ba9-4e9f-8d11-755eecd0b661" },
+                    { "executionMode", "instant" },
+                    { "manualHoldSeconds", 300 }
+                };
+            };
+            string valid = WriteRequest(root, "manual-valid", saveSet);
+            string rejection;
+            RuntimeTestRequest request = ReadProtocol(
+                new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, valid },
+                out rejection);
+            if (request == null || rejection.Length != 0 ||
+                request.Parameters.Count != 10 ||
+                RuntimeTestProtocol.ReadManualHoldSeconds(request.Parameters) != 300)
+                throw new InvalidOperationException(
+                    "A valid manual request was rejected: " + rejection);
+
+            // Each defect class fails at the non-mutating request boundary.
+            var cases = new List<KeyValuePair<string, Action<Dictionary<string, object>>>>
+            {
+                new KeyValuePair<string, Action<Dictionary<string, object>>>(
+                    "missing-hold", o =>
+                    {
+                        saveSet(o);
+                        ((Dictionary<string, object>)o["parameters"])
+                            .Remove("manualHoldSeconds");
+                    }),
+                new KeyValuePair<string, Action<Dictionary<string, object>>>(
+                    "hold-out-of-range", o =>
+                    {
+                        saveSet(o);
+                        ((Dictionary<string, object>)o["parameters"])
+                            ["manualHoldSeconds"] = 0;
+                    }),
+                new KeyValuePair<string, Action<Dictionary<string, object>>>(
+                    "unknown-extra", o =>
+                    {
+                        saveSet(o);
+                        ((Dictionary<string, object>)o["parameters"])
+                            ["surprise"] = true;
+                    }),
+                new KeyValuePair<string, Action<Dictionary<string, object>>>(
+                    "wrong-save-name", o =>
+                    {
+                        saveSet(o);
+                        ((Dictionary<string, object>)o["parameters"])
+                            ["workingSaveName"] = "SOMETHING_ELSE";
+                    }),
+                new KeyValuePair<string, Action<Dictionary<string, object>>>(
+                    "bad-hash", o =>
+                    {
+                        saveSet(o);
+                        ((Dictionary<string, object>)o["parameters"])
+                            ["baselineSha256"] = "nothex";
+                    }),
+                new KeyValuePair<string, Action<Dictionary<string, object>>>(
+                    "duplicate-files", o =>
+                    {
+                        saveSet(o);
+                        ((Dictionary<string, object>)o["parameters"])
+                            ["baselineFileName"] = "Manual_305_KBP_AUTOMATION_WORKING.zks";
+                    }),
+                new KeyValuePair<string, Action<Dictionary<string, object>>>(
+                    "invalid-mode", o =>
+                    {
+                        saveSet(o);
+                        ((Dictionary<string, object>)o["parameters"])
+                            ["executionMode"] = "teleport";
+                    }),
+                new KeyValuePair<string, Action<Dictionary<string, object>>>(
+                    "hold-on-automation", o =>
+                    {
+                        saveSet(o);
+                        o["scenario"] = "live-workspace-qual";
+                    })
+            };
+            foreach (KeyValuePair<string, Action<Dictionary<string, object>>> item in cases)
+            {
+                string path = WriteRequest(root, "manual-bad-" + item.Key, item.Value);
+                RuntimeTestRequest bad = ReadProtocol(
+                    new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path },
+                    out rejection);
+                if (bad != null || string.IsNullOrEmpty(rejection))
+                    throw new InvalidOperationException(
+                        "An invalid manual request was accepted: " + item.Key);
+            }
         }
 
         private static void TestValidNativeUiProbeRequest(string root)

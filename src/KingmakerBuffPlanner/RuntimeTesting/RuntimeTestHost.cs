@@ -97,6 +97,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private long _manualHoldStartedMillis = -1;
         private long _manualHoldDeadlineMillis;
         private string _manualOutcome;
+        private string _manualReadyEvidence;
         private readonly List<string> _interactionCasters = new List<string>();
         private readonly List<string> _interactionTargets = new List<string>();
         private readonly List<string> _interactionCastIds = new List<string>();
@@ -662,7 +663,53 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         result.Stage = "menu-diagnostic-validation";
                     }
                 }
-                if (RuntimeTestProtocol.IsWorkspaceScenario(_request.Scenario))
+                if (RuntimeTestProtocol.IsManualWorkspaceScenario(
+                        _request.Scenario))
+                {
+                    // Manual lifecycle contract (review I3): prove the
+                    // ready/hold/terminal sequence and zero automatic
+                    // editing/input — never manufacture automatic
+                    // interaction evidence, and never inherit it.
+                    string readyEvidence = _manualReadyEvidence ?? "missing";
+                    bool readyAcknowledged = readyEvidence.StartsWith(
+                        "manual-ready;workspaceOpen=true", StringComparison.Ordinal);
+                    result.Assertions.Add(readyAcknowledged
+                        ? RuntimeTestAssertion.Pass("manual-ready-acknowledged",
+                            "workspace open;no input requested", readyEvidence)
+                        : RuntimeTestAssertion.Fail("manual-ready-acknowledged",
+                            "workspace open;no input requested", readyEvidence));
+                    bool noAuthoring = _workspaceInteractionEvidence != null &&
+                        _workspaceInteractionEvidence.StartsWith("manual;outcome=",
+                            StringComparison.Ordinal);
+                    result.Assertions.Add(noAuthoring
+                        ? RuntimeTestAssertion.Pass("manual-no-automatic-authoring",
+                            "scripted authoring suspended", _workspaceInteractionEvidence)
+                        : RuntimeTestAssertion.Fail("manual-no-automatic-authoring",
+                            "scripted authoring suspended",
+                            _workspaceInteractionEvidence ?? "missing"));
+                    bool donePathOutcome = _manualOutcome != null &&
+                        _manualOutcome.StartsWith("manual-completed",
+                            StringComparison.Ordinal);
+                    result.Assertions.Add(donePathOutcome
+                        ? RuntimeTestAssertion.Pass("manual-session-outcome",
+                            "done-marker", _manualOutcome ?? "missing")
+                        : RuntimeTestAssertion.Fail("manual-session-outcome",
+                            "done-marker", _manualOutcome ?? "missing"));
+                    if (!readyAcknowledged || !noAuthoring || !donePathOutcome)
+                    {
+                        result.Status = "FAIL";
+                        result.Stage = _manualOutcome != null &&
+                            _manualOutcome.StartsWith("manual-cancelled",
+                                StringComparison.Ordinal)
+                            ? "manual-cancelled"
+                            : _manualOutcome != null &&
+                              _manualOutcome.StartsWith("manual-deadline",
+                                  StringComparison.Ordinal)
+                                ? "manual-deadline"
+                                : "manual-lifecycle-validation";
+                    }
+                }
+                else if (RuntimeTestProtocol.IsWorkspaceScenario(_request.Scenario))
                 {
                     // The workspace scenario's own acceptance gate. The prior
                     // runs passed on identity checks alone (black frame) and
@@ -749,11 +796,20 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     // from two casters, one focused edit, Undo, deliberate
                     // re-edit, save, and reopen with exact identity/order.
                     string interactionEvidence = _workspaceInteractionEvidence ?? "missing";
+                    // The state control is valid as either a real click or
+                    // a legitimately already-Ready draft (review I5); the
+                    // exact-record checks carry the correctness burden.
                     bool interactions = interactionEvidence.Contains(
                             "browseNoMutation=True") &&
-                        interactionEvidence.Contains("cast1=controls:invoked/invoked/invoked/invoked;cast1Exact=True") &&
-                        interactionEvidence.Contains("cast2=controls:invoked/invoked/invoked/invoked;cast2Exact=True") &&
-                        interactionEvidence.Contains("cast3=controls:invoked/invoked/invoked/invoked;cast3Exact=True") &&
+                        interactionEvidence.Contains("cast1=controls:invoked/invoked/invoked;cast1Exact=True") &&
+                        interactionEvidence.Contains("cast2=controls:invoked/invoked/invoked;cast2Exact=True") &&
+                        interactionEvidence.Contains("cast3=controls:invoked/invoked/invoked;cast3Exact=True") &&
+                        (interactionEvidence.Contains("state1=invoked") ||
+                         interactionEvidence.Contains("state1=already-ready")) &&
+                        (interactionEvidence.Contains("state2=invoked") ||
+                         interactionEvidence.Contains("state2=already-ready")) &&
+                        (interactionEvidence.Contains("state3=invoked") ||
+                         interactionEvidence.Contains("state3=already-ready")) &&
                         interactionEvidence.Contains("refusedAdd=invoked;refusedAddClean=True") &&
                         interactionEvidence.Contains("editControl=invoked;editFocused=True") &&
                         interactionEvidence.Contains("retargetControl=invoked;retargetApplied=True") &&
@@ -786,29 +842,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         result.Status = "FAIL";
                         result.Stage = "workspace-interaction-validation";
                     }
-                    if (RuntimeTestProtocol.IsManualWorkspaceScenario(
-                            _request.Scenario))
-                    {
-                        bool donePath = _manualOutcome != null &&
-                            _manualOutcome.StartsWith("manual-completed",
-                                StringComparison.Ordinal);
-                        result.Assertions.Add(donePath
-                            ? RuntimeTestAssertion.Pass("manual-session-outcome",
-                                "done-marker", _manualOutcome ?? "missing")
-                            : RuntimeTestAssertion.Fail("manual-session-outcome",
-                                "done-marker", _manualOutcome ?? "missing"));
-                        if (!donePath)
-                        {
-                            // Stop and deadline are honest non-acceptances,
-                            // never human-approval failures of the operator.
-                            result.Status = "FAIL";
-                            result.Stage = _manualOutcome != null &&
-                                _manualOutcome.StartsWith("manual-cancelled",
-                                    StringComparison.Ordinal)
-                                ? "manual-cancelled"
-                                : "manual-deadline";
-                        }
-                    }
+
                 }
                 int loadedOptionalAssemblies = 0;
                 int loadedOptionalUmmEntries = 0;
@@ -1486,22 +1520,22 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 BuffPlannerUiRoot.CaptureRuntimeBaseline(true);
                 if (!_liveHotkeyMarkerWritten &&
                     RuntimeTestProtocol.IsWorkspaceScenario(_request.Scenario) &&
-                    !RuntimeTestProtocol.IsManualWorkspaceScenario(
-                        _request.Scenario) &&
                     !_workspaceControlRequested)
                 {
-                    // The matched control frame is captured BEFORE the
-                    // hotkey request marker exists, so neither opening route
-                    // (physical or programmatic) can bypass it (review R6).
+                    // The matched control frame is captured BEFORE any
+                    // opening route (physical, programmatic, or manual) so
+                    // none can bypass it (reviews R6, I1).
                     _workspaceControlRequested = true;
-                    _log.Info("[KBP-WORKSPACE] capturing control frame before hotkey request;" +
+                    _log.Info("[KBP-WORKSPACE] capturing control frame before opening;" +
                         MenuRenderDiagnostic.EnvironmentSample() + ".");
                     BeginWorkspaceCapture("workspace-control-frame.png");
                     BeginWorkspaceCameraCapture("workspace-camera-control.png", true);
                     _liveUiPhase = 24;
                     return false;
                 }
-                if (!_liveHotkeyMarkerWritten)
+                if (!_liveHotkeyMarkerWritten &&
+                    !RuntimeTestProtocol.IsManualWorkspaceScenario(
+                        _request.Scenario))
                 {
                     AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory, "hotkey-ready.json"),
                         "{\"runId\":\"" + _request.RunId + "\",\"armed\":" +
@@ -1529,25 +1563,27 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             }
             if (_liveUiPhase == 24)
             {
-                // Control frame consumed. For the manual scenario NO hotkey
-                // request is ever written — the launcher performs no
-                // synthetic input at all, and the fallback open below is
-                // purely programmatic (review H1).
-                if (RuntimeTestProtocol.IsManualWorkspaceScenario(
-                        _request.Scenario))
-                {
-                    _liveHotkeyMarkerWritten = true;
-                    _liveUiPhase = 0;
-                    return false;
-                }
-                // Otherwise the hotkey request marker is written and phase 0
-                // resumes its normal armed/fallback flow.
+                // Control frame consumed for EVERY workspace scenario. For
+                // the manual scenario no hotkey request is ever written and
+                // no physical input is ever awaited: the candidate opens
+                // through the production path immediately (review I1).
                 if (!ConsumeWorkspaceCapture("workspace-control-frame.png")) return false;
                 _workspaceControlLuma = _workspaceFrameCapture.Summary == null
                     ? "missing" : _workspaceFrameCapture.Summary.Describe();
                 _workspaceControlSha256 =
                     Hashing.Sha256(_workspaceFrameCapture.FullPath);
                 _workspaceControlSamples = _workspaceFrameCapture.Samples;
+                if (RuntimeTestProtocol.IsManualWorkspaceScenario(
+                        _request.Scenario))
+                {
+                    _liveHotkeyMarkerWritten = true;
+                    _log.Info("[KBP-MANUAL] control frame consumed; opening the " +
+                        "candidate programmatically with no input request.");
+                    _liveUiPhase = 22;
+                    return false;
+                }
+                // Automated qualification: the hotkey request marker is
+                // written and phase 0 resumes its armed/fallback flow.
                 AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory,
                     "hotkey-ready.json"),
                     "{\"runId\":\"" + _request.RunId + "\",\"armed\":" +
@@ -1723,9 +1759,16 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     AtomicFile.WriteUtf8(Path.Combine(
                         _request.EvidenceDirectory, "manual-ready.json"),
                         ready + Environment.NewLine);
+                    _manualReadyEvidence = "manual-ready;workspaceOpen=true;" +
+                        "legacyScreenClosed=true;syntheticInputRequested=false;" +
+                        "holdSeconds=" + holdSeconds;
                     _log.Info("[KBP-MANUAL] manual-ready acknowledged;" +
                         "syntheticInputRequested=false;holdSeconds=" +
                         holdSeconds + ";operator may now interact.");
+                    // One-shot transition into the hold (review I2): the
+                    // hold phase is the only consumer of terminal markers
+                    // and the deadline.
+                    _liveUiPhase = 31;
                 }
                 return false;
             }
@@ -1738,14 +1781,18 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 if (_workspaceCaptureElapsed.ElapsedMilliseconds <
                         _manualHoldDeadlineMillis)
                 {
+                    // Deterministic conflict rule (review I2): a stop
+                    // request always wins over a concurrent done request;
+                    // markers are honored any time between ready and the
+                    // deadline.
                     string donePath = Path.Combine(
                         _request.EvidenceDirectory, "manual-done.json");
                     string stopPath = Path.Combine(
                         _request.EvidenceDirectory, "manual-stop.json");
-                    if (File.Exists(donePath))
-                        _manualOutcome = "manual-completed;by=done-marker";
-                    else if (File.Exists(stopPath))
+                    if (File.Exists(stopPath))
                         _manualOutcome = "manual-cancelled;by=stop-marker";
+                    else if (File.Exists(donePath))
+                        _manualOutcome = "manual-completed;by=done-marker";
                     else return false;
                 }
                 else
@@ -2366,7 +2413,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         _interactionCastIds.Add(created.CastingId);
                     _workspaceInteractionEvidence += ";cast" + (index + 1) +
                         "=controls:" + casterClick + "/" + targetClick + "/" +
-                        stateClick + "/" + addClick +
+                        addClick +
+                        ";state" + (index + 1) + "=" + stateClick +
                         ";cast" + (index + 1) + "Exact=" +
                         (grew && distinct && fieldsExact && siblingsUnchanged);
                     if (!grew || !distinct || !fieldsExact || !siblingsUnchanged)
