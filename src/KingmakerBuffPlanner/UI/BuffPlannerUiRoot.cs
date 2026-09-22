@@ -184,24 +184,33 @@ namespace KingmakerBuffPlanner.UI
             if (root == null) return "workspace-missing";
             UnityEngine.UI.Button[] buttons =
                 root.GetComponentsInChildren<UnityEngine.UI.Button>(true);
-            bool seen = false;
+            // A same-frame rebuild leaves the destroyed-pending OLD buttons
+            // (SetActive(false) + deferred Destroy) attached until end of
+            // frame; among same-named matches the LIVE one is the real
+            // control. Callback coverage is still not reachability: if no
+            // match is active (or interactable) the control is reported as
+            // such (review G4).
+            UnityEngine.UI.Button live = null;
+            UnityEngine.UI.Button anyMatch = null;
             foreach (UnityEngine.UI.Button button in buttons)
-                if (button != null && string.Equals(button.name, buttonName,
-                        StringComparison.Ordinal))
+            {
+                if (button == null || !string.Equals(button.name, buttonName,
+                        StringComparison.Ordinal)) continue;
+                if (anyMatch == null) anyMatch = button;
+                if (button.gameObject.activeInHierarchy)
                 {
-                    seen = true;
-                    // Callback coverage is not reachability: a control the
-                    // player cannot see or press is reported as such
-                    // (review G4).
-                    if (!button.gameObject.activeInHierarchy)
-                        return "control-inactive:" + buttonName;
-                    if (!button.interactable)
-                        return "control-not-interactable:" + buttonName;
-                    button.onClick.Invoke();
-                    return "invoked";
+                    live = button;
+                    break;
                 }
-            return seen ? "control-unusable:" + buttonName
-                : "control-missing:" + buttonName;
+            }
+            if (live == null)
+                return anyMatch == null
+                    ? "control-missing:" + buttonName
+                    : "control-inactive:" + buttonName;
+            if (!live.interactable)
+                return "control-not-interactable:" + buttonName;
+            live.onClick.Invoke();
+            return "invoked";
         }
 
         // Runtime presentation evidence for the workspace root: whether the
