@@ -33,9 +33,10 @@ and legacy quick execution remain disabled; nothing can cast a buff.
    writes `manual-ready.json` into the run's evidence directory with
    `syntheticInputRequested=false`, `workspaceOpen=true`,
    `legacyScreenClosed=true`, and the hold deadline.
-2. Z confirms `manual-ready.json` and the `[KBP-MANUAL] manual-ready`
-   game-log line, reports the exact build identity, and only THEN tells
-   you the session is ready. The paused state is a non-blocking frame
+2. The operating agent (Claude since the 2026-09-22 takeover; Z
+   before that) confirms `manual-ready.json` and the `[KBP-MANUAL]
+   manual-ready` game-log line, reports the exact build identity, and
+   only THEN tells you the session is ready. The paused state is a non-blocking frame
    loop — rendering, cursor, and input processing are fully alive; no
    scripted authoring runs.
 
@@ -53,20 +54,40 @@ and legacy quick execution remain disabled; nothing can cast a buff.
 
 ## Ending the session (implemented, run-bound)
 
-Say **"done"** or **"stop"** to Z, who performs the implemented terminal
-operation: writing `manual-done.json` (completion) or `manual-stop.json`
-(cancellation) into that run's evidence directory. The harness consumes
-the marker, captures a final frame, closes the workspace through its
-production lifecycle, writes the result, exits, and restores the exact
-pre-run Mods state with a verified receipt. If the hold deadline passes
-with no marker, the run ends as `manual-deadline` — **a deadline is
-never acceptance** and the transaction still restores. Incomplete
-restoration takes priority over any further run.
+Say **"done"** or **"stop"** to the operating agent, who performs the
+implemented terminal operation: atomically writing `manual-done.json`
+(completion) or `manual-stop.json` (cancellation) into **that run's**
+evidence directory, recording the run id, the instruction's origin
+(you) and the time. The harness consumes the marker (marker presence;
+stop wins if both are seen), then:
+
+1. requests one final camera-path capture and waits for its callback
+   for at most 20 s — capture can never hold the session open;
+2. consumes that capture's own failure and camera-restoration verdict
+   (review J2) instead of trusting the file name;
+3. closes the workspace through its production lifecycle and records
+   the postcondition (view closed, input lease released) even if the
+   capture failed or never reported;
+4. writes the result, exits, and the launcher restores the exact
+   pre-run Mods state with a verified receipt.
+
+The result keeps separate assertions for the operator request
+(`manual-session-outcome`), final evidence (`manual-final-capture`),
+camera restoration (`manual-camera-restoration`) and cleanup
+(`manual-workspace-closed`). A failed or missing capture is a visible
+FAIL of the evidence, not of your session; an unclean or unobserved
+camera restoration is never a clean PASS. None of these is a usability
+verdict — your observations are recorded separately.
+
+If the hold deadline passes with no marker, the run ends as
+`manual-deadline` — **a deadline is never acceptance** and the
+transaction still restores. Incomplete restoration takes priority over
+any further run.
 
 ## Evidence labeling
 
-Automated callback coverage (runs `casting-ws-gseries-*`, protocol
-225/225), rendered captures, your manual observations, and any
+Automated callback coverage (runs `casting-ws-gseries-*`; source-only
+protocol suite 231/231 at the J-review repair), rendered captures, your manual observations, and any
 screenshots you take are kept as distinct evidence layers; manual
 artifacts are labeled as manual and never counted as automated
 acceptance, and vice versa.

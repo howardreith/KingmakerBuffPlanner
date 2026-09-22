@@ -9,8 +9,24 @@ Reviewed baseline: `c182061354e9e761c09648ca779ab334588ba379`
 
 Status: **work in progress — development branch, not a gameplay-qualified
 release.** Native casting submission is explicitly disabled at the
-workspace dispatch boundary. The visual qualification campaign is live
-and its current blocker is documented below.
+workspace dispatch boundary. The workspace renders in presenting
+sessions (display-path acceptance run `casting-ws-gseries-081000`);
+human usability and the native aesthetic pass remain open.
+
+## Current review dispositions — J-review at `19ecbe8` (repaired 2026-09-22)
+
+| Finding | Disposition | Code | Tests |
+| --- | --- | --- | --- |
+| J1 — automatic evidence producer/consumer adjacency mismatch | Repaired: structured record; the host fills it through `WorkspaceCastStepEvaluator.Evaluate` and accepts it only through `WorkspaceInteractionRecord.Violations()`; `saved` is observed via `!IsDirty` | `src/KingmakerBuffPlanner/RuntimeTesting/WorkspaceScenarioContracts.cs`, `RuntimeTestHost.cs` (`UpdateWorkspaceInteraction`, workspace result block) | `workspace-interaction-evidence-contract`, `workspace-cast-step-evaluator-real-session`, `runtime-host-scenario-contract-wiring` |
+| J2 — manual terminal accepted capture by filename, ignoring failure/restoration | Repaired: `ManualTerminalCoordinator` — bounded 20 s capture wait, failure + restoration verdict consumed, close postcondition (view + input lease) always recorded, four separate manual assertions; camera routine now always reports `RestorationClean` | `WorkspaceScenarioContracts.cs`, `RuntimeTestHost.cs` (phases 31/32, manual result block), `MenuRenderDiagnostic.cs` | `manual-terminal-policy-done-stop-deadline`, `manual-terminal-capture-restoration-cleanup`, `runtime-host-scenario-contract-wiring` |
+| C1 — stale current-state summaries | Updated: tracker CURRENT STATE section, this index, `AUTONOMOUS-RESUME.md`, PR body; history kept | `planning/CASTING-FIRST-MIGRATION-STATUS.md` | — |
+| C2 — rehearsal-6 evidence distinctions | Raw records re-verified; sanitized receipt published | `docs/evidence/casting-ws-manual-rehearsal-6-receipt.md` | — |
+| C3 — manual hold numeric boundary | Protocol reader matches launcher 30–1200 s and range-checks before narrowing | `RuntimeTestProtocol.ReadManualHoldSeconds` | `runtime-manual-scenario-validation` (29, 2^32+300 long, -1 rejected) |
+
+Every new regression was mutation-checked: re-introducing the defect
+(already-ready rejected, capture failure ignored, unclean restoration
+ignored, unbounded capture wait, lease ignored, sibling change ignored,
+done preferred over stop) makes the suite fail.
 
 ## What to review, by area
 
@@ -26,7 +42,7 @@ and its current blocker is documented below.
 - `src/KingmakerBuffPlanner/Planning/CastingExecutionGate.cs`,
   `CastingForecast.cs`, `CastingTargetingModifiers.cs`.
 - Regression tests: `tests/KingmakerBuffPlanner.Tests/Program.cs`
-  (custom runner; 217 protocol tests incl.
+  (custom runner; 231 protocol tests at the J-review repair, incl.
   `casting-workspace-mixed-caster-flow`,
   `casting-workspace-review-and-apply-policy`,
   `casting-workspace-save-reopen-and-protection`,
@@ -79,7 +95,7 @@ and its current blocker is documented below.
 
 | Layer | Status |
 | --- | --- |
-| Source/protocol tests | 217/217 PASS locally (`Test-SourceOnly.ps1`: source 42/42, harness 27/27, deployment WhatIf 5/5, launcher -File WhatIf 3/3, fixture 3/3, rollback 4/4, publisher 3/3) |
+| Source/protocol tests | 231/231 protocol PASS locally at the J-review repair (the full `Test-SourceOnly.ps1` gate counts for the pushed HEAD are recorded in `AUTONOMOUS-RESUME.md`). Historical: 217/217 at checkpoint 12. |
 | Live campaign qualification | Campaign load, UMM close, workspace open through the production hotkey path: PROVEN (run `casting-ws-root-200200`, game log) |
 | Visual capture | Backbuffer presentation dies with a disconnected session (classified by matched control/open/closed bisection); the camera-render capture lane bypasses the display path and produced rendered workspace frames including the live authoring run. Display-path acceptance still pending a connected session. |
 | Interaction/execution | **Corrected control-path LIVE-PASSED** (run `casting-ws-gseries-081000`; supersedes the `casting-ws-controls-051500` claim, whose assertions could not detect refused Adds): every action through real ACTIVE buttons — source, caster, recipient, state, Add (×3 with one-record growth, distinct identities, exact authored fields, unchanged siblings), a deliberately refused Add leaving the document untouched, Edit, focused retarget, Undo restoring the exact pre-edit canonical document, Done clearing focus, Save, and production-route reopen with the full canonical signature preserved and a clean dirty state. Protocol layer additionally proves group transitions, focused enhancements, campaign binding, and a fresh-session persisted round trip (223/223). Native submission remains disabled; physical-input (real pointer/keyboard) acceptance and the native aesthetic pass remain OPEN. |
@@ -104,6 +120,6 @@ the visual gate on their own terms.
 
 ## Durable records for the full chain
 
-`planning/CASTING-FIRST-MIGRATION-STATUS.md` (checkpoint 12),
+`planning/CASTING-FIRST-MIGRATION-STATUS.md` (CURRENT STATE section),
 `AUTONOMOUS-RESUME.md`, `AUTONOMOUS-BLOCKERS.md`,
 `KINGMAKER-BUFF-PLANNER-JOURNAL.md`.

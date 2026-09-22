@@ -1,5 +1,24 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-09-22 J-review repair (Claude takeover)
+
+- Took over from Z at `19ecbe8`; reconciled git, processes, locks and
+  the latest restoration receipt before editing (all clean). Rehearsal-6
+  raw records re-verified and its package archived outside the repo.
+- J1 root cause: the producer emitted `castN=controls:…;stateN=…;castNExact=…`
+  while the consumer required `controls:…;castNExact` adjacency, so a
+  correct automatic run could never pass. Rejected fix: re-ordering the
+  string (still a substring coincidence). Chosen: a structured record
+  with a field-based predicate shared by producer and consumer.
+- J2 root cause: phase 32 advanced on `FileName == manual-final.png`,
+  which the camera routine sets even on failure; the restoration
+  verdict was only stored when unclean and never read. Chosen: a
+  bounded terminal coordinator that consumes the callback outcome and
+  always records the cleanup postcondition.
+- Mutation checks surfaced one masked test (a failure with a written png
+  was only caught via the missing hash); added the written-then-failed
+  case.
+
 ## 2026-09-20 campaign-load repair (Gunslinger-reference adaptation)
 
 - Followed the review-directed reframe: prove launch/render/menu-input

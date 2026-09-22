@@ -5,7 +5,66 @@ Linked from `AUTONOMOUS-RESUME.md`. Specification: the adopted
 `Kingmaker-Buff-Planner-Casting-First-Migration-Charter.md` (casting-first
 migration and native scroll UI charter v1.0, 2026-09-19).
 
-## Checkpoint 12 — workspace visual honesty chain; five runs, every claim re-classified — 2026-09-20 (CURRENT)
+## CURRENT STATE — J-review repairs; implementer handoff Z → Claude — 2026-09-22
+
+This section supersedes every earlier "CURRENT" label below; older
+checkpoints are **history** and keep their original failures and
+rejected theories. The newest dated narrative is the top of
+`AUTONOMOUS-RESUME.md`; review dispositions are in
+`docs/CASTING-FIRST-REVIEW-INDEX.md`.
+
+Superseded statements in older checkpoints (do not act on them):
+- "local-only" / "no push authority" — guarded public development-branch
+  publication through `codex-policy/Push-KingmakerBuffPlanner.ps1` is
+  authorized; the branch and draft PR #2 are live.
+- 217 / 223 / 225 / 226 protocol tests — the suite is 231/231 after the
+  J1/J2 regressions.
+- "workspace draws nothing / black presentation blocker" — resolved
+  2026-09-21 (anchor order, nested canvas ownership, UI-camera layer);
+  the workspace renders in presenting sessions.
+- The fixture profile is the owner-approved `full-user` 15-mod profile;
+  the three separately approved snapshots (BagOfTricks, CallOfTheWild,
+  CheatMenu) are provenance, not the whole profile.
+
+Current source state (branch `codex/kingmaker-buff-planner-casting-first`):
+- **J1 repaired** — automatic interaction evidence is a structured
+  record (`RuntimeTesting/WorkspaceScenarioContracts.cs`): the runtime
+  host fills it through `WorkspaceCastStepEvaluator` (exact record,
+  distinct id, growth, full-fidelity sibling signature) and accepts it
+  only through `WorkspaceInteractionRecord.Violations()`; the old
+  adjacency-substring predicate is gone. `saved=True` is now observed
+  (`!session.IsDirty` after the Save control), no longer hard-coded.
+- **J2 repaired** — `ManualTerminalCoordinator` classifies done/stop/
+  deadline (stop wins), bounds the final capture wait (20 s), consumes
+  the capture's failure and camera-restoration verdict (now always
+  reported by the camera routine), records the close postcondition
+  (view closed + input lease released) regardless of capture outcome,
+  and emits separate `manual-session-outcome`, `manual-final-capture`,
+  `manual-camera-restoration`, `manual-workspace-closed` assertions.
+- **C3** — `ReadManualHoldSeconds` range-checks at full width before
+  narrowing and matches the launcher's 30–1200 s contract.
+- Regressions (source-only suite): `workspace-interaction-evidence-contract`,
+  `workspace-cast-step-evaluator-real-session` (real
+  `CastingWorkspaceSession`), `manual-terminal-policy-done-stop-deadline`,
+  `manual-terminal-capture-restoration-cleanup`,
+  `runtime-host-scenario-contract-wiring`. Each was mutation-checked:
+  reintroducing the defect fails the suite.
+- `casting-ws-manual-rehearsal-6` raw records re-verified locally
+  (`docs/evidence/casting-ws-manual-rehearsal-6-receipt.md`): PASS at
+  `0551949`, restored and independently re-compared (1109 entries,
+  0 differences).
+
+Not yet established: human usability; stop/deadline runtime proof;
+native aesthetics/audio/physical input; exact rods (A06) and advanced
+native adapters; execution integration (native casting stays disabled);
+migration cutover/rollback; A01–A20 final qualification.
+
+Next executable step: build the local-runtime package at the pushed
+HEAD, run one `-ManualRehearseDone` rehearsal of the repaired terminal
+path, then the supervised manual session when the owner confirms
+availability.
+
+## Checkpoint 12 — workspace visual honesty chain; five runs, every claim re-classified — 2026-09-20 (HISTORICAL — superseded by the section above)
 
 HEAD `41893a2`. Gates: source 42/42; protocol 217/217; harness 27/27;
 deployment WhatIf 5/5; **launcher -File WhatIf 3/3 (new)**; fixture
