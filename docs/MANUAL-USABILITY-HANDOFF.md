@@ -11,10 +11,13 @@ and legacy quick execution remain disabled; nothing can cast a buff.
 ```powershell
 & 'C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\scripts\Invoke-KingmakerRuntimeTest.ps1' `
     -Scenario live-workspace-manual -CompatibilityProfileId full-user `
-    -RunId casting-ws-manual-<time> -ManualHoldSeconds 900 `
+    -RunId casting-ws-manual-HHmm -ManualHoldSeconds 900 `
     -TimeoutSeconds 1500 -Confirm:$false
 ```
 
+- Replace `HHmm` in the RunId with the current local time (for example
+  `casting-ws-manual-1435`); the id allows letters, digits, dot,
+  underscore, and hyphen only.
 - `-ManualHoldSeconds` (30–1200) bounds the human phase. The launcher
   refuses the run unless `-TimeoutSeconds` covers hold + 420 s of
   boot/load budget.
