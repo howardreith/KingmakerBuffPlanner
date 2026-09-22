@@ -1,5 +1,14 @@
 Set-StrictMode -Version Latest
 
+# Windows PowerShell 5.1 only. PowerShell 7's ConvertFrom-Json turns the
+# manifests' ISO timestamp strings into DateTime values whose re-serialization
+# drops trailing fractional zeros, so exact manifest comparisons (including
+# live Mods restoration verification) fail on unchanged files. Refuse rather
+# than mis-verify (reproduced 2026-09-22).
+if ($PSVersionTable.PSEdition -cne 'Desktop') {
+    throw 'The Kingmaker runtime harness requires Windows PowerShell 5.1 (powershell.exe); PowerShell 7 JSON date conversion breaks exact manifest verification.'
+}
+
 . (Join-Path $PSScriptRoot 'Common.ps1')
 
 $script:KbpLabRoot = 'C:\Dev\KingmakerBuffPlannerLab'
