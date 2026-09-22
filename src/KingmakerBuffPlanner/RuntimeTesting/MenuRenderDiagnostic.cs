@@ -520,7 +520,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         internal float[] Samples { get; set; }
         internal Exception Failure { get; set; }
         internal bool Handled { get; set; }
+        // Camera-path captures only: the self-verified restoration verdict
+        // is recorded for EVERY completion (clean or not) so consumers can
+        // tell "restored" from "never reported" (review J2).
         internal string RestorationVerdict { get; set; }
+        internal bool? RestorationClean { get; set; }
     }
 
     // Dedicated DontDestroyOnLoad host so the diagnostic's readback runs at
@@ -731,13 +735,16 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 string verdict = "targetsRestored=" + targetsRestored +
                     ";activeRestored=" + activeRestored +
                     ";cleanupFailures=" + cleanupFailures.Count;
+                bool restorationClean = targetsRestored && activeRestored &&
+                    cleanupFailures.Count == 0;
+                capture.RestorationVerdict = verdict;
+                capture.RestorationClean = restorationClean;
                 if (log != null)
                     log.Info("[KBP-CAPTURE] camera-path restoration;" + verdict +
                         (cleanupFailures.Count == 0 ? string.Empty
                             : ";detail=" + string.Join("|", cleanupFailures.ToArray())) + ".");
-                if (!targetsRestored || !activeRestored || cleanupFailures.Count != 0)
+                if (!restorationClean)
                 {
-                    capture.RestorationVerdict = verdict;
                     if (failure == null)
                         failure = new InvalidOperationException(
                             "camera capture restoration unclean;" + verdict);

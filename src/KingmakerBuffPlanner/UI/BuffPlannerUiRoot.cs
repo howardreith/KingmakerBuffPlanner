@@ -148,6 +148,13 @@ namespace KingmakerBuffPlanner.UI
             get { return _instance != null && _instance._castingWorkspace != null; }
         }
 
+        // Read-only runtime postcondition for the manual terminal step
+        // (review J2): the production close must release the input lease.
+        internal static bool IsCastingWorkspaceInputLeaseHeldForRuntime
+        {
+            get { return _instance != null && _instance._workspaceInputLease != null; }
+        }
+
         // Runtime-only close seam for diagnostic bisection: closing the
         // workspace without routing through HandlePlannerHotkey (whose
         // toggle would immediately reopen it through OpenSetup).

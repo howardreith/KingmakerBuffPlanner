@@ -160,6 +160,8 @@
     <Compile Include="Persistence\CastingPlanImporter.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="RuntimeTesting\RuntimeTestHost.cs" />
+    <Compile Include="RuntimeTesting\RuntimeTestResultModels.cs" />
+    <Compile Include="RuntimeTesting\WorkspaceScenarioContracts.cs" />
     <Compile Include="RuntimeTesting\LiveCampaignSaveLoader.cs" />
     <Compile Include="RuntimeTesting\UiInputIsolationProbe.cs" />
     <Compile Include="RuntimeTesting\HarmonyPatchInventoryExporter.cs" />

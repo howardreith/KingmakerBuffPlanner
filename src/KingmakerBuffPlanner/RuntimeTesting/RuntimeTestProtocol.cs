@@ -207,14 +207,22 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 !parameters.ContainsKey("manualHoldSeconds"))
                 throw new InvalidDataException("manual-hold-seconds-missing");
             object raw = parameters["manualHoldSeconds"];
-            if (raw is long) raw = (int)(long)raw;
-            if (!(raw is int))
-                throw new InvalidDataException("manual-hold-seconds-invalid");
-            int seconds = (int)raw;
-            if (seconds < 5 || seconds > 1200)
+            // Range-check at full width BEFORE narrowing (review C3): an
+            // out-of-range long must never wrap into an accepted int.
+            long seconds;
+            if (raw is int) seconds = (int)raw;
+            else if (raw is long) seconds = (long)raw;
+            else throw new InvalidDataException("manual-hold-seconds-invalid");
+            if (seconds < MinimumManualHoldSeconds ||
+                seconds > MaximumManualHoldSeconds)
                 throw new InvalidDataException("manual-hold-seconds-range");
-            return seconds;
+            return (int)seconds;
         }
+
+        // The launcher's [ValidateRange(30, 1200)] on -ManualHoldSeconds is
+        // the same contract; the reader enforces it independently.
+        internal const int MinimumManualHoldSeconds = 30;
+        internal const int MaximumManualHoldSeconds = 1200;
 
         internal static bool IsNativeUiProbeScenario(string scenario)
         {
