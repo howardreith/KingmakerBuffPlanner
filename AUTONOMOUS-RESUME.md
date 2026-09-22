@@ -1,6 +1,47 @@
 # AUTONOMOUS-RESUME — top section is current; planning/CASTING-FIRST-MIGRATION-STATUS.md is the per-checkpoint tracker.
 
-## Follow-up review answered; full display-path acceptance PASS — 2026-09-21 (LATEST)
+## G-review answered; corrected control-path acceptance PASS — 2026-09-21 (LATEST)
+
+The third review (G1-G5 at 8dcdef0) is answered at HEAD (pushed,
+verified): G3 campaign-bound session reuse via the pure
+CastingWorkspaceSessionBinding policy with isolated-candidate lifecycle
+regressions (same-campaign retention incl. undo; A→B cross-bind refused
+and disclosed; unresolved identity refuses); G1 the ACTUAL Done control
+and focused-enhancement toggles derived from the focused record's own
+caster/ability (grep-verified in the pushed view this time — the
+earlier F4 claim was partly never applied and is superseded); G2
+remembered-recipient restore or deliberate pick-to-return, group-aware
+SetFocusedTargeting (WithTargeting clone, never direct-target cloning
+on group records), required-coverage authoring, and surfaced refusals;
+G4 the interaction scenario drives EVERY action through real
+active+interactable buttons (source/caster/recipient/state/Add/edit/
+retarget/undo/done/save), asserts one-record growth + distinct
+identities + exact fields + unchanged siblings per Add, and exercises a
+deliberately refused Add; G5 DocumentIntentSignature is the canonical
+serialized profile (modifiers, policies, routines included) with
+same-session retention and fresh-session persisted round trip separated
+plus single-field negative cases. A same-frame stale-button shadowing
+bug in the invoke helper (DestroyChildren deactivates + defers) was
+found and fixed (34a18b7).
+
+**Run casting-ws-gseries-081000: FULL PASS** — all nine assertions:
+cast1/2/3Exact=True through controls, refusedAddClean=True,
+undoIntentRestored=True, doneClearedFocus=True, preserved=True,
+dirty=False, display path non-black (0.73/0.14, changed 0.95).
+Transaction restored+verified. Protocol 223/223.
+
+OPEN (honest): supervised MANUAL usability session (the mission's
+checklist: real mouse, names/readiness/labels, group↔direct, unsaved
+close/reopen, scroll/long-labels/states/sounds) — prepared below;
+physical-input seam acceptance; §5 native aesthetic pass; live group
+authoring; exact rods/native adapters. Native casting remains disabled.
+
+NEXT (exact action): supervised manual session with Howie per the
+package in docs/MANUAL-USABILITY-HANDOFF.md (suspend auto input; record
+identity; restore). Then the §5 aesthetic pass and the launcher
+physical-input seam qualification.
+
+## Follow-up review answered; full display-path acceptance PASS — 2026-09-21
 
 The second review (F1-F7 + C1 at head 196389f) is answered at `0a7229e`
 (pushed, verified): F1 Add self-resolves the exact ability+spellbook and
