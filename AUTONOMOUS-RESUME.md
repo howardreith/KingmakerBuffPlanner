@@ -1,6 +1,43 @@
 # AUTONOMOUS-RESUME — top section is current; planning/CASTING-FIRST-MIGRATION-STATUS.md is the per-checkpoint tracker.
 
-## H-review answered; manual mode implemented; live rehearsal awaits a connected session — 2026-09-22 (LATEST)
+## I-review answered; manual success path PROVEN by rehearsal — 2026-09-22 (LATEST)
+
+The fifth review (I1-I5 at 5c927cb) is answered at pushed HEAD
+`0551949` (verified): I1 the pre-open control frame is captured and
+consumed for EVERY workspace scenario and manual opens programmatically
+with no input request or wait; I2 manual-ready one-shot transitions
+into the reachable marker-watching hold, stop deterministically wins
+over done; I3 manual has its own result contract (ready acknowledged,
+zero automatic authoring, done-path outcome) and inherits no automatic
+assertions; I4 manual request validation enforces the COMPLETE live-save
+contract plus exactly the hold (orchestration regressions: valid
+combined request + eight rejected defect classes through real TryRead);
+I5 the State outcome is per-step evidence accepted as invoked or
+already-ready with correctness on the exact-record checks. Protocol
+226/226.
+
+LIVE PROOF (rehearsal, labeled — never human acceptance):
+casting-ws-manual-rehearsal-4 ran the pre-fix build and confirmed I1
+live (phase-0 input wait, 46k ticks, timeout; restored verified).
+casting-ws-manual-rehearsal-6 on the fixed build PASSED end to end:
+programmatic open after control capture, manual-ready.json
+(syntheticInputRequested=false, workspaceOpen=true, hold 60s), the
+rehearsal done marker consumed, final camera frame captured, workspace
+closed via production lifecycle, PASS manual-session-outcome, owned
+exit, transaction restored verified. Rehearsals 1-5 preserved as
+history (request-clobber bug, throttled session, stale-package refusal,
+running-game refusal — all restored or refused cleanly).
+
+NEXT (exact action, owner required): the supervised manual session per
+docs/MANUAL-USABILITY-HANDOFF.md — Z launches with -ManualHoldSeconds
+900 -TimeoutSeconds 1500 and a concrete RunId (e.g.
+casting-ws-manual-1435), confirms manual-ready.json + the MANUAL-READY
+console line, reports build identity, then transfers interaction to
+Howie; done/stop relayed through the marker files; acceptance is based
+on Howie's observations, not the done file. Afterward: §5 native
+aesthetic pass, launcher physical-input seam qualification.
+
+## H-review answered; manual mode implemented; live rehearsal awaits a connected session — 2026-09-22
 
 The fourth review (H1-H4 at c01f88bd) is answered at the pushed HEAD:
 H3 identity resolves BEFORE the input lease (unresolved/failed opens
