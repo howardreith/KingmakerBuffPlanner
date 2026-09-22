@@ -18,6 +18,26 @@ try {
     Assert-KbpNotRunning -KnownProcessIds $null
     $passed++
 
+    # The harness refuses PowerShell 7, whose JSON date conversion breaks
+    # exact manifest verification (checked only where pwsh is installed).
+    $pwsh = Get-Command pwsh -ErrorAction SilentlyContinue
+    if ($null -ne $pwsh) {
+        $common = Join-Path $PSScriptRoot 'RuntimeHarness.Common.ps1'
+        # Native stderr is an ErrorRecord in 5.1; capture it, do not throw.
+        $priorPreference = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        try {
+            $editionOutput = (& $pwsh.Source -NoProfile -NonInteractive -Command ". '$common'" 2>&1 |
+                ForEach-Object { [string]$_ }) -join ' '
+            $editionExit = $LASTEXITCODE
+        }
+        finally { $ErrorActionPreference = $priorPreference }
+        if ($editionExit -eq 0 -or $editionOutput -notmatch 'requires Windows PowerShell 5\.1') {
+            throw "Runtime harness did not refuse PowerShell 7: $editionOutput"
+        }
+        $passed++
+    }
+
     $game = Join-Path $root 'game-existing'
     New-Item -ItemType Directory -Path (Join-Path $game 'Mods\Existing\settings') -Force | Out-Null
     Set-Content -LiteralPath (Join-Path $game 'Kingmaker.exe') -Value 'fixture' -Encoding Ascii
@@ -236,6 +256,9 @@ try {
     finally {
         if (-not $probe.HasExited) {
             try { Stop-Process -Id $probe.Id -Force } catch { }
+            # Stop-Process does not wait; a still-exiting probe would make
+            # the NEXT case's not-running guard see it (observed race).
+            try { [void]$probe.WaitForExit(15000) } catch { }
         }
     }
     $passed++
@@ -578,6 +601,9 @@ try {
     }
     finally {
         if (-not $liveProbe.HasExited) { try { Stop-Process -Id $liveProbe.Id -Force } catch { } }
+        # Wait for the probe to be gone before the next case's guard runs
+        # (observed race: 'Kingmaker is running' from the r1-mixed setup).
+        try { [void]$liveProbe.WaitForExit(15000) } catch { }
     }
     $passed++
 
