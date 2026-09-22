@@ -111,6 +111,12 @@
     <Compile Include="..\..\src\KingmakerBuffPlanner\RuntimeTesting\LoadedAssemblyIdentity.cs">
       <Link>RuntimeTesting\LoadedAssemblyIdentity.cs</Link>
     </Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\RuntimeTesting\RuntimeTestResultModels.cs">
+      <Link>RuntimeTesting\RuntimeTestResultModels.cs</Link>
+    </Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\RuntimeTesting\WorkspaceScenarioContracts.cs">
+      <Link>RuntimeTesting\WorkspaceScenarioContracts.cs</Link>
+    </Compile>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

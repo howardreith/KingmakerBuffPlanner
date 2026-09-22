@@ -366,6 +366,17 @@ namespace KingmakerBuffPlanner.Tests
                     TestRuntimeManualScenarioValidation);
                 Run("runtime-manual-request-validation",
                     () => TestManualScenarioRequestValidation(root));
+                // Review J1/J2 production producer/consumer regressions.
+                Run("workspace-interaction-evidence-contract",
+                    TestWorkspaceInteractionEvidenceContract);
+                Run("workspace-cast-step-evaluator-real-session",
+                    () => TestWorkspaceCastStepEvaluatorAgainstSession(root));
+                Run("manual-terminal-policy-done-stop-deadline",
+                    TestManualTerminalPolicy);
+                Run("manual-terminal-capture-restoration-cleanup",
+                    TestManualTerminalCoordinatorContract);
+                Run("runtime-host-scenario-contract-wiring",
+                    TestRuntimeHostScenarioContractWiring);
             }
             finally
             {
@@ -12688,6 +12699,709 @@ namespace KingmakerBuffPlanner.Tests
                     session.Draft.RequiredCoverageUnitIds.ToArray());
         }
 
+        // ------------------------------------------------------------------
+        // Review J1: the automatic interaction evidence is a structured
+        // record; its producer (Describe/Evaluate) and its ONLY acceptance
+        // predicate (Violations) are exercised together here.
+        // ------------------------------------------------------------------
+
+        private static WorkspaceInteractionRecord CompleteInteractionRecord(
+            string state1, string state2, string state3)
+        {
+            var record = new WorkspaceInteractionRecord();
+            record.RecordBrowse(true, "invoked", 2, 3);
+            record.RecordCastStep(new WorkspaceCastStepEvidence(1, "invoked",
+                "invoked", "invoked", state1, true, true, true, true));
+            record.RecordCastStep(new WorkspaceCastStepEvidence(2, "invoked",
+                "invoked", "invoked", state2, true, true, true, true));
+            record.RecordCastStep(new WorkspaceCastStepEvidence(3, "invoked",
+                "invoked", "invoked", state3, true, true, true, true));
+            record.RefusedAddControl = "invoked";
+            record.RefusedAddClean = true;
+            record.EditControl = "invoked";
+            record.EditFocused = true;
+            record.RetargetControl = "invoked";
+            record.RetargetApplied = true;
+            record.UndoControl = "invoked";
+            record.UndoIntentRestored = true;
+            record.DoneControl = "invoked";
+            record.DoneClearedFocus = true;
+            record.SaveControl = "invoked";
+            record.Saved = true;
+            return record;
+        }
+
+        private static void AssertViolation(WorkspaceInteractionRecord record,
+            string expectedViolation, string label)
+        {
+            IList<string> violations = record.Violations();
+            if (!violations.Contains(expectedViolation))
+                throw new InvalidOperationException(label +
+                    ": expected violation '" + expectedViolation + "' but got [" +
+                    string.Join(",", violations.ToArray()) + "].");
+        }
+
+        private static void TestWorkspaceInteractionEvidenceContract()
+        {
+            // 1/2. Both legitimate State outcomes are accepted, in every mix.
+            foreach (string[] states in new[]
+                {
+                    new[] { "invoked", "already-ready", "already-ready" },
+                    new[] { "invoked", "invoked", "invoked" },
+                    new[] { "already-ready", "already-ready", "already-ready" }
+                })
+            {
+                WorkspaceInteractionRecord record = CompleteInteractionRecord(
+                    states[0], states[1], states[2]);
+                IList<string> violations = record.Violations();
+                if (violations.Count != 0)
+                    throw new InvalidOperationException(
+                        "A correct control sequence was rejected: " +
+                        string.Join(",", violations.ToArray()));
+                string described = record.Describe();
+                // The producer's real field order (state between controls
+                // and Exact) — the adjacency the old validator demanded is
+                // absent, which is exactly why a substring check failed.
+                if (!described.Contains("cast1=controls:invoked/invoked/invoked;state1=" +
+                        states[0] + ";cast1Exact=True") ||
+                    described.Contains("cast1=controls:invoked/invoked/invoked;cast1Exact=True") ||
+                    !described.Contains("saveControl=invoked;saved=True"))
+                    throw new InvalidOperationException(
+                        "Evidence description drifted from the producer contract: " +
+                        described);
+            }
+
+            // 3. Control-level and record-level defects each fail by name.
+            WorkspaceInteractionRecord badState = new WorkspaceInteractionRecord();
+            badState.RecordBrowse(true, "invoked", 2, 3);
+            badState.RecordCastStep(new WorkspaceCastStepEvidence(1, "invoked",
+                "invoked", "invoked", "control-missing:State", true, true, true, true));
+            AssertViolation(badState, "cast1:state=control-missing:State", "state control missing");
+            AssertViolation(badState, "castSteps:count=1", "missing Adds");
+
+            var defects = new[]
+            {
+                new { Step = new WorkspaceCastStepEvidence(2, "invoked", "invoked",
+                    "control-missing:AddCasting", "already-ready", true, true, true, true),
+                    Violation = "cast2:controls=invoked/invoked/control-missing:AddCasting" },
+                new { Step = new WorkspaceCastStepEvidence(2, "control-not-interactable:DraftCaster.u2",
+                    "invoked", "invoked", "already-ready", true, true, true, true),
+                    Violation = "cast2:controls=control-not-interactable:DraftCaster.u2/invoked/invoked" },
+                new { Step = new WorkspaceCastStepEvidence(2, "invoked", "invoked",
+                    "invoked", "already-ready", false, false, false, true),
+                    Violation = "cast2:not-added" },
+                new { Step = new WorkspaceCastStepEvidence(2, "invoked", "invoked",
+                    "invoked", "already-ready", true, false, true, true),
+                    Violation = "cast2:reused-id" },
+                new { Step = new WorkspaceCastStepEvidence(2, "invoked", "invoked",
+                    "invoked", "already-ready", true, true, false, true),
+                    Violation = "cast2:fields-inexact" },
+                new { Step = new WorkspaceCastStepEvidence(2, "invoked", "invoked",
+                    "invoked", "already-ready", true, true, true, false),
+                    Violation = "cast2:sibling-changed" },
+                new { Step = new WorkspaceCastStepEvidence(3, "invoked", "invoked",
+                    "invoked", "already-ready", true, true, true, true),
+                    Violation = "cast2:ordinal=3" }
+            };
+            foreach (var defect in defects)
+            {
+                WorkspaceInteractionRecord record = CompleteInteractionRecord(
+                    "invoked", "already-ready", "already-ready");
+                var rebuilt = new WorkspaceInteractionRecord();
+                rebuilt.RecordBrowse(true, "invoked", 2, 3);
+                rebuilt.RecordCastStep(record.CastSteps[0]);
+                rebuilt.RecordCastStep(defect.Step);
+                rebuilt.RecordCastStep(record.CastSteps[2]);
+                CopyLaterControls(record, rebuilt);
+                AssertViolation(rebuilt, defect.Violation, defect.Violation);
+            }
+
+            // Each later control: not run, not invoked, and wrong outcome.
+            var laterChecks = new List<KeyValuePair<string, Action<WorkspaceInteractionRecord>>>
+            {
+                Later("refusedAdd:not-run", r => r.RefusedAddControl = null),
+                Later("refusedAdd:outcome=False", r => r.RefusedAddClean = false),
+                Later("edit:control=control-missing:Edit.x", r => r.EditControl = "control-missing:Edit.x"),
+                Later("edit:outcome=missing", r => r.EditFocused = null),
+                Later("retarget:outcome=False", r => r.RetargetApplied = false),
+                Later("undo:outcome=False", r => r.UndoIntentRestored = false),
+                Later("done:control=control-inactive:DoneEditing", r => r.DoneControl = "control-inactive:DoneEditing"),
+                Later("save:outcome=False", r => r.Saved = false),
+                Later("save:not-run", r => r.SaveControl = null)
+            };
+            foreach (KeyValuePair<string, Action<WorkspaceInteractionRecord>> check in laterChecks)
+            {
+                WorkspaceInteractionRecord record = CompleteInteractionRecord(
+                    "invoked", "already-ready", "already-ready");
+                check.Value(record);
+                AssertViolation(record, check.Key, check.Key);
+            }
+            WorkspaceInteractionRecord mutatedBrowse = CompleteInteractionRecord(
+                "invoked", "already-ready", "already-ready");
+            mutatedBrowse.RecordBrowse(false, "invoked", 2, 3);
+            AssertViolation(mutatedBrowse, "browse:mutated", "browse mutation");
+
+            // 4. A manual lifecycle result never substitutes: the manual
+            // scenario performs no scripted authoring, so its (empty)
+            // record fails the automatic predicate everywhere.
+            var manualRecord = new WorkspaceInteractionRecord();
+            AssertViolation(manualRecord, "browse:not-run", "manual record");
+            AssertViolation(manualRecord, "castSteps:count=0", "manual record");
+            AssertViolation(manualRecord, "save:not-run", "manual record");
+            if (manualRecord.Describe() != "not-run")
+                throw new InvalidOperationException(
+                    "An unpopulated record described evidence it never produced.");
+        }
+
+        private static KeyValuePair<string, Action<WorkspaceInteractionRecord>> Later(
+            string violation, Action<WorkspaceInteractionRecord> mutate)
+        {
+            return new KeyValuePair<string, Action<WorkspaceInteractionRecord>>(
+                violation, mutate);
+        }
+
+        private static void CopyLaterControls(WorkspaceInteractionRecord from,
+            WorkspaceInteractionRecord to)
+        {
+            to.RefusedAddControl = from.RefusedAddControl;
+            to.RefusedAddClean = from.RefusedAddClean;
+            to.EditControl = from.EditControl;
+            to.EditFocused = from.EditFocused;
+            to.RetargetControl = from.RetargetControl;
+            to.RetargetApplied = from.RetargetApplied;
+            to.UndoControl = from.UndoControl;
+            to.UndoIntentRestored = from.UndoIntentRestored;
+            to.DoneControl = from.DoneControl;
+            to.DoneClearedFocus = from.DoneClearedFocus;
+            to.SaveControl = from.SaveControl;
+            to.Saved = from.Saved;
+        }
+
+        // Review J1 (production path): the evaluator the runtime host calls,
+        // driven against a REAL CastingWorkspaceSession. The first draft is
+        // made Ready (the State control's effect); later drafts stay Ready
+        // with no toggle. Three exact records yield an accepted record, and
+        // every wrong-field / reused-id / refused / sibling-change case fails.
+        private static void TestWorkspaceCastStepEvaluatorAgainstSession(string root)
+        {
+            string modPath = Path.Combine(root, "casting-workspace-j1");
+            Directory.CreateDirectory(modPath);
+            PartyProviderSnapshot snapshot;
+            CastingWorkspaceInputs inputs = WorkspaceInputs(out snapshot);
+            var session = new CastingWorkspaceSession(modPath, "workspace-campaign");
+            session.SelectBuff("source-bulls");
+            session.SelectRoutine("long");
+            session.BuildView(inputs);
+            session.Draft.SourceId = "source-bulls";
+            session.Draft.TargetMode = CastingTargetMode.DirectTarget;
+            if (session.Draft.State == CastingAuthoringState.Ready)
+                throw new InvalidOperationException(
+                    "Fixture precondition: a fresh draft must not start Ready.");
+            var record = new WorkspaceInteractionRecord();
+            record.RecordBrowse(true, "invoked", 2, 3);
+            var ids = new List<string>();
+            var plan = new[]
+            {
+                new[] { "unit-cleric", "unit-t1" },
+                new[] { "unit-wizard", "unit-t2" },
+                new[] { "unit-cleric", "unit-t3" }
+            };
+            WorkspaceCastExpectation lastExpected = null;
+            string lastSiblingsBefore = null;
+            int lastCountBefore = 0;
+            for (int index = 0; index < plan.Length; index++)
+            {
+                int countBefore = session.Document.Castings.Count;
+                string siblingsBefore = WorkspaceCastStepEvaluator.SiblingSignature(
+                    session.Document.Castings, null);
+                session.Draft.CasterUnitId = plan[index][0];
+                session.Draft.DirectTargetUnitId = plan[index][1];
+                var expected = new WorkspaceCastExpectation
+                {
+                    CasterUnitId = plan[index][0],
+                    DirectTargetUnitId = plan[index][1],
+                    SourceId = "source-bulls",
+                    Ability = session.DraftAbilityFor(inputs),
+                    SpellbookGuid = session.DraftSpellbookFor(inputs),
+                    RoutineId = session.SelectedRoutineId
+                };
+                string stateOutcome;
+                if (session.Draft.State == CastingAuthoringState.Ready)
+                {
+                    if (index == 0)
+                        throw new InvalidOperationException("Draft was Ready too early.");
+                    stateOutcome = "already-ready";
+                }
+                else
+                {
+                    if (index != 0)
+                        throw new InvalidOperationException(
+                            "A later draft lost Ready and would need a toggle.");
+                    session.Draft.State = CastingAuthoringState.Ready;
+                    stateOutcome = "invoked";
+                }
+                if (!session.AddCastingFromDraft(inputs).Applied)
+                    throw new InvalidOperationException("Add " + index + " was refused.");
+                PlannedCasting created;
+                WorkspaceCastStepEvidence step = WorkspaceCastStepEvaluator.Evaluate(
+                    index + 1, "invoked", "invoked", stateOutcome, "invoked",
+                    session.Document.Castings.ToList(), countBefore, ids,
+                    expected, siblingsBefore, out created);
+                if (!step.Exact || created == null)
+                    throw new InvalidOperationException(
+                        "A correct Add was not evaluated exact: " + step.Describe());
+                // Reused id: the same record evaluated against its own id.
+                PlannedCasting ignored;
+                if (WorkspaceCastStepEvaluator.Evaluate(index + 1, "invoked",
+                        "invoked", stateOutcome, "invoked",
+                        session.Document.Castings.ToList(), countBefore,
+                        ids.Concat(new[] { created.CastingId }).ToList(),
+                        expected, siblingsBefore, out ignored).Distinct)
+                    throw new InvalidOperationException("A reused id was accepted.");
+                ids.Add(created.CastingId);
+                record.RecordCastStep(step);
+                lastExpected = expected;
+                lastSiblingsBefore = siblingsBefore;
+                lastCountBefore = countBefore;
+            }
+            record.RefusedAddControl = "invoked";
+            record.RefusedAddClean = true;
+            record.EditControl = "invoked";
+            record.EditFocused = true;
+            record.RetargetControl = "invoked";
+            record.RetargetApplied = true;
+            record.UndoControl = "invoked";
+            record.UndoIntentRestored = true;
+            record.DoneControl = "invoked";
+            record.DoneClearedFocus = true;
+            record.SaveControl = "invoked";
+            session.Save();
+            record.Saved = !session.IsDirty;
+            if (record.Violations().Count != 0)
+                throw new InvalidOperationException(
+                    "Three exact session records were rejected: " +
+                    string.Join(",", record.Violations().ToArray()));
+
+            // Wrong-field cases against the real third record.
+            PlannedCasting third = session.Document.Castings[2];
+            Func<Action<WorkspaceCastExpectation>, WorkspaceCastExpectation> alter =
+                change =>
+                {
+                    var copy = new WorkspaceCastExpectation
+                    {
+                        CasterUnitId = lastExpected.CasterUnitId,
+                        DirectTargetUnitId = lastExpected.DirectTargetUnitId,
+                        SourceId = lastExpected.SourceId,
+                        Ability = lastExpected.Ability,
+                        SpellbookGuid = lastExpected.SpellbookGuid,
+                        RoutineId = lastExpected.RoutineId
+                    };
+                    change(copy);
+                    return copy;
+                };
+            if (!WorkspaceCastStepEvaluator.FieldsExact(third, lastExpected))
+                throw new InvalidOperationException("The exact expectation drifted.");
+            var wrong = new Dictionary<string, WorkspaceCastExpectation>
+            {
+                { "caster", alter(e => e.CasterUnitId = "unit-wizard") },
+                { "target", alter(e => e.DirectTargetUnitId = "unit-t1") },
+                { "source", alter(e => e.SourceId = "source-other") },
+                { "ability", alter(e => e.Ability = CastingGroupAbility) },
+                { "spellbook", alter(e => e.SpellbookGuid = "spellbook-other") },
+                { "routine", alter(e => e.RoutineId = "short") }
+            };
+            foreach (KeyValuePair<string, WorkspaceCastExpectation> pair in wrong)
+                if (WorkspaceCastStepEvaluator.FieldsExact(third, pair.Value))
+                    throw new InvalidOperationException(
+                        "A wrong " + pair.Key + " was accepted as exact.");
+            PlannedCasting draftState = new PlannedCasting(third.CastingId,
+                third.RoutineId, third.Order, third.SourceId, third.Ability,
+                third.CasterUnitId, third.SpellbookGuid, third.TargetMode,
+                third.DirectTargetUnitId, third.Origin, third.RequiredCoverageUnitIds,
+                third.TargetingModifiers, third.Enhancements,
+                third.ExistingEffectPolicy, third.IgnoredPresenceMarkers,
+                CastingAuthoringState.Draft, third.Provenance);
+            if (WorkspaceCastStepEvaluator.FieldsExact(draftState, lastExpected))
+                throw new InvalidOperationException("A wrong state was accepted as exact.");
+            PlannedCasting enhanced = third.WithEnhancementSelections(
+                new[] { new AuthoredEnhancementSelection("extend-cleric", true, null) });
+            if (WorkspaceCastStepEvaluator.FieldsExact(enhanced, lastExpected))
+                throw new InvalidOperationException(
+                    "An unexpected enhancement was accepted as exact.");
+
+            // Refused Add: no growth, no created record.
+            PlannedCasting none;
+            WorkspaceCastStepEvidence refused = WorkspaceCastStepEvaluator.Evaluate(
+                4, "invoked", "invoked", "already-ready", "invoked",
+                session.Document.Castings.ToList(), session.Document.Castings.Count,
+                ids, lastExpected, WorkspaceCastStepEvaluator.SiblingSignature(
+                    session.Document.Castings, null), out none);
+            if (refused.Grew || none != null || refused.Exact)
+                throw new InvalidOperationException("A refused Add was accepted.");
+
+            // Changed sibling intent: the first record retargeted while the
+            // third was "added" — full serialized fidelity catches it.
+            var tampered = session.Document.Castings.ToList();
+            tampered[0] = tampered[0].WithDirectTarget("unit-t3");
+            PlannedCasting tamperedCreated;
+            WorkspaceCastStepEvidence sibling = WorkspaceCastStepEvaluator.Evaluate(
+                3, "invoked", "invoked", "already-ready", "invoked", tampered,
+                lastCountBefore, ids.Take(2).ToList(), lastExpected,
+                lastSiblingsBefore, out tamperedCreated);
+            if (sibling.SiblingsUnchanged || sibling.Exact)
+                throw new InvalidOperationException("A changed sibling was accepted.");
+        }
+
+        // ------------------------------------------------------------------
+        // Review J2: the manual terminal step consumes the final capture's
+        // failure and restoration outcome, is bounded, always records the
+        // cleanup postcondition, and keeps request / capture / restoration /
+        // cleanup as separate assertions. Driven through the same
+        // coordinator and RuntimeTestResult the runtime host uses.
+        // ------------------------------------------------------------------
+
+        private const string ManualReady =
+            "manual-ready;workspaceOpen=true;legacyScreenClosed=true;" +
+            "syntheticInputRequested=false;holdSeconds=60";
+
+        private static ManualCaptureObservation FinalCapture(bool? restorationClean,
+            string failureType, bool fileExists)
+        {
+            return new ManualCaptureObservation
+            {
+                FileName = "manual-final.png",
+                FailureType = failureType,
+                FailureMessage = failureType == null ? null : "detail",
+                RestorationClean = restorationClean,
+                RestorationVerdict = restorationClean == null ? null
+                    : "targetsRestored=" + restorationClean.Value +
+                      ";activeRestored=True;cleanupFailures=" +
+                      (restorationClean.Value ? "0" : "1"),
+                FileExists = fileExists,
+                Sha256 = fileExists && failureType == null ? "abc123" : null,
+                LumaSummary = "mean=0.40"
+            };
+        }
+
+        private static RuntimeTestResult ManualResult(ManualTerminalCoordinator terminal)
+        {
+            var result = new RuntimeTestResult
+            {
+                Status = "PASS",
+                Stage = "completed",
+                Assertions = new List<RuntimeTestAssertion>()
+            };
+            terminal.AppendAssertions(result, ManualReady,
+                "manual;outcome=" + terminal.OutcomeText);
+            return result;
+        }
+
+        private static string AssertionStatus(RuntimeTestResult result, string id)
+        {
+            RuntimeTestAssertion assertion = result.Assertions.SingleOrDefault(
+                candidate => candidate.Id == id);
+            return assertion == null ? "absent" : assertion.Status;
+        }
+
+        private static void ExpectManual(RuntimeTestResult result, string status,
+            string stage, string label, params string[] idStatusPairs)
+        {
+            if (result.Status != status || result.Stage != stage)
+                throw new InvalidOperationException(label + ": expected " + status +
+                    "/" + stage + " but got " + result.Status + "/" + result.Stage);
+            for (int i = 0; i < idStatusPairs.Length; i += 2)
+            {
+                string observed = AssertionStatus(result, idStatusPairs[i]);
+                if (observed != idStatusPairs[i + 1])
+                    throw new InvalidOperationException(label + ": assertion " +
+                        idStatusPairs[i] + " expected " + idStatusPairs[i + 1] +
+                        " but was " + observed);
+            }
+            // Manual acceptance never inherits the automatic assertions.
+            if (result.Assertions.Any(a => a.Id.StartsWith("workspace-",
+                    StringComparison.Ordinal)))
+                throw new InvalidOperationException(label +
+                    ": automatic workspace assertions leaked into the manual result.");
+        }
+
+        private static void TestManualTerminalPolicy()
+        {
+            var cases = new[]
+            {
+                new { Deadline = false, Stop = false, Done = false, Expected = ManualTerminalRequest.None },
+                new { Deadline = false, Stop = false, Done = true, Expected = ManualTerminalRequest.Completed },
+                new { Deadline = false, Stop = true, Done = false, Expected = ManualTerminalRequest.Cancelled },
+                new { Deadline = false, Stop = true, Done = true, Expected = ManualTerminalRequest.Cancelled },
+                new { Deadline = true, Stop = false, Done = false, Expected = ManualTerminalRequest.Deadline },
+                new { Deadline = true, Stop = true, Done = true, Expected = ManualTerminalRequest.Deadline }
+            };
+            foreach (var item in cases)
+                if (ManualTerminalPolicy.Classify(item.Deadline, item.Stop, item.Done) !=
+                    item.Expected)
+                    throw new InvalidOperationException("Terminal classification wrong for deadline=" +
+                        item.Deadline + ";stop=" + item.Stop + ";done=" + item.Done);
+            if (ManualTerminalPolicy.OutcomeText(ManualTerminalRequest.Completed) !=
+                    "manual-completed;by=done-marker" ||
+                ManualTerminalPolicy.OutcomeText(ManualTerminalRequest.Cancelled) !=
+                    "manual-cancelled;by=stop-marker" ||
+                ManualTerminalPolicy.OutcomeText(ManualTerminalRequest.Deadline) !=
+                    "manual-deadline;timeout-is-not-acceptance")
+                throw new InvalidOperationException("Terminal outcome text drifted.");
+        }
+
+        private static void TestManualTerminalCoordinatorContract()
+        {
+            // Successful final capture with clean restoration and cleanup.
+            var success = new ManualTerminalCoordinator("manual-final.png", 20000);
+            success.Begin(ManualTerminalRequest.Completed, 1000);
+            if (success.Poll(1010, null))
+                throw new InvalidOperationException("Close proceeded before the capture resolved.");
+            var stale = FinalCapture(true, null, true);
+            stale.FileName = "workspace-camera-frame.png";
+            if (success.Poll(1020, stale))
+                throw new InvalidOperationException("An earlier capture satisfied the final capture.");
+            if (!success.Poll(1030, FinalCapture(true, null, true)))
+                throw new InvalidOperationException("A completed capture did not release the close.");
+            success.RecordClose(false, false, null);
+            ExpectManual(ManualResult(success), "PASS", "completed", "success",
+                "manual-ready-acknowledged", "PASS",
+                "manual-no-automatic-authoring", "PASS",
+                "manual-session-outcome", "PASS",
+                "manual-final-capture", "PASS",
+                "manual-camera-restoration", "PASS",
+                "manual-workspace-closed", "PASS");
+
+            // Render/readback failure with CLEAN restoration: the session
+            // still ends and cleans up; the evidence failure stays visible.
+            var readback = new ManualTerminalCoordinator("manual-final.png", 20000);
+            readback.Begin(ManualTerminalRequest.Completed, 0);
+            if (!readback.Poll(5, FinalCapture(true, "InvalidOperationException", false)))
+                throw new InvalidOperationException("A failed capture did not release the close.");
+            readback.RecordClose(false, false, null);
+            ExpectManual(ManualResult(readback), "FAIL", "manual-final-capture-failed",
+                "readback failure",
+                "manual-session-outcome", "PASS",
+                "manual-final-capture", "FAIL",
+                "manual-camera-restoration", "PASS",
+                "manual-workspace-closed", "PASS");
+
+            // A failure reported AFTER the png was written (for example the
+            // luma pass threw): the file's presence never overrides the
+            // capture's own failure.
+            var writtenThenFailed = new ManualTerminalCoordinator("manual-final.png", 20000);
+            writtenThenFailed.Begin(ManualTerminalRequest.Completed, 0);
+            ManualCaptureObservation partial = FinalCapture(true, "IndexOutOfRangeException", true);
+            partial.Sha256 = "def456";
+            writtenThenFailed.Poll(5, partial);
+            writtenThenFailed.RecordClose(false, false, null);
+            RuntimeTestResult partialResult = ManualResult(writtenThenFailed);
+            ExpectManual(partialResult, "FAIL", "manual-final-capture-failed",
+                "written then failed",
+                "manual-final-capture", "FAIL",
+                "manual-camera-restoration", "PASS");
+            if (!partialResult.Assertions.Single(a => a.Id == "manual-final-capture")
+                    .Observed.StartsWith("failed:IndexOutOfRangeException",
+                        StringComparison.Ordinal))
+                throw new InvalidOperationException("The capture failure type was not preserved.");
+
+            // Explicit restoration failure: never a clean PASS, and the
+            // safety stage outranks every other classification.
+            var unclean = new ManualTerminalCoordinator("manual-final.png", 20000);
+            unclean.Begin(ManualTerminalRequest.Completed, 0);
+            unclean.Poll(5, FinalCapture(false, "InvalidOperationException", true));
+            unclean.RecordClose(false, false, null);
+            RuntimeTestResult uncleanResult = ManualResult(unclean);
+            ExpectManual(uncleanResult, "FAIL", "manual-camera-restoration-unclean",
+                "restoration failure",
+                "manual-session-outcome", "PASS",
+                "manual-final-capture", "FAIL",
+                "manual-camera-restoration", "FAIL",
+                "manual-workspace-closed", "PASS");
+            if (!uncleanResult.Assertions.Single(a => a.Id == "manual-camera-restoration")
+                    .Observed.Contains("targetsRestored=False"))
+                throw new InvalidOperationException("The unclean verdict was not preserved.");
+
+            // A capture that reports no restoration verdict is not clean.
+            var noVerdict = new ManualTerminalCoordinator("manual-final.png", 20000);
+            noVerdict.Begin(ManualTerminalRequest.Completed, 0);
+            noVerdict.Poll(5, FinalCapture(null, null, true));
+            noVerdict.RecordClose(false, false, null);
+            ExpectManual(ManualResult(noVerdict), "FAIL",
+                "manual-camera-restoration-unverified", "missing verdict",
+                "manual-final-capture", "PASS",
+                "manual-camera-restoration", "FAIL");
+
+            // Missing callback: bounded — the close proceeds at the budget,
+            // nothing is claimed restored, and a late callback cannot
+            // rewrite the recorded verdict.
+            var missing = new ManualTerminalCoordinator("manual-final.png", 20000);
+            missing.Begin(ManualTerminalRequest.Completed, 1000);
+            if (missing.Poll(20999, null))
+                throw new InvalidOperationException("The capture budget expired early.");
+            if (!missing.Poll(21000, null) ||
+                missing.CaptureState != ManualFinalCaptureState.CallbackMissing)
+                throw new InvalidOperationException("A missing callback held the session open.");
+            missing.Poll(22000, FinalCapture(true, null, true));
+            if (missing.CaptureState != ManualFinalCaptureState.CallbackMissing)
+                throw new InvalidOperationException("A late callback rewrote the verdict.");
+            missing.RecordClose(false, false, null);
+            ExpectManual(ManualResult(missing), "FAIL", "manual-final-capture-missing",
+                "missing callback",
+                "manual-session-outcome", "PASS",
+                "manual-final-capture", "FAIL",
+                "manual-camera-restoration", "FAIL",
+                "manual-workspace-closed", "PASS");
+
+            // Delayed callback within the budget is accepted normally.
+            var delayed = new ManualTerminalCoordinator("manual-final.png", 20000);
+            delayed.Begin(ManualTerminalRequest.Completed, 0);
+            if (delayed.Poll(15000, null) || !delayed.Poll(19999, FinalCapture(true, null, true)))
+                throw new InvalidOperationException("A delayed in-budget callback was mishandled.");
+            delayed.RecordClose(false, false, null);
+            ExpectManual(ManualResult(delayed), "PASS", "completed", "delayed callback",
+                "manual-final-capture", "PASS");
+
+            // Stop and deadline keep their terminal classification even with
+            // perfect evidence; a stop is not delayed by a missing capture.
+            var stopped = new ManualTerminalCoordinator("manual-final.png", 20000);
+            stopped.Begin(ManualTerminalRequest.Cancelled, 0);
+            stopped.Poll(3, FinalCapture(true, null, true));
+            stopped.RecordClose(false, false, null);
+            RuntimeTestResult stoppedResult = ManualResult(stopped);
+            ExpectManual(stoppedResult, "FAIL", "manual-cancelled", "stop",
+                "manual-session-outcome", "FAIL",
+                "manual-final-capture", "PASS",
+                "manual-camera-restoration", "PASS",
+                "manual-workspace-closed", "PASS");
+            if (stoppedResult.Assertions.Single(a => a.Id == "manual-session-outcome")
+                    .Observed != "manual-cancelled;by=stop-marker")
+                throw new InvalidOperationException("The stop outcome was not recorded.");
+            var stoppedMissing = new ManualTerminalCoordinator("manual-final.png", 20000);
+            stoppedMissing.Begin(ManualTerminalRequest.Cancelled, 0);
+            if (!stoppedMissing.Poll(20000, null))
+                throw new InvalidOperationException("A stop waited past the capture budget.");
+            stoppedMissing.RecordClose(false, false, null);
+            ExpectManual(ManualResult(stoppedMissing), "FAIL", "manual-cancelled",
+                "stop with missing capture", "manual-final-capture", "FAIL");
+            var deadline = new ManualTerminalCoordinator("manual-final.png", 20000);
+            deadline.Begin(ManualTerminalRequest.Deadline, 0);
+            deadline.Poll(3, FinalCapture(true, null, true));
+            deadline.RecordClose(false, false, null);
+            ExpectManual(ManualResult(deadline), "FAIL", "manual-deadline", "deadline",
+                "manual-session-outcome", "FAIL",
+                "manual-workspace-closed", "PASS");
+
+            // Cleanup failures are recorded beside (never instead of) the
+            // primary failure: a throwing close, a lease still held.
+            var closeThrew = new ManualTerminalCoordinator("manual-final.png", 20000);
+            closeThrew.Begin(ManualTerminalRequest.Completed, 0);
+            closeThrew.Poll(3, FinalCapture(true, "InvalidOperationException", false));
+            closeThrew.RecordClose(true, true, "InvalidOperationException:boom");
+            ExpectManual(ManualResult(closeThrew), "FAIL", "manual-workspace-close",
+                "close failure",
+                "manual-final-capture", "FAIL",
+                "manual-workspace-closed", "FAIL");
+            var leaseHeld = new ManualTerminalCoordinator("manual-final.png", 20000);
+            leaseHeld.Begin(ManualTerminalRequest.Completed, 0);
+            leaseHeld.Poll(3, FinalCapture(true, null, true));
+            leaseHeld.RecordClose(false, true, null);
+            ExpectManual(ManualResult(leaseHeld), "FAIL", "manual-workspace-close",
+                "lease held", "manual-workspace-closed", "FAIL");
+            var uncleanAndClose = new ManualTerminalCoordinator("manual-final.png", 20000);
+            uncleanAndClose.Begin(ManualTerminalRequest.Completed, 0);
+            uncleanAndClose.Poll(3, FinalCapture(false, "InvalidOperationException", false));
+            uncleanAndClose.RecordClose(true, false, "InvalidOperationException:boom");
+            ExpectManual(ManualResult(uncleanAndClose), "FAIL",
+                "manual-camera-restoration-unclean", "unclean and close failure",
+                "manual-camera-restoration", "FAIL",
+                "manual-workspace-closed", "FAIL");
+
+            // The final capture could not even start: close proceeds at once.
+            var noStart = new ManualTerminalCoordinator("manual-final.png", 20000);
+            noStart.Begin(ManualTerminalRequest.Completed, 0);
+            noStart.RecordCaptureStartFailure("MissingMethodException:x");
+            if (!noStart.Poll(1, null))
+                throw new InvalidOperationException("A capture that never started blocked the close.");
+            noStart.RecordClose(false, false, null);
+            ExpectManual(ManualResult(noStart), "FAIL", "manual-final-capture-failed",
+                "capture start failure",
+                "manual-final-capture", "FAIL",
+                "manual-camera-restoration", "FAIL");
+
+            // A terminal step that never ran cannot pass; ready evidence is
+            // still required.
+            ExpectManual(ManualResult(new ManualTerminalCoordinator()), "FAIL",
+                "manual-workspace-close", "never ran",
+                "manual-session-outcome", "FAIL",
+                "manual-workspace-closed", "FAIL");
+            var notReady = new ManualTerminalCoordinator();
+            notReady.Begin(ManualTerminalRequest.Completed, 0);
+            notReady.Poll(1, FinalCapture(true, null, true));
+            notReady.RecordClose(false, false, null);
+            var notReadyResult = new RuntimeTestResult
+            {
+                Status = "PASS",
+                Stage = "completed",
+                Assertions = new List<RuntimeTestAssertion>()
+            };
+            notReady.AppendAssertions(notReadyResult, null,
+                "manual;outcome=" + notReady.OutcomeText);
+            ExpectManual(notReadyResult, "FAIL", "manual-lifecycle-validation",
+                "ready missing", "manual-ready-acknowledged", "FAIL");
+
+            bool threw = false;
+            try { new ManualTerminalCoordinator().Poll(0, null); }
+            catch (InvalidOperationException) { threw = true; }
+            if (!threw)
+                throw new InvalidOperationException("Poll before Begin was accepted.");
+            threw = false;
+            try { new ManualTerminalCoordinator().Begin(ManualTerminalRequest.None, 0); }
+            catch (ArgumentException) { threw = true; }
+            if (!threw)
+                throw new InvalidOperationException("A non-terminal Begin was accepted.");
+        }
+
+        // The Unity-bound host cannot be compiled here, so its wiring to the
+        // tested contracts is pinned at source level: both J1 and J2 paths
+        // must route through the contract types, and the superseded
+        // substring predicate and filename-only terminal gate must be gone.
+        private static void TestRuntimeHostScenarioContractWiring()
+        {
+            DirectoryInfo directory = new DirectoryInfo(Environment.CurrentDirectory);
+            while (directory != null && !File.Exists(Path.Combine(
+                directory.FullName, "KingmakerBuffPlanner.sln")))
+                directory = directory.Parent;
+            if (directory == null)
+                throw new InvalidOperationException("Repository root was not discoverable.");
+            string host = File.ReadAllText(Path.Combine(directory.FullName, "src",
+                "KingmakerBuffPlanner", "RuntimeTesting", "RuntimeTestHost.cs"));
+            string capture = File.ReadAllText(Path.Combine(directory.FullName, "src",
+                "KingmakerBuffPlanner", "RuntimeTesting", "MenuRenderDiagnostic.cs"));
+            string[] required =
+            {
+                "WorkspaceCastStepEvaluator.Evaluate(",
+                "_workspaceInteraction.Violations()",
+                "ManualTerminalPolicy.Classify(",
+                "_manualTerminal.Poll(",
+                "_manualTerminal.RecordClose(",
+                "terminal.AppendAssertions(",
+                "IsCastingWorkspaceInputLeaseHeldForRuntime"
+            };
+            foreach (string needle in required)
+                if (!host.Contains(needle))
+                    throw new InvalidOperationException(
+                        "Runtime host no longer routes through: " + needle);
+            if (host.Contains("interactionEvidence.Contains(\"cast1=") ||
+                host.Contains("saveControl=\" + saveClick + \";saved=True") ||
+                host.Contains("\"manual-final.png\",\r\n") ||
+                host.Contains("\"manual-final.png\",\n"))
+                throw new InvalidOperationException(
+                    "A superseded J1/J2 acceptance path is back in the runtime host.");
+            if (!capture.Contains("capture.RestorationClean = restorationClean;"))
+                throw new InvalidOperationException(
+                    "The camera capture no longer reports its restoration verdict.");
+        }
+
         // Review H1: the supervised manual scenario validates exactly one
         // bounded hold parameter; the hold is never implied, and other
         // scenarios reject it.
@@ -12704,6 +13418,14 @@ namespace KingmakerBuffPlanner.Tests
             if (RuntimeTestProtocol.ReadManualHoldSeconds(manual) != 300)
                 throw new InvalidOperationException(
                     "A valid hold was misread.");
+            if (RuntimeTestProtocol.ReadManualHoldSeconds(
+                    new Dictionary<string, object> { { "manualHoldSeconds", 900L } }) != 900 ||
+                RuntimeTestProtocol.ReadManualHoldSeconds(
+                    new Dictionary<string, object> { { "manualHoldSeconds", 30 } }) != 30 ||
+                RuntimeTestProtocol.ReadManualHoldSeconds(
+                    new Dictionary<string, object> { { "manualHoldSeconds", 1200L } }) != 1200)
+                throw new InvalidOperationException(
+                    "A valid JSON-width hold was misread.");
             var badCases = new[]
                 {
                     new Dictionary<string, object>(),
@@ -12712,7 +13434,15 @@ namespace KingmakerBuffPlanner.Tests
                     new Dictionary<string, object>
                         { { "manualHoldSeconds", 1201 } },
                     new Dictionary<string, object>
-                        { { "manualHoldSeconds", "300" } }
+                        { { "manualHoldSeconds", "300" } },
+                    // Review C3: the launcher's 30-second floor, and a long
+                    // that would wrap to an accepted 300 if narrowed first.
+                    new Dictionary<string, object>
+                        { { "manualHoldSeconds", 29 } },
+                    new Dictionary<string, object>
+                        { { "manualHoldSeconds", 4294967596L } },
+                    new Dictionary<string, object>
+                        { { "manualHoldSeconds", -1L } }
                 };
             foreach (Dictionary<string, object> bad in badCases)
             {
