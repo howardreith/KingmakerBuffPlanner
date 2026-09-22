@@ -2272,6 +2272,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         ? _interactionCastIds[1] : string.Empty;
                     string newTarget = _interactionTargets[
                         3 % _interactionTargets.Count];
+                    // Baseline BEFORE the edit: Undo must restore exactly
+                    // this, so it is captured before the retarget control
+                    // fires, never after.
+                    _workspaceIntentBeforeEdit =
+                        session.DocumentIntentSignature();
                     string retargetClick = Invoke("Target." + newTarget);
                     Domain.Authoring.PlannedCasting focused =
                         session.Document.Castings.FirstOrDefault(casting =>
@@ -2280,8 +2285,6 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     bool retargeted = focused != null &&
                         string.Equals(focused.DirectTargetUnitId, newTarget,
                             StringComparison.Ordinal);
-                    _workspaceIntentBeforeEdit =
-                        session.DocumentIntentSignature();
                     _workspaceInteractionEvidence += ";retargetControl=" +
                         retargetClick + ";retargetApplied=" + retargeted;
                     _workspaceInteractionStep = 7;
