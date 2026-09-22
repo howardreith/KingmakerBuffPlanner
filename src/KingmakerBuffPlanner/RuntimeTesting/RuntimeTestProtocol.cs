@@ -182,7 +182,38 @@ namespace KingmakerBuffPlanner.RuntimeTesting
 
         internal static bool IsWorkspaceScenario(string scenario)
         {
-            return string.Equals(scenario, "live-workspace-qual", StringComparison.Ordinal);
+            return string.Equals(scenario, "live-workspace-qual",
+                StringComparison.Ordinal) ||
+                IsManualWorkspaceScenario(scenario);
+        }
+
+        // The supervised manual-inspection scenario (review H1): the full
+        // guarded pipeline through the opened workspace, then a BOUNDED
+        // human-hold phase with all synthetic input suppressed. It requires
+        // an explicit manualHoldSeconds parameter; the host acknowledges
+        // manual-ready only with the workspace open and no input requested,
+        // and terminal outcomes are done-marker, stop-marker, or deadline
+        // (which is never acceptance).
+        internal static bool IsManualWorkspaceScenario(string scenario)
+        {
+            return string.Equals(scenario, "live-workspace-manual",
+                StringComparison.Ordinal);
+        }
+
+        internal static int ReadManualHoldSeconds(
+            System.Collections.Generic.IDictionary<string, object> parameters)
+        {
+            if (parameters == null ||
+                !parameters.ContainsKey("manualHoldSeconds"))
+                throw new InvalidDataException("manual-hold-seconds-missing");
+            object raw = parameters["manualHoldSeconds"];
+            if (raw is long) raw = (int)(long)raw;
+            if (!(raw is int))
+                throw new InvalidDataException("manual-hold-seconds-invalid");
+            int seconds = (int)raw;
+            if (seconds < 5 || seconds > 1200)
+                throw new InvalidDataException("manual-hold-seconds-range");
+            return seconds;
         }
 
         internal static bool IsNativeUiProbeScenario(string scenario)
@@ -223,6 +254,16 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private static void ValidateParameters(RuntimeTestRequest request)
         {
             if (request.Parameters == null) throw new InvalidDataException("parameters");
+            if (IsManualWorkspaceScenario(request.Scenario))
+            {
+                if (request.Parameters.Count != 1)
+                    throw new InvalidDataException("manual-parameters");
+                ReadManualHoldSeconds(request.Parameters);
+                return;
+            }
+            if (request.Parameters.ContainsKey("manualHoldSeconds"))
+                throw new InvalidDataException(
+                    "manual-hold-seconds-only-with-manual-scenario");
             if (IsPerformanceScenario(request.Scenario))
             {
                 string[] performanceNames =

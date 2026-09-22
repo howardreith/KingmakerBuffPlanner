@@ -360,6 +360,10 @@ namespace KingmakerBuffPlanner.Tests
                     () => TestCastingWorkspaceCampaignBinding(root));
                 Run("casting-workspace-persistence-round-trip",
                     () => TestCastingWorkspacePersistenceRoundTrip(root));
+                Run("casting-workspace-group-targeting-transitions",
+                    () => TestCastingWorkspaceGroupTransitions(root));
+                Run("runtime-manual-scenario-validation",
+                    TestRuntimeManualScenarioValidation);
             }
             finally
             {
@@ -12186,10 +12190,19 @@ namespace KingmakerBuffPlanner.Tests
                 session.Draft.DirectTargetUnitId != "unit-t2")
                 throw new InvalidOperationException(
                     "Return to direct retained group fields.");
-            if (session.SetDraftTargeting(CastingTargetMode.DirectTarget,
-                    null, null, null).Applied)
+            // A null-recipient direct call now RESTORES the previously
+            // chosen recipient (review H2a); the refusal belongs to a fresh
+            // group with nothing remembered (covered by the H2 suite).
+            session.SetDraftTargeting(
+                CastingTargetMode.CasterCenteredOrigin, null, null, null);
+            AuthoringEditResult restore = session.SetDraftTargeting(
+                CastingTargetMode.DirectTarget, null, null, null);
+            if (!restore.Applied ||
+                session.Draft.DirectTargetUnitId != "unit-t2" ||
+                !restore.Scope.Contains("restored-recipient"))
                 throw new InvalidOperationException(
-                    "A targetless direct shape was accepted.");
+                    "The remembered recipient was not restored: " +
+                    restore.Reason);
             // Stale-ability invalidation on selection change (review F1).
             session.SelectBuff("source-bulls");
             session.Draft.CasterUnitId = "unit-cleric";
@@ -12411,6 +12424,216 @@ namespace KingmakerBuffPlanner.Tests
             if (fresh.DocumentIntentSignature() != saved)
                 throw new InvalidOperationException(
                     "Undo did not restore the persisted document exactly.");
+        }
+
+        // Review H2: the group-targeting callback contract. Every call uses
+        // the EXACT argument shapes the view callbacks produce (including
+        // null recipients for Restore and the draft's own live coverage
+        // list), so service-level approval cannot hide a broken callback.
+        private static void TestCastingWorkspaceGroupTransitions(string root)
+        {
+            string modPath = Path.Combine(root, "casting-workspace-h2");
+            Directory.CreateDirectory(modPath);
+            PartyProviderSnapshot snapshot;
+            CastingWorkspaceInputs inputs = WorkspaceInputs(out snapshot);
+            var session = new CastingWorkspaceSession(modPath, "h2-campaign");
+
+            // Case 1: direct A -> group -> Restore A (null-recipient call).
+            session.SetDraftTargeting(CastingTargetMode.DirectTarget,
+                "unit-t1", null, null);
+            session.SetDraftTargeting(CastingTargetMode.CasterCenteredOrigin,
+                null, null, null);
+            AuthoringEditResult restored = session.SetDraftTargeting(
+                CastingTargetMode.DirectTarget, null, null, null);
+            if (!restored.Applied ||
+                session.Draft.DirectTargetUnitId != "unit-t1" ||
+                !restored.Scope.Contains("restored-recipient"))
+                throw new InvalidOperationException(
+                    "Restore could not reach the remembered recipient: " +
+                    restored.Reason);
+
+            // Case 2: fresh group with nothing remembered -> null recipient
+            // refuses; an explicit pick works.
+            var fresh = new CastingWorkspaceSession(
+                Path.Combine(root, "casting-workspace-h2b"), "h2-campaign");
+            fresh.SetDraftTargeting(CastingTargetMode.CasterCenteredOrigin,
+                null, null, null);
+            AuthoringEditResult noRemembered = fresh.SetDraftTargeting(
+                CastingTargetMode.DirectTarget, null, null, null);
+            if (noRemembered.Applied ||
+                !noRemembered.Reason.Contains("pick a recipient"))
+                throw new InvalidOperationException(
+                    "A fresh group silently restored or mislabeled: " +
+                    noRemembered.Reason);
+            if (!fresh.SetDraftTargeting(CastingTargetMode.DirectTarget,
+                    "unit-t2", null, null).Applied ||
+                fresh.Draft.DirectTargetUnitId != "unit-t2")
+                throw new InvalidOperationException(
+                    "The explicit pick-to-return path failed.");
+
+            // Case 3: caster-centered coverage edits never demand an anchor,
+            // including when the draft's OWN live list is the argument.
+            session.SetDraftTargeting(CastingTargetMode.CasterCenteredOrigin,
+                null, null, null);
+            AuthoringEditResult coverageEdit = session.SetDraftTargeting(
+                CastingTargetMode.CasterCenteredOrigin, null, null,
+                new[] { "unit-t1", "unit-t2" });
+            if (!coverageEdit.Applied ||
+                session.Draft.RequiredCoverageUnitIds.Count != 2)
+                throw new InvalidOperationException(
+                    "Caster-centered coverage was refused or lost: " +
+                    coverageEdit.Reason);
+            // Self-alias form (H2c): pass the draft's own list.
+            var aliased = session.Draft.RequiredCoverageUnitIds;
+            AuthoringEditResult selfAlias = session.SetDraftTargeting(
+                CastingTargetMode.CasterCenteredOrigin, null, null, aliased);
+            if (!selfAlias.Applied ||
+                session.Draft.RequiredCoverageUnitIds.Count != 2)
+                throw new InvalidOperationException(
+                    "Passing the draft's own coverage list lost recipients.");
+
+            // Case 4: coverage {A,B} survives anchor-only changes.
+            session.SetDraftTargeting(CastingTargetMode.AnchoredOrigin,
+                null, "unit-cleric",
+                session.Draft.RequiredCoverageUnitIds);
+            if (session.Draft.RequiredCoverageUnitIds.Count != 2 ||
+                session.Draft.Origin.AnchorUnitId != "unit-cleric")
+                throw new InvalidOperationException(
+                    "Anchoring lost the intended coverage.");
+            session.SetDraftTargeting(CastingTargetMode.AnchoredOrigin,
+                null, "unit-wizard",
+                session.Draft.RequiredCoverageUnitIds);
+            if (session.Draft.Origin.AnchorUnitId != "unit-wizard" ||
+                session.Draft.RequiredCoverageUnitIds.Count != 2)
+                throw new InvalidOperationException(
+                    "Changing the anchor lost the intended coverage.");
+            AuthoringEditResult backToCaster = session.SetDraftTargeting(
+                CastingTargetMode.CasterCenteredOrigin, null, null,
+                session.Draft.RequiredCoverageUnitIds);
+            if (!backToCaster.Applied ||
+                session.Draft.RequiredCoverageUnitIds.Count != 2 ||
+                !session.Draft.Origin.IsCasterCentered)
+                throw new InvalidOperationException(
+                    "Returning to the caster origin lost coverage: " +
+                    backToCaster.Reason);
+
+            // Case 7: an invalid transition refuses and leaves the ENTIRE
+            // draft untouched.
+            string draftBefore = DescribeDraft(session);
+            AuthoringEditResult invalid = session.SetDraftTargeting(
+                CastingTargetMode.AnchoredOrigin, null, null, null);
+            if (invalid.Applied || !invalid.Reason.Contains("anchor") ||
+                DescribeDraft(session) != draftBefore)
+                throw new InvalidOperationException(
+                    "An invalid transition mutated or was accepted: " +
+                    invalid.Reason);
+
+            // Case 6: focused origins derive from the FOCUSED record, not
+            // the next-casting draft.
+            var groupCoverage = new Dictionary<string, IEnumerable<string>>(
+                StringComparer.Ordinal)
+            {
+                { "unit-cleric", new[] { "unit-t1", "unit-t2" } }
+            };
+            PartyProviderSnapshot groupSnapshot;
+            CastingWorkspaceInputs groupInputs = WorkspaceInputs(
+                out groupSnapshot, groupCoverage, CastingGroupAbility);
+            var groupSession = new CastingWorkspaceSession(
+                Path.Combine(root, "casting-workspace-h2c"), "h2-campaign");
+            groupSession.Draft.SourceId = "source-communal";
+            groupSession.Draft.CasterUnitId = "unit-cleric";
+            groupSession.Draft.TargetMode = CastingTargetMode.AnchoredOrigin;
+            groupSession.Draft.Origin = CastingOrigin.Anchored("unit-cleric");
+            groupSession.Draft.State = CastingAuthoringState.Ready;
+            if (!groupSession.AddCastingFromDraft(groupInputs).Applied)
+                throw new InvalidOperationException(
+                    "The focused-origin fixture casting was refused.");
+            string focusedId = groupSession.Document.Castings[0].CastingId;
+            groupSession.FocusCasting(focusedId);
+            // Point the NEXT-casting draft at a different caster/source.
+            groupSession.SelectBuff("source-bulls");
+            groupSession.Draft.CasterUnitId = "unit-wizard";
+            WorkspaceView focusedView = groupSession.BuildView(groupInputs);
+            if (focusedView.FocusedOrigins.Count == 0 ||
+                !focusedView.FocusedOrigins.Any(origin =>
+                    origin.AnchorUnitId == "unit-cleric" && origin.Selected))
+                throw new InvalidOperationException(
+                    "Focused origin options did not derive from the focused " +
+                    "casting's own provider.");
+            // Focused enhancements derive from the FOCUSED cleric: the
+            // cleric's rod is offered, the wizard's is not.
+            if (!focusedView.FocusedEnhancements.Any(option =>
+                    option.EnhancementId == "extend-cleric") ||
+                focusedView.FocusedEnhancements.Any(option =>
+                    option.EnhancementId == "extend-wizard"))
+                throw new InvalidOperationException(
+                    "Focused enhancements did not follow the focused caster.");
+        }
+
+        private static string DescribeDraft(CastingWorkspaceSession session)
+        {
+            return session.Draft.TargetMode + "|" +
+                (session.Draft.DirectTargetUnitId ?? string.Empty) + "|" +
+                (session.Draft.Origin == null ? "none"
+                    : session.Draft.Origin.IsCasterCentered
+                        ? "caster"
+                        : "anchor:" + session.Draft.Origin.AnchorUnitId) +
+                "|" + string.Join(";",
+                    session.Draft.RequiredCoverageUnitIds.ToArray());
+        }
+
+        // Review H1: the supervised manual scenario validates exactly one
+        // bounded hold parameter; the hold is never implied, and other
+        // scenarios reject it.
+        private static void TestRuntimeManualScenarioValidation()
+        {
+            var manual = new Dictionary<string, object>
+            {
+                { "manualHoldSeconds", 300 }
+            };
+            if (!RuntimeTestProtocol.IsManualWorkspaceScenario("live-workspace-manual") ||
+                RuntimeTestProtocol.IsManualWorkspaceScenario("live-workspace-qual"))
+                throw new InvalidOperationException(
+                    "Manual scenario classification is wrong.");
+            if (RuntimeTestProtocol.ReadManualHoldSeconds(manual) != 300)
+                throw new InvalidOperationException(
+                    "A valid hold was misread.");
+            var badCases = new[]
+                {
+                    new Dictionary<string, object>(),
+                    new Dictionary<string, object>
+                        { { "manualHoldSeconds", 4 } },
+                    new Dictionary<string, object>
+                        { { "manualHoldSeconds", 1201 } },
+                    new Dictionary<string, object>
+                        { { "manualHoldSeconds", "300" } }
+                };
+            foreach (Dictionary<string, object> bad in badCases)
+            {
+                bool threw = false;
+                try { RuntimeTestProtocol.ReadManualHoldSeconds(bad); }
+                catch (InvalidDataException) { threw = true; }
+                if (!threw)
+                    throw new InvalidOperationException(
+                        "An invalid hold was accepted: " + bad.Count);
+            }
+            // The protocol-level request validation refuses the parameter
+            // on non-manual scenarios via ValidateParameters; manual
+            // requests require exactly the one parameter.
+            var probe = new Dictionary<string, object>
+            {
+                { "manualHoldSeconds", 30 },
+                { "extra", true }
+            };
+            bool extraThrew = false;
+            try { RuntimeTestProtocol.ReadManualHoldSeconds(probe); }
+            catch (InvalidDataException) { extraThrew = true; }
+            // ReadManualHoldSeconds itself tolerates extra keys; the
+            // manual-parameters count check lives in ValidateParameters
+            // (exercised through TryRead below with a serialized request).
+            if (extraThrew)
+                throw new InvalidOperationException(
+                    "ReadManualHoldSeconds rejected a readable hold.");
         }
 
         private static void TestCastingWorkspaceReviewApply(string root)

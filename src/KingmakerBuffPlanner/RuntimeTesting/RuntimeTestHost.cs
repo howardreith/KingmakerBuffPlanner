@@ -94,6 +94,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private string _workspaceReopenEvidence = "not-run";
         private string _workspaceSavedIntentIds;
         private string _workspaceIntentBeforeEdit;
+        private long _manualHoldStartedMillis = -1;
+        private long _manualHoldDeadlineMillis;
+        private string _manualOutcome;
         private readonly List<string> _interactionCasters = new List<string>();
         private readonly List<string> _interactionTargets = new List<string>();
         private readonly List<string> _interactionCastIds = new List<string>();
@@ -783,6 +786,29 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         result.Status = "FAIL";
                         result.Stage = "workspace-interaction-validation";
                     }
+                    if (RuntimeTestProtocol.IsManualWorkspaceScenario(
+                            _request.Scenario))
+                    {
+                        bool donePath = _manualOutcome != null &&
+                            _manualOutcome.StartsWith("manual-completed",
+                                StringComparison.Ordinal);
+                        result.Assertions.Add(donePath
+                            ? RuntimeTestAssertion.Pass("manual-session-outcome",
+                                "done-marker", _manualOutcome ?? "missing")
+                            : RuntimeTestAssertion.Fail("manual-session-outcome",
+                                "done-marker", _manualOutcome ?? "missing"));
+                        if (!donePath)
+                        {
+                            // Stop and deadline are honest non-acceptances,
+                            // never human-approval failures of the operator.
+                            result.Status = "FAIL";
+                            result.Stage = _manualOutcome != null &&
+                                _manualOutcome.StartsWith("manual-cancelled",
+                                    StringComparison.Ordinal)
+                                ? "manual-cancelled"
+                                : "manual-deadline";
+                        }
+                    }
                 }
                 int loadedOptionalAssemblies = 0;
                 int loadedOptionalUmmEntries = 0;
@@ -1349,7 +1375,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             // govern this timeout (the campaign load itself is budgeted by
             // the save loader's per-stage stopwatch).
             if (_livePhaseElapsed == null) _livePhaseElapsed = System.Diagnostics.Stopwatch.StartNew();
-            if (_livePhaseElapsed.Elapsed.TotalSeconds > 300)
+            double liveBudgetSeconds = 300;
+            if (RuntimeTestProtocol.IsManualWorkspaceScenario(
+                    _request.Scenario))
+                liveBudgetSeconds = 600 +
+                    RuntimeTestProtocol.ReadManualHoldSeconds(
+                        _request.Parameters);
+            if (_livePhaseElapsed.Elapsed.TotalSeconds > liveBudgetSeconds)
                 throw new TimeoutException("Live UI scenario timed out;phase=" + _liveUiPhase +
                     ";elapsedSeconds=" + _livePhaseElapsed.Elapsed.TotalSeconds.ToString("F1",
                         System.Globalization.CultureInfo.InvariantCulture) +
@@ -1454,6 +1486,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 BuffPlannerUiRoot.CaptureRuntimeBaseline(true);
                 if (!_liveHotkeyMarkerWritten &&
                     RuntimeTestProtocol.IsWorkspaceScenario(_request.Scenario) &&
+                    !RuntimeTestProtocol.IsManualWorkspaceScenario(
+                        _request.Scenario) &&
                     !_workspaceControlRequested)
                 {
                     // The matched control frame is captured BEFORE the
@@ -1495,8 +1529,19 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             }
             if (_liveUiPhase == 24)
             {
-                // Control frame consumed; NOW the hotkey request marker is
-                // written and phase 0 resumes its normal armed/fallback flow.
+                // Control frame consumed. For the manual scenario NO hotkey
+                // request is ever written — the launcher performs no
+                // synthetic input at all, and the fallback open below is
+                // purely programmatic (review H1).
+                if (RuntimeTestProtocol.IsManualWorkspaceScenario(
+                        _request.Scenario))
+                {
+                    _liveHotkeyMarkerWritten = true;
+                    _liveUiPhase = 0;
+                    return false;
+                }
+                // Otherwise the hotkey request marker is written and phase 0
+                // resumes its normal armed/fallback flow.
                 if (!ConsumeWorkspaceCapture("workspace-control-frame.png")) return false;
                 _workspaceControlLuma = _workspaceFrameCapture.Summary == null
                     ? "missing" : _workspaceFrameCapture.Summary.Describe();
@@ -1626,6 +1671,16 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     // Root state at CAPTURE time; the bisection below closes
                     // the workspace, so phase 21 must not re-sample it.
                     _workspaceWasOpenAtCapture = BuffPlannerUiRoot.IsCastingWorkspaceOpen;
+                    if (RuntimeTestProtocol.IsManualWorkspaceScenario(
+                            _request.Scenario))
+                    {
+                        // Supervised manual phase (review H1): scripted
+                        // authoring is SUSPENDED here; the hold phase waits
+                        // on terminal markers or its deadline.
+                        _manualHoldStartedMillis = -1;
+                        _liveUiPhase = 30;
+                        return false;
+                    }
                     // The guarded interaction sequence runs BEFORE the
                     // bisection close, against the live session the view
                     // owns (review R1/C4: direct session calls, labeled as
@@ -1634,6 +1689,89 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     _liveUiPhase = 25;
                 }
                 return false;
+            }
+            if (_liveUiPhase == 30)
+            {
+                // manual-ready preconditions: workspace root open, legacy
+                // closed, and — by construction of this scenario — no
+                // synthetic input ever requested (no hotkey-ready.json, no
+                // physical-input requests, no UMM escape markers).
+                if (!BuffPlannerUiRoot.IsCastingWorkspaceOpen) return false;
+                if (BuffPlannerUiRoot.IsScreenOpen) return false;
+                if (_manualHoldStartedMillis < 0)
+                {
+                    int holdSeconds = RuntimeTestProtocol.ReadManualHoldSeconds(
+                        _request.Parameters);
+                    _manualHoldStartedMillis =
+                        _workspaceCaptureElapsed.IsRunning
+                            ? _workspaceCaptureElapsed.ElapsedMilliseconds
+                            : 0;
+                    if (!_workspaceCaptureElapsed.IsRunning)
+                        _workspaceCaptureElapsed.Start();
+                    _manualHoldDeadlineMillis =
+                        _manualHoldStartedMillis + holdSeconds * 1000L;
+                    string ready = "{\"schemaVersion\":1,\"runId\":" +
+                        JsonConvert.ToString(_request.RunId) +
+                        ",\"stage\":\"manual-ready\"" +
+                        ",\"syntheticInputRequested\":false" +
+                        ",\"workspaceOpen\":true" +
+                        ",\"legacyScreenClosed\":true" +
+                        ",\"holdSeconds\":" + holdSeconds +
+                        ",\"deadlineUtc\":\"" +
+                        DateTime.UtcNow.AddSeconds(holdSeconds).ToString("o") +
+                        "\"}";
+                    AtomicFile.WriteUtf8(Path.Combine(
+                        _request.EvidenceDirectory, "manual-ready.json"),
+                        ready + Environment.NewLine);
+                    _log.Info("[KBP-MANUAL] manual-ready acknowledged;" +
+                        "syntheticInputRequested=false;holdSeconds=" +
+                        holdSeconds + ";operator may now interact.");
+                }
+                return false;
+            }
+            if (_liveUiPhase == 31)
+            {
+                // Non-blocking hold: rendering/event processing continue
+                // (this Update returns each frame); the phase advances only
+                // on a terminal marker or the deadline. Deadline is NEVER
+                // acceptance (review H1).
+                if (_workspaceCaptureElapsed.ElapsedMilliseconds <
+                        _manualHoldDeadlineMillis)
+                {
+                    string donePath = Path.Combine(
+                        _request.EvidenceDirectory, "manual-done.json");
+                    string stopPath = Path.Combine(
+                        _request.EvidenceDirectory, "manual-stop.json");
+                    if (File.Exists(donePath))
+                        _manualOutcome = "manual-completed;by=done-marker";
+                    else if (File.Exists(stopPath))
+                        _manualOutcome = "manual-cancelled;by=stop-marker";
+                    else return false;
+                }
+                else
+                {
+                    _manualOutcome =
+                        "manual-deadline;timeout-is-not-acceptance";
+                }
+                BeginWorkspaceCameraCapture("manual-final.png", false);
+                _liveUiPhase = 32;
+                return false;
+            }
+            if (_liveUiPhase == 32)
+            {
+                if (_workspaceCameraOpenCapture == null ||
+                    !string.Equals(_workspaceCameraOpenCapture.FileName,
+                        "manual-final.png",
+                        StringComparison.OrdinalIgnoreCase)) return false;
+                BuffPlannerUiRoot.CloseCastingWorkspaceForRuntime();
+                _log.Info("[KBP-MANUAL] manual phase terminal;outcome=" +
+                    _manualOutcome + ";workspace=closed.");
+                _liveInitialCatalogEvidence = "manual-scenario;outcome=" +
+                    _manualOutcome;
+                _workspaceInteractionEvidence = "manual;outcome=" + _manualOutcome;
+                _workspaceReopenEvidence = "manual;no-reopen-claim";
+                _completed = true;
+                return true;
             }
             if (_liveUiPhase == 25)
             {
@@ -2122,11 +2260,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             }
             try
             {
-                CastingWorkspaceInputs inputs =
+                CastingWorkspaceInputs currentInputs =
                     BuffPlannerUiRoot.CastingWorkspaceInputsForRuntime();
                 if (_workspaceInteractionStep == 0)
                 {
-                    WorkspaceView view = session.BuildView(inputs);
+                    WorkspaceView view = session.BuildView(currentInputs);
                     _interactionCasters.Clear();
                     _interactionTargets.Clear();
                     if (view.Draft != null)
@@ -2158,7 +2296,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         ";targets=" + _interactionTargets.Count;
                     session.SelectRoutine(view.RoutineIds.Count == 0
                         ? "long" : view.RoutineIds[0]);
-                    session.BuildView(inputs);
+                    session.BuildView(currentInputs);
                     BeginWorkspaceCameraCapture("ws-interact-browse.png", false);
                     _workspaceInteractionStep = 1;
                     return false;
@@ -2178,9 +2316,19 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     string siblingsBefore = SiblingSignature(session, null);
                     string casterClick = Invoke("DraftCaster." + caster);
                     string targetClick = Invoke("DraftTarget." + target);
-                    // The visible state control: one press toggles the fresh
-                    // draft from Draft to Ready.
-                    string stateClick = Invoke("State");
+                    // Expected record resolved from the POST-selection draft
+                    // (review H4): exact ability, spellbook, routine, state,
+                    // and enhancement set — not just non-null fields.
+                    Domain.Identity.AbilityKey expectedAbility =
+                        session.DraftAbilityFor(currentInputs);
+                    string expectedSpellbook =
+                        session.DraftSpellbookFor(currentInputs);
+                    string expectedRoutine = session.SelectedRoutineId;
+                    // The visible state control is clicked only when the
+                    // draft is not already Ready (the button toggles).
+                    string stateClick = session.Draft.State ==
+                        Domain.Authoring.CastingAuthoringState.Ready
+                        ? "already-ready" : Invoke("State");
                     string addClick = Invoke("AddCasting");
                     var castings = session.Document.Castings;
                     bool grew = castings.Count == beforeCount + 1;
@@ -2197,7 +2345,19 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                             StringComparison.Ordinal) &&
                         string.Equals(created.SourceId, _interactionSourceId,
                             StringComparison.Ordinal) &&
-                        created.Ability != null;
+                        created.Ability != null &&
+                        expectedAbility != null &&
+                        string.Equals(created.Ability.Canonical,
+                            expectedAbility.Canonical,
+                            StringComparison.Ordinal) &&
+                        string.Equals(created.SpellbookGuid ?? string.Empty,
+                            expectedSpellbook ?? string.Empty,
+                            StringComparison.Ordinal) &&
+                        string.Equals(created.RoutineId, expectedRoutine,
+                            StringComparison.Ordinal) &&
+                        created.State ==
+                            Domain.Authoring.CastingAuthoringState.Ready &&
+                        created.Enhancements.Count == 0;
                     bool siblingsUnchanged = string.Equals(
                         SiblingSignature(session, created == null
                             ? null : created.CastingId),
@@ -2234,7 +2394,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     session.Draft.TargetMode =
                         Domain.Authoring.CastingTargetMode.DirectTarget;
                     session.Draft.Enhancements.Clear();
-                    session.BuildView(inputs);
+                    session.BuildView(currentInputs);
                     string signatureBefore = session.DocumentIntentSignature();
                     int countBefore = session.Document.Castings.Count;
                     string refusedAdd = Invoke("AddCasting");
@@ -2345,7 +2505,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         }
 
         // Canonical signature of every record EXCEPT the excluded id — the
-        // unchanged-siblings contract (review G4).
+        // unchanged-siblings contract at FULL authored-field fidelity: the
+        // same serialized profile the persistence round trip uses (review
+        // H4).
         private static string SiblingSignature(
             UI.CastingWorkspaceSession session, string excludeCastingId)
         {
@@ -2355,9 +2517,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             {
                 if (casting == null || string.Equals(casting.CastingId,
                         excludeCastingId, StringComparison.Ordinal)) continue;
-                parts.Add(casting.CastingId + "|" + casting.CasterUnitId + "|" +
-                    casting.DirectTargetUnitId + "|" + casting.State + "|" +
-                    casting.Order.ToString(CultureInfo.InvariantCulture));
+                parts.Add(Newtonsoft.Json.JsonConvert.SerializeObject(
+                    Persistence.PlannedCastingProfile.FromDomain(casting),
+                    Newtonsoft.Json.Formatting.None));
             }
             return string.Join("||", parts.ToArray());
         }

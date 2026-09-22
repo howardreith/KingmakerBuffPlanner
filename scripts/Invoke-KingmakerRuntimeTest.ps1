@@ -1,6 +1,6 @@
 ﻿[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
 param(
-    [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'live-ui-bootstrap', 'ui-native-contract-probe', 'final-no-save-core', 'performance-probe', 'launch-render-diagnostic', 'menu-input-diagnostic', 'live-workspace-qual')][string]$Scenario = 'mod-load-smoke',
+    [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'live-ui-bootstrap', 'ui-native-contract-probe', 'final-no-save-core', 'performance-probe', 'launch-render-diagnostic', 'menu-input-diagnostic', 'live-workspace-qual', 'live-workspace-manual')][string]$Scenario = 'mod-load-smoke',
     [ValidateSet('native-only', 'call-of-the-wild', 'human-reproduction', 'full-user')][string]$CompatibilityProfileId = 'native-only',
     [ValidateRange(5, 1800)][int]$TimeoutSeconds = 180,
     [ValidateRange(5, 300)][int]$LaunchTimeoutSeconds = 60,
@@ -10,7 +10,16 @@ param(
     [switch]$DiagnosticDisableHudDiscovery,
     [bool]$ExitAfterCompletion = $true,
     [string]$SteamPath = 'C:\Program Files (x86)\Steam\steam.exe',
-    [ValidatePattern('^[A-Za-z0-9._-]{1,100}$')][string]$RunId
+    [ValidatePattern('^[A-Za-z0-9._-]{1,100}$')][string]$RunId,
+    # Supervised manual-inspection hold (live-workspace-manual only): the
+    # harness performs NO synthetic input; the host acknowledges
+    # manual-ready and holds for the operator until manual-done.json /
+    # manual-stop.json appears in the evidence directory or this deadline
+    # passes (a deadline is never acceptance). RehearseDone exercises the
+    # done path without an operator by writing the done marker 20 seconds
+    # after manual-ready, clearly labeled as a rehearsal.
+    [ValidateRange(30, 1200)][int]$ManualHoldSeconds = 300,
+    [switch]$ManualRehearseDone
 )
 
 Set-StrictMode -Version Latest
@@ -40,7 +49,7 @@ $expectedOptionalMods = @($compatibilityProfile.mods | ForEach-Object {
         } else { $_.assemblySha256 }
     }
 })
-$savePair = if ($Scenario -ceq 'live-ui-bootstrap' -or $Scenario -ceq 'live-workspace-qual') { Get-KbpDisposableSavePair } else { $null }
+$savePair = if ($Scenario -ceq 'live-ui-bootstrap' -or $Scenario -ceq 'live-workspace-qual' -or $Scenario -ceq 'live-workspace-manual') { Get-KbpDisposableSavePair } else { $null }
 $steamSafety = Assert-KbpSteamSafety -SteamPath $SteamPath
 & (Join-Path $PSScriptRoot 'Deploy-Local.ps1') -PackagePath $package `
     -RunId 'runtime-whatif-preflight' -CompatibilityProfileId $CompatibilityProfileId `
@@ -78,6 +87,10 @@ if (-not $shouldProceed) {
     return
 }
 
+if ($Scenario -ceq 'live-workspace-manual' -and
+    $TimeoutSeconds -lt ($ManualHoldSeconds + 420)) {
+    throw "TimeoutSeconds must be at least ManualHoldSeconds + 420 (boot/load budget); got $TimeoutSeconds for hold $ManualHoldSeconds."
+}
 $ConfirmPreference = 'None'
 $WhatIfPreference = $false
 $runId = if ([string]::IsNullOrWhiteSpace($RunId)) {
@@ -106,6 +119,8 @@ try {
         durationSeconds = $PerformanceDurationSeconds
         disableHudDiscovery = [bool]$DiagnosticDisableHudDiscovery
         minimumFramesPerSecond = $MinimumFramesPerSecond
+    } } elseif ($Scenario -ceq 'live-workspace-manual') { @{
+        manualHoldSeconds = $ManualHoldSeconds
     } } else { @{} }
     $request = New-KbpRuntimeRequest -RunId $runId -EvidenceDirectory $evidence `
         -BuildManifest $buildManifest -TimeoutSeconds $TimeoutSeconds `
@@ -237,8 +252,32 @@ public static class KbpPhysicalInput {
         throw
     }
     try {
+    $manualReadySeen = $false
+    $manualRehearsalDoneWritten = $false
     while (-not (Test-Path -LiteralPath $resultPath -PathType Leaf)) {
         $process.Refresh()
+        if ($Scenario -ceq 'live-workspace-manual') {
+            $manualReadyPath = Join-Path $evidence 'manual-ready.json'
+            if (-not $manualReadySeen -and
+                (Test-Path -LiteralPath $manualReadyPath -PathType Leaf)) {
+                $manualReadySeen = $true
+                Write-Host ("MANUAL-READY acknowledged; evidence: " + $manualReadyPath)
+                if ($ManualRehearseDone) {
+                    Write-Host "REHEARSAL: manual-done.json will be written 20s after manual-ready (labeled rehearsal)."
+                }
+            }
+            if ($manualReadySeen -and $ManualRehearseDone -and
+                -not $manualRehearsalDoneWritten) {
+                $readyAt = (Get-Item -LiteralPath $manualReadyPath).LastWriteTimeUtc
+                if ([DateTime]::UtcNow -ge $readyAt.AddSeconds(20)) {
+                    $manualRehearsalDoneWritten = $true
+                    [IO.File]::WriteAllText(
+                        (Join-Path $evidence 'manual-done.json'),
+                        '{"stage":"manual-done","by":"rehearsal"}' + [Environment]::NewLine)
+                    Write-Host "REHEARSAL: manual-done.json written."
+                }
+            }
+        }
         if ($process.HasExited) { throw 'Kingmaker exited before committing the atomic runtime result.' }
         if ([DateTime]::UtcNow -ge $deadline) { throw 'Runtime result timed out; launched Kingmaker was left running and restoration is blocked.' }
         if ([DateTime]::UtcNow -ge $nextWindowSampleUtc) {

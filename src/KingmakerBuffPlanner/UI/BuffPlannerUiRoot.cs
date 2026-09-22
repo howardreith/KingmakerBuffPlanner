@@ -820,10 +820,11 @@ namespace KingmakerBuffPlanner.UI
                     LogUiUnavailable("casting-workspace: campaign UI unavailable");
                     return false;
                 }
-                // Acquire the established game-mode/selection input lease
-                // exactly once per open, before construction; a failed
-                // acquire self-restores and fails the open (review R2).
-                lease = BuffPlannerInputLease.Acquire(new KingmakerPlannerInputBoundary());
+                // Campaign identity resolves BEFORE any ownership is
+                // acquired: an unresolved identity refuses without ever
+                // holding the input lease, and every later failure path
+                // funnels through the catch, which releases the local lease
+                // exactly once (review H3).
                 _session.Refresh();
                 string campaignId = _session.Model == null ||
                     _session.Model.Profile == null
@@ -839,12 +840,18 @@ namespace KingmakerBuffPlanner.UI
                 {
                     // Unresolved/transitional campaign identity must not
                     // bind arbitrary work to an unknown-campaign fallback
-                    // (review G3).
+                    // (review G3) — and must not leak an acquired lease.
                     LogUiUnavailable(
                         "casting-workspace: campaign identity unresolved");
                     return false;
                 }
                 _castingWorkspaceSession = workspaceSession;
+                // Acquire the established game-mode/selection input lease
+                // exactly once per open, AFTER identity resolves and BEFORE
+                // construction; a failed acquire self-restores, and the
+                // catch below releases this local reference on any
+                // subsequent failure (reviews R2, H3).
+                lease = BuffPlannerInputLease.Acquire(new KingmakerPlannerInputBoundary());
                 _castingWorkspace = new CastingWorkspaceScreenView(
                     StaticCanvas.Instance, workspaceSession,
                     BuildCastingWorkspaceInputs, CloseCastingWorkspace);

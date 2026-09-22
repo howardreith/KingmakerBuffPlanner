@@ -326,7 +326,36 @@ namespace KingmakerBuffPlanner.UI
                 plan.Diagnostics,
                 BuildDraftView(inputs, selectedSource, casters));
             BuildFocusedEnhancements(view, inputs);
+            foreach (WorkspaceOriginOption origin in BuildFocusedOrigins(inputs))
+                view._focusedOrigins.Add(origin);
             return view;
+        }
+
+        // Origin options for the FOCUSED record, derived from THAT
+        // record's own provider option — never the next-casting draft's
+        // (review H2d).
+        internal List<WorkspaceOriginOption> BuildFocusedOrigins(
+            CastingWorkspaceInputs inputs)
+        {
+            var origins = new List<WorkspaceOriginOption>();
+            if (EditingFocusCastingId == null || inputs == null) return origins;
+            PlannedCasting focused = _authoring.Document.Castings
+                .FirstOrDefault(value => value != null && string.Equals(
+                    value.CastingId, EditingFocusCastingId,
+                    StringComparison.Ordinal));
+            if (focused == null || string.IsNullOrEmpty(focused.CasterUnitId))
+                return origins;
+            int candidates;
+            ProviderPlanningOption option = FindDraftOption(
+                inputs, focused.SourceId, focused.CasterUnitId,
+                out candidates);
+            if (option == null) return origins;
+            foreach (string anchor in option.LegalAnchorIds)
+                origins.Add(new WorkspaceOriginOption(anchor,
+                    focused.Origin != null && !focused.Origin.IsCasterCentered &&
+                    string.Equals(focused.Origin.AnchorUnitId, anchor,
+                        StringComparison.Ordinal)));
+            return origins;
         }
 
         // Enhancement options for the FOCUSED record, derived from that
@@ -467,6 +496,21 @@ namespace KingmakerBuffPlanner.UI
                 sources,
                 casters.Where(row => row.Capable).ToList(),
                 targets, origins, enhancements);
+        }
+
+        // The spellbook the draft's current (source, caster) pair resolves
+        // to — the exact expected authored spellbook for Add assertions.
+        public string DraftSpellbookFor(CastingWorkspaceInputs inputs)
+        {
+            if (inputs == null) return null;
+            string draftSource = string.IsNullOrEmpty(Draft.SourceId)
+                ? SelectedSourceId : Draft.SourceId;
+            int candidates;
+            ProviderPlanningOption option = FindDraftOption(
+                inputs, draftSource,
+                Draft.CasterUnitId ?? SelectedCasterUnitId, out candidates);
+            return candidates == 1 && option != null
+                ? option.Provider.Key.SpellbookGuid : null;
         }
 
         // Resolves the exact discovered provider option serving the draft's
@@ -717,28 +761,26 @@ namespace KingmakerBuffPlanner.UI
             }
         }
 
-        // One coherent targeting-shape operation (review F3): mode, origin,
-        // direct target, and coverage change together so the draft always
-        // satisfies ValidateTargetModeShape.
+        // One coherent targeting-shape operation (reviews F3, H2): the
+        // candidate state — recipient (given, remembered, or none), anchor,
+        // and a SNAPSHOTTED coverage list — resolves completely before any
+        // owned state changes, so refusals preserve the entire prior draft
+        // and callers may safely pass the draft's own live coverage list.
         public AuthoringEditResult SetDraftTargeting(
             CastingTargetMode mode,
             string directTargetUnitId,
             string originAnchorUnitId,
             IEnumerable<string> requiredCoverageUnitIds)
         {
-            // Validate first; a refused command must leave the draft
-            // exactly as it was (review F3).
             if (!Enum.IsDefined(typeof(CastingTargetMode), mode))
                 return AuthoringEditResult.Refuse("targeting-mode-unsupported");
-            if (mode == CastingTargetMode.DirectTarget &&
-                string.IsNullOrWhiteSpace(directTargetUnitId))
-                return AuthoringEditResult.Refuse("targeting-requires-direct-target");
-            if (mode == CastingTargetMode.AnchoredOrigin &&
-                string.IsNullOrWhiteSpace(originAnchorUnitId))
-                return AuthoringEditResult.Refuse("targeting-requires-anchor");
-            Draft.TargetMode = mode;
-            Draft.DirectTargetUnitId = null;
-            Draft.RequiredCoverageUnitIds.Clear();
+            // H2c: snapshot the incoming coverage BEFORE touching the draft —
+            // callers legitimately pass Draft.RequiredCoverageUnitIds.
+            var coverage = new List<string>();
+            foreach (string unitId in requiredCoverageUnitIds ?? new string[0])
+                if (!string.IsNullOrWhiteSpace(unitId) &&
+                    !coverage.Contains(unitId))
+                    coverage.Add(unitId);
             if (mode == CastingTargetMode.DirectTarget)
             {
                 string recipient = directTargetUnitId;
@@ -746,9 +788,9 @@ namespace KingmakerBuffPlanner.UI
                 if (string.IsNullOrWhiteSpace(recipient) &&
                     !string.IsNullOrEmpty(_rememberedDirectRecipient))
                 {
-                    // Switching back restores the PREVIOUSLY CHOSEN
-                    // recipient explicitly; nothing is silently picked
-                    // (review G2).
+                    // H2a: the remembered-recipient restore resolves HERE,
+                    // before validation, so the Restore control's
+                    // null-recipient call can actually reach it.
                     recipient = _rememberedDirectRecipient;
                     restored = true;
                 }
@@ -756,24 +798,30 @@ namespace KingmakerBuffPlanner.UI
                     return AuthoringEditResult.Refuse(
                         "targeting-requires-direct-target:" +
                         "pick a recipient to switch back");
-                _rememberedDirectRecipient = recipient;
+                if (!string.IsNullOrEmpty(Draft.DirectTargetUnitId))
+                    _rememberedDirectRecipient = Draft.DirectTargetUnitId;
+                Draft.TargetMode = mode;
                 Draft.DirectTargetUnitId = recipient;
+                Draft.RequiredCoverageUnitIds.Clear();
                 Draft.Origin = null;
                 return AuthoringEditResult.Accept(
                     restored ? "draft-targeting:restored-recipient"
                         : "draft-targeting",
                     new string[0]);
             }
+            if (mode == CastingTargetMode.AnchoredOrigin &&
+                string.IsNullOrWhiteSpace(originAnchorUnitId))
+                return AuthoringEditResult.Refuse("targeting-requires-anchor");
             if (!string.IsNullOrEmpty(Draft.DirectTargetUnitId))
                 _rememberedDirectRecipient = Draft.DirectTargetUnitId;
-            foreach (string unitId in requiredCoverageUnitIds ?? new string[0])
-                if (!string.IsNullOrWhiteSpace(unitId) &&
-                    !Draft.RequiredCoverageUnitIds.Contains(unitId))
-                    Draft.RequiredCoverageUnitIds.Add(unitId);
-            if (mode == CastingTargetMode.AnchoredOrigin)
-                Draft.Origin = CastingOrigin.Anchored(originAnchorUnitId);
-            else
-                Draft.Origin = CastingOrigin.CasterCentered();
+            Draft.TargetMode = mode;
+            Draft.DirectTargetUnitId = null;
+            Draft.RequiredCoverageUnitIds.Clear();
+            foreach (string unitId in coverage)
+                Draft.RequiredCoverageUnitIds.Add(unitId);
+            Draft.Origin = mode == CastingTargetMode.AnchoredOrigin
+                ? CastingOrigin.Anchored(originAnchorUnitId)
+                : CastingOrigin.CasterCentered();
             return AuthoringEditResult.Accept("draft-targeting", new string[0]);
         }
 

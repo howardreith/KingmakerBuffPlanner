@@ -506,7 +506,7 @@ namespace KingmakerBuffPlanner.UI
                         RefreshView();
                     }));
                 KingmakerUiFactory.AddLayout(RectOf(casterOrigin), 30f);
-                foreach (WorkspaceOriginOption origin in view.Draft.Origins)
+                foreach (WorkspaceOriginOption origin in view.FocusedOrigins)
                 {
                     WorkspaceOriginOption captured = origin;
                     Button pick = KingmakerUiFactory.CreateButton(
@@ -767,7 +767,7 @@ namespace KingmakerBuffPlanner.UI
                     {
                         AuthoringEditResult result = _session.SetDraftTargeting(
                             Domain.Authoring.CastingTargetMode.CasterCenteredOrigin,
-                            null, null, null);
+                            null, null, _session.Draft.RequiredCoverageUnitIds);
                         SurfaceRefusal(result, "origin");
                         RefreshView();
                     }));
@@ -809,10 +809,11 @@ namespace KingmakerBuffPlanner.UI
                                     captured.UnitId, StringComparison.Ordinal))
                                 .ToList();
                             if (!covered) coverage.Add(captured.UnitId);
+                            // H2b: a coverage edit preserves the CURRENT
+                            // group mode and origin — a caster-centered
+                            // spell never needs an anchor.
                             AuthoringEditResult result = _session
-                                .SetDraftTargeting(
-                                    Domain.Authoring.CastingTargetMode.AnchoredOrigin,
-                                    null,
+                                .SetDraftTargeting(draft.TargetMode, null,
                                     string.IsNullOrEmpty(draft.OriginAnchorUnitId)
                                         ? null : draft.OriginAnchorUnitId,
                                     coverage);

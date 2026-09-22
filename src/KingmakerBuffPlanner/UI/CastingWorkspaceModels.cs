@@ -298,8 +298,16 @@ namespace KingmakerBuffPlanner.UI
         {
             get { return _focusedEnhancements; }
         }
+
+        // Origin options for the FOCUSED record's own provider (review H2d).
+        public IReadOnlyList<WorkspaceOriginOption> FocusedOrigins
+        {
+            get { return _focusedOrigins; }
+        }
         internal readonly List<WorkspaceEnhancementOption> _focusedEnhancements =
             new List<WorkspaceEnhancementOption>();
+        internal readonly List<WorkspaceOriginOption> _focusedOrigins =
+            new List<WorkspaceOriginOption>();
 
         public WorkspaceCastingCard CardById(string castingId)
         {
