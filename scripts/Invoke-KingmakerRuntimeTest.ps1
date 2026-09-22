@@ -119,9 +119,12 @@ try {
         durationSeconds = $PerformanceDurationSeconds
         disableHudDiscovery = [bool]$DiagnosticDisableHudDiscovery
         minimumFramesPerSecond = $MinimumFramesPerSecond
-    } } elseif ($Scenario -ceq 'live-workspace-manual') { @{
-        manualHoldSeconds = $ManualHoldSeconds
     } } else { @{} }
+    if ($Scenario -ceq 'live-workspace-manual') {
+        # The manual scenario always stages the WORKING save pair; its hold
+        # parameter merges into that parameter set (never replaces it).
+        $scenarioParameters.manualHoldSeconds = $ManualHoldSeconds
+    }
     $request = New-KbpRuntimeRequest -RunId $runId -EvidenceDirectory $evidence `
         -BuildManifest $buildManifest -TimeoutSeconds $TimeoutSeconds `
         -ExitAfterCompletion $ExitAfterCompletion -Scenario $Scenario `

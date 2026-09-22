@@ -256,8 +256,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (request.Parameters == null) throw new InvalidDataException("parameters");
             if (IsManualWorkspaceScenario(request.Scenario))
             {
-                if (request.Parameters.Count != 1)
-                    throw new InvalidDataException("manual-parameters");
+                // The manual scenario carries the WORKING-campaign save set
+                // (the launcher stages a save pair for it) plus exactly one
+                // additional parameter: the bounded hold.
                 ReadManualHoldSeconds(request.Parameters);
                 return;
             }
