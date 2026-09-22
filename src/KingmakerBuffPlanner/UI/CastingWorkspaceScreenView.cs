@@ -86,9 +86,7 @@ namespace KingmakerBuffPlanner.UI
             CastingWorkspaceInputs inputs = _inputs();
             WorkspaceView view = _session.BuildView(inputs);
             _session.PresentForReview(inputs);
-            _headerTitle.text = "Casting Workspace — " +
-                (string.IsNullOrEmpty(view.SelectedSourceId)
-                    ? "no buff selected" : view.SelectedSourceId);
+            _headerTitle.text = "Casting Workspace — " + view.SelectedSourceCaption;
             int ready = 0;
             foreach (WorkspaceCastingCard card in view.Cards)
                 if (card.Readiness == ResolvedCastingReadiness.Ready) ready++;
@@ -229,9 +227,19 @@ namespace KingmakerBuffPlanner.UI
             KingmakerUiFactory.SetAnchors(label.rectTransform, 0f, 1f, 1f, 1f);
             label.rectTransform.sizeDelta = new Vector2(0f, 22f);
             RectTransform content;
-            KingmakerUiFactory.CreateScrollView(
+            ScrollRect scroll = KingmakerUiFactory.CreateScrollView(
                 "Scroll", lane, _theme, out content, 12f);
-            KingmakerUiFactory.SetAnchors(content, 0f, 0f, 1f, 1f);
+            // The scroll view must FILL its lane below the title: left at
+            // its default 100x100 centered rect it rendered as a small box
+            // mid-lane in every live run (rehearsal-6, gseries-081000).
+            KingmakerUiFactory.SetAnchors(RectOf(scroll), 0f, 0f, 1f, 1f,
+                0f, 0f, 0f, 24f);
+            // Content stays top-anchored (factory contract) and grows with
+            // its rows so the lane scrolls to the final row instead of being
+            // clipped to the viewport height.
+            ContentSizeFitter fitter =
+                content.gameObject.AddComponent<ContentSizeFitter>();
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
             return content;
         }
 
@@ -341,7 +349,10 @@ namespace KingmakerBuffPlanner.UI
                     (row.Capable ? string.Empty : " — not capable"), 16,
                     TextAnchor.MiddleLeft);
                 name.fontStyle = row.SelectedFocus ? FontStyle.Bold : FontStyle.Normal;
-                KingmakerUiFactory.Stretch(name.rectTransform, 8, 8, 4, 4);
+                // Name owns the row left of the Focus button (0.72), never
+                // underneath it.
+                KingmakerUiFactory.SetAnchors(name.rectTransform, 0f, 0f, 0.7f, 1f,
+                    8f, 4f, 4f, 4f);
                 Button select = KingmakerUiFactory.CreateButton(
                     "Focus", entry, _theme, "Focus", () => Click(() =>
                     {

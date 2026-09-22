@@ -309,6 +309,26 @@ namespace KingmakerBuffPlanner.UI
         internal readonly List<WorkspaceOriginOption> _focusedOrigins =
             new List<WorkspaceOriginOption>();
 
+        // Header caption for the selected buff: the discovered display name
+        // of the selected source; never the raw source key when a name was
+        // discovered (the raw "variant|<guid>|<guid>" key reached the header
+        // in every live run through casting-ws-claude-rehearsal-*).
+        public string SelectedSourceCaption
+        {
+            get
+            {
+                if (SelectedSourceId.Length == 0) return "no buff selected";
+                WorkspaceSourceOption match = Draft == null ? null :
+                    Draft.Sources.FirstOrDefault(source => source != null &&
+                        string.Equals(source.SourceId, SelectedSourceId,
+                            StringComparison.Ordinal));
+                if (match != null && !string.Equals(match.DisplayName,
+                        match.SourceId, StringComparison.Ordinal))
+                    return match.DisplayName;
+                return "unnamed buff source";
+            }
+        }
+
         public WorkspaceCastingCard CardById(string castingId)
         {
             return Cards.FirstOrDefault(card =>
