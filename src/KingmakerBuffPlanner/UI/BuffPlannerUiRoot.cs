@@ -184,14 +184,24 @@ namespace KingmakerBuffPlanner.UI
             if (root == null) return "workspace-missing";
             UnityEngine.UI.Button[] buttons =
                 root.GetComponentsInChildren<UnityEngine.UI.Button>(true);
+            bool seen = false;
             foreach (UnityEngine.UI.Button button in buttons)
                 if (button != null && string.Equals(button.name, buttonName,
                         StringComparison.Ordinal))
                 {
+                    seen = true;
+                    // Callback coverage is not reachability: a control the
+                    // player cannot see or press is reported as such
+                    // (review G4).
+                    if (!button.gameObject.activeInHierarchy)
+                        return "control-inactive:" + buttonName;
+                    if (!button.interactable)
+                        return "control-not-interactable:" + buttonName;
                     button.onClick.Invoke();
                     return "invoked";
                 }
-            return "control-missing:" + buttonName;
+            return seen ? "control-unusable:" + buttonName
+                : "control-missing:" + buttonName;
         }
 
         // Runtime presentation evidence for the workspace root: whether the
@@ -808,10 +818,23 @@ namespace KingmakerBuffPlanner.UI
                 _session.Refresh();
                 string campaignId = _session.Model == null ||
                     _session.Model.Profile == null
-                        ? "unknown-campaign"
-                        : _session.Model.Profile.CampaignId;
-                var workspaceSession = _castingWorkspaceSession ??
-                    new CastingWorkspaceSession(_modPath, campaignId);
+                        ? null : _session.Model.Profile.CampaignId;
+                var workspaceSession = CastingWorkspaceSessionBinding.Resolve(
+                    _castingWorkspaceSession, campaignId,
+                    delegate(string id)
+                    {
+                        return new CastingWorkspaceSession(_modPath, id);
+                    },
+                    delegate(string message) { _log.Info(message); });
+                if (workspaceSession == null)
+                {
+                    // Unresolved/transitional campaign identity must not
+                    // bind arbitrary work to an unknown-campaign fallback
+                    // (review G3).
+                    LogUiUnavailable(
+                        "casting-workspace: campaign identity unresolved");
+                    return false;
+                }
                 _castingWorkspaceSession = workspaceSession;
                 _castingWorkspace = new CastingWorkspaceScreenView(
                     StaticCanvas.Instance, workspaceSession,

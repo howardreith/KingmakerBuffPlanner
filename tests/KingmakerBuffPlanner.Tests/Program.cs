@@ -356,6 +356,10 @@ namespace KingmakerBuffPlanner.Tests
                     () => TestCastingWorkspaceDraftCatalog(root));
                 Run("casting-workspace-targeting-shapes-and-dirty-state",
                     () => TestCastingWorkspaceTargetingShapes(root));
+                Run("casting-workspace-campaign-bound-session-reuse",
+                    () => TestCastingWorkspaceCampaignBinding(root));
+                Run("casting-workspace-persistence-round-trip",
+                    () => TestCastingWorkspacePersistenceRoundTrip(root));
             }
             finally
             {
@@ -12218,6 +12222,195 @@ namespace KingmakerBuffPlanner.Tests
             if (session.IsDirty)
                 throw new InvalidOperationException(
                     "Undo to the saved state is still dirty.");
+        }
+
+        // Review G3: retained sessions bind to the verified campaign
+        // identity. Isolated candidate roots only — no ordinary saves.
+        private static void TestCastingWorkspaceCampaignBinding(string root)
+        {
+            string pathA = Path.Combine(root, "casting-workspace-campA");
+            string pathB = Path.Combine(root, "casting-workspace-campB");
+            Directory.CreateDirectory(pathA);
+            Directory.CreateDirectory(pathB);
+            PartyProviderSnapshot snapshot;
+            CastingWorkspaceInputs inputs = WorkspaceInputs(out snapshot);
+            var sessionA = new CastingWorkspaceSession(pathA, "campaign-A");
+            // Author unsaved intent in A and save a first document.
+            sessionA.Draft.SourceId = "source-bulls";
+            sessionA.Draft.CasterUnitId = "unit-cleric";
+            sessionA.Draft.TargetMode = CastingTargetMode.DirectTarget;
+            sessionA.Draft.DirectTargetUnitId = "unit-t1";
+            sessionA.Draft.State = CastingAuthoringState.Ready;
+            if (!sessionA.AddCastingFromDraft(inputs).Applied)
+                throw new InvalidOperationException("A authoring refused.");
+            sessionA.Save();
+            string savedA = sessionA.DocumentIntentSignature();
+
+            // Same-campaign reuse: retained A returns A itself (reference
+            // identity — unsaved intent and undo history survive).
+            sessionA.Draft.DirectTargetUnitId = "unit-t2";
+            if (!sessionA.AddCastingFromDraft(inputs).Applied)
+                throw new InvalidOperationException("A second authoring refused.");
+            var messages = new List<string>();
+            CastingWorkspaceSession reused = CastingWorkspaceSessionBinding.Resolve(
+                sessionA, "campaign-A",
+                delegate(string id) { return new CastingWorkspaceSession(pathA, id); },
+                delegate(string message) { messages.Add(message); });
+            if (!ReferenceEquals(reused, sessionA) || messages.Count != 0)
+                throw new InvalidOperationException(
+                    "Same-campaign reuse did not retain the session.");
+            if (reused.Document.Castings.Count != 2 || !reused.CanUndo)
+                throw new InvalidOperationException(
+                    "Retained session lost unsaved intent or undo history.");
+
+            // Campaign switch: a NEW session for B; A's document cannot be
+            // exposed or saved against B; A's file is untouched.
+            CastingWorkspaceSession sessionB = CastingWorkspaceSessionBinding.Resolve(
+                sessionA, "campaign-B",
+                delegate(string id) { return new CastingWorkspaceSession(pathB, id); },
+                delegate(string message) { messages.Add(message); });
+            if (ReferenceEquals(sessionB, sessionA))
+                throw new InvalidOperationException(
+                    "A campaign switch reused the foreign session.");
+            if (sessionB.Document.Castings.Count != 0 ||
+                sessionB.CampaignId != "campaign-B")
+                throw new InvalidOperationException(
+                    "Campaign B started from foreign authored intent.");
+            if (messages.Count != 1 || !messages[0].Contains("dirty=True") ||
+                !messages[0].Contains("campaign-A") ||
+                !messages[0].Contains("campaign-B"))
+                throw new InvalidOperationException(
+                    "The campaign switch did not disclose the dirty cross-bind: " +
+                    (messages.Count == 0 ? "(no message)" : messages[0]));
+
+            // B -> A follows the documented policy: a fresh A session reads
+            // A's saved file (the unsaved A edit was disclosed and dropped).
+            CastingWorkspaceSession reopenedA = CastingWorkspaceSessionBinding.Resolve(
+                null, "campaign-A",
+                delegate(string id) { return new CastingWorkspaceSession(pathA, id); },
+                null);
+            if (!ReferenceEquals(reopenedA, sessionA) &&
+                reopenedA.DocumentIntentSignature() != savedA)
+                throw new InvalidOperationException(
+                    "B -> A did not restore campaign A's saved document.");
+
+            // Unresolved identity refuses rather than binding.
+            if (CastingWorkspaceSessionBinding.Resolve(sessionA, null,
+                    delegate(string id)
+                    {
+                        return new CastingWorkspaceSession(pathA, id);
+                    },
+                    null) != null ||
+                CastingWorkspaceSessionBinding.Resolve(sessionA, "  ",
+                    delegate(string id)
+                    {
+                        return new CastingWorkspaceSession(pathA, id);
+                    },
+                    null) != null)
+                throw new InvalidOperationException(
+                    "An unresolved campaign identity produced a binding.");
+
+            // File destinations: A's candidate lives under A's root only.
+            if (!File.Exists(Path.Combine(pathA, "casting-plan.json")) &&
+                !Directory.Exists(pathA))
+                throw new InvalidOperationException("A's candidate root is missing.");
+            if (Directory.GetFiles(pathB).Length != 0 &&
+                sessionB.Document.Castings.Count == 0)
+                throw new InvalidOperationException(
+                    "Campaign B's root holds unexpected candidate bytes.");
+        }
+
+        // Review G5: same-session unsaved retention and a REAL persistence
+        // round trip (fresh session reading the saved bytes) are separately
+        // proven with complete canonical comparisons, including previously
+        // omitted fields (targeting modifiers, policies, routine
+        // definitions) via single-field negative cases.
+        private static void TestCastingWorkspacePersistenceRoundTrip(string root)
+        {
+            string modPath = Path.Combine(root, "casting-workspace-persist");
+            Directory.CreateDirectory(modPath);
+            PartyProviderSnapshot snapshot;
+            CastingWorkspaceInputs inputs = WorkspaceInputs(out snapshot);
+            var session = new CastingWorkspaceSession(modPath, "persist-campaign");
+            // Author a maximally complete record: enhancement, targeting
+            // modifier, and a second routine definition.
+            session.SelectRoutine("long");
+            session.Draft.SourceId = "source-bulls";
+            session.Draft.CasterUnitId = "unit-cleric";
+            session.Draft.TargetMode = CastingTargetMode.DirectTarget;
+            session.Draft.DirectTargetUnitId = "unit-t1";
+            session.Draft.State = CastingAuthoringState.Ready;
+            session.Draft.Enhancements.Add(
+                new AuthoredEnhancementSelection("extend-cleric", true, null));
+            session.Draft.TargetingModifiers.Add(
+                new TargetingModifierSelection("share-transmutation", true,
+                    "exact-item-ref-1"));
+            if (!session.AddCastingFromDraft(inputs).Applied)
+                throw new InvalidOperationException("authoring refused.");
+            if (!session.IsDirty)
+                throw new InvalidOperationException("authored work is not dirty.");
+            session.Save();
+            if (session.IsDirty)
+                throw new InvalidOperationException("saved work is still dirty.");
+            string saved = session.DocumentIntentSignature();
+
+            // Same-session unsaved retention: an unsaved edit survives an
+            // in-memory "reopen" (the retained-session path) and is visible
+            // as dirty.
+            session.Draft.DirectTargetUnitId = "unit-t2";
+            if (!session.AddCastingFromDraft(inputs).Applied)
+                throw new InvalidOperationException("second authoring refused.");
+            if (!session.IsDirty)
+                throw new InvalidOperationException(
+                    "unsaved retention is not reported dirty.");
+
+            // REAL persistence round trip: a FRESH session reads the saved
+            // bytes; the complete canonical documents must match.
+            var fresh = new CastingWorkspaceSession(modPath, "persist-campaign");
+            if (fresh.LoadStatus != CastingPlanLoadStatus.Loaded)
+                throw new InvalidOperationException(
+                    "fresh load failed: " + fresh.LoadStatus);
+            if (fresh.DocumentIntentSignature() != saved)
+                throw new InvalidOperationException(
+                    "The persisted document did not round-trip completely.");
+            if (fresh.IsDirty)
+                throw new InvalidOperationException(
+                    "A freshly loaded document reports dirty.");
+
+            // Single-field negative cases on previously omitted fields: each
+            // change must be visible to the canonical comparison.
+            PlannedCasting loaded = fresh.Document.Castings[0];
+            fresh.FocusCasting(loaded.CastingId);
+            // Targeting modifier removal.
+            var withoutModifier = new PlannedCasting(
+                loaded.CastingId, loaded.RoutineId, loaded.Order, loaded.SourceId,
+                loaded.Ability, loaded.CasterUnitId, loaded.SpellbookGuid,
+                loaded.TargetMode, loaded.DirectTargetUnitId, loaded.Origin,
+                loaded.RequiredCoverageUnitIds, new TargetingModifierSelection[0],
+                loaded.Enhancements, loaded.ExistingEffectPolicy,
+                loaded.IgnoredPresenceMarkers, loaded.State, loaded.Provenance);
+            fresh.UpdateFocusedCasting(withoutModifier);
+            if (!fresh.IsDirty)
+                throw new InvalidOperationException(
+                    "A targeting-modifier change is invisible to dirty tracking.");
+            fresh.Undo();
+            // Existing-effect policy change.
+            var otherPolicy = new PlannedCasting(
+                loaded.CastingId, loaded.RoutineId, loaded.Order, loaded.SourceId,
+                loaded.Ability, loaded.CasterUnitId, loaded.SpellbookGuid,
+                loaded.TargetMode, loaded.DirectTargetUnitId, loaded.Origin,
+                loaded.RequiredCoverageUnitIds, loaded.TargetingModifiers,
+                loaded.Enhancements,
+                Domain.Planning.ExistingEffectPolicy.Overwrite,
+                loaded.IgnoredPresenceMarkers, loaded.State, loaded.Provenance);
+            fresh.UpdateFocusedCasting(otherPolicy);
+            if (!fresh.IsDirty)
+                throw new InvalidOperationException(
+                    "An existing-effect-policy change is invisible to dirty tracking.");
+            fresh.Undo();
+            if (fresh.DocumentIntentSignature() != saved)
+                throw new InvalidOperationException(
+                    "Undo did not restore the persisted document exactly.");
         }
 
         private static void TestCastingWorkspaceReviewApply(string root)

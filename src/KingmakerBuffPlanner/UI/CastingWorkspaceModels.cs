@@ -82,6 +82,14 @@ namespace KingmakerBuffPlanner.UI
         public string RoutineId { get; private set; }
         public int Order { get; private set; }
         public string CasterUnitId { get; private set; }
+        public string CasterDisplayName { get; private set; }
+        public string DirectTargetDisplayName { get; private set; }
+
+        internal void ApplyDisplayNames(string caster, string target)
+        {
+            CasterDisplayName = caster ?? CasterUnitId ?? string.Empty;
+            DirectTargetDisplayName = target;
+        }
         public string SourceId { get; private set; }
         public string ModeLabel { get; private set; }
         public string DirectTargetUnitId { get; private set; }
@@ -196,6 +204,7 @@ namespace KingmakerBuffPlanner.UI
             CastingTargetMode targetMode,
             string directTargetUnitId,
             string originAnchorUnitId,
+            string rememberedDirectTargetUnitId,
             Domain.Authoring.CastingAuthoringState state,
             IReadOnlyList<WorkspaceSourceOption> sources,
             IReadOnlyList<WorkspaceCasterRow> capableCasters,
@@ -208,6 +217,7 @@ namespace KingmakerBuffPlanner.UI
             TargetMode = targetMode;
             DirectTargetUnitId = directTargetUnitId ?? string.Empty;
             OriginAnchorUnitId = originAnchorUnitId ?? string.Empty;
+            RememberedDirectTargetUnitId = rememberedDirectTargetUnitId ?? string.Empty;
             State = state;
             Sources = sources;
             CapableCasters = capableCasters;
@@ -221,6 +231,10 @@ namespace KingmakerBuffPlanner.UI
         public CastingTargetMode TargetMode { get; private set; }
         public string DirectTargetUnitId { get; private set; }
         public string OriginAnchorUnitId { get; private set; }
+        // The previously chosen direct recipient, preserved across a switch
+        // to group mode so switching back can restore it explicitly instead
+        // of silently choosing one (review G2).
+        public string RememberedDirectTargetUnitId { get; private set; }
         public Domain.Authoring.CastingAuthoringState State { get; private set; }
         public IReadOnlyList<WorkspaceSourceOption> Sources { get; private set; }
         public IReadOnlyList<WorkspaceCasterRow> CapableCasters { get; private set; }
@@ -277,6 +291,15 @@ namespace KingmakerBuffPlanner.UI
         public string EditingScopeLabel { get; private set; }
         public IReadOnlyList<string> Diagnostics { get; private set; }
         public WorkspaceDraftView Draft { get; private set; }
+        // Enhancement options for the FOCUSED casting, derived from that
+        // casting's own caster and ability — never the next-casting draft
+        // (review G1).
+        public IReadOnlyList<WorkspaceEnhancementOption> FocusedEnhancements
+        {
+            get { return _focusedEnhancements; }
+        }
+        internal readonly List<WorkspaceEnhancementOption> _focusedEnhancements =
+            new List<WorkspaceEnhancementOption>();
 
         public WorkspaceCastingCard CardById(string castingId)
         {

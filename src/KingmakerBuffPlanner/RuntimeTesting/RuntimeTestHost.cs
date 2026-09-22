@@ -93,7 +93,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private string _workspaceInteractionEvidence = "not-run";
         private string _workspaceReopenEvidence = "not-run";
         private string _workspaceSavedIntentIds;
-        private string _intentBeforeEdit;
+        private string _workspaceIntentBeforeEdit;
         private readonly List<string> _interactionCasters = new List<string>();
         private readonly List<string> _interactionTargets = new List<string>();
         private readonly List<string> _interactionCastIds = new List<string>();
@@ -748,15 +748,15 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     string interactionEvidence = _workspaceInteractionEvidence ?? "missing";
                     bool interactions = interactionEvidence.Contains(
                             "browseNoMutation=True") &&
-                        interactionEvidence.Contains("cast1=control:invoked/invoked/invoked") &&
-                        interactionEvidence.Contains("cast2=control:invoked/invoked/invoked") &&
-                        interactionEvidence.Contains("cast3=control:invoked/invoked/invoked") &&
-                        interactionEvidence.Contains("cast1Id=cast-") &&
-                        interactionEvidence.Contains("cast2Id=cast-") &&
-                        interactionEvidence.Contains("cast3Id=cast-") &&
-                        interactionEvidence.Contains("edit=applied") &&
-                        interactionEvidence.Contains("undo=True") &&
-                        interactionEvidence.Contains("undoIntentRestored=True") &&
+                        interactionEvidence.Contains("cast1=controls:invoked/invoked/invoked/invoked;cast1Exact=True") &&
+                        interactionEvidence.Contains("cast2=controls:invoked/invoked/invoked/invoked;cast2Exact=True") &&
+                        interactionEvidence.Contains("cast3=controls:invoked/invoked/invoked/invoked;cast3Exact=True") &&
+                        interactionEvidence.Contains("refusedAdd=invoked;refusedAddClean=True") &&
+                        interactionEvidence.Contains("editControl=invoked;editFocused=True") &&
+                        interactionEvidence.Contains("retargetControl=invoked;retargetApplied=True") &&
+                        interactionEvidence.Contains("undoControl=invoked;undoIntentRestored=True") &&
+                        interactionEvidence.Contains("doneControl=invoked;doneClearedFocus=True") &&
+                        interactionEvidence.Contains("saveControl=invoked") &&
                         interactionEvidence.Contains("saved=True");
                     result.Assertions.Add(interactions
                         ? RuntimeTestAssertion.Pass("workspace-interaction-sequence",
@@ -2101,10 +2101,15 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 ? Hashing.Sha256(capture.FullPath) : "missing");
         }
 
-        // Guarded interaction sequence (review R1/C4): canonical session
-        // commands against the LIVE workspace session, one step per update,
-        // with camera captures between milestones. Labeled direct session
-        // calls — never physical-input claims.
+        // Guarded interaction sequence (reviews R1/C4, G4): EVERY claimed
+        // control-covered action goes through its real ACTIVE, INTERACTABLE
+        // button — state, enhancement, edit, retarget, undo, done, and save
+        // included. After each Add the scenario asserts one-record growth,
+        // a distinct new identity, exact authored fields, and unchanged
+        // siblings; a deliberately refused Add is exercised and must leave
+        // the document untouched. Direct session calls appear only where
+        // labeled as such (selection scope for driving), never as
+        // substitutes for the controls under test.
         private bool UpdateWorkspaceInteraction()
         {
             UI.CastingWorkspaceSession session =
@@ -2117,153 +2122,201 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             }
             try
             {
+                CastingWorkspaceInputs inputs =
+                    BuffPlannerUiRoot.CastingWorkspaceInputsForRuntime();
                 if (_workspaceInteractionStep == 0)
                 {
-                    CastingWorkspaceInputs inputs =
-                        BuffPlannerUiRoot.CastingWorkspaceInputsForRuntime();
                     WorkspaceView view = session.BuildView(inputs);
                     _interactionCasters.Clear();
                     _interactionTargets.Clear();
                     if (view.Draft != null)
                     {
                         foreach (UI.WorkspaceCasterRow caster in
-                            view.Draft.CapableCasters.Take(4))
+                            view.Draft.CapableCasters)
                             _interactionCasters.Add(caster.UnitId);
                         foreach (UI.WorkspaceTargetOption target in
-                            view.Draft.Targets.Take(8))
+                            view.Draft.Targets)
                             _interactionTargets.Add(target.UnitId);
                         UI.WorkspaceSourceOption selected =
                             view.Draft.Sources.FirstOrDefault(source =>
-                                source.Selected) ?? view.Draft.Sources.FirstOrDefault();
+                                source.Selected) ??
+                            view.Draft.Sources.FirstOrDefault();
                         _interactionSourceId = selected == null
                             ? view.SelectedSourceId : selected.SourceId;
                     }
                     if (string.IsNullOrEmpty(_interactionSourceId))
                         _interactionSourceId = view.SelectedSourceId;
-                    // Full-intent signature before/after browsing (review
-                    // F2): a non-null document proves nothing.
+                    // Full canonical signature before/after browsing.
                     string beforeBrowse = session.DocumentIntentSignature();
-                    string buffControl = BuffPlannerUiRoot
-                        .CastingWorkspaceInvokeControlForRuntime(
-                            "Source." + _interactionSourceId);
-                    string casterControl = _interactionCasters.Count == 0
-                        ? "no-caster" : BuffPlannerUiRoot
-                        .CastingWorkspaceInvokeControlForRuntime(
-                            "DraftCaster." + _interactionCasters[0]);
+                    string buffControl = Invoke("Source." + _interactionSourceId);
                     bool browseClean = string.Equals(
                         session.DocumentIntentSignature(), beforeBrowse,
                         StringComparison.Ordinal);
                     _workspaceInteractionEvidence = "browseNoMutation=" +
                         browseClean + ";buffControl=" + buffControl +
-                        ";casterControl=" + casterControl +
                         ";capableCasters=" + _interactionCasters.Count +
                         ";targets=" + _interactionTargets.Count;
-                    if (view.RoutineIds.Count != 0)
-                        session.SelectRoutine(view.RoutineIds[0]);
+                    session.SelectRoutine(view.RoutineIds.Count == 0
+                        ? "long" : view.RoutineIds[0]);
+                    session.BuildView(inputs);
                     BeginWorkspaceCameraCapture("ws-interact-browse.png", false);
                     _workspaceInteractionStep = 1;
                     return false;
                 }
                 if (_interactionCasters.Count < 2 || _interactionTargets.Count < 3)
                 {
-                    // Honest environment shortfall: record and skip the
-                    // authoring steps; the assertions fail closed.
                     _workspaceInteractionEvidence += ";insufficient-party";
                     TransitionToBisectionClose();
                     return false;
                 }
-                CastingWorkspaceInputs currentInputs =
-                    BuffPlannerUiRoot.CastingWorkspaceInputsForRuntime();
                 if (_workspaceInteractionStep >= 1 && _workspaceInteractionStep <= 3)
                 {
-                    // Production control path (review F1/F2): the REAL view
-                    // buttons — no private draft field assignment. Add
-                    // resolves the ability itself and refuses with an
-                    // explanation when it cannot.
                     int index = _workspaceInteractionStep - 1;
                     string caster = _interactionCasters[index == 1 ? 1 : 0];
-                    string casterClick = BuffPlannerUiRoot
-                        .CastingWorkspaceInvokeControlForRuntime(
-                            "DraftCaster." + caster);
-                    string targetClick = BuffPlannerUiRoot
-                        .CastingWorkspaceInvokeControlForRuntime(
-                            "DraftTarget." + _interactionTargets[index]);
-                    session.Draft.State = CastingAuthoringState.Ready;
-                    session.Draft.Enhancements.Clear();
-                    string addClick = BuffPlannerUiRoot
-                        .CastingWorkspaceInvokeControlForRuntime("AddCasting");
-                    string castId = session.Document.Castings.Count == 0
-                        ? string.Empty
-                        : session.Document.Castings[
-                            session.Document.Castings.Count - 1].CastingId;
-                    _interactionCastIds.Add(castId);
+                    string target = _interactionTargets[index];
+                    int beforeCount = session.Document.Castings.Count;
+                    string siblingsBefore = SiblingSignature(session, null);
+                    string casterClick = Invoke("DraftCaster." + caster);
+                    string targetClick = Invoke("DraftTarget." + target);
+                    // The visible state control: one press toggles the fresh
+                    // draft from Draft to Ready.
+                    string stateClick = Invoke("State");
+                    string addClick = Invoke("AddCasting");
+                    var castings = session.Document.Castings;
+                    bool grew = castings.Count == beforeCount + 1;
+                    Domain.Authoring.PlannedCasting created = grew
+                        ? castings[castings.Count - 1] : null;
+                    bool distinct = created != null &&
+                        _interactionCastIds.All(id =>
+                            !string.Equals(id, created.CastingId,
+                                StringComparison.Ordinal));
+                    bool fieldsExact = created != null &&
+                        string.Equals(created.CasterUnitId, caster,
+                            StringComparison.Ordinal) &&
+                        string.Equals(created.DirectTargetUnitId, target,
+                            StringComparison.Ordinal) &&
+                        string.Equals(created.SourceId, _interactionSourceId,
+                            StringComparison.Ordinal) &&
+                        created.Ability != null;
+                    bool siblingsUnchanged = string.Equals(
+                        SiblingSignature(session, created == null
+                            ? null : created.CastingId),
+                        siblingsBefore, StringComparison.Ordinal);
+                    if (created != null)
+                        _interactionCastIds.Add(created.CastingId);
                     _workspaceInteractionEvidence += ";cast" + (index + 1) +
-                        "=control:" + casterClick + "/" + targetClick + "/" +
-                        addClick + ";cast" + (index + 1) + "Id=" + castId;
+                        "=controls:" + casterClick + "/" + targetClick + "/" +
+                        stateClick + "/" + addClick +
+                        ";cast" + (index + 1) + "Exact=" +
+                        (grew && distinct && fieldsExact && siblingsUnchanged);
+                    if (!grew || !distinct || !fieldsExact || !siblingsUnchanged)
+                    {
+                        // A refused or wrong Add fails the sequence here —
+                        // no recycled last-record id can satisfy it.
+                        _workspaceInteractionEvidence += ";cast" + (index + 1) +
+                            "RefusalDetail=count" + castings.Count +
+                            ";created=" + (created == null ? "none"
+                                : created.CastingId + "/" + created.CasterUnitId +
+                                "/" + created.DirectTargetUnitId);
+                        TransitionToBisectionClose();
+                        return false;
+                    }
                     _workspaceInteractionStep++;
                     return false;
                 }
                 if (_workspaceInteractionStep == 4)
                 {
-                    string editId = _interactionCastIds.Count > 1
-                        ? _interactionCastIds[1] : string.Empty;
-                    Domain.Authoring.PlannedCasting focused =
-                        session.Document.Castings.FirstOrDefault(casting =>
-                            casting != null && string.Equals(casting.CastingId,
-                                editId, StringComparison.Ordinal));
-                    if (focused == null)
-                    {
-                        _workspaceInteractionEvidence += ";edit=missing-focus";
-                    }
-                    else
-                    {
-                        session.FocusCasting(editId);
-                        _intentBeforeEdit = session.DocumentIntentSignature();
-                        AuthoringEditResult edited = session.UpdateFocusedCasting(
-                            focused.WithDirectTarget(
-                                _interactionTargets[3 % _interactionTargets.Count]));
-                        _workspaceInteractionEvidence += ";edit=" +
-                            (edited.Applied ? "applied" : "refused:" + edited.Reason);
-                    }
-                    BeginWorkspaceCameraCapture("ws-interact-authored.png", false);
+                    // Negative case: an Add with NO recipient chosen must be
+                    // refused and leave the document untouched (review G4).
+                    session.Draft.SourceId = _interactionSourceId;
+                    session.Draft.CasterUnitId = _interactionCasters[0];
+                    session.Draft.DirectTargetUnitId = null;
+                    session.Draft.TargetMode =
+                        Domain.Authoring.CastingTargetMode.DirectTarget;
+                    session.Draft.Enhancements.Clear();
+                    session.BuildView(inputs);
+                    string signatureBefore = session.DocumentIntentSignature();
+                    int countBefore = session.Document.Castings.Count;
+                    string refusedAdd = Invoke("AddCasting");
+                    bool refusedClean =
+                        session.Document.Castings.Count == countBefore &&
+                        string.Equals(session.DocumentIntentSignature(),
+                            signatureBefore, StringComparison.Ordinal);
+                    _workspaceInteractionEvidence += ";refusedAdd=" +
+                        refusedAdd + ";refusedAddClean=" + refusedClean;
                     _workspaceInteractionStep = 5;
                     return false;
                 }
                 if (_workspaceInteractionStep == 5)
                 {
-                    // Undo must restore the exact pre-edit intent, not just
-                    // return true (review F2).
-                    bool undone = session.Undo();
-                    bool intentRestored = undone && string.Equals(
-                        session.DocumentIntentSignature(),
-                        _intentBeforeEdit, StringComparison.Ordinal);
-                    _workspaceInteractionEvidence += ";undo=" + undone +
-                        ";undoIntentRestored=" + intentRestored;
-                    BeginWorkspaceCameraCapture("ws-interact-undo.png", false);
+                    string editId = _interactionCastIds.Count > 1
+                        ? _interactionCastIds[1] : string.Empty;
+                    string editClick = Invoke("Edit." + editId);
+                    Domain.Authoring.PlannedCasting focused =
+                        session.Document.Castings.FirstOrDefault(casting =>
+                            casting != null && string.Equals(casting.CastingId,
+                                editId, StringComparison.Ordinal));
+                    bool editFocused = focused != null &&
+                        string.Equals(session.EditingFocusCastingId, editId,
+                            StringComparison.Ordinal);
+                    _workspaceInteractionEvidence += ";editControl=" + editClick +
+                        ";editFocused=" + editFocused;
+                    BeginWorkspaceCameraCapture("ws-interact-authored.png", false);
                     _workspaceInteractionStep = 6;
                     return false;
                 }
                 if (_workspaceInteractionStep == 6)
                 {
-                    // Re-apply the edit deliberately, then persist and record
-                    // the exact intent the reopen must preserve.
+                    // Retarget through the FOCUSED editor's real control.
                     string editId = _interactionCastIds.Count > 1
                         ? _interactionCastIds[1] : string.Empty;
+                    string newTarget = _interactionTargets[
+                        3 % _interactionTargets.Count];
+                    string retargetClick = Invoke("Target." + newTarget);
                     Domain.Authoring.PlannedCasting focused =
                         session.Document.Castings.FirstOrDefault(casting =>
                             casting != null && string.Equals(casting.CastingId,
                                 editId, StringComparison.Ordinal));
-                    if (focused != null)
-                    {
-                        session.FocusCasting(editId);
-                        session.UpdateFocusedCasting(focused.WithDirectTarget(
-                            _interactionTargets[3 % _interactionTargets.Count]));
-                    }
-                    session.Save();
+                    bool retargeted = focused != null &&
+                        string.Equals(focused.DirectTargetUnitId, newTarget,
+                            StringComparison.Ordinal);
+                    _workspaceIntentBeforeEdit =
+                        session.DocumentIntentSignature();
+                    _workspaceInteractionEvidence += ";retargetControl=" +
+                        retargetClick + ";retargetApplied=" + retargeted;
+                    _workspaceInteractionStep = 7;
+                    return false;
+                }
+                if (_workspaceInteractionStep == 7)
+                {
+                    string undoClick = Invoke("Undo");
+                    bool intentRestored = string.Equals(
+                        session.DocumentIntentSignature(),
+                        _workspaceIntentBeforeEdit, StringComparison.Ordinal);
+                    _workspaceInteractionEvidence += ";undoControl=" + undoClick +
+                        ";undoIntentRestored=" + intentRestored;
+                    BeginWorkspaceCameraCapture("ws-interact-undo.png", false);
+                    _workspaceInteractionStep = 8;
+                    return false;
+                }
+                if (_workspaceInteractionStep == 8)
+                {
+                    // Undo restored the pre-edit intent (the edit is gone);
+                    // deliberately re-apply it, then Done and Save through
+                    // their controls.
+                    string editId = _interactionCastIds.Count > 1
+                        ? _interactionCastIds[1] : string.Empty;
+                    string newTarget = _interactionTargets[
+                        3 % _interactionTargets.Count];
+                    Invoke("Edit." + editId);
+                    Invoke("Target." + newTarget);
+                    string doneClick = Invoke("DoneEditing");
+                    bool doneCleared = session.EditingFocusCastingId == null;
+                    string saveClick = Invoke("Save");
                     _workspaceSavedIntentIds = session.DocumentIntentSignature();
-                    _workspaceInteractionEvidence += ";saved=True;intentHash=" +
-                        _workspaceSavedIntentIds.GetHashCode().ToString(
-                            CultureInfo.InvariantCulture);
+                    _workspaceInteractionEvidence += ";doneControl=" + doneClick +
+                        ";doneClearedFocus=" + doneCleared +
+                        ";saveControl=" + saveClick + ";saved=True";
                     _log.Info("[KBP-WORKSPACE] interaction authored and saved;" +
                         _workspaceInteractionEvidence + ".");
                     TransitionToBisectionClose();
@@ -2280,6 +2333,30 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             }
             TransitionToBisectionClose();
             return false;
+        }
+
+        private static string Invoke(string buttonName)
+        {
+            return BuffPlannerUiRoot.CastingWorkspaceInvokeControlForRuntime(
+                buttonName);
+        }
+
+        // Canonical signature of every record EXCEPT the excluded id — the
+        // unchanged-siblings contract (review G4).
+        private static string SiblingSignature(
+            UI.CastingWorkspaceSession session, string excludeCastingId)
+        {
+            var parts = new List<string>();
+            foreach (Domain.Authoring.PlannedCasting casting in
+                session.Document.Castings)
+            {
+                if (casting == null || string.Equals(casting.CastingId,
+                        excludeCastingId, StringComparison.Ordinal)) continue;
+                parts.Add(casting.CastingId + "|" + casting.CasterUnitId + "|" +
+                    casting.DirectTargetUnitId + "|" + casting.State + "|" +
+                    casting.Order.ToString(CultureInfo.InvariantCulture));
+            }
+            return string.Join("||", parts.ToArray());
         }
 
         private void TransitionToBisectionClose()

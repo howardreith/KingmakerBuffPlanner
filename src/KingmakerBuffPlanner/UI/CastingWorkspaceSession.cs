@@ -142,6 +142,7 @@ namespace KingmakerBuffPlanner.UI
         private CastingWorkspaceInputs _lastInputs;
         private string _savedIntentSignature = string.Empty;
         private string _resolvedDraftKey = string.Empty;
+        private string _rememberedDirectRecipient = string.Empty;
         private readonly CastingForecastService _forecast =
             new CastingForecastService();
         private readonly CastingReviewCoordinator _review =
@@ -173,7 +174,6 @@ namespace KingmakerBuffPlanner.UI
                 case CastingPlanLoadStatus.RecoveredFromBackup:
                     _authoring = new CastingAuthoringService(
                         loaded.Profile.ToDocument());
-                    _savedIntentSignature = DocumentIntentSignature();
                     break;
                 case CastingPlanLoadStatus.Absent:
                     _authoring = new CastingAuthoringService(NewDocument());
@@ -187,6 +187,9 @@ namespace KingmakerBuffPlanner.UI
                     _authoring = new CastingAuthoringService(NewDocument());
                     break;
             }
+            // The dirty baseline covers every load state — an absent or
+            // blocked candidate starts exactly as clean as a loaded one.
+            _savedIntentSignature = DocumentIntentSignature();
             SelectedRoutineId = "long";
         }
 
@@ -287,6 +290,18 @@ namespace KingmakerBuffPlanner.UI
                 ? FirstSourceId(inputs) : SelectedSourceId;
             var casters = BuildCasterRows(plan, inputs, selectedSource);
             var cards = BuildCards(plan, selectedSource);
+            var namesByUnit = inputs.Snapshot.Units.ToDictionary(
+                unit => unit.UnitId,
+                unit => string.IsNullOrEmpty(unit.DisplayName)
+                    ? unit.UnitId : unit.DisplayName,
+                StringComparer.Ordinal);
+            foreach (WorkspaceCastingCard card in cards)
+                card.ApplyDisplayNames(
+                    namesByUnit.TryGetValue(card.CasterUnitId ?? string.Empty,
+                        out string casterName) ? casterName : null,
+                    card.DirectTargetUnitId == null ? null
+                        : namesByUnit.TryGetValue(card.DirectTargetUnitId,
+                            out string targetName) ? targetName : null);
             var budget = plan.BudgetLines
                 .Select(line => new WorkspaceBudgetRow(line)).ToList();
             CastingApplyDecision selectedGate = _gate.Evaluate(
@@ -303,13 +318,49 @@ namespace KingmakerBuffPlanner.UI
             string scopeLabel = EditingFocusCastingId == null
                 ? "Configure next casting"
                 : "Editing casting " + EditingFocusCastingId;
-            return new WorkspaceView(
+            var view = new WorkspaceView(
                 selectedSource, SelectedRoutineId, casters, cards, budget,
                 _authoring.Document.Routines.Select(value => value.RoutineId)
                     .ToList(),
                 selectedGate, onePassGate, _review.Status, scope, scopeLabel,
                 plan.Diagnostics,
                 BuildDraftView(inputs, selectedSource, casters));
+            BuildFocusedEnhancements(view, inputs);
+            return view;
+        }
+
+        // Enhancement options for the FOCUSED record, derived from that
+        // record's own caster and ability — not the draft's (review G1).
+        private void BuildFocusedEnhancements(
+            WorkspaceView view, CastingWorkspaceInputs inputs)
+        {
+            if (EditingFocusCastingId == null ||
+                inputs == null || inputs.Enhancements == null) return;
+            PlannedCasting focused = _authoring.Document.Castings
+                .FirstOrDefault(value => value != null && string.Equals(
+                    value.CastingId, EditingFocusCastingId,
+                    StringComparison.Ordinal));
+            if (focused == null || focused.Ability == null ||
+                string.IsNullOrEmpty(focused.CasterUnitId)) return;
+            string baseGuid = focused.Ability.BaseAbilityGuid;
+            string variantGuid = focused.Ability.VariantGuid;
+            foreach (CastEnhancementSnapshot enhancement in inputs.Enhancements)
+            {
+                if (enhancement == null ||
+                    !string.Equals(enhancement.CasterUnitId,
+                        focused.CasterUnitId, StringComparison.Ordinal))
+                    continue;
+                bool qualified = enhancement.AbilityWhiteList.Count == 0 ||
+                    enhancement.AbilityWhiteList.Contains(baseGuid) ||
+                    enhancement.AbilityWhiteList.Contains(variantGuid);
+                if (!qualified) continue;
+                view._focusedEnhancements.Add(new WorkspaceEnhancementOption(
+                    enhancement.EnhancementId, enhancement.DisplayName,
+                    focused.Enhancements.Any(selection => selection != null &&
+                        string.Equals(selection.EnhancementId,
+                            enhancement.EnhancementId,
+                            StringComparison.Ordinal))));
+            }
         }
 
         private WorkspaceDraftView BuildDraftView(
@@ -411,6 +462,7 @@ namespace KingmakerBuffPlanner.UI
                 Draft.DirectTargetUnitId ?? string.Empty,
                 Draft.Origin == null || Draft.Origin.IsCasterCentered
                     ? string.Empty : Draft.Origin.AnchorUnitId,
+                _rememberedDirectRecipient,
                 Draft.State,
                 sources,
                 casters.Where(row => row.Capable).ToList(),
@@ -626,6 +678,45 @@ namespace KingmakerBuffPlanner.UI
             return (source ?? string.Empty) + "" + (caster ?? string.Empty);
         }
 
+        // Group-aware focused-casting targeting edit: mode, recipient,
+        // origin, and coverage change together through the canonical
+        // UpdateFocusedCasting command — never direct-target cloning on a
+        // group record (review G2).
+        public AuthoringEditResult SetFocusedTargeting(
+            CastingTargetMode mode,
+            string directTargetUnitId,
+            string originAnchorUnitId,
+            IEnumerable<string> requiredCoverageUnitIds)
+        {
+            if (EditingFocusCastingId == null)
+                return AuthoringEditResult.Refuse("no-editing-focus");
+            PlannedCasting focused = _authoring.Document.Castings
+                .FirstOrDefault(value => value != null && string.Equals(
+                    value.CastingId, EditingFocusCastingId,
+                    StringComparison.Ordinal));
+            if (focused == null)
+                return AuthoringEditResult.Refuse("focused-casting-missing");
+            if (!Enum.IsDefined(typeof(CastingTargetMode), mode))
+                return AuthoringEditResult.Refuse("targeting-mode-unsupported");
+            string direct = mode == CastingTargetMode.DirectTarget
+                ? directTargetUnitId : null;
+            CastingOrigin origin = mode == CastingTargetMode.DirectTarget
+                ? null
+                : mode == CastingTargetMode.AnchoredOrigin
+                    ? CastingOrigin.Anchored(originAnchorUnitId)
+                    : CastingOrigin.CasterCentered();
+            try
+            {
+                return UpdateFocusedCasting(focused.WithTargeting(
+                    mode, direct, origin, requiredCoverageUnitIds));
+            }
+            catch (ArgumentException exception)
+            {
+                return AuthoringEditResult.Refuse(
+                    "targeting-invalid:" + exception.Message);
+            }
+        }
+
         // One coherent targeting-shape operation (review F3): mode, origin,
         // direct target, and coverage change together so the draft always
         // satisfies ValidateTargetModeShape.
@@ -650,11 +741,31 @@ namespace KingmakerBuffPlanner.UI
             Draft.RequiredCoverageUnitIds.Clear();
             if (mode == CastingTargetMode.DirectTarget)
             {
-                Draft.DirectTargetUnitId = directTargetUnitId;
+                string recipient = directTargetUnitId;
+                bool restored = false;
+                if (string.IsNullOrWhiteSpace(recipient) &&
+                    !string.IsNullOrEmpty(_rememberedDirectRecipient))
+                {
+                    // Switching back restores the PREVIOUSLY CHOSEN
+                    // recipient explicitly; nothing is silently picked
+                    // (review G2).
+                    recipient = _rememberedDirectRecipient;
+                    restored = true;
+                }
+                if (string.IsNullOrWhiteSpace(recipient))
+                    return AuthoringEditResult.Refuse(
+                        "targeting-requires-direct-target:" +
+                        "pick a recipient to switch back");
+                _rememberedDirectRecipient = recipient;
+                Draft.DirectTargetUnitId = recipient;
                 Draft.Origin = null;
                 return AuthoringEditResult.Accept(
-                    "draft-targeting", new string[0]);
+                    restored ? "draft-targeting:restored-recipient"
+                        : "draft-targeting",
+                    new string[0]);
             }
+            if (!string.IsNullOrEmpty(Draft.DirectTargetUnitId))
+                _rememberedDirectRecipient = Draft.DirectTargetUnitId;
             foreach (string unitId in requiredCoverageUnitIds ?? new string[0])
                 if (!string.IsNullOrWhiteSpace(unitId) &&
                     !Draft.RequiredCoverageUnitIds.Contains(unitId))
@@ -726,41 +837,27 @@ namespace KingmakerBuffPlanner.UI
             _savedIntentSignature = DocumentIntentSignature();
         }
 
-        // Full authored-intent signature (identity, order, routine, source,
-        // ability, caster, spellbook, targeting shape, coverage,
-        // enhancements, state) — the equality contract for browsing,
-        // Undo, and save/reopen verification (review F2). CastingIds alone
-        // prove nothing about preserved intent.
+        // Canonical authored-document comparison (review G5): the EXISTING
+        // serialization model — every persisted authored field including
+        // targeting-modifier parameters, exact sources, policies, and the
+        // ordered routine definitions — not a selectively maintained
+        // delimiter string. Derived observations are excluded by the
+        // profile model itself.
         public string DocumentIntentSignature()
         {
-            var parts = new List<string>();
-            foreach (PlannedCasting casting in _authoring.Document.Castings)
-            {
-                parts.Add(string.Join("|", new[]
-                {
-                    casting.CastingId,
-                    casting.RoutineId,
-                    casting.Order.ToString(CultureInfo.InvariantCulture),
-                    casting.SourceId,
-                    casting.Ability == null ? string.Empty : casting.Ability.Canonical,
-                    casting.CasterUnitId ?? string.Empty,
-                    casting.SpellbookGuid ?? string.Empty,
-                    casting.TargetMode.ToString(),
-                    casting.DirectTargetUnitId ?? string.Empty,
-                    casting.Origin == null ? string.Empty
-                        : casting.Origin.IsCasterCentered
-                            ? "caster"
-                            : "anchor:" + casting.Origin.AnchorUnitId,
-                    string.Join(";", casting.RequiredCoverageUnitIds.ToArray()),
-                    string.Join(";", casting.Enhancements
-                        .Select(value => value.EnhancementId + ":" +
-                            (value.Required ? "1" : "0") + ":" +
-                            (value.ExactSourceRef ?? string.Empty))
-                        .ToArray()),
-                    casting.State.ToString()
-                }));
-            }
-            return string.Join("||", parts.ToArray());
+            CastingPlanProfile profile = CastingPlanProfile.FromDocument(
+                _authoring.Document, null, null);
+            // Normalize the volatile schema stamp so equality reflects
+            // CONTENT, and stamp the campaign binding explicitly.
+            profile.SchemaVersion = 0;
+            return CampaignId + "" +
+                Newtonsoft.Json.JsonConvert.SerializeObject(
+                    profile, Newtonsoft.Json.Formatting.None,
+                    new Newtonsoft.Json.JsonSerializerSettings
+                    {
+                        NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore,
+                        Converters = { new Newtonsoft.Json.Converters.StringEnumConverter() }
+                    });
         }
 
         // True when authored intent differs from the last explicitly saved

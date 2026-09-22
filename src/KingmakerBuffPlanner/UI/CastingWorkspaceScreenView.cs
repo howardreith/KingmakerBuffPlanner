@@ -383,7 +383,8 @@ namespace KingmakerBuffPlanner.UI
                 Text title = KingmakerUiFactory.CreateText(
                     "Title", entry, _theme,
                     card.CastingId + " · " + card.RoutineId + " #" + card.Order +
-                    " · " + (card.CasterUnitId ?? "unresolved caster"), 16,
+                    " · " + (string.IsNullOrEmpty(card.CasterDisplayName)
+                        ? "unresolved caster" : card.CasterDisplayName), 16,
                     TextAnchor.MiddleLeft);
                 title.fontStyle = FontStyle.Bold;
                 KingmakerUiFactory.Stretch(title.rectTransform, 8, 90, 4, 2);
@@ -398,7 +399,7 @@ namespace KingmakerBuffPlanner.UI
                 detail.rectTransform.offsetMin = new Vector2(8f, 2f);
                 detail.rectTransform.offsetMax = new Vector2(-8f, -2f);
                 Button edit = KingmakerUiFactory.CreateButton(
-                    "Edit", entry, _theme, "Edit", () => Click(() =>
+                    "Edit." + card.CastingId, entry, _theme, "Edit", () => Click(() =>
                     {
                         _session.FocusCasting(card.CastingId);
                         RefreshView();
@@ -412,7 +413,8 @@ namespace KingmakerBuffPlanner.UI
         {
             var parts = new List<string>();
             if (card.DirectTargetUnitId != null)
-                parts.Add("Target: " + card.DirectTargetUnitId);
+                parts.Add("Target: " + (card.DirectTargetDisplayName ??
+                    card.DirectTargetUnitId));
             if (card.OriginLabel.Length != 0) parts.Add(card.OriginLabel);
             if (card.EnhancementLabels.Count != 0)
                 parts.Add("Enhancements: " + string.Join(", ", card.EnhancementLabels));
@@ -456,20 +458,143 @@ namespace KingmakerBuffPlanner.UI
                     TextAnchor.UpperLeft);
                 missing.color = _theme.MutedBrownText;
                 KingmakerUiFactory.AddLayout(missing.rectTransform, 34f);
+                AddDoneButton();
                 return;
             }
-            AddInspectorCaption("Retarget");
-            foreach (WorkspaceTargetOption target in view.Draft.Targets)
+            bool directRecord = focused.TargetMode ==
+                Domain.Authoring.CastingTargetMode.DirectTarget;
+            AddInspectorCaption(directRecord
+                ? "Retarget (direct)" : "Group targeting");
+            if (directRecord)
             {
-                WorkspaceTargetOption captured = target;
-                bool selected = string.Equals(focused.DirectTargetUnitId,
-                    captured.UnitId, StringComparison.Ordinal);
-                Button pick = KingmakerUiFactory.CreateButton(
-                    "Target." + captured.UnitId, _inspectorContent, _theme,
-                    (selected ? "[x] " : "[  ] ") + captured.DisplayName,
-                    () => Click(() => ApplyFocusedEdit(
-                        focused.WithDirectTarget(captured.UnitId))));
-                KingmakerUiFactory.AddLayout(RectOf(pick), 30f);
+                foreach (WorkspaceTargetOption target in view.Draft.Targets)
+                {
+                    WorkspaceTargetOption captured = target;
+                    bool selected = string.Equals(focused.DirectTargetUnitId,
+                        captured.UnitId, StringComparison.Ordinal);
+                    Button pick = KingmakerUiFactory.CreateButton(
+                        "Target." + captured.UnitId, _inspectorContent, _theme,
+                        (selected ? "[x] " : "[  ] ") + captured.DisplayName,
+                        () => Click(() =>
+                        {
+                            AuthoringEditResult result = _session
+                                .SetFocusedTargeting(
+                                    Domain.Authoring.CastingTargetMode.DirectTarget,
+                                    captured.UnitId, null, null);
+                            SurfaceRefusal(result, "retarget");
+                            RefreshView();
+                        }));
+                    KingmakerUiFactory.AddLayout(RectOf(pick), 30f);
+                }
+            }
+            else
+            {
+                // Group records edit origin and coverage through the
+                // group-aware command — never direct-target cloning
+                // (review G2).
+                Button casterOrigin = KingmakerUiFactory.CreateButton(
+                    "FocusedOrigin.Caster", _inspectorContent, _theme,
+                    focused.Origin != null && focused.Origin.IsCasterCentered
+                        ? "[x] Origin: caster" : "[  ] Origin: caster",
+                    () => Click(() =>
+                    {
+                        AuthoringEditResult result = _session
+                            .SetFocusedTargeting(
+                                Domain.Authoring.CastingTargetMode.CasterCenteredOrigin,
+                                null, null, focused.RequiredCoverageUnitIds);
+                        SurfaceRefusal(result, "origin");
+                        RefreshView();
+                    }));
+                KingmakerUiFactory.AddLayout(RectOf(casterOrigin), 30f);
+                foreach (WorkspaceOriginOption origin in view.Draft.Origins)
+                {
+                    WorkspaceOriginOption captured = origin;
+                    Button pick = KingmakerUiFactory.CreateButton(
+                        "FocusedOrigin." + captured.AnchorUnitId,
+                        _inspectorContent, _theme,
+                        (captured.Selected ? "[x] " : "[  ] ") +
+                            "Origin: " + captured.AnchorUnitId,
+                        () => Click(() =>
+                        {
+                            AuthoringEditResult result = _session
+                                .SetFocusedTargeting(
+                                    Domain.Authoring.CastingTargetMode.AnchoredOrigin,
+                                    null, captured.AnchorUnitId,
+                                    focused.RequiredCoverageUnitIds);
+                            SurfaceRefusal(result, "origin");
+                            RefreshView();
+                        }));
+                    KingmakerUiFactory.AddLayout(RectOf(pick), 30f);
+                }
+                AddInspectorCaption("Required coverage");
+                foreach (WorkspaceTargetOption target in view.Draft.Targets)
+                {
+                    WorkspaceTargetOption captured = target;
+                    bool covered = focused.RequiredCoverageUnitIds.Contains(
+                        captured.UnitId);
+                    Button toggle = KingmakerUiFactory.CreateButton(
+                        "FocusedCoverage." + captured.UnitId,
+                        _inspectorContent, _theme,
+                        (covered ? "[x] " : "[  ] ") + captured.DisplayName,
+                        () => Click(() =>
+                        {
+                            var coverage = focused.RequiredCoverageUnitIds
+                                .Where(unitId => !string.Equals(unitId,
+                                    captured.UnitId, StringComparison.Ordinal))
+                                .ToList();
+                            if (!covered) coverage.Add(captured.UnitId);
+                            AuthoringEditResult result = _session
+                                .SetFocusedTargeting(focused.TargetMode, null,
+                                    focused.Origin == null ||
+                                        focused.Origin.IsCasterCentered
+                                        ? null
+                                        : focused.Origin.AnchorUnitId,
+                                    coverage);
+                            SurfaceRefusal(result, "coverage");
+                            RefreshView();
+                        }));
+                    KingmakerUiFactory.AddLayout(RectOf(toggle), 30f);
+                }
+            }
+            AddInspectorCaption("Enhancements (this casting)");
+            foreach (WorkspaceEnhancementOption enhancement in
+                view.FocusedEnhancements)
+            {
+                WorkspaceEnhancementOption captured = enhancement;
+                bool selected = focused.Enhancements.Any(selection =>
+                    selection != null && string.Equals(
+                        selection.EnhancementId,
+                        captured.EnhancementId,
+                        StringComparison.Ordinal));
+                Button toggle = KingmakerUiFactory.CreateButton(
+                    "FocusedEnhancement." + captured.EnhancementId,
+                    _inspectorContent, _theme,
+                    (selected ? "[x] " : "[  ] ") + captured.Label,
+                    () => Click(() =>
+                    {
+                        var selections = focused.Enhancements
+                            .Where(selection => selection != null &&
+                                !string.Equals(selection.EnhancementId,
+                                    captured.EnhancementId,
+                                    StringComparison.Ordinal))
+                            .ToList();
+                        if (!selected)
+                            selections.Add(
+                                new Domain.Authoring.AuthoredEnhancementSelection(
+                                    captured.EnhancementId, true, null));
+                        ApplyFocusedEdit(
+                            focused.WithEnhancementSelections(selections));
+                    }));
+                KingmakerUiFactory.AddLayout(RectOf(toggle), 30f);
+            }
+            if (view.FocusedEnhancements.Count == 0)
+            {
+                Text none = KingmakerUiFactory.CreateText(
+                    "NoFocusedEnhancement", _inspectorContent, _theme,
+                    "None available for this casting's caster and ability.",
+                    13, TextAnchor.MiddleLeft);
+                none.color = _theme.MutedBrownText;
+                KingmakerUiFactory.AddLayout(none.rectTransform, 26f);
             }
             AddInspectorCaption("Casting state");
             Button disable = KingmakerUiFactory.CreateButton(
@@ -495,6 +620,33 @@ namespace KingmakerBuffPlanner.UI
                     RefreshView();
                 }));
             KingmakerUiFactory.AddLayout(RectOf(remove), 30f);
+            AddDoneButton();
+        }
+
+        // Explicit nondestructive return to next-casting authoring (review
+        // G1): the canonical focus command, without deleting the record or
+        // recreating the session.
+        private void AddDoneButton()
+        {
+            Button done = KingmakerUiFactory.CreateButton(
+                "DoneEditing", _inspectorContent, _theme,
+                "Done — back to next casting", () => Click(() =>
+                {
+                    _session.FocusCasting(null);
+                    RefreshView();
+                }));
+            KingmakerUiFactory.AddLayout(RectOf(done), 34f);
+        }
+
+        // A denied operation must explain itself, not silently redraw the
+        // unchanged screen (review G2).
+        private void SurfaceRefusal(AuthoringEditResult result, string action)
+        {
+            if (result != null && !result.Applied)
+                _footerResult.text = action + " refused: " + result.Reason;
+            else if (result != null && result.Applied &&
+                !string.IsNullOrEmpty(result.Reason))
+                _footerResult.text = action + ": " + result.Reason;
         }
 
         private void ApplyFocusedEdit(Domain.Authoring.PlannedCasting replacement)
@@ -573,14 +725,14 @@ namespace KingmakerBuffPlanner.UI
                 {
                     // One coherent shape operation: the session command
                     // clears/rebuilds the incompatible fields (review F3).
-                    if (direct)
-                        _session.SetDraftTargeting(
+                    AuthoringEditResult result = direct
+                        ? _session.SetDraftTargeting(
                             Domain.Authoring.CastingTargetMode.CasterCenteredOrigin,
-                            null, null, null);
-                    else
-                        _session.SetDraftTargeting(
+                            null, null, null)
+                        : _session.SetDraftTargeting(
                             Domain.Authoring.CastingTargetMode.DirectTarget,
                             draft.DirectTargetUnitId, null, null);
+                    SurfaceRefusal(result, "mode");
                     RefreshView();
                 }));
             KingmakerUiFactory.AddLayout(RectOf(mode), 30f);
@@ -613,9 +765,10 @@ namespace KingmakerBuffPlanner.UI
                         ? "[x] Origin: caster" : "[  ] Origin: caster",
                     () => Click(() =>
                     {
-                        _session.SetDraftTargeting(
+                        AuthoringEditResult result = _session.SetDraftTargeting(
                             Domain.Authoring.CastingTargetMode.CasterCenteredOrigin,
                             null, null, null);
+                        SurfaceRefusal(result, "origin");
                         RefreshView();
                     }));
                 KingmakerUiFactory.AddLayout(RectOf(casterOrigin), 30f);
@@ -629,9 +782,74 @@ namespace KingmakerBuffPlanner.UI
                             "Origin: " + captured.AnchorUnitId,
                         () => Click(() =>
                         {
-                            _session.SetDraftTargeting(
+                            AuthoringEditResult result = _session.SetDraftTargeting(
                                 Domain.Authoring.CastingTargetMode.AnchoredOrigin,
-                                null, captured.AnchorUnitId, null);
+                                null, captured.AnchorUnitId,
+                                _session.Draft.RequiredCoverageUnitIds);
+                            SurfaceRefusal(result, "origin");
+                            RefreshView();
+                        }));
+                    KingmakerUiFactory.AddLayout(RectOf(pick), 30f);
+                }
+                AddInspectorCaption("Required coverage (intended recipients)");
+                foreach (WorkspaceTargetOption target in draft.Targets)
+                {
+                    WorkspaceTargetOption captured = target;
+                    bool covered = _session.Draft.RequiredCoverageUnitIds
+                        .Contains(captured.UnitId);
+                    Button toggle = KingmakerUiFactory.CreateButton(
+                        "DraftCoverage." + captured.UnitId, _inspectorContent,
+                        _theme,
+                        (covered ? "[x] " : "[  ] ") + captured.DisplayName,
+                        () => Click(() =>
+                        {
+                            var coverage = _session.Draft
+                                .RequiredCoverageUnitIds
+                                .Where(unitId => !string.Equals(unitId,
+                                    captured.UnitId, StringComparison.Ordinal))
+                                .ToList();
+                            if (!covered) coverage.Add(captured.UnitId);
+                            AuthoringEditResult result = _session
+                                .SetDraftTargeting(
+                                    Domain.Authoring.CastingTargetMode.AnchoredOrigin,
+                                    null,
+                                    string.IsNullOrEmpty(draft.OriginAnchorUnitId)
+                                        ? null : draft.OriginAnchorUnitId,
+                                    coverage);
+                            SurfaceRefusal(result, "coverage");
+                            RefreshView();
+                        }));
+                    KingmakerUiFactory.AddLayout(RectOf(toggle), 30f);
+                }
+                AddInspectorCaption("Switch back to single target");
+                if (!string.IsNullOrEmpty(draft.RememberedDirectTargetUnitId))
+                {
+                    Button restore = KingmakerUiFactory.CreateButton(
+                        "Mode.Restore", _inspectorContent, _theme,
+                        "Restore recipient: " + draft.RememberedDirectTargetUnitId,
+                        () => Click(() =>
+                        {
+                            AuthoringEditResult result = _session.SetDraftTargeting(
+                                Domain.Authoring.CastingTargetMode.DirectTarget,
+                                null, null, null);
+                            SurfaceRefusal(result, "mode");
+                            RefreshView();
+                        }));
+                    KingmakerUiFactory.AddLayout(RectOf(restore), 30f);
+                }
+                foreach (WorkspaceTargetOption target in draft.Targets)
+                {
+                    WorkspaceTargetOption captured = target;
+                    Button pick = KingmakerUiFactory.CreateButton(
+                        "Mode.PickReturn." + captured.UnitId, _inspectorContent,
+                        _theme,
+                        "Single target on " + captured.DisplayName,
+                        () => Click(() =>
+                        {
+                            AuthoringEditResult result = _session.SetDraftTargeting(
+                                Domain.Authoring.CastingTargetMode.DirectTarget,
+                                captured.UnitId, null, null);
+                            SurfaceRefusal(result, "mode");
                             RefreshView();
                         }));
                     KingmakerUiFactory.AddLayout(RectOf(pick), 30f);

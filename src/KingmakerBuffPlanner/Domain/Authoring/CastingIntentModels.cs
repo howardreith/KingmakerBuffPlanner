@@ -207,6 +207,22 @@ namespace KingmakerBuffPlanner.Domain.Authoring
                 State, Provenance);
         }
 
+        // Targeting-shape edit clone: mode, direct recipient, origin, and
+        // required coverage change together so the replacement always
+        // satisfies ValidateTargetModeShape (review G2).
+        public PlannedCasting WithTargeting(
+            CastingTargetMode mode,
+            string directTargetUnitId,
+            CastingOrigin origin,
+            IEnumerable<string> requiredCoverageUnitIds)
+        {
+            return new PlannedCasting(CastingId, RoutineId, Order, SourceId,
+                Ability, CasterUnitId, SpellbookGuid, mode, directTargetUnitId,
+                origin, requiredCoverageUnitIds, TargetingModifiers,
+                Enhancements, ExistingEffectPolicy, IgnoredPresenceMarkers,
+                State, Provenance);
+        }
+
         public PlannedCasting WithEnhancementSelections(
             IEnumerable<AuthoredEnhancementSelection> selections)
         {
