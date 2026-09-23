@@ -653,9 +653,12 @@ namespace KingmakerBuffPlanner.UI
             }
         }
 
-        private WorkspaceDraftView BuildDraftView(
-            CastingWorkspaceInputs inputs, string selectedSource,
-            List<WorkspaceCasterRow> casters)
+        // The buff grid's sources in the order a player reads them:
+        // alphabetical by display name, then the disambiguating detail, then
+        // the source id (the classic catalogue's order; the id order looked
+        // arbitrary in live frame casting-ws-qual-20260923-r1-01).
+        private List<WorkspaceSourceOption> BuildSourceOptions(
+            CastingWorkspaceInputs inputs, string selectedSource)
         {
             var sources = new List<WorkspaceSourceOption>();
             if (inputs.EffectsBySource != null && inputs.ProviderOptions != null)
@@ -736,6 +739,15 @@ namespace KingmakerBuffPlanner.UI
                         kinds[descriptor.SourceId]));
                 }
             }
+            return WorkspaceSourceLabels.GridOrder(sources);
+        }
+
+        private WorkspaceDraftView BuildDraftView(
+            CastingWorkspaceInputs inputs, string selectedSource,
+            List<WorkspaceCasterRow> casters)
+        {
+            List<WorkspaceSourceOption> sources = inputs == null
+                ? new List<WorkspaceSourceOption>() : BuildSourceOptions(inputs, selectedSource);
             string draftSource = string.IsNullOrEmpty(Draft.SourceId)
                 ? selectedSource : Draft.SourceId;
             string draftCaster = Draft.CasterUnitId ?? SelectedCasterUnitId;
@@ -1471,10 +1483,13 @@ namespace KingmakerBuffPlanner.UI
             PlannedCasting first = _authoring.Document.Castings.FirstOrDefault();
             if (first != null) return first.SourceId;
             // With nothing authored, the initial selection is the first
-            // discovered catalogue source, not a blank buff list (review C1).
+            // buff of the grid (alphabetical), not a blank buff list (review
+            // C1).
             if (inputs == null || inputs.ProviderOptions == null ||
                 inputs.EffectsBySource == null || inputs.ProviderOptions.Count == 0)
                 return string.Empty;
+            WorkspaceSourceOption firstShown = BuildSourceOptions(inputs, null).FirstOrDefault();
+            if (firstShown != null) return firstShown.SourceId;
             ProviderPlanningOption firstOption = inputs.ProviderOptions
                 .Where(value => value != null && value.Provider != null)
                 .OrderBy(value => value.Provider.Key.Canonical, StringComparer.Ordinal)

@@ -491,6 +491,18 @@ namespace KingmakerBuffPlanner.UI
     // only as a last resort an ordinal. Unique names get no detail.
     public static class WorkspaceSourceLabels
     {
+        // The grid's order: alphabetical by display name, then the
+        // disambiguating detail, then the source id (deterministic).
+        internal static List<WorkspaceSourceOption> GridOrder(IEnumerable<WorkspaceSourceOption> sources)
+        {
+            return (sources ?? new WorkspaceSourceOption[0])
+                .Where(value => value != null)
+                .OrderBy(value => value.DisplayName, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(value => value.Detail, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(value => value.SourceId, StringComparer.Ordinal)
+                .ToList();
+        }
+
         // The grid's source-type tabs, with the classic catalogue's
         // meaning: Spells = a spellbook provider; Abilities = an ability
         // resource or a feature; Other = anything else (items). A buff
