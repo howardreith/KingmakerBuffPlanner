@@ -1,6 +1,6 @@
 # Definition of Done Matrix
 
-## Casting-first migration — release buckets (updated 2026-09-23, live probe at `320a1b6`)
+## Casting-first migration — release buckets (updated 2026-09-23, live qualification at `d35b38f`)
 
 No percentage or date is claimed; green unit tests do not measure
 readiness. Evidence words mean exactly this:
@@ -28,16 +28,16 @@ readiness. Evidence words mean exactly this:
 | Capability | Status |
 | --- | --- |
 | Explicit projection with complete identity, refusal of unsupported contracts | implemented + stand-ins |
-| Zero-cost (Unlimited) native reservations | implemented + stand-ins; selection in-game (Resistance selected); **no cast** |
+| Zero-cost (Unlimited) native reservations | **in-game**: the probe and the zero-cost qualification cast Resistance with resources unchanged |
 | One-shot probe boundary, fresh observations, owned terminal cleanup | **in-game**: constructed, submitted once, disposed, cleaned up (two identified runs) |
 | First native cast (cantrip) | **in-game PASS**: `casting-probe-cast-20260923-p2-02` (`320a1b6`) confirmed a new Resistance instance, free, zero violations; the earlier run p1-01 exposed casting inside the open planner (fixed). Receipt `docs/evidence/casting-probe-20260923-receipt.md` |
 | Casting only while the world runs (Default mode, not paused, planner closed) | implemented + stand-ins; **in-game** for the probe (`worldRunningAtSubmit=True`) |
 | Paid-slot cast (finite resource) | not run; needs its own request after the cantrip |
-| Production dispatch and run host (one run, per-frame pump, one terminal for stop/deadline/area change/disable/unload/teardown) | implemented + stand-ins; locked to a refusing boundary in runtime-test sessions; **no cast** |
+| Production dispatch and run host (one run, per-frame pump, one terminal for stop/deadline/area change/disable/unload/teardown) | **in-game** for session Apply, the host and the real instant executor behind the qualification boundary (three runs: stop, complete, recast); area change, disable, unload and animated mode not in game |
 | Live existing-effect policy (weaker/expiring/unprovable never satisfied; active effect needs no slot) | implemented + stand-ins |
-| Per-routine review acceptance persisted across sessions; skip flips are harmless refreshes | implemented + stand-ins |
-| Multi-cast routine, halting after failure, interruption, reload | implemented + stand-ins (coordinator and host); not in-game |
-| Casting qualification `zero-cost-mixed` (automation fixture): stop, complete, repeat, reopen, recast, judged per step and stopped at the first failure | implemented + stand-ins; **not run** (needs the frozen probe first, the Gunslinger identity and an owner allowance) |
+| Per-routine review acceptance persisted across sessions; skip flips are harmless refreshes | **in-game**: the recast step ran from a session reopened from disk, authorized by the restored acceptance |
+| Multi-cast routine, halting after failure, interruption, reload | multi-cast routine, player stop and close/reopen **in-game** (zero-cost qualification); halting after a failed casting and save/reload stand-ins only |
+| Casting qualification `zero-cost-mixed` (automation fixture): stop, complete, repeat, reopen, recast, judged per step and stopped at the first failure | **in-game PASS**: `casting-qual-cast-20260923-q1-01` on `d35b38f`, zero violations; receipt `docs/evidence/casting-qual-20260923-receipt.md` |
 | Casting qualification `finite-direct-mixed` (advanced copy): exact prepared slots, spontaneous levels, mixed casters, metamagic | implemented + stand-ins (exact token and availability judging); **not run** (needs a `KBP_ADVANCED_SEED`, a passing inspection and an allowance) |
 | Group casts, anchored origin | implemented + stand-ins; not in-game |
 
@@ -49,7 +49,8 @@ readiness. Evidence words mean exactly this:
 | Unsupported features prominently disabled in the UI | implemented: cards show "cannot run in this version" (targeting modifiers, exact rod identity, required coverage outside the predicted area); Apply refuses them |
 | Deliberate activation path | implemented: UMM planner-mode setting, Classic by default; player guide `docs/CASTING-FIRST-PLAYER-GUIDE.md` |
 | Owner usability acceptance of the workspace | not accepted |
-| Source-type tabs, routine tabs with counts, per-card last-run outcome | implemented + stand-ins; not in-game (the live workspace scenario now exercises the tabs) |
+| Source-type tabs, routine tabs with counts, per-card last-run outcome | source tabs **in-game** (clicked by the live workspace run); routine tabs and last-run lines rendered in game frames; not accepted |
+| Player-facing resource names on cards and the budget footer | implemented + stand-ins (`48e46e3`, from the live frames) |
 | Install/rollback on a real installation | stand-ins only (K6/L4/L5 isolated fixtures; the planner-mode and review-state files are covered) |
 | Release packaging and publisher gates | existing tooling; not exercised for casting-first |
 

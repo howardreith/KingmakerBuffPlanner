@@ -16,6 +16,9 @@ frozen probe candidates `repo/KingmakerBuffPlanner-P1` (`7664f2f`) and
 | `2a443c3` | RC1 typed slot-token readings (native ids contain "\|"); RC2 a step casts only on a complete before-read |
 | `320a1b6` | Cast only while the world runs: the probe closes the planner and waits for Default mode, not paused; the production host and the qualification driver advance only then |
 | `1af543c` | RC3 `run-completion.json` gates advanced casting on whole-run success; RC4 per-casting recipients (three-unit parties qualify); roster evidence |
+| `d35b38f` | Probe receipt and review-index dispositions (frozen as the qualification candidate, worktree `repo/KingmakerBuffPlanner-Q1`) |
+| `f7726c9` | Advanced seed: the one missing input and its compatibility decision (`docs/ADVANCED-SEED-COMPATIBILITY.md`) |
+| `48e46e3` | Workspace text from the live frames: whose resource and what kind instead of pool keys, footer budget kept inside its third, routine display names on cards; qualification receipt |
 
 Live runs (all with verified Mods restoration and unchanged protected saves):
 
@@ -30,11 +33,22 @@ Live runs (all with verified Mods restoration and unchanged protected saves):
 P1 candidate by a script path error, never used, VOID notice beside it).
 Receipt: `docs/evidence/casting-probe-20260923-receipt.md`.
 
+Qualification on the frozen `d35b38f` (worktree `-Q1`):
+
+| Run | Result |
+| --- | --- |
+| `casting-qual-select-20260923-q1-01` | PASS: roster Hedwirg, Linzi, Tartuccio (no pets); Resistance by Linzi and Tartuccio, three forecast projection ids |
+| `casting-qual-cast-20260923-q1-01` | **PASS**: stop, complete, repeat and recast exactly as forecast; three approved submissions (6 planned casts of a 6 budget); recast from a session reopened from disk under the restored acceptance; every save unchanged, none created |
+| `casting-ws-qual-20260923-q1-01` | PASS, 91 assertions (non-casting workspace run; source tabs invoked). Its frames showed internal pool keys, the footer under the buttons and "in long": fixed in `48e46e3` |
+
+Receipt: `docs/evidence/casting-qual-20260923-receipt.md`.
+
 Remaining owner input: a designated `KBP_ADVANCED_SEED` (and, if that
 save was made under Gunslinger 0.0.136, the profile decision for it).
-Next: zero-cost qualification on a frozen candidate of `1af543c`
-(selection, allowance, run), the live workspace UI run, then the advanced
-copy once designated.
+Next: the live workspace run on `48e46e3` (worktree `-Q2`), a temporary
+guarded deployment of the actual release package with verified rollback
+(section 11), remaining section 10 UI work, then the advanced copy once
+designated.
 
 ## RC mission (2026-09-23): production execution integration and advanced-copy tooling (history)
 
