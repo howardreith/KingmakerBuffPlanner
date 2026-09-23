@@ -326,13 +326,16 @@ namespace KingmakerBuffPlanner.UI
             grid.startAxis = GridLayoutGroup.Axis.Horizontal;
             grid.childAlignment = TextAnchor.UpperLeft;
             RectTransform cards = KingmakerUiFactory.CreateRect("Cards", frame);
-            KingmakerUiFactory.SetAnchors(cards, 0f, 0.085f, 0.58f, 0.55f);
+            // Castings on the left page, inspector on the right page: the
+            // spine runs down the frame's center (live frame qual-215709
+            // showed the castings lane text crossing the gutter).
+            KingmakerUiFactory.SetAnchors(cards, 0f, 0.085f, 0.5f, 0.55f);
             cards.offsetMin = new Vector2(PageInset, 0f);
-            cards.offsetMax = new Vector2(-4f, 0f);
+            cards.offsetMax = new Vector2(-PageInset * 0.6f, 0f);
             _cardContent = BuildLanePanel(cards, "Castings", out _castingsTitle);
             RectTransform inspector = KingmakerUiFactory.CreateRect("Inspector", frame);
-            KingmakerUiFactory.SetAnchors(inspector, 0.58f, 0.085f, 1f, 0.55f);
-            inspector.offsetMin = new Vector2(4f, 0f);
+            KingmakerUiFactory.SetAnchors(inspector, 0.5f, 0.085f, 1f, 0.55f);
+            inspector.offsetMin = new Vector2(PageInset * 0.6f, 0f);
             inspector.offsetMax = new Vector2(-PageInset, 0f);
             Text inspectorTitle;
             _inspectorContent = BuildLanePanel(inspector, "Inspector", out inspectorTitle);
@@ -577,6 +580,14 @@ namespace KingmakerBuffPlanner.UI
             return button;
         }
 
+        private static string UnitName(WorkspaceView view, string unitId)
+        {
+            WorkspaceTargetOption match = view == null || view.Draft == null ? null :
+                view.Draft.Targets.FirstOrDefault(target => string.Equals(
+                    target.UnitId, unitId, StringComparison.Ordinal));
+            return match == null ? unitId : match.DisplayName;
+        }
+
         private RectTransform CreateTileRow(string name)
         {
             RectTransform row = KingmakerUiFactory.CreateRect(name, _inspectorContent);
@@ -742,14 +753,14 @@ namespace KingmakerBuffPlanner.UI
                 ? "Retarget (direct)" : "Group targeting");
             if (directRecord)
             {
+                RectTransform retargetRow = CreateTileRow("RetargetTiles");
                 foreach (WorkspaceTargetOption target in view.Draft.Targets)
                 {
                     WorkspaceTargetOption captured = target;
                     bool selected = string.Equals(focused.DirectTargetUnitId,
                         captured.UnitId, StringComparison.Ordinal);
-                    Button pick = KingmakerUiFactory.CreateButton(
-                        "Target." + captured.UnitId, _inspectorContent, _theme,
-                        (selected ? "[x] " : "[  ] ") + captured.DisplayName,
+                    CreatePortraitTile("Target." + captured.UnitId, retargetRow,
+                        captured.UnitId, captured.DisplayName, selected, Color.white,
                         () => Click(() =>
                         {
                             AuthoringEditResult result = _session
@@ -759,7 +770,6 @@ namespace KingmakerBuffPlanner.UI
                             SurfaceRefusal(result, "retarget");
                             RefreshView();
                         }));
-                    KingmakerUiFactory.AddLayout(RectOf(pick), 30f);
                 }
             }
             else
@@ -781,14 +791,14 @@ namespace KingmakerBuffPlanner.UI
                         RefreshView();
                     }));
                 KingmakerUiFactory.AddLayout(RectOf(casterOrigin), 30f);
+                RectTransform focusedOriginRow = CreateTileRow("FocusedOriginTiles");
                 foreach (WorkspaceOriginOption origin in view.FocusedOrigins)
                 {
                     WorkspaceOriginOption captured = origin;
-                    Button pick = KingmakerUiFactory.CreateButton(
-                        "FocusedOrigin." + captured.AnchorUnitId,
-                        _inspectorContent, _theme,
-                        (captured.Selected ? "[x] " : "[  ] ") +
-                            "Origin: " + captured.AnchorUnitId,
+                    CreatePortraitTile("FocusedOrigin." + captured.AnchorUnitId,
+                        focusedOriginRow, captured.AnchorUnitId,
+                        "Origin: " + UnitName(view, captured.AnchorUnitId),
+                        captured.Selected, Color.white,
                         () => Click(() =>
                         {
                             AuthoringEditResult result = _session
@@ -799,18 +809,17 @@ namespace KingmakerBuffPlanner.UI
                             SurfaceRefusal(result, "origin");
                             RefreshView();
                         }));
-                    KingmakerUiFactory.AddLayout(RectOf(pick), 30f);
                 }
                 AddInspectorCaption("Required coverage");
+                RectTransform focusedCoverageRow = CreateTileRow("FocusedCoverageTiles");
                 foreach (WorkspaceTargetOption target in view.Draft.Targets)
                 {
                     WorkspaceTargetOption captured = target;
                     bool covered = focused.RequiredCoverageUnitIds.Contains(
                         captured.UnitId);
-                    Button toggle = KingmakerUiFactory.CreateButton(
-                        "FocusedCoverage." + captured.UnitId,
-                        _inspectorContent, _theme,
-                        (covered ? "[x] " : "[  ] ") + captured.DisplayName,
+                    CreatePortraitTile("FocusedCoverage." + captured.UnitId,
+                        focusedCoverageRow, captured.UnitId, captured.DisplayName,
+                        covered, Color.white,
                         () => Click(() =>
                         {
                             var coverage = focused.RequiredCoverageUnitIds
@@ -828,7 +837,6 @@ namespace KingmakerBuffPlanner.UI
                             SurfaceRefusal(result, "coverage");
                             RefreshView();
                         }));
-                    KingmakerUiFactory.AddLayout(RectOf(toggle), 30f);
                 }
             }
             AddInspectorCaption("Enhancements (this casting)");
@@ -1048,14 +1056,14 @@ namespace KingmakerBuffPlanner.UI
                         RefreshView();
                     }));
                 KingmakerUiFactory.AddLayout(RectOf(casterOrigin), 30f);
+                RectTransform originRow = CreateTileRow("OriginTiles");
                 foreach (WorkspaceOriginOption origin in draft.Origins)
                 {
                     WorkspaceOriginOption captured = origin;
-                    Button pick = KingmakerUiFactory.CreateButton(
-                        "Origin." + captured.AnchorUnitId, _inspectorContent,
-                        _theme,
-                        (captured.Selected ? "[x] " : "[  ] ") +
-                            "Origin: " + captured.AnchorUnitId,
+                    CreatePortraitTile("Origin." + captured.AnchorUnitId, originRow,
+                        captured.AnchorUnitId,
+                        "Origin: " + UnitName(view, captured.AnchorUnitId),
+                        captured.Selected, Color.white,
                         () => Click(() =>
                         {
                             AuthoringEditResult result = _session.SetDraftTargeting(
@@ -1065,18 +1073,16 @@ namespace KingmakerBuffPlanner.UI
                             SurfaceRefusal(result, "origin");
                             RefreshView();
                         }));
-                    KingmakerUiFactory.AddLayout(RectOf(pick), 30f);
                 }
                 AddInspectorCaption("Required coverage (intended recipients)");
+                RectTransform coverageRow = CreateTileRow("CoverageTiles");
                 foreach (WorkspaceTargetOption target in draft.Targets)
                 {
                     WorkspaceTargetOption captured = target;
                     bool covered = _session.Draft.RequiredCoverageUnitIds
                         .Contains(captured.UnitId);
-                    Button toggle = KingmakerUiFactory.CreateButton(
-                        "DraftCoverage." + captured.UnitId, _inspectorContent,
-                        _theme,
-                        (covered ? "[x] " : "[  ] ") + captured.DisplayName,
+                    CreatePortraitTile("DraftCoverage." + captured.UnitId, coverageRow,
+                        captured.UnitId, captured.DisplayName, covered, Color.white,
                         () => Click(() =>
                         {
                             var coverage = _session.Draft
@@ -1096,7 +1102,6 @@ namespace KingmakerBuffPlanner.UI
                             SurfaceRefusal(result, "coverage");
                             RefreshView();
                         }));
-                    KingmakerUiFactory.AddLayout(RectOf(toggle), 30f);
                 }
                 AddInspectorCaption("Switch back to single target");
                 if (!string.IsNullOrEmpty(draft.RememberedDirectTargetUnitId))
