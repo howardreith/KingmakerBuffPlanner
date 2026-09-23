@@ -55,6 +55,7 @@ namespace KingmakerBuffPlanner.Tests
             Run("qualification-recipe-selection", TestQualificationRecipeSelection);
             Run("qualification-forecast-and-boundary", TestQualificationForecastAndBoundary);
             Run("qualification-driver-end-to-end", () => TestQualificationDriverEndToEnd(root));
+            Run("qualification-finite-recipe", () => TestFiniteQualificationRecipe(root));
             Run("qualification-driver-refusals-and-deadline",
                 () => TestQualificationDriverRefusalsAndDeadline(root));
             Run("qualification-scenario-requests", () => TestQualificationScenarioRequests(root));
@@ -1721,6 +1722,245 @@ namespace KingmakerBuffPlanner.Tests
             }
         }
 
+        // A finite world: a prepared caster (exact slot tokens) and a
+        // spontaneous caster (one level count), both casting the fixture
+        // buff by rule. Firing spends exactly the reservation of the step unless
+        // a failure shape says otherwise.
+        private sealed class FiniteBuffWorld : IInstantCastRuntimeAdapter,
+            ICastEnhancementRuntimeAdapter
+        {
+            internal readonly Dictionary<string, KeyValuePair<string, long>> Active =
+                new Dictionary<string, KeyValuePair<string, long>>(StringComparer.Ordinal);
+            internal readonly List<string> Fired = new List<string>();
+            internal readonly SortedDictionary<string, bool> Tokens = new SortedDictionary<string, bool>(
+                StringComparer.Ordinal) { { "tok-1", true }, { "tok-2", true }, { "tok-3", true } };
+            internal int SpontaneousRemaining = 1;
+            internal AbilityKey Ability = CastingBuffAbility;
+            internal string WrongTokenCasting;
+            internal bool NoSpend;
+            private int _instances;
+            private long _sequence;
+            public bool IsInCombat { get { return false; } }
+            public CastRuntimeValidation Validate(CastStep step) { return CastRuntimeValidation.Pass(); }
+            public CastEnhancementPreparation PrepareEnhancements(CastStep step)
+            { return CastEnhancementPreparation.Pass(null); }
+            public InstantCastResult Fire(CastStep step)
+            {
+                Fired.Add(step.AssignmentId);
+                Active[step.TargetUnitIds[0]] = new KeyValuePair<string, long>("i" + (++_instances), 600);
+                bool spent = false;
+                if (!NoSpend && !step.Reservation.Unlimited)
+                {
+                    if (step.Reservation.TokenIds.Count != 0)
+                    {
+                        List<string> spend = step.AssignmentId == WrongTokenCasting
+                            ? Tokens.Keys.Where(key => Tokens[key] &&
+                                !step.Reservation.TokenIds.Contains(key)).Take(1).ToList()
+                            : step.Reservation.TokenIds.ToList();
+                        foreach (string token in spend) Tokens[token] = false;
+                    }
+                    else SpontaneousRemaining -= step.Reservation.Units;
+                    spent = true;
+                }
+                return new InstantCastResult(true, true, true, spent, "simulated");
+            }
+            public bool EffectsObserved(CastStep step) { return Active.ContainsKey(step.TargetUnitIds[0]); }
+            public InstantCastCompletion InspectCompletion(CastStep step)
+            { return InstantCastCompletion.Settled("simulated-settled"); }
+            public InstantCastCompletion Cleanup(CastStep step)
+            { return InstantCastCompletion.Settled("simulated-clean"); }
+
+            internal ActiveEffectSnapshot Live()
+            {
+                return LiveEffects(Active.Select(pair => On(pair.Key, "buff-effect", 100, null, 0)).ToArray());
+            }
+
+            internal ProbeObservation Observe(CastStep step, string label)
+            {
+                KeyValuePair<string, long> instance;
+                string target = step.TargetUnitIds[0];
+                var instances = Active.TryGetValue(target, out instance)
+                    ? new[] { new ProbeEffectInstance("buff-effect", instance.Key, instance.Value) }
+                    : new ProbeEffectInstance[0];
+                bool prepared = step.Reservation.TokenIds.Count != 0;
+                int available = prepared ? Tokens.Count(pair => pair.Value) : SpontaneousRemaining;
+                Dictionary<string, bool> reserved = prepared
+                    ? step.Reservation.TokenIds.ToDictionary(id => id, id => Tokens[id], StringComparer.Ordinal)
+                    : null;
+                return ProbeObservation.Read(label, ++_sequence, DateTime.UtcNow, target, available,
+                    instances, reserved);
+            }
+
+            internal CastingWorkspaceInputs Inputs()
+            {
+                string[] others = { "unit-t1", "unit-t2", "unit-t3", "unit-t4" };
+                List<string> all = new[] { "unit-sorcerer", "unit-wizard" }.Concat(others).ToList();
+                List<UnitSnapshot> units = all.Select(id => new UnitSnapshot(id, id, false, string.Empty,
+                    new TargetValidationSnapshot(true, true, true, true))).ToList();
+                var wizard = new ProviderSnapshot(new ProviderKey("unit-wizard", "book-wizard",
+                    Ability, "level-2"), Ability.BaseAbilityGuid, 2,
+                    "pool-unit-wizard", 1, Tokens.Keys);
+                var sorcerer = new ProviderSnapshot(new ProviderKey("unit-sorcerer", "book-sorcerer",
+                    Ability, "level-2"), Ability.BaseAbilityGuid, 2,
+                    "pool-unit-sorcerer", 1, null);
+                var pools = new[]
+                {
+                    new ResourcePoolSnapshot("pool-unit-wizard", ResourcePoolKind.PreparedSlots, 3,
+                        Tokens.Count(pair => pair.Value), Tokens.Select(pair => new ResourceTokenSnapshot(
+                            pair.Key, Ability, 2, PreparedSlotKind.Common, pair.Value, true, null))),
+                    new ResourcePoolSnapshot("pool-unit-sorcerer", ResourcePoolKind.SpontaneousLevel, 3,
+                        SpontaneousRemaining, null)
+                };
+                var options = new[] { wizard, sorcerer }.Select(provider => new ProviderPlanningOption(
+                    provider, all, new[] { provider.Key.CasterUnitId }, 10, 100,
+                    CastExecutionStrategy.DirectRuleCast, "fixture-direct",
+                    new Dictionary<string, IEnumerable<string>>(StringComparer.Ordinal))).ToList();
+                return new CastingWorkspaceInputs(new PartyProviderSnapshot(units,
+                        new[] { wizard, sorcerer }, pools), options,
+                    CastingEffectsWithAbilityAlias("source-bulls", "source-communal", Ability),
+                    new CastEnhancementSnapshot[0], null, Live());
+            }
+        }
+        private static CastingQualificationAllowance FiniteAllowance(FiniteBuffWorld world, int maximum = 4)
+        {
+            CastingWorkspaceInputs inputs = world.Inputs();
+            CastingQualificationSelection selection =
+                CastingQualificationRecipe.SelectFiniteDirectMixed(inputs, "fixture-campaign");
+            IReadOnlyList<CastingQualificationStepForecast> forecast =
+                CastingQualificationForecast.Forecast(selection, inputs, "fixture-campaign");
+            string refusal;
+            return CastingQualificationAllowance.Parse(QualificationAllowanceJson(o =>
+            {
+                o["fixtureGameId"] = "fixture-campaign";
+                o["recipe"] = CastingQualificationRecipe.FiniteDirectMixed;
+                o["approvedProjectionIds"] = new JArray(forecast.Select(step => (object)step.ProjectionId).ToArray());
+                o["maximumNativeSubmissions"] = maximum;
+            }), "qual-run-1", out refusal);
+        }
+
+        private static CastingQualificationDriver NewFiniteDriver(string dir, FiniteBuffWorld world,
+            CastingQualificationRecord record, CastingQualificationAllowance allowance, Func<long> clock,
+            string recipe = null)
+        {
+            Directory.CreateDirectory(dir);
+            var host = new CastingExecutionHost(settings => new InstantCastExecutor(world, true), clock);
+            return new CastingQualificationDriver(record, allowance, "fixture-campaign", world.Inputs,
+                boundary => new CastingWorkspaceSession(dir, "fixture-campaign", boundary),
+                host, world.Observe, clock, 240000, recipe);
+        }
+
+        // The finite-direct-mixed recipe: a prepared caster with exact slot
+        // tokens and a spontaneous caster. The forecast spends exactly what
+        // each step reserves (the recast takes the NEXT prepared token), and
+        // the judged run checks availability and the exact tokens per step,
+        // stopping at the first wrong one.
+        private static void TestFiniteQualificationRecipe(string root)
+        {
+            var world = new FiniteBuffWorld();
+            CastingWorkspaceInputs inputs = world.Inputs();
+            CastingQualificationSelection selection =
+                CastingQualificationRecipe.SelectFiniteDirectMixed(inputs, "fixture-campaign");
+            if (!selection.Selected || selection.Recipe != CastingQualificationRecipe.FiniteDirectMixed ||
+                selection.Castings.Count != 2 ||
+                selection.Castings[0].CasterUnitId != "unit-wizard" ||
+                selection.Castings[1].CasterUnitId != "unit-sorcerer" ||
+                selection.Castings[0].DirectTargetUnitId != "unit-t1" ||
+                selection.Castings[1].DirectTargetUnitId != "unit-t2" ||
+                !selection.Coverage.SequenceEqual(new[] { "prepared", "spontaneous", "mixed-caster" }))
+                throw new InvalidOperationException("The finite selection was wrong: " + selection.Refusal +
+                    " " + string.Join(",", selection.Castings.Select(casting => casting.CastingId + "=" +
+                        casting.CasterUnitId + ">" + casting.DirectTargetUnitId).ToArray()) +
+                    " coverage=" + string.Join(",", selection.Coverage.ToArray()));
+            IReadOnlyList<CastingQualificationStepForecast> forecast =
+                CastingQualificationForecast.Forecast(selection, inputs, "fixture-campaign");
+            if (forecast.Count != 3 || forecast.Any(step => step.ProjectionId == null) ||
+                !forecast[0].Projection.Plan.Steps[0].Reservation.TokenIds.SequenceEqual(new[] { "tok-1" }) ||
+                !forecast[1].CastingIds.SequenceEqual(new[] { "qual-cast-2" }) ||
+                forecast[1].Projection.Plan.Steps[0].Reservation.Units != 1 ||
+                !forecast[2].CastingIds.SequenceEqual(new[] { "qual-cast-1" }) ||
+                !forecast[2].Projection.Plan.Steps[0].Reservation.TokenIds.SequenceEqual(new[] { "tok-2" }))
+                throw new InvalidOperationException("The finite forecast did not spend exactly: " +
+                    string.Join(" | ", forecast.Select(step => step.Name + ":" + (step.Refusal ??
+                        string.Join(",", step.CastingIds.ToArray()))).ToArray()));
+            var poor = new FiniteBuffWorld();
+            poor.Tokens["tok-2"] = false;
+            poor.Tokens["tok-3"] = false;
+            CastingQualificationSelection refused =
+                CastingQualificationRecipe.SelectFiniteDirectMixed(poor.Inputs(), "fixture-campaign");
+            if (refused.Selected || !refused.Rejections.Any(value => value.EndsWith(
+                    "|no-caster-pair-with-casts:2+1", StringComparison.Ordinal)))
+                throw new InvalidOperationException("A party without two casts for one caster was selected.");
+            if (CastingQualificationRecipe.SelectFiniteDirectMixed(QualificationInputs(true, true, null),
+                    "fixture-campaign").Selected)
+                throw new InvalidOperationException("Verified-free pools satisfied the finite recipe.");
+            // A metamagic variant (Extend): the forecast grants the effect
+            // WITH that metamagic, so the complete step still skips the
+            // first casting instead of recasting it as "missing Extend".
+            var extended = new FiniteBuffWorld
+            {
+                Ability = new AbilityKey(CastingBuffAbility.BaseAbilityGuid, CastingBuffAbility.VariantGuid,
+                    8, SourceKind.Spellbook, null)
+            };
+            CastingWorkspaceInputs extendedInputs = extended.Inputs();
+            CastingQualificationSelection extendedSelection =
+                CastingQualificationRecipe.SelectFiniteDirectMixed(extendedInputs, "fixture-campaign");
+            IReadOnlyList<CastingQualificationStepForecast> extendedForecast = !extendedSelection.Selected ? null
+                : CastingQualificationForecast.Forecast(extendedSelection, extendedInputs, "fixture-campaign");
+            if (extendedForecast == null || !extendedSelection.Coverage.Contains("metamagic") ||
+                !extendedForecast[1].CastingIds.SequenceEqual(new[] { "qual-cast-2" }) ||
+                !extendedForecast[2].CastingIds.SequenceEqual(new[] { "qual-cast-1" }))
+                throw new InvalidOperationException("The metamagic forecast was wrong: " + extendedSelection.Refusal +
+                    (extendedForecast == null ? string.Empty : " " + string.Join(" | ", extendedForecast
+                        .Select(step => step.Name + ":" + (step.Refusal ??
+                            string.Join(",", step.CastingIds.ToArray()))).ToArray())));
+            long now = 0;
+            var run = new FiniteBuffWorld();
+            var record = new CastingQualificationRecord { CastingScenario = true, AllowanceStatus = "parsed" };
+            CastingQualificationDriver driver = NewFiniteDriver(Path.Combine(root, "qualification-finite"),
+                run, record, FiniteAllowance(run), () => now);
+            for (int i = 0; i < 2000 && !driver.Completed; i++) driver.Update();
+            if (record.Violations().Count != 0 || record.TerminalReason != "completed" ||
+                !run.Fired.SequenceEqual(new[] { "qual-cast-1", "qual-cast-2", "qual-cast-1" }) ||
+                run.Tokens["tok-1"] || run.Tokens["tok-2"] || !run.Tokens["tok-3"] ||
+                run.SpontaneousRemaining != 0 ||
+                !record.Step("recast").Tokens.Contains("qual-cast-1:tok-2=T>F") ||
+                !record.Step("complete").Availability.Contains("qual-cast-2:1>0"))
+                throw new InvalidOperationException("The finite run was not accepted exactly: " +
+                    string.Join("|", record.Violations().ToArray()) + " fired=" +
+                    string.Join(",", run.Fired.ToArray()));
+            foreach (string shape in new[] { "wrong-token", "no-spend" })
+            {
+                var bad = new FiniteBuffWorld();
+                CastingQualificationAllowance allowance = FiniteAllowance(bad);
+                if (shape == "wrong-token") bad.WrongTokenCasting = "qual-cast-1";
+                else bad.NoSpend = true;
+                var badRecord = new CastingQualificationRecord { CastingScenario = true, AllowanceStatus = "parsed" };
+                CastingQualificationDriver badDriver = NewFiniteDriver(
+                    Path.Combine(root, "qualification-finite-" + shape), bad, badRecord, allowance, () => now);
+                for (int i = 0; i < 2000 && !badDriver.Completed; i++) badDriver.Update();
+                string expected = shape == "wrong-token" ? "stop-wait:step:tokens:qual-cast-1:tok-1=T>T"
+                    : "stop-wait:step:resource:qual-cast-1:3>3:expected-spend=1";
+                if (!bad.Fired.SequenceEqual(new[] { "qual-cast-1" }) ||
+                    !badRecord.Failures.Contains(expected))
+                    throw new InvalidOperationException("The " + shape + " shape was not stopped at the stop step: " +
+                        string.Join("|", badRecord.Failures.ToArray()) + " fired=" +
+                        string.Join(",", bad.Fired.ToArray()));
+            }
+            var mismatched = new FiniteBuffWorld();
+            var mismatchedRecord = new CastingQualificationRecord { CastingScenario = true, AllowanceStatus = "parsed" };
+            CastingQualificationDriver mismatchedDriver = NewFiniteDriver(
+                Path.Combine(root, "qualification-finite-recipe-mismatch"), mismatched, mismatchedRecord,
+                FiniteAllowance(mismatched), () => now, CastingQualificationRecipe.ZeroCostMixed);
+            for (int i = 0; i < 20 && !mismatchedDriver.Completed; i++) mismatchedDriver.Update();
+            if (mismatched.Fired.Count != 0 || mismatchedRecord.AllowanceStatus != "recipe-differs-from-request")
+                throw new InvalidOperationException("A recipe different from the allowance ran.");
+            string unknownRefusal;
+            if (CastingQualificationAllowance.Parse(QualificationAllowanceJson(o => o["recipe"] = "improvised"),
+                    "qual-run-1", out unknownRefusal) != null || unknownRefusal != "allowance-recipe-unknown")
+                throw new InvalidOperationException("An unknown recipe was accepted.");
+        }
+
+
         private static CastingQualificationDriver NewQualificationDriver(string dir,
             SimulatedBuffWorld world, CastingQualificationRecord record,
             CastingQualificationAllowance allowance, Func<long> clock)
@@ -1920,18 +2160,37 @@ namespace KingmakerBuffPlanner.Tests
                     if (allowance) parameters["qualificationAllowance"] = "{}";
                     o["parameters"] = parameters;
                 };
+            Func<Action<Dictionary<string, object>>, string, Action<Dictionary<string, object>>> recipe =
+                (inner, name) => o =>
+                {
+                    inner(o);
+                    ((Dictionary<string, object>)o["parameters"])["qualificationRecipe"] = name;
+                };
             var accepted = new Dictionary<string, Action<Dictionary<string, object>>>
             {
                 { "select", set("live-cast-qual-select", "KBP_AUTOMATION", false, "instant") },
                 { "cast-without-allowance", set("live-cast-qual", "KBP_AUTOMATION", false, "instant") },
-                { "cast-with-allowance", set("live-cast-qual", "KBP_AUTOMATION", true, "instant") }
+                { "cast-with-allowance", set("live-cast-qual", "KBP_AUTOMATION", true, "instant") },
+                // The advanced copy: selection (non-casting), and a casting
+                // qualification only with its run-bound allowance.
+                { "advanced-select", set("live-cast-qual-select", "KBP_ADVANCED", false, "instant") },
+                { "advanced-cast-with-allowance", set("live-cast-qual", "KBP_ADVANCED", true, "instant") },
+                { "select-finite-recipe", recipe(set("live-cast-qual-select", "KBP_ADVANCED", false, "instant"),
+                    "finite-direct-mixed") },
+                { "cast-zero-cost-recipe", recipe(set("live-cast-qual", "KBP_AUTOMATION", true, "instant"),
+                    "zero-cost-mixed") }
             };
             var refused = new Dictionary<string, Action<Dictionary<string, object>>>
             {
                 { "select-with-allowance", set("live-cast-qual-select", "KBP_AUTOMATION", true, "instant") },
                 { "animated", set("live-cast-qual", "KBP_AUTOMATION", true, "animated") },
-                { "advanced-family", set("live-cast-qual", "KBP_ADVANCED", true, "instant") },
-                { "allowance-on-workspace", set("live-workspace-qual", "KBP_AUTOMATION", true, "instant") }
+                { "advanced-cast-without-allowance", set("live-cast-qual", "KBP_ADVANCED", false, "instant") },
+                { "advanced-probe", set("live-cast-probe-select", "KBP_ADVANCED", false, "instant") },
+                { "allowance-on-workspace", set("live-workspace-qual", "KBP_AUTOMATION", true, "instant") },
+                { "unknown-recipe", recipe(set("live-cast-qual-select", "KBP_AUTOMATION", false, "instant"),
+                    "improvised") },
+                { "recipe-on-workspace", recipe(set("live-workspace-qual", "KBP_AUTOMATION", false, "instant"),
+                    "zero-cost-mixed") }
             };
             string rejection;
             foreach (KeyValuePair<string, Action<Dictionary<string, object>>> item in accepted)

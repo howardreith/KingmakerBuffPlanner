@@ -291,4 +291,20 @@ foreach ($case in $qualificationBindingCases.Keys) {
         -RunId 'qual-bind-test' -BuildManifest $manifestFixture
     if ($refusal -cne $case) { throw "Qualification binding case $case returned '$refusal'." }
 }
-Write-Host 'Launcher -File WhatIf purity: PASS=11 FAIL=0'
+# The finite recipe binds; a recipe named on the launcher must match.
+$finiteJson = New-QualificationFixtureJson @{ recipe = 'finite-direct-mixed' }
+if ($null -ne (Get-KbpQualificationAllowanceBuildRefusal -AllowanceJson $finiteJson -RunId 'qual-bind-test' `
+        -BuildManifest $manifestFixture -Recipe 'finite-direct-mixed') -or
+    (Get-KbpQualificationAllowanceBuildRefusal -AllowanceJson $finiteJson -RunId 'qual-bind-test' `
+        -BuildManifest $manifestFixture -Recipe 'zero-cost-mixed') -cne 'recipe-differs') {
+    throw 'The qualification recipe binding is wrong.'
+}
+$ErrorActionPreference = 'Continue'
+$recipeOutput = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $launcher -Scenario live-cast-probe-select `
+    -QualificationRecipe finite-direct-mixed -WhatIf 2>&1)
+$recipeExit = $LASTEXITCODE
+$ErrorActionPreference = 'Stop'
+if ($recipeExit -eq 0 -or -not (@($recipeOutput | Where-Object { "$_" -like '*only valid with -Scenario live-cast-qual-select*' }).Count -ge 1)) {
+    throw "A qualification recipe on another scenario was not refused: $($recipeOutput -join ' ')"
+}
+Write-Host 'Launcher -File WhatIf purity: PASS=12 FAIL=0'

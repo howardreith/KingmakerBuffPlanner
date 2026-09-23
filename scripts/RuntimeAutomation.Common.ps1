@@ -613,7 +613,9 @@ function Get-KbpProbeAllowanceBuildRefusal {
 # submission budget. The host re-parses it strictly and re-measures the
 # loaded identity; the forecast projections are checked in game.
 function Get-KbpQualificationAllowanceBuildRefusal {
-    param([string]$AllowanceJson, [string]$RunId, $BuildManifest)
+    # -Recipe (optional): the recipe the launcher was asked for; the
+    # allowance must name the same one.
+    param([string]$AllowanceJson, [string]$RunId, $BuildManifest, [string]$Recipe)
     try { $allowance = $AllowanceJson | ConvertFrom-Json }
     catch { return 'unreadable' }
     if ($null -eq $allowance) { return 'unreadable' }
@@ -629,7 +631,8 @@ function Get-KbpQualificationAllowanceBuildRefusal {
     if ([string]$allowance.packageSha256 -cne [string]$BuildManifest.packageSha256) { return 'package' }
     if ([string]$allowance.dllSha256 -cne [string]$BuildManifest.dllSha256) { return 'dll' }
     if ([string]$allowance.assemblyMvid -cne [string]$BuildManifest.assemblyMvid) { return 'mvid' }
-    if ([string]$allowance.recipe -cne 'zero-cost-mixed') { return 'recipe' }
+    if (@('zero-cost-mixed', 'finite-direct-mixed') -cnotcontains [string]$allowance.recipe) { return 'recipe' }
+    if (-not [string]::IsNullOrEmpty($Recipe) -and [string]$allowance.recipe -cne $Recipe) { return 'recipe-differs' }
     if (-not ($allowance.maximumNativeSubmissions -is [int] -or $allowance.maximumNativeSubmissions -is [long]) -or
         [int]$allowance.maximumNativeSubmissions -lt 1 -or [int]$allowance.maximumNativeSubmissions -gt 24) {
         return 'submissions'
@@ -677,4 +680,38 @@ function Assert-KbpAdvancedFixtureBinding {
         throw 'The advanced save pair does not match its bootstrap manifest (baseline bytes, file names or campaign).'
     }
     return $record
+}
+
+# Mission section 9: nothing casts on the advanced copy before a
+# non-casting inspection of the SAME bound pair has passed. Returns the
+# run id of such an inspection; throws when there is none.
+function Assert-KbpAdvancedInspectionPassed {
+    param([Parameter(Mandatory = $true)]$Binding, [string]$EvidenceRoot)
+    if ([string]::IsNullOrWhiteSpace($EvidenceRoot)) { $EvidenceRoot = $script:KbpRuntimeEvidenceRoot }
+    $bindingManifest = [string]$Binding.manifestPath
+    foreach ($directory in @(Get-ChildItem -LiteralPath $EvidenceRoot -Directory -ErrorAction SilentlyContinue |
+            Sort-Object Name)) {
+        $orchestrationPath = Join-Path $directory.FullName 'orchestration.json'
+        $resultPath = Join-Path $directory.FullName 'runtime-result.json'
+        if (-not (Test-Path -LiteralPath $orchestrationPath -PathType Leaf) -or
+            -not (Test-Path -LiteralPath $resultPath -PathType Leaf)) { continue }
+        try {
+            $orchestration = Read-KbpJson $orchestrationPath
+            $result = Read-KbpJson $resultPath
+        }
+        catch { continue }
+        $names = @($orchestration.PSObject.Properties | ForEach-Object Name)
+        $resultNames = @($result.PSObject.Properties | ForEach-Object Name)
+        if ($names -cnotcontains 'scenario' -or $names -cnotcontains 'fixtureFamily' -or
+            $names -cnotcontains 'advancedBindingManifest' -or $names -cnotcontains 'runId' -or
+            $resultNames -cnotcontains 'status' -or $resultNames -cnotcontains 'runId') { continue }
+        if ([string]$orchestration.scenario -ceq 'live-advanced-inspect' -and
+            [string]$orchestration.fixtureFamily -ceq 'Advanced' -and
+            [string]$orchestration.advancedBindingManifest -ceq $bindingManifest -and
+            [string]$result.status -ceq 'PASS' -and
+            [string]$result.runId -ceq [string]$orchestration.runId) {
+            return [string]$orchestration.runId
+        }
+    }
+    throw 'Casting on the advanced copy requires a passing live-advanced-inspect run of the same bound advanced pair first.'
 }

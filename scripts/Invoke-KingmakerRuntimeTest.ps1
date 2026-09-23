@@ -31,6 +31,10 @@ param(
     # forecast projections (from a live-cast-qual-select run) and a 1..24
     # submission budget.
     [string]$QualificationAllowancePath,
+    # Qualification recipe (qualification scenarios only): the selection
+    # run defaults to zero-cost-mixed; a casting run takes its recipe from
+    # the allowance, and when this is given as well it must name the same.
+    [ValidateSet('zero-cost-mixed', 'finite-direct-mixed')][string]$QualificationRecipe,
     # Fixture family: the approved automation pair (default) or the
     # owner-designated advanced copy. The advanced copy is loaded only by
     # non-casting scenarios and only when it matches its guarded bootstrap
@@ -92,11 +96,15 @@ if ($Scenario -ceq 'live-cast-qual') {
     }
     $qualificationAllowanceJson = [IO.File]::ReadAllText($qualificationFull)
     $qualificationRefusal = Get-KbpQualificationAllowanceBuildRefusal -AllowanceJson $qualificationAllowanceJson `
-        -RunId $RunId -BuildManifest $buildManifest
+        -RunId $RunId -BuildManifest $buildManifest -Recipe $QualificationRecipe
     if ($null -ne $qualificationRefusal) { throw "The qualification allowance was refused: $qualificationRefusal" }
 }
 elseif (-not [string]::IsNullOrWhiteSpace($QualificationAllowancePath)) {
     throw '-QualificationAllowancePath is only valid with -Scenario live-cast-qual.'
+}
+if (-not [string]::IsNullOrWhiteSpace($QualificationRecipe) -and
+    $Scenario -cne 'live-cast-qual' -and $Scenario -cne 'live-cast-qual-select') {
+    throw '-QualificationRecipe is only valid with -Scenario live-cast-qual-select or live-cast-qual.'
 }
 # Review P2-2: a qualification run needs the boot/load budget (600 s) plus
 # its own deadline (240 s) inside the harness wait, or the harness would
@@ -108,10 +116,14 @@ if (($Scenario -ceq 'live-cast-qual' -or $Scenario -ceq 'live-cast-qual-select')
 if ($Scenario -ceq 'live-cast-qual-select' -and $ExecutionMode -cne 'instant') {
     throw 'live-cast-qual-select runs in instant mode only.'
 }
-$advancedScenarios = @('live-advanced-inspect', 'live-workspace-qual', 'live-workspace-manual')
-if ($FixtureFamily -ceq 'Advanced' -and $advancedScenarios -cnotcontains $Scenario) {
+# The advanced copy: the non-casting scenarios, plus the allowance-bound
+# casting qualification once a non-casting inspection of the same bound
+# pair has passed (checked below, before anything is deployed).
+$advancedScenarios = @('live-advanced-inspect', 'live-workspace-qual', 'live-workspace-manual', 'live-cast-qual-select')
+if ($FixtureFamily -ceq 'Advanced' -and $advancedScenarios -cnotcontains $Scenario -and
+    $Scenario -cne 'live-cast-qual') {
     throw ("The advanced copy may only be loaded by the non-casting scenarios (" +
-        ($advancedScenarios -join ', ') + "); refused: $Scenario.")
+        ($advancedScenarios -join ', ') + ") or an allowance-bound live-cast-qual; refused: $Scenario.")
 }
 $compatibilityProfile = Get-KbpCompatibilityProfile $CompatibilityProfileId
 Assert-KbpCompatibilityProfileFixtures -Profile $compatibilityProfile
@@ -130,6 +142,9 @@ $savePair = if ($Scenario -ceq 'live-ui-bootstrap' -or $Scenario -ceq 'live-work
     $Scenario -ceq 'live-advanced-inspect' -or $Scenario -ceq 'live-cast-qual-select' -or
     $Scenario -ceq 'live-cast-qual') { Get-KbpDisposableSavePair -Family $FixtureFamily } else { $null }
 $advancedBinding = if ($FixtureFamily -ceq 'Advanced') { Assert-KbpAdvancedFixtureBinding -Pair $savePair } else { $null }
+$advancedInspectionRunId = if ($FixtureFamily -ceq 'Advanced' -and $Scenario -ceq 'live-cast-qual') {
+    Assert-KbpAdvancedInspectionPassed -Binding $advancedBinding
+} else { $null }
 $steamSafety = Assert-KbpSteamSafety -SteamPath $SteamPath
 & (Join-Path $PSScriptRoot 'Deploy-Local.ps1') -PackagePath $package `
     -RunId 'runtime-whatif-preflight' -CompatibilityProfileId $CompatibilityProfileId `
@@ -219,6 +234,9 @@ try {
     if ($null -ne $qualificationAllowanceJson) {
         $scenarioParameters.qualificationAllowance = $qualificationAllowanceJson
     }
+    if (-not [string]::IsNullOrWhiteSpace($QualificationRecipe)) {
+        $scenarioParameters.qualificationRecipe = $QualificationRecipe
+    }
     $request = New-KbpRuntimeRequest -RunId $runId -EvidenceDirectory $evidence `
         -BuildManifest $buildManifest -TimeoutSeconds $TimeoutSeconds `
         -ExitAfterCompletion $ExitAfterCompletion -Scenario $Scenario `
@@ -231,6 +249,7 @@ try {
         schemaVersion = 1; runId = $runId; scenario = $Scenario; profileId = $CompatibilityProfileId
         fixtureFamily = $FixtureFamily
         advancedBindingManifest = if ($null -eq $advancedBinding) { $null } else { $advancedBinding.manifestPath }
+        advancedInspectionRunId = $advancedInspectionRunId
         status = 'IN PROGRESS'; stage = 'request-written'; steamSafety = $steamSafety
         packagePath = $package; packageSha256 = $buildManifest.packageSha256
         transactionStatePath = $statePath; startedAtUtc = [DateTime]::UtcNow.ToString('o')
