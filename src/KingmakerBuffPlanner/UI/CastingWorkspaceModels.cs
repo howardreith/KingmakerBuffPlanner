@@ -123,6 +123,34 @@ namespace KingmakerBuffPlanner.UI
         // Imported review items the player explicitly resolved (kept as
         // history, review L1).
         public IReadOnlyList<string> ResolvedReviewItems { get; private set; } = new string[0];
+
+        // Why this version cannot execute the casting as authored (null when
+        // it can): shown before Apply; Apply refuses the run with it.
+        public string ExecutionLimitation { get; private set; }
+
+        // The live existing-effect verdict per intended recipient.
+        public IReadOnlyList<string> ExistingEffectNotes { get; private set; } = new string[0];
+
+        internal void ApplyExecutionDetail(string limitation, IEnumerable<string> existingNotes)
+        {
+            ExecutionLimitation = string.IsNullOrEmpty(limitation) ? null : limitation;
+            ExistingEffectNotes = (existingNotes ?? new string[0]).ToList();
+        }
+
+        // The card status as a player reads it.
+        public string StatusLabel
+        {
+            get
+            {
+                switch (Readiness)
+                {
+                    case ResolvedCastingReadiness.AlreadySatisfied: return "Already active";
+                    case ResolvedCastingReadiness.Ready:
+                        return ExecutionLimitation == null ? "Ready" : "Ready - cannot run yet";
+                    default: return Readiness.ToString();
+                }
+            }
+        }
         public string SourceId { get; private set; }
         public string ModeLabel { get; private set; }
         public string DirectTargetUnitId { get; private set; }

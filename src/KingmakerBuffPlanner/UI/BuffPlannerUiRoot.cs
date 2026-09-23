@@ -116,6 +116,20 @@ namespace KingmakerBuffPlanner.UI
             get { return _instance != null && _instance._plannerMode == PlannerMode.CastingFirst; }
         }
 
+        // Runtime evidence: how many production casting runs started in
+        // this session, and the current dispatch disposition.
+        internal static int CastingRunsStartedForRuntime
+        {
+            get { return _instance == null || _instance._castingHost == null
+                ? 0 : _instance._castingHost.StartedRuns; }
+        }
+
+        internal static string CastingDispatchDispositionForRuntime
+        {
+            get { return _instance == null || _instance._castingWorkspaceSession == null
+                ? "no-session" : _instance._castingWorkspaceSession.DispatchDisposition; }
+        }
+
         internal static bool IsCastingRunActive
         {
             get { return _instance != null && _instance._castingHost != null &&

@@ -215,4 +215,24 @@ foreach ($case in $bindingCases.Keys) {
         -RunId 'probe-bind-test' -BuildManifest $manifestFixture
     if ($refusal -cne $case) { throw "Allowance binding case $case returned '$refusal'." }
 }
-Write-Host 'Launcher -File WhatIf purity: PASS=9 FAIL=0'
+# Layer 7 (advanced copy): the advanced family is refused for every casting
+# or legacy-execution scenario before any save lookup, deployment or
+# launch; only the non-casting inspection and workspace scenarios may load
+# it.
+$familyCases = @(
+    @{ Name = 'advanced-probe-select'; Args = @('-Scenario', 'live-cast-probe-select', '-FixtureFamily', 'Advanced', '-WhatIf') },
+    @{ Name = 'advanced-bootstrap'; Args = @('-Scenario', 'live-ui-bootstrap', '-FixtureFamily', 'Advanced', '-WhatIf') },
+    @{ Name = 'advanced-smoke'; Args = @('-Scenario', 'mod-load-smoke', '-FixtureFamily', 'Advanced', '-WhatIf') }
+)
+foreach ($case in $familyCases) {
+    $ErrorActionPreference = 'Continue'
+    $caseArgs = $case.Args
+    $caseOutput = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $launcher @caseArgs 2>&1)
+    $caseExit = $LASTEXITCODE
+    $ErrorActionPreference = 'Stop'
+    if ($caseExit -eq 0 -or -not (@($caseOutput | Where-Object {
+            "$_" -like '*may only be loaded by the non-casting scenarios*' }).Count -ge 1)) {
+        throw "Advanced family case $($case.Name) was not refused as expected.: $($caseOutput -join ' ')"
+    }
+}
+Write-Host 'Launcher -File WhatIf purity: PASS=10 FAIL=0'

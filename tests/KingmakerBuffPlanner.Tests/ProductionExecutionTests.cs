@@ -10,6 +10,7 @@ using KingmakerBuffPlanner.Domain.Providers;
 using KingmakerBuffPlanner.Execution;
 using KingmakerBuffPlanner.Persistence;
 using KingmakerBuffPlanner.Planning;
+using KingmakerBuffPlanner.RuntimeTesting;
 using KingmakerBuffPlanner.UI;
 using Newtonsoft.Json.Linq;
 
@@ -41,6 +42,10 @@ namespace KingmakerBuffPlanner.Tests
             Run("production-apply-end-to-end-through-host",
                 () => TestProductionApplyEndToEnd(root));
             Run("run-presentation-separates-effects-and-spending", TestRunPresentation);
+            Run("inspection-and-fixture-family-requests",
+                () => TestInspectionAndFixtureFamilyRequests(root));
+            Run("card-discloses-limits-and-existing-effects",
+                () => TestCardDisclosesLimitsAndExistingEffects(root));
             // Last: it takes the process-wide runtime-test lock.
             Run("production-execution-wiring-and-session-lock", TestProductionExecutionWiring);
         }
@@ -1002,6 +1007,140 @@ namespace KingmakerBuffPlanner.Tests
                 new DisabledCastingDispatchBoundary("anything-else").DispositionReason !=
                     "native-submission-disabled:no-qualified-casting-first-executor")
                 throw new InvalidOperationException("The session lock or its refusal reason is wrong.");
+        }
+
+        // The inspection scenario is a no-input, non-casting workspace
+        // scenario; the advanced family is accepted only for non-casting
+        // scenarios, and a mixed pair is always refused.
+        private static void TestInspectionAndFixtureFamilyRequests(string root)
+        {
+            if (!RuntimeTestProtocol.IsInspectionScenario("live-advanced-inspect") ||
+                !RuntimeTestProtocol.IsWorkspaceScenario("live-advanced-inspect") ||
+                !RuntimeTestProtocol.IsNoInputWorkspaceScenario("live-advanced-inspect") ||
+                !RuntimeTestProtocol.IsLiveUiScenario("live-advanced-inspect") ||
+                RuntimeTestProtocol.IsProbeScenario("live-advanced-inspect") ||
+                RuntimeTestProtocol.IsCastingProbeScenario("live-advanced-inspect") ||
+                !RuntimeTestProtocol.IsAdvancedFamilyScenario("live-workspace-manual") ||
+                RuntimeTestProtocol.IsAdvancedFamilyScenario("live-cast-probe-select") ||
+                RuntimeTestProtocol.IsAdvancedFamilyScenario("live-cast-probe") ||
+                RuntimeTestProtocol.IsAdvancedFamilyScenario("live-ui-bootstrap"))
+                throw new InvalidOperationException("Inspection or family classification is wrong.");
+            Func<string, string, string, Action<Dictionary<string, object>>> set =
+                (scenario, workingFamily, baselineFamily) => o =>
+                {
+                    o["scenario"] = scenario;
+                    o["parameters"] = new Dictionary<string, object>
+                    {
+                        { "workingSaveName", workingFamily + "_WORKING" },
+                        { "workingFileName", "Manual_412_" + workingFamily + "_WORKING.zks" },
+                        { "workingSha256", new string('a', 64) },
+                        { "baselineSaveName", baselineFamily + "_BASELINE" },
+                        { "baselineFileName", "Manual_411_" + baselineFamily + "_BASELINE.zks" },
+                        { "baselineSha256", new string('b', 64) },
+                        { "expectedGameName", "Advanced Campaign" },
+                        { "expectedGameId", "66666666-7777-8888-9999-000000000000" },
+                        { "executionMode", "instant" }
+                    };
+                };
+            var accepted = new[]
+            {
+                new KeyValuePair<string, string>("live-advanced-inspect", "KBP_ADVANCED"),
+                new KeyValuePair<string, string>("live-advanced-inspect", "KBP_AUTOMATION"),
+                new KeyValuePair<string, string>("live-workspace-qual", "KBP_ADVANCED")
+            };
+            foreach (KeyValuePair<string, string> item in accepted)
+            {
+                string path = WriteRequest(root, "family-ok-" + item.Key + "-" + item.Value,
+                    set(item.Key, item.Value, item.Value));
+                string rejection;
+                RuntimeTestRequest request = ReadProtocol(
+                    new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path }, out rejection);
+                if (request == null || rejection.Length != 0)
+                    throw new InvalidOperationException("A valid family request was refused: " +
+                        item.Key + "/" + item.Value + ":" + rejection);
+            }
+            var refused = new[]
+            {
+                new KeyValuePair<string, Action<Dictionary<string, object>>>("advanced-probe-select",
+                    set("live-cast-probe-select", "KBP_ADVANCED", "KBP_ADVANCED")),
+                new KeyValuePair<string, Action<Dictionary<string, object>>>("advanced-probe",
+                    set("live-cast-probe", "KBP_ADVANCED", "KBP_ADVANCED")),
+                new KeyValuePair<string, Action<Dictionary<string, object>>>("advanced-bootstrap",
+                    set("live-ui-bootstrap", "KBP_ADVANCED", "KBP_ADVANCED")),
+                new KeyValuePair<string, Action<Dictionary<string, object>>>("mixed-pair",
+                    set("live-advanced-inspect", "KBP_ADVANCED", "KBP_AUTOMATION")),
+                new KeyValuePair<string, Action<Dictionary<string, object>>>("unknown-family",
+                    set("live-advanced-inspect", "KBP_OTHER", "KBP_OTHER"))
+            };
+            foreach (KeyValuePair<string, Action<Dictionary<string, object>>> item in refused)
+            {
+                string path = WriteRequest(root, "family-bad-" + item.Key, item.Value);
+                string rejection;
+                RuntimeTestRequest request = ReadProtocol(
+                    new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path }, out rejection);
+                if (request != null || string.IsNullOrEmpty(rejection))
+                    throw new InvalidOperationException("A refused family request was accepted: " +
+                        item.Key);
+            }
+        }
+
+        // Before execution the card says what will happen: already active
+        // (skipped), weaker/expiring (recast), or a contract this version
+        // cannot execute yet.
+        private static void TestCardDisclosesLimitsAndExistingEffects(string root)
+        {
+            string dir = Path.Combine(root, "card-disclosure");
+            Directory.CreateDirectory(dir);
+            PartyProviderSnapshot snapshot;
+            CastingWorkspaceInputs inputs = WorkspaceInputs(out snapshot);
+            var session = new CastingWorkspaceSession(dir, "workspace-campaign");
+            Assert(AddDraftCasting(session, inputs, "unit-cleric", "unit-t1").Applied);
+            var live = new CastingWorkspaceInputs(inputs.Snapshot, inputs.ProviderOptions,
+                inputs.EffectsBySource, inputs.Enhancements, null,
+                LiveEffects(On("unit-t1", "buff-effect", null, null, null)));
+            WorkspaceCastingCard card = session.BuildView(live).Cards.Single();
+            if (card.StatusLabel != "Already active" || card.ExecutionLimitation != null ||
+                card.ExistingEffectNotes.Count != 1 ||
+                CastingRunPresentation.DescribeExistingEffectNote(card.ExistingEffectNotes[0]) !=
+                    "already active on unit-t1 (skipped)")
+                throw new InvalidOperationException("The card did not disclose the skip: " +
+                    card.StatusLabel + "|" + string.Join(",", card.ExistingEffectNotes.ToArray()));
+            if (session.BuildView(inputs).Cards.Single().StatusLabel != "Ready")
+                throw new InvalidOperationException("Without live effects the card was not Ready.");
+            if (CastingRunPresentation.DescribeExistingEffectNote(
+                    "existing-insufficient:unit-t1:weaker-caster-level:4<10:buff-effect") !=
+                    "present on unit-t1 but weaker (lower caster level) (will recast)" ||
+                CastingRunPresentation.DescribeExistingEffectNote(
+                    "existing-insufficient:unit-t2:remaining-duration-short:10<3000:buff-effect") !=
+                    "present on unit-t2 but about to expire (will recast)" ||
+                CastingRunPresentation.DescribeExistingEffectNote("existing-active-recast:unit-t3") !=
+                    "active on unit-t3 but set to always recast")
+                throw new InvalidOperationException("Existing-effect wording is wrong.");
+            List<ProviderPlanningOption> options;
+            List<CastEnhancementSnapshot> enhancements;
+            PartyProviderSnapshot party = CastingParty(CastingBuffAbility,
+                out options, out enhancements, new[] { "unit-t1", "unit-t2" }, 3);
+            PlannedCasting shared = DirectCasting("cast-share", "long", "unit-cleric",
+                "unit-t1", "source-bulls", CastingBuffAbility);
+            shared = new PlannedCasting(shared.CastingId, shared.RoutineId, 0,
+                shared.SourceId, shared.Ability, shared.CasterUnitId, null,
+                shared.TargetMode, shared.DirectTargetUnitId, null, null,
+                new[] { new TargetingModifierSelection("share", true, null) }, null,
+                shared.ExistingEffectPolicy, null, shared.State, null);
+            ResolvedCasting modified = new ExplicitCastingCompiler().Compile(
+                CastingDocument(shared), party, options,
+                CastingEffects("source-bulls", "source-communal"), enhancements, null,
+                new ICastingTargetingModifier[]
+                {
+                    new FixtureShareCastingModifier("unit-cleric", new[] { "unit-t1", "unit-t2" })
+                }).CastingById("cast-share");
+            string limitation = ExplicitCastingStepConverter.StandardExecutionLimitation(modified);
+            if (!modified.IsExecutable || limitation == null ||
+                !limitation.StartsWith("unsupported-contract:targeting-modifier:cast-share",
+                    StringComparison.Ordinal) ||
+                !CastingRunPresentation.DescribeLimitation(limitation).Contains("Share Transmutation"))
+                throw new InvalidOperationException("A modifier casting did not disclose its limit: " +
+                    (limitation ?? "none"));
         }
     }
 }

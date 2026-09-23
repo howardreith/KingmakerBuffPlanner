@@ -1,6 +1,6 @@
 ﻿[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
 param(
-    [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'live-ui-bootstrap', 'ui-native-contract-probe', 'final-no-save-core', 'performance-probe', 'launch-render-diagnostic', 'menu-input-diagnostic', 'live-workspace-qual', 'live-workspace-manual', 'live-cast-probe-select', 'live-cast-probe')][string]$Scenario = 'mod-load-smoke',
+    [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'live-ui-bootstrap', 'ui-native-contract-probe', 'final-no-save-core', 'performance-probe', 'launch-render-diagnostic', 'menu-input-diagnostic', 'live-workspace-qual', 'live-workspace-manual', 'live-cast-probe-select', 'live-cast-probe', 'live-advanced-inspect')][string]$Scenario = 'mod-load-smoke',
     [ValidateSet('native-only', 'call-of-the-wild', 'human-reproduction', 'full-user')][string]$CompatibilityProfileId = 'native-only',
     [ValidateRange(5, 1800)][int]$TimeoutSeconds = 180,
     [ValidateRange(5, 300)][int]$LaunchTimeoutSeconds = 60,
@@ -25,7 +25,12 @@ param(
     # approvals directory. Without it the casting probe cannot be launched;
     # live-cast-probe-select never takes one and never constructs a
     # dispatch boundary.
-    [string]$ProbeAllowancePath
+    [string]$ProbeAllowancePath,
+    # Fixture family: the approved automation pair (default) or the
+    # owner-designated advanced copy. The advanced copy is loaded only by
+    # non-casting scenarios and only when it matches its guarded bootstrap
+    # manifest exactly.
+    [ValidateSet('Automation', 'Advanced')][string]$FixtureFamily = 'Automation'
 )
 
 Set-StrictMode -Version Latest
@@ -67,6 +72,11 @@ if ($Scenario -ceq 'live-cast-probe') {
 elseif (-not [string]::IsNullOrWhiteSpace($ProbeAllowancePath)) {
     throw '-ProbeAllowancePath is only valid with -Scenario live-cast-probe.'
 }
+$advancedScenarios = @('live-advanced-inspect', 'live-workspace-qual', 'live-workspace-manual')
+if ($FixtureFamily -ceq 'Advanced' -and $advancedScenarios -cnotcontains $Scenario) {
+    throw ("The advanced copy may only be loaded by the non-casting scenarios (" +
+        ($advancedScenarios -join ', ') + "); refused: $Scenario.")
+}
 $compatibilityProfile = Get-KbpCompatibilityProfile $CompatibilityProfileId
 Assert-KbpCompatibilityProfileFixtures -Profile $compatibilityProfile
 $expectedOptionalMods = @($compatibilityProfile.mods | ForEach-Object {
@@ -80,7 +90,9 @@ $expectedOptionalMods = @($compatibilityProfile.mods | ForEach-Object {
     }
 })
 $savePair = if ($Scenario -ceq 'live-ui-bootstrap' -or $Scenario -ceq 'live-workspace-qual' -or $Scenario -ceq 'live-workspace-manual' -or
-    $Scenario -ceq 'live-cast-probe-select' -or $Scenario -ceq 'live-cast-probe') { Get-KbpDisposableSavePair } else { $null }
+    $Scenario -ceq 'live-cast-probe-select' -or $Scenario -ceq 'live-cast-probe' -or
+    $Scenario -ceq 'live-advanced-inspect') { Get-KbpDisposableSavePair -Family $FixtureFamily } else { $null }
+$advancedBinding = if ($FixtureFamily -ceq 'Advanced') { Assert-KbpAdvancedFixtureBinding -Pair $savePair } else { $null }
 $steamSafety = Assert-KbpSteamSafety -SteamPath $SteamPath
 & (Join-Path $PSScriptRoot 'Deploy-Local.ps1') -PackagePath $package `
     -RunId 'runtime-whatif-preflight' -CompatibilityProfileId $CompatibilityProfileId `
@@ -135,6 +147,13 @@ if ((Test-Path -LiteralPath $evidence) -or (Test-Path -LiteralPath $transactionR
 $transactionEntered = $false
 $process = $null
 New-Item -ItemType Directory -Path $evidence | Out-Null
+# Protected-save comparison: every save-folder file before launch, compared
+# after restoration. Only the run WORKING copy may change; a changed or
+# removed file always fails the run, and a new file (for example an
+# autosave) fails an advanced-copy run and is recorded otherwise.
+$protectedSaveRoot = Join-Path $env:USERPROFILE 'AppData\LocalLow\Owlcat Games\Pathfinder Kingmaker\Saved Games'
+$protectedBefore = if ($null -ne $savePair) { Get-KbpSaveFolderSnapshot -SaveRoot $protectedSaveRoot } else { $null }
+$protectedSaveFailure = $null
 try {
     $statePath = & (Join-Path $PSScriptRoot 'Deploy-Local.ps1') -PackagePath $package `
         -RunId $runId -CompatibilityProfileId $CompatibilityProfileId `
@@ -170,6 +189,8 @@ try {
     Write-KbpJsonAtomic $requestPath $request
     $orchestration = [ordered]@{
         schemaVersion = 1; runId = $runId; scenario = $Scenario; profileId = $CompatibilityProfileId
+        fixtureFamily = $FixtureFamily
+        advancedBindingManifest = if ($null -eq $advancedBinding) { $null } else { $advancedBinding.manifestPath }
         status = 'IN PROGRESS'; stage = 'request-written'; steamSafety = $steamSafety
         packagePath = $package; packageSha256 = $buildManifest.packageSha256
         transactionStatePath = $statePath; startedAtUtc = [DateTime]::UtcNow.ToString('o')
@@ -536,4 +557,22 @@ finally {
             Write-Error "Kingmaker remains running; exact Mods restoration is intentionally blocked. Transaction: $runId"
         }
     }
+    if ($null -ne $protectedBefore -and @(Get-Process -Name Kingmaker -ErrorAction SilentlyContinue).Count -eq 0) {
+        try {
+            $violations = Compare-KbpSaveFolderSnapshot -Before $protectedBefore `
+                -After (Get-KbpSaveFolderSnapshot -SaveRoot $protectedSaveRoot) `
+                -AllowedChangedFileNames @([string]$savePair.working.fileName)
+            $blocking = @($violations | Where-Object { $_ -notlike 'new:*' -or $FixtureFamily -ceq 'Advanced' })
+            Write-KbpJsonAtomic (Join-Path $evidence 'protected-saves.json') ([ordered]@{
+                schemaVersion = 1; runId = $runId; fixtureFamily = $FixtureFamily
+                allowedChanged = @([string]$savePair.working.fileName)
+                violations = @($violations); blocking = @($blocking)
+            })
+            if ($blocking.Count -ne 0) {
+                $protectedSaveFailure = 'Protected saves changed during the run: ' + ($blocking -join ', ')
+            }
+        }
+        catch { $protectedSaveFailure = 'Protected-save comparison failed: ' + $_.Exception.Message }
+    }
 }
+if ($null -ne $protectedSaveFailure) { throw $protectedSaveFailure }
