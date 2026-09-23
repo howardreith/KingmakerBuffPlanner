@@ -11,11 +11,17 @@ detached at `e964d2f`, untouched.
 | --- | --- |
 | `3b69321` | Production execution. Planner-mode setting (`UserSettings/planner-mode.json`, Classic by default, casting-first chosen in the UMM panel). Every routine route (HUD, hotkey, spellbook, planner Apply, Ready Casts Only) goes through the session Apply to the production boundary and the execution host: one run at a time, pumped per frame, one terminal for completion, player stop (press the routine again), deadline, area change, disable, unload and teardown. Live existing-effect policy: weaker, expiring, unprovable or suppressed effects never count as satisfied, and an exhausted pool no longer blocks an already-active effect. Review acceptance is per routine and persisted as a digest. Save keeps the player's execution/UI settings. Runtime-test sessions are locked to the refusing boundary. |
 | `6b92020` | Advanced-copy tooling: `live-advanced-inspect` (non-casting), protocol fixture families, launcher `-FixtureFamily Advanced` bound to the bootstrap manifest, protected-save comparison around every live run. Workspace cards disclose skips, recasts and "cannot run in this version" limits. |
+| `7e864e7` | Casting-first feedback without floating results (refusals kept per routine on the HUD tooltip and planner footer); player guide `docs/CASTING-FIRST-PLAYER-GUIDE.md`. |
+| `6e55990`, `7ebdb67`, `4e7e921` | Casting qualification: allowance schema 3 bound to commit/package/DLL/MVID/fixture, recipe `zero-cost-mixed`, step forecast with exact projection ids, bounded boundary (next approved id only, budget, no retry), judged driver (stop, complete, repeat, reopen, recast), scenarios `live-cast-qual-select` (no cast) and `live-cast-qual` (allowance-bound). |
+| `0228278` | `docs/CASTING-QUALIFICATION-REQUEST.md`: purpose, contracts, expectations and procedure for the first qualification run. |
+| `47caeef` | Fixes for the independent review of `ca0d636..325e4b3` (dispositions in `docs/CASTING-FIRST-REVIEW-INDEX.md`): launchable inspection scenario, exhausted rods waived by an active effect, acceptance never revoked by viewing, two-round expiry floor, graceful player stop, classic path locked in automation. |
+| `4097ca7` | Routine tabs show names, counts and a gold selected state; header states the routine's own Apply gate. |
 
-Gates at `6b92020` (Windows PowerShell 5.1, non-interactive): source 42/42,
-protocol 275/275, harness 32/32, deploy WhatIf 5/5, launcher WhatIf 10/10,
-fixture 3/3, Restore-InstallLocal 16/16, publisher 3/3. 17 new mutants of
-the new guards were all caught.
+Gates at `47caeef` (Windows PowerShell 5.1, non-interactive): source 42/42,
+protocol 285/285, harness 33/33, deploy WhatIf 5/5, launcher WhatIf 11/11,
+fixture 3/3, Restore-InstallLocal 16/16, publisher 3/3. Every new guard
+has a mutant that the tests catch (17 in slice 1, 8 + 2 drift in the
+review fixes).
 
 Live runs this slice (no native cast):
 
@@ -39,9 +45,14 @@ Owner blockers:
    resealing (the frozen probe checkout cannot change, so it needs
    0.0.133 back).
 3. No `KBP_ADVANCED_SEED` exists yet.
+4. The casting qualification needs its own owner-created allowance after
+   `live-cast-qual-select` reports the projection ids
+   (`docs/CASTING-QUALIFICATION-REQUEST.md`); that selection run itself
+   also needs blocker 2 resolved.
 
-Next, independent of the blockers: migration/rollback audit of the new
-UserSettings files, remaining UI items, RC packaging and documentation.
+Next, independent of the blockers: a second independent review (of the
+qualification commits and the review fixes), remaining UI items, RC
+packaging and documentation.
 
 ## N-series (`7379dc8` review): frozen-artifact binding, terminal shutdown, exact prepared-slot reads — 2026-09-23 (history)
 

@@ -7,13 +7,38 @@ Reviewed baseline: `c182061354e9e761c09648ca779ab334588ba379`
 (`fd0e6dc..c182061`); this index covers the casting-first commits
 `c182061..HEAD` (61 commits at first publication).
 
-Status: **work in progress — development branch, not a gameplay-qualified
-release.** Native casting submission is explicitly disabled at the
-workspace dispatch boundary. The workspace renders in presenting
-sessions (display-path acceptance run `casting-ws-gseries-081000`);
-human usability and the native aesthetic pass remain open.
+Status: **release-candidate work in progress — not a gameplay-qualified
+release.** Casting-first is an opt-in planner mode (UMM setting, Classic
+by default). In ordinary play every routine route reaches the production
+dispatch boundary and the execution host; in an automated test session
+both player routes (casting-first and classic) refuse, and native casts
+happen only through the owner-authorized harness boundaries (single-cast
+probe, casting qualification). No casting-first native cast has run yet:
+the frozen probe and the qualification await owner inputs (allowance
+files, the KingmakerGunslinger identity, an advanced seed). Human
+usability and the native aesthetic pass remain open.
 
-## Current review dispositions — O1 at `e964d2f` (answered 2026-09-23)
+## Current review dispositions — RC review of `ca0d636..325e4b3` (answered 2026-09-23)
+
+An independent read-only review of RC slice 1 found no P0. Every finding
+is fixed in `47caeef` with a regression test; the eight new mutants and
+two scenario-drift mutants were caught. Full gate at `47caeef`: source
+42/42, protocol 285/285, harness 33/33, deploy WhatIf 5/5, launcher
+WhatIf 11/11, fixture 3/3, Restore-InstallLocal 16/16, publisher 3/3.
+
+| Finding | Disposition |
+| --- | --- |
+| P1: `live-advanced-inspect` could not build its request (the request builder repeated an older scenario list) | Fixed: the builder accepts the three new scenarios; the harness builds a request for every launcher scenario and requires identical sets |
+| P2: an exhausted rod blocked (required) or re-shaped (optional) a casting whose effect was already active | Fixed: an exhausted required enhancement is a resource shortage that a sufficient live effect waives; the skip keeps the would-be cost shape, so the digest is unchanged |
+| P2: opening the planner revoked a stored acceptance on a temporary difference, and saved that | Fixed: presenting never revokes (an acceptance only ever authorizes its exact digest); viewing writes no review state |
+| P2: casting-first refusals were invisible in game | Fixed in RC slice 1 (`7e864e7`): refusals are kept per routine and shown on the HUD tooltip and planner footer |
+| P2: nearly expired effects counted as sufficient when durations were not comparable | Fixed: under two rounds left is never sufficient, whatever the duration text |
+| P3: the stop tooltip promised a graceful stop the host did not provide | Fixed: the player stop now lands after the cast in progress; area change, disable and teardown still stop at once |
+| P3: lock comments overstated coverage (the classic path still cast in automation) | Fixed: the lock also refuses the classic routine execution; `live-ui-bootstrap` asserts that refusal |
+| P3: the HUD tooltip called a stale stored digest "accepted"; execution settings outside the signature were undocumented | Fixed: the tooltip states current / on file / changed; the signature comment and player guide say why the Animated/Instant choice is not signed |
+| P3: coverage gaps | Closed by the tests listed above |
+
+## Previous review dispositions — O1 at `e964d2f` (history)
 
 The frozen probe checkout and artifact (`e964d2f`,
 `runtime-backups/probe-frozen/e964d2f…/`) are unchanged. Development now
