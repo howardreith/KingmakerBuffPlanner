@@ -50,6 +50,7 @@ namespace KingmakerBuffPlanner.Tests
             Run("host-stops-between-castings", TestHostStopsBetweenCastings);
             Run("host-player-stop-finishes-cast-in-progress", TestHostPlayerStopIsGraceful);
             Run("exhausted-rod-waived-by-active-effect", TestExhaustedRodWithActiveEffect);
+            Run("probe-refuses-a-cast-while-the-world-is-held", TestProbeWorldHeldViolation);
             Run("buff-grid-source-type-tabs", () => TestBuffGridSourceTypeTabs(root));
             Run("qualification-allowance-parsing", TestQualificationAllowanceParsing);
             Run("qualification-recipe-selection", TestQualificationRecipeSelection);
@@ -1341,6 +1342,44 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("A stop without a run reported success.");
         }
 
+        // A cast submitted while the world was held (paused, dialog, or the
+        // planner full-screen window) is never a valid probe: the rule is
+        // queued and cannot be confirmed (casting-probe-cast-20260923-p1-01).
+        // The host must also never submit before the world runs (source).
+        private static void TestProbeWorldHeldViolation()
+        {
+            Func<bool, SingleCastProbeRunRecord> record = running => new SingleCastProbeRunRecord
+            {
+                CastingScenario = true, Selected = true, SelectionEvidence = "fixture",
+                ProjectionId = "p", AllowanceStatus = "valid", Submitted = true,
+                BoundaryDisposed = true, CleanupRecorded = true, WorkspaceClosed = true,
+                InputLeaseReleased = true, WorldRunningAtSubmit = running,
+                SubmitWorldState = running ? "mode=Default;paused=False" : "mode=FullScreenUi;paused=False"
+            };
+            if (!record(false).Violations().Contains("probe-submitted-while-world-held:mode=FullScreenUi;paused=False") ||
+                record(true).Violations().Any(value => value.StartsWith("probe-submitted-while-world-held",
+                    StringComparison.Ordinal)))
+                throw new InvalidOperationException("The held-world probe rule is wrong.");
+            DirectoryInfo directory = new DirectoryInfo(Environment.CurrentDirectory);
+            while (directory != null && !File.Exists(Path.Combine(directory.FullName, "KingmakerBuffPlanner.sln")))
+                directory = directory.Parent;
+            if (directory == null) throw new InvalidOperationException("Repository root was not discoverable.");
+            string host = File.ReadAllText(Path.Combine(directory.FullName, "src", "KingmakerBuffPlanner",
+                "RuntimeTesting", "RuntimeTestHost.cs"));
+            int close = host.IndexOf("ProbeWorkspaceCloseResult closedForCast = CloseProbeWorkspace();", StringComparison.Ordinal);
+            int worldCheck = host.IndexOf("_probeRecord.WorldRunningAtSubmit = true;", StringComparison.Ordinal);
+            int boundary = host.IndexOf("var boundary = new SingleCastProbeBoundary(_probeAllowance,", StringComparison.Ordinal);
+            if (close < 0 || worldCheck < 0 || boundary < 0 || !(close < worldCheck && worldCheck < boundary) ||
+                host.IndexOf("new SingleCastProbeBoundary(", StringComparison.Ordinal) !=
+                    host.LastIndexOf("new SingleCastProbeBoundary(", StringComparison.Ordinal))
+                throw new InvalidOperationException("The probe host can submit before the planner closed and the world runs.");
+            string root = File.ReadAllText(Path.Combine(directory.FullName, "src", "KingmakerBuffPlanner",
+                "UI", "BuffPlannerUiRoot.cs"));
+            if (!root.Contains("bool worldRuns = WorldRunsForCasting && _castingWorkspace == null && !_screen.IsOpen;") ||
+                !root.Contains("() => _castingWorldMillis);"))
+                throw new InvalidOperationException("The production host is pumped while the world is held.");
+        }
+
         // An exhausted REQUIRED rod is a resource shortage: the run that
         // spent it left the effect active, so a repeat press skips instead
         // of blocking, with the same would-be cost shape (and so the same
@@ -2046,13 +2085,13 @@ namespace KingmakerBuffPlanner.Tests
 
         private static CastingQualificationDriver NewQualificationDriver(string dir,
             SimulatedBuffWorld world, CastingQualificationRecord record,
-            CastingQualificationAllowance allowance, Func<long> clock)
+            CastingQualificationAllowance allowance, Func<long> clock, Func<bool> worldRunning = null)
         {
             var host = new CastingExecutionHost(settings => new InstantCastExecutor(world, true), clock);
             return new CastingQualificationDriver(record, allowance, "fixture-campaign",
                 () => QualificationInputs(true, true, world.Live()),
                 boundary => new CastingWorkspaceSession(dir, "fixture-campaign", boundary),
-                host, world.Observe, clock, 240000);
+                host, world.Observe, clock, 240000, null, worldRunning);
         }
 
         private static CastingQualificationAllowance ForecastAllowance(SimulatedBuffWorld world,
@@ -2187,6 +2226,24 @@ namespace KingmakerBuffPlanner.Tests
                     throw new InvalidOperationException("The stop rule judged cleanup=" + cleanupFailed +
                         " as " + (failure ?? "pass"));
             }
+            // A held world (paused, dialog, full-screen window) holds the
+            // steps: nothing is cast until it runs, then the run completes.
+            var heldWorld = new SimulatedBuffWorld();
+            CastingQualificationAllowance heldAllowance = ForecastAllowance(heldWorld);
+            var heldRecord = new CastingQualificationRecord { CastingScenario = true, AllowanceStatus = "parsed" };
+            string heldDir = Path.Combine(root, "qh");
+            Directory.CreateDirectory(heldDir);
+            bool worldRuns = false;
+            CastingQualificationDriver heldDriver = NewQualificationDriver(heldDir, heldWorld, heldRecord,
+                heldAllowance, () => now, () => worldRuns);
+            for (int i = 0; i < 30; i++) heldDriver.Update();
+            if (heldWorld.Fired.Count != 0 || heldDriver.Completed || heldDriver.HeldUpdates == 0)
+                throw new InvalidOperationException("A held world was cast into.");
+            worldRuns = true;
+            for (int i = 0; i < 400 && !heldDriver.Completed; i++) heldDriver.Update();
+            if (heldRecord.Violations().Count != 0 || heldWorld.Fired.Count != 4)
+                throw new InvalidOperationException("The run did not resume once the world ran: " +
+                    string.Join("|", heldRecord.Violations().ToArray()));
             // Review RC2: a failed, missing, throwing or wrong-target
             // before-read ends the run before Apply: nothing is submitted.
             foreach (string fault in new[] { "throw", "failed", "null", "wrong-target" })

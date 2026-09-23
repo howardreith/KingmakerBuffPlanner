@@ -74,8 +74,34 @@ namespace KingmakerBuffPlanner.UI
         // result), shown on demand in that routine HUD tooltip.
         private readonly Dictionary<string, string> _lastCastingPress =
             new Dictionary<string, string>(StringComparer.Ordinal);
-        private static readonly System.Diagnostics.Stopwatch CastingClock =
-            System.Diagnostics.Stopwatch.StartNew();
+        // World-running time (milliseconds) for the casting host deadline: it
+        // advances only while casting can execute.
+        private long _castingWorldMillis;
+        private bool _castingRunHeld;
+
+        // Whether a cast can execute in the world now: the Default game mode
+        // and not paused. A rule submitted while the world is held (paused,
+        // a dialog, or a full-screen window such as the planner itself) is
+        // queued but does not execute, so its confirmation window would
+        // expire with the effect still absent (probe
+        // casting-probe-cast-20260923-p1-01 cast inside the open planner).
+        internal static bool WorldRunsForCasting
+        {
+            get
+            {
+                return Game.Instance != null && !Game.Instance.IsPaused &&
+                    Game.Instance.CurrentMode == GameModeType.Default;
+            }
+        }
+
+        internal static string WorldStateForRuntime
+        {
+            get
+            {
+                return Game.Instance == null ? "game=absent"
+                    : "mode=" + Game.Instance.CurrentMode + ";paused=" + Game.Instance.IsPaused;
+            }
+        }
 
         public int Priority { get { return 400; } }
 
@@ -995,7 +1021,7 @@ namespace KingmakerBuffPlanner.UI
                 _plannerModeWarning = "runtime-test-session:persisted-mode-ignored";
             }
             _castingHost = new CastingExecutionHost(CreateCastingExecutor,
-                () => CastingClock.ElapsedMilliseconds);
+                () => _castingWorldMillis);
             _castingHost.RunCompleted = OnCastingRunCompleted;
             _log.Info("[KBP-MODE] planner mode=" + _plannerMode +
                 (_plannerModeWarning.Length == 0 ? string.Empty : ";warning=" + _plannerModeWarning) +
@@ -1292,10 +1318,13 @@ namespace KingmakerBuffPlanner.UI
             if (!CastingFirstActive) return null;
             string name = char.ToUpperInvariant(routineId[0]) + routineId.Substring(1);
             if (_castingHost != null && _castingHost.IsRunning)
-                return string.Equals(_castingHost.ActiveScopeRoutineId, routineId,
+                return (_castingRunHeld
+                        ? "Waiting for the game to run (it is paused, or a window is open). "
+                        : string.Empty) +
+                    (string.Equals(_castingHost.ActiveScopeRoutineId, routineId,
                         StringComparison.Ordinal)
-                    ? name + " is running. Press again to stop it after the cast in progress."
-                    : "Another routine is running. Press to stop it after the cast in progress.";
+                        ? name + " is running. Press again to stop it after the cast in progress."
+                        : "Another routine is running. Press to stop it after the cast in progress.");
             CastingWorkspaceSession session = _castingWorkspaceSession;
             if (session == null)
                 return "Cast " + name + " (casting-first planner). Open the planner to " +
@@ -1396,13 +1425,21 @@ namespace KingmakerBuffPlanner.UI
             long rootStartedAt = RuntimePerformanceDiagnostics.BeginOperation();
             _tickCount++;
             // One step of the active casting run per frame (executors yield
-            // per frame); the host ends the run on its deadline.
+            // per frame), only while the world runs and no planner window
+            // holds the game; a held run waits, and its deadline counts only
+            // running time. The host ends the run on its deadline.
             if (_castingHost != null)
             {
-                try { _castingHost.Pump(); }
-                catch (Exception exception)
+                bool worldRuns = WorldRunsForCasting && _castingWorkspace == null && !_screen.IsOpen;
+                _castingRunHeld = _castingHost.IsRunning && !worldRuns;
+                if (worldRuns)
                 {
-                    _log.Error("[KBP-CF-RUN] run pump failed.", exception);
+                    _castingWorldMillis += (long)(Math.Max(0f, deltaTime) * 1000f);
+                    try { _castingHost.Pump(); }
+                    catch (Exception exception)
+                    {
+                        _log.Error("[KBP-CF-RUN] run pump failed.", exception);
+                    }
                 }
             }
             try

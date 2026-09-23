@@ -322,6 +322,9 @@ namespace KingmakerBuffPlanner.Execution
         private readonly Func<long> _clock;
         private readonly long _deadlineMillis;
         private readonly string _requestedRecipe;
+        // Whether a cast can execute in the world now (Default mode, not
+        // paused, no full-screen window); null means always.
+        private readonly Func<bool> _worldRunning;
         private CastingQualificationBoundary _boundary;
         private Dictionary<string, CastStep> _observeSteps;
         private CastingWorkspaceSession _session;
@@ -335,9 +338,11 @@ namespace KingmakerBuffPlanner.Execution
             Func<CastingWorkspaceInputs> freshInputs,
             Func<ICastingDispatchBoundary, CastingWorkspaceSession> openSession,
             CastingExecutionHost host, Func<CastStep, string, ProbeObservation> observe,
-            Func<long> clock, long deadlineMillis, string recipe = null)
+            Func<long> clock, long deadlineMillis, string recipe = null,
+            Func<bool> worldRunning = null)
         {
             _requestedRecipe = recipe;
+            _worldRunning = worldRunning;
             Record = record ?? throw new ArgumentNullException("record");
             _allowance = allowance;
             _campaignId = campaignId;
@@ -350,6 +355,15 @@ namespace KingmakerBuffPlanner.Execution
         }
 
         public CastingQualificationRecord Record { get; private set; }
+        // Updates on which a step waited because the world was held.
+        public int HeldUpdates { get; private set; }
+
+        private bool WorldHeld()
+        {
+            if (_worldRunning == null || _worldRunning()) return false;
+            HeldUpdates++;
+            return true;
+        }
         public bool Completed { get; private set; }
         public string Phase { get { return _phase; } }
 
@@ -496,6 +510,9 @@ namespace KingmakerBuffPlanner.Execution
 
         private void Begin(string name)
         {
+            // A step starts (and its before-reads are taken) only while the
+            // world runs; a held world waits under the run deadline.
+            if (WorldHeld()) return;
             var step = new CastingQualificationStepResult(name);
             Record.Steps.Add(step);
             _observeSteps = StepsToObserve(name);
@@ -530,7 +547,8 @@ namespace KingmakerBuffPlanner.Execution
                 _host.Cancel(StopReason);
             if (_host.IsRunning)
             {
-                _host.Pump();
+                // A run advances only while the world runs.
+                if (!WorldHeld()) _host.Pump();
                 return;
             }
             CastingQualificationStepResult finished = _running;
