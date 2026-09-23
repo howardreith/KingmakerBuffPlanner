@@ -389,6 +389,8 @@ namespace KingmakerBuffPlanner.Tests
                     TestWorkspaceGroupCardNames);
                 Run("explicit-casting-step-conversion",
                     TestExplicitCastingStepConversion);
+                Run("workspace-legacy-import-failures-block",
+                    () => TestWorkspaceLegacyImportFailuresBlock(root));
             }
             finally
             {
@@ -2371,27 +2373,35 @@ namespace KingmakerBuffPlanner.Tests
             ProfileLoadResult rejected = repository.Load("campaign:duplicate");
             if (!rejected.Warning.Contains("duplicate-property"))
                 throw new InvalidOperationException("Duplicate JSON property was not rejected.");
-            // Saving the recovered default over the malformed primary must
-            // first quarantine the exact unreadable bytes (charter §7.1);
-            // the same holds for a newer-schema primary.
+            // Review K1: an ordinary save of the recovered default must NOT
+            // replace the malformed primary; its bytes are quarantined as
+            // evidence and the refusal recorded. Only the explicit recovery
+            // operation replaces it.
             byte[] malformedBytes = File.ReadAllBytes(path);
             repository.Save(loaded.Profile);
             string[] quarantined = Directory.GetFiles(Path.GetDirectoryName(path),
                 "kbp-unreadable-*.orig");
-            if (quarantined.Length != 1 ||
+            if (!File.ReadAllBytes(path).SequenceEqual(malformedBytes) ||
+                repository.LastSaveRefusal == null ||
+                quarantined.Length != 1 ||
                 !File.ReadAllBytes(quarantined[0]).SequenceEqual(malformedBytes))
                 throw new InvalidOperationException(
-                    "The unreadable primary was overwritten without a byte-exact quarantine.");
+                    "An ordinary save replaced the unresolved primary or left no quarantine.");
+            repository.ReplaceUnresolvedPrimary(loaded.Profile);
+            if (File.ReadAllBytes(path).SequenceEqual(malformedBytes) ||
+                repository.LastSaveRefusal != null)
+                throw new InvalidOperationException("Explicit recovery did not replace the primary.");
             string newerPath = repository.GetProfilePath("campaign:newer");
             byte[] newerBytes = new byte[] { 0xEF, 0xBB, 0xBF }.Concat(
                 System.Text.Encoding.UTF8.GetBytes(
                     "{ \"schemaVersion\": 99, \"campaignId\": \"campaign:newer\" }")).ToArray();
             File.WriteAllBytes(newerPath, newerBytes);
             repository.Save(ProfileFixture("campaign:newer"));
-            if (!Directory.GetFiles(Path.GetDirectoryName(path), "kbp-unreadable-*.orig")
+            if (!File.ReadAllBytes(newerPath).SequenceEqual(newerBytes) ||
+                !Directory.GetFiles(Path.GetDirectoryName(path), "kbp-unreadable-*.orig")
                     .Any(file => File.ReadAllBytes(file).SequenceEqual(newerBytes)))
                 throw new InvalidOperationException(
-                    "A newer-schema primary (with BOM) was not quarantined byte-exactly.");
+                    "A newer-schema primary (with BOM) was replaced or not quarantined byte-exactly.");
         }
 
         private static BuffPlannerProfile ProfileFixture(string campaignId)
@@ -13887,6 +13897,121 @@ namespace KingmakerBuffPlanner.Tests
                     groupCasting.PredictedBeneficiaryUnitIds.OrderBy(v => v, StringComparer.Ordinal)))
                 throw new InvalidOperationException("Group casting did not become one mass step: " +
                     (group.Converted ? group.Plan.Steps.Count.ToString() : group.Refusal));
+        }
+
+        // Review K1: every failed legacy import blocks the workspace instead
+        // of activating a writable empty replacement. For each failure the
+        // legacy bytes are unchanged, no candidate is written, Save and
+        // Apply are refused with a visible reason, and Reload retries after
+        // the legacy file is actually repaired. Production session
+        // orchestration, isolated fixture directories.
+        private static void TestWorkspaceLegacyImportFailuresBlock(string root)
+        {
+            BuffPlannerProfile valid = LegacyProfile();
+            valid.Routines[0].Assignments.Add(LegacyAssignment(
+                "source-bulls", CastingBuffAbility,
+                PinnedChild("legacy-bulls", 0, "unit-cleric", "unit-t1")));
+            PartyProviderSnapshot snapshot;
+            CastingWorkspaceInputs inputs = WorkspaceInputs(out snapshot);
+            Func<string, Action<string, ProfileRepository>, CastingWorkspaceSession> scenario =
+                (name, arrange) =>
+                {
+                    string dir = Path.Combine(root, "k1-" + name);
+                    Directory.CreateDirectory(dir);
+                    var legacyRepo = new ProfileRepository(dir);
+                    arrange(dir, legacyRepo);
+                    return new CastingWorkspaceSession(dir, "legacy-campaign");
+                };
+            Action<string, CastingWorkspaceSession, string, byte[]> expectBlocked =
+                (name, session, legacyPath, legacyBytes) =>
+                {
+                    string candidate = new CastingPlanRepository(Path.GetDirectoryName(
+                        Path.GetDirectoryName(legacyPath))).GetProfilePath("legacy-campaign");
+                    if (!session.LegacyImportBlocked || !session.PersistenceBlocked ||
+                        string.IsNullOrEmpty(session.LegacyImportBlockReason))
+                        throw new InvalidOperationException(name + ": not blocked (" +
+                            session.MigrationStatus + " " + session.MigrationWarning + ")");
+                    if (!File.ReadAllBytes(legacyPath).SequenceEqual(legacyBytes))
+                        throw new InvalidOperationException(name + ": legacy bytes changed.");
+                    if (File.Exists(candidate))
+                        throw new InvalidOperationException(name + ": a candidate was activated.");
+                    bool saveRefused = false;
+                    try { session.Save(); } catch (InvalidOperationException) { saveRefused = true; }
+                    if (!saveRefused)
+                        throw new InvalidOperationException(name + ": Save was allowed.");
+                    WorkspaceApplyResult apply = session.Apply(
+                        CastingApplyMode.ReadyCastsOnly, "long", inputs);
+                    if (apply.Allowed || !apply.ReviewReason.StartsWith(
+                            "legacy-import-unresolved:", StringComparison.Ordinal))
+                        throw new InvalidOperationException(name + ": Apply was not refused.");
+                };
+
+            // Malformed primary.
+            string malformedLegacy = null;
+            byte[] malformedBytes = null;
+            CastingWorkspaceSession malformed = scenario("malformed", (dir, repo) =>
+            {
+                malformedLegacy = repo.GetProfilePath("legacy-campaign");
+                Directory.CreateDirectory(Path.GetDirectoryName(malformedLegacy));
+                File.WriteAllText(malformedLegacy, "{ not json");
+                malformedBytes = File.ReadAllBytes(malformedLegacy);
+            });
+            expectBlocked("malformed", malformed, malformedLegacy, malformedBytes);
+
+            // Newer-schema primary with a valid older backup: the backup is
+            // never silently used in its place.
+            string newerLegacy = null;
+            byte[] newerBytes = null;
+            CastingWorkspaceSession newer = scenario("newer", (dir, repo) =>
+            {
+                repo.Save(valid);
+                repo.Save(valid);
+                newerLegacy = repo.GetProfilePath("legacy-campaign");
+                File.WriteAllText(newerLegacy,
+                    "{ \"schemaVersion\": 99, \"campaignId\": \"legacy-campaign\" }");
+                newerBytes = File.ReadAllBytes(newerLegacy);
+            });
+            expectBlocked("newer-with-backup", newer, newerLegacy, newerBytes);
+
+            // Archive write failure (a directory occupies the archive name).
+            string archiveLegacy = null;
+            byte[] archiveBytes = null;
+            CastingWorkspaceSession archiveFail = scenario("archive-fail", (dir, repo) =>
+            {
+                repo.Save(valid);
+                archiveLegacy = repo.GetProfilePath("legacy-campaign");
+                archiveBytes = File.ReadAllBytes(archiveLegacy);
+                string hash = KingmakerBuffPlanner.Infrastructure.Hashing.Sha256(archiveLegacy);
+                Directory.CreateDirectory(Path.Combine(Path.GetDirectoryName(archiveLegacy),
+                    "kbp-casting-" + hash.Substring(0, 24) + ".orig"));
+            });
+            expectBlocked("archive-fail", archiveFail, archiveLegacy, archiveBytes);
+
+            // Candidate write failure (a directory occupies the candidate).
+            string candidateLegacy = null;
+            byte[] candidateBytes = null;
+            CastingWorkspaceSession candidateFail = scenario("candidate-fail", (dir, repo) =>
+            {
+                repo.Save(valid);
+                candidateLegacy = repo.GetProfilePath("legacy-campaign");
+                candidateBytes = File.ReadAllBytes(candidateLegacy);
+                Directory.CreateDirectory(new CastingPlanRepository(dir)
+                    .GetProfilePath("legacy-campaign"));
+            });
+            if (!candidateFail.LegacyImportBlocked || !candidateFail.PersistenceBlocked ||
+                !File.ReadAllBytes(candidateLegacy).SequenceEqual(candidateBytes))
+                throw new InvalidOperationException("candidate-fail: not blocked (" +
+                    candidateFail.MigrationStatus + " " + candidateFail.MigrationWarning + ")");
+
+            // Recovery after an actual repair: Reload retries the import.
+            new ProfileRepository(Path.GetDirectoryName(Path.GetDirectoryName(malformedLegacy)))
+                .ReplaceUnresolvedPrimary(valid);
+            malformed.Reload();
+            if (malformed.LegacyImportBlocked || malformed.PersistenceBlocked ||
+                malformed.MigrationStatus != CastingMigrationStatus.Migrated ||
+                malformed.Document.Castings.Count != 1 || malformed.ImportReport == null)
+                throw new InvalidOperationException("Retry after repair did not import: " +
+                    malformed.MigrationStatus + " " + malformed.MigrationWarning);
         }
 
         // The Unity-bound host cannot be compiled here, so its wiring to the

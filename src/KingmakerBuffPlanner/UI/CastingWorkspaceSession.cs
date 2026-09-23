@@ -173,6 +173,8 @@ namespace KingmakerBuffPlanner.UI
                 throw new ArgumentException("Exact campaign ID is required.",
                     "campaignId");
             _repository = new CastingPlanRepository(modPath);
+            _modPath = modPath;
+            _legacyGroupings = legacyGroupings;
             _dispatch = dispatchBoundary ?? new DisabledCastingDispatchBoundary();
             CampaignId = campaignId;
             CastingPlanLoadResult loaded = _repository.Load(campaignId);
@@ -311,6 +313,24 @@ namespace KingmakerBuffPlanner.UI
         // existed). The report counts are shown to the player; import is
         // not execution readiness — imported drafts still need review.
         public CastingMigrationStatus? MigrationStatus { get; private set; }
+
+        // Review K1: a legacy plan that exists but could not be imported
+        // (unreadable, newer schema, unusable candidate, importer/archive
+        // failure) BLOCKS the workspace: no empty replacement is saved and
+        // Apply is refused, so missing work is never presented as absent.
+        // Reload retries the import once the legacy file is repaired.
+        public bool LegacyImportBlocked { get; private set; }
+        public string LegacyImportBlockReason { get; private set; }
+        private readonly string _modPath;
+        private readonly IDictionary<string, CastGroupingKind> _legacyGroupings;
+
+        private CastingPlanDocument BlockLegacyImport(string reason)
+        {
+            LegacyImportBlocked = true;
+            LegacyImportBlockReason = reason ?? "unknown";
+            PersistenceBlocked = true;
+            return NewDocument();
+        }
         public CastingImportReport ImportReport { get; private set; }
         public string MigrationWarning { get; private set; }
 
@@ -337,23 +357,24 @@ namespace KingmakerBuffPlanner.UI
                         }
                         MigrationWarning = "migrated-candidate-did-not-reopen:" +
                             reloaded.Status;
-                        PersistenceBlocked = true;
-                        return NewDocument();
-                    case CastingMigrationStatus.CandidateUnusable:
-                    case CastingMigrationStatus.NewerCandidateRefused:
-                        PersistenceBlocked = true;
+                        return BlockLegacyImport(MigrationWarning);
+                    case CastingMigrationStatus.LegacyAbsent:
+                        // Genuinely no previous plan: an empty, writable
+                        // document is the correct start.
                         return NewDocument();
                     default:
-                        // LegacyAbsent or LegacyUnreadable: start empty; the
-                        // legacy file (if any) stays untouched and recoverable.
-                        return NewDocument();
+                        // LegacyUnreadable / CandidateUnusable /
+                        // NewerCandidateRefused: the old plan exists but is
+                        // not represented — block, never replace it.
+                        return BlockLegacyImport(migration.Status + ":" +
+                            (migration.Warning ?? string.Empty));
                 }
             }
             catch (Exception exception)
             {
                 MigrationWarning = "migration-exception:" + exception.GetType().Name +
                     ":" + exception.Message;
-                return NewDocument();
+                return BlockLegacyImport(MigrationWarning);
             }
         }
 
@@ -736,6 +757,10 @@ namespace KingmakerBuffPlanner.UI
         {
             if (_submissionInFlight)
                 return RefusedInFlight(null);
+            if (LegacyImportBlocked)
+                return new WorkspaceApplyResult(false,
+                    "legacy-import-unresolved:" + LegacyImportBlockReason,
+                    null, null);
             // Normalize the optional scope ONCE (review C1): the compiler,
             // gate, and dispatch must all see the same selected-run scope —
             // a null scope must never mean whole-plan to one consumer and
@@ -1068,6 +1093,23 @@ namespace KingmakerBuffPlanner.UI
         public CastingPlanLoadStatus Reload()
         {
             CastingPlanLoadResult loaded = _repository.Load(CampaignId);
+            if (LegacyImportBlocked && loaded.Status == CastingPlanLoadStatus.Absent)
+            {
+                // Retry the blocked legacy import (after the owner repaired
+                // the legacy file); still blocked if it fails again.
+                LegacyImportBlocked = false;
+                LegacyImportBlockReason = null;
+                PersistenceBlocked = false;
+                ImportReport = null;
+                CastingPlanDocument retried = MigrateLegacyOrEmpty(
+                    _modPath, CampaignId, _legacyGroupings);
+                _authoring = new CastingAuthoringService(retried);
+                EditingFocusCastingId = null;
+                _savedIntentSignature = DocumentIntentSignature();
+                if (!LegacyImportBlocked && MigrationStatus == CastingMigrationStatus.Migrated)
+                    return LoadStatus;
+                return CastingPlanLoadStatus.Absent;
+            }
             LoadStatus = loaded.Status;
             LoadWarning = loaded.Warning;
             switch (loaded.Status)
