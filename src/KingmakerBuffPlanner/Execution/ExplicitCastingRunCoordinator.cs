@@ -127,13 +127,24 @@ namespace KingmakerBuffPlanner.Execution
         public IEnumerator Run(ExplicitStepConversion projection,
             Action<ExplicitCastingRunOutcome> completed)
         {
+            return Run(projection, completed, null);
+        }
+
+        // castingFinished observes each casting as soon as its executor has
+        // finished and been disposed (progress only: an observer exception
+        // is swallowed and never changes the run).
+        public IEnumerator Run(ExplicitStepConversion projection,
+            Action<ExplicitCastingRunOutcome> completed,
+            Action<ExplicitCastingRunEntry> castingFinished)
+        {
             if (projection == null) throw new ArgumentNullException("projection");
             if (completed == null) throw new ArgumentNullException("completed");
-            return RunCore(projection, completed);
+            return RunCore(projection, completed, castingFinished);
         }
 
         private IEnumerator RunCore(ExplicitStepConversion projection,
-            Action<ExplicitCastingRunOutcome> completed)
+            Action<ExplicitCastingRunOutcome> completed,
+            Action<ExplicitCastingRunEntry> castingFinished)
         {
             var entries = new List<ExplicitCastingRunEntry>();
             if (!projection.Converted)
@@ -211,11 +222,24 @@ namespace KingmakerBuffPlanner.Execution
                     activeIndex = -1;
                     ExplicitCastingRunEntry entry = Evaluate(castingId, report);
                     entries.Add(entry);
+                    if (castingFinished != null)
+                    {
+                        try { castingFinished(entry); }
+                        catch (Exception)
+                        {
+                            // Progress observation never alters the run.
+                        }
+                    }
                     if (!entry.Confirmed)
                     {
                         haltedAfter = castingId;
                         haltReason = entry.FinalStatus + ":" + entry.Detail;
                     }
+                    // One frame between castings: an owner that stops the run
+                    // here stops it BETWEEN castings (the next one never
+                    // starts), not in the middle of the next submission.
+                    else if (index + 1 < projection.Plan.Steps.Count)
+                        yield return null;
                 }
                 reported = true;
                 completed(new ExplicitCastingRunOutcome(projection.ProjectionId, entries,

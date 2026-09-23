@@ -163,6 +163,13 @@ namespace KingmakerBuffPlanner.UI
         {
             get { return _active == null ? null : _active.Scope; }
         }
+
+        // Castings of the active run whose executor has finished (progress
+        // for a deliberate stop between castings); -1 when idle.
+        public int ActiveFinishedCastings
+        {
+            get { return _active == null ? -1 : _active.FinishedCastings; }
+        }
         public CastingRunReport LastReport { get; private set; }
         public int StartedRuns { get; private set; }
         public int ReportedRuns { get; private set; }
@@ -196,7 +203,8 @@ namespace KingmakerBuffPlanner.UI
                 _clockMillis(), BaseDeadlineMillis +
                     PerCastingDeadlineMillis * projection.Plan.Steps.Count);
             active.Run = new ExplicitCastingRunCoordinator(executor)
-                .Run(projection, outcome => active.Outcome = outcome);
+                .Run(projection, outcome => active.Outcome = outcome,
+                    entry => active.FinishedCastings++);
             _active = active;
             StartedRuns++;
             return new CastingDispatchOutcome(true, "run-started:" + runId, ids);
@@ -376,6 +384,7 @@ namespace KingmakerBuffPlanner.UI
             internal ExplicitCastingRunOutcome Outcome;
             internal bool Terminated;
             internal bool Pumped;
+            internal int FinishedCastings;
         }
     }
 

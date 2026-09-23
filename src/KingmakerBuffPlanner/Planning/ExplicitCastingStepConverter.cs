@@ -280,7 +280,7 @@ namespace KingmakerBuffPlanner.Planning
         // discovery wrapper that references THE CAST ABILITY ITSELF.
         // Conditionals, references to any OTHER ability, area/party/caster
         // targets and worn-item enchantments are unmodeled for the probe.
-        private static bool IsPlainCurrentTargetBuff(EffectExpression expression,
+        internal static bool IsPlainCurrentTargetBuff(EffectExpression expression,
             string castAbilityGuid)
         {
             var leaf = expression as EffectLeafExpression;

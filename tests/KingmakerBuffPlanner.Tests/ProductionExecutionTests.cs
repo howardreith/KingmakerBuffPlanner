@@ -47,6 +47,10 @@ namespace KingmakerBuffPlanner.Tests
             Run("card-discloses-limits-and-existing-effects",
                 () => TestCardDisclosesLimitsAndExistingEffects(root));
             Run("refusal-feedback-rules", () => TestRefusalFeedbackRules(root));
+            Run("host-stops-between-castings", TestHostStopsBetweenCastings);
+            Run("qualification-allowance-parsing", TestQualificationAllowanceParsing);
+            Run("qualification-recipe-selection", TestQualificationRecipeSelection);
+            Run("qualification-forecast-and-boundary", TestQualificationForecastAndBoundary);
             // Last: it takes the process-wide runtime-test lock.
             Run("production-execution-wiring-and-session-lock", TestProductionExecutionWiring);
         }
@@ -1168,6 +1172,226 @@ namespace KingmakerBuffPlanner.Tests
                 "p", "completed", false, false, new CastingOutcomeEntry[0], new string[0]));
             if (session.LastAttemptMessage != null || session.LastRunReport == null)
                 throw new InvalidOperationException("A run report did not supersede the last attempt.");
+        }
+
+        // A stop observed between castings (progress == 1) lands between
+        // them: the first is confirmed, the next never starts.
+        private static void TestHostStopsBetweenCastings()
+        {
+            ExplicitCastingPlan plan;
+            CastingApplyDecision decision;
+            ExplicitStepConversion projection = HostFixture(out plan, out decision, false);
+            long now = 0;
+            var runtime = new ScriptedInstantRuntime("none", "none");
+            var host = new CastingExecutionHost(
+                settings => new InstantCastExecutor(runtime, true), () => now);
+            if (host.ActiveFinishedCastings != -1)
+                throw new InvalidOperationException("Idle progress was not -1.");
+            host.Start(plan, decision, "long", projection, null);
+            int guard = 0;
+            while (host.IsRunning && host.ActiveFinishedCastings < 1 && guard++ < 1000) host.Pump();
+            if (!host.IsRunning || host.ActiveFinishedCastings != 1)
+                throw new InvalidOperationException("The run did not pause between castings.");
+            host.Cancel("qualification-stop");
+            CastingRunReport report = host.LastReport;
+            if (report == null || !report.Cancelled ||
+                report.TerminalReason != "cancelled:qualification-stop" ||
+                report.Entries[0].State != CastingOutcomeState.EffectConfirmed ||
+                report.Entries[1].State != CastingOutcomeState.NotProcessed ||
+                report.Entries[1].Submitted ||
+                !runtime.Fired.SequenceEqual(new[] { "cast-1" }) ||
+                runtime.Validated.Contains("cast-2"))
+                throw new InvalidOperationException("A stop between castings started the next one.");
+        }
+
+        // Two casters with verified-free pools casting the fixture buff by
+        // rule, plus four other party members (optionally a finite pool or
+        // a single caster).
+        private static CastingWorkspaceInputs QualificationInputs(bool free, bool twoCasters,
+            ActiveEffectSnapshot live)
+        {
+            string[] casters = twoCasters
+                ? new[] { "unit-cleric", "unit-wizard" } : new[] { "unit-cleric" };
+            string[] others = { "unit-t1", "unit-t2", "unit-t3", "unit-t4" };
+            List<string> all = casters.Concat(others).ToList();
+            List<UnitSnapshot> units = all.Select(id => new UnitSnapshot(id, id, false, string.Empty,
+                new TargetValidationSnapshot(true, true, true, true))).ToList();
+            var providers = new List<ProviderSnapshot>();
+            var pools = new List<ResourcePoolSnapshot>();
+            var options = new List<ProviderPlanningOption>();
+            foreach (string caster in casters)
+            {
+                string poolKey = "pool-" + caster;
+                pools.Add(free
+                    ? new ResourcePoolSnapshot(poolKey, ResourcePoolKind.Unlimited, 0, 0, null)
+                    : new ResourcePoolSnapshot(poolKey, ResourcePoolKind.SpontaneousLevel, 3, 3, null));
+                ProviderSnapshot provider = PlannerProvider(caster, "book-" + caster,
+                    CastingBuffAbility, poolKey, free ? 0 : 1);
+                providers.Add(provider);
+                options.Add(new ProviderPlanningOption(provider, all, new[] { caster }, 10, 100,
+                    CastExecutionStrategy.DirectRuleCast, "fixture-direct",
+                    new Dictionary<string, IEnumerable<string>>(StringComparer.Ordinal)));
+            }
+            return new CastingWorkspaceInputs(new PartyProviderSnapshot(units, providers, pools),
+                options, CastingEffectsWithAbilityAlias("source-bulls", "source-communal",
+                    CastingBuffAbility), new CastEnhancementSnapshot[0], null, live);
+        }
+
+        private static string QualificationAllowanceJson(Action<JObject> mutate = null)
+        {
+            var root = new JObject
+            {
+                { "schemaVersion", 3 },
+                { "kind", "kbp-casting-qualification" },
+                { "runId", "qual-run-1" },
+                { "sourceCommit", new string('c', 40) },
+                { "packageSha256", new string('a', 64) },
+                { "dllSha256", new string('b', 64) },
+                { "assemblyMvid", "11111111-2222-3333-4444-555555555555" },
+                { "fixtureGameId", "fixture-game" },
+                { "recipe", "zero-cost-mixed" },
+                { "approvedProjectionIds", new JArray(new string('d', 64), new string('e', 64)) },
+                { "maximumNativeSubmissions", 6 },
+                { "approvedBy", "Howie" },
+                { "authority", "owner mission 2026-09-23 section 4" }
+            };
+            if (mutate != null) mutate(root);
+            return root.ToString();
+        }
+
+        private static void TestQualificationAllowanceParsing()
+        {
+            string refusal;
+            CastingQualificationAllowance valid = CastingQualificationAllowance.Parse(
+                QualificationAllowanceJson(), "qual-run-1", out refusal);
+            if (valid == null || refusal != null || valid.ApprovedProjectionIds.Count != 2 ||
+                valid.MaximumNativeSubmissions != 6 || valid.Recipe != "zero-cost-mixed")
+                throw new InvalidOperationException("A valid qualification allowance was refused: " + refusal);
+            var cases = new Dictionary<string, Action<JObject>>
+            {
+                { "allowance-unknown-member:extra", o => o["extra"] = 1 },
+                { "allowance-missing-member:authority", o => o.Remove("authority") },
+                { "allowance-schema", o => o["schemaVersion"] = 2 },
+                { "allowance-kind", o => o["kind"] = "kbp-single-cast-probe" },
+                { "allowance-submissions-range", o => o["maximumNativeSubmissions"] = 25 },
+                { "allowance-projection-ids", o => o["approvedProjectionIds"] = new JArray("XYZ") },
+                { "allowance-artifact-identity", o => o["dllSha256"] = "short" },
+                { "allowance-fixture-missing", o => o["fixtureGameId"] = string.Empty },
+                { "allowance-recipe-unknown", o => o["recipe"] = "anything" },
+                { "allowance-approval-missing", o => o["approvedBy"] = string.Empty }
+            };
+            foreach (KeyValuePair<string, Action<JObject>> item in cases)
+            {
+                if (CastingQualificationAllowance.Parse(QualificationAllowanceJson(item.Value),
+                        "qual-run-1", out refusal) != null || refusal != item.Key)
+                    throw new InvalidOperationException("Allowance case " + item.Key + " returned " + refusal);
+            }
+            if (CastingQualificationAllowance.Parse(QualificationAllowanceJson(), "other-run",
+                    out refusal) != null || refusal != "allowance-run-mismatch")
+                throw new InvalidOperationException("A different run used the allowance.");
+            if (CastingQualificationAllowance.Parse(QualificationAllowanceJson(o =>
+                    o["maximumNativeSubmissions"] = 0), "qual-run-1", out refusal) != null)
+                throw new InvalidOperationException("A zero submission budget was accepted.");
+        }
+
+        // The recipe picks one free buff, two casters and fresh targets
+        // deterministically, and refuses rather than improvise.
+        private static void TestQualificationRecipeSelection()
+        {
+            CastingQualificationSelection selection = CastingQualificationRecipe.SelectZeroCostMixed(
+                QualificationInputs(true, true, null), "fixture-campaign");
+            string shape = string.Join(",", selection.Castings.Select(casting =>
+                casting.CastingId + "=" + casting.CasterUnitId + ">" + casting.DirectTargetUnitId).ToArray());
+            if (!selection.Selected || shape !=
+                    "qual-cast-1=unit-cleric>unit-t1,qual-cast-2=unit-wizard>unit-t2,qual-cast-3=unit-cleric>unit-t3" ||
+                selection.SourceId != "source-bulls")
+                throw new InvalidOperationException("The recipe selection is wrong: " + shape + "|" +
+                    selection.Refusal + "|" + string.Join(";", selection.Rejections.ToArray()));
+            CastingQualificationSelection freshOnly = CastingQualificationRecipe.SelectZeroCostMixed(
+                QualificationInputs(true, true, LiveEffects(On("unit-t1", "buff-effect", null, null, null))),
+                "fixture-campaign");
+            if (!freshOnly.Selected || freshOnly.Castings[0].DirectTargetUnitId != "unit-t2")
+                throw new InvalidOperationException("A target with the effect already active was chosen.");
+            CastingQualificationSelection finite = CastingQualificationRecipe.SelectZeroCostMixed(
+                QualificationInputs(false, true, null), "fixture-campaign");
+            if (finite.Selected || !finite.Rejections.Any(value => value.EndsWith("|not-verified-free",
+                    StringComparison.Ordinal)))
+                throw new InvalidOperationException("A finite source was used for the free recipe.");
+            CastingQualificationSelection single = CastingQualificationRecipe.SelectZeroCostMixed(
+                QualificationInputs(true, false, null), "fixture-campaign");
+            if (single.Selected || !single.Rejections.Any(value => value.EndsWith(
+                    "|fewer-than-two-casters", StringComparison.Ordinal)))
+                throw new InvalidOperationException("A single caster satisfied the mixed recipe.");
+        }
+
+        // The forecast gives the exact projection of each executing step,
+        // and the qualification boundary submits only those, in order,
+        // within the submission budget.
+        private static void TestQualificationForecastAndBoundary()
+        {
+            CastingWorkspaceInputs inputs = QualificationInputs(true, true, null);
+            CastingQualificationSelection selection = CastingQualificationRecipe.SelectZeroCostMixed(
+                inputs, "fixture-campaign");
+            IReadOnlyList<CastingQualificationStepForecast> steps = CastingQualificationForecast.Forecast(
+                selection, inputs, "fixture-campaign");
+            string shape = string.Join(";", steps.Select(step => step.Name + "=" +
+                string.Join(",", step.CastingIds.ToArray()) + (step.Refusal ?? string.Empty)).ToArray());
+            if (shape != "stop=qual-cast-1,qual-cast-2,qual-cast-3;complete=qual-cast-2,qual-cast-3;recast=qual-cast-1" ||
+                steps.Any(step => step.ProjectionId == null) ||
+                steps.Select(step => step.ProjectionId).Distinct().Count() != 3)
+                throw new InvalidOperationException("The step forecast is wrong: " + shape);
+            // The real state after the stop step (qual-cast-1 active) projects
+            // exactly the forecast complete step.
+            CastingPlanDocument document = CastingQualificationForecast.BuildDocument(
+                "fixture-campaign", selection.Castings);
+            CastingQualificationStepForecast real = CastingQualificationForecast.Project("real",
+                document, inputs, LiveEffects(On("unit-t1", "buff-effect", 20, null, 0)));
+            if (real.ProjectionId != steps[1].ProjectionId)
+                throw new InvalidOperationException("The complete forecast differs from the real projection.");
+            // Boundary: next approved id in order, budget respected.
+            string json = QualificationAllowanceJson(o =>
+            {
+                o["approvedProjectionIds"] = new JArray(steps.Select(step => (object)step.ProjectionId).ToArray());
+                o["maximumNativeSubmissions"] = 4;
+            });
+            string refusal;
+            CastingQualificationAllowance allowance = CastingQualificationAllowance.Parse(json,
+                "qual-run-1", out refusal);
+            long now = 0;
+            // "free": a genuine zero-cost cast reports no spend (a spend on a
+            // verified free pool would correctly fail the cast).
+            var runtime = new ScriptedInstantRuntime("none", "free");
+            var host = new CastingExecutionHost(settings => new InstantCastExecutor(runtime, true), () => now);
+            var boundary = new CastingQualificationBoundary(allowance, host, () => null);
+            Func<string, ActiveEffectSnapshot, CastingPlanDocument, CastingDispatchOutcome> submit =
+                (name, live, doc) =>
+                {
+                    ExplicitCastingPlan plan = new ExplicitCastingCompiler().Compile(doc,
+                        inputs.Snapshot, inputs.ProviderOptions, inputs.EffectsBySource,
+                        inputs.Enhancements, "long", null, false, live);
+                    CastingApplyDecision decision = new CastingExecutionGate().Evaluate(plan,
+                        CastingApplyMode.Ordinary, "long");
+                    ExplicitStepConversion projection = ExplicitCastingStepConverter.Convert(plan,
+                        decision, inputs.ProviderOptions, inputs.EffectsBySource);
+                    CastingDispatchOutcome outcome = boundary.Submit(plan, decision, "long", projection);
+                    int guard = 0;
+                    while (host.IsRunning && guard++ < 1000) host.Pump();
+                    return outcome;
+                };
+            ActiveEffectSnapshot afterStop = LiveEffects(On("unit-t1", "buff-effect", 20, null, 0));
+            if (submit("early", afterStop, document).Submitted ||
+                !boundary.Submissions[0].StartsWith("refused:qualification-projection-not-approved:step=0",
+                    StringComparison.Ordinal))
+                throw new InvalidOperationException("An out-of-order projection was submitted.");
+            if (!submit("stop", null, document).Submitted || boundary.PlannedSubmissions != 3)
+                throw new InvalidOperationException("The approved stop projection was refused.");
+            CastingDispatchOutcome overBudget = submit("complete", afterStop, document);
+            if (overBudget.Submitted ||
+                !overBudget.Reason.StartsWith("qualification-submission-cap:4", StringComparison.Ordinal) ||
+                runtime.Fired.Count != 3)
+                throw new InvalidOperationException("The submission budget was exceeded: " +
+                    overBudget.Reason + "|fired=" + runtime.Fired.Count + "|" +
+                    string.Join(";", boundary.Submissions.ToArray()));
         }
     }
 }
