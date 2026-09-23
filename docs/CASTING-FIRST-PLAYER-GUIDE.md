@@ -1,8 +1,10 @@
 # Casting-first planner: player guide (experimental)
 
 This guide covers the casting-first planner in the release candidate. The
-classic planner stays the default and is unchanged. Nothing described here
-has been qualified in gameplay yet; see "Qualification status" at the end.
+classic planner stays the default and is unchanged. Only part of what is
+described here has been checked in the game so far; the table in "What
+runs in this version" says which, and "Qualification status" at the end
+has the details.
 
 ## Turning it on
 
@@ -94,18 +96,24 @@ it ran skips the castings that are still in effect instead of refusing.
 
 ## What runs in this version
 
-| Casting setting | Status |
-| --- | --- |
-| Spellbook spells, prepared or spontaneous, direct target | Runs |
-| Cantrips and other verified free sources | Runs, no resource spent |
-| Exact prepared slots and spontaneous or ability pools, shared across castings | Runs, budgeted in order |
-| Group spells, caster-centred or anchored origin, predicted coverage | Runs |
-| Metamagic spell variants, metamagic rods (any matching rod) | Runs |
-| Several casters in one routine, each casting with its own caster | Runs |
-| Skip if already active / Always recast | Runs |
-| Targeting modifiers (for example Share Transmutation) | Shown as "cannot run in this version"; Apply refuses |
-| A specific physical rod or item | Shown as "cannot run in this version"; Apply refuses |
-| Group castings whose required recipients are outside the predicted area | Shown as "cannot run in this version"; Apply refuses |
+"Checked in the game" means a guarded run on a disposable test campaign
+observed the real result (effect, resources, submissions). Everything
+else has passed source and recorded-runtime tests only.
+
+| Casting setting | In this version | Checked in the game |
+| --- | --- | --- |
+| Cantrips and other verified free sources, direct target | Runs, no resource spent | Yes: Resistance, cast by two casters on other party members; resources unchanged |
+| Several casters in one routine, each casting with its own caster | Runs | Yes (two casters, three castings) |
+| Skip if already active / Always recast | Runs | Yes, with free sources: an active effect is skipped, a repeat press casts nothing, Always recast casts again |
+| Stopping a running routine | Runs | Yes: the cast in progress finished and nothing after it started |
+| Close and reopen the planner; the accepted plan survives | Runs | Yes |
+| Spellbook spells from prepared slots or spontaneous levels, direct target | Runs, budgeted in order | Not yet (the test party has only cantrips) |
+| Exact prepared slots and ability pools shared across castings | Runs, budgeted in order | Not yet |
+| Group spells, caster-centred or anchored origin, predicted coverage | Runs | Not yet |
+| Metamagic spell variants, metamagic rods (any matching rod) | Runs | Not yet |
+| Targeting modifiers (for example Share Transmutation) | Shown as "cannot run in this version"; Apply refuses | n/a |
+| A specific physical rod or item | Shown as "cannot run in this version"; Apply refuses | n/a |
+| Group castings whose required recipients are outside the predicted area | Shown as "cannot run in this version"; Apply refuses | n/a |
 
 A casting that cannot run is never silently changed into something that
 can: it has to be edited, disabled, or left out with Ready Casts Only.
@@ -130,8 +138,20 @@ where the older version would misread it.
 ## Qualification status
 
 The casting-first execution path has passed source tests, mutation tests
-and recorded-runtime tests. It has **not** yet cast a spell in the game:
-the first live casting (one Resistance cantrip on a disposable test
-campaign) is waiting for the owner, and the broader in-game
-qualification follows it. Until then, treat casting-first mode as
-experimental and keep the classic planner for normal play.
+and recorded-runtime tests, and on a disposable test campaign (never an
+ordinary save) it has cast in the game:
+
+- one Resistance cantrip through a one-cast probe: the effect appeared
+  and nothing was spent;
+- a two-caster Resistance routine through the same Apply a player uses:
+  stopped after its first cast, completed (skipping the buff already
+  active), pressed again (nothing to cast), and, after closing and
+  reopening the planner, recast with Always recast. Every step matched
+  its prediction; no save was written.
+
+Spells that spend slots, group spells, metamagic and rods have not been
+cast in the game yet; they need a test campaign with a more advanced
+party. The workspace itself, the save and reopen cycle and the planner's
+text were checked in game frames; the owner has not yet accepted the
+workspace's usability. Treat casting-first mode as experimental and keep
+the classic planner for normal play.
