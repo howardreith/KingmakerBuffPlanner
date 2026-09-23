@@ -164,6 +164,26 @@ namespace KingmakerBuffPlanner.UI
             return _instance.CreateCastingExecutor(settings ?? ExecutionProfile.Default());
         }
 
+        // The planner's own execution host, which this root pumps once per
+        // frame while the world runs (runtime qualification submits its
+        // approved runs to it through the qualification boundary).
+        internal static CastingExecutionHost CastingHostForRuntime
+        {
+            get
+            {
+                if (_instance == null || _instance._castingHost == null)
+                    throw new InvalidOperationException("UI root casting host is absent.");
+                return _instance._castingHost;
+            }
+        }
+
+        // A routine press exactly as the HUD button delivers it (the single
+        // routine entry); while a run is active this is the player's stop.
+        internal static bool PressRoutineForRuntime(string routineId)
+        {
+            return _instance != null && _instance.ExecuteRoutineRequest(routineId);
+        }
+
         // Runtime evidence: how many production casting runs started in
         // this session, and the current dispatch disposition.
         internal static int CastingRunsStartedForRuntime
@@ -930,7 +950,7 @@ namespace KingmakerBuffPlanner.UI
             if (_castingHost.IsRunning)
             {
                 string running = _castingHost.ActiveScopeRoutineId ?? "the";
-                _castingHost.RequestStop("player-stopped");
+                _castingHost.RequestStop(CastingExecutionHost.PlayerStopReason);
                 _log.Info("[KBP-CF-RUN] stop requested by routine press;routine=" + routineId +
                     ";running=" + running + ";effective=after-current-cast.");
                 CompleteQuick(completed, new QuickExecutionResult(routineId, name,
@@ -1121,10 +1141,10 @@ namespace KingmakerBuffPlanner.UI
         // records the flow diagnostics and calls TryStart, which sends the
         // request to the casting-first pipeline whenever that planner is
         // active - no route can reach the legacy executor then.
-        private void ExecuteRoutineRequest(string routineId, bool readyOnly = false)
+        private bool ExecuteRoutineRequest(string routineId, bool readyOnly = false)
         {
-            if (_quick == null) return;
-            _quick.Execute(routineId, readyOnly);
+            if (_quick == null) return false;
+            return _quick.Execute(routineId, readyOnly);
         }
 
         private bool OpenSetup()

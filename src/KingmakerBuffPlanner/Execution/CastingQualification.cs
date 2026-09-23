@@ -24,7 +24,9 @@ namespace KingmakerBuffPlanner.Execution
     {
         private CastingQualificationAllowance() { }
 
-        public const int AllowanceSchemaVersion = 3;
+        // Schema 4 names the casting mode the run is approved for; the
+        // boundary refuses a run in any other mode.
+        public const int AllowanceSchemaVersion = 4;
         public const int MaximumSubmissionsCeiling = 24;
 
         public string RunId { get; private set; }
@@ -34,6 +36,7 @@ namespace KingmakerBuffPlanner.Execution
         public string AssemblyMvid { get; private set; }
         public string FixtureGameId { get; private set; }
         public string Recipe { get; private set; }
+        public string ExecutionMode { get; private set; }
         public IReadOnlyList<string> ApprovedProjectionIds { get; private set; }
         public int MaximumNativeSubmissions { get; private set; }
         public string ApprovedBy { get; private set; }
@@ -42,7 +45,7 @@ namespace KingmakerBuffPlanner.Execution
         private static readonly string[] Members =
         {
             "schemaVersion", "kind", "runId", "sourceCommit", "packageSha256", "dllSha256",
-            "assemblyMvid", "fixtureGameId", "recipe", "approvedProjectionIds",
+            "assemblyMvid", "fixtureGameId", "recipe", "executionMode", "approvedProjectionIds",
             "maximumNativeSubmissions", "approvedBy", "authority"
         };
 
@@ -82,6 +85,7 @@ namespace KingmakerBuffPlanner.Execution
                 AssemblyMvid = Text(root, "assemblyMvid"),
                 FixtureGameId = Text(root, "fixtureGameId"),
                 Recipe = Text(root, "recipe"),
+                ExecutionMode = Text(root, "executionMode"),
                 ApprovedProjectionIds = new ReadOnlyCollection<string>(
                     ids.Select(token => (string)token).ToList()),
                 MaximumNativeSubmissions = maximum,
@@ -102,6 +106,8 @@ namespace KingmakerBuffPlanner.Execution
             { refusal = "allowance-fixture-missing"; return null; }
             if (!CastingQualificationRecipe.IsKnown(allowance.Recipe))
             { refusal = "allowance-recipe-unknown"; return null; }
+            if (allowance.ExecutionMode != "instant" && allowance.ExecutionMode != "animated")
+            { refusal = "allowance-execution-mode"; return null; }
             if (string.IsNullOrEmpty(allowance.ApprovedBy) || string.IsNullOrEmpty(allowance.Authority))
             { refusal = "allowance-approval-missing"; return null; }
             return allowance;
@@ -763,10 +769,18 @@ namespace KingmakerBuffPlanner.Execution
                 return new CastingDispatchOutcome(false, "execution-settings-unavailable:" +
                     exception.GetType().Name, ids);
             }
+            // The run executes only in the casting mode the allowance names.
+            string mode = settings == null ? null : settings.Mode;
+            if (!string.Equals(mode, _allowance.ExecutionMode, StringComparison.Ordinal))
+            {
+                string modeRefusal = "qualification-mode-not-approved:" + (mode ?? "none");
+                Submissions.Add("refused:" + modeRefusal);
+                return new CastingDispatchOutcome(false, modeRefusal, ids);
+            }
             CastingDispatchOutcome outcome = _host.Start(plan, decision, scopeRoutineId,
                 projection, settings);
             Submissions.Add((outcome.Submitted ? "submitted:" : "refused:") + outcome.Reason +
-                ";projection=" + projection.ProjectionId);
+                ";projection=" + projection.ProjectionId + ";mode=" + mode);
             if (outcome.Submitted)
             {
                 // An approved id is consumed by its submission, whatever the

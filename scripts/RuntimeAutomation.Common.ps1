@@ -614,17 +614,20 @@ function Get-KbpProbeAllowanceBuildRefusal {
 # loaded identity; the forecast projections are checked in game.
 function Get-KbpQualificationAllowanceBuildRefusal {
     # -Recipe (optional): the recipe the launcher was asked for; the
-    # allowance must name the same one.
-    param([string]$AllowanceJson, [string]$RunId, $BuildManifest, [string]$Recipe)
+    # allowance must name the same one. -ExecutionMode (optional): the
+    # casting mode the launcher runs; schema 4 names the one approved.
+    param([string]$AllowanceJson, [string]$RunId, $BuildManifest, [string]$Recipe, [string]$ExecutionMode)
     try { $allowance = $AllowanceJson | ConvertFrom-Json }
     catch { return 'unreadable' }
     if ($null -eq $allowance) { return 'unreadable' }
     $names = @($allowance.PSObject.Properties | ForEach-Object Name)
     foreach ($required in @('schemaVersion', 'kind', 'runId', 'sourceCommit', 'packageSha256', 'dllSha256',
-            'assemblyMvid', 'fixtureGameId', 'recipe', 'approvedProjectionIds', 'maximumNativeSubmissions',
-            'approvedBy', 'authority')) {
+            'assemblyMvid', 'fixtureGameId', 'recipe', 'executionMode', 'approvedProjectionIds',
+            'maximumNativeSubmissions', 'approvedBy', 'authority')) {
         if ($names -cnotcontains $required) { return "missing:$required" }
     }
+    if (-not ($allowance.schemaVersion -is [int] -or $allowance.schemaVersion -is [long]) -or
+        [int]$allowance.schemaVersion -ne 4) { return 'schema' }
     if ([string]$allowance.kind -cne 'kbp-casting-qualification') { return 'kind' }
     if ([string]$allowance.runId -cne $RunId) { return 'run-id' }
     if ([string]$allowance.sourceCommit -cne [string]$BuildManifest.commit) { return 'commit' }
@@ -633,6 +636,10 @@ function Get-KbpQualificationAllowanceBuildRefusal {
     if ([string]$allowance.assemblyMvid -cne [string]$BuildManifest.assemblyMvid) { return 'mvid' }
     if (@('zero-cost-mixed', 'finite-direct-mixed') -cnotcontains [string]$allowance.recipe) { return 'recipe' }
     if (-not [string]::IsNullOrEmpty($Recipe) -and [string]$allowance.recipe -cne $Recipe) { return 'recipe-differs' }
+    if (@('instant', 'animated') -cnotcontains [string]$allowance.executionMode) { return 'execution-mode' }
+    if (-not [string]::IsNullOrEmpty($ExecutionMode) -and [string]$allowance.executionMode -cne $ExecutionMode) {
+        return 'execution-mode-differs'
+    }
     if (-not ($allowance.maximumNativeSubmissions -is [int] -or $allowance.maximumNativeSubmissions -is [long]) -or
         [int]$allowance.maximumNativeSubmissions -lt 1 -or [int]$allowance.maximumNativeSubmissions -gt 24) {
         return 'submissions'

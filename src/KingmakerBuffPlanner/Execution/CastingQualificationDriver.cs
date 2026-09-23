@@ -100,6 +100,14 @@ namespace KingmakerBuffPlanner.Execution
         public IReadOnlyList<string> Submissions { get; set; } = new string[0];
         public int PlannedSubmissions { get; set; }
         public int MaximumSubmissions { get; set; }
+        // The casting mode the allowance approved (every run uses it).
+        public string ExecutionMode { get; set; }
+        // The player's stop in the stop step: how it was delivered, whether
+        // the host took it as the player stop, and whether the first
+        // casting was still in progress when it arrived.
+        public string StopPress { get; set; }
+        public bool StopPressHandled { get; set; }
+        public bool? StopPressedInFlight { get; set; }
 
         internal CastingQualificationStepResult Step(string name)
         {
@@ -129,6 +137,14 @@ namespace KingmakerBuffPlanner.Execution
                 string failure = StepFailure(name);
                 if (failure != null) violations.Add(name + ":" + failure);
             }
+            // The stop is the player's own: pressed once and taken by the
+            // host as the player stop. An animated cast spans many frames,
+            // so there the press must land while the first cast is in
+            // progress (the stop waits for it to complete).
+            if (StopPress == null) violations.Add("stop-press:none");
+            else if (!StopPressHandled) violations.Add("stop-press:not-handled:" + StopPress);
+            else if (ExecutionMode == "animated" && StopPressedInFlight != true)
+                violations.Add("stop-press:not-in-flight:" + StopPress);
             return violations;
         }
 
@@ -157,7 +173,7 @@ namespace KingmakerBuffPlanner.Execution
             if (name == "stop")
             {
                 if (!step.Report.Cancelled ||
-                    step.Report.TerminalReason != "cancelled:" + CastingQualificationDriver.StopReason)
+                    step.Report.TerminalReason != "cancelled:" + CastingExecutionHost.PlayerStopReason)
                     failure = "report:" + step.Report.TerminalReason;
                 else if (step.StateOf(first) != CastingOutcomeState.EffectConfirmed ||
                     rest.Any(id => step.StateOf(id) != CastingOutcomeState.NotProcessed) ||
@@ -307,15 +323,14 @@ namespace KingmakerBuffPlanner.Execution
     // host. Every Apply goes through CastingWorkspaceSession.Apply with
     // fresh inputs; only the qualification boundary (approved projections
     // in order, submission budget) stands between it and the host. Steps:
-    // select -> author/accept -> stop (the run is stopped after its first
-    // casting) -> complete (the rest; the first is skipped as active) ->
+    // select -> author/accept -> stop (the player's stop, pressed while the
+    // first casting is in progress: it completes, nothing after it starts)
+    // -> complete (the rest; the first is skipped as active) ->
     // repeat (nothing to cast) -> recast (Always recast on the first
     // casting, accepted, then the session is REOPENED from disk and the
     // restored acceptance authorizes the run).
     public sealed class CastingQualificationDriver
     {
-        public const string StopReason = "qualification-stop";
-
         private readonly CastingQualificationAllowance _allowance;
         private readonly string _campaignId;
         private readonly Func<CastingWorkspaceInputs> _freshInputs;
@@ -328,6 +343,13 @@ namespace KingmakerBuffPlanner.Execution
         // Whether a cast can execute in the world now (Default mode, not
         // paused, no full-screen window); null means always.
         private readonly Func<bool> _worldRunning;
+        // The host's owner pumps it (the planner's root, once per frame
+        // while the world runs); the driver then only waits on it.
+        private readonly bool _ownerPumpsHost;
+        // The player's routine press as the HUD delivers it; without it the
+        // stop goes to the host's own player stop.
+        private readonly Func<string, bool> _pressRoutine;
+        private bool _stopPressed;
         private CastingQualificationBoundary _boundary;
         private Dictionary<string, CastStep> _observeSteps;
         private CastingWorkspaceSession _session;
@@ -342,10 +364,13 @@ namespace KingmakerBuffPlanner.Execution
             Func<ICastingDispatchBoundary, CastingWorkspaceSession> openSession,
             CastingExecutionHost host, Func<CastStep, string, ProbeObservation> observe,
             Func<long> clock, long deadlineMillis, string recipe = null,
-            Func<bool> worldRunning = null)
+            Func<bool> worldRunning = null, bool ownerPumpsHost = false,
+            Func<string, bool> pressRoutine = null)
         {
             _requestedRecipe = recipe;
             _worldRunning = worldRunning;
+            _ownerPumpsHost = ownerPumpsHost;
+            _pressRoutine = pressRoutine;
             Record = record ?? throw new ArgumentNullException("record");
             _allowance = allowance;
             _campaignId = campaignId;
@@ -489,6 +514,7 @@ namespace KingmakerBuffPlanner.Execution
                 return;
             }
             Record.AllowanceStatus = "valid";
+            Record.ExecutionMode = _allowance.ExecutionMode;
             Record.MaximumSubmissions = _allowance.MaximumNativeSubmissions;
             _boundary = new CastingQualificationBoundary(_allowance, _host,
                 () => _session == null ? null : _session.ExecutionSettings);
@@ -503,7 +529,7 @@ namespace KingmakerBuffPlanner.Execution
                 AuthoringEditResult added = _session.AddCastingForRuntime(casting);
                 if (!added.Applied) { Fail("author-refused:" + casting.CastingId + ":" + added.Reason); return; }
             }
-            _session.SetExecutionMode("instant");
+            _session.SetExecutionMode(_allowance.ExecutionMode);
             _session.Save();
             CastingWorkspaceInputs inputs = _freshInputs();
             _session.PresentForReview(inputs);
@@ -543,16 +569,18 @@ namespace KingmakerBuffPlanner.Execution
             _phase = name + "-wait";
         }
 
-        // Pumps the run; the stop step cancels as soon as the first casting
-        // has finished (the coordinator is then between castings).
+        // Waits on the run (pumping it unless its owner does); the stop step
+        // presses the player's stop once the first casting is in progress
+        // or has finished.
         private void Wait(bool stopAfterFirst, string next)
         {
-            if (_host.IsRunning && stopAfterFirst && _host.ActiveFinishedCastings >= 1)
-                _host.Cancel(StopReason);
+            if (_host.IsRunning && stopAfterFirst && !_stopPressed &&
+                (_host.ActiveCastingInFlight || _host.ActiveFinishedCastings >= 1))
+                PressStop();
             if (_host.IsRunning)
             {
                 // A run advances only while the world runs.
-                if (!WorldHeld()) _host.Pump();
+                if (!WorldHeld() && !_ownerPumpsHost) _host.Pump();
                 return;
             }
             CastingQualificationStepResult finished = _running;
@@ -565,6 +593,27 @@ namespace KingmakerBuffPlanner.Execution
             string failure = Record.StepFailure(finished.Name);
             if (failure != null) { Fail("step:" + failure); return; }
             _phase = next;
+        }
+
+        // The player's stop, delivered once: a routine press exactly as the
+        // HUD sends it (the host's own player stop when no press route is
+        // given). The cast in progress completes; nothing after it starts.
+        private void PressStop()
+        {
+            _stopPressed = true;
+            bool inFlight = _host.ActiveFinishedCastings == 0;
+            bool handled = _pressRoutine != null
+                ? _pressRoutine(CastingQualificationRecipe.RoutineId)
+                : _host.RequestStop(CastingExecutionHost.PlayerStopReason);
+            string pending = _host.ActiveStopRequested;
+            Record.StopPressedInFlight = inFlight;
+            Record.StopPressHandled = handled && (_host.IsRunning
+                ? pending == CastingExecutionHost.PlayerStopReason
+                : _host.LastReport != null && _host.LastReport.TerminalReason ==
+                    "cancelled:" + CastingExecutionHost.PlayerStopReason);
+            Record.StopPress = (_pressRoutine != null ? "routine-press" : "host-request") +
+                ";handled=" + handled + ";inFlight=" + inFlight + ";pending=" +
+                (pending ?? (_host.IsRunning ? "none" : "run-ended"));
         }
 
         private void Repeat()
