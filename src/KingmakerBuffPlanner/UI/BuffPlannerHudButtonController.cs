@@ -57,14 +57,20 @@ namespace KingmakerBuffPlanner.UI
             BuffPlannerUiLifecycleDiagnostics diagnostics,
             ModLog log,
             Action openSetup,
-            Action<string> quickExecute)
+            Action<string> quickExecute,
+            Func<string, string> routineTooltipOverride = null)
         {
             _session = session ?? throw new ArgumentNullException("session");
             _diagnostics = diagnostics ?? throw new ArgumentNullException("diagnostics");
             _log = log ?? throw new ArgumentNullException("log");
             _openSetup = openSetup ?? throw new ArgumentNullException("openSetup");
             _quickExecute = quickExecute ?? throw new ArgumentNullException("quickExecute");
+            _routineTooltipOverride = routineTooltipOverride;
         }
+
+        // Casting-first mode describes its own plan; null keeps the classic
+        // tooltip.
+        private readonly Func<string, string> _routineTooltipOverride;
 
         internal bool IsInstalled
         {
@@ -883,6 +889,16 @@ namespace KingmakerBuffPlanner.UI
 
         private string RoutineTooltip(string routineId)
         {
+            if (_routineTooltipOverride != null)
+            {
+                string casting = null;
+                try { casting = _routineTooltipOverride(routineId); }
+                catch (Exception exception)
+                {
+                    _log.Error("[KBP-HUD] casting-first tooltip failed.", exception);
+                }
+                if (casting != null) return casting;
+            }
             string name = char.ToUpperInvariant(routineId[0]) + routineId.Substring(1);
             if (_session.Model == null) return "Load a campaign to run " + name + ".";
             if (_session.IsExecuting) return "A buff routine is already executing.";

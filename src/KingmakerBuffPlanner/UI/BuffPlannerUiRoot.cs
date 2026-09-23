@@ -8,7 +8,12 @@ using Kingmaker.UI;
 using Kingmaker.UI.Common;
 using Kingmaker.UI.Selection;
 using Kingmaker.PubSubSystem;
+using KingmakerBuffPlanner.Domain.Planning;
+using KingmakerBuffPlanner.Execution;
+using KingmakerBuffPlanner.GameAdapters;
 using KingmakerBuffPlanner.Infrastructure;
+using KingmakerBuffPlanner.Persistence;
+using KingmakerBuffPlanner.Planning;
 using KingmakerBuffPlanner.RuntimeTesting;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -58,6 +63,15 @@ namespace KingmakerBuffPlanner.UI
         private bool _lastLoggedHudActive;
         private int _hudInstallExceptionCount;
         private int _hudTickExceptionCount;
+        // Casting-first production execution: one host owns at most one run;
+        // Tick pumps it; disable/unload/teardown shut it down.
+        private CastingExecutionHost _castingHost;
+        private PlannerModeStore _plannerModeStore;
+        private PlannerMode _plannerMode = PlannerMode.Classic;
+        private string _plannerModeWarning = string.Empty;
+        private Action<QuickExecutionResult> _pendingCastingCompletion;
+        private static readonly System.Diagnostics.Stopwatch CastingClock =
+            System.Diagnostics.Stopwatch.StartNew();
 
         public int Priority { get { return 400; } }
 
@@ -76,12 +90,74 @@ namespace KingmakerBuffPlanner.UI
         {
             if (_instance == null) return;
             _instance._enabled = enabled;
-            if (enabled) _instance.RequestHudInstall("mod-enabled", true);
+            if (enabled)
+            {
+                if (_instance._castingHost != null) _instance._castingHost.Resume();
+                _instance.RequestHudInstall("mod-enabled", true);
+            }
             else
             {
+                // A running routine ends through its owned terminal (the
+                // executor restores any temporary native state) before the
+                // player UI is released.
+                if (_instance._castingHost != null)
+                    _instance._castingHost.Shutdown("mod-disabled");
                 _instance.SuspendHudInstall("mod-disabled");
                 _instance.ReleasePlayerUi();
             }
+        }
+
+        // ------------------------------------------------------------------
+        // Planner mode (the deliberate, player-facing activation path)
+        // ------------------------------------------------------------------
+
+        internal static bool IsCastingFirstSelected
+        {
+            get { return _instance != null && _instance._plannerMode == PlannerMode.CastingFirst; }
+        }
+
+        internal static bool IsCastingRunActive
+        {
+            get { return _instance != null && _instance._castingHost != null &&
+                _instance._castingHost.IsRunning; }
+        }
+
+        // Returns null on success, otherwise why the mode was not changed.
+        internal static string TrySetPlannerMode(PlannerMode mode)
+        {
+            if (_instance == null) return "The planner is not loaded yet.";
+            return _instance.SetPlannerMode(mode);
+        }
+
+        private string SetPlannerMode(PlannerMode mode)
+        {
+            if (mode == _plannerMode) return null;
+            if (NativeCastingSessionPolicy.Locked)
+                return "The planner mode cannot be changed during an automated test session.";
+            if ((_castingHost != null && _castingHost.IsRunning) ||
+                (_session != null && _session.IsExecuting) || _quickStartPending)
+                return "A buff routine is running; wait for it to finish or stop it first.";
+            // Neither planner may stay open across the switch.
+            CloseCastingWorkspace();
+            if (_screen != null) _screen.Close();
+            try { _plannerModeStore.Save(mode); }
+            catch (Exception exception)
+            {
+                _log.Error("[KBP-MODE] planner mode could not be saved.", exception);
+                return "The planner mode could not be saved: " + exception.Message;
+            }
+            _plannerMode = mode;
+            _log.Info("[KBP-MODE] planner mode set;mode=" + mode + ";store=" +
+                _plannerModeStore.FilePath + ".");
+            return null;
+        }
+
+        // Casting-first routes are active for the chosen mode, or for a
+        // runtime-test session that selected the workspace.
+        private bool CastingFirstActive
+        {
+            get { return CastingWorkspaceDevSelection.Enabled ||
+                _plannerMode == PlannerMode.CastingFirst; }
         }
 
         internal static void DestroyOwned()
@@ -351,7 +427,16 @@ namespace KingmakerBuffPlanner.UI
                 ";hudFailure=" + (root._hud == null ? "controller-null" : root._hud.LastFailure) +
                 ";screenState=" + (root._screen == null ? "controller-null" : root._screen.LifecycleState.ToString()) +
                 ";screenFailure=" + (root._screen == null ? "controller-null" : root._screen.LastFailure) +
-                ";plannerHotkey=" + PlannerHotkey.Binding + ";armed-in-Main.OnUpdate";
+                ";plannerHotkey=" + PlannerHotkey.Binding + ";armed-in-Main.OnUpdate" +
+                ";plannerMode=" + root._plannerMode +
+                (root._plannerModeWarning.Length == 0 ? string.Empty
+                    : ";plannerModeWarning=" + root._plannerModeWarning) +
+                ";castingFirstActive=" + root.CastingFirstActive +
+                ";nativeCastingLocked=" + NativeCastingSessionPolicy.Locked +
+                ";castingRun=" + (root._castingHost == null ? "host-missing"
+                    : root._castingHost.IsRunning ? root._castingHost.ActiveRunId
+                    : root._castingHost.Accepting ? "idle"
+                    : "shutdown:" + root._castingHost.ShutdownReason);
         }
 
         internal static void BeginRuntimeSmoke()
@@ -691,7 +776,10 @@ namespace KingmakerBuffPlanner.UI
 
         public bool TryStart(string routineId, Action<QuickExecutionResult> completed)
         {
-            if (!_enabled || _session == null || _session.IsExecuting || _quickStartPending)
+            if (CastingFirstActive)
+                return StartCastingFirstRoutine(routineId, completed, CastingApplyMode.Ordinary);
+            if (!_enabled || _session == null || _session.IsExecuting || _quickStartPending ||
+                (_castingHost != null && _castingHost.IsRunning))
                 return false;
             _quickStartPending = true;
             StartCoroutine(ExecuteQuickRoutine(routineId, completed, false));
@@ -700,11 +788,97 @@ namespace KingmakerBuffPlanner.UI
 
         public bool TryStartReadyOnly(string routineId, Action<QuickExecutionResult> completed)
         {
-            if (!_enabled || _session == null || _session.IsExecuting || _quickStartPending)
+            if (CastingFirstActive)
+                return StartCastingFirstRoutine(routineId, completed,
+                    CastingApplyMode.ReadyCastsOnly);
+            if (!_enabled || _session == null || _session.IsExecuting || _quickStartPending ||
+                (_castingHost != null && _castingHost.IsRunning))
                 return false;
             _quickStartPending = true;
             StartCoroutine(ExecuteQuickRoutine(routineId, completed, true));
             return true;
+        }
+
+        // The casting-first quick-run shared by the HUD buttons, the planner
+        // hotkey flow and any other routine route: the same session Apply as
+        // the workspace (current preflight on FRESH discovery, the routine
+        // accepted contents, the gate, the exact projection) and the same
+        // production dispatch boundary. Pressing a routine while a run is
+        // active is the deliberate stop of that run.
+        private bool StartCastingFirstRoutine(string routineId,
+            Action<QuickExecutionResult> completed, CastingApplyMode mode)
+        {
+            if (!_enabled || _session == null) return false;
+            if (_session.IsExecuting || _quickStartPending) return false;
+            string name = char.ToUpperInvariant(routineId[0]) + routineId.Substring(1);
+            if (_castingHost.IsRunning)
+            {
+                string running = _castingHost.ActiveScopeRoutineId ?? "the";
+                _castingHost.Cancel("player-stopped");
+                _log.Info("[KBP-CF-RUN] stop requested by routine press;routine=" + routineId +
+                    ";running=" + running + ".");
+                CompleteQuick(completed, new QuickExecutionResult(routineId, name,
+                    QuickExecutionDisposition.Refused,
+                    "Stopped the running " + running + " routine.", 0, 0, 0));
+                return true;
+            }
+            // One fresh discovery pass serves both the campaign identity and
+            // the preflight inputs; a failed refresh refuses (never a stale
+            // plan).
+            CastingWorkspaceInputs inputs;
+            try { inputs = BuildFreshCastingWorkspaceInputs(); }
+            catch (Exception exception)
+            {
+                _log.Error("[KBP-CF-RUN] fresh preflight inputs unavailable;routine=" +
+                    routineId + ".", exception);
+                CompleteQuick(completed, new QuickExecutionResult(routineId, name,
+                    QuickExecutionDisposition.Refused,
+                    name + " was not cast: the party state could not be refreshed (" +
+                    exception.Message + ").", 0, 0, 0));
+                return true;
+            }
+            CastingWorkspaceSession session;
+            string unavailable = EnsureCastingSession(out session, false);
+            if (session == null)
+            {
+                CompleteQuick(completed, new QuickExecutionResult(routineId, name,
+                    QuickExecutionDisposition.Refused,
+                    "Cannot run " + name + ": " + unavailable, 0, 0, 0));
+                return true;
+            }
+            name = session.RoutineDisplayName(routineId);
+            WorkspaceApplyResult result;
+            try { result = session.Apply(mode, routineId, inputs); }
+            catch (Exception exception)
+            {
+                _log.Error("[KBP-CF-RUN] apply failed before submission;routine=" +
+                    routineId + ".", exception);
+                CompleteQuick(completed, new QuickExecutionResult(routineId, name,
+                    QuickExecutionDisposition.Failed,
+                    name + " failed before anything was cast: " + exception.Message,
+                    0, 0, 0));
+                return true;
+            }
+            if (!result.Allowed)
+            {
+                string refusal = CastingRunPresentation.DescribeRefusal(name, result);
+                _log.Info("[KBP-CF-RUN] refused;routine=" + routineId + ";mode=" + mode +
+                    ";reason=" + result.ReviewReason + ".");
+                CompleteQuick(completed, new QuickExecutionResult(routineId, name,
+                    QuickExecutionDisposition.Refused, refusal,
+                    result.GateDecision == null ? 0 : result.GateDecision.ExecutableCastingIds.Count,
+                    0, 0));
+                return true;
+            }
+            _pendingCastingCompletion = completed;
+            LogRunStarted(routineId, mode, result);
+            return true;
+        }
+
+        private static void CompleteQuick(Action<QuickExecutionResult> completed,
+            QuickExecutionResult result)
+        {
+            if (completed != null) completed(result);
         }
 
         private IEnumerator ExecuteQuickRoutine(
@@ -758,13 +932,32 @@ namespace KingmakerBuffPlanner.UI
             _modPath = modPath;
             _log = log;
             _session = new PlannerUiSession(modPath, log);
+            _plannerModeStore = new PlannerModeStore(modPath);
+            string modeWarning;
+            _plannerMode = _plannerModeStore.Load(out modeWarning);
+            _plannerModeWarning = modeWarning ?? string.Empty;
+            if (NativeCastingSessionPolicy.Locked)
+            {
+                // Automation runs are deterministic: a persisted player mode
+                // never changes which planner a scenario drives (workspace
+                // scenarios select casting-first explicitly).
+                _plannerMode = PlannerMode.Classic;
+                _plannerModeWarning = "runtime-test-session:persisted-mode-ignored";
+            }
+            _castingHost = new CastingExecutionHost(CreateCastingExecutor,
+                () => CastingClock.ElapsedMilliseconds);
+            _castingHost.RunCompleted = OnCastingRunCompleted;
+            _log.Info("[KBP-MODE] planner mode=" + _plannerMode +
+                (_plannerModeWarning.Length == 0 ? string.Empty : ";warning=" + _plannerModeWarning) +
+                ";nativeCastingLocked=" + NativeCastingSessionPolicy.Locked + ".");
             _diagnostics = new BuffPlannerUiLifecycleDiagnostics();
             _quick = new BuffPlannerQuickExecuteController(this, _diagnostics, PresentQuickResult);
             _screen = new BuffPlannerScreenController(_session, _diagnostics, log,
-                routineId => ExecuteLegacyRoutine(routineId), PlayNativeSetupOpenSound,
-                routineId => ExecuteLegacyRoutine(routineId, true));
+                routineId => ExecuteRoutineRequest(routineId), PlayNativeSetupOpenSound,
+                routineId => ExecuteRoutineRequest(routineId, true));
             _hud = new BuffPlannerHudButtonController(_session, _diagnostics, log,
-                () => { OpenSetup(); }, routineId => ExecuteLegacyRoutine(routineId));
+                () => { OpenSetup(); }, routineId => ExecuteRoutineRequest(routineId),
+                CastingFirstRoutineTooltip);
             _spellbookEntry = new BuffPlannerSpellbookEntryController(
                 value => _log.Info(value),
                 () => OpenSetup(),
@@ -787,25 +980,20 @@ namespace KingmakerBuffPlanner.UI
             }
         }
 
-        // Single guarded legacy-execution entry: while the casting-first
-        // workspace is selected, every legacy quick-run route (screen,
-        // HUD, hotkey, spellbook) refuses here instead of bypassing the
-        // workspace's explicitly disabled dispatch boundary.
-        private void ExecuteLegacyRoutine(string routineId, bool readyOnly = false)
+        // Single routine-execution entry for every route (HUD buttons, the
+        // legacy screen, hotkey and spellbook flows). The quick controller
+        // records the flow diagnostics and calls TryStart, which sends the
+        // request to the casting-first pipeline whenever that planner is
+        // active - no route can reach the legacy executor then.
+        private void ExecuteRoutineRequest(string routineId, bool readyOnly = false)
         {
-            if (!CastingWorkspaceDevSelection.LegacyExecutionPermitted)
-            {
-                _log.Info("[KBP-WORKSPACE] refused legacy quick execution;routine=" +
-                    routineId + ";reason=" +
-                    CastingWorkspaceDevSelection.LegacyExecutionRefusal);
-                return;
-            }
+            if (_quick == null) return;
             _quick.Execute(routineId, readyOnly);
         }
 
         private bool OpenSetup()
         {
-            if (CastingWorkspaceDevSelection.Enabled)
+            if (CastingFirstActive)
                 return OpenCastingWorkspace();
             return _screen != null && _screen.Open();
         }
@@ -833,29 +1021,18 @@ namespace KingmakerBuffPlanner.UI
                 // holding the input lease, and every later failure path
                 // funnels through the catch, which releases the local lease
                 // exactly once (review H3).
-                _session.Refresh();
-                string campaignId = _session.Model == null ||
-                    _session.Model.Profile == null
-                        ? null : _session.Model.Profile.CampaignId;
-                var workspaceSession = CastingWorkspaceSessionBinding.Resolve(
-                    _castingWorkspaceSession, campaignId,
-                    delegate(string id)
-                    {
-                        return new CastingWorkspaceSession(_modPath, id, null,
-                            _session.Model == null ? null
-                                : _session.Model.SourceGroupings());
-                    },
-                    delegate(string message) { _log.Info(message); });
+                CastingWorkspaceSession workspaceSession;
+                string unresolved = EnsureCastingSession(out workspaceSession);
+                string campaignId = workspaceSession == null ? null : workspaceSession.CampaignId;
                 if (workspaceSession == null)
                 {
                     // Unresolved/transitional campaign identity must not
                     // bind arbitrary work to an unknown-campaign fallback
                     // (review G3) — and must not leak an acquired lease.
                     LogUiUnavailable(
-                        "casting-workspace: campaign identity unresolved");
+                        "casting-workspace: campaign identity unresolved (" + unresolved + ")");
                     return false;
                 }
-                _castingWorkspaceSession = workspaceSession;
                 // Acquire the established game-mode/selection input lease
                 // exactly once per open, AFTER identity resolves and BEFORE
                 // construction; a failed acquire self-restores, and the
@@ -864,7 +1041,8 @@ namespace KingmakerBuffPlanner.UI
                 lease = BuffPlannerInputLease.Acquire(new KingmakerPlannerInputBoundary());
                 _castingWorkspace = new CastingWorkspaceScreenView(
                     StaticCanvas.Instance, workspaceSession,
-                    BuildCastingWorkspaceInputs, CloseCastingWorkspace);
+                    BuildCastingWorkspaceInputs, BuildFreshCastingWorkspaceInputs,
+                    CloseCastingWorkspace);
                 _workspaceInputLease = lease;
                 lease = null;
                 _castingWorkspace.RefreshView();
@@ -932,11 +1110,180 @@ namespace KingmakerBuffPlanner.UI
                         " using prior discovery state.", exception);
                 }
             }
+            return CurrentCastingInputs();
+        }
+
+        // Apply and quick-run preflight: discovery is re-read NOW and a
+        // failed refresh refuses the run instead of falling back to earlier
+        // state (the bounded provider above is for rendering only).
+        private CastingWorkspaceInputs BuildFreshCastingWorkspaceInputs()
+        {
+            _lastWorkspaceInputsRefreshUtc = DateTime.UtcNow;
+            _session.Refresh();
+            if (_session.Model == null)
+                throw new InvalidOperationException(_session.Status ?? "discovery failed");
+            return CurrentCastingInputs();
+        }
+
+        private CastingWorkspaceInputs CurrentCastingInputs()
+        {
             return new CastingWorkspaceInputs(
                 _session.Model.Snapshot,
                 _session.ProviderOptions,
                 _session.Model.EffectsBySource,
-                _session.Model.Enhancements);
+                _session.Model.Enhancements,
+                null,
+                _session.ActiveEffects);
+        }
+
+        // Resolves (or reuses) the casting-first session for the loaded
+        // campaign. Returns null on success, otherwise why none exists.
+        private string EnsureCastingSession(out CastingWorkspaceSession session,
+            bool refresh = true)
+        {
+            session = null;
+            if (refresh)
+            {
+                _lastWorkspaceInputsRefreshUtc = DateTime.UtcNow;
+                _session.Refresh();
+            }
+            string campaignId = _session.Model == null || _session.Model.Profile == null
+                ? null : _session.Model.Profile.CampaignId;
+            if (string.IsNullOrEmpty(campaignId))
+                return string.IsNullOrEmpty(_session.Status) ? "no campaign is loaded" : _session.Status;
+            session = CastingWorkspaceSessionBinding.Resolve(
+                _castingWorkspaceSession, campaignId,
+                delegate(string id) { return CreateCastingSession(id); },
+                delegate(string message) { _log.Info(message); });
+            if (session == null) return "campaign identity unresolved";
+            _castingWorkspaceSession = session;
+            return null;
+        }
+
+        private CastingWorkspaceSession CreateCastingSession(string campaignId)
+        {
+            return new CastingWorkspaceSession(_modPath, campaignId, CreateDispatchBoundary(),
+                _session.Model == null ? null : _session.Model.SourceGroupings());
+        }
+
+        // Ordinary play submits through the production boundary; a
+        // runtime-test session is locked to an explicit refusal.
+        private ICastingDispatchBoundary CreateDispatchBoundary()
+        {
+            if (NativeCastingSessionPolicy.Locked)
+                return new DisabledCastingDispatchBoundary(NativeCastingSessionPolicy.LockReason);
+            return new NativeCastingDispatchBoundary(_castingHost,
+                () => _castingWorkspaceSession == null
+                    ? ExecutionProfile.Default()
+                    : _castingWorkspaceSession.ExecutionSettings,
+                message => _log.Info("[KBP-CF-RUN] " + message));
+        }
+
+        // The same executors and adapters the classic planner uses: animated
+        // native casting by default; Instant mode through the hybrid executor
+        // (animated only where a step requires a native command or the
+        // player allowed the animated fallback).
+        private ICastExecutor CreateCastingExecutor(ExecutionProfile settings)
+        {
+            if (!string.Equals(settings.Mode, "instant", StringComparison.Ordinal))
+                return new AnimatedCastExecutor(new KingmakerAnimatedCastAdapter(),
+                    settings.OutOfCombatOnly);
+            IEnumerable<CastEnhancementSnapshot> enhancements = _session.Model == null
+                ? new CastEnhancementSnapshot[0] : _session.Model.Enhancements;
+            var nativeCommand = new HashSet<string>(enhancements
+                .Where(value => value != null && value.RequiresNativeCommand)
+                .Select(value => value.EnhancementId), StringComparer.Ordinal);
+            return new HybridCastExecutor(
+                new KingmakerInstantCastAdapter(_log.Info), new KingmakerAnimatedCastAdapter(),
+                settings.AllowAnimatedFallback, settings.OutOfCombatOnly,
+                step => step.EnhancementIds.Any(nativeCommand.Contains),
+                (index, step, animated, route) => _log.Info("[KBP-CF-ROUTE] step=" + index +
+                    ";casting=" + step.AssignmentId + ";provider=" + step.Provider.Canonical +
+                    ";animated=" + animated + ";" + route + "."));
+        }
+
+        private void OnCastingRunCompleted(CastingRunReport report)
+        {
+            // The next inputs re-read discovery (spent slots, new effects).
+            _lastWorkspaceInputsRefreshUtc = DateTime.MinValue;
+            CastingWorkspaceSession session = _castingWorkspaceSession;
+            string routineId = string.IsNullOrEmpty(report.ScopeRoutineId)
+                ? "long" : report.ScopeRoutineId;
+            string name = session == null ? routineId : session.RoutineDisplayName(routineId);
+            if (session != null) session.RecordRunReport(report);
+            LogRunReport(report, session);
+            Func<string, string> label = null;
+            if (session != null) label = session.CastingLabel;
+            QuickExecutionResult quick = CastingRunPresentation.ToQuickResult(report, name, label);
+            Action<QuickExecutionResult> pending = _pendingCastingCompletion;
+            _pendingCastingCompletion = null;
+            try
+            {
+                if (pending != null) pending(quick);
+                else PresentQuickResult(quick);
+            }
+            catch (Exception exception)
+            {
+                _log.Error("[KBP-CF-RUN] result presentation failed.", exception);
+            }
+            // Deliberately no floating or native-log result (the accepted
+            // HUD boundary): the full result is logged, shown in the planner
+            // footer, and kept on the session for the next planner open.
+        }
+
+        // HUD routine tooltips in casting-first mode describe the casting
+        // plan (not the classic profile): castings in the routine, whether
+        // it is accepted, the run state, and the stop gesture.
+        private string CastingFirstRoutineTooltip(string routineId)
+        {
+            if (!CastingFirstActive) return null;
+            string name = char.ToUpperInvariant(routineId[0]) + routineId.Substring(1);
+            if (_castingHost != null && _castingHost.IsRunning)
+                return string.Equals(_castingHost.ActiveScopeRoutineId, routineId,
+                        StringComparison.Ordinal)
+                    ? name + " is running. Press again to stop after the current cast."
+                    : "Another routine is running. Press to stop it.";
+            CastingWorkspaceSession session = _castingWorkspaceSession;
+            if (session == null)
+                return "Cast " + name + " (casting-first planner). Open the planner to " +
+                    "review and accept the routine first.";
+            name = session.RoutineDisplayName(routineId);
+            int castings = session.Document.Castings.Count(value => value != null &&
+                string.Equals(value.RoutineId, routineId, StringComparison.Ordinal));
+            bool accepted = session.ReviewStatusFor(routineId) == CastingReviewStatus.Accepted;
+            return "Cast " + name + ": " + castings + (castings == 1 ? " casting" : " castings") +
+                ", " + session.ExecutionMode + " mode" + (accepted ? "."
+                    : ". Not yet accepted - open the planner to review it.");
+        }
+
+        private void LogRunStarted(string routineId, CastingApplyMode mode,
+            WorkspaceApplyResult result)
+        {
+            _log.Info("[KBP-CF-RUN] quick-run submitted;routine=" + routineId + ";mode=" + mode +
+                ";dispatch=" + result.Dispatch.Reason +
+                ";castings=" + string.Join(",", result.Projection.CastingIds.ToArray()) +
+                ";projection=" + result.Projection.ProjectionId +
+                ";omissions=" + result.GateDecision.Omissions.Count + ".");
+        }
+
+        private void LogRunReport(CastingRunReport report, CastingWorkspaceSession session)
+        {
+            _log.Info("[KBP-CF-RUN] terminal;run=" + report.RunId + ";routine=" +
+                report.ScopeRoutineId + ";mode=" + report.Mode + ";projection=" +
+                report.ProjectionId + ";terminal=" + report.TerminalReason +
+                ";planned=" + report.Planned + ";submitted=" + report.Submitted +
+                ";confirmed=" + report.Confirmed + ";failed=" + report.Failed +
+                ";cancelled=" + report.CancelledCastings + ";notProcessed=" + report.NotProcessed +
+                ";skipped=" + report.Skipped + ";omitted=" + report.Omitted +
+                ";resourcesSpent=" + report.ResourcesSpent +
+                ";cleanupFailures=" + string.Join("|", report.CleanupFailures.ToArray()) + ".");
+            foreach (CastingOutcomeEntry entry in report.Entries)
+                _log.Info("[KBP-CF-RUN] casting;run=" + report.RunId + ";casting=" +
+                    entry.CastingId + ";label=" +
+                    (session == null ? entry.CastingId : session.CastingLabel(entry.CastingId)) +
+                    ";state=" + entry.State + ";planned=" + entry.Planned +
+                    ";submitted=" + entry.Submitted + ";spendReported=" + entry.SpendReported +
+                    ";free=" + entry.FreeCast + ";detail=" + entry.Detail + ".");
         }
 
         private void RequestNativeEscapeVeil()
@@ -973,6 +1320,16 @@ namespace KingmakerBuffPlanner.UI
             if (!_enabled) return;
             long rootStartedAt = RuntimePerformanceDiagnostics.BeginOperation();
             _tickCount++;
+            // One step of the active casting run per frame (executors yield
+            // per frame); the host ends the run on its deadline.
+            if (_castingHost != null)
+            {
+                try { _castingHost.Pump(); }
+                catch (Exception exception)
+                {
+                    _log.Error("[KBP-CF-RUN] run pump failed.", exception);
+                }
+            }
             try
             {
                 if (_spellbookEntry != null) _spellbookEntry.Tick();
@@ -1145,6 +1502,9 @@ namespace KingmakerBuffPlanner.UI
         public void OnAreaBeginUnloading()
         {
             SignalLifecycle("OnAreaBeginUnloading", true);
+            // An area change (including loading another save) ends a running
+            // routine through its owned terminal; new runs remain possible.
+            if (_castingHost != null) _castingHost.Cancel("area-unloading");
             ReleasePlayerUi();
         }
 
@@ -1218,15 +1578,21 @@ namespace KingmakerBuffPlanner.UI
             if (result.RoutineId == "long" && _runtimeFirstLongResult == null)
                 _runtimeFirstLongResult = result;
             _runtimeQuickResults[result.RoutineId] = result;
-            _screen.Present(result);
+            if (_screen != null) _screen.Present(result);
             _log.Info("Routine UI result: " + result.RoutineId + " " +
                 result.Disposition + " " + result.Message);
         }
 
         private void OnDisable()
         {
+            if (_castingHost != null) _castingHost.Shutdown("ui-root-disabled");
             SuspendHudInstall("ui-root-disabled");
             ReleasePlayerUi();
+        }
+
+        private void OnEnable()
+        {
+            if (_castingHost != null && _enabled && !_disposed) _castingHost.Resume();
         }
 
         private void OnDestroy()
@@ -1246,6 +1612,9 @@ namespace KingmakerBuffPlanner.UI
         {
             if (_disposed) return;
             _disposed = true;
+            // End any casting run first, through its owned terminal, while
+            // the result can still be logged and presented.
+            if (_castingHost != null) _castingHost.Shutdown("root-teardown");
             StopAllCoroutines();
             CloseCastingWorkspace();
             if (_castingWorkspaceSession != null)

@@ -329,9 +329,51 @@ namespace KingmakerBuffPlanner.Domain.Planning
         public IReadOnlyDictionary<string, int> MaximumCasts { get; private set; }
     }
 
+    // One live effect instance on a unit, with the details the casting-first
+    // existing-effect policy needs to tell an equal-or-stronger effect from
+    // a weaker, suppressed or nearly expired one. Unknown caster level or
+    // metamagic stays null (never zero); a null remaining duration means the
+    // instance has no expiry (permanent, or worn while equipped).
+    public sealed class ActiveEffectInstance
+    {
+        public ActiveEffectInstance(EffectKind kind, string effectId,
+            double? remainingRounds, int? casterLevel, int? metamagicMask,
+            bool suppressed = false)
+        {
+            if (string.IsNullOrWhiteSpace(effectId))
+                throw new ArgumentException("Effect ID is required.", "effectId");
+            if (remainingRounds != null &&
+                (double.IsNaN(remainingRounds.Value) || remainingRounds.Value < 0))
+                throw new ArgumentOutOfRangeException("remainingRounds");
+            if (casterLevel != null && casterLevel.Value < 0)
+                throw new ArgumentOutOfRangeException("casterLevel");
+            if (metamagicMask != null && metamagicMask.Value < 0)
+                throw new ArgumentOutOfRangeException("metamagicMask");
+            Kind = kind;
+            EffectId = effectId;
+            RemainingRounds = remainingRounds;
+            CasterLevel = casterLevel;
+            MetamagicMask = metamagicMask;
+            Suppressed = suppressed;
+        }
+
+        public EffectKind Kind { get; private set; }
+        public string EffectId { get; private set; }
+        public double? RemainingRounds { get; private set; }
+        public int? CasterLevel { get; private set; }
+        public int? MetamagicMask { get; private set; }
+        public bool Suppressed { get; private set; }
+
+        public ActiveEffectMarker Marker
+        {
+            get { return new ActiveEffectMarker(Kind, EffectId); }
+        }
+    }
+
     public sealed class ActiveEffectSnapshot
     {
         private readonly IReadOnlyDictionary<string, ISet<ActiveEffectMarker>> _effectsByUnit;
+        private IReadOnlyDictionary<string, IReadOnlyList<ActiveEffectInstance>> _instancesByUnit;
 
         public ActiveEffectSnapshot(IDictionary<string, IEnumerable<string>> effectsByUnit)
         {
@@ -356,6 +398,47 @@ namespace KingmakerBuffPlanner.Domain.Planning
         {
             return new ActiveEffectSnapshot(effectsByUnit ??
                 new Dictionary<string, IEnumerable<ActiveEffectMarker>>());
+        }
+
+        // A snapshot that also carries per-instance detail. Markers are
+        // derived from every instance (suppressed ones included), so the
+        // legacy planner sees exactly the markers it always saw; only the
+        // casting-first existing-effect policy reads the instance detail.
+        public static ActiveEffectSnapshot FromInstances(
+            IDictionary<string, IEnumerable<ActiveEffectInstance>> instancesByUnit)
+        {
+            var markers = new Dictionary<string, IEnumerable<ActiveEffectMarker>>(
+                StringComparer.Ordinal);
+            var instances = new Dictionary<string, IReadOnlyList<ActiveEffectInstance>>(
+                StringComparer.Ordinal);
+            foreach (KeyValuePair<string, IEnumerable<ActiveEffectInstance>> pair in
+                instancesByUnit ?? new Dictionary<string, IEnumerable<ActiveEffectInstance>>())
+            {
+                List<ActiveEffectInstance> list = (pair.Value ?? new ActiveEffectInstance[0])
+                    .Where(value => value != null).ToList();
+                instances[pair.Key] = new ReadOnlyCollection<ActiveEffectInstance>(list);
+                markers[pair.Key] = list.Select(value => value.Marker).ToList();
+            }
+            var snapshot = new ActiveEffectSnapshot(markers);
+            snapshot._instancesByUnit =
+                new ReadOnlyDictionary<string, IReadOnlyList<ActiveEffectInstance>>(instances);
+            return snapshot;
+        }
+
+        // True when this snapshot carries instance detail (FromInstances).
+        public bool HasInstanceDetail
+        {
+            get { return _instancesByUnit != null; }
+        }
+
+        public IReadOnlyList<ActiveEffectInstance> GetInstances(string unitId)
+        {
+            IReadOnlyList<ActiveEffectInstance> instances;
+            return _instancesByUnit != null && unitId != null &&
+                _instancesByUnit.TryGetValue(unitId, out instances)
+                    ? instances
+                    : new ReadOnlyCollection<ActiveEffectInstance>(
+                        new List<ActiveEffectInstance>());
         }
 
         public ISet<ActiveEffectMarker> GetEffects(string unitId)

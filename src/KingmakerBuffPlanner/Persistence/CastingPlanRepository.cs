@@ -288,6 +288,12 @@ namespace KingmakerBuffPlanner.Persistence
             return primary + ".bak" + index;
         }
 
+        // The shared short campaign hash used in candidate file names.
+        internal static string CampaignHashFor(string campaignId)
+        {
+            return CampaignHash(campaignId);
+        }
+
         private static string CampaignHash(string campaignId)
         {
             using (var sha = SHA256.Create())

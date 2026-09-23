@@ -21,7 +21,7 @@ using Newtonsoft.Json.Linq;
 
 namespace KingmakerBuffPlanner.Tests
 {
-    internal static class Program
+    internal static partial class Program
     {
         private static int _passed;
         private static readonly List<string> Failures = new List<string>();
@@ -419,6 +419,7 @@ namespace KingmakerBuffPlanner.Tests
                 Run("probe-requires-frozen-artifact-identity", TestProbeRequiresFrozenArtifactIdentity);
                 Run("probe-shutdown-before-selection-is-terminal", TestProbeShutdownBeforeSelectionIsTerminal);
                 Run("prepared-slot-observation-reads-exact-source", TestPreparedSlotObservationReadsExactSource);
+                RunProductionExecutionTests(root);
             }
             finally
             {
