@@ -208,9 +208,14 @@ namespace KingmakerBuffPlanner.UI
                     result[members[0].SourceId] = string.Empty;
                     continue;
                 }
+                // Discovered variant names usually repeat the base name
+                // ("Use Heal Skill — Treat Affliction"); keep only the part
+                // that distinguishes the variant.
                 Func<WorkspaceSourceDescriptor, string> byVariant = s =>
-                    string.Join(", ", s.VariantNames.Where(v =>
-                        !string.Equals(v, s.DisplayName, StringComparison.Ordinal)));
+                    string.Join(", ", s.VariantNames
+                        .Select(v => StripBase(v, s.DisplayName))
+                        .Where(v => v.Length != 0)
+                        .Distinct(StringComparer.Ordinal));
                 Func<WorkspaceSourceDescriptor, string> byKindAndCaster = s =>
                     string.Join("/", s.KindNames) +
                     (s.CasterNames.Count == 0 ? string.Empty
@@ -239,6 +244,19 @@ namespace KingmakerBuffPlanner.UI
                 }
             }
             return result;
+        }
+
+        private static string StripBase(string variant, string baseName)
+        {
+            if (string.Equals(variant, baseName, StringComparison.Ordinal))
+                return string.Empty;
+            foreach (string separator in new[] { " — ", " - ", ": " })
+            {
+                string prefix = baseName + separator;
+                if (variant.StartsWith(prefix, StringComparison.Ordinal))
+                    return variant.Substring(prefix.Length).Trim();
+            }
+            return variant;
         }
     }
 
