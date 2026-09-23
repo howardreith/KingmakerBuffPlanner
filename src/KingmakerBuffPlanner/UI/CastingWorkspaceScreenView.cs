@@ -495,8 +495,15 @@ namespace KingmakerBuffPlanner.UI
             footer.offsetMax = Vector2.zero;
             _footerBudget = KingmakerUiFactory.CreateText(
                 "Budget", footer, _theme, string.Empty, 14, TextAnchor.MiddleLeft);
-            _footerBudget.horizontalOverflow = HorizontalWrapMode.Overflow;
-            KingmakerUiFactory.Stretch(_footerBudget.rectTransform, 12, 480, 4, 4);
+            // Lower-left third only: the budget never runs under the buttons
+            // (the first starts at 34 percent of the width); long text wraps
+            // and is truncated inside that area.
+            _footerBudget.fontSize = 13;
+            _footerBudget.horizontalOverflow = HorizontalWrapMode.Wrap;
+            _footerBudget.verticalOverflow = VerticalWrapMode.Truncate;
+            KingmakerUiFactory.SetAnchors(_footerBudget.rectTransform, 0f, 0f, 0.33f, 0.55f);
+            _footerBudget.rectTransform.offsetMin = new Vector2(12f, 2f);
+            _footerBudget.rectTransform.offsetMax = new Vector2(-4f, 0f);
             _footerResult = KingmakerUiFactory.CreateText(
                 "Result", footer, _theme, string.Empty, 14, TextAnchor.MiddleLeft);
             _footerResult.color = _theme.MutedBrownText;

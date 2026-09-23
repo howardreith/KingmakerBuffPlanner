@@ -52,6 +52,7 @@ namespace KingmakerBuffPlanner.Tests
             Run("exhausted-rod-waived-by-active-effect", TestExhaustedRodWithActiveEffect);
             Run("probe-refuses-a-cast-while-the-world-is-held", TestProbeWorldHeldViolation);
             Run("buff-grid-source-type-tabs", () => TestBuffGridSourceTypeTabs(root));
+            Run("player-facing-resource-labels", () => TestPlayerFacingResourceLabels(root));
             Run("qualification-allowance-parsing", TestQualificationAllowanceParsing);
             Run("qualification-recipe-selection", TestQualificationRecipeSelection);
             Run("qualification-forecast-and-boundary", TestQualificationForecastAndBoundary);
@@ -1514,6 +1515,44 @@ namespace KingmakerBuffPlanner.Tests
                 view.Draft.Sources.Any(source => !source.SourceKinds.SequenceEqual(
                     new[] { SourceKind.Spellbook })))
                 throw new InvalidOperationException("The session did not derive the spellbook kind.");
+        }
+
+        // Players read whose resource and what kind, never an internal pool
+        // key: card costs, the budget footer and the pool label helper.
+        private static void TestPlayerFacingResourceLabels(string root)
+        {
+            if (WorkspacePoolLabels.Describe(ResourcePoolKind.Unlimited, 0, "Linzi") != "Linzi: free" ||
+                WorkspacePoolLabels.Describe(ResourcePoolKind.SpontaneousLevel, 2, "Linzi") != "Linzi: level 2 spell slot" ||
+                WorkspacePoolLabels.Describe(ResourcePoolKind.PreparedSlots, 1, "Tartuccio") != "Tartuccio: prepared level 1 slot" ||
+                WorkspacePoolLabels.Describe(ResourcePoolKind.ItemCharges, null, null) != "item charge")
+                throw new InvalidOperationException("The pool label wording is wrong.");
+            var session = new CastingWorkspaceSession(Path.Combine(root, "labels"), "campaign-labels");
+            var free = QualificationInputs(true, true, null);
+            Assert(AddDraftCasting(session, free, "unit-cleric", "unit-t1").Applied);
+            WorkspaceView view = session.BuildView(free);
+            WorkspaceCastingCard card = view.Cards.Single();
+            if (!card.CostLabels.SequenceEqual(new[] { "unit-cleric: free" }) ||
+                card.Subtitle != "Casting 1 in Long" ||
+                view.BudgetRows.Select(row => row.Describe()).Where(text => text != null)
+                    .Any(text => text.Contains("|") || text.Contains("pool-")))
+                throw new InvalidOperationException("Internal keys reached the player: " +
+                    string.Join(",", card.CostLabels.ToArray()) + " / " +
+                    string.Join(" / ", view.BudgetRows.Select(row => row.Describe() ?? "-").ToArray()));
+            var finite = QualificationInputs(false, true, null);
+            WorkspaceView finiteView = session.BuildView(finite);
+            if (!finiteView.Cards.Single().CostLabels.SequenceEqual(new[] { "unit-cleric: level 2 spell slot" }))
+                throw new InvalidOperationException("A finite pool label is wrong: " +
+                    string.Join(",", finiteView.Cards.Single().CostLabels.ToArray()));
+            // A prepared pool spans every spell level: whose, not which level.
+            var world = new FiniteBuffWorld();
+            CastingWorkspaceInputs mixed = world.Inputs();
+            var both = new CastingWorkspaceSession(Path.Combine(root, "labels-mixed"), "campaign-labels");
+            Assert(AddDraftCasting(both, mixed, "unit-wizard", "unit-t1").Applied);
+            Assert(AddDraftCasting(both, mixed, "unit-sorcerer", "unit-t2").Applied);
+            var labels = both.BuildView(mixed).Cards.SelectMany(value => value.CostLabels).ToList();
+            if (!labels.SequenceEqual(new[] { "unit-wizard: prepared slot", "unit-sorcerer: level 2 spell slot" }))
+                throw new InvalidOperationException("Prepared or spontaneous pool labels are wrong: " +
+                    string.Join(",", labels.ToArray()));
         }
 
         // Two casters with verified-free pools casting the fixture buff by
