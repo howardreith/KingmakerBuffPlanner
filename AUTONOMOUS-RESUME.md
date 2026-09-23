@@ -1,6 +1,42 @@
 # AUTONOMOUS-RESUME — top section is current; planning/CASTING-FIRST-MIGRATION-STATUS.md is the per-checkpoint tracker.
 
-## RC mission (2026-09-23): production execution integration and advanced-copy tooling — IN PROGRESS (LATEST)
+## RC mission (2026-09-23, continued): live native evidence and the Pro review of `e7c5207` (LATEST)
+
+Owner message of 2026-09-23 (second): allowance files are written by
+Claude under the delegated mission authority; the sealed Gunslinger
+0.0.133 is staged from the owner-approved exact copy; the historical
+`e964d2f` freeze is preserved but no longer blocks development; fix
+RC1-RC4. Worktrees: dev `repo/KingmakerBuffPlanner-O1` (PR branch),
+frozen probe candidates `repo/KingmakerBuffPlanner-P1` (`7664f2f`) and
+`-P2` (`320a1b6`), historical `repo/KingmakerBuffPlanner` (`e964d2f`).
+
+| Commit | Content |
+| --- | --- |
+| `7664f2f` | `full-user` stages Gunslinger 0.0.133 from `C:\Dev\KingmakerBuffPlannerLab\examples\KingmakerGunslinger` (all five sealed identities re-verified, provenance in `examples\KingmakerGunslinger.provenance.json`, never committed or packaged); the transaction records the installed 0.0.136 (238 files, manifest `d08f0d5a...`) before activation and re-verifies it after restore |
+| `2a443c3` | RC1 typed slot-token readings (native ids contain "\|"); RC2 a step casts only on a complete before-read |
+| `320a1b6` | Cast only while the world runs: the probe closes the planner and waits for Default mode, not paused; the production host and the qualification driver advance only then |
+| `1af543c` | RC3 `run-completion.json` gates advanced casting on whole-run success; RC4 per-casting recipients (three-unit parties qualify); roster evidence |
+
+Live runs (all with verified Mods restoration and unchanged protected saves):
+
+| Run | Result |
+| --- | --- |
+| `casting-probe-select-20260923-p1-01` (7664f2f) | PASS: same Resistance source, caster, recipient and projection as the historical proposal |
+| `casting-probe-cast-20260923-p1-01` (7664f2f) | FAIL, one invocation: cast inside the open planner, effect never landed (`TimedOutUnconfirmed`); cause fixed in `320a1b6` |
+| `casting-probe-select-20260923-p2-01` (320a1b6) | PASS, same selection |
+| `casting-probe-cast-20260923-p2-02` (320a1b6) | **PASS: first confirmed casting-first native cast** (new ResistanceBuff instance, free, zero violations) |
+
+`casting-probe-cast-20260923-p2-01` is void (allowance mis-bound to the
+P1 candidate by a script path error, never used, VOID notice beside it).
+Receipt: `docs/evidence/casting-probe-20260923-receipt.md`.
+
+Remaining owner input: a designated `KBP_ADVANCED_SEED` (and, if that
+save was made under Gunslinger 0.0.136, the profile decision for it).
+Next: zero-cost qualification on a frozen candidate of `1af543c`
+(selection, allowance, run), the live workspace UI run, then the advanced
+copy once designated.
+
+## RC mission (2026-09-23): production execution integration and advanced-copy tooling (history)
 
 Mission: the casting-first release candidate (owner message of 2026-09-23).
 Development continues in the worktree `repo/KingmakerBuffPlanner-O1` on the

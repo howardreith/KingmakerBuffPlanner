@@ -13,12 +13,34 @@ by default). In ordinary play every routine route reaches the production
 dispatch boundary and the execution host; in an automated test session
 both player routes (casting-first and classic) refuse, and native casts
 happen only through the owner-authorized harness boundaries (single-cast
-probe, casting qualification). No casting-first native cast has run yet:
-the frozen probe and the qualification await owner inputs (allowance
-files, the KingmakerGunslinger identity, an advanced seed). Human
-usability and the native aesthetic pass remain open.
+probe, casting qualification). First native evidence: the one-cast
+Resistance probe confirmed its effect in game on
+`320a1b6` (`casting-probe-cast-20260923-p2-02`); the zero-cost
+qualification is next, and finite-resource qualification waits for an
+owner-designated advanced seed. Human usability and the native aesthetic
+pass remain open.
 
-## Current review dispositions — review of `54d330b..47caeef` (answered 2026-09-23)
+## Current review dispositions — Pro review of `e7c5207` (answered 2026-09-23)
+
+| Finding | Disposition |
+| --- | --- |
+| RC1: native slot ids (`level-N\|type-T\|index-I`) contain the "\|" the token evidence was joined and split on | Fixed in `2a443c3`: typed readings (casting, opaque token id, before, after) and a list of castings read on one side only; the judge reads them directly and text is presentation only. One `PreparedSlotIds.Format` serves the snapshot and the cast adapter, and the tests build native ids with it: linked pairs, wrong-token spend, partial consumption, missing readings |
+| RC2: a failed before-read did not stop the step before Apply | Fixed in `2a443c3`: every casting the step observes needs a succeeded read of its own target with effect, availability and every reserved token; otherwise the run ends before Apply with zero submissions. Driver tests: observer exception, failed read, null read, wrong target, missing prepared tokens |
+| RC3: an in-game PASS could authorize advanced casting before restoration and the protected-save check | Fixed in `1af543c`: the launcher writes `run-completion.json` last (game result, harness success, owned exit, verified restoration, protected saves compared and clean, fixture files and hashes, campaign, binding manifest, compatibility identity); only a complete record of the same pair and identity qualifies. `harness-error.txt` is written only for failed runs. The 900-second floor is documented as a time budget with truthful recovery |
+| RC4: zero-cost selection banned both casters as recipients and so needed four units | Fixed in `1af543c`: recipients are chosen per casting (never the casting's own caster); a three-unit party qualifies, end to end. The record now carries the roster the selection saw |
+
+**Live finding (not from the review).** The first one-cast probe on the
+current candidate (`casting-probe-cast-20260923-p1-01`, frozen `7664f2f`)
+submitted its rule while the casting workspace was open. The workspace
+lease holds the game in `FullScreenUi`, where queued ability execution
+does not advance, so the Resistance effect never appeared
+(`TimedOutUnconfirmed`). One invocation, no retry; restoration and the
+protected-save check passed. Fixed in `320a1b6`: the probe closes the
+planner and submits only once the world runs (Default mode, not
+paused), the production host and the qualification driver advance only
+while the world runs, and the run deadline counts only running time.
+
+## Previous review dispositions — review of `54d330b..47caeef` (history)
 
 A second independent read-only review covered the qualification core,
 driver and scenarios, the run request and the RC review fixes. Every
