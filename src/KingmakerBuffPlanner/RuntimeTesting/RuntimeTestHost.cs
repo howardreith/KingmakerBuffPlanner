@@ -742,6 +742,30 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     terminal.AppendAssertions(result, _manualReadyEvidence,
                         _workspaceInteractionEvidence);
                 }
+                else if (RuntimeTestProtocol.IsImportScenario(_request.Scenario))
+                {
+                    // First-open import in game (mission section 11): the
+                    // production migration imported the seeded classic plan,
+                    // left it byte-unchanged, archived it byte-exact and made
+                    // nothing Ready; the planner closed cleanly.
+                    string import = _importVerification ?? "missing";
+                    bool imported = import.StartsWith("passed=True", StringComparison.Ordinal);
+                    result.Assertions.Add(imported
+                        ? RuntimeTestAssertion.Pass("workspace-first-open-import",
+                            "migrated;classic unchanged;archived;one casting per target;none Ready", import)
+                        : RuntimeTestAssertion.Fail("workspace-first-open-import",
+                            "migrated;classic unchanged;archived;one casting per target;none Ready", import));
+                    result.Assertions.Add(_importWorkspaceClosed
+                        ? RuntimeTestAssertion.Pass("import-workspace-closed",
+                            "closed;lease released", "closed=True;lease=released")
+                        : RuntimeTestAssertion.Fail("import-workspace-closed",
+                            "closed;lease released", "not-closed-or-lease-held"));
+                    if (!imported || !_importWorkspaceClosed)
+                    {
+                        result.Status = "FAIL";
+                        result.Stage = "import-validation";
+                    }
+                }
                 else if (RuntimeTestProtocol.IsInspectionScenario(_request.Scenario))
                 {
                     // Inspection acceptance: evidence written, nothing
@@ -1746,6 +1770,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         _request.Scenario))
                 {
                     _liveHotkeyMarkerWritten = true;
+                    if (RuntimeTestProtocol.IsImportScenario(_request.Scenario)) SeedClassicPlanForImport();
                     _log.Info("[KBP-MANUAL] control frame consumed; opening the " +
                         "candidate programmatically with no input request.");
                     _liveUiPhase = 22;
@@ -1892,6 +1917,12 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         _liveUiPhase = 45;
                         return false;
                     }
+                    if (RuntimeTestProtocol.IsImportScenario(_request.Scenario))
+                    {
+                        // First-open import: judge the migration, then close.
+                        _liveUiPhase = 90;
+                        return false;
+                    }
                     if (RuntimeTestProtocol.IsQualificationScenario(_request.Scenario))
                     {
                         // Qualification: the production-path driver.
@@ -1917,6 +1948,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (_liveUiPhase == 45)
             {
                 return UpdateInspection();
+            }
+            if (_liveUiPhase == 90)
+            {
+                return UpdateImport();
             }
             if (_liveUiPhase == 55)
             {
@@ -2702,6 +2737,143 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             _completed = true;
             return true;
         }
+
+        // Mission section 11 (first-open import in game): before the first
+        // open, a classic plan for the loaded campaign is written through the
+        // classic repository, built from live discovery: the zero-cost
+        // recipe's buff as one Automatic assignment on two party members.
+        private void SeedClassicPlanForImport()
+        {
+            try
+            {
+                string campaignId = Kingmaker.Game.Instance == null || Kingmaker.Game.Instance.Player == null
+                    ? null : Kingmaker.Game.Instance.Player.GameId;
+                CastingWorkspaceInputs inputs = BuffPlannerUiRoot.CastingWorkspaceFreshInputsForRuntime();
+                if (string.IsNullOrEmpty(campaignId) || inputs == null)
+                {
+                    _importFailure = "seed:no-campaign-or-discovery";
+                    return;
+                }
+                CastingQualificationSelection selection =
+                    CastingQualificationRecipe.SelectZeroCostMixed(inputs, campaignId);
+                List<string> targets = selection.Castings
+                    .Select(value => value.DirectTargetUnitId)
+                    .Where(value => !string.IsNullOrEmpty(value))
+                    .Distinct(StringComparer.Ordinal).Take(2).ToList();
+                if (!selection.Selected || targets.Count != 2)
+                {
+                    _importFailure = "seed:no-zero-cost-buff:" + selection.Refusal;
+                    return;
+                }
+                var repository = new KingmakerBuffPlanner.Persistence.ProfileRepository(_modEntry.Path);
+                string path = repository.GetProfilePath(campaignId);
+                if (File.Exists(path))
+                {
+                    _importFailure = "seed:classic-plan-already-present";
+                    return;
+                }
+                KingmakerBuffPlanner.Persistence.BuffPlannerProfile profile =
+                    KingmakerBuffPlanner.Persistence.BuffPlannerProfile.CreateDefault(campaignId);
+                profile.Routines[0].Assignments.Add(new KingmakerBuffPlanner.Persistence.SourceAssignmentProfile
+                {
+                    SourceId = selection.SourceId,
+                    Ability = KingmakerBuffPlanner.Persistence.AbilityKeyProfile.FromKey(selection.Ability),
+                    ExistingEffectPolicy = ExistingEffectPolicy.SkipAlreadyActive,
+                    IgnoredPresenceMarkers = new List<string>(),
+                    CastingAssignments = new List<KingmakerBuffPlanner.Persistence.CastingAssignmentProfile>
+                    {
+                        new KingmakerBuffPlanner.Persistence.CastingAssignmentProfile
+                        {
+                            AssignmentId = "auto-" + selection.SourceId,
+                            Order = 0,
+                            CasterUnitId = null,
+                            SpellbookGuid = null,
+                            ProviderKey = null,
+                            TargetUnitIds = targets,
+                            Enhancements = new List<KingmakerBuffPlanner.Persistence.EnhancementSelectionProfile>()
+                        }
+                    }
+                });
+                repository.Save(profile);
+                _importClassicPath = path;
+                _importClassicSha256 = Hashing.Sha256(path);
+                _importExpectedCastings = targets.Count;
+                _importSeedEvidence = "campaign=" + campaignId + ";source=" + selection.SourceId +
+                    ";targets=" + string.Join(",", targets.ToArray()) + ";classicSha256=" + _importClassicSha256;
+                _log.Info("[KBP-IMPORT] classic plan seeded before the first open;" + _importSeedEvidence + ".");
+            }
+            catch (Exception exception)
+            {
+                _importFailure = "seed-failed:" + exception.GetType().Name + ":" + exception.Message;
+                _log.Error("[KBP-IMPORT] seeding failed.", exception);
+            }
+        }
+
+        // The first open ran the production migration: judge it, capture the
+        // opened planner, close it through its owned route and finish.
+        private bool UpdateImport()
+        {
+            if (_importVerification == null)
+            {
+                _importVerification = VerifyWorkspaceImport();
+                _log.Info("[KBP-IMPORT] first open;" + _importVerification + ".");
+                BeginWorkspaceCameraCapture("ws-import-opened.png", false);
+                return false;
+            }
+            if (_workspaceCameraOpenCapture == null ||
+                !string.Equals(_workspaceCameraOpenCapture.FileName, "ws-import-opened.png",
+                    StringComparison.OrdinalIgnoreCase))
+                return false;
+            ProbeWorkspaceCloseResult closed = CloseProbeWorkspace();
+            _importWorkspaceClosed = closed.Closed && closed.InputLeaseReleased &&
+                string.IsNullOrEmpty(closed.Failure);
+            _liveInitialCatalogEvidence = "import-scenario;workspaceRoot=active;legacyScreen=closed";
+            _workspaceInteractionEvidence = "import;no-authoring";
+            _workspaceReopenEvidence = "import;no-reopen-claim";
+            _completed = true;
+            return true;
+        }
+
+        // Imported (not blocked, not a fresh empty plan), one casting per
+        // classic target, nothing Ready on its own, the classic file
+        // byte-unchanged and archived byte-exact beside it.
+        private string VerifyWorkspaceImport()
+        {
+            UI.CastingWorkspaceSession session = BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
+            if (session == null) return "passed=False;session-missing;seed=" + (_importSeedEvidence ?? "missing");
+            string settings = Path.Combine(_modEntry.Path, "UserSettings");
+            bool classicUnchanged = _importClassicPath != null && File.Exists(_importClassicPath) &&
+                string.Equals(Hashing.Sha256(_importClassicPath), _importClassicSha256, StringComparison.Ordinal);
+            string[] archives = Directory.Exists(settings)
+                ? Directory.GetFiles(settings, "kbp-casting-*.orig") : new string[0];
+            bool archived = _importClassicSha256 != null && archives.Any(path => string.Equals(
+                Hashing.Sha256(path), _importClassicSha256, StringComparison.Ordinal));
+            KingmakerBuffPlanner.Persistence.CastingImportReport report = session.ImportReport;
+            bool migrated = session.MigrationStatus == KingmakerBuffPlanner.Persistence.CastingMigrationStatus.Migrated &&
+                !session.LegacyImportBlocked;
+            int castings = session.Document == null ? -1 : session.Document.Castings.Count;
+            bool imported = report != null && _importExpectedCastings > 0 &&
+                report.ResultingCastingCount == _importExpectedCastings && castings == _importExpectedCastings;
+            bool reviewed = report != null && report.ReadyCount == 0 && session.Document != null &&
+                session.Document.Castings.All(value => value != null && value.State != CastingAuthoringState.Ready);
+            bool passed = _importFailure == null && migrated && classicUnchanged && archived && imported && reviewed;
+            return "passed=" + passed + ";migrated=" + migrated + ";status=" + session.MigrationStatus +
+                ";classicUnchanged=" + classicUnchanged + ";archived=" + archived + ";castings=" + castings +
+                ";resulting=" + (report == null ? -1 : report.ResultingCastingCount) +
+                ";ready=" + (report == null ? -1 : report.ReadyCount) +
+                ";drafts=" + (report == null ? -1 : report.DraftCount) +
+                ";unresolvedCasters=" + (report == null ? -1 : report.UnresolvedCasterCount) +
+                ";seed=" + (_importSeedEvidence ?? "missing") +
+                (_importFailure == null ? string.Empty : ";failure=" + _importFailure);
+        }
+
+        private string _importSeedEvidence;
+        private string _importClassicPath;
+        private string _importClassicSha256;
+        private int _importExpectedCastings;
+        private string _importVerification;
+        private bool _importWorkspaceClosed;
+        private string _importFailure;
 
         private bool _inspectionWritten;
         private bool _inspectionWorkspaceClosed;

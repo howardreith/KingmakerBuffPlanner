@@ -56,6 +56,7 @@ namespace KingmakerBuffPlanner.Tests
             Run("buff-grid-source-type-tabs", () => TestBuffGridSourceTypeTabs(root));
             Run("player-facing-resource-labels", () => TestPlayerFacingResourceLabels(root));
             Run("in-game-reload-is-guarded", TestInGameReloadIsGuarded);
+            Run("in-game-first-open-import-is-judged", TestInGameFirstOpenImportIsJudged);
             Run("player-facing-refusals-and-routine-header", () => TestPlayerFacingRefusalsAndHeader(root));
             Run("buff-grid-is-alphabetical", () => TestBuffGridIsAlphabetical(root));
             Run("qualification-allowance-parsing", TestQualificationAllowanceParsing);
@@ -1153,7 +1154,8 @@ namespace KingmakerBuffPlanner.Tests
                 new KeyValuePair<string, string>("live-advanced-inspect", "KBP_ADVANCED"),
                 new KeyValuePair<string, string>("live-advanced-inspect", "KBP_AUTOMATION"),
                 new KeyValuePair<string, string>("live-workspace-qual", "KBP_ADVANCED"),
-                new KeyValuePair<string, string>("live-workspace-reload", "KBP_AUTOMATION")
+                new KeyValuePair<string, string>("live-workspace-reload", "KBP_AUTOMATION"),
+                new KeyValuePair<string, string>("live-workspace-import", "KBP_AUTOMATION")
             };
             foreach (KeyValuePair<string, string> item in accepted)
             {
@@ -1176,6 +1178,8 @@ namespace KingmakerBuffPlanner.Tests
                     set("live-ui-bootstrap", "KBP_ADVANCED", "KBP_ADVANCED")),
                 new KeyValuePair<string, Action<Dictionary<string, object>>>("advanced-reload",
                     set("live-workspace-reload", "KBP_ADVANCED", "KBP_ADVANCED")),
+                new KeyValuePair<string, Action<Dictionary<string, object>>>("advanced-import",
+                    set("live-workspace-import", "KBP_ADVANCED", "KBP_ADVANCED")),
                 new KeyValuePair<string, Action<Dictionary<string, object>>>("mixed-pair",
                     set("live-advanced-inspect", "KBP_ADVANCED", "KBP_AUTOMATION")),
                 new KeyValuePair<string, Action<Dictionary<string, object>>>("unknown-family",
@@ -1727,6 +1731,46 @@ namespace KingmakerBuffPlanner.Tests
                 !shown.Select(value => value.SourceId).SequenceEqual(
                     WorkspaceSourceLabels.GridOrder(shown).Select(value => value.SourceId)))
                 throw new InvalidOperationException("The grid is not shown in its order, or its first buff is not selected.");
+        }
+
+        // Mission section 11 (first-open import in game): the scenario opens
+        // with no synthetic input, seeds the classic plan only through the
+        // classic repository before the first open and never over an existing
+        // plan, and passes only when the production migration imported it,
+        // left it byte-unchanged, archived it byte-exact and made nothing
+        // Ready (source checks: the host is game-bound).
+        private static void TestInGameFirstOpenImportIsJudged()
+        {
+            if (!RuntimeTestProtocol.IsImportScenario("live-workspace-import") ||
+                !RuntimeTestProtocol.IsWorkspaceScenario("live-workspace-import") ||
+                !RuntimeTestProtocol.IsNoInputWorkspaceScenario("live-workspace-import") ||
+                RuntimeTestProtocol.IsAdvancedFamilyScenario("live-workspace-import"))
+                throw new InvalidOperationException("The import scenario classification is wrong.");
+            DirectoryInfo directory = new DirectoryInfo(Environment.CurrentDirectory);
+            while (directory != null && !File.Exists(Path.Combine(directory.FullName, "KingmakerBuffPlanner.sln")))
+                directory = directory.Parent;
+            if (directory == null) throw new InvalidOperationException("Repository root was not discoverable.");
+            string host = File.ReadAllText(Path.Combine(directory.FullName, "src", "KingmakerBuffPlanner",
+                "RuntimeTesting", "RuntimeTestHost.cs"));
+            string seed = SourceBlock(host, "private void SeedClassicPlanForImport()");
+            int exists = seed == null ? -1 : seed.IndexOf("if (File.Exists(path))", StringComparison.Ordinal);
+            int save = seed == null ? -1 : seed.IndexOf("repository.Save(profile);", StringComparison.Ordinal);
+            if (seed == null || exists < 0 || save < 0 || exists > save ||
+                !seed.Contains("CastingQualificationRecipe.SelectZeroCostMixed(inputs, campaignId)") ||
+                !seed.Contains("CasterUnitId = null,"))
+                throw new InvalidOperationException("The import seed can overwrite a classic plan or is not built from discovery.");
+            string verify = SourceBlock(host, "private string VerifyWorkspaceImport()");
+            if (verify == null ||
+                !verify.Contains("bool passed = _importFailure == null && migrated && classicUnchanged && archived && imported && reviewed;") ||
+                !verify.Contains("CastingMigrationStatus.Migrated") ||
+                !verify.Contains("report.ReadyCount == 0"))
+                throw new InvalidOperationException("The import verification is weaker than the scenario claims.");
+            int seedCall = host.IndexOf("if (RuntimeTestProtocol.IsImportScenario(_request.Scenario)) SeedClassicPlanForImport();",
+                StringComparison.Ordinal);
+            int programmaticOpen = host.IndexOf("if (_liveUiPhase == 22)", StringComparison.Ordinal);
+            if (seedCall < 0 || programmaticOpen < 0 || seedCall > programmaticOpen ||
+                Occurrences(host, "SeedClassicPlanForImport();") != 1)
+                throw new InvalidOperationException("The classic plan is not seeded exactly once before the first open.");
         }
 
         // Refusals tell the player what to do next and the header counts the
