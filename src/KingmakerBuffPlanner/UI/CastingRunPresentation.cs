@@ -90,6 +90,53 @@ namespace KingmakerBuffPlanner.UI
             return routineName + " was not cast: " + text + ". (" + reason + ")";
         }
 
+        // An executor-contract limitation (the converter refusal) in words.
+        internal static string DescribeLimitation(string limitation)
+        {
+            string value = limitation ?? string.Empty;
+            if (value.Contains(":targeting-modifier:"))
+                return "a targeting modifier (such as Share Transmutation) is not executed yet";
+            if (value.Contains(":exact-enhancement-source:"))
+                return "an exact rod or item identity is not executed yet";
+            if (value.Contains(":required-coverage-incomplete:"))
+                return "required recipients are outside the predicted area of effect";
+            return value;
+        }
+
+        // One live existing-effect verdict in words.
+        internal static string DescribeExistingEffectNote(string note)
+        {
+            string value = note ?? string.Empty;
+            if (value.StartsWith("already-active:", StringComparison.Ordinal))
+                return "already active on " + FirstSegment(value, "already-active:") + " (skipped)";
+            if (value.StartsWith("existing-active-recast:", StringComparison.Ordinal))
+                return "active on " + FirstSegment(value, "existing-active-recast:") +
+                    " but set to always recast";
+            if (value.StartsWith("existing-insufficient:", StringComparison.Ordinal))
+            {
+                string unit = FirstSegment(value, "existing-insufficient:");
+                string why = value.Substring("existing-insufficient:".Length + unit.Length);
+                string reason = why.Contains("weaker-caster-level")
+                    ? "weaker (lower caster level)"
+                    : why.Contains("remaining-duration-short")
+                        ? "about to expire"
+                        : why.Contains("missing-metamagic") || why.Contains("metamagic-unverified")
+                            ? "without the planned metamagic"
+                            : why.Contains("equivalence-unproven")
+                                ? "not provably as strong"
+                                : "not sufficient";
+                return "present on " + unit + " but " + reason + " (will recast)";
+            }
+            return value;
+        }
+
+        private static string FirstSegment(string value, string prefix)
+        {
+            string rest = value.Substring(prefix.Length);
+            int split = rest.IndexOf(":", StringComparison.Ordinal);
+            return split < 0 ? rest : rest.Substring(0, split);
+        }
+
         private static string StopReason(string terminal)
         {
             string reason = terminal ?? string.Empty;

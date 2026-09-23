@@ -872,7 +872,7 @@ namespace KingmakerBuffPlanner.UI
                     176f, 4f, 0f, 4f);
                 Text status = KingmakerUiFactory.CreateText(
                     "Status", entry, _theme,
-                    card.Readiness.ToString() + coverage, 14, TextAnchor.UpperRight);
+                    card.StatusLabel + coverage, 14, TextAnchor.UpperRight);
                 KingmakerUiFactory.SetAnchors(status.rectTransform, 0.55f, 0.55f, 0.98f, 0.92f);
                 Text detail = KingmakerUiFactory.CreateText(
                     "Detail", entry, _theme,
@@ -924,6 +924,12 @@ namespace KingmakerBuffPlanner.UI
                 parts.Add("Reasons: " + string.Join(", ", card.ReadinessReasons));
             if (card.ReviewItems.Count != 0)
                 parts.Add("Needs review (imported): " + string.Join(", ", card.ReviewItems));
+            if (card.ExecutionLimitation != null)
+                parts.Add("Cannot run in this version: " +
+                    CastingRunPresentation.DescribeLimitation(card.ExecutionLimitation));
+            if (card.ExistingEffectNotes.Count != 0)
+                parts.Add("Existing effect: " + string.Join("; ", card.ExistingEffectNotes
+                    .Select(CastingRunPresentation.DescribeExistingEffectNote).ToArray()));
             return string.Join("  ·  ", parts);
         }
 

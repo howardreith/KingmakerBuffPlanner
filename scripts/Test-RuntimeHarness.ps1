@@ -1058,6 +1058,68 @@ try {
         }
     }
     $passed++
+
+    # Advanced-copy binding: the pair must be exactly the pair published by
+    # one completed advanced bootstrap (immutable BASELINE bytes, the same
+    # WORKING file, the same campaign). Automation or rolled-back records
+    # never bind; two completed advanced bootstraps are ambiguous.
+    . (Join-Path $PSScriptRoot 'RuntimeAutomation.Common.ps1')
+    $bindState = Join-Path $root 'bind-state'
+    New-Item -ItemType Directory -Path $bindState | Out-Null
+    function New-BindRecord([string]$RunId, [string]$Status, [string]$BaselineFile, [string]$WorkingFile,
+        [string]$BaselineSha, [string]$GameId) {
+        $runDir = Join-Path $bindState $RunId
+        New-Item -ItemType Directory -Path $runDir | Out-Null
+        $manifestPath = Join-Path $runDir 'fixture-manifest.json'
+        Write-KbpJsonAtomic $manifestPath ([ordered]@{
+            schemaVersion = 1; runId = $RunId
+            baseline = @{ fileName = $BaselineFile; sha256 = $BaselineSha }
+            working = @{ fileName = $WorkingFile; sha256 = ('c' * 64) }
+            gameId = $GameId })
+        Write-KbpJsonAtomic (Join-Path $runDir 'transaction.json') ([ordered]@{
+            schemaVersion = 1; runId = $RunId; status = $Status; manifestPath = $manifestPath })
+    }
+    $bindGame = '66666666-7777-8888-9999-000000000000'
+    New-BindRecord 'bootstrap-advanced-fixture' 'Completed' 'Manual_411_KBP_ADVANCED_BASELINE.zks' `
+        'Manual_412_KBP_ADVANCED_WORKING.zks' ('a' * 64) $bindGame
+    New-BindRecord 'bootstrap-automation-fixture' 'Completed' 'Manual_304_KBP_AUTOMATION_BASELINE.zks' `
+        'Manual_305_KBP_AUTOMATION_WORKING.zks' ('d' * 64) 'automation-game'
+    New-BindRecord 'bootstrap-advanced-rolled-back' 'RolledBack' 'Manual_421_KBP_ADVANCED_BASELINE.zks' `
+        'Manual_422_KBP_ADVANCED_WORKING.zks' ('e' * 64) $bindGame
+    function New-BindPair([string]$BaselineFile, [string]$BaselineSha, [string]$WorkingFile, [string]$GameId) {
+        return [pscustomobject]@{
+            family = 'Advanced'
+            baseline = [pscustomobject]@{ fileName = $BaselineFile; sha256 = $BaselineSha; gameId = $GameId }
+            working = [pscustomobject]@{ fileName = $WorkingFile; sha256 = ('f' * 64); gameId = $GameId }
+        }
+    }
+    $boundRecord = Assert-KbpAdvancedFixtureBinding -FixtureStateRoot $bindState -Pair (New-BindPair `
+        'Manual_411_KBP_ADVANCED_BASELINE.zks' ('a' * 64) 'Manual_412_KBP_ADVANCED_WORKING.zks' $bindGame)
+    if ($boundRecord.runId -cne 'bootstrap-advanced-fixture') {
+        throw 'The advanced binding did not resolve the single completed advanced bootstrap.'
+    }
+    $bindRefusals = @(
+        (New-BindPair 'Manual_411_KBP_ADVANCED_BASELINE.zks' ('b' * 64) 'Manual_412_KBP_ADVANCED_WORKING.zks' $bindGame),
+        (New-BindPair 'Manual_411_KBP_ADVANCED_BASELINE.zks' ('a' * 64) 'Manual_499_KBP_ADVANCED_WORKING.zks' $bindGame),
+        (New-BindPair 'Manual_411_KBP_ADVANCED_BASELINE.zks' ('a' * 64) 'Manual_412_KBP_ADVANCED_WORKING.zks' 'other-game'),
+        (New-BindPair 'Manual_421_KBP_ADVANCED_BASELINE.zks' ('e' * 64) 'Manual_422_KBP_ADVANCED_WORKING.zks' $bindGame)
+    )
+    foreach ($bindPair in $bindRefusals) {
+        $refused = $false
+        try { Assert-KbpAdvancedFixtureBinding -FixtureStateRoot $bindState -Pair $bindPair | Out-Null }
+        catch { $refused = $true }
+        if (-not $refused) { throw "An unbound advanced pair was accepted: $($bindPair.baseline.fileName)/$($bindPair.working.fileName)." }
+    }
+    New-BindRecord 'bootstrap-advanced-second' 'Completed' 'Manual_431_KBP_ADVANCED_BASELINE.zks' `
+        'Manual_432_KBP_ADVANCED_WORKING.zks' ('9' * 64) $bindGame
+    $refused = $false
+    try {
+        Assert-KbpAdvancedFixtureBinding -FixtureStateRoot $bindState -Pair (New-BindPair `
+            'Manual_411_KBP_ADVANCED_BASELINE.zks' ('a' * 64) 'Manual_412_KBP_ADVANCED_WORKING.zks' $bindGame) | Out-Null
+    }
+    catch { $refused = $_.Exception.Message -like '*exactly one completed advanced bootstrap*' }
+    if (-not $refused) { throw 'Two completed advanced bootstraps were not refused as ambiguous.' }
+    $passed++
 }
 finally {
     if (Test-Path -LiteralPath $root) {

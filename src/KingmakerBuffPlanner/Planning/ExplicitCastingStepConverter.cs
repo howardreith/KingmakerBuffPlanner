@@ -298,6 +298,16 @@ namespace KingmakerBuffPlanner.Planning
             return false;
         }
 
+        // The Standard-scope contract check alone, for disclosure BEFORE
+        // execution (the workspace card): null when the executor step can
+        // carry the casting as authored; otherwise the same refusal Apply
+        // would report for the whole conversion.
+        internal static string StandardExecutionLimitation(ResolvedCasting casting)
+        {
+            return casting == null ? null
+                : UnsupportedContract(casting, ExplicitProjectionScope.Standard);
+        }
+
         private static string UnsupportedContract(ResolvedCasting casting,
             ExplicitProjectionScope scope)
         {

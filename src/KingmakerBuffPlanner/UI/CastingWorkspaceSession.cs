@@ -1506,6 +1506,9 @@ namespace KingmakerBuffPlanner.UI
                     cards[cards.Count - 1].ApplyReviewItems(
                         casting.Provenance.UnresolvedReviewItems,
                         casting.Provenance.ResolvedReviewItems);
+                cards[cards.Count - 1].ApplyExecutionDetail(
+                    ExplicitCastingStepConverter.StandardExecutionLimitation(casting),
+                    casting.ExistingEffectNotes);
             }
             return cards;
         }

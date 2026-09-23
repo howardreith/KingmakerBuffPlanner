@@ -731,6 +731,38 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     terminal.AppendAssertions(result, _manualReadyEvidence,
                         _workspaceInteractionEvidence);
                 }
+                else if (RuntimeTestProtocol.IsInspectionScenario(_request.Scenario))
+                {
+                    // Inspection acceptance: evidence written, nothing
+                    // submitted (session lock, zero runs), production close
+                    // with the input lease released. Frames are recorded
+                    // as files but are not a pass condition here.
+                    result.Assertions.Add(_inspectionWritten
+                        ? RuntimeTestAssertion.Pass("inspection-written",
+                            "advanced-inspection.json", _inspectionSummary)
+                        : RuntimeTestAssertion.Fail("inspection-written",
+                            "advanced-inspection.json", _inspectionFailure ?? "missing"));
+                    bool noSubmission = UI.NativeCastingSessionPolicy.Locked &&
+                        _inspectionStartedRuns == 0;
+                    result.Assertions.Add(noSubmission
+                        ? RuntimeTestAssertion.Pass("inspection-no-native-submission",
+                            "session locked;0 runs", "locked=True;runs=0;disposition=" +
+                                _inspectionDisposition)
+                        : RuntimeTestAssertion.Fail("inspection-no-native-submission",
+                            "session locked;0 runs", "locked=" +
+                                UI.NativeCastingSessionPolicy.Locked + ";runs=" +
+                                _inspectionStartedRuns));
+                    result.Assertions.Add(_inspectionWorkspaceClosed
+                        ? RuntimeTestAssertion.Pass("inspection-workspace-closed",
+                            "closed;lease released", "closed=True;lease=released")
+                        : RuntimeTestAssertion.Fail("inspection-workspace-closed",
+                            "closed;lease released", "not-closed-or-lease-held"));
+                    if (!_inspectionWritten || !noSubmission || !_inspectionWorkspaceClosed)
+                    {
+                        result.Status = "FAIL";
+                        result.Stage = "inspection-validation";
+                    }
+                }
                 else if (RuntimeTestProtocol.IsProbeScenario(_request.Scenario))
                 {
                     // Probe acceptance (Unity-free rules in
@@ -1765,6 +1797,12 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         _liveUiPhase = 30;
                         return false;
                     }
+                    if (RuntimeTestProtocol.IsInspectionScenario(_request.Scenario))
+                    {
+                        // Inspection: read-only evidence, then close.
+                        _liveUiPhase = 45;
+                        return false;
+                    }
                     if (RuntimeTestProtocol.IsProbeScenario(_request.Scenario))
                     {
                         // Probe: no scripted authoring; selection (and, only
@@ -1780,6 +1818,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     _liveUiPhase = 25;
                 }
                 return false;
+            }
+            if (_liveUiPhase == 45)
+            {
+                return UpdateInspection();
             }
             if (_liveUiPhase == 40)
             {
@@ -2418,6 +2460,71 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         // and the ONE terminal cleanup path (reviews M2/M3); this host only
         // routes frames, stop/deadline, host failures and disable/unload to it.
         // ------------------------------------------------------------------
+        // Inspection scenario: read-only evidence of the loaded copy, then a
+        // production close. No authoring, no save, no submission (the
+        // runtime-test session lock keeps the casting boundary refusing).
+        private bool UpdateInspection()
+        {
+            CastingWorkspaceInputs inputs = null;
+            try { inputs = BuffPlannerUiRoot.CastingWorkspaceInputsForRuntime(); }
+            catch (Exception exception)
+            {
+                _inspectionFailure = "inputs-unavailable:" + exception.GetType().Name + ":" +
+                    exception.Message;
+            }
+            if (inputs != null)
+            {
+                try
+                {
+                    JObject inspection = AdvancedCopyInspection.Collect(inputs);
+                    inspection["runId"] = _request.RunId;
+                    object working;
+                    inspection["workingSaveName"] = _request.Parameters.TryGetValue(
+                        "workingSaveName", out working) ? working as string : null;
+                    _inspectionStartedRuns = BuffPlannerUiRoot.CastingRunsStartedForRuntime;
+                    _inspectionDisposition = BuffPlannerUiRoot.CastingDispatchDispositionForRuntime;
+                    inspection["nativeCasting"] = new JObject
+                    {
+                        { "sessionLocked", UI.NativeCastingSessionPolicy.Locked },
+                        { "lockReason", UI.NativeCastingSessionPolicy.LockReason },
+                        { "dispatchDisposition", _inspectionDisposition },
+                        { "startedRuns", _inspectionStartedRuns }
+                    };
+                    AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory,
+                        "advanced-inspection.json"), inspection.ToString(Formatting.Indented) +
+                        Environment.NewLine);
+                    _inspectionWritten = true;
+                    _inspectionSummary = "units=" + inputs.Snapshot.Units.Count +
+                        ";providers=" + inputs.Snapshot.Providers.Count +
+                        ";pools=" + inputs.Snapshot.ResourcePools.Count +
+                        ";sources=" + inputs.EffectsBySource.Count +
+                        ";enhancements=" + inputs.Enhancements.Count;
+                    _log.Info("[KBP-INSPECT] written;" + _inspectionSummary + ".");
+                }
+                catch (Exception exception)
+                {
+                    _inspectionFailure = "collect-failed:" + exception.GetType().Name + ":" +
+                        exception.Message;
+                    _log.Error("[KBP-INSPECT] collection failed.", exception);
+                }
+            }
+            ProbeWorkspaceCloseResult closed = CloseProbeWorkspace();
+            _inspectionWorkspaceClosed = closed.Closed && closed.InputLeaseReleased &&
+                string.IsNullOrEmpty(closed.Failure);
+            _liveInitialCatalogEvidence = "inspection-scenario;workspaceRoot=active;legacyScreen=closed";
+            _workspaceInteractionEvidence = "inspection;no-authoring";
+            _workspaceReopenEvidence = "inspection;no-reopen-claim";
+            _completed = true;
+            return true;
+        }
+
+        private bool _inspectionWritten;
+        private bool _inspectionWorkspaceClosed;
+        private int _inspectionStartedRuns = -1;
+        private string _inspectionDisposition = string.Empty;
+        private string _inspectionSummary = string.Empty;
+        private string _inspectionFailure;
+
         private bool UpdateProbeSelection()
         {
             if (_probeOwner == null || !_probeOwner.BeginSelection())

@@ -605,3 +605,45 @@ function Get-KbpProbeAllowanceBuildRefusal {
         [int]$allowance.maximumNativeSubmissions -ne 1) { return 'submissions' }
     return $null
 }
+
+# Advanced-copy binding: the pair found by name must be exactly the pair the
+# guarded bootstrap published - the immutable BASELINE bytes, the same
+# WORKING file and the same campaign - from exactly one completed advanced
+# bootstrap. Any other advanced-named save, a second bootstrap, or a
+# changed BASELINE is refused before anything is deployed or launched.
+function Assert-KbpAdvancedFixtureBinding {
+    param(
+        [Parameter(Mandatory = $true)]$Pair,
+        [string]$FixtureStateRoot = (Join-Path $script:KbpLabRoot 'runtime-fixture-state')
+    )
+    if (-not (Test-Path -LiteralPath $FixtureStateRoot -PathType Container)) {
+        throw 'Advanced fixture binding: the fixture state root is missing.'
+    }
+    $bound = New-Object System.Collections.Generic.List[object]
+    foreach ($runRoot in @(Get-ChildItem -LiteralPath $FixtureStateRoot -Directory -Force)) {
+        $transactionPath = Join-Path $runRoot.FullName 'transaction.json'
+        if (-not (Test-Path -LiteralPath $transactionPath -PathType Leaf)) { continue }
+        $transaction = Read-KbpJson $transactionPath
+        if ([string]$transaction.status -cne 'Completed') { continue }
+        $manifestPath = [string]$transaction.manifestPath
+        if ([string]::IsNullOrWhiteSpace($manifestPath) -or
+            -not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) { continue }
+        $manifest = Read-KbpJson $manifestPath
+        if ([string]$manifest.baseline.fileName -cnotmatch '^Manual_[0-9]+_KBP_ADVANCED_BASELINE\.zks$') { continue }
+        $bound.Add([pscustomobject]@{
+            runId = [string]$transaction.runId; manifestPath = $manifestPath; manifest = $manifest
+        })
+    }
+    if ($bound.Count -ne 1) {
+        throw "Advanced fixture binding requires exactly one completed advanced bootstrap; found $($bound.Count)."
+    }
+    $record = $bound[0]
+    if ([string]$record.manifest.baseline.fileName -cne [string]$Pair.baseline.fileName -or
+        [string]$record.manifest.baseline.sha256 -cne [string]$Pair.baseline.sha256 -or
+        [string]$record.manifest.working.fileName -cne [string]$Pair.working.fileName -or
+        [string]$record.manifest.gameId -cne [string]$Pair.working.gameId -or
+        [string]$record.manifest.gameId -cne [string]$Pair.baseline.gameId) {
+        throw 'The advanced save pair does not match its bootstrap manifest (baseline bytes, file names or campaign).'
+    }
+    return $record
+}

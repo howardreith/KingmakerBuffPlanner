@@ -185,7 +185,27 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             return string.Equals(scenario, "live-workspace-qual",
                 StringComparison.Ordinal) ||
                 IsManualWorkspaceScenario(scenario) ||
-                IsProbeScenario(scenario);
+                IsProbeScenario(scenario) ||
+                IsInspectionScenario(scenario);
+        }
+
+        // Read-only inspection of a loaded campaign copy (the advanced-copy
+        // family first; the automation fixture is its smoke test): opens the
+        // workspace through the production path with zero synthetic input,
+        // records campaign, roster, pools, providers, enhancements and live
+        // effects, closes the workspace, and never authors or submits.
+        internal static bool IsInspectionScenario(string scenario)
+        {
+            return string.Equals(scenario, "live-advanced-inspect", StringComparison.Ordinal);
+        }
+
+        // The advanced copy is inspected before anything casts on it: only
+        // the non-casting inspection and workspace scenarios may load it.
+        internal static bool IsAdvancedFamilyScenario(string scenario)
+        {
+            return IsInspectionScenario(scenario) ||
+                string.Equals(scenario, "live-workspace-qual", StringComparison.Ordinal) ||
+                IsManualWorkspaceScenario(scenario);
         }
 
         // Single-cast probe scenarios. BOTH request zero synthetic input and
@@ -209,7 +229,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         // Workspace scenarios that must never request synthetic input.
         internal static bool IsNoInputWorkspaceScenario(string scenario)
         {
-            return IsManualWorkspaceScenario(scenario) || IsProbeScenario(scenario);
+            return IsManualWorkspaceScenario(scenario) || IsProbeScenario(scenario) ||
+                IsInspectionScenario(scenario);
         }
 
         internal const int ProbeRunDeadlineSeconds = 60;
@@ -396,9 +417,17 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 if (name.EndsWith("Sha256", StringComparison.Ordinal) && !IsSha256(value))
                     throw new InvalidDataException("live-save-hash:" + name);
             }
-            if ((string)request.Parameters["workingSaveName"] != "KBP_AUTOMATION_WORKING" ||
-                (string)request.Parameters["baselineSaveName"] != "KBP_AUTOMATION_BASELINE")
+            string workingName = (string)request.Parameters["workingSaveName"];
+            string baselineName = (string)request.Parameters["baselineSaveName"];
+            bool automation = workingName == "KBP_AUTOMATION_WORKING" &&
+                baselineName == "KBP_AUTOMATION_BASELINE";
+            bool advanced = workingName == "KBP_ADVANCED_WORKING" &&
+                baselineName == "KBP_ADVANCED_BASELINE";
+            // Exactly one sealed family, never a mixed pair.
+            if (!automation && !advanced)
                 throw new InvalidDataException("live-save-names");
+            if (advanced && !IsAdvancedFamilyScenario(request.Scenario))
+                throw new InvalidDataException("live-save-family-scenario");
             if (string.Equals((string)request.Parameters["workingFileName"],
                 (string)request.Parameters["baselineFileName"], StringComparison.OrdinalIgnoreCase))
                 throw new InvalidDataException("live-save-files-not-distinct");
