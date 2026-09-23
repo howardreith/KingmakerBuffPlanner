@@ -622,9 +622,10 @@ namespace KingmakerBuffPlanner.UI
             if (!result.Allowed && result.GateDecision != null &&
                 !result.GateDecision.Allowed && mode == CastingApplyMode.Ordinary)
             {
-                _footerResult.text = "Apply blocked (" +
-                    result.GateDecision.BlockingReasons.Count +
-                    "): use Ready Casts Only deliberately.";
+                int notReady = _lastView == null ? 0
+                    : Math.Max(0, _lastView.RoutineCastingCount - _lastView.RoutineReadyCount);
+                _footerResult.text = "Apply blocked: " + (notReady == 1 ? "1 casting is" : notReady + " castings are") +
+                    " not ready (see the cards). Fix them, or use Ready Casts Only to run the ready ones.";
                 _readyOnlyButton.gameObject.SetActive(true);
                 return;
             }
@@ -982,10 +983,17 @@ namespace KingmakerBuffPlanner.UI
             if (card.CoverageGapDisplayNames.Count != 0)
                 parts.Add("Outside coverage: " + string.Join(", ",
                     card.CoverageGapDisplayNames));
-            if (card.ReadinessReasons.Count != 0)
-                parts.Add("Reasons: " + string.Join(", ", card.ReadinessReasons));
+            // Player-facing reasons; the import reason is not repeated when the
+            // review items themselves are listed.
+            string[] reasons = card.ReadinessReasons
+                .Where(code => card.ReviewItems.Count == 0 ||
+                    !code.StartsWith("import-review-unresolved", StringComparison.Ordinal))
+                .Select(WorkspaceReasonText.Describe).Distinct(StringComparer.Ordinal).ToArray();
+            if (reasons.Length != 0)
+                parts.Add("Why not ready: " + string.Join("; ", reasons));
             if (card.ReviewItems.Count != 0)
-                parts.Add("Needs review (imported): " + string.Join(", ", card.ReviewItems));
+                parts.Add("Imported, needs your review: " + string.Join("; ", card.ReviewItems
+                    .Select(WorkspaceReasonText.DescribeReviewItem).Distinct(StringComparer.Ordinal).ToArray()));
             if (card.ExecutionLimitation != null)
                 parts.Add("Cannot run in this version: " +
                     CastingRunPresentation.DescribeLimitation(card.ExecutionLimitation));

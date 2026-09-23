@@ -1320,6 +1320,7 @@ try {
             @('live-cast-qual', 'Automation', $true), @('live-cast-qual-select', 'Automation', $false),
             @('live-advanced-inspect', 'Advanced', $true), @('live-advanced-inspect', 'Automation', $false),
             @('live-cast-probe', 'Automation', $true),
+            @('live-workspace-reload', 'Automation', $true), @('live-workspace-import', 'Automation', $true),
             @('live-workspace-qual', 'Advanced', $true),
             @('live-cast-qual-select', 'Advanced', $true))) {
         $policy = Get-KbpProtectedSavePolicy -Scenario $strictCase[0] -FixtureFamily $strictCase[1] -WorkingFileName 'W.zks'

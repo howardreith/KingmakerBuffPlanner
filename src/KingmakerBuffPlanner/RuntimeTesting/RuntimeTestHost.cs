@@ -105,6 +105,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private int _reloadRunsBefore;
         private int _reloadUnloadsBefore;
         private int _reloadLoadsBefore;
+        private int _reloadActivatedBefore;
+        private int _reloadCompleteBefore;
+        private UI.CastingWorkspaceSession _reloadSessionBefore;
         private string _workspaceSavedIntentIds;
         private string _workspaceIntentBeforeEdit;
         private long _manualHoldStartedMillis = -1;
@@ -1608,6 +1611,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 liveBudgetSeconds = 600 + RuntimeTestProtocol.ProbeRunDeadlineSeconds;
             if (RuntimeTestProtocol.IsQualificationScenario(_request.Scenario))
                 liveBudgetSeconds = 600 + RuntimeTestProtocol.QualificationRunDeadlineSeconds;
+            if (RuntimeTestProtocol.IsReloadScenario(_request.Scenario))
+                liveBudgetSeconds = 300 + LiveCampaignSaveLoader.ReloadBudgetSeconds;
             if (_livePhaseElapsed.Elapsed.TotalSeconds > liveBudgetSeconds)
                 throw new TimeoutException("Live UI scenario timed out;phase=" + _liveUiPhase +
                     ";elapsedSeconds=" + _livePhaseElapsed.Elapsed.TotalSeconds.ToString("F1",
@@ -2138,7 +2143,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 _log.Info("[KBP-WORKSPACE] interaction sequence complete;" +
                     _workspaceInteractionEvidence + ";reopen=" +
                     _workspaceReopenEvidence + ".");
-                _liveUiPhase = RuntimeTestProtocol.IsReloadScenario(_request.Scenario) ? 80 : 21;
+                // The reload adds a native load only to a run whose authoring,
+                // save and reopen already passed (review of 1332ed8..542cd66).
+                bool reloadable = _workspaceInteraction.Violations().Count == 0 &&
+                    (_workspaceReopenEvidence ?? string.Empty).Contains("preserved=True");
+                if (RuntimeTestProtocol.IsReloadScenario(_request.Scenario) && !reloadable)
+                    _workspaceReloadEvidence = "passed=False;skipped:interaction-or-reopen-failed";
+                _liveUiPhase = RuntimeTestProtocol.IsReloadScenario(_request.Scenario) && reloadable ? 80 : 21;
                 return false;
             }
             if (_liveUiPhase == 80)
@@ -2158,6 +2169,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 _reloadUnloadsBefore = BuffPlannerUiRoot.LifecycleSignalsForRuntime("OnAreaBeginUnloading");
                 _reloadLoadsBefore = BuffPlannerUiRoot.LifecycleSignalsForRuntime("OnAreaLoadingComplete") +
                     BuffPlannerUiRoot.LifecycleSignalsForRuntime("OnAreaActivated");
+                _reloadActivatedBefore = BuffPlannerUiRoot.LifecycleSignalsForRuntime("OnAreaActivated");
+                _reloadCompleteBefore = BuffPlannerUiRoot.LifecycleSignalsForRuntime("OnAreaLoadingComplete");
+                _reloadSessionBefore = BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
                 _reloadStartedMillis = _workspaceCaptureElapsed.ElapsedMilliseconds;
                 _reloadSettleFrame = -1;
                 _log.Info("[KBP-RELOAD] loading the exact working save again in game;subscriptions=" +
@@ -2181,10 +2195,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 {
                     if (_workspaceCaptureElapsed.ElapsedMilliseconds - _reloadStartedMillis >
                         LiveCampaignSaveLoader.ReloadBudgetSeconds * 1000L)
-                        throw new TimeoutException("The in-game reload did not settle;loaded=" +
-                            (loaded ?? "pending") + ";areaCycled=" + areaCycled + ";world=" +
-                            BuffPlannerUiRoot.WorldStateForRuntime + ";hud=" +
-                            BuffPlannerUiRoot.IsHudInstalledForRuntime + ".");
+                    {
+                        string settle = "loaded=" + (loaded ?? "pending") + ";areaCycled=" + areaCycled +
+                            ";world=" + BuffPlannerUiRoot.WorldStateForRuntime + ";hud=" +
+                            BuffPlannerUiRoot.IsHudInstalledForRuntime;
+                        _liveSaveLoader.FailReload("host-timeout:" + settle);
+                        throw new TimeoutException("The in-game reload did not settle;" + settle + ".");
+                    }
                     return false;
                 }
                 if (_reloadSettleFrame < 0)
@@ -3616,18 +3633,35 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 !string.IsNullOrEmpty(_workspaceSavedIntentIds) &&
                 string.Equals(session.DocumentIntentSignature(), _workspaceSavedIntentIds,
                     StringComparison.Ordinal);
+            // Review of 1332ed8..542cd66, P2-1: what a fresh session would
+            // read from disk must equal what was saved (the same-campaign
+            // session object is retained, so comparing it with itself proves
+            // nothing about the file).
+            string diskStatus = "no-campaign";
+            string disk = string.IsNullOrEmpty(expectedGame) ? null
+                : UI.CastingWorkspaceSession.SavedIntentSignature(_modEntry.Path, expectedGame, out diskStatus);
+            bool diskPreserved = disk != null && string.Equals(disk, _workspaceSavedIntentIds, StringComparison.Ordinal);
             bool campaign = session != null && !string.IsNullOrEmpty(expectedGame) &&
                 string.Equals(session.CampaignId, expectedGame, StringComparison.Ordinal);
             int subscriptions = BuffPlannerUiRoot.ActiveEventSubscriptionsForRuntime;
             int hudRoots = BuffPlannerUiRoot.HudRootCountForRuntime;
+            // One delivery of each single-shot area event for one load: a
+            // duplicate EventBus registration would deliver them twice.
+            int unloads = BuffPlannerUiRoot.LifecycleSignalsForRuntime("OnAreaBeginUnloading") - _reloadUnloadsBefore;
+            int completes = BuffPlannerUiRoot.LifecycleSignalsForRuntime("OnAreaLoadingComplete") - _reloadCompleteBefore;
+            int activations = BuffPlannerUiRoot.LifecycleSignalsForRuntime("OnAreaActivated") - _reloadActivatedBefore;
             bool idle = !BuffPlannerUiRoot.IsCastingRunActive &&
                 BuffPlannerUiRoot.CastingRunsStartedForRuntime == _reloadRunsBefore;
             bool clean = session != null && !session.IsDirty;
-            bool passed = preserved && campaign && _reloadSubscriptionsBefore == 1 &&
-                subscriptions == 1 && hudRoots == 1 && idle && clean;
-            return "passed=" + passed + ";preserved=" + preserved + ";campaign=" + campaign +
+            bool passed = preserved && diskPreserved && campaign && _reloadSubscriptionsBefore == 1 &&
+                subscriptions == 1 && _reloadHudRootsBefore == 1 && hudRoots == 1 &&
+                unloads == 1 && completes == 1 && idle && clean;
+            return "passed=" + passed + ";preserved=" + preserved + ";diskPreserved=" + diskPreserved +
+                ";diskStatus=" + diskStatus + ";campaign=" + campaign +
                 ";subscriptions=" + _reloadSubscriptionsBefore + "->" + subscriptions +
-                ";hudRoots=" + _reloadHudRootsBefore + "->" + hudRoots + ";idle=" + idle +
+                ";hudRoots=" + _reloadHudRootsBefore + "->" + hudRoots +
+                ";areaEvents=unload+" + unloads + ",complete+" + completes + ",activated+" + activations +
+                ";sessionReused=" + ReferenceEquals(session, _reloadSessionBefore) + ";idle=" + idle +
                 ";dirty=" + (session == null ? "no-session" : session.IsDirty.ToString()) +
                 ";loadStatus=" + (session == null ? "none" : session.LoadStatus.ToString()) +
                 ";loaded=" + (_reloadLoadedEvidence ?? "missing");

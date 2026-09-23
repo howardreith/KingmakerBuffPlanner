@@ -191,13 +191,17 @@ namespace KingmakerBuffPlanner.UI
             get { return _instance != null && _instance._hud != null && _instance._hud.IsInstalled; }
         }
 
+        // Every HUD root in the loaded scenes, inactive ones included (review
+        // of 1332ed8..542cd66, P2-1): FindObjectsOfType sees active objects
+        // only; FindObjectsOfTypeAll also returns assets, so scene objects
+        // are kept.
         internal static int HudRootCountForRuntime
         {
             get
             {
-                return UnityEngine.Object.FindObjectsOfType<RectTransform>().Count(rect =>
-                    rect != null && string.Equals(rect.name,
-                        BuffPlannerHudButtonController.RootName, StringComparison.Ordinal));
+                return Resources.FindObjectsOfTypeAll<RectTransform>().Count(rect =>
+                    rect != null && rect.gameObject.scene.IsValid() &&
+                    string.Equals(rect.name, BuffPlannerHudButtonController.RootName, StringComparison.Ordinal));
             }
         }
 
@@ -439,18 +443,24 @@ namespace KingmakerBuffPlanner.UI
             // Scale evidence (mission section 10, resolutions and scales):
             // the workspace is its own top-level canvas; the native UI
             // canvas and its scaler say how the game scales its own UI.
+            // The scaler is read on the native ROOT canvas (a scaler lives on
+            // the root, not necessarily on StaticCanvas itself); invariant
+            // number formats.
+            System.Globalization.CultureInfo invariant = System.Globalization.CultureInfo.InvariantCulture;
             Canvas nativeCanvas = StaticCanvas.Instance == null
                 ? null : StaticCanvas.Instance.GetComponent<Canvas>();
-            UnityEngine.UI.CanvasScaler nativeScaler = StaticCanvas.Instance == null
-                ? null : StaticCanvas.Instance.GetComponent<UnityEngine.UI.CanvasScaler>();
+            Canvas nativeRoot = nativeCanvas == null ? null : nativeCanvas.rootCanvas;
+            UnityEngine.UI.CanvasScaler nativeScaler = nativeRoot == null
+                ? null : nativeRoot.GetComponent<UnityEngine.UI.CanvasScaler>();
             sb.Append(";screen=").Append(Screen.width).Append("x").Append(Screen.height)
-                .Append(";ownScale=").Append(canvas == null ? "null" : canvas.scaleFactor.ToString("F3"))
-                .Append(";nativeScale=").Append(nativeCanvas == null ? "null" : nativeCanvas.scaleFactor.ToString("F3"))
+                .Append(";ownScale=").Append(canvas == null ? "null" : canvas.scaleFactor.ToString("F3", invariant))
+                .Append(";nativeRoot=").Append(nativeRoot == null ? "null" : nativeRoot.name)
+                .Append(";nativeScale=").Append(nativeRoot == null ? "null" : nativeRoot.scaleFactor.ToString("F3", invariant))
                 .Append(";nativeScaler=").Append(nativeScaler == null ? "none"
-                    : nativeScaler.uiScaleMode + "/" + nativeScaler.referenceResolution.x.ToString("F0") + "x" +
-                        nativeScaler.referenceResolution.y.ToString("F0") + "/" + nativeScaler.screenMatchMode +
-                        "/match" + nativeScaler.matchWidthOrHeight.ToString("F2") +
-                        "/factor" + nativeScaler.scaleFactor.ToString("F2"));
+                    : nativeScaler.uiScaleMode + "/" + nativeScaler.referenceResolution.x.ToString("F0", invariant) + "x" +
+                        nativeScaler.referenceResolution.y.ToString("F0", invariant) + "/" + nativeScaler.screenMatchMode +
+                        "/match" + nativeScaler.matchWidthOrHeight.ToString("F2", invariant) +
+                        "/factor" + nativeScaler.scaleFactor.ToString("F2", invariant));
             // Per-node dump (bounded): which graphics exist, their rect
             // sizes, and their effective colors — the discriminator for
             // "blocker renders but frame/texts invisible".

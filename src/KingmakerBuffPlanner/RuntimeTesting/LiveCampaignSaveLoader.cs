@@ -345,6 +345,52 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             }
         }
 
+        // Review of 1332ed8..542cd66, P1-1: the reload runs under the same
+        // write sentinels as the first load (any save-writing method fails the
+        // run) plus a correlation hook on Game.LoadGame itself; they are
+        // removed when the reload completes or fails.
+        private MethodInfo _reloadLoadGame;
+        private int _reloadLoadGameCalls;
+        private bool _reloadLoadGameCorrelated;
+
+        private void InstallReloadSentinels()
+        {
+            if (_active != null)
+                throw new InvalidOperationException("A guarded save load is already active.");
+            try
+            {
+                Assembly assembly = typeof(Game).Assembly;
+                Type manager = assembly.GetType("Kingmaker.EntitySystem.Persistence.SaveManager", true);
+                Type areaState = assembly.GetType("Kingmaker.EntitySystem.AreaPersistentState", true);
+                Type descriptorType = assembly.GetType(MainMenuLoadContracts.SaveInfoTypeName, true);
+                MethodInfo prefix = typeof(LiveCampaignSaveLoader).GetMethod(
+                    "Prefix", BindingFlags.Static | BindingFlags.NonPublic);
+                _reloadLoadGame = MainMenuLoadContracts.ExactPatchableMethod(typeof(Game),
+                    "LoadGame", new[] { descriptorType }, typeof(void));
+                if (_harmony == null) _harmony = HarmonyInstance.Create(HarmonyId);
+                Patch(_reloadLoadGame, prefix);
+                Patch(MainMenuLoadContracts.ExactPatchableMethod(manager,
+                    "DeleteSave", new[] { descriptorType }, typeof(void)), prefix);
+                Patch(MainMenuLoadContracts.ExactPatchableMethod(manager,
+                    "DeleteSave", new[] { typeof(string) }, typeof(void)), prefix);
+                Patch(MainMenuLoadContracts.ExactPatchableMethod(manager,
+                    "RemoveSaveFromList", new[] { descriptorType }, typeof(void)), prefix);
+                Patch(MainMenuLoadContracts.ExactPatchableMethod(manager,
+                    "SaveStashedArea", new[] { descriptorType, areaState }, typeof(void)), prefix);
+                Patch(MainMenuLoadContracts.ExactPatchableMethod(manager,
+                    "SaveRoutine", new[] { descriptorType, typeof(bool) },
+                    typeof(System.Collections.Generic.IEnumerator<object>)), prefix);
+                _hooksRemoved = false;
+                _active = this;
+                Add("reload-sentinels-installed", "hooks=" + _patched.Count);
+            }
+            catch
+            {
+                RemoveHooks();
+                throw;
+            }
+        }
+
         private static bool Prefix(MethodBase __originalMethod, object __instance,
             object[] __args)
         {
@@ -412,6 +458,15 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 Add("receiver-bound-window-handler-enter", "count=" +
                     _windowHandlerInvocations + ";exactWindow=" +
                     ReferenceEquals(receiver, _receiverBoundWindow) +
+                    ";exactWorkingDescriptor=" + ReferenceEquals(argument, _workingDescriptor));
+            }
+            else if (_reloadLoadGame != null && method == _reloadLoadGame)
+            {
+                object argument = args == null || args.Length == 0 ? null : args[0];
+                _reloadLoadGameCalls++;
+                _reloadLoadGameCorrelated = _reloadLoadGameCalls == 1 &&
+                    ReferenceEquals(argument, _workingDescriptor);
+                Add("reload-load-game-enter", "count=" + _reloadLoadGameCalls +
                     ";exactWorkingDescriptor=" + ReferenceEquals(argument, _workingDescriptor));
             }
             else if (method == _loadEntry)
@@ -563,14 +618,40 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 throw new InvalidOperationException("No proven working descriptor to reload.");
             _reloadStarted = true;
             _reloadStartedMillis = _elapsed.ElapsedMilliseconds;
-            _reloadSaver = new GuardedReadOnlySaver(descriptor,
-                detail => Add("reload-read-only-native-save-load", detail));
-            descriptor.Saver = _reloadSaver;
-            Game.Instance.LoadGame(descriptor);
-            Add("reload-load-game-invoked", "Game.LoadGame(exact working descriptor)");
-            if (RegisterAfterLoad(new Action(OnReloadCompleted)))
+            try
+            {
+                InstallReloadSentinels();
+                _reloadSaver = new GuardedReadOnlySaver(descriptor,
+                    detail => Add("reload-read-only-native-save-load", detail));
+                descriptor.Saver = _reloadSaver;
+                Game.Instance.LoadGame(descriptor);
+                Add("reload-load-game-invoked", "Game.LoadGame(exact working descriptor)");
+                // Registered once the load has started (a coroutine), so it
+                // can only report this load's completion.
+                if (!RegisterAfterLoad(new Action(OnReloadCompleted)))
+                    throw new InvalidOperationException("The after-load callback could not be registered.");
                 Add("reload-callback-registered", "read-only callback registration");
+            }
+            catch (Exception exception)
+            {
+                FailReload("begin:" + exception.GetType().Name + ":" + exception.Message);
+                throw;
+            }
         }
+
+        // Ends a failed reload's evidence: the failure, the sentinels
+        // removed and the events written (the native saver stays wrapped
+        // read-only when the load never completed).
+        internal void FailReload(string reason)
+        {
+            if (_reloadComplete || _reloadFailed) return;
+            _reloadFailed = true;
+            Add("reload-failure", reason ?? "unspecified");
+            RemoveHooks();
+            WriteEventsEvidence();
+        }
+
+        private bool _reloadFailed;
 
         // Null while the reload is in progress; its evidence once the header
         // protocol completed, the native saver is restored, the host saw the
@@ -585,8 +666,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             try { return AdvanceReload(areaReloaded); }
             catch (Exception exception)
             {
-                Add("reload-failure", exception.GetType().Name + ":" + exception.Message);
-                WriteEventsEvidence();
+                FailReload(exception.GetType().Name + ":" + exception.Message);
                 throw;
             }
         }
@@ -598,11 +678,19 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (_elapsed.ElapsedMilliseconds - _reloadStartedMillis > ReloadBudgetSeconds * 1000L)
                 throw new TimeoutException("The guarded in-game reload did not complete within " +
                     ReloadBudgetSeconds + " s.");
+            if (_writeObserved)
+                throw new InvalidOperationException("A native save-writing method was observed during the reload.");
+            if (_wrongThread)
+                throw new InvalidOperationException("A reload hook ran off the game thread.");
+            if (_reloadLoadGameCalls > 1 || (_reloadLoadGameCalls == 1 && !_reloadLoadGameCorrelated))
+                throw new InvalidOperationException("Game.LoadGame received something other than the exact working descriptor, or ran twice.");
             if (Time.frameCount == _reloadLastFrame) return null;
             _reloadLastFrame = Time.frameCount;
             if (_reloadSaver != null)
             {
-                if (!_reloadSaver.Complete) return null;
+                // Review P1-1: the read-only saver stays in place for the
+                // whole native load, until its after-load callback.
+                if (!_reloadSaver.Complete || !_reloadCallback) return null;
                 var descriptor = (Kingmaker.EntitySystem.Persistence.SaveInfo)_workingDescriptor;
                 if (!ReferenceEquals(descriptor.Saver, _reloadSaver))
                     throw new InvalidOperationException(
@@ -623,10 +711,14 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 _reloadStableFingerprints = 1;
             }
             if (_reloadStableFingerprints < 2) return null;
+            if (_reloadLoadGameCalls != 1 || !_reloadLoadGameCorrelated)
+                throw new InvalidOperationException("The reload was not observed entering Game.LoadGame with the exact working descriptor.");
             _reloadComplete = true;
             ReloadEvidence = fingerprint + ";afterLoadCallback=" + _reloadCallback +
+                ";loadGameCorrelated=" + _reloadLoadGameCorrelated + ";writesObserved=" + _writeObserved +
                 ";elapsedMs=" + (_elapsed.ElapsedMilliseconds - _reloadStartedMillis);
             Add("reload-stable-fingerprint", ReloadEvidence);
+            RemoveHooks();
             WriteEventsEvidence();
             return ReloadEvidence;
         }

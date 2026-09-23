@@ -18,8 +18,8 @@ readiness. Evidence words mean exactly this:
 | --- | --- |
 | Casting-first workspace opens through the production path (not the legacy screen) | in-game (WORKING fixture); not on an advanced party |
 | Bubble Buffs-style layout, search, scope toggle, portraits, coverage colours | in-game (camera and display frames); not accepted (owner glimpse only) |
-| Layout at resolutions and UI scales | 1920×1200 only: the workspace canvas and the native StaticCanvas both at scale 1.000, the native canvas without a CanvasScaler (`casting-ws-qual-20260923-t1-01`); other resolutions not tested (changing the game resolution would change the owner's display settings) |
-| Legacy import on first open, failed-import blocking, review items, notices | implemented + stand-ins; not in-game with a real legacy plan |
+| Layout at resolutions and UI scales | 1920×1200 only: the workspace canvas and the native StaticCanvas both at scale 1.000 (`casting-ws-qual-20260923-t1-01`); how the native UI scales at other resolutions is not established, and other resolutions are not tested (changing the game resolution would change the owner's display settings) |
+| Legacy import on first open, failed-import blocking, review items, notices | first open with a classic plan **in-game** (`casting-ws-import-20260923-i1-01`: real migration, two drafts needing review, classic file byte-unchanged and archived); failed-import blocking and notices stand-ins only |
 | Large catalogue, multiple spellbooks, pets, long/group buffs at scale | not in-game (tiny fixture only) |
 | Input isolation | in-game (earlier HUD/UI runs); not re-checked on an advanced party |
 | Advanced-save disposable copy tooling | implemented + stand-ins: guarded bootstrap (`-Family Advanced`), family pair lookup, manifest binding, protocol family gate, non-casting `live-advanced-inspect`, protected-save comparison, whole-run completion record gating advanced casting. Not in-game: no `KBP_ADVANCED_SEED` yet (`docs/ADVANCED-SEED-COMPATIBILITY.md`) |

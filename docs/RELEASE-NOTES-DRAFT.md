@@ -38,22 +38,27 @@ See `docs/CASTING-FIRST-PLAYER-GUIDE.md` for the full guide.
 ## What was checked, by evidence layer
 
 **Source tests** (Windows PowerShell 5.1, non-interactive, at the
-candidate commit): source validation, protocol tests (293 at the reload
-commit), runtime-harness filesystem, deployment WhatIf, launcher WhatIf,
-fixture inventory, install rollback in isolated state and the guarded
-publisher gate. Every guard added in this iteration has a mutant the
-tests catch.
+candidate commit; counts in the release-candidate receipt): source
+validation, protocol tests, runtime-harness filesystem, deployment
+WhatIf, launcher WhatIf, fixture inventory, install rollback in isolated
+state and the guarded publisher gate. Every guard added in this iteration
+has a mutant the tests catch.
 
 **Native gameplay** (guarded runs on the disposable automation campaign,
-never an ordinary save; the exact candidate build loaded, verified by
-commit, package, DLL and MVID):
+never an ordinary save). Each run checked in game that the build it
+loaded was the one it staged (commit, package, DLL and MVID). The runs
+below were made on development commits during this iteration; the
+release-candidate receipt (`docs/evidence/rc-0.2.0-rc1-receipt.md`, added
+after the freeze) lists the runs repeated on the frozen candidate itself.
 
 | Run | What it showed |
 | --- | --- |
 | `casting-probe-cast-20260923-p2-02` | One Resistance cantrip cast through the one-cast probe: new effect instance, nothing spent, zero violations |
 | `casting-qual-cast-20260923-q1-01` | A two-caster Resistance routine through the same Apply a player uses: stop after the first cast, complete (skipping the active buff), repeat (nothing to cast), and a recast after closing and reopening the planner; every step as forecast, no save written |
-| `casting-ws-qual-20260923-q2-03`, `casting-ws-qual-20260923-r1-01` | The workspace in game frames: authoring, focused edit, Undo, Save, close and reopen; resource names, refusal text and header as described above |
-| `casting-ws-reload-20260923-s1-01` | See the release-candidate receipt: the exact test save loaded again in game, the planner reopened with the saved plan and one set of handlers |
+| `casting-ws-qual-20260923-q2-03` | Resource names and the footer fixed in game frames (the same frames still showed refusal codes and casting ids) |
+| `casting-ws-qual-20260923-r1-01` | Refusal text, the routine-wide header and the editing label fixed in game frames |
+| `casting-ws-reload-20260923-s2-01` | The exact test save loaded again in game (read-only, no write); the reopened planner kept the saved plan with one set of handlers |
+| `casting-ws-import-20260923-i1-01` | First open with a classic plan: imported as two drafts needing review, the classic file byte-unchanged and archived |
 
 **Restoration:** every run moved the owner's Mods folder aside, staged
 only the candidate and the approved mod set, and restored the folder
