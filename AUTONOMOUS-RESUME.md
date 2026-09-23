@@ -54,7 +54,18 @@ this UI"). Record: `docs/evidence/casting-ws-claude-manual-20260922-200244-sessi
 Owner direction: Bubble Buffs–like look, casting as the atomic unit —
 `docs/UI-END-GOAL.md`.
 
-NEXT (exact action): the UI slice in `docs/UI-END-GOAL.md` — icon-first
+USABILITY PASS (`afe2749` + label follow-up): duplicate buff sources
+disambiguated (variant names without the repeated base name, then
+kind/caster, then ordinal); caster-lane button now picks the caster for
+the next casting ("Use"/"Casting"); empty-lane guidance; routine tabs no
+longer clipped; lanes clear the footer. Live frame
+`casting-ws-claude-rehearsal-20260922-202050` (PASS, restored verified)
+confirmed the tabs, hint and distinct labels. The automatic
+`live-workspace-qual` scenario (J1 at runtime) has NOT been re-run since
+the repair: it injects keystrokes and the owner was at the desktop.
+
+NEXT (exact action): run `live-workspace-qual` when the desktop is free
+(J1 runtime proof); then the UI slice in `docs/UI-END-GOAL.md` — icon-first
 searchable buff grid with disambiguated variants, portrait strips with
 the coverage colour legend, casting cards with portraits and enhancement
 chips; then the native parchment pass. Historical next step:

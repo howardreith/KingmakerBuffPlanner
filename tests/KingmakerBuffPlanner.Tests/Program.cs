@@ -13420,6 +13420,10 @@ namespace KingmakerBuffPlanner.Tests
                     new[] { "Resist Energy — Fire" }, new[] { "spell" }, new[] { "Linzi" }),
                 new WorkspaceSourceDescriptor("s-res-b", "Resist Energy",
                     new[] { "Resist Energy — Cold" }, new[] { "spell" }, new[] { "Linzi" }),
+                new WorkspaceSourceDescriptor("s-treat-a", "Use Heal Skill 2",
+                    new[] { "Use Heal Skill 2 — Treat Deadly Wounds" }, null, null),
+                new WorkspaceSourceDescriptor("s-treat-b", "Use Heal Skill 2",
+                    new[] { "Use Heal Skill 2 — Treat Affliction" }, null, null),
                 new WorkspaceSourceDescriptor("s-aid-a", "Aid Another",
                     null, null, null),
                 new WorkspaceSourceDescriptor("s-aid-b", "Aid Another",
@@ -13427,8 +13431,12 @@ namespace KingmakerBuffPlanner.Tests
             });
             if (details["s-light"] != string.Empty)
                 throw new InvalidOperationException("A unique name was decorated.");
-            if (details["s-res-a"] != "Resist Energy — Fire" ||
-                details["s-res-b"] != "Resist Energy — Cold")
+            if (details["s-treat-a"] != "Treat Deadly Wounds" ||
+                details["s-treat-b"] != "Treat Affliction")
+                throw new InvalidOperationException(
+                    "The repeated base name was not stripped: " + details["s-treat-a"]);
+            if (details["s-res-a"] != "Fire" ||
+                details["s-res-b"] != "Cold")
                 throw new InvalidOperationException("Variant names were not preferred.");
             if (details["s-heal-a"] != "ability · Hedwirg" ||
                 details["s-heal-b"] != "feature · Linzi")
