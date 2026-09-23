@@ -1,10 +1,26 @@
-# First live casting probe — concrete proposal, NOT approved
+# One-cast Resistance probe
 
-Status: **NOT EXECUTED and NOT APPROVED.** This document proposes one
-specific run. Nothing in it grants permission. The probe cannot submit a
-native cast unless the owner writes an allowance file for this exact run
-into the approvals directory (section 7). Claude does not create, edit or
-infer that file.
+Status (2026-09-23): **run on the current candidate; PASS on the second
+identified run.** `casting-probe-cast-20260923-p2-02` (frozen `320a1b6`)
+cast Resistance through the reviewed one-cast boundary and confirmed a new
+ResistanceBuff instance on the recipient in a fresh read, with no resource
+spent, no violation, verified Mods restoration and unchanged protected
+saves. The first identified run, `casting-probe-cast-20260923-p1-01`
+(frozen `7664f2f`), submitted inside the open planner (FullScreenUi) and
+correctly reported `TimedOutUnconfirmed`; that cause was fixed in
+`320a1b6`. Exact identities and outcomes:
+[`docs/evidence/casting-probe-20260923-receipt.md`](evidence/casting-probe-20260923-receipt.md).
+
+Under the owner's delegated mission authority (owner message of
+2026-09-23, sections 1 and 3), Claude writes each run's allowance
+mechanically: fresh run id, exclusive creation, the frozen candidate's
+exact identities, the recomputed projection, and the same Resistance
+source, caster and recipient (no substitution; a different selection
+would have been recorded and not run). The historical `e964d2f` checkout
+and its frozen artifact are preserved unchanged; the proposal below is
+that historical version, kept verbatim for review.
+
+## Historical proposal for `e964d2f` (preserved)
 
 The previous version of this proposal (for `7379dc8`) is kept verbatim in
 `docs/probe/history/LIVE-CAST-PROBE-REQUEST-7379dc8.md`. It is
