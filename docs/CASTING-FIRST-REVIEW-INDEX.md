@@ -13,7 +13,23 @@ workspace dispatch boundary. The workspace renders in presenting
 sessions (display-path acceptance run `casting-ws-gseries-081000`);
 human usability and the native aesthetic pass remain open.
 
-## Current review dispositions — L-review at `475d2b9` (answered 2026-09-23)
+## Current review dispositions — M-series at `1e3c95b` (answered 2026-09-23)
+
+Normal dispatch stays disabled; no cast was run. Evidence is source and
+recording-runtime tests plus selection-only live runs (no boundary
+constructed).
+
+| Finding | Disposition | Commit | Tests (mutants caught) |
+| --- | --- | --- | --- |
+| M1 — zero-cost native sources could not be projected | A known Unlimited pool is one zero-unit native demand reserved by the existing ledger and flagged verified; flag carried by cost line, budget line (shown "unlimited"), converter, projection identity v3 and both executors; unknown/stripped/missing costs refused; spend on a free source fails; feature costs still count | `a023293` | `zero-cost-native-source-integration` (5/5); four legacy fixtures moved to finite pools because their runtimes report a spend |
+| M2 — probe after-state came from cached UI discovery | Fresh native reads (ability availability, target buff instances + end time) stamped from one sequence; failed reads recorded, never replaced; before < submission < after; new instance or verified refresh; free = zero change, finite = exactly one; missing ≠ zero; target without the effect preferred | `0a4c382` | `probe-observations-are-authoritative` (6/6) |
+| M3 — host did not own probe cancellation | `SingleCastProbeRunOwner`: one idempotent terminal (dispose boundary, fresh after-read, close workspace, release lease, record cleanup, publish once) for completion, stop, deadline, host exception, disable and unload | `0a4c382` | `probe-owner-terminal-cleanup` (3/3), `probe-owner-wiring-in-host-and-main` (1/1) |
+| Selection finding | Discovery wraps effects in a self-reference; accepted only for the cast ability itself | `ea45807` | `probe-scope-enforces-whole-subset` (1/1) |
+
+Concrete, unapproved cast proposal: `docs/LIVE-CAST-PROBE-REQUEST.md`.
+Advanced-copy inspection request: `docs/ADVANCED-SAVE-COPY-INSPECTION-REQUEST.md`.
+
+## Previous review dispositions — L-review at `475d2b9` (history)
 
 Native dispatch remains disabled in the production workspace. Every row
 below is **source/isolated-test evidence only** (protocol suite, isolated

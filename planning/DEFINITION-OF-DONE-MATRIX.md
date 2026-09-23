@@ -1,5 +1,60 @@
 # Definition of Done Matrix
 
+## Casting-first migration — release buckets (updated 2026-09-23)
+
+No percentage or date is claimed; green unit tests do not measure
+readiness. Evidence words mean exactly this:
+
+- **implemented**: the code exists.
+- **stand-ins**: tested only with recording runtimes, scripted
+  observers or fake assemblies.
+- **in-game**: observed in a guarded live run.
+- **accepted**: the owner accepted it in a supervised session.
+- **not implemented**: the code does not exist.
+
+### Bucket 1 — Private advanced-copy UI inspection (casting disabled)
+
+| Capability | Status |
+| --- | --- |
+| Casting-first workspace opens through the production path (not the legacy screen) | in-game (WORKING fixture); not on an advanced party |
+| Bubble Buffs-style layout, search, scope toggle, portraits, coverage colours | in-game (camera and display frames); not accepted (owner glimpse only) |
+| Legacy import on first open, failed-import blocking, review items, notices | implemented + stand-ins; not in-game with a real legacy plan |
+| Large catalogue, multiple spellbooks, pets, long/group buffs at scale | not in-game (tiny fixture only) |
+| Input isolation | in-game (earlier HUD/UI runs); not re-checked on an advanced party |
+| Advanced-save disposable copy tooling | **not implemented**; request in `docs/ADVANCED-SAVE-COPY-INSPECTION-REQUEST.md` |
+
+### Bucket 2 — Private supported-subset gameplay alpha (after explicit native-test approvals)
+
+| Capability | Status |
+| --- | --- |
+| Explicit projection with complete identity, refusal of unsupported contracts | implemented + stand-ins |
+| Zero-cost (Unlimited) native reservations | implemented + stand-ins; selection in-game (Resistance selected); **no cast** |
+| One-shot probe boundary, fresh observations, owned terminal cleanup | implemented + stand-ins; boundary never constructed in-game |
+| First native cast (cantrip) | **not run**; proposal in `docs/LIVE-CAST-PROBE-REQUEST.md` awaits owner approval |
+| Paid-slot cast (finite resource) | not run; needs its own request after the cantrip |
+| Multi-cast routine, halting after failure, interruption, reload | implemented + stand-ins (coordinator); not in-game |
+| Group casts, anchored origin | implemented + stand-ins; not in-game |
+
+### Bucket 3 — Public experimental prerelease
+
+| Requirement | Status |
+| --- | --- |
+| Advertised scope tested in-game (bucket 2 subset) | not started |
+| Unsupported features prominently disabled in the UI | partial (probe/dispatch disabled; no user-facing "unsupported" surfacing yet) |
+| Owner usability acceptance of the workspace | not accepted |
+| Install/rollback on a real installation | stand-ins only (K6/L4/L5 isolated fixtures) |
+| Release packaging and publisher gates | existing tooling; not exercised for casting-first |
+
+### Bucket 4 — Full charter release
+
+| Requirement | Status |
+| --- | --- |
+| Exact rods / enhancement identity (A06) | not implemented |
+| Targeting modifiers (e.g. Share Transmutation) in execution | refused by the converter; not implemented |
+| Animated-mode gameplay, all class adapters | not in-game for casting-first |
+| Migration cutover and rollback on real data | stand-ins only |
+| A01–A20 final qualification | A01–A05, A07–A11 and parts of A12/A13 pass at domain level; the rest open |
+
 ## 0.0.13 Brown-Fur Powerful Change repair
 
 Published tag source/package/DLL/MVID:
