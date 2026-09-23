@@ -1,6 +1,6 @@
 # Definition of Done Matrix
 
-## Casting-first migration — release buckets (updated 2026-09-23)
+## Casting-first migration — release buckets (updated 2026-09-23, RC slice 1 at `7e864e7`)
 
 No percentage or date is claimed; green unit tests do not measure
 readiness. Evidence words mean exactly this:
@@ -21,7 +21,7 @@ readiness. Evidence words mean exactly this:
 | Legacy import on first open, failed-import blocking, review items, notices | implemented + stand-ins; not in-game with a real legacy plan |
 | Large catalogue, multiple spellbooks, pets, long/group buffs at scale | not in-game (tiny fixture only) |
 | Input isolation | in-game (earlier HUD/UI runs); not re-checked on an advanced party |
-| Advanced-save disposable copy tooling | **not implemented**; request in `docs/ADVANCED-SAVE-COPY-INSPECTION-REQUEST.md` |
+| Advanced-save disposable copy tooling | implemented + stand-ins: guarded bootstrap (`-Family Advanced`), family pair lookup, manifest binding, protocol family gate, non-casting `live-advanced-inspect`, protected-save comparison. Not in-game: no `KBP_ADVANCED_SEED` yet, and the `full-user` profile is blocked by the KingmakerGunslinger 0.0.136 update |
 
 ### Bucket 2 — Private supported-subset gameplay alpha (after explicit native-test approvals)
 
@@ -32,7 +32,10 @@ readiness. Evidence words mean exactly this:
 | One-shot probe boundary, fresh observations, owned terminal cleanup | implemented + stand-ins; boundary never constructed in-game |
 | First native cast (cantrip) | **not run**; proposal in `docs/LIVE-CAST-PROBE-REQUEST.md` awaits owner approval |
 | Paid-slot cast (finite resource) | not run; needs its own request after the cantrip |
-| Multi-cast routine, halting after failure, interruption, reload | implemented + stand-ins (coordinator); not in-game |
+| Production dispatch and run host (one run, per-frame pump, one terminal for stop/deadline/area change/disable/unload/teardown) | implemented + stand-ins; locked to a refusing boundary in runtime-test sessions; **no cast** |
+| Live existing-effect policy (weaker/expiring/unprovable never satisfied; active effect needs no slot) | implemented + stand-ins |
+| Per-routine review acceptance persisted across sessions; skip flips are harmless refreshes | implemented + stand-ins |
+| Multi-cast routine, halting after failure, interruption, reload | implemented + stand-ins (coordinator and host); not in-game |
 | Group casts, anchored origin | implemented + stand-ins; not in-game |
 
 ### Bucket 3 — Public experimental prerelease
@@ -40,9 +43,10 @@ readiness. Evidence words mean exactly this:
 | Requirement | Status |
 | --- | --- |
 | Advertised scope tested in-game (bucket 2 subset) | not started |
-| Unsupported features prominently disabled in the UI | partial (probe/dispatch disabled; no user-facing "unsupported" surfacing yet) |
+| Unsupported features prominently disabled in the UI | implemented: cards show "cannot run in this version" (targeting modifiers, exact rod identity, required coverage outside the predicted area); Apply refuses them |
+| Deliberate activation path | implemented: UMM planner-mode setting, Classic by default; player guide `docs/CASTING-FIRST-PLAYER-GUIDE.md` |
 | Owner usability acceptance of the workspace | not accepted |
-| Install/rollback on a real installation | stand-ins only (K6/L4/L5 isolated fixtures) |
+| Install/rollback on a real installation | stand-ins only (K6/L4/L5 isolated fixtures; the planner-mode and review-state files are covered) |
 | Release packaging and publisher gates | existing tooling; not exercised for casting-first |
 
 ### Bucket 4 — Full charter release
