@@ -1,11 +1,10 @@
 # Casting qualification run request: zero-cost-mixed (automation fixture)
 
-Status: **prepared, not run.** It follows the frozen Resistance probe
-(`docs/LIVE-CAST-PROBE-REQUEST.md`), which must run first. Both are
-currently blocked: the probe allowance file does not exist yet, and the
-installed KingmakerGunslinger (0.0.136) no longer matches the sealed
-`full-user` compatibility profile (0.0.133) that the automation fixture
-needs to load.
+Status: **prepared, not run.** It follows the one-cast Resistance probe
+(`docs/LIVE-CAST-PROBE-REQUEST.md`). The automation fixture loads again:
+`full-user` stages the owner-approved exact copy of the sealed
+KingmakerGunslinger 0.0.133 (`7664f2f`), and the installed 0.0.136 is
+recorded and restored byte-exact around every run.
 
 ## Purpose
 
@@ -73,38 +72,40 @@ violations.
 
 ## Procedure
 
-1. The frozen Resistance probe has run (or the owner explicitly waives
-   that ordering).
-2. The `full-user` profile loads the fixture again: Gunslinger 0.0.133 is
-   restored, or the owner approves a reseal.
-3. Selection run (non-casting):
-   `Invoke-KingmakerRuntimeTest.ps1 -Scenario live-cast-qual-select -CompatibilityProfileId full-user -TimeoutSeconds 900 -RunId <fresh>`
-   (the launcher refuses a qualification scenario with less than 900
-   seconds, so it can never abandon a live run).
-   It writes `qual-outcome.json` with the selection and the three
-   forecast projection ids and contracts.
-4. The allowance (schema 3) is written once, exclusively, under
+1. The one-cast Resistance probe on the current candidate has run.
+2. Selection run (non-casting):
+   `Invoke-KingmakerRuntimeTest.ps1 -Scenario live-cast-qual-select -CompatibilityProfileId full-user -TimeoutSeconds 900 -RunId <fresh>`.
+   900 seconds is a time budget (boot and load plus the 240-second run
+   deadline), not a guarantee: the launcher refuses less, and a run that
+   still outlives it is reported as failed, its Mods restoration stays
+   blocked while Kingmaker runs, and `Restore-Local.ps1 -RunId <runId>`
+   recovers it once the game has exited.
+   It writes `qual-outcome.json` with the selection, the party roster it
+   saw, and the three forecast projection ids and contracts.
+3. Claude writes the allowance (schema 3) under the owner's delegated
+   mission authority, once, exclusively, under
    `C:\Dev\KingmakerBuffPlannerLab\approvals\<runId>.json`, with the
    fields `runId`, `sourceCommit`, `packageSha256`, `dllSha256`,
    `assemblyMvid`, `fixtureGameId`, `recipe`, `approvedProjectionIds`
    (the three forecast ids in order), `maximumNativeSubmissions` = 6,
    `approvedBy` and `authority`. The build identity comes from the
    selection run's build manifest.
-5. Casting run:
+4. Casting run:
    `Invoke-KingmakerRuntimeTest.ps1 -Scenario live-cast-qual -CompatibilityProfileId full-user -TimeoutSeconds 900 -RunId <runId> -QualificationAllowancePath <file>`.
    It makes one attempt and never retries.
-6. Evidence: `qual-outcome.json`, `runtime-result.json`,
+5. Evidence: `qual-outcome.json`, `runtime-result.json`,
    `protected-saves.json`, `orchestration.json`, the frames, and the
    verified restoration.
 
 ## Authority
 
 The owner mission of 2026-09-23 (sections 4 and 8) authorizes bounded,
-out-of-combat buff qualification on the disposable WORKING fixture. It
-requires a fresh run id and an exclusively created authorization record
-per run. The tool permission classifier refused Claude's earlier write
-under `approvals\`. Until the owner allows that write, or writes the
-file, this run cannot start.
+out-of-combat buff qualification on the disposable WORKING fixture, and
+mechanically creating each run's allowance on the owner's behalf (owner
+message of 2026-09-23, section 1). Each run needs a fresh run id and an
+exclusively created allowance and authorization record; an existing
+allowance is never overwritten or reused. A tool permission refusal is
+reported with its exact action and path, never worked around.
 
 ## Recipe `finite-direct-mixed` (advanced copy)
 
@@ -154,8 +155,9 @@ It covers the mission section 8 items the automation party cannot:
    `Invoke-KingmakerRuntimeTest.ps1 -Scenario live-cast-qual-select -FixtureFamily Advanced -QualificationRecipe finite-direct-mixed -CompatibilityProfileId <profile> -TimeoutSeconds 900 -RunId <fresh>`.
    `qual-outcome.json` records the selection, its coverage and the three
    forecast projection ids and contracts.
-4. The owner writes the allowance (schema 3, recipe `finite-direct-mixed`,
-   the three ids in order, `maximumNativeSubmissions` 3) under
+4. Claude writes the allowance under the delegated authority (schema 3,
+   recipe `finite-direct-mixed`, the three ids in order,
+   `maximumNativeSubmissions` 3) under
    `approvals\<runId>.json`.
 5. Casting run:
    `Invoke-KingmakerRuntimeTest.ps1 -Scenario live-cast-qual -FixtureFamily Advanced -QualificationRecipe finite-direct-mixed -CompatibilityProfileId <profile> -TimeoutSeconds 900 -RunId <runId> -QualificationAllowancePath <file>`.

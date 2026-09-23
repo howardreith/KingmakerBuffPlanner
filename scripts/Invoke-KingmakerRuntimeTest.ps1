@@ -143,7 +143,9 @@ $savePair = if ($Scenario -ceq 'live-ui-bootstrap' -or $Scenario -ceq 'live-work
     $Scenario -ceq 'live-cast-qual') { Get-KbpDisposableSavePair -Family $FixtureFamily } else { $null }
 $advancedBinding = if ($FixtureFamily -ceq 'Advanced') { Assert-KbpAdvancedFixtureBinding -Pair $savePair } else { $null }
 $advancedInspectionRunId = if ($FixtureFamily -ceq 'Advanced' -and $Scenario -ceq 'live-cast-qual') {
-    Assert-KbpAdvancedInspectionPassed -Binding $advancedBinding
+    Assert-KbpAdvancedInspectionPassed -Binding $advancedBinding -Pair $savePair `
+        -ProfileId $CompatibilityProfileId `
+        -CompatibilityIdentity (Get-KbpCompatibilityIdentityDigest $compatibilityProfile)
 } else { $null }
 $steamSafety = Assert-KbpSteamSafety -SteamPath $SteamPath
 & (Join-Path $PSScriptRoot 'Deploy-Local.ps1') -PackagePath $package `
@@ -206,6 +208,9 @@ New-Item -ItemType Directory -Path $evidence | Out-Null
 $protectedSaveRoot = Join-Path $env:USERPROFILE 'AppData\LocalLow\Owlcat Games\Pathfinder Kingmaker\Saved Games'
 $protectedBefore = if ($null -ne $savePair) { Get-KbpSaveFolderSnapshot -SaveRoot $protectedSaveRoot } else { $null }
 $protectedSaveFailure = $null
+$protectedSavesCompared = $false
+$runSucceeded = $false
+$result = $null
 try {
     $statePath = & (Join-Path $PSScriptRoot 'Deploy-Local.ps1') -PackagePath $package `
         -RunId $runId -CompatibilityProfileId $CompatibilityProfileId `
@@ -592,13 +597,15 @@ public static class KbpPhysicalInput {
         Write-KbpJsonAtomic (Join-Path $evidence 'orchestration.json') $orchestration
     }
     Write-Host "Runtime result PASS: $resultPath"
+    $runSucceeded = $true
 }
 finally {
     try {
         # In non-interactive hosts the finally's own Write-Error can displace
         # the original terminating error from the output stream; persist the
         # pending errors first so no failure cause is ever lost.
-        if (@($Error).Count -gt 0 -and $null -ne (Get-Variable -Name evidence -ErrorAction SilentlyContinue)) {
+        if (-not $runSucceeded -and @($Error).Count -gt 0 -and
+            $null -ne (Get-Variable -Name evidence -ErrorAction SilentlyContinue)) {
             $lines = foreach ($entry in @($Error | Select-Object -First 5)) { $entry.ToString() }
             [IO.File]::WriteAllLines((Join-Path $evidence 'harness-error.txt'), [string[]]$lines)
         }
@@ -631,11 +638,52 @@ finally {
                 allowedChanged = @($allowedChanged)
                 violations = @($violations); blocking = @($blocking)
             })
+            $protectedSavesCompared = $true
             if ($blocking.Count -ne 0) {
                 $protectedSaveFailure = 'Protected saves changed during the run: ' + ($blocking -join ', ')
             }
         }
         catch { $protectedSaveFailure = 'Protected-save comparison failed: ' + $_.Exception.Message }
+    }
+    # Review RC3: the whole-run terminal record, written last. Game-level
+    # success (runtime-result.json) is kept separate: a run is complete
+    # only when the harness itself succeeded, Kingmaker exited, the Mods
+    # transaction was restored and verified, and the protected saves were
+    # compared clean. Later gates (advanced casting) read only this record.
+    if ($null -ne (Get-Variable -Name evidence -ErrorAction SilentlyContinue) -and
+        -not [string]::IsNullOrWhiteSpace([string]$evidence) -and (Test-Path -LiteralPath $evidence)) {
+        try {
+            $completionState = $null
+            $completionTransaction = Join-Path $script:KbpRuntimeStateRoot "transactions\$runId\transaction.json"
+            if ($transactionEntered -and (Test-Path -LiteralPath $completionTransaction -PathType Leaf)) {
+                $completionState = Read-KbpJson $completionTransaction
+            }
+            $completionExited = @(Get-Process -Name Kingmaker -ErrorAction SilentlyContinue).Count -eq 0
+            $completionRestored = $null -ne $completionState -and [bool]$completionState.restorationVerified
+            $completionGame = if ($null -ne (Get-Variable -Name result -ErrorAction SilentlyContinue) -and
+                $null -ne $result) { [string]$result.status } else { 'none' }
+            $completionClean = $protectedSavesCompared -and $null -eq $protectedSaveFailure
+            Write-KbpJsonAtomic (Join-Path $evidence 'run-completion.json') ([ordered]@{
+                schemaVersion = 1; runId = $runId; scenario = $Scenario; fixtureFamily = $FixtureFamily
+                profileId = $CompatibilityProfileId
+                compatibilityIdentity = Get-KbpCompatibilityIdentityDigest $compatibilityProfile
+                advancedBindingManifest = if ($null -eq $advancedBinding) { $null } else { [string]$advancedBinding.manifestPath }
+                fixture = if ($null -eq $savePair) { $null } else { [ordered]@{
+                    baselineFileName = [string]$savePair.baseline.fileName; baselineSha256 = [string]$savePair.baseline.sha256
+                    workingFileName = [string]$savePair.working.fileName; workingSha256 = [string]$savePair.working.sha256
+                    gameId = [string]$savePair.working.gameId } }
+                gameResultStatus = $completionGame
+                harnessSucceeded = $runSucceeded
+                kingmakerExited = $completionExited
+                restorationVerified = $completionRestored
+                protectedSavesCompared = $protectedSavesCompared
+                protectedSavesClean = $completionClean
+                complete = ($completionGame -ceq 'PASS') -and $runSucceeded -and $completionExited -and
+                    $completionRestored -and $completionClean
+                completedAtUtc = [DateTime]::UtcNow.ToString('o')
+            })
+        }
+        catch { Write-Warning "Run completion record not written: $($_.Exception.Message)" }
     }
 }
 if ($null -ne $protectedSaveFailure) { throw $protectedSaveFailure }

@@ -2737,6 +2737,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         {
                             { "selected", selection.Selected },
                             { "recipe", selection.Recipe },
+                            { "roster", new JArray(record.Roster.Select(unit => (object)new JObject
+                                {
+                                    { "unitId", unit.UnitId }, { "name", unit.DisplayName },
+                                    { "isPet", unit.IsPet }, { "masterUnitId", unit.MasterUnitId },
+                                    { "targetable", unit.TargetValidation.Alive && unit.TargetValidation.Conscious &&
+                                        unit.TargetValidation.Friendly && unit.TargetValidation.Targetable }
+                                }).ToArray()) },
                             { "coverage", new JArray(selection.Coverage.Cast<object>().ToArray()) },
                             { "refusal", selection.Refusal },
                             { "sourceId", selection.SourceId },

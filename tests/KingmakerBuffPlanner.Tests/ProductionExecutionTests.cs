@@ -1520,11 +1520,11 @@ namespace KingmakerBuffPlanner.Tests
         // rule, plus four other party members (optionally a finite pool or
         // a single caster).
         private static CastingWorkspaceInputs QualificationInputs(bool free, bool twoCasters,
-            ActiveEffectSnapshot live)
+            ActiveEffectSnapshot live, int otherUnits = 4)
         {
             string[] casters = twoCasters
                 ? new[] { "unit-cleric", "unit-wizard" } : new[] { "unit-cleric" };
-            string[] others = { "unit-t1", "unit-t2", "unit-t3", "unit-t4" };
+            string[] others = new[] { "unit-t1", "unit-t2", "unit-t3", "unit-t4" }.Take(otherUnits).ToArray();
             List<string> all = casters.Concat(others).ToList();
             List<UnitSnapshot> units = all.Select(id => new UnitSnapshot(id, id, false, string.Empty,
                 new TargetValidationSnapshot(true, true, true, true))).ToList();
@@ -1634,6 +1634,22 @@ namespace KingmakerBuffPlanner.Tests
             if (single.Selected || !single.Rejections.Any(value => value.EndsWith(
                     "|fewer-than-two-casters", StringComparison.Ordinal)))
                 throw new InvalidOperationException("A single caster satisfied the mixed recipe.");
+            // Review RC4: a three-unit party (two casters and one other)
+            // qualifies: recipients are chosen per casting, a caster may
+            // receive from the other caster, never from itself.
+            CastingQualificationSelection three = CastingQualificationRecipe.SelectZeroCostMixed(
+                QualificationInputs(true, true, null, 1), "fixture-campaign");
+            string threeShape = string.Join(",", three.Castings.Select(casting =>
+                casting.CastingId + "=" + casting.CasterUnitId + ">" + casting.DirectTargetUnitId).ToArray());
+            if (!three.Selected || threeShape !=
+                    "qual-cast-1=unit-cleric>unit-t1,qual-cast-2=unit-wizard>unit-cleric,qual-cast-3=unit-cleric>unit-wizard")
+                throw new InvalidOperationException("The three-unit selection is wrong: " + threeShape + "|" +
+                    three.Refusal + "|" + string.Join(";", three.Rejections.ToArray()));
+            CastingQualificationSelection two = CastingQualificationRecipe.SelectZeroCostMixed(
+                QualificationInputs(true, true, null, 0), "fixture-campaign");
+            if (!two.Selected || two.Castings.Count != 2 ||
+                two.Castings.Any(casting => casting.CasterUnitId == casting.DirectTargetUnitId))
+                throw new InvalidOperationException("Two casters could not buff each other, or one buffed itself.");
         }
 
         // The forecast gives the exact projection of each executing step,
@@ -1720,6 +1736,9 @@ namespace KingmakerBuffPlanner.Tests
             // reports a resource spent on its verified-free source.
             internal string UnconfirmedCasting;
             internal string SpendOnFreeCasting;
+            // Party members besides the two casters (the automation party
+            // has one).
+            internal int OtherUnits = 4;
             // Before-read fault for qual-cast-1 in the stop step: throw,
             // failed, null or wrong-target.
             internal string BeforeReadFault;
@@ -2089,7 +2108,7 @@ namespace KingmakerBuffPlanner.Tests
         {
             var host = new CastingExecutionHost(settings => new InstantCastExecutor(world, true), clock);
             return new CastingQualificationDriver(record, allowance, "fixture-campaign",
-                () => QualificationInputs(true, true, world.Live()),
+                () => QualificationInputs(true, true, world.Live(), world.OtherUnits),
                 boundary => new CastingWorkspaceSession(dir, "fixture-campaign", boundary),
                 host, world.Observe, clock, 240000, null, worldRunning);
         }
@@ -2097,7 +2116,7 @@ namespace KingmakerBuffPlanner.Tests
         private static CastingQualificationAllowance ForecastAllowance(SimulatedBuffWorld world,
             Func<IReadOnlyList<CastingQualificationStepForecast>, IEnumerable<string>> ids = null)
         {
-            CastingWorkspaceInputs inputs = QualificationInputs(true, true, world.Live());
+            CastingWorkspaceInputs inputs = QualificationInputs(true, true, world.Live(), world.OtherUnits);
             CastingQualificationSelection selection = CastingQualificationRecipe.SelectZeroCostMixed(
                 inputs, "fixture-campaign");
             IReadOnlyList<CastingQualificationStepForecast> forecast =
@@ -2226,6 +2245,19 @@ namespace KingmakerBuffPlanner.Tests
                     throw new InvalidOperationException("The stop rule judged cleanup=" + cleanupFailed +
                         " as " + (failure ?? "pass"));
             }
+            // Review RC4: the whole judged sequence on a three-unit party
+            // (two casters buffing each other and the one other member).
+            var small = new SimulatedBuffWorld { OtherUnits = 1 };
+            CastingQualificationAllowance smallAllowance = ForecastAllowance(small);
+            var smallRecord = new CastingQualificationRecord { CastingScenario = true, AllowanceStatus = "parsed" };
+            string smallDir = Path.Combine(root, "q3");
+            Directory.CreateDirectory(smallDir);
+            CastingQualificationDriver smallDriver = NewQualificationDriver(smallDir, small, smallRecord,
+                smallAllowance, () => now);
+            for (int i = 0; i < 400 && !smallDriver.Completed; i++) smallDriver.Update();
+            if (smallRecord.Violations().Count != 0 || small.Fired.Count != 4 || smallRecord.Roster.Count != 3)
+                throw new InvalidOperationException("The three-unit qualification was not accepted: " +
+                    string.Join("|", smallRecord.Violations().ToArray()));
             // A held world (paused, dialog, full-screen window) holds the
             // steps: nothing is cast until it runs, then the run completes.
             var heldWorld = new SimulatedBuffWorld();

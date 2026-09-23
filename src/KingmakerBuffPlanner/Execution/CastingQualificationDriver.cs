@@ -91,6 +91,9 @@ namespace KingmakerBuffPlanner.Execution
         public string AllowanceStatus { get; set; } = "not-read";
         public string TerminalReason { get; set; }
         public CastingQualificationSelection Selection { get; set; }
+        // The party snapshot the selection saw (units and pets), as evidence.
+        public IReadOnlyList<Domain.Providers.UnitSnapshot> Roster { get; set; } =
+            new Domain.Providers.UnitSnapshot[0];
         public IReadOnlyList<CastingQualificationStepForecast> Forecast { get; set; }
         public List<CastingQualificationStepResult> Steps { get; } = new List<CastingQualificationStepResult>();
         public List<string> Failures { get; } = new List<string>();
@@ -466,6 +469,7 @@ namespace KingmakerBuffPlanner.Execution
                 return;
             }
             CastingWorkspaceInputs inputs = _freshInputs();
+            Record.Roster = inputs.Snapshot.Units.ToList();
             Record.Selection = CastingQualificationRecipe.Select(Recipe, inputs, _campaignId);
             if (!Record.Selection.Selected) { Fail("selection-refused:" + Record.Selection.Refusal); return; }
             Record.Forecast = CastingQualificationForecast.Forecast(Record.Selection, inputs, _campaignId);

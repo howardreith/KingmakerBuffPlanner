@@ -1194,34 +1194,75 @@ try {
     if (-not $refused) { throw 'Two completed advanced bootstraps were not refused as ambiguous.' }
     $passed++
 
-    # Mission section 9: casting on the advanced copy needs a passing
-    # inspection of the SAME bound pair; other runs never count.
+    # Review RC3: casting on the advanced copy needs a COMPLETED inspection
+    # of the same bound pair and compatibility identity: game PASS alone,
+    # a failed or missing protected-save comparison, an unverified
+    # restoration, another fixture or another profile never qualifies.
     $inspectRoot = Join-Path $root 'inspect-evidence'
     New-Item -ItemType Directory -Path $inspectRoot -Force | Out-Null
     $inspectBinding = [pscustomobject]@{ manifestPath = 'C:/lab/fixture/bootstrap-advanced/manifest.json' }
-    function New-InspectRecord([string]$RunId, [string]$Scenario, [string]$Family, [string]$Manifest, [string]$Status) {
+    $inspectPair = [pscustomobject]@{
+        baseline = [pscustomobject]@{ fileName = 'Manual_411_KBP_ADVANCED_BASELINE.zks'; sha256 = ('a' * 64) }
+        working = [pscustomobject]@{ fileName = 'Manual_412_KBP_ADVANCED_WORKING.zks'; sha256 = ('b' * 64); gameId = 'advanced-game' }
+    }
+    $inspectIdentity = 'c' * 64
+    function New-InspectEvidence([string]$RunId, [hashtable]$Override, [switch]$OnlyGameResult) {
         $dir = Join-Path $inspectRoot $RunId
         New-Item -ItemType Directory -Path $dir -Force | Out-Null
-        Write-KbpJsonAtomic (Join-Path $dir 'orchestration.json') ([ordered]@{
-            schemaVersion = 1; runId = $RunId; scenario = $Scenario; fixtureFamily = $Family
-            advancedBindingManifest = $Manifest; status = $Status })
         Write-KbpJsonAtomic (Join-Path $dir 'runtime-result.json') ([ordered]@{
-            schemaVersion = 1; runId = $RunId; scenario = $Scenario; status = $Status })
+            schemaVersion = 1; runId = $RunId; scenario = 'live-advanced-inspect'; status = 'PASS' })
+        if ($OnlyGameResult) { return }
+        $record = [ordered]@{
+            schemaVersion = 1; runId = $RunId; scenario = 'live-advanced-inspect'; fixtureFamily = 'Advanced'
+            profileId = 'full-user'; compatibilityIdentity = $inspectIdentity
+            advancedBindingManifest = $inspectBinding.manifestPath
+            fixture = [ordered]@{ baselineFileName = $inspectPair.baseline.fileName; baselineSha256 = $inspectPair.baseline.sha256
+                workingFileName = $inspectPair.working.fileName; workingSha256 = $inspectPair.working.sha256; gameId = 'advanced-game' }
+            gameResultStatus = 'PASS'; harnessSucceeded = $true; kingmakerExited = $true; restorationVerified = $true
+            protectedSavesCompared = $true; protectedSavesClean = $true; complete = $true
+        }
+        foreach ($key in $Override.Keys) { $record[$key] = $Override[$key] }
+        Write-KbpJsonAtomic (Join-Path $dir 'run-completion.json') $record
     }
-    New-InspectRecord 'inspect-fail' 'live-advanced-inspect' 'Advanced' $inspectBinding.manifestPath 'FAIL'
-    New-InspectRecord 'inspect-other-pair' 'live-advanced-inspect' 'Advanced' 'C:/other/manifest.json' 'PASS'
-    New-InspectRecord 'qual-select-pass' 'live-cast-qual-select' 'Advanced' $inspectBinding.manifestPath 'PASS'
-    New-InspectRecord 'inspect-automation' 'live-advanced-inspect' 'Automation' $null 'PASS'
+    New-InspectEvidence 'inspect-game-pass-only' @{} -OnlyGameResult
+    New-InspectEvidence 'inspect-protected-failed' @{ protectedSavesClean = $false; complete = $false; harnessSucceeded = $false }
+    New-InspectEvidence 'inspect-protected-missing' @{ protectedSavesCompared = $false; protectedSavesClean = $false; complete = $false }
+    New-InspectEvidence 'inspect-not-restored' @{ restorationVerified = $false; complete = $false }
+    New-InspectEvidence 'inspect-no-exit' @{ kingmakerExited = $false; complete = $false }
+    # A record claiming complete while any single condition fails.
+    New-InspectEvidence 'inspect-complete-flag-only' @{ restorationVerified = $false }
+    New-InspectEvidence 'inspect-claim-unclean' @{ protectedSavesClean = $false }
+    New-InspectEvidence 'inspect-claim-uncompared' @{ protectedSavesCompared = $false }
+    New-InspectEvidence 'inspect-claim-running' @{ kingmakerExited = $false }
+    New-InspectEvidence 'inspect-claim-harness' @{ harnessSucceeded = $false }
+    New-InspectEvidence 'inspect-claim-game' @{ gameResultStatus = 'FAIL' }
+    New-InspectEvidence 'inspect-other-working' @{ fixture = [ordered]@{ baselineFileName = $inspectPair.baseline.fileName
+        baselineSha256 = $inspectPair.baseline.sha256; workingFileName = $inspectPair.working.fileName
+        workingSha256 = ('d' * 64); gameId = 'advanced-game' } }
+    New-InspectEvidence 'inspect-other-profile' @{ compatibilityIdentity = ('e' * 64) }
+    New-InspectEvidence 'inspect-other-binding' @{ advancedBindingManifest = 'C:/other/manifest.json' }
+    New-InspectEvidence 'inspect-automation-family' @{ fixtureFamily = 'Automation' }
+    New-InspectEvidence 'inspect-wrong-scenario' @{ scenario = 'live-cast-qual-select' }
     $refused = $false
-    try { Assert-KbpAdvancedInspectionPassed -Binding $inspectBinding -EvidenceRoot $inspectRoot | Out-Null }
-    catch { $refused = $_.Exception.Message -like '*passing live-advanced-inspect*' }
-    if (-not $refused) { throw 'An advanced casting run was allowed without a passing inspection of its pair.' }
-    New-InspectRecord 'inspect-pass' 'live-advanced-inspect' 'Advanced' $inspectBinding.manifestPath 'PASS'
-    if ((Assert-KbpAdvancedInspectionPassed -Binding $inspectBinding -EvidenceRoot $inspectRoot) -cne 'inspect-pass') {
-        throw 'The passing inspection of the bound pair was not found.'
+    try {
+        Assert-KbpAdvancedInspectionPassed -Binding $inspectBinding -Pair $inspectPair -ProfileId 'full-user' `
+            -CompatibilityIdentity $inspectIdentity -EvidenceRoot $inspectRoot | Out-Null
+    }
+    catch { $refused = $_.Exception.Message -like '*completed live-advanced-inspect*' }
+    if (-not $refused) { throw 'An incomplete or foreign inspection authorized advanced casting.' }
+    New-InspectEvidence 'inspect-clean' @{}
+    if ((Assert-KbpAdvancedInspectionPassed -Binding $inspectBinding -Pair $inspectPair -ProfileId 'full-user' `
+            -CompatibilityIdentity $inspectIdentity -EvidenceRoot $inspectRoot) -cne 'inspect-clean') {
+        throw 'The completed clean inspection of the bound pair was not found.'
+    }
+    $digestA = Get-KbpCompatibilityIdentityDigest ([pscustomobject]@{ profileId = 'p'; mods = @(
+        [pscustomobject]@{ directoryName = 'A'; version = '1'; directoryManifestSha256 = ('1' * 64); fileCount = 2; totalBytes = 10 }) })
+    $digestB = Get-KbpCompatibilityIdentityDigest ([pscustomobject]@{ profileId = 'p'; mods = @(
+        [pscustomobject]@{ directoryName = 'A'; version = '1'; directoryManifestSha256 = ('2' * 64); fileCount = 2; totalBytes = 10 }) })
+    if ($digestA -notmatch '^[0-9a-f]{64}$' -or $digestA -ceq $digestB) {
+        throw 'The compatibility identity digest does not follow the mod identities.'
     }
     $passed++
-
     # Scenario drift: every scenario the launcher accepts must build a
     # request (the request builder repeats the ValidateSet), and the two
     # sets must be identical.
