@@ -23,6 +23,12 @@ namespace KingmakerBuffPlanner.Planning
     // any casting becoming blocked, draft or disabled, stays material.
     // Budget balances are not signed: they follow from the per-casting
     // costs and readiness classes, which are.
+    //
+    // Execution settings (Animated/Instant mode, the animated fallback) are
+    // deliberately NOT signed: they choose how the game performs the same
+    // castings, never which castings run, from which source, on whom, with
+    // which enhancements or at what cost. The mode in effect is shown on
+    // the routine tooltip and the planner, and recorded with every run.
     public sealed class CastingPlanSignature
     {
         internal CastingPlanSignature(string value)
@@ -114,6 +120,19 @@ namespace KingmakerBuffPlanner.Planning
         Accepted
     }
 
+    // What the player can be told about a scope's acceptance without
+    // recomputing the plan: none; on file (accepted, possibly in an earlier
+    // session, and not presented since, so it runs only if still
+    // identical); current (what is presented is what was accepted); or
+    // changed (what is presented differs, which may be temporary).
+    public enum CastingAcceptanceStanding
+    {
+        None,
+        OnFile,
+        Current,
+        Changed
+    }
+
     public sealed class CastingReviewDecision
     {
         internal CastingReviewDecision(bool allowed, string reason)
@@ -153,12 +172,33 @@ namespace KingmakerBuffPlanner.Planning
             get { return StatusFor(DefaultScope); }
         }
 
+        // Accepted only while the accepted digest is what is presented (or
+        // nothing has been presented yet, e.g. an acceptance restored from
+        // storage before the planner opens).
         public CastingReviewStatus StatusFor(string scope)
         {
             string key = scope ?? DefaultScope;
-            if (_accepted.ContainsKey(key)) return CastingReviewStatus.Accepted;
-            if (_presented.ContainsKey(key)) return CastingReviewStatus.Presented;
+            string accepted;
+            string presented;
+            bool hasAccepted = _accepted.TryGetValue(key, out accepted);
+            bool hasPresented = _presented.TryGetValue(key, out presented);
+            if (hasAccepted && (!hasPresented ||
+                    string.Equals(accepted, presented, StringComparison.Ordinal)))
+                return CastingReviewStatus.Accepted;
+            if (hasPresented) return CastingReviewStatus.Presented;
             return CastingReviewStatus.NothingPresented;
+        }
+
+        public CastingAcceptanceStanding StandingFor(string scope)
+        {
+            string key = scope ?? DefaultScope;
+            string accepted;
+            string presented;
+            if (!_accepted.TryGetValue(key, out accepted)) return CastingAcceptanceStanding.None;
+            if (!_presented.TryGetValue(key, out presented)) return CastingAcceptanceStanding.OnFile;
+            return string.Equals(accepted, presented, StringComparison.Ordinal)
+                ? CastingAcceptanceStanding.Current
+                : CastingAcceptanceStanding.Changed;
         }
 
         // The accepted contents' digests by scope (for persistence).
@@ -176,27 +216,16 @@ namespace KingmakerBuffPlanner.Planning
             Present(DefaultScope, current);
         }
 
-        // Records that these contents are now shown to the player. The same
-        // contents re-presented (a refresh) keep any existing acceptance;
-        // different contents clear it (the player has not seen or accepted
-        // the new material). Returns true when an acceptance was cleared.
-        public bool Present(string scope, CastingPlanSignature current)
+        // Records that these contents are now shown to the player. Showing
+        // DIFFERENT contents never revokes an acceptance: an acceptance only
+        // ever authorizes its exact digest, so a temporary difference (a
+        // slot spent, a buff expired, the planner opened mid-run) cannot
+        // turn into a permanent "accept again", and the new material still
+        // needs its own acceptance before it can run.
+        public void Present(string scope, CastingPlanSignature current)
         {
             if (current == null) throw new ArgumentNullException("current");
-            string key = scope ?? DefaultScope;
-            string presented;
-            if (_presented.TryGetValue(key, out presented) &&
-                string.Equals(presented, current.Digest, StringComparison.Ordinal))
-                return false;
-            _presented[key] = current.Digest;
-            string accepted;
-            if (_accepted.TryGetValue(key, out accepted) &&
-                !string.Equals(accepted, current.Digest, StringComparison.Ordinal))
-            {
-                _accepted.Remove(key);
-                return true;
-            }
-            return false;
+            _presented[scope ?? DefaultScope] = current.Digest;
         }
 
         public CastingReviewDecision Accept(CastingPlanSignature current)
@@ -243,8 +272,8 @@ namespace KingmakerBuffPlanner.Planning
 
         // Restores an acceptance recorded in an earlier session. It is not
         // a presentation: it authorizes only contents whose digest still
-        // matches exactly, and the first presentation of different contents
-        // clears it.
+        // matches exactly (presenting different contents does not clear it;
+        // see Present).
         public void RestoreAccepted(string scope, string digest)
         {
             if (string.IsNullOrEmpty(digest) || digest.Length != 64 ||

@@ -35,7 +35,9 @@ Nothing is expanded, merged or substituted behind your back.
   it. A routine runs only while its accepted contents still match. If a
   casting changes (caster, source, target, origin, enhancements, cost, the
   existing-effect choice, or it becomes blocked), the routine needs a new
-  review. Buffs expiring or being applied do not.
+  review. Buffs expiring or being applied do not. The HUD tooltip says
+  whether an accepted plan is on file; a press still re-checks it and
+  refuses if anything material changed.
 - **Run.** Use **Review & Apply** in the planner (the planner closes while
   the party casts) or the routine buttons on the HUD. Both use the same
   checks: the party state is re-read at that moment, and nothing runs on
@@ -45,10 +47,11 @@ Nothing is expanded, merged or substituted behind your back.
   **Ready Casts Only** runs the ready castings and lists what it left out.
   It never waives a required enhancement or an unacknowledged legacy
   constraint.
-- **Stopping.** Press the running routine's HUD button again. The current
-  cast finishes its own cleanup, and nothing after it starts. Changing
-  area, disabling the mod or closing the game also stops a run the same
-  way.
+- **Stopping.** Press the running routine's HUD button again. The cast in
+  progress finishes normally, and nothing after it starts. Changing area,
+  disabling the mod or closing the game stop a run at once instead: the
+  cast in progress is interrupted and cleaned up, and its slot may be
+  spent without the effect (the result says so).
 - **Results.** The planner footer shows the last run: casts confirmed,
   castings skipped because the buff was already active, omitted castings,
   a failed cast and why, and resources spent (free casts counted
@@ -60,7 +63,10 @@ Nothing is expanded, merged or substituted behind your back.
   (native casting animations, the default) and **Instant**. Instant mode
   still uses animated casting where a step needs a native command, or
   where you allowed the animated fallback. The choice is saved with the
-  plan.
+  plan. It changes only how the game performs the castings, never which
+  castings run, their sources, targets or costs, so switching it does not
+  need a new review; the mode in use is shown on the HUD tooltip and
+  recorded in the log with every run.
 
 ## Buffs that are already active
 
@@ -75,7 +81,9 @@ what this casting would give:
   (Empower, Maximize, Extend, Heighten; Quicken and Reach do not count);
 - at least half of the duration this casting would give remains. This is
   compared only when the spell duration is "per level"; a permanent or
-  worn-item effect always has enough.
+  worn-item effect always has enough;
+- whatever the spell, more than two rounds of it remain (an effect about
+  to expire is always recast).
 
 A weaker, expiring or unprovable existing effect is recast, and the card
 says why. **Always recast** casts regardless. For a group casting the

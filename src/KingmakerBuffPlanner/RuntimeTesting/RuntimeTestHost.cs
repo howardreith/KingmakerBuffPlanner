@@ -150,9 +150,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             RuntimeTestRequest request = RuntimeTestProtocol.TryRead(arguments, out rejection);
             if (request != null)
             {
-                // Taken before any planner session exists: the ordinary
-                // planner routes of an automation session can never submit
-                // native casts (the probe keeps its own allowance boundary).
+                // Taken before any planner session exists: neither player
+                // route (casting-first boundary, classic routine execution)
+                // of an automation session submits native casts. The probe
+                // and the qualification keep their own allowance-bound
+                // boundaries.
                 UI.NativeCastingSessionPolicy.LockForRuntimeTest(request.Scenario);
                 RuntimePerformanceDiagnostics.Configure(request, log);
                 return new RuntimeTestHost(request, modEntry, log);
@@ -1279,16 +1281,20 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                             ui.PhysicalInputSelectionUnchanged + "/" +
                             ui.PhysicalInputCameraUnchanged + "/" +
                             ui.HudUnderlyingNativeActivationCount);
+                        // The configured Long press reaches the classic
+                        // routine execution, which the session lock refuses:
+                        // nothing is submitted in an automation session.
                         bool configuredOutcome = !string.IsNullOrWhiteSpace(
                             ui.ConfiguredLongResultMessage) &&
-                            (ui.ConfiguredLongDisposition != "Completed" ||
-                                ui.ConfiguredLongConfirmed > 0);
+                            ui.ConfiguredLongDisposition == "Refused" &&
+                            ui.ConfiguredLongSubmitted == 0 && ui.ConfiguredLongConfirmed == 0 &&
+                            ui.ConfiguredLongResultMessage.Contains("automated test session");
                         AddUiAssertion(result, "ui-quick-visible-results",
                             ui.LongResultMessage == "No Long buffs are configured." &&
                             ui.ImportantResultMessage == "No Important buffs are configured." &&
                             ui.ShortResultMessage == "No Short buffs are configured." &&
                             _liveBlessSelectedAndConfigured && configuredOutcome,
-                            "three explicit empty outcomes + configured exact outcome",
+                            "three explicit empty outcomes + configured Long refused by the session lock",
                             ui.LongResultMessage + " | " + ui.ImportantResultMessage + " | " +
                             ui.ShortResultMessage + " | " + ui.ConfiguredLongDisposition + ": " +
                             ui.ConfiguredLongResultMessage);
@@ -1452,8 +1458,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                             ui.ShortResultMessage != "No Short buffs are configured." ||
                             !_liveBlessSelectedAndConfigured ||
                             string.IsNullOrWhiteSpace(ui.ConfiguredLongResultMessage) ||
-                            (ui.ConfiguredLongDisposition == "Completed" &&
-                                ui.ConfiguredLongConfirmed <= 0) ||
+                            ui.ConfiguredLongDisposition != "Refused" ||
+                            ui.ConfiguredLongSubmitted != 0 || ui.ConfiguredLongConfirmed != 0 ||
                             ui.ScreenCreateCount != ui.ScreenDestroyCount + 1 ||
                             ui.ScreenCreateCount != ui.ScreenDestroyCountAfterClose ||
                             string.IsNullOrWhiteSpace(ui.HudObjectEvidence) ||

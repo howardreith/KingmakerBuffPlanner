@@ -48,6 +48,8 @@ namespace KingmakerBuffPlanner.Tests
                 () => TestCardDisclosesLimitsAndExistingEffects(root));
             Run("refusal-feedback-rules", () => TestRefusalFeedbackRules(root));
             Run("host-stops-between-castings", TestHostStopsBetweenCastings);
+            Run("host-player-stop-finishes-cast-in-progress", TestHostPlayerStopIsGraceful);
+            Run("exhausted-rod-waived-by-active-effect", TestExhaustedRodWithActiveEffect);
             Run("qualification-allowance-parsing", TestQualificationAllowanceParsing);
             Run("qualification-recipe-selection", TestQualificationRecipeSelection);
             Run("qualification-forecast-and-boundary", TestQualificationForecastAndBoundary);
@@ -144,6 +146,25 @@ namespace KingmakerBuffPlanner.Tests
                 !unknownDuration.Reasons.Contains("remaining-duration-not-compared"))
                 throw new InvalidOperationException(
                     "An uncomparable duration was not disclosed as presence-only.");
+            // The absolute floor applies whatever the duration comparability
+            // (fixed or localized durations included): under two rounds left
+            // is about to expire.
+            foreach (ExistingEffectRequirement requirement in new[] { plain, uncomparable })
+                foreach (double left in new[] { 0d, 1d, 1.9d })
+                {
+                    ExistingEffectRecipientAssessment expiring = assess(requirement, buff,
+                        new[] { instance(left, 10, 0) });
+                    string expected = "expiring:" + Math.Floor(left).ToString(
+                        System.Globalization.CultureInfo.InvariantCulture) + "<2";
+                    if (expiring.Verdict != ExistingEffectVerdict.Insufficient ||
+                        !expiring.Reasons.Any(reason => reason.Contains(expected)))
+                        throw new InvalidOperationException("An effect with " + left +
+                            " rounds left counted as satisfied: " +
+                            string.Join(",", expiring.Reasons.ToArray()));
+                }
+            if (assess(uncomparable, buff, new[] { instance(2, 10, 0) }).Verdict !=
+                    ExistingEffectVerdict.Sufficient)
+                throw new InvalidOperationException("The expiry floor is not exactly two rounds.");
             // Extend doubles the expected duration; Quicken does not make an
             // instance weaker.
             var extended = new ExistingEffectRequirement(10, 8 | 4, 6000, true);
@@ -403,28 +424,51 @@ namespace KingmakerBuffPlanner.Tests
                 review.StatusFor("short") != CastingReviewStatus.Presented ||
                 review.TrySubmit("short", short1).Reason != "not-accepted")
                 throw new InvalidOperationException("Reviewing Short disturbed Long.");
-            if (review.Present("long", long1))
+            review.Present("long", long1);
+            if (review.StatusFor("long") != CastingReviewStatus.Accepted)
                 throw new InvalidOperationException("A harmless refresh cleared acceptance.");
-            if (!review.Present("long", long2) ||
-                review.TrySubmit("long", long2).Reason != "not-accepted" ||
-                review.TrySubmit("long", long1).Allowed)
-                throw new InvalidOperationException("New material kept an old acceptance.");
+            // New material needs its own acceptance, and showing it does not
+            // revoke the old one: that still authorizes exactly its digest.
+            review.Present("long", long2);
+            if (review.StatusFor("long") != CastingReviewStatus.Presented ||
+                review.TrySubmit("long", long2).Reason != "material-change-requires-review" ||
+                !review.TrySubmit("long", long1).Allowed)
+                throw new InvalidOperationException("New material was authorized or revoked the old acceptance.");
             var restored = new CastingReviewCoordinator();
             restored.RestoreAccepted("long", long1.Digest);
             if (!restored.TrySubmit("long", long1).Allowed ||
                 restored.TrySubmit("long", long2).Reason != "material-change-requires-review")
                 throw new InvalidOperationException("A restored acceptance matched the wrong contents.");
-            if (restored.Present("long", long1) ||
-                restored.StatusFor("long") != CastingReviewStatus.Accepted)
+            restored.Present("long", long1);
+            if (restored.StatusFor("long") != CastingReviewStatus.Accepted)
                 throw new InvalidOperationException("Presenting the restored contents lost acceptance.");
-            if (!restored.Present("long", long2) || restored.TrySubmit("long", long1).Allowed)
-                throw new InvalidOperationException("Different contents did not clear a restored acceptance.");
+            restored.Present("long", long2);
+            if (restored.StatusFor("long") != CastingReviewStatus.Presented ||
+                restored.TrySubmit("long", long2).Allowed || !restored.TrySubmit("long", long1).Allowed)
+                throw new InvalidOperationException("A restored acceptance authorized new contents or was revoked.");
             var invalid = new CastingReviewCoordinator();
             invalid.RestoreAccepted("long", long1.Digest.ToUpperInvariant());
             invalid.RestoreAccepted("short", "abc");
             if (invalid.TrySubmit("long", long1).Reason != "nothing-presented" ||
                 invalid.AcceptedDigests.Count != 0)
                 throw new InvalidOperationException("An invalid restored digest was accepted.");
+            // The standing the HUD may state without recomputing the plan.
+            var standing = new CastingReviewCoordinator();
+            if (standing.StandingFor("long") != CastingAcceptanceStanding.None)
+                throw new InvalidOperationException("Nothing accepted was not None.");
+            standing.RestoreAccepted("long", long1.Digest);
+            if (standing.StandingFor("long") != CastingAcceptanceStanding.OnFile)
+                throw new InvalidOperationException("A restored acceptance was not on file.");
+            standing.Present("long", long1);
+            if (standing.StandingFor("long") != CastingAcceptanceStanding.Current)
+                throw new InvalidOperationException("Matching contents were not current.");
+            standing.Present("long", long2);
+            if (standing.StandingFor("long") != CastingAcceptanceStanding.Changed ||
+                !standing.TrySubmit("long", long1).Allowed)
+                throw new InvalidOperationException("Different contents were not reported as changed.");
+            standing.Present("long", long1);
+            if (standing.StandingFor("long") != CastingAcceptanceStanding.Current)
+                throw new InvalidOperationException("A temporary difference lost the acceptance.");
             // The unscoped calls keep their single-scope behaviour.
             var legacy = new CastingReviewCoordinator();
             legacy.Present(long1);
@@ -596,13 +640,16 @@ namespace KingmakerBuffPlanner.Tests
             WorkspaceApplyResult changed = second.Apply(CastingApplyMode.Ordinary, "long", inputs);
             if (changed.Allowed || changed.ReviewReason != "material-change-requires-review")
                 throw new InvalidOperationException("A changed plan rode a restored acceptance.");
+            // Presenting the unsaved change in another session neither
+            // revokes nor rewrites the stored acceptance: a reopened session
+            // with the accepted plan on disk still runs it.
             second.PresentForReview(inputs);
             var third = new CastingWorkspaceSession(dir, "workspace-campaign",
                 new DisabledCastingDispatchBoundary());
-            if (third.Apply(CastingApplyMode.Ordinary, "long", inputs).ReviewReason !=
-                    "nothing-presented")
+            if (!third.Apply(CastingApplyMode.Ordinary, "long", inputs).ReviewReason
+                    .StartsWith("native-submission-disabled", StringComparison.Ordinal))
                 throw new InvalidOperationException(
-                    "Presenting changed material did not clear the stored acceptance.");
+                    "Presenting other material revoked the stored acceptance.");
         }
 
         // Nothing to submit is an honest no-op before review: every casting
@@ -991,7 +1038,8 @@ namespace KingmakerBuffPlanner.Tests
                 "_castingHost.Shutdown(\"root-teardown\");",
                 "_castingHost.Shutdown(\"ui-root-disabled\");",
                 "if (NativeCastingSessionPolicy.Locked)\r\n                return new DisabledCastingDispatchBoundary(NativeCastingSessionPolicy.LockReason);",
-                "try { inputs = BuildFreshCastingWorkspaceInputs(); }"
+                "try { inputs = BuildFreshCastingWorkspaceInputs(); }",
+                "_castingHost.RequestStop(\"player-stopped\");"
             };
             foreach (string fragment in required)
                 if (rootUi.Replace("\r\n", "\n").IndexOf(fragment.Replace("\r\n", "\n"),
@@ -999,6 +1047,16 @@ namespace KingmakerBuffPlanner.Tests
                     throw new InvalidOperationException("UI root wiring missing: " + fragment);
             if (rootUi.Contains("UIUtility.SendWarning") || rootUi.Contains("ExecuteLegacyRoutine"))
                 throw new InvalidOperationException("A floating result or legacy route came back.");
+            // The classic routine execution refuses under the session lock
+            // before anything is spent or submitted.
+            string classic = source(Path.Combine("UI", "PlannerUiSession.cs"));
+            int classicLock = classic.IndexOf("if (NativeCastingSessionPolicy.Locked)",
+                StringComparison.Ordinal);
+            int classicSpend = classic.IndexOf("_review.Spent(routineId);", StringComparison.Ordinal);
+            int classicExecutor = classic.IndexOf("ICastExecutor executor;", StringComparison.Ordinal);
+            if (classicLock < 0 || classicSpend < 0 || classicExecutor < 0 ||
+                classicLock > classicSpend || classicLock > classicExecutor)
+                throw new InvalidOperationException("The classic routine execution is not locked in automation.");
             int lockAt = host.IndexOf("UI.NativeCastingSessionPolicy.LockForRuntimeTest(request.Scenario);",
                 StringComparison.Ordinal);
             int createAt = host.IndexOf("return new RuntimeTestHost(request, modEntry, log);",
@@ -1206,6 +1264,120 @@ namespace KingmakerBuffPlanner.Tests
                 !runtime.Fired.SequenceEqual(new[] { "cast-1" }) ||
                 runtime.Validated.Contains("cast-2"))
                 throw new InvalidOperationException("A stop between castings started the next one.");
+        }
+
+        // The player stop waits for the cast in progress: that casting
+        // completes (effect confirmed), the next never starts, and a stop
+        // requested before the first pump ends the run at once.
+        private static void TestHostPlayerStopIsGraceful()
+        {
+            ExplicitCastingPlan plan;
+            CastingApplyDecision decision;
+            ExplicitStepConversion projection = HostFixture(out plan, out decision, false);
+            long now = 0;
+            // Animated casts span several pumps, so a stop can arrive while
+            // the first one is in flight.
+            var runtime = new ScriptedAnimatedRuntime("none", "none");
+            var host = new CastingExecutionHost(
+                settings => new AnimatedCastExecutor(runtime, true), () => now);
+            host.Start(plan, decision, "long", projection, null);
+            if (!host.RequestStop("player-stopped") || host.IsRunning ||
+                host.LastReport == null ||
+                host.LastReport.TerminalReason != "cancelled:player-stopped" ||
+                host.LastReport.Entries.Any(entry => entry.Submitted) ||
+                runtime.Started.Count != 0)
+                throw new InvalidOperationException("A stop before the first pump did not end the run at once.");
+            host.Start(plan, decision, "long", projection, null);
+            host.Pump();
+            if (!host.IsRunning || host.ActiveFinishedCastings != 0)
+                throw new InvalidOperationException(
+                    "The fixture did not leave the first cast in progress after one pump.");
+            if (!host.RequestStop("player-stopped") || !host.IsRunning)
+                throw new InvalidOperationException("The player stop interrupted the cast in progress.");
+            int guard = 0;
+            while (host.IsRunning && guard++ < 1000) host.Pump();
+            CastingRunReport report = host.LastReport;
+            if (host.IsRunning || report == null || !report.Cancelled ||
+                report.TerminalReason != "cancelled:player-stopped" ||
+                report.Entries[0].State != CastingOutcomeState.EffectConfirmed ||
+                report.Entries[1].State != CastingOutcomeState.NotProcessed ||
+                report.Entries[1].Submitted ||
+                !runtime.Started.SequenceEqual(new[] { "cast-1" }))
+                throw new InvalidOperationException("The player stop did not land after the cast in progress: " +
+                    (report == null ? "no report" : report.TerminalReason));
+            if (host.RequestStop("player-stopped"))
+                throw new InvalidOperationException("A stop without a run reported success.");
+        }
+
+        // An exhausted REQUIRED rod is a resource shortage: the run that
+        // spent it left the effect active, so a repeat press skips instead
+        // of blocking, with the same would-be cost shape (and so the same
+        // review digest) as the accepted plan. An exhausted OPTIONAL rod
+        // keeps its would-be demand in the skip shape too, while casting
+        // without it (effect absent) is a visible material change.
+        private static void TestExhaustedRodWithActiveEffect()
+        {
+            var compiler = new ExplicitCastingCompiler();
+            Dictionary<string, EffectExpression> effects =
+                CastingEffects("source-bulls", "source-communal");
+            Func<int?, bool, ActiveEffectSnapshot, ExplicitCastingPlan> compile =
+                (uses, required, live) =>
+                {
+                    List<ProviderPlanningOption> options;
+                    PartyProviderSnapshot snapshot = LiveEffectParty(3, out options);
+                    var rod = new CastEnhancementSnapshot("rod-extend", "unit-cleric",
+                        "rod-guid", "Extend Rod", string.Empty,
+                        CastEnhancementCategory.MetamagicRod, 8, 3, uses, null);
+                    CastingPlanDocument document = CastingDocument(DirectCasting("cast-1", "long",
+                        "unit-cleric", "unit-t1", "source-bulls", CastingBuffAbility,
+                        new[] { new AuthoredEnhancementSelection("rod-extend", required, null) }));
+                    return compiler.Compile(document, snapshot, options, effects, new[] { rod },
+                        "long", null, false, live);
+                };
+            ActiveEffectSnapshot extendedActive =
+                LiveEffects(On("unit-t1", "buff-effect", 7000, 10, 8));
+            foreach (bool required in new[] { true, false })
+            {
+                string kind = required ? "required" : "optional";
+                ExplicitCastingPlan readyPlan = compile(3, required, null);
+                ResolvedCasting ready = readyPlan.CastingById("cast-1");
+                if (ready.Readiness != ResolvedCastingReadiness.Ready ||
+                    !ready.AppliedEnhancementIds.Contains("rod-extend") ||
+                    ready.CostShape.Count != 2)
+                    throw new InvalidOperationException("The " + kind + " rod did not apply: " +
+                        string.Join(",", ready.ReadinessReasons.ToArray()) + " shape=" +
+                        string.Join(",", ready.CostShape.ToArray()));
+                ExplicitCastingPlan repeatPlan = compile(0, required, extendedActive);
+                ResolvedCasting repeat = repeatPlan.CastingById("cast-1");
+                if (repeat.Readiness != ResolvedCastingReadiness.AlreadySatisfied ||
+                    !repeat.ReadinessReasons.SequenceEqual(new[] { "already-active:unit-t1" }) ||
+                    !repeat.CostShape.SequenceEqual(ready.CostShape))
+                    throw new InvalidOperationException("An exhausted " + kind +
+                        " rod blocked or reshaped a casting whose effect is active: " +
+                        repeat.Readiness + " " + string.Join(",", repeat.ReadinessReasons.ToArray()) +
+                        " shape=" + string.Join(",", repeat.CostShape.ToArray()));
+                if (!CastingPlanSignature.For(readyPlan, "long")
+                        .Matches(CastingPlanSignature.For(repeatPlan, "long")))
+                    throw new InvalidOperationException("The " + kind +
+                        " rod repeat demanded a new review.");
+            }
+            ResolvedCasting requiredAbsent = compile(0, true, LiveEffects()).CastingById("cast-1");
+            if (requiredAbsent.Readiness != ResolvedCastingReadiness.Blocked ||
+                !requiredAbsent.ReadinessReasons.Any(reason => reason.StartsWith(
+                    "enhancement-exhausted:rod-extend", StringComparison.Ordinal)))
+                throw new InvalidOperationException("An exhausted required rod without the effect did not block.");
+            // The active effect must carry the rod metamagic to satisfy a
+            // casting that requires the rod.
+            ResolvedCasting unextended = compile(0, true,
+                LiveEffects(On("unit-t1", "buff-effect", 7000, 10, 0))).CastingById("cast-1");
+            if (unextended.Readiness != ResolvedCastingReadiness.Blocked)
+                throw new InvalidOperationException("An effect without the rod metamagic waived the rod.");
+            ResolvedCasting optionalAbsent = compile(0, false, LiveEffects()).CastingById("cast-1");
+            if (optionalAbsent.Readiness != ResolvedCastingReadiness.Ready ||
+                optionalAbsent.AppliedEnhancementIds.Contains("rod-extend") ||
+                optionalAbsent.CostShape.SequenceEqual(
+                    compile(3, false, null).CastingById("cast-1").CostShape))
+                throw new InvalidOperationException("Casting without the optional rod was not a visible change.");
         }
 
         // Two casters with verified-free pools casting the fixture buff by

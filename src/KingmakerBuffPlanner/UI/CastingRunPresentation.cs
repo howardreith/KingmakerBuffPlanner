@@ -118,7 +118,7 @@ namespace KingmakerBuffPlanner.UI
                 string why = value.Substring("existing-insufficient:".Length + unit.Length);
                 string reason = why.Contains("weaker-caster-level")
                     ? "weaker (lower caster level)"
-                    : why.Contains("remaining-duration-short")
+                    : why.Contains("remaining-duration-short") || why.Contains("expiring")
                         ? "about to expire"
                         : why.Contains("missing-metamagic") || why.Contains("metamagic-unverified")
                             ? "without the planned metamagic"

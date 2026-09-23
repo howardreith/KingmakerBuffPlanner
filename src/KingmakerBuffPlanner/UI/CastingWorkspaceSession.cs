@@ -862,15 +862,20 @@ namespace KingmakerBuffPlanner.UI
         {
             ExplicitCastingPlan plan = Compile(inputs, SelectedRoutineId, false);
             CastingPlanSignature signature = CastingPlanSignature.For(plan, SelectedRoutineId);
-            // Presenting different material clears that routine's acceptance;
-            // the cleared state is persisted so it cannot resurface.
-            if (_review.Present(SelectedRoutineId, signature)) PersistReviewState();
+            // Presentation never revokes a stored acceptance (it authorizes
+            // only its exact digest); only Accept writes review state.
+            _review.Present(SelectedRoutineId, signature);
             return signature;
         }
 
         public CastingReviewStatus ReviewStatusFor(string routineId)
         {
             return _review.StatusFor(routineId);
+        }
+
+        public CastingAcceptanceStanding AcceptanceStandingFor(string routineId)
+        {
+            return _review.StandingFor(routineId);
         }
 
         private void PersistReviewState()

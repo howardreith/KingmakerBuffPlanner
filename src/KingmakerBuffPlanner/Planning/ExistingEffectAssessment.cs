@@ -89,6 +89,12 @@ namespace KingmakerBuffPlanner.Planning
     {
         public const double MinimumRemainingFraction = 0.5;
 
+        // Whatever the duration comparability: an instance with less than
+        // two rounds (12 seconds) left is about to expire and never counts
+        // as satisfying a casting (fixed durations and non-English duration
+        // texts are otherwise only checked for presence).
+        public const double MinimumRemainingRounds = 2;
+
         // Kingmaker's [Flags] Metamagic values that change an effect's
         // strength or duration (Empower=1, Maximize=2, Extend=8,
         // Heighten=16). Quicken (4) and Reach (32) change only casting time
@@ -158,6 +164,11 @@ namespace KingmakerBuffPlanner.Planning
                 int missing = plannedStrength & ~instance.MetamagicMask.Value;
                 if (missing != 0) return "missing-metamagic:" + missing;
             }
+            if (instance.RemainingRounds != null &&
+                instance.RemainingRounds.Value < MinimumRemainingRounds)
+                return "expiring:" + Math.Floor(instance.RemainingRounds.Value).ToString(
+                    CultureInfo.InvariantCulture) + "<" + MinimumRemainingRounds.ToString(
+                    CultureInfo.InvariantCulture);
             if (instance.RemainingRounds != null && requirement.DurationComparable &&
                 requirement.PlannedExpectedRounds > 0)
             {
