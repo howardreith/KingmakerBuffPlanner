@@ -436,6 +436,21 @@ namespace KingmakerBuffPlanner.UI
                     ? "null" : rootCanvas.renderMode.ToString())
                 .Append(";rootOrder=").Append(rootCanvas == null
                     ? "null" : rootCanvas.sortingOrder.ToString());
+            // Scale evidence (mission section 10, resolutions and scales):
+            // the workspace is its own top-level canvas; the native UI
+            // canvas and its scaler say how the game scales its own UI.
+            Canvas nativeCanvas = StaticCanvas.Instance == null
+                ? null : StaticCanvas.Instance.GetComponent<Canvas>();
+            UnityEngine.UI.CanvasScaler nativeScaler = StaticCanvas.Instance == null
+                ? null : StaticCanvas.Instance.GetComponent<UnityEngine.UI.CanvasScaler>();
+            sb.Append(";screen=").Append(Screen.width).Append("x").Append(Screen.height)
+                .Append(";ownScale=").Append(canvas == null ? "null" : canvas.scaleFactor.ToString("F3"))
+                .Append(";nativeScale=").Append(nativeCanvas == null ? "null" : nativeCanvas.scaleFactor.ToString("F3"))
+                .Append(";nativeScaler=").Append(nativeScaler == null ? "none"
+                    : nativeScaler.uiScaleMode + "/" + nativeScaler.referenceResolution.x.ToString("F0") + "x" +
+                        nativeScaler.referenceResolution.y.ToString("F0") + "/" + nativeScaler.screenMatchMode +
+                        "/match" + nativeScaler.matchWidthOrHeight.ToString("F2") +
+                        "/factor" + nativeScaler.scaleFactor.ToString("F2"));
             // Per-node dump (bounded): which graphics exist, their rect
             // sizes, and their effective colors — the discriminator for
             // "blocker renders but frame/texts invisible".
