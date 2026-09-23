@@ -121,8 +121,19 @@ function New-KbpRuntimeRequest {
 }
 
 function Get-KbpDisposableSavePair {
-    $saveRoot = Join-Path $env:USERPROFILE `
-        'AppData\LocalLow\Owlcat Games\Pathfinder Kingmaker\Saved Games'
+    # -Family selects the sealed pair: Automation (default, unchanged) or the
+    # separately approved Advanced copy. -SaveRoot exists for isolated tests;
+    # production always uses the exact Kingmaker save root.
+    param(
+        [ValidateSet('Automation', 'Advanced')][string]$Family = 'Automation',
+        [string]$SaveRoot
+    )
+    $prefix = if ($Family -ceq 'Advanced') { 'KBP_ADVANCED' } else { 'KBP_AUTOMATION' }
+    $baselineLabel = $prefix + '_BASELINE'
+    $workingLabel = $prefix + '_WORKING'
+    $saveRoot = if ([string]::IsNullOrWhiteSpace($SaveRoot)) {
+        Join-Path $env:USERPROFILE 'AppData\LocalLow\Owlcat Games\Pathfinder Kingmaker\Saved Games'
+    } else { $SaveRoot }
     if (-not (Test-Path -LiteralPath $saveRoot -PathType Container)) {
         throw 'The exact Kingmaker save root is unavailable.'
     }
@@ -137,7 +148,7 @@ function Get-KbpDisposableSavePair {
             if ($null -eq $entry) { continue }
             $reader = [IO.StreamReader]::new($entry.Open())
             $header = ($reader.ReadToEnd() | ConvertFrom-Json)
-            if ($header.Name -in @('KBP_AUTOMATION_BASELINE', 'KBP_AUTOMATION_WORKING')) {
+            if ($header.Name -cin @($baselineLabel, $workingLabel)) {
                 $matches += [pscustomobject]@{
                     name = [string]$header.Name; fileName = $file.Name; path = $file.FullName
                     sha256 = Get-KbpSha256 $file.FullName; gameName = [string]$header.GameName
@@ -147,7 +158,7 @@ function Get-KbpDisposableSavePair {
             }
         }
         catch [IO.InvalidDataException] {
-            if ($file.Name -like '*KBP_AUTOMATION_*') {
+            if ($file.Name -like ('*' + $prefix + '_*')) {
                 throw "Authorized disposable save archive is unreadable: $($file.Name)"
             }
             continue
@@ -157,20 +168,54 @@ function Get-KbpDisposableSavePair {
             if ($null -ne $archive) { $archive.Dispose() }
         }
     }
-    $baseline = @($matches | Where-Object name -ceq 'KBP_AUTOMATION_BASELINE')
-    $working = @($matches | Where-Object name -ceq 'KBP_AUTOMATION_WORKING')
+    $baseline = @($matches | Where-Object name -ceq $baselineLabel)
+    $working = @($matches | Where-Object name -ceq $workingLabel)
     if ($baseline.Count -ne 1 -or $working.Count -ne 1) {
         throw "Disposable save ambiguity: baseline=$($baseline.Count); working=$($working.Count)."
     }
-    if ($baseline[0].fileName -notmatch '^Manual_[0-9]+_KBP_AUTOMATION_BASELINE\.zks$' -or
-        $working[0].fileName -notmatch '^Manual_[0-9]+_KBP_AUTOMATION_WORKING\.zks$' -or
+    if ($baseline[0].fileName -cnotmatch ('^Manual_[0-9]+_' + $baselineLabel + '\.zks$') -or
+        $working[0].fileName -cnotmatch ('^Manual_[0-9]+_' + $workingLabel + '\.zks$') -or
         $baseline[0].path -ceq $working[0].path -or
         $baseline[0].gameId -cne $working[0].gameId -or
         $baseline[0].gameName -cne $working[0].gameName -or
         $baseline[0].area -cne $working[0].area) {
         throw 'Disposable save pair descriptors are not exact, distinct, and campaign-correlated.'
     }
-    return [pscustomobject]@{ baseline = $baseline[0]; working = $working[0] }
+    return [pscustomobject]@{ family = $Family; baseline = $baseline[0]; working = $working[0] }
+}
+
+# Protected-save comparison (advanced-copy safeguard): every save-folder
+# file by name, length and SHA-256.
+function Get-KbpSaveFolderSnapshot {
+    param([Parameter(Mandatory = $true)][string]$SaveRoot)
+    if (-not (Test-Path -LiteralPath $SaveRoot -PathType Container)) { throw "Save root is unavailable: $SaveRoot" }
+    $snapshot = [ordered]@{}
+    foreach ($file in @(Get-ChildItem -LiteralPath $SaveRoot -File -Force | Sort-Object Name)) {
+        $snapshot[$file.Name] = [pscustomobject]@{ length = $file.Length; sha256 = Get-KbpSha256 $file.FullName }
+    }
+    return $snapshot
+}
+
+# Returns every violation: a new file (e.g. an autosave or cloud sync), a
+# removed file, or a changed file other than the explicitly allowed ones
+# (the WORKING copy of the run). An empty result means protected saves are
+# byte-identical.
+function Compare-KbpSaveFolderSnapshot {
+    param(
+        [Parameter(Mandatory = $true)]$Before,
+        [Parameter(Mandatory = $true)]$After,
+        [string[]]$AllowedChangedFileNames = @()
+    )
+    $violations = New-Object System.Collections.Generic.List[string]
+    foreach ($name in @($After.Keys)) {
+        if (-not $Before.Contains($name)) { $violations.Add("new:$name"); continue }
+        if ($Before[$name].sha256 -cne $After[$name].sha256 -and
+            $AllowedChangedFileNames -cnotcontains $name) { $violations.Add("changed:$name") }
+    }
+    foreach ($name in @($Before.Keys)) {
+        if (-not $After.Contains($name)) { $violations.Add("removed:$name") }
+    }
+    return ,$violations.ToArray()
 }
 
 function Wait-KbpNewKingmakerProcess {
