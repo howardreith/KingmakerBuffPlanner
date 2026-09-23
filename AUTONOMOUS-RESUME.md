@@ -64,8 +64,38 @@ confirmed the tabs, hint and distinct labels. The automatic
 `live-workspace-qual` scenario (J1 at runtime) has NOT been re-run since
 the repair: it injects keystrokes and the owner was at the desktop.
 
-NEXT (exact action): run `live-workspace-qual` when the desktop is free
-(J1 runtime proof); then the UI slice in `docs/UI-END-GOAL.md` — icon-first
+J1 RUNTIME PROOF: `casting-ws-claude-qual-20260922-203846` on `6a6c42d`
+(`live-workspace-qual`, full-user) — full PASS incl.
+`workspace-interaction-sequence` with the exact producer shape that the
+old validator rejected (`state1=invoked`, `state2/3=already-ready`) and
+`saved=True` observed via `!IsDirty`; restored verified. The owner has
+stated the lab is a dedicated dev machine: run scenarios (including
+synthetic input) without asking.
+
+BUBBLE BUFFS-STYLE LAYOUT (`a2c104b`): icon grid of buffs on top with
+per-routine casting counts; castings of the selected buff as cards with
+caster → recipient portraits; inspector with "Cast by" / "Cast on"
+portrait tiles and the green/amber coverage legend.
+`casting-ws-claude-qual-20260922-204316` on `a2c104b`: every interaction
+assertion PASSED, but the run FAILED `workspace-frame-nonblack` because
+BOTH the control frame (workspace closed) and the open frame were 100%
+black on the display path — the documented intermittent
+black-presentation state, not the layout (the camera-lane frames render
+the new layout). Restored verified. Known capture-lane artifact: a
+camera capture taken in the same frame as a rebuild can blend stale
+and new UI (ws-interact-authored.png); stable frames are clean.
+
+Rerun `casting-ws-claude-qual-20260922-204631` on `a2c104b`: identical
+(interactions PASS, display frames 100% black, restored verified); at
+that moment `query user` showed the owner's RDP session as Disc — the
+known disconnected-session black backbuffer. Display-path acceptance of
+the new layout therefore waits for a connected session; session state
+is never changed by the agent.
+
+NEXT (exact action): rerun `live-workspace-qual` when the RDP session is
+Active (check `query user` first); meanwhile continue `docs/UI-END-GOAL.md`: search
+box, native parchment/frame pass (charter §6), per-caster popover,
+recipient invalid-target state; supervised session on the new layout — icon-first
 searchable buff grid with disambiguated variants, portrait strips with
 the coverage colour legend, casting cards with portraits and enhancement
 chips; then the native parchment pass. Historical next step:
