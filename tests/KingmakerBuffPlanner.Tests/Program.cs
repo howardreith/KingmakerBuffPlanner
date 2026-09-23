@@ -16057,6 +16057,15 @@ namespace KingmakerBuffPlanner.Tests
                 pending.Outcome == null || !pending.Outcome.Cancelled || pending.ActiveRun != null)
                 throw new InvalidOperationException("Disposing the probe boundary did not cancel and clean up.");
 
+            // The committed allowance template is unusable as-is (no approver).
+            string template = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "docs", "probe",
+                "ALLOWANCE-TEMPLATE-UNAPPROVED.json"));
+            string templateRefusal;
+            if (SingleCastProbeAllowance.Parse(template, "casting-probe-cast-20260923-01", out templateRefusal) != null ||
+                templateRefusal != "allowance-approver-missing")
+                throw new InvalidOperationException("The unapproved allowance template parses as an allowance: " +
+                    templateRefusal);
+
             // The production workspace never uses the probe boundary.
             string dir = Path.Combine(root, "probe-default");
             Directory.CreateDirectory(dir);

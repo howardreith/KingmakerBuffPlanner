@@ -5,7 +5,19 @@ Linked from `AUTONOMOUS-RESUME.md`. Specification: the adopted
 `Kingmaker-Buff-Planner-Casting-First-Migration-Charter.md` (casting-first
 migration and native scroll UI charter v1.0, 2026-09-19).
 
-## CURRENT STATE — L-review (`475d2b9`) answered; probe dormant — 2026-09-23
+## CURRENT STATE — M-series answered; cantrip probe proposed — 2026-09-23
+
+M1 (zero-cost native sources), M2 (authoritative probe observations) and
+M3 (owned terminal cleanup) are implemented; normal dispatch stays
+disabled. Full Windows PowerShell 5.1 gate at `ea45807`: source 42/42,
+protocol 254/254, harness 28/28, deploy WhatIf 5/5, launcher WhatIf 8/8,
+fixture 3/3, Restore-InstallLocal 16/16, publisher 3/3. A selection-only
+live run at `ea45807` selected Resistance (verified Unlimited,
+ProjectionId `ee8e76b2…`); the concrete cast proposal
+(`docs/LIVE-CAST-PROBE-REQUEST.md`) awaits owner approval. No cast has
+been run. Release buckets live in `planning/DEFINITION-OF-DONE-MATRIX.md`.
+
+## L-review (`475d2b9`) answered; probe dormant — 2026-09-23 (history)
 
 L1–L6 are repaired in source (dispositions in
 `docs/CASTING-FIRST-REVIEW-INDEX.md`); native dispatch stays disabled in

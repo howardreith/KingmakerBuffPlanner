@@ -1,6 +1,51 @@
 # AUTONOMOUS-RESUME — top section is current; planning/CASTING-FIRST-MIGRATION-STATUS.md is the per-checkpoint tracker.
 
-## L-review (`475d2b9`) answered; single-cast probe prepared and dormant — 2026-09-23 (LATEST)
+## M-series (`1e3c95b` review): zero-cost path, authoritative observations, owned cleanup; concrete cantrip proposal — 2026-09-23 (LATEST)
+
+The review-and-roadmap document named in the instructions was not on this
+machine; the work followed the pasted instructions. The L fixes, UI,
+loader, staged rollback and coordinator are preserved. Normal dispatch
+stays disabled. **No native cast was run.**
+
+| Commit | Content |
+| --- | --- |
+| `a023293` | M1: verified Unlimited pools are real zero-unit native reservations end to end |
+| `0a4c382` | M2: fresh, sequenced native observations; M3: one owned idempotent terminal cleanup |
+| `ea45807` | Probe subset accepts discovery's self-reference wrapper around plain buffs |
+| (docs) | Concrete probe proposal, unapproved template, advanced-copy request, release buckets |
+
+Evidence layers:
+
+- **Source tests:** full Windows PowerShell 5.1 gate at `ea45807`:
+  source 42/42, protocol 254/254, harness 28/28, deploy WhatIf 5/5,
+  launcher WhatIf 8/8, fixture 3/3, Restore-InstallLocal 16/16,
+  publisher 3/3. 17 M-series mutants plus the wrapper mutant were caught.
+  Mutation results show the tests are sensitive; they are not runtime
+  proof.
+- **Recording-runtime:** M1 drives both real executors (free confirmed,
+  spend-on-free fails, unverified zero never reaches the runtime). M2/M3
+  compose the real owner, session, boundary, coordinator and instant
+  executor with a recording runtime and a scripted native observer.
+- **Actual gameplay:** none.
+- **Live non-casting runs:** two selection-only runs this session
+  (`casting-probe-select-20260923-062552` at `0a4c382`: zero-cost
+  accepted, refused on effect shape; `…-063054` at `ea45807`: **PASS**,
+  Resistance by `2b56df7d…` on `050aa19a…`, verified Unlimited,
+  ProjectionId `ee8e76b2…`). No boundary was constructed in either; the
+  workspace closed, the lease was released and restoration was verified.
+- **Manual UI acceptance:** nothing new.
+- **Restoration:** verified for both runs. Rollback changes remain
+  proven only on isolated fixtures.
+
+Owner decisions pending:
+
+1. Approve (or not) the one cantrip cast in `docs/LIVE-CAST-PROBE-REQUEST.md`
+   by writing the allowance file. Claude will not write it.
+2. Approve the advanced-save copy inspection in
+   `docs/ADVANCED-SAVE-COPY-INSPECTION-REQUEST.md` by saving a
+   `KBP_ADVANCED_SEED` in-game. The tooling for it is not implemented yet.
+
+## L-review (`475d2b9`) answered; single-cast probe prepared and dormant — 2026-09-23 (history)
 
 Pro's `475d2b9` follow-up review (L1–L6) is answered in source. The UI,
 repaired loader, coverage fix, failed-import blocking, provenance ids,
