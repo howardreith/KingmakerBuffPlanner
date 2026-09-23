@@ -100,8 +100,30 @@ search field, a meaningless "coverage 1/0" on direct cards (inverted
 condition) and id-style card titles — all fixed next (cards read
 "Caster → Recipient (Casting n in routine)").
 
-NEXT (exact action): rerun `live-workspace-qual` when the RDP session is
-Active (check `query user` first); meanwhile continue `docs/UI-END-GOAL.md`: search
+DISPLAY-PATH PROOF of the new layout: `casting-ws-claude-qual-20260922-210851`
+on `c9658f1` with the owner's session Active — FULL PASS (open frame
+nonblack, changedFraction 0.948 vs control, all interactions), restored
+verified. This confirms the black frames were the disconnected session.
+Second supervised session `casting-ws-claude-manual-20260922-211054`:
+the owner, after a glimpse ("significantly improved... a much better
+direction"), asked to skip it; relayed as manual-stop → result FAIL
+stage `manual-cancelled` by design (first runtime proof of the stop
+path), final capture + camera restoration + close all PASS, restored
+verified.
+
+NATIVE PAGE ART (`a095aca`, `7a0f673`): the frame borrows the native
+spellbook page (`ServiceWindow/SpellBook/BookBackground`, sprite
+`Inventory_Book_Clear`) onto the owned frame only; lanes are unfilled
+framed boxes; header/footer ink is light outside the book.
+`casting-ws-claude-qual-20260922-211523` (`a095aca`, session Active):
+FULL PASS incl. `page=native` in presentation evidence.
+`...-211922` (`7a0f673`): interactions PASS, display black (session
+Disc), camera frame shows the finished page look. Open nit: lane titles
+clipped by the book's left edge.
+
+NEXT (exact action): nudge lane titles inside the book edge; per-caster
+popover (limits, Share Transmutation, Powerful Change) and an invalid
+target (red) state; rerun `live-workspace-qual` when Active; continue `docs/UI-END-GOAL.md`: search
 box, native parchment/frame pass (charter §6), per-caster popover,
 recipient invalid-target state; supervised session on the new layout — icon-first
 searchable buff grid with disambiguated variants, portrait strips with
