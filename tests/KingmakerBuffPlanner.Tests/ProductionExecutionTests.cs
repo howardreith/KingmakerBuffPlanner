@@ -1742,7 +1742,16 @@ namespace KingmakerBuffPlanner.Tests
                 { "no-editing-focus", "select a casting card (Edit) first." },
                 { "ready-requires-import-review:cast-4", "review what the import changed before marking it Ready." },
                 { "state-unchanged:cast-2", "it already is." },
-                { "casting-id-collision:cast-3", "casting id collision." }
+                { "casting-id-collision:cast-3", "casting id collision." },
+                { "targeting-requires-direct-target:pick a recipient to switch back",
+                    "choose who receives it to switch back to a single target." },
+                { "targeting-invalid:A group casting requires an origin.", "choose the unit the group spell is centred on first." },
+                { "draft-invalid:A group casting has an origin, not a direct target.\r\nParameter name: directTargetUnitId",
+                    "a group casting has no single recipient; switch to a single target to pick one." },
+                { "draft-invalid:A direct-target casting cannot carry a group origin.\r\nParameter name: origin",
+                    "a single-target casting has no group area; switch to group targeting for that." },
+                { "draft-invalid:A direct-target casting requires its direct target.\r\nParameter name: directTargetUnitId",
+                    "choose who receives this casting first." }
             };
             foreach (KeyValuePair<string, string> pair in expected)
                 if (WorkspaceRefusalText.Describe(pair.Key) != pair.Value)
@@ -1762,6 +1771,44 @@ namespace KingmakerBuffPlanner.Tests
             if (view.RoutineCastingCount != 2 || view.RoutineReadyCount != 2)
                 throw new InvalidOperationException("The routine counts are wrong: " + view.RoutineCastingCount +
                     "/" + view.RoutineReadyCount);
+            // Review of f7726c9..1332ed8, P3-C: the same buff in Short makes
+            // the routine's count differ from the selected buff's cards,
+            // which span routines (counting the cards would say 3).
+            session.SelectBuff("source-bulls");
+            session.SelectRoutine("short");
+            session.BuildView(free);
+            session.Draft.SourceId = "source-bulls";
+            session.Draft.TargetMode = CastingTargetMode.DirectTarget;
+            session.ChooseDraftCaster("unit-wizard");
+            session.Draft.DirectTargetUnitId = "unit-t3";
+            session.Draft.State = CastingAuthoringState.Ready;
+            AuthoringEditResult inShort = session.AddCastingFromDraft(free);
+            if (!inShort.Applied)
+                throw new InvalidOperationException("The Short casting was not added: " + inShort.Reason);
+            session.SelectRoutine("long");
+            session.SelectBuff("source-bulls");
+            WorkspaceView mixedView = session.BuildView(free);
+            if (mixedView.RoutineCastingCount != 2 || mixedView.Cards.Count != 3 ||
+                mixedView.Cards.Count(card => card.RoutineId == "long") != 2)
+                throw new InvalidOperationException("The header does not count the routine as a whole: routine=" +
+                    mixedView.RoutineCastingCount + ";cards=" + mixedView.Cards.Count);
+            session.SelectRoutine("short");
+            WorkspaceView shortView = session.BuildView(free);
+            if (shortView.RoutineCastingCount != 1 || shortView.Cards.Count != 3)
+                throw new InvalidOperationException("The short routine count follows the buff's cards: " +
+                    shortView.RoutineCastingCount);
+            // P3-F: editing a Short casting, then selecting another buff,
+            // still names the casting being edited.
+            WorkspaceCastingCard shortCard = shortView.Cards.Single(card => card.RoutineId == "short");
+            session.FocusCasting(shortCard.CastingId);
+            session.SelectBuff("source-communal");
+            WorkspaceView switched = session.BuildView(free);
+            if (switched.EditingScopeLabel != "Editing casting 1: unit-wizard → unit-t3")
+                throw new InvalidOperationException("The editing label lost the casting after a buff switch: " +
+                    switched.EditingScopeLabel);
+            session.FocusCasting(null);
+            session.SelectBuff("source-bulls");
+            session.SelectRoutine("long");
             session.Draft.SourceId = "source-bulls";
             session.Draft.TargetMode = CastingTargetMode.DirectTarget;
             session.ChooseDraftCaster("unit-cleric");
@@ -1799,6 +1846,45 @@ namespace KingmakerBuffPlanner.Tests
             if (!finiteView.Cards.Single().CostLabels.SequenceEqual(new[] { "unit-cleric: level 2 spell slot" }))
                 throw new InvalidOperationException("A finite pool label is wrong: " +
                     string.Join(",", finiteView.Cards.Single().CostLabels.ToArray()));
+            // Review of f7726c9..1332ed8, P3-D: shortages first, free pools
+            // merged, same-looking finite pools numbered, enhancement and
+            // material rows named by kind.
+            var freeA = new WorkspaceBudgetRow(new CastingBudgetLine("free-a", CastingCostCategory.NativePool,
+                null, 0, 0, new[] { "c1" }, true), "Linzi: free");
+            var freeB = new WorkspaceBudgetRow(new CastingBudgetLine("free-b", CastingCostCategory.NativePool,
+                null, 0, 0, new[] { "c2" }, true), "Linzi: free");
+            var ok = new WorkspaceBudgetRow(new CastingBudgetLine("book-a", CastingCostCategory.NativePool,
+                2, 1, 1, new[] { "c3" }), "Linzi: level 1 spell slot");
+            var twin = new WorkspaceBudgetRow(new CastingBudgetLine("book-b", CastingCostCategory.NativePool,
+                2, 1, 1, new[] { "c4" }), "Linzi: level 1 spell slot");
+            var short1 = new WorkspaceBudgetRow(new CastingBudgetLine("prep", CastingCostCategory.NativePool,
+                1, 2, 1, new[] { "c5", "c6" }), "Tartuccio: prepared slot");
+            var rows = new List<WorkspaceBudgetRow> { freeA, ok, freeB, twin, short1 };
+            WorkspaceBudgetRow.DisambiguateLabels(rows);
+            var footer = WorkspaceBudgetRow.FooterLines(rows).ToList();
+            if (!footer.SequenceEqual(new[]
+                {
+                    "Tartuccio: prepared slot: 1 of 2 covered, short by 1",
+                    "Linzi: level 1 spell slot: 1 of 1 covered",
+                    "Linzi: level 1 spell slot (2): 1 of 1 covered",
+                    "Linzi: free (2 casts, nothing spent)"
+                }))
+                throw new InvalidOperationException("The budget footer is wrong: " + string.Join(" / ", footer.ToArray()));
+            var rodInputs = new CastingWorkspaceInputs(free.Snapshot, free.ProviderOptions, free.EffectsBySource,
+                new[]
+                {
+                    new CastEnhancementSnapshot("rod-extend", "unit-cleric", "rod-guid", "Extend Rod", string.Empty,
+                        CastEnhancementCategory.MetamagicRod, 8, 3, 3, null, null, null, "rod-pool", false, null, 1,
+                        false, null, "Lesser Extend Metamagic Rod")
+                });
+            var rodSession = new CastingWorkspaceSession(Path.Combine(root, "labels-rod"), "campaign-labels");
+            rodSession.BuildView(rodInputs);
+            string rodLabel = rodSession.BudgetLabel(new CastingBudgetLine("rod-pool", CastingCostCategory.EnhancementPool,
+                3, 1, 1, new[] { "c7" }));
+            string materialLabel = rodSession.BudgetLabel(new CastingBudgetLine("item-guid", CastingCostCategory.Material,
+                1, 1, 1, new[] { "c8" }));
+            if (rodLabel != "unit-cleric: Lesser Extend Metamagic Rod uses" || materialLabel != "material component")
+                throw new InvalidOperationException("Enhancement or material rows are unnamed: " + rodLabel + " / " + materialLabel);
             // A prepared pool spans every spell level: whose, not which level.
             var world = new FiniteBuffWorld();
             CastingWorkspaceInputs mixed = world.Inputs();

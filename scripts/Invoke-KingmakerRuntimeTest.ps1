@@ -49,6 +49,18 @@ $ErrorActionPreference = 'Stop'
 
 $requestedWhatIf = [bool]$WhatIfPreference
 $WhatIfPreference = $false
+# Review of f7726c9..1332ed8, P3-J: ValidateSet binds case-insensitively,
+# but every later comparison is case-sensitive; continue with the
+# canonical spelling of each value (for example -Scenario LIVE-CAST-QUAL).
+foreach ($canonicalName in @('Scenario', 'CompatibilityProfileId', 'ExecutionMode', 'FixtureFamily', 'QualificationRecipe')) {
+    $bound = Get-Variable -Name $canonicalName -ValueOnly -ErrorAction SilentlyContinue
+    if ([string]::IsNullOrEmpty([string]$bound)) { continue }
+    $validSet = @((Get-Command -Name $PSCommandPath).Parameters[$canonicalName].Attributes |
+        Where-Object { $_ -is [System.Management.Automation.ValidateSetAttribute] } |
+        ForEach-Object { $_.ValidValues })
+    $canonical = @($validSet | Where-Object { [string]$_ -ieq [string]$bound })
+    if ($canonical.Count -eq 1) { Set-Variable -Name $canonicalName -Value ([string]$canonical[0]) }
+}
 $root = Get-KbpRepositoryRoot
 $version = Get-KbpVersion
 $package = (Resolve-Path -LiteralPath (Join-Path $root "artifacts\local-runtime\$version\KingmakerBuffPlanner-$version-local-runtime.zip")).Path
@@ -112,6 +124,14 @@ if (-not [string]::IsNullOrWhiteSpace($QualificationRecipe) -and
 if (($Scenario -ceq 'live-cast-qual' -or $Scenario -ceq 'live-cast-qual-select') -and
     $TimeoutSeconds -lt 900) {
     throw "TimeoutSeconds must be at least 900 for $Scenario (boot/load plus the qualification deadline); got $TimeoutSeconds."
+}
+# Review of f7726c9..1332ed8, P3-H: a probe waits up to 30 s for the world
+# and has a 60 s run deadline after boot and load; the harness wait must
+# cover them, or it would abandon a live run with the Mods folder
+# unrestored.
+if (($Scenario -ceq 'live-cast-probe' -or $Scenario -ceq 'live-cast-probe-select') -and
+    $TimeoutSeconds -lt 600) {
+    throw "TimeoutSeconds must be at least 600 for $Scenario (boot/load plus the probe's world wait and deadline); got $TimeoutSeconds."
 }
 if ($Scenario -ceq 'live-cast-qual-select' -and $ExecutionMode -cne 'instant') {
     throw 'live-cast-qual-select runs in instant mode only.'
@@ -211,6 +231,7 @@ $protectedBefore = if ($null -ne $savePair) { Get-KbpSaveFolderSnapshot -SaveRoo
 $protectedSaveFailure = $null
 $protectedSavesCompared = $false
 $restoreFailure = $null
+$runFailure = $null
 $runSucceeded = $false
 $result = $null
 try {
@@ -604,6 +625,11 @@ public static class KbpPhysicalInput {
     Write-Host "Runtime result PASS: $resultPath"
     $runSucceeded = $true
 }
+catch {
+    # Held until the restoration and records below are done, then rethrown
+    # (with any restoration failure folded in).
+    $runFailure = $_
+}
 finally {
     try {
         # In non-interactive hosts the finally's own Write-Error can displace
@@ -634,7 +660,18 @@ finally {
         } else {
             $restoreFailure = "Kingmaker remains running; exact Mods restoration is intentionally blocked. Transaction: $runId"
         }
-        if ($null -ne $restoreFailure) { Write-Warning $restoreFailure }
+        if ($null -ne $restoreFailure) {
+            Write-Warning $restoreFailure
+            # Review of f7726c9..1332ed8, P3-A: the reason is kept beside
+            # the run's evidence, not only on the console.
+            try {
+                if ($null -ne (Get-Variable -Name evidence -ErrorAction SilentlyContinue) -and
+                    -not [string]::IsNullOrWhiteSpace([string]$evidence) -and (Test-Path -LiteralPath $evidence)) {
+                    [IO.File]::WriteAllText((Join-Path $evidence 'restoration-failure.txt'), $restoreFailure + [Environment]::NewLine)
+                }
+            }
+            catch { Write-Warning "Restoration failure not recorded: $($_.Exception.Message)" }
+        }
     }
     if ($null -ne $protectedBefore -and @(Get-Process -Name Kingmaker -ErrorAction SilentlyContinue).Count -eq 0) {
         try {
@@ -679,10 +716,20 @@ finally {
                 -CompatibilityIdentity $completionIdentity -AdvancedBindingManifest $completionBinding `
                 -SavePair $savePair -GameResultStatus $completionGame -HarnessSucceeded $runSucceeded `
                 -KingmakerExited $completionExited -TransactionStatePath $completionTransaction `
+                -RestoreFailure $restoreFailure `
                 -ProtectedSavesCompared $protectedSavesCompared -ProtectedSaveFailure $protectedSaveFailure)
         }
         catch { Write-Warning "Run completion record not written: $($_.Exception.Message)" }
     }
+}
+# The run's own failure wins; a restoration failure is folded into it, and
+# a restoration failure and a save violation are reported together.
+if ($null -ne $runFailure) {
+    if ($null -ne $restoreFailure) { throw ($runFailure.Exception.Message + ' | Restoration: ' + $restoreFailure) }
+    throw $runFailure
+}
+if ($null -ne $restoreFailure -and $null -ne $protectedSaveFailure) {
+    throw ($restoreFailure + ' | ' + $protectedSaveFailure)
 }
 if ($null -ne $restoreFailure) { throw $restoreFailure }
 if ($null -ne $protectedSaveFailure) { throw $protectedSaveFailure }

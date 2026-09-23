@@ -9859,7 +9859,7 @@ namespace KingmakerBuffPlanner.Tests
         private static void PumpToEnd(ProbeOwnerRun run)
         {
             int guard = 0;
-            while (!run.Owner.Pump(guard, 60000, false) && guard++ < 10000) { }
+            while (!run.Owner.Pump(guard, 60000, false, true, "fixture-world-running") && guard++ < 10000) { }
         }
 
         // Review M2: fresh, sequenced before/after observations judged
@@ -9998,7 +9998,7 @@ namespace KingmakerBuffPlanner.Tests
                     run.Owner.Record.TerminalReason != reason || run.Owner.Record.BoundaryConstructed)
                     throw new InvalidOperationException(reason + " before selection did not stay terminal.");
                 // "Re-enable" / later updates: pumping and terminating again change nothing.
-                run.Owner.Pump(10, 60000, false);
+                run.Owner.Pump(10, 60000, false, true, "fixture-world-running");
                 run.Owner.Terminate("completed");
                 if (run.Published.Count != 1 || run.Owner.Record.TerminalReason != reason || run.FactoryCalls != 0)
                     throw new InvalidOperationException(reason + ": a later update resumed the request.");
@@ -10113,14 +10113,14 @@ namespace KingmakerBuffPlanner.Tests
                 if (!run.Submitted.Submitted)
                     throw new InvalidOperationException("Owner fixture did not submit: " + run.Submitted.Reason);
                 int frames = 0;
-                while (run.Runtime.Fired.Count == 0 && !run.Owner.Pump(frames, 60000, false) && frames++ < 1000) { }
+                while (run.Runtime.Fired.Count == 0 && !run.Owner.Pump(frames, 60000, false, true, "fixture-world-running") && frames++ < 1000) { }
                 if (run.Runtime.Fired.Count != 1 || run.Owner.Terminated)
                     throw new InvalidOperationException("Owner fixture did not reach the pending confirmation.");
-                if (reason == "deadline") run.Owner.Pump(120000, 60000, false);
-                else if (reason == "stop") run.Owner.Pump(frames + 1, 60000, true);
+                if (reason == "deadline") run.Owner.Pump(120000, 60000, false, true, "fixture-world-running");
+                else if (reason == "stop") run.Owner.Pump(frames + 1, 60000, true, true, "fixture-world-running");
                 else run.Owner.Terminate(reason);
                 run.Owner.Terminate("mod-unload");
-                run.Owner.Pump(999999, 60000, true);
+                run.Owner.Pump(999999, 60000, true, true, "fixture-world-running");
                 SingleCastProbeRunRecord record = run.Published.SingleOrDefault();
                 if (record == null || run.Owner.PublishCount != 1 || run.Closes != 1)
                     throw new InvalidOperationException(reason + ": terminal cleanup was not exactly once.");
@@ -10135,7 +10135,7 @@ namespace KingmakerBuffPlanner.Tests
             // A cleanup failure is appended; the primary reason is kept.
             ProbeOwnerRun failing = StartProbeOwnerRun("unlimited", "pending", read, true);
             int step = 0;
-            while (failing.Runtime.Fired.Count == 0 && !failing.Owner.Pump(step, 60000, false) && step++ < 1000) { }
+            while (failing.Runtime.Fired.Count == 0 && !failing.Owner.Pump(step, 60000, false, true, "fixture-world-running") && step++ < 1000) { }
             failing.Owner.Terminate("host-exception:Fixture:primary");
             SingleCastProbeRunRecord failed = failing.Published.Single();
             if (failed.TerminalReason != "host-exception:Fixture:primary" ||

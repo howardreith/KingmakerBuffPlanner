@@ -253,6 +253,52 @@ namespace KingmakerBuffPlanner.UI
                 (UnmetDemand == 0 ? string.Empty : ", short by " + UnmetDemand);
         }
 
+        internal void ApplyLabel(string label)
+        {
+            if (!string.IsNullOrWhiteSpace(label)) Label = label;
+        }
+
+        // Rows of different pools that would read the same (two spellbooks
+        // of one caster at the same level) are numbered in pool order; free
+        // rows are merged in the footer instead.
+        internal static void DisambiguateLabels(IList<WorkspaceBudgetRow> rows)
+        {
+            foreach (IGrouping<string, WorkspaceBudgetRow> group in (rows ?? new WorkspaceBudgetRow[0])
+                .Where(value => value != null && !value.Unlimited)
+                .GroupBy(value => value.Label, StringComparer.Ordinal)
+                .Where(value => value.Count() > 1))
+            {
+                int index = 0;
+                foreach (WorkspaceBudgetRow row in group.OrderBy(value => value.PoolKey, StringComparer.Ordinal))
+                    if (++index > 1) row.ApplyLabel(row.Label + " (" + index + ")");
+            }
+        }
+
+        // The footer's lines (review of f7726c9..1332ed8, P3-D): shortages
+        // first, so a truncated footer never hides one; then the other
+        // finite rows; then free pools merged by label.
+        public static IReadOnlyList<string> FooterLines(IEnumerable<WorkspaceBudgetRow> rows)
+        {
+            List<WorkspaceBudgetRow> list = (rows ?? new WorkspaceBudgetRow[0])
+                .Where(value => value != null).ToList();
+            var lines = new List<string>();
+            foreach (WorkspaceBudgetRow row in list.Where(value => !value.Unlimited && value.UnmetDemand > 0)
+                .Concat(list.Where(value => !value.Unlimited && value.UnmetDemand == 0)))
+            {
+                string text = row.Describe();
+                if (text != null) lines.Add(text);
+            }
+            foreach (IGrouping<string, WorkspaceBudgetRow> group in list
+                .Where(value => value.Unlimited && value.ResponsibleCastingIds.Count > 0)
+                .GroupBy(value => value.Label, StringComparer.Ordinal))
+            {
+                int casts = group.Sum(value => value.ResponsibleCastingIds.Count);
+                lines.Add(group.Key + " (" + casts + " cast" + (casts == 1 ? string.Empty : "s") +
+                    ", nothing spent)");
+            }
+            return lines;
+        }
+
         public string PoolKey { get; private set; }
         public CastingCostCategory Category { get; private set; }
         public int? AvailableNow { get; private set; }
@@ -406,14 +452,10 @@ namespace KingmakerBuffPlanner.UI
             switch (head)
             {
                 case "draft-invalid":
-                    if (detail.IndexOf("direct target", StringComparison.OrdinalIgnoreCase) >= 0)
-                        return "choose who receives this casting first.";
-                    if (detail.IndexOf("anchor", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                        detail.IndexOf("origin", StringComparison.OrdinalIgnoreCase) >= 0)
-                        return "choose the group's origin first.";
-                    if (detail.IndexOf("caster", StringComparison.OrdinalIgnoreCase) >= 0)
-                        return "choose who casts it first.";
-                    return "this casting is not complete yet.";
+                case "targeting-invalid":
+                    return ShapeAdvice(detail);
+                case "targeting-requires-direct-target":
+                    return "choose who receives it to switch back to a single target.";
                 case "draft-ability-unresolved":
                     if (detail.StartsWith("no-caster-selected", StringComparison.Ordinal))
                         return "choose who casts it first.";
@@ -449,6 +491,34 @@ namespace KingmakerBuffPlanner.UI
                     return head.Length == 0 ? "not possible right now." : head.Replace('-', ' ') + ".";
             }
         }
+
+        // The casting-shape messages are this mod's own (PlannedCasting
+        // validation); each gets the advice that fixes it (review of
+        // f7726c9..1332ed8, P3-E). The .NET parameter-name line is ignored.
+        private static string ShapeAdvice(string detail)
+        {
+            string message = (detail ?? string.Empty).Split(new[] { '\r', '\n' },
+                StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? string.Empty;
+            switch (message.Trim())
+            {
+                case "A direct-target casting requires its direct target.":
+                    return "choose who receives this casting first.";
+                case "A group casting requires an origin.":
+                case "An anchored casting must select an anchor unit.":
+                    return "choose the unit the group spell is centred on first.";
+                case "A caster-centered casting must use the caster origin.":
+                    return "a caster-centred group spell is centred on its caster.";
+                case "A group casting has an origin, not a direct target.":
+                    return "a group casting has no single recipient; switch to a single target to pick one.";
+                case "A direct-target casting cannot carry a group origin.":
+                case "A direct-target casting cannot carry required coverage.":
+                    return "a single-target casting has no group area; switch to group targeting for that.";
+                default:
+                    if (message.IndexOf("caster", StringComparison.OrdinalIgnoreCase) >= 0)
+                        return "choose who casts it first.";
+                    return "this casting is not complete yet.";
+            }
+        }
     }
 
     // The workspace header for the selected routine as a whole (live frame
@@ -469,7 +539,8 @@ namespace KingmakerBuffPlanner.UI
     // Player-facing resource pool names.
     public static class WorkspacePoolLabels
     {
-        public static string Describe(ResourcePoolKind kind, int? spellLevel, string owner)
+        public static string Describe(ResourcePoolKind kind, int? spellLevel, string owner,
+            string sourceName = null)
         {
             string what;
             switch (kind)
@@ -479,7 +550,8 @@ namespace KingmakerBuffPlanner.UI
                     what = spellLevel == null ? "prepared slot" : "prepared level " + spellLevel + " slot"; break;
                 case ResourcePoolKind.SpontaneousLevel:
                     what = spellLevel == null ? "spell slot" : "level " + spellLevel + " spell slot"; break;
-                case ResourcePoolKind.AbilityResource: what = "ability use"; break;
+                case ResourcePoolKind.AbilityResource:
+                    what = string.IsNullOrWhiteSpace(sourceName) ? "ability use" : sourceName + " uses"; break;
                 default: what = "item charge"; break;
             }
             return string.IsNullOrWhiteSpace(owner) ? what : owner + ": " + what;
