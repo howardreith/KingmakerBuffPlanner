@@ -1153,7 +1153,8 @@ namespace KingmakerBuffPlanner.UI
                         captured.UnitId, captured.DisplayName, selected,
                         illegal ? new Color(1f, 0.45f, 0.45f, 1f)
                             : CoverageTint(WorkspaceBuffSummary.CoverageFor(
-                                view.Cards, view.SelectedRoutineId, captured.UnitId)),
+                                view.SelectedBuffCards, view.SelectedSourceId,
+                                view.SelectedRoutineId, captured.UnitId)),
                         () => Click(() =>
                         {
                             _session.SetDraftTargeting(
