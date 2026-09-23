@@ -1,6 +1,39 @@
 # AUTONOMOUS-RESUME — top section is current; planning/CASTING-FIRST-MIGRATION-STATUS.md is the per-checkpoint tracker.
 
-## J-review repaired; implementer handoff Z → Claude — 2026-09-22 (LATEST)
+## K-review (`258a1d0`) answered; first live cast prepared as a request — 2026-09-22 (LATEST)
+
+Pro's `258a1d0` review (K1–K7) is answered in source; the new UI, native
+page borrowing, the converter and the earlier repairs are preserved; the
+UI was not restarted and no loader/fixture investigation was reopened.
+Native dispatch remains disabled.
+
+Commits: K7 `93408bd`, K1 `e0509fe`, K2/K3 `0c7b760`, K4 `b69f873`,
+K5 `20bbe82`, K6 `b243b02`, then the probe-scope test tightening and
+these documents. Pushed through the guarded helper; remote HEAD verified.
+
+Evidence layers, kept separate:
+- **Source tests:** full PS 5.1 gate at `b243b02` — source 42/42,
+  protocol 242/242, harness 28/28, deploy WhatIf 5/5, launcher WhatIf
+  4/4, fixture 3/3, Restore-InstallLocal 12/12, publisher 3/3. The
+  probe-scope tightening adds cases inside an existing test (still
+  242/242); each probe refusal was mutation-checked.
+- **Recording-runtime evidence:** K4/K5 run the existing executors over
+  scripted/recording runtimes. This proves ordering and halting logic,
+  not any game behaviour.
+- **Actual gameplay:** none. No native cast has been attempted by the
+  casting-first path.
+- **Manual UI acceptance:** unchanged — the owner's second session was
+  skipped at their request after a positive glimpse; no human
+  acceptance of the current layout is claimed.
+- **Restoration:** no live runs in this slice. K6 changes the install
+  rollback script only and is proven on isolated fixtures, not on the
+  live installation.
+
+Next: the owner decides on `docs/LIVE-CAST-PROBE-REQUEST.md` (one cast,
+single target, no rod, WORKING fixture, isolated candidate without
+automatic import). Nothing in it runs without that separate approval.
+
+## J-review repaired; implementer handoff Z → Claude — 2026-09-22 (history)
 
 Implementation moved from Z to Claude (Z's quota exhausted); Pro remains
 the independent reviewer. Same branch, same draft PR #2, same authority

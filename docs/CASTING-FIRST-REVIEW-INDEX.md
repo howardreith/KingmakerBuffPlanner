@@ -13,7 +13,26 @@ workspace dispatch boundary. The workspace renders in presenting
 sessions (display-path acceptance run `casting-ws-gseries-081000`);
 human usability and the native aesthetic pass remain open.
 
-## Current review dispositions — J-review at `19ecbe8` (repaired 2026-09-22)
+## Current review dispositions — K-review at `258a1d0` (answered 2026-09-22)
+
+Native dispatch remains disabled. Evidence for every row below is
+**source tests only** (protocol suite / isolated script fixtures); no row
+claims gameplay.
+
+| Finding | Disposition | Commit | Tests |
+| --- | --- | --- | --- |
+| K1 — a failed legacy import activated an empty plan / default replacement | A failed import blocks the workspace with a visible reason: no candidate written, Save and Apply refused, old plan not replaced; legacy `ProfileRepository.Save` quarantines an unresolved primary instead of replacing it (explicit `ReplaceUnresolvedPrimary` recovery) | `e0509fe` | malformed primary, newer primary + valid backup, archive/candidate write failures, retry after repair, legacy save refusal/recovery |
+| K2 — import ids could collide | Ids `m5:<routine>:<child>:<recipient key>`; reuse only on exact persisted provenance; any other collision refuses the import (K1 blocks) | `0c7b760` | duplicate child ids across routines, repeated import, unrelated collision, earlier-format reuse without renumbering |
+| K3 — unresolved legacy constraints were dropped | Unknown grouping, provider pins, enhancement requiredness, automatic/missing casters and target-less children become Draft castings with durable review items; bans/caps/priorities become plan-wide import notices that block Apply until acknowledged (undoable) | `0c7b760` | unknown grouping, pin, optional enhancement, priority/cap, target-less child, save/reopen, Apply refusal + acknowledgement |
+| K4 — converter could drop contracts it cannot carry | Standard scope refuses the whole projection for an enabled targeting modifier, an exact-source enhancement, or incomplete required group coverage; `SingleCastProbe` scope admits one plain direct casting only; deterministic `ProjectionId`; the dispatch boundary receives the exact projection | `b69f873` + probe-case tests | `converter-refuses-unsupported-contracts` (every probe refusal mutation-checked) |
+| K5 — a failed/uncertain cast must stop later submissions | `ExplicitCastingRunCoordinator` halts after any casting not positively confirmed, marks the rest NotAttempted, never retries; optional submission limit | `20bbe82` | `explicit-run-stops-after-failure-both-modes` (instant + animated, five failure kinds each; limit 1) |
+| K6 — install rollback could mis-record state after a post-swap failure | Prior build prepared and verified in staging (backup never modified); RollingBack + phase recorded before each transition; post-swap failure reverses the swap; unrecoverable reversal records RollbackRecoveryNeeded and keeps the lock; candidate compatibility read from the restored binary; candidates from both sides archived | `b243b02` | `Test-RestoreInstallLocal.ps1` 12 isolated cases incl. injected failures at candidate-archive, settings-merge, identity, verify, record and reversal |
+| K7 — selected-buff coverage depended on the lane scope | Coverage computed from every casting of the selected buff, independent of the this-buff/whole-routine toggle | `93408bd` | scope toggle changes cards only, never coverage |
+
+First live cast: **request prepared, not executed** —
+`docs/LIVE-CAST-PROBE-REQUEST.md`.
+
+## Previous review dispositions — J-review at `19ecbe8` (history)
 
 | Finding | Disposition | Code | Tests |
 | --- | --- | --- | --- |
