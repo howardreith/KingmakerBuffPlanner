@@ -29,6 +29,11 @@ namespace KingmakerBuffPlanner.Persistence
         public UiProfile Ui { get; set; }
         [JsonProperty("execution", Required = Required.Always, Order = 6)]
         public ExecutionProfile Execution { get; set; }
+        // Optional (absent in earlier candidates): unacknowledged legacy
+        // import notices.
+        [JsonProperty("importNotices", Order = 7,
+            NullValueHandling = NullValueHandling.Ignore)]
+        public List<string> ImportNotices { get; set; }
 
         public static CastingPlanProfile CreateDefault(string campaignId)
         {
@@ -53,7 +58,8 @@ namespace KingmakerBuffPlanner.Persistence
             return new CastingPlanDocument(
                 CampaignId,
                 Routines.Select(value => value.ToDomain()),
-                Castings.Select(value => value.ToDomain()));
+                Castings.Select(value => value.ToDomain()),
+                ImportNotices);
         }
 
         public static CastingPlanProfile FromDocument(
@@ -68,6 +74,8 @@ namespace KingmakerBuffPlanner.Persistence
                     .Select(value => RoutineDefinitionProfile.FromDomain(value)).ToList(),
                 Castings = document.Castings
                     .Select(value => PlannedCastingProfile.FromDomain(value)).ToList(),
+                ImportNotices = document.ImportNotices.Count == 0 ? null
+                    : document.ImportNotices.ToList(),
                 Ui = ui ?? UiProfile.Default(),
                 Execution = execution ?? ExecutionProfile.Default()
             };
@@ -261,6 +269,12 @@ namespace KingmakerBuffPlanner.Persistence
         public string LegacyRoutineId { get; set; }
         [JsonProperty("note", Required = Required.AllowNull, Order = 4)]
         public string Note { get; set; }
+        [JsonProperty("legacyRecipientKey", Order = 5,
+            NullValueHandling = NullValueHandling.Ignore)]
+        public string LegacyRecipientKey { get; set; }
+        [JsonProperty("reviewItems", Order = 6,
+            NullValueHandling = NullValueHandling.Ignore)]
+        public List<string> ReviewItems { get; set; }
 
         internal static MigrationProvenanceProfile FromDomain(MigrationProvenance provenance)
         {
@@ -269,14 +283,19 @@ namespace KingmakerBuffPlanner.Persistence
                 LegacyAssignmentId = provenance.LegacyAssignmentId,
                 LegacySchemaVersion = provenance.LegacySchemaVersion,
                 LegacyRoutineId = provenance.LegacyRoutineId,
-                Note = provenance.Note
+                Note = provenance.Note,
+                LegacyRecipientKey = string.IsNullOrEmpty(provenance.LegacyRecipientKey)
+                    ? null : provenance.LegacyRecipientKey,
+                ReviewItems = provenance.ReviewItems.Count == 0 ? null
+                    : provenance.ReviewItems.ToList()
             };
         }
 
         internal MigrationProvenance ToDomain()
         {
             return new MigrationProvenance(
-                LegacyAssignmentId, LegacySchemaVersion, LegacyRoutineId, Note);
+                LegacyAssignmentId, LegacySchemaVersion, LegacyRoutineId, Note,
+                LegacyRecipientKey, ReviewItems);
         }
     }
 }

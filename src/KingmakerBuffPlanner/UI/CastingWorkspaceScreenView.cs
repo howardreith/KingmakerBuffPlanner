@@ -863,6 +863,8 @@ namespace KingmakerBuffPlanner.UI
                     card.CoverageGapDisplayNames));
             if (card.ReadinessReasons.Count != 0)
                 parts.Add("Reasons: " + string.Join(", ", card.ReadinessReasons));
+            if (card.ReviewItems.Count != 0)
+                parts.Add("Needs review (imported): " + string.Join(", ", card.ReviewItems));
             return string.Join("  ·  ", parts);
         }
 
