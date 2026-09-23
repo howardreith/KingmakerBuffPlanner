@@ -105,10 +105,11 @@ namespace KingmakerBuffPlanner.UI
             int ready = 0;
             foreach (WorkspaceCastingCard card in view.Cards)
                 if (card.Readiness == ResolvedCastingReadiness.Ready) ready++;
-            _headerStatus.text = "Routine " + view.SelectedRoutineId +
-                " · " + ready + "/" + view.Cards.Count + " ready · one-pass " +
-                (view.OnePassGate.Allowed ? "clear" :
-                    view.OnePassGate.BlockingReasons.Count + " blocked");
+            // The routine's own gate: what Apply of this routine would do.
+            _headerStatus.text = _session.RoutineDisplayName(view.SelectedRoutineId) +
+                " · " + ready + " of " + view.Cards.Count + " castings ready · " +
+                (view.SelectedRoutineGate.Allowed ? "ready to apply"
+                    : "Apply blocked (" + view.SelectedRoutineGate.BlockingReasons.Count + ")");
             _scopeLabel.text = view.EditingScopeLabel;
             _lastView = view;
             if (!_importAnnounced && _footerResult != null)
@@ -1464,14 +1465,17 @@ namespace KingmakerBuffPlanner.UI
                 string captured = routineId;
                 bool selected = string.Equals(view.SelectedRoutineId, captured,
                     StringComparison.Ordinal);
+                int count = _session.Document.Castings.Count(value => value != null &&
+                    string.Equals(value.RoutineId, captured, StringComparison.Ordinal));
                 Button tab = KingmakerUiFactory.CreateButton(
                     "Routine." + captured, _routineBar, _theme,
-                    (selected ? "[x] " : string.Empty) + captured,
+                    _session.RoutineDisplayName(captured) + " (" + count + ")",
                     () => Click(() =>
                     {
                         _session.SelectRoutine(captured);
                         RefreshView();
                     }));
+                StyleRoutineTab(tab, selected);
                 RectOf(tab).pivot = new Vector2(0f, 0.5f);
                 RectOf(tab).anchorMin = new Vector2(0f, 0.1f);
                 RectOf(tab).anchorMax = new Vector2(0f, 0.9f);
@@ -1481,6 +1485,17 @@ namespace KingmakerBuffPlanner.UI
                         !string.Equals(id, captured, StringComparison.Ordinal))
                         .Count() * 178f, 0f);
             }
+        }
+
+        // The selected routine tab is gold with a bold label (the chip
+        // convention); the others keep the native button look.
+        private void StyleRoutineTab(Button tab, bool selected)
+        {
+            Image image = tab.targetGraphic as Image;
+            if (image != null) image.color = selected ? _theme.GoldAccent : Color.white;
+            Transform labelNode = tab.transform.Find("Label");
+            Text label = labelNode == null ? null : labelNode.GetComponent<Text>();
+            if (label != null) label.fontStyle = selected ? FontStyle.Bold : FontStyle.Normal;
         }
 
         private void RebuildFooter(WorkspaceView view)
