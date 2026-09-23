@@ -391,6 +391,81 @@ namespace KingmakerBuffPlanner.UI
         }
     }
 
+    // Player-facing text for an authoring refusal: what to do next, never an
+    // internal code or casting id (live frame casting-ws-qual-20260923-q2-03
+    // showed "draft-invalid:A direct-target casting requires its direct
+    // target."). Unmapped codes are shown in words without their ids.
+    public static class WorkspaceRefusalText
+    {
+        public static string Describe(string reason)
+        {
+            string code = reason ?? string.Empty;
+            int colon = code.IndexOf(':');
+            string head = colon < 0 ? code : code.Substring(0, colon);
+            string detail = colon < 0 ? string.Empty : code.Substring(colon + 1);
+            switch (head)
+            {
+                case "draft-invalid":
+                    if (detail.IndexOf("direct target", StringComparison.OrdinalIgnoreCase) >= 0)
+                        return "choose who receives this casting first.";
+                    if (detail.IndexOf("anchor", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                        detail.IndexOf("origin", StringComparison.OrdinalIgnoreCase) >= 0)
+                        return "choose the group's origin first.";
+                    if (detail.IndexOf("caster", StringComparison.OrdinalIgnoreCase) >= 0)
+                        return "choose who casts it first.";
+                    return "this casting is not complete yet.";
+                case "draft-ability-unresolved":
+                    if (detail.StartsWith("no-caster-selected", StringComparison.Ordinal))
+                        return "choose who casts it first.";
+                    if (detail.StartsWith("no-provider-for-source-and-caster", StringComparison.Ordinal))
+                        return "that character cannot cast this buff.";
+                    if (detail.StartsWith("exact-source-ambiguous", StringComparison.Ordinal))
+                        return "that character can cast it in more than one way; pick the exact spell or item first.";
+                    return "the party could not be read; close and reopen the planner.";
+                case "no-editing-focus":
+                case "focused-casting-missing":
+                    return "select a casting card (Edit) first.";
+                case "targeting-mode-unsupported":
+                case "target-mode-unsupported":
+                    return "this buff cannot be cast that way.";
+                case "targeting-requires-anchor":
+                    return "choose the group's origin first.";
+                case "ready-requires-caster":
+                    return "choose who casts it before marking it Ready.";
+                case "ready-requires-import-review":
+                    return "review what the import changed before marking it Ready.";
+                case "state-unchanged":
+                    return "it already is.";
+                case "casting-unknown":
+                case "casting-missing":
+                case "casting-null":
+                    return "that casting no longer exists.";
+                case "routine-unknown":
+                    return "that routine no longer exists.";
+                case "no-import-review":
+                case "no-import-notices":
+                    return "there is nothing to review.";
+                default:
+                    return head.Length == 0 ? "not possible right now." : head.Replace('-', ' ') + ".";
+            }
+        }
+    }
+
+    // The workspace header for the selected routine as a whole (live frame
+    // casting-ws-qual-20260923-q2-03 read "0 of 0 castings ready · ready to
+    // apply": the selected buff's count beside the routine's gate).
+    public static class WorkspaceHeaderText
+    {
+        public static string Describe(string routineName, int castings, int ready,
+            bool applyAllowed, int blockingReasons)
+        {
+            if (castings == 0) return routineName + " · no castings yet";
+            return routineName + " · " + ready + " of " + castings + " casting" +
+                (castings == 1 ? string.Empty : "s") + " ready · " +
+                (applyAllowed ? "ready to apply" : "Apply blocked (" + blockingReasons + ")");
+        }
+    }
+
     // Player-facing resource pool names.
     public static class WorkspacePoolLabels
     {
@@ -670,6 +745,10 @@ namespace KingmakerBuffPlanner.UI
         public CastingReviewStatus ReviewStatus { get; private set; }
         public WorkspaceEditingScope EditingScope { get; private set; }
         public string EditingScopeLabel { get; private set; }
+        // The selected routine as a whole (the header's gate is the
+        // routine's own), independent of the selected buff's cards.
+        public int RoutineCastingCount { get; internal set; }
+        public int RoutineReadyCount { get; internal set; }
         public IReadOnlyList<string> Diagnostics { get; private set; }
         public WorkspaceDraftView Draft { get; private set; }
 

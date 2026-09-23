@@ -105,14 +105,12 @@ namespace KingmakerBuffPlanner.UI
             WorkspaceView view = _session.BuildView(inputs);
             _session.PresentForReview(inputs);
             _headerTitle.text = "Casting Workspace — " + view.SelectedSourceCaption;
-            int ready = 0;
-            foreach (WorkspaceCastingCard card in view.Cards)
-                if (card.Readiness == ResolvedCastingReadiness.Ready) ready++;
-            // The routine's own gate: what Apply of this routine would do.
-            _headerStatus.text = _session.RoutineDisplayName(view.SelectedRoutineId) +
-                " · " + ready + " of " + view.Cards.Count + " castings ready · " +
-                (view.SelectedRoutineGate.Allowed ? "ready to apply"
-                    : "Apply blocked (" + view.SelectedRoutineGate.BlockingReasons.Count + ")");
+            // The routine's own gate and counts: what Apply of this routine
+            // would do, whichever buff is selected below.
+            _headerStatus.text = WorkspaceHeaderText.Describe(
+                _session.RoutineDisplayName(view.SelectedRoutineId), view.RoutineCastingCount,
+                view.RoutineReadyCount, view.SelectedRoutineGate.Allowed,
+                view.SelectedRoutineGate.BlockingReasons.Count);
             _scopeLabel.text = view.EditingScopeLabel;
             _lastView = view;
             if (!_importAnnounced && _footerResult != null)
@@ -336,14 +334,17 @@ namespace KingmakerBuffPlanner.UI
             RectTransform searchRect = RectOf(_buffSearch);
             KingmakerUiFactory.SetAnchors(searchRect, 0.55f, 1f, 1f, 1f);
             searchRect.pivot = new Vector2(0.5f, 1f);
-            searchRect.sizeDelta = new Vector2(0f, 22f);
+            searchRect.sizeDelta = new Vector2(0f, BuffBarHeight);
             searchRect.anchoredPosition = Vector2.zero;
+            ScrollRect buffScroll = _buffGridContent.GetComponentInParent<ScrollRect>();
+            if (buffScroll != null)
+                KingmakerUiFactory.SetAnchors(RectOf(buffScroll), 0f, 0f, 1f, 1f, 0f, 0f, 0f, BuffBarHeight + 4f);
             foreach (Text text in _buffSearch.GetComponentsInChildren<Text>(true))
             {
                 // The factory's 17px text with 5px insets was clipped to
                 // nothing in a 22px field (live frame qual-205126).
-                text.fontSize = 13;
-                text.resizeTextMaxSize = 13;
+                text.fontSize = 14;
+                text.resizeTextMaxSize = 14;
                 text.verticalOverflow = VerticalWrapMode.Overflow;
                 KingmakerUiFactory.Stretch(text.rectTransform, 8, 6, 1, 1);
             }
@@ -384,13 +385,14 @@ namespace KingmakerBuffPlanner.UI
                 RectTransform tabRect = RectOf(tab);
                 KingmakerUiFactory.SetAnchors(tabRect, tabLeft, 1f, tabLeft + 0.1f, 1f);
                 tabRect.pivot = new Vector2(0.5f, 1f);
-                tabRect.sizeDelta = new Vector2(0f, 22f);
+                tabRect.sizeDelta = new Vector2(0f, BuffBarHeight);
                 tabRect.anchoredPosition = Vector2.zero;
                 foreach (Text text in tab.GetComponentsInChildren<Text>(true))
                 {
-                    // 22px tabs clip the factory's 17px text (as the search did).
-                    text.fontSize = 13;
-                    text.resizeTextMaxSize = 13;
+                    // Thin 22px tabs with 13px text read as squashed bars
+                    // (live frame casting-ws-qual-20260923-q2-03).
+                    text.fontSize = 14;
+                    text.resizeTextMaxSize = 14;
                     text.verticalOverflow = VerticalWrapMode.Overflow;
                 }
                 StyleTab(tab, captured == _sourceCategory);
@@ -438,7 +440,7 @@ namespace KingmakerBuffPlanner.UI
                 {
                     AuthoringEditResult result = _session.AddCastingFromDraft(_inputs());
                     if (!result.Applied)
-                        _footerResult.text = "Add refused: " + result.Reason;
+                        _footerResult.text = "Add refused: " + WorkspaceRefusalText.Describe(result.Reason);
                     RefreshView();
                 }));
             PinToTitleRow(RectOf(_pinnedAdd));
@@ -453,6 +455,8 @@ namespace KingmakerBuffPlanner.UI
         }
 
         private const float PageInset = 44f;
+        // Height of the buff lane's source tabs and search field.
+        private const float BuffBarHeight = 26f;
 
         private static void PinToTitleRow(RectTransform rect)
         {
@@ -1242,7 +1246,7 @@ namespace KingmakerBuffPlanner.UI
         private void SurfaceRefusal(AuthoringEditResult result, string action)
         {
             if (result != null && !result.Applied)
-                _footerResult.text = action + " refused: " + result.Reason;
+                _footerResult.text = action + " refused: " + WorkspaceRefusalText.Describe(result.Reason);
             else if (result != null && result.Applied &&
                 !string.IsNullOrEmpty(result.Reason))
                 _footerResult.text = action + ": " + result.Reason;
@@ -1252,7 +1256,7 @@ namespace KingmakerBuffPlanner.UI
         {
             AuthoringEditResult result = _session.UpdateFocusedCasting(replacement);
             if (!result.Applied)
-                _footerResult.text = "Edit refused: " + result.Reason;
+                _footerResult.text = "Edit refused: " + WorkspaceRefusalText.Describe(result.Reason);
             RefreshView();
         }
 

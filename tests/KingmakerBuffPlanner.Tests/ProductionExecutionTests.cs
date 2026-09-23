@@ -55,6 +55,7 @@ namespace KingmakerBuffPlanner.Tests
             Run("casting-world-clock-keeps-fractions-and-skips-held-time", TestCastingWorldClock);
             Run("buff-grid-source-type-tabs", () => TestBuffGridSourceTypeTabs(root));
             Run("player-facing-resource-labels", () => TestPlayerFacingResourceLabels(root));
+            Run("player-facing-refusals-and-routine-header", () => TestPlayerFacingRefusalsAndHeader(root));
             Run("qualification-allowance-parsing", TestQualificationAllowanceParsing);
             Run("qualification-recipe-selection", TestQualificationRecipeSelection);
             Run("qualification-forecast-and-boundary", TestQualificationForecastAndBoundary);
@@ -1629,6 +1630,50 @@ namespace KingmakerBuffPlanner.Tests
                 view.Draft.Sources.Any(source => !source.SourceKinds.SequenceEqual(
                     new[] { SourceKind.Spellbook })))
                 throw new InvalidOperationException("The session did not derive the spellbook kind.");
+        }
+
+        // Refusals tell the player what to do next and the header counts the
+        // routine as a whole; no internal code or casting id reaches them
+        // (live frames casting-ws-qual-20260923-q2-03).
+        private static void TestPlayerFacingRefusalsAndHeader(string root)
+        {
+            var expected = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                { "draft-invalid:A direct-target casting requires its direct target.", "choose who receives this casting first." },
+                { "draft-ability-unresolved:no-caster-selected", "choose who casts it first." },
+                { "draft-ability-unresolved:no-provider-for-source-and-caster", "that character cannot cast this buff." },
+                { "no-editing-focus", "select a casting card (Edit) first." },
+                { "ready-requires-import-review:cast-4", "review what the import changed before marking it Ready." },
+                { "state-unchanged:cast-2", "it already is." },
+                { "casting-id-collision:cast-3", "casting id collision." }
+            };
+            foreach (KeyValuePair<string, string> pair in expected)
+                if (WorkspaceRefusalText.Describe(pair.Key) != pair.Value)
+                    throw new InvalidOperationException("Refusal text for " + pair.Key + " is " +
+                        WorkspaceRefusalText.Describe(pair.Key));
+            if (WorkspaceHeaderText.Describe("Long", 0, 0, true, 0) != "Long · no castings yet" ||
+                WorkspaceHeaderText.Describe("Long", 3, 2, false, 1) != "Long · 2 of 3 castings ready · Apply blocked (1)" ||
+                WorkspaceHeaderText.Describe("Short", 1, 1, true, 0) != "Short · 1 of 1 casting ready · ready to apply")
+                throw new InvalidOperationException("The routine header text is wrong.");
+            // The session counts the routine, whichever buff is selected, and
+            // an Add without a recipient explains itself in words.
+            var session = new CastingWorkspaceSession(Path.Combine(root, "header"), "campaign-header");
+            var free = QualificationInputs(true, true, null);
+            Assert(AddDraftCasting(session, free, "unit-cleric", "unit-t1").Applied);
+            Assert(AddDraftCasting(session, free, "unit-wizard", "unit-t2").Applied);
+            WorkspaceView view = session.BuildView(free);
+            if (view.RoutineCastingCount != 2 || view.RoutineReadyCount != 2)
+                throw new InvalidOperationException("The routine counts are wrong: " + view.RoutineCastingCount +
+                    "/" + view.RoutineReadyCount);
+            session.Draft.SourceId = "source-bulls";
+            session.Draft.TargetMode = CastingTargetMode.DirectTarget;
+            session.ChooseDraftCaster("unit-cleric");
+            session.Draft.DirectTargetUnitId = null;
+            AuthoringEditResult refused = session.AddCastingFromDraft(free);
+            if (refused.Applied || WorkspaceRefusalText.Describe(refused.Reason).Contains(":") ||
+                WorkspaceRefusalText.Describe(refused.Reason).Contains("draft-"))
+                throw new InvalidOperationException("An Add without a recipient did not explain itself: " +
+                    refused.Reason + " -> " + WorkspaceRefusalText.Describe(refused.Reason));
         }
 
         // Players read whose resource and what kind, never an internal pool
