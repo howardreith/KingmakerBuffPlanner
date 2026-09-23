@@ -512,17 +512,120 @@ namespace KingmakerBuffPlanner.RuntimeTesting
 
         private void RegisterCompletionCallback()
         {
+            if (!RegisterAfterLoad(new Action(OnLoadCompleted))) return;
+            _callbackRegistered = true;
+            Add("completion-callback-registered", "read-only callback registration");
+        }
+
+        private static bool RegisterAfterLoad(Action callback)
+        {
             object manager = Game.Instance == null
                 ? null : MainMenuLoadContracts.ReadMember(Game.Instance, "SaveManager");
-            if (manager == null) return;
+            if (manager == null) return false;
             MethodInfo method = manager.GetType().GetMethod("AddCallbackAfterLoad",
                 BindingFlags.Instance | BindingFlags.Public, null,
                 new[] { typeof(Action) }, null);
             if (method == null)
                 throw new MissingMethodException("SaveManager.AddCallbackAfterLoad(Action)");
-            method.Invoke(manager, new object[] { new Action(OnLoadCompleted) });
-            _callbackRegistered = true;
-            Add("completion-callback-registered", "read-only callback registration");
+            method.Invoke(manager, new object[] { callback });
+            return true;
+        }
+
+        // Mission section 8 (save/reload): the SAME working descriptor is
+        // loaded again from inside the campaign through the game's own
+        // Game.LoadGame, as a player's in-game load would. A native load
+        // bumps the header's load counter and commits it, so the reload runs
+        // under a fresh read-only saver exactly like the first load: one
+        // header update and one commit, both suppressed, and the native
+        // saver restored afterwards. Only the descriptor the guarded
+        // main-menu chain proved is ever passed.
+        internal const int ReloadBudgetSeconds = 240;
+        private GuardedReadOnlySaver _reloadSaver;
+        private bool _reloadStarted;
+        private bool _reloadCallback;
+        private bool _reloadWrongThread;
+        private bool _reloadComplete;
+        private long _reloadStartedMillis;
+        private int _reloadLastFrame = -1;
+        private int _reloadStableFingerprints;
+        private string _reloadLastFingerprint = "";
+
+        internal string ReloadEvidence { get; private set; }
+
+        internal void BeginGuardedReload()
+        {
+            if (!IsComplete)
+                throw new InvalidOperationException("The guarded first load has not completed.");
+            if (_reloadStarted)
+                throw new InvalidOperationException("The guarded reload was already started.");
+            var descriptor = _workingDescriptor as Kingmaker.EntitySystem.Persistence.SaveInfo;
+            if (descriptor == null || Game.Instance == null)
+                throw new InvalidOperationException("No proven working descriptor to reload.");
+            _reloadStarted = true;
+            _reloadStartedMillis = _elapsed.ElapsedMilliseconds;
+            _reloadSaver = new GuardedReadOnlySaver(descriptor,
+                detail => Add("reload-read-only-native-save-load", detail));
+            descriptor.Saver = _reloadSaver;
+            Game.Instance.LoadGame(descriptor);
+            Add("reload-load-game-invoked", "Game.LoadGame(exact working descriptor)");
+            if (RegisterAfterLoad(new Action(OnReloadCompleted)))
+                Add("reload-callback-registered", "read-only callback registration");
+        }
+
+        // Null while the reload is in progress; its evidence once the header
+        // protocol completed, the native saver is restored and the reloaded
+        // campaign's identity is stable over two frames. Throws on a
+        // violation or when the budget is spent.
+        internal string UpdateReload()
+        {
+            if (!_reloadStarted) return null;
+            if (_reloadComplete) return ReloadEvidence;
+            if (_reloadWrongThread)
+                throw new InvalidOperationException("The reload callback ran off the game thread.");
+            if (_elapsed.ElapsedMilliseconds - _reloadStartedMillis > ReloadBudgetSeconds * 1000L)
+                throw new TimeoutException("The guarded in-game reload did not complete within " +
+                    ReloadBudgetSeconds + " s.");
+            if (Time.frameCount == _reloadLastFrame) return null;
+            _reloadLastFrame = Time.frameCount;
+            if (_reloadSaver != null)
+            {
+                if (!_reloadSaver.Complete) return null;
+                var descriptor = (Kingmaker.EntitySystem.Persistence.SaveInfo)_workingDescriptor;
+                if (!ReferenceEquals(descriptor.Saver, _reloadSaver))
+                    throw new InvalidOperationException(
+                        "The reload's read-only header protocol did not complete exactly once.");
+                descriptor.Saver = _reloadSaver.Native;
+                _reloadSaver = null;
+                Add("reload-read-only-native-save-load-verified",
+                    "headerUpdateSuppressed=1;commitSuppressed=1;nativeDescriptorRestored=true");
+            }
+            string fingerprint = CurrentFingerprint();
+            if (fingerprint == null) return null;
+            if (string.Equals(fingerprint, _reloadLastFingerprint, StringComparison.Ordinal))
+                _reloadStableFingerprints++;
+            else
+            {
+                _reloadLastFingerprint = fingerprint;
+                _reloadStableFingerprints = 1;
+            }
+            if (_reloadStableFingerprints < 2) return null;
+            _reloadComplete = true;
+            ReloadEvidence = fingerprint + ";afterLoadCallback=" + _reloadCallback +
+                ";elapsedMs=" + (_elapsed.ElapsedMilliseconds - _reloadStartedMillis);
+            Add("reload-stable-fingerprint", ReloadEvidence);
+            WriteEventsEvidence();
+            return ReloadEvidence;
+        }
+
+        private void OnReloadCompleted()
+        {
+            if (Thread.CurrentThread.ManagedThreadId != _gameThreadId)
+            {
+                _reloadWrongThread = true;
+                return;
+            }
+            _reloadCallback = true;
+            Add("reload-after-load-callback", "SaveManager after-load callback invoked");
         }
 
         private void OnLoadCompleted()
@@ -539,9 +642,31 @@ namespace KingmakerBuffPlanner.RuntimeTesting
 
         private void PollFingerprint()
         {
+            string value = CurrentFingerprint();
+            if (value == null) return;
+            if (string.Equals(value, _lastFingerprint, StringComparison.Ordinal))
+                _stableFingerprints++;
+            else
+            {
+                _lastFingerprint = value;
+                _stableFingerprints = 1;
+            }
+            if (_stableFingerprints == 2)
+            {
+                _fingerprintSequence = _events.Count + 1;
+                FingerprintEvidence = value;
+                Add("stable-post-load-fingerprint", value);
+                CompleteLoad();
+            }
+        }
+
+        // The loaded campaign's identity; null before a player exists.
+        // Throws when it is not the expected working campaign.
+        private string CurrentFingerprint()
+        {
             object player = Game.Instance == null
                 ? null : MainMenuLoadContracts.ReadMember(Game.Instance, "Player");
-            if (player == null) return;
+            if (player == null) return null;
             string gameId = MainMenuLoadContracts.Read(player, "GameId");
             object area = MainMenuLoadContracts.ReadMember(Game.Instance, "CurrentlyLoadedArea");
             object scene = MainMenuLoadContracts.ReadMember(Game.Instance, "CurrentScene");
@@ -557,20 +682,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 partyCount <= 0)
                 throw new InvalidOperationException(
                     "Loaded campaign fingerprint mismatch: " + value + ".");
-            if (string.Equals(value, _lastFingerprint, StringComparison.Ordinal))
-                _stableFingerprints++;
-            else
-            {
-                _lastFingerprint = value;
-                _stableFingerprints = 1;
-            }
-            if (_stableFingerprints == 2)
-            {
-                _fingerprintSequence = _events.Count + 1;
-                FingerprintEvidence = value;
-                Add("stable-post-load-fingerprint", value);
-                CompleteLoad();
-            }
+            return value;
         }
 
         private void CompleteLoad()

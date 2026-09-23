@@ -184,10 +184,22 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         {
             return string.Equals(scenario, "live-workspace-qual",
                 StringComparison.Ordinal) ||
+                IsReloadScenario(scenario) ||
                 IsManualWorkspaceScenario(scenario) ||
                 IsProbeScenario(scenario) ||
                 IsInspectionScenario(scenario) ||
                 IsQualificationScenario(scenario);
+        }
+
+        // The workspace scenario plus an in-game reload (mission section 8,
+        // save/reload): after the saved close and reopen, the planner is
+        // closed, the exact WORKING save is loaded again through the game's
+        // own Game.LoadGame under the guarded read-only loader, and the
+        // reopened planner must show the saved plan for the same campaign
+        // with one event subscription, one HUD root and no casting run.
+        internal static bool IsReloadScenario(string scenario)
+        {
+            return string.Equals(scenario, "live-workspace-reload", StringComparison.Ordinal);
         }
 
         // Guarded casting qualification through the PRODUCTION path.

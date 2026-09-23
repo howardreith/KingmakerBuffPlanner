@@ -25,6 +25,9 @@ namespace KingmakerBuffPlanner.UI
     {
         private const string ObjectName = "KingmakerBuffPlanner.UiRoot";
         private static BuffPlannerUiRoot _instance;
+        // Live EventBus subscriptions held by planner roots (reload evidence:
+        // exactly one across area and save loads).
+        private static int _activeEventSubscriptions;
         private PlannerUiSession _session;
         private ModLog _log;
         private string _modPath;
@@ -59,6 +62,8 @@ namespace KingmakerBuffPlanner.UI
             new HudInstallInvalidationGate();
         private int _tickCount;
         private int _lifecycleSignalCount;
+        private readonly Dictionary<string, int> _lifecycleSignalsByName =
+            new Dictionary<string, int>(StringComparer.Ordinal);
         private int _lastLoggedHudIdentity = int.MinValue;
         private bool _lastLoggedHudActive;
         private int _hudInstallExceptionCount;
@@ -165,6 +170,35 @@ namespace KingmakerBuffPlanner.UI
         {
             get { return _instance == null || _instance._castingHost == null
                 ? 0 : _instance._castingHost.StartedRuns; }
+        }
+
+        // Reload evidence (mission section 8): live EventBus subscriptions,
+        // lifecycle signals by name, whether the HUD is installed, and how
+        // many HUD roots exist in the loaded scenes.
+        internal static int ActiveEventSubscriptionsForRuntime
+        {
+            get { return _activeEventSubscriptions; }
+        }
+
+        internal static int LifecycleSignalsForRuntime(string name)
+        {
+            int seen;
+            return _instance != null && _instance._lifecycleSignalsByName.TryGetValue(name, out seen) ? seen : 0;
+        }
+
+        internal static bool IsHudInstalledForRuntime
+        {
+            get { return _instance != null && _instance._hud != null && _instance._hud.IsInstalled; }
+        }
+
+        internal static int HudRootCountForRuntime
+        {
+            get
+            {
+                return UnityEngine.Object.FindObjectsOfType<RectTransform>().Count(rect =>
+                    rect != null && string.Equals(rect.name,
+                        BuffPlannerHudButtonController.RootName, StringComparison.Ordinal));
+            }
         }
 
         internal static string CastingDispatchDispositionForRuntime
@@ -1045,6 +1079,7 @@ namespace KingmakerBuffPlanner.UI
             try
             {
                 _eventSubscription = EventBus.Subscribe((object)this);
+                if (_eventSubscription != null) _activeEventSubscriptions++;
                 _log.Info("[KBP-BOOT] EventBus subscribed;scene=true;areaStages=true;" +
                     "areaActivation=true;controller=" + gameObject.GetInstanceID() + ".");
             }
@@ -1643,6 +1678,8 @@ namespace KingmakerBuffPlanner.UI
         private void SignalLifecycle(string name, bool unloading)
         {
             _lifecycleSignalCount++;
+            int seen;
+            _lifecycleSignalsByName[name] = _lifecycleSignalsByName.TryGetValue(name, out seen) ? seen + 1 : 1;
             if (unloading || !_enabled) SuspendHudInstall(name);
             else RequestHudInstall(name, true);
             _log.Info("[KBP-BOOT] lifecycle callback;name=" + name +
@@ -1746,6 +1783,7 @@ namespace KingmakerBuffPlanner.UI
             {
                 _eventSubscription.Dispose();
                 _eventSubscription = null;
+                _activeEventSubscriptions--;
                 _log.Info("[KBP-BOOT] EventBus unsubscribed;controller=" +
                     gameObject.GetInstanceID() + ".");
             }

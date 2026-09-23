@@ -55,6 +55,7 @@ namespace KingmakerBuffPlanner.Tests
             Run("casting-world-clock-keeps-fractions-and-skips-held-time", TestCastingWorldClock);
             Run("buff-grid-source-type-tabs", () => TestBuffGridSourceTypeTabs(root));
             Run("player-facing-resource-labels", () => TestPlayerFacingResourceLabels(root));
+            Run("in-game-reload-is-guarded", TestInGameReloadIsGuarded);
             Run("player-facing-refusals-and-routine-header", () => TestPlayerFacingRefusalsAndHeader(root));
             Run("qualification-allowance-parsing", TestQualificationAllowanceParsing);
             Run("qualification-recipe-selection", TestQualificationRecipeSelection);
@@ -1150,7 +1151,8 @@ namespace KingmakerBuffPlanner.Tests
             {
                 new KeyValuePair<string, string>("live-advanced-inspect", "KBP_ADVANCED"),
                 new KeyValuePair<string, string>("live-advanced-inspect", "KBP_AUTOMATION"),
-                new KeyValuePair<string, string>("live-workspace-qual", "KBP_ADVANCED")
+                new KeyValuePair<string, string>("live-workspace-qual", "KBP_ADVANCED"),
+                new KeyValuePair<string, string>("live-workspace-reload", "KBP_AUTOMATION")
             };
             foreach (KeyValuePair<string, string> item in accepted)
             {
@@ -1171,6 +1173,8 @@ namespace KingmakerBuffPlanner.Tests
                     set("live-cast-probe", "KBP_ADVANCED", "KBP_ADVANCED")),
                 new KeyValuePair<string, Action<Dictionary<string, object>>>("advanced-bootstrap",
                     set("live-ui-bootstrap", "KBP_ADVANCED", "KBP_ADVANCED")),
+                new KeyValuePair<string, Action<Dictionary<string, object>>>("advanced-reload",
+                    set("live-workspace-reload", "KBP_ADVANCED", "KBP_ADVANCED")),
                 new KeyValuePair<string, Action<Dictionary<string, object>>>("mixed-pair",
                     set("live-advanced-inspect", "KBP_ADVANCED", "KBP_AUTOMATION")),
                 new KeyValuePair<string, Action<Dictionary<string, object>>>("unknown-family",
@@ -1630,6 +1634,65 @@ namespace KingmakerBuffPlanner.Tests
                 view.Draft.Sources.Any(source => !source.SourceKinds.SequenceEqual(
                     new[] { SourceKind.Spellbook })))
                 throw new InvalidOperationException("The session did not derive the spellbook kind.");
+        }
+
+        // Mission section 8 (save/reload): the reload scenario loads only the
+        // descriptor the guarded main-menu chain proved, under a fresh
+        // read-only saver installed BEFORE the only Game.LoadGame call, and
+        // restores the native saver only after the header protocol
+        // completed; the host reloads only with the planner closed and
+        // judges the reopened plan and ownership (source checks: the loader
+        // and host are game-bound).
+        private static void TestInGameReloadIsGuarded()
+        {
+            if (!RuntimeTestProtocol.IsReloadScenario("live-workspace-reload") ||
+                !RuntimeTestProtocol.IsWorkspaceScenario("live-workspace-reload") ||
+                RuntimeTestProtocol.IsNoInputWorkspaceScenario("live-workspace-reload") ||
+                RuntimeTestProtocol.IsAdvancedFamilyScenario("live-workspace-reload") ||
+                RuntimeTestProtocol.IsReloadScenario("live-workspace-qual"))
+                throw new InvalidOperationException("The reload scenario classification is wrong.");
+            DirectoryInfo directory = new DirectoryInfo(Environment.CurrentDirectory);
+            while (directory != null && !File.Exists(Path.Combine(directory.FullName, "KingmakerBuffPlanner.sln")))
+                directory = directory.Parent;
+            if (directory == null) throw new InvalidOperationException("Repository root was not discoverable.");
+            string testing = Path.Combine(directory.FullName, "src", "KingmakerBuffPlanner", "RuntimeTesting");
+            string loader = File.ReadAllText(Path.Combine(testing, "LiveCampaignSaveLoader.cs"));
+            string begin = SourceBlock(loader, "internal void BeginGuardedReload()");
+            int guard = begin == null ? -1 : begin.IndexOf("descriptor.Saver = _reloadSaver;", StringComparison.Ordinal);
+            int load = begin == null ? -1 : begin.IndexOf("Game.Instance.LoadGame(descriptor);", StringComparison.Ordinal);
+            if (begin == null || !begin.Contains("if (!IsComplete)") || !begin.Contains("if (_reloadStarted)") ||
+                !begin.Contains("var descriptor = _workingDescriptor as Kingmaker.EntitySystem.Persistence.SaveInfo;") ||
+                !begin.Contains("_reloadSaver = new GuardedReadOnlySaver(descriptor,") ||
+                guard < 0 || load < 0 || guard > load)
+                throw new InvalidOperationException("The in-game reload is not guarded by the read-only saver.");
+            string update = SourceBlock(loader, "internal string UpdateReload()");
+            int complete = update == null ? -1 : update.IndexOf("if (!_reloadSaver.Complete) return null;", StringComparison.Ordinal);
+            int restore = update == null ? -1 : update.IndexOf("descriptor.Saver = _reloadSaver.Native;", StringComparison.Ordinal);
+            if (update == null || complete < 0 || restore < 0 || complete > restore ||
+                !update.Contains("if (!ReferenceEquals(descriptor.Saver, _reloadSaver))") ||
+                !update.Contains("string fingerprint = CurrentFingerprint();"))
+                throw new InvalidOperationException("The reload restores the native saver before its protocol completed.");
+            int loads = 0;
+            foreach (string file in Directory.GetFiles(Path.Combine(directory.FullName, "src", "KingmakerBuffPlanner"),
+                "*.cs", SearchOption.AllDirectories))
+                if (!file.Contains(Path.DirectorySeparatorChar + "obj" + Path.DirectorySeparatorChar))
+                    loads += Occurrences(File.ReadAllText(file), "Game.Instance.LoadGame(");
+            if (loads != 1)
+                throw new InvalidOperationException("Game.LoadGame is called outside the guarded reload: " + loads);
+            string host = File.ReadAllText(Path.Combine(testing, "RuntimeTestHost.cs"));
+            string reload = SourceBlock(host, "if (_liveUiPhase == 80)");
+            int closed = reload == null ? -1 : reload.IndexOf("if (BuffPlannerUiRoot.IsCastingWorkspaceInputLeaseHeldForRuntime) return false;", StringComparison.Ordinal);
+            int started = reload == null ? -1 : reload.IndexOf("_liveSaveLoader.BeginGuardedReload();", StringComparison.Ordinal);
+            if (reload == null || !reload.Contains("BuffPlannerUiRoot.CloseCastingWorkspaceForRuntime();") ||
+                closed < 0 || started < 0 || closed > started ||
+                !host.Contains("_liveUiPhase = RuntimeTestProtocol.IsReloadScenario(_request.Scenario) ? 80 : 21;") ||
+                Occurrences(host, "BeginGuardedReload()") != 1)
+                throw new InvalidOperationException("The host can reload with the planner open, or outside the reload scenario.");
+            string verify = SourceBlock(host, "private string VerifyWorkspaceReload()");
+            if (verify == null || !verify.Contains("_reloadSubscriptionsBefore == 1 &&") ||
+                !verify.Contains("subscriptions == 1 && hudRoots == 1 && idle && clean;") ||
+                !verify.Contains("string.Equals(session.CampaignId, expectedGame, StringComparison.Ordinal)"))
+                throw new InvalidOperationException("The reload verification is weaker than the scenario claims.");
         }
 
         // Refusals tell the player what to do next and the header counts the
