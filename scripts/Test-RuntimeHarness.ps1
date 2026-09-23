@@ -1255,6 +1255,37 @@ try {
             -CompatibilityIdentity $inspectIdentity -EvidenceRoot $inspectRoot) -cne 'inspect-clean') {
         throw 'The completed clean inspection of the bound pair was not found.'
     }
+    # A transient sharing lock on a directory being restored is retried
+    # (live run casting-ws-import-20260923-i2-01); a lock that outlasts the
+    # attempts still fails closed, leaving the source in place.
+    if (-not ('KbpTestHold' -as [type])) {
+        Add-Type -TypeDefinition 'using System.IO; using System.Threading; public static class KbpTestHold { public static FileStream Hold(string path, int releaseAfterMs) { var stream = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.None); if (releaseAfterMs >= 0) new Thread(() => { Thread.Sleep(releaseAfterMs); stream.Dispose(); }).Start(); return stream; } }'
+    }
+    $moveRoot = Join-Path $root 'move-retry'
+    New-Item -ItemType Directory -Path (Join-Path $moveRoot 'held') -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $moveRoot 'held\file.txt') -Value 'x' -Encoding ASCII
+    [void][KbpTestHold]::Hold((Join-Path $moveRoot 'held\file.txt'), 700)
+    $attempts = Move-KbpDirectoryWithRetry -Source (Join-Path $moveRoot 'held') -Destination (Join-Path $moveRoot 'moved') -Attempts 10 -DelayMilliseconds 300
+    if (-not (Test-Path -LiteralPath (Join-Path $moveRoot 'moved\file.txt')) -or [int]$attempts -lt 2) {
+        throw "A transiently held directory was not moved after a retry (attempts=$attempts)."
+    }
+    New-Item -ItemType Directory -Path (Join-Path $moveRoot 'stuck') -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $moveRoot 'stuck\file.txt') -Value 'x' -Encoding ASCII
+    $stuck = [KbpTestHold]::Hold((Join-Path $moveRoot 'stuck\file.txt'), -1)
+    $failedClosed = $false
+    try { Move-KbpDirectoryWithRetry -Source (Join-Path $moveRoot 'stuck') -Destination (Join-Path $moveRoot 'stuck-moved') -Attempts 3 -DelayMilliseconds 100 | Out-Null }
+    catch { $failedClosed = $true }
+    finally { $stuck.Dispose() }
+    if (-not $failedClosed -or -not (Test-Path -LiteralPath (Join-Path $moveRoot 'stuck\file.txt')) -or
+        (Test-Path -LiteralPath (Join-Path $moveRoot 'stuck-moved'))) {
+        throw 'A persistently held directory did not fail closed in place.'
+    }
+    $commonText = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'RuntimeHarness.Common.ps1') -Raw
+    if (([regex]::Matches($commonText, '\[void\]\(Move-KbpDirectoryWithRetry -Source ')).Count -ne 2 -or
+        $commonText -match 'Move-Item -LiteralPath \$mods -Destination \$state\.stagedQuarantine' -or
+        $commonText -match 'Move-Item -LiteralPath \$state\.originalBackup -Destination \$mods') {
+        throw 'Restoration does not move the Mods folders through the bounded retry.'
+    }
     # Review of e7c5207..f7726c9, P3-5: the launcher's own completion
     # computation (not a hand-built record) decides completeness, reads
     # restoration from the transaction state, and round-trips through the

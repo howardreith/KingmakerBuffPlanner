@@ -430,6 +430,33 @@ function Assert-KbpExternallyStagedLiveRestored($State, [string]$ModsPath) {
     $State.externallyStagedModsRestored = $true
 }
 
+# A directory rename on one volume either happens or does not. Right after
+# Kingmaker exits, a file the run wrote can still be held open for a moment
+# (live run casting-ws-import-20260923-i2-01: "Access to the path ...\Mods
+# is denied"), so a sharing failure is retried briefly; any other failure,
+# an occupied destination or a lock that outlasts the attempts still throws
+# and restoration fails closed as before.
+function Move-KbpDirectoryWithRetry {
+    param(
+        [Parameter(Mandatory = $true)][string]$Source,
+        [Parameter(Mandatory = $true)][string]$Destination,
+        [int]$Attempts = 10,
+        [int]$DelayMilliseconds = 3000)
+    for ($attempt = 1; ; $attempt++) {
+        try {
+            Move-Item -LiteralPath $Source -Destination $Destination -ErrorAction Stop
+            return $attempt
+        }
+        catch {
+            $transient = $_.Exception -is [System.UnauthorizedAccessException] -or
+                $_.Exception -is [System.IO.IOException]
+            if (-not $transient -or $attempt -ge $Attempts -or (Test-Path -LiteralPath $Destination) -or
+                -not (Test-Path -LiteralPath $Source)) { throw }
+            Start-Sleep -Milliseconds $DelayMilliseconds
+        }
+    }
+}
+
 function Restore-KbpRuntimeTransaction {
     param(
         [Parameter(Mandatory = $true)][string]$RunId,
@@ -473,7 +500,7 @@ function Restore-KbpRuntimeTransaction {
                 $currentStaged = @(Get-KbpDirectoryManifest $mods)
                 $state.stagedMutationObserved = -not (Test-KbpManifestEqual @($state.stagedManifest) $currentStaged)
                 if ($state.stagedMutationObserved) { $state.observedStagedManifest = $currentStaged }
-                Move-Item -LiteralPath $mods -Destination $state.stagedQuarantine
+                [void](Move-KbpDirectoryWithRetry -Source $mods -Destination $state.stagedQuarantine)
             }
         }
 
@@ -483,7 +510,7 @@ function Restore-KbpRuntimeTransaction {
                     throw 'Original Mods backup is missing.'
                 }
                 if (Test-Path -LiteralPath $mods) { throw 'Mods destination is occupied during restore.' }
-                Move-Item -LiteralPath $state.originalBackup -Destination $mods
+                [void](Move-KbpDirectoryWithRetry -Source $state.originalBackup -Destination $mods)
                 $restoredManifest = @(Get-KbpDirectoryManifest $mods)
                 if (-not (Test-KbpManifestEqual @($state.originalManifest) $restoredManifest)) {
                     throw 'Restored Mods manifest/hash mismatch.'
