@@ -120,6 +120,19 @@ namespace KingmakerBuffPlanner.UI
             get { return _instance != null && _instance._plannerMode == PlannerMode.CastingFirst; }
         }
 
+        // Qualification seams: fresh discovery exactly as Apply uses it, and
+        // the production executor for given execution settings.
+        internal static CastingWorkspaceInputs CastingWorkspaceFreshInputsForRuntime()
+        {
+            return _instance == null ? null : _instance.BuildFreshCastingWorkspaceInputs();
+        }
+
+        internal static ICastExecutor CreateCastingExecutorForRuntime(ExecutionProfile settings)
+        {
+            if (_instance == null) throw new InvalidOperationException("UI root is absent.");
+            return _instance.CreateCastingExecutor(settings ?? ExecutionProfile.Default());
+        }
+
         // Runtime evidence: how many production casting runs started in
         // this session, and the current dispatch disposition.
         internal static int CastingRunsStartedForRuntime

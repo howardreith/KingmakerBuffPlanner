@@ -606,6 +606,35 @@ function Get-KbpProbeAllowanceBuildRefusal {
     return $null
 }
 
+# Casting-qualification allowance (schema 3) against THIS build, before any
+# deployment: run id, commit, package, DLL, MVID, recipe and a 1..24
+# submission budget. The host re-parses it strictly and re-measures the
+# loaded identity; the forecast projections are checked in game.
+function Get-KbpQualificationAllowanceBuildRefusal {
+    param([string]$AllowanceJson, [string]$RunId, $BuildManifest)
+    try { $allowance = $AllowanceJson | ConvertFrom-Json }
+    catch { return 'unreadable' }
+    if ($null -eq $allowance) { return 'unreadable' }
+    $names = @($allowance.PSObject.Properties | ForEach-Object Name)
+    foreach ($required in @('schemaVersion', 'kind', 'runId', 'sourceCommit', 'packageSha256', 'dllSha256',
+            'assemblyMvid', 'fixtureGameId', 'recipe', 'approvedProjectionIds', 'maximumNativeSubmissions',
+            'approvedBy', 'authority')) {
+        if ($names -cnotcontains $required) { return "missing:$required" }
+    }
+    if ([string]$allowance.kind -cne 'kbp-casting-qualification') { return 'kind' }
+    if ([string]$allowance.runId -cne $RunId) { return 'run-id' }
+    if ([string]$allowance.sourceCommit -cne [string]$BuildManifest.commit) { return 'commit' }
+    if ([string]$allowance.packageSha256 -cne [string]$BuildManifest.packageSha256) { return 'package' }
+    if ([string]$allowance.dllSha256 -cne [string]$BuildManifest.dllSha256) { return 'dll' }
+    if ([string]$allowance.assemblyMvid -cne [string]$BuildManifest.assemblyMvid) { return 'mvid' }
+    if ([string]$allowance.recipe -cne 'zero-cost-mixed') { return 'recipe' }
+    if (-not ($allowance.maximumNativeSubmissions -is [int] -or $allowance.maximumNativeSubmissions -is [long]) -or
+        [int]$allowance.maximumNativeSubmissions -lt 1 -or [int]$allowance.maximumNativeSubmissions -gt 24) {
+        return 'submissions'
+    }
+    return $null
+}
+
 # Advanced-copy binding: the pair found by name must be exactly the pair the
 # guarded bootstrap published - the immutable BASELINE bytes, the same
 # WORKING file and the same campaign - from exactly one completed advanced

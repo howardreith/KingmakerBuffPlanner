@@ -54,6 +54,7 @@ namespace KingmakerBuffPlanner.Tests
             Run("qualification-driver-end-to-end", () => TestQualificationDriverEndToEnd(root));
             Run("qualification-driver-refusals-and-deadline",
                 () => TestQualificationDriverRefusalsAndDeadline(root));
+            Run("qualification-scenario-requests", () => TestQualificationScenarioRequests(root));
             // Last: it takes the process-wide runtime-test lock.
             Run("production-execution-wiring-and-session-lock", TestProductionExecutionWiring);
         }
@@ -1536,6 +1537,69 @@ namespace KingmakerBuffPlanner.Tests
             if (!deadline.Completed || slow.TerminalReason != "qualification-deadline" ||
                 slow.Violations().All(value => !value.StartsWith("terminal:", StringComparison.Ordinal)))
                 throw new InvalidOperationException("The qualification deadline did not end the run.");
+        }
+
+        // The qualification scenarios: no-input workspace scenarios, the
+        // allowance only on the casting one, instant only, automation only.
+        private static void TestQualificationScenarioRequests(string root)
+        {
+            if (!RuntimeTestProtocol.IsQualificationScenario("live-cast-qual-select") ||
+                !RuntimeTestProtocol.IsCastingQualificationScenario("live-cast-qual") ||
+                RuntimeTestProtocol.IsCastingQualificationScenario("live-cast-qual-select") ||
+                !RuntimeTestProtocol.IsNoInputWorkspaceScenario("live-cast-qual") ||
+                !RuntimeTestProtocol.IsWorkspaceScenario("live-cast-qual-select") ||
+                RuntimeTestProtocol.IsAdvancedFamilyScenario("live-cast-qual") ||
+                RuntimeTestProtocol.IsProbeScenario("live-cast-qual"))
+                throw new InvalidOperationException("Qualification scenario classification is wrong.");
+            Func<string, string, bool, string, Action<Dictionary<string, object>>> set =
+                (scenario, family, allowance, mode) => o =>
+                {
+                    o["scenario"] = scenario;
+                    var parameters = new Dictionary<string, object>
+                    {
+                        { "workingSaveName", family + "_WORKING" },
+                        { "workingFileName", "Manual_305_" + family + "_WORKING.zks" },
+                        { "workingSha256", new string('a', 64) },
+                        { "baselineSaveName", family + "_BASELINE" },
+                        { "baselineFileName", "Manual_304_" + family + "_BASELINE.zks" },
+                        { "baselineSha256", new string('b', 64) },
+                        { "expectedGameName", "Hedwirg" },
+                        { "expectedGameId", "df33d1ff-4ec8-4707-bfa0-5e059bf9a049" },
+                        { "executionMode", mode }
+                    };
+                    if (allowance) parameters["qualificationAllowance"] = "{}";
+                    o["parameters"] = parameters;
+                };
+            var accepted = new Dictionary<string, Action<Dictionary<string, object>>>
+            {
+                { "select", set("live-cast-qual-select", "KBP_AUTOMATION", false, "instant") },
+                { "cast-without-allowance", set("live-cast-qual", "KBP_AUTOMATION", false, "instant") },
+                { "cast-with-allowance", set("live-cast-qual", "KBP_AUTOMATION", true, "instant") }
+            };
+            var refused = new Dictionary<string, Action<Dictionary<string, object>>>
+            {
+                { "select-with-allowance", set("live-cast-qual-select", "KBP_AUTOMATION", true, "instant") },
+                { "animated", set("live-cast-qual", "KBP_AUTOMATION", true, "animated") },
+                { "advanced-family", set("live-cast-qual", "KBP_ADVANCED", true, "instant") },
+                { "allowance-on-workspace", set("live-workspace-qual", "KBP_AUTOMATION", true, "instant") }
+            };
+            string rejection;
+            foreach (KeyValuePair<string, Action<Dictionary<string, object>>> item in accepted)
+            {
+                string path = WriteRequest(root, "qual-ok-" + item.Key, item.Value);
+                if (ReadProtocol(new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path },
+                        out rejection) == null || rejection.Length != 0)
+                    throw new InvalidOperationException("A valid qualification request was refused: " +
+                        item.Key + ":" + rejection);
+            }
+            foreach (KeyValuePair<string, Action<Dictionary<string, object>>> item in refused)
+            {
+                string path = WriteRequest(root, "qual-bad-" + item.Key, item.Value);
+                if (ReadProtocol(new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path },
+                        out rejection) != null || string.IsNullOrEmpty(rejection))
+                    throw new InvalidOperationException("An invalid qualification request was accepted: " +
+                        item.Key);
+            }
         }
     }
 }

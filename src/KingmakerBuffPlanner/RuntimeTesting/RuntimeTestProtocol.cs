@@ -186,8 +186,28 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 StringComparison.Ordinal) ||
                 IsManualWorkspaceScenario(scenario) ||
                 IsProbeScenario(scenario) ||
-                IsInspectionScenario(scenario);
+                IsInspectionScenario(scenario) ||
+                IsQualificationScenario(scenario);
         }
+
+        // Guarded casting qualification through the PRODUCTION path.
+        // "live-cast-qual-select" selects the recipe and forecasts every
+        // step projection without constructing any boundary;
+        // "live-cast-qual" additionally requires the run-bound schema-3
+        // allowance (qualificationAllowance parameter) naming exactly those
+        // projections, and is the only other path that can submit casts.
+        internal static bool IsQualificationScenario(string scenario)
+        {
+            return string.Equals(scenario, "live-cast-qual-select", StringComparison.Ordinal) ||
+                IsCastingQualificationScenario(scenario);
+        }
+
+        internal static bool IsCastingQualificationScenario(string scenario)
+        {
+            return string.Equals(scenario, "live-cast-qual", StringComparison.Ordinal);
+        }
+
+        internal const int QualificationRunDeadlineSeconds = 240;
 
         // Read-only inspection of a loaded campaign copy (the advanced-copy
         // family first; the automation fixture is its smoke test): opens the
@@ -230,7 +250,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         internal static bool IsNoInputWorkspaceScenario(string scenario)
         {
             return IsManualWorkspaceScenario(scenario) || IsProbeScenario(scenario) ||
-                IsInspectionScenario(scenario);
+                IsInspectionScenario(scenario) || IsQualificationScenario(scenario);
         }
 
         internal const int ProbeRunDeadlineSeconds = 60;
@@ -340,6 +360,19 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             bool hasAllowance = request.Parameters.ContainsKey("probeAllowance");
             if (hasAllowance && !IsCastingProbeScenario(request.Scenario))
                 throw new InvalidDataException("probe-allowance-only-with-casting-probe");
+            bool hasQualification = request.Parameters.ContainsKey("qualificationAllowance");
+            if (hasQualification && !IsCastingQualificationScenario(request.Scenario))
+                throw new InvalidDataException("qualification-allowance-only-with-casting-qualification");
+            if (IsQualificationScenario(request.Scenario))
+            {
+                if (hasQualification && !(request.Parameters["qualificationAllowance"] is string))
+                    throw new InvalidDataException("qualification-allowance-type");
+                ValidateLiveSaveParameters(request, 9 + (hasQualification ? 1 : 0));
+                if (!string.Equals(request.Parameters["executionMode"] as string, "instant",
+                        StringComparison.Ordinal))
+                    throw new InvalidDataException("qualification-execution-mode-instant-only");
+                return;
+            }
             if (IsProbeScenario(request.Scenario))
             {
                 if (hasAllowance && !(request.Parameters["probeAllowance"] is string))

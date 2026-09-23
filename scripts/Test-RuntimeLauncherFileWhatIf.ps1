@@ -235,4 +235,58 @@ foreach ($case in $familyCases) {
         throw "Advanced family case $($case.Name) was not refused as expected.: $($caseOutput -join ' ')"
     }
 }
-Write-Host 'Launcher -File WhatIf purity: PASS=10 FAIL=0'
+# Layer 8 (casting qualification): the casting run needs the run-bound
+# allowance under the lab approvals directory, the selection-only run never
+# takes one, and the build binding refuses a replacement artifact, another
+# recipe or an out-of-range budget before anything is deployed.
+$outsideQualification = Join-Path ([IO.Path]::GetTempPath()) ('kbp-qual-allowance-' + [Guid]::NewGuid().ToString('N') + '.json')
+Set-Content -LiteralPath $outsideQualification -Value '{}' -Encoding UTF8
+try {
+    $qualificationCases = @(
+        @{ Name = 'qual-without-allowance'; Expect = '*requires -QualificationAllowancePath*'
+           Args = @('-Scenario', 'live-cast-qual', '-RunId', 'qual-gate-test', '-WhatIf') },
+        @{ Name = 'qual-allowance-outside-approvals'; Expect = '*qualification allowance must be an existing file under*'
+           Args = @('-Scenario', 'live-cast-qual', '-RunId', 'qual-gate-test', '-QualificationAllowancePath', $outsideQualification, '-WhatIf') },
+        @{ Name = 'qual-select-with-allowance'; Expect = '*only valid with -Scenario live-cast-qual*'
+           Args = @('-Scenario', 'live-cast-qual-select', '-QualificationAllowancePath', $outsideQualification, '-WhatIf') },
+        @{ Name = 'qual-select-animated'; Expect = '*instant mode only*'
+           Args = @('-Scenario', 'live-cast-qual-select', '-ExecutionMode', 'animated', '-WhatIf') }
+    )
+    foreach ($case in $qualificationCases) {
+        $ErrorActionPreference = 'Continue'
+        $caseArgs = $case.Args
+        $caseOutput = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $launcher @caseArgs 2>&1)
+        $caseExit = $LASTEXITCODE
+        $ErrorActionPreference = 'Stop'
+        if ($caseExit -eq 0 -or -not (@($caseOutput | Where-Object { "$_" -like $case.Expect }).Count -ge 1)) {
+            throw "Qualification gate case $($case.Name) was not refused as expected.: $($caseOutput -join ' ')"
+        }
+    }
+}
+finally { Remove-Item -LiteralPath $outsideQualification -Force -ErrorAction SilentlyContinue }
+function New-QualificationFixtureJson([hashtable]$Override) {
+    $value = [ordered]@{ schemaVersion = 3; kind = 'kbp-casting-qualification'; runId = 'qual-bind-test'
+        sourceCommit = ('c' * 40); packageSha256 = ('a' * 64); dllSha256 = ('b' * 64)
+        assemblyMvid = '11111111-2222-3333-4444-555555555555'; fixtureGameId = 'game'
+        recipe = 'zero-cost-mixed'; approvedProjectionIds = @(('d' * 64)); maximumNativeSubmissions = 6
+        approvedBy = 'Howie'; authority = 'owner mission 2026-09-23 section 4' }
+    foreach ($key in $Override.Keys) { $value[$key] = $Override[$key] }
+    return ($value | ConvertTo-Json -Compress)
+}
+if ($null -ne (Get-KbpQualificationAllowanceBuildRefusal -AllowanceJson (New-QualificationFixtureJson @{}) `
+        -RunId 'qual-bind-test' -BuildManifest $manifestFixture)) {
+    throw 'A matching qualification allowance was refused by the build binding.'
+}
+$qualificationBindingCases = [ordered]@{
+    'package' = @{ packageSha256 = ('d' * 64) }; 'dll' = @{ dllSha256 = ('e' * 64) }
+    'mvid' = @{ assemblyMvid = '99999999-2222-3333-4444-555555555555' }
+    'commit' = @{ sourceCommit = ('f' * 40) }; 'run-id' = @{ runId = 'other-run' }
+    'kind' = @{ kind = 'kbp-single-cast-probe' }; 'recipe' = @{ recipe = 'other' }
+    'submissions' = @{ maximumNativeSubmissions = 25 }
+}
+foreach ($case in $qualificationBindingCases.Keys) {
+    $refusal = Get-KbpQualificationAllowanceBuildRefusal -AllowanceJson (New-QualificationFixtureJson $qualificationBindingCases[$case]) `
+        -RunId 'qual-bind-test' -BuildManifest $manifestFixture
+    if ($refusal -cne $case) { throw "Qualification binding case $case returned '$refusal'." }
+}
+Write-Host 'Launcher -File WhatIf purity: PASS=11 FAIL=0'
