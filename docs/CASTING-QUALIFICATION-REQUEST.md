@@ -64,7 +64,12 @@ resources, group buffs and metamagic variants need the advanced copy.
 | repeat | refused as `nothing-to-cast:3`; nothing submitted | unchanged | unchanged |
 | recast | completed; `qual-cast-1` confirmed, the rest skipped | target 1: new instance or refreshed | unchanged |
 
-Any other outcome fails the run, which then stops.
+Any other outcome fails the run, which then stops: each step is judged
+the moment it ends, and a failed, uncertain, cancelled or otherwise
+unexpected step ends the run before anything else is submitted (review
+of `54d330b..47caeef`, P0). The casting run also writes no save at all:
+the WORKING save and any new save file count as protected-save
+violations.
 
 ## Procedure
 
@@ -73,7 +78,9 @@ Any other outcome fails the run, which then stops.
 2. The `full-user` profile loads the fixture again: Gunslinger 0.0.133 is
    restored, or the owner approves a reseal.
 3. Selection run (non-casting):
-   `Invoke-KingmakerRuntimeTest.ps1 -Scenario live-cast-qual-select -CompatibilityProfileId full-user -RunId <fresh>`.
+   `Invoke-KingmakerRuntimeTest.ps1 -Scenario live-cast-qual-select -CompatibilityProfileId full-user -TimeoutSeconds 900 -RunId <fresh>`
+   (the launcher refuses a qualification scenario with less than 900
+   seconds, so it can never abandon a live run).
    It writes `qual-outcome.json` with the selection and the three
    forecast projection ids and contracts.
 4. The allowance (schema 3) is written once, exclusively, under
@@ -84,7 +91,7 @@ Any other outcome fails the run, which then stops.
    `approvedBy` and `authority`. The build identity comes from the
    selection run's build manifest.
 5. Casting run:
-   `Invoke-KingmakerRuntimeTest.ps1 -Scenario live-cast-qual -CompatibilityProfileId full-user -RunId <runId> -QualificationAllowancePath <file>`.
+   `Invoke-KingmakerRuntimeTest.ps1 -Scenario live-cast-qual -CompatibilityProfileId full-user -TimeoutSeconds 900 -RunId <runId> -QualificationAllowancePath <file>`.
    It makes one attempt and never retries.
 6. Evidence: `qual-outcome.json`, `runtime-result.json`,
    `protected-saves.json`, `orchestration.json`, the frames, and the

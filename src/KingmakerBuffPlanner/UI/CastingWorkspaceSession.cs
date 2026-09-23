@@ -882,6 +882,15 @@ namespace KingmakerBuffPlanner.UI
             return _review.StandingFor(routineId);
         }
 
+        // The digest accepted for a routine (restored or given in this
+        // session), or null.
+        public string AcceptedDigestFor(string routineId)
+        {
+            string digest;
+            return _review.AcceptedDigests.TryGetValue(routineId ?? string.Empty, out digest)
+                ? digest : null;
+        }
+
         private void PersistReviewState()
         {
             if (_reviewStore == null) return;

@@ -83,68 +83,83 @@ namespace KingmakerBuffPlanner.Execution
                 violations.Add("submission-cap:" + PlannedSubmissions + ">" + MaximumSubmissions);
             if (Submissions.Any(value => value.StartsWith("refused:", StringComparison.Ordinal)))
                 violations.Add("refused-submission:" + string.Join("|", Submissions.ToArray()));
-            IReadOnlyList<PlannedCasting> castings = Selection.Castings;
-            string first = castings[0].CastingId;
-            List<string> rest = castings.Skip(1).Select(value => value.CastingId).ToList();
-            Expect(violations, "stop", step =>
+            foreach (string name in StepNames)
             {
-                if (step.Report == null || !step.Report.Cancelled ||
-                    step.Report.TerminalReason != "cancelled:" + CastingQualificationDriver.StopReason)
-                    return "report:" + (step.Report == null ? "none" : step.Report.TerminalReason);
-                if (step.StateOf(first) != CastingOutcomeState.EffectConfirmed ||
-                    rest.Any(id => step.StateOf(id) != CastingOutcomeState.NotProcessed) ||
-                    step.Report.Submitted != 1)
-                    return "states:" + States(step);
-                if (step.TransitionOf(first) != "new-instance" ||
-                    rest.Any(id => step.TransitionOf(id) != "absent"))
-                    return "effects:" + string.Join(",", step.Transitions.ToArray());
-                return null;
-            });
-            Expect(violations, "complete", step =>
-            {
-                if (step.Report == null || step.Report.TerminalReason != "completed")
-                    return "report:" + (step.Report == null ? "none" : step.Report.TerminalReason);
-                if (step.StateOf(first) != CastingOutcomeState.Skipped ||
-                    rest.Any(id => step.StateOf(id) != CastingOutcomeState.EffectConfirmed))
-                    return "states:" + States(step);
-                if (step.TransitionOf(first) != "unchanged" ||
-                    rest.Any(id => step.TransitionOf(id) != "new-instance"))
-                    return "effects:" + string.Join(",", step.Transitions.ToArray());
-                return null;
-            });
-            Expect(violations, "repeat", step => step.ApplyAllowed || step.Report != null ||
-                step.ApplyReason != "nothing-to-cast:" + castings.Count
-                    ? "not-a-no-op:" + step.ApplyReason : null);
-            Expect(violations, "recast", step =>
-            {
-                if (step.Report == null || step.Report.TerminalReason != "completed")
-                    return "report:" + (step.Report == null ? "none" : step.Report.TerminalReason);
-                if (step.StateOf(first) != CastingOutcomeState.EffectConfirmed ||
-                    rest.Any(id => step.StateOf(id) != CastingOutcomeState.Skipped))
-                    return "states:" + States(step);
-                string transition = step.TransitionOf(first);
-                if (transition != "new-instance" && transition != "refreshed")
-                    return "effects:" + string.Join(",", step.Transitions.ToArray());
-                return null;
-            });
-            foreach (CastingQualificationStepResult step in Steps)
-                foreach (string availability in step.Availability)
-                {
-                    string[] parts = availability.Split(new[] { ":" }, 2, StringSplitOptions.None);
-                    string[] values = parts.Length == 2
-                        ? parts[1].Split(new[] { ">" }, StringSplitOptions.None) : new string[0];
-                    if (values.Length != 2 || values[0] != values[1] || values[0] == "unknown")
-                        violations.Add("resource:" + step.Name + ":" + availability);
-                }
+                string failure = StepFailure(name);
+                if (failure != null) violations.Add(name + ":" + failure);
+            }
             return violations;
         }
 
-        private void Expect(List<string> violations, string name,
-            Func<CastingQualificationStepResult, string> check)
+        public static readonly string[] StepNames = { "stop", "complete", "repeat", "recast" };
+
+        // The rule for ONE step, applied by the driver the moment the step
+        // ends (the run stops at the first mismatch, before anything else
+        // is submitted) and again by Violations over the whole record.
+        // Null when the step is exactly as expected.
+        public string StepFailure(string name)
         {
             CastingQualificationStepResult step = Step(name);
-            string failure = step == null ? "missing" : check(step);
-            if (failure != null) violations.Add(name + ":" + failure);
+            if (step == null) return "missing";
+            if (Selection == null || !Selection.Selected) return "no-selection";
+            IReadOnlyList<PlannedCasting> castings = Selection.Castings;
+            string first = castings[0].CastingId;
+            List<string> rest = castings.Skip(1).Select(value => value.CastingId).ToList();
+            if (name == "repeat")
+                return step.ApplyAllowed || step.Report != null ||
+                    step.ApplyReason != "nothing-to-cast:" + castings.Count
+                        ? "not-a-no-op:" + step.ApplyReason : null;
+            if (step.Report == null) return "report:none";
+            if (step.Report.CleanupFailures.Count != 0)
+                return "cleanup:" + string.Join("|", step.Report.CleanupFailures.ToArray());
+            string failure = null;
+            if (name == "stop")
+            {
+                if (!step.Report.Cancelled ||
+                    step.Report.TerminalReason != "cancelled:" + CastingQualificationDriver.StopReason)
+                    failure = "report:" + step.Report.TerminalReason;
+                else if (step.StateOf(first) != CastingOutcomeState.EffectConfirmed ||
+                    rest.Any(id => step.StateOf(id) != CastingOutcomeState.NotProcessed) ||
+                    step.Report.Submitted != 1)
+                    failure = "states:" + States(step);
+                else if (step.TransitionOf(first) != "new-instance" ||
+                    rest.Any(id => step.TransitionOf(id) != "absent"))
+                    failure = "effects:" + string.Join(",", step.Transitions.ToArray());
+            }
+            else if (name == "complete")
+            {
+                if (step.Report.TerminalReason != "completed")
+                    failure = "report:" + step.Report.TerminalReason;
+                else if (step.StateOf(first) != CastingOutcomeState.Skipped ||
+                    rest.Any(id => step.StateOf(id) != CastingOutcomeState.EffectConfirmed))
+                    failure = "states:" + States(step);
+                else if (step.TransitionOf(first) != "unchanged" ||
+                    rest.Any(id => step.TransitionOf(id) != "new-instance"))
+                    failure = "effects:" + string.Join(",", step.Transitions.ToArray());
+            }
+            else if (name == "recast")
+            {
+                string transition = step.TransitionOf(first);
+                if (step.Report.TerminalReason != "completed")
+                    failure = "report:" + step.Report.TerminalReason;
+                else if (step.StateOf(first) != CastingOutcomeState.EffectConfirmed ||
+                    rest.Any(id => step.StateOf(id) != CastingOutcomeState.Skipped))
+                    failure = "states:" + States(step);
+                else if ((transition != "new-instance" && transition != "refreshed") ||
+                    rest.Any(id => step.TransitionOf(id) != "unchanged"))
+                    failure = "effects:" + string.Join(",", step.Transitions.ToArray());
+            }
+            else return "unknown-step";
+            if (failure != null) return failure;
+            foreach (string availability in step.Availability)
+            {
+                string[] parts = availability.Split(new[] { ":" }, 2, StringSplitOptions.None);
+                string[] values = parts.Length == 2
+                    ? parts[1].Split(new[] { ">" }, StringSplitOptions.None) : new string[0];
+                if (values.Length != 2 || values[0] != values[1] || values[0] == "unknown")
+                    return "resource:" + availability;
+            }
+            return null;
         }
 
         private static string States(CastingQualificationStepResult step)
@@ -209,7 +224,23 @@ namespace KingmakerBuffPlanner.Execution
         {
             if (Completed) return;
             if (_host.IsRunning) _host.Cancel(reason);
+            RecordInterruptedStep();
             Finish(string.IsNullOrEmpty(reason) ? "terminated" : reason);
+        }
+
+        // A step cancelled in flight (deadline, shutdown, exception) keeps
+        // its run report and the post-run reads in the record.
+        private void RecordInterruptedStep()
+        {
+            CastingQualificationStepResult running = _running;
+            _running = null;
+            if (running == null) return;
+            running.Report = _host.LastReport;
+            try { ObserveTransitions(running, running.Name + "-interrupted"); }
+            catch (Exception exception)
+            {
+                running.Observations.Add("interrupted-reads-failed:" + exception.GetType().Name);
+            }
         }
 
         private void Finish(string reason)
@@ -242,6 +273,7 @@ namespace KingmakerBuffPlanner.Execution
             catch (Exception exception)
             {
                 if (_host.IsRunning) _host.Cancel("qualification-exception");
+                RecordInterruptedStep();
                 Fail("exception:" + exception.GetType().Name + ":" + exception.Message);
             }
         }
@@ -340,9 +372,15 @@ namespace KingmakerBuffPlanner.Execution
                 _host.Pump();
                 return;
             }
-            _running.Report = _host.LastReport;
-            ObserveTransitions(_running, _running.Name + "-after");
+            CastingQualificationStepResult finished = _running;
             _running = null;
+            finished.Report = _host.LastReport;
+            ObserveTransitions(finished, finished.Name + "-after");
+            // Review P0: the step is judged NOW. A failed, uncertain,
+            // cancelled or otherwise unexpected step ends the run before
+            // anything else is submitted.
+            string failure = Record.StepFailure(finished.Name);
+            if (failure != null) { Fail("step:" + failure); return; }
             _phase = next;
         }
 
@@ -363,6 +401,9 @@ namespace KingmakerBuffPlanner.Execution
                 Fail("repeat-submitted:" + step.ApplyReason);
                 return;
             }
+            // Only the exact no-op (every casting already active) continues.
+            string failure = Record.StepFailure("repeat");
+            if (failure != null) { Fail("step:" + failure); return; }
             _phase = "recast-edit";
         }
 
@@ -382,13 +423,15 @@ namespace KingmakerBuffPlanner.Execution
             CastingWorkspaceInputs inputs = _freshInputs();
             _session.PresentForReview(inputs);
             if (!_session.AcceptPresentedPlan(inputs)) { Fail("recast-accept-refused"); return; }
-            // Close and reopen: a NEW session from disk must restore the
-            // acceptance and let the unchanged plan run without ceremony.
+            string accepted = _session.AcceptedDigestFor(CastingQualificationRecipe.RoutineId);
+            // Close and reopen: a NEW session from disk must restore exactly
+            // the acceptance just given (review P3-5: not merely any stored
+            // one) and let the unchanged plan run without ceremony.
             _session = _openSession(_boundary);
-            if (_session.ReviewStatusFor(CastingQualificationRecipe.RoutineId) !=
-                    CastingReviewStatus.Accepted)
+            string restored = _session.AcceptedDigestFor(CastingQualificationRecipe.RoutineId);
+            if (accepted == null || restored != accepted)
             {
-                Fail("reopen-acceptance-not-restored");
+                Fail("reopen-acceptance-not-restored:" + (restored ?? "none"));
                 return;
             }
             _phase = "recast";

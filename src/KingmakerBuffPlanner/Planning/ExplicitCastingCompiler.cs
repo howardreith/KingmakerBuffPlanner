@@ -816,7 +816,11 @@ namespace KingmakerBuffPlanner.Planning
                 else if (selection.Required) reasons.Add(failure);
                 else omitted.Add(selection.EnhancementId + ":" + failure);
             }
-            if (matched.Count != 0 && !CastEnhancementSnapshot.AreCompatible(matched))
+            // Review P3-3: an exhausted required enhancement is still part
+            // of the selection; an incompatible set stays a structural block
+            // that no active effect waives.
+            List<CastEnhancementSnapshot> selected = matched.Concat(requiredExhausted).ToList();
+            if (selected.Count != 0 && !CastEnhancementSnapshot.AreCompatible(selected))
                 reasons.Add("enhancement-incompatible");
         }
 
