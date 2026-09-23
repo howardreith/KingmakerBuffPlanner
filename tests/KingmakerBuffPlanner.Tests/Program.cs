@@ -401,6 +401,8 @@ namespace KingmakerBuffPlanner.Tests
                     () => TestConverterRefusesUnsupportedContracts(root));
                 Run("explicit-run-stops-after-failure-both-modes",
                     TestExplicitRunStopsAfterFailure);
+                Run("explicit-run-cancellation-disposes-executor",
+                    TestExplicitRunCancellationDisposesExecutor);
             }
             finally
             {
@@ -8650,6 +8652,7 @@ namespace KingmakerBuffPlanner.Tests
             private readonly string _mode;
             internal readonly List<string> Validated = new List<string>();
             internal readonly List<string> Fired = new List<string>();
+            internal readonly List<string> Cleaned = new List<string>();
             internal ScriptedInstantRuntime(string failCasting, string mode)
             {
                 _failCasting = failCasting;
@@ -8678,27 +8681,50 @@ namespace KingmakerBuffPlanner.Tests
                 if (Failing(step, "throw")) throw new InvalidOperationException("fixture-submit");
                 if (Failing(step, "rejected"))
                     return new InstantCastResult(false, false, false, false, "fixture-rejected");
-                return new InstantCastResult(true, true, !Failing(step, "unconfirmed"),
+                return new InstantCastResult(true, true, !Unconfirmed(step),
                     true, "fixture");
             }
-            public bool EffectsObserved(CastStep step) { return !Failing(step, "unconfirmed"); }
+            private bool Pending(CastStep step)
+            {
+                return Failing(step, "pending") || Failing(step, "pending-cleanup-throws");
+            }
+            private bool Unconfirmed(CastStep step)
+            {
+                return Failing(step, "unconfirmed") || Pending(step);
+            }
+            public bool EffectsObserved(CastStep step) { return !Unconfirmed(step); }
             public InstantCastCompletion InspectCompletion(CastStep step)
-            { return InstantCastCompletion.Settled("fixture-settled"); }
+            {
+                return Pending(step) ? InstantCastCompletion.Pending("fixture-confirming")
+                    : InstantCastCompletion.Settled("fixture-settled");
+            }
             public InstantCastCompletion Cleanup(CastStep step)
-            { return InstantCastCompletion.Settled("fixture-clean"); }
+            {
+                Cleaned.Add(step.AssignmentId);
+                if (Failing(step, "pending-cleanup-throws"))
+                    throw new InvalidOperationException("fixture-cleanup");
+                return InstantCastCompletion.Settled("fixture-clean");
+            }
         }
 
         private sealed class ScriptedAnimatedOperation : IAnimatedCastOperation
         {
             private readonly bool _succeeded;
             private readonly bool _timedOut;
+            private readonly bool _pending;
+            private readonly bool _disposeThrows;
+            private readonly Action _disposed;
             private int _checks;
-            internal ScriptedAnimatedOperation(bool succeeded, bool timedOut)
+            internal ScriptedAnimatedOperation(bool succeeded, bool timedOut,
+                bool pending = false, bool disposeThrows = false, Action disposed = null)
             {
                 _succeeded = succeeded;
                 _timedOut = timedOut;
+                _pending = pending;
+                _disposeThrows = disposeThrows;
+                _disposed = disposed;
             }
-            public bool IsCompleted { get { return ++_checks >= 2; } }
+            public bool IsCompleted { get { return !_pending && ++_checks >= 2; } }
             public bool IsStarted { get { return true; } }
             public bool TimedOut { get { return _timedOut; } }
             public bool Succeeded { get { return _succeeded; } }
@@ -8706,7 +8732,11 @@ namespace KingmakerBuffPlanner.Tests
             public bool ResourceSpent { get { return _succeeded; } }
             public bool HasResidualDeliveryState { get { return false; } }
             public string Detail { get { return "fixture-operation"; } }
-            public void Dispose() { }
+            public void Dispose()
+            {
+                if (_disposed != null) _disposed();
+                if (_disposeThrows) throw new InvalidOperationException("fixture-operation-dispose");
+            }
         }
 
         private sealed class ScriptedAnimatedRuntime : ICastRuntimeAdapter,
@@ -8715,6 +8745,7 @@ namespace KingmakerBuffPlanner.Tests
             private readonly string _failCasting;
             private readonly string _mode;
             internal readonly List<string> Started = new List<string>();
+            internal readonly List<string> DisposedOperations = new List<string>();
             internal ScriptedAnimatedRuntime(string failCasting, string mode)
             {
                 _failCasting = failCasting;
@@ -8740,8 +8771,67 @@ namespace KingmakerBuffPlanner.Tests
             {
                 Started.Add(step.AssignmentId);
                 if (Failing(step, "throw")) throw new InvalidOperationException("fixture-start");
+                string id = step.AssignmentId;
                 return new ScriptedAnimatedOperation(!Failing(step, "failed"),
-                    Failing(step, "timeout"));
+                    Failing(step, "timeout"),
+                    Failing(step, "pending") || Failing(step, "pending-dispose-throws"),
+                    Failing(step, "pending-dispose-throws"),
+                    () => DisposedOperations.Add(id));
+            }
+        }
+
+        // Executor stand-ins ONLY for failure shapes the real executors never
+        // produce (a throwing Current, a throwing iterator Dispose, a
+        // throwing Execute); the coordinator under test is the real one.
+        private sealed class ScriptedIterator : System.Collections.IEnumerator, IDisposable
+        {
+            private readonly int _yields;
+            private readonly bool _currentThrows;
+            private readonly bool _disposeThrows;
+            private readonly Action _finish;
+            private int _moves;
+            internal int Disposed;
+            internal ScriptedIterator(int yields, bool currentThrows, bool disposeThrows, Action finish)
+            {
+                _yields = yields;
+                _currentThrows = currentThrows;
+                _disposeThrows = disposeThrows;
+                _finish = finish;
+            }
+            public bool MoveNext()
+            {
+                if (_moves < _yields) { _moves++; return true; }
+                if (_moves == _yields) { _moves++; if (_finish != null) _finish(); }
+                return false;
+            }
+            public object Current
+            {
+                get
+                {
+                    if (_currentThrows) throw new InvalidOperationException("fixture-current");
+                    return null;
+                }
+            }
+            public void Reset() { }
+            public void Dispose()
+            {
+                Disposed++;
+                if (_disposeThrows) throw new InvalidOperationException("fixture-iterator-dispose");
+            }
+        }
+
+        private sealed class ScriptedExecutor : ICastExecutor
+        {
+            private readonly Func<CastPlan, ExecutionReport, System.Collections.IEnumerator> _execute;
+            internal readonly List<string> Executed = new List<string>();
+            internal ScriptedExecutor(Func<CastPlan, ExecutionReport, System.Collections.IEnumerator> execute)
+            {
+                _execute = execute;
+            }
+            public System.Collections.IEnumerator Execute(CastPlan plan, ExecutionReport report)
+            {
+                Executed.Add(plan.Steps[0].AssignmentId);
+                return _execute(plan, report);
             }
         }
 
@@ -14746,7 +14836,7 @@ namespace KingmakerBuffPlanner.Tests
                 ExplicitCastingRunOutcome outcome = run(new InstantCastExecutor(runtime, true), int.MaxValue);
                 if (runtime.Fired.Contains("cast-2") || runtime.Validated.Contains("cast-2") ||
                     !outcome.Halted || outcome.HaltedAfterCastingId != "cast-1" ||
-                    outcome.Entries[1].Attempted || outcome.AllConfirmed)
+                    outcome.Entries[1].Processed || outcome.AllConfirmed)
                     throw new InvalidOperationException("Instant mode submitted cast-2 after a " + mode +
                         " failure (or misreported the halt).");
                 if (runtime.Fired.Count(id => id == "cast-1") > 1)
@@ -14757,7 +14847,7 @@ namespace KingmakerBuffPlanner.Tests
                 var runtime = new ScriptedAnimatedRuntime("cast-1", mode);
                 ExplicitCastingRunOutcome outcome = run(new AnimatedCastExecutor(runtime, true), int.MaxValue);
                 if (runtime.Started.Contains("cast-2") || !outcome.Halted ||
-                    outcome.HaltedAfterCastingId != "cast-1" || outcome.Entries[1].Attempted)
+                    outcome.HaltedAfterCastingId != "cast-1" || outcome.Entries[1].Processed)
                     throw new InvalidOperationException("Animated mode started cast-2 after a " + mode +
                         " failure (or misreported the halt).");
                 if (runtime.Started.Count(id => id == "cast-1") > 1)
@@ -14773,11 +14863,178 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("A clean animated run did not submit both castings.");
             var limited = new ScriptedInstantRuntime("none", "none");
             ExplicitCastingRunOutcome one = run(new InstantCastExecutor(limited, true), 1);
-            if (limited.Fired.Count != 1 || one.Entries[1].Attempted ||
+            if (limited.Fired.Count != 1 || one.Entries[1].Processed ||
                 one.HaltReason != "submission-limit:1")
                 throw new InvalidOperationException("The submission limit did not stop the second casting.");
             if (one.ProjectionId != projection.ProjectionId)
                 throw new InvalidOperationException("The run did not report the projection identity.");
+        }
+
+        // Review L2: the coordinator owns the nested executor iterator.
+        // Disposing the OUTER run while a casting is in flight reaches the
+        // real executors' cleanup; nothing later is validated or submitted;
+        // Current/acquire/dispose failures halt without replacing the
+        // original failure; a validation refusal is not a submission.
+        private static void TestExplicitRunCancellationDisposesExecutor()
+        {
+            List<ProviderPlanningOption> options;
+            List<CastEnhancementSnapshot> enhancements;
+            PartyProviderSnapshot snapshot = CastingParty(CastingBuffAbility,
+                out options, out enhancements, new[] { "unit-t1", "unit-t2" }, 3);
+            ExplicitCastingPlan plan = CompileCastingPlan(CastingDocument(
+                    DirectCasting("cast-1", "long", "unit-cleric", "unit-t1",
+                        "source-bulls", CastingBuffAbility),
+                    DirectCasting("cast-2", "long", "unit-wizard", "unit-t2",
+                        "source-bulls", CastingBuffAbility)),
+                snapshot, options, enhancements, "source-bulls", "source-communal");
+            CastingApplyDecision decision = new CastingExecutionGate().Evaluate(
+                plan, CastingApplyMode.Ordinary, "long");
+            ExplicitStepConversion projection = ExplicitCastingStepConverter.Convert(
+                plan, decision, options, CastingEffects("source-bulls", "source-communal"));
+            if (!projection.Converted)
+                throw new InvalidOperationException("L2 fixture projection failed: " + projection.Refusal);
+
+            // Advance until `inFlight` holds, then dispose the OUTER run.
+            Func<ICastExecutor, Func<bool>, List<ExplicitCastingRunOutcome>> cancelWhen =
+                (executor, inFlight) =>
+                {
+                    var outcomes = new List<ExplicitCastingRunOutcome>();
+                    System.Collections.IEnumerator outer = new ExplicitCastingRunCoordinator(executor)
+                        .Run(projection, value => outcomes.Add(value));
+                    int guard = 0;
+                    while (!inFlight())
+                    {
+                        if (!outer.MoveNext() || guard++ > 1000)
+                            throw new InvalidOperationException("The run finished before the in-flight point.");
+                    }
+                    if (outcomes.Count != 0)
+                        throw new InvalidOperationException("The run completed before cancellation.");
+                    ((IDisposable)outer).Dispose();
+                    ((IDisposable)outer).Dispose();
+                    return outcomes;
+                };
+            Action<List<ExplicitCastingRunOutcome>, string, string> assertCancelled =
+                (outcomes, label, expectedDetail) =>
+                {
+                    if (outcomes.Count != 1)
+                        throw new InvalidOperationException(label + ": completion reported " +
+                            outcomes.Count + " times.");
+                    ExplicitCastingRunOutcome outcome = outcomes[0];
+                    if (!outcome.Cancelled || !outcome.Halted || outcome.AllConfirmed ||
+                        outcome.Entries.Count != 2 || outcome.Entries[0].FinalStatus != "Cancelled" ||
+                        outcome.Entries[0].Confirmed || !outcome.Entries[0].NativeSubmissionReported ||
+                        outcome.Entries[1].Processed)
+                        throw new InvalidOperationException(label + ": cancellation misreported.");
+                    if (expectedDetail != null && !outcome.Entries[0].Detail.Contains(expectedDetail))
+                        throw new InvalidOperationException(label + ": cleanup outcome missing (" +
+                            outcome.Entries[0].Detail + ").");
+                };
+
+            // Instant: pending confirmation window -> OUTER disposal runs the
+            // executor's iterator-finalizer cleanup.
+            var instant = new ScriptedInstantRuntime("cast-1", "pending");
+            assertCancelled(cancelWhen(new InstantCastExecutor(instant, true),
+                () => instant.Fired.Count == 1), "instant-pending", null);
+            if (!instant.Cleaned.Contains("cast-1") || instant.Validated.Contains("cast-2") ||
+                instant.Fired.Contains("cast-2"))
+                throw new InvalidOperationException("Instant cancellation skipped cleanup or continued.");
+            var instantThrows = new ScriptedInstantRuntime("cast-1", "pending-cleanup-throws");
+            assertCancelled(cancelWhen(new InstantCastExecutor(instantThrows, true),
+                () => instantThrows.Fired.Count == 1), "instant-cleanup-throws",
+                "completion-cleanup-exception");
+            if (instantThrows.Fired.Contains("cast-2"))
+                throw new InvalidOperationException("Instant run continued after uncertain cleanup.");
+
+            // Animated: pending operation -> OUTER disposal disposes it.
+            var animated = new ScriptedAnimatedRuntime("cast-1", "pending");
+            assertCancelled(cancelWhen(new AnimatedCastExecutor(animated, true),
+                () => animated.Started.Count == 1), "animated-pending",
+                "animated-operation-abandoned-in-flight");
+            if (!animated.DisposedOperations.SequenceEqual(new[] { "cast-1" }) ||
+                animated.Started.Contains("cast-2"))
+                throw new InvalidOperationException("Animated cancellation skipped disposal or continued.");
+            var animatedThrows = new ScriptedAnimatedRuntime("cast-1", "pending-dispose-throws");
+            assertCancelled(cancelWhen(new AnimatedCastExecutor(animatedThrows, true),
+                () => animatedThrows.Started.Count == 1), "animated-dispose-throws",
+                "animated-cancel-cleanup-exception");
+            if (animatedThrows.Started.Contains("cast-2"))
+                throw new InvalidOperationException("Animated run continued after uncertain cleanup.");
+
+            Func<ICastExecutor, ExplicitCastingRunOutcome> runToEnd = executor =>
+            {
+                ExplicitCastingRunOutcome outcome = null;
+                System.Collections.IEnumerator loop = new ExplicitCastingRunCoordinator(executor)
+                    .Run(projection, value => outcome = value);
+                int guard = 0;
+                while (loop.MoveNext() && guard++ < 10000) { }
+                if (outcome == null) throw new InvalidOperationException("No run outcome.");
+                return outcome;
+            };
+
+            // A validation refusal is processed, never a native submission.
+            var refused = new ScriptedInstantRuntime("cast-1", "validate");
+            ExplicitCastingRunOutcome validation = runToEnd(new InstantCastExecutor(refused, true));
+            if (!validation.Entries[0].Processed || validation.Entries[0].NativeSubmissionReported ||
+                validation.Entries[0].FinalStatus != "FailedValidation" || validation.Entries[1].Processed)
+                throw new InvalidOperationException("A validation refusal was reported as a submission.");
+            var clean = new ScriptedInstantRuntime("none", "none");
+            ExplicitCastingRunOutcome cleanRun = runToEnd(new InstantCastExecutor(clean, true));
+            if (!cleanRun.AllConfirmed || !cleanRun.Entries.All(entry => entry.NativeSubmissionReported))
+                throw new InvalidOperationException("A clean run did not report its submissions.");
+
+            // Current throws: halted, the iterator disposed exactly once.
+            ScriptedIterator currentIterator = null;
+            var currentExecutor = new ScriptedExecutor((single, report) =>
+                currentIterator = new ScriptedIterator(3, true, false, null));
+            ExplicitCastingRunOutcome currentRun = runToEnd(currentExecutor);
+            if (currentIterator.Disposed != 1 || currentExecutor.Executed.Count != 1 ||
+                currentRun.Entries[0].FinalStatus != "FailedExecution" ||
+                !currentRun.Entries[0].Detail.Contains("fixture-current") || currentRun.Entries[1].Processed)
+                throw new InvalidOperationException("A throwing Current was not contained.");
+
+            // Execute throws: halted, nothing later.
+            var acquireExecutor = new ScriptedExecutor((single, report) =>
+            { throw new InvalidOperationException("fixture-acquire"); });
+            ExplicitCastingRunOutcome acquireRun = runToEnd(acquireExecutor);
+            if (acquireExecutor.Executed.Count != 1 ||
+                !acquireRun.Entries[0].Detail.Contains("executor-acquire-exception") ||
+                acquireRun.Entries[1].Processed)
+                throw new InvalidOperationException("An executor acquisition failure was not contained.");
+
+            // Dispose throws after a FAILURE: the original failure stays first.
+            var failThenDispose = new ScriptedExecutor((single, report) =>
+                new ScriptedIterator(1, false, true, () => report.Add(0, single.Steps[0],
+                    CastExecutionStatus.FailedValidation, "fixture-original-failure")));
+            ExplicitCastingRunOutcome original = runToEnd(failThenDispose);
+            if (original.Entries[0].FinalStatus != "FailedValidation" ||
+                !original.Entries[0].Detail.StartsWith("fixture-original-failure", StringComparison.Ordinal) ||
+                !original.Entries[0].Detail.Contains("executor-dispose-exception") ||
+                failThenDispose.Executed.Count != 1)
+                throw new InvalidOperationException("A disposal failure replaced the original failure.");
+            // Dispose throws after CONFIRMATION: uncertain cleanup still halts.
+            var confirmThenDispose = new ScriptedExecutor((single, report) =>
+                new ScriptedIterator(1, false, true, () => report.Add(0, single.Steps[0],
+                    CastExecutionStatus.EffectConfirmed, "fixture-confirmed")));
+            ExplicitCastingRunOutcome uncertain = runToEnd(confirmThenDispose);
+            if (uncertain.Entries[0].Confirmed || confirmThenDispose.Executed.Count != 1 ||
+                uncertain.Entries[1].Processed)
+                throw new InvalidOperationException("The run continued after uncertain executor cleanup.");
+            // OUTER disposal while a scripted iterator's Dispose throws:
+            // reported as cleanup-uncertain, completion still exactly once.
+            ScriptedIterator hanging = null;
+            var hangingExecutor = new ScriptedExecutor((single, report) =>
+                hanging = new ScriptedIterator(int.MaxValue, false, true, null));
+            var hangingOutcomes = new List<ExplicitCastingRunOutcome>();
+            System.Collections.IEnumerator hangingRun = new ExplicitCastingRunCoordinator(hangingExecutor)
+                .Run(projection, value => hangingOutcomes.Add(value));
+            hangingRun.MoveNext();
+            hangingRun.MoveNext();
+            ((IDisposable)hangingRun).Dispose();
+            if (hanging.Disposed != 1 || hangingOutcomes.Count != 1 ||
+                !hangingOutcomes[0].Cancelled ||
+                !hangingOutcomes[0].HaltReason.Contains("cleanup-uncertain") ||
+                hangingExecutor.Executed.Count != 1)
+                throw new InvalidOperationException("Cancellation with a throwing iterator Dispose was misreported.");
         }
 
         // The Unity-bound host cannot be compiled here, so its wiring to the

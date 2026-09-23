@@ -81,6 +81,7 @@ namespace KingmakerBuffPlanner.Execution
                 }
                 Exception cleanupFailure = null;
                 Exception operationFailure = null;
+                bool operationBodyCompleted = false;
                 try
                 {
                     report.Add(index, step, CastExecutionStatus.Queued, "animated-command-queued");
@@ -145,6 +146,7 @@ namespace KingmakerBuffPlanner.Execution
                             "animated-operation-exception:" +
                             operationFailure.GetType().FullName + ":" +
                             operationFailure.Message);
+                    operationBodyCompleted = true;
                 }
                 finally
                 {
@@ -154,6 +156,27 @@ namespace KingmakerBuffPlanner.Execution
                         cleanupFailure = exception;
                     }
                     finally { enhancement.Dispose(); }
+                    // Review L2: when the iterator is disposed while the
+                    // operation is in flight (owner cancellation), the code
+                    // after this block never runs; report the abandonment
+                    // and the cleanup outcome here instead of losing them.
+                    if (!operationBodyCompleted)
+                    {
+                        report.Add(index, step, CastExecutionStatus.FailedExecution,
+                            "animated-operation-abandoned-in-flight");
+                        bool residual;
+                        try { residual = operation.HasResidualDeliveryState; }
+                        catch (Exception) { residual = true; }
+                        if (cleanupFailure != null || residual)
+                            report.Add(index, step,
+                                CastExecutionStatus.ResidualStateUnsettled,
+                                cleanupFailure == null
+                                    ? "animated-delivery-state-remained-after-cancel-cleanup;" +
+                                        SafeDetail(operation)
+                                    : "animated-cancel-cleanup-exception:" +
+                                        cleanupFailure.GetType().FullName + ":" +
+                                        cleanupFailure.Message);
+                    }
                 }
                 try
                 {
@@ -182,6 +205,12 @@ namespace KingmakerBuffPlanner.Execution
                 }
                 yield return null;
             }
+        }
+
+        private static string SafeDetail(IAnimatedCastOperation operation)
+        {
+            try { return operation.Detail; }
+            catch (Exception exception) { return "detail-exception:" + exception.GetType().Name; }
         }
 
         private CastEnhancementPreparation Prepare(CastStep step)
