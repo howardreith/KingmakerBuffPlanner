@@ -57,6 +57,7 @@ namespace KingmakerBuffPlanner.Tests
             Run("player-facing-resource-labels", () => TestPlayerFacingResourceLabels(root));
             Run("in-game-reload-is-guarded", TestInGameReloadIsGuarded);
             Run("player-facing-refusals-and-routine-header", () => TestPlayerFacingRefusalsAndHeader(root));
+            Run("buff-grid-is-alphabetical", () => TestBuffGridIsAlphabetical(root));
             Run("qualification-allowance-parsing", TestQualificationAllowanceParsing);
             Run("qualification-recipe-selection", TestQualificationRecipeSelection);
             Run("qualification-forecast-and-boundary", TestQualificationForecastAndBoundary);
@@ -1700,6 +1701,32 @@ namespace KingmakerBuffPlanner.Tests
                 !verify.Contains("subscriptions == 1 && hudRoots == 1 && idle && clean;") ||
                 !verify.Contains("string.Equals(session.CampaignId, expectedGame, StringComparison.Ordinal)"))
                 throw new InvalidOperationException("The reload verification is weaker than the scenario claims.");
+        }
+
+        // The grid reads alphabetically by name (then detail, then id), not in
+        // source-id order, and with nothing authored the first buff shown is
+        // the one selected.
+        private static void TestBuffGridIsAlphabetical(string root)
+        {
+            var ordered = WorkspaceSourceLabels.GridOrder(new[]
+            {
+                new WorkspaceSourceOption("a-id", "Resistance", false),
+                new WorkspaceSourceOption("b-id", "aid another", false, "Attack Bonus"),
+                new WorkspaceSourceOption("c-id", "Aid Another", false, "AC Bonus"),
+                new WorkspaceSourceOption("d-id", "Light", false),
+                new WorkspaceSourceOption("0-id", "Light", false)
+            }).Select(value => value.SourceId).ToArray();
+            if (!ordered.SequenceEqual(new[] { "c-id", "b-id", "0-id", "d-id", "a-id" }))
+                throw new InvalidOperationException("The buff grid order is wrong: " + string.Join(",", ordered));
+            var session = new CastingWorkspaceSession(Path.Combine(root, "grid-order"), "campaign-grid");
+            PartyProviderSnapshot snapshot;
+            CastingWorkspaceInputs inputs = WorkspaceInputs(out snapshot);
+            WorkspaceView view = session.BuildView(inputs);
+            List<WorkspaceSourceOption> shown = view.Draft.Sources.ToList();
+            if (shown.Count == 0 || !shown[0].Selected ||
+                !shown.Select(value => value.SourceId).SequenceEqual(
+                    WorkspaceSourceLabels.GridOrder(shown).Select(value => value.SourceId)))
+                throw new InvalidOperationException("The grid is not shown in its order, or its first buff is not selected.");
         }
 
         // Refusals tell the player what to do next and the header counts the
