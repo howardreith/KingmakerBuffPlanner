@@ -486,7 +486,12 @@ namespace KingmakerBuffPlanner.UI
             // The dispatch boundary refuses native submission explicitly;
             // that refusal is the honest result text, never a cast claim.
             if (result.Dispatch != null && !result.Dispatch.Submitted)
-                _footerResult.text = result.Dispatch.Reason;
+                _footerResult.text = "Native casting is disabled — nothing was cast. " +
+                    (result.Projection != null && result.Projection.Converted
+                        ? "Would run " + result.Projection.Plan.Steps.Count +
+                          (result.Projection.Plan.Steps.Count == 1 ? " cast" : " casts") +
+                          " in order."
+                        : string.Empty) + " (" + result.Dispatch.Reason + ")";
         }
 
         private void Click(Action action)

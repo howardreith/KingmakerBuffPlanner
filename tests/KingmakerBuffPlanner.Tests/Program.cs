@@ -13699,6 +13699,45 @@ namespace KingmakerBuffPlanner.Tests
             if (noOption.Converted || !noOption.Refusal.StartsWith(
                     "provider-option-missing:", StringComparison.Ordinal))
                 throw new InvalidOperationException("A missing provider option was tolerated.");
+            // The workspace Apply path attaches the same projection while
+            // dispatch stays disabled: nothing is cast, and the result says
+            // exactly what would run.
+            string applyPath = Path.Combine(Path.GetTempPath(),
+                "kbp-projection-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(applyPath);
+            try
+            {
+                PartyProviderSnapshot applySnapshot;
+                CastingWorkspaceInputs applyInputs = WorkspaceInputs(out applySnapshot);
+                var applySession = new CastingWorkspaceSession(applyPath, "workspace-campaign");
+                applySession.SelectBuff("source-bulls");
+                applySession.SelectRoutine("long");
+                applySession.BuildView(applyInputs);
+                applySession.Draft.SourceId = "source-bulls";
+                applySession.Draft.TargetMode = CastingTargetMode.DirectTarget;
+                applySession.ChooseDraftCaster("unit-cleric");
+                applySession.Draft.DirectTargetUnitId = "unit-t1";
+                Assert(applySession.AddCastingFromDraft(applyInputs).Applied);
+                applySession.Draft.DirectTargetUnitId = "unit-t2";
+                Assert(applySession.AddCastingFromDraft(applyInputs).Applied);
+                applySession.PresentForReview(applyInputs);
+                Assert(applySession.AcceptPresentedPlan(applyInputs));
+                WorkspaceApplyResult applied = applySession.Apply(
+                    CastingApplyMode.Ordinary, "long", applyInputs);
+                if (applied.Allowed || applied.Dispatch == null ||
+                    applied.Dispatch.Submitted || applied.Projection == null ||
+                    !applied.Projection.Converted ||
+                    applied.Projection.Plan.Steps.Count != 2)
+                    throw new InvalidOperationException(
+                        "Apply did not project two steps behind the disabled boundary: " +
+                        applied.ReviewReason + " | " +
+                        (applied.Projection == null ? "no projection"
+                            : applied.Projection.Refusal));
+            }
+            finally
+            {
+                Directory.Delete(applyPath, true);
+            }
             ExplicitStepConversion noEffects = ExplicitCastingStepConverter.Convert(
                 plan, decision, options, new Dictionary<string, EffectExpression>());
             if (noEffects.Converted)
