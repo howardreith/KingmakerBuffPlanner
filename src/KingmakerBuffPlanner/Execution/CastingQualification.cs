@@ -212,10 +212,10 @@ namespace KingmakerBuffPlanner.Execution
         }
 
         // One verified-free plain buff that two DIFFERENT casters can cast,
-        // on two or three distinct other party members without the effect:
-        // qual-cast-1 = first caster on the first target, qual-cast-2 =
-        // second caster on the second target, qual-cast-3 = first caster on
-        // the third target (when one exists).
+        // on two or three distinct recipients without the effect, chosen per
+        // casting (a caster may receive from the other caster, never from
+        // itself): qual-cast-1 = first caster, qual-cast-2 = second caster,
+        // qual-cast-3 = first caster again (when a third recipient exists).
         public static CastingQualificationSelection SelectZeroCostMixed(
             CastingWorkspaceInputs inputs, string campaignId)
         {
@@ -247,16 +247,9 @@ namespace KingmakerBuffPlanner.Execution
                 AbilityKey ability = first.Provider.Key.Ability;
                 string sourceId = SingleCastProbeSelector.SourceIdFor(inputs.EffectsBySource, ability);
                 EffectExpression expected = inputs.EffectsBySource[sourceId];
-                var casters = new HashSet<string>(new[]
-                    { first.Provider.Key.CasterUnitId, second.Provider.Key.CasterUnitId },
-                    StringComparer.Ordinal);
-                List<string> targets = inputs.Snapshot.Units.Select(unit => unit.UnitId)
-                    .Where(unit => targetable.Contains(unit) && !casters.Contains(unit) &&
-                        first.ReachableTargetIds.Contains(unit) &&
-                        second.ReachableTargetIds.Contains(unit) &&
-                        !EffectActive(inputs.LiveEffects, unit, expected))
-                    .OrderBy(unit => unit, StringComparer.Ordinal).Take(3).ToList();
-                if (targets.Count < 2) { reject(group.Key + "|fewer-than-two-fresh-targets"); continue; }
+                List<string> targets = RecipientsPerCasting(inputs, targetable, expected,
+                    new[] { first, second, first });
+                if (targets.Count < 2) { reject(group.Key + "|fewer-than-two-fresh-recipients"); continue; }
                 var castings = new List<PlannedCasting>();
                 for (int index = 0; index < targets.Count; index++)
                 {
@@ -364,16 +357,9 @@ namespace KingmakerBuffPlanner.Execution
                         second = other.Key;
                     }
                 if (first == null) { reject(sourceId + "|no-caster-pair-with-casts:2+1"); continue; }
-                var casters = new HashSet<string>(new[]
-                    { first.Provider.Key.CasterUnitId, second.Provider.Key.CasterUnitId },
-                    StringComparer.Ordinal);
-                List<string> targets = inputs.Snapshot.Units.Select(unit => unit.UnitId)
-                    .Where(unit => targetable.Contains(unit) && !casters.Contains(unit) &&
-                        first.ReachableTargetIds.Contains(unit) &&
-                        second.ReachableTargetIds.Contains(unit) &&
-                        !EffectActive(inputs.LiveEffects, unit, expected))
-                    .OrderBy(unit => unit, StringComparer.Ordinal).Take(2).ToList();
-                if (targets.Count < 2) { reject(sourceId + "|fewer-than-two-fresh-targets"); continue; }
+                List<string> targets = RecipientsPerCasting(inputs, targetable, expected,
+                    new[] { first, second });
+                if (targets.Count < 2) { reject(sourceId + "|fewer-than-two-fresh-recipients"); continue; }
                 var castings = new List<PlannedCasting>();
                 for (int index = 0; index < 2; index++)
                 {
@@ -407,6 +393,38 @@ namespace KingmakerBuffPlanner.Execution
             }
             return new CastingQualificationSelection("no-eligible-qualification-recipe", null, null,
                 null, considered, rejections, FiniteDirectMixed);
+        }
+
+        // Review RC4: recipients are chosen per casting, in recipe order.
+        // Each is targetable, reachable by THAT casting's own option, without
+        // the effect, not yet a recipient in this recipe, and never the
+        // casting's own caster (the recipe observes a buff given to someone
+        // else; a self-cast is the only exclusion). Another caster may be a
+        // recipient; non-casters come first only to keep the observation
+        // simple. Stops at the first casting without a legal recipient.
+        internal static List<string> RecipientsPerCasting(CastingWorkspaceInputs inputs,
+            ISet<string> targetable, EffectExpression expected, IList<ProviderPlanningOption> order)
+        {
+            var casters = new HashSet<string>(order.Select(option => option.Provider.Key.CasterUnitId),
+                StringComparer.Ordinal);
+            var used = new HashSet<string>(StringComparer.Ordinal);
+            var recipients = new List<string>();
+            foreach (ProviderPlanningOption option in order)
+            {
+                string caster = option.Provider.Key.CasterUnitId;
+                string recipient = inputs.Snapshot.Units.Select(unit => unit.UnitId)
+                    .Where(unit => targetable.Contains(unit) && !used.Contains(unit) &&
+                        !string.Equals(unit, caster, StringComparison.Ordinal) &&
+                        option.ReachableTargetIds.Contains(unit) &&
+                        !EffectActive(inputs.LiveEffects, unit, expected))
+                    .OrderBy(unit => casters.Contains(unit) ? 1 : 0)
+                    .ThenBy(unit => unit, StringComparer.Ordinal)
+                    .FirstOrDefault();
+                if (recipient == null) break;
+                used.Add(recipient);
+                recipients.Add(recipient);
+            }
+            return recipients;
         }
 
         // How many casts (up to the limit) this provider can reserve from

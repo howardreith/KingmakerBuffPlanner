@@ -682,36 +682,69 @@ function Assert-KbpAdvancedFixtureBinding {
     return $record
 }
 
-# Mission section 9: nothing casts on the advanced copy before a
-# non-casting inspection of the SAME bound pair has passed. Returns the
-# run id of such an inspection; throws when there is none.
+# The identity of a compatibility profile as a run used it: every mod entry
+# (directory, version, directory manifest, file count, bytes) and the
+# profile id, as one SHA-256. Evidence from a run with another identity
+# never qualifies a later run.
+function Get-KbpCompatibilityIdentityDigest {
+    param([Parameter(Mandatory = $true)]$Profile)
+    $lines = @('profile|' + [string]$Profile.profileId) + @(@($Profile.mods) | ForEach-Object {
+        [string]$_.directoryName + '|' + [string]$_.version + '|' + [string]$_.directoryManifestSha256 + '|' +
+            [string]$_.fileCount + '|' + [string]$_.totalBytes
+    } | Sort-Object)
+    $bytes = [Text.UTF8Encoding]::new($false).GetBytes(($lines -join "`n") + "`n")
+    $hasher = [Security.Cryptography.SHA256]::Create()
+    try { return ([BitConverter]::ToString($hasher.ComputeHash($bytes))).Replace('-', '').ToLowerInvariant() }
+    finally { $hasher.Dispose() }
+}
+
+# Review RC3 (mission section 9): nothing casts on the advanced copy before
+# a non-casting inspection of the SAME bound pair has passed its WHOLE
+# lifecycle: game PASS, harness success, owned Kingmaker exit, verified
+# Mods restoration and a clean protected-save comparison, recorded in
+# run-completion.json against the same fixture files and hashes, the same
+# campaign, the same binding manifest and the same compatibility identity.
+# Returns that inspection run id; throws when there is none.
 function Assert-KbpAdvancedInspectionPassed {
-    param([Parameter(Mandatory = $true)]$Binding, [string]$EvidenceRoot)
+    param(
+        [Parameter(Mandatory = $true)]$Binding,
+        [Parameter(Mandatory = $true)]$Pair,
+        [Parameter(Mandatory = $true)][string]$ProfileId,
+        [Parameter(Mandatory = $true)][string]$CompatibilityIdentity,
+        [string]$EvidenceRoot)
     if ([string]::IsNullOrWhiteSpace($EvidenceRoot)) { $EvidenceRoot = $script:KbpRuntimeEvidenceRoot }
-    $bindingManifest = [string]$Binding.manifestPath
+    $required = @('schemaVersion', 'runId', 'scenario', 'fixtureFamily', 'profileId', 'compatibilityIdentity',
+        'advancedBindingManifest', 'fixture', 'gameResultStatus', 'harnessSucceeded', 'kingmakerExited',
+        'restorationVerified', 'protectedSavesCompared', 'protectedSavesClean', 'complete')
     foreach ($directory in @(Get-ChildItem -LiteralPath $EvidenceRoot -Directory -ErrorAction SilentlyContinue |
             Sort-Object Name)) {
-        $orchestrationPath = Join-Path $directory.FullName 'orchestration.json'
-        $resultPath = Join-Path $directory.FullName 'runtime-result.json'
-        if (-not (Test-Path -LiteralPath $orchestrationPath -PathType Leaf) -or
-            -not (Test-Path -LiteralPath $resultPath -PathType Leaf)) { continue }
-        try {
-            $orchestration = Read-KbpJson $orchestrationPath
-            $result = Read-KbpJson $resultPath
-        }
-        catch { continue }
-        $names = @($orchestration.PSObject.Properties | ForEach-Object Name)
-        $resultNames = @($result.PSObject.Properties | ForEach-Object Name)
-        if ($names -cnotcontains 'scenario' -or $names -cnotcontains 'fixtureFamily' -or
-            $names -cnotcontains 'advancedBindingManifest' -or $names -cnotcontains 'runId' -or
-            $resultNames -cnotcontains 'status' -or $resultNames -cnotcontains 'runId') { continue }
-        if ([string]$orchestration.scenario -ceq 'live-advanced-inspect' -and
-            [string]$orchestration.fixtureFamily -ceq 'Advanced' -and
-            [string]$orchestration.advancedBindingManifest -ceq $bindingManifest -and
-            [string]$result.status -ceq 'PASS' -and
-            [string]$result.runId -ceq [string]$orchestration.runId) {
-            return [string]$orchestration.runId
+        $completionPath = Join-Path $directory.FullName 'run-completion.json'
+        if (-not (Test-Path -LiteralPath $completionPath -PathType Leaf)) { continue }
+        try { $completion = Read-KbpJson $completionPath } catch { continue }
+        $names = @($completion.PSObject.Properties | ForEach-Object Name)
+        if (@($required | Where-Object { $names -cnotcontains $_ }).Count -ne 0) { continue }
+        $fixture = $completion.fixture
+        if ($null -eq $fixture) { continue }
+        $fixtureNames = @($fixture.PSObject.Properties | ForEach-Object Name)
+        if (@('baselineFileName', 'baselineSha256', 'workingFileName', 'workingSha256', 'gameId' |
+                Where-Object { $fixtureNames -cnotcontains $_ }).Count -ne 0) { continue }
+        if ([string]$completion.scenario -cne 'live-advanced-inspect' -or
+            [string]$completion.fixtureFamily -cne 'Advanced' -or
+            [string]$completion.runId -cne $directory.Name -or
+            [string]$completion.advancedBindingManifest -cne [string]$Binding.manifestPath -or
+            [string]$completion.profileId -cne $ProfileId -or
+            [string]$completion.compatibilityIdentity -cne $CompatibilityIdentity -or
+            [string]$fixture.baselineFileName -cne [string]$Pair.baseline.fileName -or
+            [string]$fixture.baselineSha256 -cne [string]$Pair.baseline.sha256 -or
+            [string]$fixture.workingFileName -cne [string]$Pair.working.fileName -or
+            [string]$fixture.workingSha256 -cne [string]$Pair.working.sha256 -or
+            [string]$fixture.gameId -cne [string]$Pair.working.gameId) { continue }
+        if ([string]$completion.gameResultStatus -ceq 'PASS' -and [bool]$completion.harnessSucceeded -and
+            [bool]$completion.kingmakerExited -and [bool]$completion.restorationVerified -and
+            [bool]$completion.protectedSavesCompared -and [bool]$completion.protectedSavesClean -and
+            [bool]$completion.complete) {
+            return [string]$completion.runId
         }
     }
-    throw 'Casting on the advanced copy requires a passing live-advanced-inspect run of the same bound advanced pair first.'
+    throw 'Casting on the advanced copy requires a completed live-advanced-inspect run (game PASS, owned exit, verified restoration, clean protected saves) of the same bound pair and compatibility identity first.'
 }
