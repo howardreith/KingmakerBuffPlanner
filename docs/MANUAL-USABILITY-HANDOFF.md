@@ -1,5 +1,20 @@
 # Supervised manual usability session — implemented procedure
 
+**Release-candidate session (0.2.0-rc1).** This is the one consolidated
+manual acceptance session the mission asks for near the end. It runs the
+frozen candidate from its own clean checkout (the RC receipt names the
+worktree and the exact build identity; the command below uses
+`<rc-worktree>` for it). In this session the planner authors and saves
+but cannot cast: native casting is disabled in every automated or
+supervised test session, and the candidate's casting was qualified
+separately by the guarded runs listed in the receipt.
+
+What to look at first, because it changed since your last session: the
+buff grid with its Spells / Abilities / Other tabs; routine tabs with
+counts; card costs and the footer naming whose resource and what kind;
+the header counting the routine; the inspector naming the casting being
+edited; refusals that say what to do next.
+
 Every mechanism below is implemented in the pushed harness (scenario
 `live-workspace-manual`), rehearsed end to end before you are asked to
 participate, and bounded by the existing guarded transaction against the
@@ -9,7 +24,7 @@ and legacy quick execution remain disabled; nothing can cast a buff.
 ## The supported command (exact)
 
 ```powershell
-& 'C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\scripts\Invoke-KingmakerRuntimeTest.ps1' `
+& '<rc-worktree>\scripts\Invoke-KingmakerRuntimeTest.ps1' `
     -Scenario live-workspace-manual -CompatibilityProfileId full-user `
     -RunId casting-ws-manual-HHmm -ManualHoldSeconds 900 `
     -TimeoutSeconds 1500 -Confirm:$false
