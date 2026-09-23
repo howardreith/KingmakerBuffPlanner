@@ -651,6 +651,31 @@ namespace KingmakerBuffPlanner.UI
             return row;
         }
 
+        // Enhancements are compact chips (Extend, rods, metamagic) laid out
+        // in rows; a selected chip is gold, an unselected one keeps the
+        // native button look. Selected enhancements on a new casting are
+        // requirements, never silently dropped.
+        private RectTransform CreateChipRow(string name)
+        {
+            RectTransform row = KingmakerUiFactory.CreateRect(name, _inspectorContent);
+            GridLayoutGroup grid = row.gameObject.AddComponent<GridLayoutGroup>();
+            grid.cellSize = new Vector2(236f, 30f);
+            grid.spacing = new Vector2(6f, 6f);
+            grid.childAlignment = TextAnchor.UpperLeft;
+            return row;
+        }
+
+        private void StyleChip(Button chip, bool selected)
+        {
+            Image image = chip.targetGraphic as Image;
+            if (image != null)
+                image.color = selected ? _theme.GoldAccent : Color.white;
+            Transform labelNode = chip.transform.Find("Label");
+            Text label = labelNode == null ? null : labelNode.GetComponent<Text>();
+            if (label != null && selected)
+                label.text = "● " + label.text;
+        }
+
         private Color CoverageTint(WorkspaceRecipientCoverage coverage)
         {
             switch (coverage)
@@ -935,6 +960,7 @@ namespace KingmakerBuffPlanner.UI
                 }
             }
             AddInspectorCaption("Enhancements (this casting)");
+            RectTransform focusedChips = CreateChipRow("FocusedEnhancementChips");
             foreach (WorkspaceEnhancementOption enhancement in
                 view.FocusedEnhancements)
             {
@@ -946,8 +972,7 @@ namespace KingmakerBuffPlanner.UI
                         StringComparison.Ordinal));
                 Button toggle = KingmakerUiFactory.CreateButton(
                     "FocusedEnhancement." + captured.EnhancementId,
-                    _inspectorContent, _theme,
-                    (selected ? "[x] " : "[  ] ") + captured.Label,
+                    focusedChips, _theme, captured.Label,
                     () => Click(() =>
                     {
                         var selections = focused.Enhancements
@@ -963,7 +988,7 @@ namespace KingmakerBuffPlanner.UI
                         ApplyFocusedEdit(
                             focused.WithEnhancementSelections(selections));
                     }));
-                KingmakerUiFactory.AddLayout(RectOf(toggle), 30f);
+                StyleChip(toggle, selected);
             }
             if (view.FocusedEnhancements.Count == 0)
             {
@@ -1226,14 +1251,14 @@ namespace KingmakerBuffPlanner.UI
                 none.color = _theme.MutedBrownText;
                 KingmakerUiFactory.AddLayout(none.rectTransform, 26f);
             }
+            RectTransform draftChips = CreateChipRow("EnhancementChips");
             foreach (WorkspaceEnhancementOption enhancement in
                 draft.Enhancements)
             {
                 WorkspaceEnhancementOption captured = enhancement;
                 Button toggle = KingmakerUiFactory.CreateButton(
-                    "Enhancement." + captured.EnhancementId, _inspectorContent,
-                    _theme,
-                    (captured.Selected ? "[x] " : "[  ] ") + captured.Label,
+                    "Enhancement." + captured.EnhancementId, draftChips,
+                    _theme, captured.Label,
                     () => Click(() =>
                     {
                         if (captured.Selected)
@@ -1248,7 +1273,7 @@ namespace KingmakerBuffPlanner.UI
                                     captured.EnhancementId, true, null));
                         RefreshView();
                     }));
-                KingmakerUiFactory.AddLayout(RectOf(toggle), 30f);
+                StyleChip(toggle, captured.Selected);
             }
             AddInspectorCaption("State");
             Button state = KingmakerUiFactory.CreateButton(
