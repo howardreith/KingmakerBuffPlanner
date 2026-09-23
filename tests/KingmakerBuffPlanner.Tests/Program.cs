@@ -9812,7 +9812,9 @@ namespace KingmakerBuffPlanner.Tests
             var record = new SingleCastProbeRunRecord
             {
                 CastingScenario = true, Selected = true, SelectionEvidence = "fixture",
-                ProjectionId = projection.ProjectionId, AllowanceStatus = "valid"
+                ProjectionId = projection.ProjectionId, AllowanceStatus = "valid",
+                // The runtime host submits only once the world runs.
+                WorldRunningAtSubmit = true, SubmitWorldState = "fixture-world-running"
             };
             run.Owner = new SingleCastProbeRunOwner(record, () =>
             {

@@ -458,6 +458,10 @@ namespace KingmakerBuffPlanner.Execution
         public string AllowanceStatus { get; set; } = "not-read";
         public bool BoundaryConstructed { get; set; }
         public bool Submitted { get; set; }
+        // Whether the world ran (Default mode, not paused, planner closed)
+        // when the boundary was constructed; the state is evidence either way.
+        public bool WorldRunningAtSubmit { get; set; }
+        public string SubmitWorldState { get; set; }
         public string SubmitReason { get; set; }
         public ExplicitCastingRunOutcome Outcome { get; set; }
         public SingleCastProbeObservationSession Observation { get; set; }
@@ -494,6 +498,8 @@ namespace KingmakerBuffPlanner.Execution
                 return violations;
             }
             if (!Submitted) { violations.Add("probe-not-submitted:" + (SubmitReason ?? "missing")); return violations; }
+            if (!WorldRunningAtSubmit)
+                violations.Add("probe-submitted-while-world-held:" + (SubmitWorldState ?? "unknown"));
             if (!BoundaryDisposed) violations.Add("probe-boundary-not-disposed");
             if (Outcome == null) violations.Add("probe-outcome-missing");
             else

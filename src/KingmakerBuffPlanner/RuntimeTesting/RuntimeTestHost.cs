@@ -1907,6 +1907,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             {
                 return CompleteProbe();
             }
+            if (_liveUiPhase == 43)
+            {
+                return UpdateProbeAwaitWorld();
+            }
             if (_liveUiPhase == 30)
             {
                 // manual-ready preconditions: workspace root open, legacy
@@ -2662,7 +2666,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     () => clock.ElapsedMilliseconds,
                     RuntimeTestProtocol.QualificationRunDeadlineSeconds * 1000L,
                     _request.Parameters.TryGetValue("qualificationRecipe", out recipeRaw)
-                        ? recipeRaw as string : null);
+                        ? recipeRaw as string : null,
+                    () => BuffPlannerUiRoot.WorldRunsForCasting);
                 _log.Info("[KBP-QUAL] driver built;casting=" + _qualificationRecord.CastingScenario +
                     ";allowance=" + _qualificationRecord.AllowanceStatus + ";workspaceClosed=" +
                     closed.Closed + ";campaign=" + campaignId + ".");
@@ -2828,15 +2833,55 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 _liveUiPhase = 42;
                 return false;
             }
-            var boundary = new SingleCastProbeBoundary(allowance,
+            // The cast must run in the world, not under the planner: close the
+            // workspace (its input lease holds the game in FullScreenUi) and
+            // submit only once the world runs (probe
+            // casting-probe-cast-20260923-p1-01 cast inside the open planner;
+            // the rule was queued and the effect stayed absent).
+            _probeAllowance = allowance;
+            _probeStep = step;
+            ProbeWorkspaceCloseResult closedForCast = CloseProbeWorkspace();
+            _probeRecord.SubmitWorldState = "workspaceClosed=" + closedForCast.Closed +
+                ";leaseReleased=" + closedForCast.InputLeaseReleased +
+                (string.IsNullOrEmpty(closedForCast.Failure) ? string.Empty
+                    : ";closeFailure=" + closedForCast.Failure);
+            _probeWorldWaitFrames = 0;
+            _liveUiPhase = 43;
+            return false;
+        }
+
+        // Waits (bounded) for the world to run with the planner closed, then
+        // constructs the boundary and submits the one approved cast.
+        private bool UpdateProbeAwaitWorld()
+        {
+            bool running = BuffPlannerUiRoot.WorldRunsForCasting &&
+                !BuffPlannerUiRoot.IsCastingWorkspaceOpen &&
+                !BuffPlannerUiRoot.IsCastingWorkspaceInputLeaseHeldForRuntime;
+            string state = BuffPlannerUiRoot.WorldStateForRuntime + ";workspaceOpen=" +
+                BuffPlannerUiRoot.IsCastingWorkspaceOpen + ";leaseHeld=" +
+                BuffPlannerUiRoot.IsCastingWorkspaceInputLeaseHeldForRuntime;
+            if (!running)
+            {
+                if (++_probeWorldWaitFrames < 300) return false;
+                _probeRecord.SubmitWorldState += ";atRefusal:" + state;
+                _probeRecord.SubmitReason = "world-not-running:" + state;
+                _log.Info("[KBP-PROBE] the world did not run; no dispatch boundary constructed;" + state + ".");
+                _probeOwner.Terminate("completed");
+                _liveUiPhase = 42;
+                return false;
+            }
+            _probeRecord.WorldRunningAtSubmit = true;
+            _probeRecord.SubmitWorldState += ";atSubmit:" + state + ";waitFrames=" + _probeWorldWaitFrames;
+            ExplicitStepConversion projection = _probeSelection.Projection;
+            var boundary = new SingleCastProbeBoundary(_probeAllowance,
                 () => new InstantCastExecutor(new KingmakerInstantCastAdapter(_log.Info), true),
                 MeasureProbeRuntimeIdentity);
             CastingDispatchOutcome outcome = _probeOwner.Submit(boundary,
-                new SingleCastProbeObservationSession(new KingmakerProbeObserver(), _probeClock, step),
+                new SingleCastProbeObservationSession(new KingmakerProbeObserver(), _probeClock, _probeStep),
                 _probeSelection.Plan, _probeSelection.Decision, projection,
                 _workspaceCaptureElapsed.ElapsedMilliseconds);
             _log.Info("[KBP-PROBE] owner submit;submitted=" + outcome.Submitted +
-                ";reason=" + outcome.Reason + ".");
+                ";reason=" + outcome.Reason + ";world=" + state + ".");
             if (!outcome.Submitted)
             {
                 _probeOwner.Terminate("completed");
@@ -2846,6 +2891,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             _liveUiPhase = 41;
             return false;
         }
+
+        private SingleCastProbeAllowance _probeAllowance;
+        private CastStep _probeStep;
+        private int _probeWorldWaitFrames;
 
         private bool UpdateProbeRun()
         {
@@ -2931,6 +2980,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     { "submitReason", record.SubmitReason },
                     { "boundaryDisposed", record.BoundaryDisposed },
                     { "measuredIdentity", record.MeasuredIdentity },
+                    { "worldRunningAtSubmit", record.WorldRunningAtSubmit },
+                    { "submitWorldState", record.SubmitWorldState },
                     { "invocation", new JObject
                         {
                             { "outcomeProjectionId", outcome == null ? null : outcome.ProjectionId },
