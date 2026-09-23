@@ -1,6 +1,29 @@
 # AUTONOMOUS-RESUME — top section is current; planning/CASTING-FIRST-MIGRATION-STATUS.md is the per-checkpoint tracker.
 
-## RC mission (2026-09-23, continued): live native evidence and the Pro review of `e7c5207` (LATEST)
+## RC mission (2026-09-23, continued): review fixes, workspace text, in-game reload, 0.2.0-rc1 (LATEST)
+
+Worktrees: dev `repo/KingmakerBuffPlanner-O1` (PR branch); gate and live
+runs from the clean detached `repo/KingmakerBuffPlanner-G` (moved to each
+commit under test); `-Q1` (`d35b38f`) and `-Q2` (`48e46e3`) hold earlier
+run candidates.
+
+| Commit | Content |
+| --- | --- |
+| `548a90d` | Independent review of `e7c5207..f7726c9` (no P0/P1): probe pumps only while the world runs (P2-1); `CastingWorldClock` for the production and qualification hosts (P3-1/2); restoration failures no longer skip the protected-save comparison or `run-completion.json` (P3-3); no save change for the selection and every advanced run (P3-4); launcher logic in tested functions (P3-5) |
+| `1332ed8` | Workspace text: refusals say what to do next; the header counts the routine; the inspector names the casting being edited; taller buff tabs |
+| `478bb5b`, `07cf011` | `live-workspace-reload`: the exact WORKING save loaded again in game under a fresh read-only saver; the reopened planner must show the saved plan, one subscription, one HUD root, no run |
+| `2024578` | Version 0.2.0-rc1, release notes, install text, manual session for the RC |
+
+Live runs (all restored and verified, every save unchanged):
+
+| Run | Result |
+| --- | --- |
+| `casting-ws-qual-20260923-q2-03` (`48e46e3`) | PASS: resource names and footer fixed in game; showed refusal codes, casting ids and "0 of 0 … ready to apply" |
+| `casting-ws-qual-20260923-r1-01` (`1332ed8`) | PASS: those fixed in game |
+| `casting-ws-reload-20260923-s1-01` (`478bb5b`) | FAIL, clean: the guarded reload's header protocol completed; the campaign was then read mid-load (party 0). Fixed in `07cf011` |
+| `casting-ws-reload-20260923-s2-01` (`2024578`, 0.2.0-rc1) | **PASS**, 92 assertions: Game.LoadGame of the exact WORKING descriptor, header update and commit suppressed (no disk write), after-load callback, stable campaign identity after 6.5 s; reopened planner: saved plan, same campaign, subscriptions 1→1, HUD roots 1→1, no run, clean |
+
+## RC mission (2026-09-23, continued): live native evidence and the Pro review of `e7c5207` (history)
 
 Owner message of 2026-09-23 (second): allowance files are written by
 Claude under the delegated mission authority; the sealed Gunslinger
