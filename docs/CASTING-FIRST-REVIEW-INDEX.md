@@ -22,7 +22,22 @@ after a close and reopen, each exactly as forecast). Finite-resource
 qualification waits for an owner-designated advanced seed. Human usability and the native aesthetic
 pass remain open.
 
-## Current review dispositions — Pro review of `e7c5207` (answered 2026-09-23)
+## Current review dispositions — independent review of `e7c5207..f7726c9` (answered 2026-09-23)
+
+A read-only independent review of the RC1-RC4 fixes, the world-running
+gate and the external Gunslinger fixture found no P0 or P1 issue. Fixed in
+`548a90d` (each with a caught mutant):
+
+| Finding | Disposition |
+| --- | --- |
+| P2-1: the probe checked the world once, a frame before its rule fired, and pumped its confirmation frames without a check; the wait was bounded by 300 updates | Every probe pump (the fire and each confirmation frame) waits while the world is held; a stop and the wall-clock deadline still apply. The record carries the world state at the first step and the held pump count; the wait before submitting is bounded in elapsed time (`ProbeWorldWaitSeconds`) |
+| P3-1: the production world clock truncated each frame to whole milliseconds | `CastingWorldClock` accumulates double seconds; unit-tested at 60 fps and above 1000 updates a second |
+| P3-2: the qualification host deadline counted held time although this index said it did not | The qualification host uses the same world clock as production; the run's own 240-second deadline stays wall-clock as the hard bound. A driver test holds a step for 200 s: it completes under the world clock and fails under a wall clock |
+| P3-3: a failed restoration or a still-running Kingmaker skipped the protected-save comparison and `run-completion.json` | Restoration failures are captured, both records are written (restoration not verified), and the failure is thrown afterwards |
+| P3-4: an inspection that changed the WORKING save was recorded complete but could never qualify | The casting selection and every advanced-copy run, the inspection included, allow no save change |
+| P3-5: several tests were weaker than their commits claimed | The launcher computes its completion record and save policy through tested functions; the held-world driver tests cover the Begin and Wait gates separately; the source checks test the gate blocks themselves |
+
+## Previous review dispositions — Pro review of `e7c5207` (history)
 
 | Finding | Disposition |
 | --- | --- |
@@ -40,7 +55,8 @@ does not advance, so the Resistance effect never appeared
 protected-save check passed. Fixed in `320a1b6`: the probe closes the
 planner and submits only once the world runs (Default mode, not
 paused), the production host and the qualification driver advance only
-while the world runs, and the run deadline counts only running time.
+while the world runs, and the host deadlines count only running time
+(the qualification host since `548a90d`).
 
 ## Previous review dispositions — review of `54d330b..47caeef` (history)
 

@@ -561,9 +561,15 @@ namespace KingmakerBuffPlanner.UI
             WorkspaceEditingScope scope = EditingFocusCastingId == null
                 ? WorkspaceEditingScope.ConfigureNextCasting
                 : WorkspaceEditingScope.EditingSingleCasting;
+            // The casting as the player reads it (its place in the routine,
+            // who casts it on whom), never its internal id.
+            WorkspaceCastingCard focusedCard = EditingFocusCastingId == null ? null
+                : cards.FirstOrDefault(value => string.Equals(value.CastingId,
+                    EditingFocusCastingId, StringComparison.Ordinal));
             string scopeLabel = EditingFocusCastingId == null
                 ? "Configure next casting"
-                : "Editing casting " + EditingFocusCastingId;
+                : focusedCard == null ? "Editing one casting"
+                : "Editing casting " + (focusedCard.Order + 1) + ": " + focusedCard.Headline;
             var view = new WorkspaceView(
                 selectedSource, SelectedRoutineId, casters, cards, budget,
                 _authoring.Document.Routines.Select(value => value.RoutineId)
@@ -572,6 +578,11 @@ namespace KingmakerBuffPlanner.UI
                 scope, scopeLabel,
                 plan.Diagnostics,
                 BuildDraftView(inputs, selectedSource, casters));
+            List<ResolvedCasting> routineCastings = plan.Castings.Where(value => string.Equals(
+                value.RoutineId, SelectedRoutineId, StringComparison.Ordinal)).ToList();
+            view.RoutineCastingCount = routineCastings.Count;
+            view.RoutineReadyCount = routineCastings.Count(value =>
+                value.Readiness == ResolvedCastingReadiness.Ready);
             BuildFocusedEnhancements(view, inputs);
             foreach (WorkspaceOriginOption origin in BuildFocusedOrigins(inputs))
                 view._focusedOrigins.Add(origin);

@@ -12866,7 +12866,9 @@ namespace KingmakerBuffPlanner.Tests
             session.FocusCasting("cast-2");
             view = session.BuildView(inputs);
             if (view.EditingScope != WorkspaceEditingScope.EditingSingleCasting ||
-                !view.EditingScopeLabel.Contains("cast-2") ||
+                view.EditingScopeLabel != "Editing casting " + (view.CardById("cast-2").Order + 1) + ": " +
+                    view.CardById("cast-2").Headline ||
+                view.EditingScopeLabel.Contains("cast-2") ||
                 !view.CardById("cast-2").EditingFocus)
                 throw new InvalidOperationException(
                     "The editing scope is not prominently single-card.");
