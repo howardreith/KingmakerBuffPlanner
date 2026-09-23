@@ -96,6 +96,15 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private int _workspaceInteractionStep;
         private string _workspaceInteractionEvidence = "not-run";
         private string _workspaceReopenEvidence = "not-run";
+        private string _workspaceReloadEvidence = "not-run";
+        private string _reloadLoadedEvidence;
+        private long _reloadStartedMillis;
+        private int _reloadSettleFrame = -1;
+        private int _reloadSubscriptionsBefore;
+        private int _reloadHudRootsBefore;
+        private int _reloadRunsBefore;
+        private int _reloadUnloadsBefore;
+        private int _reloadLoadsBefore;
         private string _workspaceSavedIntentIds;
         private string _workspaceIntentBeforeEdit;
         private long _manualHoldStartedMillis = -1;
@@ -965,6 +974,19 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                             "exact IDs and order after close/reopen", reopenEvidence)
                         : RuntimeTestAssertion.Fail("workspace-reopen-preserves-intent",
                             "exact IDs and order after close/reopen", reopenEvidence));
+                    bool reloadPassed = true;
+                    if (RuntimeTestProtocol.IsReloadScenario(_request.Scenario))
+                    {
+                        string reloadEvidence = _workspaceReloadEvidence ?? "missing";
+                        reloadPassed = reloadEvidence.StartsWith("passed=True", StringComparison.Ordinal);
+                        result.Assertions.Add(reloadPassed
+                            ? RuntimeTestAssertion.Pass("workspace-reload-preserves-plan-and-ownership",
+                                "saved plan, same campaign, one subscription, one HUD root, no run, clean",
+                                reloadEvidence)
+                            : RuntimeTestAssertion.Fail("workspace-reload-preserves-plan-and-ownership",
+                                "saved plan, same campaign, one subscription, one HUD root, no run, clean",
+                                reloadEvidence));
+                    }
                     if (!workspaceOpen || !frameCaptured || !engineCaptured ||
                         !nonBlack || !presented || !controlCaptured || !visibleChange)
                     {
@@ -975,6 +997,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     {
                         result.Status = "FAIL";
                         result.Stage = "workspace-interaction-validation";
+                    }
+                    else if (!reloadPassed)
+                    {
+                        result.Status = "FAIL";
+                        result.Stage = "workspace-reload-validation";
                     }
 
                 }
@@ -2076,6 +2103,88 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 _log.Info("[KBP-WORKSPACE] interaction sequence complete;" +
                     _workspaceInteractionEvidence + ";reopen=" +
                     _workspaceReopenEvidence + ".");
+                _liveUiPhase = RuntimeTestProtocol.IsReloadScenario(_request.Scenario) ? 80 : 21;
+                return false;
+            }
+            if (_liveUiPhase == 80)
+            {
+                // Mission section 8 (save/reload): close the planner through
+                // its owned route, then load the exact WORKING save again in
+                // game through the guarded loader (no save write).
+                if (BuffPlannerUiRoot.IsCastingWorkspaceOpen)
+                {
+                    BuffPlannerUiRoot.CloseCastingWorkspaceForRuntime();
+                    return false;
+                }
+                if (BuffPlannerUiRoot.IsCastingWorkspaceInputLeaseHeldForRuntime) return false;
+                _reloadSubscriptionsBefore = BuffPlannerUiRoot.ActiveEventSubscriptionsForRuntime;
+                _reloadHudRootsBefore = BuffPlannerUiRoot.HudRootCountForRuntime;
+                _reloadRunsBefore = BuffPlannerUiRoot.CastingRunsStartedForRuntime;
+                _reloadUnloadsBefore = BuffPlannerUiRoot.LifecycleSignalsForRuntime("OnAreaBeginUnloading");
+                _reloadLoadsBefore = BuffPlannerUiRoot.LifecycleSignalsForRuntime("OnAreaLoadingComplete") +
+                    BuffPlannerUiRoot.LifecycleSignalsForRuntime("OnAreaActivated");
+                _reloadStartedMillis = _workspaceCaptureElapsed.ElapsedMilliseconds;
+                _reloadSettleFrame = -1;
+                _log.Info("[KBP-RELOAD] loading the exact working save again in game;subscriptions=" +
+                    _reloadSubscriptionsBefore + ";hudRoots=" + _reloadHudRootsBefore + ".");
+                _liveSaveLoader.BeginGuardedReload();
+                _liveUiPhase = 81;
+                return false;
+            }
+            if (_liveUiPhase == 81)
+            {
+                // Settled: the guarded load completed with a stable campaign
+                // identity, the area unloaded and loaded again, the world
+                // runs and the HUD is back; then 60 rendered frames.
+                string loaded = _liveSaveLoader.UpdateReload();
+                bool areaCycled =
+                    BuffPlannerUiRoot.LifecycleSignalsForRuntime("OnAreaBeginUnloading") > _reloadUnloadsBefore &&
+                    BuffPlannerUiRoot.LifecycleSignalsForRuntime("OnAreaLoadingComplete") +
+                        BuffPlannerUiRoot.LifecycleSignalsForRuntime("OnAreaActivated") > _reloadLoadsBefore;
+                if (loaded == null || !areaCycled || !BuffPlannerUiRoot.WorldRunsForCasting ||
+                    !BuffPlannerUiRoot.IsHudInstalledForRuntime)
+                {
+                    if (_workspaceCaptureElapsed.ElapsedMilliseconds - _reloadStartedMillis >
+                        LiveCampaignSaveLoader.ReloadBudgetSeconds * 1000L)
+                        throw new TimeoutException("The in-game reload did not settle;loaded=" +
+                            (loaded ?? "pending") + ";areaCycled=" + areaCycled + ";world=" +
+                            BuffPlannerUiRoot.WorldStateForRuntime + ";hud=" +
+                            BuffPlannerUiRoot.IsHudInstalledForRuntime + ".");
+                    return false;
+                }
+                if (_reloadSettleFrame < 0)
+                {
+                    _reloadSettleFrame = Time.frameCount;
+                    return false;
+                }
+                if (Time.frameCount - _reloadSettleFrame < 60) return false;
+                _reloadLoadedEvidence = loaded;
+                UI.BuffPlannerUiRoot.HandlePlannerHotkey();
+                _log.Info("[KBP-RELOAD] reload settled;" + loaded + ";reopening through the production toggle.");
+                _liveUiPhase = 82;
+                return false;
+            }
+            if (_liveUiPhase == 82)
+            {
+                if (!BuffPlannerUiRoot.IsCastingWorkspaceOpen)
+                {
+                    if (_workspaceCaptureElapsed.ElapsedMilliseconds - _reloadStartedMillis >
+                        LiveCampaignSaveLoader.ReloadBudgetSeconds * 1000L)
+                        throw new TimeoutException("The planner did not reopen after the in-game reload.");
+                    return false;
+                }
+                _workspaceReloadEvidence = VerifyWorkspaceReload();
+                _log.Info("[KBP-RELOAD] reopened after the reload;" + _workspaceReloadEvidence + ".");
+                BeginWorkspaceCameraCapture("ws-reload-reopened.png", false);
+                _liveUiPhase = 83;
+                return false;
+            }
+            if (_liveUiPhase == 83)
+            {
+                if (_workspaceCameraOpenCapture == null ||
+                    !string.Equals(_workspaceCameraOpenCapture.FileName,
+                        "ws-reload-reopened.png", StringComparison.OrdinalIgnoreCase))
+                    return false;
                 _liveUiPhase = 21;
                 return false;
             }
@@ -3319,6 +3428,37 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             _log.Info("[KBP-WORKSPACE] workspace closed for bisection capture;interactions=" +
                 _workspaceInteractionEvidence + ".");
             _liveUiPhase = 19;
+        }
+
+        // Mission section 8: after an in-game reload the planner shows the
+        // saved plan for the same campaign, with one live event subscription,
+        // one HUD root, no casting run and a clean session.
+        private string VerifyWorkspaceReload()
+        {
+            UI.CastingWorkspaceSession session =
+                BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
+            object rawGame;
+            string expectedGame = _request.Parameters.TryGetValue("expectedGameId", out rawGame)
+                ? rawGame as string : null;
+            bool preserved = session != null && session.Document != null &&
+                !string.IsNullOrEmpty(_workspaceSavedIntentIds) &&
+                string.Equals(session.DocumentIntentSignature(), _workspaceSavedIntentIds,
+                    StringComparison.Ordinal);
+            bool campaign = session != null && !string.IsNullOrEmpty(expectedGame) &&
+                string.Equals(session.CampaignId, expectedGame, StringComparison.Ordinal);
+            int subscriptions = BuffPlannerUiRoot.ActiveEventSubscriptionsForRuntime;
+            int hudRoots = BuffPlannerUiRoot.HudRootCountForRuntime;
+            bool idle = !BuffPlannerUiRoot.IsCastingRunActive &&
+                BuffPlannerUiRoot.CastingRunsStartedForRuntime == _reloadRunsBefore;
+            bool clean = session != null && !session.IsDirty;
+            bool passed = preserved && campaign && _reloadSubscriptionsBefore == 1 &&
+                subscriptions == 1 && hudRoots == 1 && idle && clean;
+            return "passed=" + passed + ";preserved=" + preserved + ";campaign=" + campaign +
+                ";subscriptions=" + _reloadSubscriptionsBefore + "->" + subscriptions +
+                ";hudRoots=" + _reloadHudRootsBefore + "->" + hudRoots + ";idle=" + idle +
+                ";dirty=" + (session == null ? "no-session" : session.IsDirty.ToString()) +
+                ";loadStatus=" + (session == null ? "none" : session.LoadStatus.ToString()) +
+                ";loaded=" + (_reloadLoadedEvidence ?? "missing");
         }
 
         private string VerifyWorkspaceReopen()
