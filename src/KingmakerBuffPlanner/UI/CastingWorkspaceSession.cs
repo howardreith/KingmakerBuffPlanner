@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Linq;
 using KingmakerBuffPlanner.Domain.Authoring;
 using KingmakerBuffPlanner.Domain.Effects;
@@ -163,7 +164,8 @@ namespace KingmakerBuffPlanner.UI
 
         public CastingWorkspaceSession(
             string modPath, string campaignId,
-            ICastingDispatchBoundary dispatchBoundary = null)
+            ICastingDispatchBoundary dispatchBoundary = null,
+            IDictionary<string, CastGroupingKind> legacyGroupings = null)
         {
             if (string.IsNullOrWhiteSpace(modPath))
                 throw new ArgumentException("Absolute mod path is required.", "modPath");
@@ -184,7 +186,13 @@ namespace KingmakerBuffPlanner.UI
                         loaded.Profile.ToDocument());
                     break;
                 case CastingPlanLoadStatus.Absent:
-                    _authoring = new CastingAuthoringService(NewDocument());
+                    // First open in this campaign: import the legacy
+                    // (schema-5) plan through the migration boundary —
+                    // exact original archived, legacy file untouched,
+                    // candidate written and reopened — so the player's
+                    // existing buffs are not silently lost (charter §7).
+                    _authoring = new CastingAuthoringService(
+                        MigrateLegacyOrEmpty(modPath, campaignId, legacyGroupings));
                     break;
                 default:
                     // Corrupt or unsupported candidate data is never
@@ -297,6 +305,56 @@ namespace KingmakerBuffPlanner.UI
                     return string.IsNullOrWhiteSpace(unit.DisplayName)
                         ? unitId : unit.DisplayName;
             return unitId;
+        }
+
+        // Legacy import outcome on first open (null when a candidate already
+        // existed). The report counts are shown to the player; import is
+        // not execution readiness — imported drafts still need review.
+        public CastingMigrationStatus? MigrationStatus { get; private set; }
+        public CastingImportReport ImportReport { get; private set; }
+        public string MigrationWarning { get; private set; }
+
+        private CastingPlanDocument MigrateLegacyOrEmpty(string modPath,
+            string campaignId, IDictionary<string, CastGroupingKind> groupings)
+        {
+            if (!Path.IsPathRooted(modPath)) return NewDocument();
+            try
+            {
+                CastingMigrationResult migration = new CastingPlanMigrationService(modPath)
+                    .Migrate(campaignId, groupings);
+                MigrationStatus = migration.Status;
+                MigrationWarning = migration.Warning;
+                switch (migration.Status)
+                {
+                    case CastingMigrationStatus.Migrated:
+                        CastingPlanLoadResult reloaded = _repository.Load(campaignId);
+                        if (reloaded.Status == CastingPlanLoadStatus.Loaded)
+                        {
+                            ImportReport = migration.ImportReport;
+                            LoadStatus = reloaded.Status;
+                            LoadWarning = reloaded.Warning;
+                            return reloaded.Profile.ToDocument();
+                        }
+                        MigrationWarning = "migrated-candidate-did-not-reopen:" +
+                            reloaded.Status;
+                        PersistenceBlocked = true;
+                        return NewDocument();
+                    case CastingMigrationStatus.CandidateUnusable:
+                    case CastingMigrationStatus.NewerCandidateRefused:
+                        PersistenceBlocked = true;
+                        return NewDocument();
+                    default:
+                        // LegacyAbsent or LegacyUnreadable: start empty; the
+                        // legacy file (if any) stays untouched and recoverable.
+                        return NewDocument();
+                }
+            }
+            catch (Exception exception)
+            {
+                MigrationWarning = "migration-exception:" + exception.GetType().Name +
+                    ":" + exception.Message;
+                return NewDocument();
+            }
         }
 
         public void FocusCasting(string castingId)

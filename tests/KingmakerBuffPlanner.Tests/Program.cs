@@ -14191,6 +14191,36 @@ namespace KingmakerBuffPlanner.Tests
                 File.ReadAllText(legacyPath) != originalBytes)
                 throw new InvalidOperationException(
                     "A newer-schema candidate was buried or the original disturbed.");
+            // The workspace session runs this boundary on FIRST OPEN: an
+            // absent candidate with a legacy profile imports it (report
+            // exposed), the legacy bytes stay unchanged, and a second open
+            // loads the candidate instead of importing again.
+            string sessionBoundary = Path.Combine(root, "casting-migration-session");
+            Directory.CreateDirectory(sessionBoundary);
+            new ProfileRepository(sessionBoundary).Save(legacy);
+            string sessionLegacyPath = new ProfileRepository(sessionBoundary)
+                .GetProfilePath("legacy-campaign");
+            string sessionLegacyBytes = File.ReadAllText(sessionLegacyPath);
+            var opened = new CastingWorkspaceSession(sessionBoundary, "legacy-campaign");
+            if (opened.MigrationStatus != CastingMigrationStatus.Migrated ||
+                opened.ImportReport == null ||
+                opened.ImportReport.ResultingCastingCount != 2 ||
+                opened.Document.Castings.Count != 2 ||
+                opened.LoadStatus != CastingPlanLoadStatus.Loaded ||
+                opened.PersistenceBlocked ||
+                File.ReadAllText(sessionLegacyPath) != sessionLegacyBytes)
+                throw new InvalidOperationException("First open did not import the legacy plan: " +
+                    opened.MigrationStatus + " " + opened.MigrationWarning);
+            var reopened = new CastingWorkspaceSession(sessionBoundary, "legacy-campaign");
+            if (reopened.MigrationStatus != null || reopened.ImportReport != null ||
+                reopened.Document.Castings.Count != 2)
+                throw new InvalidOperationException(
+                    "A second open imported again instead of loading the candidate.");
+            var fresh = new CastingWorkspaceSession(
+                Path.Combine(sessionBoundary, "no-legacy"), "legacy-campaign");
+            if (fresh.MigrationStatus != CastingMigrationStatus.LegacyAbsent ||
+                fresh.Document.Castings.Count != 0 || fresh.PersistenceBlocked)
+                throw new InvalidOperationException("An absent legacy profile was not handled.");
             // An absent legacy profile is reported, not fabricated.
             var empty = new CastingPlanMigrationService(
                 Path.Combine(boundary, "empty"));
