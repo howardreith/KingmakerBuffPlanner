@@ -1,6 +1,6 @@
 # Definition of Done Matrix
 
-## Casting-first migration — release buckets (updated 2026-09-23, RC slice 2 at `ebf2329`)
+## Casting-first migration — release buckets (updated 2026-09-23, live probe at `320a1b6`)
 
 No percentage or date is claimed; green unit tests do not measure
 readiness. Evidence words mean exactly this:
@@ -21,7 +21,7 @@ readiness. Evidence words mean exactly this:
 | Legacy import on first open, failed-import blocking, review items, notices | implemented + stand-ins; not in-game with a real legacy plan |
 | Large catalogue, multiple spellbooks, pets, long/group buffs at scale | not in-game (tiny fixture only) |
 | Input isolation | in-game (earlier HUD/UI runs); not re-checked on an advanced party |
-| Advanced-save disposable copy tooling | implemented + stand-ins: guarded bootstrap (`-Family Advanced`), family pair lookup, manifest binding, protocol family gate, non-casting `live-advanced-inspect`, protected-save comparison. Not in-game: no `KBP_ADVANCED_SEED` yet, and the `full-user` profile is blocked by the KingmakerGunslinger 0.0.136 update |
+| Advanced-save disposable copy tooling | implemented + stand-ins: guarded bootstrap (`-Family Advanced`), family pair lookup, manifest binding, protocol family gate, non-casting `live-advanced-inspect`, protected-save comparison, whole-run completion record gating advanced casting. Not in-game: no `KBP_ADVANCED_SEED` yet (`docs/ADVANCED-SEED-COMPATIBILITY.md`) |
 
 ### Bucket 2 — Private supported-subset gameplay alpha (after explicit native-test approvals)
 
@@ -29,8 +29,9 @@ readiness. Evidence words mean exactly this:
 | --- | --- |
 | Explicit projection with complete identity, refusal of unsupported contracts | implemented + stand-ins |
 | Zero-cost (Unlimited) native reservations | implemented + stand-ins; selection in-game (Resistance selected); **no cast** |
-| One-shot probe boundary, fresh observations, owned terminal cleanup | implemented + stand-ins; boundary never constructed in-game |
-| First native cast (cantrip) | **not run**; proposal in `docs/LIVE-CAST-PROBE-REQUEST.md` awaits owner approval |
+| One-shot probe boundary, fresh observations, owned terminal cleanup | **in-game**: constructed, submitted once, disposed, cleaned up (two identified runs) |
+| First native cast (cantrip) | **in-game PASS**: `casting-probe-cast-20260923-p2-02` (`320a1b6`) confirmed a new Resistance instance, free, zero violations; the earlier run p1-01 exposed casting inside the open planner (fixed). Receipt `docs/evidence/casting-probe-20260923-receipt.md` |
+| Casting only while the world runs (Default mode, not paused, planner closed) | implemented + stand-ins; **in-game** for the probe (`worldRunningAtSubmit=True`) |
 | Paid-slot cast (finite resource) | not run; needs its own request after the cantrip |
 | Production dispatch and run host (one run, per-frame pump, one terminal for stop/deadline/area change/disable/unload/teardown) | implemented + stand-ins; locked to a refusing boundary in runtime-test sessions; **no cast** |
 | Live existing-effect policy (weaker/expiring/unprovable never satisfied; active effect needs no slot) | implemented + stand-ins |
