@@ -5,7 +5,19 @@ Linked from `AUTONOMOUS-RESUME.md`. Specification: the adopted
 `Kingmaker-Buff-Planner-Casting-First-Migration-Charter.md` (casting-first
 migration and native scroll UI charter v1.0, 2026-09-19).
 
-## CURRENT STATE — K-review (`258a1d0`) answered — 2026-09-22
+## CURRENT STATE — L-review (`475d2b9`) answered; probe dormant — 2026-09-23
+
+L1–L6 are repaired in source (dispositions in
+`docs/CASTING-FIRST-REVIEW-INDEX.md`); native dispatch stays disabled in
+the production workspace. Full Windows PowerShell 5.1 gate at
+`2117438`: source 42/42, protocol 250/250, harness 28/28, deploy WhatIf
+5/5, launcher WhatIf 8/8, fixture 3/3, Restore-InstallLocal 16/16,
+publisher 3/3. The single-cast probe is implemented but dormant; two
+selection-only live runs found no eligible casting on the WORKING
+fixture (cantrips only). No cast has been run. The K-review section
+below is history.
+
+## K-review (`258a1d0`) answered — 2026-09-22 (history)
 
 K1–K7 are repaired in source (dispositions table in
 `docs/CASTING-FIRST-REVIEW-INDEX.md`); native dispatch remains disabled.

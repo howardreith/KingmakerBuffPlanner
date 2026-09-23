@@ -1,117 +1,130 @@
-# First live casting probe — approval REQUEST (not executed)
+# First live casting probe — prepared, dormant, awaiting approval
 
-Status: **REQUEST ONLY. Nothing here has run.** Native dispatch stays
-disabled in every build on this branch. This document asks the owner for
-one separate, explicit approval; without it no part of section 3 is
-built into a runnable scenario and no cast is attempted.
+Status: **NOT EXECUTED. Nothing in this document is approval.** The probe
+code exists and is tested with recording runtimes, but it cannot submit a
+native cast unless the owner writes a run-bound allowance file (section
+4). The production workspace still uses the disabled dispatch boundary.
 
-Prepared on branch `codex/kingmaker-buff-planner-casting-first` after
-review K1–K7 were answered (K6 at `b243b02`). The approval should name
-the exact commit the probe code lands on.
+This replaces the earlier request, which asked for approval of a commit
+that did not yet contain the probe code (review L, "sequencing loop").
 
-## 1. What would be approved
+## 1. What exists (source, all at `2117438`)
 
-Exactly **one native cast** of **one discovered spell** by **one party
-caster** on **one other party member**, out of combat, in the approved
-`KBP_AUTOMATION_WORKING` fixture, through the casting-first path:
+| Piece | Where | What it guarantees |
+| --- | --- | --- |
+| Probe subset | `Planning/ExplicitCastingStepConverter.cs` (`SingleCastProbe` scope) | Exactly one direct-target casting; spellbook source, no metamagic, no special source; caster ≠ target; target in the verified reachable set; plain direct rule-cast strategy; current-target buff effects only; no enhancement, targeting modifier, group, material or non-native cost. Undefined scope values refused. |
+| Projection identity | same file (`CanonicalContract`, `ProjectionId`) | SHA-256 of a versioned canonical JSON of every executable/observed step field, including exact reserved tokens and the expected effect tree. |
+| Selector | `Execution/SingleCastProbe.cs` (`SingleCastProbeSelector`) | Deterministic first eligible casting from live discovery (ordinal provider, then target). It only picks; the converter enforces. |
+| Allowance | same file (`SingleCastProbeAllowance`) | Strict owner-written JSON: exact members, this run id, the 64-hex approved projection id, caster, target, source, `maximumNativeSubmissions = 1`, approver. |
+| Boundary | same file (`SingleCastProbeBoundary`) | Refuses by default. Recomputes the identity from the steps it is handed. Requires the approved id and selection. Consumes the allowance before anything reaches the game. Runs the existing `InstantCastExecutor` + `KingmakerInstantCastAdapter` through `ExplicitCastingRunCoordinator` with one submission. Disposal cancels and reaches the executor's cleanup. Never retries. |
+| Scenarios | `RuntimeTesting/RuntimeTestHost.cs`, `RuntimeTestProtocol.cs`, `scripts/Invoke-KingmakerRuntimeTest.ps1` | `live-cast-probe-select`: WORKING fixture, zero synthetic input, records the selection, projection id and canonical contract, never constructs a boundary. `live-cast-probe`: the same plus the allowance, a 60 s run deadline and a `probe-stop.json` marker. The launcher requires `-ProbeAllowancePath` under `C:\Dev\KingmakerBuffPlannerLab\approvals\` with matching run id and build commit; the protocol accepts the allowance only on `live-cast-probe`, instant mode only. |
 
-authored casting → compiler → apply gate → `ExplicitCastingStepConverter`
-with `ExplicitProjectionScope.SingleCastProbe` → the exact projection
-(its `ProjectionId`) → `ExplicitCastingRunCoordinator` with
-`maximumSubmissions = 1` → the existing, unchanged `InstantCastExecutor`
-and `KingmakerInstantCastAdapter`.
+Source tests (recording runtimes, not gameplay):
+`single-cast-probe-is-dormant-and-one-shot`,
+`probe-scope-enforces-whole-subset`, `projection-identity-is-complete`,
+`explicit-run-cancellation-disposes-executor`,
+`probe-scenario-request-validation`, `single-cast-probe-run-record-rules`,
+and the launcher gating cases in `Test-RuntimeLauncherFileWhatIf.ps1`.
 
-Not included: rods, metamagic, any enhancement, targeting modifiers
-(Share Transmutation and similar), group or mass castings, material
-costs, a second casting, retries, combat, ordinary saves, the owner's
-real campaigns, or any global "enable native casting" setting.
+## 2. Build identity (the code a probe would run)
 
-## 2. Exact identity the run must prove before the cast
-
-| Item | Required value |
+| Item | Value |
 | --- | --- |
-| Source commit | the approved commit, equal to the build manifest commit; clean tree |
-| Package | fresh `Build-Local.ps1` ZIP; SHA-256 recorded in the request receipt |
-| DLL | SHA-256 and module MVID recorded; the runtime host logs the same MVID |
-| Run id | fresh, `casting-probe-<yyyyMMdd-HHmmss>` |
-| Fixture | `Manual_403_KBP_AUTOMATION_WORKING.zks` (only mutable fixture); `Manual_401_KBP_AUTOMATION_SEED.zks` and every other save byte-identical before and after |
-| Candidate | isolated: the probe document is written by the run into the run's own staging `UserSettings`; **no automatic legacy import** (the run starts from a probe-only document and never calls the migration service) |
-| Compatibility profile | `full-user` (the proven profile) |
-| Deployment | the existing transactional stage/restore (`Enter-KbpRuntimeTransaction`), with restoration verified against the original Mods manifest |
+| Source commit | `2117438756a4c8a202bd0008d87f0a9731f9dd87` (pushed; remote HEAD verified) |
+| Package | `KingmakerBuffPlanner-0.1.1-rc3-local-runtime.zip`, SHA-256 `6ae6f24e8b801d5727fbb8b4f9473c5dbe045c364094ea8993d6051fd5cb6ed4` |
+| DLL | SHA-256 `90ce738cc92f7156114b5340f8334ebb8f90ce459353413edba53bc097ed1ed9`, MVID `07569a08-9fdc-4647-b63c-705e95c5bb90` |
+| Fixture | `Manual_403_KBP_AUTOMATION_WORKING.zks`, re-hashed by the launcher on every run (never trusted by name) |
 
-## 3. Code the approval would add (none of it exists yet)
+## 3. Selection: none is possible on the WORKING fixture yet
 
-1. A `live-cast-probe` scenario in the launcher and runtime host. The
-   capability is **run-scoped**: the host receives it only through that
-   run's protocol file and only for that run id; no setting, hotkey or
-   UI element can enable it.
-2. A probe dispatch boundary used only by that scenario. It accepts a
-   projection only when `Scope == SingleCastProbe`, `Converted`, exactly
-   one casting, and a `ProjectionId` equal to the id computed at review
-   time. Any other input is refused and recorded; the production
-   workspace keeps `DisabledCastingDispatchBoundary`.
-3. Discovery-driven choice, not hard-coded content: the host picks the
-   first party caster with a discovered direct-target buff spell (not
-   personal range) that has a native slot or cast available, no material
-   component and no enhancement applied, and a legal second party member
-   as target. The chosen caster, source, spellbook,
-   level and target are written to the evidence **before** the cast, and
-   the run fails closed as `Not Run` if none qualifies.
+Two selection-only live runs found **no eligible probe casting**. Both
+used `live-cast-probe-select` with the full-user profile and zero
+synthetic input. Neither constructed a dispatch boundary. Both closed
+the workspace, released the input lease and verified restoration.
 
-## 4. Observation and stop rules
+| Run | Result |
+| --- | --- |
+| `casting-probe-select-20260923-052640` | 8 target candidates, no reasons recorded (led to the diagnostics commit) |
+| `casting-probe-select-20260923-053136` at `2117438` | 8 target candidates plus skipped options, every one rejected with a reason |
 
-- **Before:** target buff list (the expected effect absent or its
-  duration recorded), caster's spellbook resource for that source
-  (slots/casts remaining), in-combat flag false, both units conscious
-  and in range.
-- **Submit once** through the coordinator; `maximumSubmissions = 1`.
-- **After:** the expected effect present on the target, the caster's
-  resource decreased by exactly the reserved units, no other unit's
-  buffs or resources changed, no residual command/animation state.
-- **No retry** on any outcome. A validation refusal, submission
-  failure, unconfirmed effect, timeout or residual state ends the run
-  with that outcome recorded (the K5 halt).
-- **Deadline:** the scenario's `TimeoutSeconds` (proposed 600). On
-  expiry: no further input, owned game exit, restoration.
-- **Cancel:** the existing run-bound stop marker ends the run before the
-  submit if present; after the submit it only shortens observation.
-- **Exit and restoration:** owned exit of the game process, Mods tree
-  restored and compared to the original manifest, fixture hashes
-  compared, `deployment.lock` released, transaction `Restored`.
-- The WORKING fixture is **not saved** by the scenario; the gameplay
-  effect lives only in the process that is then exited.
+The recorded reasons from the second run:
 
-## 5. Negative gates already proven in source tests
+- **Every spellbook option is a level-0 spell (a cantrip).** A cantrip
+  has no native resource cost. The converter requires exactly one native
+  pool cost line per step, so it refuses with
+  `native-cost-count:probe-cast-1:0`. Cantrips therefore cannot be
+  projected in the standard scope either. This is a real gap, not a
+  probe artifact.
+- **Every other option is a fact-sourced ability**, which the probe
+  subset excludes (`source-kind-or-metamagic`).
 
-These run in the unit/protocol suite on every gate (recording runtimes,
-not gameplay):
+So there is no projection id to approve yet. There are two ways forward,
+and both are the owner's decision:
 
-- `converter-refuses-unsupported-contracts`: an enabled targeting
-  modifier, an exact-source enhancement, and incomplete required group
-  coverage each refuse the whole projection.
-- Probe-scope cases in the same suite: two castings, a fully covered
-  group casting, an enhancement, a (disabled) targeting-modifier
-  selection and a material cost each convert or are allowed under the
-  standard scope (hard fixture preconditions) yet are refused under
-  `SingleCastProbe`; one plain direct casting is accepted with a
-  deterministic 64-hex `ProjectionId`. Each probe refusal was
-  mutation-checked: removing it fails the test.
-- `explicit-run-stops-after-failure-both-modes`: in instant and animated
-  modes, a failure of casting 1 (validation, enhancement preparation,
-  thrown submission, rejected submission or unconfirmed effect for
-  instant; validation, enhancement, thrown start, failed operation or
-  timeout for animated) leads to zero validation or submission of
-  casting 2 and no retry of casting 1; `maximumSubmissions = 1` stops
-  the second casting of a clean plan.
+1. **Model zero-cost native casts** (recommended). Teach the converter an
+   explicit zero-cost native contract for cantrips (no reservation,
+   expected resource delta 0), keep every other probe restriction, and
+   rerun the selection. The pass rule would then observe the effect and
+   an unchanged pool. This is source work within current authority; only
+   the cast itself needs approval.
+2. **Use a fixture with a level-1 buff slot.** This changes the approved
+   fixture and needs explicit owner approval.
+
+## 4. The allowance file (the owner writes it; Claude does not)
+
+Once a selection run reports a projection id, the allowance uses the
+values from that run's `probe-selection.json`.
+
+Save it under the lab approvals directory as `<run id>.json`:
+
+```json
+{
+  "schemaVersion": 1,
+  "kind": "kbp-single-cast-probe",
+  "runId": "<run id>",
+  "sourceCommit": "<the commit the probe runs at>",
+  "approvedProjectionId": "<64-hex projectionId from probe-selection.json>",
+  "casterUnitId": "<casterUnitId>",
+  "targetUnitId": "<targetUnitId>",
+  "sourceId": "<sourceId>",
+  "maximumNativeSubmissions": 1,
+  "approvedBy": "Howie"
+}
+```
+
+Then the run is:
+
+```powershell
+& 'scripts/Invoke-KingmakerRuntimeTest.ps1' -Scenario live-cast-probe `
+  -CompatibilityProfileId full-user -RunId <run id> `
+  -ProbeAllowancePath 'C:\Dev\KingmakerBuffPlannerLab\approvals\<run id>.json' `
+  -TimeoutSeconds 900 -Confirm:$false
+```
+
+The allowance is consumed by that one run. It cannot be reused: the run id
+is single-use, and the boundary refuses a second submission.
+
+## 5. Observation and pass rule
+
+- **Before:** the selected pool's remaining count (recorded at selection).
+- **One submission** through the coordinator. The executor itself
+  requires out-of-combat, validates the target, fires the rule cast,
+  observes the expected effect on the target and the resource delta, and
+  settles or cleans up delivery state.
+- **After:** the pool's remaining count from a fresh discovery.
+- **PASS** only if the allowance was valid, the one casting is
+  `EffectConfirmed` with no failure record, the outcome reports the
+  approved projection id, the pool dropped by exactly the reserved units,
+  and the workspace closed with the input lease released.
+- **Deadline/stop:** 60 s or `probe-stop.json` disposes the run
+  (executor cleanup runs) and the result is FAIL, never a retry.
+- **Restoration:** the existing transaction restores Mods and verifies
+  the fixture hashes. That does not undo the in-process effect or the
+  spent slot. The WORKING save is never written by the scenario.
 
 ## 6. What a PASS would and would not mean
 
 A PASS proves one native cast of one plain spell through the
 casting-first projection on the WORKING fixture, and clean restoration.
-It does not qualify rods, enhancements, modifiers, groups, multi-cast
-routines, animated mode in gameplay, or any release.
-
-## 7. Approval wording requested
-
-"Approved: one live-cast-probe run on commit <sha>, WORKING fixture,
-single direct-target cast as described in LIVE-CAST-PROBE-REQUEST.md."
+It does not qualify rods, metamagic, enhancements, modifiers, groups,
+multi-cast routines, animated mode, or any release.

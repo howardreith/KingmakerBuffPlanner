@@ -1,6 +1,64 @@
 # AUTONOMOUS-RESUME — top section is current; planning/CASTING-FIRST-MIGRATION-STATUS.md is the per-checkpoint tracker.
 
-## K-review (`258a1d0`) answered; first live cast prepared as a request — 2026-09-22 (LATEST)
+## L-review (`475d2b9`) answered; single-cast probe prepared and dormant — 2026-09-23 (LATEST)
+
+Pro's `475d2b9` follow-up review (L1–L6) is answered in source. The UI,
+repaired loader, coverage fix, failed-import blocking, provenance ids,
+staged rollback and stop-after-failure coordinator are all preserved.
+Native dispatch stays disabled in the production workspace. No probe
+cast was run.
+
+Commits (all pushed through the guarded helper; remote HEAD verified at
+each push):
+
+| Commit | Content |
+| --- | --- |
+| `58a1aaf` | L1 imported requirements enforced in the gate, compiler and authoring service |
+| `2929985` | L2 coordinator owns and disposes the active executor; animated cancel reporting |
+| `cd5bc4a` | L3 complete versioned projection identity; L6 whole probe subset |
+| `aa3b95c` | L4 partial-swap recovery; L5 candidate compatibility by declared format |
+| `6f22a78` | Dormant probe: selector, strict allowance, one-shot boundary, gated scenarios |
+| `2117438` | Probe selector records per-candidate rejection reasons |
+
+Evidence layers, kept separate:
+
+- **Source tests:** full Windows PowerShell 5.1 gate at `2117438`:
+  source 42/42, protocol 250/250, harness 28/28, deploy WhatIf 5/5,
+  launcher WhatIf 8/8, fixture 3/3, Restore-InstallLocal 16/16,
+  publisher 3/3. Each new guard was mutation-checked (L1 6/6, L2 6/6,
+  L3 6/7 with one equivalent survivor, L6 5/5, L4/L5 script 6/6, probe
+  8/8).
+- **Recording-runtime evidence:** L2 and the probe boundary drive the
+  REAL instant and animated executors through scripted runtimes. This
+  proves disposal, halting and one-shot logic, not game behaviour.
+- **Actual gameplay:** none. No native cast has been attempted by the
+  casting-first path.
+- **Live non-casting runs:** two `live-cast-probe-select` runs
+  (`casting-probe-select-20260923-052640`, `…-053136`) on the WORKING
+  fixture. Each had zero synthetic input and no dispatch boundary; the
+  workspace closed, the input lease was released and restoration was
+  verified. Both returned FAIL at `probe-validation` because no eligible
+  casting exists. The fixture's spellbook buffs are all cantrips, which
+  the converter cannot project (zero native cost), and the rest are
+  fact abilities.
+- **Manual UI acceptance:** nothing new.
+- **Restoration:** verified for both live runs. K6/L4/L5 rollback
+  changes are proven only on isolated fixtures, never on the live
+  installation.
+
+Operational note: a gate run launched with an interactive stdin hung in
+the launcher test's ShouldProcess pattern check (a confirmation prompt).
+Gates are now run with `-NonInteractive` and stdin closed. A later gate
+hit a transient "access denied" moving a freshly extracted folder in the
+harness test's own temp area; the immediate rerun passed.
+
+Next (owner decisions, see `docs/LIVE-CAST-PROBE-REQUEST.md`): either
+approve modelling zero-cost native casts (cantrips) so a selection
+exists on the current fixture (recommended; source work), or approve a
+fixture with a level-1 buff slot. The cast itself always needs a
+separate allowance file written by the owner.
+
+## K-review (`258a1d0`) answered; first live cast prepared as a request — 2026-09-22 (history)
 
 Pro's `258a1d0` review (K1–K7) is answered in source; the new UI, native
 page borrowing, the converter and the earlier repairs are preserved; the
