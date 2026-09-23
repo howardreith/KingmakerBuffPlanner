@@ -86,11 +86,28 @@ namespace KingmakerBuffPlanner.UI
         public string CasterDisplayName { get; private set; }
         public string DirectTargetDisplayName { get; private set; }
 
-        internal void ApplyDisplayNames(string caster, string target)
+        internal void ApplyDisplayNames(string caster, string target,
+            Func<string, string> nameOf = null)
         {
             CasterDisplayName = caster ?? CasterUnitId ?? string.Empty;
             DirectTargetDisplayName = target;
+            Func<string, string> resolve = nameOf ?? (id => id);
+            // Players read names, never unit ids: the anchored origin and
+            // the missed-coverage list are resolved like caster and target.
+            const string originPrefix = "Origin: ";
+            if (OriginLabel != null && OriginLabel.StartsWith(originPrefix,
+                    StringComparison.Ordinal))
+            {
+                string anchor = OriginLabel.Substring(originPrefix.Length);
+                if (!string.Equals(anchor, "caster", StringComparison.Ordinal))
+                    OriginLabel = originPrefix + (resolve(anchor) ?? anchor);
+            }
+            CoverageGapDisplayNames = (CoverageGapUnitIds ?? new string[0])
+                .Select(id => resolve(id) ?? id).ToList();
         }
+
+        public IReadOnlyList<string> CoverageGapDisplayNames { get; private set; } =
+            new string[0];
         public string SourceId { get; private set; }
         public string ModeLabel { get; private set; }
         public string DirectTargetUnitId { get; private set; }

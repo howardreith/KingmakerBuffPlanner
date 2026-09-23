@@ -701,6 +701,41 @@ namespace KingmakerBuffPlanner.UI
                     arrow.rectTransform.anchoredPosition = new Vector2(76f, 0f);
                     AddCardPortrait(entry, "TargetPortrait", card.DirectTargetUnitId, 102f);
                 }
+                else
+                {
+                    // Group casting: one cast, several predicted
+                    // beneficiaries (small portraits); intended recipients
+                    // outside predicted coverage stay visible in red —
+                    // never silently covered by another casting.
+                    Text arrow = KingmakerUiFactory.CreateText("Arrow", entry, _theme,
+                        "⇉", 20, TextAnchor.MiddleCenter);
+                    KingmakerUiFactory.SetAnchors(arrow.rectTransform, 0f, 0f, 0f, 1f);
+                    arrow.rectTransform.pivot = new Vector2(0f, 0.5f);
+                    arrow.rectTransform.sizeDelta = new Vector2(24f, 0f);
+                    arrow.rectTransform.anchoredPosition = new Vector2(76f, 0f);
+                    var shown = new List<KeyValuePair<string, bool>>();
+                    foreach (string unit in card.PredictedBeneficiaryUnitIds ?? new string[0])
+                        shown.Add(new KeyValuePair<string, bool>(unit, false));
+                    foreach (string unit in card.CoverageGapUnitIds ?? new string[0])
+                        shown.Add(new KeyValuePair<string, bool>(unit, true));
+                    for (int index = 0; index < shown.Count && index < 6; index++)
+                    {
+                        RectTransform small = KingmakerUiFactory.CreateRect(
+                            "Beneficiary." + shown[index].Key, entry);
+                        KingmakerUiFactory.SetAnchors(small, 0f, 0.5f, 0f, 0.5f);
+                        small.pivot = new Vector2(0f, 0.5f);
+                        small.sizeDelta = new Vector2(30f, 38f);
+                        small.anchoredPosition = new Vector2(
+                            102f + (index % 3) * 32f, index < 3 ? 20f : -20f);
+                        Sprite portrait = BuffPlannerScreenView.ResolvePortrait(shown[index].Key);
+                        Image image = small.gameObject.AddComponent<Image>();
+                        image.sprite = portrait;
+                        image.preserveAspect = true;
+                        image.raycastTarget = false;
+                        image.color = portrait == null ? new Color(0f, 0f, 0f, 0.08f)
+                            : shown[index].Value ? new Color(1f, 0.45f, 0.45f, 1f) : Color.white;
+                    }
+                }
                 string coverage = card.CoverageSummary.Length == 0
                     ? string.Empty : " · " + card.CoverageSummary;
                 string buffName = _session.ShowWholeRoutine
@@ -759,9 +794,9 @@ namespace KingmakerBuffPlanner.UI
                 parts.Add("Enhancements: " + string.Join(", ", card.EnhancementLabels));
             if (card.CostLabels.Count != 0)
                 parts.Add("Cost: " + string.Join(", ", card.CostLabels));
-            if (card.CoverageGapUnitIds.Count != 0)
+            if (card.CoverageGapDisplayNames.Count != 0)
                 parts.Add("Outside coverage: " + string.Join(", ",
-                    card.CoverageGapUnitIds));
+                    card.CoverageGapDisplayNames));
             if (card.ReadinessReasons.Count != 0)
                 parts.Add("Reasons: " + string.Join(", ", card.ReadinessReasons));
             return string.Join("  ·  ", parts);

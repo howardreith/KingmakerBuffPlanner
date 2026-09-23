@@ -385,6 +385,8 @@ namespace KingmakerBuffPlanner.Tests
                     () => TestWorkspaceChooseDraftCaster(root));
                 Run("workspace-buff-summary-and-coverage-legend",
                     () => TestWorkspaceBuffSummaryAndCoverage(root));
+                Run("workspace-group-card-names",
+                    TestWorkspaceGroupCardNames);
             }
             finally
             {
@@ -13590,6 +13592,34 @@ namespace KingmakerBuffPlanner.Tests
                 .FirstOrDefault(source => source.SourceId == "source-bulls");
             if (selected == null || selected.IconAbility == null)
                 throw new InvalidOperationException("The buff grid has no icon ability for a discovered buff.");
+        }
+
+        // Group cards read names, never unit ids: anchored origin and the
+        // missed-coverage list resolve through the same unit names.
+        private static void TestWorkspaceGroupCardNames()
+        {
+            var card = new WorkspaceCastingCard("cast-9", "long", 0, "unit-cleric",
+                "source-communal", "Group · anchored", null, "Origin: unit-t2",
+                new[] { "unit-t2", "unit-t3" }, new[] { "unit-t2" },
+                new[] { "unit-t3" }, new string[0], new string[0],
+                ResolvedCastingReadiness.Ready, new string[0], false);
+            card.ApplyDisplayNames("Cleric", null, id =>
+                id == "unit-t2" ? "Bob" : id == "unit-t3" ? "Rogue" : id);
+            if (card.OriginLabel != "Origin: Bob" ||
+                card.CoverageGapDisplayNames.Count != 1 ||
+                card.CoverageGapDisplayNames[0] != "Rogue" ||
+                card.Headline != "Cleric → Origin: Bob" ||
+                card.CoverageSummary != "coverage 1/2")
+                throw new InvalidOperationException("Group card names are wrong: " +
+                    card.Headline + " | " + string.Join(",", card.CoverageGapDisplayNames.ToArray()) +
+                    " | " + card.CoverageSummary);
+            var caster = new WorkspaceCastingCard("cast-8", "long", 0, "unit-cleric",
+                "source-communal", "Group · caster-centered", null, "Origin: caster",
+                new string[0], new string[0], new string[0], new string[0],
+                new string[0], ResolvedCastingReadiness.Ready, new string[0], false);
+            caster.ApplyDisplayNames("Cleric", null, id => "X");
+            if (caster.OriginLabel != "Origin: caster")
+                throw new InvalidOperationException("The caster-centered origin was renamed.");
         }
 
         // The Unity-bound host cannot be compiled here, so its wiring to the

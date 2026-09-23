@@ -333,7 +333,9 @@ namespace KingmakerBuffPlanner.UI
                         out string casterName) ? casterName : null,
                     card.DirectTargetUnitId == null ? null
                         : namesByUnit.TryGetValue(card.DirectTargetUnitId,
-                            out string targetName) ? targetName : null);
+                            out string targetName) ? targetName : null,
+                    id => id != null && namesByUnit.TryGetValue(id,
+                        out string unitName) ? unitName : id);
             var budget = plan.BudgetLines
                 .Select(line => new WorkspaceBudgetRow(line)).ToList();
             CastingApplyDecision selectedGate = _gate.Evaluate(
