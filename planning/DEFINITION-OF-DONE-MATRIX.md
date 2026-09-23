@@ -1,6 +1,6 @@
 # Definition of Done Matrix
 
-## Casting-first migration — release buckets (updated 2026-09-23, live qualification at `d35b38f`)
+## Casting-first migration — release buckets (updated 2026-09-23, 0.2.0-rc1: live qualification at `d35b38f`, in-game reload at `2024578`)
 
 No percentage or date is claimed; green unit tests do not measure
 readiness. Evidence words mean exactly this:
@@ -36,7 +36,7 @@ readiness. Evidence words mean exactly this:
 | Production dispatch and run host (one run, per-frame pump, one terminal for stop/deadline/area change/disable/unload/teardown) | **in-game** for session Apply, the host and the real instant executor behind the qualification boundary (three runs: stop, complete, recast); area change, disable, unload and animated mode not in game |
 | Live existing-effect policy (weaker/expiring/unprovable never satisfied; active effect needs no slot) | implemented + stand-ins |
 | Per-routine review acceptance persisted across sessions; skip flips are harmless refreshes | **in-game**: the recast step ran from a session reopened from disk, authorized by the restored acceptance |
-| Multi-cast routine, halting after failure, interruption, reload | multi-cast routine, player stop and close/reopen **in-game** (zero-cost qualification); halting after a failed casting and save/reload stand-ins only |
+| Multi-cast routine, halting after failure, interruption, reload | multi-cast routine, player stop and close/reopen **in-game** (zero-cost qualification); in-game save reload **in-game** (`casting-ws-reload-20260923-s2-01`: the exact test save loaded again, saved plan kept, one subscription, one HUD root, no run); halting after a failed casting stand-ins only |
 | Casting qualification `zero-cost-mixed` (automation fixture): stop, complete, repeat, reopen, recast, judged per step and stopped at the first failure | **in-game PASS**: `casting-qual-cast-20260923-q1-01` on `d35b38f`, zero violations; receipt `docs/evidence/casting-qual-20260923-receipt.md` |
 | Casting qualification `finite-direct-mixed` (advanced copy): exact prepared slots, spontaneous levels, mixed casters, metamagic | implemented + stand-ins (exact token and availability judging); **not run** (needs a `KBP_ADVANCED_SEED`, a passing inspection and an allowance) |
 | Group casts, anchored origin | implemented + stand-ins; not in-game |
@@ -50,7 +50,7 @@ readiness. Evidence words mean exactly this:
 | Deliberate activation path | implemented: UMM planner-mode setting, Classic by default; player guide `docs/CASTING-FIRST-PLAYER-GUIDE.md` |
 | Owner usability acceptance of the workspace | not accepted |
 | Source-type tabs, routine tabs with counts, per-card last-run outcome | source tabs **in-game** (clicked by the live workspace run); routine tabs and last-run lines rendered in game frames; not accepted |
-| Player-facing resource names on cards and the budget footer | implemented + stand-ins (`48e46e3`, from the live frames) |
+| Player-facing resource names on cards and the budget footer; refusals in words; routine-wide header; editing label names the casting | **in-game** frames (`casting-ws-qual-20260923-r1-01`, `casting-ws-reload-20260923-s2-01`); not accepted |
 | Install/rollback on a real installation | stand-ins only (K6/L4/L5 isolated fixtures; the planner-mode and review-state files are covered) |
 | Release packaging and publisher gates | existing tooling; not exercised for casting-first |
 
