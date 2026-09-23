@@ -546,6 +546,20 @@ namespace KingmakerBuffPlanner.UI
                     ";requested=" + gate.RequestedTargets + ";planned=" + gate.PlannedCasts +
                     ";unfulfilled=" + gate.Unfulfilled + ";skipped=" + gate.SkippedActive + ".");
             }
+            // An automation session never casts through the classic routes
+            // either (NativeCastingSessionPolicy); the plan was still built
+            // and gated above, so the refusal is the only difference.
+            if (NativeCastingSessionPolicy.Locked)
+            {
+                LastExecutionReport = new ExecutionReport(preview.Plan);
+                Status = routineName + " was not cast: native casting is disabled in this " +
+                    "automated test session.";
+                Complete(completed, new QuickExecutionResult(routineId, routineName,
+                    QuickExecutionDisposition.Refused, Status, preview.Plan.Steps.Count, 0, 0));
+                _log.Info("[KBP-QUICK] runtime-test lock refused;group=" + routineId +
+                    ";reason=" + NativeCastingSessionPolicy.LockReason + ".");
+                yield break;
+            }
             // The native state is about to change by design; the reviewed
             // baseline for this routine is spent with it.
             _review.Spent(routineId);

@@ -845,12 +845,13 @@ namespace KingmakerBuffPlanner.UI
             if (_castingHost.IsRunning)
             {
                 string running = _castingHost.ActiveScopeRoutineId ?? "the";
-                _castingHost.Cancel("player-stopped");
+                _castingHost.RequestStop("player-stopped");
                 _log.Info("[KBP-CF-RUN] stop requested by routine press;routine=" + routineId +
-                    ";running=" + running + ".");
+                    ";running=" + running + ";effective=after-current-cast.");
                 CompleteQuick(completed, new QuickExecutionResult(routineId, name,
                     QuickExecutionDisposition.Refused,
-                    "Stopped the running " + running + " routine.", 0, 0, 0));
+                    "Stopping the running " + running + " routine after the cast in progress.",
+                    0, 0, 0));
                 return true;
             }
             // One fresh discovery pass serves both the campaign identity and
@@ -1047,13 +1048,14 @@ namespace KingmakerBuffPlanner.UI
             return _screen != null && _screen.Open();
         }
 
-        // Session-scoped development selection: the casting-first workspace
-        // renders instead of the legacy screen for this whole session. It
-        // consumes the same discovery data through the legacy session's
+        // The casting-first planner (selected in the mod settings, or by a
+        // workspace runtime scenario) renders instead of the classic screen.
+        // It consumes the same discovery data through the classic session's
         // model (one snapshot, one option set, one effect map) and owns its
-        // candidate records through its own session; the legacy authoring
-        // path is never open at the same time. Native submission stays
-        // explicitly disabled at its dispatch boundary.
+        // records through its own session; the classic authoring path is
+        // never open at the same time. Its Apply reaches the native host
+        // through the production dispatch boundary (refusing in an
+        // automated test session; see NativeCastingSessionPolicy).
         private bool OpenCastingWorkspace()
         {
             if (_castingWorkspace != null) return false;
@@ -1292,8 +1294,8 @@ namespace KingmakerBuffPlanner.UI
             if (_castingHost != null && _castingHost.IsRunning)
                 return string.Equals(_castingHost.ActiveScopeRoutineId, routineId,
                         StringComparison.Ordinal)
-                    ? name + " is running. Press again to stop after the current cast."
-                    : "Another routine is running. Press to stop it.";
+                    ? name + " is running. Press again to stop it after the cast in progress."
+                    : "Another routine is running. Press to stop it after the cast in progress.";
             CastingWorkspaceSession session = _castingWorkspaceSession;
             if (session == null)
                 return "Cast " + name + " (casting-first planner). Open the planner to " +
@@ -1301,12 +1303,30 @@ namespace KingmakerBuffPlanner.UI
             name = session.RoutineDisplayName(routineId);
             int castings = session.Document.Castings.Count(value => value != null &&
                 string.Equals(value.RoutineId, routineId, StringComparison.Ordinal));
-            bool accepted = session.ReviewStatusFor(routineId) == CastingReviewStatus.Accepted;
+            // The tooltip never recomputes the plan: an acceptance on file
+            // is described as such, not as a promise that the press runs.
+            string acceptance;
+            switch (session.AcceptanceStandingFor(routineId))
+            {
+                case CastingAcceptanceStanding.Current:
+                    acceptance = ". Accepted.";
+                    break;
+                case CastingAcceptanceStanding.OnFile:
+                    acceptance = ". An accepted plan is on file; it runs only if nothing " +
+                        "changed since.";
+                    break;
+                case CastingAcceptanceStanding.Changed:
+                    acceptance = ". It differs from the accepted plan right now - open the " +
+                        "planner to see why.";
+                    break;
+                default:
+                    acceptance = ". Not yet accepted - open the planner to review it.";
+                    break;
+            }
             string last;
             _lastCastingPress.TryGetValue(routineId, out last);
             return "Cast " + name + ": " + castings + (castings == 1 ? " casting" : " castings") +
-                ", " + session.ExecutionMode + " mode" + (accepted ? "."
-                    : ". Not yet accepted - open the planner to review it.") +
+                ", " + session.ExecutionMode + " mode" + acceptance +
                 (string.IsNullOrEmpty(last) ? string.Empty
                     : " Last: " + (last.Length <= 180 ? last : last.Substring(0, 177) + "..."));
         }

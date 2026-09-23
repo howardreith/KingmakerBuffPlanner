@@ -204,7 +204,11 @@ namespace KingmakerBuffPlanner.UI
                     PerCastingDeadlineMillis * projection.Plan.Steps.Count);
             active.Run = new ExplicitCastingRunCoordinator(executor)
                 .Run(projection, outcome => active.Outcome = outcome,
-                    entry => active.FinishedCastings++);
+                    entry =>
+                    {
+                        active.FinishedCastings++;
+                        active.BetweenCastings = true;
+                    });
             _active = active;
             StartedRuns++;
             return new CastingDispatchOutcome(true, "run-started:" + runId, ids);
@@ -220,8 +224,16 @@ namespace KingmakerBuffPlanner.UI
                 Terminate(active, "deadline");
                 return;
             }
+            // A requested stop takes effect between castings: the cast in
+            // progress always finished (with its own cleanup) first.
+            if (active.StopRequested != null && active.BetweenCastings)
+            {
+                Terminate(active, active.StopRequested);
+                return;
+            }
             bool moved;
             active.Pumped = true;
+            active.BetweenCastings = false;
             try { moved = active.Run.MoveNext(); }
             catch (Exception exception)
             {
@@ -232,7 +244,21 @@ namespace KingmakerBuffPlanner.UI
             if (!moved) Terminate(active, "completed");
         }
 
-        // The player's deliberate stop (or any owner stop) of the active run.
+        // The player stop: the run ends at the next point between castings,
+        // so the cast in progress completes normally (a run not started yet
+        // ends at once). Deadline, disable, unload, area change and teardown
+        // use Cancel/Shutdown and stop immediately.
+        public bool RequestStop(string reason)
+        {
+            ActiveRun active = _active;
+            if (active == null) return false;
+            active.StopRequested = string.IsNullOrEmpty(reason) ? "stopped" : reason;
+            if (!active.Pumped || active.BetweenCastings) Terminate(active, active.StopRequested);
+            return true;
+        }
+
+        // An immediate stop of the active run (the in-flight executor is
+        // disposed, which interrupts and cleans up the cast in progress).
         public bool Cancel(string reason)
         {
             ActiveRun active = _active;
@@ -385,6 +411,8 @@ namespace KingmakerBuffPlanner.UI
             internal bool Terminated;
             internal bool Pumped;
             internal int FinishedCastings;
+            internal bool BetweenCastings;
+            internal string StopRequested;
         }
     }
 

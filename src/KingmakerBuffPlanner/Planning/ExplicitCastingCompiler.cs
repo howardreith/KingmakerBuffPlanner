@@ -249,6 +249,8 @@ namespace KingmakerBuffPlanner.Planning
             var diagnostics = new List<string>();
             var matchedEnhancements = new Dictionary<string, List<CastEnhancementSnapshot>>(
                 StringComparer.Ordinal);
+            var intendedEnhancements = new Dictionary<string, List<CastEnhancementSnapshot>>(
+                StringComparer.Ordinal);
             var providers = new Dictionary<string, ProviderSnapshot>(
                 StringComparer.Ordinal);
             var modifierDemandsByCasting =
@@ -257,12 +259,14 @@ namespace KingmakerBuffPlanner.Planning
             foreach (PlannedCasting casting in document.Castings)
             {
                 List<CastEnhancementSnapshot> matched;
+                List<CastEnhancementSnapshot> intended;
                 ProviderSnapshot provider;
                 List<ModifierUsageDemand> modifierDemands;
                 castings.Add(CompileOne(casting, snapshot, options, effectsBySource,
                     enhancementList, modifierList, diagnostics, liveEffects, out matched,
-                    out provider, out modifierDemands));
+                    out intended, out provider, out modifierDemands));
                 matchedEnhancements[casting.CastingId] = matched;
+                intendedEnhancements[casting.CastingId] = intended;
                 providers[casting.CastingId] = provider;
                 modifierDemandsByCasting[casting.CastingId] = modifierDemands;
             }
@@ -295,9 +299,16 @@ namespace KingmakerBuffPlanner.Planning
                     casting.CastingId, out modifierDemands);
                 // The would-be cost vector, known whenever the exact
                 // provider resolved (also for skipped or blocked castings).
+                // A skipped casting keeps the shape of its INTENDED
+                // enhancements (an exhausted rod after the run included), so
+                // a skip is never a material change by itself.
+                List<CastEnhancementSnapshot> intended;
+                intendedEnhancements.TryGetValue(casting.CastingId, out intended);
                 IReadOnlyList<string> shape = provider == null
                     ? new string[0]
-                    : CostShapeOf(ledger.DemandsFor(provider, matched, modifierDemands));
+                    : CostShapeOf(ledger.DemandsFor(provider,
+                        casting.Readiness == ResolvedCastingReadiness.AlreadySatisfied
+                            ? intended : matched, modifierDemands));
                 if (casting.Readiness != ResolvedCastingReadiness.Ready ||
                     (budgetRoutineScope != null &&
                      casting.RoutineId != budgetRoutineScope))
@@ -352,6 +363,7 @@ namespace KingmakerBuffPlanner.Planning
             List<string> diagnostics,
             ActiveEffectSnapshot liveEffects,
             out List<CastEnhancementSnapshot> matchedEnhancements,
+            out List<CastEnhancementSnapshot> intendedEnhancements,
             out ProviderSnapshot providerSnapshot,
             out List<ModifierUsageDemand> modifierDemands)
         {
@@ -406,9 +418,11 @@ namespace KingmakerBuffPlanner.Planning
             var applied = new List<string>();
             var omitted = new List<string>();
             var matched = new List<CastEnhancementSnapshot>();
+            var intended = new List<CastEnhancementSnapshot>();
+            var requiredExhausted = new List<CastEnhancementSnapshot>();
             if (option != null)
                 ResolveEnhancements(casting, option, enhancements, applied, omitted,
-                    matched, reasons);
+                    matched, intended, requiredExhausted, reasons, resourceReasons);
             else
                 foreach (AuthoredEnhancementSelection selection in casting.Enhancements)
                     if (selection.Required)
@@ -422,7 +436,8 @@ namespace KingmakerBuffPlanner.Planning
             var satisfiedUnits = new List<string>();
             bool alreadyActive = liveEffects != null && option != null &&
                 reasons.Count == 0 && casting.State == CastingAuthoringState.Ready &&
-                AssessExistingEffects(casting, option.Provider, matched, predicted,
+                AssessExistingEffects(casting, option.Provider,
+                    matched.Concat(requiredExhausted).ToList(), predicted,
                     effectsBySource, liveEffects, existingNotes, satisfiedUnits);
             if (alreadyActive)
                 reasons.Add("already-active:" + string.Join(",", satisfiedUnits.ToArray()));
@@ -448,6 +463,7 @@ namespace KingmakerBuffPlanner.Planning
                 diagnostics.Add("targeting-modifier-disabled:" + modifier +
                     ":" + casting.CastingId);
             matchedEnhancements = matched;
+            intendedEnhancements = intended;
             providerSnapshot = option == null ? null : option.Provider;
             return new ResolvedCasting(
                 casting.CastingId, casting.RoutineId, casting.Order, casting.SourceId,
@@ -750,7 +766,10 @@ namespace KingmakerBuffPlanner.Planning
             List<string> applied,
             List<string> omitted,
             List<CastEnhancementSnapshot> matched,
-            List<string> reasons)
+            List<CastEnhancementSnapshot> intended,
+            List<CastEnhancementSnapshot> requiredExhausted,
+            List<string> reasons,
+            List<string> resourceReasons)
         {
             foreach (AuthoredEnhancementSelection selection in casting.Enhancements)
             {
@@ -768,8 +787,12 @@ namespace KingmakerBuffPlanner.Planning
                     if (applicability.Length != 0)
                         failure = "enhancement-not-applicable:" +
                             selection.EnhancementId + ":" + applicability;
-                    else if (snapshot.RemainingUses == 0)
-                        failure = "enhancement-exhausted:" + selection.EnhancementId;
+                    else
+                    {
+                        intended.Add(snapshot);
+                        if (snapshot.RemainingUses == 0)
+                            failure = "enhancement-exhausted:" + selection.EnhancementId;
+                    }
                 }
                 if (failure == null)
                 {
@@ -780,7 +803,17 @@ namespace KingmakerBuffPlanner.Planning
                 // Selected enhancements on new castings are requirements: no
                 // silent removal, substitution, or weakening. Only explicit
                 // legacy optional intent may be omitted, disclosed as such.
-                if (selection.Required) reasons.Add(failure);
+                // An exhausted REQUIRED enhancement is a resource shortage like
+                // a spent slot: it blocks a casting that must cast, but a
+                // sufficient active effect (typically from the run that
+                // spent it) waives it.
+                if (selection.Required && snapshot != null &&
+                    failure.StartsWith("enhancement-exhausted:", StringComparison.Ordinal))
+                {
+                    resourceReasons.Add(failure);
+                    requiredExhausted.Add(snapshot);
+                }
+                else if (selection.Required) reasons.Add(failure);
                 else omitted.Add(selection.EnhancementId + ":" + failure);
             }
             if (matched.Count != 0 && !CastEnhancementSnapshot.AreCompatible(matched))

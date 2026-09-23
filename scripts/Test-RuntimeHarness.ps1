@@ -1120,6 +1120,28 @@ try {
     catch { $refused = $_.Exception.Message -like '*exactly one completed advanced bootstrap*' }
     if (-not $refused) { throw 'Two completed advanced bootstraps were not refused as ambiguous.' }
     $passed++
+
+    # Scenario drift: every scenario the launcher accepts must build a
+    # request (the request builder repeats the ValidateSet), and the two
+    # sets must be identical.
+    $launcherSet = @((Get-Command (Join-Path $PSScriptRoot 'Invoke-KingmakerRuntimeTest.ps1')).Parameters['Scenario'].Attributes |
+        Where-Object { $_ -is [System.Management.Automation.ValidateSetAttribute] } |
+        ForEach-Object { $_.ValidValues })
+    $requestSet = @((Get-Command New-KbpRuntimeRequest).Parameters['Scenario'].Attributes |
+        Where-Object { $_ -is [System.Management.Automation.ValidateSetAttribute] } |
+        ForEach-Object { $_.ValidValues })
+    if ($launcherSet.Count -lt 16 -or
+        (@(Compare-Object -ReferenceObject $launcherSet -DifferenceObject $requestSet -CaseSensitive).Count -ne 0)) {
+        throw ('Launcher and request scenario sets differ: launcher=' + ($launcherSet -join ',') +
+            ' request=' + ($requestSet -join ','))
+    }
+    $driftManifest = [pscustomobject]@{ version = '0.0.0'; commit = ('0' * 40); packageSha256 = ('a' * 64); dllSha256 = ('b' * 64) }
+    foreach ($driftScenario in $launcherSet) {
+        $driftRequest = New-KbpRuntimeRequest -RunId ('drift-' + $driftScenario) -EvidenceDirectory 'evidence' `
+            -BuildManifest $driftManifest -TimeoutSeconds 60 -ExitAfterCompletion $true -Scenario $driftScenario
+        if ($driftRequest.scenario -cne $driftScenario) { throw "Request for $driftScenario was not built." }
+    }
+    $passed++
 }
 finally {
     if (Test-Path -LiteralPath $root) {
