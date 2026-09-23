@@ -106,10 +106,31 @@ namespace KingmakerBuffPlanner.Persistence
                 }
                 catch (Exception)
                 {
-                    // A malformed primary is never promoted over a known-good backup.
+                    // A malformed primary is never promoted over a known-good
+                    // backup — and its exact bytes are never destroyed:
+                    // a corrupt or newer-schema primary is quarantined
+                    // (content-keyed, non-rotating) before this save
+                    // replaces it (charter §7.1: never autosave a default
+                    // over unresolved user data without a recoverable copy).
+                    QuarantineUnreadablePrimary(path);
                 }
             }
             AtomicFile.WriteUtf8(path, json);
+        }
+
+        internal string QuarantineUnreadablePrimary(string primary)
+        {
+            byte[] bytes = File.ReadAllBytes(primary);
+            string hash;
+            using (SHA256 sha = SHA256.Create())
+                hash = BitConverter.ToString(sha.ComputeHash(bytes))
+                    .Replace("-", string.Empty).ToLowerInvariant();
+            string archive = Path.Combine(Path.GetDirectoryName(primary),
+                "kbp-unreadable-" + Path.GetFileName(primary)
+                    .Replace("kingmaker-buff-planner-", string.Empty)
+                    .Replace(".json", string.Empty) + "-" + hash.Substring(0, 16) + ".orig");
+            if (!File.Exists(archive)) AtomicFile.WriteBytes(archive, bytes);
+            return archive;
         }
 
         internal string GetProfilePath(string campaignId)

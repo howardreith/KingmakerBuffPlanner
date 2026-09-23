@@ -870,7 +870,12 @@ namespace KingmakerBuffPlanner.UI
                 _castingWorkspace.RefreshView();
                 _log.Info("[KBP-WORKSPACE] casting-first workspace opened;" +
                     "campaign=" + campaignId +
-                    ";dispatch=" + workspaceSession.DispatchDisposition);
+                    ";dispatch=" + workspaceSession.DispatchDisposition +
+                    ";load=" + workspaceSession.LoadStatus +
+                    ";legacyImport=" + (workspaceSession.MigrationStatus.HasValue
+                        ? workspaceSession.MigrationStatus.Value.ToString() : "not-attempted") +
+                    (workspaceSession.ImportReport == null ? string.Empty
+                        : ";imported=" + workspaceSession.ImportReport.ResultingCastingCount));
                 return true;
             }
             catch (Exception exception)

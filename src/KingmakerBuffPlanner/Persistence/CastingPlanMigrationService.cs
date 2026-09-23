@@ -153,22 +153,20 @@ namespace KingmakerBuffPlanner.Persistence
         // changed legacy bytes archives a new boundary instead of relying on
         // a much older original, while the file name stays far below
         // MAX_PATH even under deep settings directories.
+        // Byte-exact (review of §7.1): the archive copies the file's raw
+        // bytes — a BOM or non-UTF-8 encoding survives — and is keyed by the
+        // same file hash the migration reports.
         private static string ArchiveBoundaryOriginal(
             string legacyPath, string legacyBytes)
         {
             string directory = Path.GetDirectoryName(legacyPath);
+            string hash = Hashing.Sha256(legacyPath);
             string archive = Path.Combine(directory,
-                "kbp-casting-" + BoundaryKey(legacyBytes) + ".orig");
+                "kbp-casting-" + (hash.Length <= 24 ? hash : hash.Substring(0, 24)) + ".orig");
             if (File.Exists(archive)) return archive;
             Directory.CreateDirectory(directory);
-            AtomicFile.WriteUtf8(archive, legacyBytes);
+            AtomicFile.WriteBytes(archive, File.ReadAllBytes(legacyPath));
             return archive;
-        }
-
-        private static string BoundaryKey(string legacyBytes)
-        {
-            string hash = Hashing.Sha256Text(legacyBytes);
-            return hash.Length <= 24 ? hash : hash.Substring(0, 24);
         }
 
         private static BuffPlannerProfile JsonConvertDeserialize(
