@@ -185,6 +185,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             return string.Equals(scenario, "live-workspace-qual",
                 StringComparison.Ordinal) ||
                 IsReloadScenario(scenario) ||
+                IsImportScenario(scenario) ||
                 IsManualWorkspaceScenario(scenario) ||
                 IsProbeScenario(scenario) ||
                 IsInspectionScenario(scenario) ||
@@ -200,6 +201,17 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         internal static bool IsReloadScenario(string scenario)
         {
             return string.Equals(scenario, "live-workspace-reload", StringComparison.Ordinal);
+        }
+
+        // First-open import in game (mission section 11): before the first
+        // open the host writes a classic plan for the loaded campaign from
+        // live discovery; the first open must import it through the
+        // production migration (never modifying it, archiving it byte-exact,
+        // making nothing Ready on its own). No synthetic input; automation
+        // family only.
+        internal static bool IsImportScenario(string scenario)
+        {
+            return string.Equals(scenario, "live-workspace-import", StringComparison.Ordinal);
         }
 
         // Guarded casting qualification through the PRODUCTION path.
@@ -266,7 +278,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         internal static bool IsNoInputWorkspaceScenario(string scenario)
         {
             return IsManualWorkspaceScenario(scenario) || IsProbeScenario(scenario) ||
-                IsInspectionScenario(scenario) || IsQualificationScenario(scenario);
+                IsInspectionScenario(scenario) || IsQualificationScenario(scenario) ||
+                IsImportScenario(scenario);
         }
 
         internal const int ProbeRunDeadlineSeconds = 60;
