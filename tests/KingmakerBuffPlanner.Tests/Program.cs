@@ -15305,6 +15305,24 @@ namespace KingmakerBuffPlanner.Tests
             string plain = probe(CastingBuffAbility, "unit-cleric", "unit-t1", null, null, "plain");
             if (plain != null)
                 throw new InvalidOperationException("The plain probe casting was refused: " + plain);
+            // The discovery wrapper (ability-reference to THE CAST ABILITY
+            // around nested sequences, as live Resistance/Light discover)
+            // is plain; a reference to a DIFFERENT ability is not.
+            Func<string, EffectExpression> wrapped = abilityId => new ReferencedAbilityExpression(abilityId,
+                new SequenceEffectExpression(new EffectExpression[]
+                {
+                    new SequenceEffectExpression(new EffectExpression[] { Leaf("buff-effect") })
+                }));
+            string selfWrapped = probe(CastingBuffAbility, "unit-cleric", "unit-t1", null,
+                new Dictionary<string, EffectExpression>(effects)
+                { ["source-bulls"] = wrapped(CastingBuffAbility.BaseAbilityGuid) }, "self-reference");
+            if (selfWrapped != null)
+                throw new InvalidOperationException("The self-referencing discovery wrapper was refused: " + selfWrapped);
+            string otherWrapped = probe(CastingBuffAbility, "unit-cleric", "unit-t1", null,
+                new Dictionary<string, EffectExpression>(effects)
+                { ["source-bulls"] = wrapped("b0000000000000000000000000000002") }, "other-reference");
+            if (otherWrapped == null || !otherWrapped.StartsWith("probe-unsupported:effect-shape:", StringComparison.Ordinal))
+                throw new InvalidOperationException("A reference to another ability was admitted: " + otherWrapped);
             var cases = new[]
             {
                 new { Label = "metamagic", Expect = "probe-unsupported:metamagic:",
