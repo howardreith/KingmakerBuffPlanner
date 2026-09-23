@@ -268,7 +268,7 @@ namespace KingmakerBuffPlanner.Execution
         // alias contract maps effects[ability.Canonical] and
         // effects[sourceId] to the SAME instance; the ordinal-first such
         // source id is used, else the canonical key itself.
-        private static string SourceIdFor(IReadOnlyDictionary<string, EffectExpression> effects,
+        internal static string SourceIdFor(IReadOnlyDictionary<string, EffectExpression> effects,
             AbilityKey ability)
         {
             EffectExpression expected;
