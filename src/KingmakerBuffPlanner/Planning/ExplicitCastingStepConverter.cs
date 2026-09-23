@@ -270,16 +270,18 @@ namespace KingmakerBuffPlanner.Planning
                 return "probe-unsupported:target-not-verified-reachable:" + id;
             if (option.ExecutionStrategy != CastExecutionStrategy.DirectRuleCast)
                 return "probe-unsupported:strategy:" + option.ExecutionStrategy + ":" + id;
-            if (!IsPlainCurrentTargetBuff(expected))
+            if (!IsPlainCurrentTargetBuff(expected, ability.BaseAbilityGuid))
                 return "probe-unsupported:effect-shape:" + id;
             return null;
         }
 
         // A plain buff on the chosen target: one or more buff leaves aimed at
-        // the current target, optionally in a sequence. Conditionals,
-        // referenced abilities, area/party/caster targets and worn-item
-        // enchantments are unmodeled for the probe.
-        private static bool IsPlainCurrentTargetBuff(EffectExpression expression)
+        // the current target, optionally in sequences, optionally under the
+        // discovery wrapper that references THE CAST ABILITY ITSELF.
+        // Conditionals, references to any OTHER ability, area/party/caster
+        // targets and worn-item enchantments are unmodeled for the probe.
+        private static bool IsPlainCurrentTargetBuff(EffectExpression expression,
+            string castAbilityGuid)
         {
             var leaf = expression as EffectLeafExpression;
             if (leaf != null)
@@ -287,7 +289,12 @@ namespace KingmakerBuffPlanner.Planning
             var sequence = expression as SequenceEffectExpression;
             if (sequence != null)
                 return sequence.Children.Count != 0 &&
-                    sequence.Children.All(IsPlainCurrentTargetBuff);
+                    sequence.Children.All(child => IsPlainCurrentTargetBuff(child, castAbilityGuid));
+            var reference = expression as ReferencedAbilityExpression;
+            if (reference != null)
+                return !string.IsNullOrEmpty(castAbilityGuid) &&
+                    string.Equals(reference.AbilityId, castAbilityGuid, StringComparison.Ordinal) &&
+                    IsPlainCurrentTargetBuff(reference.Child, castAbilityGuid);
             return false;
         }
 
