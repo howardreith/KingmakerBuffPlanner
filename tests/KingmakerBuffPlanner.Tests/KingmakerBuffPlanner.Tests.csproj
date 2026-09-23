@@ -56,6 +56,7 @@
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\HybridCastExecutor.cs"><Link>Execution\HybridCastExecutor.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\ExplicitCastingRunCoordinator.cs"><Link>Execution\ExplicitCastingRunCoordinator.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\SingleCastProbe.cs"><Link>Execution\SingleCastProbe.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\SingleCastProbeObservation.cs"><Link>Execution\SingleCastProbeObservation.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\MaterialComponentAvailability.cs"><Link>Execution\MaterialComponentAvailability.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\ResourceLedger.cs"><Link>Planning\ResourceLedger.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\RoutinePlanService.cs"><Link>Planning\RoutinePlanService.cs</Link></Compile>

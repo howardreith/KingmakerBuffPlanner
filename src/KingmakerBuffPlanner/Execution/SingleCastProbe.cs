@@ -137,8 +137,11 @@ namespace KingmakerBuffPlanner.Execution
         public const string ProbeCastingId = "probe-cast-1";
         public const int MaximumRecordedRejections = 60;
 
+        // effectPresentOnTarget (optional, a FRESH native read): targets
+        // without the expected effect are preferred, unknown next, present
+        // last (review M2); a present effect then needs a verified refresh.
         public static SingleCastProbeSelection Select(CastingWorkspaceInputs inputs,
-            string campaignId)
+            string campaignId, Func<string, EffectExpression, bool?> effectPresentOnTarget = null)
         {
             if (inputs == null) throw new ArgumentNullException("inputs");
             var units = new HashSet<string>(inputs.Snapshot.Units.Select(unit => unit.UnitId),
@@ -163,10 +166,20 @@ namespace KingmakerBuffPlanner.Execution
                 if (!option.ReachableTargetIds.Any(value => units.Contains(value) &&
                         !string.Equals(value, caster, StringComparison.Ordinal)))
                     reject(provider + "|no-other-reachable-target");
+                EffectExpression expectedEffects = inputs.EffectsBySource[sourceId];
+                Func<string, int> presenceRank = target =>
+                {
+                    if (effectPresentOnTarget == null) return 1;
+                    bool? present;
+                    try { present = effectPresentOnTarget(target, expectedEffects); }
+                    catch (Exception) { present = null; }
+                    return present == false ? 0 : present == null ? 1 : 2;
+                };
                 foreach (string target in option.ReachableTargetIds
                     .Where(value => units.Contains(value) &&
                         !string.Equals(value, caster, StringComparison.Ordinal))
-                    .OrderBy(value => value, StringComparer.Ordinal))
+                    .OrderBy(presenceRank)
+                    .ThenBy(value => value, StringComparer.Ordinal))
                 {
                     considered++;
                     var casting = new PlannedCasting(ProbeCastingId, "long", 0, sourceId,
@@ -346,11 +359,14 @@ namespace KingmakerBuffPlanner.Execution
         }
     }
 
-    // What one probe run did, filled by the Unity host and judged here
+    // What one probe run did, filled by the run owner and judged here
     // (Unity-free, unit-tested). Selection-only runs must never construct
     // the boundary; the casting run passes only with a valid allowance, one
-    // confirmed casting, the exact reserved resource change, and a clean
-    // close. Nothing here claims more than the run observed.
+    // confirmed casting, a verified effect transition and the exact
+    // expected resource delta from FRESH before/after observations (review
+    // M2), and a clean, owned terminal (review M3). Nothing here claims more
+    // than the run observed; spent resources and applied effects are never
+    // described as rolled back.
     public sealed class SingleCastProbeRunRecord
     {
         public bool CastingScenario { get; set; }
@@ -362,18 +378,24 @@ namespace KingmakerBuffPlanner.Execution
         public bool Submitted { get; set; }
         public string SubmitReason { get; set; }
         public ExplicitCastingRunOutcome Outcome { get; set; }
-        public int? PoolRemainingBefore { get; set; }
-        public int? PoolRemainingAfter { get; set; }
-        public int ReservedUnits { get; set; }
-        public bool DeadlineOrStop { get; set; }
+        public SingleCastProbeObservationSession Observation { get; set; }
         public bool BoundaryDisposed { get; set; }
         public bool WorkspaceClosed { get; set; }
         public bool InputLeaseReleased { get; set; }
+        // "completed", "deadline", "stop", "mod-disabled", "mod-unload",
+        // "host-exception:..." - how the owner ended the run.
+        public string TerminalReason { get; set; }
+        public bool CleanupRecorded { get; set; }
+        public List<string> CleanupFailures { get; } = new List<string>();
 
         public IList<string> Violations()
         {
             var violations = new List<string>();
             if (!Selected) violations.Add("probe-selection:" + (SelectionEvidence ?? "missing"));
+            if (!CleanupRecorded) violations.Add("probe-cleanup-not-recorded");
+            if (TerminalReason != null && TerminalReason != "completed")
+                violations.Add("probe-terminated:" + TerminalReason);
+            foreach (string failure in CleanupFailures) violations.Add("probe-cleanup-failed:" + failure);
             if (!WorkspaceClosed || !InputLeaseReleased)
                 violations.Add("probe-close:closed=" + WorkspaceClosed + ";leaseReleased=" + InputLeaseReleased);
             if (!CastingScenario)
@@ -390,17 +412,164 @@ namespace KingmakerBuffPlanner.Execution
             }
             if (!Submitted) { violations.Add("probe-not-submitted:" + (SubmitReason ?? "missing")); return violations; }
             if (!BoundaryDisposed) violations.Add("probe-boundary-not-disposed");
-            if (DeadlineOrStop) violations.Add("probe-cancelled-by-deadline-or-stop");
-            if (Outcome == null) { violations.Add("probe-outcome-missing"); return violations; }
-            if (Outcome.Entries.Count != 1 || !Outcome.AllConfirmed)
-                violations.Add("probe-not-confirmed:" + Outcome.HaltReason);
-            if (Outcome.ProjectionId != ProjectionId)
-                violations.Add("probe-outcome-projection-mismatch");
-            if (!PoolRemainingBefore.HasValue || !PoolRemainingAfter.HasValue ||
-                PoolRemainingBefore.Value - PoolRemainingAfter.Value != ReservedUnits)
-                violations.Add("probe-resource-delta:before=" + PoolRemainingBefore + ";after=" +
-                    PoolRemainingAfter + ";reserved=" + ReservedUnits);
+            if (Outcome == null) violations.Add("probe-outcome-missing");
+            else
+            {
+                if (Outcome.Entries.Count != 1 || !Outcome.AllConfirmed)
+                    violations.Add("probe-not-confirmed:" + Outcome.HaltReason);
+                if (Outcome.ProjectionId != ProjectionId)
+                    violations.Add("probe-outcome-projection-mismatch");
+            }
+            if (Observation == null) violations.Add("probe-observation-missing");
+            else foreach (string violation in Observation.Violations())
+                    violations.Add("probe-observation:" + violation);
             return violations;
+        }
+    }
+
+    public sealed class ProbeWorkspaceCloseResult
+    {
+        public ProbeWorkspaceCloseResult(bool closed, bool inputLeaseReleased, string failure)
+        {
+            Closed = closed;
+            InputLeaseReleased = inputLeaseReleased;
+            Failure = failure;
+        }
+
+        public bool Closed { get; private set; }
+        public bool InputLeaseReleased { get; private set; }
+        public string Failure { get; private set; }
+    }
+
+    // Review M3: the single owner of a probe run's boundary, observation and
+    // terminal cleanup. The runtime host delegates to it for normal
+    // completion, stop marker, deadline, unexpected host failure, mod disable
+    // and unload. Terminate is idempotent: it disposes the active boundary
+    // (propagating to the executor's cleanup) BEFORE abandoning it, takes a
+    // fresh after-observation when a cast was submitted, closes the owned
+    // workspace and releases the input lease, records cleanup, and only then
+    // publishes the record exactly once. The primary reason is kept; cleanup
+    // failures are appended, never substituted.
+    public sealed class SingleCastProbeRunOwner
+    {
+        private readonly SingleCastProbeRunRecord _record;
+        private readonly Func<ProbeWorkspaceCloseResult> _closeWorkspace;
+        private readonly Action<SingleCastProbeRunRecord> _publish;
+        private SingleCastProbeBoundary _boundary;
+        private long _runStartedMillis = -1;
+        private bool _terminated;
+
+        public SingleCastProbeRunOwner(SingleCastProbeRunRecord record,
+            Func<ProbeWorkspaceCloseResult> closeWorkspace,
+            Action<SingleCastProbeRunRecord> publish)
+        {
+            _record = record ?? throw new ArgumentNullException("record");
+            _closeWorkspace = closeWorkspace ?? throw new ArgumentNullException("closeWorkspace");
+            _publish = publish ?? throw new ArgumentNullException("publish");
+        }
+
+        public SingleCastProbeRunRecord Record { get { return _record; } }
+        public bool Terminated { get { return _terminated; } }
+        public bool Running { get { return !_terminated && _boundary != null && _boundary.ActiveRun != null; } }
+        public int PublishCount { get; private set; }
+
+        // Takes a FRESH before-observation, marks the submission sequence and
+        // submits through the one-shot boundary. A failed before-read refuses
+        // the submission (nothing reaches the game).
+        public CastingDispatchOutcome Submit(SingleCastProbeBoundary boundary,
+            SingleCastProbeObservationSession observation, ExplicitCastingPlan plan,
+            CastingApplyDecision decision, ExplicitStepConversion projection, long nowMillis)
+        {
+            if (_terminated) throw new InvalidOperationException("probe-owner-terminated");
+            _boundary = boundary ?? throw new ArgumentNullException("boundary");
+            _record.BoundaryConstructed = true;
+            _record.Observation = observation;
+            ProbeObservation before = observation.ObserveBefore();
+            if (!before.Succeeded)
+            {
+                _record.Submitted = false;
+                _record.SubmitReason = "before-observation-unavailable:" + before.Failure;
+                return new CastingDispatchOutcome(false, _record.SubmitReason, projection.CastingIds);
+            }
+            observation.MarkSubmission();
+            CastingDispatchOutcome outcome = boundary.Submit(plan, decision, "long", projection);
+            _record.Submitted = outcome.Submitted;
+            _record.SubmitReason = outcome.Reason;
+            _runStartedMillis = nowMillis;
+            return outcome;
+        }
+
+        // One step per frame. Returns true once the run has terminated.
+        public bool Pump(long nowMillis, long deadlineMillis, bool stopRequested)
+        {
+            if (_terminated) return true;
+            if (_boundary == null || _boundary.ActiveRun == null)
+            {
+                Terminate("completed");
+                return true;
+            }
+            if (stopRequested) { Terminate("stop"); return true; }
+            if (_runStartedMillis >= 0 && nowMillis - _runStartedMillis > deadlineMillis)
+            {
+                Terminate("deadline");
+                return true;
+            }
+            bool moved;
+            try { moved = _boundary.ActiveRun.MoveNext(); }
+            catch (Exception exception)
+            {
+                Terminate("run-pump-exception:" + exception.GetType().Name + ":" + exception.Message);
+                return true;
+            }
+            if (moved) return false;
+            Terminate("completed");
+            return true;
+        }
+
+        public void Terminate(string reason)
+        {
+            if (_terminated) return;
+            _terminated = true;
+            _record.TerminalReason = string.IsNullOrEmpty(reason) ? "unspecified" : reason;
+            if (_boundary != null)
+            {
+                try
+                {
+                    _boundary.Dispose();
+                    _record.BoundaryDisposed = true;
+                }
+                catch (Exception exception)
+                {
+                    _record.CleanupFailures.Add("boundary-dispose:" + exception.GetType().Name + ":" +
+                        exception.Message);
+                }
+                _record.Outcome = _boundary.Outcome;
+            }
+            if (_record.Submitted && _record.Observation != null && _record.Observation.After == null)
+                _record.Observation.ObserveAfter();
+            try
+            {
+                ProbeWorkspaceCloseResult closed = _closeWorkspace();
+                _record.WorkspaceClosed = closed != null && closed.Closed && string.IsNullOrEmpty(closed.Failure);
+                _record.InputLeaseReleased = closed != null && closed.InputLeaseReleased;
+                if (closed != null && !string.IsNullOrEmpty(closed.Failure))
+                    _record.CleanupFailures.Add("workspace-close:" + closed.Failure);
+            }
+            catch (Exception exception)
+            {
+                _record.CleanupFailures.Add("workspace-close:" + exception.GetType().Name + ":" +
+                    exception.Message);
+            }
+            _record.CleanupRecorded = true;
+            try
+            {
+                PublishCount++;
+                _publish(_record);
+            }
+            catch (Exception exception)
+            {
+                _record.CleanupFailures.Add("publish:" + exception.GetType().Name + ":" + exception.Message);
+            }
         }
     }
 }
