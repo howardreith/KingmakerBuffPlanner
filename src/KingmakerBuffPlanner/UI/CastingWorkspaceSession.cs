@@ -259,6 +259,38 @@ namespace KingmakerBuffPlanner.UI
             SelectedCasterUnitId = resolved;
         }
 
+        // The caster lane's primary action: use this caster for the NEXT
+        // casting (draft) and focus it. Never edits an existing casting.
+        public void ChooseDraftCaster(string casterUnitId)
+        {
+            SelectCaster(casterUnitId);
+            Draft.CasterUnitId = SelectedCasterUnitId;
+        }
+
+        private static string SourceKindName(SourceKind kind)
+        {
+            switch (kind)
+            {
+                case SourceKind.Spellbook: return "spell";
+                case SourceKind.AbilityResource: return "ability";
+                case SourceKind.Item: return "item";
+                default: return "feature";
+            }
+        }
+
+        private static string UnitDisplayName(CastingWorkspaceInputs inputs,
+            string unitId)
+        {
+            if (string.IsNullOrEmpty(unitId) || inputs == null ||
+                inputs.Snapshot == null) return unitId;
+            foreach (var unit in inputs.Snapshot.Units)
+                if (unit != null && string.Equals(unit.UnitId, unitId,
+                        StringComparison.Ordinal))
+                    return string.IsNullOrWhiteSpace(unit.DisplayName)
+                        ? unitId : unit.DisplayName;
+            return unitId;
+        }
+
         public void FocusCasting(string castingId)
         {
             if (castingId != null &&
@@ -416,6 +448,8 @@ namespace KingmakerBuffPlanner.UI
                                 sourceIds.Add(pair.Key);
                     }
                 }
+                var descriptors = new List<WorkspaceSourceDescriptor>();
+                var displays = new Dictionary<string, string>(StringComparer.Ordinal);
                 foreach (string sourceId in sourceIds.OrderBy(
                          value => value, StringComparer.Ordinal))
                 {
@@ -434,10 +468,31 @@ namespace KingmakerBuffPlanner.UI
                             .FirstOrDefault(name =>
                                 !string.IsNullOrWhiteSpace(name))
                         : null;
+                    List<ProviderPlanningOption> serving = labelExpression == null
+                        ? new List<ProviderPlanningOption>()
+                        : inputs.ProviderOptions.Where(value => value != null &&
+                            value.Provider != null &&
+                            OptionServesExpression(inputs, value, labelExpression))
+                            .ToList();
+                    displays[sourceId] = display;
+                    descriptors.Add(new WorkspaceSourceDescriptor(sourceId,
+                        string.IsNullOrWhiteSpace(display) ? sourceId : display,
+                        serving.Select(value => value.Provider.DisplayName),
+                        serving.Select(value => SourceKindName(
+                            value.Provider.Key.Ability.SourceKind)),
+                        serving.Select(value => UnitDisplayName(inputs,
+                            value.Provider.Key.CasterUnitId))));
+                }
+                IReadOnlyDictionary<string, string> details =
+                    WorkspaceSourceLabels.Details(descriptors);
+                foreach (WorkspaceSourceDescriptor descriptor in descriptors)
+                {
+                    string detail;
+                    details.TryGetValue(descriptor.SourceId, out detail);
                     sources.Add(new WorkspaceSourceOption(
-                        sourceId, display,
-                        string.Equals(sourceId, selectedSource,
-                            StringComparison.Ordinal)));
+                        descriptor.SourceId, displays[descriptor.SourceId],
+                        string.Equals(descriptor.SourceId, selectedSource,
+                            StringComparison.Ordinal), detail));
                 }
             }
             string draftSource = string.IsNullOrEmpty(Draft.SourceId)

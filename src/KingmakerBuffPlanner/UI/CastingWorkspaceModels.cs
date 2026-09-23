@@ -134,17 +134,112 @@ namespace KingmakerBuffPlanner.UI
     public sealed class WorkspaceSourceOption
     {
         internal WorkspaceSourceOption(
-            string sourceId, string displayName, bool selected)
+            string sourceId, string displayName, bool selected,
+            string detail = null)
         {
             SourceId = sourceId ?? string.Empty;
             DisplayName = string.IsNullOrWhiteSpace(displayName)
                 ? SourceId : displayName;
             Selected = selected;
+            Detail = detail ?? string.Empty;
         }
 
         public string SourceId { get; private set; }
         public string DisplayName { get; private set; }
         public bool Selected { get; private set; }
+        // Distinguishes sources that share a display name (for example two
+        // "Aid Another" sources); empty when the name is already unique.
+        public string Detail { get; private set; }
+
+        public string Label
+        {
+            get { return Detail.Length == 0 ? DisplayName : DisplayName + " — " + Detail; }
+        }
+    }
+
+    // What discovery knows about one buff source, for labeling.
+    public sealed class WorkspaceSourceDescriptor
+    {
+        public WorkspaceSourceDescriptor(string sourceId, string displayName,
+            IEnumerable<string> variantNames, IEnumerable<string> kindNames,
+            IEnumerable<string> casterNames)
+        {
+            SourceId = sourceId ?? string.Empty;
+            DisplayName = displayName ?? string.Empty;
+            VariantNames = Clean(variantNames);
+            KindNames = Clean(kindNames);
+            CasterNames = Clean(casterNames);
+        }
+
+        public string SourceId { get; private set; }
+        public string DisplayName { get; private set; }
+        public IReadOnlyList<string> VariantNames { get; private set; }
+        public IReadOnlyList<string> KindNames { get; private set; }
+        public IReadOnlyList<string> CasterNames { get; private set; }
+
+        private static IReadOnlyList<string> Clean(IEnumerable<string> values)
+        {
+            return (values ?? new string[0])
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(value => value, StringComparer.Ordinal)
+                .ToList();
+        }
+    }
+
+    // Deterministic disambiguation for same-named buff sources: prefer the
+    // discovered variant names, then source kind and who can cast it, and
+    // only as a last resort an ordinal. Unique names get no detail.
+    public static class WorkspaceSourceLabels
+    {
+        public static IReadOnlyDictionary<string, string> Details(
+            IEnumerable<WorkspaceSourceDescriptor> sources)
+        {
+            var result = new Dictionary<string, string>(StringComparer.Ordinal);
+            List<WorkspaceSourceDescriptor> all = (sources ??
+                new WorkspaceSourceDescriptor[0]).Where(s => s != null).ToList();
+            foreach (IGrouping<string, WorkspaceSourceDescriptor> group in all
+                .GroupBy(s => s.DisplayName, StringComparer.Ordinal))
+            {
+                List<WorkspaceSourceDescriptor> members = group
+                    .OrderBy(s => s.SourceId, StringComparer.Ordinal).ToList();
+                if (members.Count == 1)
+                {
+                    result[members[0].SourceId] = string.Empty;
+                    continue;
+                }
+                Func<WorkspaceSourceDescriptor, string> byVariant = s =>
+                    string.Join(", ", s.VariantNames.Where(v =>
+                        !string.Equals(v, s.DisplayName, StringComparison.Ordinal)));
+                Func<WorkspaceSourceDescriptor, string> byKindAndCaster = s =>
+                    string.Join("/", s.KindNames) +
+                    (s.CasterNames.Count == 0 ? string.Empty
+                        : (s.KindNames.Count == 0 ? string.Empty : " · ") +
+                          string.Join(", ", s.CasterNames));
+                Func<WorkspaceSourceDescriptor, string> chosen = null;
+                foreach (Func<WorkspaceSourceDescriptor, string> candidate in
+                    new[] { byVariant, byKindAndCaster })
+                {
+                    List<string> details = members.Select(candidate).ToList();
+                    if (details.All(d => d.Length != 0) &&
+                        details.Distinct(StringComparer.Ordinal).Count() == details.Count)
+                    {
+                        chosen = candidate;
+                        break;
+                    }
+                }
+                for (int index = 0; index < members.Count; index++)
+                {
+                    string detail = chosen != null ? chosen(members[index])
+                        : byKindAndCaster(members[index]);
+                    if (chosen == null)
+                        detail = (detail.Length == 0 ? string.Empty : detail + " · ") +
+                            "source " + (index + 1);
+                    result[members[index].SourceId] = detail;
+                }
+            }
+            return result;
+        }
     }
 
     // One selectable recipient unit for a direct-target casting.
@@ -324,7 +419,7 @@ namespace KingmakerBuffPlanner.UI
                             StringComparison.Ordinal));
                 if (match != null && !string.Equals(match.DisplayName,
                         match.SourceId, StringComparison.Ordinal))
-                    return match.DisplayName;
+                    return match.Label;
                 return "unnamed buff source";
             }
         }
