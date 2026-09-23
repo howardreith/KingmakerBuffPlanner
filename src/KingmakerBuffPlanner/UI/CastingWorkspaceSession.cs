@@ -112,13 +112,21 @@ namespace KingmakerBuffPlanner.UI
             bool allowed,
             string reviewReason,
             CastingApplyDecision gateDecision,
-            CastingDispatchOutcome dispatch)
+            CastingDispatchOutcome dispatch,
+            ExplicitStepConversion projection = null)
         {
             Allowed = allowed;
             ReviewReason = reviewReason ?? string.Empty;
             GateDecision = gateDecision;
             Dispatch = dispatch;
+            Projection = projection;
         }
+
+        // The exact executor steps an allowed decision projects to (one per
+        // approved casting); null when the decision never reached
+        // projection. Present even while native dispatch is disabled, so
+        // the result can say precisely what WOULD run.
+        public ExplicitStepConversion Projection { get; private set; }
 
         public bool Allowed { get; private set; }
         // Empty when the review coordinator permitted the submission.
@@ -686,6 +694,17 @@ namespace KingmakerBuffPlanner.UI
             if (!review.Allowed)
                 return new WorkspaceApplyResult(
                     false, review.Reason, decision, null);
+            // Project the approved castings onto executor steps BEFORE the
+            // dispatch boundary: a plan that cannot become exactly one step
+            // per approved casting is refused here, never partially run.
+            ExplicitStepConversion projection = decision.Allowed
+                ? ExplicitCastingStepConverter.Convert(plan, decision,
+                    inputs.ProviderOptions, inputs.EffectsBySource)
+                : null;
+            if (projection != null && !projection.Converted)
+                return new WorkspaceApplyResult(false,
+                    "execution-projection-refused:" + projection.Refusal,
+                    decision, null, projection);
             try
             {
                 _submissionInFlight = true;
@@ -694,7 +713,7 @@ namespace KingmakerBuffPlanner.UI
                 return new WorkspaceApplyResult(
                     dispatch.Submitted, dispatch.Submitted
                         ? string.Empty : dispatch.Reason,
-                    decision, dispatch);
+                    decision, dispatch, projection);
             }
             finally
             {
