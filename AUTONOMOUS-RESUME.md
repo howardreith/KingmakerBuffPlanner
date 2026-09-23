@@ -1,6 +1,32 @@
 # AUTONOMOUS-RESUME — top section is current; planning/CASTING-FIRST-MIGRATION-STATUS.md is the per-checkpoint tracker.
 
-## Release candidate 0.2.0-rc2 frozen at `ae0181d` (LATEST)
+## Batch 3 mission (2026-09-23): Classic regression, finite and group qualification, lifecycle (LATEST)
+
+Reconciled at start: PR #2 head `b042e36` (draft); candidate rc2 `ae0181d`
+(package `35382731...`, DLL `5ec74d2f...`, MVID `5d780e27-...`); installed
+planner 0.1.1-rc3 (DLL `78407dd4...`) and Gunslinger 0.0.136 (DLL
+`c6cccdac...`); no locks, no unfinished transaction (131 restored), game
+not running; the owner's RDP session is active. External dependency: no
+`KBP_ADVANCED_SEED` save exists (asked once; not re-asked). The
+automation party has finite spontaneous slots (bard 2, sorcerer 5 at
+level 1; diagnostics `casting-qual-select-20260923-d1-01`).
+
+Worklist (updated as slices land):
+1. Capability inventory of the automation party (read-only, live).
+2. Classic regression: resolver negatives in source; a bounded Classic
+   cantrip cast through Classic's own routes, animated and instant.
+3. Finite spontaneous qualification on the automation party, both modes.
+4. Group behavior with whatever the party really has; otherwise it waits
+   for the seed.
+5. Lifecycle: stop while pending, disable/unload, target loss, refusal,
+   re-enable, a new accepted run; an area transition only on a safe route.
+6. UI and physical input, 1920x1080 and other resolutions (session active).
+7. Persistence and import gaps; install and rollback of the final artifact.
+8. Build reproducibility across checkouts (bounded, secondary).
+9. Independent reviews, rc3, full gate, native qualification on rc3,
+   receipt, PR handoff.
+
+## Release candidate 0.2.0-rc2 frozen at `ae0181d`
 
 Receipt: `docs/evidence/rc-0.2.0-rc2-receipt.md`. Clean checkout
 `repo/KingmakerBuffPlanner-RC2`; frozen copy

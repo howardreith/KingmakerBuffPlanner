@@ -68,6 +68,7 @@ namespace KingmakerBuffPlanner.Tests
             Run("qualification-on-the-planner-pumped-host", () => TestQualificationOnOwnerPumpedHost(root));
             Run("qualification-disable-step-rules", () => TestQualificationDisableStepRules(root));
             Run("cantrips-cast-at-will-through-the-class-ability", TestCantripsCastAtWill);
+            Run("capability-inventory-describes-the-party", TestCapabilityInventory);
             Run("qualification-finite-recipe", () => TestFiniteQualificationRecipe(root));
             Run("qualification-driver-refusals-and-deadline",
                 () => TestQualificationDriverRefusalsAndDeadline(root));
@@ -3026,6 +3027,31 @@ namespace KingmakerBuffPlanner.Tests
                 !prepared.Contains("!selections.All(selection => HasAtWillCantrip(unit, spellbook, selection)))") ||
                 !prepared.Contains("var slots = allSlots.Where(s => !atWillSlots.Contains(s)).ToList();"))
                 throw new InvalidOperationException("A level-0 entry is priced as free without an at-will ability.");
+        }
+
+        // The read-only capability inventory lists every unit, pool and
+        // provider option the planner's own discovery sees, with the
+        // effect's recipient shape (direct, self, pet, party, area).
+        private static void TestCapabilityInventory()
+        {
+            IList<string> lines = CastingCapabilityInventory.Describe(QualificationInputs(true, true, null));
+            if (!lines.Any(line => line.StartsWith("unit=unit-cleric;", StringComparison.Ordinal)) ||
+                !lines.Any(line => line.StartsWith("pool=", StringComparison.Ordinal) &&
+                    line.Contains(";kind=Unlimited;")) ||
+                !lines.Any(line => line.StartsWith("provider=", StringComparison.Ordinal) &&
+                    line.Contains(";caster=unit-cleric;") && line.Contains(";pool=Unlimited:")) ||
+                lines.Any(line => line.Contains(";pool=missing:")))
+                throw new InvalidOperationException("The inventory missed units, pools or providers: " +
+                    string.Join(" | ", lines.ToArray()));
+            var direct = new EffectLeafExpression(EffectKind.Buff, "buff-a", EffectTarget.CurrentTarget, null, null);
+            var area = new EffectLeafExpression(EffectKind.AreaBuff, "buff-b", EffectTarget.AlliedAreaRecipients, null, null);
+            if (CastingCapabilityInventory.Shape(direct) != "direct" ||
+                CastingCapabilityInventory.Shape(area) != "allied-area" ||
+                CastingCapabilityInventory.Shape(new SequenceEffectExpression(new EffectExpression[] { direct, area })) !=
+                    "allied-area+direct" ||
+                CastingCapabilityInventory.Shape(null) != "none" ||
+                CastingCapabilityInventory.Describe(null).Single() != "inputs-unavailable")
+                throw new InvalidOperationException("Effect shapes were not described exactly.");
         }
 
         // The live shape: the planner's root owns and pumps the host, the
