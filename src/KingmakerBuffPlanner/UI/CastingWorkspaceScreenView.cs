@@ -131,6 +131,10 @@ namespace KingmakerBuffPlanner.UI
 
         private static string DescribeImport(CastingWorkspaceSession session)
         {
+            if (session.LegacyImportBlocked)
+                return "Your previous plan could not be imported (" +
+                    session.LegacyImportBlockReason + "). It was NOT replaced: saving and " +
+                    "Apply are blocked. Repair or restore that file, then press Reload to retry.";
             CastingImportReport report = session.ImportReport;
             if (report == null) return null;
             return "Imported " + report.ResultingCastingCount +
@@ -462,7 +466,10 @@ namespace KingmakerBuffPlanner.UI
                 "Reload", footer, _theme, "Reload", () => Click(() =>
                 {
                     CastingPlanLoadStatus status = _session.Reload();
-                    _footerResult.text = "Reloaded: " + status;
+                    _footerResult.text = _session.LegacyImportBlocked
+                        ? DescribeImport(_session)
+                        : _session.ImportReport != null
+                            ? DescribeImport(_session) : "Reloaded: " + status;
                     RefreshView();
                 }));
             KingmakerUiFactory.SetAnchors(RectOf(_reloadButton), 0.43f, 0.2f, 0.51f, 0.8f);

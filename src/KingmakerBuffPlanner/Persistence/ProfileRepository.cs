@@ -104,18 +104,38 @@ namespace KingmakerBuffPlanner.Persistence
                     Deserialize(previous, profile.CampaignId, out migrated);
                     RotateBackups(path, previous);
                 }
-                catch (Exception)
+                catch (Exception exception)
                 {
-                    // A malformed primary is never promoted over a known-good
-                    // backup — and its exact bytes are never destroyed:
-                    // a corrupt or newer-schema primary is quarantined
-                    // (content-keyed, non-rotating) before this save
-                    // replaces it (charter §7.1: never autosave a default
-                    // over unresolved user data without a recoverable copy).
+                    // Review K1 / charter §7.1: an unresolved (corrupt or
+                    // newer-schema) primary is NEVER replaced by an ordinary
+                    // save — not even by a recovered default. Its exact bytes
+                    // are quarantined as evidence and the save is refused
+                    // (recorded, not thrown: UI callbacks keep working).
+                    // Replacement requires the explicit recovery operation
+                    // ReplaceUnresolvedPrimary.
                     QuarantineUnreadablePrimary(path);
+                    LastSaveRefusal = "legacy-primary-unresolved:" + exception.Message;
+                    return;
                 }
             }
+            LastSaveRefusal = null;
             AtomicFile.WriteUtf8(path, json);
+        }
+
+        // Null after a successful save; the refusal reason otherwise.
+        public string LastSaveRefusal { get; private set; }
+
+        // Explicit, owner-directed recovery: quarantine the unresolved
+        // primary's exact bytes, then replace it. Never called implicitly.
+        public string ReplaceUnresolvedPrimary(BuffPlannerProfile profile)
+        {
+            Validate(profile, profile == null ? null : profile.CampaignId);
+            string path = GetProfilePath(profile.CampaignId);
+            string archive = File.Exists(path) ? QuarantineUnreadablePrimary(path) : null;
+            Directory.CreateDirectory(_settingsDirectory);
+            AtomicFile.WriteUtf8(path, Serialize(profile));
+            LastSaveRefusal = null;
+            return archive;
         }
 
         internal string QuarantineUnreadablePrimary(string primary)
