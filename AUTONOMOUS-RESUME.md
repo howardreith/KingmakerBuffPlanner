@@ -13,6 +13,10 @@ run candidates.
 | `1332ed8` | Workspace text: refusals say what to do next; the header counts the routine; the inspector names the casting being edited; taller buff tabs |
 | `478bb5b`, `07cf011` | `live-workspace-reload`: the exact WORKING save loaded again in game under a fresh read-only saver; the reopened planner must show the saved plan, one subscription, one HUD root, no run |
 | `2024578` | Version 0.2.0-rc1, release notes, install text, manual session for the RC |
+| `1ed2418`, `542cd66` | Canvas scale evidence; alphabetical buff grid |
+| `a1bcc5f`, `fd2dfcb` | Independent review of `f7726c9..1332ed8` (no P0-P2): restoration failures reported in the record and the error; footer named and ordered; refusal advice; probe budget; canonical scenario spelling |
+| `5c70f1a` | `live-workspace-import`: first open with a classic plan seeded from live discovery, judged against the real migration |
+| `7255b8a` | Independent review of `1332ed8..542cd66` (no P0): the reload stays read-only for the whole load under write sentinels; strict saves for reload and import; disk read-back, exact area events and all HUD roots checked; committed buff selection; card reasons and import review items in words |
 
 Live runs (all restored and verified, every save unchanged):
 
@@ -22,6 +26,8 @@ Live runs (all restored and verified, every save unchanged):
 | `casting-ws-qual-20260923-r1-01` (`1332ed8`) | PASS: those fixed in game |
 | `casting-ws-reload-20260923-s1-01` (`478bb5b`) | FAIL, clean: the guarded reload's header protocol completed; the campaign was then read mid-load (party 0). Fixed in `07cf011` |
 | `casting-ws-reload-20260923-s2-01` (`2024578`, 0.2.0-rc1) | **PASS**, 92 assertions: Game.LoadGame of the exact WORKING descriptor, header update and commit suppressed (no disk write), after-load callback, stable campaign identity after 6.5 s; reopened planner: saved plan, same campaign, subscriptions 1→1, HUD roots 1→1, no run, clean |
+| `casting-ws-qual-20260923-t1-01` (`1ed2418`) | PASS: workspace and native canvas both at scale 1.000 at 1920×1200 |
+| `casting-ws-import-20260923-i1-01` (`5c70f1a`) | **PASS**: the real migration imported the seeded classic plan as two drafts needing review; classic file byte-unchanged and archived byte-exact; the frames showed reason codes on the cards (fixed in `7255b8a`) |
 
 ## RC mission (2026-09-23, continued): live native evidence and the Pro review of `e7c5207` (history)
 

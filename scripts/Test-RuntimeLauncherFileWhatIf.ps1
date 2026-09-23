@@ -231,7 +231,7 @@ $familyCases = @(
     @{ Name = 'advanced-probe-select'; Args = @('-Scenario', 'live-cast-probe-select', '-FixtureFamily', 'Advanced', '-TimeoutSeconds', '600', '-WhatIf') },
     @{ Name = 'advanced-bootstrap'; Args = @('-Scenario', 'live-ui-bootstrap', '-FixtureFamily', 'Advanced', '-WhatIf') },
     @{ Name = 'advanced-smoke'; Args = @('-Scenario', 'mod-load-smoke', '-FixtureFamily', 'Advanced', '-WhatIf') },
-    @{ Name = 'advanced-reload'; Args = @('-Scenario', 'live-workspace-reload', '-FixtureFamily', 'Advanced', '-WhatIf') },
+    @{ Name = 'advanced-reload'; Args = @('-Scenario', 'live-workspace-reload', '-FixtureFamily', 'Advanced', '-TimeoutSeconds', '600', '-WhatIf') },
     @{ Name = 'advanced-import'; Args = @('-Scenario', 'live-workspace-import', '-FixtureFamily', 'Advanced', '-WhatIf') }
 )
 foreach ($case in $familyCases) {
