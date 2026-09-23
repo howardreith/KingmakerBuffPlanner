@@ -44,8 +44,20 @@ discovered buff name; caster names no longer run under Focus).
 The harness must run under Windows PowerShell 5.1 (`powershell.exe`);
 it now refuses PowerShell 7 (JSON date conversion broke manifest checks).
 
-NEXT (exact action): rebuild at the new HEAD and re-rehearse to confirm
-the lane layout in a live frame; then,
+`casting-ws-claude-rehearsal-20260922-194601` on `5781301` confirmed
+the lanes fill their columns in a live frame (PASS, restored verified).
+
+SUPERVISED SESSION DONE: `casting-ws-claude-manual-20260922-200244`
+(`5781301`) — lifecycle PASS on Howie's done instruction, restored
+verified; usability verdict FAIL (functional Add/Undo, "I really hate
+this UI"). Record: `docs/evidence/casting-ws-claude-manual-20260922-200244-session.md`.
+Owner direction: Bubble Buffs–like look, casting as the atomic unit —
+`docs/UI-END-GOAL.md`.
+
+NEXT (exact action): the UI slice in `docs/UI-END-GOAL.md` — icon-first
+searchable buff grid with disambiguated variants, portrait strips with
+the coverage colour legend, casting cards with portraits and enhancement
+chips; then the native parchment pass. Historical next step:
 when Howie confirms availability, the supervised manual session per
 `docs/MANUAL-USABILITY-HANDOFF.md` with Claude relaying done/stop via
 the run-bound marker. Afterward: fix the observed defects, then the §5
