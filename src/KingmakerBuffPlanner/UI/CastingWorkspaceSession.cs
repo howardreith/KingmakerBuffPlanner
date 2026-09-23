@@ -56,10 +56,14 @@ namespace KingmakerBuffPlanner.UI
     {
         string DispositionReason { get; }
 
+        // The boundary receives the EXACT approved projection (review K4):
+        // a native adapter must execute these steps, identified by
+        // projection.ProjectionId, never re-plan from the plan/decision.
         CastingDispatchOutcome Submit(
             ExplicitCastingPlan plan,
             CastingApplyDecision decision,
-            string scopeRoutineId);
+            string scopeRoutineId,
+            ExplicitStepConversion projection);
     }
 
     public sealed class CastingDispatchOutcome
@@ -81,6 +85,7 @@ namespace KingmakerBuffPlanner.UI
     {
         internal readonly List<string> RecordedSubmissions =
             new List<string>();
+        internal ExplicitStepConversion LastProjection;
 
         public string DispositionReason
         {
@@ -94,7 +99,8 @@ namespace KingmakerBuffPlanner.UI
         public CastingDispatchOutcome Submit(
             ExplicitCastingPlan plan,
             CastingApplyDecision decision,
-            string scopeRoutineId)
+            string scopeRoutineId,
+            ExplicitStepConversion projection)
         {
             // Policy proof only: the exact reviewed identity is recorded and
             // refused. This is never a cast, never a gameplay result, and
@@ -102,6 +108,7 @@ namespace KingmakerBuffPlanner.UI
             RecordedSubmissions.Add(
                 (scopeRoutineId ?? "one-pass") + "|" +
                 string.Join(",", decision.ExecutableCastingIds));
+            LastProjection = projection;
             return new CastingDispatchOutcome(
                 false, DispositionReason, decision.ExecutableCastingIds);
         }
@@ -810,7 +817,7 @@ namespace KingmakerBuffPlanner.UI
             {
                 _submissionInFlight = true;
                 CastingDispatchOutcome dispatch = _dispatch.Submit(
-                    plan, decision, scope);
+                    plan, decision, scope, projection);
                 return new WorkspaceApplyResult(
                     dispatch.Submitted, dispatch.Submitted
                         ? string.Empty : dispatch.Reason,
