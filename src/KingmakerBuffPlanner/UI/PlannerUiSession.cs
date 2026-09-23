@@ -57,6 +57,12 @@ namespace KingmakerBuffPlanner.UI
             get { return _providerOptions ?? new ProviderPlanningOption[0]; }
         }
         internal string LastBindingFailure { get; private set; }
+        // Live party effects with instance detail from the last refresh
+        // (null before a campaign snapshot exists).
+        internal ActiveEffectSnapshot ActiveEffects
+        {
+            get { return _activeEffects; }
+        }
 
         internal void Refresh()
         {

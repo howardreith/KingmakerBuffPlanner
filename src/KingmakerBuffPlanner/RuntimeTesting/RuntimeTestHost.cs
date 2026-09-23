@@ -150,6 +150,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             RuntimeTestRequest request = RuntimeTestProtocol.TryRead(arguments, out rejection);
             if (request != null)
             {
+                // Taken before any planner session exists: the ordinary
+                // planner routes of an automation session can never submit
+                // native casts (the probe keeps its own allowance boundary).
+                UI.NativeCastingSessionPolicy.LockForRuntimeTest(request.Scenario);
                 RuntimePerformanceDiagnostics.Configure(request, log);
                 return new RuntimeTestHost(request, modEntry, log);
             }

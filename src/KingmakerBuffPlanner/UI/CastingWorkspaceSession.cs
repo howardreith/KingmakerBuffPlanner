@@ -25,9 +25,11 @@ namespace KingmakerBuffPlanner.UI
             IEnumerable<ProviderPlanningOption> providerOptions,
             IReadOnlyDictionary<string, EffectExpression> effectsBySource,
             IEnumerable<CastEnhancementSnapshot> enhancements,
-            IEnumerable<ICastingTargetingModifier> targetingModifiers = null)
+            IEnumerable<ICastingTargetingModifier> targetingModifiers = null,
+            ActiveEffectSnapshot liveEffects = null)
         {
             Snapshot = snapshot ?? throw new ArgumentNullException("snapshot");
+            LiveEffects = liveEffects;
             ProviderOptions = (providerOptions ?? new ProviderPlanningOption[0])
                 .Where(value => value != null).ToList();
             EffectsBySource = effectsBySource ??
@@ -44,14 +46,17 @@ namespace KingmakerBuffPlanner.UI
         public IReadOnlyList<CastEnhancementSnapshot> Enhancements { get; private set; }
         public IReadOnlyList<ICastingTargetingModifier> TargetingModifiers
         { get; private set; }
+        // Live effects on the party (with instance detail in production);
+        // null when unknown, which disables the live existing-effect skip.
+        public ActiveEffectSnapshot LiveEffects { get; private set; }
     }
 
     // The boundary between the reviewed casting plan and native submission.
-    // The production implementation refuses: no qualified executor exists
-    // for the casting-first resolved plan yet, and legacy expansion or
-    // substitution paths must never receive new-model intent. The refusal
-    // records the attempted submission identity so integration tests can
-    // prove policy without any gameplay claim.
+    // Production uses NativeCastingDispatchBoundary (the execution host runs
+    // the exact projection through the existing executors); a runtime-test
+    // session and the default constructor use DisabledCastingDispatchBoundary,
+    // which records the attempted identity and refuses. Legacy expansion or
+    // substitution paths never receive new-model intent.
     public interface ICastingDispatchBoundary
     {
         string DispositionReason { get; }
@@ -86,14 +91,26 @@ namespace KingmakerBuffPlanner.UI
         internal readonly List<string> RecordedSubmissions =
             new List<string>();
         internal ExplicitStepConversion LastProjection;
+        private readonly string _reason;
+
+        public DisabledCastingDispatchBoundary()
+            : this(null)
+        {
+        }
+
+        // A specific refusal (for example the runtime-test session lock);
+        // the reason always starts with "native-submission-disabled".
+        public DisabledCastingDispatchBoundary(string reason)
+        {
+            _reason = string.IsNullOrEmpty(reason) ||
+                !reason.StartsWith("native-submission-disabled", StringComparison.Ordinal)
+                    ? "native-submission-disabled:no-qualified-casting-first-executor"
+                    : reason;
+        }
 
         public string DispositionReason
         {
-            get
-            {
-                return "native-submission-disabled:" +
-                    "no-qualified-casting-first-executor";
-            }
+            get { return _reason; }
         }
 
         public CastingDispatchOutcome Submit(
@@ -149,8 +166,8 @@ namespace KingmakerBuffPlanner.UI
     // review coordinator. Browsing and previewing never mutate the document
     // and never approve anything; every mutation is an explicit command with
     // a disclosed scope and Undo; Apply routes through presented-plan review
-    // and preflight before a dispatch boundary that is disabled until a
-    // qualified executor exists.
+    // (per routine, restorable across sessions) and preflight on the
+    // caller's inputs before the injected dispatch boundary.
     public sealed class CastingWorkspaceSession
     {
         private readonly CastingPlanRepository _repository;
@@ -168,6 +185,11 @@ namespace KingmakerBuffPlanner.UI
             new ExplicitCastingCompiler();
         private CastingAuthoringService _authoring;
         private bool _submissionInFlight;
+        // Player settings stored beside the document in the candidate
+        // profile; loaded with it and written back by Save (never reset).
+        private UiProfile _uiSettings = UiProfile.Default();
+        private ExecutionProfile _executionSettings = ExecutionProfile.Default();
+        private readonly CastingReviewStore _reviewStore;
 
         public CastingWorkspaceSession(
             string modPath, string campaignId,
@@ -193,6 +215,7 @@ namespace KingmakerBuffPlanner.UI
                 case CastingPlanLoadStatus.RecoveredFromBackup:
                     _authoring = new CastingAuthoringService(
                         loaded.Profile.ToDocument());
+                    AdoptSettings(loaded.Profile);
                     break;
                 case CastingPlanLoadStatus.Absent:
                     // First open in this campaign: import the legacy
@@ -216,6 +239,76 @@ namespace KingmakerBuffPlanner.UI
             // blocked candidate starts exactly as clean as a loaded one.
             _savedIntentSignature = DocumentIntentSignature();
             SelectedRoutineId = "long";
+            // Accepted review state from an earlier session: it authorizes
+            // only contents whose digest still matches exactly.
+            _reviewStore = Path.IsPathRooted(modPath)
+                ? new CastingReviewStore(modPath) : null;
+            if (_reviewStore != null)
+            {
+                CastingReviewStoreLoad review = _reviewStore.Load(campaignId);
+                ReviewStoreWarning = review.Warning;
+                foreach (KeyValuePair<string, string> pair in review.AcceptedDigests)
+                    _review.RestoreAccepted(pair.Key, pair.Value);
+            }
+        }
+
+        // Persisted review state problems (unreadable file, failed write);
+        // review then simply requires a fresh acceptance.
+        public string ReviewStoreWarning { get; private set; }
+
+        private void AdoptSettings(CastingPlanProfile profile)
+        {
+            _uiSettings = profile == null || profile.Ui == null
+                ? UiProfile.Default()
+                : new UiProfile { Scale = profile.Ui.Scale, Hotkey = profile.Ui.Hotkey };
+            _executionSettings = profile == null || profile.Execution == null
+                ? ExecutionProfile.Default()
+                : CopyOf(profile.Execution);
+        }
+
+        private static ExecutionProfile CopyOf(ExecutionProfile value)
+        {
+            return new ExecutionProfile
+            {
+                Mode = value.Mode,
+                AllowAnimatedFallback = value.AllowAnimatedFallback,
+                OutOfCombatOnly = value.OutOfCombatOnly,
+                RecastExisting = value.RecastExisting
+            };
+        }
+
+        // The execution settings a run uses (a copy; edits go through the
+        // setters below and are saved with the document).
+        public ExecutionProfile ExecutionSettings
+        {
+            get { return CopyOf(_executionSettings); }
+        }
+
+        public string ExecutionMode
+        {
+            get { return _executionSettings.Mode; }
+        }
+
+        public bool AllowAnimatedFallback
+        {
+            get { return _executionSettings.AllowAnimatedFallback; }
+        }
+
+        // "animated" (native casting animations, the default) or "instant".
+        public void SetExecutionMode(string mode)
+        {
+            if (mode != "animated" && mode != "instant")
+                throw new ArgumentException("Unknown execution mode.", "mode");
+            ExecutionProfile next = CopyOf(_executionSettings);
+            next.Mode = mode;
+            _executionSettings = next;
+        }
+
+        public void SetAllowAnimatedFallback(bool allow)
+        {
+            ExecutionProfile next = CopyOf(_executionSettings);
+            next.AllowAnimatedFallback = allow;
+            _executionSettings = next;
         }
 
         public string CampaignId { get; private set; }
@@ -360,6 +453,9 @@ namespace KingmakerBuffPlanner.UI
                             ImportReport = migration.ImportReport;
                             LoadStatus = reloaded.Status;
                             LoadWarning = reloaded.Warning;
+                            // The legacy execution/UI settings travel with
+                            // the import (the migration wrote them).
+                            AdoptSettings(reloaded.Profile);
                             return reloaded.Profile.ToDocument();
                         }
                         MigrationWarning = "migrated-candidate-did-not-reopen:" +
@@ -471,7 +567,8 @@ namespace KingmakerBuffPlanner.UI
                 selectedSource, SelectedRoutineId, casters, cards, budget,
                 _authoring.Document.Routines.Select(value => value.RoutineId)
                     .ToList(),
-                selectedGate, onePassGate, _review.Status, scope, scopeLabel,
+                selectedGate, onePassGate, _review.StatusFor(SelectedRoutineId),
+                scope, scopeLabel,
                 plan.Diagnostics,
                 BuildDraftView(inputs, selectedSource, casters));
             BuildFocusedEnhancements(view, inputs);
@@ -764,9 +861,27 @@ namespace KingmakerBuffPlanner.UI
         public CastingPlanSignature PresentForReview(CastingWorkspaceInputs inputs)
         {
             ExplicitCastingPlan plan = Compile(inputs, SelectedRoutineId, false);
-            CastingPlanSignature signature = CastingPlanSignature.For(plan);
-            _review.Present(signature);
+            CastingPlanSignature signature = CastingPlanSignature.For(plan, SelectedRoutineId);
+            // Presenting different material clears that routine's acceptance;
+            // the cleared state is persisted so it cannot resurface.
+            if (_review.Present(SelectedRoutineId, signature)) PersistReviewState();
             return signature;
+        }
+
+        public CastingReviewStatus ReviewStatusFor(string routineId)
+        {
+            return _review.StatusFor(routineId);
+        }
+
+        private void PersistReviewState()
+        {
+            if (_reviewStore == null) return;
+            try { _reviewStore.Save(CampaignId, _review.AcceptedDigests); }
+            catch (Exception exception)
+            {
+                ReviewStoreWarning = "review-state-save-failed:" +
+                    exception.GetType().Name + ":" + exception.Message;
+            }
         }
 
         // The player accepts the contents as currently compiled; the
@@ -775,7 +890,10 @@ namespace KingmakerBuffPlanner.UI
         public bool AcceptPresentedPlan(CastingWorkspaceInputs inputs)
         {
             ExplicitCastingPlan plan = Compile(inputs, SelectedRoutineId, false);
-            return _review.Accept(CastingPlanSignature.For(plan)).Allowed;
+            bool accepted = _review.Accept(SelectedRoutineId,
+                CastingPlanSignature.For(plan, SelectedRoutineId)).Allowed;
+            if (accepted) PersistReviewState();
+            return accepted;
         }
 
         public WorkspaceApplyResult Apply(
@@ -813,8 +931,14 @@ namespace KingmakerBuffPlanner.UI
                 return new WorkspaceApplyResult(false,
                     "apply-refused:" + string.Join(",", decision.BlockingReasons.ToArray()),
                     decision, null);
-            CastingPlanSignature signature = CastingPlanSignature.For(plan);
-            CastingReviewDecision review = _review.TrySubmit(signature);
+            // Nothing to submit (every casting already active, disabled or
+            // deliberately omitted): an honest no-op, not a failure and not
+            // an execution.
+            if (decision.ExecutableCastingIds.Count == 0)
+                return new WorkspaceApplyResult(false,
+                    "nothing-to-cast:" + decision.Omissions.Count, decision, null);
+            CastingPlanSignature signature = CastingPlanSignature.For(plan, scope);
+            CastingReviewDecision review = _review.TrySubmit(scope, signature);
             if (!review.Allowed)
                 return new WorkspaceApplyResult(
                     false, review.Reason, decision, null);
@@ -843,6 +967,50 @@ namespace KingmakerBuffPlanner.UI
             {
                 _submissionInFlight = false;
             }
+        }
+
+        // The last production run started from this session (any route),
+        // recorded by the run owner when the run reached its terminal.
+        public CastingRunReport LastRunReport { get; private set; }
+
+        public void RecordRunReport(CastingRunReport report)
+        {
+            if (report != null) LastRunReport = report;
+        }
+
+        // "Spell (caster -> target)" for results and logs, from the last
+        // discovery inputs; falls back to identifiers, never throws.
+        public string CastingLabel(string castingId)
+        {
+            PlannedCasting casting = _authoring.Document.Castings.FirstOrDefault(
+                value => value != null && string.Equals(value.CastingId, castingId,
+                    StringComparison.Ordinal));
+            if (casting == null) return castingId ?? string.Empty;
+            string spell = casting.SourceId;
+            if (_lastInputs != null && casting.Ability != null)
+            {
+                ProviderPlanningOption option = _lastInputs.ProviderOptions.FirstOrDefault(
+                    value => value != null && value.Provider != null &&
+                        string.Equals(value.Provider.Key.Ability.Canonical,
+                            casting.Ability.Canonical, StringComparison.Ordinal));
+                if (option != null && !string.IsNullOrWhiteSpace(option.Provider.DisplayName))
+                    spell = option.Provider.DisplayName;
+            }
+            string target = casting.TargetMode == CastingTargetMode.DirectTarget
+                ? UnitDisplayName(_lastInputs, casting.DirectTargetUnitId)
+                : "group";
+            return spell + " (" + UnitDisplayName(_lastInputs, casting.CasterUnitId) +
+                " -> " + target + ")";
+        }
+
+        public string RoutineDisplayName(string routineId)
+        {
+            RoutineDefinition routine = _authoring.Document.Routines.FirstOrDefault(
+                value => value != null && string.Equals(value.RoutineId, routineId,
+                    StringComparison.Ordinal));
+            if (routine != null && !string.IsNullOrWhiteSpace(routine.Name)) return routine.Name;
+            return string.IsNullOrEmpty(routineId) ? "Routine"
+                : char.ToUpperInvariant(routineId[0]) + routineId.Substring(1);
         }
 
         // ------------------------------------------------------------------
@@ -1090,8 +1258,11 @@ namespace KingmakerBuffPlanner.UI
                 throw new InvalidOperationException(
                     "Candidate persistence is blocked: " + LoadStatus +
                     " " + LoadWarning);
+            // The loaded (or imported) player settings are written back
+            // unchanged unless the player changed them - never reset to
+            // defaults by a document save.
             _repository.Save(CastingPlanProfile.FromDocument(
-                _authoring.Document, null, null));
+                _authoring.Document, _uiSettings, _executionSettings));
             _savedIntentSignature = DocumentIntentSignature();
         }
 
@@ -1104,7 +1275,7 @@ namespace KingmakerBuffPlanner.UI
         public string DocumentIntentSignature()
         {
             CastingPlanProfile profile = CastingPlanProfile.FromDocument(
-                _authoring.Document, null, null);
+                _authoring.Document, _uiSettings, _executionSettings);
             // Normalize the volatile schema stamp so equality reflects
             // CONTENT, and stamp the campaign binding explicitly.
             profile.SchemaVersion = 0;
@@ -1156,6 +1327,7 @@ namespace KingmakerBuffPlanner.UI
                 case CastingPlanLoadStatus.RecoveredFromBackup:
                     _authoring = new CastingAuthoringService(
                         loaded.Profile.ToDocument());
+                    AdoptSettings(loaded.Profile);
                     PersistenceBlocked = false;
                     // Focus cannot survive a document swap (review F4).
                     EditingFocusCastingId = null;
@@ -1180,7 +1352,8 @@ namespace KingmakerBuffPlanner.UI
             return _compiler.Compile(
                 _authoring.Document, inputs.Snapshot, inputs.ProviderOptions,
                 inputs.EffectsBySource, inputs.Enhancements,
-                routineScope, inputs.TargetingModifiers, projectEffects);
+                routineScope, inputs.TargetingModifiers, projectEffects,
+                inputs.LiveEffects);
         }
 
         private WorkspaceApplyResult RefusedInFlight(CastingApplyDecision decision)

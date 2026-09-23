@@ -29,6 +29,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Program.cs" />
+    <Compile Include="ProductionExecutionTests.cs" />
     <Compile Include="TestBuildInfo.cs" />
     <Compile Include="..\..\src\KingmakerBuffPlanner\Discovery\ActionGraphScanner.cs"><Link>Discovery\ActionGraphScanner.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Discovery\AreaRecipientSemantics.cs"><Link>Discovery\AreaRecipientSemantics.cs</Link></Compile>
@@ -69,11 +70,14 @@
     <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\CastingReviewCoordinator.cs"><Link>Planning\CastingReviewCoordinator.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\ExplicitCastingStepConverter.cs"><Link>Planning\ExplicitCastingStepConverter.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\EffectPresenceEvaluator.cs"><Link>Planning\EffectPresenceEvaluator.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\ExistingEffectAssessment.cs"><Link>Planning\ExistingEffectAssessment.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\CastPlanner.cs"><Link>Planning\CastPlanner.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Persistence\ProfileModels.cs"><Link>Persistence\ProfileModels.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Persistence\ProfileRepository.cs"><Link>Persistence\ProfileRepository.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Persistence\CastingPlanProfileModels.cs"><Link>Persistence\CastingPlanProfileModels.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Persistence\CastingPlanRepository.cs"><Link>Persistence\CastingPlanRepository.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Persistence\CastingReviewStore.cs"><Link>Persistence\CastingReviewStore.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Persistence\PlannerModeStore.cs"><Link>Persistence\PlannerModeStore.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Persistence\CastingPlanMigrationService.cs"><Link>Persistence\CastingPlanMigrationService.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Persistence\CastingPlanImporter.cs"><Link>Persistence\CastingPlanImporter.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Infrastructure\AtomicFile.cs"><Link>Infrastructure\AtomicFile.cs</Link></Compile>
@@ -81,6 +85,9 @@
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\PlannerSetupModel.cs"><Link>UI\PlannerSetupModel.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingWorkspaceModels.cs"><Link>UI\CastingWorkspaceModels.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingWorkspaceSession.cs"><Link>UI\CastingWorkspaceSession.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingExecutionHost.cs"><Link>UI\CastingExecutionHost.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\NativeCastingSessionPolicy.cs"><Link>UI\NativeCastingSessionPolicy.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingRunPresentation.cs"><Link>UI\CastingRunPresentation.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingWorkspaceSessionBinding.cs"><Link>UI\CastingWorkspaceSessionBinding.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingWorkspaceDevSelection.cs"><Link>UI\CastingWorkspaceDevSelection.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\PlannerPresentationModels.cs"><Link>UI\PlannerPresentationModels.cs</Link></Compile>

@@ -63,7 +63,9 @@ namespace KingmakerBuffPlanner.Planning
             IReadOnlyList<string> readinessReasons,
             IReadOnlyList<string> capableCasterUnitIds,
             MigrationProvenance provenance,
-            IReadOnlyList<CastingCostLine> cost = null)
+            IReadOnlyList<CastingCostLine> cost = null,
+            IReadOnlyList<string> existingEffectNotes = null,
+            IReadOnlyList<string> costShape = null)
         {
             CastingId = castingId;
             RoutineId = routineId;
@@ -90,7 +92,25 @@ namespace KingmakerBuffPlanner.Planning
             Provenance = provenance;
             Cost = new ReadOnlyCollection<CastingCostLine>(
                 (cost ?? new CastingCostLine[0]).ToList());
+            ExistingEffectNotes = new ReadOnlyCollection<string>(
+                (existingEffectNotes ?? new string[0]).ToList());
+            CostShape = new ReadOnlyCollection<string>(
+                (costShape ?? new string[0]).ToList());
         }
+
+        // Disclosure of the live existing-effect assessment for this
+        // casting's recipients: already active (why it is skipped), present
+        // but insufficient (why it still casts), or present and recast by
+        // an always-recast policy. Informational; never a blocking reason.
+        public IReadOnlyList<string> ExistingEffectNotes { get; private set; }
+
+        // The casting's would-be cost vector as "category:pool:units",
+        // independent of whether it reserves now (an already-satisfied
+        // casting keeps the shape of what it would spend). The review
+        // signature uses this so a skip that flips with live effects is a
+        // harmless refresh, while any change of what a casting would spend
+        // stays material.
+        public IReadOnlyList<string> CostShape { get; private set; }
 
         // The complete cost vector this casting reserved atomically: native
         // pool charge, enhancement usage pools, and material components.
@@ -99,7 +119,8 @@ namespace KingmakerBuffPlanner.Planning
         internal ResolvedCasting WithBudgetResult(
             ResolvedCastingReadiness readiness,
             IReadOnlyList<string> readinessReasons,
-            IReadOnlyList<CastingCostLine> cost)
+            IReadOnlyList<CastingCostLine> cost,
+            IReadOnlyList<string> costShape = null)
         {
             return new ResolvedCasting(
                 CastingId, RoutineId, Order, SourceId, Ability, CasterUnitId,
@@ -107,7 +128,8 @@ namespace KingmakerBuffPlanner.Planning
                 RequiredCoverageUnitIds, PredictedBeneficiaryUnitIds, CoverageGaps,
                 TargetingModifiers, Enhancements, AppliedEnhancementIds,
                 OmittedEnhancementIds, ExistingEffectPolicy, IgnoredPresenceMarkers,
-                readiness, readinessReasons, CapableCasterUnitIds, Provenance, cost);
+                readiness, readinessReasons, CapableCasterUnitIds, Provenance, cost,
+                ExistingEffectNotes, costShape ?? CostShape);
         }
 
         public string CastingId { get; private set; }
@@ -213,7 +235,8 @@ namespace KingmakerBuffPlanner.Planning
             IEnumerable<CastEnhancementSnapshot> enhancements = null,
             string budgetRoutineScope = null,
             IEnumerable<ICastingTargetingModifier> targetingModifiers = null,
-            bool projectEffects = false)
+            bool projectEffects = false,
+            ActiveEffectSnapshot liveEffects = null)
         {
             if (document == null) throw new ArgumentNullException("document");
             if (snapshot == null) throw new ArgumentNullException("snapshot");
@@ -237,7 +260,7 @@ namespace KingmakerBuffPlanner.Planning
                 ProviderSnapshot provider;
                 List<ModifierUsageDemand> modifierDemands;
                 castings.Add(CompileOne(casting, snapshot, options, effectsBySource,
-                    enhancementList, modifierList, diagnostics, out matched,
+                    enhancementList, modifierList, diagnostics, liveEffects, out matched,
                     out provider, out modifierDemands));
                 matchedEnhancements[casting.CastingId] = matched;
                 providers[casting.CastingId] = provider;
@@ -263,13 +286,6 @@ namespace KingmakerBuffPlanner.Planning
             var finalized = new List<ResolvedCasting>();
             foreach (ResolvedCasting casting in castings)
             {
-                if (casting.Readiness != ResolvedCastingReadiness.Ready ||
-                    (budgetRoutineScope != null &&
-                     casting.RoutineId != budgetRoutineScope))
-                {
-                    finalized.Add(casting);
-                    continue;
-                }
                 List<CastEnhancementSnapshot> matched;
                 matchedEnhancements.TryGetValue(casting.CastingId, out matched);
                 ProviderSnapshot provider;
@@ -277,6 +293,19 @@ namespace KingmakerBuffPlanner.Planning
                 List<ModifierUsageDemand> modifierDemands;
                 modifierDemandsByCasting.TryGetValue(
                     casting.CastingId, out modifierDemands);
+                // The would-be cost vector, known whenever the exact
+                // provider resolved (also for skipped or blocked castings).
+                IReadOnlyList<string> shape = provider == null
+                    ? new string[0]
+                    : CostShapeOf(ledger.DemandsFor(provider, matched, modifierDemands));
+                if (casting.Readiness != ResolvedCastingReadiness.Ready ||
+                    (budgetRoutineScope != null &&
+                     casting.RoutineId != budgetRoutineScope))
+                {
+                    finalized.Add(casting.WithBudgetResult(casting.Readiness,
+                        casting.ReadinessReasons, casting.Cost, shape));
+                    continue;
+                }
                 if (projectEffects &&
                     casting.ExistingEffectPolicy == ExistingEffectPolicy.SkipAlreadyActive &&
                     IsStructurallySatisfied(casting, matched, grantedByUnit))
@@ -284,7 +313,7 @@ namespace KingmakerBuffPlanner.Planning
                     finalized.Add(casting.WithBudgetResult(
                         ResolvedCastingReadiness.AlreadySatisfied,
                         new[] { "already-satisfied-structural" },
-                        new CastingCostLine[0]));
+                        new CastingCostLine[0], shape));
                     continue;
                 }
                 IReadOnlyList<CastingDemand> demands = ledger.DemandsFor(
@@ -295,7 +324,7 @@ namespace KingmakerBuffPlanner.Planning
                         casting.CastingId, provider, demands, out cost, out reason))
                 {
                     finalized.Add(casting.WithBudgetResult(
-                        casting.Readiness, casting.ReadinessReasons, cost));
+                        casting.Readiness, casting.ReadinessReasons, cost, shape));
                     if (projectEffects)
                         ProjectEffects(casting, matched, grantedByUnit);
                     continue;
@@ -306,7 +335,7 @@ namespace KingmakerBuffPlanner.Planning
                     .Distinct(StringComparer.Ordinal)
                     .OrderBy(value => value, StringComparer.Ordinal).ToList();
                 finalized.Add(casting.WithBudgetResult(
-                    ResolvedCastingReadiness.Blocked, reasons, new CastingCostLine[0]));
+                    ResolvedCastingReadiness.Blocked, reasons, new CastingCostLine[0], shape));
             }
             AddDuplicateRequestWarnings(finalized, diagnostics);
             return new ExplicitCastingPlan(finalized, diagnostics, ledger.BuildReport(),
@@ -321,6 +350,7 @@ namespace KingmakerBuffPlanner.Planning
             List<CastEnhancementSnapshot> enhancements,
             List<ICastingTargetingModifier> targetingModifiers,
             List<string> diagnostics,
+            ActiveEffectSnapshot liveEffects,
             out List<CastEnhancementSnapshot> matchedEnhancements,
             out ProviderSnapshot providerSnapshot,
             out List<ModifierUsageDemand> modifierDemands)
@@ -349,11 +379,13 @@ namespace KingmakerBuffPlanner.Planning
             if (option != null)
                 option = ApplyTargetingModifiers(
                     casting, targetingModifiers, option, reasons, modifierDemands);
+            // Resources are judged AFTER targeting, enhancements and the live
+            // existing-effect assessment: a casting whose effect is already
+            // sufficiently active needs no resources, so an exhausted pool
+            // must not block it (repeat use right after a routine ran).
+            var resourceReasons = new List<string>();
             if (option != null)
-            {
-                if (!HasSpendableResources(option, snapshot, reasons))
-                    option = null;
-            }
+                HasSpendableResources(option, snapshot, resourceReasons);
             if (option != null)
             {
                 predicted = ResolveTargeting(casting, option, snapshot, gaps, reasons);
@@ -381,14 +413,31 @@ namespace KingmakerBuffPlanner.Planning
                 foreach (AuthoredEnhancementSelection selection in casting.Enhancements)
                     if (selection.Required)
                         reasons.Add("enhancements-unvalidated:source-unresolved");
+            // Only a structurally valid, authored-Ready casting may be
+            // satisfied by live effects; a structural block (caster, target,
+            // enhancement, modifier, import review) stays a block that the
+            // player must resolve, whatever is active right now. Resource
+            // exhaustion alone is overridden by a sufficient active effect.
+            var existingNotes = new List<string>();
+            var satisfiedUnits = new List<string>();
+            bool alreadyActive = liveEffects != null && option != null &&
+                reasons.Count == 0 && casting.State == CastingAuthoringState.Ready &&
+                AssessExistingEffects(casting, option.Provider, matched, predicted,
+                    effectsBySource, liveEffects, existingNotes, satisfiedUnits);
+            if (alreadyActive)
+                reasons.Add("already-active:" + string.Join(",", satisfiedUnits.ToArray()));
+            else
+                reasons.AddRange(resourceReasons);
             ResolvedCastingReadiness readiness =
                 casting.State == CastingAuthoringState.Draft
                     ? ResolvedCastingReadiness.Draft
                     : casting.State == CastingAuthoringState.Disabled
                         ? ResolvedCastingReadiness.Disabled
-                        : reasons.Count == 0
-                            ? ResolvedCastingReadiness.Ready
-                            : ResolvedCastingReadiness.Blocked;
+                        : alreadyActive
+                            ? ResolvedCastingReadiness.AlreadySatisfied
+                            : reasons.Count == 0
+                                ? ResolvedCastingReadiness.Ready
+                                : ResolvedCastingReadiness.Blocked;
             // Targeting modifiers change recipient eligibility only: an
             // enabled modifier transforms the proven option or blocks with a
             // repairable reason. With no host registry the selection stays
@@ -411,7 +460,7 @@ namespace KingmakerBuffPlanner.Planning
                 readiness,
                 reasons.Distinct(StringComparer.Ordinal)
                     .OrderBy(value => value, StringComparer.Ordinal).ToList(),
-                capableCasters, casting.Provenance);
+                capableCasters, casting.Provenance, null, existingNotes);
         }
 
         // Applies the casting's enabled targeting modifiers in authored
@@ -736,6 +785,105 @@ namespace KingmakerBuffPlanner.Planning
             }
             if (matched.Count != 0 && !CastEnhancementSnapshot.AreCompatible(matched))
                 reasons.Add("enhancement-incompatible");
+        }
+
+        // Live existing-effect assessment for one casting. Every INTENDED
+        // recipient is judged against exact effect identities: the direct
+        // target, or the group's required coverage (the predicted
+        // beneficiaries when no coverage is required). Returns true only
+        // when the policy skips and every intended recipient already has a
+        // sufficient instance of the complete effect; notes disclose each
+        // recipient's verdict either way.
+        private static bool AssessExistingEffects(
+            PlannedCasting casting,
+            ProviderSnapshot provider,
+            IReadOnlyList<CastEnhancementSnapshot> matched,
+            IReadOnlyList<string> predicted,
+            IReadOnlyDictionary<string, EffectExpression> effectsBySource,
+            ActiveEffectSnapshot liveEffects,
+            List<string> notes,
+            List<string> satisfiedUnitIds)
+        {
+            EffectExpression expression;
+            if (!effectsBySource.TryGetValue(casting.SourceId, out expression) &&
+                !effectsBySource.TryGetValue(casting.Ability.Canonical, out expression))
+                return false;
+            IReadOnlyList<string> recipients =
+                casting.TargetMode == CastingTargetMode.DirectTarget
+                    ? new ReadOnlyCollection<string>(new[] { casting.DirectTargetUnitId })
+                    : casting.RequiredCoverageUnitIds.Count != 0
+                        ? casting.RequiredCoverageUnitIds
+                        : predicted;
+            if (recipients == null || recipients.Count == 0 ||
+                recipients.Any(string.IsNullOrEmpty))
+                return false;
+            ExistingEffectRequirement requirement = RequirementFor(provider, matched);
+            var ignored = new HashSet<string>(
+                casting.IgnoredPresenceMarkers ?? new string[0], StringComparer.Ordinal);
+            bool skip = casting.ExistingEffectPolicy == ExistingEffectPolicy.SkipAlreadyActive;
+            bool allSufficient = true;
+            foreach (string unitId in recipients)
+            {
+                ExistingEffectRecipientAssessment assessment = ExistingEffectSufficiency.Assess(
+                    unitId, expression, InstancesFor(liveEffects, unitId), ignored, requirement);
+                string detail = assessment.Reasons.Count == 0 ? string.Empty
+                    : ":" + string.Join("|", assessment.Reasons.ToArray());
+                switch (assessment.Verdict)
+                {
+                    case ExistingEffectVerdict.Sufficient:
+                        satisfiedUnitIds.Add(unitId);
+                        notes.Add((skip ? "already-active:" : "existing-active-recast:") +
+                            unitId + detail);
+                        break;
+                    case ExistingEffectVerdict.Insufficient:
+                        allSufficient = false;
+                        notes.Add("existing-insufficient:" + unitId + detail);
+                        break;
+                    default:
+                        allSufficient = false;
+                        if (detail.Length != 0)
+                            notes.Add("existing-incomplete:" + unitId + detail);
+                        break;
+                }
+            }
+            return skip && allSufficient;
+        }
+
+        private static IEnumerable<ActiveEffectInstance> InstancesFor(
+            ActiveEffectSnapshot liveEffects, string unitId)
+        {
+            if (liveEffects.HasInstanceDetail) return liveEffects.GetInstances(unitId);
+            // Marker-only snapshot: presence without detail (legacy parity);
+            // unknown caster level and metamagic stay unknown.
+            return liveEffects.GetEffects(unitId).Select(marker =>
+                new ActiveEffectInstance(marker.Kind, marker.EffectId, null, null, null));
+        }
+
+        private static ExistingEffectRequirement RequirementFor(
+            ProviderSnapshot provider, IReadOnlyList<CastEnhancementSnapshot> matched)
+        {
+            int mask = provider.Key.Ability.MetamagicMask;
+            string unprovable = null;
+            foreach (CastEnhancementSnapshot enhancement in
+                matched ?? new CastEnhancementSnapshot[0])
+            {
+                if (enhancement == null) continue;
+                if (enhancement.Category == CastEnhancementCategory.MetamagicRod)
+                    mask |= enhancement.MetamagicMask;
+                else if (!enhancement.AffectsTargeting && unprovable == null)
+                    unprovable = "class-feature:" + enhancement.EnhancementId;
+            }
+            return new ExistingEffectRequirement(provider.EffectiveCasterLevel, mask,
+                provider.ExpectedDurationRounds,
+                ExistingEffectSufficiency.IsPerLevelDuration(provider.DurationText),
+                unprovable);
+        }
+
+        private static IReadOnlyList<string> CostShapeOf(IEnumerable<CastingDemand> demands)
+        {
+            return new ReadOnlyCollection<string>(demands
+                .Select(demand => demand.Category + ":" + demand.PoolKey + ":" + demand.Units)
+                .OrderBy(value => value, StringComparer.Ordinal).ToList());
         }
 
         private static void AddDuplicateRequestWarnings(

@@ -13,7 +13,8 @@ namespace KingmakerBuffPlanner.Execution
     {
         internal ExplicitCastingRunEntry(string castingId, bool processed,
             bool nativeSubmissionReported, bool confirmed, string finalStatus,
-            string detail)
+            string detail, bool resourceSpentReported = false,
+            bool spendInvoked = false)
         {
             CastingId = castingId;
             Processed = processed;
@@ -21,7 +22,16 @@ namespace KingmakerBuffPlanner.Execution
             Confirmed = confirmed;
             FinalStatus = finalStatus ?? string.Empty;
             Detail = detail ?? string.Empty;
+            ResourceSpentReported = resourceSpentReported;
+            SpendInvoked = spendInvoked;
         }
+
+        // Resource spending is reported separately from the effect: the
+        // executor observed the native resource being spent (ResourceSpent)
+        // or invoked the native spend (SpendInvoked). Neither says anything
+        // about whether the effect landed, and neither is ever reversed.
+        public bool ResourceSpentReported { get; private set; }
+        public bool SpendInvoked { get; private set; }
 
         public string CastingId { get; private set; }
         // Review L2: the executor was invoked for this casting (validation
@@ -230,7 +240,8 @@ namespace KingmakerBuffPlanner.Execution
                         entries.Add(new ExplicitCastingRunEntry(inFlight.CastingId, true,
                             inFlight.NativeSubmissionReported, false,
                             "Cancelled", "cancelled-in-flight;last:" + inFlight.FinalStatus +
-                            ":" + inFlight.Detail));
+                            ":" + inFlight.Detail, inFlight.ResourceSpentReported,
+                            inFlight.SpendInvoked));
                         haltedAfter = inFlight.CastingId;
                     }
                     string cancelReason = "cancelled" +
@@ -271,7 +282,9 @@ namespace KingmakerBuffPlanner.Execution
                 .Select(record => record.Status + ":" + record.Detail).ToArray());
             if (later.Length != 0) detail += "|also:" + later;
             return new ExplicitCastingRunEntry(castingId, true, submitted, confirmed,
-                status, detail);
+                status, detail,
+                report.Records.Any(record => record.Status == CastExecutionStatus.ResourceSpent),
+                report.Records.Any(record => record.Status == CastExecutionStatus.SpendInvoked));
         }
 
         private static string DisposeOnce(ref IEnumerator active)

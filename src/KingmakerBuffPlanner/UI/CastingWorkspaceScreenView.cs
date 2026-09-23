@@ -19,18 +19,20 @@ namespace KingmakerBuffPlanner.UI
     // models and issuing only session commands. The view owns no planner
     // state of its own — no second ledger, no targeting or budget logic.
     //
-    // STATUS: source-integrated and compiled against the installed Unity
-    // 2018.4 legacy UI contracts; not yet visually or audibly qualified in
-    // the running game (native donor qualification remains open), and its
-    // composition-root wiring behind CastingWorkspaceDevSelection is the
-    // remaining integration step recorded in the migration status.
+    // STATUS: the production planner view of the casting-first mode (the
+    // player selects the mode in the UMM settings panel; runtime-test
+    // workspace scenarios select it for their session). Apply routes the
+    // accepted, freshly preflighted plan to the production dispatch
+    // boundary and closes the view while the run proceeds.
     internal sealed class CastingWorkspaceScreenView : IDisposable
     {
         internal const string RootName = "KingmakerBuffPlanner.CastingWorkspaceRoot";
 
         private readonly CastingWorkspaceSession _session;
         private readonly Func<CastingWorkspaceInputs> _inputs;
+        private readonly Func<CastingWorkspaceInputs> _freshInputs;
         private readonly Action _close;
+        private Button _modeButton;
         private PlannerUiTheme _theme;
         private PlannerNativeThemeSurface _nativeTheme;
         private RectTransform _root;
@@ -64,12 +66,15 @@ namespace KingmakerBuffPlanner.UI
             StaticCanvas nativeCanvas,
             CastingWorkspaceSession session,
             Func<CastingWorkspaceInputs> inputsProvider,
+            Func<CastingWorkspaceInputs> freshInputsProvider,
             Action close)
         {
             if (nativeCanvas == null)
                 throw new ArgumentNullException("nativeCanvas");
             _session = session ?? throw new ArgumentNullException("session");
             _inputs = inputsProvider ?? throw new ArgumentNullException("inputsProvider");
+            _freshInputs = freshInputsProvider ??
+                throw new ArgumentNullException("freshInputsProvider");
             _close = close ?? throw new ArgumentNullException("close");
             _theme = PlannerUiTheme.Resolve(nativeCanvas);
             Build(nativeCanvas);
@@ -499,13 +504,65 @@ namespace KingmakerBuffPlanner.UI
             RectOf(_readyOnlyButton).anchorMin = new Vector2(0.62f, 0f);
             RectOf(_readyOnlyButton).anchorMax = new Vector2(0.97f, 0.12f);
             _readyOnlyButton.gameObject.SetActive(false);
-            _footerResult.text = _session.DispatchDisposition;
+            // Per-plan execution mode (saved with the plan): native
+            // animated casting, or Instant.
+            _modeButton = KingmakerUiFactory.CreateButton(
+                "ExecutionMode", footer, _theme, ModeCaption(), () => Click(() =>
+                {
+                    _session.SetExecutionMode(
+                        _session.ExecutionMode == "instant" ? "animated" : "instant");
+                    SetModeCaption();
+                    _footerResult.text = "Casting mode: " + _session.ExecutionMode +
+                        " (Save to keep it).";
+                }));
+            KingmakerUiFactory.SetAnchors(RectOf(_modeButton), 0.52f, 0.2f, 0.61f, 0.8f);
+            _footerResult.text = DescribeReadiness();
+        }
+
+        private string ModeCaption()
+        {
+            return _session.ExecutionMode == "instant" ? "Mode: Instant" : "Mode: Animated";
+        }
+
+        private void SetModeCaption()
+        {
+            Text caption = _modeButton == null ? null
+                : _modeButton.GetComponentInChildren<Text>();
+            if (caption != null) caption.text = ModeCaption();
+        }
+
+        // The last run result when there is one; otherwise whether native
+        // casting is available in this session.
+        private string DescribeReadiness()
+        {
+            CastingRunReport last = _session.LastRunReport;
+            if (last != null)
+                return "Last run: " + CastingRunPresentation.Describe(last,
+                    _session.RoutineDisplayName(last.ScopeRoutineId), _session.CastingLabel);
+            string disposition = _session.DispatchDisposition ?? string.Empty;
+            if (disposition == "native-casting-enabled")
+                return "Review the plan, press Accept Plan, then Review & Apply (or use the " +
+                    "routine buttons).";
+            if (disposition == "native-casting-busy")
+                return "A routine is running; press its button again to stop it.";
+            return "Native casting is not available in this session (" + disposition + ").";
         }
 
         private void RunApply(CastingApplyMode mode)
         {
+            string name = _session.RoutineDisplayName(_session.SelectedRoutineId);
+            CastingWorkspaceInputs inputs;
+            try { inputs = _freshInputs(); }
+            catch (Exception exception)
+            {
+                // A stale plan is never executed: without fresh discovery
+                // nothing is submitted.
+                _footerResult.text = name + " was not cast: the party state could not be " +
+                    "refreshed (" + exception.Message + ").";
+                return;
+            }
             WorkspaceApplyResult result = _session.Apply(
-                mode, _session.SelectedRoutineId, _inputs());
+                mode, _session.SelectedRoutineId, inputs);
             if (!result.Allowed && result.GateDecision != null &&
                 !result.GateDecision.Allowed && mode == CastingApplyMode.Ordinary)
             {
@@ -515,17 +572,19 @@ namespace KingmakerBuffPlanner.UI
                 _readyOnlyButton.gameObject.SetActive(true);
                 return;
             }
-            _footerResult.text = result.Allowed
-                ? "Submitted." : "Refused: " + result.ReviewReason;
-            // The dispatch boundary refuses native submission explicitly;
-            // that refusal is the honest result text, never a cast claim.
-            if (result.Dispatch != null && !result.Dispatch.Submitted)
-                _footerResult.text = "Native casting is disabled — nothing was cast. " +
-                    (result.Projection != null && result.Projection.Converted
-                        ? "Would run " + result.Projection.Plan.Steps.Count +
-                          (result.Projection.Plan.Steps.Count == 1 ? " cast" : " casts") +
-                          " in order."
-                        : string.Empty) + " (" + result.Dispatch.Reason + ")";
+            if (result.Allowed && result.Dispatch != null && result.Dispatch.Submitted)
+            {
+                // The run proceeds in the world: the workspace closes so the
+                // party can act, and the result is reported when it ends.
+                _close();
+                return;
+            }
+            _footerResult.text = CastingRunPresentation.DescribeRefusal(name, result);
+            if (result.Dispatch != null && !result.Dispatch.Submitted &&
+                result.Projection != null && result.Projection.Converted)
+                _footerResult.text += " Would run " + result.Projection.Plan.Steps.Count +
+                    (result.Projection.Plan.Steps.Count == 1 ? " cast" : " casts") +
+                    " in order.";
         }
 
         private void Click(Action action)

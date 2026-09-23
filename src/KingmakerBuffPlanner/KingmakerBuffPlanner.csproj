@@ -156,11 +156,14 @@
     <Compile Include="Planning\CastingReviewCoordinator.cs" />
     <Compile Include="Planning\ExplicitCastingStepConverter.cs" />
     <Compile Include="Planning\EffectPresenceEvaluator.cs" />
+    <Compile Include="Planning\ExistingEffectAssessment.cs" />
     <Compile Include="Planning\CastPlanner.cs" />
     <Compile Include="Persistence\ProfileModels.cs" />
     <Compile Include="Persistence\ProfileRepository.cs" />
     <Compile Include="Persistence\CastingPlanProfileModels.cs" />
     <Compile Include="Persistence\CastingPlanRepository.cs" />
+    <Compile Include="Persistence\CastingReviewStore.cs" />
+    <Compile Include="Persistence\PlannerModeStore.cs" />
     <Compile Include="Persistence\CastingPlanMigrationService.cs" />
     <Compile Include="Persistence\CastingPlanImporter.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -182,6 +185,9 @@
     <Compile Include="UI\PlannerSetupModel.cs" />
     <Compile Include="UI\CastingWorkspaceModels.cs" />
     <Compile Include="UI\CastingWorkspaceSession.cs" />
+    <Compile Include="UI\CastingExecutionHost.cs" />
+    <Compile Include="UI\NativeCastingSessionPolicy.cs" />
+    <Compile Include="UI\CastingRunPresentation.cs" />
     <Compile Include="UI\CastingWorkspaceSessionBinding.cs" />
     <Compile Include="UI\CastingWorkspaceScreenView.cs" />
     <Compile Include="UI\CastingWorkspaceDevSelection.cs" />
