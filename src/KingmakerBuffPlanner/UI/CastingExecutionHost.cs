@@ -9,6 +9,27 @@ using KingmakerBuffPlanner.Planning;
 
 namespace KingmakerBuffPlanner.UI
 {
+    // Game time that counts only while the world runs, for run deadlines.
+    // Seconds accumulate as a double, so the fraction of a millisecond each
+    // frame is kept (a truncating millisecond sum lost 4 percent at 60 fps
+    // and stood still above 1000 updates a second; review of
+    // e7c5207..f7726c9, P3-1).
+    public sealed class CastingWorldClock
+    {
+        private double _seconds;
+
+        public void Advance(bool worldRunning, double deltaSeconds)
+        {
+            if (worldRunning && deltaSeconds > 0 && !double.IsInfinity(deltaSeconds))
+                _seconds += deltaSeconds;
+        }
+
+        public long Milliseconds
+        {
+            get { return (long)(_seconds * 1000.0); }
+        }
+    }
+
     // What happened to one casting of a production run, from the player's
     // point of view. Resource spending is reported beside the state, never
     // folded into it: a failed casting may still have spent its resource.

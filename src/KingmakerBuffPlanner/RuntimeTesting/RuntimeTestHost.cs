@@ -2654,10 +2654,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     ? null : Kingmaker.Game.Instance.Player.GameId;
                 string modPath = _modEntry.Path;
                 object recipeRaw;
+                // The host deadline counts only running time, as in
+                // production; the run's own deadline stays wall-clock time
+                // and bounds a world that never runs (review P3-2).
                 var clock = System.Diagnostics.Stopwatch.StartNew();
                 _qualificationHost = new CastingExecutionHost(
                     settings => BuffPlannerUiRoot.CreateCastingExecutorForRuntime(settings),
-                    () => clock.ElapsedMilliseconds);
+                    () => _qualificationWorldClock.Milliseconds);
                 _qualificationDriver = new CastingQualificationDriver(_qualificationRecord, allowance,
                     campaignId, BuffPlannerUiRoot.CastingWorkspaceFreshInputsForRuntime,
                     boundary => new CastingWorkspaceSession(modPath, campaignId, boundary),
@@ -2673,6 +2676,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     closed.Closed + ";campaign=" + campaignId + ".");
                 return false;
             }
+            _qualificationWorldClock.Advance(BuffPlannerUiRoot.WorldRunsForCasting, Time.deltaTime);
             _qualificationDriver.Update();
             if (!_qualificationDriver.Completed) return false;
             PublishQualificationRecord();
@@ -2686,6 +2690,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private readonly CastingQualificationRecord _qualificationRecord = new CastingQualificationRecord();
         private CastingQualificationDriver _qualificationDriver;
         private CastingExecutionHost _qualificationHost;
+        private readonly CastingWorldClock _qualificationWorldClock = new CastingWorldClock();
         private bool _qualificationWorkspaceClosed;
         private bool _qualificationPublished;
 
@@ -2853,23 +2858,36 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 (string.IsNullOrEmpty(closedForCast.Failure) ? string.Empty
                     : ";closeFailure=" + closedForCast.Failure);
             _probeWorldWaitFrames = 0;
+            _probeWorldWaitStartedMillis = _workspaceCaptureElapsed.ElapsedMilliseconds;
             _liveUiPhase = 43;
             return false;
         }
 
-        // Waits (bounded) for the world to run with the planner closed, then
-        // constructs the boundary and submits the one approved cast.
-        private bool UpdateProbeAwaitWorld()
+        // The probe's world predicate: Default mode, not paused, and the
+        // planner closed with its input lease released.
+        private static bool ProbeWorldRuns(out string state)
         {
-            bool running = BuffPlannerUiRoot.WorldRunsForCasting &&
-                !BuffPlannerUiRoot.IsCastingWorkspaceOpen &&
-                !BuffPlannerUiRoot.IsCastingWorkspaceInputLeaseHeldForRuntime;
-            string state = BuffPlannerUiRoot.WorldStateForRuntime + ";workspaceOpen=" +
+            state = BuffPlannerUiRoot.WorldStateForRuntime + ";workspaceOpen=" +
                 BuffPlannerUiRoot.IsCastingWorkspaceOpen + ";leaseHeld=" +
                 BuffPlannerUiRoot.IsCastingWorkspaceInputLeaseHeldForRuntime;
+            return BuffPlannerUiRoot.WorldRunsForCasting &&
+                !BuffPlannerUiRoot.IsCastingWorkspaceOpen &&
+                !BuffPlannerUiRoot.IsCastingWorkspaceInputLeaseHeldForRuntime;
+        }
+
+        // Waits for the world to run with the planner closed, then constructs
+        // the boundary and submits the one approved cast. The wait is bounded
+        // in elapsed time, never in updates (an unfocused game can run far
+        // above 60 updates a second).
+        private bool UpdateProbeAwaitWorld()
+        {
+            string state;
+            bool running = ProbeWorldRuns(out state);
             if (!running)
             {
-                if (++_probeWorldWaitFrames < 300) return false;
+                _probeWorldWaitFrames++;
+                if (_workspaceCaptureElapsed.ElapsedMilliseconds - _probeWorldWaitStartedMillis <
+                    RuntimeTestProtocol.ProbeWorldWaitSeconds * 1000L) return false;
                 _probeRecord.SubmitWorldState += ";atRefusal:" + state;
                 _probeRecord.SubmitReason = "world-not-running:" + state;
                 _log.Info("[KBP-PROBE] the world did not run; no dispatch boundary constructed;" + state + ".");
@@ -2902,12 +2920,17 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private SingleCastProbeAllowance _probeAllowance;
         private CastStep _probeStep;
         private int _probeWorldWaitFrames;
+        private long _probeWorldWaitStartedMillis;
 
+        // The native step and its confirmation frames advance only while the
+        // world runs (review P2-1); the deadline is wall-clock time.
         private bool UpdateProbeRun()
         {
             bool stop = File.Exists(Path.Combine(_request.EvidenceDirectory, "probe-stop.json"));
+            string state;
+            bool running = ProbeWorldRuns(out state);
             if (_probeOwner.Pump(_workspaceCaptureElapsed.ElapsedMilliseconds,
-                    RuntimeTestProtocol.ProbeRunDeadlineSeconds * 1000L, stop))
+                    RuntimeTestProtocol.ProbeRunDeadlineSeconds * 1000L, stop, running, state))
                 _liveUiPhase = 42;
             return false;
         }
@@ -2989,6 +3012,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     { "measuredIdentity", record.MeasuredIdentity },
                     { "worldRunningAtSubmit", record.WorldRunningAtSubmit },
                     { "submitWorldState", record.SubmitWorldState },
+                    { "firstStepWorldState", record.FirstStepWorldState },
+                    { "heldPumps", record.HeldPumps },
                     { "invocation", new JObject
                         {
                             { "outcomeProjectionId", outcome == null ? null : outcome.ProjectionId },

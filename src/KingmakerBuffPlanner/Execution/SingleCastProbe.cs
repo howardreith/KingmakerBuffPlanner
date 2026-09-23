@@ -462,6 +462,12 @@ namespace KingmakerBuffPlanner.Execution
         // when the boundary was constructed; the state is evidence either way.
         public bool WorldRunningAtSubmit { get; set; }
         public string SubmitWorldState { get; set; }
+        // The native step itself (the rule fires on the first pump, and the
+        // confirmation frames follow) advances only while the world runs:
+        // the state at the first step, and how many pumps were held back
+        // (review of e7c5207..f7726c9, P2-1).
+        public string FirstStepWorldState { get; set; }
+        public int HeldPumps { get; set; }
         public string SubmitReason { get; set; }
         public ExplicitCastingRunOutcome Outcome { get; set; }
         public SingleCastProbeObservationSession Observation { get; set; }
@@ -611,8 +617,12 @@ namespace KingmakerBuffPlanner.Execution
             return outcome;
         }
 
-        // One step per frame. Returns true once the run has terminated.
-        public bool Pump(long nowMillis, long deadlineMillis, bool stopRequested)
+        // One step per frame, only while the world runs (a held world queues
+        // the rule and swallows the confirmation frames). A stop and the
+        // wall-clock deadline apply either way. Returns true once the run
+        // has terminated.
+        public bool Pump(long nowMillis, long deadlineMillis, bool stopRequested,
+            bool worldRunning = true, string worldState = null)
         {
             if (_terminated) return true;
             if (_boundary == null || _boundary.ActiveRun == null)
@@ -626,6 +636,13 @@ namespace KingmakerBuffPlanner.Execution
                 Terminate("deadline");
                 return true;
             }
+            if (!worldRunning)
+            {
+                _record.HeldPumps++;
+                return false;
+            }
+            if (_record.FirstStepWorldState == null)
+                _record.FirstStepWorldState = string.IsNullOrEmpty(worldState) ? "running" : worldState;
             bool moved;
             try { moved = _boundary.ActiveRun.MoveNext(); }
             catch (Exception exception)

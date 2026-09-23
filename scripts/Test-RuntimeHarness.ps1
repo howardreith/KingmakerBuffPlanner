@@ -1255,6 +1255,80 @@ try {
             -CompatibilityIdentity $inspectIdentity -EvidenceRoot $inspectRoot) -cne 'inspect-clean') {
         throw 'The completed clean inspection of the bound pair was not found.'
     }
+    # Review of e7c5207..f7726c9, P3-5: the launcher's own completion
+    # computation (not a hand-built record) decides completeness, reads
+    # restoration from the transaction state, and round-trips through the
+    # inspection guard; the save policy per scenario is exact (P3-4).
+    $txRoot = Join-Path $root 'completion-tx'
+    New-Item -ItemType Directory -Path $txRoot -Force | Out-Null
+    $txRestored = Join-Path $txRoot 'restored.json'
+    $txUnrestored = Join-Path $txRoot 'unrestored.json'
+    $txNoField = Join-Path $txRoot 'nofield.json'
+    Write-KbpJsonAtomic $txRestored ([ordered]@{ schemaVersion = 1; restorationVerified = $true })
+    Write-KbpJsonAtomic $txUnrestored ([ordered]@{ schemaVersion = 1; restorationVerified = $false })
+    Write-KbpJsonAtomic $txNoField ([ordered]@{ schemaVersion = 1 })
+    function New-TestCompletion([hashtable]$Override) {
+        $arguments = @{
+            RunId = 'inspect-computed'; Scenario = 'live-advanced-inspect'; FixtureFamily = 'Advanced'
+            ProfileId = 'full-user'; CompatibilityIdentity = $inspectIdentity
+            AdvancedBindingManifest = $inspectBinding.manifestPath; SavePair = $inspectPair
+            GameResultStatus = 'PASS'; HarnessSucceeded = $true; KingmakerExited = $true
+            TransactionStatePath = $txRestored; ProtectedSavesCompared = $true; ProtectedSaveFailure = $null
+        }
+        foreach ($key in $Override.Keys) { $arguments[$key] = $Override[$key] }
+        return New-KbpRunCompletionRecord @arguments
+    }
+    if (-not (New-TestCompletion @{}).complete) { throw 'A clean whole run was not recorded complete.' }
+    foreach ($case in @(
+            @{ GameResultStatus = 'FAIL' }, @{ GameResultStatus = $null }, @{ HarnessSucceeded = $false },
+            @{ KingmakerExited = $false }, @{ TransactionStatePath = $txUnrestored },
+            @{ TransactionStatePath = $txNoField }, @{ TransactionStatePath = (Join-Path $txRoot 'missing.json') },
+            @{ TransactionStatePath = $null }, @{ ProtectedSavesCompared = $false },
+            @{ ProtectedSaveFailure = 'Protected saves changed during the run: changed:x' })) {
+        $computed = New-TestCompletion $case
+        if ($computed.complete) {
+            throw ('A run was recorded complete although ' + (($case.Keys | ForEach-Object { $_ }) -join ',') + ' failed.')
+        }
+    }
+    $unrestored = New-TestCompletion @{ TransactionStatePath = $txUnrestored }
+    if ($unrestored.restorationVerified -or -not $unrestored.protectedSavesClean -or $unrestored.gameResultStatus -cne 'PASS') {
+        throw 'The completion record misreports its individual conditions.'
+    }
+    $computedRoot = Join-Path $root 'computed-evidence'
+    New-Item -ItemType Directory -Path (Join-Path $computedRoot 'inspect-computed') -Force | Out-Null
+    Write-KbpJsonAtomic (Join-Path $computedRoot 'inspect-computed\run-completion.json') $unrestored
+    $refused = $false
+    try {
+        Assert-KbpAdvancedInspectionPassed -Binding $inspectBinding -Pair $inspectPair -ProfileId 'full-user' `
+            -CompatibilityIdentity $inspectIdentity -EvidenceRoot $computedRoot | Out-Null
+    }
+    catch { $refused = $true }
+    if (-not $refused) { throw 'A computed record with an unverified restoration qualified advanced casting.' }
+    Write-KbpJsonAtomic (Join-Path $computedRoot 'inspect-computed\run-completion.json') (New-TestCompletion @{})
+    if ((Assert-KbpAdvancedInspectionPassed -Binding $inspectBinding -Pair $inspectPair -ProfileId 'full-user' `
+            -CompatibilityIdentity $inspectIdentity -EvidenceRoot $computedRoot) -cne 'inspect-computed') {
+        throw 'The launcher-computed complete inspection record did not qualify.'
+    }
+    foreach ($strictCase in @(
+            @('live-cast-qual', 'Automation', $true), @('live-cast-qual-select', 'Automation', $false),
+            @('live-advanced-inspect', 'Advanced', $true), @('live-advanced-inspect', 'Automation', $false),
+            @('live-workspace-qual', 'Advanced', $true),
+            @('live-cast-qual-select', 'Advanced', $true))) {
+        $policy = Get-KbpProtectedSavePolicy -Scenario $strictCase[0] -FixtureFamily $strictCase[1] -WorkingFileName 'W.zks'
+        if (@($policy.allowedChanged).Count -ne 0 -or [bool]$policy.newFilesBlocking -ne $strictCase[2]) {
+            throw ('The save policy for ' + $strictCase[0] + '/' + $strictCase[1] + ' is wrong.')
+        }
+    }
+    $loose = Get-KbpProtectedSavePolicy -Scenario 'live-workspace-qual' -FixtureFamily 'Automation' -WorkingFileName 'W.zks'
+    if (@($loose.allowedChanged).Count -ne 1 -or @($loose.allowedChanged)[0] -cne 'W.zks' -or $loose.newFilesBlocking) {
+        throw 'An automation UI run may change only its WORKING save.'
+    }
+    $launcherText = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'Invoke-KingmakerRuntimeTest.ps1') -Raw
+    if ($launcherText -notmatch 'New-KbpRunCompletionRecord' -or $launcherText -notmatch 'Get-KbpProtectedSavePolicy' -or
+        $launcherText -match 'Write-Error "Kingmaker remains running' -or
+        $launcherText -notmatch "try \{ & \(Join-Path \`$PSScriptRoot 'Restore-Local\.ps1'\)") {
+        throw 'The launcher does not compute its completion record and save policy through the tested functions, or a restoration failure can still skip them.'
+    }
     $digestA = Get-KbpCompatibilityIdentityDigest ([pscustomobject]@{ profileId = 'p'; mods = @(
         [pscustomobject]@{ directoryName = 'A'; version = '1'; directoryManifestSha256 = ('1' * 64); fileCount = 2; totalBytes = 10 }) })
     $digestB = Get-KbpCompatibilityIdentityDigest ([pscustomobject]@{ profileId = 'p'; mods = @(
