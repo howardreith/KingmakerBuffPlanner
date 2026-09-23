@@ -2371,6 +2371,27 @@ namespace KingmakerBuffPlanner.Tests
             ProfileLoadResult rejected = repository.Load("campaign:duplicate");
             if (!rejected.Warning.Contains("duplicate-property"))
                 throw new InvalidOperationException("Duplicate JSON property was not rejected.");
+            // Saving the recovered default over the malformed primary must
+            // first quarantine the exact unreadable bytes (charter §7.1);
+            // the same holds for a newer-schema primary.
+            byte[] malformedBytes = File.ReadAllBytes(path);
+            repository.Save(loaded.Profile);
+            string[] quarantined = Directory.GetFiles(Path.GetDirectoryName(path),
+                "kbp-unreadable-*.orig");
+            if (quarantined.Length != 1 ||
+                !File.ReadAllBytes(quarantined[0]).SequenceEqual(malformedBytes))
+                throw new InvalidOperationException(
+                    "The unreadable primary was overwritten without a byte-exact quarantine.");
+            string newerPath = repository.GetProfilePath("campaign:newer");
+            byte[] newerBytes = new byte[] { 0xEF, 0xBB, 0xBF }.Concat(
+                System.Text.Encoding.UTF8.GetBytes(
+                    "{ \"schemaVersion\": 99, \"campaignId\": \"campaign:newer\" }")).ToArray();
+            File.WriteAllBytes(newerPath, newerBytes);
+            repository.Save(ProfileFixture("campaign:newer"));
+            if (!Directory.GetFiles(Path.GetDirectoryName(path), "kbp-unreadable-*.orig")
+                    .Any(file => File.ReadAllBytes(file).SequenceEqual(newerBytes)))
+                throw new InvalidOperationException(
+                    "A newer-schema primary (with BOM) was not quarantined byte-exactly.");
         }
 
         private static BuffPlannerProfile ProfileFixture(string campaignId)
