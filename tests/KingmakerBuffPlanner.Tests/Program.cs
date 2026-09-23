@@ -397,6 +397,8 @@ namespace KingmakerBuffPlanner.Tests
                     () => TestCastingImportPreservesUnresolvedIntent(root));
                 Run("converter-refuses-unsupported-contracts",
                     () => TestConverterRefusesUnsupportedContracts(root));
+                Run("explicit-run-stops-after-failure-both-modes",
+                    TestExplicitRunStopsAfterFailure);
             }
             finally
             {
@@ -8637,6 +8639,110 @@ namespace KingmakerBuffPlanner.Tests
             { return InstantCastCompletion.Settled("recorded-clean"); }
         }
 
+        // K5 fakes: a scripted failure for one casting id; every submission
+        // is recorded by casting id (CastStep.AssignmentId).
+        private sealed class ScriptedInstantRuntime : IInstantCastRuntimeAdapter,
+            ICastEnhancementRuntimeAdapter
+        {
+            private readonly string _failCasting;
+            private readonly string _mode;
+            internal readonly List<string> Validated = new List<string>();
+            internal readonly List<string> Fired = new List<string>();
+            internal ScriptedInstantRuntime(string failCasting, string mode)
+            {
+                _failCasting = failCasting;
+                _mode = mode;
+            }
+            private bool Failing(CastStep step, string mode)
+            {
+                return step.AssignmentId == _failCasting && _mode == mode;
+            }
+            public bool IsInCombat { get { return false; } }
+            public CastRuntimeValidation Validate(CastStep step)
+            {
+                Validated.Add(step.AssignmentId);
+                return Failing(step, "validate") ? CastRuntimeValidation.Fail("fixture-invalid")
+                    : CastRuntimeValidation.Pass();
+            }
+            public CastEnhancementPreparation PrepareEnhancements(CastStep step)
+            {
+                return Failing(step, "enhancement")
+                    ? CastEnhancementPreparation.Fail("fixture-enhancement-unavailable")
+                    : CastEnhancementPreparation.Pass(null);
+            }
+            public InstantCastResult Fire(CastStep step)
+            {
+                Fired.Add(step.AssignmentId);
+                if (Failing(step, "throw")) throw new InvalidOperationException("fixture-submit");
+                if (Failing(step, "rejected"))
+                    return new InstantCastResult(false, false, false, false, "fixture-rejected");
+                return new InstantCastResult(true, true, !Failing(step, "unconfirmed"),
+                    true, "fixture");
+            }
+            public bool EffectsObserved(CastStep step) { return !Failing(step, "unconfirmed"); }
+            public InstantCastCompletion InspectCompletion(CastStep step)
+            { return InstantCastCompletion.Settled("fixture-settled"); }
+            public InstantCastCompletion Cleanup(CastStep step)
+            { return InstantCastCompletion.Settled("fixture-clean"); }
+        }
+
+        private sealed class ScriptedAnimatedOperation : IAnimatedCastOperation
+        {
+            private readonly bool _succeeded;
+            private readonly bool _timedOut;
+            private int _checks;
+            internal ScriptedAnimatedOperation(bool succeeded, bool timedOut)
+            {
+                _succeeded = succeeded;
+                _timedOut = timedOut;
+            }
+            public bool IsCompleted { get { return ++_checks >= 2; } }
+            public bool IsStarted { get { return true; } }
+            public bool TimedOut { get { return _timedOut; } }
+            public bool Succeeded { get { return _succeeded; } }
+            public bool EffectsObserved { get { return _succeeded && !_timedOut; } }
+            public bool ResourceSpent { get { return _succeeded; } }
+            public bool HasResidualDeliveryState { get { return false; } }
+            public string Detail { get { return "fixture-operation"; } }
+            public void Dispose() { }
+        }
+
+        private sealed class ScriptedAnimatedRuntime : ICastRuntimeAdapter,
+            ICastEnhancementRuntimeAdapter
+        {
+            private readonly string _failCasting;
+            private readonly string _mode;
+            internal readonly List<string> Started = new List<string>();
+            internal ScriptedAnimatedRuntime(string failCasting, string mode)
+            {
+                _failCasting = failCasting;
+                _mode = mode;
+            }
+            private bool Failing(CastStep step, string mode)
+            {
+                return step.AssignmentId == _failCasting && _mode == mode;
+            }
+            public bool IsInCombat { get { return false; } }
+            public CastRuntimeValidation Validate(CastStep step)
+            {
+                return Failing(step, "validate") ? CastRuntimeValidation.Fail("fixture-invalid")
+                    : CastRuntimeValidation.Pass();
+            }
+            public CastEnhancementPreparation PrepareEnhancements(CastStep step)
+            {
+                return Failing(step, "enhancement")
+                    ? CastEnhancementPreparation.Fail("fixture-enhancement-unavailable")
+                    : CastEnhancementPreparation.Pass(null);
+            }
+            public IAnimatedCastOperation StartAnimated(CastStep step)
+            {
+                Started.Add(step.AssignmentId);
+                if (Failing(step, "throw")) throw new InvalidOperationException("fixture-start");
+                return new ScriptedAnimatedOperation(!Failing(step, "failed"),
+                    Failing(step, "timeout"));
+            }
+        }
+
         private sealed class FakeInstantRuntime : IInstantCastRuntimeAdapter
         {
             private int _validations;
@@ -14334,6 +14440,78 @@ namespace KingmakerBuffPlanner.Tests
                 applied.Dispatch == null || applied.Dispatch.Submitted)
                 throw new InvalidOperationException(
                     "The dispatch boundary did not receive the exact approved projection.");
+        }
+
+        // Review K5: a failed or uncertain earlier casting stops every later
+        // submission, in BOTH execution modes; success runs all; a submission
+        // limit enforces the single-cast probe; nothing is retried.
+        private static void TestExplicitRunStopsAfterFailure()
+        {
+            List<ProviderPlanningOption> options;
+            List<CastEnhancementSnapshot> enhancements;
+            PartyProviderSnapshot snapshot = CastingParty(CastingBuffAbility,
+                out options, out enhancements, new[] { "unit-t1", "unit-t2" }, 3);
+            ExplicitCastingPlan plan = CompileCastingPlan(CastingDocument(
+                    DirectCasting("cast-1", "long", "unit-cleric", "unit-t1",
+                        "source-bulls", CastingBuffAbility,
+                        new[] { new AuthoredEnhancementSelection("extend-cleric", true, null) }),
+                    DirectCasting("cast-2", "long", "unit-wizard", "unit-t2",
+                        "source-bulls", CastingBuffAbility)),
+                snapshot, options, enhancements, "source-bulls", "source-communal");
+            CastingApplyDecision decision = new CastingExecutionGate().Evaluate(
+                plan, CastingApplyMode.Ordinary, "long");
+            ExplicitStepConversion projection = ExplicitCastingStepConverter.Convert(
+                plan, decision, options, CastingEffects("source-bulls", "source-communal"));
+            if (!projection.Converted || projection.CastingIds[0] != "cast-1")
+                throw new InvalidOperationException("K5 fixture projection failed: " + projection.Refusal);
+            Func<ICastExecutor, int, ExplicitCastingRunOutcome> run = (executor, limit) =>
+            {
+                ExplicitCastingRunOutcome outcome = null;
+                System.Collections.IEnumerator loop = new ExplicitCastingRunCoordinator(executor, limit)
+                    .Run(projection, value => outcome = value);
+                int guard = 0;
+                while (loop.MoveNext() && guard++ < 10000) { }
+                if (outcome == null) throw new InvalidOperationException("No run outcome.");
+                return outcome;
+            };
+            foreach (string mode in new[] { "validate", "enhancement", "throw", "rejected", "unconfirmed" })
+            {
+                var runtime = new ScriptedInstantRuntime("cast-1", mode);
+                ExplicitCastingRunOutcome outcome = run(new InstantCastExecutor(runtime, true), int.MaxValue);
+                if (runtime.Fired.Contains("cast-2") || runtime.Validated.Contains("cast-2") ||
+                    !outcome.Halted || outcome.HaltedAfterCastingId != "cast-1" ||
+                    outcome.Entries[1].Attempted || outcome.AllConfirmed)
+                    throw new InvalidOperationException("Instant mode submitted cast-2 after a " + mode +
+                        " failure (or misreported the halt).");
+                if (runtime.Fired.Count(id => id == "cast-1") > 1)
+                    throw new InvalidOperationException("Instant mode retried cast-1 after " + mode + ".");
+            }
+            foreach (string mode in new[] { "validate", "enhancement", "throw", "failed", "timeout" })
+            {
+                var runtime = new ScriptedAnimatedRuntime("cast-1", mode);
+                ExplicitCastingRunOutcome outcome = run(new AnimatedCastExecutor(runtime, true), int.MaxValue);
+                if (runtime.Started.Contains("cast-2") || !outcome.Halted ||
+                    outcome.HaltedAfterCastingId != "cast-1" || outcome.Entries[1].Attempted)
+                    throw new InvalidOperationException("Animated mode started cast-2 after a " + mode +
+                        " failure (or misreported the halt).");
+                if (runtime.Started.Count(id => id == "cast-1") > 1)
+                    throw new InvalidOperationException("Animated mode retried cast-1 after " + mode + ".");
+            }
+            var clean = new ScriptedInstantRuntime("none", "none");
+            ExplicitCastingRunOutcome all = run(new InstantCastExecutor(clean, true), int.MaxValue);
+            if (!all.AllConfirmed || !clean.Fired.SequenceEqual(new[] { "cast-1", "cast-2" }))
+                throw new InvalidOperationException("A clean run did not submit both castings in order.");
+            var cleanAnimated = new ScriptedAnimatedRuntime("none", "none");
+            if (!run(new AnimatedCastExecutor(cleanAnimated, true), int.MaxValue).AllConfirmed ||
+                !cleanAnimated.Started.SequenceEqual(new[] { "cast-1", "cast-2" }))
+                throw new InvalidOperationException("A clean animated run did not submit both castings.");
+            var limited = new ScriptedInstantRuntime("none", "none");
+            ExplicitCastingRunOutcome one = run(new InstantCastExecutor(limited, true), 1);
+            if (limited.Fired.Count != 1 || one.Entries[1].Attempted ||
+                one.HaltReason != "submission-limit:1")
+                throw new InvalidOperationException("The submission limit did not stop the second casting.");
+            if (one.ProjectionId != projection.ProjectionId)
+                throw new InvalidOperationException("The run did not report the projection identity.");
         }
 
         // The Unity-bound host cannot be compiled here, so its wiring to the
