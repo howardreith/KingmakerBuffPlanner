@@ -372,17 +372,24 @@ namespace KingmakerBuffPlanner.UI
     public sealed class WorkspaceTargetOption
     {
         internal WorkspaceTargetOption(
-            string unitId, string displayName, bool selected)
+            string unitId, string displayName, bool selected,
+            bool? legal = null)
         {
             UnitId = unitId ?? string.Empty;
             DisplayName = string.IsNullOrWhiteSpace(displayName)
                 ? UnitId : displayName;
             Selected = selected;
+            Legal = legal;
         }
 
         public string UnitId { get; private set; }
         public string DisplayName { get; private set; }
         public bool Selected { get; private set; }
+        // Whether the draft's resolved caster/ability can target this unit
+        // (Bubble Buffs' red state). Null when no provider option is
+        // resolved yet (no caster chosen): unknown is never shown as legal
+        // or illegal.
+        public bool? Legal { get; private set; }
     }
 
     // One selectable group origin (anchor) for a group casting.

@@ -282,8 +282,10 @@ namespace KingmakerBuffPlanner.UI
             // the atomic unit — lower left; the inspector lower right.
             RectTransform buffs = KingmakerUiFactory.CreateRect("Buffs", frame);
             KingmakerUiFactory.SetAnchors(buffs, 0f, 0.565f, 1f, 0.885f);
-            buffs.offsetMin = new Vector2(10f, 0f);
-            buffs.offsetMax = new Vector2(-10f, 0f);
+            // Inset inside the book's printed page edges (titles clipped
+            // against the left edge in live frame qual-211922).
+            buffs.offsetMin = new Vector2(PageInset, 0f);
+            buffs.offsetMax = new Vector2(-PageInset, 0f);
             Text buffTitle;
             _buffGridContent = BuildLanePanel(buffs, "Buffs", out buffTitle);
             _buffSearch = KingmakerUiFactory.CreateInputField(
@@ -325,16 +327,18 @@ namespace KingmakerBuffPlanner.UI
             grid.childAlignment = TextAnchor.UpperLeft;
             RectTransform cards = KingmakerUiFactory.CreateRect("Cards", frame);
             KingmakerUiFactory.SetAnchors(cards, 0f, 0.085f, 0.58f, 0.55f);
-            cards.offsetMin = new Vector2(10f, 0f);
+            cards.offsetMin = new Vector2(PageInset, 0f);
             cards.offsetMax = new Vector2(-4f, 0f);
             _cardContent = BuildLanePanel(cards, "Castings", out _castingsTitle);
             RectTransform inspector = KingmakerUiFactory.CreateRect("Inspector", frame);
             KingmakerUiFactory.SetAnchors(inspector, 0.58f, 0.085f, 1f, 0.55f);
             inspector.offsetMin = new Vector2(4f, 0f);
-            inspector.offsetMax = new Vector2(-10f, 0f);
+            inspector.offsetMax = new Vector2(-PageInset, 0f);
             Text inspectorTitle;
             _inspectorContent = BuildLanePanel(inspector, "Inspector", out inspectorTitle);
         }
+
+        private const float PageInset = 44f;
 
         private RectTransform BuildLanePanel(RectTransform lane, string title,
             out Text label)
@@ -1005,10 +1009,12 @@ namespace KingmakerBuffPlanner.UI
                     WorkspaceTargetOption captured = target;
                     bool selected = string.Equals(draft.DirectTargetUnitId,
                         captured.UnitId, StringComparison.Ordinal);
-                    CreatePortraitTile("DraftTarget." + captured.UnitId, targetRow,
+                    bool illegal = captured.Legal == false;
+                    Button tile = CreatePortraitTile("DraftTarget." + captured.UnitId, targetRow,
                         captured.UnitId, captured.DisplayName, selected,
-                        CoverageTint(WorkspaceBuffSummary.CoverageFor(
-                            view.Cards, view.SelectedRoutineId, captured.UnitId)),
+                        illegal ? new Color(1f, 0.45f, 0.45f, 1f)
+                            : CoverageTint(WorkspaceBuffSummary.CoverageFor(
+                                view.Cards, view.SelectedRoutineId, captured.UnitId)),
                         () => Click(() =>
                         {
                             _session.SetDraftTargeting(
@@ -1016,11 +1022,14 @@ namespace KingmakerBuffPlanner.UI
                                 captured.UnitId, null, null);
                             RefreshView();
                         }));
+                    // An illegal recipient cannot become a casting target.
+                    if (illegal) tile.interactable = false;
                 }
                 Text legend = KingmakerUiFactory.CreateText("CoverageLegend",
                     _inspectorContent, _theme,
                     "Green: already has a Ready casting of this buff · " +
-                    "Amber: has one that is not Ready", 12, TextAnchor.MiddleLeft);
+                    "Amber: has one that is not Ready · Red: this caster cannot target them",
+                    12, TextAnchor.MiddleLeft);
                 legend.color = _theme.MutedBrownText;
                 KingmakerUiFactory.AddLayout(legend.rectTransform, 20f);
             }
