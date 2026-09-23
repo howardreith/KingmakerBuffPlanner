@@ -139,9 +139,30 @@ ICastingTargetingModifier but no implementation exists; the legacy
 Brown-Fur Share Transmutation adapter needs a transmuter the fixture
 party lacks (would be Not Run).
 
-NEXT (exact action): enhancement chips on cards / inspector; group
-castings' predicted beneficiaries on cards; rerun `live-workspace-qual`
-when Active; continue `docs/UI-END-GOAL.md`: search
+- `c4d3b03` group cards: predicted-beneficiary portraits, missed
+  coverage in red, anchored origin and "Outside coverage" by name.
+
+EXECUTION INTEGRATION (charter §5.3 / takeover §10.B), native dispatch
+still disabled:
+- `2264ff9` `Planning/ExplicitCastingStepConverter`: an allowed apply
+  decision → the CastPlan the existing executors consume; exactly one
+  step per approved Ready casting in decision order with exact provider,
+  target shape (direct, or ONE mass step at caster/anchor expecting the
+  predicted beneficiaries), applied/omitted enhancements, enhancement
+  pool usage, native reservation, material; any unconvertible casting
+  refuses the whole conversion.
+- `53c7fe1` Session.Apply projects before the disabled boundary (an
+  unconvertible plan is refused and never reaches it); the footer says
+  "Native casting is disabled — nothing was cast. Would run N casts".
+- Regression drives the EXISTING `InstantCastExecutor` over the
+  projection with a recording runtime: one fire per approved casting,
+  in order. Live runs `...-221951`, `...-222501` (session Disc):
+  interactions PASS, display black, restored verified.
+
+NEXT (exact action): animated-executor consumption test; decide with the
+owner the first gameplay-test scope (single-target, non-rod) — needs
+separate authority; meanwhile migration/rollback (charter §7) and
+enhancement chips; rerun `live-workspace-qual` when Active; continue `docs/UI-END-GOAL.md`: search
 box, native parchment/frame pass (charter §6), per-caster popover,
 recipient invalid-target state; supervised session on the new layout — icon-first
 searchable buff grid with disambiguated variants, portrait strips with
