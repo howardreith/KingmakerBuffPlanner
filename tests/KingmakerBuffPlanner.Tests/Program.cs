@@ -12902,9 +12902,9 @@ namespace KingmakerBuffPlanner.Tests
             session.BuildView(inputs);
             session.Draft.SourceId = "source-bulls";
             session.Draft.TargetMode = CastingTargetMode.DirectTarget;
-            if (session.Draft.State == CastingAuthoringState.Ready)
-                throw new InvalidOperationException(
-                    "Fixture precondition: a fresh draft must not start Ready.");
+            // Exercise the State control's "invoked" outcome explicitly: a
+            // fresh draft now defaults to Ready, so start from Draft.
+            session.Draft.State = CastingAuthoringState.Draft;
             var record = new WorkspaceInteractionRecord();
             record.RecordBrowse(true, "invoked", 2, 3);
             var ids = new List<string>();
@@ -13450,6 +13450,12 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("Indistinguishable sources stayed identical.");
             var option = new WorkspaceSourceOption("s-heal-a", "Use Heal Skill", false,
                 details["s-heal-a"]);
+            if (!WorkspaceSourceLabels.Matches(option, "") ||
+                !WorkspaceSourceLabels.Matches(option, "heal hedw") ||
+                !WorkspaceSourceLabels.Matches(option, "ABILITY") ||
+                WorkspaceSourceLabels.Matches(option, "heal linzi") ||
+                WorkspaceSourceLabels.Matches(null, ""))
+                throw new InvalidOperationException("Buff search matching is wrong.");
             if (option.Label != "Use Heal Skill — ability · Hedwirg")
                 throw new InvalidOperationException("Label composition drifted: " + option.Label);
         }
