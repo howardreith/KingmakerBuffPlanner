@@ -250,7 +250,9 @@ try {
         @{ Name = 'qual-select-with-allowance'; Expect = '*only valid with -Scenario live-cast-qual*'
            Args = @('-Scenario', 'live-cast-qual-select', '-QualificationAllowancePath', $outsideQualification, '-WhatIf') },
         @{ Name = 'qual-select-animated'; Expect = '*instant mode only*'
-           Args = @('-Scenario', 'live-cast-qual-select', '-ExecutionMode', 'animated', '-WhatIf') }
+           Args = @('-Scenario', 'live-cast-qual-select', '-ExecutionMode', 'animated', '-TimeoutSeconds', '900', '-WhatIf') },
+        @{ Name = 'qual-select-short-timeout'; Expect = '*at least 900*'
+           Args = @('-Scenario', 'live-cast-qual-select', '-WhatIf') }
     )
     foreach ($case in $qualificationCases) {
         $ErrorActionPreference = 'Continue'

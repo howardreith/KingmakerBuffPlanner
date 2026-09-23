@@ -790,12 +790,30 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                             : RuntimeTestAssertion.Fail("qualification-run",
                                 "stop/complete/repeat/recast as forecast",
                                 string.Join("|", violations.ToArray())))
-                        : (violations.Count == 0 && _qualificationRecord.Submissions.Count == 0
+                        : (violations.Count == 0 && _qualificationRecord.Submissions.Count == 0 &&
+                            (_qualificationHost == null || _qualificationHost.StartedRuns == 0)
                             ? RuntimeTestAssertion.Pass("qualification-selection-only-no-dispatch",
-                                "no boundary;no submission", "submissions=0")
+                                "no boundary;no run", "submissions=0;qualificationRuns=0")
                             : RuntimeTestAssertion.Fail("qualification-selection-only-no-dispatch",
-                                "no boundary;no submission", string.Join("|", violations.ToArray()))));
-                    if (!selected || violations.Count != 0)
+                                "no boundary;no run", string.Join("|", violations.ToArray()) +
+                                    ";qualificationRuns=" + (_qualificationHost == null ? 0
+                                        : _qualificationHost.StartedRuns))));
+                    // Review P3-4: evidence that is never vacuous - the player
+                    // routes stayed locked with no production run, and the
+                    // workspace closed with its input lease released.
+                    bool playerRoutesQuiet = UI.NativeCastingSessionPolicy.Locked &&
+                        BuffPlannerUiRoot.CastingRunsStartedForRuntime == 0;
+                    result.Assertions.Add(playerRoutesQuiet && _qualificationWorkspaceClosed
+                        ? RuntimeTestAssertion.Pass("qualification-player-routes-locked",
+                            "session locked;0 production runs;workspace closed",
+                            "locked=True;runs=0;closed=True")
+                        : RuntimeTestAssertion.Fail("qualification-player-routes-locked",
+                            "session locked;0 production runs;workspace closed", "locked=" +
+                                UI.NativeCastingSessionPolicy.Locked + ";runs=" +
+                                BuffPlannerUiRoot.CastingRunsStartedForRuntime + ";closed=" +
+                                _qualificationWorkspaceClosed));
+                    if (!selected || violations.Count != 0 || !playerRoutesQuiet ||
+                        !_qualificationWorkspaceClosed)
                     {
                         result.Status = "FAIL";
                         result.Stage = "qualification-validation";
@@ -2588,8 +2606,21 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (_qualificationDriver == null)
             {
                 ProbeWorkspaceCloseResult closed = CloseProbeWorkspace();
+                // Review P3-7: the production workspace must close and
+                // release its input lease before the driver authors anything.
+                _qualificationWorkspaceClosed = closed.Closed && closed.InputLeaseReleased &&
+                    string.IsNullOrEmpty(closed.Failure);
                 _qualificationRecord.CastingScenario =
                     RuntimeTestProtocol.IsCastingQualificationScenario(_request.Scenario);
+                if (!_qualificationWorkspaceClosed)
+                {
+                    _qualificationRecord.Failures.Add("workspace-not-closed:" +
+                        (closed.Failure ?? "lease-held"));
+                    _qualificationRecord.TerminalReason = "failed:workspace-not-closed";
+                    PublishQualificationRecord();
+                    _completed = true;
+                    return true;
+                }
                 CastingQualificationAllowance allowance = null;
                 if (_qualificationRecord.CastingScenario)
                 {
@@ -2647,9 +2678,12 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private readonly CastingQualificationRecord _qualificationRecord = new CastingQualificationRecord();
         private CastingQualificationDriver _qualificationDriver;
         private CastingExecutionHost _qualificationHost;
+        private bool _qualificationWorkspaceClosed;
+        private bool _qualificationPublished;
 
         private void PublishQualificationRecord()
         {
+            _qualificationPublished = true;
             CastingQualificationRecord record = _qualificationRecord;
             var steps = new JArray();
             foreach (CastingQualificationStepResult step in record.Steps)
@@ -2827,6 +2861,15 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             // in-flight executor restores temporary native state).
             if (_qualificationDriver != null) _qualificationDriver.Terminate(reason);
             if (_qualificationHost != null) _qualificationHost.Shutdown(reason);
+            // Review P3-6: a run ended by shutdown still leaves its record.
+            if (_qualificationDriver != null && !_qualificationPublished)
+            {
+                try { PublishQualificationRecord(); }
+                catch (Exception exception)
+                {
+                    _log.Error("[KBP-QUAL] record not published at shutdown.", exception);
+                }
+            }
         }
 
         private string _shutdownReason;

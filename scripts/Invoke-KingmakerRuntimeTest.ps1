@@ -98,6 +98,13 @@ if ($Scenario -ceq 'live-cast-qual') {
 elseif (-not [string]::IsNullOrWhiteSpace($QualificationAllowancePath)) {
     throw '-QualificationAllowancePath is only valid with -Scenario live-cast-qual.'
 }
+# Review P2-2: a qualification run needs the boot/load budget (600 s) plus
+# its own deadline (240 s) inside the harness wait, or the harness would
+# abandon a live run with the Mods folder unrestored.
+if (($Scenario -ceq 'live-cast-qual' -or $Scenario -ceq 'live-cast-qual-select') -and
+    $TimeoutSeconds -lt 900) {
+    throw "TimeoutSeconds must be at least 900 for $Scenario (boot/load plus the qualification deadline); got $TimeoutSeconds."
+}
 if ($Scenario -ceq 'live-cast-qual-select' -and $ExecutionMode -cne 'instant') {
     throw 'live-cast-qual-select runs in instant mode only.'
 }
@@ -592,13 +599,17 @@ finally {
     }
     if ($null -ne $protectedBefore -and @(Get-Process -Name Kingmaker -ErrorAction SilentlyContinue).Count -eq 0) {
         try {
+            $allowedChanged = if ($Scenario -ceq 'live-cast-qual') { @() } else { @([string]$savePair.working.fileName) }
             $violations = Compare-KbpSaveFolderSnapshot -Before $protectedBefore `
                 -After (Get-KbpSaveFolderSnapshot -SaveRoot $protectedSaveRoot) `
-                -AllowedChangedFileNames @([string]$savePair.working.fileName)
-            $blocking = @($violations | Where-Object { $_ -notlike 'new:*' -or $FixtureFamily -ceq 'Advanced' })
+                -AllowedChangedFileNames $allowedChanged
+            # A casting qualification writes no save at all (review P3-9):
+            # even the WORKING save and new autosaves count against it.
+            $blocking = @($violations | Where-Object {
+                $_ -notlike 'new:*' -or $FixtureFamily -ceq 'Advanced' -or $Scenario -ceq 'live-cast-qual' })
             Write-KbpJsonAtomic (Join-Path $evidence 'protected-saves.json') ([ordered]@{
                 schemaVersion = 1; runId = $runId; fixtureFamily = $FixtureFamily
-                allowedChanged = @([string]$savePair.working.fileName)
+                allowedChanged = @($allowedChanged)
                 violations = @($violations); blocking = @($blocking)
             })
             if ($blocking.Count -ne 0) {

@@ -82,7 +82,7 @@ what this casting would give:
 - at least half of the duration this casting would give remains. This is
   compared only when the spell duration is "per level"; a permanent or
   worn-item effect always has enough;
-- whatever the spell, more than two rounds of it remain (an effect about
+- whatever the spell, at least two rounds of it remain (an effect about
   to expire is always recast).
 
 A weaker, expiring or unprovable existing effect is recast, and the card

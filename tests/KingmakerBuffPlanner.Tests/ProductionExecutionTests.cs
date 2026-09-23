@@ -1409,6 +1409,30 @@ namespace KingmakerBuffPlanner.Tests
                 optionalAbsent.CostShape.SequenceEqual(
                     compile(3, false, null).CastingById("cast-1").CostShape))
                 throw new InvalidOperationException("Casting without the optional rod was not a visible change.");
+            // Review P3-3: two required rods that can never be combined (one
+            // exclusive group) stay blocked even when one is exhausted and
+            // the effect carries both metamagics.
+            List<ProviderPlanningOption> pairOptions;
+            PartyProviderSnapshot pairSnapshot = LiveEffectParty(3, out pairOptions);
+            var extendRod = new CastEnhancementSnapshot("rod-extend", "unit-cleric", "rod-guid",
+                "Extend Rod", string.Empty, CastEnhancementCategory.MetamagicRod, 8, 3, 3, null,
+                exclusiveGroupId: "one-rod");
+            var empowerRod = new CastEnhancementSnapshot("rod-empower", "unit-cleric", "rod-guid-2",
+                "Empower Rod", string.Empty, CastEnhancementCategory.MetamagicRod, 1, 3, 0, null,
+                exclusiveGroupId: "one-rod");
+            ResolvedCasting pair = compiler.Compile(CastingDocument(DirectCasting("cast-1", "long",
+                    "unit-cleric", "unit-t1", "source-bulls", CastingBuffAbility,
+                    new[]
+                    {
+                        new AuthoredEnhancementSelection("rod-extend", true, null),
+                        new AuthoredEnhancementSelection("rod-empower", true, null)
+                    })), pairSnapshot, pairOptions, effects, new[] { extendRod, empowerRod },
+                "long", null, false, LiveEffects(On("unit-t1", "buff-effect", 7000, 10, 9)))
+                .CastingById("cast-1");
+            if (pair.Readiness != ResolvedCastingReadiness.Blocked ||
+                !pair.ReadinessReasons.Contains("enhancement-incompatible"))
+                throw new InvalidOperationException("An incompatible rod set was waived: " +
+                    pair.Readiness + " " + string.Join(",", pair.ReadinessReasons.ToArray()));
         }
 
         // The grid's Spells / Abilities / Other tabs follow the classic
@@ -1652,6 +1676,10 @@ namespace KingmakerBuffPlanner.Tests
             internal readonly Dictionary<string, KeyValuePair<string, long>> Active =
                 new Dictionary<string, KeyValuePair<string, long>>(StringComparer.Ordinal);
             internal readonly List<string> Fired = new List<string>();
+            // Failure shapes: this casting lands but is never confirmed, or
+            // reports a resource spent on its verified-free source.
+            internal string UnconfirmedCasting;
+            internal string SpendOnFreeCasting;
             private int _instances;
             private long _sequence;
             internal long Now;
@@ -1664,9 +1692,13 @@ namespace KingmakerBuffPlanner.Tests
                 Fired.Add(step.AssignmentId);
                 Active[step.TargetUnitIds[0]] = new KeyValuePair<string, long>(
                     "i" + (++_instances), Now + 600);
-                return new InstantCastResult(true, true, true, false, "simulated");
+                return new InstantCastResult(true, true, step.AssignmentId != UnconfirmedCasting,
+                    step.AssignmentId == SpendOnFreeCasting, "simulated");
             }
-            public bool EffectsObserved(CastStep step) { return Active.ContainsKey(step.TargetUnitIds[0]); }
+            public bool EffectsObserved(CastStep step)
+            {
+                return step.AssignmentId != UnconfirmedCasting && Active.ContainsKey(step.TargetUnitIds[0]);
+            }
             public InstantCastCompletion InspectCompletion(CastStep step)
             { return InstantCastCompletion.Settled("simulated-settled"); }
             public InstantCastCompletion Cleanup(CastStep step)
@@ -1781,6 +1813,80 @@ namespace KingmakerBuffPlanner.Tests
             if (!deadline.Completed || slow.TerminalReason != "qualification-deadline" ||
                 slow.Violations().All(value => !value.StartsWith("terminal:", StringComparison.Ordinal)))
                 throw new InvalidOperationException("The qualification deadline did not end the run.");
+            // Review P0 (repeat): anything but the exact no-op ends the run
+            // AT the repeat step - here an effect expired after complete,
+            // so the repeat Apply is refused by the boundary.
+            var expiring = new SimulatedBuffWorld();
+            CastingQualificationAllowance expiringAllowance = ForecastAllowance(expiring);
+            var expiringRecord = new CastingQualificationRecord { CastingScenario = true, AllowanceStatus = "parsed" };
+            string expiringDir = Path.Combine(root, "qualification-repeat-expired");
+            Directory.CreateDirectory(expiringDir);
+            CastingQualificationDriver repeatDriver = NewQualificationDriver(expiringDir, expiring,
+                expiringRecord, expiringAllowance, () => now);
+            for (int i = 0; i < 400 && !repeatDriver.Completed && repeatDriver.Phase != "repeat"; i++)
+                repeatDriver.Update();
+            if (repeatDriver.Phase != "repeat" || expiring.Fired.Count != 3)
+                throw new InvalidOperationException("The repeat fixture did not reach the repeat step.");
+            expiring.Active.Remove(expiring.Active.Keys.OrderBy(key => key, StringComparer.Ordinal).Last());
+            for (int i = 0; i < 400 && !repeatDriver.Completed; i++) repeatDriver.Update();
+            if (expiring.Fired.Count != 3 || expiringRecord.TerminalReason != "failed:repeat" ||
+                !expiringRecord.Failures.Any(value => value.StartsWith("repeat:step:not-a-no-op",
+                    StringComparison.Ordinal)))
+                throw new InvalidOperationException("A refused repeat did not end the run at the repeat step: " +
+                    expiringRecord.TerminalReason + " " + string.Join("|", expiringRecord.Failures.ToArray()));
+            // The step rule itself: a report with a cleanup failure never
+            // passes, even when every casting landed as forecast.
+            var judged = new CastingQualificationRecord { CastingScenario = true };
+            judged.Selection = new CastingQualificationSelection(null, "source-bulls", CastingBuffAbility,
+                new[]
+                {
+                    DirectCasting("qual-cast-1", "long", "unit-cleric", "unit-t1", "source-bulls", CastingBuffAbility),
+                    DirectCasting("qual-cast-2", "long", "unit-wizard", "unit-t2", "source-bulls", CastingBuffAbility)
+                }, 1, null);
+            foreach (bool cleanupFailed in new[] { false, true })
+            {
+                judged.Steps.Clear();
+                var stopStep = new CastingQualificationStepResult("stop");
+                stopStep.Report = new CastingRunReport("run-1", "long", CastingApplyMode.Ordinary, "p",
+                    "cancelled:" + CastingQualificationDriver.StopReason, true, false,
+                    new[]
+                    {
+                        new CastingOutcomeEntry("qual-cast-1", CastingOutcomeState.EffectConfirmed, true, true, false, "ok", true),
+                        new CastingOutcomeEntry("qual-cast-2", CastingOutcomeState.NotProcessed, true, false, false, "stopped")
+                    },
+                    cleanupFailed ? new[] { "restore-failed" } : new string[0]);
+                stopStep.Transitions.Add("qual-cast-1:new-instance");
+                stopStep.Transitions.Add("qual-cast-2:absent");
+                stopStep.Availability.Add("qual-cast-1:-1>-1");
+                judged.Steps.Add(stopStep);
+                string failure = judged.StepFailure("stop");
+                if (cleanupFailed ? failure != "cleanup:restore-failed" : failure != null)
+                    throw new InvalidOperationException("The stop rule judged cleanup=" + cleanupFailed +
+                        " as " + (failure ?? "pass"));
+            }
+            // Review P0: a step that ends any other way than forecast stops
+            // the run at once; nothing further is submitted.
+            foreach (string shape in new[] { "unconfirmed", "spend-on-free" })
+            {
+                var world = new SimulatedBuffWorld();
+                CastingQualificationAllowance allowance = ForecastAllowance(world);
+                if (shape == "unconfirmed") world.UnconfirmedCasting = "qual-cast-1";
+                else world.SpendOnFreeCasting = "qual-cast-1";
+                var record = new CastingQualificationRecord { CastingScenario = true, AllowanceStatus = "parsed" };
+                string dir = Path.Combine(root, "qualification-halt-" + shape);
+                Directory.CreateDirectory(dir);
+                CastingQualificationDriver driver = NewQualificationDriver(dir, world, record, allowance, () => now);
+                for (int i = 0; i < 400 && !driver.Completed; i++) driver.Update();
+                CastingQualificationStepResult stop = record.Step("stop");
+                if (!driver.Completed || !world.Fired.SequenceEqual(new[] { "qual-cast-1" }) ||
+                    record.Step("complete") != null ||
+                    record.TerminalReason != "failed:stop-wait" ||
+                    !record.Failures.Any(value => value.StartsWith("stop-wait:step:", StringComparison.Ordinal)) ||
+                    stop == null || stop.Report == null || !stop.Report.Halted)
+                    throw new InvalidOperationException("A " + shape + " stop step did not end the run: fired=" +
+                        string.Join(",", world.Fired.ToArray()) + " terminal=" + record.TerminalReason +
+                        " failures=" + string.Join("|", record.Failures.ToArray()));
+            }
         }
 
         // The qualification scenarios: no-input workspace scenarios, the
