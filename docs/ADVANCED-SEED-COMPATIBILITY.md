@@ -1,0 +1,50 @@
+# Advanced seed: the one missing input and its compatibility decision
+
+Status (2026-09-23): **waiting for the owner to designate the seed.** All
+advanced-copy tooling is implemented and tested (guarded bootstrap
+`-Family Advanced`, non-casting `live-advanced-inspect`, the
+`finite-direct-mixed` qualification recipe, and the rule that nothing
+casts on the advanced copy before a complete inspection of the same bound
+pair and compatibility identity).
+
+## The input
+
+In the game, load the advanced campaign of your choice and save it through
+the ordinary save dialog as a **new** manual save named exactly
+`KBP_ADVANCED_SEED`. No script ever reads or touches the original save.
+
+## The compatibility decision it implies
+
+The automation profile `full-user` now stages the sealed Gunslinger
+**0.0.133** (exact external copy). Your installed Gunslinger is **0.0.136**.
+A seed saved now is saved under 0.0.136, and it will not be loaded under
+the 0.0.133 configuration without establishing compatibility. The options:
+
+1. **A separate advanced profile sealed at your installed 0.0.136**
+   (recommended if the seed is saved now). It would equal `full-user` in
+   every other entry, with Gunslinger sealed at exactly these measured
+   identities of your installation (read-only, 2026-09-23):
+
+   | Field | Value |
+   | --- | --- |
+   | version | 0.0.136 |
+   | directoryManifestSha256 | `d08f0d5a2b3c9d9ef4fdc715caee1b76833d4128d97b9de8f8adb622c420e21f` |
+   | fileCount | 238 |
+   | totalBytes | 47128988 |
+   | KingmakerGunslinger.dll SHA-256 | `c6cccdac914ed59fa4d85d020108588d7d12cfb4ac38cf5a162772bacc9b465c` |
+   | Info.json SHA-256 | `f66de05d5c6282eece8218b6c4f31d49dfc8ef9efa27dfeceeda712034717e17` |
+
+   This is a new seal, so it needs your explicit approval; nothing is
+   resealed automatically, and `full-user` keeps 0.0.133.
+2. Save the seed while 0.0.133 is installed. This would require you to
+   downgrade temporarily, which the automation never does.
+
+Also say whether Steam Cloud sync is on for Kingmaker (the harness
+records it and refuses unsafe states).
+
+## What happens next (under the existing mission authority)
+
+The guarded bootstrap seals the advanced pair; `live-advanced-inspect`
+runs non-casting; after it completes cleanly (game PASS, owned exit,
+verified restoration, clean protected saves), the finite-resource
+selection and a bounded, allowance-bound qualification run follow.
