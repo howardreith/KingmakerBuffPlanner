@@ -59,6 +59,31 @@ namespace KingmakerBuffPlanner.UI
         }
 
 
+        // One casting's outcome in the last run, as its card shows it. The
+        // effect and the resource are stated separately: a failed or
+        // interrupted cast may still have spent its slot.
+        internal static string DescribeEntry(CastingOutcomeEntry entry)
+        {
+            if (entry == null) return null;
+            string spent = entry.ResourceSpent ? "; its resource was spent" : string.Empty;
+            switch (entry.State)
+            {
+                case CastingOutcomeState.EffectConfirmed:
+                    return entry.FreeCast ? "cast, effect confirmed (free)"
+                        : "cast, effect confirmed";
+                case CastingOutcomeState.Skipped:
+                    return "skipped: the effect was already active";
+                case CastingOutcomeState.Omitted:
+                    return "left out of the run (" + ShortDetail(entry.Detail) + ")";
+                case CastingOutcomeState.Failed:
+                    return "failed (" + ShortDetail(entry.Detail) + ")" + spent;
+                case CastingOutcomeState.Cancelled:
+                    return "interrupted when the run stopped" + spent;
+                default:
+                    return "not attempted: the run stopped earlier";
+            }
+        }
+
         // Refusals are explained in terms the player can act on; the exact
         // machine reason stays appended for the log and bug reports.
         internal static string DescribeRefusal(string routineName, WorkspaceApplyResult result)
