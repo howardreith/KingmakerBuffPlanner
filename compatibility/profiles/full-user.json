@@ -97,6 +97,7 @@
       "directoryName": "KingmakerGunslinger",
       "version": "0.0.133",
       "assemblyName": "KingmakerGunslinger.dll",
+      "fixtureRelativePath": "KingmakerGunslinger",
       "infoSha256": "a59520f24356d17fc559644c0d7769fbd64fc23997c7e7449f3479f3a232e418",
       "assemblySha256": "f03a0a67ba9c790fb578ec6f61d24aea81ea80e0f49a18827d0ea44e2bb5060b",
       "directoryManifestSha256": "b8e4dd51e70b31bfbcd48744301023d71945114e572d82e52e6d0b4c65ebfb7c",

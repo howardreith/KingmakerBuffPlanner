@@ -188,6 +188,79 @@ try {
     }
     $passed++
 
+    # External exact-copy fixture (owner authorization 2026-09-23): the
+    # profile stages a sealed copy from the external fixture root; the
+    # owner's installed directory (files and settings) is recorded before
+    # activation and is back byte-exact after restoration.
+    $game = Join-Path $root 'game-external-fixture'
+    $liveDep = Join-Path $game 'Mods\LiveDep'
+    New-Item -ItemType Directory -Path (Join-Path $liveDep 'settings') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $game 'Mods\Existing') -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $game 'Kingmaker.exe') -Value 'fixture' -Encoding Ascii
+    Set-Content -LiteralPath (Join-Path $game 'Mods\Existing\Info.json') -Value '{"Id":"Existing"}' -Encoding Ascii
+    Set-Content -LiteralPath (Join-Path $liveDep 'info.json') -Value '{"Id":"LiveDep","Version":"0.0.136"}' -Encoding Ascii
+    Set-Content -LiteralPath (Join-Path $liveDep 'LiveDep.dll') -Value 'installed-assembly' -Encoding Ascii
+    Set-Content -LiteralPath (Join-Path $liveDep 'settings\Settings.xml') -Value 'owner-settings' -Encoding Ascii
+    $externalRoot = Join-Path $root 'external-fixtures'
+    $sealedDep = Join-Path $externalRoot 'LiveDep'
+    New-Item -ItemType Directory -Path (Join-Path $sealedDep 'data') -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $sealedDep 'info.json') -Value '{"Id":"LiveDep","Version":"0.0.133"}' -Encoding Ascii
+    Set-Content -LiteralPath (Join-Path $sealedDep 'LiveDep.dll') -Value 'sealed-assembly' -Encoding Ascii
+    Set-Content -LiteralPath (Join-Path $sealedDep 'data\value.txt') -Value 'sealed' -Encoding Ascii
+    $sealedIdentity = Get-KbpDirectoryContentIdentity $sealedDep
+    $liveBefore = Get-KbpDirectoryContentIdentity $liveDep
+    $externalProfile = [pscustomobject]@{
+        profileId = 'fixture-external'
+        mods = @([pscustomobject]@{
+            ummId = 'LiveDep'; directoryName = 'LiveDep'; version = '0.0.133'
+            assemblyName = 'LiveDep.dll'; fixtureRelativePath = 'LiveDep'
+            infoSha256 = Get-KbpSha256 (Join-Path $sealedDep 'info.json')
+            assemblySha256 = Get-KbpSha256 (Join-Path $sealedDep 'LiveDep.dll')
+            directoryManifestSha256 = $sealedIdentity.directoryManifestSha256
+            fileCount = $sealedIdentity.fileCount; totalBytes = $sealedIdentity.totalBytes
+        })
+    }
+    $before = @(Get-KbpDirectoryManifest (Join-Path $game 'Mods'))
+    $priorExternalRoot = $script:KbpExternalFixtureRoot
+    $script:KbpExternalFixtureRoot = $externalRoot
+    try {
+        $statePath = Enter-KbpRuntimeTransaction -PackagePath $package -KingmakerInstallDir $game `
+            -StateRoot $stateRoot -StagingRoot $stagingRoot -BackupRoot $backupRoot `
+            -RunId 'external-fixture' -FixtureMode -KnownKingmakerProcessIds @() `
+            -CompatibilityProfile $externalProfile
+    }
+    finally { $script:KbpExternalFixtureRoot = $priorExternalRoot }
+    $active = Read-KbpJson $statePath
+    $recorded = @($active.externallyStagedMods)
+    if ((Get-KbpDirectoryContentIdentity $liveDep).directoryManifestSha256 -cne $sealedIdentity.directoryManifestSha256 -or
+        $recorded.Count -ne 1 -or -not [bool]$recorded[0].liveExisted -or
+        [string]$recorded[0].liveDirectoryManifestSha256 -cne $liveBefore.directoryManifestSha256 -or
+        [bool]$active.externallyStagedModsRestored) {
+        throw 'The external fixture was not staged, or the installed identity was not recorded.'
+    }
+    $restored = Restore-KbpRuntimeTransaction -RunId 'external-fixture' -StateRoot $stateRoot `
+        -FixtureMode -KnownKingmakerProcessIds @()
+    if (-not $restored.restorationVerified -or -not [bool]$restored.externallyStagedModsRestored -or
+        (Get-KbpDirectoryContentIdentity $liveDep).directoryManifestSha256 -cne $liveBefore.directoryManifestSha256 -or
+        (Get-Content -LiteralPath (Join-Path $liveDep 'settings\Settings.xml') -Raw).Trim() -cne 'owner-settings' -or
+        -not (Test-KbpManifestEqual $before @(Get-KbpDirectoryManifest (Join-Path $game 'Mods')))) {
+        throw 'The installed dependency was not restored byte-exact after the external fixture run.'
+    }
+    # The identity check itself: a changed settings file or a vanished
+    # directory is refused.
+    $check = [pscustomobject]@{ externallyStagedMods = @($recorded); externallyStagedModsRestored = $false }
+    Set-Content -LiteralPath (Join-Path $liveDep 'settings\Settings.xml') -Value 'changed' -Encoding Ascii
+    $refused = $false
+    try { Assert-KbpExternallyStagedLiveRestored -State $check -ModsPath (Join-Path $game 'Mods') }
+    catch { $refused = $_.Exception.Message -like '*identity mismatch*' }
+    if (-not $refused -or [bool]$check.externallyStagedModsRestored) { throw 'A changed installed dependency passed.' }
+    Remove-Item -LiteralPath $liveDep -Recurse -Force
+    $refused = $false
+    try { Assert-KbpExternallyStagedLiveRestored -State $check -ModsPath (Join-Path $game 'Mods') }
+    catch { $refused = $_.Exception.Message -like '*presence changed*' }
+    if (-not $refused) { throw 'A vanished installed dependency passed.' }
+    $passed++
+
     # --- Guarded automation-fixture bootstrap (production script) ---
     Add-Type -AssemblyName System.IO.Compression
     Add-Type -AssemblyName System.IO.Compression.FileSystem

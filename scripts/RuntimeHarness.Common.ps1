@@ -174,9 +174,13 @@ function Assert-KbpCompatibilityModIdentity($Expected, [string]$Path) {
     return $identity
 }
 
+# External exact-copy fixtures (profile entries with fixtureRelativePath)
+# live under the lab examples root, never in the repository or a package.
+$script:KbpExternalFixtureRoot = Join-Path $script:KbpLabRoot 'examples'
+
 function Get-KbpCompatibilitySourcePath($Expected, [string]$LiveModsPath) {
     if ($Expected.PSObject.Properties.Name -contains 'fixtureRelativePath') {
-        $fixtureRoot = Join-Path $script:KbpLabRoot 'examples'
+        $fixtureRoot = $script:KbpExternalFixtureRoot
         $candidate = [IO.Path]::GetFullPath((Join-Path $fixtureRoot ([string]$Expected.fixtureRelativePath)))
         [void](Assert-KbpPathWithin -Path $candidate -Root $fixtureRoot)
         return $candidate
@@ -317,6 +321,25 @@ function Enter-KbpRuntimeTransaction {
         $profileMods.Count -ne 0) {
         throw 'Compatibility profile requires an existing exact fixture tree.'
     }
+    # A dependency staged from an external exact copy replaces the owner's
+    # installed directory only inside this transaction: its live identity
+    # (files and settings) is recorded now and re-verified after restore.
+    $externallyStaged = @(foreach ($expectedMod in $profileMods) {
+        if ($expectedMod.PSObject.Properties.Name -notcontains 'fixtureRelativePath') { continue }
+        $liveDirectory = Join-Path $mods ([string]$expectedMod.directoryName)
+        $liveExisted = Test-Path -LiteralPath $liveDirectory -PathType Container
+        $liveIdentity = if ($liveExisted) { Get-KbpDirectoryContentIdentity $liveDirectory } else { $null }
+        [ordered]@{
+            directoryName = [string]$expectedMod.directoryName
+            fixtureRelativePath = [string]$expectedMod.fixtureRelativePath
+            stagedVersion = [string]$expectedMod.version
+            stagedDirectoryManifestSha256 = [string]$expectedMod.directoryManifestSha256
+            liveExisted = $liveExisted
+            liveDirectoryManifestSha256 = if ($liveExisted) { $liveIdentity.directoryManifestSha256 } else { $null }
+            liveFileCount = if ($liveExisted) { $liveIdentity.fileCount } else { 0 }
+            liveTotalBytes = if ($liveExisted) { [long]$liveIdentity.totalBytes } else { [long]0 }
+        }
+    })
     $originalBackup = Join-Path $backupRunRoot 'Mods.original'
     $stagedQuarantine = Join-Path $backupRunRoot 'Mods.staged'
     $state = [ordered]@{
@@ -330,6 +353,7 @@ function Enter-KbpRuntimeTransaction {
         observedStagedManifest = @()
         compatibilityProfileId = if ($null -eq $CompatibilityProfile) { 'native-only' } else { [string]$CompatibilityProfile.profileId }
         compatibilityMods = @()
+        externallyStagedMods = @($externallyStaged); externallyStagedModsRestored = $false
         activatedAtUtc = $null; restoredAtUtc = $null; restorationFailure = $null
     }
     Write-KbpJsonAtomic $statePath $state
@@ -381,6 +405,29 @@ function Enter-KbpRuntimeTransaction {
         }
         throw $entryFailure
     }
+}
+
+# The owner's installed directory of every externally staged dependency is
+# back with exactly the identity recorded before activation (or absent if
+# it was absent).
+function Assert-KbpExternallyStagedLiveRestored($State, [string]$ModsPath) {
+    if ($State.PSObject.Properties.Name -notcontains 'externallyStagedMods') { return }
+    foreach ($record in @($State.externallyStagedMods)) {
+        $liveDirectory = Join-Path $ModsPath ([string]$record.directoryName)
+        $present = Test-Path -LiteralPath $liveDirectory -PathType Container
+        if ([bool]$record.liveExisted -ne $present) {
+            throw "Restored installed dependency presence changed: $($record.directoryName)"
+        }
+        if ($present) {
+            $identity = Get-KbpDirectoryContentIdentity $liveDirectory
+            if ($identity.directoryManifestSha256 -cne [string]$record.liveDirectoryManifestSha256 -or
+                $identity.fileCount -ne [int]$record.liveFileCount -or
+                [long]$identity.totalBytes -ne [long]$record.liveTotalBytes) {
+                throw "Restored installed dependency identity mismatch: $($record.directoryName)"
+            }
+        }
+    }
+    $State.externallyStagedModsRestored = $true
 }
 
 function Restore-KbpRuntimeTransaction {
@@ -441,6 +488,7 @@ function Restore-KbpRuntimeTransaction {
                 if (-not (Test-KbpManifestEqual @($state.originalManifest) $restoredManifest)) {
                     throw 'Restored Mods manifest/hash mismatch.'
                 }
+                Assert-KbpExternallyStagedLiveRestored -State $state -ModsPath $mods
             }
         }
         elseif (Test-Path -LiteralPath $mods) { throw 'Mods must remain absent because it was absent before entry.' }
