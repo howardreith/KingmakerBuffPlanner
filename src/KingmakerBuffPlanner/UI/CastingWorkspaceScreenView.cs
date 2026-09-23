@@ -106,6 +106,12 @@ namespace KingmakerBuffPlanner.UI
                     view.OnePassGate.BlockingReasons.Count + " blocked");
             _scopeLabel.text = view.EditingScopeLabel;
             _lastView = view;
+            if (!_importAnnounced && _footerResult != null)
+            {
+                _importAnnounced = true;
+                string import = DescribeImport(_session);
+                if (import != null) _footerResult.text = import;
+            }
             RebuildBuffGrid(view);
             RebuildCards(view);
             RebuildInspector(view);
@@ -117,6 +123,27 @@ namespace KingmakerBuffPlanner.UI
         private static RectTransform RectOf(Component component)
         {
             return (RectTransform)component.transform;
+        }
+
+        // The legacy import summary is shown once, on the first refresh
+        // after the session imported it.
+        private bool _importAnnounced;
+
+        private static string DescribeImport(CastingWorkspaceSession session)
+        {
+            CastingImportReport report = session.ImportReport;
+            if (report == null) return null;
+            return "Imported " + report.ResultingCastingCount +
+                (report.ResultingCastingCount == 1 ? " casting" : " castings") +
+                " from your previous plan: " + report.ReadyCount + " ready, " +
+                report.DraftCount + " need review" +
+                (report.UnresolvedCasterCount == 0 ? string.Empty
+                    : ", " + report.UnresolvedCasterCount + " without a caster") +
+                (report.GroupReviewCount == 0 ? string.Empty
+                    : ", " + report.GroupReviewCount + " group(s) to confirm") +
+                (report.Warnings.Count == 0 ? string.Empty
+                    : " · " + report.Warnings.Count + " warning(s)") +
+                ". Your previous plan file was kept unchanged.";
         }
 
         private void Build(StaticCanvas nativeCanvas)

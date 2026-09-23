@@ -526,6 +526,22 @@ namespace KingmakerBuffPlanner.UI
         // assignment's effective targeting, never collapsed to the first.
         // Assignment-scoped presentation (chooser availability for one
         // child) reads this; it never mutates state.
+        // Grouping kind per discovered source (per-target vs. mass), used by
+        // the legacy importer to recognize group assignments instead of
+        // splitting them as pinned single-target children.
+        internal IDictionary<string, CastGroupingKind> SourceGroupings()
+        {
+            var result = new Dictionary<string, CastGroupingKind>(StringComparer.Ordinal);
+            foreach (KeyValuePair<string, EffectExpression> pair in _effects)
+            {
+                CastGroupingKind grouping;
+                if (pair.Value != null &&
+                    EffectExpressionTargetAnalysis.TryGetGrouping(pair.Value, out grouping))
+                    result[pair.Key] = grouping;
+            }
+            return result;
+        }
+
         internal IReadOnlyList<AssignmentProviderOption> GetAssignmentProviderOptions(
             SetupSourceRow source, string routineId)
         {

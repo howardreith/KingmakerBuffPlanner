@@ -841,7 +841,9 @@ namespace KingmakerBuffPlanner.UI
                     _castingWorkspaceSession, campaignId,
                     delegate(string id)
                     {
-                        return new CastingWorkspaceSession(_modPath, id);
+                        return new CastingWorkspaceSession(_modPath, id, null,
+                            _session.Model == null ? null
+                                : _session.Model.SourceGroupings());
                     },
                     delegate(string message) { _log.Info(message); });
                 if (workspaceSession == null)
