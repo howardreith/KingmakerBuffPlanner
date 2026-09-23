@@ -395,6 +395,8 @@ namespace KingmakerBuffPlanner.Tests
                     TestCastingImportIdentity);
                 Run("casting-import-preserves-unresolved-intent",
                     () => TestCastingImportPreservesUnresolvedIntent(root));
+                Run("converter-refuses-unsupported-contracts",
+                    () => TestConverterRefusesUnsupportedContracts(root));
             }
             finally
             {
@@ -11768,7 +11770,7 @@ namespace KingmakerBuffPlanner.Tests
 
             public CastingDispatchOutcome Submit(
                 ExplicitCastingPlan plan, CastingApplyDecision decision,
-                string scopeRoutineId)
+                string scopeRoutineId, ExplicitStepConversion projection)
             {
                 Attempts++;
                 throw new InvalidOperationException("dispatch-fixture-failure");
@@ -14189,6 +14191,149 @@ namespace KingmakerBuffPlanner.Tests
             session.SetFocusedCastingState(CastingAuthoringState.Disabled);
             if (session.Document.ImportNotices.Count != 1)
                 throw new InvalidOperationException("An authored edit dropped the import notices.");
+        }
+
+        // Review K4: compiler-to-converter — contracts the executor step
+        // cannot carry refuse the WHOLE conversion; the single-cast probe
+        // scope admits exactly one plain direct-target casting; the
+        // dispatch boundary receives the exact projection instance.
+        private static void TestConverterRefusesUnsupportedContracts(string root)
+        {
+            List<ProviderPlanningOption> options;
+            List<CastEnhancementSnapshot> enhancements;
+            PartyProviderSnapshot snapshot = CastingParty(CastingBuffAbility,
+                out options, out enhancements, new[] { "unit-t1", "unit-t2" }, 3);
+            var effects = CastingEffects("source-bulls", "source-communal");
+            var gate = new CastingExecutionGate();
+            // A validated, Ready casting with an enabled targeting modifier.
+            PlannedCasting plain = DirectCasting("cast-plain", "long", "unit-wizard",
+                "unit-t2", "source-bulls", CastingBuffAbility);
+            PlannedCasting shared = DirectCasting("cast-share", "long", "unit-cleric",
+                "unit-t1", "source-bulls", CastingBuffAbility);
+            shared = new PlannedCasting(shared.CastingId, shared.RoutineId, 0,
+                shared.SourceId, shared.Ability, shared.CasterUnitId, null,
+                shared.TargetMode, shared.DirectTargetUnitId, null, null,
+                new[] { new TargetingModifierSelection("share", true, null) }, null,
+                shared.ExistingEffectPolicy, null, shared.State, null);
+            ExplicitCastingPlan modPlan = new ExplicitCastingCompiler().Compile(
+                CastingDocument(shared, plain), snapshot, options, effects, enhancements,
+                null, new ICastingTargetingModifier[]
+                {
+                    new FixtureShareCastingModifier("unit-cleric", new[] { "unit-t1", "unit-t2" })
+                });
+            CastingApplyDecision modDecision = gate.Evaluate(modPlan, CastingApplyMode.Ordinary, "long");
+            if (!modDecision.Allowed)
+                throw new InvalidOperationException("Modifier fixture refused: " +
+                    string.Join(",", modDecision.BlockingReasons.ToArray()));
+            ExplicitStepConversion modConversion = ExplicitCastingStepConverter.Convert(
+                modPlan, modDecision, options, effects);
+            if (modConversion.Converted || !modConversion.Refusal.StartsWith(
+                    "unsupported-contract:targeting-modifier:cast-share", StringComparison.Ordinal))
+                throw new InvalidOperationException("A targeting modifier vanished from a successful conversion: " +
+                    modConversion.Refusal);
+
+            // An exact-source enhancement requirement.
+            PlannedCasting exact = DirectCasting("cast-exact", "long", "unit-cleric",
+                "unit-t1", "source-bulls", CastingBuffAbility,
+                new[] { new AuthoredEnhancementSelection("extend-cleric", true, "rod-exact-1") });
+            ExplicitCastingPlan exactPlan = CompileCastingPlan(CastingDocument(exact),
+                snapshot, options, enhancements, "source-bulls", "source-communal");
+            ResolvedCasting exactCasting = exactPlan.Castings.Single();
+            if (!exactCasting.IsExecutable)
+                throw new InvalidOperationException("Fixture precondition: exact-source casting must compile Ready.");
+            {
+                CastingApplyDecision exactDecision = gate.Evaluate(exactPlan,
+                    CastingApplyMode.Ordinary, "long");
+                ExplicitStepConversion exactConversion = ExplicitCastingStepConverter.Convert(
+                    exactPlan, exactDecision, options, effects);
+                if (exactConversion.Converted || !exactConversion.Refusal.StartsWith(
+                        "unsupported-contract:exact-enhancement-source:", StringComparison.Ordinal))
+                    throw new InvalidOperationException("An exact enhancement source vanished: " +
+                        exactConversion.Refusal);
+            }
+
+            // Group with required coverage that the prediction does not meet.
+            List<ProviderPlanningOption> groupOptions;
+            List<CastEnhancementSnapshot> groupEnhancements;
+            PartyProviderSnapshot groupParty = CastingParty(CastingGroupAbility,
+                out groupOptions, out groupEnhancements, new[] { "unit-t1", "unit-t2" }, 3,
+                new Dictionary<string, IEnumerable<string>>
+                {
+                    { "unit-cleric", new[] { "unit-t1" } },
+                    { "unit-wizard", new[] { "unit-t1" } }
+                });
+            ExplicitCastingPlan gapPlan = CompileCastingPlan(CastingDocument(
+                    GroupCasting("cast-gap", "long", "unit-cleric", "source-communal",
+                        CastingGroupAbility, new[] { "unit-t1", "unit-t2" })),
+                groupParty, groupOptions, groupEnhancements, "source-bulls", "source-communal");
+            CastingApplyDecision gapDecision = gate.Evaluate(gapPlan, CastingApplyMode.Ordinary, "long");
+            if (!gapDecision.Allowed)
+                throw new InvalidOperationException("Fixture precondition: the coverage-gap decision must be allowed.");
+            {
+                ExplicitStepConversion gapConversion = ExplicitCastingStepConverter.Convert(
+                    gapPlan, gapDecision, groupOptions, effects);
+                if (gapConversion.Converted)
+                    throw new InvalidOperationException(
+                        "Incomplete required coverage converted successfully.");
+            }
+
+            // Probe scope: one plain direct casting converts; two, a group,
+            // or an enhancement are refused.
+            ExplicitCastingPlan onePlan = CompileCastingPlan(CastingDocument(plain),
+                snapshot, options, enhancements, "source-bulls", "source-communal");
+            CastingApplyDecision oneDecision = gate.Evaluate(onePlan, CastingApplyMode.Ordinary, "long");
+            ExplicitStepConversion probe = ExplicitCastingStepConverter.Convert(
+                onePlan, oneDecision, options, effects, ExplicitProjectionScope.SingleCastProbe);
+            if (!probe.Converted || probe.Plan.Steps.Count != 1 ||
+                probe.CastingIds[0] != "cast-plain" || probe.ProjectionId.Length != 64)
+                throw new InvalidOperationException("The single-cast probe did not convert: " + probe.Refusal);
+            ExplicitStepConversion probeAgain = ExplicitCastingStepConverter.Convert(
+                onePlan, oneDecision, options, effects, ExplicitProjectionScope.SingleCastProbe);
+            if (probeAgain.ProjectionId != probe.ProjectionId)
+                throw new InvalidOperationException("Projection identity is not deterministic.");
+            ExplicitCastingPlan twoPlan = CompileCastingPlan(CastingDocument(plain,
+                    DirectCasting("cast-second", "long", "unit-cleric", "unit-t1",
+                        "source-bulls", CastingBuffAbility)),
+                snapshot, options, enhancements, "source-bulls", "source-communal");
+            if (ExplicitCastingStepConverter.Convert(twoPlan,
+                    gate.Evaluate(twoPlan, CastingApplyMode.Ordinary, "long"), options, effects,
+                    ExplicitProjectionScope.SingleCastProbe).Refusal !=
+                    "probe-requires-exactly-one-casting:2")
+                throw new InvalidOperationException("The probe admitted two castings.");
+            PlannedCasting enhanced = DirectCasting("cast-enh", "long", "unit-cleric",
+                "unit-t1", "source-bulls", CastingBuffAbility,
+                new[] { new AuthoredEnhancementSelection("extend-cleric", true, null) });
+            ExplicitCastingPlan enhPlan = CompileCastingPlan(CastingDocument(enhanced),
+                snapshot, options, enhancements, "source-bulls", "source-communal");
+            CastingApplyDecision enhDecision = gate.Evaluate(enhPlan, CastingApplyMode.Ordinary, "long");
+            if (enhDecision.Allowed && !ExplicitCastingStepConverter.Convert(enhPlan, enhDecision,
+                    options, effects, ExplicitProjectionScope.SingleCastProbe).Refusal
+                    .StartsWith("probe-unsupported:enhancement:", StringComparison.Ordinal))
+                throw new InvalidOperationException("The probe admitted an enhancement.");
+
+            // The dispatch boundary receives the exact projection instance.
+            string dir = Path.Combine(root, "k4-boundary");
+            Directory.CreateDirectory(dir);
+            var boundary = new DisabledCastingDispatchBoundary();
+            PartyProviderSnapshot applySnapshot;
+            CastingWorkspaceInputs applyInputs = WorkspaceInputs(out applySnapshot);
+            var session = new CastingWorkspaceSession(dir, "workspace-campaign", boundary);
+            session.SelectBuff("source-bulls");
+            session.SelectRoutine("long");
+            session.BuildView(applyInputs);
+            session.Draft.SourceId = "source-bulls";
+            session.Draft.TargetMode = CastingTargetMode.DirectTarget;
+            session.ChooseDraftCaster("unit-cleric");
+            session.Draft.DirectTargetUnitId = "unit-t1";
+            Assert(session.AddCastingFromDraft(applyInputs).Applied);
+            session.PresentForReview(applyInputs);
+            Assert(session.AcceptPresentedPlan(applyInputs));
+            WorkspaceApplyResult applied = session.Apply(CastingApplyMode.Ordinary, "long", applyInputs);
+            if (applied.Projection == null || !applied.Projection.Converted ||
+                !ReferenceEquals(boundary.LastProjection, applied.Projection) ||
+                applied.Dispatch == null || applied.Dispatch.Submitted)
+                throw new InvalidOperationException(
+                    "The dispatch boundary did not receive the exact approved projection.");
         }
 
         // The Unity-bound host cannot be compiled here, so its wiring to the
