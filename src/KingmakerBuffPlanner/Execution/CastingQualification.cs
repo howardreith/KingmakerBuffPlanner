@@ -165,6 +165,19 @@ namespace KingmakerBuffPlanner.Execution
             return recipe == ZeroCostMixed || recipe == FiniteDirectMixed;
         }
 
+        // The zero-cost recipe ends with the disable step (its sources are
+        // free, so a further approved casting needs no further resource);
+        // the finite recipe keeps its prepared slots for the four steps.
+        public static bool HasDisableStep(string recipe)
+        {
+            return recipe == ZeroCostMixed;
+        }
+
+        public static int ForecastSteps(string recipe)
+        {
+            return HasDisableStep(recipe) ? 4 : 3;
+        }
+
         public static CastingQualificationSelection Select(string recipe,
             CastingWorkspaceInputs inputs, string campaignId)
         {
@@ -482,7 +495,10 @@ namespace KingmakerBuffPlanner.Execution
     //              the first casting finishes),
     //   complete - qual-cast-1 already active (skipped), the rest execute,
     //   recast   - every target active, qual-cast-1 set to Always recast,
-    //              so only it executes (after a close and reopen).
+    //              so only it executes (after a close and reopen),
+    //   disable  - (zero-cost recipe) the same plan again; the planner is
+    //              disabled while that cast is in progress (animated) or
+    //              before the run's first step (instant), so nothing lands.
     // The repeat step (everything active) submits nothing. A later step
     // whose real projection differs from its forecast is refused.
     public static class CastingQualificationForecast
@@ -490,6 +506,7 @@ namespace KingmakerBuffPlanner.Execution
         public const string Stop = "stop";
         public const string Complete = "complete";
         public const string Recast = "recast";
+        public const string Disable = "disable";
 
         public static IReadOnlyList<CastingQualificationStepForecast> Forecast(
             CastingQualificationSelection selection, CastingWorkspaceInputs inputs,
@@ -527,9 +544,21 @@ namespace KingmakerBuffPlanner.Execution
             CastingWorkspaceInputs afterComplete = WithSpent(inputs, spent);
             // recast: everything active; the first, set to Always recast,
             // executes again.
-            steps.Add(Project(Recast, WithPolicy(document, firstCasting.CastingId,
-                    ExistingEffectPolicy.Overwrite), afterComplete,
-                WithGranted(afterComplete, expected, selection.Castings.Select(grant))));
+            CastingPlanDocument recastDocument = WithPolicy(document, firstCasting.CastingId,
+                ExistingEffectPolicy.Overwrite);
+            CastingQualificationStepForecast recast = Project(Recast, recastDocument, afterComplete,
+                WithGranted(afterComplete, expected, selection.Castings.Select(grant)));
+            steps.Add(recast);
+            if (CastingQualificationRecipe.HasDisableStep(selection.Recipe))
+            {
+                // disable: everything active again; the same Always recast
+                // plan is submitted and the planner is disabled during it.
+                if (recast.Projection != null)
+                    spent.AddRange(recast.Projection.Plan.Steps.Select(step => step.Reservation));
+                CastingWorkspaceInputs afterRecast = WithSpent(inputs, spent);
+                steps.Add(Project(Disable, recastDocument, afterRecast,
+                    WithGranted(afterRecast, expected, selection.Castings.Select(grant))));
+            }
             return new ReadOnlyCollection<CastingQualificationStepForecast>(steps);
         }
 

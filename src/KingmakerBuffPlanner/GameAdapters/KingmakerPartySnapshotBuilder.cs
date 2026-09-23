@@ -135,26 +135,70 @@ namespace KingmakerBuffPlanner.GameAdapters
         {
             for (int level = 0; level <= spellbook.MaxSpellLevel; level++)
             {
-                string poolKey = PoolKey(unit.UniqueId, spellbook.Blueprint.AssetGuid,
-                    level == 0 ? "unlimited" : "spontaneous-" + level);
                 if (level == 0)
-                    pools.Add(new ResourcePoolSnapshot(poolKey, ResourcePoolKind.Unlimited, 0, 0, null));
-                else
                 {
-                    int remaining = Math.Max(0, spellbook.GetSpontaneousSlots(level));
-                    int capacity = Math.Max(remaining, spellbook.GetSpellsPerDay(level));
-                    pools.Add(new ResourcePoolSnapshot(poolKey, ResourcePoolKind.SpontaneousLevel,
-                        capacity, remaining, null));
+                    ScanSpontaneousLevelZero(unit, spellbook, providers, pools);
+                    continue;
                 }
+                string poolKey = PoolKey(unit.UniqueId, spellbook.Blueprint.AssetGuid,
+                    "spontaneous-" + level);
+                int remaining = Math.Max(0, spellbook.GetSpontaneousSlots(level));
+                int capacity = Math.Max(remaining, spellbook.GetSpellsPerDay(level));
+                pools.Add(new ResourcePoolSnapshot(poolKey, ResourcePoolKind.SpontaneousLevel,
+                    capacity, remaining, null));
                 foreach (KingmakerAbilitySelection selection in ExpandOwned(
                     spellbook.GetKnownSpells(level), unit, spellbook.Blueprint.AssetGuid))
-                    AddSpellProvider(unit, spellbook, selection, poolKey, level == 0 ? 0 : 1,
+                    AddSpellProvider(unit, spellbook, selection, poolKey, 1,
                         new string[0], providers);
                 foreach (KingmakerAbilitySelection selection in ExpandOwned(
                     spellbook.GetCustomSpells(level), unit, spellbook.Blueprint.AssetGuid))
-                    AddSpellProvider(unit, spellbook, selection, poolKey, level == 0 ? 0 : 1,
+                    AddSpellProvider(unit, spellbook, selection, poolKey, 1,
                         new string[0], providers);
             }
+        }
+
+        // Level 0: a spell the caster casts at will (the cantrip ability the
+        // class grants) costs nothing; one without it spends a level-0 slot,
+        // like any spontaneous level, exactly as the game's command does.
+        private void ScanSpontaneousLevelZero(
+            UnitEntityData unit,
+            Spellbook spellbook,
+            List<ProviderSnapshot> providers,
+            List<ResourcePoolSnapshot> pools)
+        {
+            string unlimitedKey = PoolKey(unit.UniqueId, spellbook.Blueprint.AssetGuid, "unlimited");
+            string slotKey = PoolKey(unit.UniqueId, spellbook.Blueprint.AssetGuid, "spontaneous-0");
+            bool unlimitedAdded = false;
+            bool slotsAdded = false;
+            foreach (KingmakerAbilitySelection selection in ExpandOwned(
+                    spellbook.GetKnownSpells(0), unit, spellbook.Blueprint.AssetGuid)
+                .Concat(ExpandOwned(spellbook.GetCustomSpells(0), unit, spellbook.Blueprint.AssetGuid)))
+            {
+                if (HasAtWillCantrip(unit, spellbook, selection))
+                {
+                    if (!unlimitedAdded)
+                        pools.Add(new ResourcePoolSnapshot(unlimitedKey, ResourcePoolKind.Unlimited, 0, 0, null));
+                    unlimitedAdded = true;
+                    AddSpellProvider(unit, spellbook, selection, unlimitedKey, 0, new string[0], providers);
+                    continue;
+                }
+                if (!slotsAdded)
+                {
+                    int remaining = Math.Max(0, spellbook.GetSpontaneousSlots(0));
+                    pools.Add(new ResourcePoolSnapshot(slotKey, ResourcePoolKind.SpontaneousLevel,
+                        Math.Max(remaining, spellbook.GetSpellsPerDay(0)), remaining, null));
+                }
+                slotsAdded = true;
+                AddSpellProvider(unit, spellbook, selection, slotKey, 1, new string[0], providers);
+            }
+        }
+
+        private static bool HasAtWillCantrip(UnitEntityData unit, Spellbook spellbook,
+            KingmakerAbilitySelection selection)
+        {
+            return KingmakerAtWillCantrips.Resolve(unit,
+                KingmakerAbilityVariants.ToAbilityKey(selection, SourceKind.Spellbook),
+                spellbook.CasterLevel) != null;
         }
 
         private void ScanPreparedSpellbook(
@@ -165,20 +209,32 @@ namespace KingmakerBuffPlanner.GameAdapters
         {
             var allSlots = spellbook.GetAllMemorizedSpells().Where(s => s != null && s.Spell != null)
                 .OrderBy(s => s.SpellLevel).ThenBy(s => s.Type).ThenBy(s => s.Index).ToList();
+            // A memorized level-0 spell the caster casts at will costs
+            // nothing; one without the cantrip ability is a prepared slot the
+            // cast consumes, as the game's own spend does.
             var cantripSlots = allSlots.Where(s => s.SpellLevel == 0).ToList();
+            var atWillSlots = new HashSet<SpellSlot>(ReferenceEqualityComparer<SpellSlot>.Instance);
             if (cantripSlots.Count != 0)
             {
                 string unlimitedKey = PoolKey(unit.UniqueId, spellbook.Blueprint.AssetGuid, "unlimited");
-                pools.Add(new ResourcePoolSnapshot(unlimitedKey, ResourcePoolKind.Unlimited, 0, 0, null));
+                bool unlimitedAdded = false;
                 foreach (IGrouping<string, SpellSlot> group in cantripSlots.GroupBy(
                     s => ToAbilityKey(s.Spell, SourceKind.Spellbook).Canonical, StringComparer.Ordinal))
                 {
-                    foreach (KingmakerAbilitySelection selection in ExpandOwned(
-                        new[] { group.First().Spell }, unit, spellbook.Blueprint.AssetGuid))
+                    List<KingmakerAbilitySelection> selections = ExpandOwned(
+                        new[] { group.First().Spell }, unit, spellbook.Blueprint.AssetGuid).ToList();
+                    if (selections.Count == 0 ||
+                        !selections.All(selection => HasAtWillCantrip(unit, spellbook, selection)))
+                        continue;
+                    if (!unlimitedAdded)
+                        pools.Add(new ResourcePoolSnapshot(unlimitedKey, ResourcePoolKind.Unlimited, 0, 0, null));
+                    unlimitedAdded = true;
+                    foreach (SpellSlot slot in group) atWillSlots.Add(slot);
+                    foreach (KingmakerAbilitySelection selection in selections)
                         AddSpellProvider(unit, spellbook, selection, unlimitedKey, 0, new string[0], providers);
                 }
             }
-            var slots = allSlots.Where(s => s.SpellLevel > 0).ToList();
+            var slots = allSlots.Where(s => !atWillSlots.Contains(s)).ToList();
             if (slots.Count == 0) return;
             var ids = slots.ToDictionary(s => s, SlotId, ReferenceEqualityComparer<SpellSlot>.Instance);
             var tokens = new List<ResourceTokenSnapshot>();

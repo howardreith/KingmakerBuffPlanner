@@ -83,7 +83,10 @@ namespace KingmakerBuffPlanner.GameAdapters
             if (resolved.Caster.Descriptor == null || resolved.Caster.Descriptor.State == null ||
                 resolved.Caster.Descriptor.State.IsDead || !resolved.Caster.Descriptor.State.IsConscious)
                 return CastRuntimeValidation.Fail("caster-incapacitated");
-            if (!resolved.Ability.IsAvailableForCast) return CastRuntimeValidation.Fail("ability-unavailable");
+            // The cast command's own guard (IsAvailable: the spellbook can
+            // spend it and the caster can cast it); IsAvailableForCast alone
+            // passed a spellbook cantrip the command then failed.
+            if (!resolved.Ability.IsAvailable) return CastRuntimeValidation.Fail("ability-unavailable");
             if (!MaterialComponentAvailability.IsSatisfied(
                 resolved.Ability.RequireMaterialComponent,
                 () => resolved.Ability.HasEnoughMaterialComponent))
@@ -169,6 +172,15 @@ namespace KingmakerBuffPlanner.GameAdapters
                     b.Blueprint != null && b.Blueprint.AssetGuid == provider.SpellbookGuid);
                 if (book == null || !new KingmakerSpellbookRoleAdapter().IsIncluded(book, ownedBooks))
                     return null;
+                // A level-0 entry is cast at will through the cantrip ability
+                // the class grants, exactly as the game's action bar casts
+                // it; the entry itself needs a level-0 slot the book lacks.
+                if (provider.SourceInstanceId == AtWillSourceInstance)
+                {
+                    AbilityData atWill = KingmakerAtWillCantrips.Resolve(caster, provider.Ability,
+                        book.CasterLevel);
+                    if (atWill != null) return atWill;
+                }
                 if (reservedTokenIds != null && reservedTokenIds.Count != 0)
                 {
                     foreach (SpellSlot slot in book.GetAllMemorizedSpells().Where(s => s != null &&
@@ -213,6 +225,8 @@ namespace KingmakerBuffPlanner.GameAdapters
             }
             return null;
         }
+
+        internal const string AtWillSourceInstance = "level-0|heighten-0";
 
         private static bool SourceInstanceMatches(AbilityData data, string sourceInstance)
         {

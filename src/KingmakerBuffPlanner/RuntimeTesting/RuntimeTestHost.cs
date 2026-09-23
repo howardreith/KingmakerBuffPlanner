@@ -835,22 +835,27 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     // exactly the judged steps.
                     IList<string> violations = _qualificationRecord.Violations();
                     CastingQualificationSelection selection = _qualificationRecord.Selection;
+                    int forecastSteps = selection == null ? 3
+                        : CastingQualificationRecipe.ForecastSteps(selection.Recipe);
                     bool selected = selection != null && selection.Selected &&
-                        _qualificationRecord.Forecast != null && _qualificationRecord.Forecast.Count == 3;
+                        _qualificationRecord.Forecast != null &&
+                        _qualificationRecord.Forecast.Count == forecastSteps;
                     result.Assertions.Add(selected
-                        ? RuntimeTestAssertion.Pass("qualification-selection", "recipe selected;3 forecast steps",
+                        ? RuntimeTestAssertion.Pass("qualification-selection",
+                            "recipe selected;" + forecastSteps + " forecast steps",
                             string.Join(",", selection.Castings.Select(casting => casting.CastingId + "=" +
                                 casting.CasterUnitId + ">" + casting.DirectTargetUnitId).ToArray()))
-                        : RuntimeTestAssertion.Fail("qualification-selection", "recipe selected;3 forecast steps",
+                        : RuntimeTestAssertion.Fail("qualification-selection",
+                            "recipe selected;" + forecastSteps + " forecast steps",
                             selection == null ? "missing" : selection.Refusal));
                     result.Assertions.Add(_qualificationRecord.CastingScenario
                         ? (violations.Count == 0
                             ? RuntimeTestAssertion.Pass("qualification-run",
-                                "stop/complete/repeat/recast as forecast", "planned=" +
+                                string.Join("/", _qualificationRecord.JudgedSteps.ToArray()) + " as forecast", "planned=" +
                                     _qualificationRecord.PlannedSubmissions + ";max=" +
                                     _qualificationRecord.MaximumSubmissions)
                             : RuntimeTestAssertion.Fail("qualification-run",
-                                "stop/complete/repeat/recast as forecast",
+                                string.Join("/", _qualificationRecord.JudgedSteps.ToArray()) + " as forecast",
                                 string.Join("|", violations.ToArray())))
                         : (violations.Count == 0 && _qualificationRecord.Submissions.Count == 0 &&
                             (_qualificationHost == null || _qualificationHost.StartedRuns == 0)
@@ -3027,7 +3032,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     _request.Parameters.TryGetValue("qualificationRecipe", out recipeRaw)
                         ? recipeRaw as string : null,
                     () => BuffPlannerUiRoot.WorldRunsForCasting, true,
-                    BuffPlannerUiRoot.PressRoutineForRuntime);
+                    BuffPlannerUiRoot.PressRoutineForRuntime, BuffPlannerUiRoot.SetEnabled);
                 _log.Info("[KBP-QUAL] driver built;casting=" + _qualificationRecord.CastingScenario +
                     ";allowance=" + _qualificationRecord.AllowanceStatus + ";workspaceClosed=" +
                     closed.Closed + ";campaign=" + campaignId + ".");
@@ -3131,6 +3136,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     { "stopPressHandled", record.StopPressHandled },
                     { "stopPressedInFlight", record.StopPressedInFlight.HasValue
                         ? (JToken)record.StopPressedInFlight.Value : JValue.CreateNull() },
+                    { "disable", record.Disable },
+                    { "disabledAt", record.DisabledAt },
+                    { "acceptingAfterEnable", record.AcceptingAfterEnable },
                     { "hostRunsBefore", _qualificationRunsBefore },
                     { "hostRunsStarted", _qualificationHost == null ? -1 : _qualificationHost.StartedRuns },
                     { "failures", new JArray(record.Failures.Cast<object>().ToArray()) },
