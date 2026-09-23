@@ -761,12 +761,16 @@ function Get-KbpProtectedSavePolicy {
         [Parameter(Mandatory = $true)][string]$Scenario,
         [Parameter(Mandatory = $true)][string]$FixtureFamily,
         [Parameter(Mandatory = $true)][string]$WorkingFileName)
+    # The in-game reload and the first-open import load or read the WORKING
+    # save and must leave it and the save folder untouched as well (review of
+    # 1332ed8..542cd66, P1-2).
     $strict = $FixtureFamily -ceq 'Advanced' -or
-        @('live-cast-qual', 'live-cast-qual-select', 'live-advanced-inspect', 'live-cast-probe') -ccontains $Scenario
+        @('live-cast-qual', 'live-cast-qual-select', 'live-advanced-inspect', 'live-cast-probe',
+            'live-workspace-reload', 'live-workspace-import') -ccontains $Scenario
     return [pscustomobject]@{
         allowedChanged = if ($strict) { @() } else { @($WorkingFileName) }
-        newFilesBlocking = $FixtureFamily -ceq 'Advanced' -or $Scenario -ceq 'live-cast-qual' -or
-            $Scenario -ceq 'live-cast-probe'
+        newFilesBlocking = $FixtureFamily -ceq 'Advanced' -or
+            @('live-cast-qual', 'live-cast-probe', 'live-workspace-reload', 'live-workspace-import') -ccontains $Scenario
     }
 }
 

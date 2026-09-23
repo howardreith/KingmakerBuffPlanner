@@ -82,13 +82,25 @@ namespace KingmakerBuffPlanner.RuntimeTesting
 
         public void SaveJson(string name, string json)
         {
-            _counter.SuppressHeader(name, json);
+            // A rejection is recorded before it is thrown, so its cause is in
+            // the evidence even when the game swallows the exception.
+            try { _counter.SuppressHeader(name, json); }
+            catch (Exception exception)
+            {
+                _record("header-update-rejected:" + name + ":" + exception.Message + ";diskWrite=false");
+                throw;
+            }
             _record("single-native-load-counter-update-suppressed;diskWrite=false");
         }
 
         public void Save()
         {
-            _counter.SuppressCommit();
+            try { _counter.SuppressCommit(); }
+            catch (Exception exception)
+            {
+                _record("commit-rejected:" + exception.Message + ";diskWrite=false");
+                throw;
+            }
             _native.Dispose();
             _record("single-native-load-header-commit-suppressed;diskWrite=false");
         }

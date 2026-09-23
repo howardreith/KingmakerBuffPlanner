@@ -530,8 +530,15 @@ namespace KingmakerBuffPlanner.UI
             // (review R3).
             ExplicitCastingPlan plan = Compile(inputs, SelectedRoutineId, false);
             RefreshPoolLabels(inputs);
-            string selectedSource = string.IsNullOrEmpty(SelectedSourceId)
-                ? FirstSourceId(inputs) : SelectedSourceId;
+            // The buff shown selected is the one the draft and Add use (review
+            // of 1332ed8..542cd66, P2-2): the first buff is committed as the
+            // selection, not only highlighted.
+            if (string.IsNullOrEmpty(SelectedSourceId))
+            {
+                string first = FirstSourceId(inputs);
+                if (!string.IsNullOrEmpty(first)) SelectedSourceId = first;
+            }
+            string selectedSource = SelectedSourceId ?? string.Empty;
             var casters = BuildCasterRows(plan, inputs, selectedSource);
             var cards = BuildCards(plan, selectedSource);
             var namesByUnit = inputs.Snapshot.Units.ToDictionary(
@@ -1206,6 +1213,10 @@ namespace KingmakerBuffPlanner.UI
             // headless caller may pass them explicitly. Resolution never
             // depends on a prior BuildView having happened.
             if (inputs != null) _lastInputs = inputs;
+            // A draft authored without clicking a buff uses the buff shown
+            // selected, never "unsourced" (review of 1332ed8..542cd66, P2-2).
+            if (string.IsNullOrEmpty(Draft.SourceId) && !string.IsNullOrEmpty(SelectedSourceId))
+                Draft.SourceId = SelectedSourceId;
             // The visible controls set source and caster; the exact ability
             // is resolved HERE through the same discovery the plan compiles
             // from (review F1) — callers never compensate privately, and an
@@ -1456,12 +1467,34 @@ namespace KingmakerBuffPlanner.UI
         // profile model itself.
         public string DocumentIntentSignature()
         {
-            CastingPlanProfile profile = CastingPlanProfile.FromDocument(
-                _authoring.Document, _uiSettings, _executionSettings);
+            return ProfileIntentSignature(CampaignId, CastingPlanProfile.FromDocument(
+                _authoring.Document, _uiSettings, _executionSettings));
+        }
+
+        // What a fresh session would read for this campaign, as the same
+        // intent signature (a plain read: no import, no session), so the
+        // in-game reload compares disk with what was saved, not the retained
+        // session with itself (review of 1332ed8..542cd66, P2-1).
+        internal static string SavedIntentSignature(string modPath, string campaignId, out string status)
+        {
+            CastingPlanLoadResult loaded = new CastingPlanRepository(modPath).Load(campaignId);
+            status = loaded.Status.ToString();
+            if (loaded.Status != CastingPlanLoadStatus.Loaded || loaded.Profile == null) return null;
+            CastingPlanProfile profile = loaded.Profile;
+            UiProfile ui = profile.Ui == null ? UiProfile.Default()
+                : new UiProfile { Scale = profile.Ui.Scale, Hotkey = profile.Ui.Hotkey };
+            ExecutionProfile execution = profile.Execution == null
+                ? ExecutionProfile.Default() : CopyOf(profile.Execution);
+            return ProfileIntentSignature(campaignId,
+                CastingPlanProfile.FromDocument(profile.ToDocument(), ui, execution));
+        }
+
+        private static string ProfileIntentSignature(string campaignId, CastingPlanProfile profile)
+        {
             // Normalize the volatile schema stamp so equality reflects
             // CONTENT, and stamp the campaign binding explicitly.
             profile.SchemaVersion = 0;
-            return CampaignId + "" +
+            return campaignId + "" +
                 Newtonsoft.Json.JsonConvert.SerializeObject(
                     profile, Newtonsoft.Json.Formatting.None,
                     new Newtonsoft.Json.JsonSerializerSettings

@@ -22,7 +22,25 @@ after a close and reopen, each exactly as forecast). Finite-resource
 qualification waits for an owner-designated advanced seed. Human usability and the native aesthetic
 pass remain open.
 
-## Current review dispositions — independent review of `f7726c9..1332ed8` (answered 2026-09-23)
+## Current review dispositions — independent review of `1332ed8..542cd66` (answered 2026-09-23)
+
+A read-only review of the in-game reload, the grid order, the version bump
+and the docs found no P0. Both P1s concern the reload's save safety; no
+run wrote a save (the WORKING hash stayed the same across the runs), but
+the guarantee rested on the wrapper's counters alone.
+
+| Finding | Disposition |
+| --- | --- |
+| P1-1: the reload restored the writable native saver after the header commit but before the load finished, with no write sentinels | The read-only saver stays until the reload's after-load callback; the first load's write sentinels (SaveRoutine, SaveStashedArea, DeleteSave, RemoveSaveFromList) are installed for the reload window together with a correlation hook on Game.LoadGame; any write, a foreign or repeated load, or a missing correlation fails the run; the hooks are removed on success and failure; rejected header updates and commits are recorded before they throw |
+| P1-2: the harness still allowed the WORKING save to change in the reload scenario | The reload and import scenarios allow no save change and block new save files; the reload needs `-TimeoutSeconds` of at least 600 and has its own live budget |
+| P2-1: three reload checks could not detect their failures | The saved plan is read back from disk as a fresh session would and compared with what was saved; exactly one area unload and one loading-complete delivery are required; HUD roots are counted including inactive ones; session reuse is reported |
+| P2-2: the highlighted first buff was not the draft's buff | The first buff is committed as the selection, and a draft authored without a click uses it (it would otherwise have been saved as "unsourced") |
+| P2-3: one version label, several builds | The candidate is frozen at one commit; its receipt pins the identities and repeats the runs on it |
+| P2-4: release-note evidence errors | Corrected (the failed s1-01 run, per-run build checks, which frames showed what) |
+| P2-5: tests weaker than claimed | The grid test uses three buffs whose ids sort against their names and adds without a click; the reload source check pins the callback gating and the sentinels; the family refusal asserts its reason |
+| P3 | Failure evidence is flushed by the host's timeout and every loader failure path; the reload runs only after a passing authoring and reopen; grid names sort culture-aware; the scale evidence reads the native root canvas with invariant formatting |
+
+## Previous review dispositions — independent review of `f7726c9..1332ed8` (history)
 
 A second read-only review of the fixes above found no P0, P1 or P2 issue.
 All ten P3 items are addressed:

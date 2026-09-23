@@ -57,6 +57,7 @@ namespace KingmakerBuffPlanner.Tests
             Run("player-facing-resource-labels", () => TestPlayerFacingResourceLabels(root));
             Run("in-game-reload-is-guarded", TestInGameReloadIsGuarded);
             Run("in-game-first-open-import-is-judged", TestInGameFirstOpenImportIsJudged);
+            Run("card-reasons-and-review-items-in-words", TestCardReasonsInWords);
             Run("player-facing-refusals-and-routine-header", () => TestPlayerFacingRefusalsAndHeader(root));
             Run("buff-grid-is-alphabetical", () => TestBuffGridIsAlphabetical(root));
             Run("qualification-allowance-parsing", TestQualificationAllowanceParsing);
@@ -1194,6 +1195,12 @@ namespace KingmakerBuffPlanner.Tests
                 if (request != null || string.IsNullOrEmpty(rejection))
                     throw new InvalidOperationException("A refused family request was accepted: " +
                         item.Key);
+                // Review of 1332ed8..542cd66, P2-5: an advanced save with a
+                // scenario outside the family is refused for exactly that.
+                if (item.Key.StartsWith("advanced-", StringComparison.Ordinal) &&
+                    !rejection.Contains("live-save-family-scenario"))
+                    throw new InvalidOperationException("The advanced-family refusal is for the wrong reason: " +
+                        item.Key + ":" + rejection);
             }
         }
 
@@ -1671,7 +1678,7 @@ namespace KingmakerBuffPlanner.Tests
                 guard < 0 || load < 0 || guard > load)
                 throw new InvalidOperationException("The in-game reload is not guarded by the read-only saver.");
             string update = SourceBlock(loader, "private string AdvanceReload(bool areaReloaded)");
-            int complete = update == null ? -1 : update.IndexOf("if (!_reloadSaver.Complete) return null;", StringComparison.Ordinal);
+            int complete = update == null ? -1 : update.IndexOf("if (!_reloadSaver.Complete || !_reloadCallback) return null;", StringComparison.Ordinal);
             int restore = update == null ? -1 : update.IndexOf("descriptor.Saver = _reloadSaver.Native;", StringComparison.Ordinal);
             int waitArea = update == null ? -1 : update.IndexOf("if (!areaReloaded) return null;", StringComparison.Ordinal);
             int read = update == null ? -1 : update.IndexOf("string fingerprint = CurrentFingerprint(true);", StringComparison.Ordinal);
@@ -1682,8 +1689,24 @@ namespace KingmakerBuffPlanner.Tests
                 !loader.Contains("if (waitWhileLoading && partyCount <= 0) return null;"))
                 throw new InvalidOperationException("The reload restores the native saver early or reads the campaign mid-load.");
             string wrapper = SourceBlock(loader, "internal string UpdateReload(bool areaReloaded)");
-            if (wrapper == null || !wrapper.Contains("WriteEventsEvidence();") || !wrapper.Contains("throw;"))
+            if (wrapper == null || !wrapper.Contains("FailReload(") || !wrapper.Contains("throw;"))
                 throw new InvalidOperationException("A failed reload does not leave its events.");
+            // Review of 1332ed8..542cd66, P1-1: write sentinels and a
+            // Game.LoadGame correlation hook cover the reload window; writes,
+            // a foreign or repeated load, or a missing correlation fail it;
+            // the hooks are removed on success and on failure.
+            int sentinels = begin.IndexOf("InstallReloadSentinels();", StringComparison.Ordinal);
+            string fail = SourceBlock(loader, "internal void FailReload(string reason)");
+            string sentinelInstall = SourceBlock(loader, "private void InstallReloadSentinels()");
+            if (sentinels < 0 || sentinels > load || fail == null || !fail.Contains("RemoveHooks();") ||
+                !fail.Contains("WriteEventsEvidence();") || sentinelInstall == null ||
+                !sentinelInstall.Contains("\"SaveRoutine\"") || !sentinelInstall.Contains("\"SaveStashedArea\"") ||
+                !sentinelInstall.Contains("\"LoadGame\"") ||
+                !update.Contains("if (_writeObserved)") ||
+                !update.Contains("if (_reloadLoadGameCalls > 1 || (_reloadLoadGameCalls == 1 && !_reloadLoadGameCorrelated))") ||
+                !update.Contains("if (_reloadLoadGameCalls != 1 || !_reloadLoadGameCorrelated)") ||
+                Occurrences(update, "RemoveHooks();") != 1)
+                throw new InvalidOperationException("The reload window is not guarded by the write sentinels and the load correlation.");
             int loads = 0;
             foreach (string file in Directory.GetFiles(Path.Combine(directory.FullName, "src", "KingmakerBuffPlanner"),
                 "*.cs", SearchOption.AllDirectories))
@@ -1697,12 +1720,15 @@ namespace KingmakerBuffPlanner.Tests
             int started = reload == null ? -1 : reload.IndexOf("_liveSaveLoader.BeginGuardedReload();", StringComparison.Ordinal);
             if (reload == null || !reload.Contains("BuffPlannerUiRoot.CloseCastingWorkspaceForRuntime();") ||
                 closed < 0 || started < 0 || closed > started ||
-                !host.Contains("_liveUiPhase = RuntimeTestProtocol.IsReloadScenario(_request.Scenario) ? 80 : 21;") ||
+                !host.Contains("_liveUiPhase = RuntimeTestProtocol.IsReloadScenario(_request.Scenario) && reloadable ? 80 : 21;") ||
+                !host.Contains("_workspaceReloadEvidence = \"passed=False;skipped:interaction-or-reopen-failed\";") ||
                 Occurrences(host, "BeginGuardedReload()") != 1)
                 throw new InvalidOperationException("The host can reload with the planner open, or outside the reload scenario.");
             string verify = SourceBlock(host, "private string VerifyWorkspaceReload()");
-            if (verify == null || !verify.Contains("_reloadSubscriptionsBefore == 1 &&") ||
-                !verify.Contains("subscriptions == 1 && hudRoots == 1 && idle && clean;") ||
+            if (verify == null || !verify.Contains("bool passed = preserved && diskPreserved && campaign && _reloadSubscriptionsBefore == 1 &&") ||
+                !verify.Contains("subscriptions == 1 && _reloadHudRootsBefore == 1 && hudRoots == 1 &&") ||
+                !verify.Contains("unloads == 1 && completes == 1 && idle && clean;") ||
+                !verify.Contains("UI.CastingWorkspaceSession.SavedIntentSignature(") ||
                 !verify.Contains("string.Equals(session.CampaignId, expectedGame, StringComparison.Ordinal)"))
                 throw new InvalidOperationException("The reload verification is weaker than the scenario claims.");
         }
@@ -1722,15 +1748,59 @@ namespace KingmakerBuffPlanner.Tests
             }).Select(value => value.SourceId).ToArray();
             if (!ordered.SequenceEqual(new[] { "c-id", "b-id", "0-id", "d-id", "a-id" }))
                 throw new InvalidOperationException("The buff grid order is wrong: " + string.Join(",", ordered));
-            var session = new CastingWorkspaceSession(Path.Combine(root, "grid-order"), "campaign-grid");
-            PartyProviderSnapshot snapshot;
-            CastingWorkspaceInputs inputs = WorkspaceInputs(out snapshot);
-            WorkspaceView view = session.BuildView(inputs);
-            List<WorkspaceSourceOption> shown = view.Draft.Sources.ToList();
-            if (shown.Count == 0 || !shown[0].Selected ||
-                !shown.Select(value => value.SourceId).SequenceEqual(
-                    WorkspaceSourceLabels.GridOrder(shown).Select(value => value.SourceId)))
-                throw new InvalidOperationException("The grid is not shown in its order, or its first buff is not selected.");
+            // Review of 1332ed8..542cd66, P2-5: three castable buffs whose ids
+            // sort opposite to their names; the grid shows them by name and
+            // commits the first as the selection (P2-2), which a draft then
+            // uses without any buff click.
+            CastingWorkspaceInputs three = ThreeBuffInputs();
+            var gridSession = new CastingWorkspaceSession(Path.Combine(root, "grid-order"), "campaign-grid");
+            WorkspaceView gridView = gridSession.BuildView(three);
+            string[] shownIds = gridView.Draft.Sources.Select(value => value.SourceId).ToArray();
+            if (!shownIds.SequenceEqual(new[] { "c-source", "b-source", "a-source" }) ||
+                !gridView.Draft.Sources.First().Selected || gridSession.SelectedSourceId != "c-source" ||
+                gridView.SelectedSourceId != "c-source")
+                throw new InvalidOperationException("The grid order or the committed selection is wrong: " +
+                    string.Join(",", shownIds) + ";selected=" + gridSession.SelectedSourceId);
+            gridSession.Draft.TargetMode = CastingTargetMode.DirectTarget;
+            gridSession.ChooseDraftCaster("unit-cleric");
+            gridSession.Draft.DirectTargetUnitId = "unit-t1";
+            AuthoringEditResult added = gridSession.AddCastingFromDraft(three);
+            if (!added.Applied || gridSession.Document.Castings.Count != 1 ||
+                gridSession.Document.Castings[0].SourceId != "c-source")
+                throw new InvalidOperationException("Add did not use the buff shown selected: " + added.Reason);
+        }
+
+        // Three castable free buffs on one caster; their source ids sort
+        // opposite to their names (Zebra Ward, Mage Armor, Aid).
+        private static CastingWorkspaceInputs ThreeBuffInputs()
+        {
+            List<UnitSnapshot> units = new[] { "unit-cleric", "unit-t1", "unit-t2" }
+                .Select(id => new UnitSnapshot(id, id, false, string.Empty,
+                    new TargetValidationSnapshot(true, true, true, true))).ToList();
+            var effects = new Dictionary<string, EffectExpression>(StringComparer.Ordinal);
+            var providers = new List<ProviderSnapshot>();
+            var options = new List<ProviderPlanningOption>();
+            foreach (string[] buff in new[]
+                {
+                    new[] { "a-source", "guid-zebra", "Zebra Ward" },
+                    new[] { "b-source", "guid-mage", "Mage Armor" },
+                    new[] { "c-source", "guid-aid", "Aid" }
+                })
+            {
+                AbilityKey ability = Ability(buff[1], string.Empty, 0);
+                EffectExpression expression = Leaf(buff[1] + "-effect");
+                effects[buff[0]] = expression;
+                effects[ability.Canonical] = expression;
+                var provider = new ProviderSnapshot(new ProviderKey("unit-cleric", "book-cleric", ability, "level-0"),
+                    buff[2], 0, "pool-cleric-free", 0, null, null, 1, 10, string.Empty, string.Empty, buff[2]);
+                providers.Add(provider);
+                options.Add(new ProviderPlanningOption(provider, units.Select(unit => unit.UnitId).ToList(),
+                    new[] { "unit-cleric" }, 10, 100, CastExecutionStrategy.DirectRuleCast, "fixture-direct",
+                    new Dictionary<string, IEnumerable<string>>(StringComparer.Ordinal)));
+            }
+            var pools = new[] { new ResourcePoolSnapshot("pool-cleric-free", ResourcePoolKind.Unlimited, 0, 0, null) };
+            return new CastingWorkspaceInputs(new PartyProviderSnapshot(units, providers, pools),
+                options, effects, new CastEnhancementSnapshot[0], null, null);
         }
 
         // Mission section 11 (first-open import in game): the scenario opens
@@ -1773,6 +1843,50 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("The classic plan is not seeded exactly once before the first open.");
         }
 
+        // Cards explain themselves in words, never in codes or ids.
+        private static void TestCardReasonsInWords()
+        {
+            var expected = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                { "caster-unresolved", "no caster chosen" },
+                { "import-review-unresolved:automatic-caster-pending-review", "imported: needs your review" },
+                { "prepared-slots-exhausted:pool-unit-wizard", "no prepared slot left" },
+                { "target-not-conscious:unit-t1", "the recipient is unconscious" },
+                { "present-effect-not-sufficient", "the active effect is weaker or about to expire" }
+            };
+            foreach (KeyValuePair<string, string> pair in expected)
+                if (WorkspaceReasonText.Describe(pair.Key) != pair.Value)
+                    throw new InvalidOperationException("Reason text for " + pair.Key + " is " +
+                        WorkspaceReasonText.Describe(pair.Key));
+            string[] items =
+            {
+                "automatic-caster-pending-review", "provider-pin-without-caster-pending-review",
+                "group-origin-and-count-pending-review", "no-recipient:pending-review",
+                "grouping-unknown:single-or-group-pending-review;targets=unit-a,unit-b",
+                "provider-pin:unit-a|book|ability", "enhancement:rod-extend:required:exact-source-pending"
+            };
+            foreach (string item in items)
+            {
+                string text = WorkspaceReasonText.DescribeReviewItem(item);
+                if (text.Contains(":") || text.Contains("pending-review") || text.Contains("unit-") ||
+                    text.Contains("rod-extend"))
+                    throw new InvalidOperationException("A review item reached the player as a code: " + item + " -> " + text);
+            }
+            if (WorkspaceReasonText.DescribeReviewItem("automatic-caster-pending-review") !=
+                    "the old plan let the planner pick any caster; choose one")
+                throw new InvalidOperationException("The automatic-caster review item is misworded.");
+            DirectoryInfo directory = new DirectoryInfo(Environment.CurrentDirectory);
+            while (directory != null && !File.Exists(Path.Combine(directory.FullName, "KingmakerBuffPlanner.sln")))
+                directory = directory.Parent;
+            string view = File.ReadAllText(Path.Combine(directory.FullName, "src", "KingmakerBuffPlanner",
+                "UI", "CastingWorkspaceScreenView.cs"));
+            string detail = SourceBlock(view, "private static string BuildCardDetail(WorkspaceCastingCard card)");
+            if (detail == null || !detail.Contains(".Select(WorkspaceReasonText.Describe)") ||
+                !detail.Contains(".Select(WorkspaceReasonText.DescribeReviewItem)") ||
+                detail.Contains("string.Join(\", \", card.ReadinessReasons)"))
+                throw new InvalidOperationException("Cards still print reason codes.");
+        }
+
         // Refusals tell the player what to do next and the header counts the
         // routine as a whole; no internal code or casting id reaches them
         // (live frames casting-ws-qual-20260923-q2-03).
@@ -1802,7 +1916,7 @@ namespace KingmakerBuffPlanner.Tests
                     throw new InvalidOperationException("Refusal text for " + pair.Key + " is " +
                         WorkspaceRefusalText.Describe(pair.Key));
             if (WorkspaceHeaderText.Describe("Long", 0, 0, true, 0) != "Long · no castings yet" ||
-                WorkspaceHeaderText.Describe("Long", 3, 2, false, 1) != "Long · 2 of 3 castings ready · Apply blocked (1)" ||
+                WorkspaceHeaderText.Describe("Long", 3, 2, false, 1) != "Long · 2 of 3 castings ready · Apply blocked" ||
                 WorkspaceHeaderText.Describe("Short", 1, 1, true, 0) != "Short · 1 of 1 casting ready · ready to apply")
                 throw new InvalidOperationException("The routine header text is wrong.");
             // The session counts the routine, whichever buff is selected, and

@@ -521,6 +521,72 @@ namespace KingmakerBuffPlanner.UI
         }
     }
 
+    // Player-facing text for a casting's readiness reasons and its import
+    // review items (live frame casting-ws-import-20260923-i1-01 showed
+    // "caster-unresolved, import-review-unresolved:automatic-caster-pending-
+    // review"). Unit ids and other details after the code are dropped.
+    public static class WorkspaceReasonText
+    {
+        public static string Describe(string code)
+        {
+            string value = code ?? string.Empty;
+            int colon = value.IndexOf(':');
+            string head = colon < 0 ? value : value.Substring(0, colon);
+            switch (head)
+            {
+                case "caster-unresolved": return "no caster chosen";
+                case "caster-not-in-party": return "the caster is not in the party";
+                case "caster-not-capable": return "the caster cannot cast this";
+                case "source-unresolvable": return "the buff's source was not found";
+                case "exact-source-ambiguous": return "the caster can cast it in more than one way; pick the exact spell or item";
+                case "provider-option-unavailable": return "the caster cannot cast it right now";
+                case "spellbook-constraint-unsatisfied": return "not in the chosen spellbook";
+                case "resource-pool-unknown": return "its resource was not found";
+                case "resource-pool-exhausted": return "no casts left";
+                case "prepared-slots-exhausted": return "no prepared slot left";
+                case "target-not-in-party": return "the recipient is not in the party";
+                case "target-not-friendly": return "the recipient is not an ally";
+                case "target-not-conscious": return "the recipient is unconscious";
+                case "target-not-alive": return "the recipient is dead";
+                case "target-not-targetable": return "the recipient cannot be targeted";
+                case "target-unreachable": return "the caster cannot target this recipient";
+                case "target-mode-mismatch": return "the buff cannot be cast this way";
+                case "origin-anchor-illegal": return "the group spell cannot be centred there";
+                case "ability-targeting-unsupported": return "this buff's targeting is not supported";
+                case "targeting-modifier-unavailable": return "a required targeting modifier is not available";
+                case "enhancements-unvalidated": return "an enhancement could not be checked";
+                case "enhancement-incompatible": return "an enhancement does not fit this casting";
+                case "import-review-unresolved": return "imported: needs your review";
+                case "already-active": return "already active";
+                case "present-effect-not-sufficient": return "the active effect is weaker or about to expire";
+                default: return head.Length == 0 ? "not ready" : head.Replace('-', ' ');
+            }
+        }
+
+        public static string DescribeReviewItem(string item)
+        {
+            string value = item ?? string.Empty;
+            if (value == "automatic-caster-pending-review")
+                return "the old plan let the planner pick any caster; choose one";
+            if (value == "provider-pin-without-caster-pending-review")
+                return "the old plan named a source but no caster; choose the caster";
+            if (value == "group-origin-and-count-pending-review")
+                return "the old plan cast this on a group; check where it is centred and who it reaches";
+            if (value == "no-recipient:pending-review")
+                return "the old plan named no recipient; choose one";
+            if (value.StartsWith("grouping-unknown:", StringComparison.Ordinal))
+                return "the old plan did not say single target or group; choose";
+            if (value.StartsWith("provider-pin:", StringComparison.Ordinal))
+                return "the old plan used one exact source; check it";
+            if (value.StartsWith("enhancement:", StringComparison.Ordinal))
+                return value.Contains(":required:")
+                    ? "the old plan required an enhancement; check which one"
+                    : "the old plan allowed an optional enhancement; check which one";
+            int colon = value.IndexOf(':');
+            return (colon < 0 ? value : value.Substring(0, colon)).Replace('-', ' ');
+        }
+    }
+
     // The workspace header for the selected routine as a whole (live frame
     // casting-ws-qual-20260923-q2-03 read "0 of 0 castings ready · ready to
     // apply": the selected buff's count beside the routine's gate).
@@ -532,7 +598,7 @@ namespace KingmakerBuffPlanner.UI
             if (castings == 0) return routineName + " · no castings yet";
             return routineName + " · " + ready + " of " + castings + " casting" +
                 (castings == 1 ? string.Empty : "s") + " ready · " +
-                (applyAllowed ? "ready to apply" : "Apply blocked (" + blockingReasons + ")");
+                (applyAllowed ? "ready to apply" : "Apply blocked");
         }
     }
 
@@ -569,8 +635,8 @@ namespace KingmakerBuffPlanner.UI
         {
             return (sources ?? new WorkspaceSourceOption[0])
                 .Where(value => value != null)
-                .OrderBy(value => value.DisplayName, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(value => value.Detail, StringComparer.OrdinalIgnoreCase)
+                .OrderBy(value => value.DisplayName, StringComparer.InvariantCultureIgnoreCase)
+                .ThenBy(value => value.Detail, StringComparer.InvariantCultureIgnoreCase)
                 .ThenBy(value => value.SourceId, StringComparer.Ordinal)
                 .ToList();
         }

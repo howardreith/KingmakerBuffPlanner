@@ -129,7 +129,8 @@ if (($Scenario -ceq 'live-cast-qual' -or $Scenario -ceq 'live-cast-qual-select')
 # and has a 60 s run deadline after boot and load; the harness wait must
 # cover them, or it would abandon a live run with the Mods folder
 # unrestored.
-if (($Scenario -ceq 'live-cast-probe' -or $Scenario -ceq 'live-cast-probe-select') -and
+if (($Scenario -ceq 'live-cast-probe' -or $Scenario -ceq 'live-cast-probe-select' -or
+        $Scenario -ceq 'live-workspace-reload') -and
     $TimeoutSeconds -lt 600) {
     throw "TimeoutSeconds must be at least 600 for $Scenario (boot/load plus the probe's world wait and deadline); got $TimeoutSeconds."
 }
