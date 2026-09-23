@@ -8563,6 +8563,28 @@ namespace KingmakerBuffPlanner.Tests
             public void Dispose() { }
         }
 
+        // Records every step the executor fires, for the explicit-casting
+        // projection test; enhancement preparation always succeeds.
+        private sealed class RecordingInstantRuntime : IInstantCastRuntimeAdapter,
+            ICastEnhancementRuntimeAdapter
+        {
+            internal readonly List<CastStep> Fired = new List<CastStep>();
+            public bool IsInCombat { get { return false; } }
+            public CastRuntimeValidation Validate(CastStep step) { return CastRuntimeValidation.Pass(); }
+            public CastEnhancementPreparation PrepareEnhancements(CastStep step)
+            { return CastEnhancementPreparation.Pass(null); }
+            public InstantCastResult Fire(CastStep step)
+            {
+                Fired.Add(step);
+                return new InstantCastResult(true, true, true, true, "recorded");
+            }
+            public bool EffectsObserved(CastStep step) { return true; }
+            public InstantCastCompletion InspectCompletion(CastStep step)
+            { return InstantCastCompletion.Settled("recorded-settled"); }
+            public InstantCastCompletion Cleanup(CastStep step)
+            { return InstantCastCompletion.Settled("recorded-clean"); }
+        }
+
         private sealed class FakeInstantRuntime : IInstantCastRuntimeAdapter
         {
             private int _validations;
@@ -13677,6 +13699,21 @@ namespace KingmakerBuffPlanner.Tests
                         "Step does not mirror its casting: " + casting.CastingId);
             }
             CastStep extended = conversion.Plan.Steps[conversion.CastingIds.ToList().IndexOf("cast-a")];
+            // The EXISTING instant executor consumes the projection: one
+            // fire per approved casting, in order, with the exact provider
+            // and recipient — no expansion, no substitution.
+            var recorder = new RecordingInstantRuntime();
+            var report = new ExecutionReport(conversion.Plan);
+            System.Collections.IEnumerator run = new InstantCastExecutor(recorder, true)
+                .Execute(conversion.Plan, report);
+            int guard = 0;
+            while (run.MoveNext() && guard++ < 1000) { }
+            if (recorder.Fired.Count != conversion.Plan.Steps.Count)
+                throw new InvalidOperationException("Executor fired " + recorder.Fired.Count +
+                    " times for " + conversion.Plan.Steps.Count + " approved castings.");
+            for (int index = 0; index < recorder.Fired.Count; index++)
+                if (!ReferenceEquals(recorder.Fired[index], conversion.Plan.Steps[index]))
+                    throw new InvalidOperationException("Executor fired steps out of order.");
             if (!extended.EnhancementIds.Contains("extend-cleric"))
                 throw new InvalidOperationException("A required enhancement was dropped.");
 
