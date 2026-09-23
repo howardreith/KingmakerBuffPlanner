@@ -378,6 +378,13 @@ namespace KingmakerBuffPlanner.UI
             }
         }
 
+        // Explicit acknowledgement of plan-wide legacy import notices;
+        // undoable, and saved like any other edit.
+        public AuthoringEditResult AcknowledgeImportNotices()
+        {
+            return _authoring.AcknowledgeImportNotices();
+        }
+
         public void FocusCasting(string castingId)
         {
             if (castingId != null &&
@@ -760,6 +767,14 @@ namespace KingmakerBuffPlanner.UI
             if (LegacyImportBlocked)
                 return new WorkspaceApplyResult(false,
                     "legacy-import-unresolved:" + LegacyImportBlockReason,
+                    null, null);
+            // Review K3: unacknowledged legacy provider bans/caps/priorities
+            // are requested constraints; the ordinary apply never ignores
+            // them silently.
+            if (mode == CastingApplyMode.Ordinary &&
+                _authoring.Document.ImportNotices.Count != 0)
+                return new WorkspaceApplyResult(false,
+                    "import-notices-pending:" + _authoring.Document.ImportNotices.Count,
                     null, null);
             // Normalize the optional scope ONCE (review C1): the compiler,
             // gate, and dispatch must all see the same selected-run scope —
@@ -1291,6 +1306,8 @@ namespace KingmakerBuffPlanner.UI
                         line.PoolKey + ": " + line.Units).ToList(),
                     casting.Readiness, casting.ReadinessReasons,
                     casting.CastingId == EditingFocusCastingId));
+                if (casting.Provenance != null)
+                    cards[cards.Count - 1].ApplyReviewItems(casting.Provenance.ReviewItems);
             }
             return cards;
         }

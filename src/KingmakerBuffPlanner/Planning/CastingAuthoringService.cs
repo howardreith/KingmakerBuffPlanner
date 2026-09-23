@@ -167,6 +167,18 @@ namespace KingmakerBuffPlanner.Planning
         // Restores the document as it was before the most recent accepted
         // command. Refused commands never enter history, so an undo always
         // undoes an actual edit.
+        // Explicit acknowledgement of the plan-wide legacy import notices
+        // (review K3); undoable like any other edit.
+        public AuthoringEditResult AcknowledgeImportNotices()
+        {
+            if (_document.ImportNotices.Count == 0)
+                return AuthoringEditResult.Refuse("no-import-notices");
+            _history.Push(_document);
+            _document = new CastingPlanDocument(_document.CampaignId,
+                _document.Routines, _document.Castings, null);
+            return AuthoringEditResult.Accept("import-notices", new string[0]);
+        }
+
         public bool Undo()
         {
             if (_history.Count == 0) return false;
@@ -178,7 +190,8 @@ namespace KingmakerBuffPlanner.Planning
             string scope, IEnumerable<string> affected, List<PlannedCasting> castings)
         {
             var replacement = new CastingPlanDocument(
-                _document.CampaignId, _document.Routines, castings);
+                _document.CampaignId, _document.Routines, castings,
+                _document.ImportNotices);
             _history.Push(_document);
             if (_history.Count > HistoryLimit)
             {

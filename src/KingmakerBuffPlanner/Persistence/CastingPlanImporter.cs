@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Linq;
 using KingmakerBuffPlanner.Domain.Authoring;
 using KingmakerBuffPlanner.Domain.Planning;
@@ -141,9 +142,25 @@ namespace KingmakerBuffPlanner.Persistence
                     warnings.Add("legacy-order-not-unique:" + routine.RoutineId);
                 ordered.AddRange(children);
             }
-            var existingIds = new HashSet<string>(
+            // Review K2: identity is (routine, legacy assignment id,
+            // recipient key). A record already in the candidate is reused
+            // only when its persisted provenance matches that identity
+            // exactly; any other ID collision refuses the import.
+            var allIds = new HashSet<string>(
                 baseDocument.Castings.Select(value => value.CastingId),
                 StringComparer.Ordinal);
+            var existingByIdentity = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (PlannedCasting casting in baseDocument.Castings)
+            {
+                if (casting.Provenance == null) continue;
+                string key = casting.Provenance.LegacyRecipientKey;
+                if (string.IsNullOrEmpty(key))
+                    // Records imported before the recipient key existed:
+                    // their identity is recoverable from the record itself.
+                    key = casting.DirectTargetUnitId ?? "group";
+                existingByIdentity[ImportIdentity(casting.Provenance.LegacyRoutineId,
+                    casting.Provenance.LegacyAssignmentId, key)] = casting.CastingId;
+            }
             var produced = new List<PlannedCasting>();
             var mappings = new List<CastingImportMapping>();
             int pooledEnhancements = 0;
@@ -151,42 +168,60 @@ namespace KingmakerBuffPlanner.Persistence
             int unresolvedCasters = 0;
             foreach (LegacyChild entry in ordered)
             {
-                bool isGroup = IsGroup(entry.Assignment, groupingMap);
-                if (!isGroup && entry.Child.TargetUnitIds.Count == 0)
+                CastGroupingKind grouping;
+                bool groupingKnown = groupingMap.TryGetValue(
+                    entry.Assignment.SourceId, out grouping);
+                var recipientKeys = new List<string>();
+                if (entry.Child.TargetUnitIds.Count == 0)
                 {
-                    // A legacy child without recipients cannot become a
-                    // casting (the explicit model requires a recipient or an
-                    // origin); it stays a visible unresolved import item
-                    // instead of a phantom record or a silent drop.
+                    // Kept as a durable Draft with a review item — never a
+                    // silent drop or a phantom recipient.
                     warnings.Add("legacy-child-without-target:" + entry.Child.AssignmentId);
-                    mappings.Add(new CastingImportMapping(
-                        entry.Child.AssignmentId, entry.RoutineId,
-                        new string[0], "unresolved-no-recipient"));
-                    continue;
+                    recipientKeys.Add(NoRecipientKey);
                 }
-                int recipients = isGroup ? 1 : entry.Child.TargetUnitIds.Count;
+                else if (!groupingKnown)
+                {
+                    // Unknown grouping is not single-target evidence: one
+                    // Draft keeps every legacy recipient pending review
+                    // instead of guessing the cast count.
+                    warnings.Add("legacy-grouping-unknown:" + entry.Assignment.SourceId);
+                    recipientKeys.Add(GroupingUnknownKey);
+                }
+                else if (grouping == CastGroupingKind.MassConfiguredTargets)
+                    recipientKeys.Add(GroupKey);
+                else
+                    recipientKeys.AddRange(entry.Child.TargetUnitIds);
                 var castingIds = new List<string>();
                 bool reusedExisting = false;
-                for (int targetIndex = 0; targetIndex < recipients; targetIndex++)
+                foreach (string recipientKey in recipientKeys)
                 {
-                    string castingId = MigrationCastingId(entry.Child.AssignmentId,
-                        isGroup ? -1 : targetIndex);
-                    if (existingIds.Contains(castingId))
+                    string identity = ImportIdentity(entry.RoutineId,
+                        entry.Child.AssignmentId, recipientKey);
+                    string existingId;
+                    if (existingByIdentity.TryGetValue(identity, out existingId))
                     {
-                        // Idempotent re-import: the record already exists with
-                        // this provenance identity and is never duplicated.
                         reusedExisting = true;
-                        castingIds.Add(castingId);
+                        castingIds.Add(existingId);
                         continue;
                     }
-                    produced.Add(BuildCasting(entry, isGroup, targetIndex,
+                    string castingId = MigrationCastingId(entry.RoutineId,
+                        entry.Child.AssignmentId, recipientKey);
+                    if (!allIds.Add(castingId))
+                        throw new InvalidDataException(
+                            "import-id-collision:" + castingId +
+                            " (an unrelated record already uses this id)");
+                    produced.Add(BuildCasting(entry, castingId, recipientKey,
                         ref pooledEnhancements, ref groupReviews,
                         ref unresolvedCasters));
+                    existingByIdentity[identity] = castingId;
                     castingIds.Add(castingId);
                 }
                 mappings.Add(new CastingImportMapping(
                     entry.Child.AssignmentId, entry.RoutineId, castingIds,
-                    reusedExisting ? "reused" : "imported"));
+                    reusedExisting ? "reused" : recipientKeys[0] == NoRecipientKey
+                        ? "unresolved-no-recipient"
+                        : recipientKeys[0] == GroupingUnknownKey
+                            ? "unresolved-grouping" : "imported"));
             }
             // Newly produced castings may belong to any routine while the
             // existing document already holds others; a stable sort by
@@ -208,8 +243,23 @@ namespace KingmakerBuffPlanner.Persistence
                     return PlannedCasting.WithOrder(value, position);
                 })
                 .ToList();
+            // Legacy provider bans/caps/priorities are plan-wide constraints
+            // no single casting carries: preserved as durable import notices
+            // (review K3) until explicitly acknowledged.
+            var notices = new List<string>(baseDocument.ImportNotices);
+            foreach (ProviderPreferenceProfile preference in legacy.ProviderPreferences)
+            {
+                if (preference == null) continue;
+                string notice = "legacy-provider-preference:" + preference.ProviderKey +
+                    ";banned=" + preference.Banned +
+                    ";priority=" + (preference.Priority.HasValue
+                        ? preference.Priority.Value.ToString() : "none") +
+                    ";maximumCasts=" + (preference.MaximumCasts.HasValue
+                        ? preference.MaximumCasts.Value.ToString() : "none");
+                if (!notices.Contains(notice)) notices.Add(notice);
+            }
             var document = new CastingPlanDocument(
-                baseDocument.CampaignId, baseDocument.Routines, normalized);
+                baseDocument.CampaignId, baseDocument.Routines, normalized, notices);
             int ready = document.Castings.Count(
                 value => value.State == CastingAuthoringState.Ready);
             var report = new CastingImportReport(
@@ -232,76 +282,89 @@ namespace KingmakerBuffPlanner.Persistence
                 new PlannedCasting[0]);
         }
 
-        private static bool IsGroup(
-            SourceAssignmentProfile assignment,
-            IDictionary<string, CastGroupingKind> groupingsBySourceId)
+        private const string GroupKey = "group";
+        private const string GroupingUnknownKey = "grouping-unknown";
+        private const string NoRecipientKey = "no-recipient";
+
+        private static string ImportIdentity(string routineId,
+            string legacyAssignmentId, string recipientKey)
         {
-            CastGroupingKind grouping;
-            return groupingsBySourceId.TryGetValue(assignment.SourceId, out grouping) &&
-                grouping == CastGroupingKind.MassConfiguredTargets;
+            return (routineId ?? string.Empty) + "\u0001" + legacyAssignmentId +
+                "\u0001" + recipientKey;
         }
 
         private static PlannedCasting BuildCasting(
             LegacyChild entry,
-            bool group,
-            int targetIndex,
+            string castingId,
+            string recipientKey,
             ref int pooledEnhancements,
             ref int groupReviews,
             ref int unresolvedCasters)
         {
             CastingAssignmentProfile child = entry.Child;
-            string note = string.Empty;
+            var reviewItems = new List<string>();
             string casterUnitId = child.CasterUnitId;
             if (child.IsAutomatic)
             {
                 // An automatic legacy choice becomes a review draft; today's
                 // best caster is never silently pinned as player intent.
-                note = AutomaticNote;
+                reviewItems.Add(AutomaticNote);
                 unresolvedCasters++;
             }
             else if (casterUnitId == null)
             {
-                // A provider/spellbook pin without a caster unit cannot
-                // resolve to an explicit caster; it stays a review draft
-                // rather than being dropped or guessed.
-                note = ProviderPinNote;
+                reviewItems.Add(ProviderPinNote);
                 unresolvedCasters++;
             }
+            // Review K3: the exact legacy provider pin is carried as a
+            // durable constraint, not dropped in favour of caster+spellbook.
+            if (!string.IsNullOrWhiteSpace(child.ProviderKey))
+                reviewItems.Add("provider-pin:" + child.ProviderKey);
             var enhancements = new List<AuthoredEnhancementSelection>();
             foreach (EnhancementSelectionProfile selection in child.Enhancements)
             {
                 enhancements.Add(new AuthoredEnhancementSelection(
                     selection.EnhancementId, selection.IsRequired, null));
+                reviewItems.Add("enhancement:" + selection.EnhancementId + ":" +
+                    (selection.IsRequired ? "required" : "optional") +
+                    ":exact-source-pending");
                 pooledEnhancements++;
             }
             string directTarget = null;
             var coverage = new List<string>();
             CastingTargetMode mode;
             CastingOrigin origin = null;
-            if (group)
+            if (recipientKey == GroupKey || recipientKey == GroupingUnknownKey ||
+                recipientKey == NoRecipientKey)
             {
                 mode = CastingTargetMode.CasterCenteredOrigin;
                 origin = CastingOrigin.CasterCentered();
                 coverage.AddRange(child.TargetUnitIds);
-                // The legacy profile never authored a group origin or cast
-                // count; both stay pending explicit review.
-                note = GroupReviewNote;
-                groupReviews++;
+                if (recipientKey == GroupKey)
+                {
+                    reviewItems.Add(GroupReviewNote);
+                    groupReviews++;
+                }
+                else if (recipientKey == GroupingUnknownKey)
+                    reviewItems.Add("grouping-unknown:single-or-group-pending-review;targets=" +
+                        string.Join(",", child.TargetUnitIds));
+                else
+                    reviewItems.Add("no-recipient:pending-review");
             }
             else
             {
                 mode = CastingTargetMode.DirectTarget;
-                directTarget = child.TargetUnitIds[targetIndex];
+                directTarget = recipientKey;
             }
-            bool ready = !group && casterUnitId != null;
-            var notes = new List<string>();
-            if (!string.IsNullOrEmpty(note)) notes.Add(note);
-            if (enhancements.Count != 0) notes.Add(PooledRodNote);
+            // Only a clean, known per-target, explicitly pinned child is
+            // Ready; everything with an unresolved item stays Draft and is
+            // counted as unresolved work by ordinary Apply.
+            bool ready = reviewItems.Count == 0 && casterUnitId != null;
             var provenance = new MigrationProvenance(
                 child.AssignmentId, 5, entry.RoutineId,
-                string.Join("|", notes));
+                string.Join("|", reviewItems), recipientKey, reviewItems);
             return new PlannedCasting(
-                MigrationCastingId(child.AssignmentId, group ? -1 : targetIndex),
+                castingId,
                 entry.RoutineId, 0, entry.Assignment.SourceId,
                 entry.Assignment.Ability.ToKey(), casterUnitId, child.SpellbookGuid,
                 mode, directTarget, origin, coverage, null, enhancements,
@@ -311,17 +374,16 @@ namespace KingmakerBuffPlanner.Persistence
                 provenance);
         }
 
-        internal static string MigrationCastingId(string legacyAssignmentId, int targetIndex)
+        internal static string MigrationCastingId(string routineId,
+            string legacyAssignmentId, string recipientKey)
         {
             if (string.IsNullOrWhiteSpace(legacyAssignmentId))
                 throw new ArgumentException(
                     "Legacy assignment ID is required.", "legacyAssignmentId");
-            // Deterministic identity from provenance: repeated import of the
-            // same legacy child (and recipient index) yields the same ID, so
-            // idempotent re-import maps onto the same records instead of
-            // duplicating them.
-            return "m5:" + legacyAssignmentId + ":" +
-                (targetIndex < 0 ? "group" : targetIndex.ToString());
+            // Deterministic identity from COMPLETE provenance (review K2):
+            // the same legacy child id may legitimately exist in two
+            // routines, so the routine is part of the id.
+            return "m5:" + routineId + ":" + legacyAssignmentId + ":" + recipientKey;
         }
 
         private sealed class LegacyChild

@@ -99,7 +99,9 @@ namespace KingmakerBuffPlanner.Domain.Authoring
     {
         public MigrationProvenance(
             string legacyAssignmentId, int legacySchemaVersion,
-            string legacyRoutineId, string note)
+            string legacyRoutineId, string note,
+            string legacyRecipientKey = null,
+            IEnumerable<string> reviewItems = null)
         {
             if (string.IsNullOrWhiteSpace(legacyAssignmentId))
                 throw new ArgumentException("Legacy assignment ID is required.", "legacyAssignmentId");
@@ -109,12 +111,25 @@ namespace KingmakerBuffPlanner.Domain.Authoring
             LegacySchemaVersion = legacySchemaVersion;
             LegacyRoutineId = legacyRoutineId ?? string.Empty;
             Note = note ?? string.Empty;
+            LegacyRecipientKey = legacyRecipientKey ?? string.Empty;
+            ReviewItems = new ReadOnlyCollection<string>((reviewItems ?? new string[0])
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Distinct(StringComparer.Ordinal).ToList());
         }
 
         public string LegacyAssignmentId { get; private set; }
         public int LegacySchemaVersion { get; private set; }
         public string LegacyRoutineId { get; private set; }
         public string Note { get; private set; }
+        // Which legacy recipient this record represents (a target unit id,
+        // "group", "grouping-unknown" or "no-recipient"): with the routine
+        // and assignment id it is the complete import identity (review K2).
+        public string LegacyRecipientKey { get; private set; }
+        // Durable unresolved import intent (review K3): provider pins,
+        // enhancement requiredness, unknown grouping, missing caster or
+        // recipient. A record with review items is imported as Draft and
+        // counts as unresolved work until the player resolves it.
+        public IReadOnlyList<string> ReviewItems { get; private set; }
     }
 
     public sealed class RoutineDefinition
@@ -316,8 +331,14 @@ namespace KingmakerBuffPlanner.Domain.Authoring
         public CastingPlanDocument(
             string campaignId,
             IEnumerable<RoutineDefinition> routines,
-            IEnumerable<PlannedCasting> castings)
+            IEnumerable<PlannedCasting> castings,
+            IEnumerable<string> importNotices = null)
         {
+            // Plan-wide import constraints that no single casting carries
+            // (legacy provider bans, caps and priorities; review K3). They
+            // persist until explicitly acknowledged.
+            ImportNotices = new ReadOnlyCollection<string>((importNotices ?? new string[0])
+                .Where(value => !string.IsNullOrWhiteSpace(value)).ToList());
             if (string.IsNullOrWhiteSpace(campaignId))
                 throw new ArgumentException("Campaign ID is required.", "campaignId");
             CampaignId = campaignId;
@@ -364,6 +385,7 @@ namespace KingmakerBuffPlanner.Domain.Authoring
         public string CampaignId { get; private set; }
         public IReadOnlyList<RoutineDefinition> Routines { get; private set; }
         public IReadOnlyList<PlannedCasting> Castings { get; private set; }
+        public IReadOnlyList<string> ImportNotices { get; private set; }
 
         private static void RequireUnique(IEnumerable<string> values, string label)
         {

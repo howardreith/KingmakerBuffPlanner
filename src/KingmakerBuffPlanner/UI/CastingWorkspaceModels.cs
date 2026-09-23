@@ -108,6 +108,15 @@ namespace KingmakerBuffPlanner.UI
 
         public IReadOnlyList<string> CoverageGapDisplayNames { get; private set; } =
             new string[0];
+
+        // Durable import-review items carried by this record's provenance
+        // (review K3); empty for authored or cleanly imported records.
+        public IReadOnlyList<string> ReviewItems { get; private set; } = new string[0];
+
+        internal void ApplyReviewItems(IEnumerable<string> items)
+        {
+            ReviewItems = (items ?? new string[0]).ToList();
+        }
         public string SourceId { get; private set; }
         public string ModeLabel { get; private set; }
         public string DirectTargetUnitId { get; private set; }

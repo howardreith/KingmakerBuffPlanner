@@ -391,6 +391,10 @@ namespace KingmakerBuffPlanner.Tests
                     TestExplicitCastingStepConversion);
                 Run("workspace-legacy-import-failures-block",
                     () => TestWorkspaceLegacyImportFailuresBlock(root));
+                Run("casting-import-identity-collision-safe",
+                    TestCastingImportIdentity);
+                Run("casting-import-preserves-unresolved-intent",
+                    () => TestCastingImportPreservesUnresolvedIntent(root));
             }
             finally
             {
@@ -10609,6 +10613,16 @@ namespace KingmakerBuffPlanner.Tests
         // (charter section 7.2 conversion rules).
         // ------------------------------------------------------------------
 
+        // Discovery grouping kinds for the importer: the tests state the
+        // per-target semantics explicitly (unknown grouping is not
+        // single-target evidence — review K3).
+        private static Dictionary<string, CastGroupingKind> PerTarget(params string[] sources)
+        {
+            var map = new Dictionary<string, CastGroupingKind>(StringComparer.Ordinal);
+            foreach (string source in sources) map[source] = CastGroupingKind.PerTarget;
+            return map;
+        }
+
         private static BuffPlannerProfile LegacyProfile()
         {
             BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault("legacy-campaign");
@@ -10655,7 +10669,8 @@ namespace KingmakerBuffPlanner.Tests
                 "source-bulls", CastingBuffAbility, child));
             legacy.Routines[0].Assignments[0].ExistingEffectPolicy = ExistingEffectPolicy.Overwrite;
             legacy.Routines[0].Assignments[0].IgnoredPresenceMarkers.Add("marker-a");
-            CastingImportResult result = new CastingPlanImporter().Import(legacy);
+            CastingImportResult result = new CastingPlanImporter().Import(
+                legacy, null, PerTarget("source-bulls"));
             if (result.Document.Castings.Count != 3)
                 throw new InvalidOperationException(
                     "A pinned three-recipient child must split into three castings.");
@@ -10663,10 +10678,14 @@ namespace KingmakerBuffPlanner.Tests
             for (int i = 0; i < 3; i++)
             {
                 PlannedCasting casting = result.Document.Castings[i];
-                if (casting.CastingId != "m5:legacy-bulls:" + i ||
+                // The pooled enhancement needs exact-source review, so the
+                // split records are Drafts with a durable review item.
+                if (casting.CastingId != "m5:long:legacy-bulls:" + expectedTargets[i] ||
                     casting.DirectTargetUnitId != expectedTargets[i] ||
                     casting.Order != i ||
-                    casting.State != CastingAuthoringState.Ready ||
+                    casting.State != CastingAuthoringState.Draft ||
+                    !casting.Provenance.ReviewItems.Contains(
+                        "enhancement:extend-cleric:required:exact-source-pending") ||
                     casting.CasterUnitId != "unit-cleric" ||
                     casting.TargetMode != CastingTargetMode.DirectTarget)
                     throw new InvalidOperationException(
@@ -10686,6 +10705,16 @@ namespace KingmakerBuffPlanner.Tests
                     casting.Provenance.LegacySchemaVersion != 5)
                     throw new InvalidOperationException("Provenance was not attached.");
             }
+            // A clean, known per-target, pinned child with nothing to review
+            // stays Ready (no unnecessary ceremony).
+            BuffPlannerProfile clean = LegacyProfile();
+            clean.Routines[0].Assignments.Add(LegacyAssignment("source-bulls",
+                CastingBuffAbility, PinnedChild("legacy-clean", 0, "unit-cleric", "unit-t1")));
+            PlannedCasting cleanCasting = new CastingPlanImporter().Import(
+                clean, null, PerTarget("source-bulls")).Document.Castings.Single();
+            if (cleanCasting.State != CastingAuthoringState.Ready ||
+                cleanCasting.Provenance.ReviewItems.Count != 0)
+                throw new InvalidOperationException("A clean pinned child did not stay Ready.");
         }
 
         // Automatic children import as review drafts with targets preserved;
@@ -10698,7 +10727,8 @@ namespace KingmakerBuffPlanner.Tests
                 CastingAssignmentProfile.CreateAutomatic("legacy-auto", 0)));
             legacy.Routines[0].Assignments[0].CastingAssignments[0].TargetUnitIds =
                 new List<string> { "unit-t1", "unit-t2" };
-            CastingImportResult result = new CastingPlanImporter().Import(legacy);
+            CastingImportResult result = new CastingPlanImporter().Import(
+                legacy, null, PerTarget("source-bulls"));
             if (result.Document.Castings.Count != 2)
                 throw new InvalidOperationException(
                     "Automatic targets were collapsed instead of preserved.");
@@ -10768,17 +10798,19 @@ namespace KingmakerBuffPlanner.Tests
                 "source-haste", CastingBuffAbility,
                 PinnedChild("legacy-haste", 0, "unit-wizard", "unit-t2")));
             CastingPlanImporter importer = new CastingPlanImporter();
-            CastingImportResult first = importer.Import(legacy);
+            Dictionary<string, CastGroupingKind> kinds =
+                PerTarget("source-bulls", "source-haste", "source-shield");
+            CastingImportResult first = importer.Import(legacy, null, kinds);
             if (first.Document.Castings.Count != 2)
                 throw new InvalidOperationException("Fixture import count wrong.");
             // Interleaved routine orders import routine-major: the long
             // casting (legacy order 1) precedes the short one (order 0).
-            if (first.Document.Castings[0].CastingId != "m5:legacy-bulls:0" ||
-                first.Document.Castings[1].CastingId != "m5:legacy-haste:0")
+            if (first.Document.Castings[0].CastingId != "m5:long:legacy-bulls:unit-t1" ||
+                first.Document.Castings[1].CastingId != "m5:short:legacy-haste:unit-t2")
                 throw new InvalidOperationException(
                     "Persisted order did not group by routine declaration.");
             // Re-import of the same legacy data duplicates nothing.
-            CastingImportResult second = importer.Import(legacy, first.Document);
+            CastingImportResult second = importer.Import(legacy, first.Document, kinds);
             if (second.Document.Castings.Count != 2 ||
                 second.Report.ResultingCastingCount != 2)
                 throw new InvalidOperationException(
@@ -10794,7 +10826,7 @@ namespace KingmakerBuffPlanner.Tests
             addition.Routines[1].Assignments.Add(LegacyAssignment(
                 "source-shield", CastingBuffAbility,
                 PinnedChild("legacy-shield", 0, "unit-cleric", "unit-t3")));
-            CastingImportResult merged = importer.Import(addition, first.Document);
+            CastingImportResult merged = importer.Import(addition, first.Document, kinds);
             if (merged.Document.Castings.Count != 3 ||
                 merged.Document.Castings[1].RoutineId != "important" ||
                 merged.Document.Castings[1].Order != 0)
@@ -10821,16 +10853,27 @@ namespace KingmakerBuffPlanner.Tests
             legacy.Routines[2].Assignments.Add(LegacyAssignment(
                 "source-empty", CastingBuffAbility,
                 CastingAssignmentProfile.CreateAutomatic("legacy-empty", 0)));
-            CastingImportResult result = new CastingPlanImporter().Import(legacy);
+            CastingImportResult result = new CastingPlanImporter().Import(
+                legacy, null, PerTarget("source-bulls", "source-empty"));
             CastingImportReport report = result.Report;
             if (report.LegacyRoutineCount != 3 || report.LegacyChildCount != 2)
                 throw new InvalidOperationException("Legacy counts are wrong.");
-            if (report.ResultingCastingCount != 1 || report.ReadyCount != 1 ||
-                report.DraftCount != 0)
+            // Review K3: the target-less child is kept as a durable Draft
+            // (not dropped, not Ready); the enhancement child needs review.
+            if (report.ResultingCastingCount != 2 || report.ReadyCount != 0 ||
+                report.DraftCount != 2)
                 throw new InvalidOperationException(
-                    "The target-less child must not become a phantom casting.");
-            if (report.UnresolvedCasterCount != 0)
+                    "The target-less child was dropped or made executable.");
+            PlannedCasting targetless = result.Document.Castings.Single(value =>
+                value.Provenance.LegacyAssignmentId == "legacy-empty");
+            if (targetless.State != CastingAuthoringState.Draft ||
+                !targetless.Provenance.ReviewItems.Contains("no-recipient:pending-review"))
+                throw new InvalidOperationException("The target-less child is not a durable review item.");
+            if (report.UnresolvedCasterCount != 1)
                 throw new InvalidOperationException("Unresolved casters miscounted.");
+            if (result.Document.ImportNotices.Count != 1 ||
+                !result.Document.ImportNotices[0].Contains("banned=True"))
+                throw new InvalidOperationException("The provider ban was not preserved as a notice.");
             if (report.PooledEnhancementCount != 1)
                 throw new InvalidOperationException("Pooled enhancements miscounted.");
             if (report.PolicyNoticeCount != 1)
@@ -14014,6 +14057,140 @@ namespace KingmakerBuffPlanner.Tests
                     malformed.MigrationStatus + " " + malformed.MigrationWarning);
         }
 
+        // Review K2: complete, collision-checked import identity.
+        private static void TestCastingImportIdentity()
+        {
+            var importer = new CastingPlanImporter();
+            // The same legacy child id legitimately exists in two routines.
+            BuffPlannerProfile legacy = LegacyProfile();
+            legacy.Routines[0].Assignments.Add(LegacyAssignment("source-bulls",
+                CastingBuffAbility, PinnedChild("assignment-1", 0, "unit-cleric", "unit-t1")));
+            legacy.Routines[2].Assignments.Add(LegacyAssignment("source-bulls",
+                CastingBuffAbility, PinnedChild("assignment-1", 0, "unit-cleric", "unit-t1")));
+            Dictionary<string, CastGroupingKind> kinds = PerTarget("source-bulls");
+            CastingImportResult first = importer.Import(legacy, null, kinds);
+            if (first.Document.Castings.Count != 2 ||
+                first.Document.Castings.Select(value => value.CastingId).Distinct().Count() != 2)
+                throw new InvalidOperationException("Duplicate child ids across routines collided.");
+            // Repeated import is identical and reuses provenance-verified ids.
+            CastingImportResult again = importer.Import(legacy, first.Document, kinds);
+            if (!again.Document.Castings.Select(value => value.CastingId)
+                    .SequenceEqual(first.Document.Castings.Select(value => value.CastingId)) ||
+                again.Report.Mappings.Any(mapping => mapping.Disposition != "reused"))
+                throw new InvalidOperationException("Repeated import was not identical.");
+            // An unrelated record already using a generated id refuses the
+            // import instead of being treated as "reused".
+            var squatter = new CastingPlanDocument("legacy-campaign",
+                first.Document.Routines, new[]
+                {
+                    DirectCasting("m5:long:assignment-1:unit-t1", "long", "unit-wizard",
+                        "unit-t2", "source-other", CastingBuffAbility)
+                });
+            bool refused = false;
+            try { importer.Import(legacy, squatter, kinds); }
+            catch (InvalidDataException) { refused = true; }
+            if (!refused)
+                throw new InvalidOperationException("An unrelated colliding record was treated as reuse.");
+            // Records imported under the earlier id format are recognized by
+            // provenance and never renumbered.
+            var olderFormat = new CastingPlanDocument("legacy-campaign",
+                first.Document.Routines, new[]
+                {
+                    new PlannedCasting("m5:assignment-1:0", "long", 0, "source-bulls",
+                        CastingBuffAbility, "unit-cleric", null,
+                        CastingTargetMode.DirectTarget, "unit-t1", null, null, null, null,
+                        ExistingEffectPolicy.SkipAlreadyActive, null,
+                        CastingAuthoringState.Ready,
+                        new MigrationProvenance("assignment-1", 5, "long", string.Empty))
+                });
+            CastingImportResult upgraded = importer.Import(legacy, olderFormat, kinds);
+            if (!upgraded.Document.Castings.Any(value => value.CastingId == "m5:assignment-1:0") ||
+                upgraded.Document.Castings.Count != 2)
+                throw new InvalidOperationException("An earlier-format record was renumbered or duplicated.");
+        }
+
+        // Review K3: unresolved legacy intent is durable, never guessed.
+        private static void TestCastingImportPreservesUnresolvedIntent(string root)
+        {
+            BuffPlannerProfile legacy = LegacyProfile();
+            // Unknown grouping (source not in the discovery map).
+            legacy.Routines[0].Assignments.Add(LegacyAssignment("source-unavailable",
+                CastingGroupAbility, PinnedChild("legacy-unknown", 0, "unit-cleric",
+                    "unit-t1", "unit-t2")));
+            // Provider-pinned child whose provider may be gone.
+            CastingAssignmentProfile pinned = PinnedChild("legacy-pinned", 1, "unit-cleric", "unit-t3");
+            pinned.ProviderKey = "unit-cleric|book-old|ability|";
+            legacy.Routines[0].Assignments.Add(LegacyAssignment("source-bulls",
+                CastingBuffAbility, pinned));
+            // Optional enhancement intent.
+            CastingAssignmentProfile optional = PinnedChild("legacy-optional", 2, "unit-cleric", "unit-t4");
+            optional.Enhancements.Add(new EnhancementSelectionProfile
+                { EnhancementId = "extend-cleric", Required = false });
+            legacy.Routines[0].Assignments[1].CastingAssignments.Add(optional);
+            legacy.ProviderPreferences.Add(new ProviderPreferenceProfile
+                { ProviderKey = "unit-wizard|book|ability|", Banned = false, Priority = 2, MaximumCasts = 1 });
+            CastingImportResult result = new CastingPlanImporter().Import(
+                legacy, null, PerTarget("source-bulls"));
+            PlannedCasting unknown = result.Document.Castings.Single(value =>
+                value.Provenance.LegacyAssignmentId == "legacy-unknown");
+            if (unknown.State != CastingAuthoringState.Draft ||
+                unknown.RequiredCoverageUnitIds.Count != 2 ||
+                !unknown.Provenance.ReviewItems.Any(item => item.StartsWith(
+                    "grouping-unknown:", StringComparison.Ordinal)) ||
+                result.Document.Castings.Count(value =>
+                    value.Provenance.LegacyAssignmentId == "legacy-unknown") != 1)
+                throw new InvalidOperationException("Unknown grouping was guessed or split.");
+            PlannedCasting pin = result.Document.Castings.Single(value =>
+                value.Provenance.LegacyAssignmentId == "legacy-pinned");
+            if (pin.State != CastingAuthoringState.Draft ||
+                !pin.Provenance.ReviewItems.Contains("provider-pin:unit-cleric|book-old|ability|"))
+                throw new InvalidOperationException("The provider pin was dropped.");
+            PlannedCasting opt = result.Document.Castings.Single(value =>
+                value.Provenance.LegacyAssignmentId == "legacy-optional");
+            if (opt.State != CastingAuthoringState.Draft || opt.Enhancements[0].Required ||
+                !opt.Provenance.ReviewItems.Contains(
+                    "enhancement:extend-cleric:optional:exact-source-pending"))
+                throw new InvalidOperationException("Optional enhancement intent was not preserved.");
+            if (result.Document.ImportNotices.Count != 1 ||
+                !result.Document.ImportNotices[0].Contains("priority=2") ||
+                !result.Document.ImportNotices[0].Contains("maximumCasts=1"))
+                throw new InvalidOperationException("Provider priority/cap was not preserved.");
+            // Save/reopen keeps review items and notices.
+            string dir = Path.Combine(root, "k3-roundtrip");
+            Directory.CreateDirectory(dir);
+            var repository = new CastingPlanRepository(dir);
+            repository.Save(CastingPlanProfile.FromDocument(result.Document));
+            CastingPlanDocument reopened = repository.Load("legacy-campaign").Profile.ToDocument();
+            if (reopened.ImportNotices.Count != 1 ||
+                !reopened.Castings.Single(value => value.Provenance.LegacyAssignmentId ==
+                    "legacy-pinned").Provenance.ReviewItems.Any() ||
+                reopened.Castings.Single(value => value.Provenance.LegacyAssignmentId ==
+                    "legacy-unknown").Provenance.LegacyRecipientKey != "grouping-unknown")
+                throw new InvalidOperationException("Review data did not survive save/reopen.");
+            // Ordinary Apply is refused while notices are unacknowledged;
+            // acknowledgement is an explicit, undoable edit.
+            var session = new CastingWorkspaceSession(dir, "legacy-campaign");
+            PartyProviderSnapshot snapshot;
+            CastingWorkspaceInputs inputs = WorkspaceInputs(out snapshot);
+            WorkspaceApplyResult refusedApply = session.Apply(
+                CastingApplyMode.Ordinary, "long", inputs);
+            if (refusedApply.Allowed || !refusedApply.ReviewReason.StartsWith(
+                    "import-notices-pending:", StringComparison.Ordinal))
+                throw new InvalidOperationException("Ordinary Apply ignored pending import notices.");
+            if (!session.AcknowledgeImportNotices().Applied ||
+                session.Document.ImportNotices.Count != 0)
+                throw new InvalidOperationException("Acknowledgement did not clear the notices.");
+            session.Undo();
+            if (session.Document.ImportNotices.Count != 1)
+                throw new InvalidOperationException("Acknowledgement was not undoable.");
+            // An authored edit keeps the notices (the document rebuild must
+            // not silently drop them).
+            session.FocusCasting(session.Document.Castings[0].CastingId);
+            session.SetFocusedCastingState(CastingAuthoringState.Disabled);
+            if (session.Document.ImportNotices.Count != 1)
+                throw new InvalidOperationException("An authored edit dropped the import notices.");
+        }
+
         // The Unity-bound host cannot be compiled here, so its wiring to the
         // tested contracts is pinned at source level: both J1 and J2 paths
         // must route through the contract types, and the superseded
@@ -14309,7 +14486,8 @@ namespace KingmakerBuffPlanner.Tests
             string legacyPath = repository.GetProfilePath("legacy-campaign");
             string originalBytes = File.ReadAllText(legacyPath);
             var migration = new CastingPlanMigrationService(boundary);
-            CastingMigrationResult first = migration.Migrate("legacy-campaign");
+            CastingMigrationResult first = migration.Migrate("legacy-campaign",
+                PerTarget("source-bulls"));
             if (first.Status != CastingMigrationStatus.Migrated ||
                 first.ImportReport == null ||
                 first.ImportReport.ResultingCastingCount != 2)
@@ -14332,7 +14510,8 @@ namespace KingmakerBuffPlanner.Tests
                     "The migrated candidate did not reopen.");
             // Idempotent boundary: migrating again reuses provenance
             // identities and archives nothing new.
-            CastingMigrationResult second = migration.Migrate("legacy-campaign");
+            CastingMigrationResult second = migration.Migrate("legacy-campaign",
+                PerTarget("source-bulls"));
             if (second.Status != CastingMigrationStatus.Migrated ||
                 second.ImportReport.ResultingCastingCount != 2 ||
                 File.ReadAllText(second.ArchivePath) != originalBytes ||
@@ -14351,7 +14530,8 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException(
                     "A torn candidate was not reported or disturbed the original.");
             File.Delete(candidatePath);
-            CastingMigrationResult retried = migration.Migrate("legacy-campaign");
+            CastingMigrationResult retried = migration.Migrate("legacy-campaign",
+                PerTarget("source-bulls"));
             if (retried.Status != CastingMigrationStatus.Migrated)
                 throw new InvalidOperationException(
                     "Recovery after a torn candidate failed: " + retried.Warning);
@@ -14373,7 +14553,8 @@ namespace KingmakerBuffPlanner.Tests
             string sessionLegacyPath = new ProfileRepository(sessionBoundary)
                 .GetProfilePath("legacy-campaign");
             string sessionLegacyBytes = File.ReadAllText(sessionLegacyPath);
-            var opened = new CastingWorkspaceSession(sessionBoundary, "legacy-campaign");
+            var opened = new CastingWorkspaceSession(sessionBoundary, "legacy-campaign",
+                null, PerTarget("source-bulls"));
             if (opened.MigrationStatus != CastingMigrationStatus.Migrated ||
                 opened.ImportReport == null ||
                 opened.ImportReport.ResultingCastingCount != 2 ||
