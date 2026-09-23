@@ -1537,6 +1537,11 @@ namespace KingmakerBuffPlanner.UI
                 cards[cards.Count - 1].ApplyExecutionDetail(
                     ExplicitCastingStepConverter.StandardExecutionLimitation(casting),
                     casting.ExistingEffectNotes);
+                CastingOutcomeEntry lastRun = LastRunReport == null ? null
+                    : LastRunReport.Entries.FirstOrDefault(entry => string.Equals(
+                        entry.CastingId, casting.CastingId, StringComparison.Ordinal));
+                cards[cards.Count - 1].ApplyLastRun(
+                    CastingRunPresentation.DescribeEntry(lastRun));
             }
             return cards;
         }

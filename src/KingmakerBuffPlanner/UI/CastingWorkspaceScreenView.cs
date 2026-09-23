@@ -981,6 +981,7 @@ namespace KingmakerBuffPlanner.UI
             if (card.ExistingEffectNotes.Count != 0)
                 parts.Add("Existing effect: " + string.Join("; ", card.ExistingEffectNotes
                     .Select(CastingRunPresentation.DescribeExistingEffectNote).ToArray()));
+            if (card.LastRunOutcome != null) parts.Add("Last run: " + card.LastRunOutcome);
             return string.Join("  ·  ", parts);
         }
 

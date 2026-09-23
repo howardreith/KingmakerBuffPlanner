@@ -137,6 +137,15 @@ namespace KingmakerBuffPlanner.UI
             ExistingEffectNotes = (existingNotes ?? new string[0]).ToList();
         }
 
+        // This casting's outcome in the last reported run of its routine
+        // (null when it took no part in that run): history, not a promise.
+        public string LastRunOutcome { get; private set; }
+
+        internal void ApplyLastRun(string outcome)
+        {
+            LastRunOutcome = string.IsNullOrEmpty(outcome) ? null : outcome;
+        }
+
         // The card status as a player reads it.
         public string StatusLabel
         {

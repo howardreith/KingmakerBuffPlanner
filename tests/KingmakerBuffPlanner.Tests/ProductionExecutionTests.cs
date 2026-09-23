@@ -955,10 +955,40 @@ namespace KingmakerBuffPlanner.Tests
             if (!ReferenceEquals(session.LastRunReport, host.LastReport) ||
                 session.LastRunReport.RunId != "run-2")
                 throw new InvalidOperationException("The repeat run was not recorded.");
+            // Each card carries its own outcome in that run.
+            List<WorkspaceCastingCard> cards = session.BuildView(inputs).Cards.ToList();
+            if (cards.Count != 2 || cards.Any(card =>
+                    card.LastRunOutcome != "cast, effect confirmed"))
+                throw new InvalidOperationException("Cards did not show their last-run outcome: " +
+                    string.Join(" | ", cards.Select(card => card.LastRunOutcome ?? "none").ToArray()));
         }
 
         private static void TestRunPresentation()
         {
+            // Per-casting outcomes keep the effect and the resource apart.
+            var outcomes = new[]
+            {
+                new { Entry = new CastingOutcomeEntry("c", CastingOutcomeState.EffectConfirmed, true, true, true, "ok"),
+                    Text = "cast, effect confirmed" },
+                new { Entry = new CastingOutcomeEntry("c", CastingOutcomeState.EffectConfirmed, true, true, true, "ok", true),
+                    Text = "cast, effect confirmed (free)" },
+                new { Entry = new CastingOutcomeEntry("c", CastingOutcomeState.Skipped, false, false, false, "already-active:u"),
+                    Text = "skipped: the effect was already active" },
+                new { Entry = new CastingOutcomeEntry("c", CastingOutcomeState.Failed, true, true, true, "effect-not-observed"),
+                    Text = "failed (effect-not-observed); its resource was spent" },
+                new { Entry = new CastingOutcomeEntry("c", CastingOutcomeState.Failed, true, false, false, "validation"),
+                    Text = "failed (validation)" },
+                new { Entry = new CastingOutcomeEntry("c", CastingOutcomeState.Cancelled, true, true, true, "stopped"),
+                    Text = "interrupted when the run stopped; its resource was spent" },
+                new { Entry = new CastingOutcomeEntry("c", CastingOutcomeState.NotProcessed, true, false, false, "stopped-before-start"),
+                    Text = "not attempted: the run stopped earlier" }
+            };
+            foreach (var outcome in outcomes)
+                if (CastingRunPresentation.DescribeEntry(outcome.Entry) != outcome.Text)
+                    throw new InvalidOperationException("Outcome text for " + outcome.Entry.State +
+                        " was: " + CastingRunPresentation.DescribeEntry(outcome.Entry));
+            if (CastingRunPresentation.DescribeEntry(null) != null)
+                throw new InvalidOperationException("A casting outside the run got an outcome.");
             Func<string, CastingOutcomeState, bool, bool, string, CastingOutcomeEntry> entry =
                 (id, state, planned, spent, detail) => new CastingOutcomeEntry(id, state, planned,
                     planned && state != CastingOutcomeState.NotProcessed, spent, detail);
