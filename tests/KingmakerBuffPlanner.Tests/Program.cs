@@ -387,6 +387,8 @@ namespace KingmakerBuffPlanner.Tests
                     () => TestWorkspaceBuffSummaryAndCoverage(root));
                 Run("workspace-group-card-names",
                     TestWorkspaceGroupCardNames);
+                Run("explicit-casting-step-conversion",
+                    TestExplicitCastingStepConversion);
             }
             finally
             {
@@ -13620,6 +13622,121 @@ namespace KingmakerBuffPlanner.Tests
             caster.ApplyDisplayNames("Cleric", null, id => "X");
             if (caster.OriginLabel != "Origin: caster")
                 throw new InvalidOperationException("The caster-centered origin was renamed.");
+        }
+
+        // Takeover §10.B: executors consume the SAME resolved explicit
+        // castings. One approved Ready casting = exactly one step, in the
+        // decision's order, with its exact provider, target shape, applied
+        // enhancements and reserved native cost; no partial conversions.
+        private static void TestExplicitCastingStepConversion()
+        {
+            List<ProviderPlanningOption> options;
+            List<CastEnhancementSnapshot> enhancements;
+            PartyProviderSnapshot snapshot = CastingParty(CastingBuffAbility,
+                out options, out enhancements,
+                new[] { "unit-t1", "unit-t2", "unit-t3" }, 3);
+            var service = new CastingAuthoringService(CastingDocument(
+                DirectCasting("cast-a", "long", "unit-cleric", "unit-t1",
+                    "source-bulls", CastingBuffAbility,
+                    new[] { new AuthoredEnhancementSelection("extend-cleric", true, null) }),
+                DirectCasting("cast-b", "long", "unit-wizard", "unit-t2",
+                    "source-bulls", CastingBuffAbility),
+                DirectCasting("cast-c", "long", "unit-cleric", "unit-t2",
+                    "source-bulls", CastingBuffAbility)));
+            ExplicitCastingPlan plan = CompileCastingPlan(service.Document, snapshot,
+                options, enhancements, "source-bulls", "source-communal");
+            CastingApplyDecision decision = new CastingExecutionGate().Evaluate(
+                plan, CastingApplyMode.Ordinary, "long");
+            if (!decision.Allowed)
+                throw new InvalidOperationException("Fixture decision refused: " +
+                    string.Join(",", decision.BlockingReasons.ToArray()));
+            Dictionary<string, EffectExpression> effects =
+                CastingEffects("source-bulls", "source-communal");
+            ExplicitStepConversion conversion = ExplicitCastingStepConverter.Convert(
+                plan, decision, options, effects);
+            if (!conversion.Converted)
+                throw new InvalidOperationException("Conversion refused: " + conversion.Refusal);
+            if (conversion.Plan.Steps.Count != decision.ExecutableCastingIds.Count ||
+                !conversion.CastingIds.SequenceEqual(decision.ExecutableCastingIds))
+                throw new InvalidOperationException(
+                    "Steps are not one-per-approved-casting in decision order.");
+            for (int index = 0; index < conversion.Plan.Steps.Count; index++)
+            {
+                CastStep step = conversion.Plan.Steps[index];
+                ResolvedCasting casting = plan.Castings.Single(value =>
+                    value.CastingId == conversion.CastingIds[index]);
+                if (step.AssignmentId != casting.CastingId ||
+                    !step.Provider.Equals(casting.Provider) ||
+                    step.MassCast ||
+                    step.TargetUnitIds.Count != 1 ||
+                    step.TargetUnitIds[0] != casting.DirectTargetUnitId ||
+                    !step.EnhancementIds.SequenceEqual(
+                        casting.AppliedEnhancementIds.OrderBy(v => v, StringComparer.Ordinal)) ||
+                    step.Reservation == null || step.Reservation.Units < 1)
+                    throw new InvalidOperationException(
+                        "Step does not mirror its casting: " + casting.CastingId);
+            }
+            CastStep extended = conversion.Plan.Steps[conversion.CastingIds.ToList().IndexOf("cast-a")];
+            if (!extended.EnhancementIds.Contains("extend-cleric"))
+                throw new InvalidOperationException("A required enhancement was dropped.");
+
+            // A refused decision, a missing provider option and missing
+            // expected effects each refuse the WHOLE conversion.
+            var blockedService = new CastingAuthoringService(CastingDocument(
+                DirectCasting("cast-ready", "long", "unit-cleric", "unit-t1",
+                    "source-bulls", CastingBuffAbility),
+                DirectCasting("cast-ghost", "long", "unit-ghost", "unit-t1",
+                    "source-bulls", CastingBuffAbility)));
+            ExplicitCastingPlan blockedPlan = CompileCastingPlan(blockedService.Document,
+                snapshot, options, enhancements, "source-bulls", "source-communal");
+            CastingApplyDecision blocked = new CastingExecutionGate().Evaluate(
+                blockedPlan, CastingApplyMode.Ordinary, "long");
+            if (ExplicitCastingStepConverter.Convert(blockedPlan, blocked, options, effects)
+                    .Converted)
+                throw new InvalidOperationException("A refused decision was converted.");
+            ExplicitStepConversion noOption = ExplicitCastingStepConverter.Convert(
+                plan, decision, new ProviderPlanningOption[0], effects);
+            if (noOption.Converted || !noOption.Refusal.StartsWith(
+                    "provider-option-missing:", StringComparison.Ordinal))
+                throw new InvalidOperationException("A missing provider option was tolerated.");
+            ExplicitStepConversion noEffects = ExplicitCastingStepConverter.Convert(
+                plan, decision, options, new Dictionary<string, EffectExpression>());
+            if (noEffects.Converted)
+                throw new InvalidOperationException("Missing expected effects were tolerated.");
+
+            // A group casting: one step (never one per beneficiary), mass,
+            // anchored at the caster, expecting the predicted beneficiaries.
+            List<ProviderPlanningOption> groupOptions;
+            List<CastEnhancementSnapshot> groupEnhancements;
+            PartyProviderSnapshot groupParty = CastingParty(CastingGroupAbility,
+                out groupOptions, out groupEnhancements,
+                new[] { "unit-t1", "unit-t2" }, 3,
+                new Dictionary<string, IEnumerable<string>>
+                {
+                    { "unit-cleric", new[] { "unit-t1", "unit-t2" } },
+                    { "unit-wizard", new[] { "unit-t1", "unit-t2" } }
+                });
+            var groupService = new CastingAuthoringService(CastingDocument(
+                GroupCasting("cast-g", "long", "unit-cleric", "source-communal",
+                    CastingGroupAbility, new[] { "unit-t1", "unit-t2" })));
+            ExplicitCastingPlan groupPlan = CompileCastingPlan(groupService.Document,
+                groupParty, groupOptions, groupEnhancements, "source-bulls", "source-communal");
+            CastingApplyDecision groupDecision = new CastingExecutionGate().Evaluate(
+                groupPlan, CastingApplyMode.Ordinary, "long");
+            if (!groupDecision.Allowed)
+                throw new InvalidOperationException("Group fixture refused: " +
+                    string.Join(",", groupDecision.BlockingReasons.ToArray()));
+            ExplicitStepConversion group = ExplicitCastingStepConverter.Convert(
+                groupPlan, groupDecision, groupOptions,
+                CastingEffects("source-bulls", "source-communal"));
+            ResolvedCasting groupCasting = groupPlan.Castings.Single();
+            if (!group.Converted || group.Plan.Steps.Count != 1 ||
+                !group.Plan.Steps[0].MassCast ||
+                group.Plan.Steps[0].AnchorUnitId != "unit-cleric" ||
+                !group.Plan.Steps[0].ExpectedRecipientUnitIds.SequenceEqual(
+                    groupCasting.PredictedBeneficiaryUnitIds.OrderBy(v => v, StringComparer.Ordinal)))
+                throw new InvalidOperationException("Group casting did not become one mass step: " +
+                    (group.Converted ? group.Plan.Steps.Count.ToString() : group.Refusal));
         }
 
         // The Unity-bound host cannot be compiled here, so its wiring to the
