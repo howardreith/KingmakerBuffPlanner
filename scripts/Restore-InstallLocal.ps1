@@ -12,7 +12,7 @@ param(
     [string]$EvidenceRoot,
     # Isolated-test failure injection (review K6); refused unless every root
     # override is supplied, so it can never act on the live lab roots.
-    [ValidateSet('', 'candidate-archive', 'settings-merge', 'identity', 'verify', 'record', 'record-and-reverse')]
+    [ValidateSet('', 'candidate-archive', 'settings-merge', 'identity', 'move-installed', 'move-prior', 'move-prior-and-reverse', 'verify', 'record', 'record-and-reverse')]
     [string]$InjectFailureAt = ''
 )
 
@@ -112,11 +112,15 @@ if (-not $PSCmdlet.ShouldProcess($planner,
 $token = [Guid]::NewGuid().ToString('N')
 $lockPath = Join-Path $StateRoot 'deployment.lock'
 New-KbpOwnedLock $lockPath $InstallId $token
-$keepLock = $false
-$swapped = $false
+# The lock is released only after a CLEAN state has been durably recorded
+# (review L4): any ambiguous outcome keeps it.
+$keepLock = $true
+$installedDisplaced = $false
+$priorPlaced = $false
 $removedPlanner = Join-Path $rollEvidence 'rolled-back-planner'
 $stagedPlanner = Join-Path $rollStaging 'restored-planner'
 $candidatePattern = 'kingmaker-buff-planner-casting-*'
+$beforeRollbackIdentity = $null
 
 function Set-KbpRollbackRecord([string]$Status, [string]$Phase, [string]$Failure) {
     $install.status = $Status
@@ -125,6 +129,10 @@ function Set-KbpRollbackRecord([string]$Status, [string]$Phase, [string]$Failure
         Add-Member -InputObject $install -MemberType NoteProperty -Name failure -Value $Failure -Force
     }
     Write-KbpJsonAtomic $installStatePath $install
+}
+
+function Set-KbpRollbackField([string]$Name, $Value) {
+    Add-Member -InputObject $install -MemberType NoteProperty -Name $Name -Value $Value -Force
 }
 
 function Invoke-KbpInjectedFailure([string]$Phase) {
@@ -136,34 +144,115 @@ function Get-KbpContentLines([string]$Path) {
         if ($_.kind -ceq 'file') { "F|$($_.path)|$($_.sha256)" } else { "D|$($_.path)" } })
 }
 
-# Review K6: whether the RESTORED binary reads casting-first candidate
-# profiles is decided from that binary (its UTF-16 candidate file-name
-# literal), never from a file-name prefix alone.
-function Test-KbpBinaryReadsCandidateProfiles([string]$DllPath) {
-    $bytes = [IO.File]::ReadAllBytes($DllPath)
-    $needle = [Text.Encoding]::Unicode.GetBytes('kingmaker-buff-planner-casting-')
-    $first = $needle[0]
-    $limit = $bytes.Length - $needle.Length
-    $index = [Array]::IndexOf($bytes, $first, 0)
-    while ($index -ge 0 -and $index -le $limit) {
-        $match = $true
-        for ($j = 1; $j -lt $needle.Length; $j++) {
-            if ($bytes[$index + $j] -ne $needle[$j]) { $match = $false; break }
+function Get-KbpIdentityDigest([string]$Path) {
+    return (Get-KbpDirectoryContentIdentity $Path).directoryManifestSha256
+}
+
+# Review L5: candidate-profile compatibility is a FORMAT contract, not a
+# file-name family. The restored binary declares the newest candidate
+# format it reads ("<schema>.<revision>") in an AssemblyMetadata attribute;
+# it is read in a separate process (reflection-only, no execution, no
+# assembly-identity clash with this session). No declaration = unknown =
+# no candidate is kept active.
+function Get-KbpTargetCandidateFormat([string]$DllPath) {
+    $script = @'
+param([string]$Path)
+$ErrorActionPreference = 'Stop'
+try {
+    $assembly = [Reflection.Assembly]::ReflectionOnlyLoad([IO.File]::ReadAllBytes($Path))
+    foreach ($data in $assembly.GetCustomAttributesData()) {
+        if ($data.AttributeType.FullName -ceq 'System.Reflection.AssemblyMetadataAttribute' -and
+            $data.ConstructorArguments.Count -eq 2 -and
+            [string]$data.ConstructorArguments[0].Value -ceq 'KingmakerBuffPlanner.CandidateProfileFormat') {
+            [Console]::Out.WriteLine('FORMAT=' + [string]$data.ConstructorArguments[1].Value)
         }
-        if ($match) { return $true }
-        if ($index + 1 -gt $limit) { break }
-        $index = [Array]::IndexOf($bytes, $first, $index + 1)
     }
-    return $false
+    [Console]::Out.WriteLine('DONE')
+}
+catch { [Console]::Out.WriteLine('ERROR=' + $_.Exception.GetType().Name) }
+'@
+    $probeFile = Join-Path $rollStaging ('format-probe-' + [Guid]::NewGuid().ToString('N') + '.ps1')
+    Set-Content -LiteralPath $probeFile -Value $script -Encoding UTF8
+    try {
+        $output = @(& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $probeFile -Path $DllPath 2>$null)
+    }
+    finally { Remove-Item -LiteralPath $probeFile -Force -ErrorAction SilentlyContinue }
+    if (-not ($output -ccontains 'DONE')) { return $null }
+    $formats = @($output | Where-Object { $_ -like 'FORMAT=*' } | ForEach-Object { $_.Substring(7) })
+    if ($formats.Count -ne 1 -or $formats[0] -notmatch '^\d+\.\d+$') { return $null }
+    return $formats[0]
+}
+
+# Members each candidate format revision may contain (the schema-6 profile
+# model, including nested ui/execution/ability objects). Kept in step with
+# CastingPlanProfileModels.cs by the protocol test
+# rollback-candidate-format-members-match-model.
+$candidateMembersRev1 = @('schemaVersion', 'campaignId', 'routines', 'castings', 'ui', 'execution',
+    'routineId', 'name', 'castingId', 'order', 'sourceId', 'ability', 'casterUnitId', 'spellbookGuid',
+    'targetMode', 'directTargetUnitId', 'origin', 'requiredCoverageUnitIds', 'targetingModifiers',
+    'enhancements', 'existingEffectPolicy', 'ignoredPresenceMarkers', 'state', 'provenance',
+    'casterCentered', 'anchorUnitId', 'modifierId', 'enabled', 'enhancementId', 'required',
+    'exactSourceRef', 'legacyAssignmentId', 'legacySchemaVersion', 'legacyRoutineId', 'note',
+    'baseAbilityGuid', 'variantGuid', 'metamagicMask', 'sourceKind', 'specialSourceId',
+    'scale', 'hotkey', 'mode', 'allowAnimatedFallback', 'outOfCombatOnly', 'recastExisting')
+$candidateMembersRev2 = @('importNotices', 'legacyRecipientKey', 'reviewItems')
+$candidateMembersRev3 = @('acknowledgedImportNotices', 'resolvedReviewItems', 'formatRevision')
+
+function Get-KbpJsonMemberNames($Node) {
+    $names = New-Object System.Collections.Generic.List[string]
+    $stack = New-Object System.Collections.Stack
+    $stack.Push($Node)
+    while ($stack.Count -ne 0) {
+        $current = $stack.Pop()
+        if ($current -is [System.Management.Automation.PSCustomObject]) {
+            foreach ($property in $current.PSObject.Properties) {
+                $names.Add($property.Name)
+                $stack.Push($property.Value)
+            }
+        }
+        elseif ($current -is [System.Collections.IEnumerable] -and -not ($current -is [string])) {
+            foreach ($item in $current) { $stack.Push($item) }
+        }
+    }
+    return ,$names
+}
+
+# The format a candidate file REQUIRES, or $null when it is not a readable
+# schema-6 candidate at all (malformed, other schema, unknown members).
+function Get-KbpCandidateRequirement([string]$Path) {
+    try {
+        $raw = [IO.File]::ReadAllText($Path)
+        $json = $raw | ConvertFrom-Json
+    }
+    catch { return $null }
+    if ($null -eq $json -or -not ($json -is [System.Management.Automation.PSCustomObject])) { return $null }
+    $schemaProperty = $json.PSObject.Properties['schemaVersion']
+    if ($null -eq $schemaProperty -or -not ($schemaProperty.Value -is [int] -or $schemaProperty.Value -is [long])) { return $null }
+    $schema = [int]$schemaProperty.Value
+    $required = 1
+    foreach ($name in (Get-KbpJsonMemberNames $json)) {
+        if ($candidateMembersRev1 -ccontains $name) { continue }
+        if ($candidateMembersRev2 -ccontains $name) { if ($required -lt 2) { $required = 2 }; continue }
+        if ($candidateMembersRev3 -ccontains $name) { if ($required -lt 3) { $required = 3 }; continue }
+        return $null
+    }
+    $revisionProperty = $json.PSObject.Properties['formatRevision']
+    if ($null -ne $revisionProperty) {
+        if (-not ($revisionProperty.Value -is [int] -or $revisionProperty.Value -is [long])) { return $null }
+        if ([int]$revisionProperty.Value -gt $required) { $required = [int]$revisionProperty.Value }
+    }
+    return [pscustomobject]@{ schema = $schema; revision = $required }
+}
+
+function Test-KbpTargetReadsCandidate([string]$TargetFormat, $Requirement) {
+    if ([string]::IsNullOrEmpty($TargetFormat) -or $null -eq $Requirement) { return $false }
+    $parts = $TargetFormat.Split('.')
+    return ([int]$parts[0] -eq $Requirement.schema) -and ([int]$parts[1] -ge $Requirement.revision)
 }
 
 try {
     # Phase 1 (prepare): nothing under Mods or the recorded backup changes.
-    # The prior build is COPIED into staging, and every settings transition
-    # happens on that copy, so a failure here leaves the install untouched
-    # and the recorded backup byte-exact.
-    Add-Member -InputObject $install -MemberType NoteProperty -Name rollbackEvidenceRoot `
-        -Value $rollEvidence -Force
+    Set-KbpRollbackField 'rollbackEvidenceRoot' $rollEvidence
     Set-KbpRollbackRecord 'RollingBack' 'prepare' $null
     New-Item -ItemType Directory -Path $rollStaging, $rollEvidence | Out-Null
     $preservedSettings = Join-Path $rollStaging 'usersettings-preserved'
@@ -179,44 +268,50 @@ try {
         $preservedProfiles = @(Get-ChildItem -LiteralPath $preservedSettings -File -Recurse |
             ForEach-Object { Get-KbpRelativePath $preservedSettings $_.FullName })
     }
-    $beforeRollbackIdentity = (Get-KbpDirectoryContentIdentity $planner).directoryManifestSha256
+    $beforeRollbackIdentity = Get-KbpIdentityDigest $planner
     Set-Content -LiteralPath (Join-Path $rollEvidence 'before-rollback-identity.txt') `
         -Value $beforeRollbackIdentity -Encoding UTF8
-    $backupIdentity = (Get-KbpDirectoryContentIdentity $backupPlanner).directoryManifestSha256
+    $backupIdentity = Get-KbpIdentityDigest $backupPlanner
     Copy-Item -LiteralPath $backupPlanner -Destination $stagedPlanner -Recurse
-    if ((Get-KbpDirectoryContentIdentity $stagedPlanner).directoryManifestSha256 -cne $backupIdentity) {
+    if ((Get-KbpIdentityDigest $stagedPlanner) -cne $backupIdentity) {
         throw 'Staged prior build does not match the recorded backup.'
     }
-    $readsCandidates = Test-KbpBinaryReadsCandidateProfiles (Join-Path $stagedPlanner 'KingmakerBuffPlanner.dll')
+    $targetFormat = Get-KbpTargetCandidateFormat (Join-Path $stagedPlanner 'KingmakerBuffPlanner.dll')
 
-    # Casting-first candidates the restored binary cannot read are
-    # DEACTIVATED from BOTH sides (the newer install's and any that came
-    # back with the prior backup) and archived with the evidence. A binary
-    # that reads them keeps them deliberately (charter 7.3).
+    # Every candidate from BOTH sides is checked against the restored
+    # binary's declared format; any it cannot verifiably read is archived
+    # byte-for-byte and deactivated. Kept candidates are recorded too.
     Set-KbpRollbackRecord 'RollingBack' 'candidate-archive' $null
     Invoke-KbpInjectedFailure 'candidate-archive'
     $stagedSettings = Join-Path $stagedPlanner 'UserSettings'
     $candidateArchive = Join-Path $rollEvidence 'deactivated-candidate-profiles'
     $deactivatedCandidates = @()
-    if (-not $readsCandidates) {
-        foreach ($relative in @($preservedProfiles | Where-Object { (Split-Path -Leaf $_) -like $candidatePattern })) {
-            $target = Join-Path $candidateArchive ('installed\' + $relative)
-            New-Item -ItemType Directory -Path (Split-Path -Parent $target) -Force | Out-Null
-            Copy-Item -LiteralPath (Join-Path $preservedSettings $relative) -Destination $target
-            $deactivatedCandidates += @('installed\' + $relative)
+    $keptCandidates = @()
+    foreach ($relative in @($preservedProfiles | Where-Object { (Split-Path -Leaf $_) -like $candidatePattern })) {
+        $requirement = Get-KbpCandidateRequirement (Join-Path $preservedSettings $relative)
+        if (Test-KbpTargetReadsCandidate $targetFormat $requirement) {
+            $keptCandidates += @('installed\' + $relative)
+            continue
         }
-        if (Test-Path -LiteralPath $stagedSettings -PathType Container) {
-            foreach ($file in @(Get-ChildItem -LiteralPath $stagedSettings -File -Recurse |
-                    Where-Object { $_.Name -like $candidatePattern })) {
-                $relative = Get-KbpRelativePath $stagedSettings $file.FullName
-                $target = Join-Path $candidateArchive ('prior\' + $relative)
-                New-Item -ItemType Directory -Path (Split-Path -Parent $target) -Force | Out-Null
-                Move-Item -LiteralPath $file.FullName -Destination $target
-                $deactivatedCandidates += @('prior\' + $relative)
+        $target = Join-Path $candidateArchive ('installed\' + $relative)
+        New-Item -ItemType Directory -Path (Split-Path -Parent $target) -Force | Out-Null
+        Copy-Item -LiteralPath (Join-Path $preservedSettings $relative) -Destination $target
+        $deactivatedCandidates += @('installed\' + $relative)
+        $preservedProfiles = @($preservedProfiles | Where-Object { $_ -cne $relative })
+    }
+    if (Test-Path -LiteralPath $stagedSettings -PathType Container) {
+        foreach ($file in @(Get-ChildItem -LiteralPath $stagedSettings -File -Recurse |
+                Where-Object { $_.Name -like $candidatePattern })) {
+            $relative = Get-KbpRelativePath $stagedSettings $file.FullName
+            if (Test-KbpTargetReadsCandidate $targetFormat (Get-KbpCandidateRequirement $file.FullName)) {
+                $keptCandidates += @('prior\' + $relative)
+                continue
             }
+            $target = Join-Path $candidateArchive ('prior\' + $relative)
+            New-Item -ItemType Directory -Path (Split-Path -Parent $target) -Force | Out-Null
+            Move-Item -LiteralPath $file.FullName -Destination $target
+            $deactivatedCandidates += @('prior\' + $relative)
         }
-        $preservedProfiles = @($preservedProfiles | Where-Object {
-            (Split-Path -Leaf $_) -notlike $candidatePattern })
     }
 
     # Merge the preserved newer profiles over the staged prior build.
@@ -233,26 +328,40 @@ try {
     Set-KbpRollbackRecord 'RollingBack' 'identity' $null
     Invoke-KbpInjectedFailure 'identity'
     Assert-KbpPlannerIdentity $stagedPlanner $priorVersion
-    $stagedIdentity = (Get-KbpDirectoryContentIdentity $stagedPlanner).directoryManifestSha256
+    $stagedIdentity = Get-KbpIdentityDigest $stagedPlanner
 
-    # Phase 2 (swap): the record says so BEFORE Mods changes, so an
-    # interruption is never recorded as the installed version.
+    # Phase 2 (swap). Recovery data is recorded BEFORE Mods changes.
+    Set-KbpRollbackField 'rollbackInstalledIdentity' $beforeRollbackIdentity
+    Set-KbpRollbackField 'rollbackStagedIdentity' $stagedIdentity
+    Set-KbpRollbackField 'rollbackInstalledDisplacedPath' $removedPlanner
+    Set-KbpRollbackField 'rollbackStagedPriorPath' $stagedPlanner
     Set-KbpRollbackRecord 'RollingBack' 'swap' $null
+    Invoke-KbpInjectedFailure 'move-installed'
     Move-Item -LiteralPath $planner -Destination $removedPlanner
+    $installedDisplaced = $true
     try {
+        Invoke-KbpInjectedFailure 'move-prior'
+        Invoke-KbpInjectedFailure 'move-prior-and-reverse'
         Move-Item -LiteralPath $stagedPlanner -Destination $planner
+        $priorPlaced = $true
     }
     catch {
-        # Put the tested build back rather than leaving Mods empty.
-        Move-Item -LiteralPath $removedPlanner -Destination $planner
-        throw
+        $moveFailure = $_
+        # Put the tested build back rather than leaving Mods empty; only a
+        # verified return clears the displaced state.
+        try {
+            if ($InjectFailureAt -ceq 'move-prior-and-reverse') { throw 'injected reverse failure' }
+            Move-Item -LiteralPath $removedPlanner -Destination $planner
+            if ((Get-KbpIdentityDigest $planner) -ceq $beforeRollbackIdentity) { $installedDisplaced = $false }
+        }
+        catch { }
+        throw $moveFailure
     }
-    $swapped = $true
 
     Set-KbpRollbackRecord 'RollingBack' 'verify' $null
     Invoke-KbpInjectedFailure 'verify'
     Assert-KbpPlannerIdentity $planner $priorVersion
-    if ((Get-KbpDirectoryContentIdentity $planner).directoryManifestSha256 -cne $stagedIdentity) {
+    if ((Get-KbpIdentityDigest $planner) -cne $stagedIdentity) {
         throw 'Mods planner does not match the verified staged prior build.'
     }
     # Unrelated mods may have legitimately changed since the install (the
@@ -270,46 +379,60 @@ try {
 
     Invoke-KbpInjectedFailure 'record'
     Invoke-KbpInjectedFailure 'record-and-reverse'
-    Add-Member -InputObject $install -MemberType NoteProperty -Name rolledBackAtUtc `
-        -Value ([DateTime]::UtcNow.ToString('o')) -Force
-    Add-Member -InputObject $install -MemberType NoteProperty -Name rollbackPreservedProfiles `
-        -Value $preservedProfiles -Force
-    Add-Member -InputObject $install -MemberType NoteProperty -Name rollbackDeactivatedCandidateProfiles `
-        -Value $deactivatedCandidates -Force
-    Add-Member -InputObject $install -MemberType NoteProperty -Name rollbackTargetReadsCandidateProfiles `
-        -Value $readsCandidates -Force
+    Set-KbpRollbackField 'rolledBackAtUtc' ([DateTime]::UtcNow.ToString('o'))
+    Set-KbpRollbackField 'rollbackPreservedProfiles' $preservedProfiles
+    Set-KbpRollbackField 'rollbackDeactivatedCandidateProfiles' $deactivatedCandidates
+    Set-KbpRollbackField 'rollbackKeptCandidateProfiles' $keptCandidates
+    Set-KbpRollbackField 'rollbackTargetCandidateFormat' $(if ($targetFormat) { $targetFormat } else { 'none' })
     Set-KbpRollbackRecord 'RolledBack' 'complete' $null
-    $summary = 'Install rollback: PASS=1 FAIL=0 installId={0} restoredVersion={1} preservedProfiles={2} deactivatedCandidateProfiles={3} evidence={4}'
-    Write-Host ($summary -f $InstallId, $priorVersion, $preservedProfiles.Count, $deactivatedCandidates.Count, $rollEvidence)
+    $keepLock = $false
+    $summary = 'Install rollback: PASS=1 FAIL=0 installId={0} restoredVersion={1} preservedProfiles={2} deactivatedCandidateProfiles={3} keptCandidateProfiles={4} evidence={5}'
+    Write-Host ($summary -f $InstallId, $priorVersion, $preservedProfiles.Count, $deactivatedCandidates.Count, $keptCandidates.Count, $rollEvidence)
 }
 catch {
     $primary = 'rollback: ' + $_.Exception.Message
-    if (-not $swapped) {
-        # Mods and the recorded backup were never changed: the installed
-        # build is still live, and the record says exactly that.
-        Set-KbpRollbackRecord 'Installed' 'not-applied' $primary
-        throw
-    }
-    # Review K6: a failure after the swap reverses it, so Mods and the
-    # record agree again. The recorded backup was never moved.
     try {
-        if ($InjectFailureAt -ceq 'record-and-reverse') { throw 'injected reverse failure' }
-        Move-Item -LiteralPath $planner -Destination $stagedPlanner
-        Move-Item -LiteralPath $removedPlanner -Destination $planner
-        Assert-KbpPlannerIdentity $planner ([string]$install.version)
-        if ((Get-KbpDirectoryContentIdentity $planner).directoryManifestSha256 -cne $beforeRollbackIdentity) {
-            throw 'Reversed Mods planner does not match the pre-rollback identity.'
+        if (-not $installedDisplaced -and -not $priorPlaced) {
+            # The installed build never left Mods, or it was put back and
+            # verified byte-identical: confirm before calling it clean.
+            if ($null -ne $beforeRollbackIdentity -and
+                (Get-KbpIdentityDigest $planner) -cne $beforeRollbackIdentity) {
+                throw 'installed planner identity changed during a failed rollback'
+            }
+            Set-KbpRollbackRecord 'Installed' 'not-applied' $primary
+            $keepLock = $false
         }
-        Set-KbpRollbackRecord 'Installed' 'reversed' $primary
+        elseif ($priorPlaced) {
+            # A failure after the complete swap reverses it.
+            if ($InjectFailureAt -ceq 'record-and-reverse') { throw 'injected reverse failure' }
+            Move-Item -LiteralPath $planner -Destination $stagedPlanner
+            $priorPlaced = $false
+            Move-Item -LiteralPath $removedPlanner -Destination $planner
+            $installedDisplaced = $false
+            Assert-KbpPlannerIdentity $planner ([string]$install.version)
+            if ((Get-KbpIdentityDigest $planner) -cne $beforeRollbackIdentity) {
+                throw 'Reversed Mods planner does not match the pre-rollback identity.'
+            }
+            Set-KbpRollbackRecord 'Installed' 'reversed' $primary
+            $keepLock = $false
+        }
+        else {
+            throw 'installed planner displaced and not restored'
+        }
     }
     catch {
-        # No consistent state could be re-established: say so, and keep
-        # the lock so no deployment runs over an ambiguous Mods tree.
+        # No verified consistent state: say so (best effort) and keep the
+        # lock so no deployment or rollback runs over an ambiguous Mods tree.
         $keepLock = $true
-        Set-KbpRollbackRecord 'RollbackRecoveryNeeded' 'reverse-failed' `
-            ($primary + '; reverse: ' + $_.Exception.Message +
-             '; installed build expected at ' + $removedPlanner +
-             '; recorded prior backup at ' + $backupPlanner)
+        try {
+            Set-KbpRollbackRecord 'RollbackRecoveryNeeded' 'recovery-needed' `
+                ($primary + '; recovery: ' + $_.Exception.Message +
+                 '; installed build (identity ' + $beforeRollbackIdentity + ') expected at ' +
+                 $(if ($installedDisplaced) { $removedPlanner } else { $planner }) +
+                 '; staged prior at ' + $stagedPlanner +
+                 '; recorded prior backup untouched at ' + $backupPlanner)
+        }
+        catch { }
     }
     throw
 }

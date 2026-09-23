@@ -17,6 +17,22 @@ namespace KingmakerBuffPlanner.Persistence
     {
         internal const int CurrentSchemaVersion = 6;
 
+        // Review L5: additions inside schema 6 are tracked as a format
+        // revision, because a strict (unknown-member-rejecting) reader of
+        // an earlier revision cannot read them.
+        //   1 = schema 6 as first published (through 258a1d0)
+        //   2 = + importNotices, legacyRecipientKey, reviewItems (K-series)
+        //   3 = + acknowledgedImportNotices, resolvedReviewItems,
+        //       formatRevision (L1)
+        // The built assembly declares the newest revision it reads through
+        // an AssemblyMetadata attribute ("KingmakerBuffPlanner.
+        // CandidateProfileFormat" = "<schema>.<revision>"), which install
+        // rollback reads from the restored binary itself.
+        internal const int CurrentFormatRevision = 3;
+        internal const string CandidateFormatToken = "6.3";
+        internal const string CandidateFormatAttributeKey =
+            "KingmakerBuffPlanner.CandidateProfileFormat";
+
         [JsonProperty("schemaVersion", Required = Required.Always, Order = 1)]
         public int SchemaVersion { get; set; }
         [JsonProperty("campaignId", Required = Required.Always, Order = 2)]
@@ -38,12 +54,17 @@ namespace KingmakerBuffPlanner.Persistence
         [JsonProperty("acknowledgedImportNotices", Order = 8,
             NullValueHandling = NullValueHandling.Ignore)]
         public List<string> AcknowledgedImportNotices { get; set; }
+        // Optional in older candidates (absent = revision 1 or 2).
+        [JsonProperty("formatRevision", Order = 9,
+            NullValueHandling = NullValueHandling.Ignore)]
+        public int? FormatRevision { get; set; }
 
         public static CastingPlanProfile CreateDefault(string campaignId)
         {
             return new CastingPlanProfile
             {
                 SchemaVersion = CurrentSchemaVersion,
+                FormatRevision = CurrentFormatRevision,
                 CampaignId = campaignId,
                 Routines = new List<RoutineDefinitionProfile>
                 {
@@ -73,6 +94,7 @@ namespace KingmakerBuffPlanner.Persistence
             return new CastingPlanProfile
             {
                 SchemaVersion = CurrentSchemaVersion,
+                FormatRevision = CurrentFormatRevision,
                 CampaignId = document.CampaignId,
                 Routines = document.Routines
                     .Select(value => RoutineDefinitionProfile.FromDomain(value)).ToList(),

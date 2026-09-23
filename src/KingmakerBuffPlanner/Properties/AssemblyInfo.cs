@@ -11,3 +11,8 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyVersion("0.1.1.0")]
 [assembly: AssemblyFileVersion("0.1.1.0")]
 [assembly: AssemblyInformationalVersion("0.1.1-rc3")]
+// Review L5: the candidate-profile format this binary reads (install
+// rollback reads it from the restored binary).
+[assembly: AssemblyMetadata(
+    KingmakerBuffPlanner.Persistence.CastingPlanProfile.CandidateFormatAttributeKey,
+    KingmakerBuffPlanner.Persistence.CastingPlanProfile.CandidateFormatToken)]

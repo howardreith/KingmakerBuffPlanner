@@ -91,6 +91,11 @@ namespace KingmakerBuffPlanner.Persistence
                     return new CastingPlanLoadResult(
                         CastingPlanLoadStatus.UnsupportedSchema, null, path,
                         "schema-version-newer:" + schema);
+                int revision = ReadFormatRevision(json);
+                if (revision > CastingPlanProfile.CurrentFormatRevision)
+                    return new CastingPlanLoadResult(
+                        CastingPlanLoadStatus.UnsupportedSchema, null, path,
+                        "format-revision-newer:" + revision);
                 try
                 {
                     CastingPlanProfile profile = Deserialize(json, campaignId);
@@ -127,7 +132,8 @@ namespace KingmakerBuffPlanner.Persistence
                 string previous = File.ReadAllText(path);
                 int schema;
                 if (!TryReadSchemaVersion(previous, out schema) ||
-                    schema > CastingPlanProfile.CurrentSchemaVersion)
+                    schema > CastingPlanProfile.CurrentSchemaVersion ||
+                    ReadFormatRevision(previous) > CastingPlanProfile.CurrentFormatRevision)
                     throw new InvalidDataException(
                         "refusing-to-overwrite-unreadable-or-newer-primary");
                 // A candidate write must round-trip before it can replace a
@@ -150,6 +156,24 @@ namespace KingmakerBuffPlanner.Persistence
             RequireCampaign(campaignId);
             return Path.Combine(_settingsDirectory,
                 "kingmaker-buff-planner-casting-" + CampaignHash(campaignId) + ".json");
+        }
+
+        // Absent -> 0 (an earlier revision); non-integer -> int.MaxValue
+        // (treated as unknown/newer, never guessed).
+        private static int ReadFormatRevision(string json)
+        {
+            try
+            {
+                JToken token = JObject.Parse(json)["formatRevision"];
+                if (token == null || token.Type == JTokenType.Null) return 0;
+                if (token.Type != JTokenType.Integer) return int.MaxValue;
+                long value = (long)token;
+                return value < 0 || value > int.MaxValue ? int.MaxValue : (int)value;
+            }
+            catch (Exception)
+            {
+                return 0;
+            }
         }
 
         private static bool TryReadSchemaVersion(string json, out int schemaVersion)

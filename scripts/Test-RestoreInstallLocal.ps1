@@ -9,42 +9,68 @@ $ErrorActionPreference = 'Stop'
 # Isolated-state tests for Restore-InstallLocal.ps1: a fake lab (state,
 # backup, staging, evidence roots) and a fake game Mods tree exercise the
 # rollback record contract, profile preservation, WhatIf purity, refusal
-# rules, injected failures in every phase (review K6), and target-binary
-# candidate compatibility, without touching the real machine or any game
-# file.
+# rules, injected failures in every phase including both swap moves and
+# their reversal (reviews K6/L4), and candidate-format compatibility read
+# from the restored binary (review L5), without touching the real machine
+# or any game file.
 $boundary = Join-Path ([IO.Path]::GetTempPath()) ('KbpRestoreInstallTest-' + [Guid]::NewGuid().ToString('N'))
 $passed = 0
 function Assert-True([bool]$Condition, [string]$Message) {
     if (-not $Condition) { throw "RestoreInstallLocal test failed: $Message" }
 }
 
+# A fake planner assembly. $CandidateFormat declares the candidate-profile
+# format the binary reads, exactly as the real AssemblyInfo does; '' means
+# no declaration (a build that predates the contract, e.g. 258a1d0 or
+# 475d2b9, which contain the candidate file-name literal but declare
+# nothing). The literal is always compiled in, so a file-name scan would
+# (wrongly) call every fixture compatible.
 Add-Type -AssemblyName Microsoft.CSharp
-function New-FakeAssembly([string]$Path, [string]$AssemblyVersion, [bool]$ReadsCandidates) {
+function New-FakeAssembly([string]$Path, [string]$AssemblyVersion, [string]$CandidateFormat) {
     $provider = [Microsoft.CSharp.CSharpCodeProvider]::new()
     $parameters = [System.CodeDom.Compiler.CompilerParameters]::new()
     $parameters.GenerateExecutable = $false
     $parameters.OutputAssembly = $Path
-    $body = if ($ReadsCandidates) {
-        'public static string Prefix() { return "kingmaker-buff-planner-casting-"; }'
+    $metadata = if ($CandidateFormat) {
+        '[assembly: System.Reflection.AssemblyMetadata("KingmakerBuffPlanner.CandidateProfileFormat", "' + $CandidateFormat + '")] '
     } else { '' }
-    $source = '[assembly: System.Reflection.AssemblyVersion("' + $AssemblyVersion + '")] public class Marker { ' + $body + ' }'
+    $source = '[assembly: System.Reflection.AssemblyVersion("' + $AssemblyVersion + '")] ' + $metadata +
+        'public class Marker { public static string Prefix() { return "kingmaker-buff-planner-casting-"; } }'
     $compile = $provider.CompileAssemblyFromSource($parameters, $source)
     if ($compile.Errors.Count -ne 0) { throw "Marker assembly failed to compile: $($compile.Errors[0])" }
 }
 
-function New-FakePlanner([string]$Path, [string]$Version, [string]$AssemblyVersion, [bool]$ReadsCandidates) {
+function New-FakePlanner([string]$Path, [string]$Version, [string]$AssemblyVersion, [string]$CandidateFormat) {
     New-Item -ItemType Directory -Path (Join-Path $Path 'UserSettings') | Out-Null
     @{ Id = 'KingmakerBuffPlanner'; DisplayName = 'Kingmaker Buff Planner'; Author = 'Test'
        Version = $Version; ManagerVersion = '0.28.2'; GameVersion = '2.1.7'
        AssemblyName = 'KingmakerBuffPlanner.dll'; EntryMethod = 'KingmakerBuffPlanner.Main.Load'
        Requirements = @() } | ConvertTo-Json |
         Set-Content -LiteralPath (Join-Path $Path 'Info.json')
-    New-FakeAssembly (Join-Path $Path 'KingmakerBuffPlanner.dll') $AssemblyVersion $ReadsCandidates
+    New-FakeAssembly (Join-Path $Path 'KingmakerBuffPlanner.dll') $AssemblyVersion $CandidateFormat
     Set-Content -LiteralPath (Join-Path $Path 'THIRD-PARTY-NOTICES.md') -Value 'notices'
 }
 
-# Fresh isolated fixture: installed 9.9.9-rc1 over a recorded prior 9.9.8.
-function New-Fixture([string]$Name, [bool]$PriorReadsCandidates) {
+# Realistic schema-6 candidate documents (members of the real profile model).
+$candidateBase = '"schemaVersion":6,"campaignId":"campaign-a","routines":[{"routineId":"long","name":"Long"}],' +
+    '"castings":[{"castingId":"c1","routineId":"long","order":0,"sourceId":"s","ability":{"baseAbilityGuid":"g",' +
+    '"variantGuid":"","metamagicMask":0,"sourceKind":"Spellbook","specialSourceId":""},"casterUnitId":"u1",' +
+    '"spellbookGuid":null,"targetMode":"DirectTarget","directTargetUnitId":"u2","origin":null,' +
+    '"requiredCoverageUnitIds":[],"targetingModifiers":[],"enhancements":[],"existingEffectPolicy":"SkipAlreadyActive",' +
+    '"ignoredPresenceMarkers":[],"state":"Ready","provenance":null}],"ui":{"scale":1.0,"hotkey":"Ctrl+Shift+B"},' +
+    '"execution":{"mode":"hybrid","allowAnimatedFallback":true,"outOfCombatOnly":true,"recastExisting":false}'
+$candidates = [ordered]@{
+    'kingmaker-buff-planner-casting-rev1.json' = '{' + $candidateBase + '}'
+    'kingmaker-buff-planner-casting-rev2.json' = '{' + $candidateBase + ',"importNotices":["legacy-provider-preference:x"]}'
+    'kingmaker-buff-planner-casting-rev3.json' = '{' + $candidateBase + ',"importNotices":["n"],"acknowledgedImportNotices":["n"],"formatRevision":3}'
+    'kingmaker-buff-planner-casting-unknown-member.json' = '{' + $candidateBase + ',"futureField":1}'
+    'kingmaker-buff-planner-casting-rev4.json' = '{' + $candidateBase + ',"formatRevision":4}'
+    'kingmaker-buff-planner-casting-malformed.json' = '{not json'
+}
+
+# Fresh isolated fixture: installed 9.9.9-rc1 over a recorded prior 9.9.8
+# whose binary declares $PriorFormat. Candidates sit on BOTH sides.
+function New-Fixture([string]$Name, [string]$PriorFormat) {
     $root = Join-Path $boundary $Name
     $f = [ordered]@{}
     $f.game = Join-Path $root 'game'
@@ -58,20 +84,20 @@ function New-Fixture([string]$Name, [bool]$PriorReadsCandidates) {
     }
     Set-Content -LiteralPath (Join-Path (Join-Path $f.mods 'OtherMod') 'other.txt') -Value 'other'
     $f.planner = Join-Path $f.mods 'KingmakerBuffPlanner'
-    New-FakePlanner $f.planner '9.9.9-rc1' '9.9.9.0' $true
+    New-FakePlanner $f.planner '9.9.9-rc1' '9.9.9.0' '6.3'
     $f.prior = Join-Path $f.backup 'KingmakerBuffPlanner.prior'
-    New-FakePlanner $f.prior '9.9.8' '9.9.8.0' $PriorReadsCandidates
+    New-FakePlanner $f.prior '9.9.8' '9.9.8.0' $PriorFormat
     # A profile edited AFTER installation must survive the rollback.
     Set-Content -LiteralPath (Join-Path $f.planner 'UserSettings\kingmaker-buff-planner-new.json') `
         -Value '{"newer":true}'
     Set-Content -LiteralPath (Join-Path $f.prior 'UserSettings\kingmaker-buff-planner-old.json') `
         -Value '{"older":true}'
-    # Casting-first candidates on BOTH sides: the newer install's, and one
-    # that came back inside the prior backup.
-    Set-Content -LiteralPath (Join-Path $f.planner 'UserSettings\kingmaker-buff-planner-casting-abc.json') `
-        -Value '{"schemaVersion":6}'
-    Set-Content -LiteralPath (Join-Path $f.prior 'UserSettings\kingmaker-buff-planner-casting-old.json') `
-        -Value '{"schemaVersion":6,"older":true}'
+    foreach ($name in $candidates.Keys) {
+        [IO.File]::WriteAllText((Join-Path $f.planner ('UserSettings\' + $name)), $candidates[$name])
+    }
+    # A backup-side candidate (e.g. a .bak rotation) that came back with the prior build.
+    [IO.File]::WriteAllText((Join-Path $f.prior 'UserSettings\kingmaker-buff-planner-casting-prior.json.bak.1'),
+        $candidates['kingmaker-buff-planner-casting-rev2.json'])
 
     $f.installDir = Join-Path $f.state 'installations\test-install'
     New-Item -ItemType Directory -Path $f.installDir | Out-Null
@@ -93,12 +119,17 @@ function New-Fixture([string]$Name, [bool]$PriorReadsCandidates) {
 }
 
 function Read-Record($f) { return Read-KbpJson (Join-Path $f.installDir 'install.json') }
+function Get-Identity([string]$Path) { return (Get-KbpDirectoryContentIdentity $Path).directoryManifestSha256 }
+function Get-ActiveCandidates([string]$Planner) {
+    return @(Get-ChildItem -LiteralPath (Join-Path $Planner 'UserSettings') -File |
+        Where-Object { $_.Name -like 'kingmaker-buff-planner-casting-*' } | ForEach-Object Name | Sort-Object)
+}
 
 $restoreScript = Join-Path $PSScriptRoot 'Restore-InstallLocal.ps1'
 
 try {
     # ---------- WhatIf purity ----------
-    $f = New-Fixture 'whatif' $false
+    $f = New-Fixture 'whatif' ''
     $arguments = $f.arguments
     & $restoreScript @arguments -WhatIf | Out-Null
     Assert-True (Test-Path -LiteralPath (Join-Path $f.planner 'Info.json')) 'WhatIf removed the installed planner.'
@@ -106,8 +137,8 @@ try {
     Assert-True ([string](Read-Record $f).status -ceq 'Installed') 'WhatIf changed the record.'
     $passed++
 
-    # ---------- successful rollback to a binary that cannot read candidates ----------
-    $f = New-Fixture 'success' $false
+    # ---------- L5: target declares no candidate format (pre-contract build) ----------
+    $f = New-Fixture 'no-declaration' ''
     $arguments = $f.arguments
     & $restoreScript @arguments | Out-Null
     $settings = Join-Path $f.planner 'UserSettings'
@@ -122,17 +153,19 @@ try {
     $record = Read-Record $f
     Assert-True ([string]$record.status -ceq 'RolledBack') 'Record status was not RolledBack.'
     Assert-True ([string]$record.rollbackPhase -ceq 'complete') 'Record phase was not complete.'
-    Assert-True (@($record.rollbackPreservedProfiles).Count -eq 1) 'Preserved-profile list was not recorded.'
-    Assert-True (@(Get-ChildItem -LiteralPath $settings -Filter 'kingmaker-buff-planner-casting-*').Count -eq 0) `
-        'A casting-first candidate was left active beside a binary that cannot read it.'
-    Assert-True (Test-Path -LiteralPath (Join-Path $rollEvidence 'deactivated-candidate-profiles\installed\kingmaker-buff-planner-casting-abc.json')) `
-        'The installed-side candidate was not archived.'
-    Assert-True (Test-Path -LiteralPath (Join-Path $rollEvidence 'deactivated-candidate-profiles\prior\kingmaker-buff-planner-casting-old.json')) `
-        'The prior-side candidate was not archived.'
-    Assert-True (@($record.rollbackDeactivatedCandidateProfiles).Count -eq 2) 'Deactivated candidates were not recorded.'
-    Assert-True ($record.rollbackTargetReadsCandidateProfiles -eq $false) 'Target compatibility was misrecorded.'
-    Assert-True ((Get-KbpDirectoryContentIdentity $f.prior).directoryManifestSha256 -ceq $f.priorIdentity) `
-        'The recorded prior backup was modified by the rollback.'
+    Assert-True ([string]$record.rollbackTargetCandidateFormat -ceq 'none') 'Undeclared format was misrecorded.'
+    Assert-True (@(Get-ActiveCandidates $f.planner).Count -eq 0) `
+        'A candidate was left active beside a binary that declares no candidate format.'
+    Assert-True (@($record.rollbackDeactivatedCandidateProfiles).Count -eq ($candidates.Count + 1)) `
+        'Not every candidate (both sides) was deactivated.'
+    foreach ($name in $candidates.Keys) {
+        $archived = Join-Path $rollEvidence ('deactivated-candidate-profiles\installed\' + $name)
+        Assert-True ((Test-Path -LiteralPath $archived) -and
+            [IO.File]::ReadAllText($archived) -ceq $candidates[$name]) "Candidate $name was not archived byte-exact."
+    }
+    Assert-True (Test-Path -LiteralPath (Join-Path $rollEvidence 'deactivated-candidate-profiles\prior\kingmaker-buff-planner-casting-prior.json.bak.1')) `
+        'The backup-side candidate was not archived.'
+    Assert-True ((Get-Identity $f.prior) -ceq $f.priorIdentity) 'The recorded prior backup was modified.'
     Assert-True (Test-Path -LiteralPath (Join-Path (Join-Path $f.mods 'OtherMod') 'other.txt')) 'Unrelated mod was touched.'
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $f.state 'deployment.lock'))) 'Lock was not released.'
     $passed++
@@ -151,24 +184,37 @@ try {
     Assert-True $refused 'An unknown install id was accepted.'
     $passed++
 
-    # ---------- target binary reads candidates: they stay active ----------
-    $f = New-Fixture 'compatible' $true
+    # ---------- L5: older format revision with the same schema and prefix ----------
+    $f = New-Fixture 'older-revision' '6.1'
     $arguments = $f.arguments
     & $restoreScript @arguments | Out-Null
-    $settings = Join-Path $f.planner 'UserSettings'
-    $record = Read-Record $f
-    Assert-True ([string]$record.status -ceq 'RolledBack') 'Compatible rollback did not complete.'
-    Assert-True ($record.rollbackTargetReadsCandidateProfiles -eq $true) 'Compatible target was not detected from its binary.'
-    Assert-True (Test-Path -LiteralPath (Join-Path $settings 'kingmaker-buff-planner-casting-abc.json')) `
-        'A candidate the restored binary reads was deactivated.'
-    Assert-True (Test-Path -LiteralPath (Join-Path $settings 'kingmaker-buff-planner-casting-old.json')) `
-        'The prior-side candidate was removed from a compatible target.'
-    Assert-True (@($record.rollbackDeactivatedCandidateProfiles).Count -eq 0) 'Candidates were deactivated for a compatible target.'
+    $active = @(Get-ActiveCandidates $f.planner)
+    Assert-True (($active -join ',') -ceq 'kingmaker-buff-planner-casting-rev1.json') `
+        "A 6.1 reader kept candidates it cannot read: $($active -join ',')"
+    Assert-True ([string](Read-Record $f).rollbackTargetCandidateFormat -ceq '6.1') 'Declared format was not recorded.'
+    $passed++
+
+    # ---------- L5: current reader keeps exactly what it can read ----------
+    $f = New-Fixture 'current-revision' '6.3'
+    $arguments = $f.arguments
+    & $restoreScript @arguments | Out-Null
+    $active = @(Get-ActiveCandidates $f.planner)
+    $expected = @('kingmaker-buff-planner-casting-prior.json.bak.1', 'kingmaker-buff-planner-casting-rev1.json',
+        'kingmaker-buff-planner-casting-rev2.json', 'kingmaker-buff-planner-casting-rev3.json') | Sort-Object
+    Assert-True (($active -join ',') -ceq ($expected -join ',')) `
+        "A 6.3 reader kept the wrong set: $($active -join ',')"
+    foreach ($name in @('kingmaker-buff-planner-casting-unknown-member.json',
+            'kingmaker-buff-planner-casting-rev4.json', 'kingmaker-buff-planner-casting-malformed.json')) {
+        Assert-True (Test-Path -LiteralPath (Join-Path $f.evidence ('rollback-test-install\deactivated-candidate-profiles\installed\' + $name))) `
+            "Unreadable candidate $name was not archived."
+    }
+    Assert-True ([IO.File]::ReadAllText((Join-Path $f.planner 'UserSettings\kingmaker-buff-planner-casting-rev3.json')) -ceq
+        $candidates['kingmaker-buff-planner-casting-rev3.json']) 'A kept candidate was modified.'
     $passed++
 
     # ---------- pre-swap failures: nothing applied, record truthful, retry works ----------
-    foreach ($phase in @('candidate-archive', 'settings-merge', 'identity')) {
-        $f = New-Fixture ('pre-' + $phase) $false
+    foreach ($phase in @('candidate-archive', 'settings-merge', 'identity', 'move-installed')) {
+        $f = New-Fixture ('pre-' + $phase) ''
         $arguments = $f.arguments
         $threw = $false
         try { & $restoreScript @arguments -InjectFailureAt $phase | Out-Null }
@@ -178,24 +224,63 @@ try {
         Assert-True ([string]$record.status -ceq 'Installed') "After a $phase failure the record is not Installed."
         Assert-True ([string]$record.rollbackPhase -ceq 'not-applied') "After a $phase failure the phase is wrong."
         Assert-True ([string]$record.failure -like '*injected*') "The $phase failure was not recorded."
-        Assert-True ((Get-KbpDirectoryContentIdentity $f.planner).directoryManifestSha256 -ceq $f.installedIdentity) `
-            "A $phase failure changed the installed planner."
-        Assert-True ((Get-KbpDirectoryContentIdentity $f.prior).directoryManifestSha256 -ceq $f.priorIdentity) `
-            "A $phase failure changed the recorded prior backup."
+        Assert-True ((Get-Identity $f.planner) -ceq $f.installedIdentity) "A $phase failure changed the installed planner."
+        Assert-True ((Get-Identity $f.prior) -ceq $f.priorIdentity) "A $phase failure changed the recorded prior backup."
         Assert-True (-not (Test-Path -LiteralPath (Join-Path $f.state 'deployment.lock'))) "Lock kept after a $phase failure."
         & $restoreScript @arguments | Out-Null
         $record = Read-Record $f
         Assert-True ([string]$record.status -ceq 'RolledBack') "Retry after a $phase failure did not complete."
         Assert-True ([string]$record.rollbackEvidenceRoot -like '*rollback-test-install-attempt2') `
             "Retry after a $phase failure reused the failed attempt's evidence."
-        Assert-True ((Read-KbpJson (Join-Path $f.planner 'Info.json')).Version -ceq '9.9.8') `
-            "Retry after a $phase failure did not restore the prior build."
         $passed++
     }
 
+    # ---------- L4: second move fails, immediate reversal succeeds ----------
+    $f = New-Fixture 'move-prior' ''
+    $arguments = $f.arguments
+    $threw = $false
+    try { & $restoreScript @arguments -InjectFailureAt 'move-prior' | Out-Null }
+    catch { $threw = $_.Exception.Message -like '*injected rollback failure at move-prior*' }
+    Assert-True $threw 'Injected move-prior failure did not surface.'
+    $record = Read-Record $f
+    Assert-True ([string]$record.status -ceq 'Installed' -and [string]$record.rollbackPhase -ceq 'not-applied') `
+        "A reversed partial swap was recorded as $($record.status)/$($record.rollbackPhase)."
+    Assert-True ((Get-Identity $f.planner) -ceq $f.installedIdentity) 'The reversed installed planner is not byte-identical.'
+    Assert-True ((Get-Identity $f.prior) -ceq $f.priorIdentity) 'The prior backup changed in a partial swap.'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $f.state 'deployment.lock'))) 'Lock kept after a verified reversal.'
+    $passed++
+
+    # ---------- L4: second move fails AND its reversal fails ----------
+    $f = New-Fixture 'move-prior-and-reverse' ''
+    $arguments = $f.arguments
+    $threw = $false
+    try { & $restoreScript @arguments -InjectFailureAt 'move-prior-and-reverse' | Out-Null } catch { $threw = $true }
+    Assert-True $threw 'The unrecoverable partial swap did not surface.'
+    $record = Read-Record $f
+    Assert-True ([string]$record.status -ceq 'RollbackRecoveryNeeded') `
+        "A displaced, unrestored install was recorded as $($record.status)."
+    Assert-True (Test-Path -LiteralPath (Join-Path $f.state 'deployment.lock')) 'The lock was released over a displaced install.'
+    Assert-True (-not (Test-Path -LiteralPath $f.planner)) 'Fixture precondition: the live planner should be displaced.'
+    $displaced = [string]$record.rollbackInstalledDisplacedPath
+    Assert-True ((Get-Identity $displaced) -ceq $f.installedIdentity) 'The displaced installed build lost bytes.'
+    Assert-True ([string]$record.rollbackInstalledIdentity -ceq $f.installedIdentity) 'The recovery identity was not recorded.'
+    Assert-True ([string]$record.failure -like ('*' + $displaced + '*')) 'The recovery location was not recorded.'
+    Assert-True ((Get-Identity $f.prior) -ceq $f.priorIdentity) 'The prior backup changed.'
+    $refused = $false
+    try { & $restoreScript @arguments | Out-Null } catch { $refused = $true }
+    Assert-True $refused 'A rollback ran over an unrecovered partial swap.'
+    $refused = $false
+    try { Assert-KbpNoUnresolvedTransaction $f.state } catch { $refused = $true }
+    Assert-True $refused 'A deployment could start over an unrecovered partial swap.'
+    Remove-Item -LiteralPath (Join-Path $f.state 'deployment.lock') -Force
+    $refused = $false
+    try { Assert-KbpNoUnresolvedTransaction $f.state } catch { $refused = $_.Exception.Message -like '*Unresolved install rollback*' }
+    Assert-True $refused 'The RollbackRecoveryNeeded record alone did not block deployment.'
+    $passed++
+
     # ---------- post-swap failures: the swap is reversed ----------
     foreach ($phase in @('verify', 'record')) {
-        $f = New-Fixture ('post-' + $phase) $false
+        $f = New-Fixture ('post-' + $phase) ''
         $arguments = $f.arguments
         $threw = $false
         try { & $restoreScript @arguments -InjectFailureAt $phase | Out-Null }
@@ -204,33 +289,24 @@ try {
         $record = Read-Record $f
         Assert-True ([string]$record.status -ceq 'Installed') "After a $phase failure the record is not Installed."
         Assert-True ([string]$record.rollbackPhase -ceq 'reversed') "After a $phase failure the swap was not reversed."
-        Assert-True ((Read-KbpJson (Join-Path $f.planner 'Info.json')).Version -ceq '9.9.9-rc1') `
-            "After a $phase failure Mods does not hold the installed version the record names."
-        Assert-True ((Get-KbpDirectoryContentIdentity $f.planner).directoryManifestSha256 -ceq $f.installedIdentity) `
+        Assert-True ((Get-Identity $f.planner) -ceq $f.installedIdentity) `
             "After a $phase failure the installed planner is not byte-identical."
-        Assert-True ((Get-KbpDirectoryContentIdentity $f.prior).directoryManifestSha256 -ceq $f.priorIdentity) `
-            "After a $phase failure the recorded prior backup changed."
+        Assert-True ((Get-Identity $f.prior) -ceq $f.priorIdentity) "After a $phase failure the prior backup changed."
         Assert-True (-not (Test-Path -LiteralPath (Join-Path $f.state 'deployment.lock'))) "Lock kept after a reversed $phase failure."
         $passed++
     }
 
-    # ---------- reversal itself fails: recovery needed, lock kept ----------
-    $f = New-Fixture 'reverse-failed' $false
+    # ---------- reversal after a complete swap fails: recovery needed ----------
+    $f = New-Fixture 'reverse-failed' ''
     $arguments = $f.arguments
     $threw = $false
     try { & $restoreScript @arguments -InjectFailureAt 'record-and-reverse' | Out-Null } catch { $threw = $true }
     Assert-True $threw 'The unrecoverable failure did not surface.'
     $record = Read-Record $f
     Assert-True ([string]$record.status -ceq 'RollbackRecoveryNeeded') 'An unreversed swap was not recorded as needing recovery.'
-    Assert-True ([string]$record.failure -like '*reverse*') 'The reversal failure was not recorded.'
     Assert-True (Test-Path -LiteralPath (Join-Path $f.state 'deployment.lock')) 'The lock was released over an ambiguous Mods tree.'
-    $refused = $false
-    try { Assert-KbpNoUnresolvedTransaction $f.state } catch { $refused = $true }
-    Assert-True $refused 'An unrecoverable rollback did not block further transactions.'
-    Remove-Item -LiteralPath (Join-Path $f.state 'deployment.lock') -Force
-    $refused = $false
-    try { Assert-KbpNoUnresolvedTransaction $f.state } catch { $refused = $_.Exception.Message -like '*Unresolved install rollback*' }
-    Assert-True $refused 'A RollbackRecoveryNeeded record alone did not block further transactions.'
+    Assert-True ((Get-Identity ([string]$record.rollbackInstalledDisplacedPath)) -ceq $f.installedIdentity) `
+        'The displaced installed build lost bytes.'
     $passed++
 
     # ---------- injection refuses without fully isolated roots ----------
