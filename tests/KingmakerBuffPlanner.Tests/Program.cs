@@ -8563,6 +8563,21 @@ namespace KingmakerBuffPlanner.Tests
             public void Dispose() { }
         }
 
+        private sealed class RecordingAnimatedRuntime : ICastRuntimeAdapter,
+            ICastEnhancementRuntimeAdapter
+        {
+            internal readonly List<CastStep> Started = new List<CastStep>();
+            public bool IsInCombat { get { return false; } }
+            public CastRuntimeValidation Validate(CastStep step) { return CastRuntimeValidation.Pass(); }
+            public CastEnhancementPreparation PrepareEnhancements(CastStep step)
+            { return CastEnhancementPreparation.Pass(null); }
+            public IAnimatedCastOperation StartAnimated(CastStep step)
+            {
+                Started.Add(step);
+                return new FakeAnimatedOperation();
+            }
+        }
+
         // Records every step the executor fires, for the explicit-casting
         // projection test; enhancement preparation always succeeds.
         private sealed class RecordingInstantRuntime : IInstantCastRuntimeAdapter,
@@ -13714,6 +13729,18 @@ namespace KingmakerBuffPlanner.Tests
             for (int index = 0; index < recorder.Fired.Count; index++)
                 if (!ReferenceEquals(recorder.Fired[index], conversion.Plan.Steps[index]))
                     throw new InvalidOperationException("Executor fired steps out of order.");
+            // ...and so does the animated (native command) executor.
+            var animated = new RecordingAnimatedRuntime();
+            System.Collections.IEnumerator animatedRun = new AnimatedCastExecutor(animated, true)
+                .Execute(conversion.Plan, new ExecutionReport(conversion.Plan));
+            guard = 0;
+            while (animatedRun.MoveNext() && guard++ < 10000) { }
+            if (animated.Started.Count != conversion.Plan.Steps.Count ||
+                animated.Started.Where((step, index) =>
+                    !ReferenceEquals(step, conversion.Plan.Steps[index])).Any())
+                throw new InvalidOperationException("Animated executor started " +
+                    animated.Started.Count + " casts for " +
+                    conversion.Plan.Steps.Count + " approved castings (or out of order).");
             if (!extended.EnhancementIds.Contains("extend-cleric"))
                 throw new InvalidOperationException("A required enhancement was dropped.");
 
