@@ -36,6 +36,8 @@ namespace KingmakerBuffPlanner.UI
         private RectTransform _root;
         private RectTransform _buffGridContent;
         private InputField _buffSearch;
+        private Button _pinnedAdd;
+        private Button _pinnedDone;
         private string _buffQuery = string.Empty;
         private WorkspaceView _lastView;
         private Text _castingsTitle;
@@ -339,9 +341,38 @@ namespace KingmakerBuffPlanner.UI
             inspector.offsetMax = new Vector2(-PageInset, 0f);
             Text inspectorTitle;
             _inspectorContent = BuildLanePanel(inspector, "Inspector", out inspectorTitle);
+            // The primary action is pinned to the inspector's title row so
+            // it is always visible (it sat below the fold at the end of the
+            // scrolling inspector in live frame qual-220104). Add Casting
+            // while configuring the next casting; Done while editing one.
+            _pinnedAdd = KingmakerUiFactory.CreateButton(
+                "AddCasting", inspector, _theme, "Add Casting", () => Click(() =>
+                {
+                    AuthoringEditResult result = _session.AddCastingFromDraft(_inputs());
+                    if (!result.Applied)
+                        _footerResult.text = "Add refused: " + result.Reason;
+                    RefreshView();
+                }));
+            PinToTitleRow(RectOf(_pinnedAdd));
+            _pinnedDone = KingmakerUiFactory.CreateButton(
+                "DoneEditing", inspector, _theme, "Done — back to next casting",
+                () => Click(() =>
+                {
+                    _session.FocusCasting(null);
+                    RefreshView();
+                }));
+            PinToTitleRow(RectOf(_pinnedDone));
         }
 
         private const float PageInset = 44f;
+
+        private static void PinToTitleRow(RectTransform rect)
+        {
+            KingmakerUiFactory.SetAnchors(rect, 0.52f, 1f, 1f, 1f);
+            rect.pivot = new Vector2(0.5f, 1f);
+            rect.sizeDelta = new Vector2(0f, 26f);
+            rect.anchoredPosition = new Vector2(0f, 3f);
+        }
 
         private RectTransform BuildLanePanel(RectTransform lane, string title,
             out Text label)
@@ -716,6 +747,9 @@ namespace KingmakerBuffPlanner.UI
 
         private void RebuildInspector(WorkspaceView view)
         {
+            bool editing = view.EditingScope == WorkspaceEditingScope.EditingSingleCasting;
+            if (_pinnedAdd != null) _pinnedAdd.gameObject.SetActive(!editing);
+            if (_pinnedDone != null) _pinnedDone.gameObject.SetActive(editing);
             KingmakerUiFactory.DestroyChildren(_inspectorContent);
             Text scope = KingmakerUiFactory.CreateText(
                 "Scope", _inspectorContent, _theme, view.EditingScopeLabel, 16,
@@ -744,7 +778,6 @@ namespace KingmakerBuffPlanner.UI
                     TextAnchor.UpperLeft);
                 missing.color = _theme.MutedBrownText;
                 KingmakerUiFactory.AddLayout(missing.rectTransform, 34f);
-                AddDoneButton();
                 return;
             }
             bool directRecord = focused.TargetMode ==
@@ -903,22 +936,6 @@ namespace KingmakerBuffPlanner.UI
                     RefreshView();
                 }));
             KingmakerUiFactory.AddLayout(RectOf(remove), 30f);
-            AddDoneButton();
-        }
-
-        // Explicit nondestructive return to next-casting authoring (review
-        // G1): the canonical focus command, without deleting the record or
-        // recreating the session.
-        private void AddDoneButton()
-        {
-            Button done = KingmakerUiFactory.CreateButton(
-                "DoneEditing", _inspectorContent, _theme,
-                "Done — back to next casting", () => Click(() =>
-                {
-                    _session.FocusCasting(null);
-                    RefreshView();
-                }));
-            KingmakerUiFactory.AddLayout(RectOf(done), 34f);
         }
 
         // A denied operation must explain itself, not silently redraw the
@@ -1183,16 +1200,6 @@ namespace KingmakerBuffPlanner.UI
                     RefreshView();
                 }));
             KingmakerUiFactory.AddLayout(RectOf(state), 30f);
-            Button add = KingmakerUiFactory.CreateButton(
-                "AddCasting", _inspectorContent, _theme, "Add Casting",
-                () => Click(() =>
-                {
-                    AuthoringEditResult result = _session.AddCastingFromDraft(_inputs());
-                    if (!result.Applied)
-                        _footerResult.text = "Add refused: " + result.Reason;
-                    RefreshView();
-                }));
-            KingmakerUiFactory.AddLayout(RectOf(add), 36f);
         }
 
         private void AddInspectorCaption(string caption)
