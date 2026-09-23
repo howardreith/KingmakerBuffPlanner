@@ -1028,6 +1028,14 @@ namespace KingmakerBuffPlanner.UI
         // Authoring commands (explicit mutations with disclosed scope)
         // ------------------------------------------------------------------
 
+        // Guarded-qualification seam: adds one exact, recipe-selected casting
+        // through the authoring service (an ordinary undoable edit). The
+        // player UI never calls it.
+        internal AuthoringEditResult AddCastingForRuntime(PlannedCasting casting)
+        {
+            return _authoring.AddCasting(casting);
+        }
+
         public AuthoringEditResult AddCastingFromDraft(
             CastingWorkspaceInputs inputs = null)
         {

@@ -264,6 +264,7 @@ namespace KingmakerBuffPlanner.Execution
         internal CastingQualificationStepForecast(string name, string refusal,
             ExplicitStepConversion projection, IList<string> castingIds)
         {
+            Projection = projection != null && projection.Converted ? projection : null;
             Name = name ?? string.Empty;
             Refusal = refusal;
             ProjectionId = projection == null || !projection.Converted
@@ -274,6 +275,9 @@ namespace KingmakerBuffPlanner.Execution
         }
 
         public string Name { get; private set; }
+        // The converted projection itself (its steps name each caster,
+        // target and source to observe).
+        internal ExplicitStepConversion Projection { get; private set; }
         // Null when the step projects; otherwise why it does not.
         public string Refusal { get; private set; }
         public string ProjectionId { get; private set; }

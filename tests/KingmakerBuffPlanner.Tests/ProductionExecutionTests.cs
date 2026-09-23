@@ -51,6 +51,9 @@ namespace KingmakerBuffPlanner.Tests
             Run("qualification-allowance-parsing", TestQualificationAllowanceParsing);
             Run("qualification-recipe-selection", TestQualificationRecipeSelection);
             Run("qualification-forecast-and-boundary", TestQualificationForecastAndBoundary);
+            Run("qualification-driver-end-to-end", () => TestQualificationDriverEndToEnd(root));
+            Run("qualification-driver-refusals-and-deadline",
+                () => TestQualificationDriverRefusalsAndDeadline(root));
             // Last: it takes the process-wide runtime-test lock.
             Run("production-execution-wiring-and-session-lock", TestProductionExecutionWiring);
         }
@@ -1392,6 +1395,147 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("The submission budget was exceeded: " +
                     overBudget.Reason + "|fired=" + runtime.Fired.Count + "|" +
                     string.Join(";", boundary.Submissions.ToArray()));
+        }
+
+        // A tiny simulated game world for the qualification driver: a rule
+        // cast of the fixture buff creates a NEW effect instance on its
+        // target (no spend: the sources are verified free); fresh reads and
+        // later compiles see exactly the world state.
+        private sealed class SimulatedBuffWorld : IInstantCastRuntimeAdapter,
+            ICastEnhancementRuntimeAdapter
+        {
+            internal readonly Dictionary<string, KeyValuePair<string, long>> Active =
+                new Dictionary<string, KeyValuePair<string, long>>(StringComparer.Ordinal);
+            internal readonly List<string> Fired = new List<string>();
+            private int _instances;
+            private long _sequence;
+            internal long Now;
+            public bool IsInCombat { get { return false; } }
+            public CastRuntimeValidation Validate(CastStep step) { return CastRuntimeValidation.Pass(); }
+            public CastEnhancementPreparation PrepareEnhancements(CastStep step)
+            { return CastEnhancementPreparation.Pass(null); }
+            public InstantCastResult Fire(CastStep step)
+            {
+                Fired.Add(step.AssignmentId);
+                Active[step.TargetUnitIds[0]] = new KeyValuePair<string, long>(
+                    "i" + (++_instances), Now + 600);
+                return new InstantCastResult(true, true, true, false, "simulated");
+            }
+            public bool EffectsObserved(CastStep step) { return Active.ContainsKey(step.TargetUnitIds[0]); }
+            public InstantCastCompletion InspectCompletion(CastStep step)
+            { return InstantCastCompletion.Settled("simulated-settled"); }
+            public InstantCastCompletion Cleanup(CastStep step)
+            { return InstantCastCompletion.Settled("simulated-clean"); }
+
+            internal ActiveEffectSnapshot Live()
+            {
+                return LiveEffects(Active.Select(pair => On(pair.Key, "buff-effect", 100, null, 0)).ToArray());
+            }
+
+            internal ProbeObservation Observe(CastStep step, string label)
+            {
+                KeyValuePair<string, long> instance;
+                string target = step.TargetUnitIds[0];
+                var instances = Active.TryGetValue(target, out instance)
+                    ? new[] { new ProbeEffectInstance("buff-effect", instance.Key, instance.Value) }
+                    : new ProbeEffectInstance[0];
+                return ProbeObservation.Read(label, ++_sequence, DateTime.UtcNow,
+                    target, -1, instances);
+            }
+        }
+
+        private static CastingQualificationDriver NewQualificationDriver(string dir,
+            SimulatedBuffWorld world, CastingQualificationRecord record,
+            CastingQualificationAllowance allowance, Func<long> clock)
+        {
+            var host = new CastingExecutionHost(settings => new InstantCastExecutor(world, true), clock);
+            return new CastingQualificationDriver(record, allowance, "fixture-campaign",
+                () => QualificationInputs(true, true, world.Live()),
+                boundary => new CastingWorkspaceSession(dir, "fixture-campaign", boundary),
+                host, world.Observe, clock, 240000);
+        }
+
+        private static CastingQualificationAllowance ForecastAllowance(SimulatedBuffWorld world,
+            Func<IReadOnlyList<CastingQualificationStepForecast>, IEnumerable<string>> ids = null)
+        {
+            CastingWorkspaceInputs inputs = QualificationInputs(true, true, world.Live());
+            CastingQualificationSelection selection = CastingQualificationRecipe.SelectZeroCostMixed(
+                inputs, "fixture-campaign");
+            IReadOnlyList<CastingQualificationStepForecast> forecast =
+                CastingQualificationForecast.Forecast(selection, inputs, "fixture-campaign");
+            IEnumerable<string> approved = ids == null
+                ? forecast.Select(step => step.ProjectionId) : ids(forecast);
+            string refusal;
+            return CastingQualificationAllowance.Parse(QualificationAllowanceJson(o =>
+            {
+                o["fixtureGameId"] = "fixture-campaign";
+                o["approvedProjectionIds"] = new JArray(approved.Cast<object>().ToArray());
+                o["maximumNativeSubmissions"] = 6;
+            }), "qual-run-1", out refusal);
+        }
+
+        // The whole zero-cost-mixed qualification through the production
+        // session, gate, converter, qualification boundary and host.
+        private static void TestQualificationDriverEndToEnd(string root)
+        {
+            var world = new SimulatedBuffWorld();
+            CastingQualificationAllowance allowance = ForecastAllowance(world);
+            var record = new CastingQualificationRecord { CastingScenario = true, AllowanceStatus = "parsed" };
+            string dir = Path.Combine(root, "qualification-e2e");
+            Directory.CreateDirectory(dir);
+            long now = 0;
+            CastingQualificationDriver driver = NewQualificationDriver(dir, world, record, allowance, () => now);
+            int guard = 0;
+            while (!driver.Completed && guard++ < 5000) { now += 16; world.Now = now; driver.Update(); }
+            IList<string> violations = record.Violations();
+            string steps = string.Join(";", record.Steps.Select(step => step.Name + "=" +
+                (step.Report == null ? step.ApplyReason : step.Report.TerminalReason)).ToArray());
+            if (!driver.Completed || record.TerminalReason != "completed" || violations.Count != 0)
+                throw new InvalidOperationException("The qualification did not pass: " +
+                    record.TerminalReason + "|" + string.Join("|", violations.ToArray()) + "|" + steps);
+            if (!world.Fired.SequenceEqual(new[] { "qual-cast-1", "qual-cast-2", "qual-cast-3", "qual-cast-1" }) ||
+                record.PlannedSubmissions != 3 + 2 + 1)
+                throw new InvalidOperationException("Unexpected submissions: " +
+                    string.Join(",", world.Fired.ToArray()) + "|" + record.PlannedSubmissions);
+        }
+
+        // Nothing reaches the world unless the approved projections are
+        // exactly the forecast; selection-only never submits; the run
+        // deadline ends it through the host terminal.
+        private static void TestQualificationDriverRefusalsAndDeadline(string root)
+        {
+            var mismatchWorld = new SimulatedBuffWorld();
+            CastingQualificationAllowance wrong = ForecastAllowance(mismatchWorld,
+                forecast => forecast.Select(step => step.ProjectionId).Reverse());
+            var mismatch = new CastingQualificationRecord { CastingScenario = true };
+            long now = 0;
+            CastingQualificationDriver refused = NewQualificationDriver(
+                Path.Combine(root, "qualification-mismatch"), mismatchWorld, mismatch, wrong, () => now);
+            for (int i = 0; i < 20 && !refused.Completed; i++) refused.Update();
+            if (!refused.Completed || mismatchWorld.Fired.Count != 0 ||
+                mismatch.AllowanceStatus != "projections-differ-from-forecast" ||
+                mismatch.Violations().Count == 0)
+                throw new InvalidOperationException("Mismatched projections reached the world.");
+            var selectWorld = new SimulatedBuffWorld();
+            var selectOnly = new CastingQualificationRecord { CastingScenario = false };
+            CastingQualificationDriver select = NewQualificationDriver(
+                Path.Combine(root, "qualification-select"), selectWorld, selectOnly, null, () => now);
+            for (int i = 0; i < 20 && !select.Completed; i++) select.Update();
+            if (!select.Completed || selectWorld.Fired.Count != 0 || selectOnly.Violations().Count != 0 ||
+                selectOnly.Forecast.Count != 3)
+                throw new InvalidOperationException("The selection-only run misbehaved.");
+            var slowWorld = new SimulatedBuffWorld();
+            var slow = new CastingQualificationRecord { CastingScenario = true };
+            string slowDir = Path.Combine(root, "qualification-deadline");
+            Directory.CreateDirectory(slowDir);
+            CastingQualificationDriver deadline = NewQualificationDriver(slowDir, slowWorld, slow,
+                ForecastAllowance(slowWorld), () => now);
+            for (int i = 0; i < 3; i++) deadline.Update();
+            now += 240001;
+            deadline.Update();
+            if (!deadline.Completed || slow.TerminalReason != "qualification-deadline" ||
+                slow.Violations().All(value => !value.StartsWith("terminal:", StringComparison.Ordinal)))
+                throw new InvalidOperationException("The qualification deadline did not end the run.");
         }
     }
 }

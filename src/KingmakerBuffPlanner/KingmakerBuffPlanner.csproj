@@ -119,6 +119,7 @@
     <Compile Include="Execution\ExplicitCastingRunCoordinator.cs" />
     <Compile Include="Execution\SingleCastProbe.cs" />
     <Compile Include="Execution\CastingQualification.cs" />
+    <Compile Include="Execution\CastingQualificationDriver.cs" />
     <Compile Include="Execution\SingleCastProbeObservation.cs" />
     <Compile Include="GameAdapters\KingmakerProbeObserver.cs" />
     <Compile Include="Diagnostics\ShareCastDiagnostics.cs" />
