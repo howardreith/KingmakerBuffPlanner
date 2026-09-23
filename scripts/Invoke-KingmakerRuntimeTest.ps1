@@ -57,13 +57,12 @@ if ($Scenario -ceq 'live-cast-probe') {
         throw "The probe allowance must be an existing file under $approvalsRoot"
     }
     $probeAllowanceJson = [IO.File]::ReadAllText($allowanceFull)
-    $allowance = $probeAllowanceJson | ConvertFrom-Json
-    if ([string]$allowance.kind -cne 'kbp-single-cast-probe' -or
-        [string]$allowance.runId -cne $RunId -or
-        [string]$allowance.sourceCommit -cne [string]$buildManifest.commit -or
-        [int]$allowance.maximumNativeSubmissions -ne 1) {
-        throw 'The probe allowance does not match this run id, this build commit, or one submission.'
-    }
+    # Review N1: run id, commit, one submission AND the frozen package/DLL/
+    # MVID must all match this build before anything is deployed; the host
+    # re-measures the loaded DLL and MVID before any submission.
+    $allowanceRefusal = Get-KbpProbeAllowanceBuildRefusal -AllowanceJson $probeAllowanceJson `
+        -RunId $RunId -BuildManifest $buildManifest
+    if ($null -ne $allowanceRefusal) { throw "The probe allowance was refused: $allowanceRefusal" }
 }
 elseif (-not [string]::IsNullOrWhiteSpace($ProbeAllowancePath)) {
     throw '-ProbeAllowancePath is only valid with -Scenario live-cast-probe.'

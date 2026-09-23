@@ -134,6 +134,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             _modEntry = modEntry;
             _log = log;
             _startedAtUtc = DateTime.UtcNow;
+            // Review N2: a probe request's owner exists from host creation, so
+            // a disable/unload/failure at ANY point is terminal for it.
+            if (RuntimeTestProtocol.IsProbeScenario(request.Scenario))
+                _probeOwner = new SingleCastProbeRunOwner(_probeRecord, CloseProbeWorkspace,
+                    PublishProbeRecord);
         }
 
         internal static RuntimeTestHost TryCreate(
@@ -155,6 +160,23 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         internal bool Update()
         {
             if (_completed) return true;
+            // Review N2: after Shutdown (disable/unload/host failure) no later
+            // update or re-enable can resume this request: it completes once,
+            // as a failure, without selecting, arming or submitting.
+            if (_shutdownReason != null)
+            {
+                _completed = true;
+                try
+                {
+                    TryWriteFailure(_startedAtUtc,
+                        new InvalidOperationException("runtime-request-shut-down:" + _shutdownReason));
+                }
+                catch (Exception exception)
+                {
+                    _log.Error("[KBP-PROBE] shutdown result could not be written.", exception);
+                }
+                return true;
+            }
             // Workspace scenario: route the planner to the casting-first
             // workspace instead of the legacy screen. This must precede the
             // live-UI dispatch below (which returns until the phase machine
@@ -2394,11 +2416,15 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         // ------------------------------------------------------------------
         private bool UpdateProbeSelection()
         {
+            if (_probeOwner == null || !_probeOwner.BeginSelection())
+            {
+                _liveUiPhase = 42;
+                return false;
+            }
             if (!BuffPlannerUiRoot.IsCastingWorkspaceOpen) return false;
             CastingWorkspaceInputs inputs = BuffPlannerUiRoot.CastingWorkspaceInputsForRuntime();
             if (inputs == null) return false;
             _probeRecord.CastingScenario = RuntimeTestProtocol.IsCastingProbeScenario(_request.Scenario);
-            _probeOwner = new SingleCastProbeRunOwner(_probeRecord, CloseProbeWorkspace, PublishProbeRecord);
             _probeSelection = SingleCastProbeSelector.Select(inputs, "probe",
                 KingmakerProbeObserver.EffectPresent);
             _probeRecord.Selected = _probeSelection.Selected;
@@ -2457,7 +2483,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 return false;
             }
             var boundary = new SingleCastProbeBoundary(allowance,
-                () => new InstantCastExecutor(new KingmakerInstantCastAdapter(_log.Info), true));
+                () => new InstantCastExecutor(new KingmakerInstantCastAdapter(_log.Info), true),
+                MeasureProbeRuntimeIdentity);
             CastingDispatchOutcome outcome = _probeOwner.Submit(boundary,
                 new SingleCastProbeObservationSession(new KingmakerProbeObserver(), _probeClock, step),
                 _probeSelection.Plan, _probeSelection.Decision, projection,
@@ -2497,7 +2524,22 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         // unload) reaches the SAME idempotent owner terminal.
         internal void Shutdown(string reason)
         {
+            if (_shutdownReason == null)
+                _shutdownReason = string.IsNullOrEmpty(reason) ? "unspecified" : reason;
             if (_probeOwner != null) _probeOwner.Terminate(reason);
+        }
+
+        private string _shutdownReason;
+
+        // Review N1: measured at submit time from the LOADED code, never from
+        // the request alone: compiled-in commit, the launcher-verified
+        // package, the loaded DLL file hash and the loaded module MVID.
+        private SingleCastProbeRuntimeIdentity MeasureProbeRuntimeIdentity()
+        {
+            Assembly assembly = typeof(Main).Assembly;
+            return new SingleCastProbeRuntimeIdentity(BuildInfo.Commit,
+                _request.ExpectedPackageSha256, Hashing.Sha256(assembly.Location),
+                assembly.ManifestModule.ModuleVersionId.ToString("D"));
         }
 
         private ProbeWorkspaceCloseResult CloseProbeWorkspace()
@@ -2529,6 +2571,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     { "submitted", record.Submitted },
                     { "submitReason", record.SubmitReason },
                     { "boundaryDisposed", record.BoundaryDisposed },
+                    { "measuredIdentity", record.MeasuredIdentity },
                     { "invocation", new JObject
                         {
                             { "outcomeProjectionId", outcome == null ? null : outcome.ProjectionId },

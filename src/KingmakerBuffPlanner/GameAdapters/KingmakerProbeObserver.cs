@@ -4,6 +4,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using Kingmaker;
 using Kingmaker.EntitySystem.Entities;
+using Kingmaker.UnitLogic.Abilities;
 using Kingmaker.UnitLogic.Buffs;
 using KingmakerBuffPlanner.Domain.Effects;
 using KingmakerBuffPlanner.Domain.Planning;
@@ -22,17 +23,37 @@ namespace KingmakerBuffPlanner.GameAdapters
         {
             try
             {
-                KingmakerAnimatedCastAdapter.ResolvedCast resolved;
-                string reason;
-                if (!KingmakerAnimatedCastAdapter.TryResolve(step, out resolved, out reason))
-                    return ProbeObservation.Failed(phase, clock.Next(), DateTime.UtcNow, "resolve:" + reason);
-                UnitEntityData target = resolved.Target == null ? null : resolved.Target.Unit;
-                if (target == null || target.Descriptor == null)
-                    return ProbeObservation.Failed(phase, clock.Next(), DateTime.UtcNow, "target-unit-unavailable");
-                int available = resolved.Ability.GetAvailableForCastCount();
+                if (Game.Instance == null || Game.Instance.Player == null)
+                    return ProbeObservation.Failed(phase, clock.Next(), DateTime.UtcNow, "player-state-unavailable");
+                // Review N3: resolve units and the source for OBSERVATION,
+                // independent of spendability - after a successful cast the
+                // reserved prepared slot is consumed but is still the source.
+                Dictionary<string, UnitEntityData> units = KingmakerAnimatedCastAdapter.CollectUnits();
+                UnitEntityData caster;
+                UnitEntityData target;
+                string targetId = step.TargetUnitIds.FirstOrDefault();
+                if (!units.TryGetValue(step.Provider.CasterUnitId, out caster) || caster.Descriptor == null)
+                    return ProbeObservation.Failed(phase, clock.Next(), DateTime.UtcNow, "caster-not-in-party");
+                if (string.IsNullOrEmpty(targetId) || !units.TryGetValue(targetId, out target) ||
+                    target.Descriptor == null)
+                    return ProbeObservation.Failed(phase, clock.Next(), DateTime.UtcNow, "target-not-in-party");
+                IDictionary<string, bool> reserved = null;
+                if (step.Reservation != null && step.Reservation.TokenIds.Count != 0)
+                {
+                    string failure;
+                    reserved = ProbeSourceSlots.ReservedExactly(
+                        KingmakerAnimatedCastAdapter.ObserveSpellbookSlots(caster, step.Provider),
+                        step.Reservation.TokenIds, out failure);
+                    if (reserved == null)
+                        return ProbeObservation.Failed(phase, clock.Next(), DateTime.UtcNow, failure);
+                }
+                AbilityData ability = KingmakerAnimatedCastAdapter.ResolveAbility(caster, step.Provider);
+                int? available = ability == null ? (int?)null : ability.GetAvailableForCastCount();
+                if (available == null && reserved == null)
+                    return ProbeObservation.Failed(phase, clock.Next(), DateTime.UtcNow, "source-ability-not-found");
                 List<ProbeEffectInstance> instances = Instances(target, ExpectedIds(step.ExpectedEffects));
                 return ProbeObservation.Read(phase, clock.Next(), DateTime.UtcNow, target.UniqueId,
-                    available, instances);
+                    available, instances, reserved);
             }
             catch (Exception exception)
             {

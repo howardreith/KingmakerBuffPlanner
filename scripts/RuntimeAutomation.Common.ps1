@@ -537,3 +537,26 @@ function Assert-KbpRuntimeResult {
         }
     }
 }
+
+# Review N1: the launcher-side binding of an owner allowance to THIS build.
+# Returns $null when it matches, otherwise the first refusal reason.
+function Get-KbpProbeAllowanceBuildRefusal {
+    param([string]$AllowanceJson, [string]$RunId, $BuildManifest)
+    try { $allowance = $AllowanceJson | ConvertFrom-Json }
+    catch { return 'unreadable' }
+    if ($null -eq $allowance) { return 'unreadable' }
+    $names = @($allowance.PSObject.Properties | ForEach-Object Name)
+    foreach ($required in @('kind', 'runId', 'sourceCommit', 'packageSha256', 'dllSha256', 'assemblyMvid',
+            'maximumNativeSubmissions')) {
+        if ($names -cnotcontains $required) { return "missing:$required" }
+    }
+    if ([string]$allowance.kind -cne 'kbp-single-cast-probe') { return 'kind' }
+    if ([string]$allowance.runId -cne $RunId) { return 'run-id' }
+    if ([string]$allowance.sourceCommit -cne [string]$BuildManifest.commit) { return 'commit' }
+    if ([string]$allowance.packageSha256 -cne [string]$BuildManifest.packageSha256) { return 'package' }
+    if ([string]$allowance.dllSha256 -cne [string]$BuildManifest.dllSha256) { return 'dll' }
+    if ([string]$allowance.assemblyMvid -cne [string]$BuildManifest.assemblyMvid) { return 'mvid' }
+    if (-not ($allowance.maximumNativeSubmissions -is [int] -or $allowance.maximumNativeSubmissions -is [long]) -or
+        [int]$allowance.maximumNativeSubmissions -ne 1) { return 'submissions' }
+    return $null
+}
