@@ -201,19 +201,19 @@ namespace KingmakerBuffPlanner.UI
         {
             // Caster lane (left).
             RectTransform casters = KingmakerUiFactory.CreateRect("Casters", frame);
-            KingmakerUiFactory.SetAnchors(casters, 0f, 0.06f, 0.28f, 0.88f);
+            KingmakerUiFactory.SetAnchors(casters, 0f, 0.085f, 0.28f, 0.88f);
             casters.offsetMin = new Vector2(10f, 0f);
             casters.offsetMax = new Vector2(-4f, 0f);
             _casterContent = BuildLanePanel(casters, "Casters");
             // Casting-card lane (center).
             RectTransform cards = KingmakerUiFactory.CreateRect("Cards", frame);
-            KingmakerUiFactory.SetAnchors(cards, 0.28f, 0.06f, 0.72f, 0.88f);
+            KingmakerUiFactory.SetAnchors(cards, 0.28f, 0.085f, 0.72f, 0.88f);
             cards.offsetMin = new Vector2(4f, 0f);
             cards.offsetMax = new Vector2(-4f, 0f);
             _cardContent = BuildLanePanel(cards, "Castings");
             // Inspector (right).
             RectTransform inspector = KingmakerUiFactory.CreateRect("Inspector", frame);
-            KingmakerUiFactory.SetAnchors(inspector, 0.72f, 0.06f, 1f, 0.88f);
+            KingmakerUiFactory.SetAnchors(inspector, 0.72f, 0.085f, 1f, 0.88f);
             inspector.offsetMin = new Vector2(4f, 0f);
             inspector.offsetMax = new Vector2(-10f, 0f);
             _inspectorContent = BuildLanePanel(inspector, "Inspector");
@@ -353,10 +353,14 @@ namespace KingmakerBuffPlanner.UI
                 // underneath it.
                 KingmakerUiFactory.SetAnchors(name.rectTransform, 0f, 0f, 0.7f, 1f,
                     8f, 4f, 4f, 4f);
+                // "Use" picks this caster for the next casting (the draft)
+                // and shows it; it never edits an existing casting. The
+                // former "Focus" only moved an invisible editing focus.
                 Button select = KingmakerUiFactory.CreateButton(
-                    "Focus", entry, _theme, "Focus", () => Click(() =>
+                    "Focus", entry, _theme,
+                    row.SelectedFocus ? "Casting" : "Use", () => Click(() =>
                     {
-                        _session.SelectCaster(row.UnitId);
+                        _session.ChooseDraftCaster(row.UnitId);
                         RefreshView();
                     }));
                 KingmakerUiFactory.SetAnchors(RectOf(select), 0.72f, 0.15f, 0.98f, 0.85f);
@@ -378,6 +382,18 @@ namespace KingmakerBuffPlanner.UI
             ScrollRect scroll = _cardContent.GetComponentInParent<ScrollRect>();
             if (scroll != null) _cardScrollPosition = scroll.normalizedPosition;
             KingmakerUiFactory.DestroyChildren(_cardContent);
+            if (view.Cards.Count == 0)
+            {
+                Text hint = KingmakerUiFactory.CreateText(
+                    "EmptyHint", _cardContent, _theme,
+                    "No castings in the " + view.SelectedRoutineId + " routine yet.\n" +
+                    "Pick a buff, a caster and a recipient in the Inspector, " +
+                    "then press Add Casting. Each casting is one cast of one " +
+                    "buff and can be edited on its own.", 15, TextAnchor.UpperLeft);
+                hint.color = _theme.MutedBrownText;
+                hint.horizontalOverflow = HorizontalWrapMode.Wrap;
+                KingmakerUiFactory.AddLayout(hint.rectTransform, 90f);
+            }
             foreach (WorkspaceCastingCard card in view.Cards)
             {
                 RectTransform entry = KingmakerUiFactory.CreateRect(
@@ -690,7 +706,7 @@ namespace KingmakerBuffPlanner.UI
                 WorkspaceSourceOption captured = source;
                 Button pick = KingmakerUiFactory.CreateButton(
                     "Source." + captured.SourceId, _inspectorContent, _theme,
-                    (captured.Selected ? "[x] " : "[  ] ") + captured.DisplayName,
+                    (captured.Selected ? "[x] " : "[  ] ") + captured.Label,
                     () => Click(() =>
                     {
                         _session.SelectBuff(captured.SourceId);
@@ -952,6 +968,7 @@ namespace KingmakerBuffPlanner.UI
                         _session.SelectRoutine(captured);
                         RefreshView();
                     }));
+                RectOf(tab).pivot = new Vector2(0f, 0.5f);
                 RectOf(tab).anchorMin = new Vector2(0f, 0.1f);
                 RectOf(tab).anchorMax = new Vector2(0f, 0.9f);
                 RectOf(tab).sizeDelta = new Vector2(170f, 0f);

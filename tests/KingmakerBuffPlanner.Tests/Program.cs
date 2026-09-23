@@ -379,6 +379,10 @@ namespace KingmakerBuffPlanner.Tests
                     TestRuntimeHostScenarioContractWiring);
                 Run("workspace-header-caption-and-lane-layout",
                     () => TestWorkspaceHeaderAndLaneLayoutContract(root));
+                Run("workspace-source-label-disambiguation",
+                    TestWorkspaceSourceLabelDisambiguation);
+                Run("workspace-choose-draft-caster",
+                    () => TestWorkspaceChooseDraftCaster(root));
             }
             finally
             {
@@ -13398,6 +13402,69 @@ namespace KingmakerBuffPlanner.Tests
                 !screen.Contains("view.SelectedSourceCaption"))
                 throw new InvalidOperationException(
                     "Workspace lanes no longer fill their columns or the header regressed.");
+        }
+
+        // Session 2026-09-22: "Use Heal Skill" and "Aid Another" each
+        // appeared twice with identical labels.
+        private static void TestWorkspaceSourceLabelDisambiguation()
+        {
+            IReadOnlyDictionary<string, string> details = WorkspaceSourceLabels.Details(new[]
+            {
+                new WorkspaceSourceDescriptor("s-light", "Light",
+                    new[] { "Light" }, new[] { "spell" }, new[] { "Linzi" }),
+                new WorkspaceSourceDescriptor("s-heal-a", "Use Heal Skill",
+                    new[] { "Use Heal Skill" }, new[] { "ability" }, new[] { "Hedwirg" }),
+                new WorkspaceSourceDescriptor("s-heal-b", "Use Heal Skill",
+                    new[] { "Use Heal Skill" }, new[] { "feature" }, new[] { "Linzi" }),
+                new WorkspaceSourceDescriptor("s-res-a", "Resist Energy",
+                    new[] { "Resist Energy — Fire" }, new[] { "spell" }, new[] { "Linzi" }),
+                new WorkspaceSourceDescriptor("s-res-b", "Resist Energy",
+                    new[] { "Resist Energy — Cold" }, new[] { "spell" }, new[] { "Linzi" }),
+                new WorkspaceSourceDescriptor("s-aid-a", "Aid Another",
+                    null, null, null),
+                new WorkspaceSourceDescriptor("s-aid-b", "Aid Another",
+                    null, null, null)
+            });
+            if (details["s-light"] != string.Empty)
+                throw new InvalidOperationException("A unique name was decorated.");
+            if (details["s-res-a"] != "Resist Energy — Fire" ||
+                details["s-res-b"] != "Resist Energy — Cold")
+                throw new InvalidOperationException("Variant names were not preferred.");
+            if (details["s-heal-a"] != "ability · Hedwirg" ||
+                details["s-heal-b"] != "feature · Linzi")
+                throw new InvalidOperationException(
+                    "Kind/caster detail was not used: " + details["s-heal-a"] +
+                    " | " + details["s-heal-b"]);
+            if (details["s-aid-a"] == details["s-aid-b"] ||
+                !details["s-aid-a"].Contains("source 1"))
+                throw new InvalidOperationException("Indistinguishable sources stayed identical.");
+            var option = new WorkspaceSourceOption("s-heal-a", "Use Heal Skill", false,
+                details["s-heal-a"]);
+            if (option.Label != "Use Heal Skill — ability · Hedwirg")
+                throw new InvalidOperationException("Label composition drifted: " + option.Label);
+        }
+
+        // The caster lane's button must set the caster the next Add uses
+        // (it formerly moved only an invisible focus), without touching the
+        // saved document.
+        private static void TestWorkspaceChooseDraftCaster(string root)
+        {
+            string modPath = Path.Combine(root, "casting-workspace-draft-caster");
+            Directory.CreateDirectory(modPath);
+            PartyProviderSnapshot snapshot;
+            CastingWorkspaceInputs inputs = WorkspaceInputs(out snapshot);
+            var session = new CastingWorkspaceSession(modPath, "workspace-campaign");
+            session.SelectBuff("source-bulls");
+            session.SelectRoutine("long");
+            string before = session.DocumentIntentSignature();
+            session.ChooseDraftCaster("unit-wizard");
+            if (session.Draft.CasterUnitId != "unit-wizard" ||
+                session.SelectedCasterUnitId != "unit-wizard" ||
+                session.DocumentIntentSignature() != before)
+                throw new InvalidOperationException("Choosing a caster did not set the draft only.");
+            WorkspaceView view = session.BuildView(inputs);
+            if (!view.Casters.Any(row => row.UnitId == "unit-wizard" && row.SelectedFocus))
+                throw new InvalidOperationException("The chosen caster is not shown as selected.");
         }
 
         // The Unity-bound host cannot be compiled here, so its wiring to the
