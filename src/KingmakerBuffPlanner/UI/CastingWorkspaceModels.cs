@@ -190,7 +190,16 @@ namespace KingmakerBuffPlanner.UI
 
         public string Subtitle
         {
-            get { return "Casting " + (Order + 1) + " in " + RoutineId; }
+            get { return "Casting " + (Order + 1) + " in " + (RoutineName ?? RoutineId); }
+        }
+
+        // The routine display name (Long, Important, Short); null until the
+        // session sets it.
+        public string RoutineName { get; private set; }
+
+        internal void ApplyRoutineName(string name)
+        {
+            RoutineName = string.IsNullOrWhiteSpace(name) ? null : name;
         }
 
         // Group castings only: predicted beneficiaries over intended
@@ -211,9 +220,10 @@ namespace KingmakerBuffPlanner.UI
     // resolved plan's authoritative lines with the responsible casting IDs.
     public sealed class WorkspaceBudgetRow
     {
-        internal WorkspaceBudgetRow(CastingBudgetLine line)
+        internal WorkspaceBudgetRow(CastingBudgetLine line, string label = null)
         {
             PoolKey = line.PoolKey;
+            Label = string.IsNullOrWhiteSpace(label) ? "resource" : label;
             Category = line.Category;
             AvailableNow = line.AvailableNow;
             RequestedUsage = line.RequestedUsage;
@@ -228,18 +238,19 @@ namespace KingmakerBuffPlanner.UI
         // "unlimited", never as an unknown or zero balance.
         public bool Unlimited { get; private set; }
 
+        // Player-facing pool name (whose and what kind), never the key.
+        public string Label { get; private set; }
+
         // Footer text for this row, or null when it has nothing to show.
         public string Describe()
         {
             if (Unlimited)
                 return ResponsibleCastingIds.Count == 0 ? null
-                    : PoolKey + " unlimited (" + ResponsibleCastingIds.Count + " cast" +
-                        (ResponsibleCastingIds.Count == 1 ? "" : "s") + ", no slot spent)";
+                    : Label + " (" + ResponsibleCastingIds.Count + " cast" +
+                        (ResponsibleCastingIds.Count == 1 ? "" : "s") + ", nothing spent)";
             if (UnmetDemand == 0 && RequestedUsage == 0) return null;
-            return PoolKey + " " + AllocatedUsage + "/" + RequestedUsage +
-                (UnmetDemand == 0 ? string.Empty
-                    : " (unmet " + UnmetDemand + " — " +
-                        string.Join(",", ResponsibleCastingIds.ToArray()) + ")");
+            return Label + ": " + AllocatedUsage + " of " + RequestedUsage + " covered" +
+                (UnmetDemand == 0 ? string.Empty : ", short by " + UnmetDemand);
         }
 
         public string PoolKey { get; private set; }
@@ -377,6 +388,26 @@ namespace KingmakerBuffPlanner.UI
                 .Distinct(StringComparer.Ordinal)
                 .OrderBy(value => value, StringComparer.Ordinal)
                 .ToList();
+        }
+    }
+
+    // Player-facing resource pool names.
+    public static class WorkspacePoolLabels
+    {
+        public static string Describe(ResourcePoolKind kind, int? spellLevel, string owner)
+        {
+            string what;
+            switch (kind)
+            {
+                case ResourcePoolKind.Unlimited: what = "free"; break;
+                case ResourcePoolKind.PreparedSlots:
+                    what = spellLevel == null ? "prepared slot" : "prepared level " + spellLevel + " slot"; break;
+                case ResourcePoolKind.SpontaneousLevel:
+                    what = spellLevel == null ? "spell slot" : "level " + spellLevel + " spell slot"; break;
+                case ResourcePoolKind.AbilityResource: what = "ability use"; break;
+                default: what = "item charge"; break;
+            }
+            return string.IsNullOrWhiteSpace(owner) ? what : owner + ": " + what;
         }
     }
 

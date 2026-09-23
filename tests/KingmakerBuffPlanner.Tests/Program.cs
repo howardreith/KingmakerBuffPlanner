@@ -14464,7 +14464,7 @@ namespace KingmakerBuffPlanner.Tests
                     (first.DirectTargetDisplayName ?? "unit-t1")) ||
                 first.Headline.Contains(first.CastingId) ||
                 first.CoverageSummary.Length != 0 ||
-                !first.Subtitle.StartsWith("Casting 1 in long"))
+                !first.Subtitle.StartsWith("Casting 1 in Long"))
                 throw new InvalidOperationException("Card headline/coverage text is wrong: " +
                     (first == null ? "missing" : first.Headline + " | " +
                         first.CoverageSummary + " | " + first.Subtitle));
@@ -15185,8 +15185,9 @@ namespace KingmakerBuffPlanner.Tests
             if (freeBudget == null || !freeBudget.Unlimited || freeBudget.AvailableNow != null ||
                 freeBudget.ForecastRemaining != null || freeBudget.AllocatedUsage != 0)
                 throw new InvalidOperationException("The Unlimited budget line reported a balance.");
-            if (!new WorkspaceBudgetRow(freeBudget).Describe().Contains("unlimited"))
-                throw new InvalidOperationException("The workspace budget row hid the unlimited pool.");
+            if (new WorkspaceBudgetRow(freeBudget, "Cleric: free").Describe() != "Cleric: free (1 cast, nothing spent)")
+                throw new InvalidOperationException("The workspace budget row hid the unlimited pool: " +
+                    new WorkspaceBudgetRow(freeBudget, "Cleric: free").Describe());
             CastingApplyDecision freeDecision = gate.Evaluate(free, CastingApplyMode.Ordinary, "long");
             foreach (ExplicitProjectionScope scope in new[] { ExplicitProjectionScope.Standard,
                 ExplicitProjectionScope.SingleCastProbe })
