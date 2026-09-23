@@ -5,7 +5,15 @@ Linked from `AUTONOMOUS-RESUME.md`. Specification: the adopted
 `Kingmaker-Buff-Planner-Casting-First-Migration-Charter.md` (casting-first
 migration and native scroll UI charter v1.0, 2026-09-19).
 
-## CURRENT STATE — M-series answered; cantrip probe proposed — 2026-09-23
+## CURRENT STATE — N-series answered; frozen cantrip proposal — 2026-09-23
+
+N1 (frozen-artifact binding checked before any native path), N2 (shutdown
+terminal from host creation) and N3 (exact prepared-slot observation) are
+implemented and tested with stand-ins. The cantrip proposal now binds a
+frozen artifact recorded outside the repository. The advanced-copy
+fixture family exists with an isolated test only. No cast has been run.
+
+## CURRENT STATE — M-series answered; cantrip probe proposed — 2026-09-23 (history)
 
 M1 (zero-cost native sources), M2 (authoritative probe observations) and
 M3 (owned terminal cleanup) are implemented; normal dispatch stays
