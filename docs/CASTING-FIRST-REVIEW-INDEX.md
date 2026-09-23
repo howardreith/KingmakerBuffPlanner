@@ -15,9 +15,11 @@ both player routes (casting-first and classic) refuse, and native casts
 happen only through the owner-authorized harness boundaries (single-cast
 probe, casting qualification). First native evidence: the one-cast
 Resistance probe confirmed its effect in game on
-`320a1b6` (`casting-probe-cast-20260923-p2-02`); the zero-cost
-qualification is next, and finite-resource qualification waits for an
-owner-designated advanced seed. Human usability and the native aesthetic
+`320a1b6` (`casting-probe-cast-20260923-p2-02`), and the zero-cost
+qualification passed in game on `d35b38f`
+(`casting-qual-cast-20260923-q1-01`: stop, complete, repeat and a recast
+after a close and reopen, each exactly as forecast). Finite-resource
+qualification waits for an owner-designated advanced seed. Human usability and the native aesthetic
 pass remain open.
 
 ## Current review dispositions — Pro review of `e7c5207` (answered 2026-09-23)

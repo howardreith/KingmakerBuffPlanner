@@ -39,8 +39,13 @@ the 0.0.133 configuration without establishing compatibility. The options:
 2. Save the seed while 0.0.133 is installed. This would require you to
    downgrade temporarily, which the automation never does.
 
-Also say whether Steam Cloud sync is on for Kingmaker (the harness
-records it and refuses unsafe states).
+The Steam Cloud state needs no answer: every guarded run records it and
+refuses unsafe states. The latest runs observed Steam offline with Cloud
+sync disabled for Kingmaker (`orchestration.json`, `steamSafety`:
+"Sync Disabled; offlineMode=true").
+
+This is asked once (owner mission section 9); all other work continues
+meanwhile.
 
 ## What happens next (under the existing mission authority)
 
