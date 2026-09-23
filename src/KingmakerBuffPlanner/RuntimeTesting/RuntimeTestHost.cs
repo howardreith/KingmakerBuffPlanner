@@ -2950,9 +2950,16 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     // Full canonical signature before/after browsing.
                     string beforeBrowse = session.DocumentIntentSignature();
                     string buffControl = Invoke("Source." + _interactionSourceId);
+                    // The source-type tabs are view-only: Spells, then back
+                    // to All, inside the same no-mutation check.
+                    string spellsTab = Invoke("SourceTab.Spells");
+                    string allTab = Invoke("SourceTab.All");
                     bool browseClean = string.Equals(
                         session.DocumentIntentSignature(), beforeBrowse,
                         StringComparison.Ordinal);
+                    _workspaceInteraction.SourceTabsControl =
+                        spellsTab != WorkspaceControlOutcome.Invoked ? spellsTab : allTab;
+                    _workspaceInteraction.SourceTabsClean = browseClean;
                     _workspaceInteraction.RecordBrowse(browseClean, buffControl,
                         _interactionCasters.Count, _interactionTargets.Count);
                     SyncInteractionEvidence();

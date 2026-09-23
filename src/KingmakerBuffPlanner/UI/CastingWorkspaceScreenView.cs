@@ -42,6 +42,9 @@ namespace KingmakerBuffPlanner.UI
         private Button _scopeToggle;
         private Button _pinnedDone;
         private string _buffQuery = string.Empty;
+        private PlannerSourceCategory _sourceCategory = PlannerSourceCategory.All;
+        private readonly Dictionary<PlannerSourceCategory, Button> _categoryTabs =
+            new Dictionary<PlannerSourceCategory, Button>();
         private WorkspaceView _lastView;
         private Text _castingsTitle;
         private RectTransform _cardContent;
@@ -355,6 +358,45 @@ namespace KingmakerBuffPlanner.UI
                     PropagateUiLayer();
                 }
             });
+            // Source-type tabs (Bubble Buffs and the classic catalogue):
+            // view-only filters like the search, between the lane title and
+            // the search field.
+            float tabLeft = 0.12f;
+            foreach (PlannerSourceCategory category in new[]
+                {
+                    PlannerSourceCategory.All, PlannerSourceCategory.Spells,
+                    PlannerSourceCategory.Abilities, PlannerSourceCategory.Other
+                })
+            {
+                PlannerSourceCategory captured = category;
+                Button tab = KingmakerUiFactory.CreateButton("SourceTab." + captured, buffs,
+                    _theme, captured.ToString(), () => Click(() =>
+                    {
+                        _sourceCategory = captured;
+                        foreach (KeyValuePair<PlannerSourceCategory, Button> pair in _categoryTabs)
+                            StyleTab(pair.Value, pair.Key == _sourceCategory);
+                        if (_lastView != null)
+                        {
+                            RebuildBuffGrid(_lastView);
+                            PropagateUiLayer();
+                        }
+                    }));
+                RectTransform tabRect = RectOf(tab);
+                KingmakerUiFactory.SetAnchors(tabRect, tabLeft, 1f, tabLeft + 0.1f, 1f);
+                tabRect.pivot = new Vector2(0.5f, 1f);
+                tabRect.sizeDelta = new Vector2(0f, 22f);
+                tabRect.anchoredPosition = Vector2.zero;
+                foreach (Text text in tab.GetComponentsInChildren<Text>(true))
+                {
+                    // 22px tabs clip the factory's 17px text (as the search did).
+                    text.fontSize = 13;
+                    text.resizeTextMaxSize = 13;
+                    text.verticalOverflow = VerticalWrapMode.Overflow;
+                }
+                StyleTab(tab, captured == _sourceCategory);
+                _categoryTabs[captured] = tab;
+                tabLeft += 0.105f;
+            }
             UnityEngine.Object.DestroyImmediate(
                 _buffGridContent.GetComponent<VerticalLayoutGroup>());
             GridLayoutGroup grid =
@@ -608,7 +650,8 @@ namespace KingmakerBuffPlanner.UI
             {
                 // The selected buff stays visible even when filtered out.
                 if (!source.Selected &&
-                    !WorkspaceSourceLabels.Matches(source, _buffQuery)) continue;
+                    (!WorkspaceSourceLabels.Matches(source, _buffQuery) ||
+                     !WorkspaceSourceLabels.MatchesCategory(source, _sourceCategory))) continue;
                 shown++;
                 WorkspaceSourceOption captured = source;
                 int count;
@@ -648,18 +691,23 @@ namespace KingmakerBuffPlanner.UI
                     captured.Label, 15, TextAnchor.UpperLeft);
                 name.fontStyle = captured.Selected ? FontStyle.Bold : FontStyle.Normal;
                 KingmakerUiFactory.Stretch(name.rectTransform, 66, 8, 20, 4);
+                string routineName = _session.RoutineDisplayName(view.SelectedRoutineId);
                 Text castings = KingmakerUiFactory.CreateText("Count", rect, _theme,
-                    count == 0 ? "no castings in " + view.SelectedRoutineId
+                    count == 0 ? "no castings in " + routineName
                         : count + (count == 1 ? " casting" : " castings") +
-                          " in " + view.SelectedRoutineId,
+                          " in " + routineName,
                     12, TextAnchor.LowerLeft);
                 castings.color = count == 0 ? _theme.MutedBrownText : _theme.GreenSuccess;
                 KingmakerUiFactory.Stretch(castings.rectTransform, 66, 8, 3, 36);
             }
             if (shown == 0)
             {
+                string where = _sourceCategory == PlannerSourceCategory.All
+                    ? string.Empty : " under " + _sourceCategory;
                 Text none = KingmakerUiFactory.CreateText("NoMatch", _buffGridContent,
-                    _theme, "No buff matches \"" + _buffQuery + "\".", 14,
+                    _theme, _buffQuery.Length == 0
+                        ? "No buffs" + where + "."
+                        : "No buff matches \"" + _buffQuery + "\"" + where + ".", 14,
                     TextAnchor.MiddleLeft);
                 none.color = _theme.MutedBrownText;
             }
@@ -1475,7 +1523,7 @@ namespace KingmakerBuffPlanner.UI
                         _session.SelectRoutine(captured);
                         RefreshView();
                     }));
-                StyleRoutineTab(tab, selected);
+                StyleTab(tab, selected);
                 RectOf(tab).pivot = new Vector2(0f, 0.5f);
                 RectOf(tab).anchorMin = new Vector2(0f, 0.1f);
                 RectOf(tab).anchorMax = new Vector2(0f, 0.9f);
@@ -1487,9 +1535,9 @@ namespace KingmakerBuffPlanner.UI
             }
         }
 
-        // The selected routine tab is gold with a bold label (the chip
-        // convention); the others keep the native button look.
-        private void StyleRoutineTab(Button tab, bool selected)
+        // A selected tab (routine or source type) is gold with a bold label
+        // (the chip convention); the others keep the native button look.
+        private void StyleTab(Button tab, bool selected)
         {
             Image image = tab.targetGraphic as Image;
             if (image != null) image.color = selected ? _theme.GoldAccent : Color.white;

@@ -13579,6 +13579,8 @@ namespace KingmakerBuffPlanner.Tests
             record.DoneClearedFocus = true;
             record.SaveControl = "invoked";
             record.Saved = true;
+            record.SourceTabsControl = "invoked";
+            record.SourceTabsClean = true;
             return record;
         }
 
@@ -13678,7 +13680,11 @@ namespace KingmakerBuffPlanner.Tests
                 Later("undo:outcome=False", r => r.UndoIntentRestored = false),
                 Later("done:control=control-inactive:DoneEditing", r => r.DoneControl = "control-inactive:DoneEditing"),
                 Later("save:outcome=False", r => r.Saved = false),
-                Later("save:not-run", r => r.SaveControl = null)
+                Later("save:not-run", r => r.SaveControl = null),
+                Later("sourceTabs:not-run", r => r.SourceTabsControl = null),
+                Later("sourceTabs:control=control-missing:SourceTab.Spells",
+                    r => r.SourceTabsControl = "control-missing:SourceTab.Spells"),
+                Later("sourceTabs:outcome=False", r => r.SourceTabsClean = false)
             };
             foreach (KeyValuePair<string, Action<WorkspaceInteractionRecord>> check in laterChecks)
             {
@@ -13726,6 +13732,8 @@ namespace KingmakerBuffPlanner.Tests
             to.DoneClearedFocus = from.DoneClearedFocus;
             to.SaveControl = from.SaveControl;
             to.Saved = from.Saved;
+            to.SourceTabsControl = from.SourceTabsControl;
+            to.SourceTabsClean = from.SourceTabsClean;
         }
 
         // Review J1 (production path): the evaluator the runtime host calls,
@@ -13828,6 +13836,9 @@ namespace KingmakerBuffPlanner.Tests
             record.SaveControl = "invoked";
             session.Save();
             record.Saved = !session.IsDirty;
+            // The source-type tabs are view-only controls (no session call).
+            record.SourceTabsControl = "invoked";
+            record.SourceTabsClean = true;
             if (record.Violations().Count != 0)
                 throw new InvalidOperationException(
                     "Three exact session records were rejected: " +

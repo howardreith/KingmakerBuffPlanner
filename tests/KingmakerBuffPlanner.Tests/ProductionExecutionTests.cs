@@ -50,6 +50,7 @@ namespace KingmakerBuffPlanner.Tests
             Run("host-stops-between-castings", TestHostStopsBetweenCastings);
             Run("host-player-stop-finishes-cast-in-progress", TestHostPlayerStopIsGraceful);
             Run("exhausted-rod-waived-by-active-effect", TestExhaustedRodWithActiveEffect);
+            Run("buff-grid-source-type-tabs", () => TestBuffGridSourceTypeTabs(root));
             Run("qualification-allowance-parsing", TestQualificationAllowanceParsing);
             Run("qualification-recipe-selection", TestQualificationRecipeSelection);
             Run("qualification-forecast-and-boundary", TestQualificationForecastAndBoundary);
@@ -1378,6 +1379,47 @@ namespace KingmakerBuffPlanner.Tests
                 optionalAbsent.CostShape.SequenceEqual(
                     compile(3, false, null).CastingById("cast-1").CostShape))
                 throw new InvalidOperationException("Casting without the optional rod was not a visible change.");
+        }
+
+        // The grid's Spells / Abilities / Other tabs follow the classic
+        // catalogue: a buff appears under every kind of provider it has,
+        // and All shows everything. The session derives the kinds from the
+        // buff's own discovered providers.
+        private static void TestBuffGridSourceTypeTabs(string root)
+        {
+            Func<SourceKind[], WorkspaceSourceOption> option = kinds =>
+                new WorkspaceSourceOption("source", "Buff", false, null, null, kinds);
+            var cases = new[]
+            {
+                new { Kinds = new[] { SourceKind.Spellbook }, Expected = "Spells" },
+                new { Kinds = new[] { SourceKind.AbilityResource }, Expected = "Abilities" },
+                new { Kinds = new[] { SourceKind.Fact }, Expected = "Abilities" },
+                new { Kinds = new[] { SourceKind.Item }, Expected = "Other" },
+                new { Kinds = new[] { SourceKind.Item, SourceKind.Spellbook }, Expected = "Other,Spells" },
+                new { Kinds = new SourceKind[0], Expected = "" }
+            };
+            foreach (var entry in cases)
+            {
+                WorkspaceSourceOption source = option(entry.Kinds);
+                string actual = string.Join(",", new[]
+                    {
+                        PlannerSourceCategory.Abilities, PlannerSourceCategory.Other,
+                        PlannerSourceCategory.Spells
+                    }.Where(category => WorkspaceSourceLabels.MatchesCategory(source, category))
+                    .Select(category => category.ToString()).ToArray());
+                if (actual != entry.Expected ||
+                    !WorkspaceSourceLabels.MatchesCategory(source, PlannerSourceCategory.All))
+                    throw new InvalidOperationException("Kinds " +
+                        string.Join("+", entry.Kinds.Select(kind => kind.ToString()).ToArray()) +
+                        " matched " + actual + " instead of " + entry.Expected + ".");
+            }
+            CastingWorkspaceInputs inputs = QualificationInputs(true, true, null);
+            var session = new CastingWorkspaceSession(Path.Combine(root, "source-tabs"), "campaign-tabs");
+            WorkspaceView view = session.BuildView(inputs);
+            if (view.Draft == null || view.Draft.Sources.Count == 0 ||
+                view.Draft.Sources.Any(source => !source.SourceKinds.SequenceEqual(
+                    new[] { SourceKind.Spellbook })))
+                throw new InvalidOperationException("The session did not derive the spellbook kind.");
         }
 
         // Two casters with verified-free pools casting the fixture buff by

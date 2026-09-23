@@ -201,6 +201,12 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         // authored intent clean afterwards (never a hard-coded claim).
         internal bool? Saved { get; set; }
 
+        // The buff grid's source-type tabs (Spells, then back to All): the
+        // first non-invoked outcome, and whether browsing and the tab
+        // clicks left the document untouched.
+        internal string SourceTabsControl { get; set; }
+        internal bool? SourceTabsClean { get; set; }
+
         internal IList<WorkspaceCastStepEvidence> CastSteps
         {
             get { return _castSteps.AsReadOnly(); }
@@ -261,6 +267,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (SaveControl != null)
                 parts.Add("saveControl=" + SaveControl +
                     ";saved=" + Describe(Saved));
+            if (SourceTabsControl != null)
+                parts.Add("sourceTabs=" + SourceTabsControl +
+                    ";sourceTabsClean=" + Describe(SourceTabsClean));
             parts.AddRange(_notes);
             return parts.Count == 0 ? "not-run" : string.Join(";", parts.ToArray());
         }
@@ -303,6 +312,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             RequireControl(violations, "undo", UndoControl, UndoIntentRestored);
             RequireControl(violations, "done", DoneControl, DoneClearedFocus);
             RequireControl(violations, "save", SaveControl, Saved);
+            RequireControl(violations, "sourceTabs", SourceTabsControl, SourceTabsClean);
             return violations;
         }
 
