@@ -108,6 +108,28 @@ namespace KingmakerBuffPlanner.Execution
         public string StopPress { get; set; }
         public bool StopPressHandled { get; set; }
         public bool? StopPressedInFlight { get; set; }
+        // The disable step: how the planner was disabled, at which point of
+        // the run ("in-flight", "before-start", ...), and whether the host
+        // accepted runs again once the planner was enabled.
+        public string Disable { get; set; }
+        public string DisabledAt { get; set; }
+        public bool AcceptingAfterEnable { get; set; }
+
+        private bool HasDisableStep
+        {
+            get { return Selection != null && CastingQualificationRecipe.HasDisableStep(Selection.Recipe); }
+        }
+
+        // The judged steps of this record's recipe, in order.
+        public IEnumerable<string> JudgedSteps
+        {
+            get
+            {
+                return HasDisableStep
+                    ? StepNames.Concat(new[] { CastingQualificationForecast.Disable })
+                    : StepNames;
+            }
+        }
 
         internal CastingQualificationStepResult Step(string name)
         {
@@ -123,7 +145,9 @@ namespace KingmakerBuffPlanner.Execution
             var violations = new List<string>(Failures);
             if (Selection == null || !Selection.Selected)
                 violations.Add("selection:" + (Selection == null ? "missing" : Selection.Refusal));
-            if (Forecast == null || Forecast.Count != 3 || Forecast.Any(step => step.ProjectionId == null))
+            if (Forecast == null || Selection == null ||
+                Forecast.Count != CastingQualificationRecipe.ForecastSteps(Selection.Recipe) ||
+                Forecast.Any(step => step.ProjectionId == null))
                 violations.Add("forecast-incomplete");
             if (!CastingScenario || violations.Count != 0) return violations;
             if (AllowanceStatus != "valid") violations.Add("allowance:" + AllowanceStatus);
@@ -132,7 +156,7 @@ namespace KingmakerBuffPlanner.Execution
                 violations.Add("submission-cap:" + PlannedSubmissions + ">" + MaximumSubmissions);
             if (Submissions.Any(value => value.StartsWith("refused:", StringComparison.Ordinal)))
                 violations.Add("refused-submission:" + string.Join("|", Submissions.ToArray()));
-            foreach (string name in StepNames)
+            foreach (string name in JudgedSteps)
             {
                 string failure = StepFailure(name);
                 if (failure != null) violations.Add(name + ":" + failure);
@@ -145,6 +169,17 @@ namespace KingmakerBuffPlanner.Execution
             else if (!StopPressHandled) violations.Add("stop-press:not-handled:" + StopPress);
             else if (ExecutionMode == "animated" && StopPressedInFlight != true)
                 violations.Add("stop-press:not-in-flight:" + StopPress);
+            // The disable lands while the animated cast is in progress, or
+            // (instant casts are atomic) before the run's first step; the
+            // host accepts runs again once the planner is enabled.
+            if (HasDisableStep)
+            {
+                string expectedAt = ExecutionMode == "animated" ? "in-flight" : "before-start";
+                if (Disable == null) violations.Add("disable:none");
+                else if (DisabledAt != expectedAt)
+                    violations.Add("disable:not-" + expectedAt + ":" + Disable);
+                else if (!AcceptingAfterEnable) violations.Add("disable:not-resumed:" + Disable);
+            }
             return violations;
         }
 
@@ -192,6 +227,28 @@ namespace KingmakerBuffPlanner.Execution
                     failure = "states:" + States(step);
                 else if (step.TransitionOf(first) != "unchanged" ||
                     rest.Any(id => step.TransitionOf(id) != "new-instance"))
+                    failure = "effects:" + string.Join(",", step.Transitions.ToArray());
+            }
+            else if (name == CastingQualificationForecast.Disable)
+            {
+                // The disable ends the run: the animated cast in progress is
+                // interrupted and cleaned up (submitted, never confirmed),
+                // an instant run ends before its first step (nothing
+                // submitted); nothing lands and the rest stay skipped.
+                bool animated = ExecutionMode == "animated";
+                CastingOutcomeEntry entry = step.Report.Entries.FirstOrDefault(value =>
+                    string.Equals(value.CastingId, first, StringComparison.Ordinal));
+                if (!step.Report.Cancelled ||
+                    step.Report.TerminalReason != "cancelled:" + CastingQualificationDriver.DisableReason)
+                    failure = "report:" + step.Report.TerminalReason;
+                else if (entry == null || entry.Submitted != animated ||
+                    entry.State != (animated ? CastingOutcomeState.Cancelled : CastingOutcomeState.NotProcessed) ||
+                    !entry.Detail.StartsWith(animated ? "Cancelled:cancelled-in-flight" : "stopped-before-start",
+                        StringComparison.Ordinal) ||
+                    rest.Any(id => step.StateOf(id) != CastingOutcomeState.Skipped))
+                    failure = "states:" + States(step);
+                else if (step.TransitionOf(first) != "unchanged" ||
+                    rest.Any(id => step.TransitionOf(id) != "unchanged"))
                     failure = "effects:" + string.Join(",", step.Transitions.ToArray());
             }
             else if (name == "recast")
@@ -331,6 +388,10 @@ namespace KingmakerBuffPlanner.Execution
     // restored acceptance authorizes the run).
     public sealed class CastingQualificationDriver
     {
+        // The reason the planner's own disable ends a run with (the root's
+        // SetEnabled(false), which unchecking the mod calls).
+        public const string DisableReason = "mod-disabled";
+
         private readonly CastingQualificationAllowance _allowance;
         private readonly string _campaignId;
         private readonly Func<CastingWorkspaceInputs> _freshInputs;
@@ -349,7 +410,11 @@ namespace KingmakerBuffPlanner.Execution
         // The player's routine press as the HUD delivers it; without it the
         // stop goes to the host's own player stop.
         private readonly Func<string, bool> _pressRoutine;
+        // The planner's own disable and enable (the root's SetEnabled);
+        // without it the disable step shuts the host down and resumes it.
+        private readonly Action<bool> _setPlannerEnabled;
         private bool _stopPressed;
+        private bool _disabled;
         private CastingQualificationBoundary _boundary;
         private Dictionary<string, CastStep> _observeSteps;
         private CastingWorkspaceSession _session;
@@ -365,12 +430,13 @@ namespace KingmakerBuffPlanner.Execution
             CastingExecutionHost host, Func<CastStep, string, ProbeObservation> observe,
             Func<long> clock, long deadlineMillis, string recipe = null,
             Func<bool> worldRunning = null, bool ownerPumpsHost = false,
-            Func<string, bool> pressRoutine = null)
+            Func<string, bool> pressRoutine = null, Action<bool> setPlannerEnabled = null)
         {
             _requestedRecipe = recipe;
             _worldRunning = worldRunning;
             _ownerPumpsHost = ownerPumpsHost;
             _pressRoutine = pressRoutine;
+            _setPlannerEnabled = setPlannerEnabled;
             Record = record ?? throw new ArgumentNullException("record");
             _allowance = allowance;
             _campaignId = campaignId;
@@ -466,7 +532,11 @@ namespace KingmakerBuffPlanner.Execution
                 case "repeat": Repeat(); return;
                 case "recast-edit": RecastEdit(); return;
                 case "recast": Begin(CastingQualificationForecast.Recast); return;
-                case "recast-wait": Wait(false, "done"); return;
+                case "recast-wait":
+                    Wait(false, CastingQualificationRecipe.HasDisableStep(Recipe) ? "disable" : "done");
+                    return;
+                case "disable": Begin(CastingQualificationForecast.Disable); return;
+                case "disable-wait": WaitDisable(); return;
                 default: Finish("completed"); return;
             }
         }
@@ -567,6 +637,44 @@ namespace KingmakerBuffPlanner.Execution
             }
             _running = step;
             _phase = name + "-wait";
+            // An instant cast is atomic within one pump: the instant run is
+            // disabled before its first step (each mod update ticks the
+            // planner root before this driver, so no pump has run yet).
+            if (name == CastingQualificationForecast.Disable && _allowance.ExecutionMode != "animated")
+                DisablePlanner();
+        }
+
+        // The animated run is disabled as soon as its cast is in progress.
+        private void WaitDisable()
+        {
+            if (_host.IsRunning && !_disabled && _host.ActiveCastingInFlight) DisablePlanner();
+            Wait(false, "done");
+        }
+
+        // The planner's own disable, then enable, as the mod toggle drives
+        // them: the host ends the run through its owned terminal (the cast
+        // in progress is interrupted and cleaned up) and accepts runs again
+        // once enabled.
+        private void DisablePlanner()
+        {
+            _disabled = true;
+            string at = !_host.IsRunning ? "after-run"
+                : _host.ActiveCastingInFlight ? "in-flight"
+                : _host.ActiveFinishedCastings == 0 ? "before-start" : "between-castings";
+            if (_setPlannerEnabled != null)
+            {
+                _setPlannerEnabled(false);
+                _setPlannerEnabled(true);
+            }
+            else
+            {
+                _host.Shutdown(DisableReason);
+                _host.Resume();
+            }
+            Record.DisabledAt = at;
+            Record.AcceptingAfterEnable = _host.Accepting;
+            Record.Disable = (_setPlannerEnabled != null ? "planner-disable" : "host-shutdown") +
+                ";at=" + at + ";ended=" + !_host.IsRunning + ";accepting=" + _host.Accepting;
         }
 
         // Waits on the run (pumping it unless its owner does); the stop step
