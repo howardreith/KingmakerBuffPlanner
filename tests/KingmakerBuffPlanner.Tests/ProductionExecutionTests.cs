@@ -46,6 +46,7 @@ namespace KingmakerBuffPlanner.Tests
                 () => TestInspectionAndFixtureFamilyRequests(root));
             Run("card-discloses-limits-and-existing-effects",
                 () => TestCardDisclosesLimitsAndExistingEffects(root));
+            Run("refusal-feedback-rules", () => TestRefusalFeedbackRules(root));
             // Last: it takes the process-wide runtime-test lock.
             Run("production-execution-wiring-and-session-lock", TestProductionExecutionWiring);
         }
@@ -1141,6 +1142,32 @@ namespace KingmakerBuffPlanner.Tests
                 !CastingRunPresentation.DescribeLimitation(limitation).Contains("Share Transmutation"))
                 throw new InvalidOperationException("A modifier casting did not disclose its limit: " +
                     (limitation ?? "none"));
+        }
+
+        // Without a floating result, feedback is the planner itself: an
+        // actionable refusal opens it with the reason; informational ones
+        // do not; the footer shows the last attempt until a run reports.
+        private static void TestRefusalFeedbackRules(string root)
+        {
+            string[] opens = { "nothing-presented", "not-accepted", "material-change-requires-review",
+                "apply-refused:blocked-casting:cast-1:x", "import-notices-pending:1",
+                "legacy-import-unresolved:x", "execution-projection-refused:unsupported-contract:x" };
+            string[] quiet = { "nothing-to-cast:2", "execution-in-progress:run-3",
+                "native-submission-disabled:runtime-test-session:x", "native-casting-unavailable:mod-disabled",
+                "submission-already-in-flight", string.Empty };
+            if (opens.Any(reason => !CastingRunPresentation.OpensPlanner(reason)) ||
+                quiet.Any(reason => CastingRunPresentation.OpensPlanner(reason)))
+                throw new InvalidOperationException("Planner-opening refusal rules are wrong.");
+            string dir = Path.Combine(root, "refusal-feedback");
+            Directory.CreateDirectory(dir);
+            var session = new CastingWorkspaceSession(dir, "workspace-campaign");
+            session.RecordAttempt("Long was not cast: open the planner.");
+            if (session.LastAttemptMessage != "Long was not cast: open the planner.")
+                throw new InvalidOperationException("The last attempt was not recorded.");
+            session.RecordRunReport(new CastingRunReport("run-1", "long", CastingApplyMode.Ordinary,
+                "p", "completed", false, false, new CastingOutcomeEntry[0], new string[0]));
+            if (session.LastAttemptMessage != null || session.LastRunReport == null)
+                throw new InvalidOperationException("A run report did not supersede the last attempt.");
         }
     }
 }

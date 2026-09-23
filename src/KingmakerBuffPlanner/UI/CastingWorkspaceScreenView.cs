@@ -535,6 +535,8 @@ namespace KingmakerBuffPlanner.UI
         // casting is available in this session.
         private string DescribeReadiness()
         {
+            if (!string.IsNullOrEmpty(_session.LastAttemptMessage))
+                return "Last attempt: " + _session.LastAttemptMessage;
             CastingRunReport last = _session.LastRunReport;
             if (last != null)
                 return "Last run: " + CastingRunPresentation.Describe(last,

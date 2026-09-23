@@ -137,6 +137,21 @@ namespace KingmakerBuffPlanner.UI
             return split < 0 ? rest : rest.Substring(0, split);
         }
 
+        // Refusals the player resolves in the planner (review, blocked or
+        // unsupported castings, import review): the planner opens on that
+        // routine. Informational refusals (nothing to cast, a run already in
+        // progress, casting unavailable in this session) do not.
+        internal static bool OpensPlanner(string reason)
+        {
+            string value = reason ?? string.Empty;
+            return value == "nothing-presented" || value == "not-accepted" ||
+                value == "material-change-requires-review" ||
+                value.StartsWith("apply-refused", StringComparison.Ordinal) ||
+                value.StartsWith("import-notices-pending", StringComparison.Ordinal) ||
+                value.StartsWith("legacy-import-unresolved", StringComparison.Ordinal) ||
+                value.StartsWith("execution-projection-refused", StringComparison.Ordinal);
+        }
+
         private static string StopReason(string terminal)
         {
             string reason = terminal ?? string.Empty;
