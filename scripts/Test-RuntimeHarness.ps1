@@ -1280,6 +1280,23 @@ try {
         (Test-Path -LiteralPath (Join-Path $moveRoot 'stuck-moved'))) {
         throw 'A persistently held directory did not fail closed in place.'
     }
+    # The owner's other project may hold a live lease on the same
+    # installation: nothing starts while its lock exists.
+    $foreignLease = Join-Path $root 'foreign-runtime.lock'
+    Assert-KbpNoForeignRuntimeLease -LeasePaths @($foreignLease)
+    Set-Content -LiteralPath $foreignLease -Value 'held' -Encoding ASCII
+    $refusedForeign = $false
+    try { Assert-KbpNoForeignRuntimeLease -LeasePaths @($foreignLease) }
+    catch { $refusedForeign = $_.Exception.Message -like '*runtime lease is active*' }
+    Remove-Item -LiteralPath $foreignLease -Force
+    $installText = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'Install-Local.ps1') -Raw
+    $harnessText = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'RuntimeHarness.Common.ps1') -Raw
+    if (-not $refusedForeign -or
+        @($script:KbpForeignRuntimeLeases) -notcontains 'C:\Dev\KingmakerGunslingerLab\compatibility-state\compatibility.lock' -or
+        $harnessText -notmatch 'if \(-not \$FixtureMode\) \{ Assert-KbpNoForeignRuntimeLease \}' -or
+        $installText -notmatch '(?m)^Assert-KbpNoForeignRuntimeLease\s*$') {
+        throw "A foreign project's runtime lease does not stop a transaction or a local install."
+    }
     $commonText = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'RuntimeHarness.Common.ps1') -Raw
     if (([regex]::Matches($commonText, '\[void\]\(Move-KbpDirectoryWithRetry -Source ')).Count -ne 2 -or
         $commonText -match 'Move-Item -LiteralPath \$mods -Destination \$state\.stagedQuarantine' -or

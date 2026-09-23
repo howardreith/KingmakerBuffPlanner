@@ -17,6 +17,22 @@ $script:KbpRuntimeStagingRoot = Join-Path $script:KbpLabRoot 'runtime-staging'
 $script:KbpRuntimeBackupRoot = Join-Path $script:KbpLabRoot 'runtime-backups'
 $script:KbpRuntimeEvidenceRoot = Join-Path $script:KbpLabRoot 'runtime-evidence'
 
+# Another project's live lease on the same Kingmaker installation: the
+# owner's KingmakerGunslinger lab replaces Mods\KingmakerGunslinger and
+# launches the game while this lock exists (coordinated with that session
+# on 2026-09-23; it checks this lab's deployment.lock in turn). No runtime
+# transaction or local install starts while one is held.
+$script:KbpForeignRuntimeLeases = @('C:\Dev\KingmakerGunslingerLab\compatibility-state\compatibility.lock')
+
+function Assert-KbpNoForeignRuntimeLease {
+    param([string[]]$LeasePaths = $script:KbpForeignRuntimeLeases)
+    foreach ($lease in @($LeasePaths | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })) {
+        if (Test-Path -LiteralPath $lease) {
+            throw "Another project's Kingmaker runtime lease is active: $lease. Wait until it is released."
+        }
+    }
+}
+
 function Assert-KbpNotRunning {
     param([int[]]$KnownProcessIds)
     $ids = if ($PSBoundParameters.ContainsKey('KnownProcessIds')) {
@@ -286,6 +302,7 @@ function Enter-KbpRuntimeTransaction {
     if ($PSBoundParameters.ContainsKey('KnownKingmakerProcessIds')) {
         Assert-KbpNotRunning -KnownProcessIds $KnownKingmakerProcessIds
     } else { Assert-KbpNotRunning }
+    if (-not $FixtureMode) { Assert-KbpNoForeignRuntimeLease }
     $game = (Resolve-Path -LiteralPath $KingmakerInstallDir).Path
     if (-not (Test-Path -LiteralPath (Join-Path $game 'Kingmaker.exe') -PathType Leaf)) { throw 'Kingmaker executable is missing.' }
     $package = (Resolve-Path -LiteralPath $PackagePath).Path

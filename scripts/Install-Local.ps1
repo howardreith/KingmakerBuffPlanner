@@ -60,6 +60,7 @@ if ((Get-KbpSha256 $package) -cne [string]$release.packageSha256) {
 if (-not $KingmakerInstallDir) { $KingmakerInstallDir = Get-KbpGamePath }
 $game = (Resolve-Path -LiteralPath $KingmakerInstallDir).Path
 Assert-KbpNotRunning
+Assert-KbpNoForeignRuntimeLease
 if (@(Get-Process -Name UnityModManager -ErrorAction SilentlyContinue).Count -ne 0) {
     throw 'Unity Mod Manager is running.'
 }
