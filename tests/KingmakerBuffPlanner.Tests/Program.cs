@@ -13555,6 +13555,27 @@ namespace KingmakerBuffPlanner.Tests
                 WorkspaceBuffSummary.CoverageFor(view.Cards, "short", "unit-t1") !=
                     WorkspaceRecipientCoverage.None)
                 throw new InvalidOperationException("Recipient coverage legend is wrong.");
+            // Castings lane scope: this buff vs. the whole routine, with no
+            // document mutation either way.
+            string beforeScope = session.DocumentIntentSignature();
+            session.SelectBuff("source-communal");
+            WorkspaceView otherBuff = session.BuildView(inputs);
+            if (otherBuff.Cards.Any(card => card.SourceId == "source-bulls"))
+                throw new InvalidOperationException("Buff scope leaked other buffs' castings.");
+            session.ShowWholeRoutine = true;
+            WorkspaceView whole = session.BuildView(inputs);
+            if (whole.Cards.Count(card => card.SourceId == "source-bulls") != 2 ||
+                whole.Cards.Any(card => card.RoutineId != "long"))
+                throw new InvalidOperationException("Whole-routine scope is wrong.");
+            session.SelectRoutine("short");
+            if (session.BuildView(inputs).Cards.Count != 0)
+                throw new InvalidOperationException("Whole-routine scope crossed routines.");
+            session.SelectRoutine("long");
+            session.ShowWholeRoutine = false;
+            session.SelectBuff("source-bulls");
+            if (session.DocumentIntentSignature() != beforeScope)
+                throw new InvalidOperationException("Changing scope mutated the document.");
+            view = session.BuildView(inputs);
             WorkspaceCastingCard first = view.Cards.FirstOrDefault(card =>
                 card.DirectTargetUnitId == "unit-t1");
             if (first == null || !first.Headline.EndsWith(" → " +

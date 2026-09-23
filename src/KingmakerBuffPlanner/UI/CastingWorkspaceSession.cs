@@ -1113,13 +1113,22 @@ namespace KingmakerBuffPlanner.UI
             return rows;
         }
 
+        // Castings lane scope: the selected buff's castings (default), or
+        // every casting in the selected routine — the whole plan for that
+        // routine, like Bubble Buffs' "Only Requested" overview. Browsing
+        // scope never mutates the document.
+        public bool ShowWholeRoutine { get; set; }
+
         private List<WorkspaceCastingCard> BuildCards(
             ExplicitCastingPlan plan, string selectedSource)
         {
             var cards = new List<WorkspaceCastingCard>();
             foreach (ResolvedCasting casting in plan.Castings
-                .Where(value => string.Equals(value.SourceId, selectedSource,
-                    StringComparison.Ordinal)))
+                .Where(value => ShowWholeRoutine
+                    ? string.Equals(value.RoutineId, SelectedRoutineId,
+                        StringComparison.Ordinal)
+                    : string.Equals(value.SourceId, selectedSource,
+                        StringComparison.Ordinal)))
             {
                 string modeLabel;
                 string originLabel = string.Empty;

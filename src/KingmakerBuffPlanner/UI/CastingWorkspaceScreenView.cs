@@ -37,6 +37,7 @@ namespace KingmakerBuffPlanner.UI
         private RectTransform _buffGridContent;
         private InputField _buffSearch;
         private Button _pinnedAdd;
+        private Button _scopeToggle;
         private Button _pinnedDone;
         private string _buffQuery = string.Empty;
         private WorkspaceView _lastView;
@@ -335,6 +336,14 @@ namespace KingmakerBuffPlanner.UI
             cards.offsetMin = new Vector2(PageInset, 0f);
             cards.offsetMax = new Vector2(-PageInset * 0.6f, 0f);
             _cardContent = BuildLanePanel(cards, "Castings", out _castingsTitle);
+            _scopeToggle = KingmakerUiFactory.CreateButton(
+                "CastingsScope", cards, _theme, "Show whole routine", () => Click(() =>
+                {
+                    _session.ShowWholeRoutine = !_session.ShowWholeRoutine;
+                    RefreshView();
+                }));
+            PinToTitleRow(RectOf(_scopeToggle));
+            RectOf(_scopeToggle).anchorMin = new Vector2(0.68f, 1f);
             RectTransform inspector = KingmakerUiFactory.CreateRect("Inspector", frame);
             KingmakerUiFactory.SetAnchors(inspector, 0.5f, 0.085f, 1f, 0.55f);
             inspector.offsetMin = new Vector2(PageInset * 0.6f, 0f);
@@ -611,6 +620,14 @@ namespace KingmakerBuffPlanner.UI
             return button;
         }
 
+        private static string SourceLabel(WorkspaceView view, string sourceId)
+        {
+            WorkspaceSourceOption match = view == null || view.Draft == null ? null :
+                view.Draft.Sources.FirstOrDefault(source => string.Equals(
+                    source.SourceId, sourceId, StringComparison.Ordinal));
+            return match == null ? "unnamed buff" : match.Label;
+        }
+
         private static string UnitName(WorkspaceView view, string unitId)
         {
             WorkspaceTargetOption match = view == null || view.Draft == null ? null :
@@ -647,8 +664,11 @@ namespace KingmakerBuffPlanner.UI
             ScrollRect scroll = _cardContent.GetComponentInParent<ScrollRect>();
             if (scroll != null) _cardScrollPosition = scroll.normalizedPosition;
             KingmakerUiFactory.DestroyChildren(_cardContent);
-            _castingsTitle.text = "Castings of " + view.SelectedSourceCaption +
-                " — each card is one cast";
+            _castingsTitle.text = _session.ShowWholeRoutine
+                ? "Every casting in " + view.SelectedRoutineId + " — each card is one cast"
+                : "Castings of " + view.SelectedSourceCaption + " — each card is one cast";
+            KingmakerUiFactory.SetButtonLabel(_scopeToggle, _session.ShowWholeRoutine
+                ? "Only this buff" : "Show whole routine");
             if (view.Cards.Count == 0)
             {
                 Text hint = KingmakerUiFactory.CreateText(
@@ -683,9 +703,11 @@ namespace KingmakerBuffPlanner.UI
                 }
                 string coverage = card.CoverageSummary.Length == 0
                     ? string.Empty : " · " + card.CoverageSummary;
+                string buffName = _session.ShowWholeRoutine
+                    ? SourceLabel(view, card.SourceId) + ": " : string.Empty;
                 Text title = KingmakerUiFactory.CreateText(
                     "Title", entry, _theme,
-                    card.Headline + "   (" + card.Subtitle + ")", 16,
+                    buffName + card.Headline + "   (" + card.Subtitle + ")", 16,
                     TextAnchor.MiddleLeft);
                 title.fontStyle = FontStyle.Bold;
                 KingmakerUiFactory.SetAnchors(title.rectTransform, 0f, 0.55f, 0.62f, 1f,
