@@ -1,6 +1,6 @@
 # Definition of Done Matrix
 
-## Casting-first migration — release buckets (updated 2026-09-23, RC slice 1 at `7e864e7`)
+## Casting-first migration — release buckets (updated 2026-09-23, RC slice 2 at `ebf2329`)
 
 No percentage or date is claimed; green unit tests do not measure
 readiness. Evidence words mean exactly this:
@@ -36,6 +36,8 @@ readiness. Evidence words mean exactly this:
 | Live existing-effect policy (weaker/expiring/unprovable never satisfied; active effect needs no slot) | implemented + stand-ins |
 | Per-routine review acceptance persisted across sessions; skip flips are harmless refreshes | implemented + stand-ins |
 | Multi-cast routine, halting after failure, interruption, reload | implemented + stand-ins (coordinator and host); not in-game |
+| Casting qualification `zero-cost-mixed` (automation fixture): stop, complete, repeat, reopen, recast, judged per step and stopped at the first failure | implemented + stand-ins; **not run** (needs the frozen probe first, the Gunslinger identity and an owner allowance) |
+| Casting qualification `finite-direct-mixed` (advanced copy): exact prepared slots, spontaneous levels, mixed casters, metamagic | implemented + stand-ins (exact token and availability judging); **not run** (needs a `KBP_ADVANCED_SEED`, a passing inspection and an allowance) |
 | Group casts, anchored origin | implemented + stand-ins; not in-game |
 
 ### Bucket 3 — Public experimental prerelease
@@ -46,6 +48,7 @@ readiness. Evidence words mean exactly this:
 | Unsupported features prominently disabled in the UI | implemented: cards show "cannot run in this version" (targeting modifiers, exact rod identity, required coverage outside the predicted area); Apply refuses them |
 | Deliberate activation path | implemented: UMM planner-mode setting, Classic by default; player guide `docs/CASTING-FIRST-PLAYER-GUIDE.md` |
 | Owner usability acceptance of the workspace | not accepted |
+| Source-type tabs, routine tabs with counts, per-card last-run outcome | implemented + stand-ins; not in-game (the live workspace scenario now exercises the tabs) |
 | Install/rollback on a real installation | stand-ins only (K6/L4/L5 isolated fixtures; the planner-mode and review-state files are covered) |
 | Release packaging and publisher gates | existing tooling; not exercised for casting-first |
 
