@@ -423,7 +423,7 @@ namespace KingmakerBuffPlanner.GameAdapters
 
         private static string SlotId(SpellSlot slot)
         {
-            return "level-" + slot.SpellLevel + "|type-" + (int)slot.Type + "|index-" + slot.Index;
+            return PreparedSlotIds.Format(slot.SpellLevel, (int)slot.Type, slot.Index);
         }
 
         private static PreparedSlotKind ToSlotKind(SpellSlot slot)

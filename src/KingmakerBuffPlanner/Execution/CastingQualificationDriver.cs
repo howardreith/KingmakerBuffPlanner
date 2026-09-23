@@ -9,6 +9,38 @@ using KingmakerBuffPlanner.UI;
 
 namespace KingmakerBuffPlanner.Execution
 {
+    // One exact prepared-slot token as read before and after a step (review
+    // RC1): the token id is opaque (native ids contain "|") and the states
+    // are typed, so validation never re-parses presentation text. A null
+    // state means the token was absent from that read.
+    public sealed class CastingQualificationTokenReading
+    {
+        internal CastingQualificationTokenReading(string castingId, string tokenId,
+            bool? before, bool? after)
+        {
+            CastingId = castingId ?? string.Empty;
+            TokenId = tokenId ?? string.Empty;
+            Before = before;
+            After = after;
+        }
+
+        public string CastingId { get; private set; }
+        public string TokenId { get; private set; }
+        public bool? Before { get; private set; }
+        public bool? After { get; private set; }
+
+        // Presentation only.
+        public override string ToString()
+        {
+            return CastingId + " " + TokenId + " " + State(Before) + ">" + State(After);
+        }
+
+        internal static string State(bool? value)
+        {
+            return value == null ? "?" : value.Value ? "T" : "F";
+        }
+    }
+
     // One step of a qualification run as observed: the Apply decision, the
     // run report, and per target the effect transition and the source
     // availability before and after (from fresh native reads).
@@ -28,10 +60,12 @@ namespace KingmakerBuffPlanner.Execution
         public List<string> Transitions { get; } = new List<string>();
         // "<castingId>:<before>><after>" source availability per casting.
         public List<string> Availability { get; } = new List<string>();
-        // "<castingId>:<token>=<T|F>><T|F>|..." for the exact prepared
-        // tokens this step observes for the casting (absent for
-        // non-prepared reservations).
-        public List<string> Tokens { get; } = new List<string>();
+        // The exact prepared tokens this step observes per casting (none for
+        // non-prepared reservations), and the castings whose token read
+        // exists on only one side.
+        public List<CastingQualificationTokenReading> TokenReadings { get; } =
+            new List<CastingQualificationTokenReading>();
+        public List<string> UnreadTokenCastings { get; } = new List<string>();
         public List<string> Observations { get; } = new List<string>();
 
         internal string TransitionOf(string castingId)
@@ -188,30 +222,30 @@ namespace KingmakerBuffPlanner.Execution
                 CastStep observed = ReservedStep(step.Name, castingId, true);
                 bool prepared = observed != null && observed.Reservation != null &&
                     observed.Reservation.TokenIds.Count != 0;
-                string entry = step.Tokens.FirstOrDefault(value =>
-                    value.StartsWith(castingId + ":", StringComparison.Ordinal));
-                if (entry == null)
+                if (step.UnreadTokenCastings.Contains(castingId))
+                    return "tokens:" + castingId + ":unread";
+                List<CastingQualificationTokenReading> readings = step.TokenReadings
+                    .Where(reading => reading.CastingId == castingId).ToList();
+                if (readings.Count == 0)
                 {
                     if (prepared && step.Availability.Count != 0)
                         return "tokens:" + castingId + ":unobserved";
                     continue;
                 }
-                string body = entry.Substring(castingId.Length + 1);
                 bool spends = prepared && confirmed.Contains(castingId) &&
                     ReservedStep(step.Name, castingId, false) != null;
-                var seen = new List<string>();
-                foreach (string token in body.Split(new[] { "|" }, StringSplitOptions.None))
+                foreach (CastingQualificationTokenReading reading in readings)
                 {
-                    string[] pair = token.Split(new[] { "=" }, 2, StringSplitOptions.None);
-                    string[] states = pair.Length == 2
-                        ? pair[1].Split(new[] { ">" }, StringSplitOptions.None) : new string[0];
-                    bool ok = states.Length == 2 && (spends
-                        ? states[0] == "T" && states[1] == "F"
-                        : states[0] == states[1] && states[0] != "?");
-                    if (!ok) return "tokens:" + castingId + ":" + token;
-                    seen.Add(pair[0]);
+                    bool ok = spends
+                        ? reading.Before == true && reading.After == false
+                        : reading.Before.HasValue && reading.Before == reading.After;
+                    if (!ok)
+                        return "tokens:" + castingId + ":" + reading.TokenId + "=" +
+                            CastingQualificationTokenReading.State(reading.Before) + ">" +
+                            CastingQualificationTokenReading.State(reading.After);
                 }
-                if (prepared && !seen.OrderBy(value => value, StringComparer.Ordinal)
+                if (prepared && !readings.Select(reading => reading.TokenId)
+                        .OrderBy(value => value, StringComparer.Ordinal)
                         .SequenceEqual(observed.Reservation.TokenIds, StringComparer.Ordinal))
                     return "tokens:" + castingId + ":read-other-tokens";
             }
@@ -466,6 +500,13 @@ namespace KingmakerBuffPlanner.Execution
             Record.Steps.Add(step);
             _observeSteps = StepsToObserve(name);
             _before = ObserveAll(step, name + "-before");
+            string beforeFailure = BeforeReadFailure(_observeSteps, _before);
+            if (beforeFailure != null)
+            {
+                // Nothing was applied: zero native submissions for this step.
+                Fail("before-read:" + beforeFailure);
+                return;
+            }
             WorkspaceApplyResult result = _session.Apply(CastingApplyMode.Ordinary,
                 CastingQualificationRecipe.RoutineId, _freshInputs());
             step.ApplyAllowed = result.Allowed;
@@ -557,6 +598,36 @@ namespace KingmakerBuffPlanner.Execution
             _phase = "recast";
         }
 
+        // Review RC2: the step casts only on a complete before-state. Every
+        // casting to observe needs its own read, succeeded, of the step's
+        // own target, with the effect and availability reads, and for a
+        // prepared reservation every reserved token. Null when complete.
+        internal static string BeforeReadFailure(IReadOnlyDictionary<string, CastStep> steps,
+            IReadOnlyDictionary<string, ProbeObservation> observations)
+        {
+            if (steps == null || steps.Count == 0) return "nothing-to-observe";
+            foreach (KeyValuePair<string, CastStep> pair in steps
+                .OrderBy(value => value.Key, StringComparer.Ordinal))
+            {
+                ProbeObservation observation;
+                if (observations == null || !observations.TryGetValue(pair.Key, out observation) ||
+                    observation == null)
+                    return pair.Key + ":missing";
+                if (!observation.Succeeded) return pair.Key + ":failed:" + observation.Failure;
+                string target = pair.Value.TargetUnitIds.FirstOrDefault();
+                if (!string.Equals(observation.TargetUnitId, target, StringComparison.Ordinal))
+                    return pair.Key + ":wrong-target:" + observation.TargetUnitId;
+                if (observation.EffectInstances == null) return pair.Key + ":effects-unread";
+                if (observation.AvailableForCast == null) return pair.Key + ":availability-unread";
+                ResourceReservation reservation = pair.Value.Reservation;
+                if (reservation != null && reservation.TokenIds.Count != 0 &&
+                    (observation.ReservedTokenAvailability == null ||
+                     reservation.TokenIds.Any(id => !observation.ReservedTokenAvailability.ContainsKey(id))))
+                    return pair.Key + ":tokens-unread";
+            }
+            return null;
+        }
+
         // Every recipe casting, observed through THIS step's forecast
         // projection when the step executes it (so exactly the tokens it
         // reserves are read) and through the stop projection otherwise.
@@ -609,8 +680,7 @@ namespace KingmakerBuffPlanner.Execution
                 _before.TryGetValue(pair.Key, out before);
                 step.Transitions.Add(pair.Key + ":" + Transition(before, pair.Value));
                 step.Availability.Add(pair.Key + ":" + Available(before) + ">" + Available(pair.Value));
-                string tokens = TokenTransitions(before, pair.Value);
-                if (tokens != null) step.Tokens.Add(pair.Key + ":" + tokens);
+                RecordTokens(step, pair.Key, before, pair.Value);
             }
         }
 
@@ -633,25 +703,29 @@ namespace KingmakerBuffPlanner.Execution
             return "unchanged";
         }
 
-        // "<token>=<T|F>><T|F>|..." over the reserved tokens either read
-        // named; "unread" when only one side read them; null when neither
-        // did (a non-prepared reservation).
-        internal static string TokenTransitions(ProbeObservation before, ProbeObservation after)
+        // The exact reserved tokens either read named, as typed readings;
+        // a casting whose token read exists on only one side is unread.
+        internal static void RecordTokens(CastingQualificationStepResult step, string castingId,
+            ProbeObservation before, ProbeObservation after)
         {
             IReadOnlyDictionary<string, bool> prior = before == null ? null : before.ReservedTokenAvailability;
             IReadOnlyDictionary<string, bool> next = after == null ? null : after.ReservedTokenAvailability;
-            if (prior == null && next == null) return null;
-            if (prior == null || next == null) return "unread";
-            return string.Join("|", prior.Keys.Union(next.Keys, StringComparer.Ordinal)
-                .OrderBy(key => key, StringComparer.Ordinal)
-                .Select(key => key + "=" + TokenState(prior, key) + ">" + TokenState(next, key))
-                .ToArray());
+            if (prior == null && next == null) return;
+            if (prior == null || next == null)
+            {
+                step.UnreadTokenCastings.Add(castingId);
+                return;
+            }
+            foreach (string token in prior.Keys.Union(next.Keys, StringComparer.Ordinal)
+                .OrderBy(key => key, StringComparer.Ordinal))
+                step.TokenReadings.Add(new CastingQualificationTokenReading(castingId, token,
+                    Lookup(prior, token), Lookup(next, token)));
         }
 
-        private static string TokenState(IReadOnlyDictionary<string, bool> tokens, string key)
+        private static bool? Lookup(IReadOnlyDictionary<string, bool> tokens, string key)
         {
             bool available;
-            return tokens.TryGetValue(key, out available) ? (available ? "T" : "F") : "?";
+            return tokens.TryGetValue(key, out available) ? available : (bool?)null;
         }
 
         private static string Available(ProbeObservation observation)
