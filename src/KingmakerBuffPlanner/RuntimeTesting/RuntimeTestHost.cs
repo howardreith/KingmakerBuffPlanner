@@ -128,6 +128,32 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private readonly List<string> _interactionCasters = new List<string>();
         private readonly List<string> _interactionTargets = new List<string>();
         private readonly List<string> _interactionCastIds = new List<string>();
+        private readonly List<string> _interactionCastTargets = new List<string>();
+        private string _interactionRetarget;
+
+        // A recipient for a scripted cast: legal for the caster in the draft
+        // (when a session is given), never the caster itself, avoiding the
+        // listed units when another choice exists.
+        private string InteractionTarget(UI.CastingWorkspaceSession session, CastingWorkspaceInputs inputs,
+            string caster, ICollection<string> avoid)
+        {
+            List<string> candidates = _interactionTargets.Where(unit =>
+                !string.Equals(unit, caster, StringComparison.Ordinal)).ToList();
+            if (session != null && inputs != null)
+            {
+                UI.WorkspaceView view = session.BuildView(inputs);
+                if (view.Draft != null)
+                {
+                    List<string> legal = view.Draft.Targets
+                        .Where(option => option.Legal != false &&
+                            !string.Equals(option.UnitId, caster, StringComparison.Ordinal))
+                        .Select(option => option.UnitId).ToList();
+                    if (legal.Count != 0) candidates = legal;
+                }
+            }
+            return candidates.FirstOrDefault(unit => avoid == null || !avoid.Contains(unit)) ??
+                candidates.FirstOrDefault() ?? _interactionTargets[0];
+        }
         private string _interactionSourceId;
         private MenuFrameCapture _workspaceCameraOpenCapture;
         private MenuFrameCapture _workspaceCameraControlCapture;
@@ -3421,12 +3447,19 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 {
                     int index = _workspaceInteractionStep - 1;
                     string caster = _interactionCasters[index == 1 ? 1 : 0];
-                    string target = _interactionTargets[index];
                     int beforeCount = session.Document.Castings.Count;
                     string siblingsBefore =
                         WorkspaceCastStepEvaluator.SiblingSignature(
                             session.Document.Castings, null);
                     string casterClick = Invoke("DraftCaster." + caster);
+                    // A legal recipient for THIS caster, never the caster
+                    // itself (live run casting-ws-reload-20260923-s3-01: the
+                    // first buff, Aid Another, cannot target its caster), and
+                    // cast 3 goes to someone other than cast 1's recipient.
+                    string target = InteractionTarget(session, currentInputs, caster,
+                        index == 2 && _interactionCastTargets.Count > 0
+                            ? new[] { _interactionCastTargets[0] } : new string[0]);
+                    _interactionCastTargets.Add(target);
                     string targetClick = Invoke("DraftTarget." + target);
                     // Expected record resolved from the POST-selection draft
                     // (review H4): exact ability, spellbook, routine, state,
@@ -3522,8 +3555,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     // Retarget through the FOCUSED editor's real control.
                     string editId = _interactionCastIds.Count > 1
                         ? _interactionCastIds[1] : string.Empty;
-                    string newTarget = _interactionTargets[
-                        3 % _interactionTargets.Count];
+                    // Another legal recipient for cast 2's caster: neither the
+                    // caster nor its current recipient; the re-edit reuses it.
+                    _interactionRetarget = InteractionTarget(null, null, _interactionCasters[1],
+                        _interactionCastTargets.Count > 1 ? new[] { _interactionCastTargets[1] } : new string[0]);
+                    string newTarget = _interactionRetarget;
                     // Baseline BEFORE the edit: Undo must restore exactly
                     // this, so it is captured before the retarget control
                     // fires, never after.
@@ -3563,8 +3599,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     // their controls.
                     string editId = _interactionCastIds.Count > 1
                         ? _interactionCastIds[1] : string.Empty;
-                    string newTarget = _interactionTargets[
-                        3 % _interactionTargets.Count];
+                    string newTarget = _interactionRetarget ?? InteractionTarget(null, null, _interactionCasters[1],
+                        _interactionCastTargets.Count > 1 ? new[] { _interactionCastTargets[1] } : new string[0]);
                     Invoke("Edit." + editId);
                     Invoke("Target." + newTarget);
                     string doneClick = Invoke("DoneEditing");
