@@ -15477,6 +15477,16 @@ namespace KingmakerBuffPlanner.Tests
             if (SingleCastProbeSelector.Select(inputs, "fixture-campaign").Projection.ProjectionId !=
                     selection.Projection.ProjectionId)
                 throw new InvalidOperationException("Probe selection is not deterministic.");
+            // An empty result explains itself: every metamagic option is
+            // recorded as rejected, never silently skipped.
+            PartyProviderSnapshot metamagicSnapshot;
+            SingleCastProbeSelection none = SingleCastProbeSelector.Select(WorkspaceInputs(
+                out metamagicSnapshot, null, Ability("a0000000000000000000000000000001", string.Empty, 1)),
+                "fixture-campaign");
+            if (none.Selected || none.Rejections.Count == 0 ||
+                !none.Rejections.All(value => value.EndsWith("|source-kind-or-metamagic", StringComparison.Ordinal)))
+                throw new InvalidOperationException("An empty probe selection did not record its rejections: " +
+                    string.Join(";", none.Rejections.ToArray()));
 
             // Allowance parsing is strict and run-bound.
             string refusal;

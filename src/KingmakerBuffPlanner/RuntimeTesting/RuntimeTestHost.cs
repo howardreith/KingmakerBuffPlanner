@@ -2412,7 +2412,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     { "reservedPoolKey", step == null ? null : step.Reservation.PoolKey },
                     { "reservedUnits", _probeRecord.ReservedUnits },
                     { "poolRemainingBefore", _probeRecord.PoolRemainingBefore },
-                    { "candidatesConsidered", _probeSelection.CandidatesConsidered }
+                    { "candidatesConsidered", _probeSelection.CandidatesConsidered },
+                    { "rejections", new JArray(_probeSelection.Rejections.Cast<object>().ToArray()) }
                 }.ToString(Formatting.Indented) + Environment.NewLine);
             _log.Info("[KBP-PROBE] selection;" + _probeRecord.SelectionEvidence + ".");
             if (!_probeRecord.CastingScenario || !_probeSelection.Selected)

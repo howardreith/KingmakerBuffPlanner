@@ -97,8 +97,10 @@ namespace KingmakerBuffPlanner.Execution
         internal SingleCastProbeSelection(string refusal, string casterUnitId,
             string targetUnitId, string sourceId, ProviderKey provider,
             ExplicitCastingPlan plan, CastingApplyDecision decision,
-            ExplicitStepConversion projection, int candidatesConsidered)
+            ExplicitStepConversion projection, int candidatesConsidered,
+            IList<string> rejections = null)
         {
+            Rejections = new List<string>(rejections ?? new string[0]);
             Refusal = refusal ?? string.Empty;
             CasterUnitId = casterUnitId;
             TargetUnitId = targetUnitId;
@@ -120,6 +122,9 @@ namespace KingmakerBuffPlanner.Execution
         public CastingApplyDecision Decision { get; private set; }
         public ExplicitStepConversion Projection { get; private set; }
         public int CandidatesConsidered { get; private set; }
+        // Why each discovered option/target was not chosen (bounded), so a
+        // selection-only run explains an empty result.
+        public IReadOnlyList<string> Rejections { get; private set; }
     }
 
     // Deterministic, discovery-driven choice of the probe casting: the
@@ -130,6 +135,7 @@ namespace KingmakerBuffPlanner.Execution
     public static class SingleCastProbeSelector
     {
         public const string ProbeCastingId = "probe-cast-1";
+        public const int MaximumRecordedRejections = 60;
 
         public static SingleCastProbeSelection Select(CastingWorkspaceInputs inputs,
             string campaignId)
@@ -138,16 +144,25 @@ namespace KingmakerBuffPlanner.Execution
             var units = new HashSet<string>(inputs.Snapshot.Units.Select(unit => unit.UnitId),
                 StringComparer.Ordinal);
             int considered = 0;
+            var rejections = new List<string>();
+            Action<string> reject = value => { if (rejections.Count < MaximumRecordedRejections) rejections.Add(value); };
             foreach (ProviderPlanningOption option in inputs.ProviderOptions
                 .Where(value => value.Provider != null)
                 .OrderBy(value => value.Provider.Key.Canonical, StringComparer.Ordinal))
             {
                 AbilityKey ability = option.Provider.Key.Ability;
+                string provider = option.Provider.Key.Canonical;
                 if (ability.SourceKind != SourceKind.Spellbook || ability.MetamagicMask != 0)
+                {
+                    reject(provider + "|source-kind-or-metamagic");
                     continue;
+                }
                 string sourceId = SourceIdFor(inputs.EffectsBySource, ability);
-                if (sourceId == null) continue;
+                if (sourceId == null) { reject(provider + "|no-expected-effects"); continue; }
                 string caster = option.Provider.Key.CasterUnitId;
+                if (!option.ReachableTargetIds.Any(value => units.Contains(value) &&
+                        !string.Equals(value, caster, StringComparison.Ordinal)))
+                    reject(provider + "|no-other-reachable-target");
                 foreach (string target in option.ReachableTargetIds
                     .Where(value => units.Contains(value) &&
                         !string.Equals(value, caster, StringComparison.Ordinal))
@@ -167,18 +182,28 @@ namespace KingmakerBuffPlanner.Execution
                         inputs.TargetingModifiers);
                     CastingApplyDecision decision = new CastingExecutionGate().Evaluate(
                         plan, CastingApplyMode.Ordinary, "long");
-                    if (!decision.Allowed) continue;
+                    if (!decision.Allowed)
+                    {
+                        ResolvedCasting refused = plan.CastingById(ProbeCastingId);
+                        reject(provider + "|" + target + "|not-ready:" + string.Join(",",
+                            refused.ReadinessReasons.ToArray()));
+                        continue;
+                    }
                     ExplicitStepConversion projection = ExplicitCastingStepConverter.Convert(
                         plan, decision, inputs.ProviderOptions, inputs.EffectsBySource,
                         ExplicitProjectionScope.SingleCastProbe);
-                    if (!projection.Converted) continue;
+                    if (!projection.Converted)
+                    {
+                        reject(provider + "|" + target + "|" + projection.Refusal);
+                        continue;
+                    }
                     ResolvedCasting resolved = plan.CastingById(ProbeCastingId);
                     return new SingleCastProbeSelection(null, caster, target, sourceId,
-                        resolved.Provider, plan, decision, projection, considered);
+                        resolved.Provider, plan, decision, projection, considered, rejections);
                 }
             }
             return new SingleCastProbeSelection("no-eligible-probe-casting", null, null, null,
-                null, null, null, null, considered);
+                null, null, null, null, considered, rejections);
         }
 
         // The discovered catalogue source for an ability: the production
