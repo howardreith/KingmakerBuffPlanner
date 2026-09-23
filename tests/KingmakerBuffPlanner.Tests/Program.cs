@@ -366,6 +366,8 @@ namespace KingmakerBuffPlanner.Tests
                     TestRuntimeManualScenarioValidation);
                 Run("runtime-manual-request-validation",
                     () => TestManualScenarioRequestValidation(root));
+                Run("probe-scenario-request-validation",
+                    () => TestProbeScenarioRequestValidation(root));
                 // Review J1/J2 production producer/consumer regressions.
                 Run("workspace-interaction-evidence-contract",
                     TestWorkspaceInteractionEvidenceContract);
@@ -407,6 +409,9 @@ namespace KingmakerBuffPlanner.Tests
                     TestExplicitRunStopsAfterFailure);
                 Run("explicit-run-cancellation-disposes-executor",
                     TestExplicitRunCancellationDisposesExecutor);
+                Run("single-cast-probe-is-dormant-and-one-shot",
+                    () => TestSingleCastProbeIsDormantAndOneShot(root));
+                Run("single-cast-probe-run-record-rules", TestSingleCastProbeRunRecordRules);
             }
             finally
             {
@@ -9618,6 +9623,152 @@ namespace KingmakerBuffPlanner.Tests
             }
         }
 
+        // Probe scenarios: both carry the exact live-save contract; only the
+        // casting scenario may carry the allowance; instant mode only; the
+        // selection-only scenario classifies as no-input and non-casting.
+        private static void TestProbeScenarioRequestValidation(string root)
+        {
+            Func<string, bool, Action<Dictionary<string, object>>> probeSet = (scenario, allowance) => o =>
+            {
+                o["scenario"] = scenario;
+                var parameters = new Dictionary<string, object>
+                {
+                    { "workingSaveName", "KBP_AUTOMATION_WORKING" },
+                    { "workingFileName", "Manual_305_KBP_AUTOMATION_WORKING.zks" },
+                    { "workingSha256", new string('a', 64) },
+                    { "baselineSaveName", "KBP_AUTOMATION_BASELINE" },
+                    { "baselineFileName", "Manual_304_KBP_AUTOMATION_BASELINE.zks" },
+                    { "baselineSha256", new string('b', 64) },
+                    { "expectedGameName", "Yadmila" },
+                    { "expectedGameId", "3d556254-8ba9-4e9f-8d11-755eecd0b661" },
+                    { "executionMode", "instant" }
+                };
+                if (allowance) parameters["probeAllowance"] = "{}";
+                o["parameters"] = parameters;
+            };
+            if (!RuntimeTestProtocol.IsNoInputWorkspaceScenario("live-cast-probe-select") ||
+                !RuntimeTestProtocol.IsNoInputWorkspaceScenario("live-cast-probe") ||
+                RuntimeTestProtocol.IsCastingProbeScenario("live-cast-probe-select") ||
+                !RuntimeTestProtocol.IsCastingProbeScenario("live-cast-probe") ||
+                RuntimeTestProtocol.IsNoInputWorkspaceScenario("live-workspace-qual") ||
+                !RuntimeTestProtocol.IsWorkspaceScenario("live-cast-probe-select"))
+                throw new InvalidOperationException("Probe scenario classification is wrong.");
+            var valid = new[]
+            {
+                new KeyValuePair<string, Action<Dictionary<string, object>>>("select", probeSet("live-cast-probe-select", false)),
+                new KeyValuePair<string, Action<Dictionary<string, object>>>("cast-no-allowance", probeSet("live-cast-probe", false)),
+                new KeyValuePair<string, Action<Dictionary<string, object>>>("cast-allowance", probeSet("live-cast-probe", true))
+            };
+            string rejection;
+            foreach (KeyValuePair<string, Action<Dictionary<string, object>>> item in valid)
+            {
+                string path = WriteRequest(root, "probe-valid-" + item.Key, item.Value);
+                if (ReadProtocol(new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path },
+                        out rejection) == null)
+                    throw new InvalidOperationException("A valid probe request was rejected: " + item.Key +
+                        " " + rejection);
+            }
+            var invalid = new[]
+            {
+                new KeyValuePair<string, Action<Dictionary<string, object>>>("allowance-on-select",
+                    probeSet("live-cast-probe-select", true)),
+                new KeyValuePair<string, Action<Dictionary<string, object>>>("allowance-on-workspace-qual", o =>
+                {
+                    probeSet("live-cast-probe", true)(o);
+                    o["scenario"] = "live-workspace-qual";
+                }),
+                new KeyValuePair<string, Action<Dictionary<string, object>>>("animated-mode", o =>
+                {
+                    probeSet("live-cast-probe", true)(o);
+                    ((Dictionary<string, object>)o["parameters"])["executionMode"] = "animated";
+                }),
+                new KeyValuePair<string, Action<Dictionary<string, object>>>("allowance-not-string", o =>
+                {
+                    probeSet("live-cast-probe", true)(o);
+                    ((Dictionary<string, object>)o["parameters"])["probeAllowance"] = 1;
+                }),
+                new KeyValuePair<string, Action<Dictionary<string, object>>>("missing-save", o =>
+                {
+                    probeSet("live-cast-probe-select", false)(o);
+                    ((Dictionary<string, object>)o["parameters"]).Remove("workingSha256");
+                }),
+                new KeyValuePair<string, Action<Dictionary<string, object>>>("extra-parameter", o =>
+                {
+                    probeSet("live-cast-probe-select", false)(o);
+                    ((Dictionary<string, object>)o["parameters"])["retry"] = true;
+                })
+            };
+            foreach (KeyValuePair<string, Action<Dictionary<string, object>>> item in invalid)
+            {
+                string path = WriteRequest(root, "probe-bad-" + item.Key, item.Value);
+                if (ReadProtocol(new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path },
+                        out rejection) != null || string.IsNullOrEmpty(rejection))
+                    throw new InvalidOperationException("An invalid probe request was accepted: " + item.Key);
+            }
+        }
+
+        // The probe run record's acceptance rules (the host only fills it).
+        private static void TestSingleCastProbeRunRecordRules()
+        {
+            Func<SingleCastProbeRunRecord> selectOnly = () => new SingleCastProbeRunRecord
+            {
+                CastingScenario = false, Selected = true, SelectionEvidence = "ok",
+                WorkspaceClosed = true, InputLeaseReleased = true
+            };
+            if (selectOnly().Violations().Count != 0)
+                throw new InvalidOperationException("A clean selection-only run was rejected.");
+            SingleCastProbeRunRecord touched = selectOnly();
+            touched.BoundaryConstructed = true;
+            if (!touched.Violations().Contains("selection-only-run-touched-dispatch"))
+                throw new InvalidOperationException("A selection-only run that touched dispatch passed.");
+            SingleCastProbeRunRecord notSelected = selectOnly();
+            notSelected.Selected = false;
+            SingleCastProbeRunRecord leaked = selectOnly();
+            leaked.InputLeaseReleased = false;
+            if (notSelected.Violations().Count == 0 || leaked.Violations().Count == 0)
+                throw new InvalidOperationException("A failed selection or leaked lease passed.");
+
+            // Casting run: build a real confirmed outcome for the projection.
+            PartyProviderSnapshot snapshot;
+            CastingWorkspaceInputs inputs = WorkspaceInputs(out snapshot);
+            SingleCastProbeSelection selection = SingleCastProbeSelector.Select(inputs, "fixture-campaign");
+            ExplicitCastingRunOutcome confirmed = null;
+            System.Collections.IEnumerator loop = new ExplicitCastingRunCoordinator(
+                    new InstantCastExecutor(new ScriptedInstantRuntime("none", "none"), true), 1)
+                .Run(selection.Projection, value => confirmed = value);
+            while (loop.MoveNext()) { }
+            Func<SingleCastProbeRunRecord> cast = () => new SingleCastProbeRunRecord
+            {
+                CastingScenario = true, Selected = true, SelectionEvidence = "ok",
+                ProjectionId = selection.Projection.ProjectionId, AllowanceStatus = "valid",
+                BoundaryConstructed = true, Submitted = true, Outcome = confirmed,
+                PoolRemainingBefore = 3, PoolRemainingAfter = 2, ReservedUnits = 1,
+                BoundaryDisposed = true, WorkspaceClosed = true, InputLeaseReleased = true
+            };
+            if (cast().Violations().Count != 0)
+                throw new InvalidOperationException("A clean confirmed probe was rejected: " +
+                    string.Join("|", cast().Violations().ToArray()));
+            var mutations = new Dictionary<string, Action<SingleCastProbeRunRecord>>
+            {
+                { "no-allowance", r => { r.AllowanceStatus = "absent"; r.Submitted = false; r.BoundaryConstructed = false; } },
+                { "not-submitted", r => r.Submitted = false },
+                { "no-resource-change", r => r.PoolRemainingAfter = 3 },
+                { "double-spend", r => r.PoolRemainingAfter = 1 },
+                { "unknown-pool", r => r.PoolRemainingAfter = null },
+                { "deadline", r => r.DeadlineOrStop = true },
+                { "not-disposed", r => r.BoundaryDisposed = false },
+                { "projection-mismatch", r => r.ProjectionId = new string('0', 64) },
+                { "no-outcome", r => r.Outcome = null }
+            };
+            foreach (KeyValuePair<string, Action<SingleCastProbeRunRecord>> mutation in mutations)
+            {
+                SingleCastProbeRunRecord record = cast();
+                mutation.Value(record);
+                if (record.Violations().Count == 0)
+                    throw new InvalidOperationException("A probe run passed with " + mutation.Key + ".");
+            }
+        }
+
         private static void TestValidNativeUiProbeRequest(string root)
         {
             string path = WriteRequest(root, "valid-ui-probe", o =>
@@ -15296,6 +15447,164 @@ namespace KingmakerBuffPlanner.Tests
                 !hangingOutcomes[0].HaltReason.Contains("cleanup-uncertain") ||
                 hangingExecutor.Executed.Count != 1)
                 throw new InvalidOperationException("Cancellation with a throwing iterator Dispose was misreported.");
+        }
+
+        // Dormant single-cast probe: deterministic selection, a strict
+        // run-bound allowance, and a default-refusing one-shot boundary
+        // driving the REAL instant executor through a recording runtime. No
+        // game cast; the production workspace never uses this boundary.
+        private static string ProbeAllowanceJson(string runId, SingleCastProbeSelection selection,
+            string projectionId = null, int submissions = 1, string extra = "")
+        {
+            return "{\"schemaVersion\":1,\"kind\":\"kbp-single-cast-probe\",\"runId\":\"" + runId +
+                "\",\"sourceCommit\":\"0000000\",\"approvedProjectionId\":\"" +
+                (projectionId ?? selection.Projection.ProjectionId) + "\",\"casterUnitId\":\"" +
+                selection.CasterUnitId + "\",\"targetUnitId\":\"" + selection.TargetUnitId +
+                "\",\"sourceId\":\"" + selection.SourceId + "\",\"maximumNativeSubmissions\":" +
+                submissions + ",\"approvedBy\":\"owner\"" + extra + "}";
+        }
+
+        private static void TestSingleCastProbeIsDormantAndOneShot(string root)
+        {
+            PartyProviderSnapshot snapshot;
+            CastingWorkspaceInputs inputs = WorkspaceInputs(out snapshot);
+            SingleCastProbeSelection selection = SingleCastProbeSelector.Select(inputs, "fixture-campaign");
+            if (!selection.Selected || selection.CasterUnitId == selection.TargetUnitId ||
+                selection.Projection.Scope != ExplicitProjectionScope.SingleCastProbe ||
+                selection.SourceId != "source-bulls")
+                throw new InvalidOperationException("The probe selector did not pick a plain casting: " +
+                    selection.Refusal);
+            if (SingleCastProbeSelector.Select(inputs, "fixture-campaign").Projection.ProjectionId !=
+                    selection.Projection.ProjectionId)
+                throw new InvalidOperationException("Probe selection is not deterministic.");
+
+            // Allowance parsing is strict and run-bound.
+            string refusal;
+            if (SingleCastProbeAllowance.Parse(ProbeAllowanceJson("run-a", selection), "run-a", out refusal) == null)
+                throw new InvalidOperationException("A valid allowance was refused: " + refusal);
+            var badAllowances = new Dictionary<string, string>
+            {
+                { "allowance-run-mismatch", ProbeAllowanceJson("run-other", selection) },
+                { "allowance-submissions-not-one", ProbeAllowanceJson("run-a", selection, null, 2) },
+                { "allowance-unknown-member:retry", ProbeAllowanceJson("run-a", selection, null, 1, ",\"retry\":true") },
+                { "allowance-projection-id", ProbeAllowanceJson("run-a", selection, "ABC") },
+                { "allowance-unreadable", "{" }
+            };
+            foreach (KeyValuePair<string, string> bad in badAllowances)
+            {
+                if (SingleCastProbeAllowance.Parse(bad.Value, "run-a", out refusal) != null ||
+                    refusal != bad.Key)
+                    throw new InvalidOperationException("Allowance accepted or misreported: " + bad.Key +
+                        " -> " + refusal);
+            }
+            SingleCastProbeAllowance allowance = SingleCastProbeAllowance.Parse(
+                ProbeAllowanceJson("run-a", selection), "run-a", out refusal);
+
+            int factoryCalls = 0;
+            ScriptedInstantRuntime runtime = null;
+            Func<string, Func<ICastExecutor>> factory = mode => () =>
+            {
+                factoryCalls++;
+                runtime = new ScriptedInstantRuntime(SingleCastProbeSelector.ProbeCastingId, mode);
+                return new InstantCastExecutor(runtime, true);
+            };
+            Func<SingleCastProbeBoundary, int> pump = boundary =>
+            {
+                int frames = 0;
+                while (boundary.ActiveRun != null && boundary.ActiveRun.MoveNext() && frames < 10000) frames++;
+                return frames;
+            };
+
+            // Default (no allowance): refused, executor never constructed.
+            var dormant = new SingleCastProbeBoundary(null, factory("none"));
+            CastingDispatchOutcome refused = dormant.Submit(selection.Plan, selection.Decision, "long",
+                selection.Projection);
+            if (refused.Submitted || refused.Reason != "native-submission-disabled:no-probe-allowance" ||
+                factoryCalls != 0 || dormant.ActiveRun != null)
+                throw new InvalidOperationException("The dormant probe boundary did not refuse.");
+
+            // Wrong approved id / wrong selection / wrong scope / tampered
+            // steps: refused, allowance NOT consumed, nothing constructed.
+            var wrongId = new SingleCastProbeBoundary(SingleCastProbeAllowance.Parse(
+                ProbeAllowanceJson("run-a", selection, new string('0', 64)), "run-a", out refusal), factory("none"));
+            if (wrongId.Submit(selection.Plan, selection.Decision, "long", selection.Projection).Reason !=
+                    "probe-projection-not-approved" || wrongId.AllowanceConsumed || factoryCalls != 0)
+                throw new InvalidOperationException("An unapproved projection was not refused.");
+            ExplicitStepConversion standard = ExplicitCastingStepConverter.Convert(selection.Plan,
+                selection.Decision, inputs.ProviderOptions, inputs.EffectsBySource);
+            var standardBoundary = new SingleCastProbeBoundary(SingleCastProbeAllowance.Parse(
+                ProbeAllowanceJson("run-a", selection, standard.ProjectionId), "run-a", out refusal), factory("none"));
+            if (!standardBoundary.Submit(selection.Plan, selection.Decision, "long", standard).Reason
+                    .StartsWith("probe-scope-required:", StringComparison.Ordinal) || factoryCalls != 0)
+                throw new InvalidOperationException("A Standard-scope projection was not refused.");
+            CastStep original = selection.Projection.Plan.Steps[0];
+            var tamperedStep = CloneStep(original, reservation: new ResourceReservation(
+                original.Reservation.PoolKey, original.Reservation.Units + 1, original.Reservation.TokenIds));
+            ExplicitStepConversion tampered = ExplicitStepConversion.Success(
+                new CastPlan(new[] { tamperedStep }, new TargetPlanOutcome[0], new string[0]),
+                selection.Projection.CastingIds.ToList(), ExplicitProjectionScope.SingleCastProbe,
+                selection.Projection.ProjectionId, selection.Projection.CanonicalContract);
+            var tamperBoundary = new SingleCastProbeBoundary(allowance, factory("none"));
+            if (tamperBoundary.Submit(selection.Plan, selection.Decision, "long", tampered).Reason !=
+                    "probe-projection-tampered" || tamperBoundary.AllowanceConsumed || factoryCalls != 0)
+                throw new InvalidOperationException("A tampered projection was not refused.");
+            string otherCaster = selection.CasterUnitId == "unit-cleric" ? "unit-wizard" : "unit-cleric";
+            var mismatch = new SingleCastProbeBoundary(SingleCastProbeAllowance.Parse(
+                ProbeAllowanceJson("run-a", selection).Replace("\"casterUnitId\":\"" + selection.CasterUnitId,
+                    "\"casterUnitId\":\"" + otherCaster), "run-a", out refusal), factory("none"));
+            if (mismatch.Submit(selection.Plan, selection.Decision, "long", selection.Projection).Reason !=
+                    "probe-selection-not-approved" || factoryCalls != 0)
+                throw new InvalidOperationException("A different selection was not refused.");
+
+            // Approved: exactly one native submission, then consumed.
+            var armed = new SingleCastProbeBoundary(allowance, factory("none"));
+            CastingDispatchOutcome submitted = armed.Submit(selection.Plan, selection.Decision, "long",
+                selection.Projection);
+            pump(armed);
+            if (!submitted.Submitted || factoryCalls != 1 || runtime.Fired.Count != 1 ||
+                armed.Outcome == null || !armed.Outcome.AllConfirmed ||
+                armed.Outcome.ProjectionId != allowance.ApprovedProjectionId)
+                throw new InvalidOperationException("The approved probe did not run exactly once.");
+            if (armed.Submit(selection.Plan, selection.Decision, "long", selection.Projection).Reason !=
+                    "probe-allowance-consumed" || factoryCalls != 1 || runtime.Fired.Count != 1)
+                throw new InvalidOperationException("The probe allowance was reusable.");
+
+            // Failure: no retry, allowance consumed.
+            var failing = new SingleCastProbeBoundary(allowance, factory("rejected"));
+            failing.Submit(selection.Plan, selection.Decision, "long", selection.Projection);
+            pump(failing);
+            if (runtime.Fired.Count != 1 || failing.Outcome == null || failing.Outcome.AllConfirmed ||
+                failing.Submit(selection.Plan, selection.Decision, "long", selection.Projection).Submitted)
+                throw new InvalidOperationException("A failed probe was retried or misreported.");
+
+            // Stop/deadline/teardown: disposing the boundary mid-confirmation
+            // reaches the executor's cleanup and reports cancellation.
+            var pending = new SingleCastProbeBoundary(allowance, factory("pending"));
+            pending.Submit(selection.Plan, selection.Decision, "long", selection.Projection);
+            while (runtime.Fired.Count == 0 && pending.ActiveRun.MoveNext()) { }
+            pending.Dispose();
+            if (!runtime.Cleaned.Contains(SingleCastProbeSelector.ProbeCastingId) ||
+                pending.Outcome == null || !pending.Outcome.Cancelled || pending.ActiveRun != null)
+                throw new InvalidOperationException("Disposing the probe boundary did not cancel and clean up.");
+
+            // The production workspace never uses the probe boundary.
+            string dir = Path.Combine(root, "probe-default");
+            Directory.CreateDirectory(dir);
+            var session = new CastingWorkspaceSession(dir, "fixture-campaign");
+            object dispatch = typeof(CastingWorkspaceSession).GetField("_dispatch",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+                .GetValue(session);
+            if (!(dispatch is DisabledCastingDispatchBoundary))
+                throw new InvalidOperationException("The production workspace default dispatch is not disabled.");
+            string source = Path.Combine(FindRepositoryRoot(), "src", "KingmakerBuffPlanner");
+            string[] constructors = Directory.GetFiles(source, "*.cs", SearchOption.AllDirectories)
+                .Where(file => !file.Contains(Path.DirectorySeparatorChar + "obj" + Path.DirectorySeparatorChar))
+                .Where(file => File.ReadAllText(file).Contains("new SingleCastProbeBoundary("))
+                .Select(file => file.Substring(source.Length + 1).Replace('\\', '/'))
+                .OrderBy(file => file, StringComparer.Ordinal).ToArray();
+            if (constructors.Any(file => file != "RuntimeTesting/RuntimeTestHost.cs"))
+                throw new InvalidOperationException("The probe boundary is constructed outside the runtime-test host: " +
+                    string.Join(",", constructors));
         }
 
         // The Unity-bound host cannot be compiled here, so its wiring to the

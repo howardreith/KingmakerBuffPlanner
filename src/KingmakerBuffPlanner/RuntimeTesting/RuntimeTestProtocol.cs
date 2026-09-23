@@ -184,8 +184,35 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         {
             return string.Equals(scenario, "live-workspace-qual",
                 StringComparison.Ordinal) ||
-                IsManualWorkspaceScenario(scenario);
+                IsManualWorkspaceScenario(scenario) ||
+                IsProbeScenario(scenario);
         }
+
+        // Single-cast probe scenarios. BOTH request zero synthetic input and
+        // open the workspace through the production path like the manual
+        // scenario. "live-cast-probe-select" only discovers and records the
+        // exact probe selection and projection identity; it never constructs
+        // a dispatch boundary. "live-cast-probe" additionally requires the
+        // owner's run-bound one-shot allowance (probeAllowance parameter)
+        // and is the ONLY path that can submit a native cast.
+        internal static bool IsProbeScenario(string scenario)
+        {
+            return string.Equals(scenario, "live-cast-probe-select", StringComparison.Ordinal) ||
+                IsCastingProbeScenario(scenario);
+        }
+
+        internal static bool IsCastingProbeScenario(string scenario)
+        {
+            return string.Equals(scenario, "live-cast-probe", StringComparison.Ordinal);
+        }
+
+        // Workspace scenarios that must never request synthetic input.
+        internal static bool IsNoInputWorkspaceScenario(string scenario)
+        {
+            return IsManualWorkspaceScenario(scenario) || IsProbeScenario(scenario);
+        }
+
+        internal const int ProbeRunDeadlineSeconds = 60;
 
         // The supervised manual-inspection scenario (review H1): the full
         // guarded pipeline through the opened workspace, then a BOUNDED
@@ -286,6 +313,22 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (request.Parameters.ContainsKey("manualHoldSeconds"))
                 throw new InvalidDataException(
                     "manual-hold-seconds-only-with-manual-scenario");
+            // The probe allowance exists only on the casting probe scenario
+            // (never on selection-only or any other scenario), as a string
+            // the host parses strictly against this run id.
+            bool hasAllowance = request.Parameters.ContainsKey("probeAllowance");
+            if (hasAllowance && !IsCastingProbeScenario(request.Scenario))
+                throw new InvalidDataException("probe-allowance-only-with-casting-probe");
+            if (IsProbeScenario(request.Scenario))
+            {
+                if (hasAllowance && !(request.Parameters["probeAllowance"] is string))
+                    throw new InvalidDataException("probe-allowance-type");
+                ValidateLiveSaveParameters(request, 9 + (hasAllowance ? 1 : 0));
+                if (!string.Equals(request.Parameters["executionMode"] as string, "instant",
+                        StringComparison.Ordinal))
+                    throw new InvalidDataException("probe-execution-mode-instant-only");
+                return;
+            }
             if (IsPerformanceScenario(request.Scenario))
             {
                 string[] performanceNames =

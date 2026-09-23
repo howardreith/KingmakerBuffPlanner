@@ -459,6 +459,13 @@ namespace KingmakerBuffPlanner.Planning
             throw new NotSupportedException("effect-type:" + expression.GetType().Name);
         }
 
+        // The identity of an exact step list (used by the probe boundary to
+        // recompute the id from the steps it is actually handed).
+        internal static string Identity(IList<CastStep> steps, ExplicitProjectionScope scope)
+        {
+            return Sha256Hex(CanonicalContract(steps, scope));
+        }
+
         private static string Sha256Hex(string text)
         {
             using (SHA256 sha = SHA256.Create())

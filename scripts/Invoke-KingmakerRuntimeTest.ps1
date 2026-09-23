@@ -1,6 +1,6 @@
 ﻿[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
 param(
-    [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'live-ui-bootstrap', 'ui-native-contract-probe', 'final-no-save-core', 'performance-probe', 'launch-render-diagnostic', 'menu-input-diagnostic', 'live-workspace-qual', 'live-workspace-manual')][string]$Scenario = 'mod-load-smoke',
+    [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'live-ui-bootstrap', 'ui-native-contract-probe', 'final-no-save-core', 'performance-probe', 'launch-render-diagnostic', 'menu-input-diagnostic', 'live-workspace-qual', 'live-workspace-manual', 'live-cast-probe-select', 'live-cast-probe')][string]$Scenario = 'mod-load-smoke',
     [ValidateSet('native-only', 'call-of-the-wild', 'human-reproduction', 'full-user')][string]$CompatibilityProfileId = 'native-only',
     [ValidateRange(5, 1800)][int]$TimeoutSeconds = 180,
     [ValidateRange(5, 300)][int]$LaunchTimeoutSeconds = 60,
@@ -19,7 +19,13 @@ param(
     # done path without an operator by writing the done marker 20 seconds
     # after manual-ready, clearly labeled as a rehearsal.
     [ValidateRange(30, 1200)][int]$ManualHoldSeconds = 300,
-    [switch]$ManualRehearseDone
+    [switch]$ManualRehearseDone,
+    # Single-cast probe (live-cast-probe only): the OWNER's run-bound,
+    # one-shot allowance file, kept outside the repository under the lab's
+    # approvals directory. Without it the casting probe cannot be launched;
+    # live-cast-probe-select never takes one and never constructs a
+    # dispatch boundary.
+    [string]$ProbeAllowancePath
 )
 
 Set-StrictMode -Version Latest
@@ -37,6 +43,31 @@ $package = (Resolve-Path -LiteralPath (Join-Path $root "artifacts\local-runtime\
 $gitStatus = @(& git -C $root status --porcelain)
 if ($LASTEXITCODE -ne 0 -or @($gitStatus).Count -ne 0) { throw 'Runtime qualification requires a clean Git worktree.' }
 $buildManifest = Read-KbpBuildManifest $package
+$probeAllowanceJson = $null
+if ($Scenario -ceq 'live-cast-probe') {
+    if ([string]::IsNullOrWhiteSpace($ProbeAllowancePath)) {
+        throw "live-cast-probe requires -ProbeAllowancePath (the owner's run-bound one-shot allowance)."
+    }
+    if ([string]::IsNullOrWhiteSpace($RunId)) { throw 'live-cast-probe requires an explicit -RunId matching the allowance.' }
+    if ($ExecutionMode -cne 'instant') { throw 'live-cast-probe runs in instant mode only.' }
+    $approvalsRoot = [IO.Path]::GetFullPath((Join-Path $root '..\..\approvals')).TrimEnd('\') + '\'
+    $allowanceFull = [IO.Path]::GetFullPath($ProbeAllowancePath)
+    if (-not $allowanceFull.StartsWith($approvalsRoot, [StringComparison]::OrdinalIgnoreCase) -or
+        -not (Test-Path -LiteralPath $allowanceFull -PathType Leaf)) {
+        throw "The probe allowance must be an existing file under $approvalsRoot"
+    }
+    $probeAllowanceJson = [IO.File]::ReadAllText($allowanceFull)
+    $allowance = $probeAllowanceJson | ConvertFrom-Json
+    if ([string]$allowance.kind -cne 'kbp-single-cast-probe' -or
+        [string]$allowance.runId -cne $RunId -or
+        [string]$allowance.sourceCommit -cne [string]$buildManifest.commit -or
+        [int]$allowance.maximumNativeSubmissions -ne 1) {
+        throw 'The probe allowance does not match this run id, this build commit, or one submission.'
+    }
+}
+elseif (-not [string]::IsNullOrWhiteSpace($ProbeAllowancePath)) {
+    throw '-ProbeAllowancePath is only valid with -Scenario live-cast-probe.'
+}
 $compatibilityProfile = Get-KbpCompatibilityProfile $CompatibilityProfileId
 Assert-KbpCompatibilityProfileFixtures -Profile $compatibilityProfile
 $expectedOptionalMods = @($compatibilityProfile.mods | ForEach-Object {
@@ -49,7 +80,8 @@ $expectedOptionalMods = @($compatibilityProfile.mods | ForEach-Object {
         } else { $_.assemblySha256 }
     }
 })
-$savePair = if ($Scenario -ceq 'live-ui-bootstrap' -or $Scenario -ceq 'live-workspace-qual' -or $Scenario -ceq 'live-workspace-manual') { Get-KbpDisposableSavePair } else { $null }
+$savePair = if ($Scenario -ceq 'live-ui-bootstrap' -or $Scenario -ceq 'live-workspace-qual' -or $Scenario -ceq 'live-workspace-manual' -or
+    $Scenario -ceq 'live-cast-probe-select' -or $Scenario -ceq 'live-cast-probe') { Get-KbpDisposableSavePair } else { $null }
 $steamSafety = Assert-KbpSteamSafety -SteamPath $SteamPath
 & (Join-Path $PSScriptRoot 'Deploy-Local.ps1') -PackagePath $package `
     -RunId 'runtime-whatif-preflight' -CompatibilityProfileId $CompatibilityProfileId `
@@ -124,6 +156,10 @@ try {
         # The manual scenario always stages the WORKING save pair; its hold
         # parameter merges into that parameter set (never replaces it).
         $scenarioParameters.manualHoldSeconds = $ManualHoldSeconds
+    }
+    if ($null -ne $probeAllowanceJson) {
+        # The host re-parses the allowance strictly against this run id.
+        $scenarioParameters.probeAllowance = $probeAllowanceJson
     }
     $request = New-KbpRuntimeRequest -RunId $runId -EvidenceDirectory $evidence `
         -BuildManifest $buildManifest -TimeoutSeconds $TimeoutSeconds `
