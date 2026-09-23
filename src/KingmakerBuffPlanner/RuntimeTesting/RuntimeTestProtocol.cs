@@ -407,9 +407,14 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     throw new InvalidDataException("qualification-recipe-unknown");
                 ValidateLiveSaveParameters(request, 9 + (hasQualification ? 1 : 0) + (hasRecipe ? 1 : 0),
                     hasQualification);
-                if (!string.Equals(request.Parameters["executionMode"] as string, "instant",
+                // The selection run never casts and stays instant (its
+                // forecast does not depend on the mode); a casting run
+                // executes in the mode its allowance approves, animated or
+                // instant, and the host refuses any other.
+                if (!IsCastingQualificationScenario(request.Scenario) &&
+                    !string.Equals(request.Parameters["executionMode"] as string, "instant",
                         StringComparison.Ordinal))
-                    throw new InvalidDataException("qualification-execution-mode-instant-only");
+                    throw new InvalidDataException("qualification-selection-instant-only");
                 return;
             }
             if (IsProbeScenario(request.Scenario))

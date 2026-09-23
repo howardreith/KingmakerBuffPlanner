@@ -3230,12 +3230,14 @@ namespace KingmakerBuffPlanner.Tests
                 { "select-finite-recipe", recipe(set("live-cast-qual-select", "KBP_ADVANCED", false, "instant"),
                     "finite-direct-mixed") },
                 { "cast-zero-cost-recipe", recipe(set("live-cast-qual", "KBP_AUTOMATION", true, "instant"),
-                    "zero-cost-mixed") }
+                    "zero-cost-mixed") },
+                // A casting run in the mode its allowance approves.
+                { "cast-animated", set("live-cast-qual", "KBP_AUTOMATION", true, "animated") }
             };
             var refused = new Dictionary<string, Action<Dictionary<string, object>>>
             {
                 { "select-with-allowance", set("live-cast-qual-select", "KBP_AUTOMATION", true, "instant") },
-                { "animated", set("live-cast-qual", "KBP_AUTOMATION", true, "animated") },
+                { "select-animated", set("live-cast-qual-select", "KBP_AUTOMATION", false, "animated") },
                 { "advanced-cast-without-allowance", set("live-cast-qual", "KBP_ADVANCED", false, "instant") },
                 { "advanced-probe", set("live-cast-probe-select", "KBP_ADVANCED", false, "instant") },
                 { "allowance-on-workspace", set("live-workspace-qual", "KBP_AUTOMATION", true, "instant") },
