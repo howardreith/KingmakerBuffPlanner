@@ -1,6 +1,49 @@
 # AUTONOMOUS-RESUME — top section is current; planning/CASTING-FIRST-MIGRATION-STATUS.md is the per-checkpoint tracker.
 
-## N-series (`7379dc8` review): frozen-artifact binding, terminal shutdown, exact prepared-slot reads — 2026-09-23 (LATEST)
+## RC mission (2026-09-23): production execution integration and advanced-copy tooling — IN PROGRESS (LATEST)
+
+Mission: the casting-first release candidate (owner message of 2026-09-23).
+Development continues in the worktree `repo/KingmakerBuffPlanner-O1` on the
+PR branch; the frozen probe checkout `repo/KingmakerBuffPlanner` stays
+detached at `e964d2f`, untouched.
+
+| Commit | Content |
+| --- | --- |
+| `3b69321` | Production execution. Planner-mode setting (`UserSettings/planner-mode.json`, Classic by default, casting-first chosen in the UMM panel). Every routine route (HUD, hotkey, spellbook, planner Apply, Ready Casts Only) goes through the session Apply to the production boundary and the execution host: one run at a time, pumped per frame, one terminal for completion, player stop (press the routine again), deadline, area change, disable, unload and teardown. Live existing-effect policy: weaker, expiring, unprovable or suppressed effects never count as satisfied, and an exhausted pool no longer blocks an already-active effect. Review acceptance is per routine and persisted as a digest. Save keeps the player's execution/UI settings. Runtime-test sessions are locked to the refusing boundary. |
+| `6b92020` | Advanced-copy tooling: `live-advanced-inspect` (non-casting), protocol fixture families, launcher `-FixtureFamily Advanced` bound to the bootstrap manifest, protected-save comparison around every live run. Workspace cards disclose skips, recasts and "cannot run in this version" limits. |
+
+Gates at `6b92020` (Windows PowerShell 5.1, non-interactive): source 42/42,
+protocol 275/275, harness 32/32, deploy WhatIf 5/5, launcher WhatIf 10/10,
+fixture 3/3, Restore-InstallLocal 16/16, publisher 3/3. 17 new mutants of
+the new guards were all caught.
+
+Live runs this slice (no native cast):
+
+- `casting-ws-claude-qual-20260923-125047` at `3b69321`: refused before
+  launch by the `full-user` compatibility check (KingmakerGunslinger
+  identity mismatch).
+- `casting-ws-claude-qual-20260923-125326-hr` at `3b69321`, profile
+  `human-reproduction`: the automation fixture does not load without the
+  full mod set (`Player.PostLoad` failed; save writes stayed suppressed),
+  FAIL on the load timeout, restoration verified.
+
+Owner blockers:
+
+1. The frozen Resistance probe needs its allowance file. My write of
+   `approvals/casting-probe-cast-20260923-01.json` was refused by the tool
+   permission classifier; the owner can run
+   `scratchpad/write_allowance.ps1` or allow writes under `approvals\`.
+2. KingmakerGunslinger 0.0.136 was installed on 2026-09-23 around 11:45;
+   `full-user` is sealed at 0.0.133. Every automation-fixture run and the
+   frozen probe are refused until the owner restores 0.0.133 or approves
+   resealing (the frozen probe checkout cannot change, so it needs
+   0.0.133 back).
+3. No `KBP_ADVANCED_SEED` exists yet.
+
+Next, independent of the blockers: migration/rollback audit of the new
+UserSettings files, remaining UI items, RC packaging and documentation.
+
+## N-series (`7379dc8` review): frozen-artifact binding, terminal shutdown, exact prepared-slot reads — 2026-09-23 (history)
 
 N1–N3 fixed in `b9721c3`; advanced-copy fixture family in `bdac45f`; the
 active proposal is rewritten for the frozen artifact (the `7379dc8`
