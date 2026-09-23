@@ -13,7 +13,28 @@ workspace dispatch boundary. The workspace renders in presenting
 sessions (display-path acceptance run `casting-ws-gseries-081000`);
 human usability and the native aesthetic pass remain open.
 
-## Current review dispositions — K-review at `258a1d0` (answered 2026-09-22)
+## Current review dispositions — L-review at `475d2b9` (answered 2026-09-23)
+
+Native dispatch remains disabled in the production workspace. Every row
+below is **source/isolated-test evidence only** (protocol suite, isolated
+PowerShell fixtures, mutation checks); no row claims gameplay. The
+single-cast probe is prepared but has **not** cast anything.
+
+| Finding | Disposition | Commit | Tests (mutants caught) |
+| --- | --- | --- | --- |
+| L1 — imported constraints bypassable (Ready Casts Only; generic Mark Ready) | Pending plan-wide notices refuse EVERY apply mode in the gate and the session; a refused gate decision never reaches the boundary; unresolved per-casting review items block compiler readiness whatever the state; Mark Ready/Add/Update refuse Ready with unresolved review; content edits cannot change provenance; explicit, undoable, disclosed ResolveImportReview / AcknowledgeImportNotices record resolution beside the kept history (persisted); inspector controls added | `58a1aaf` | `import-requirements-stay-enforced` (6/6) |
+| L2 — cancellation did not dispose the active executor | The coordinator owns the nested iterator: disposed exactly once on exhaustion, failure and OUTER disposal; acquisition/MoveNext/Current/Dispose failures halt without replacing the first failure; cancelled runs report once; Processed vs NativeSubmissionReported. Animated executor now reports abandonment and cancel-cleanup failures (reporting only) | `2929985` | `explicit-run-cancellation-disposes-executor` (6/6) |
+| L3 — ProjectionId omitted executable fields | Versioned (identityVersion 2) canonical JSON of every step field in order, incl. token ids, enhancement pool usage, source id, expected effect tree, omitted enhancements; set-like values normalized; unrepresentable effect refuses; canonical text exposed | `cd5bc4a` | `projection-identity-is-complete` (6/7; the survivor is equivalent — CastStep already sorts recipients) |
+| L4 — partial swap could release an Installed record | Each destructive substep tracked; only a verified byte-identical return yields Installed/not-applied; a failed second move with failed reversal records RollbackRecoveryNeeded with paths/identities and keeps the lock; lock released only after a clean state is recorded | `aa3b95c` | `Test-RestoreInstallLocal.ps1` 16/16 (2/2 script mutants) |
+| L5 — file-name scan is not format compatibility | Schema-6 format revisions (1/2/3); writer stamps formatRevision 3; repository refuses newer revisions; the assembly declares `KingmakerBuffPlanner.CandidateProfileFormat = 6.3`, read from the restored binary in a separate reflection-only process; candidates kept only if every member belongs to a revision the target reads; undeclared targets keep none; byte-exact archives | `aa3b95c` | `Test-RestoreInstallLocal.ps1` (4/4 script mutants), `rollback-candidate-format-members-match-model` |
+| L6 — probe scope admitted excluded categories | Converter refuses non-spellbook/special source, metamagic, provider/caster mismatch, self-target, unverified target, non-DirectRuleCast strategy, non-plain effect shape; undefined scope enum refused | `cd5bc4a` | `probe-scope-enforces-whole-subset` (5/5) |
+| Probe preparation | Dormant selector, strict owner allowance, default-refusing one-shot boundary, gated `live-cast-probe-select` / `live-cast-probe` scenarios; request `docs/LIVE-CAST-PROBE-REQUEST.md` | `6f22a78`, `2117438` | `single-cast-probe-is-dormant-and-one-shot`, `probe-scenario-request-validation`, `single-cast-probe-run-record-rules` (8/8), launcher gating 4 cases |
+
+The first live cast is **not** ready: two selection-only live runs found no
+eligible casting on the WORKING fixture (cantrips only). See
+`docs/LIVE-CAST-PROBE-REQUEST.md`.
+
+## Previous review dispositions — K-review at `258a1d0` (history)
 
 Native dispatch remains disabled. Evidence for every row below is
 **source tests only** (protocol suite / isolated script fixtures); no row
