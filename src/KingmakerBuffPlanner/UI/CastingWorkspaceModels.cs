@@ -113,10 +113,16 @@ namespace KingmakerBuffPlanner.UI
         // (review K3); empty for authored or cleanly imported records.
         public IReadOnlyList<string> ReviewItems { get; private set; } = new string[0];
 
-        internal void ApplyReviewItems(IEnumerable<string> items)
+        internal void ApplyReviewItems(IEnumerable<string> unresolved,
+            IEnumerable<string> resolved = null)
         {
-            ReviewItems = (items ?? new string[0]).ToList();
+            ReviewItems = (unresolved ?? new string[0]).ToList();
+            ResolvedReviewItems = (resolved ?? new string[0]).ToList();
         }
+
+        // Imported review items the player explicitly resolved (kept as
+        // history, review L1).
+        public IReadOnlyList<string> ResolvedReviewItems { get; private set; } = new string[0];
         public string SourceId { get; private set; }
         public string ModeLabel { get; private set; }
         public string DirectTargetUnitId { get; private set; }

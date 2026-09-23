@@ -395,6 +395,8 @@ namespace KingmakerBuffPlanner.Tests
                     TestCastingImportIdentity);
                 Run("casting-import-preserves-unresolved-intent",
                     () => TestCastingImportPreservesUnresolvedIntent(root));
+                Run("import-requirements-stay-enforced",
+                    () => TestImportRequirementsStayEnforced(root));
                 Run("converter-refuses-unsupported-contracts",
                     () => TestConverterRefusesUnsupportedContracts(root));
                 Run("explicit-run-stops-after-failure-both-modes",
@@ -14286,10 +14288,12 @@ namespace KingmakerBuffPlanner.Tests
                     "import-notices-pending:", StringComparison.Ordinal))
                 throw new InvalidOperationException("Ordinary Apply ignored pending import notices.");
             if (!session.AcknowledgeImportNotices().Applied ||
-                session.Document.ImportNotices.Count != 0)
-                throw new InvalidOperationException("Acknowledgement did not clear the notices.");
+                session.Document.PendingImportNotices.Count != 0 ||
+                session.Document.ImportNotices.Count != 1)
+                throw new InvalidOperationException(
+                    "Acknowledgement did not settle the notices while keeping them as history.");
             session.Undo();
-            if (session.Document.ImportNotices.Count != 1)
+            if (session.Document.PendingImportNotices.Count != 1)
                 throw new InvalidOperationException("Acknowledgement was not undoable.");
             // An authored edit keeps the notices (the document rebuild must
             // not silently drop them).
@@ -14297,6 +14301,177 @@ namespace KingmakerBuffPlanner.Tests
             session.SetFocusedCastingState(CastingAuthoringState.Disabled);
             if (session.Document.ImportNotices.Count != 1)
                 throw new InvalidOperationException("An authored edit dropped the import notices.");
+        }
+
+        // Review L1: imported requirements stay enforced in the shared
+        // contract. Plan-wide notices block EVERY apply mode; per-casting
+        // review items keep a casting out of executable readiness whatever
+        // its state says; only explicit, undoable, disclosed resolution
+        // settles them; editing, toggling and Save/Reload never do.
+        private static PlannedCasting ImportedCasting(string castingId, string target,
+            CastingAuthoringState state, string[] items, string[] resolved = null, int order = 1)
+        {
+            return new PlannedCasting(castingId, "long", order, "source-bulls",
+                CastingBuffAbility, "unit-cleric", null, CastingTargetMode.DirectTarget,
+                target, null, null, null, null, ExistingEffectPolicy.SkipAlreadyActive,
+                null, state, new MigrationProvenance(castingId, 5, "long", string.Empty,
+                    target, items, resolved));
+        }
+
+        private static void TestImportRequirementsStayEnforced(string root)
+        {
+            const string notice = "legacy-provider-preference:unit-wizard|book|ability|;banned=True;priority=none;maximumCasts=none";
+            const string pinItem = "provider-pin:unit-cleric|book-old|ability|";
+            PartyProviderSnapshot snapshot;
+            CastingWorkspaceInputs inputs = WorkspaceInputs(out snapshot);
+            var gate = new CastingExecutionGate();
+
+            // --- shared contract, no session: compiler + gate ---
+            CastingPlanDocument noticed = new CastingPlanDocument("fixture-campaign",
+                CastingDocument().Routines, new[]
+                {
+                    DirectCasting("plain", "long", "unit-cleric", "unit-t1",
+                        "source-bulls", CastingBuffAbility)
+                }, new[] { notice });
+            ExplicitCastingPlan noticedPlan = new ExplicitCastingCompiler().Compile(
+                noticed, snapshot, inputs.ProviderOptions, inputs.EffectsBySource,
+                inputs.Enhancements);
+            if (!noticedPlan.CastingById("plain").IsExecutable ||
+                noticedPlan.PendingImportNotices.Count != 1)
+                throw new InvalidOperationException("Fixture precondition: plain casting must be Ready.");
+            foreach (CastingApplyMode mode in new[] { CastingApplyMode.Ordinary, CastingApplyMode.ReadyCastsOnly })
+            {
+                CastingApplyDecision decision = gate.Evaluate(noticedPlan, mode, "long");
+                if (decision.Allowed || decision.ExecutableCastingIds.Count != 0 ||
+                    !decision.BlockingReasons.Any(reason => reason.StartsWith(
+                        "import-notices-pending:", StringComparison.Ordinal)))
+                    throw new InvalidOperationException("The gate waived pending import notices in " + mode + ".");
+            }
+            // A record that claims Ready while carrying unresolved review
+            // (e.g. a hand-edited file) is Blocked by the compiler.
+            CastingPlanDocument claimed = new CastingPlanDocument("fixture-campaign",
+                CastingDocument().Routines, new[]
+                {
+                    DirectCasting("plain", "long", "unit-cleric", "unit-t1",
+                        "source-bulls", CastingBuffAbility),
+                    ImportedCasting("group-review", "unit-t2", CastingAuthoringState.Ready,
+                        new[] { "grouping-unknown:source-communal" })
+                });
+            ExplicitCastingPlan claimedPlan = new ExplicitCastingCompiler().Compile(
+                claimed, snapshot, inputs.ProviderOptions, inputs.EffectsBySource,
+                inputs.Enhancements);
+            ResolvedCasting claimedReview = claimedPlan.CastingById("group-review");
+            if (claimedReview.IsExecutable || !claimedReview.ReadinessReasons.Contains(
+                    "import-review-unresolved:grouping-unknown:source-communal"))
+                throw new InvalidOperationException("A Ready record with unresolved review compiled executable.");
+            CastingApplyDecision readyOnly = gate.Evaluate(claimedPlan, CastingApplyMode.ReadyCastsOnly, "long");
+            if (!readyOnly.Allowed || readyOnly.ExecutableCastingIds.Contains("group-review") ||
+                !readyOnly.ExecutableCastingIds.Contains("plain"))
+                throw new InvalidOperationException("Ready Casts Only executed an unresolved imported casting.");
+            if (gate.Evaluate(claimedPlan, CastingApplyMode.Ordinary, "long").Allowed)
+                throw new InvalidOperationException("Ordinary Apply ignored an unresolved imported casting.");
+            var direct = new CastingAuthoringService(CastingDocument());
+            if (direct.AddCasting(ImportedCasting("added", "unit-t3", CastingAuthoringState.Ready,
+                    new[] { pinItem })).Applied)
+                throw new InvalidOperationException("AddCasting accepted Ready with unresolved review.");
+
+            // --- production session, recording (disabled) boundary ---
+            string dir = Path.Combine(root, "l1-session");
+            Directory.CreateDirectory(dir);
+            new CastingPlanRepository(dir).Save(CastingPlanProfile.FromDocument(
+                new CastingPlanDocument("fixture-campaign", CastingDocument().Routines, new[]
+                {
+                    DirectCasting("plain", "long", "unit-cleric", "unit-t1",
+                        "source-bulls", CastingBuffAbility),
+                    ImportedCasting("pinned", "unit-t2", CastingAuthoringState.Draft,
+                        new[] { pinItem })
+                }, new[] { notice })));
+            var boundary = new DisabledCastingDispatchBoundary();
+            var session = new CastingWorkspaceSession(dir, "fixture-campaign", boundary);
+            Func<CastingApplyMode, WorkspaceApplyResult> apply = mode =>
+            {
+                session.SelectBuff("source-bulls");
+                session.SelectRoutine("long");
+                session.BuildView(inputs);
+                session.PresentForReview(inputs);
+                session.AcceptPresentedPlan(inputs);
+                return session.Apply(mode, "long", inputs);
+            };
+            foreach (CastingApplyMode mode in new[] { CastingApplyMode.Ordinary, CastingApplyMode.ReadyCastsOnly })
+            {
+                WorkspaceApplyResult refused = apply(mode);
+                if (refused.Allowed || !refused.ReviewReason.StartsWith(
+                        "import-notices-pending:", StringComparison.Ordinal))
+                    throw new InvalidOperationException(mode + " Apply ignored pending import notices: " +
+                        refused.ReviewReason);
+            }
+            if (boundary.RecordedSubmissions.Count != 0)
+                throw new InvalidOperationException("Pending import notices reached the dispatch boundary.");
+
+            Func<PlannedCasting> pinned = () => session.Document.Castings.Single(
+                value => value.CastingId == "pinned");
+            session.FocusCasting("pinned");
+            AuthoringEditResult markReady = session.SetFocusedCastingState(CastingAuthoringState.Ready);
+            if (markReady.Applied || !markReady.Reason.StartsWith(
+                    "ready-requires-import-review:pinned", StringComparison.Ordinal))
+                throw new InvalidOperationException("Generic Mark Ready resolved an import review.");
+            // A content edit that drops provenance and claims Ready is refused;
+            // a plain retarget keeps the review items.
+            PlannedCasting stripped = new PlannedCasting("pinned", "long", 0, "source-bulls",
+                CastingBuffAbility, "unit-cleric", null, CastingTargetMode.DirectTarget, "unit-t2",
+                null, null, null, null, ExistingEffectPolicy.SkipAlreadyActive, null,
+                CastingAuthoringState.Ready, null);
+            if (session.UpdateFocusedCasting(stripped).Applied)
+                throw new InvalidOperationException("A content edit erased the import review.");
+            if (!session.UpdateFocusedCasting(pinned().WithDirectTarget("unit-t3")).Applied ||
+                pinned().Provenance.UnresolvedReviewItems.Count != 1)
+                throw new InvalidOperationException("A retarget manufactured a review resolution.");
+            if (!session.SetFocusedCastingState(CastingAuthoringState.Disabled).Applied ||
+                pinned().Provenance.UnresolvedReviewItems.Count != 1)
+                throw new InvalidOperationException("Disabling manufactured a review resolution.");
+            if (session.SetFocusedCastingState(CastingAuthoringState.Ready).Applied)
+                throw new InvalidOperationException("Disabled -> Ready bypassed the import review.");
+            session.Save();
+            session.Reload();
+            if (pinned().Provenance.UnresolvedReviewItems.Count != 1 ||
+                session.PendingImportNotices.Count != 1)
+                throw new InvalidOperationException("Save/Reload manufactured an acknowledgement.");
+
+            // Explicit, disclosed, undoable acknowledgement and resolution.
+            AuthoringEditResult acknowledged = session.AcknowledgeImportNotices();
+            if (!acknowledged.Applied || !acknowledged.Scope.Contains(notice) ||
+                session.PendingImportNotices.Count != 0 || session.Document.ImportNotices.Count != 1)
+                throw new InvalidOperationException("Acknowledgement was not explicit and disclosed.");
+            session.Undo();
+            if (session.PendingImportNotices.Count != 1)
+                throw new InvalidOperationException("Acknowledgement Undo did not restore the pending notice.");
+            session.AcknowledgeImportNotices();
+            session.FocusCasting("pinned");
+            AuthoringEditResult resolved = session.ResolveFocusedImportReview();
+            if (!resolved.Applied || !resolved.Scope.Contains(pinItem) ||
+                pinned().Provenance.UnresolvedReviewItems.Count != 0 ||
+                !pinned().Provenance.ReviewItems.Contains(pinItem) ||
+                pinned().State != CastingAuthoringState.Disabled)
+                throw new InvalidOperationException("Resolution was not disclosed or erased history.");
+            session.Undo();
+            if (pinned().Provenance.UnresolvedReviewItems.Count != 1)
+                throw new InvalidOperationException("Resolution Undo did not restore the unresolved state.");
+            session.ResolveFocusedImportReview();
+            if (!session.SetFocusedCastingState(CastingAuthoringState.Ready).Applied)
+                throw new InvalidOperationException("Mark Ready was refused after explicit resolution.");
+            session.Save();
+            session.Reload();
+            if (pinned().Provenance.ResolvedReviewItems.Count != 1 ||
+                pinned().State != CastingAuthoringState.Ready ||
+                session.PendingImportNotices.Count != 0 ||
+                session.Document.AcknowledgedImportNotices.Count != 1)
+                throw new InvalidOperationException("Resolution/acknowledgement did not survive Save/Reload.");
+            WorkspaceApplyResult ran = apply(CastingApplyMode.ReadyCastsOnly);
+            if (ran.GateDecision == null || !ran.GateDecision.Allowed ||
+                !ran.GateDecision.ExecutableCastingIds.Contains("pinned") ||
+                boundary.RecordedSubmissions.Count != 1)
+                throw new InvalidOperationException("The resolved plan did not reach the recording boundary: " +
+                    ran.ReviewReason);
         }
 
         // Review K4: compiler-to-converter — contracts the executor step

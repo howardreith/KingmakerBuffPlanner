@@ -879,12 +879,40 @@ namespace KingmakerBuffPlanner.UI
                 TextAnchor.MiddleLeft);
             scope.fontStyle = FontStyle.Bold;
             KingmakerUiFactory.AddLayout(scope.rectTransform, 30f);
+            RebuildImportNotices();
             if (view.EditingScope == WorkspaceEditingScope.EditingSingleCasting)
             {
                 RebuildFocusedCastingEditor(view);
                 return;
             }
             RebuildDraftEditor(view);
+        }
+
+        // Review L1: plan-wide legacy constraints are shown with an explicit,
+        // undoable acknowledgement; until then no apply mode runs.
+        private void RebuildImportNotices()
+        {
+            IReadOnlyList<string> pending = _session.PendingImportNotices;
+            if (pending.Count == 0) return;
+            AddInspectorCaption("Imported plan-wide constraints (" + pending.Count + ")");
+            Text notices = KingmakerUiFactory.CreateText(
+                "ImportNotices", _inspectorContent, _theme,
+                string.Join("\n", pending.ToArray()) +
+                "\nApply is refused until these are acknowledged.",
+                12, TextAnchor.UpperLeft);
+            notices.color = _theme.MutedBrownText;
+            KingmakerUiFactory.AddLayout(notices.rectTransform, 18f * (pending.Count + 1));
+            Button acknowledge = KingmakerUiFactory.CreateButton(
+                "AcknowledgeImportNotices", _inspectorContent, _theme,
+                "Acknowledge imported constraints", () => Click(() =>
+                {
+                    AuthoringEditResult result = _session.AcknowledgeImportNotices();
+                    SurfaceRefusal(result, "acknowledge");
+                    if (result.Applied)
+                        _footerResult.text = "Acknowledged (Undo reverts): " + result.Scope;
+                    RefreshView();
+                }));
+            KingmakerUiFactory.AddLayout(RectOf(acknowledge), 30f);
         }
 
         private void RebuildFocusedCastingEditor(WorkspaceView view)
@@ -902,6 +930,30 @@ namespace KingmakerBuffPlanner.UI
                 missing.color = _theme.MutedBrownText;
                 KingmakerUiFactory.AddLayout(missing.rectTransform, 34f);
                 return;
+            }
+            if (focused.Provenance != null &&
+                focused.Provenance.UnresolvedReviewItems.Count != 0)
+            {
+                AddInspectorCaption("Imported: needs review");
+                Text items = KingmakerUiFactory.CreateText(
+                    "ImportReviewItems", _inspectorContent, _theme,
+                    string.Join("\n", focused.Provenance.UnresolvedReviewItems.ToArray()) +
+                    "\nThis casting cannot run until the review is resolved.",
+                    12, TextAnchor.UpperLeft);
+                items.color = _theme.MutedBrownText;
+                KingmakerUiFactory.AddLayout(items.rectTransform,
+                    18f * (focused.Provenance.UnresolvedReviewItems.Count + 1));
+                Button resolve = KingmakerUiFactory.CreateButton(
+                    "ResolveImportReview", _inspectorContent, _theme,
+                    "Resolve review (keep current choices)", () => Click(() =>
+                    {
+                        AuthoringEditResult result = _session.ResolveFocusedImportReview();
+                        SurfaceRefusal(result, "resolve review");
+                        if (result.Applied)
+                            _footerResult.text = "Resolved (Undo reverts): " + result.Scope;
+                        RefreshView();
+                    }));
+                KingmakerUiFactory.AddLayout(RectOf(resolve), 30f);
             }
             bool directRecord = focused.TargetMode ==
                 Domain.Authoring.CastingTargetMode.DirectTarget;
@@ -1039,16 +1091,16 @@ namespace KingmakerBuffPlanner.UI
             Button disable = KingmakerUiFactory.CreateButton(
                 "Disable", _inspectorContent, _theme, "Disable", () => Click(() =>
                 {
-                    _session.SetFocusedCastingState(
-                        Domain.Authoring.CastingAuthoringState.Disabled);
+                    SurfaceRefusal(_session.SetFocusedCastingState(
+                        Domain.Authoring.CastingAuthoringState.Disabled), "disable");
                     RefreshView();
                 }));
             KingmakerUiFactory.AddLayout(RectOf(disable), 30f);
             Button enable = KingmakerUiFactory.CreateButton(
                 "Enable", _inspectorContent, _theme, "Mark Ready", () => Click(() =>
                 {
-                    _session.SetFocusedCastingState(
-                        Domain.Authoring.CastingAuthoringState.Ready);
+                    SurfaceRefusal(_session.SetFocusedCastingState(
+                        Domain.Authoring.CastingAuthoringState.Ready), "mark ready");
                     RefreshView();
                 }));
             KingmakerUiFactory.AddLayout(RectOf(enable), 30f);

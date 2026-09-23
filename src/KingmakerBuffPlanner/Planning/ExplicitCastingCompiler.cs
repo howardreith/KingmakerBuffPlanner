@@ -144,9 +144,12 @@ namespace KingmakerBuffPlanner.Planning
         internal ExplicitCastingPlan(
             IEnumerable<ResolvedCasting> castings,
             IEnumerable<string> diagnostics,
-            IEnumerable<CastingBudgetLine> budgetLines = null)
+            IEnumerable<CastingBudgetLine> budgetLines = null,
+            IEnumerable<string> pendingImportNotices = null)
         {
             Castings = new ReadOnlyCollection<ResolvedCasting>(castings.ToList());
+            PendingImportNotices = new ReadOnlyCollection<string>(
+                (pendingImportNotices ?? new string[0]).ToList());
             Diagnostics = new ReadOnlyCollection<string>(diagnostics.ToList());
             BudgetLines = new ReadOnlyCollection<CastingBudgetLine>(
                 (budgetLines ?? new CastingBudgetLine[0]).ToList());
@@ -156,6 +159,10 @@ namespace KingmakerBuffPlanner.Planning
         // order. Compilation never adds or removes castings.
         public IReadOnlyList<ResolvedCasting> Castings { get; private set; }
         public IReadOnlyList<string> Diagnostics { get; private set; }
+
+        // Plan-wide legacy constraints not yet acknowledged (review L1): the
+        // execution gate refuses every apply mode while any remain.
+        public IReadOnlyList<string> PendingImportNotices { get; private set; }
 
         // One authoritative line per pool touched by this plan: available
         // now, requested and allocated demand, deficits, and the responsible
@@ -302,7 +309,8 @@ namespace KingmakerBuffPlanner.Planning
                     ResolvedCastingReadiness.Blocked, reasons, new CastingCostLine[0]));
             }
             AddDuplicateRequestWarnings(finalized, diagnostics);
-            return new ExplicitCastingPlan(finalized, diagnostics, ledger.BuildReport());
+            return new ExplicitCastingPlan(finalized, diagnostics, ledger.BuildReport(),
+                document.PendingImportNotices);
         }
 
         private static ResolvedCasting CompileOne(
@@ -325,6 +333,13 @@ namespace KingmakerBuffPlanner.Planning
                 .Select(provider => provider.Key.CasterUnitId)
                 .Distinct(StringComparer.Ordinal)
                 .OrderBy(value => value, StringComparer.Ordinal).ToList();
+            // Review L1: unresolved imported review items (provider pin,
+            // enhancement requiredness, grouping/origin review, missing
+            // caster or recipient) keep the casting out of executable
+            // readiness whatever its authored state says.
+            if (casting.Provenance != null)
+                foreach (string item in casting.Provenance.UnresolvedReviewItems)
+                    reasons.Add("import-review-unresolved:" + item);
             ProviderPlanningOption option = ResolveOption(
                 casting, snapshot, options, capableCasters, reasons);
             VerifyAbilityTargetMode(casting, effectsBySource, reasons);

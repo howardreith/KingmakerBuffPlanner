@@ -101,7 +101,8 @@ namespace KingmakerBuffPlanner.Domain.Authoring
             string legacyAssignmentId, int legacySchemaVersion,
             string legacyRoutineId, string note,
             string legacyRecipientKey = null,
-            IEnumerable<string> reviewItems = null)
+            IEnumerable<string> reviewItems = null,
+            IEnumerable<string> resolvedReviewItems = null)
         {
             if (string.IsNullOrWhiteSpace(legacyAssignmentId))
                 throw new ArgumentException("Legacy assignment ID is required.", "legacyAssignmentId");
@@ -115,6 +116,32 @@ namespace KingmakerBuffPlanner.Domain.Authoring
             ReviewItems = new ReadOnlyCollection<string>((reviewItems ?? new string[0])
                 .Where(value => !string.IsNullOrWhiteSpace(value))
                 .Distinct(StringComparer.Ordinal).ToList());
+            // Review L1: resolution is recorded beside the original items,
+            // never by erasing them; only items that exist can be resolved.
+            ResolvedReviewItems = new ReadOnlyCollection<string>((resolvedReviewItems ?? new string[0])
+                .Where(value => !string.IsNullOrWhiteSpace(value) && ReviewItems.Contains(value))
+                .Distinct(StringComparer.Ordinal).ToList());
+        }
+
+        // Items the player explicitly resolved (review L1). The original
+        // items stay in ReviewItems as history.
+        public IReadOnlyList<string> ResolvedReviewItems { get; private set; }
+
+        // Items still unresolved: these keep the casting out of executable
+        // readiness whatever its authored state says.
+        public IReadOnlyList<string> UnresolvedReviewItems
+        {
+            get
+            {
+                return ReviewItems.Where(value => !ResolvedReviewItems.Contains(value))
+                    .ToList();
+            }
+        }
+
+        public MigrationProvenance WithAllReviewItemsResolved()
+        {
+            return new MigrationProvenance(LegacyAssignmentId, LegacySchemaVersion,
+                LegacyRoutineId, Note, LegacyRecipientKey, ReviewItems, ReviewItems);
         }
 
         public string LegacyAssignmentId { get; private set; }
@@ -332,13 +359,20 @@ namespace KingmakerBuffPlanner.Domain.Authoring
             string campaignId,
             IEnumerable<RoutineDefinition> routines,
             IEnumerable<PlannedCasting> castings,
-            IEnumerable<string> importNotices = null)
+            IEnumerable<string> importNotices = null,
+            IEnumerable<string> acknowledgedImportNotices = null)
         {
             // Plan-wide import constraints that no single casting carries
             // (legacy provider bans, caps and priorities; review K3). They
             // persist until explicitly acknowledged.
             ImportNotices = new ReadOnlyCollection<string>((importNotices ?? new string[0])
                 .Where(value => !string.IsNullOrWhiteSpace(value)).ToList());
+            // Review L1: acknowledgement is recorded beside the notices; the
+            // notices themselves are kept as history.
+            AcknowledgedImportNotices = new ReadOnlyCollection<string>(
+                (acknowledgedImportNotices ?? new string[0])
+                .Where(value => !string.IsNullOrWhiteSpace(value) && ImportNotices.Contains(value))
+                .Distinct(StringComparer.Ordinal).ToList());
             if (string.IsNullOrWhiteSpace(campaignId))
                 throw new ArgumentException("Campaign ID is required.", "campaignId");
             CampaignId = campaignId;
@@ -386,6 +420,18 @@ namespace KingmakerBuffPlanner.Domain.Authoring
         public IReadOnlyList<RoutineDefinition> Routines { get; private set; }
         public IReadOnlyList<PlannedCasting> Castings { get; private set; }
         public IReadOnlyList<string> ImportNotices { get; private set; }
+        public IReadOnlyList<string> AcknowledgedImportNotices { get; private set; }
+
+        // Plan-wide import constraints not yet explicitly acknowledged: they
+        // block every apply mode (review L1).
+        public IReadOnlyList<string> PendingImportNotices
+        {
+            get
+            {
+                return ImportNotices.Where(value => !AcknowledgedImportNotices.Contains(value))
+                    .ToList();
+            }
+        }
 
         private static void RequireUnique(IEnumerable<string> values, string label)
         {

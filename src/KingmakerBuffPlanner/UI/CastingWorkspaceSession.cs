@@ -392,6 +392,20 @@ namespace KingmakerBuffPlanner.UI
             return _authoring.AcknowledgeImportNotices();
         }
 
+        public IReadOnlyList<string> PendingImportNotices
+        {
+            get { return _authoring.Document.PendingImportNotices; }
+        }
+
+        // Review L1: explicit resolution of the focused imported casting's
+        // review items (undoable; discloses the legacy constraints).
+        public AuthoringEditResult ResolveFocusedImportReview()
+        {
+            if (EditingFocusCastingId == null)
+                return AuthoringEditResult.Refuse("no-editing-focus");
+            return _authoring.ResolveImportReview(EditingFocusCastingId);
+        }
+
         public void FocusCasting(string castingId)
         {
             if (castingId != null &&
@@ -775,13 +789,12 @@ namespace KingmakerBuffPlanner.UI
                 return new WorkspaceApplyResult(false,
                     "legacy-import-unresolved:" + LegacyImportBlockReason,
                     null, null);
-            // Review K3: unacknowledged legacy provider bans/caps/priorities
-            // are requested constraints; the ordinary apply never ignores
-            // them silently.
-            if (mode == CastingApplyMode.Ordinary &&
-                _authoring.Document.ImportNotices.Count != 0)
+            // Review K3/L1: unacknowledged legacy provider bans/caps/
+            // priorities are requested constraints; NO apply mode ignores
+            // them (the gate enforces the same rule on the compiled plan).
+            if (_authoring.Document.PendingImportNotices.Count != 0)
                 return new WorkspaceApplyResult(false,
-                    "import-notices-pending:" + _authoring.Document.ImportNotices.Count,
+                    "import-notices-pending:" + _authoring.Document.PendingImportNotices.Count,
                     null, null);
             // Normalize the optional scope ONCE (review C1): the compiler,
             // gate, and dispatch must all see the same selected-run scope —
@@ -795,8 +808,11 @@ namespace KingmakerBuffPlanner.UI
             // cross-routine reservations the scope filter cannot undo.
             ExplicitCastingPlan plan = Compile(inputs, scope, false);
             CastingApplyDecision decision = _gate.Evaluate(plan, mode, scope);
-            if (mode == CastingApplyMode.Ordinary && !decision.Allowed)
-                return RefusedInFlight(decision);
+            // A refused decision never reaches the boundary in any mode.
+            if (!decision.Allowed)
+                return new WorkspaceApplyResult(false,
+                    "apply-refused:" + string.Join(",", decision.BlockingReasons.ToArray()),
+                    decision, null);
             CastingPlanSignature signature = CastingPlanSignature.For(plan);
             CastingReviewDecision review = _review.TrySubmit(signature);
             if (!review.Allowed)
@@ -1314,7 +1330,9 @@ namespace KingmakerBuffPlanner.UI
                     casting.Readiness, casting.ReadinessReasons,
                     casting.CastingId == EditingFocusCastingId));
                 if (casting.Provenance != null)
-                    cards[cards.Count - 1].ApplyReviewItems(casting.Provenance.ReviewItems);
+                    cards[cards.Count - 1].ApplyReviewItems(
+                        casting.Provenance.UnresolvedReviewItems,
+                        casting.Provenance.ResolvedReviewItems);
             }
             return cards;
         }

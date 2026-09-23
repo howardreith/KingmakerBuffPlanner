@@ -70,6 +70,8 @@ namespace KingmakerBuffPlanner.Planning
                 return AuthoringEditResult.Refuse("routine-unknown:" + casting.RoutineId);
             if (_document.Castings.Any(value => value.CastingId == casting.CastingId))
                 return AuthoringEditResult.Refuse("casting-id-collision:" + casting.CastingId);
+            if (ReadyWithUnresolvedReview(casting))
+                return AuthoringEditResult.Refuse("ready-requires-import-review:" + casting.CastingId);
             var castings = new List<PlannedCasting>(_document.Castings);
             // Persisted order is routine declaration order then position;
             // appending means after the last casting of that routine, keeping
@@ -95,6 +97,11 @@ namespace KingmakerBuffPlanner.Planning
             if (replacement.RoutineId != current.RoutineId)
                 return AuthoringEditResult.Refuse(
                     "routine-change-requires-move:" + current.RoutineId + ">" + replacement.RoutineId);
+            // Review L1: a content edit never changes import provenance; the
+            // only way to resolve review items is ResolveImportReview.
+            replacement = WithProvenance(replacement, current.Provenance);
+            if (ReadyWithUnresolvedReview(replacement))
+                return AuthoringEditResult.Refuse("ready-requires-import-review:" + replacement.CastingId);
             var castings = new List<PlannedCasting>(_document.Castings);
             castings[index] = WithOrder(replacement, current.Order);
             return Commit("update-casting:" + replacement.CastingId,
@@ -152,6 +159,12 @@ namespace KingmakerBuffPlanner.Planning
                 return AuthoringEditResult.Refuse("state-unchanged:" + castingId);
             if (state == CastingAuthoringState.Ready && current.CasterUnitId == null)
                 return AuthoringEditResult.Refuse("ready-requires-caster:" + castingId);
+            // Review L1: the generic state edit is not an import-resolution
+            // boundary.
+            if (state == CastingAuthoringState.Ready && current.Provenance != null &&
+                current.Provenance.UnresolvedReviewItems.Count != 0)
+                return AuthoringEditResult.Refuse("ready-requires-import-review:" + castingId +
+                    ":" + string.Join(",", current.Provenance.UnresolvedReviewItems));
             var replacement = new PlannedCasting(
                 current.CastingId, current.RoutineId, current.Order, current.SourceId,
                 current.Ability, current.CasterUnitId, current.SpellbookGuid,
@@ -169,14 +182,60 @@ namespace KingmakerBuffPlanner.Planning
         // undoes an actual edit.
         // Explicit acknowledgement of the plan-wide legacy import notices
         // (review K3); undoable like any other edit.
+        // Review L1: acknowledgement is recorded beside the notices, which
+        // stay as history; the result scope discloses what was acknowledged.
         public AuthoringEditResult AcknowledgeImportNotices()
         {
-            if (_document.ImportNotices.Count == 0)
+            IReadOnlyList<string> pending = _document.PendingImportNotices;
+            if (pending.Count == 0)
                 return AuthoringEditResult.Refuse("no-import-notices");
-            _history.Push(_document);
+            PushHistory();
             _document = new CastingPlanDocument(_document.CampaignId,
-                _document.Routines, _document.Castings, null);
-            return AuthoringEditResult.Accept("import-notices", new string[0]);
+                _document.Routines, _document.Castings, _document.ImportNotices,
+                _document.AcknowledgedImportNotices.Concat(pending));
+            return AuthoringEditResult.Accept(
+                "acknowledge-import-notices:" + string.Join(" | ", pending), new string[0]);
+        }
+
+        // Review L1: the explicit, undoable resolution of one imported
+        // casting's review items. The scope discloses the original legacy
+        // constraints being accepted as resolved; the items stay in the
+        // provenance as history. The casting's state is not changed: the
+        // player marks it Ready separately.
+        public AuthoringEditResult ResolveImportReview(string castingId)
+        {
+            int index = IndexOf(castingId);
+            if (index < 0) return AuthoringEditResult.Refuse("casting-unknown:" + castingId);
+            PlannedCasting current = _document.Castings[index];
+            if (current.Provenance == null ||
+                current.Provenance.UnresolvedReviewItems.Count == 0)
+                return AuthoringEditResult.Refuse("no-import-review:" + castingId);
+            string disclosed = string.Join(" | ", current.Provenance.UnresolvedReviewItems);
+            var castings = new List<PlannedCasting>(_document.Castings);
+            castings[index] = WithProvenance(current,
+                current.Provenance.WithAllReviewItemsResolved());
+            return Commit("resolve-import-review:" + castingId + ":" + disclosed,
+                new[] { castingId }, castings);
+        }
+
+        private static bool ReadyWithUnresolvedReview(PlannedCasting casting)
+        {
+            return casting.State == CastingAuthoringState.Ready &&
+                casting.Provenance != null &&
+                casting.Provenance.UnresolvedReviewItems.Count != 0;
+        }
+
+        private static PlannedCasting WithProvenance(PlannedCasting casting,
+            MigrationProvenance provenance)
+        {
+            if (ReferenceEquals(casting.Provenance, provenance)) return casting;
+            return new PlannedCasting(
+                casting.CastingId, casting.RoutineId, casting.Order, casting.SourceId,
+                casting.Ability, casting.CasterUnitId, casting.SpellbookGuid,
+                casting.TargetMode, casting.DirectTargetUnitId, casting.Origin,
+                casting.RequiredCoverageUnitIds, casting.TargetingModifiers,
+                casting.Enhancements, casting.ExistingEffectPolicy,
+                casting.IgnoredPresenceMarkers, casting.State, provenance);
         }
 
         public bool Undo()
@@ -191,7 +250,14 @@ namespace KingmakerBuffPlanner.Planning
         {
             var replacement = new CastingPlanDocument(
                 _document.CampaignId, _document.Routines, castings,
-                _document.ImportNotices);
+                _document.ImportNotices, _document.AcknowledgedImportNotices);
+            PushHistory();
+            _document = replacement;
+            return AuthoringEditResult.Accept(scope, affected);
+        }
+
+        private void PushHistory()
+        {
             _history.Push(_document);
             if (_history.Count > HistoryLimit)
             {
@@ -200,8 +266,6 @@ namespace KingmakerBuffPlanner.Planning
                 retained.RemoveRange(0, retained.Count - HistoryLimit);
                 foreach (CastingPlanDocument document in retained) _history.Push(document);
             }
-            _document = replacement;
-            return AuthoringEditResult.Accept(scope, affected);
         }
 
         private int IndexOf(string castingId)
