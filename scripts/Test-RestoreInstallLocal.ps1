@@ -92,6 +92,14 @@ function New-Fixture([string]$Name, [string]$PriorFormat) {
         -Value '{"newer":true}'
     Set-Content -LiteralPath (Join-Path $f.prior 'UserSettings\kingmaker-buff-planner-old.json') `
         -Value '{"older":true}'
+    # Casting-first player settings written after installation: the saved
+    # planner mode and a persisted review digest. Neither is a candidate
+    # plan; both must survive any rollback byte-for-byte (older builds
+    # ignore them).
+    [IO.File]::WriteAllText((Join-Path $f.planner 'UserSettings\planner-mode.json'),
+        '{"schemaVersion":1,"mode":"casting-first"}')
+    [IO.File]::WriteAllText((Join-Path $f.planner 'UserSettings\kingmaker-buff-planner-review-0123456789abcdef01234567.json'),
+        ('{"schemaVersion":1,"campaignId":"c","accepted":{"long":"' + ('a' * 64) + '"}}'))
     foreach ($name in $candidates.Keys) {
         [IO.File]::WriteAllText((Join-Path $f.planner ('UserSettings\' + $name)), $candidates[$name])
     }
@@ -147,6 +155,11 @@ try {
     Assert-True (Test-Path -LiteralPath (Join-Path $settings 'kingmaker-buff-planner-new.json')) `
         'Newer post-install profile was not preserved.'
     Assert-True (Test-Path -LiteralPath (Join-Path $settings 'kingmaker-buff-planner-old.json')) 'Prior profile was lost.'
+    Assert-True ([IO.File]::ReadAllText((Join-Path $settings 'planner-mode.json')) -ceq
+        '{"schemaVersion":1,"mode":"casting-first"}') 'The saved planner mode did not survive rollback.'
+    Assert-True ([IO.File]::ReadAllText((Join-Path $settings 'kingmaker-buff-planner-review-0123456789abcdef01234567.json')) -ceq
+        ('{"schemaVersion":1,"campaignId":"c","accepted":{"long":"' + ('a' * 64) + '"}}')) `
+        'The persisted review state did not survive rollback.'
     $rollEvidence = Join-Path $f.evidence 'rollback-test-install'
     Assert-True (Test-Path -LiteralPath (Join-Path $rollEvidence 'rolled-back-planner\Info.json')) `
         'Rolled-back build was not archived as evidence.'
