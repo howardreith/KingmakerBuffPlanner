@@ -975,7 +975,18 @@ namespace KingmakerBuffPlanner.UI
 
         public void RecordRunReport(CastingRunReport report)
         {
-            if (report != null) LastRunReport = report;
+            if (report == null) return;
+            LastRunReport = report;
+            LastAttemptMessage = null;
+        }
+
+        // The last refused attempt from any route (HUD or planner), shown in
+        // the planner footer until a later run reports.
+        public string LastAttemptMessage { get; private set; }
+
+        public void RecordAttempt(string message)
+        {
+            LastAttemptMessage = string.IsNullOrEmpty(message) ? null : message;
         }
 
         // "Spell (caster -> target)" for results and logs, from the last

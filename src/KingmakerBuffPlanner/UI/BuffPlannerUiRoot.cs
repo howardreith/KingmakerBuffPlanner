@@ -70,6 +70,10 @@ namespace KingmakerBuffPlanner.UI
         private PlannerMode _plannerMode = PlannerMode.Classic;
         private string _plannerModeWarning = string.Empty;
         private Action<QuickExecutionResult> _pendingCastingCompletion;
+        // The last casting-first outcome per routine (refusal or run
+        // result), shown on demand in that routine HUD tooltip.
+        private readonly Dictionary<string, string> _lastCastingPress =
+            new Dictionary<string, string>(StringComparer.Ordinal);
         private static readonly System.Diagnostics.Stopwatch CastingClock =
             System.Diagnostics.Stopwatch.StartNew();
 
@@ -878,10 +882,28 @@ namespace KingmakerBuffPlanner.UI
                 string refusal = CastingRunPresentation.DescribeRefusal(name, result);
                 _log.Info("[KBP-CF-RUN] refused;routine=" + routineId + ";mode=" + mode +
                     ";reason=" + result.ReviewReason + ".");
+                session.RecordAttempt(refusal);
+                _lastCastingPress[routineId] = refusal;
                 CompleteQuick(completed, new QuickExecutionResult(routineId, name,
                     QuickExecutionDisposition.Refused, refusal,
                     result.GateDecision == null ? 0 : result.GateDecision.ExecutableCastingIds.Count,
                     0, 0));
+                // No floating result (the accepted HUD boundary): a refusal
+                // the player resolves in the planner opens it on that
+                // routine, with the reason in the footer.
+                if (CastingRunPresentation.OpensPlanner(result.ReviewReason) &&
+                    _castingWorkspace == null)
+                {
+                    try
+                    {
+                        session.SelectRoutine(routineId);
+                        OpenSetup();
+                    }
+                    catch (Exception exception)
+                    {
+                        _log.Error("[KBP-CF-RUN] opening the planner after a refusal failed.", exception);
+                    }
+                }
                 return true;
             }
             _pendingCastingCompletion = completed;
@@ -1226,6 +1248,8 @@ namespace KingmakerBuffPlanner.UI
             string name = session == null ? routineId : session.RoutineDisplayName(routineId);
             if (session != null) session.RecordRunReport(report);
             LogRunReport(report, session);
+            _lastCastingPress[routineId] = CastingRunPresentation.Describe(report, name,
+                session == null ? (Func<string, string>)null : session.CastingLabel);
             Func<string, string> label = null;
             if (session != null) label = session.CastingLabel;
             QuickExecutionResult quick = CastingRunPresentation.ToQuickResult(report, name, label);
@@ -1265,9 +1289,13 @@ namespace KingmakerBuffPlanner.UI
             int castings = session.Document.Castings.Count(value => value != null &&
                 string.Equals(value.RoutineId, routineId, StringComparison.Ordinal));
             bool accepted = session.ReviewStatusFor(routineId) == CastingReviewStatus.Accepted;
+            string last;
+            _lastCastingPress.TryGetValue(routineId, out last);
             return "Cast " + name + ": " + castings + (castings == 1 ? " casting" : " castings") +
                 ", " + session.ExecutionMode + " mode" + (accepted ? "."
-                    : ". Not yet accepted - open the planner to review it.");
+                    : ". Not yet accepted - open the planner to review it.") +
+                (string.IsNullOrEmpty(last) ? string.Empty
+                    : " Last: " + (last.Length <= 180 ? last : last.Substring(0, 177) + "..."));
         }
 
         private void LogRunStarted(string routineId, CastingApplyMode mode,
