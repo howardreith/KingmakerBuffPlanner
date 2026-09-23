@@ -488,6 +488,68 @@ try {
     }
     $passed++
 
+    # --- Advanced-copy load identity and protected-save comparison ---
+    . (Join-Path $PSScriptRoot 'RuntimeAutomation.Common.ps1')
+    $pairRoot = Join-Path $root 'saves-pairs'
+    New-Item -ItemType Directory -Path $pairRoot | Out-Null
+    New-TestSaveArchive -Path (Join-Path $pairRoot 'Manual_400_PlayerCampaign.zks') -Name 'PlayerCampaign' -GameName 'Valued Campaign'
+    New-TestSaveArchive -Path (Join-Path $pairRoot 'Manual_402_KBP_AUTOMATION_BASELINE.zks') -Name 'KBP_AUTOMATION_BASELINE'
+    New-TestSaveArchive -Path (Join-Path $pairRoot 'Manual_403_KBP_AUTOMATION_WORKING.zks') -Name 'KBP_AUTOMATION_WORKING'
+    # The automation lookup is unchanged; the Advanced lookup refuses with no advanced pair.
+    $autoPair = Get-KbpDisposableSavePair -SaveRoot $pairRoot
+    if ($autoPair.family -cne 'Automation' -or $autoPair.working.fileName -cne 'Manual_403_KBP_AUTOMATION_WORKING.zks') {
+        throw 'The automation save-pair lookup changed.'
+    }
+    $refused = $false
+    try { Get-KbpDisposableSavePair -Family Advanced -SaveRoot $pairRoot | Out-Null } catch { $refused = $true }
+    if (-not $refused) { throw 'The Advanced lookup accepted a folder without an advanced pair.' }
+    # With both families present each lookup returns only its own pair.
+    $advancedGameId = '66666666-7777-8888-9999-000000000000'
+    New-TestSaveArchive -Path (Join-Path $pairRoot 'Manual_411_KBP_ADVANCED_BASELINE.zks') -Name 'KBP_ADVANCED_BASELINE' `
+        -GameName 'Advanced Campaign' -GameId $advancedGameId
+    New-TestSaveArchive -Path (Join-Path $pairRoot 'Manual_412_KBP_ADVANCED_WORKING.zks') -Name 'KBP_ADVANCED_WORKING' `
+        -GameName 'Advanced Campaign' -GameId $advancedGameId
+    $advancedPair = Get-KbpDisposableSavePair -Family Advanced -SaveRoot $pairRoot
+    if ($advancedPair.family -cne 'Advanced' -or $advancedPair.working.fileName -cne 'Manual_412_KBP_ADVANCED_WORKING.zks' -or
+        $advancedPair.working.gameId -cne $advancedGameId -or
+        (Get-KbpDisposableSavePair -SaveRoot $pairRoot).working.fileName -cne 'Manual_403_KBP_AUTOMATION_WORKING.zks') {
+        throw 'Family lookups crossed pairs.'
+    }
+    # An advanced pair from two different campaigns is refused.
+    $mixedPairRoot = Join-Path $root 'saves-pairs-mixed'
+    New-Item -ItemType Directory -Path $mixedPairRoot | Out-Null
+    New-TestSaveArchive -Path (Join-Path $mixedPairRoot 'Manual_411_KBP_ADVANCED_BASELINE.zks') -Name 'KBP_ADVANCED_BASELINE' `
+        -GameName 'Advanced Campaign' -GameId $advancedGameId
+    New-TestSaveArchive -Path (Join-Path $mixedPairRoot 'Manual_412_KBP_ADVANCED_WORKING.zks') -Name 'KBP_ADVANCED_WORKING' `
+        -GameName 'Other Campaign'
+    $refused = $false
+    try { Get-KbpDisposableSavePair -Family Advanced -SaveRoot $mixedPairRoot | Out-Null } catch { $refused = $true }
+    if (-not $refused) { throw 'An advanced pair from two campaigns was accepted.' }
+
+    # Protected-save comparison: only the allowed WORKING copy may change.
+    $before = Get-KbpSaveFolderSnapshot -SaveRoot $pairRoot
+    $allowed = @('Manual_412_KBP_ADVANCED_WORKING.zks')
+    if ((Compare-KbpSaveFolderSnapshot -Before $before -After (Get-KbpSaveFolderSnapshot -SaveRoot $pairRoot) `
+            -AllowedChangedFileNames $allowed).Count -ne 0) {
+        throw 'An unchanged save folder reported violations.'
+    }
+    Add-Content -LiteralPath (Join-Path $pairRoot 'Manual_412_KBP_ADVANCED_WORKING.zks') -Value 'x'
+    if ((Compare-KbpSaveFolderSnapshot -Before $before -After (Get-KbpSaveFolderSnapshot -SaveRoot $pairRoot) `
+            -AllowedChangedFileNames $allowed).Count -ne 0) {
+        throw 'A change to the allowed WORKING copy was reported.'
+    }
+    Add-Content -LiteralPath (Join-Path $pairRoot 'Manual_400_PlayerCampaign.zks') -Value 'x'
+    Set-Content -LiteralPath (Join-Path $pairRoot 'Auto_1_Autosave.zks') -Value 'autosave'
+    Remove-Item -LiteralPath (Join-Path $pairRoot 'Manual_402_KBP_AUTOMATION_BASELINE.zks')
+    $violations = Compare-KbpSaveFolderSnapshot -Before $before -After (Get-KbpSaveFolderSnapshot -SaveRoot $pairRoot) `
+        -AllowedChangedFileNames $allowed
+    $expected = @('changed:Manual_400_PlayerCampaign.zks', 'new:Auto_1_Autosave.zks',
+        'removed:Manual_402_KBP_AUTOMATION_BASELINE.zks')
+    if ((@($violations | Sort-Object) -join '|') -cne (@($expected | Sort-Object) -join '|')) {
+        throw "Protected-save comparison missed a violation: $($violations -join '|')"
+    }
+    $passed++
+
     # Repeated operation refuses (existing pair + existing run paths).
     $refused = $false
     try {

@@ -30,8 +30,12 @@ aesthetics.
 | Piece | Status |
 | --- | --- |
 | Sealed advanced pair from `KBP_ADVANCED_SEED` | **implemented**: `New-KbpAutomationFixture.ps1 -Family Advanced` (same staged, journaled, recoverable transaction as the automation pair; seed archived; every pre-existing save re-verified byte-identical). Isolated test in `Test-RuntimeHarness.ps1` (advanced pair produced under its own names, automation pair/seed and ordinary saves unchanged, refusal without an advanced seed). Not run against the real save folder. |
-| Launcher/host support for loading the advanced WORKING copy | not implemented (the save-pair lookup accepts only the automation pair) |
-| Mod inventory comparison, party-roster verification, save-folder before/after comparison | not implemented |
+| Refusing a same-ID retry without deleting prior history (review O1) | **implemented** (`3c784c1`), isolated regressions A–E |
+| Advanced-pair load identity | **implemented** as a lookup: `Get-KbpDisposableSavePair -Family Advanced` returns only an exact, campaign-correlated advanced pair. Isolated tests cover no advanced pair, both families present, and a mixed-campaign pair. No scenario uses it yet. |
+| Protected-save comparison | **implemented** as helpers: `Get-KbpSaveFolderSnapshot` and `Compare-KbpSaveFolderSnapshot` report new files (autosave, cloud), removed files and changed files other than the allowed WORKING copy. Isolated test only; not yet wired into a launcher run. |
+| Launcher/host scenario that loads the advanced WORKING copy | not implemented (the host's live-save contract still names the automation pair) |
+| Compatibility inventory | existing profile machinery (`-CompatibilityProfileId`) applies; the owner must name the profile |
+| Party-roster verification | not implemented (needs an in-game read) |
 
 ## What the tooling does and will do
 
