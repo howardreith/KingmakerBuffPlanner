@@ -399,6 +399,8 @@ namespace KingmakerBuffPlanner.Tests
                     () => TestImportRequirementsStayEnforced(root));
                 Run("projection-identity-is-complete", TestProjectionIdentityIsComplete);
                 Run("probe-scope-enforces-whole-subset", TestProbeScopeEnforcesWholeSubset);
+                Run("rollback-candidate-format-members-match-model",
+                    () => TestRollbackCandidateFormatMatchesModel(root));
                 Run("converter-refuses-unsupported-contracts",
                     () => TestConverterRefusesUnsupportedContracts(root));
                 Run("explicit-run-stops-after-failure-both-modes",
@@ -14743,6 +14745,84 @@ namespace KingmakerBuffPlanner.Tests
                     throw new InvalidOperationException("The probe admitted " + entry.Label + ": " +
                         (refusal ?? "converted"));
             }
+        }
+
+        // Review L5: the rollback script's candidate-format member lists are
+        // exactly the profile model's JSON members; the declared format
+        // token matches the schema/revision constants; the writer stamps
+        // the current revision; a newer revision is refused, never read or
+        // overwritten.
+        private static void CollectJsonMembers(Type type, HashSet<string> names, HashSet<Type> seen)
+        {
+            if (type == null || !seen.Add(type)) return;
+            if (type.IsGenericType)
+            {
+                foreach (Type argument in type.GetGenericArguments())
+                    CollectJsonMembers(argument, names, seen);
+                return;
+            }
+            if (type.Namespace == null ||
+                !type.Namespace.StartsWith("KingmakerBuffPlanner.Persistence", StringComparison.Ordinal))
+                return;
+            foreach (System.Reflection.PropertyInfo property in type.GetProperties())
+            {
+                var attribute = (Newtonsoft.Json.JsonPropertyAttribute)Attribute.GetCustomAttribute(
+                    property, typeof(Newtonsoft.Json.JsonPropertyAttribute));
+                if (attribute == null) continue;
+                names.Add(attribute.PropertyName);
+                CollectJsonMembers(property.PropertyType, names, seen);
+            }
+        }
+
+        private static void TestRollbackCandidateFormatMatchesModel(string root)
+        {
+            var model = new HashSet<string>(StringComparer.Ordinal);
+            CollectJsonMembers(typeof(CastingPlanProfile), model, new HashSet<Type>());
+            string script = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "scripts",
+                "Restore-InstallLocal.ps1"));
+            var byRevision = new Dictionary<int, HashSet<string>>();
+            foreach (System.Text.RegularExpressions.Match match in System.Text.RegularExpressions.Regex.Matches(
+                    script, @"\$candidateMembersRev(\d+) = @\(([^)]*)\)",
+                    System.Text.RegularExpressions.RegexOptions.Singleline))
+                byRevision[int.Parse(match.Groups[1].Value)] = new HashSet<string>(
+                    System.Text.RegularExpressions.Regex.Matches(match.Groups[2].Value, "'([A-Za-z]+)'")
+                        .Cast<System.Text.RegularExpressions.Match>().Select(value => value.Groups[1].Value),
+                    StringComparer.Ordinal);
+            if (byRevision.Count != CastingPlanProfile.CurrentFormatRevision)
+                throw new InvalidOperationException("The rollback script does not list every format revision.");
+            var union = new HashSet<string>(byRevision.Values.SelectMany(value => value), StringComparer.Ordinal);
+            if (!union.SetEquals(model))
+                throw new InvalidOperationException("Rollback member lists drifted from the model: missing [" +
+                    string.Join(",", model.Except(union).ToArray()) + "] extra [" +
+                    string.Join(",", union.Except(model).ToArray()) + "]");
+            if (!byRevision[CastingPlanProfile.CurrentFormatRevision].Contains("formatRevision"))
+                throw new InvalidOperationException("formatRevision is not in the current revision's members.");
+            if (CastingPlanProfile.CandidateFormatToken != CastingPlanProfile.CurrentSchemaVersion + "." +
+                    CastingPlanProfile.CurrentFormatRevision)
+                throw new InvalidOperationException("The declared candidate format token is stale.");
+
+            // The writer stamps the current revision.
+            string dir = Path.Combine(root, "l5-format");
+            Directory.CreateDirectory(dir);
+            var repository = new CastingPlanRepository(dir);
+            repository.Save(CastingPlanProfile.FromDocument(CastingDocument()));
+            string path = repository.GetProfilePath("fixture-campaign");
+            Newtonsoft.Json.Linq.JObject written = Newtonsoft.Json.Linq.JObject.Parse(File.ReadAllText(path));
+            if ((int)written["formatRevision"] != CastingPlanProfile.CurrentFormatRevision)
+                throw new InvalidOperationException("The writer did not stamp the current format revision.");
+            // A newer revision is refused on load and never overwritten.
+            written["formatRevision"] = CastingPlanProfile.CurrentFormatRevision + 1;
+            string newer = written.ToString();
+            File.WriteAllText(path, newer);
+            CastingPlanLoadResult load = repository.Load("fixture-campaign");
+            if (load.Status != CastingPlanLoadStatus.UnsupportedSchema ||
+                !load.Warning.StartsWith("format-revision-newer:", StringComparison.Ordinal))
+                throw new InvalidOperationException("A newer format revision was read: " + load.Status);
+            bool refused = false;
+            try { repository.Save(CastingPlanProfile.FromDocument(CastingDocument())); }
+            catch (InvalidDataException) { refused = true; }
+            if (!refused || File.ReadAllText(path) != newer)
+                throw new InvalidOperationException("A newer format revision was overwritten.");
         }
 
         // Review K4: compiler-to-converter — contracts the executor step
