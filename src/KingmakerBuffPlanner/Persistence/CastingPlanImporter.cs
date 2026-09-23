@@ -259,7 +259,8 @@ namespace KingmakerBuffPlanner.Persistence
                 if (!notices.Contains(notice)) notices.Add(notice);
             }
             var document = new CastingPlanDocument(
-                baseDocument.CampaignId, baseDocument.Routines, normalized, notices);
+                baseDocument.CampaignId, baseDocument.Routines, normalized, notices,
+                baseDocument.AcknowledgedImportNotices);
             int ready = document.Castings.Count(
                 value => value.State == CastingAuthoringState.Ready);
             var report = new CastingImportReport(

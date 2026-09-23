@@ -84,6 +84,12 @@ namespace KingmakerBuffPlanner.Planning
             string scopeRoutineId = null)
         {
             if (plan == null) throw new ArgumentNullException("plan");
+            // Review L1: omission permission (Ready Casts Only) is not a
+            // waiver of plan-wide legacy bans/caps/priorities.
+            if (plan.PendingImportNotices.Count != 0)
+                return new CastingApplyDecision(false, mode, scopeRoutineId,
+                    new string[0], new CastingOmission[0],
+                    new[] { "import-notices-pending:" + plan.PendingImportNotices.Count });
             var executable = new List<string>();
             var omissions = new List<CastingOmission>();
             var blocking = new List<string>();

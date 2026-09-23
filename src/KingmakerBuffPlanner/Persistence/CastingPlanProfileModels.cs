@@ -34,6 +34,10 @@ namespace KingmakerBuffPlanner.Persistence
         [JsonProperty("importNotices", Order = 7,
             NullValueHandling = NullValueHandling.Ignore)]
         public List<string> ImportNotices { get; set; }
+        // Optional: notices the player explicitly acknowledged (review L1).
+        [JsonProperty("acknowledgedImportNotices", Order = 8,
+            NullValueHandling = NullValueHandling.Ignore)]
+        public List<string> AcknowledgedImportNotices { get; set; }
 
         public static CastingPlanProfile CreateDefault(string campaignId)
         {
@@ -59,7 +63,7 @@ namespace KingmakerBuffPlanner.Persistence
                 CampaignId,
                 Routines.Select(value => value.ToDomain()),
                 Castings.Select(value => value.ToDomain()),
-                ImportNotices);
+                ImportNotices, AcknowledgedImportNotices);
         }
 
         public static CastingPlanProfile FromDocument(
@@ -76,6 +80,8 @@ namespace KingmakerBuffPlanner.Persistence
                     .Select(value => PlannedCastingProfile.FromDomain(value)).ToList(),
                 ImportNotices = document.ImportNotices.Count == 0 ? null
                     : document.ImportNotices.ToList(),
+                AcknowledgedImportNotices = document.AcknowledgedImportNotices.Count == 0 ? null
+                    : document.AcknowledgedImportNotices.ToList(),
                 Ui = ui ?? UiProfile.Default(),
                 Execution = execution ?? ExecutionProfile.Default()
             };
@@ -275,6 +281,9 @@ namespace KingmakerBuffPlanner.Persistence
         [JsonProperty("reviewItems", Order = 6,
             NullValueHandling = NullValueHandling.Ignore)]
         public List<string> ReviewItems { get; set; }
+        [JsonProperty("resolvedReviewItems", Order = 7,
+            NullValueHandling = NullValueHandling.Ignore)]
+        public List<string> ResolvedReviewItems { get; set; }
 
         internal static MigrationProvenanceProfile FromDomain(MigrationProvenance provenance)
         {
@@ -287,7 +296,9 @@ namespace KingmakerBuffPlanner.Persistence
                 LegacyRecipientKey = string.IsNullOrEmpty(provenance.LegacyRecipientKey)
                     ? null : provenance.LegacyRecipientKey,
                 ReviewItems = provenance.ReviewItems.Count == 0 ? null
-                    : provenance.ReviewItems.ToList()
+                    : provenance.ReviewItems.ToList(),
+                ResolvedReviewItems = provenance.ResolvedReviewItems.Count == 0 ? null
+                    : provenance.ResolvedReviewItems.ToList()
             };
         }
 
@@ -295,7 +306,7 @@ namespace KingmakerBuffPlanner.Persistence
         {
             return new MigrationProvenance(
                 LegacyAssignmentId, LegacySchemaVersion, LegacyRoutineId, Note,
-                LegacyRecipientKey, ReviewItems);
+                LegacyRecipientKey, ReviewItems, ResolvedReviewItems);
         }
     }
 }
