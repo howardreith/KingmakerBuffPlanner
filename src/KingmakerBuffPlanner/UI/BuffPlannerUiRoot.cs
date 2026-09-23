@@ -230,11 +230,12 @@ namespace KingmakerBuffPlanner.UI
             CastingWorkspaceScreenView view =
                 _instance == null ? null : _instance._castingWorkspace;
             if (view == null) return "workspace=missing";
+            string pageArt = view.PageArtEvidence;
             GameObject root = view.RootObject;
             if (root == null) return "workspace=root-null";
             RectTransform rect = (RectTransform)root.transform;
             var sb = new System.Text.StringBuilder();
-            sb.Append("workspace=present")
+            sb.Append("workspace=present;").Append(pageArt)
                 .Append(";activeSelf=").Append(root.activeSelf)
                 .Append(";activeInHierarchy=").Append(root.activeInHierarchy)
                 .Append(";childCount=").Append(root.transform.childCount)

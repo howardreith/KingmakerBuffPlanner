@@ -160,11 +160,73 @@ namespace KingmakerBuffPlanner.UI
             KingmakerUiFactory.AddFramedPanel(frame,
                 _theme.ParchmentPanel, _theme.GoldAccent, 2f);
             KingmakerUiFactory.Stretch(frame, 24, 24, 24, 60);
+            bool pageArt = ApplyNativePageArt(frame, nativeCanvas);
             BuildHeader(frame);
             BuildRoutineBar(frame);
             BuildLanes(frame);
+            if (pageArt) LetPageShowThroughLanes(frame);
             BuildFooter(frame);
             PropagateUiLayer();
+        }
+
+        // Native page art (charter §6.1, docs/UI-END-GOAL.md): the planner
+        // sits on the game's own spellbook page, as Bubble Buffs does. The
+        // donor's sprite is borrowed onto OUR frame only — the native object
+        // is never modified — and a missing donor keeps the parchment
+        // fallback. Full-page art is not sliced, so it is stretched whole
+        // onto the one page-sized surface and never onto nested panels.
+        internal static readonly string[] PageArtLocators =
+        {
+            "ServiceWindow/SpellBook/BookBackground",
+            "ServiceWindow/CharacterScreen/BookBackground"
+        };
+
+        private string _pageArtEvidence = "page=fallback;not-attempted";
+
+        internal string PageArtEvidence { get { return _pageArtEvidence; } }
+
+        private bool ApplyNativePageArt(RectTransform frame, StaticCanvas nativeCanvas)
+        {
+            try
+            {
+                foreach (string locator in PageArtLocators)
+                {
+                    Transform donor = nativeCanvas.transform.Find(locator);
+                    Image image = donor == null ? null : donor.GetComponent<Image>();
+                    if (image == null || image.sprite == null) continue;
+                    Image target = frame.GetComponent<Image>();
+                    target.sprite = image.sprite;
+                    target.type = Image.Type.Simple;
+                    target.preserveAspect = false;
+                    target.color = Color.white;
+                    Outline outline = frame.GetComponent<Outline>();
+                    if (outline != null) outline.enabled = false;
+                    _pageArtEvidence = "page=native;locator=" + locator +
+                        ";sprite=" + image.sprite.name;
+                    Debug.Log("[KBP-THEME] workspace page art " + _pageArtEvidence);
+                    return true;
+                }
+                _pageArtEvidence = "page=fallback;no-donor-sprite";
+            }
+            catch (Exception exception)
+            {
+                _pageArtEvidence = "page=fallback;error=" + exception.GetType().Name;
+            }
+            Debug.LogWarning("[KBP-THEME] workspace page art " + _pageArtEvidence);
+            return false;
+        }
+
+        // Over real page art the lanes become light framed boxes (Bubble
+        // Buffs' look) instead of opaque parchment slabs.
+        private void LetPageShowThroughLanes(RectTransform frame)
+        {
+            foreach (ScrollRect scroll in frame.GetComponentsInChildren<ScrollRect>(true))
+            {
+                Image panel = scroll.GetComponent<Image>();
+                if (panel != null)
+                    panel.color = new Color(panel.color.r, panel.color.g,
+                        panel.color.b, 0.28f);
+            }
         }
 
         // Every factory-created GameObject defaults to layer 0; rebuilt rows
