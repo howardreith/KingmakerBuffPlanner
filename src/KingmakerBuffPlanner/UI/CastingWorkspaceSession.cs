@@ -668,6 +668,7 @@ namespace KingmakerBuffPlanner.UI
                 var descriptors = new List<WorkspaceSourceDescriptor>();
                 var displays = new Dictionary<string, string>(StringComparer.Ordinal);
                 var icons = new Dictionary<string, AbilityKey>(StringComparer.Ordinal);
+                var kinds = new Dictionary<string, List<SourceKind>>(StringComparer.Ordinal);
                 foreach (string sourceId in sourceIds.OrderBy(
                          value => value, StringComparer.Ordinal))
                 {
@@ -693,6 +694,8 @@ namespace KingmakerBuffPlanner.UI
                             OptionServesExpression(inputs, value, labelExpression))
                             .ToList();
                     displays[sourceId] = display;
+                    kinds[sourceId] = serving
+                        .Select(value => value.Provider.Key.Ability.SourceKind).ToList();
                     ProviderPlanningOption iconOption = serving
                         .OrderBy(value => value.Provider.VariantOrder)
                         .FirstOrDefault();
@@ -717,7 +720,8 @@ namespace KingmakerBuffPlanner.UI
                     sources.Add(new WorkspaceSourceOption(
                         descriptor.SourceId, displays[descriptor.SourceId],
                         string.Equals(descriptor.SourceId, selectedSource,
-                            StringComparison.Ordinal), detail, icon));
+                            StringComparison.Ordinal), detail, icon,
+                        kinds[descriptor.SourceId]));
                 }
             }
             string draftSource = string.IsNullOrEmpty(Draft.SourceId)

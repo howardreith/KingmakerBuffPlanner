@@ -248,7 +248,8 @@ namespace KingmakerBuffPlanner.UI
     {
         internal WorkspaceSourceOption(
             string sourceId, string displayName, bool selected,
-            string detail = null, AbilityKey iconAbility = null)
+            string detail = null, AbilityKey iconAbility = null,
+            IEnumerable<SourceKind> sourceKinds = null)
         {
             SourceId = sourceId ?? string.Empty;
             DisplayName = string.IsNullOrWhiteSpace(displayName)
@@ -256,7 +257,14 @@ namespace KingmakerBuffPlanner.UI
             Selected = selected;
             Detail = detail ?? string.Empty;
             IconAbility = iconAbility;
+            SourceKinds = (sourceKinds ?? new SourceKind[0]).Distinct()
+                .OrderBy(kind => kind).ToList();
         }
+
+        // How the party can provide this buff (spellbook, ability resource,
+        // feature, item), from its discovered providers; drives the grid's
+        // Spells / Abilities / Other tabs.
+        public IReadOnlyList<SourceKind> SourceKinds { get; private set; }
 
         // The discovered ability whose native icon represents this buff in
         // the grid; null when discovery supplied none (view shows a glyph).
@@ -368,6 +376,29 @@ namespace KingmakerBuffPlanner.UI
     // only as a last resort an ordinal. Unique names get no detail.
     public static class WorkspaceSourceLabels
     {
+        // The grid's source-type tabs, with the classic catalogue's
+        // meaning: Spells = a spellbook provider; Abilities = an ability
+        // resource or a feature; Other = anything else (items). A buff
+        // with several kinds of provider appears under each of them.
+        internal static bool MatchesCategory(WorkspaceSourceOption source,
+            PlannerSourceCategory category)
+        {
+            if (source == null) return false;
+            switch (category)
+            {
+                case PlannerSourceCategory.Spells:
+                    return source.SourceKinds.Contains(SourceKind.Spellbook);
+                case PlannerSourceCategory.Abilities:
+                    return source.SourceKinds.Contains(SourceKind.AbilityResource) ||
+                        source.SourceKinds.Contains(SourceKind.Fact);
+                case PlannerSourceCategory.Other:
+                    return source.SourceKinds.Any(kind => kind != SourceKind.Spellbook &&
+                        kind != SourceKind.AbilityResource && kind != SourceKind.Fact);
+                default:
+                    return true;
+            }
+        }
+
         // Buff grid search: every whitespace-separated term must appear in
         // the full label (name plus disambiguating detail), ignoring case.
         public static bool Matches(WorkspaceSourceOption source, string query)
