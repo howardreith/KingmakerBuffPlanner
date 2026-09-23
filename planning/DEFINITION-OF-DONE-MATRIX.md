@@ -1,6 +1,6 @@
 # Definition of Done Matrix
 
-## Casting-first migration — release buckets (updated 2026-09-23: release candidate 0.2.0-rc1 frozen at `f8562a6`; receipt `docs/evidence/rc-0.2.0-rc1-receipt.md`)
+## Casting-first migration — release buckets (updated 2026-09-23: release candidate 0.2.0-rc2 frozen at `ae0181d`; receipt `docs/evidence/rc-0.2.0-rc2-receipt.md`)
 
 No percentage or date is claimed; green unit tests do not measure
 readiness. Evidence words mean exactly this:
@@ -29,7 +29,7 @@ readiness. Evidence words mean exactly this:
 | Capability | Status |
 | --- | --- |
 | Explicit projection with complete identity, refusal of unsupported contracts | implemented + stand-ins |
-| Zero-cost (Unlimited) native reservations | **in-game**: the probe and the zero-cost qualification cast Resistance with resources unchanged |
+| Zero-cost (Unlimited) native reservations | **in-game**, both casting modes: cantrips cast at will through the class ability (count -1, unchanged); rc1 cast the spellbook's level-0 entry, which the game's own command refuses (0 level-0 slots per day), and that failed in animated mode (`casting-qual-cast-20260923-a1-anim-01`) |
 | One-shot probe boundary, fresh observations, owned terminal cleanup | **in-game**: constructed, submitted once, disposed, cleaned up (two identified runs) |
 | First native cast (cantrip) | **in-game PASS**: `casting-probe-cast-20260923-p2-02` (`320a1b6`) confirmed a new Resistance instance, free, zero violations; the earlier run p1-01 exposed casting inside the open planner (fixed). Receipt `docs/evidence/casting-probe-20260923-receipt.md` |
 | Casting only while the world runs (Default mode, not paused, planner closed) | implemented + stand-ins; **in-game** for the probe (`worldRunningAtSubmit=True`) |
@@ -37,6 +37,8 @@ readiness. Evidence words mean exactly this:
 | Production dispatch and run host (one run, per-frame pump, one terminal for stop/deadline/area change/disable/unload/teardown) | **in-game** for session Apply, the host and the real instant executor behind the qualification boundary (three runs: stop, complete, recast), pumped by the qualification driver; the production per-frame pump in the planner root (with its world gate and world clock), area change, disable, unload and animated mode not in game |
 | Live existing-effect policy (weaker/expiring/unprovable never satisfied; active effect needs no slot) | implemented + stand-ins |
 | Per-routine review acceptance persisted across sessions; skip flips are harmless refreshes | **in-game**: the recast step ran from a session reopened from disk, authorized by the restored acceptance |
+| Animated casting mode (the default) | **in-game PASS** on the candidate (`casting-qual-cast-20260923-rc2-anim-01`) |
+| Player's stop during a cast; disable during a run | **in-game**: the stop pressed through the HUD's routine entry while the first cast was in progress (it finished, nothing after it started); the planner's own disable while an animated cast was in progress (interrupted, nothing landed, runs possible again after enabling) |
 | Multi-cast routine, halting after failure, interruption, reload | multi-cast routine, cancellation between castings (the host's immediate cancel) and close/reopen **in-game** (zero-cost qualification); in-game save reload **in-game** (`casting-ws-reload-20260923-s2-01`: the exact test save loaded again, saved plan kept, one subscription, one HUD root, no run); the player's graceful stop (finish the cast in progress) and halting after a failed casting stand-ins only |
 | Casting qualification `zero-cost-mixed` (automation fixture): stop, complete, repeat, reopen, recast, judged per step and stopped at the first failure | **in-game PASS**: `casting-qual-cast-20260923-q1-01` on `d35b38f`, zero violations; receipt `docs/evidence/casting-qual-20260923-receipt.md` |
 | Casting qualification `finite-direct-mixed` (advanced copy): exact prepared slots, spontaneous levels, mixed casters, metamagic | implemented + stand-ins (exact token and availability judging); **not run** (needs a `KBP_ADVANCED_SEED`, a passing inspection and an allowance) |
@@ -54,7 +56,7 @@ readiness. Evidence words mean exactly this:
 | Player-facing resource names on cards and the budget footer; refusals in words; routine-wide header; editing label names the casting | **in-game** frames (`casting-ws-qual-20260923-r1-01`, `casting-ws-reload-20260923-s2-01`); not accepted |
 | Install/rollback on a real installation | **real installation, temporary**: the candidate's release package installed over the owner's 0.1.1-rc3 with Install-Local and rolled back with Restore-InstallLocal (`rc1-temp-deploy-20260923-01`); planner restored exactly, Mods manifest equal to before; failure handling on isolated fixtures (16 cases) |
 | Release packaging and publisher gates | Build-Release exercised for the candidate (two deterministic builds, validated, local-only); publisher gate tests 3/3; nothing published |
-| Candidate evidence on the frozen build | selection, native casting qualification, first-open import, in-game reload and the manual-session rehearsal all PASS on `f8562a6` |
+| Candidate evidence on the frozen build | rc2 (`ae0181d`): selection, animated and instant casting qualification, first-open import, in-game reload and the manual-session rehearsal all PASS; rc1 (`f8562a6`) had the same set with instant casting only |
 
 ### Bucket 4 — Full charter release
 

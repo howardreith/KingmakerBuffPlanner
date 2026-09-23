@@ -1,12 +1,12 @@
 # Supervised manual usability session — implemented procedure
 
-**Release-candidate session (0.2.0-rc1).** This is the one consolidated
+**Release-candidate session (0.2.0-rc2).** This is the one consolidated
 manual acceptance session the mission asks for near the end. It runs the
 frozen candidate from its own clean checkout,
-`C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner-RC1`
-(commit `f8562a6`; identities in `docs/evidence/rc-0.2.0-rc1-receipt.md`).
+`C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner-RC2`
+(commit `ae0181d`; identities in `docs/evidence/rc-0.2.0-rc2-receipt.md`).
 The procedure was rehearsed on that build
-(`casting-ws-manual-20260923-rc1-rehearsal`, done marker written
+(`casting-ws-manual-20260923-rc2-rehearsal`, done marker written
 automatically, labeled rehearsal). In this session the planner authors and saves
 but cannot cast: native casting is disabled in every automated or
 supervised test session, and the candidate's casting was qualified
@@ -27,7 +27,7 @@ and legacy quick execution remain disabled; nothing can cast a buff.
 ## The supported command (exact)
 
 ```powershell
-& 'C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner-RC1\scripts\Invoke-KingmakerRuntimeTest.ps1' `
+& 'C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner-RC2\scripts\Invoke-KingmakerRuntimeTest.ps1' `
     -Scenario live-workspace-manual -CompatibilityProfileId full-user `
     -RunId casting-ws-manual-HHmm -ManualHoldSeconds 900 `
     -TimeoutSeconds 1500 -Confirm:$false
