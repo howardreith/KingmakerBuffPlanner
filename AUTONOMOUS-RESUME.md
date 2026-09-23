@@ -1,6 +1,31 @@
 # AUTONOMOUS-RESUME — top section is current; planning/CASTING-FIRST-MIGRATION-STATUS.md is the per-checkpoint tracker.
 
-## Release candidate 0.2.0-rc1 frozen at `f8562a6` (LATEST)
+## After rc1: animated mode, the player's stop, a cantrip defect (LATEST)
+
+Work toward a second candidate (0.2.0-rc1 stays frozen at `f8562a6`).
+
+| Commit | Content |
+| --- | --- |
+| `2c04024`, `9f2bdf6` | The qualification runs on the planner's own host (its per-frame pump); the stop is the player's routine press while the first cast is in progress; allowance schema 4 names the casting mode (instant or animated), enforced by launcher, host, boundary and protocol |
+| `46eaabf` | Every qualification run writes `cantrip-diagnostics.json` (how the game judges each caster's level-0 spells) |
+| `70f135a` | **Cantrip fix**: a level-0 spellbook entry executes through the caster's at-will cantrip ability (as the game's action bar); validation is the cast command's own `IsAvailable`; discovery prices level 0 as free only with that ability. Qualification **disable step**: the planner's own disable and enable during a run (animated: while the cast is in progress; instant: before the first step) |
+
+What the animated run found (`casting-qual-cast-20260923-a1-anim-01`,
+FAIL, restored, saves clean): the player's stop landed in flight as
+designed, but the game's own cast command for the first Resistance ended
+with Fail; the planner halted (casting Failed, nothing spent, the other
+two not attempted). Cause, from the game's code and the live diagnostics
+(`casting-qual-select-20260923-d1-01`): the class grants each cantrip as
+an ability usable at will (no spellbook, count -1); the spellbook's own
+level-0 entry needs a level-0 slot and these books have 0 per day. rc1
+submitted the spellbook entry: animated cantrips always failed natively;
+instant mode cast it only because the cast rule skips availability.
+
+Next: gate `70f135a`, freeze it (qualification-frozen), selection (four
+forecast steps), animated and instant qualification with the disable
+step; then 0.2.0-rc2 with the full RC evidence set.
+
+## Release candidate 0.2.0-rc1 frozen at `f8562a6`
 
 Receipt: `docs/evidence/rc-0.2.0-rc1-receipt.md` (identities, gate, the
 five runs on the frozen build, the temporary install and rollback, the
