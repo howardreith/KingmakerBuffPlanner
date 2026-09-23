@@ -59,7 +59,7 @@ namespace KingmakerBuffPlanner.Planning
         public string ProjectionId { get; private set; }
         // The exact canonical JSON the id hashes, for inspection/evidence.
         public string CanonicalContract { get; private set; }
-        public const int IdentityVersion = 2;
+        public const int IdentityVersion = 3;
         public CastPlan Plan { get; private set; }
         // Casting id for each step, index-aligned with Plan.Steps.
         public IReadOnlyList<string> CastingIds { get; private set; }
@@ -143,6 +143,14 @@ namespace KingmakerBuffPlanner.Planning
                 if (native.Count != 1)
                     return ExplicitStepConversion.Refuse("native-cost-count:" + castingId +
                         ":" + native.Count);
+                // Review M1: a zero native charge is executable only when the
+                // ledger verified an Unlimited pool; a flagged line must be a
+                // true zero. Anything else is an unknown cost and refused.
+                if (native[0].Unlimited
+                        ? native[0].Units != 0 || native[0].TokenIds.Count != 0
+                        : native[0].Units < 1)
+                    return ExplicitStepConversion.Refuse("native-cost-unverified:" + castingId +
+                        ":units=" + native[0].Units + ";unlimited=" + native[0].Unlimited);
                 List<CastingCostLine> materials = casting.Cost
                     .Where(line => line.Category == CastingCostCategory.Material).ToList();
                 if (materials.Count > 1)
@@ -209,7 +217,7 @@ namespace KingmakerBuffPlanner.Planning
                     targets,
                     recipients,
                     new ResourceReservation(native[0].PoolKey, native[0].Units,
-                        native[0].TokenIds),
+                        native[0].TokenIds, native[0].Unlimited),
                     material == null ? null
                         : new MaterialReservation(material.ItemGuid, material.Units),
                     expected,
@@ -342,6 +350,7 @@ namespace KingmakerBuffPlanner.Planning
                         {
                             { "poolKey", step.Reservation.PoolKey },
                             { "units", step.Reservation.Units },
+                            { "unlimited", step.Reservation.Unlimited },
                             { "tokenIds", Sorted(step.Reservation.TokenIds) }
                         } },
                     { "material", step.MaterialReservation == null ? JValue.CreateNull()
