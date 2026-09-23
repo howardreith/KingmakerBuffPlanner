@@ -15,6 +15,7 @@ using Kingmaker.Utility;
 using KingmakerBuffPlanner.Domain.Identity;
 using KingmakerBuffPlanner.Domain.Effects;
 using KingmakerBuffPlanner.Domain.Planning;
+using KingmakerBuffPlanner.Domain.Providers;
 using KingmakerBuffPlanner.Execution;
 using KingmakerBuffPlanner.Planning;
 
@@ -265,7 +266,7 @@ namespace KingmakerBuffPlanner.GameAdapters
 
         private static string SlotId(SpellSlot slot)
         {
-            return "level-" + slot.SpellLevel + "|type-" + (int)slot.Type + "|index-" + slot.Index;
+            return PreparedSlotIds.Format(slot.SpellLevel, (int)slot.Type, slot.Index);
         }
 
         private static bool Fail(string value, out string reason)

@@ -1681,6 +1681,9 @@ namespace KingmakerBuffPlanner.Tests
             // reports a resource spent on its verified-free source.
             internal string UnconfirmedCasting;
             internal string SpendOnFreeCasting;
+            // Before-read fault for qual-cast-1 in the stop step: throw,
+            // failed, null or wrong-target.
+            internal string BeforeReadFault;
             private int _instances;
             private long _sequence;
             internal long Now;
@@ -1714,6 +1717,14 @@ namespace KingmakerBuffPlanner.Tests
             {
                 KeyValuePair<string, long> instance;
                 string target = step.TargetUnitIds[0];
+                if (BeforeReadFault != null && label == "stop-before:qual-cast-1")
+                {
+                    if (BeforeReadFault == "throw") throw new InvalidOperationException("observer-down");
+                    if (BeforeReadFault == "failed")
+                        return ProbeObservation.Failed(label, ++_sequence, DateTime.UtcNow, "read-refused");
+                    if (BeforeReadFault == "null") return null;
+                    target = "unit-somebody-else";
+                }
                 var instances = Active.TryGetValue(target, out instance)
                     ? new[] { new ProbeEffectInstance("buff-effect", instance.Key, instance.Value) }
                     : new ProbeEffectInstance[0];
@@ -1722,24 +1733,61 @@ namespace KingmakerBuffPlanner.Tests
             }
         }
 
-        // A finite world: a prepared caster (exact slot tokens) and a
-        // spontaneous caster (one level count), both casting the fixture
-        // buff by rule. Firing spends exactly the reservation of the step unless
-        // a failure shape says otherwise.
+        // A finite world: a prepared caster (exact slot tokens with native
+        // ids, optionally linked pairs) and a spontaneous caster (one level
+        // count), both casting the fixture buff by rule. Firing spends
+        // exactly the step reservation unless a failure shape says
+        // otherwise; observation shapes make reads fail or go missing.
         private sealed class FiniteBuffWorld : IInstantCastRuntimeAdapter,
             ICastEnhancementRuntimeAdapter
         {
             internal readonly Dictionary<string, KeyValuePair<string, long>> Active =
                 new Dictionary<string, KeyValuePair<string, long>>(StringComparer.Ordinal);
             internal readonly List<string> Fired = new List<string>();
-            internal readonly SortedDictionary<string, bool> Tokens = new SortedDictionary<string, bool>(
-                StringComparer.Ordinal) { { "tok-1", true }, { "tok-2", true }, { "tok-3", true } };
+            internal readonly SortedDictionary<string, bool> Tokens =
+                new SortedDictionary<string, bool>(StringComparer.Ordinal);
+            internal readonly List<string> Primaries = new List<string>();
+            internal readonly Dictionary<string, string> LinkOf =
+                new Dictionary<string, string>(StringComparer.Ordinal);
             internal int SpontaneousRemaining = 1;
             internal AbilityKey Ability = CastingBuffAbility;
             internal string WrongTokenCasting;
+            internal string PartialCasting;
             internal bool NoSpend;
+            internal bool MissingAfterTokens;
+            internal bool MissingBeforeTokens;
             private int _instances;
             private long _sequence;
+
+            // Native slot ids (level-2, type 0); linked pairs are primary
+            // index 0/2 with secondary index 1/3.
+            internal FiniteBuffWorld(bool linkedPairs = false)
+            {
+                if (linkedPairs)
+                {
+                    for (int pair = 0; pair < 2; pair++)
+                    {
+                        string primary = PreparedSlotIds.Format(2, 0, pair * 2);
+                        string secondary = PreparedSlotIds.Format(2, 0, pair * 2 + 1);
+                        Tokens[primary] = true;
+                        Tokens[secondary] = true;
+                        Primaries.Add(primary);
+                        LinkOf[primary] = secondary;
+                        LinkOf[secondary] = primary;
+                    }
+                }
+                else
+                {
+                    for (int index = 0; index < 3; index++)
+                    {
+                        string token = PreparedSlotIds.Format(2, 0, index);
+                        Tokens[token] = true;
+                        Primaries.Add(token);
+                    }
+                }
+            }
+
+            internal string Token(int index) { return PreparedSlotIds.Format(2, 0, index); }
             public bool IsInCombat { get { return false; } }
             public CastRuntimeValidation Validate(CastStep step) { return CastRuntimeValidation.Pass(); }
             public CastEnhancementPreparation PrepareEnhancements(CastStep step)
@@ -1754,9 +1802,11 @@ namespace KingmakerBuffPlanner.Tests
                     if (step.Reservation.TokenIds.Count != 0)
                     {
                         List<string> spend = step.AssignmentId == WrongTokenCasting
-                            ? Tokens.Keys.Where(key => Tokens[key] &&
+                            ? Primaries.Where(key => Tokens[key] &&
                                 !step.Reservation.TokenIds.Contains(key)).Take(1).ToList()
-                            : step.Reservation.TokenIds.ToList();
+                            : step.AssignmentId == PartialCasting
+                                ? step.Reservation.TokenIds.Take(1).ToList()
+                                : step.Reservation.TokenIds.ToList();
                         foreach (string token in spend) Tokens[token] = false;
                     }
                     else SpontaneousRemaining -= step.Reservation.Units;
@@ -1783,14 +1833,16 @@ namespace KingmakerBuffPlanner.Tests
                     ? new[] { new ProbeEffectInstance("buff-effect", instance.Key, instance.Value) }
                     : new ProbeEffectInstance[0];
                 bool prepared = step.Reservation.TokenIds.Count != 0;
-                int available = prepared ? Tokens.Count(pair => pair.Value) : SpontaneousRemaining;
-                Dictionary<string, bool> reserved = prepared
+                // AvailableForCast counts casts: available primaries.
+                int available = prepared ? Primaries.Count(key => Tokens[key]) : SpontaneousRemaining;
+                bool dropTokens = (MissingAfterTokens && label.Contains("-after")) ||
+                    (MissingBeforeTokens && label.Contains("-before"));
+                Dictionary<string, bool> reserved = prepared && !dropTokens
                     ? step.Reservation.TokenIds.ToDictionary(id => id, id => Tokens[id], StringComparer.Ordinal)
                     : null;
                 return ProbeObservation.Read(label, ++_sequence, DateTime.UtcNow, target, available,
                     instances, reserved);
             }
-
             internal CastingWorkspaceInputs Inputs()
             {
                 string[] others = { "unit-t1", "unit-t2", "unit-t3", "unit-t4" };
@@ -1799,15 +1851,17 @@ namespace KingmakerBuffPlanner.Tests
                     new TargetValidationSnapshot(true, true, true, true))).ToList();
                 var wizard = new ProviderSnapshot(new ProviderKey("unit-wizard", "book-wizard",
                     Ability, "level-2"), Ability.BaseAbilityGuid, 2,
-                    "pool-unit-wizard", 1, Tokens.Keys);
+                    "pool-unit-wizard", 1, Primaries);
                 var sorcerer = new ProviderSnapshot(new ProviderKey("unit-sorcerer", "book-sorcerer",
                     Ability, "level-2"), Ability.BaseAbilityGuid, 2,
                     "pool-unit-sorcerer", 1, null);
                 var pools = new[]
                 {
-                    new ResourcePoolSnapshot("pool-unit-wizard", ResourcePoolKind.PreparedSlots, 3,
+                    new ResourcePoolSnapshot("pool-unit-wizard", ResourcePoolKind.PreparedSlots, Tokens.Count,
                         Tokens.Count(pair => pair.Value), Tokens.Select(pair => new ResourceTokenSnapshot(
-                            pair.Key, Ability, 2, PreparedSlotKind.Common, pair.Value, true, null))),
+                            pair.Key, Ability, 2, PreparedSlotKind.Common, pair.Value,
+                            Primaries.Contains(pair.Key),
+                            LinkOf.ContainsKey(pair.Key) ? new[] { LinkOf[pair.Key] } : null))),
                     new ResourcePoolSnapshot("pool-unit-sorcerer", ResourcePoolKind.SpontaneousLevel, 3,
                         SpontaneousRemaining, null)
                 };
@@ -1821,6 +1875,7 @@ namespace KingmakerBuffPlanner.Tests
                     new CastEnhancementSnapshot[0], null, Live());
             }
         }
+
         private static CastingQualificationAllowance FiniteAllowance(FiniteBuffWorld world, int maximum = 4)
         {
             CastingWorkspaceInputs inputs = world.Inputs();
@@ -1874,17 +1929,17 @@ namespace KingmakerBuffPlanner.Tests
             IReadOnlyList<CastingQualificationStepForecast> forecast =
                 CastingQualificationForecast.Forecast(selection, inputs, "fixture-campaign");
             if (forecast.Count != 3 || forecast.Any(step => step.ProjectionId == null) ||
-                !forecast[0].Projection.Plan.Steps[0].Reservation.TokenIds.SequenceEqual(new[] { "tok-1" }) ||
+                !forecast[0].Projection.Plan.Steps[0].Reservation.TokenIds.SequenceEqual(new[] { world.Token(0) }) ||
                 !forecast[1].CastingIds.SequenceEqual(new[] { "qual-cast-2" }) ||
                 forecast[1].Projection.Plan.Steps[0].Reservation.Units != 1 ||
                 !forecast[2].CastingIds.SequenceEqual(new[] { "qual-cast-1" }) ||
-                !forecast[2].Projection.Plan.Steps[0].Reservation.TokenIds.SequenceEqual(new[] { "tok-2" }))
+                !forecast[2].Projection.Plan.Steps[0].Reservation.TokenIds.SequenceEqual(new[] { world.Token(1) }))
                 throw new InvalidOperationException("The finite forecast did not spend exactly: " +
                     string.Join(" | ", forecast.Select(step => step.Name + ":" + (step.Refusal ??
                         string.Join(",", step.CastingIds.ToArray()))).ToArray()));
             var poor = new FiniteBuffWorld();
-            poor.Tokens["tok-2"] = false;
-            poor.Tokens["tok-3"] = false;
+            poor.Tokens[poor.Token(1)] = false;
+            poor.Tokens[poor.Token(2)] = false;
             CastingQualificationSelection refused =
                 CastingQualificationRecipe.SelectFiniteDirectMixed(poor.Inputs(), "fixture-campaign");
             if (refused.Selected || !refused.Rejections.Any(value => value.EndsWith(
@@ -1921,31 +1976,59 @@ namespace KingmakerBuffPlanner.Tests
             for (int i = 0; i < 2000 && !driver.Completed; i++) driver.Update();
             if (record.Violations().Count != 0 || record.TerminalReason != "completed" ||
                 !run.Fired.SequenceEqual(new[] { "qual-cast-1", "qual-cast-2", "qual-cast-1" }) ||
-                run.Tokens["tok-1"] || run.Tokens["tok-2"] || !run.Tokens["tok-3"] ||
+                run.Tokens[run.Token(0)] || run.Tokens[run.Token(1)] || !run.Tokens[run.Token(2)] ||
                 run.SpontaneousRemaining != 0 ||
-                !record.Step("recast").Tokens.Contains("qual-cast-1:tok-2=T>F") ||
+                !record.Step("recast").TokenReadings.Any(reading => reading.CastingId == "qual-cast-1" &&
+                    reading.TokenId == run.Token(1) && reading.Before == true && reading.After == false) ||
                 !record.Step("complete").Availability.Contains("qual-cast-2:1>0"))
                 throw new InvalidOperationException("The finite run was not accepted exactly: " +
                     string.Join("|", record.Violations().ToArray()) + " fired=" +
                     string.Join(",", run.Fired.ToArray()));
-            foreach (string shape in new[] { "wrong-token", "no-spend" })
+            // Native slot ids contain "|"; every shape must still be judged
+            // exactly (review RC1), and a missing before-read casts nothing
+            // (review RC2).
+            foreach (string shape in new[] { "wrong-token", "no-spend", "partial", "missing-after-tokens",
+                "missing-before-tokens" })
             {
-                var bad = new FiniteBuffWorld();
+                var bad = new FiniteBuffWorld(shape == "partial");
                 CastingQualificationAllowance allowance = FiniteAllowance(bad);
                 if (shape == "wrong-token") bad.WrongTokenCasting = "qual-cast-1";
-                else bad.NoSpend = true;
+                else if (shape == "no-spend") bad.NoSpend = true;
+                else if (shape == "partial") bad.PartialCasting = "qual-cast-1";
+                else if (shape == "missing-after-tokens") bad.MissingAfterTokens = true;
+                else bad.MissingBeforeTokens = true;
                 var badRecord = new CastingQualificationRecord { CastingScenario = true, AllowanceStatus = "parsed" };
                 CastingQualificationDriver badDriver = NewFiniteDriver(
-                    Path.Combine(root, "qualification-finite-" + shape), bad, badRecord, allowance, () => now);
+                    Path.Combine(root, "qf-" + string.Join(string.Empty, shape.Split(new[] { "-" },
+                        StringSplitOptions.None).Select(part => part.Substring(0, 1)).ToArray())),
+                    bad, badRecord, allowance, () => now);
                 for (int i = 0; i < 2000 && !badDriver.Completed; i++) badDriver.Update();
-                string expected = shape == "wrong-token" ? "stop-wait:step:tokens:qual-cast-1:tok-1=T>T"
-                    : "stop-wait:step:resource:qual-cast-1:3>3:expected-spend=1";
-                if (!bad.Fired.SequenceEqual(new[] { "qual-cast-1" }) ||
-                    !badRecord.Failures.Contains(expected))
+                string expected =
+                    shape == "wrong-token" ? "stop-wait:step:tokens:qual-cast-1:" + bad.Token(0) + "=T>T"
+                    : shape == "no-spend" ? "stop-wait:step:resource:qual-cast-1:3>3:expected-spend=1"
+                    : shape == "partial" ? "stop-wait:step:tokens:qual-cast-1:" + bad.Token(1) + "=T>T"
+                    : shape == "missing-after-tokens" ? "stop-wait:step:tokens:qual-cast-1:unread"
+                    : "stop:before-read:qual-cast-1:tokens-unread";
+                string[] fired = shape == "missing-before-tokens" ? new string[0] : new[] { "qual-cast-1" };
+                if (!bad.Fired.SequenceEqual(fired) || !badRecord.Failures.Contains(expected))
                     throw new InvalidOperationException("The " + shape + " shape was not stopped at the stop step: " +
                         string.Join("|", badRecord.Failures.ToArray()) + " fired=" +
                         string.Join(",", bad.Fired.ToArray()));
             }
+            // Linked prepared slots: each cast spends its primary and linked
+            // token, and exactly those, in every step.
+            var linked = new FiniteBuffWorld(true);
+            var linkedRecord = new CastingQualificationRecord { CastingScenario = true, AllowanceStatus = "parsed" };
+            CastingQualificationDriver linkedDriver = NewFiniteDriver(
+                Path.Combine(root, "qf-linked"), linked, linkedRecord,
+                FiniteAllowance(linked), () => now);
+            for (int i = 0; i < 2000 && !linkedDriver.Completed; i++) linkedDriver.Update();
+            if (linkedRecord.Violations().Count != 0 || linked.Tokens.Values.Any(value => value) ||
+                !linked.Fired.SequenceEqual(new[] { "qual-cast-1", "qual-cast-2", "qual-cast-1" }) ||
+                linkedRecord.Step("stop").TokenReadings.Count(reading => reading.CastingId == "qual-cast-1" &&
+                    reading.Before == true && reading.After == false) != 2)
+                throw new InvalidOperationException("The linked-slot run was not judged exactly: " +
+                    string.Join("|", linkedRecord.Violations().ToArray()));
             var mismatched = new FiniteBuffWorld();
             var mismatchedRecord = new CastingQualificationRecord { CastingScenario = true, AllowanceStatus = "parsed" };
             CastingQualificationDriver mismatchedDriver = NewFiniteDriver(
@@ -2103,6 +2186,27 @@ namespace KingmakerBuffPlanner.Tests
                 if (cleanupFailed ? failure != "cleanup:restore-failed" : failure != null)
                     throw new InvalidOperationException("The stop rule judged cleanup=" + cleanupFailed +
                         " as " + (failure ?? "pass"));
+            }
+            // Review RC2: a failed, missing, throwing or wrong-target
+            // before-read ends the run before Apply: nothing is submitted.
+            foreach (string fault in new[] { "throw", "failed", "null", "wrong-target" })
+            {
+                var faulty = new SimulatedBuffWorld { BeforeReadFault = fault };
+                CastingQualificationAllowance faultyAllowance = ForecastAllowance(faulty);
+                var faultyRecord = new CastingQualificationRecord { CastingScenario = true, AllowanceStatus = "parsed" };
+                string faultyDir = Path.Combine(root, "qb-" + fault.Substring(0, 4));
+                Directory.CreateDirectory(faultyDir);
+                CastingQualificationDriver faultyDriver = NewQualificationDriver(faultyDir, faulty,
+                    faultyRecord, faultyAllowance, () => now);
+                for (int i = 0; i < 400 && !faultyDriver.Completed; i++) faultyDriver.Update();
+                string reason = fault == "throw" ? "failed:observer-exception:InvalidOperationException"
+                    : fault == "failed" ? "failed:read-refused"
+                    : fault == "null" ? "missing" : "wrong-target:unit-somebody-else";
+                if (faulty.Fired.Count != 0 || faultyRecord.Submissions.Count != 0 ||
+                    faultyRecord.TerminalReason != "failed:stop" ||
+                    !faultyRecord.Failures.Contains("stop:before-read:qual-cast-1:" + reason))
+                    throw new InvalidOperationException("A " + fault + " before-read did not refuse the step: " +
+                        string.Join("|", faultyRecord.Failures.ToArray()) + " fired=" + faulty.Fired.Count);
             }
             // Review P0: a step that ends any other way than forecast stops
             // the run at once; nothing further is submitted.

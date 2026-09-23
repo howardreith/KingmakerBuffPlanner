@@ -2704,7 +2704,15 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                             ";detail=" + entry.Detail)).ToArray()) },
                     { "transitions", new JArray(step.Transitions.Cast<object>().ToArray()) },
                     { "availability", new JArray(step.Availability.Cast<object>().ToArray()) },
-                    { "tokens", new JArray(step.Tokens.Cast<object>().ToArray()) },
+                    // Typed token readings (ids are opaque and contain "|").
+                    { "tokens", new JArray(step.TokenReadings.Select(reading => (object)new JObject
+                        {
+                            { "castingId", reading.CastingId },
+                            { "tokenId", reading.TokenId },
+                            { "before", reading.Before.HasValue ? (JToken)reading.Before.Value : JValue.CreateNull() },
+                            { "after", reading.After.HasValue ? (JToken)reading.After.Value : JValue.CreateNull() }
+                        }).ToArray()) },
+                    { "unreadTokenCastings", new JArray(step.UnreadTokenCastings.Cast<object>().ToArray()) },
                     { "cleanupFailures", step.Report == null ? new JArray()
                         : new JArray(step.Report.CleanupFailures.Cast<object>().ToArray()) },
                     { "observations", new JArray(step.Observations.Cast<object>().ToArray()) }

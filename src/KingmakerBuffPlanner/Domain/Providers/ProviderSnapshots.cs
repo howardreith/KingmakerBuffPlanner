@@ -6,6 +6,18 @@ using KingmakerBuffPlanner.Domain.Identity;
 
 namespace KingmakerBuffPlanner.Domain.Providers
 {
+    // The one format of a native prepared-slot token id, shared by the
+    // party snapshot (budget tokens) and the cast adapter (exact slot
+    // reads). Ids contain "|": consumers must treat them as opaque values,
+    // never split or re-parse them.
+    public static class PreparedSlotIds
+    {
+        public static string Format(int spellLevel, int slotType, int index)
+        {
+            return "level-" + spellLevel + "|type-" + slotType + "|index-" + index;
+        }
+    }
+
     public enum ResourcePoolKind
     {
         PreparedSlots,
