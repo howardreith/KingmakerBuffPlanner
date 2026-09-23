@@ -3008,6 +3008,18 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         { "lines", new JArray(cantrips.Cast<object>().ToArray()) }
                     }.ToString(Formatting.Indented) + Environment.NewLine);
                 _log.Info("[KBP-QUAL] cantrip diagnostics;lines=" + cantrips.Count + ".");
+                // Read-only: every capability the planner's own discovery
+                // sees (providers, pools, targeting shapes, enhancements).
+                IList<string> capabilities = CastingCapabilityInventory.Describe(
+                    BuffPlannerUiRoot.CastingWorkspaceFreshInputsForRuntime());
+                AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory, "capability-inventory.json"),
+                    new JObject
+                    {
+                        { "schemaVersion", 1 },
+                        { "runId", _request.RunId },
+                        { "lines", new JArray(capabilities.Cast<object>().ToArray()) }
+                    }.ToString(Formatting.Indented) + Environment.NewLine);
+                _log.Info("[KBP-QUAL] capability inventory;lines=" + capabilities.Count + ".");
                 string modPath = _modEntry.Path;
                 object recipeRaw;
                 // The planner's own execution host runs the approved runs:

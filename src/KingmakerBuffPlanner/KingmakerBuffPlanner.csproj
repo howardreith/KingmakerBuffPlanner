@@ -118,6 +118,7 @@
     <Compile Include="Execution\HybridCastExecutor.cs" />
     <Compile Include="Execution\ExplicitCastingRunCoordinator.cs" />
     <Compile Include="Execution\SingleCastProbe.cs" />
+    <Compile Include="Execution\CastingCapabilityInventory.cs" />
     <Compile Include="Execution\CastingQualification.cs" />
     <Compile Include="Execution\CastingQualificationDriver.cs" />
     <Compile Include="Execution\SingleCastProbeObservation.cs" />
