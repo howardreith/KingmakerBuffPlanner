@@ -397,6 +397,8 @@ namespace KingmakerBuffPlanner.Tests
                     () => TestCastingImportPreservesUnresolvedIntent(root));
                 Run("import-requirements-stay-enforced",
                     () => TestImportRequirementsStayEnforced(root));
+                Run("projection-identity-is-complete", TestProjectionIdentityIsComplete);
+                Run("probe-scope-enforces-whole-subset", TestProbeScopeEnforcesWholeSubset);
                 Run("converter-refuses-unsupported-contracts",
                     () => TestConverterRefusesUnsupportedContracts(root));
                 Run("explicit-run-stops-after-failure-both-modes",
@@ -14562,6 +14564,185 @@ namespace KingmakerBuffPlanner.Tests
                 boundary.RecordedSubmissions.Count != 1)
                 throw new InvalidOperationException("The resolved plan did not reach the recording boundary: " +
                     ran.ReviewReason);
+        }
+
+        // Review L3: the projection id covers every executable/observed
+        // field. Otherwise-identical copies of a REAL projection step that
+        // differ in exactly one field get different ids; set-like
+        // collections normalize; the version and scope are part of it.
+        private static CastStep CloneStep(CastStep step,
+            string sourceId = null, string castingId = null, string target = null,
+            IEnumerable<string> recipients = null, ResourceReservation reservation = null,
+            MaterialReservation material = null, bool clearMaterial = false,
+            EffectExpression effects = null, string strategyReason = null,
+            IEnumerable<string> enhancements = null, IDictionary<string, int> usage = null,
+            IEnumerable<string> omitted = null)
+        {
+            return new CastStep(sourceId ?? step.SourceId, castingId ?? step.AssignmentId,
+                step.Provider, step.AnchorUnitId,
+                target == null ? step.TargetUnitIds : new[] { target },
+                recipients ?? step.ExpectedRecipientUnitIds,
+                reservation ?? step.Reservation,
+                clearMaterial ? null : material ?? step.MaterialReservation,
+                effects ?? step.ExpectedEffects, step.MassCast, step.ExecutionStrategy,
+                strategyReason ?? step.ExecutionStrategyReason,
+                enhancements ?? step.EnhancementIds,
+                usage ?? step.EnhancementUsageByPool.ToDictionary(pair => pair.Key, pair => pair.Value),
+                omitted ?? step.OmittedEnhancementIds);
+        }
+
+        private static void TestProjectionIdentityIsComplete()
+        {
+            List<ProviderPlanningOption> options;
+            List<CastEnhancementSnapshot> enhancements;
+            PartyProviderSnapshot snapshot = CastingParty(CastingBuffAbility,
+                out options, out enhancements, new[] { "unit-t1", "unit-t2" }, 3);
+            var effects = CastingEffects("source-bulls", "source-communal");
+            ExplicitCastingPlan plan = CompileCastingPlan(CastingDocument(
+                    DirectCasting("cast-a", "long", "unit-cleric", "unit-t1",
+                        "source-bulls", CastingBuffAbility),
+                    DirectCasting("cast-b", "long", "unit-wizard", "unit-t2",
+                        "source-bulls", CastingBuffAbility)),
+                snapshot, options, enhancements, "source-bulls", "source-communal");
+            ExplicitStepConversion projection = ExplicitCastingStepConverter.Convert(plan,
+                new CastingExecutionGate().Evaluate(plan, CastingApplyMode.Ordinary, "long"),
+                options, effects);
+            if (!projection.Converted || projection.Plan.Steps.Count != 2)
+                throw new InvalidOperationException("L3 fixture did not convert: " + projection.Refusal);
+            if (!projection.CanonicalContract.Contains("\"identityVersion\":2") ||
+                projection.ProjectionId.Length != 64)
+                throw new InvalidOperationException("The identity is not versioned.");
+            CastStep a = projection.Plan.Steps[0];
+            CastStep b = projection.Plan.Steps[1];
+            Func<IList<CastStep>, string> id = steps =>
+                ExplicitCastingStepConverter.CanonicalContract(steps, ExplicitProjectionScope.Standard);
+            string baseline = id(new[] { a, b });
+            if (baseline != projection.CanonicalContract)
+                throw new InvalidOperationException("The canonical contract is not reproducible.");
+            var variants = new Dictionary<string, IList<CastStep>>
+            {
+                { "reserved-token", new[] { CloneStep(a, reservation: new ResourceReservation(
+                    a.Reservation.PoolKey, a.Reservation.Units, a.Reservation.TokenIds.Concat(new[] { "token-x" }))), b } },
+                { "reserved-units", new[] { CloneStep(a, reservation: new ResourceReservation(
+                    a.Reservation.PoolKey, a.Reservation.Units + 1, a.Reservation.TokenIds)), b } },
+                { "enhancement-usage", new[] { CloneStep(a, usage: new Dictionary<string, int> { { "rod-pool", 1 } }), b } },
+                { "source-id", new[] { CloneStep(a, sourceId: "source-other"), b } },
+                { "expected-effects", new[] { CloneStep(a, effects: Leaf("other-effect")), b } },
+                { "target", new[] { CloneStep(a, target: "unit-t2"), b } },
+                { "recipients", new[] { CloneStep(a, recipients: new[] { "unit-t1", "unit-t2" }), b } },
+                { "material", new[] { CloneStep(a, material: new MaterialReservation("diamond", 1)), b } },
+                { "applied-enhancements", new[] { CloneStep(a, enhancements: new[] { "extend" }), b } },
+                { "omitted-enhancements", new[] { CloneStep(a, omitted: new[] { "extend" }), b } },
+                { "strategy-reason", new[] { CloneStep(a, strategyReason: "other-reason"), b } },
+                { "casting-id", new[] { CloneStep(a, castingId: "cast-z"), b } },
+                { "sequence-position", new[] { b, a } }
+            };
+            var seen = new HashSet<string> { baseline };
+            foreach (KeyValuePair<string, IList<CastStep>> variant in variants)
+            {
+                string contract = id(variant.Value);
+                if (!seen.Add(contract))
+                    throw new InvalidOperationException("Projection identity ignores " + variant.Key + ".");
+            }
+            if (ExplicitCastingStepConverter.CanonicalContract(new[] { a, b },
+                    ExplicitProjectionScope.SingleCastProbe) == baseline)
+                throw new InvalidOperationException("Projection identity ignores the scope.");
+            // Set-like collections normalize.
+            if (id(new[] { CloneStep(a, recipients: a.ExpectedRecipientUnitIds.Reverse().ToList(),
+                    omitted: new[] { "y", "x" }, usage: new Dictionary<string, int> { { "p2", 1 }, { "p1", 2 } }), b }) !=
+                id(new[] { CloneStep(a, recipients: a.ExpectedRecipientUnitIds.ToList(),
+                    omitted: new[] { "x", "y" }, usage: new Dictionary<string, int> { { "p1", 2 }, { "p2", 1 } }), b }))
+                throw new InvalidOperationException("Unordered collections did not normalize.");
+            // An unrepresentable value refuses instead of certifying a partial id.
+            bool refused = false;
+            try { id(new[] { CloneStep(a, effects: new UnknownFixtureEffect()) }); }
+            catch (NotSupportedException) { refused = true; }
+            if (!refused)
+                throw new InvalidOperationException("An unrepresentable effect was identified.");
+            // An undefined scope value is refused, never read as Standard.
+            ExplicitStepConversion invalid = ExplicitCastingStepConverter.Convert(plan,
+                new CastingExecutionGate().Evaluate(plan, CastingApplyMode.Ordinary, "long"),
+                options, effects, (ExplicitProjectionScope)99);
+            if (invalid.Converted || invalid.Refusal != "projection-scope-invalid:99")
+                throw new InvalidOperationException("An undefined projection scope was accepted.");
+        }
+
+        private sealed class UnknownFixtureEffect : EffectExpression
+        {
+            internal UnknownFixtureEffect() : base("fixture-unknown") { }
+        }
+
+        // Review L6: the probe subset is enforced by the converter itself.
+        // Every refused case is first proven convertible under Standard.
+        private static void TestProbeScopeEnforcesWholeSubset()
+        {
+            var effects = CastingEffects("source-bulls", "source-communal");
+            var gate = new CastingExecutionGate();
+            Func<AbilityKey, string, string, List<ProviderPlanningOption>, Dictionary<string, EffectExpression>, string, string>
+                probe = (ability, caster, target, overrideOptions, overrideEffects, label) =>
+                {
+                    List<ProviderPlanningOption> options;
+                    List<CastEnhancementSnapshot> enhancements;
+                    PartyProviderSnapshot snapshot = CastingParty(ability, out options,
+                        out enhancements, new[] { "unit-t1", "unit-t2" }, 3);
+                    List<ProviderPlanningOption> used = overrideOptions == null ? options
+                        : overrideOptions.Count == 0
+                            ? options.Select(option => new ProviderPlanningOption(option.Provider,
+                                option.ReachableTargetIds, option.LegalAnchorIds, 10, 100, true)).ToList()
+                            : overrideOptions;
+                    Dictionary<string, EffectExpression> usedEffects = overrideEffects ?? effects;
+                    ExplicitCastingPlan plan = new ExplicitCastingCompiler().Compile(
+                        CastingDocument(DirectCasting("cast-probe", "long", caster, target,
+                            "source-bulls", ability)),
+                        snapshot, used, usedEffects, enhancements);
+                    CastingApplyDecision decision = gate.Evaluate(plan, CastingApplyMode.Ordinary, "long");
+                    ExplicitStepConversion standard = ExplicitCastingStepConverter.Convert(
+                        plan, decision, used, usedEffects);
+                    if (!decision.Allowed || !standard.Converted)
+                        throw new InvalidOperationException("Fixture precondition (" + label +
+                            "): must convert under Standard: " + standard.Refusal + " " +
+                            string.Join(",", decision.BlockingReasons.ToArray()));
+                    ExplicitStepConversion probed = ExplicitCastingStepConverter.Convert(
+                        plan, decision, used, usedEffects, ExplicitProjectionScope.SingleCastProbe);
+                    return probed.Converted ? null : probed.Refusal;
+                };
+            // Positive control: plain spellbook spell on another unit.
+            string plain = probe(CastingBuffAbility, "unit-cleric", "unit-t1", null, null, "plain");
+            if (plain != null)
+                throw new InvalidOperationException("The plain probe casting was refused: " + plain);
+            var cases = new[]
+            {
+                new { Label = "metamagic", Expect = "probe-unsupported:metamagic:",
+                    Refusal = (Func<string>)(() => probe(
+                        Ability("a0000000000000000000000000000001", string.Empty, 1),
+                        "unit-cleric", "unit-t1", null, null, "metamagic")) },
+                new { Label = "non-spell-source", Expect = "probe-unsupported:source-kind:",
+                    Refusal = (Func<string>)(() => probe(new AbilityKey(
+                        "a0000000000000000000000000000001", string.Empty, 0,
+                        SourceKind.AbilityResource, string.Empty),
+                        "unit-cleric", "unit-t1", null, null, "non-spell-source")) },
+                new { Label = "self-target", Expect = "probe-unsupported:self-target:",
+                    Refusal = (Func<string>)(() => probe(CastingBuffAbility,
+                        "unit-cleric", "unit-cleric", null, null, "self-target")) },
+                new { Label = "animated-strategy", Expect = "probe-unsupported:strategy:",
+                    Refusal = (Func<string>)(() => probe(CastingBuffAbility,
+                        "unit-cleric", "unit-t1", new List<ProviderPlanningOption>(), null,
+                        "animated-strategy")) },
+                new { Label = "conditional-effect", Expect = "probe-unsupported:effect-shape:",
+                    Refusal = (Func<string>)(() => probe(CastingBuffAbility,
+                        "unit-cleric", "unit-t1", null, new Dictionary<string, EffectExpression>(effects)
+                        {
+                            ["source-bulls"] = new ConditionalEffectExpression("fixture-condition",
+                                Leaf("buff-effect"), new EmptyEffectExpression())
+                        }, "conditional-effect")) }
+            };
+            foreach (var entry in cases)
+            {
+                string refusal = entry.Refusal();
+                if (refusal == null || !refusal.StartsWith(entry.Expect, StringComparison.Ordinal))
+                    throw new InvalidOperationException("The probe admitted " + entry.Label + ": " +
+                        (refusal ?? "converted"));
+            }
         }
 
         // Review K4: compiler-to-converter — contracts the executor step
