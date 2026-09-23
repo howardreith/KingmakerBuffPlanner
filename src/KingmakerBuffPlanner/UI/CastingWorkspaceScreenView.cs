@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Kingmaker.Blueprints;
 using Kingmaker.UI;
+using Kingmaker.UnitLogic.Abilities.Blueprints;
+using KingmakerBuffPlanner.Domain.Identity;
 using KingmakerBuffPlanner.Domain.Authoring;
 using KingmakerBuffPlanner.Persistence;
 using UnityEngine;
@@ -31,7 +34,8 @@ namespace KingmakerBuffPlanner.UI
         private PlannerUiTheme _theme;
         private PlannerNativeThemeSurface _nativeTheme;
         private RectTransform _root;
-        private RectTransform _casterContent;
+        private RectTransform _buffGridContent;
+        private Text _castingsTitle;
         private RectTransform _cardContent;
         private RectTransform _inspectorContent;
         private Text _headerTitle;
@@ -95,7 +99,7 @@ namespace KingmakerBuffPlanner.UI
                 (view.OnePassGate.Allowed ? "clear" :
                     view.OnePassGate.BlockingReasons.Count + " blocked");
             _scopeLabel.text = view.EditingScopeLabel;
-            RebuildCasters(view);
+            RebuildBuffGrid(view);
             RebuildCards(view);
             RebuildInspector(view);
             RebuildRoutineBar(view);
@@ -199,29 +203,42 @@ namespace KingmakerBuffPlanner.UI
 
         private void BuildLanes(RectTransform frame)
         {
-            // Caster lane (left).
-            RectTransform casters = KingmakerUiFactory.CreateRect("Casters", frame);
-            KingmakerUiFactory.SetAnchors(casters, 0f, 0.085f, 0.28f, 0.88f);
-            casters.offsetMin = new Vector2(10f, 0f);
-            casters.offsetMax = new Vector2(-4f, 0f);
-            _casterContent = BuildLanePanel(casters, "Casters");
-            // Casting-card lane (center).
+            // Bubble Buffs-like composition (docs/UI-END-GOAL.md): an icon
+            // grid of buffs across the top; the selected buff's castings —
+            // the atomic unit — lower left; the inspector lower right.
+            RectTransform buffs = KingmakerUiFactory.CreateRect("Buffs", frame);
+            KingmakerUiFactory.SetAnchors(buffs, 0f, 0.565f, 1f, 0.885f);
+            buffs.offsetMin = new Vector2(10f, 0f);
+            buffs.offsetMax = new Vector2(-10f, 0f);
+            Text buffTitle;
+            _buffGridContent = BuildLanePanel(buffs, "Buffs", out buffTitle);
+            UnityEngine.Object.DestroyImmediate(
+                _buffGridContent.GetComponent<VerticalLayoutGroup>());
+            GridLayoutGroup grid =
+                _buffGridContent.gameObject.AddComponent<GridLayoutGroup>();
+            grid.cellSize = new Vector2(352f, 60f);
+            grid.spacing = new Vector2(8f, 6f);
+            grid.padding = new RectOffset(6, 6, 6, 6);
+            grid.startCorner = GridLayoutGroup.Corner.UpperLeft;
+            grid.startAxis = GridLayoutGroup.Axis.Horizontal;
+            grid.childAlignment = TextAnchor.UpperLeft;
             RectTransform cards = KingmakerUiFactory.CreateRect("Cards", frame);
-            KingmakerUiFactory.SetAnchors(cards, 0.28f, 0.085f, 0.72f, 0.88f);
-            cards.offsetMin = new Vector2(4f, 0f);
+            KingmakerUiFactory.SetAnchors(cards, 0f, 0.085f, 0.58f, 0.55f);
+            cards.offsetMin = new Vector2(10f, 0f);
             cards.offsetMax = new Vector2(-4f, 0f);
-            _cardContent = BuildLanePanel(cards, "Castings");
-            // Inspector (right).
+            _cardContent = BuildLanePanel(cards, "Castings", out _castingsTitle);
             RectTransform inspector = KingmakerUiFactory.CreateRect("Inspector", frame);
-            KingmakerUiFactory.SetAnchors(inspector, 0.72f, 0.085f, 1f, 0.88f);
+            KingmakerUiFactory.SetAnchors(inspector, 0.58f, 0.085f, 1f, 0.55f);
             inspector.offsetMin = new Vector2(4f, 0f);
             inspector.offsetMax = new Vector2(-10f, 0f);
-            _inspectorContent = BuildLanePanel(inspector, "Inspector");
+            Text inspectorTitle;
+            _inspectorContent = BuildLanePanel(inspector, "Inspector", out inspectorTitle);
         }
 
-        private RectTransform BuildLanePanel(RectTransform lane, string title)
+        private RectTransform BuildLanePanel(RectTransform lane, string title,
+            out Text label)
         {
-            Text label = KingmakerUiFactory.CreateText(
+            label = KingmakerUiFactory.CreateText(
                 "LaneTitle", lane, _theme, title, 16, TextAnchor.MiddleLeft);
             label.fontStyle = FontStyle.Bold;
             KingmakerUiFactory.SetAnchors(label.rectTransform, 0f, 1f, 1f, 1f);
@@ -330,50 +347,139 @@ namespace KingmakerBuffPlanner.UI
             action();
         }
 
-        private void RebuildCasters(WorkspaceView view)
+        private void RebuildBuffGrid(WorkspaceView view)
         {
-            KingmakerUiFactory.DestroyChildren(_casterContent);
-            foreach (WorkspaceCasterRow row in view.Casters)
+            KingmakerUiFactory.DestroyChildren(_buffGridContent);
+            if (view.Draft == null) return;
+            IReadOnlyDictionary<string, int> counts =
+                WorkspaceBuffSummary.CastingsBySource(
+                    _session.Document.Castings, view.SelectedRoutineId);
+            foreach (WorkspaceSourceOption source in view.Draft.Sources)
             {
-                RectTransform entry = KingmakerUiFactory.CreateRect(
-                    "Caster", _casterContent);
-                KingmakerUiFactory.AddFramedPanel(entry,
-                    row.SelectedFocus
-                        ? _theme.ParchmentRaised : _theme.ParchmentPanel,
-                    _theme.GoldAccent);
-                KingmakerUiFactory.AddLayout(entry, 44f);
-                Text name = KingmakerUiFactory.CreateText(
-                    "Name", entry, _theme,
-                    (string.IsNullOrEmpty(row.DisplayName)
-                        ? row.UnitId : row.DisplayName) +
-                    (row.Capable ? string.Empty : " — not capable"), 16,
-                    TextAnchor.MiddleLeft);
-                name.fontStyle = row.SelectedFocus ? FontStyle.Bold : FontStyle.Normal;
-                // Name owns the row left of the Focus button (0.72), never
-                // underneath it.
-                KingmakerUiFactory.SetAnchors(name.rectTransform, 0f, 0f, 0.7f, 1f,
-                    8f, 4f, 4f, 4f);
-                // "Use" picks this caster for the next casting (the draft)
-                // and shows it; it never edits an existing casting. The
-                // former "Focus" only moved an invisible editing focus.
-                Button select = KingmakerUiFactory.CreateButton(
-                    "Focus", entry, _theme,
-                    row.SelectedFocus ? "Casting" : "Use", () => Click(() =>
-                    {
-                        _session.ChooseDraftCaster(row.UnitId);
-                        RefreshView();
-                    }));
-                KingmakerUiFactory.SetAnchors(RectOf(select), 0.72f, 0.15f, 0.98f, 0.85f);
-                if (row.ReadinessReasons.Count != 0)
+                WorkspaceSourceOption captured = source;
+                int count;
+                counts.TryGetValue(captured.SourceId, out count);
+                RectTransform rect = KingmakerUiFactory.CreateRect(
+                    "Source." + captured.SourceId, _buffGridContent);
+                Image background = KingmakerUiFactory.AddPanel(rect,
+                    captured.Selected ? _theme.ParchmentRaised : _theme.ParchmentPanel);
+                Button button = rect.gameObject.AddComponent<Button>();
+                button.targetGraphic = background;
+                button.onClick.AddListener(() => Click(() =>
                 {
-                    Text reasons = KingmakerUiFactory.CreateText(
-                        "Reasons", entry, _theme,
-                        string.Join(", ", row.ReadinessReasons), 12,
-                        TextAnchor.MiddleLeft);
-                    reasons.color = _theme.MutedBrownText;
-                    KingmakerUiFactory.SetAnchors(reasons.rectTransform, 0f, 0f, 0.7f, 0.34f);
-                    reasons.rectTransform.offsetMin = new Vector2(8f, 2f);
+                    _session.SelectBuff(captured.SourceId);
+                    _session.Draft.SourceId = captured.SourceId;
+                    RefreshView();
+                }));
+                if (captured.Selected)
+                {
+                    RectTransform rule = KingmakerUiFactory.CreateRect("Selected", rect);
+                    KingmakerUiFactory.SetAnchors(rule, 0f, 0f, 0f, 1f);
+                    rule.sizeDelta = new Vector2(5f, 0f);
+                    rule.pivot = new Vector2(0f, 0.5f);
+                    KingmakerUiFactory.AddPanel(rule, _theme.GoldAccent).raycastTarget = false;
                 }
+                RectTransform iconRect = KingmakerUiFactory.CreateRect("Icon", rect);
+                KingmakerUiFactory.SetAnchors(iconRect, 0f, 0f, 0f, 1f, 8f, 0f, 5f, 5f);
+                iconRect.pivot = new Vector2(0f, 0.5f);
+                iconRect.sizeDelta = new Vector2(50f, -10f);
+                iconRect.anchoredPosition = new Vector2(8f, 0f);
+                Sprite icon = ResolveAbilityIcon(captured.IconAbility);
+                Image iconImage = iconRect.gameObject.AddComponent<Image>();
+                iconImage.sprite = icon;
+                iconImage.preserveAspect = true;
+                iconImage.raycastTarget = false;
+                iconImage.color = icon == null ? _theme.MutedBrownText : Color.white;
+                Text name = KingmakerUiFactory.CreateText("Name", rect, _theme,
+                    captured.Label, 15, TextAnchor.UpperLeft);
+                name.fontStyle = captured.Selected ? FontStyle.Bold : FontStyle.Normal;
+                KingmakerUiFactory.Stretch(name.rectTransform, 66, 8, 20, 4);
+                Text castings = KingmakerUiFactory.CreateText("Count", rect, _theme,
+                    count == 0 ? "no castings in " + view.SelectedRoutineId
+                        : count + (count == 1 ? " casting" : " castings") +
+                          " in " + view.SelectedRoutineId,
+                    12, TextAnchor.LowerLeft);
+                castings.color = count == 0 ? _theme.MutedBrownText : _theme.GreenSuccess;
+                KingmakerUiFactory.Stretch(castings.rectTransform, 66, 8, 3, 36);
+            }
+        }
+
+        private static Sprite ResolveAbilityIcon(AbilityKey ability)
+        {
+            if (ability == null) return null;
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(ability.VariantGuid))
+                {
+                    BlueprintAbility concrete =
+                        ResourcesLibrary.TryGetBlueprint<BlueprintAbility>(
+                            ability.VariantGuid);
+                    if (concrete != null && concrete.Icon != null) return concrete.Icon;
+                }
+                BlueprintAbility parent =
+                    ResourcesLibrary.TryGetBlueprint<BlueprintAbility>(
+                        ability.BaseAbilityGuid);
+                return parent == null ? null : parent.Icon;
+            }
+            catch (Exception)
+            {
+                // A non-ability source (item, fact) simply shows no icon.
+                return null;
+            }
+        }
+
+        // A portrait tile: the primary hit area for choosing a caster or a
+        // recipient (charter §6.2). Selected tiles carry a gold frame;
+        // coverage tints follow Bubble Buffs' legend.
+        private Button CreatePortraitTile(string name, Transform parent,
+            string unitId, string label, bool selected, Color tint,
+            UnityEngine.Events.UnityAction action)
+        {
+            RectTransform rect = KingmakerUiFactory.CreateRect(name, parent);
+            Image frame = KingmakerUiFactory.AddPanel(rect,
+                selected ? _theme.GoldAccent : _theme.ParchmentPanel);
+            Button button = rect.gameObject.AddComponent<Button>();
+            button.targetGraphic = frame;
+            if (action != null) button.onClick.AddListener(action);
+            RectTransform picture = KingmakerUiFactory.CreateRect("Portrait", rect);
+            KingmakerUiFactory.SetAnchors(picture, 0f, 0.2f, 1f, 1f, 4f, 4f, 2f, 4f);
+            Sprite portrait = BuffPlannerScreenView.ResolvePortrait(unitId);
+            Image image = picture.gameObject.AddComponent<Image>();
+            image.sprite = portrait;
+            image.preserveAspect = true;
+            image.raycastTarget = false;
+            image.color = portrait == null ? new Color(0f, 0f, 0f, 0.08f) : tint;
+            Text caption = KingmakerUiFactory.CreateText("Label", rect, _theme,
+                label, 13, TextAnchor.MiddleCenter);
+            caption.color = selected ? _theme.ButtonText : _theme.DarkBrownText;
+            caption.fontStyle = selected ? FontStyle.Bold : FontStyle.Normal;
+            caption.resizeTextForBestFit = true;
+            caption.resizeTextMinSize = 10;
+            caption.resizeTextMaxSize = 13;
+            KingmakerUiFactory.SetAnchors(caption.rectTransform, 0f, 0f, 1f, 0.2f, 2f, 2f, 1f, 0f);
+            return button;
+        }
+
+        private RectTransform CreateTileRow(string name)
+        {
+            RectTransform row = KingmakerUiFactory.CreateRect(name, _inspectorContent);
+            GridLayoutGroup grid = row.gameObject.AddComponent<GridLayoutGroup>();
+            grid.cellSize = new Vector2(88f, 112f);
+            grid.spacing = new Vector2(6f, 6f);
+            grid.childAlignment = TextAnchor.UpperLeft;
+            return row;
+        }
+
+        private Color CoverageTint(WorkspaceRecipientCoverage coverage)
+        {
+            switch (coverage)
+            {
+                case WorkspaceRecipientCoverage.CoveredReady:
+                    return new Color(0.55f, 1f, 0.55f, 1f);
+                case WorkspaceRecipientCoverage.CoveredNotReady:
+                    return new Color(1f, 0.85f, 0.40f, 1f);
+                default:
+                    return Color.white;
             }
         }
 
@@ -382,12 +488,14 @@ namespace KingmakerBuffPlanner.UI
             ScrollRect scroll = _cardContent.GetComponentInParent<ScrollRect>();
             if (scroll != null) _cardScrollPosition = scroll.normalizedPosition;
             KingmakerUiFactory.DestroyChildren(_cardContent);
+            _castingsTitle.text = "Castings of " + view.SelectedSourceCaption +
+                " — each card is one cast";
             if (view.Cards.Count == 0)
             {
                 Text hint = KingmakerUiFactory.CreateText(
                     "EmptyHint", _cardContent, _theme,
-                    "No castings in the " + view.SelectedRoutineId + " routine yet.\n" +
-                    "Pick a buff, a caster and a recipient in the Inspector, " +
+                    "No castings of this buff yet.\n" +
+                    "Choose who casts it and who receives it in the Inspector, " +
                     "then press Add Casting. Each casting is one cast of one " +
                     "buff and can be edited on its own.", 15, TextAnchor.UpperLeft);
                 hint.color = _theme.MutedBrownText;
@@ -403,6 +511,17 @@ namespace KingmakerBuffPlanner.UI
                         ? _theme.ParchmentRaised : _theme.ParchmentPanel,
                     _theme.GoldAccent);
                 KingmakerUiFactory.AddLayout(entry, 96f);
+                AddCardPortrait(entry, "CasterPortrait", card.CasterUnitId, 8f);
+                if (card.DirectTargetUnitId != null)
+                {
+                    Text arrow = KingmakerUiFactory.CreateText("Arrow", entry, _theme,
+                        "→", 22, TextAnchor.MiddleCenter);
+                    KingmakerUiFactory.SetAnchors(arrow.rectTransform, 0f, 0f, 0f, 1f);
+                    arrow.rectTransform.pivot = new Vector2(0f, 0.5f);
+                    arrow.rectTransform.sizeDelta = new Vector2(24f, 0f);
+                    arrow.rectTransform.anchoredPosition = new Vector2(76f, 0f);
+                    AddCardPortrait(entry, "TargetPortrait", card.DirectTargetUnitId, 102f);
+                }
                 string coverage = card.DirectTargetUnitId == null
                     ? string.Empty
                     : " · coverage " + card.PredictedBeneficiaryUnitIds.Count +
@@ -414,7 +533,8 @@ namespace KingmakerBuffPlanner.UI
                         ? "unresolved caster" : card.CasterDisplayName), 16,
                     TextAnchor.MiddleLeft);
                 title.fontStyle = FontStyle.Bold;
-                KingmakerUiFactory.Stretch(title.rectTransform, 8, 90, 4, 2);
+                KingmakerUiFactory.SetAnchors(title.rectTransform, 0f, 0.55f, 0.62f, 1f,
+                    176f, 4f, 0f, 4f);
                 Text status = KingmakerUiFactory.CreateText(
                     "Status", entry, _theme,
                     card.Readiness.ToString() + coverage, 14, TextAnchor.UpperRight);
@@ -422,9 +542,8 @@ namespace KingmakerBuffPlanner.UI
                 Text detail = KingmakerUiFactory.CreateText(
                     "Detail", entry, _theme,
                     BuildCardDetail(card), 13, TextAnchor.UpperLeft);
-                KingmakerUiFactory.SetAnchors(detail.rectTransform, 0f, 0.22f, 1f, 0.55f);
-                detail.rectTransform.offsetMin = new Vector2(8f, 2f);
-                detail.rectTransform.offsetMax = new Vector2(-8f, -2f);
+                KingmakerUiFactory.SetAnchors(detail.rectTransform, 0f, 0.05f, 0.85f, 0.55f,
+                    176f, 8f, 2f, 2f);
                 Button edit = KingmakerUiFactory.CreateButton(
                     "Edit." + card.CastingId, entry, _theme, "Edit", () => Click(() =>
                     {
@@ -434,6 +553,22 @@ namespace KingmakerBuffPlanner.UI
                 KingmakerUiFactory.SetAnchors(RectOf(edit), 0.86f, 0.08f, 0.98f, 0.4f);
             }
             if (scroll != null) scroll.normalizedPosition = _cardScrollPosition;
+        }
+
+        private void AddCardPortrait(RectTransform entry, string name,
+            string unitId, float x)
+        {
+            RectTransform picture = KingmakerUiFactory.CreateRect(name, entry);
+            KingmakerUiFactory.SetAnchors(picture, 0f, 0f, 0f, 1f);
+            picture.pivot = new Vector2(0f, 0.5f);
+            picture.sizeDelta = new Vector2(66f, -12f);
+            picture.anchoredPosition = new Vector2(x, 0f);
+            Sprite portrait = BuffPlannerScreenView.ResolvePortrait(unitId);
+            Image image = picture.gameObject.AddComponent<Image>();
+            image.sprite = portrait;
+            image.preserveAspect = true;
+            image.raycastTarget = false;
+            image.color = portrait == null ? new Color(0f, 0f, 0f, 0.08f) : Color.white;
         }
 
         private static string BuildCardDetail(WorkspaceCastingCard card)
@@ -700,22 +835,11 @@ namespace KingmakerBuffPlanner.UI
                 KingmakerUiFactory.AddLayout(missing.rectTransform, 48f);
                 return;
             }
-            AddInspectorCaption("Buff");
-            foreach (WorkspaceSourceOption source in draft.Sources)
-            {
-                WorkspaceSourceOption captured = source;
-                Button pick = KingmakerUiFactory.CreateButton(
-                    "Source." + captured.SourceId, _inspectorContent, _theme,
-                    (captured.Selected ? "[x] " : "[  ] ") + captured.Label,
-                    () => Click(() =>
-                    {
-                        _session.SelectBuff(captured.SourceId);
-                        _session.Draft.SourceId = captured.SourceId;
-                        RefreshView();
-                    }));
-                KingmakerUiFactory.AddLayout(RectOf(pick), 30f);
-            }
-            AddInspectorCaption("Caster");
+            Text buffLine = KingmakerUiFactory.CreateText("DraftBuff", _inspectorContent,
+                _theme, "Buff: " + view.SelectedSourceCaption +
+                "  (choose another in the grid above)", 14, TextAnchor.MiddleLeft);
+            KingmakerUiFactory.AddLayout(buffLine.rectTransform, 24f);
+            AddInspectorCaption("Cast by");
             if (draft.CapableCasters.Count == 0)
             {
                 Text none = KingmakerUiFactory.CreateText(
@@ -724,23 +848,23 @@ namespace KingmakerBuffPlanner.UI
                 none.color = _theme.MutedBrownText;
                 KingmakerUiFactory.AddLayout(none.rectTransform, 26f);
             }
+            RectTransform casterRow = CreateTileRow("CasterTiles");
             foreach (WorkspaceCasterRow caster in draft.CapableCasters)
             {
                 WorkspaceCasterRow captured = caster;
                 bool selected = string.Equals(draft.CasterUnitId,
                     captured.UnitId, StringComparison.Ordinal);
-                Button pick = KingmakerUiFactory.CreateButton(
-                    "DraftCaster." + captured.UnitId, _inspectorContent, _theme,
-                    (selected ? "[x] " : "[  ] ") +
-                        (string.IsNullOrEmpty(captured.DisplayName)
-                            ? captured.UnitId : captured.DisplayName),
+                CreatePortraitTile("DraftCaster." + captured.UnitId, casterRow,
+                    captured.UnitId,
+                    string.IsNullOrEmpty(captured.DisplayName)
+                        ? captured.UnitId : captured.DisplayName,
+                    selected, captured.ReadinessReasons.Count == 0
+                        ? Color.white : new Color(0.75f, 0.75f, 0.75f, 1f),
                     () => Click(() =>
                     {
-                        _session.SelectCaster(captured.UnitId);
-                        _session.Draft.CasterUnitId = captured.UnitId;
+                        _session.ChooseDraftCaster(captured.UnitId);
                         RefreshView();
                     }));
-                KingmakerUiFactory.AddLayout(RectOf(pick), 30f);
             }
             AddInspectorCaption("Targeting");
             bool direct = draft.TargetMode ==
@@ -765,15 +889,17 @@ namespace KingmakerBuffPlanner.UI
             KingmakerUiFactory.AddLayout(RectOf(mode), 30f);
             if (direct)
             {
+                AddInspectorCaption("Cast on");
+                RectTransform targetRow = CreateTileRow("TargetTiles");
                 foreach (WorkspaceTargetOption target in draft.Targets)
                 {
                     WorkspaceTargetOption captured = target;
                     bool selected = string.Equals(draft.DirectTargetUnitId,
                         captured.UnitId, StringComparison.Ordinal);
-                    Button pick = KingmakerUiFactory.CreateButton(
-                        "DraftTarget." + captured.UnitId, _inspectorContent,
-                        _theme,
-                        (selected ? "[x] " : "[  ] ") + captured.DisplayName,
+                    CreatePortraitTile("DraftTarget." + captured.UnitId, targetRow,
+                        captured.UnitId, captured.DisplayName, selected,
+                        CoverageTint(WorkspaceBuffSummary.CoverageFor(
+                            view.Cards, view.SelectedRoutineId, captured.UnitId)),
                         () => Click(() =>
                         {
                             _session.SetDraftTargeting(
@@ -781,8 +907,13 @@ namespace KingmakerBuffPlanner.UI
                                 captured.UnitId, null, null);
                             RefreshView();
                         }));
-                    KingmakerUiFactory.AddLayout(RectOf(pick), 30f);
                 }
+                Text legend = KingmakerUiFactory.CreateText("CoverageLegend",
+                    _inspectorContent, _theme,
+                    "Green: already has a Ready casting of this buff · " +
+                    "Amber: has one that is not Ready", 12, TextAnchor.MiddleLeft);
+                legend.color = _theme.MutedBrownText;
+                KingmakerUiFactory.AddLayout(legend.rectTransform, 20f);
             }
             else
             {

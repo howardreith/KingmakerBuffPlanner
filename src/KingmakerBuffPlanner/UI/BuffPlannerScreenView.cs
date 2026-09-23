@@ -860,7 +860,7 @@ namespace KingmakerBuffPlanner.UI
                 ability.BaseAbilityGuid);
         }
 
-        private static Sprite ResolvePortrait(string unitId)
+        internal static Sprite ResolvePortrait(string unitId)
         {
             if (Game.Instance == null || Game.Instance.Player == null) return null;
             foreach (UnitEntityData member in Game.Instance.Player.Party)
