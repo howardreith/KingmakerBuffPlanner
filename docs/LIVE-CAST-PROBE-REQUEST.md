@@ -40,7 +40,9 @@ boundary. In each run the workspace closed, the input lease was released
 and transaction restoration was verified. No further equivalent
 selection runs are planned.
 
-## 3. Exact build identity (from the PASS selection run)
+## 3. Build identity
+
+The selection PASS ran on this build:
 
 | Item | Value |
 | --- | --- |
@@ -50,10 +52,26 @@ selection runs are planned.
 | Loaded MVID (runtime result) | `cfd81eab-970d-4a3d-9a95-191f794fcb62` |
 | Game / profile | 2.1.7, `full-user` |
 
-The branch has moved on since then with documentation-only commits. The
-cast must run on **exactly** `ea45807`: check it out detached, run
-`Build-Local.ps1`, and confirm the three hashes above match before
-launching. If any hash differs, stop.
+**Builds are not byte-reproducible.** Rebuilding `ea45807` in a
+separate checkout produced DLL `9578010b…` and MVID `c88466b8…`. Every
+commit also embeds its own id. So the approval cannot say "rebuild and
+match".
+
+What the approval binds instead:
+
+- **Source.** The cast runs at the **final handoff commit**. It differs
+  from `ea45807` only in documentation and one test that checks this
+  template; the probe, converter, observer and owner source is
+  identical.
+- **Binary.** The exact package that the final gate built at that commit
+  is already in `artifacts/local-runtime/0.1.1-rc3/`. Its ZIP/DLL/MVID
+  are recorded in the PR #2 body and the handoff. Do not rebuild or
+  commit before the run. If either happens, the recorded identity no
+  longer applies and the request must be refreshed.
+- **Behaviour.** The boundary recomputes the ProjectionId from the steps
+  it receives at cast time and refuses anything but
+  `ee8e76b2…`. The launcher refuses an allowance whose `sourceCommit`
+  differs from the build it deploys.
 
 ## 4. Fixture and storage
 
@@ -126,15 +144,16 @@ later paid-slot probe needs its own request and approval.
 | Item | Value |
 | --- | --- |
 | Proposed cast run id | `casting-probe-cast-20260923-01`. It is distinct from every selection run id, and the launcher refuses a reused id. |
-| Allowance scope | this run id, `sourceCommit` `ea4580770f34ebd01103f83337337bfb9fda9a74`, the ProjectionId, caster, recipient and source id above, `maximumNativeSubmissions` 1 |
+| Allowance scope | this run id, `sourceCommit` = the final handoff commit (the build the launcher deploys), the ProjectionId, caster, recipient and source id above, `maximumNativeSubmissions` 1 |
 | Template | `docs/probe/ALLOWANCE-TEMPLATE-UNAPPROVED.json`. It sits outside the approvals directory and has an empty `approvedBy`, which the host refuses, so it cannot be used as-is. |
 | Deadline | 60 s run deadline; `probe-stop.json` in the run's evidence directory stops it |
 | Terminal cleanup | The owner disposes the boundary (executor cleanup), takes a fresh after-read, closes the workspace, releases the lease, records cleanup and publishes `probe-outcome.json` once. Mod disable, unload or a host exception take the same path. Then the transaction restores Mods. |
 
 If approved, the owner would copy the template to
 `C:\Dev\KingmakerBuffPlannerLab\approvals\casting-probe-cast-20260923-01.json`,
-set `approvedBy`, and launch from the detached, hash-verified `ea45807`
-checkout:
+set `sourceCommit` to the final handoff commit and `approvedBy` to their
+name, and launch from the unchanged checkout at that commit, without
+rebuilding:
 
 ```powershell
 & 'scripts/Invoke-KingmakerRuntimeTest.ps1' -Scenario live-cast-probe `
