@@ -1121,6 +1121,34 @@ try {
     if (-not $refused) { throw 'Two completed advanced bootstraps were not refused as ambiguous.' }
     $passed++
 
+    # Mission section 9: casting on the advanced copy needs a passing
+    # inspection of the SAME bound pair; other runs never count.
+    $inspectRoot = Join-Path $root 'inspect-evidence'
+    New-Item -ItemType Directory -Path $inspectRoot -Force | Out-Null
+    $inspectBinding = [pscustomobject]@{ manifestPath = 'C:/lab/fixture/bootstrap-advanced/manifest.json' }
+    function New-InspectRecord([string]$RunId, [string]$Scenario, [string]$Family, [string]$Manifest, [string]$Status) {
+        $dir = Join-Path $inspectRoot $RunId
+        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+        Write-KbpJsonAtomic (Join-Path $dir 'orchestration.json') ([ordered]@{
+            schemaVersion = 1; runId = $RunId; scenario = $Scenario; fixtureFamily = $Family
+            advancedBindingManifest = $Manifest; status = $Status })
+        Write-KbpJsonAtomic (Join-Path $dir 'runtime-result.json') ([ordered]@{
+            schemaVersion = 1; runId = $RunId; scenario = $Scenario; status = $Status })
+    }
+    New-InspectRecord 'inspect-fail' 'live-advanced-inspect' 'Advanced' $inspectBinding.manifestPath 'FAIL'
+    New-InspectRecord 'inspect-other-pair' 'live-advanced-inspect' 'Advanced' 'C:/other/manifest.json' 'PASS'
+    New-InspectRecord 'qual-select-pass' 'live-cast-qual-select' 'Advanced' $inspectBinding.manifestPath 'PASS'
+    New-InspectRecord 'inspect-automation' 'live-advanced-inspect' 'Automation' $null 'PASS'
+    $refused = $false
+    try { Assert-KbpAdvancedInspectionPassed -Binding $inspectBinding -EvidenceRoot $inspectRoot | Out-Null }
+    catch { $refused = $_.Exception.Message -like '*passing live-advanced-inspect*' }
+    if (-not $refused) { throw 'An advanced casting run was allowed without a passing inspection of its pair.' }
+    New-InspectRecord 'inspect-pass' 'live-advanced-inspect' 'Advanced' $inspectBinding.manifestPath 'PASS'
+    if ((Assert-KbpAdvancedInspectionPassed -Binding $inspectBinding -EvidenceRoot $inspectRoot) -cne 'inspect-pass') {
+        throw 'The passing inspection of the bound pair was not found.'
+    }
+    $passed++
+
     # Scenario drift: every scenario the launcher accepts must build a
     # request (the request builder repeats the ValidateSet), and the two
     # sets must be identical.

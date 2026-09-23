@@ -219,12 +219,16 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             return string.Equals(scenario, "live-advanced-inspect", StringComparison.Ordinal);
         }
 
-        // The advanced copy is inspected before anything casts on it: only
-        // the non-casting inspection and workspace scenarios may load it.
+        // The advanced copy is inspected before anything casts on it: the
+        // non-casting inspection, workspace and qualification-selection
+        // scenarios may load it; a casting qualification may load it only
+        // with its run-bound allowance (and the launcher first requires a
+        // passing inspection of the same bound pair).
         internal static bool IsAdvancedFamilyScenario(string scenario)
         {
             return IsInspectionScenario(scenario) ||
                 string.Equals(scenario, "live-workspace-qual", StringComparison.Ordinal) ||
+                string.Equals(scenario, "live-cast-qual-select", StringComparison.Ordinal) ||
                 IsManualWorkspaceScenario(scenario);
         }
 
@@ -363,11 +367,18 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             bool hasQualification = request.Parameters.ContainsKey("qualificationAllowance");
             if (hasQualification && !IsCastingQualificationScenario(request.Scenario))
                 throw new InvalidDataException("qualification-allowance-only-with-casting-qualification");
+            bool hasRecipe = request.Parameters.ContainsKey("qualificationRecipe");
+            if (hasRecipe && !IsQualificationScenario(request.Scenario))
+                throw new InvalidDataException("qualification-recipe-only-with-qualification");
             if (IsQualificationScenario(request.Scenario))
             {
                 if (hasQualification && !(request.Parameters["qualificationAllowance"] is string))
                     throw new InvalidDataException("qualification-allowance-type");
-                ValidateLiveSaveParameters(request, 9 + (hasQualification ? 1 : 0));
+                if (hasRecipe && !Execution.CastingQualificationRecipe.IsKnown(
+                        request.Parameters["qualificationRecipe"] as string))
+                    throw new InvalidDataException("qualification-recipe-unknown");
+                ValidateLiveSaveParameters(request, 9 + (hasQualification ? 1 : 0) + (hasRecipe ? 1 : 0),
+                    hasQualification);
                 if (!string.Equals(request.Parameters["executionMode"] as string, "instant",
                         StringComparison.Ordinal))
                     throw new InvalidDataException("qualification-execution-mode-instant-only");
@@ -430,8 +441,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         // The guarded live-save contract shared by every scenario that
         // stages the WORKING campaign (reviews I4): exact keys, required
         // names, real SHA-256 values, distinct files, and a valid mode.
+        // allowanceBound: the request carries a run-bound casting allowance,
+        // the only way a casting scenario may load the advanced copy.
         private static void ValidateLiveSaveParameters(
-            RuntimeTestRequest request, int expectedTotal)
+            RuntimeTestRequest request, int expectedTotal, bool allowanceBound = false)
         {
             string[] exact =
             {
@@ -459,7 +472,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             // Exactly one sealed family, never a mixed pair.
             if (!automation && !advanced)
                 throw new InvalidDataException("live-save-names");
-            if (advanced && !IsAdvancedFamilyScenario(request.Scenario))
+            if (advanced && !IsAdvancedFamilyScenario(request.Scenario) &&
+                !(allowanceBound && IsCastingQualificationScenario(request.Scenario)))
                 throw new InvalidDataException("live-save-family-scenario");
             if (string.Equals((string)request.Parameters["workingFileName"],
                 (string)request.Parameters["baselineFileName"], StringComparison.OrdinalIgnoreCase))

@@ -100,7 +100,7 @@ namespace KingmakerBuffPlanner.Execution
             { refusal = "allowance-artifact-identity"; return null; }
             if (string.IsNullOrEmpty(allowance.FixtureGameId))
             { refusal = "allowance-fixture-missing"; return null; }
-            if (allowance.Recipe != CastingQualificationRecipe.ZeroCostMixed)
+            if (!CastingQualificationRecipe.IsKnown(allowance.Recipe))
             { refusal = "allowance-recipe-unknown"; return null; }
             if (string.IsNullOrEmpty(allowance.ApprovedBy) || string.IsNullOrEmpty(allowance.Authority))
             { refusal = "allowance-approval-missing"; return null; }
@@ -117,8 +117,12 @@ namespace KingmakerBuffPlanner.Execution
     public sealed class CastingQualificationSelection
     {
         internal CastingQualificationSelection(string refusal, string sourceId, AbilityKey ability,
-            IList<PlannedCasting> castings, int candidatesConsidered, IList<string> rejections)
+            IList<PlannedCasting> castings, int candidatesConsidered, IList<string> rejections,
+            string recipe = CastingQualificationRecipe.ZeroCostMixed,
+            IEnumerable<string> coverage = null)
         {
+            Recipe = recipe ?? CastingQualificationRecipe.ZeroCostMixed;
+            Coverage = new ReadOnlyCollection<string>((coverage ?? new string[0]).ToList());
             Refusal = refusal ?? string.Empty;
             SourceId = sourceId;
             Ability = ability;
@@ -129,6 +133,10 @@ namespace KingmakerBuffPlanner.Execution
         }
 
         public bool Selected { get { return Castings.Count >= 2; } }
+        public string Recipe { get; private set; }
+        // What the selected castings exercise (for example "prepared",
+        // "spontaneous", "metamagic"); reported, never assumed.
+        public IReadOnlyList<string> Coverage { get; private set; }
         public string Refusal { get; private set; }
         public string SourceId { get; private set; }
         public AbilityKey Ability { get; private set; }
@@ -143,7 +151,22 @@ namespace KingmakerBuffPlanner.Execution
     public static class CastingQualificationRecipe
     {
         public const string ZeroCostMixed = "zero-cost-mixed";
+        public const string FiniteDirectMixed = "finite-direct-mixed";
         public const string RoutineId = "long";
+
+        public static bool IsKnown(string recipe)
+        {
+            return recipe == ZeroCostMixed || recipe == FiniteDirectMixed;
+        }
+
+        public static CastingQualificationSelection Select(string recipe,
+            CastingWorkspaceInputs inputs, string campaignId)
+        {
+            if (recipe == FiniteDirectMixed) return SelectFiniteDirectMixed(inputs, campaignId);
+            if (recipe == ZeroCostMixed) return SelectZeroCostMixed(inputs, campaignId);
+            return new CastingQualificationSelection("unknown-recipe:" + recipe, null, null,
+                null, 0, null, recipe);
+        }
         public const int MaximumRecordedRejections = 40;
         internal static readonly string[] CastingIds = { "qual-cast-1", "qual-cast-2", "qual-cast-3" };
 
@@ -257,6 +280,147 @@ namespace KingmakerBuffPlanner.Execution
             return new CastingQualificationSelection("no-eligible-qualification-recipe", null, null,
                 null, considered, rejections);
         }
+
+        // Finite spellbook resources: one plain buff source that two
+        // DIFFERENT casters each cast from their own finite pool (prepared
+        // exact slots or spontaneous levels), on two other party members
+        // without the effect. qual-cast-1 = caster A on target 1 (cast in
+        // the stop step and again in the recast step, so A needs two
+        // casts); qual-cast-2 = caster B on target 2 (cast once, in the
+        // complete step). A pair with one prepared and one spontaneous
+        // caster is preferred so one run covers both kinds.
+        public static CastingQualificationSelection SelectFiniteDirectMixed(
+            CastingWorkspaceInputs inputs, string campaignId)
+        {
+            if (inputs == null) throw new ArgumentNullException("inputs");
+            var rejections = new List<string>();
+            Action<string> reject = value =>
+            {
+                if (rejections.Count < MaximumRecordedRejections) rejections.Add(value);
+            };
+            var pools = inputs.Snapshot.ResourcePools.ToDictionary(
+                pool => pool.PoolKey, pool => pool, StringComparer.Ordinal);
+            var targetable = new HashSet<string>(inputs.Snapshot.Units
+                .Where(unit => unit.TargetValidation.Alive && unit.TargetValidation.Conscious &&
+                    unit.TargetValidation.Friendly && unit.TargetValidation.Targetable)
+                .Select(unit => unit.UnitId), StringComparer.Ordinal);
+            var eligible = new List<KeyValuePair<string, ProviderPlanningOption>>();
+            foreach (ProviderPlanningOption option in inputs.ProviderOptions
+                .Where(value => value != null && value.Provider != null)
+                .OrderBy(value => value.Provider.Key.Canonical, StringComparer.Ordinal))
+            {
+                ProviderSnapshot provider = option.Provider;
+                AbilityKey ability = provider.Key.Ability;
+                ResourcePoolSnapshot pool;
+                string sourceId = SingleCastProbeSelector.SourceIdFor(inputs.EffectsBySource, ability);
+                if (ability.SourceKind != SourceKind.Spellbook || !string.IsNullOrEmpty(ability.SpecialSourceId))
+                    reject(provider.Key.Canonical + "|not-plain-spellbook");
+                else if (option.ExecutionStrategy != CastExecutionStrategy.DirectRuleCast)
+                    reject(provider.Key.Canonical + "|strategy:" + option.ExecutionStrategy);
+                else if (!pools.TryGetValue(provider.ResourcePoolKey, out pool) ||
+                    (pool.Kind != ResourcePoolKind.PreparedSlots &&
+                     pool.Kind != ResourcePoolKind.SpontaneousLevel))
+                    reject(provider.Key.Canonical + "|not-finite-spellbook-pool");
+                else if (sourceId == null ||
+                    !ExplicitCastingStepConverter.IsPlainCurrentTargetBuff(
+                        inputs.EffectsBySource[sourceId], ability.BaseAbilityGuid))
+                    reject(provider.Key.Canonical + "|effect-shape");
+                else
+                    eligible.Add(new KeyValuePair<string, ProviderPlanningOption>(sourceId, option));
+            }
+            int considered = 0;
+            foreach (IGrouping<string, KeyValuePair<string, ProviderPlanningOption>> group in eligible
+                .GroupBy(pair => pair.Key, StringComparer.Ordinal)
+                .OrderBy(group => group.Key, StringComparer.Ordinal))
+            {
+                considered++;
+                string sourceId = group.Key;
+                EffectExpression expected = inputs.EffectsBySource[sourceId];
+                // Per caster: the option (canonical order) with the most
+                // casts available, up to two.
+                List<KeyValuePair<ProviderPlanningOption, int>> byCaster = group
+                    .Select(pair => pair.Value)
+                    .GroupBy(option => option.Provider.Key.CasterUnitId, StringComparer.Ordinal)
+                    .OrderBy(perCaster => perCaster.Key, StringComparer.Ordinal)
+                    .Select(perCaster => perCaster
+                        .Select(option => new KeyValuePair<ProviderPlanningOption, int>(
+                            option, CastsAvailable(inputs, option.Provider, 2)))
+                        .OrderByDescending(pair => pair.Value)
+                        .ThenBy(pair => pair.Key.Provider.Key.Canonical, StringComparer.Ordinal)
+                        .First())
+                    .ToList();
+                ProviderPlanningOption first = null;
+                ProviderPlanningOption second = null;
+                int bestScore = -1;
+                foreach (KeyValuePair<ProviderPlanningOption, int> a in byCaster.Where(value => value.Value >= 2))
+                    foreach (KeyValuePair<ProviderPlanningOption, int> other in byCaster.Where(value => value.Value >= 1))
+                    {
+                        if (a.Key.Provider.Key.CasterUnitId == other.Key.Provider.Key.CasterUnitId) continue;
+                        int score = pools[a.Key.Provider.ResourcePoolKey].Kind !=
+                            pools[other.Key.Provider.ResourcePoolKey].Kind ? 1 : 0;
+                        if (score <= bestScore) continue;
+                        bestScore = score;
+                        first = a.Key;
+                        second = other.Key;
+                    }
+                if (first == null) { reject(sourceId + "|no-caster-pair-with-casts:2+1"); continue; }
+                var casters = new HashSet<string>(new[]
+                    { first.Provider.Key.CasterUnitId, second.Provider.Key.CasterUnitId },
+                    StringComparer.Ordinal);
+                List<string> targets = inputs.Snapshot.Units.Select(unit => unit.UnitId)
+                    .Where(unit => targetable.Contains(unit) && !casters.Contains(unit) &&
+                        first.ReachableTargetIds.Contains(unit) &&
+                        second.ReachableTargetIds.Contains(unit) &&
+                        !EffectActive(inputs.LiveEffects, unit, expected))
+                    .OrderBy(unit => unit, StringComparer.Ordinal).Take(2).ToList();
+                if (targets.Count < 2) { reject(sourceId + "|fewer-than-two-fresh-targets"); continue; }
+                var castings = new List<PlannedCasting>();
+                for (int index = 0; index < 2; index++)
+                {
+                    ProviderPlanningOption option = index == 0 ? first : second;
+                    castings.Add(new PlannedCasting(CastingIds[index], RoutineId, index, sourceId,
+                        option.Provider.Key.Ability, option.Provider.Key.CasterUnitId,
+                        option.Provider.Key.SpellbookGuid, CastingTargetMode.DirectTarget,
+                        targets[index], null, null, null, null,
+                        ExistingEffectPolicy.SkipAlreadyActive, null, CastingAuthoringState.Ready, null));
+                }
+                CastingQualificationStepForecast check = CastingQualificationForecast.Project(
+                    "check", CastingQualificationForecast.BuildDocument(campaignId, castings),
+                    inputs, inputs.LiveEffects);
+                if (check.Refusal != null || check.CastingIds.Count != castings.Count)
+                {
+                    reject(sourceId + "|not-executable:" + (check.Refusal ?? "partial"));
+                    continue;
+                }
+                var coverage = new List<string>();
+                foreach (ProviderPlanningOption option in new[] { first, second })
+                {
+                    string kind = pools[option.Provider.ResourcePoolKey].Kind ==
+                        ResourcePoolKind.PreparedSlots ? "prepared" : "spontaneous";
+                    if (!coverage.Contains(kind)) coverage.Add(kind);
+                    if (option.Provider.Key.Ability.MetamagicMask != 0 && !coverage.Contains("metamagic"))
+                        coverage.Add("metamagic");
+                }
+                coverage.Add("mixed-caster");
+                return new CastingQualificationSelection(null, sourceId, first.Provider.Key.Ability,
+                    castings, considered, rejections, FiniteDirectMixed, coverage);
+            }
+            return new CastingQualificationSelection("no-eligible-qualification-recipe", null, null,
+                null, considered, rejections, FiniteDirectMixed);
+        }
+
+        // How many casts (up to the limit) this provider can reserve from
+        // the current pools, by the same ledger the compiler budgets with.
+        internal static int CastsAvailable(CastingWorkspaceInputs inputs, ProviderSnapshot provider,
+            int limit)
+        {
+            var ledger = new ResourceLedger(inputs.Snapshot.ResourcePools);
+            int casts = 0;
+            ResourceReservation reservation;
+            string reason;
+            while (casts < limit && ledger.TryReserve(provider, out reservation, out reason)) casts++;
+            return casts;
+        }
     }
 
     public sealed class CastingQualificationStepForecast
@@ -285,8 +449,11 @@ namespace KingmakerBuffPlanner.Execution
         public IReadOnlyList<string> CastingIds { get; private set; }
     }
 
-    // The exact projection each executing step of the zero-cost-mixed
-    // qualification will submit, forecast from the selection-time state:
+    // The exact projection each executing step of a qualification recipe
+    // (zero-cost-mixed, finite-direct-mixed) will submit, forecast from the
+    // selection-time state plus what the earlier steps grant (effects at
+    // the caster's level and metamagic) and spend (the exact reserved
+    // prepared tokens, spontaneous units; free pools never change):
     //   stop     - the fresh plan (every casting; the run is stopped after
     //              the first casting finishes),
     //   complete - qual-cast-1 already active (skipped), the rest execute,
@@ -309,25 +476,93 @@ namespace KingmakerBuffPlanner.Execution
             CastingPlanDocument document = BuildDocument(campaignId, selection.Castings);
             EffectExpression expected = inputs.EffectsBySource[selection.SourceId];
             PlannedCasting firstCasting = selection.Castings[0];
-            var casterLevels = inputs.Snapshot.Providers
-                .GroupBy(provider => provider.Key.CasterUnitId, StringComparer.Ordinal)
-                .ToDictionary(group => group.Key, group => group
-                    .Where(provider => provider.Key.Ability.Canonical == selection.Ability.Canonical)
-                    .Select(provider => provider.EffectiveCasterLevel).DefaultIfEmpty(0).Max(),
-                    StringComparer.Ordinal);
-            Func<PlannedCasting, KeyValuePair<string, int>> grant = casting =>
-                new KeyValuePair<string, int>(casting.DirectTargetUnitId,
-                    casterLevels.ContainsKey(casting.CasterUnitId) ? casterLevels[casting.CasterUnitId] : 0);
-            var steps = new List<CastingQualificationStepForecast>
+            // Each casting grants the effect at ITS provider's caster level
+            // and with ITS metamagic, as the real instance will carry them.
+            Func<PlannedCasting, EffectGrant> grant = casting =>
             {
-                Project(Stop, document, inputs, inputs.LiveEffects),
-                Project(Complete, document, inputs, WithGranted(inputs, expected,
-                    new[] { grant(firstCasting) })),
-                Project(Recast, WithPolicy(document, firstCasting.CastingId,
-                    ExistingEffectPolicy.Overwrite), inputs, WithGranted(inputs, expected,
-                    selection.Castings.Select(grant)))
+                ProviderSnapshot provider = inputs.Snapshot.Providers.FirstOrDefault(value =>
+                    value.Key.CasterUnitId == casting.CasterUnitId &&
+                    value.Key.Ability.Canonical == casting.Ability.Canonical);
+                return new EffectGrant(casting.DirectTargetUnitId,
+                    provider == null ? 0 : provider.EffectiveCasterLevel,
+                    casting.Ability.MetamagicMask);
             };
+            var steps = new List<CastingQualificationStepForecast>();
+            // stop: every casting planned; only the first executes.
+            CastingQualificationStepForecast stop = Project(Stop, document, inputs, inputs.LiveEffects);
+            steps.Add(stop);
+            var spent = new List<ResourceReservation>();
+            if (stop.Projection != null) spent.Add(stop.Projection.Plan.Steps[0].Reservation);
+            CastingWorkspaceInputs afterStop = WithSpent(inputs, spent);
+            // complete: the first is active (skipped); the rest execute.
+            CastingQualificationStepForecast complete = Project(Complete, document, afterStop,
+                WithGranted(afterStop, expected, new[] { grant(firstCasting) }));
+            steps.Add(complete);
+            if (complete.Projection != null)
+                spent.AddRange(complete.Projection.Plan.Steps.Select(step => step.Reservation));
+            CastingWorkspaceInputs afterComplete = WithSpent(inputs, spent);
+            // recast: everything active; the first, set to Always recast,
+            // executes again.
+            steps.Add(Project(Recast, WithPolicy(document, firstCasting.CastingId,
+                    ExistingEffectPolicy.Overwrite), afterComplete,
+                WithGranted(afterComplete, expected, selection.Castings.Select(grant))));
             return new ReadOnlyCollection<CastingQualificationStepForecast>(steps);
+        }
+
+        internal sealed class EffectGrant
+        {
+            internal EffectGrant(string unitId, int casterLevel, int metamagicMask)
+            {
+                UnitId = unitId;
+                CasterLevel = casterLevel;
+                MetamagicMask = metamagicMask;
+            }
+
+            internal string UnitId { get; private set; }
+            internal int CasterLevel { get; private set; }
+            internal int MetamagicMask { get; private set; }
+        }
+
+        // The inputs after the given reservations were spent: reserved
+        // prepared tokens (with their links) unavailable, numeric pools
+        // reduced by the reserved units; verified-free pools unchanged.
+        internal static CastingWorkspaceInputs WithSpent(CastingWorkspaceInputs inputs,
+            IEnumerable<ResourceReservation> spent)
+        {
+            var tokens = new HashSet<string>(StringComparer.Ordinal);
+            var units = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (ResourceReservation reservation in spent ?? new ResourceReservation[0])
+            {
+                if (reservation == null || reservation.Unlimited) continue;
+                foreach (string token in reservation.TokenIds) tokens.Add(token);
+                if (reservation.TokenIds.Count != 0) continue;
+                int prior;
+                units.TryGetValue(reservation.PoolKey, out prior);
+                units[reservation.PoolKey] = prior + reservation.Units;
+            }
+            if (tokens.Count == 0 && units.Count == 0) return inputs;
+            List<ResourcePoolSnapshot> pools = inputs.Snapshot.ResourcePools.Select(pool =>
+            {
+                if (pool.Kind == ResourcePoolKind.PreparedSlots)
+                {
+                    List<ResourceTokenSnapshot> updated = pool.Tokens.Select(token =>
+                        tokens.Contains(token.TokenId) && token.Available
+                            ? new ResourceTokenSnapshot(token.TokenId, token.SlottedAbility,
+                                token.SpellLevel, token.SlotKind, false, token.IsPrimary,
+                                token.LinkedTokenIds)
+                            : token).ToList();
+                    return new ResourcePoolSnapshot(pool.PoolKey, pool.Kind, pool.Capacity,
+                        updated.Count(token => token.Available), updated);
+                }
+                int used;
+                if (!units.TryGetValue(pool.PoolKey, out used) || used == 0) return pool;
+                return new ResourcePoolSnapshot(pool.PoolKey, pool.Kind, pool.Capacity,
+                    Math.Max(0, pool.Remaining - used), pool.Tokens);
+            }).ToList();
+            return new CastingWorkspaceInputs(new PartyProviderSnapshot(inputs.Snapshot.Units,
+                    inputs.Snapshot.Providers, pools), inputs.ProviderOptions,
+                inputs.EffectsBySource, inputs.Enhancements, inputs.TargetingModifiers,
+                inputs.LiveEffects);
         }
 
         // The document exactly as a fresh session holds it after the recipe
@@ -392,9 +627,10 @@ namespace KingmakerBuffPlanner.Execution
         }
 
         // The live effects plus the expected effect on each given unit, at
-        // the granting caster level, with no expiry (a fresh instance).
+        // the granting caster level and metamagic, with no expiry (a fresh
+        // instance).
         internal static ActiveEffectSnapshot WithGranted(CastingWorkspaceInputs inputs,
-            EffectExpression expected, IEnumerable<KeyValuePair<string, int>> grants)
+            EffectExpression expected, IEnumerable<EffectGrant> grants)
         {
             var byUnit = new Dictionary<string, List<ActiveEffectInstance>>(StringComparer.Ordinal);
             foreach (UnitSnapshot unit in inputs.Snapshot.Units)
@@ -405,13 +641,13 @@ namespace KingmakerBuffPlanner.Execution
                         : inputs.LiveEffects.GetEffects(unit.UnitId).Select(marker =>
                             new ActiveEffectInstance(marker.Kind, marker.EffectId, null, null, null)).ToList();
             List<EffectLeafExpression> leaves = Leaves(expected).ToList();
-            foreach (KeyValuePair<string, int> grant in grants)
+            foreach (EffectGrant grant in grants)
             {
                 List<ActiveEffectInstance> instances;
-                if (!byUnit.TryGetValue(grant.Key, out instances)) continue;
+                if (!byUnit.TryGetValue(grant.UnitId, out instances)) continue;
                 foreach (EffectLeafExpression leaf in leaves)
                     instances.Add(new ActiveEffectInstance(leaf.Kind, leaf.EffectId, null,
-                        grant.Value > 0 ? (int?)grant.Value : null, 0));
+                        grant.CasterLevel > 0 ? (int?)grant.CasterLevel : null, grant.MetamagicMask));
             }
             return ActiveEffectSnapshot.FromInstances(byUnit.ToDictionary(pair => pair.Key,
                 pair => (IEnumerable<ActiveEffectInstance>)pair.Value, StringComparer.Ordinal));

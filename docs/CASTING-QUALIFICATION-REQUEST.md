@@ -105,3 +105,57 @@ requires a fresh run id and an exclusively created authorization record
 per run. The tool permission classifier refused Claude's earlier write
 under `approvals\`. Until the owner allows that write, or writes the
 file, this run cannot start.
+
+## Recipe `finite-direct-mixed` (advanced copy)
+
+Status: **prepared, not run.** It needs an owner-designated
+`KBP_ADVANCED_SEED`, the guarded advanced bootstrap, a passing
+`live-advanced-inspect` of the same bound pair (the launcher refuses a
+casting run on the advanced copy without one), and a loadable
+compatibility profile for that party.
+
+It covers the mission section 8 items the automation party cannot:
+
+| Item | How |
+| --- | --- |
+| Finite prepared exact slot | A prepared caster casts twice; each cast must spend exactly the token its step reserved (the recast reserves the next one) |
+| Finite spontaneous | A spontaneous caster casts once; its level count must drop by one |
+| Mixed casters | `qual-cast-1` and `qual-cast-2` have different casters and pools; a prepared plus spontaneous pair is preferred |
+| Metamagic variant | Chosen when the party offers one (reported as coverage `metamagic`); the effect must carry the metamagic for the complete step to skip |
+| Cancellation, skip, repeat, recast, reopen | The same stop, complete, repeat and recast steps as `zero-cost-mixed` |
+
+### Contracts
+
+- **Selection.** One plain direct buff source that two different casters
+  cast by rule from finite spellbook pools (prepared slots or spontaneous
+  levels), caster A with at least two casts available and caster B with
+  at least one, on two other party members without the effect. The
+  selection reports what it covers and every rejected candidate.
+- **Projections.** stop: both castings (A executes, then the run is
+  stopped); complete: `qual-cast-2`; recast: `qual-cast-1` with the next
+  reserved slot. The forecast simulates exactly what each earlier step
+  spends, so the three ids are the ones the run will submit.
+- **Budget.** 3 native submissions.
+- **Resources, judged per step.** Each casting's native availability must
+  drop by exactly the confirmed casts from its pool (for prepared slots,
+  of the same spell) and never otherwise. A confirmed prepared casting must
+  turn exactly its reserved tokens from available to spent; no other
+  token may change. Any other observation ends the run at that step.
+- **Saves.** None: every save, WORKING included, must be unchanged and no
+  new save file may appear.
+
+### Procedure
+
+1. The owner designates `KBP_ADVANCED_SEED`; the guarded bootstrap seals
+   the advanced pair (`New-KbpAutomationFixture.ps1 -Family Advanced`).
+2. Non-casting inspection:
+   `Invoke-KingmakerRuntimeTest.ps1 -Scenario live-advanced-inspect -FixtureFamily Advanced -CompatibilityProfileId <profile> -RunId <fresh>`.
+3. Selection (non-casting):
+   `Invoke-KingmakerRuntimeTest.ps1 -Scenario live-cast-qual-select -FixtureFamily Advanced -QualificationRecipe finite-direct-mixed -CompatibilityProfileId <profile> -TimeoutSeconds 900 -RunId <fresh>`.
+   `qual-outcome.json` records the selection, its coverage and the three
+   forecast projection ids and contracts.
+4. The owner writes the allowance (schema 3, recipe `finite-direct-mixed`,
+   the three ids in order, `maximumNativeSubmissions` 3) under
+   `approvals\<runId>.json`.
+5. Casting run:
+   `Invoke-KingmakerRuntimeTest.ps1 -Scenario live-cast-qual -FixtureFamily Advanced -QualificationRecipe finite-direct-mixed -CompatibilityProfileId <profile> -TimeoutSeconds 900 -RunId <runId> -QualificationAllowancePath <file>`.

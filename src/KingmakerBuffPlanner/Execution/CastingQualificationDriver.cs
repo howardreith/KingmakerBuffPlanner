@@ -28,6 +28,10 @@ namespace KingmakerBuffPlanner.Execution
         public List<string> Transitions { get; } = new List<string>();
         // "<castingId>:<before>><after>" source availability per casting.
         public List<string> Availability { get; } = new List<string>();
+        // "<castingId>:<token>=<T|F>><T|F>|..." for the exact prepared
+        // tokens this step observes for the casting (absent for
+        // non-prepared reservations).
+        public List<string> Tokens { get; } = new List<string>();
         public List<string> Observations { get; } = new List<string>();
 
         internal string TransitionOf(string castingId)
@@ -151,15 +155,107 @@ namespace KingmakerBuffPlanner.Execution
             }
             else return "unknown-step";
             if (failure != null) return failure;
+            return ResourceFailure(step, castings);
+        }
+
+        // Resources of one step: each casting's native availability drops by
+        // exactly the confirmed casts from its finite pool (for prepared
+        // slots, of the same spell) and never for verified-free sources; a
+        // confirmed prepared casting spends exactly the tokens its step
+        // reserved, and nothing else changes any token.
+        private string ResourceFailure(CastingQualificationStepResult step,
+            IReadOnlyList<PlannedCasting> castings)
+        {
+            List<string> confirmed = step.Report.Entries
+                .Where(entry => entry.State == CastingOutcomeState.EffectConfirmed)
+                .Select(entry => entry.CastingId).ToList();
             foreach (string availability in step.Availability)
             {
                 string[] parts = availability.Split(new[] { ":" }, 2, StringSplitOptions.None);
                 string[] values = parts.Length == 2
                     ? parts[1].Split(new[] { ">" }, StringSplitOptions.None) : new string[0];
-                if (values.Length != 2 || values[0] != values[1] || values[0] == "unknown")
+                int before;
+                int after;
+                if (values.Length != 2 || !int.TryParse(values[0], out before) ||
+                    !int.TryParse(values[1], out after))
                     return "resource:" + availability;
+                int expectedSpend = ExpectedSpend(step.Name, parts[0], confirmed);
+                if (before - after != expectedSpend)
+                    return "resource:" + availability + ":expected-spend=" + expectedSpend;
+            }
+            foreach (string castingId in castings.Select(value => value.CastingId))
+            {
+                CastStep observed = ReservedStep(step.Name, castingId, true);
+                bool prepared = observed != null && observed.Reservation != null &&
+                    observed.Reservation.TokenIds.Count != 0;
+                string entry = step.Tokens.FirstOrDefault(value =>
+                    value.StartsWith(castingId + ":", StringComparison.Ordinal));
+                if (entry == null)
+                {
+                    if (prepared && step.Availability.Count != 0)
+                        return "tokens:" + castingId + ":unobserved";
+                    continue;
+                }
+                string body = entry.Substring(castingId.Length + 1);
+                bool spends = prepared && confirmed.Contains(castingId) &&
+                    ReservedStep(step.Name, castingId, false) != null;
+                var seen = new List<string>();
+                foreach (string token in body.Split(new[] { "|" }, StringSplitOptions.None))
+                {
+                    string[] pair = token.Split(new[] { "=" }, 2, StringSplitOptions.None);
+                    string[] states = pair.Length == 2
+                        ? pair[1].Split(new[] { ">" }, StringSplitOptions.None) : new string[0];
+                    bool ok = states.Length == 2 && (spends
+                        ? states[0] == "T" && states[1] == "F"
+                        : states[0] == states[1] && states[0] != "?");
+                    if (!ok) return "tokens:" + castingId + ":" + token;
+                    seen.Add(pair[0]);
+                }
+                if (prepared && !seen.OrderBy(value => value, StringComparer.Ordinal)
+                        .SequenceEqual(observed.Reservation.TokenIds, StringComparer.Ordinal))
+                    return "tokens:" + castingId + ":read-other-tokens";
             }
             return null;
+        }
+
+        // The CastStep through which a step observes a casting: its own
+        // forecast projection when the step executes it, else (with
+        // fallBack) the stop projection's.
+        private CastStep ReservedStep(string stepName, string castingId, bool fallBack)
+        {
+            if (Forecast == null) return null;
+            foreach (CastingQualificationStepForecast forecast in new[]
+                {
+                    Forecast.FirstOrDefault(value => value.Name == stepName),
+                    fallBack && Forecast.Count != 0 ? Forecast[0] : null
+                })
+            {
+                ExplicitStepConversion projection = forecast == null ? null : forecast.Projection;
+                if (projection == null) continue;
+                int index = projection.CastingIds.ToList().IndexOf(castingId);
+                if (index >= 0) return projection.Plan.Steps[index];
+            }
+            return null;
+        }
+
+        private int ExpectedSpend(string stepName, string castingId, IList<string> confirmed)
+        {
+            CastStep observed = ReservedStep(stepName, castingId, true);
+            if (observed == null || observed.Reservation == null || observed.Reservation.Unlimited)
+                return 0;
+            bool prepared = observed.Reservation.TokenIds.Count != 0;
+            int spend = 0;
+            foreach (string other in confirmed)
+            {
+                CastStep cast = ReservedStep(stepName, other, true);
+                if (cast == null || cast.Reservation == null || cast.Reservation.Unlimited ||
+                    cast.Reservation.PoolKey != observed.Reservation.PoolKey)
+                    continue;
+                if (prepared && cast.Provider.Ability.Canonical != observed.Provider.Ability.Canonical)
+                    continue;
+                spend++;
+            }
+            return spend;
         }
 
         private static string States(CastingQualificationStepResult step)
@@ -191,7 +287,9 @@ namespace KingmakerBuffPlanner.Execution
         private readonly Func<CastStep, string, ProbeObservation> _observe;
         private readonly Func<long> _clock;
         private readonly long _deadlineMillis;
+        private readonly string _requestedRecipe;
         private CastingQualificationBoundary _boundary;
+        private Dictionary<string, CastStep> _observeSteps;
         private CastingWorkspaceSession _session;
         private CastingQualificationStepResult _running;
         private Dictionary<string, ProbeObservation> _before;
@@ -203,8 +301,9 @@ namespace KingmakerBuffPlanner.Execution
             Func<CastingWorkspaceInputs> freshInputs,
             Func<ICastingDispatchBoundary, CastingWorkspaceSession> openSession,
             CastingExecutionHost host, Func<CastStep, string, ProbeObservation> observe,
-            Func<long> clock, long deadlineMillis)
+            Func<long> clock, long deadlineMillis, string recipe = null)
         {
+            _requestedRecipe = recipe;
             Record = record ?? throw new ArgumentNullException("record");
             _allowance = allowance;
             _campaignId = campaignId;
@@ -296,10 +395,30 @@ namespace KingmakerBuffPlanner.Execution
             }
         }
 
+        // The allowance names the recipe of a casting run; a selection-only
+        // run uses the requested one (zero-cost-mixed by default). A request
+        // that names a different recipe than its allowance is refused.
+        private string Recipe
+        {
+            get
+            {
+                if (_allowance != null) return _allowance.Recipe;
+                return string.IsNullOrEmpty(_requestedRecipe)
+                    ? CastingQualificationRecipe.ZeroCostMixed : _requestedRecipe;
+            }
+        }
+
         private void Select()
         {
+            if (_allowance != null && !string.IsNullOrEmpty(_requestedRecipe) &&
+                _requestedRecipe != _allowance.Recipe)
+            {
+                Record.AllowanceStatus = "recipe-differs-from-request";
+                Fail("allowance-recipe-differs:" + _allowance.Recipe + "/" + _requestedRecipe);
+                return;
+            }
             CastingWorkspaceInputs inputs = _freshInputs();
-            Record.Selection = CastingQualificationRecipe.SelectZeroCostMixed(inputs, _campaignId);
+            Record.Selection = CastingQualificationRecipe.Select(Recipe, inputs, _campaignId);
             if (!Record.Selection.Selected) { Fail("selection-refused:" + Record.Selection.Refusal); return; }
             Record.Forecast = CastingQualificationForecast.Forecast(Record.Selection, inputs, _campaignId);
             if (!Record.CastingScenario) { Finish("completed"); return; }
@@ -345,6 +464,7 @@ namespace KingmakerBuffPlanner.Execution
         {
             var step = new CastingQualificationStepResult(name);
             Record.Steps.Add(step);
+            _observeSteps = StepsToObserve(name);
             _before = ObserveAll(step, name + "-before");
             WorkspaceApplyResult result = _session.Apply(CastingApplyMode.Ordinary,
                 CastingQualificationRecipe.RoutineId, _freshInputs());
@@ -437,18 +557,38 @@ namespace KingmakerBuffPlanner.Execution
             _phase = "recast";
         }
 
+        // Every recipe casting, observed through THIS step's forecast
+        // projection when the step executes it (so exactly the tokens it
+        // reserves are read) and through the stop projection otherwise.
+        private Dictionary<string, CastStep> StepsToObserve(string name)
+        {
+            var steps = new Dictionary<string, CastStep>(StringComparer.Ordinal);
+            foreach (CastingQualificationStepForecast forecast in new[]
+                {
+                    Record.Forecast[0],
+                    Record.Forecast.FirstOrDefault(value => value.Name == name)
+                })
+            {
+                ExplicitStepConversion projection = forecast == null ? null : forecast.Projection;
+                if (projection == null) continue;
+                for (int index = 0; index < projection.Plan.Steps.Count; index++)
+                    steps[projection.CastingIds[index]] = projection.Plan.Steps[index];
+            }
+            return steps;
+        }
+
         // Fresh native reads of every recipe casting target and source.
         private Dictionary<string, ProbeObservation> ObserveAll(CastingQualificationStepResult step,
             string label)
         {
             var observations = new Dictionary<string, ProbeObservation>(StringComparer.Ordinal);
-            ExplicitStepConversion stop = Record.Forecast[0].Projection;
-            if (_observe == null || stop == null) return observations;
-            for (int index = 0; index < stop.Plan.Steps.Count; index++)
+            if (_observe == null || _observeSteps == null) return observations;
+            foreach (KeyValuePair<string, CastStep> pair in _observeSteps
+                .OrderBy(value => value.Key, StringComparer.Ordinal))
             {
-                string castingId = stop.CastingIds[index];
+                string castingId = pair.Key;
                 ProbeObservation observation;
-                try { observation = _observe(stop.Plan.Steps[index], label + ":" + castingId); }
+                try { observation = _observe(pair.Value, label + ":" + castingId); }
                 catch (Exception exception)
                 {
                     observation = ProbeObservation.Failed(label, 0, DateTime.UtcNow,
@@ -469,6 +609,8 @@ namespace KingmakerBuffPlanner.Execution
                 _before.TryGetValue(pair.Key, out before);
                 step.Transitions.Add(pair.Key + ":" + Transition(before, pair.Value));
                 step.Availability.Add(pair.Key + ":" + Available(before) + ">" + Available(pair.Value));
+                string tokens = TokenTransitions(before, pair.Value);
+                if (tokens != null) step.Tokens.Add(pair.Key + ":" + tokens);
             }
         }
 
@@ -489,6 +631,27 @@ namespace KingmakerBuffPlanner.Execution
             if (after.EffectInstances.Count == 0)
                 return prior.Count == 0 ? "absent" : "removed";
             return "unchanged";
+        }
+
+        // "<token>=<T|F>><T|F>|..." over the reserved tokens either read
+        // named; "unread" when only one side read them; null when neither
+        // did (a non-prepared reservation).
+        internal static string TokenTransitions(ProbeObservation before, ProbeObservation after)
+        {
+            IReadOnlyDictionary<string, bool> prior = before == null ? null : before.ReservedTokenAvailability;
+            IReadOnlyDictionary<string, bool> next = after == null ? null : after.ReservedTokenAvailability;
+            if (prior == null && next == null) return null;
+            if (prior == null || next == null) return "unread";
+            return string.Join("|", prior.Keys.Union(next.Keys, StringComparer.Ordinal)
+                .OrderBy(key => key, StringComparer.Ordinal)
+                .Select(key => key + "=" + TokenState(prior, key) + ">" + TokenState(next, key))
+                .ToArray());
+        }
+
+        private static string TokenState(IReadOnlyDictionary<string, bool> tokens, string key)
+        {
+            bool available;
+            return tokens.TryGetValue(key, out available) ? (available ? "T" : "F") : "?";
         }
 
         private static string Available(ProbeObservation observation)

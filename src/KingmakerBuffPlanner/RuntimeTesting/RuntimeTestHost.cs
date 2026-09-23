@@ -2649,6 +2649,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 string campaignId = Kingmaker.Game.Instance == null || Kingmaker.Game.Instance.Player == null
                     ? null : Kingmaker.Game.Instance.Player.GameId;
                 string modPath = _modEntry.Path;
+                object recipeRaw;
                 var clock = System.Diagnostics.Stopwatch.StartNew();
                 _qualificationHost = new CastingExecutionHost(
                     settings => BuffPlannerUiRoot.CreateCastingExecutorForRuntime(settings),
@@ -2659,7 +2660,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     _qualificationHost,
                     (step, label) => new KingmakerProbeObserver().Observe(step, label, _probeClock),
                     () => clock.ElapsedMilliseconds,
-                    RuntimeTestProtocol.QualificationRunDeadlineSeconds * 1000L);
+                    RuntimeTestProtocol.QualificationRunDeadlineSeconds * 1000L,
+                    _request.Parameters.TryGetValue("qualificationRecipe", out recipeRaw)
+                        ? recipeRaw as string : null);
                 _log.Info("[KBP-QUAL] driver built;casting=" + _qualificationRecord.CastingScenario +
                     ";allowance=" + _qualificationRecord.AllowanceStatus + ";workspaceClosed=" +
                     closed.Closed + ";campaign=" + campaignId + ".");
@@ -2701,6 +2704,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                             ";detail=" + entry.Detail)).ToArray()) },
                     { "transitions", new JArray(step.Transitions.Cast<object>().ToArray()) },
                     { "availability", new JArray(step.Availability.Cast<object>().ToArray()) },
+                    { "tokens", new JArray(step.Tokens.Cast<object>().ToArray()) },
+                    { "cleanupFailures", step.Report == null ? new JArray()
+                        : new JArray(step.Report.CleanupFailures.Cast<object>().ToArray()) },
                     { "observations", new JArray(step.Observations.Cast<object>().ToArray()) }
                 });
             }
@@ -2717,6 +2723,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     { "selection", selection == null ? null : new JObject
                         {
                             { "selected", selection.Selected },
+                            { "recipe", selection.Recipe },
+                            { "coverage", new JArray(selection.Coverage.Cast<object>().ToArray()) },
                             { "refusal", selection.Refusal },
                             { "sourceId", selection.SourceId },
                             { "castings", new JArray(selection.Castings.Select(casting => (object)(
