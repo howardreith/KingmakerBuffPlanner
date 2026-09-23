@@ -22,11 +22,13 @@ namespace KingmakerBuffPlanner.Planning
             string poolKey,
             int units,
             IEnumerable<string> tokenIds,
-            string itemGuid)
+            string itemGuid,
+            bool unlimited = false)
         {
             Category = category;
             PoolKey = poolKey ?? string.Empty;
             Units = units;
+            Unlimited = unlimited;
             TokenIds = new ReadOnlyCollection<string>((tokenIds ?? new string[0])
                 .OrderBy(value => value, StringComparer.Ordinal).ToList());
             ItemGuid = itemGuid ?? string.Empty;
@@ -37,6 +39,9 @@ namespace KingmakerBuffPlanner.Planning
         public int Units { get; private set; }
         public IReadOnlyList<string> TokenIds { get; private set; }
         public string ItemGuid { get; private set; }
+        // Review M1: a native line reserved from a verified Unlimited pool
+        // (zero units, no tokens). Only such a line proves a free cast.
+        public bool Unlimited { get; private set; }
     }
 
     // One authoritative per-pool budget line for a compiled plan. AvailableNow
@@ -49,8 +54,10 @@ namespace KingmakerBuffPlanner.Planning
             int? availableNow,
             int requestedUsage,
             int allocatedUsage,
-            IEnumerable<string> traces)
+            IEnumerable<string> traces,
+            bool unlimited = false)
         {
+            Unlimited = unlimited;
             PoolKey = poolKey;
             Category = category;
             AvailableNow = availableNow;
@@ -72,6 +79,9 @@ namespace KingmakerBuffPlanner.Planning
         public int UnmetDemand { get; private set; }
         public int? ForecastRemaining { get; private set; }
         public IReadOnlyList<string> Traces { get; private set; }
+        // A verified Unlimited native pool: no balance to forecast (null),
+        // which here means "not limited", never "unknown".
+        public bool Unlimited { get; private set; }
     }
 
     internal sealed class CastingDemand
@@ -171,12 +181,16 @@ namespace KingmakerBuffPlanner.Planning
         {
             var demands = new List<CastingDemand>();
             ResourcePoolKind kind;
-            if (provider != null &&
-                (!_nativeKinds.TryGetValue(provider.ResourcePoolKey, out kind) ||
-                 kind != ResourcePoolKind.Unlimited))
+            // Review M1: a KNOWN Unlimited pool is still one native demand
+            // (zero units), reserved through the ledger so the verified free
+            // cost reaches the resolved casting. Any other or unknown pool
+            // keeps a paid demand of at least one unit.
+            if (provider != null)
                 demands.Add(new CastingDemand(
                     CastingCostCategory.NativePool, provider.ResourcePoolKey,
-                    Math.Max(1, provider.UnitsPerCast), string.Empty));
+                    _nativeKinds.TryGetValue(provider.ResourcePoolKey, out kind) &&
+                        kind == ResourcePoolKind.Unlimited
+                        ? 0 : Math.Max(1, provider.UnitsPerCast), string.Empty));
             var poolUnits = new Dictionary<string, int>(StringComparer.Ordinal);
             foreach (IGrouping<string, CastEnhancementSnapshot> group in
                 (selectedEnhancements ?? new CastEnhancementSnapshot[0])
@@ -282,7 +296,7 @@ namespace KingmakerBuffPlanner.Planning
                 }
                 lines.Add(new CastingCostLine(
                     demand.Category, demand.PoolKey, reservation.Units,
-                    reservation.TokenIds, null));
+                    reservation.TokenIds, null, reservation.Unlimited));
                 Record(demand.PoolKey, demand.Category, castingId, demand.Units,
                     reservation.Units);
             }
@@ -334,8 +348,12 @@ namespace KingmakerBuffPlanner.Planning
                 int allocated;
                 _allocatedUnits.TryGetValue(pair.Key, out allocated);
                 int? available = null;
+                ResourcePoolKind nativeKind;
+                bool unlimited = pair.Value == CastingCostCategory.NativePool &&
+                    _nativeKinds.TryGetValue(pair.Key, out nativeKind) &&
+                    nativeKind == ResourcePoolKind.Unlimited;
                 if (pair.Value == CastingCostCategory.NativePool &&
-                    _nativeInitial.ContainsKey(pair.Key))
+                    _nativeInitial.ContainsKey(pair.Key) && !unlimited)
                     available = _nativeInitial[pair.Key];
                 else if (pair.Value == CastingCostCategory.EnhancementPool &&
                     _enhancementInitial.ContainsKey(pair.Key))
@@ -348,7 +366,7 @@ namespace KingmakerBuffPlanner.Planning
                 IEnumerable<string> traceList = traces;
                 lines.Add(new CastingBudgetLine(
                     pair.Key, pair.Value, available, requested, allocated,
-                    traceList ?? new string[0]));
+                    traceList ?? new string[0], unlimited));
             }
             return lines.OrderBy(line => line.PoolKey, StringComparer.Ordinal)
                 .ToList();

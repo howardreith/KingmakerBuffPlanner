@@ -42,6 +42,13 @@ namespace KingmakerBuffPlanner.Execution
                     report.Add(index, step, CastExecutionStatus.FailedValidation, "combat-policy");
                     continue;
                 }
+                if (step.Reservation == null || !step.Reservation.CostKnown)
+                {
+                    // Review M1: an unknown cost is never treated as free.
+                    report.Add(index, step, CastExecutionStatus.FailedValidation,
+                        "reservation-cost-unknown");
+                    continue;
+                }
                 CastEnhancementPreparation enhancement = Prepare(step);
                 if (!enhancement.Valid)
                 {
@@ -136,6 +143,11 @@ namespace KingmakerBuffPlanner.Execution
                                 report.Add(index, step,
                                     CastExecutionStatus.ResourceSpent,
                                     "native-command-spend-completed");
+                            if (operation.ResourceSpent && step.Reservation.Unlimited)
+                                report.Add(index, step,
+                                    CastExecutionStatus.FailedExecution,
+                                    "unexpected-resource-spent-on-unlimited-source;" +
+                                    operation.Detail);
                         }
                         catch (Exception exception)
                         { operationFailure = exception; }

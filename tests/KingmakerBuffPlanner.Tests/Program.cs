@@ -399,6 +399,7 @@ namespace KingmakerBuffPlanner.Tests
                     () => TestCastingImportPreservesUnresolvedIntent(root));
                 Run("import-requirements-stay-enforced",
                     () => TestImportRequirementsStayEnforced(root));
+                Run("zero-cost-native-source-integration", TestZeroCostNativeSourceIntegration);
                 Run("projection-identity-is-complete", TestProjectionIdentityIsComplete);
                 Run("probe-scope-enforces-whole-subset", TestProbeScopeEnforcesWholeSubset);
                 Run("rollback-candidate-format-members-match-model",
@@ -3470,8 +3471,11 @@ namespace KingmakerBuffPlanner.Tests
         private static void TestAnimatedExecutor()
         {
             AbilityKey ability = Ability("animated", string.Empty, 0);
-            var pool = new ResourcePoolSnapshot("animated-free", ResourcePoolKind.Unlimited, 0, 0, null);
-            ProviderSnapshot provider = PlannerProvider("unit-a", "book-a", ability, "animated-free", 0);
+            // Review M1: this runtime reports a resource spend, so the fixture
+            // uses a finite pool; a spend on a verified Unlimited pool is now
+            // (correctly) an execution failure.
+            var pool = new ResourcePoolSnapshot("animated-free", ResourcePoolKind.SpontaneousLevel, 50, 50, null);
+            ProviderSnapshot provider = PlannerProvider("unit-a", "book-a", ability, "animated-free", 1);
             PartyProviderSnapshot snapshot = PlannerSnapshot(new[] { provider }, new[] { pool }, "unit-a", "unit-b");
             var option = new ProviderPlanningOption(provider, new[] { "unit-a", "unit-b" },
                 new[] { "unit-a" }, 1, 1);
@@ -3709,8 +3713,11 @@ namespace KingmakerBuffPlanner.Tests
         private static void TestInstantExecutor()
         {
             AbilityKey ability = Ability("instant", string.Empty, 0);
-            var pool = new ResourcePoolSnapshot("instant-free", ResourcePoolKind.Unlimited, 0, 0, null);
-            ProviderSnapshot provider = PlannerProvider("unit-0", "book-i", ability, "instant-free", 0);
+            // Review M1: this runtime reports a resource spend, so the fixture
+            // uses a finite pool; a spend on a verified Unlimited pool is now
+            // (correctly) an execution failure.
+            var pool = new ResourcePoolSnapshot("instant-free", ResourcePoolKind.SpontaneousLevel, 50, 50, null);
+            ProviderSnapshot provider = PlannerProvider("unit-0", "book-i", ability, "instant-free", 1);
             string[] units = Enumerable.Range(0, 9).Select(i => "unit-" + i).ToArray();
             PartyProviderSnapshot snapshot = PlannerSnapshot(new[] { provider }, new[] { pool }, units);
             var option = new ProviderPlanningOption(provider, units, new[] { "unit-0" }, 1, 1);
@@ -3730,8 +3737,11 @@ namespace KingmakerBuffPlanner.Tests
         private static void TestHybridExecutor()
         {
             AbilityKey ability = Ability("hybrid", string.Empty, 0);
-            var pool = new ResourcePoolSnapshot("hybrid-free", ResourcePoolKind.Unlimited, 0, 0, null);
-            ProviderSnapshot provider = PlannerProvider("unit-a", "book-a", ability, "hybrid-free", 0);
+            // Review M1: this runtime reports a resource spend, so the fixture
+            // uses a finite pool; a spend on a verified Unlimited pool is now
+            // (correctly) an execution failure.
+            var pool = new ResourcePoolSnapshot("hybrid-free", ResourcePoolKind.SpontaneousLevel, 50, 50, null);
+            ProviderSnapshot provider = PlannerProvider("unit-a", "book-a", ability, "hybrid-free", 1);
             PartyProviderSnapshot snapshot = PlannerSnapshot(new[] { provider }, new[] { pool },
                 "unit-a", "unit-b");
             var option = new ProviderPlanningOption(provider, new[] { "unit-a", "unit-b" },
@@ -4395,7 +4405,7 @@ namespace KingmakerBuffPlanner.Tests
 
         private static void TestStickyTouchFailureCleanup()
         {
-            CastPlan plan = CreateStickyPlan(ResourcePoolKind.Unlimited, 2,
+            CastPlan plan = CreateStickyPlan(ResourcePoolKind.SpontaneousLevel, 2,
                 CastExecutionStrategy.StickyTouchDeliveryRuleCast);
             var cleaned = new CleanupInstantRuntime(false);
             var report = new ExecutionReport(plan);
@@ -4423,7 +4433,7 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException(
                     "An uncleared delivery state allowed the next conflicting transaction.");
             uncleared.RecoverExternalState();
-            CastPlan later = CreateStickyPlan(ResourcePoolKind.Unlimited, 1,
+            CastPlan later = CreateStickyPlan(ResourcePoolKind.SpontaneousLevel, 1,
                 CastExecutionStrategy.StickyTouchDeliveryRuleCast);
             var laterReport = new ExecutionReport(later);
             Drain(new HybridCastExecutor(uncleared,
@@ -8691,8 +8701,10 @@ namespace KingmakerBuffPlanner.Tests
                 if (Failing(step, "rejected"))
                     return new InstantCastResult(false, false, false, false, "fixture-rejected");
                 return new InstantCastResult(true, true, !Unconfirmed(step),
-                    true, "fixture");
+                    !Free(step), "fixture");
             }
+            // "free" (every step) reports a genuine zero-cost cast: no spend.
+            private bool Free(CastStep step) { return _mode == "free"; }
             private bool Pending(CastStep step)
             {
                 return Failing(step, "pending") || Failing(step, "pending-cleanup-throws");
@@ -8738,7 +8750,8 @@ namespace KingmakerBuffPlanner.Tests
             public bool TimedOut { get { return _timedOut; } }
             public bool Succeeded { get { return _succeeded; } }
             public bool EffectsObserved { get { return _succeeded && !_timedOut; } }
-            public bool ResourceSpent { get { return _succeeded; } }
+            internal bool Free;
+            public bool ResourceSpent { get { return _succeeded && !Free; } }
             public bool HasResidualDeliveryState { get { return false; } }
             public string Detail { get { return "fixture-operation"; } }
             public void Dispose()
@@ -8785,7 +8798,7 @@ namespace KingmakerBuffPlanner.Tests
                     Failing(step, "timeout"),
                     Failing(step, "pending") || Failing(step, "pending-dispose-throws"),
                     Failing(step, "pending-dispose-throws"),
-                    () => DisposedOperations.Add(id));
+                    () => DisposedOperations.Add(id)) { Free = _mode == "free" };
             }
         }
 
@@ -14719,6 +14732,217 @@ namespace KingmakerBuffPlanner.Tests
                     ran.ReviewReason);
         }
 
+        // Review M1: a VERIFIED Unlimited native pool (cantrips/at-will) is
+        // one real zero-unit reservation carried through the resolved
+        // casting, budget, projection identity, executors and probe scope.
+        // Unknown or stripped costs stay refused; a free cast that consumes
+        // a paid resource fails; extra feature costs still count.
+        private static PartyProviderSnapshot ZeroCostParty(string poolKind,
+            out List<ProviderPlanningOption> options, out List<CastEnhancementSnapshot> enhancements)
+        {
+            ResourcePoolSnapshot pool = poolKind == "unlimited"
+                ? new ResourcePoolSnapshot("cantrips-cleric", ResourcePoolKind.Unlimited, 0, 0, null)
+                : poolKind == "prepared-linked"
+                    ? new ResourcePoolSnapshot("cantrips-cleric", ResourcePoolKind.PreparedSlots, 2, 2,
+                        new[]
+                        {
+                            new ResourceTokenSnapshot("t1", CastingBuffAbility, 1, PreparedSlotKind.Common,
+                                true, true, new[] { "t2" }),
+                            new ResourceTokenSnapshot("t2", CastingBuffAbility, 1, PreparedSlotKind.Common,
+                                true, false, new string[0])
+                        })
+                    : new ResourcePoolSnapshot("cantrips-cleric", ResourcePoolKind.SpontaneousLevel, 3, 3, null);
+            var provider = new ProviderSnapshot(
+                new ProviderKey("unit-cleric", "book-cleric", CastingBuffAbility, "level-0"),
+                CastingBuffAbility.BaseAbilityGuid, 0, "cantrips-cleric",
+                poolKind == "unlimited" ? 0 : 1,
+                poolKind == "prepared-linked" ? new[] { "t1" } : null);
+            options = new List<ProviderPlanningOption>
+            {
+                new ProviderPlanningOption(provider, new[] { "unit-cleric", "unit-t1" },
+                    new[] { "unit-cleric" }, 10, 100)
+            };
+            enhancements = new List<CastEnhancementSnapshot>
+            {
+                new CastEnhancementSnapshot("rod-extend", "unit-cleric", "rod-guid", "Rod",
+                    string.Empty, CastEnhancementCategory.MetamagicRod, 0x1, 10, 3,
+                    new string[0], null, null, "rod-pool")
+            };
+            return new PartyProviderSnapshot(new[]
+                {
+                    new UnitSnapshot("unit-cleric", "Cleric", false, string.Empty,
+                        new TargetValidationSnapshot(true, true, true, true)),
+                    new UnitSnapshot("unit-t1", "T1", false, string.Empty,
+                        new TargetValidationSnapshot(true, true, true, true))
+                },
+                new[] { provider }, new[] { pool });
+        }
+
+        private static void TestZeroCostNativeSourceIntegration()
+        {
+            var effects = CastingEffects("source-bulls", "source-communal");
+            var gate = new CastingExecutionGate();
+            Func<string, IEnumerable<AuthoredEnhancementSelection>, ExplicitCastingPlan> compile = (kind, enh) =>
+            {
+                List<ProviderPlanningOption> options;
+                List<CastEnhancementSnapshot> enhancements;
+                PartyProviderSnapshot party = ZeroCostParty(kind, out options, out enhancements);
+                return new ExplicitCastingCompiler().Compile(CastingDocument(DirectCasting(
+                        "cast-free", "long", "unit-cleric", "unit-t1", "source-bulls",
+                        CastingBuffAbility, enh)),
+                    party, options, effects, enhancements);
+            };
+            Func<string, List<ProviderPlanningOption>> optionsFor = kind =>
+            {
+                List<ProviderPlanningOption> options;
+                List<CastEnhancementSnapshot> enhancements;
+                ZeroCostParty(kind, out options, out enhancements);
+                return options;
+            };
+
+            // Known Unlimited: one native line, zero units, no tokens, verified.
+            ExplicitCastingPlan free = compile("unlimited", null);
+            ResolvedCasting freeCasting = free.CastingById("cast-free");
+            CastingCostLine freeNative = freeCasting.Cost.SingleOrDefault(
+                line => line.Category == CastingCostCategory.NativePool);
+            if (!freeCasting.IsExecutable || freeNative == null || freeNative.Units != 0 ||
+                freeNative.TokenIds.Count != 0 || !freeNative.Unlimited)
+                throw new InvalidOperationException("A verified Unlimited casting was not carried as a free native reservation.");
+            CastingBudgetLine freeBudget = free.BudgetLineFor("cantrips-cleric");
+            if (freeBudget == null || !freeBudget.Unlimited || freeBudget.AvailableNow != null ||
+                freeBudget.ForecastRemaining != null || freeBudget.AllocatedUsage != 0)
+                throw new InvalidOperationException("The Unlimited budget line reported a balance.");
+            if (!new WorkspaceBudgetRow(freeBudget).Describe().Contains("unlimited"))
+                throw new InvalidOperationException("The workspace budget row hid the unlimited pool.");
+            CastingApplyDecision freeDecision = gate.Evaluate(free, CastingApplyMode.Ordinary, "long");
+            foreach (ExplicitProjectionScope scope in new[] { ExplicitProjectionScope.Standard,
+                ExplicitProjectionScope.SingleCastProbe })
+            {
+                ExplicitStepConversion converted = ExplicitCastingStepConverter.Convert(free,
+                    freeDecision, optionsFor("unlimited"), effects, scope);
+                if (!converted.Converted || !converted.Plan.Steps[0].Reservation.Unlimited ||
+                    converted.Plan.Steps[0].Reservation.Units != 0 ||
+                    !converted.CanonicalContract.Contains("\"unlimited\":true"))
+                    throw new InvalidOperationException("The free casting did not convert in " + scope +
+                        ": " + converted.Refusal);
+            }
+
+            // Finite pool: paid reservation, not flagged; identities differ.
+            ExplicitCastingPlan paid = compile("finite", null);
+            CastingCostLine paidNative = paid.CastingById("cast-free").Cost.Single(
+                line => line.Category == CastingCostCategory.NativePool);
+            if (paidNative.Unlimited || paidNative.Units != 1 || paid.BudgetLineFor("cantrips-cleric").Unlimited ||
+                paid.BudgetLineFor("cantrips-cleric").AvailableNow != 3)
+                throw new InvalidOperationException("A finite pool was treated as free.");
+            ExplicitStepConversion paidProjection = ExplicitCastingStepConverter.Convert(paid,
+                gate.Evaluate(paid, CastingApplyMode.Ordinary, "long"), optionsFor("finite"), effects);
+            ExplicitStepConversion freeProjection = ExplicitCastingStepConverter.Convert(free,
+                freeDecision, optionsFor("unlimited"), effects);
+            if (!paidProjection.Converted || paidProjection.ProjectionId == freeProjection.ProjectionId)
+                throw new InvalidOperationException("Free and paid projections share an identity.");
+
+            // Linked prepared tokens are unaffected.
+            ExplicitCastingPlan linked = compile("prepared-linked", null);
+            CastingCostLine linkedNative = linked.CastingById("cast-free").Cost.Single(
+                line => line.Category == CastingCostCategory.NativePool);
+            if (linkedNative.Unlimited || linkedNative.Units != 2 ||
+                !linkedNative.TokenIds.SequenceEqual(new[] { "t1", "t2" }))
+                throw new InvalidOperationException("Linked prepared tokens regressed.");
+
+            // Stripped / missing costs are unknown, never free.
+            var stripped = new Dictionary<string, IReadOnlyList<CastingCostLine>>
+            {
+                { "unflagged-zero", new[] { new CastingCostLine(CastingCostCategory.NativePool,
+                    "cantrips-cleric", 0, null, null) } },
+                { "no-native-line", new CastingCostLine[0] },
+                { "flagged-nonzero", new[] { new CastingCostLine(CastingCostCategory.NativePool,
+                    "cantrips-cleric", 1, null, null, true) } }
+            };
+            foreach (KeyValuePair<string, IReadOnlyList<CastingCostLine>> item in stripped)
+            {
+                ResolvedCasting tampered = freeCasting.WithBudgetResult(ResolvedCastingReadiness.Ready,
+                    freeCasting.ReadinessReasons, item.Value);
+                ExplicitCastingPlan tamperedPlan = new ExplicitCastingPlan(new[] { tampered }, new string[0]);
+                ExplicitStepConversion refused = ExplicitCastingStepConverter.Convert(tamperedPlan,
+                    gate.Evaluate(tamperedPlan, CastingApplyMode.Ordinary, "long"), optionsFor("unlimited"), effects);
+                if (refused.Converted)
+                    throw new InvalidOperationException("A " + item.Key + " cost converted as executable.");
+            }
+            // A provider whose pool is absent from the snapshot never compiles Ready.
+            {
+                List<ProviderPlanningOption> options;
+                List<CastEnhancementSnapshot> enhancements;
+                PartyProviderSnapshot party = ZeroCostParty("unlimited", out options, out enhancements);
+                // The snapshot boundary itself refuses a provider without its pool.
+                bool executable;
+                try
+                {
+                    var noPool = new PartyProviderSnapshot(party.Units, party.Providers, new ResourcePoolSnapshot[0]);
+                    executable = new ExplicitCastingCompiler().Compile(CastingDocument(DirectCasting(
+                            "cast-free", "long", "unit-cleric", "unit-t1", "source-bulls", CastingBuffAbility)),
+                        noPool, options, effects, enhancements).CastingById("cast-free").IsExecutable;
+                }
+                catch (Exception exception) when (exception.Message.Contains("pool is absent")) { executable = false; }
+                if (executable)
+                    throw new InvalidOperationException("A missing pool was treated as free.");
+            }
+
+            // Zero native cost plus a paid feature: the feature still counts
+            // in Standard; the probe still refuses it.
+            ExplicitCastingPlan withRod = compile("unlimited", new[] {
+                new AuthoredEnhancementSelection("rod-extend", true, null) });
+            ResolvedCasting rodCasting = withRod.CastingById("cast-free");
+            if (!rodCasting.IsExecutable || !rodCasting.Cost.Any(line =>
+                    line.Category == CastingCostCategory.EnhancementPool && line.Units == 1) ||
+                withRod.BudgetLineFor("rod-pool").AllocatedUsage != 1)
+                throw new InvalidOperationException("A feature cost on a free cast was not counted.");
+            CastingApplyDecision rodDecision = gate.Evaluate(withRod, CastingApplyMode.Ordinary, "long");
+            if (!ExplicitCastingStepConverter.Convert(withRod, rodDecision, optionsFor("unlimited"), effects).Converted ||
+                ExplicitCastingStepConverter.Convert(withRod, rodDecision, optionsFor("unlimited"), effects,
+                    ExplicitProjectionScope.SingleCastProbe).Converted)
+                throw new InvalidOperationException("Standard/probe handling of a free cast with a rod is wrong.");
+
+            // Both REAL executors over recording runtimes (not gameplay).
+            CastPlan freePlan = freeProjection.Plan;
+            var instantFree = new ScriptedInstantRuntime("none", "free");
+            var instantReport = new ExecutionReport(freePlan);
+            Drain(new InstantCastExecutor(instantFree, true).Execute(freePlan, instantReport));
+            if (instantReport.Confirmed != 1 || instantReport.Failed != 0 || instantFree.Fired.Count != 1)
+                throw new InvalidOperationException("A genuine free instant cast was not confirmed.");
+            var instantSpends = new ScriptedInstantRuntime("none", "none");
+            var spendReport = new ExecutionReport(freePlan);
+            Drain(new InstantCastExecutor(instantSpends, true).Execute(freePlan, spendReport));
+            if (!spendReport.Records.Any(record => record.Status == CastExecutionStatus.FailedExecution &&
+                    record.Detail.StartsWith("unexpected-resource-spent-on-unlimited-source", StringComparison.Ordinal)))
+                throw new InvalidOperationException("An instant spend on a free source was not a failure.");
+            var animatedFree = new ScriptedAnimatedRuntime("none", "free");
+            var animatedReport = new ExecutionReport(freePlan);
+            Drain(new AnimatedCastExecutor(animatedFree, true).Execute(freePlan, animatedReport));
+            if (animatedReport.Confirmed != 1 || animatedReport.Failed != 0)
+                throw new InvalidOperationException("A genuine free animated cast was not confirmed.");
+            var animatedSpends = new ScriptedAnimatedRuntime("none", "none");
+            var animatedSpendReport = new ExecutionReport(freePlan);
+            Drain(new AnimatedCastExecutor(animatedSpends, true).Execute(freePlan, animatedSpendReport));
+            if (!animatedSpendReport.Records.Any(record => record.Status == CastExecutionStatus.FailedExecution &&
+                    record.Detail.StartsWith("unexpected-resource-spent-on-unlimited-source", StringComparison.Ordinal)))
+                throw new InvalidOperationException("An animated spend on a free source was not a failure.");
+            // A step with an unverified zero reservation never reaches either runtime.
+            CastStep unverified = CloneStep(freePlan.Steps[0], reservation: new ResourceReservation(
+                "cantrips-cleric", 0, new string[0]));
+            var unverifiedPlan = new CastPlan(new[] { unverified }, new TargetPlanOutcome[0], new string[0]);
+            var instantNever = new ScriptedInstantRuntime("none", "free");
+            var neverReport = new ExecutionReport(unverifiedPlan);
+            Drain(new InstantCastExecutor(instantNever, true).Execute(unverifiedPlan, neverReport));
+            var animatedNever = new ScriptedAnimatedRuntime("none", "free");
+            var animatedNeverReport = new ExecutionReport(unverifiedPlan);
+            Drain(new AnimatedCastExecutor(animatedNever, true).Execute(unverifiedPlan, animatedNeverReport));
+            if (instantNever.Validated.Count != 0 || instantNever.Fired.Count != 0 ||
+                animatedNever.Started.Count != 0 ||
+                !neverReport.Records.Any(record => record.Detail == "reservation-cost-unknown") ||
+                !animatedNeverReport.Records.Any(record => record.Detail == "reservation-cost-unknown"))
+                throw new InvalidOperationException("An unverified zero-cost step reached a runtime.");
+        }
+
         // Review L3: the projection id covers every executable/observed
         // field. Otherwise-identical copies of a REAL projection step that
         // differ in exactly one field get different ids; set-like
@@ -14762,7 +14986,7 @@ namespace KingmakerBuffPlanner.Tests
                 options, effects);
             if (!projection.Converted || projection.Plan.Steps.Count != 2)
                 throw new InvalidOperationException("L3 fixture did not convert: " + projection.Refusal);
-            if (!projection.CanonicalContract.Contains("\"identityVersion\":2") ||
+            if (!projection.CanonicalContract.Contains("\"identityVersion\":3") ||
                 projection.ProjectionId.Length != 64)
                 throw new InvalidOperationException("The identity is not versioned.");
             CastStep a = projection.Plan.Steps[0];

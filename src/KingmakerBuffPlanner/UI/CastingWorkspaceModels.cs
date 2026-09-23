@@ -184,6 +184,25 @@ namespace KingmakerBuffPlanner.UI
             UnmetDemand = line.UnmetDemand;
             ForecastRemaining = line.ForecastRemaining;
             ResponsibleCastingIds = line.Traces;
+            Unlimited = line.Unlimited;
+        }
+
+        // Verified Unlimited native pool (e.g. cantrips): shown as
+        // "unlimited", never as an unknown or zero balance.
+        public bool Unlimited { get; private set; }
+
+        // Footer text for this row, or null when it has nothing to show.
+        public string Describe()
+        {
+            if (Unlimited)
+                return ResponsibleCastingIds.Count == 0 ? null
+                    : PoolKey + " unlimited (" + ResponsibleCastingIds.Count + " cast" +
+                        (ResponsibleCastingIds.Count == 1 ? "" : "s") + ", no slot spent)";
+            if (UnmetDemand == 0 && RequestedUsage == 0) return null;
+            return PoolKey + " " + AllocatedUsage + "/" + RequestedUsage +
+                (UnmetDemand == 0 ? string.Empty
+                    : " (unmet " + UnmetDemand + " — " +
+                        string.Join(",", ResponsibleCastingIds.ToArray()) + ")");
         }
 
         public string PoolKey { get; private set; }

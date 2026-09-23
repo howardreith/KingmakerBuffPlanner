@@ -36,6 +36,11 @@ namespace KingmakerBuffPlanner.Execution
                         "prior-instant-transaction-unsettled");
                 else if (_outOfCombatOnly && _runtime.IsInCombat)
                     report.Add(index, step, CastExecutionStatus.FailedValidation, "combat-policy");
+                else if (step.Reservation == null || !step.Reservation.CostKnown)
+                    // Review M1: an unknown cost (missing reservation or an
+                    // unverified zero) is never treated as free.
+                    report.Add(index, step, CastExecutionStatus.FailedValidation,
+                        "reservation-cost-unknown");
                 else
                 {
                     CastEnhancementPreparation enhancement = Prepare(step);
@@ -187,6 +192,13 @@ namespace KingmakerBuffPlanner.Execution
                                                 ? "expected-effects-observed;"
                                                 : "expected-effects-absent-after-confirmation-window;") +
                                             terminalDetail);
+                                    if (result.ResourceSpent && step.Reservation.Unlimited)
+                                        // Review M1: a verified free source must
+                                        // not consume a paid resource.
+                                        report.Add(index, step,
+                                            CastExecutionStatus.FailedExecution,
+                                            "unexpected-resource-spent-on-unlimited-source;" +
+                                            result.Detail);
                                     if (!cleanup.Complete &&
                                         cleanup.ResidualDeliveryState)
                                     {

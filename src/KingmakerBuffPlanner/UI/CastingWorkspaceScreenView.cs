@@ -1421,12 +1421,8 @@ namespace KingmakerBuffPlanner.UI
             var lines = new List<string>();
             foreach (WorkspaceBudgetRow row in view.BudgetRows)
             {
-                if (row.UnmetDemand == 0 && row.RequestedUsage == 0) continue;
-                lines.Add(row.PoolKey + " " + row.AllocatedUsage + "/" +
-                    row.RequestedUsage +
-                    (row.UnmetDemand == 0 ? string.Empty
-                        : " (unmet " + row.UnmetDemand + " — " +
-                            string.Join(",", row.ResponsibleCastingIds) + ")"));
+                string line = row.Describe();
+                if (line != null) lines.Add(line);
             }
             _footerBudget.text = lines.Count == 0
                 ? "No resource demand yet."
