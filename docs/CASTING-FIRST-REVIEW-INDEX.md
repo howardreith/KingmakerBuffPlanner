@@ -305,6 +305,19 @@ done preferred over stop) makes the suite fail.
 
 ## Evidence layer status (honest)
 
+Current (0.2.0-rc1 work, 2026-09-23):
+
+| Layer | Status |
+| --- | --- |
+| Source tests | Full gate at every pushed source commit (Windows PowerShell 5.1, non-interactive); 294 protocol tests at `542cd66`. Every guard added in the RC iteration has a caught mutant. |
+| Native gameplay | One-cast probe (`casting-probe-cast-20260923-p2-02`) and the zero-cost qualification (`casting-qual-cast-20260923-q1-01`): real casts through the production Apply, stop, skip, repeat and a recast after a reopen, each exactly as forecast. Finite resources, group, metamagic, rods and animated mode not yet cast in game. |
+| In-game persistence | Save, close and reopen (`casting-ws-qual-*`); an in-game reload of the exact test save with the saved plan and one set of handlers after it (`casting-ws-reload-20260923-s2-01`). |
+| Workspace presentation | Game frames at 1920×1200 (scale 1.000, like the native UI); other resolutions untested. |
+| Restoration | Every live run restored the Mods folder byte-exact and compared every save. |
+| Manual acceptance | Not yet; the supervised session is prepared. |
+
+History:
+
 | Layer | Status |
 | --- | --- |
 | Source/protocol tests | 231/231 protocol PASS locally at the J-review repair (the full `Test-SourceOnly.ps1` gate counts for the pushed HEAD are recorded in `AUTONOMOUS-RESUME.md`). Historical: 217/217 at checkpoint 12. |
