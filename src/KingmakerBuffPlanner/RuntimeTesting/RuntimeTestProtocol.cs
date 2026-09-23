@@ -258,6 +258,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         }
 
         internal const int ProbeRunDeadlineSeconds = 60;
+        // How long the probe waits for the world to run after closing the
+        // planner, in elapsed time.
+        internal const int ProbeWorldWaitSeconds = 30;
 
         // The supervised manual-inspection scenario (review H1): the full
         // guarded pipeline through the opened workspace, then a BOUNDED

@@ -209,6 +209,7 @@ $protectedSaveRoot = Join-Path $env:USERPROFILE 'AppData\LocalLow\Owlcat Games\P
 $protectedBefore = if ($null -ne $savePair) { Get-KbpSaveFolderSnapshot -SaveRoot $protectedSaveRoot } else { $null }
 $protectedSaveFailure = $null
 $protectedSavesCompared = $false
+$restoreFailure = $null
 $runSucceeded = $false
 $result = $null
 try {
@@ -617,22 +618,31 @@ finally {
             catch { Write-Warning "Unable to wait for launched Kingmaker exit: $($_.Exception.Message)" }
         }
         $running = @(Get-Process -Name Kingmaker -ErrorAction SilentlyContinue)
+        # Review of e7c5207..f7726c9, P3-3: a failed or blocked restoration
+        # must not skip the protected-save comparison or the completion
+        # record; it is reported after both are written.
         if ($running.Count -eq 0) {
-            & (Join-Path $PSScriptRoot 'Restore-Local.ps1') -RunId $runId -Confirm:$false
+            try { & (Join-Path $PSScriptRoot 'Restore-Local.ps1') -RunId $runId -Confirm:$false }
+            catch {
+                $restoreFailure = "Mods restoration failed for $runId (Restore-Local.ps1 -RunId $runId recovers it once the cause is fixed): " +
+                    $_.Exception.Message
+            }
         } else {
-            Write-Error "Kingmaker remains running; exact Mods restoration is intentionally blocked. Transaction: $runId"
+            $restoreFailure = "Kingmaker remains running; exact Mods restoration is intentionally blocked. Transaction: $runId"
         }
+        if ($null -ne $restoreFailure) { Write-Warning $restoreFailure }
     }
     if ($null -ne $protectedBefore -and @(Get-Process -Name Kingmaker -ErrorAction SilentlyContinue).Count -eq 0) {
         try {
-            $allowedChanged = if ($Scenario -ceq 'live-cast-qual') { @() } else { @([string]$savePair.working.fileName) }
+            $savePolicy = Get-KbpProtectedSavePolicy -Scenario $Scenario -FixtureFamily $FixtureFamily `
+                -WorkingFileName ([string]$savePair.working.fileName)
+            $allowedChanged = @($savePolicy.allowedChanged)
             $violations = Compare-KbpSaveFolderSnapshot -Before $protectedBefore `
                 -After (Get-KbpSaveFolderSnapshot -SaveRoot $protectedSaveRoot) `
                 -AllowedChangedFileNames $allowedChanged
             # A casting qualification writes no save at all (review P3-9):
             # even the WORKING save and new autosaves count against it.
-            $blocking = @($violations | Where-Object {
-                $_ -notlike 'new:*' -or $FixtureFamily -ceq 'Advanced' -or $Scenario -ceq 'live-cast-qual' })
+            $blocking = @($violations | Where-Object { $_ -notlike 'new:*' -or $savePolicy.newFilesBlocking })
             Write-KbpJsonAtomic (Join-Path $evidence 'protected-saves.json') ([ordered]@{
                 schemaVersion = 1; runId = $runId; fixtureFamily = $FixtureFamily
                 allowedChanged = @($allowedChanged)
@@ -653,37 +663,22 @@ finally {
     if ($null -ne (Get-Variable -Name evidence -ErrorAction SilentlyContinue) -and
         -not [string]::IsNullOrWhiteSpace([string]$evidence) -and (Test-Path -LiteralPath $evidence)) {
         try {
-            $completionState = $null
-            $completionTransaction = Join-Path $script:KbpRuntimeStateRoot "transactions\$runId\transaction.json"
-            if ($transactionEntered -and (Test-Path -LiteralPath $completionTransaction -PathType Leaf)) {
-                $completionState = Read-KbpJson $completionTransaction
-            }
+            $completionTransaction = if ($transactionEntered) {
+                Join-Path $script:KbpRuntimeStateRoot "transactions\$runId\transaction.json" } else { $null }
+            $completionIdentity = if ($null -ne $compatibilityProfile) {
+                Get-KbpCompatibilityIdentityDigest $compatibilityProfile } else { $null }
+            $completionBinding = if ($null -eq $advancedBinding) { $null } else { [string]$advancedBinding.manifestPath }
+            $completionGame = if ($null -ne $result) { [string]$result.status } else { $null }
             $completionExited = @(Get-Process -Name Kingmaker -ErrorAction SilentlyContinue).Count -eq 0
-            $completionRestored = $null -ne $completionState -and [bool]$completionState.restorationVerified
-            $completionGame = if ($null -ne (Get-Variable -Name result -ErrorAction SilentlyContinue) -and
-                $null -ne $result) { [string]$result.status } else { 'none' }
-            $completionClean = $protectedSavesCompared -and $null -eq $protectedSaveFailure
-            Write-KbpJsonAtomic (Join-Path $evidence 'run-completion.json') ([ordered]@{
-                schemaVersion = 1; runId = $runId; scenario = $Scenario; fixtureFamily = $FixtureFamily
-                profileId = $CompatibilityProfileId
-                compatibilityIdentity = Get-KbpCompatibilityIdentityDigest $compatibilityProfile
-                advancedBindingManifest = if ($null -eq $advancedBinding) { $null } else { [string]$advancedBinding.manifestPath }
-                fixture = if ($null -eq $savePair) { $null } else { [ordered]@{
-                    baselineFileName = [string]$savePair.baseline.fileName; baselineSha256 = [string]$savePair.baseline.sha256
-                    workingFileName = [string]$savePair.working.fileName; workingSha256 = [string]$savePair.working.sha256
-                    gameId = [string]$savePair.working.gameId } }
-                gameResultStatus = $completionGame
-                harnessSucceeded = $runSucceeded
-                kingmakerExited = $completionExited
-                restorationVerified = $completionRestored
-                protectedSavesCompared = $protectedSavesCompared
-                protectedSavesClean = $completionClean
-                complete = ($completionGame -ceq 'PASS') -and $runSucceeded -and $completionExited -and
-                    $completionRestored -and $completionClean
-                completedAtUtc = [DateTime]::UtcNow.ToString('o')
-            })
+            Write-KbpJsonAtomic (Join-Path $evidence 'run-completion.json') (New-KbpRunCompletionRecord `
+                -RunId $runId -Scenario $Scenario -FixtureFamily $FixtureFamily -ProfileId $CompatibilityProfileId `
+                -CompatibilityIdentity $completionIdentity -AdvancedBindingManifest $completionBinding `
+                -SavePair $savePair -GameResultStatus $completionGame -HarnessSucceeded $runSucceeded `
+                -KingmakerExited $completionExited -TransactionStatePath $completionTransaction `
+                -ProtectedSavesCompared $protectedSavesCompared -ProtectedSaveFailure $protectedSaveFailure)
         }
         catch { Write-Warning "Run completion record not written: $($_.Exception.Message)" }
     }
 }
+if ($null -ne $restoreFailure) { throw $restoreFailure }
 if ($null -ne $protectedSaveFailure) { throw $protectedSaveFailure }

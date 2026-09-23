@@ -76,7 +76,7 @@ namespace KingmakerBuffPlanner.UI
             new Dictionary<string, string>(StringComparer.Ordinal);
         // World-running time (milliseconds) for the casting host deadline: it
         // advances only while casting can execute.
-        private long _castingWorldMillis;
+        private readonly CastingWorldClock _castingWorldClock = new CastingWorldClock();
         private bool _castingRunHeld;
 
         // Whether a cast can execute in the world now: the Default game mode
@@ -1021,7 +1021,7 @@ namespace KingmakerBuffPlanner.UI
                 _plannerModeWarning = "runtime-test-session:persisted-mode-ignored";
             }
             _castingHost = new CastingExecutionHost(CreateCastingExecutor,
-                () => _castingWorldMillis);
+                () => _castingWorldClock.Milliseconds);
             _castingHost.RunCompleted = OnCastingRunCompleted;
             _log.Info("[KBP-MODE] planner mode=" + _plannerMode +
                 (_plannerModeWarning.Length == 0 ? string.Empty : ";warning=" + _plannerModeWarning) +
@@ -1432,9 +1432,9 @@ namespace KingmakerBuffPlanner.UI
             {
                 bool worldRuns = WorldRunsForCasting && _castingWorkspace == null && !_screen.IsOpen;
                 _castingRunHeld = _castingHost.IsRunning && !worldRuns;
+                _castingWorldClock.Advance(worldRuns, deltaTime);
                 if (worldRuns)
                 {
-                    _castingWorldMillis += (long)(Math.Max(0f, deltaTime) * 1000f);
                     try { _castingHost.Pump(); }
                     catch (Exception exception)
                     {

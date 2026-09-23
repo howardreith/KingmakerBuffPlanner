@@ -748,3 +748,71 @@ function Assert-KbpAdvancedInspectionPassed {
     }
     throw 'Casting on the advanced copy requires a completed live-advanced-inspect run (game PASS, owned exit, verified restoration, clean protected saves) of the same bound pair and compatibility identity first.'
 }
+
+# Which save changes a run may make. A casting qualification, its selection
+# run and every advanced-copy run change no save at all: the inspection
+# must leave the bound WORKING bytes intact, or it could never qualify a
+# later casting run (review of e7c5207..f7726c9, P3-4). Other runs may
+# change only the WORKING save. New save files block on the advanced copy
+# and for the casting qualification.
+function Get-KbpProtectedSavePolicy {
+    param(
+        [Parameter(Mandatory = $true)][string]$Scenario,
+        [Parameter(Mandatory = $true)][string]$FixtureFamily,
+        [Parameter(Mandatory = $true)][string]$WorkingFileName)
+    $strict = $FixtureFamily -ceq 'Advanced' -or
+        @('live-cast-qual', 'live-cast-qual-select', 'live-advanced-inspect') -ccontains $Scenario
+    return [pscustomobject]@{
+        allowedChanged = if ($strict) { @() } else { @($WorkingFileName) }
+        newFilesBlocking = $FixtureFamily -ceq 'Advanced' -or $Scenario -ceq 'live-cast-qual'
+    }
+}
+
+# Review RC3: the whole-run terminal record, written last by the launcher.
+# A run is complete only when the game reported PASS, the harness itself
+# succeeded, Kingmaker exited, the Mods transaction was restored and
+# verified (read from the transaction's own state) and the protected saves
+# were compared clean. Later gates (advanced casting) read only this record.
+function New-KbpRunCompletionRecord {
+    param(
+        [Parameter(Mandatory = $true)][string]$RunId,
+        [Parameter(Mandatory = $true)][string]$Scenario,
+        [Parameter(Mandatory = $true)][string]$FixtureFamily,
+        [Parameter(Mandatory = $true)][string]$ProfileId,
+        [string]$CompatibilityIdentity,
+        [string]$AdvancedBindingManifest,
+        $SavePair,
+        [string]$GameResultStatus,
+        [bool]$HarnessSucceeded,
+        [bool]$KingmakerExited,
+        [string]$TransactionStatePath,
+        [bool]$ProtectedSavesCompared,
+        [string]$ProtectedSaveFailure)
+    $restored = $false
+    if (-not [string]::IsNullOrWhiteSpace($TransactionStatePath) -and
+        (Test-Path -LiteralPath $TransactionStatePath -PathType Leaf)) {
+        $state = Read-KbpJson $TransactionStatePath
+        $restored = @($state.PSObject.Properties | ForEach-Object Name) -ccontains 'restorationVerified' -and
+            [bool]$state.restorationVerified
+    }
+    $game = if ([string]::IsNullOrWhiteSpace($GameResultStatus)) { 'none' } else { $GameResultStatus }
+    $clean = $ProtectedSavesCompared -and [string]::IsNullOrEmpty($ProtectedSaveFailure)
+    return [ordered]@{
+        schemaVersion = 1; runId = $RunId; scenario = $Scenario; fixtureFamily = $FixtureFamily
+        profileId = $ProfileId
+        compatibilityIdentity = if ([string]::IsNullOrWhiteSpace($CompatibilityIdentity)) { $null } else { $CompatibilityIdentity }
+        advancedBindingManifest = if ([string]::IsNullOrWhiteSpace($AdvancedBindingManifest)) { $null } else { $AdvancedBindingManifest }
+        fixture = if ($null -eq $SavePair) { $null } else { [ordered]@{
+            baselineFileName = [string]$SavePair.baseline.fileName; baselineSha256 = [string]$SavePair.baseline.sha256
+            workingFileName = [string]$SavePair.working.fileName; workingSha256 = [string]$SavePair.working.sha256
+            gameId = [string]$SavePair.working.gameId } }
+        gameResultStatus = $game
+        harnessSucceeded = $HarnessSucceeded
+        kingmakerExited = $KingmakerExited
+        restorationVerified = $restored
+        protectedSavesCompared = $ProtectedSavesCompared
+        protectedSavesClean = $clean
+        complete = ($game -ceq 'PASS') -and $HarnessSucceeded -and $KingmakerExited -and $restored -and $clean
+        completedAtUtc = [DateTime]::UtcNow.ToString('o')
+    }
+}

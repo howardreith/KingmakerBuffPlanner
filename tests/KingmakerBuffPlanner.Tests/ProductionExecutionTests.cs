@@ -51,6 +51,8 @@ namespace KingmakerBuffPlanner.Tests
             Run("host-player-stop-finishes-cast-in-progress", TestHostPlayerStopIsGraceful);
             Run("exhausted-rod-waived-by-active-effect", TestExhaustedRodWithActiveEffect);
             Run("probe-refuses-a-cast-while-the-world-is-held", TestProbeWorldHeldViolation);
+            Run("probe-owner-pumps-only-while-the-world-runs", TestProbeOwnerPumpsOnlyWhileTheWorldRuns);
+            Run("casting-world-clock-keeps-fractions-and-skips-held-time", TestCastingWorldClock);
             Run("buff-grid-source-type-tabs", () => TestBuffGridSourceTypeTabs(root));
             Run("player-facing-resource-labels", () => TestPlayerFacingResourceLabels(root));
             Run("qualification-allowance-parsing", TestQualificationAllowanceParsing);
@@ -1376,9 +1378,121 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("The probe host can submit before the planner closed and the world runs.");
             string root = File.ReadAllText(Path.Combine(directory.FullName, "src", "KingmakerBuffPlanner",
                 "UI", "BuffPlannerUiRoot.cs"));
+            string tick = SourceBlock(root, "private void Tick(float deltaTime)");
+            string pumped = tick == null ? null : SourceBlock(tick, "if (worldRuns)");
             if (!root.Contains("bool worldRuns = WorldRunsForCasting && _castingWorkspace == null && !_screen.IsOpen;") ||
-                !root.Contains("() => _castingWorldMillis);"))
-                throw new InvalidOperationException("The production host is pumped while the world is held.");
+                pumped == null || !pumped.Contains("_castingHost.Pump();") ||
+                Occurrences(root, "_castingHost.Pump()") != 1 ||
+                !tick.Contains("_castingWorldClock.Advance(worldRuns, deltaTime);") ||
+                !root.Contains("() => _castingWorldClock.Milliseconds);") || root.Contains("_castingWorldMillis"))
+                throw new InvalidOperationException("The production host is pumped, or its deadline counts, while the world is held.");
+            // Review of e7c5207..f7726c9, P2-1 and P3-5: the probe waits in
+            // elapsed time with nothing submitted while held, every pump of
+            // its run passes the world state, and the qualification host
+            // counts only running time.
+            string await = SourceBlock(host, "private bool UpdateProbeAwaitWorld()");
+            string held = await == null ? null : SourceBlock(await, "if (!running)");
+            string heldTail = held == null ? null
+                : held.Substring(held.LastIndexOf("return false;", StringComparison.Ordinal) + "return false;".Length).Trim();
+            if (held == null || heldTail != "}" || held.Contains("Submit(") ||
+                !held.Contains("RuntimeTestProtocol.ProbeWorldWaitSeconds * 1000L) return false;") ||
+                await.Contains("_probeWorldWaitFrames < ") ||
+                await.IndexOf("if (!running)", StringComparison.Ordinal) >
+                    await.IndexOf("_probeOwner.Submit(", StringComparison.Ordinal))
+                throw new InvalidOperationException("The probe can submit before the world runs, or waits in updates.");
+            string probeRun = SourceBlock(host, "private bool UpdateProbeRun()");
+            if (probeRun == null || !probeRun.Contains("bool running = ProbeWorldRuns(out state);") ||
+                !probeRun.Contains("stop, running, state))") || Occurrences(host, "_probeOwner.Pump(") != 1)
+                throw new InvalidOperationException("The probe run is pumped without the world state.");
+            int advance = host.IndexOf("_qualificationWorldClock.Advance(BuffPlannerUiRoot.WorldRunsForCasting, Time.deltaTime);",
+                StringComparison.Ordinal);
+            int driverUpdate = host.IndexOf("_qualificationDriver.Update();", StringComparison.Ordinal);
+            if (!host.Contains("() => _qualificationWorldClock.Milliseconds);") || advance < 0 ||
+                driverUpdate < 0 || advance > driverUpdate)
+                throw new InvalidOperationException("The qualification host deadline counts held time.");
+        }
+
+        // The brace-balanced block after the first occurrence of a header,
+        // for source checks of Unity-bound code that cannot run here.
+        private static string SourceBlock(string text, string header)
+        {
+            int start = text.IndexOf(header, StringComparison.Ordinal);
+            if (start < 0) return null;
+            int open = text.IndexOf('{', start + header.Length);
+            if (open < 0) return null;
+            int depth = 0;
+            for (int i = open; i < text.Length; i++)
+            {
+                if (text[i] == '{') depth++;
+                else if (text[i] == '}' && --depth == 0) return text.Substring(open, i - open + 1);
+            }
+            return null;
+        }
+
+        private static int Occurrences(string text, string value)
+        {
+            int count = 0;
+            for (int at = text.IndexOf(value, StringComparison.Ordinal); at >= 0;
+                at = text.IndexOf(value, at + value.Length, StringComparison.Ordinal))
+                count++;
+            return count;
+        }
+
+        // Review of e7c5207..f7726c9, P2-1: the probe's rule fires on the
+        // first pump after submit and its confirmation frames follow, so
+        // every pump waits while the world is held; a stop and the
+        // wall-clock deadline still apply while it is held.
+        private static void TestProbeOwnerPumpsOnlyWhileTheWorldRuns()
+        {
+            var effect = new ProbeEffectInstance("buff-effect", "instance-2", 900);
+            Func<string, ProbeSequenceClock, ProbeObservation> read = (phase, clock) =>
+                phase == "before" ? Obs(phase, clock, 7) : Obs(phase, clock, 7, effect);
+            ProbeOwnerRun held = StartProbeOwnerRun("unlimited", "free", read);
+            for (int frame = 1; frame <= 50; frame++)
+                if (held.Owner.Pump(frame, 60000, false, false, "mode=FullScreenUi;paused=False"))
+                    throw new InvalidOperationException("A held world ended the probe run.");
+            if ((held.Runtime != null && held.Runtime.Fired.Count != 0) || held.Published.Count != 0)
+                throw new InvalidOperationException("The probe fired while the world was held.");
+            int guard = 0;
+            while (!held.Owner.Pump(100 + guard, 60000, false, true, "mode=Default;paused=False") && guard++ < 1000) { }
+            SingleCastProbeRunRecord record = held.Published.Single();
+            if (record.Violations().Count != 0 || held.Runtime.Fired.Count != 1 || record.HeldPumps != 50 ||
+                record.FirstStepWorldState != "mode=Default;paused=False")
+                throw new InvalidOperationException("The probe did not run once the world ran: " +
+                    string.Join("|", record.Violations().ToArray()) + ";held=" + record.HeldPumps);
+            // Held past the wall-clock deadline: the run ends there, unfired.
+            ProbeOwnerRun late = StartProbeOwnerRun("unlimited", "free", read);
+            if (late.Owner.Pump(30000, 60000, false, false, "held") ||
+                !late.Owner.Pump(60001, 60000, false, false, "held"))
+                throw new InvalidOperationException("A held world escaped the probe deadline.");
+            if ((late.Runtime != null && late.Runtime.Fired.Count != 0) ||
+                !late.Published.Single().Violations().Contains("probe-terminated:deadline"))
+                throw new InvalidOperationException("The probe deadline over a held world is wrong.");
+            // A stop while held ends the run at once.
+            ProbeOwnerRun stopped = StartProbeOwnerRun("unlimited", "free", read);
+            if (!stopped.Owner.Pump(1, 60000, true, false, "held") ||
+                (stopped.Runtime != null && stopped.Runtime.Fired.Count != 0) ||
+                !stopped.Published.Single().Violations().Contains("probe-terminated:stop"))
+                throw new InvalidOperationException("A stop while held did not end the probe.");
+        }
+
+        // Review of e7c5207..f7726c9, P3-1: run deadlines count running game
+        // time only and keep the fraction of a millisecond of every frame.
+        private static void TestCastingWorldClock()
+        {
+            var sixty = new CastingWorldClock();
+            for (int frame = 0; frame < 1000; frame++) sixty.Advance(true, 1.0 / 60.0);
+            var fast = new CastingWorldClock();
+            for (int frame = 0; frame < 5000; frame++) fast.Advance(true, 0.0005);
+            var idle = new CastingWorldClock();
+            idle.Advance(false, 5.0);
+            idle.Advance(true, -1.0);
+            idle.Advance(true, double.PositiveInfinity);
+            idle.Advance(true, double.NaN);
+            if (sixty.Milliseconds < 16665 || sixty.Milliseconds > 16667 ||
+                fast.Milliseconds < 2499 || fast.Milliseconds > 2500 || idle.Milliseconds != 0)
+                throw new InvalidOperationException("The world clock is wrong: " + sixty.Milliseconds + "/" +
+                    fast.Milliseconds + "/" + idle.Milliseconds);
         }
 
         // An exhausted REQUIRED rod is a resource shortage: the run that
@@ -2143,9 +2257,10 @@ namespace KingmakerBuffPlanner.Tests
 
         private static CastingQualificationDriver NewQualificationDriver(string dir,
             SimulatedBuffWorld world, CastingQualificationRecord record,
-            CastingQualificationAllowance allowance, Func<long> clock, Func<bool> worldRunning = null)
+            CastingQualificationAllowance allowance, Func<long> clock, Func<bool> worldRunning = null,
+            Func<long> hostClock = null)
         {
-            var host = new CastingExecutionHost(settings => new InstantCastExecutor(world, true), clock);
+            var host = new CastingExecutionHost(settings => new InstantCastExecutor(world, true), hostClock ?? clock);
             return new CastingQualificationDriver(record, allowance, "fixture-campaign",
                 () => QualificationInputs(true, true, world.Live(), world.OtherUnits),
                 boundary => new CastingWorkspaceSession(dir, "fixture-campaign", boundary),
@@ -2308,13 +2423,65 @@ namespace KingmakerBuffPlanner.Tests
             CastingQualificationDriver heldDriver = NewQualificationDriver(heldDir, heldWorld, heldRecord,
                 heldAllowance, () => now, () => worldRuns);
             for (int i = 0; i < 30; i++) heldDriver.Update();
-            if (heldWorld.Fired.Count != 0 || heldDriver.Completed || heldDriver.HeldUpdates == 0)
+            // Review P3-5: held from the start, no step even begins (nothing
+            // applied, not only nothing fired).
+            if (heldWorld.Fired.Count != 0 || heldDriver.Completed || heldDriver.HeldUpdates == 0 ||
+                heldRecord.Steps.Count != 0)
                 throw new InvalidOperationException("A held world was cast into.");
             worldRuns = true;
             for (int i = 0; i < 400 && !heldDriver.Completed; i++) heldDriver.Update();
             if (heldRecord.Violations().Count != 0 || heldWorld.Fired.Count != 4)
                 throw new InvalidOperationException("The run did not resume once the world ran: " +
                     string.Join("|", heldRecord.Violations().ToArray()));
+            // Held in the middle of a step (after the complete step's first
+            // cast): its next casting waits, then the run completes.
+            var midWorld = new SimulatedBuffWorld();
+            CastingQualificationAllowance midAllowance = ForecastAllowance(midWorld);
+            var midRecord = new CastingQualificationRecord { CastingScenario = true, AllowanceStatus = "parsed" };
+            string midDir = Path.Combine(root, "qm");
+            Directory.CreateDirectory(midDir);
+            bool midRuns = true;
+            CastingQualificationDriver midDriver = NewQualificationDriver(midDir, midWorld, midRecord,
+                midAllowance, () => now, () => midRuns);
+            for (int i = 0; i < 400 && midWorld.Fired.Count < 2; i++) midDriver.Update();
+            midRuns = false;
+            int heldBefore = midDriver.HeldUpdates;
+            string heldPhase = midDriver.Phase;
+            for (int i = 0; i < 30; i++) midDriver.Update();
+            if (midWorld.Fired.Count != 2 || midDriver.HeldUpdates - heldBefore != 30 || midDriver.Completed ||
+                heldPhase != "complete-wait")
+                throw new InvalidOperationException("A run advanced while the world was held mid-step: fired=" +
+                    midWorld.Fired.Count + ";phase=" + heldPhase);
+            midRuns = true;
+            for (int i = 0; i < 400 && !midDriver.Completed; i++) midDriver.Update();
+            if (midRecord.Violations().Count != 0 || midWorld.Fired.Count != 4)
+                throw new InvalidOperationException("The run did not resume after a mid-step hold: " +
+                    string.Join("|", midRecord.Violations().ToArray()));
+            // Review P3-2: the host deadline counts only running time. Held
+            // mid-step for 200 s (over the 110 s host budget of the two
+            // castings, inside the 240 s run deadline) the step still
+            // completes; the same hold under a wall-clock host fails it.
+            foreach (bool worldClock in new[] { true, false })
+            {
+                var longWorld = new SimulatedBuffWorld();
+                CastingQualificationAllowance longAllowance = ForecastAllowance(longWorld);
+                var longRecord = new CastingQualificationRecord { CastingScenario = true, AllowanceStatus = "parsed" };
+                string longDir = Path.Combine(root, worldClock ? "ql-w" : "ql-c");
+                Directory.CreateDirectory(longDir);
+                long wall = 0, running = 0;
+                bool longRuns = true;
+                CastingQualificationDriver longDriver = NewQualificationDriver(longDir, longWorld, longRecord,
+                    longAllowance, () => wall, () => longRuns, worldClock ? () => running : (Func<long>)(() => wall));
+                for (int i = 0; i < 400 && longWorld.Fired.Count < 2; i++) { longDriver.Update(); wall += 16; running += 16; }
+                longRuns = false;
+                for (int i = 0; i < 20; i++) { wall += 10000; longDriver.Update(); }
+                longRuns = true;
+                for (int i = 0; i < 400 && !longDriver.Completed; i++) { longDriver.Update(); wall += 16; running += 16; }
+                bool passed = longRecord.Violations().Count == 0 && longWorld.Fired.Count == 4;
+                if (passed != worldClock)
+                    throw new InvalidOperationException("A long hold " + (worldClock ? "failed a world-clock host: " :
+                        "did not fail a wall-clock host: ") + string.Join("|", longRecord.Violations().ToArray()));
+            }
             // Review RC2: a failed, missing, throwing or wrong-target
             // before-read ends the run before Apply: nothing is submitted.
             foreach (string fault in new[] { "throw", "failed", "null", "wrong-target" })
