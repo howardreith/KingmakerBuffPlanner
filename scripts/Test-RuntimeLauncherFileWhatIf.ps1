@@ -138,4 +138,54 @@ foreach ($target in $targets) {
     }
 }
 if (@($changedReal).Count -ne 0) { throw "Runtime launcher -File refused run changed: $($changedReal -join ', ')" }
-Write-Host 'Launcher -File WhatIf purity: PASS=4 FAIL=0'
+# Layer 5 (single-cast probe gating, review L6/probe preparation): the
+# casting probe cannot be launched without the owner's allowance file under
+# the lab approvals directory; the selection-only probe never takes one;
+# a selection-only -WhatIf is pure.
+$outsideAllowance = Join-Path ([IO.Path]::GetTempPath()) ('kbp-probe-allowance-' + [Guid]::NewGuid().ToString('N') + '.json')
+Set-Content -LiteralPath $outsideAllowance -Value '{}' -Encoding UTF8
+try {
+    $probeCases = @(
+        @{ Name = 'casting-probe-without-allowance'; Expect = '*requires -ProbeAllowancePath*'
+           Args = @('-Scenario', 'live-cast-probe', '-RunId', 'probe-gate-test', '-WhatIf') },
+        @{ Name = 'casting-probe-allowance-outside-approvals'; Expect = '*must be an existing file under*'
+           Args = @('-Scenario', 'live-cast-probe', '-RunId', 'probe-gate-test', '-ProbeAllowancePath', $outsideAllowance, '-WhatIf') },
+        @{ Name = 'selection-probe-with-allowance'; Expect = '*only valid with -Scenario live-cast-probe*'
+           Args = @('-Scenario', 'live-cast-probe-select', '-ProbeAllowancePath', $outsideAllowance, '-WhatIf') }
+    )
+    foreach ($case in $probeCases) {
+        $ErrorActionPreference = 'Continue'
+        $caseArgs = $case.Args
+        $caseOutput = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $launcher @caseArgs 2>&1)
+        $caseExit = $LASTEXITCODE
+        $ErrorActionPreference = 'Stop'
+        if ($caseExit -eq 0 -or -not (@($caseOutput | Where-Object { "$_" -like $case.Expect }).Count -ge 1)) {
+            throw "Probe gate case $($case.Name) was not refused as expected.: $($caseOutput -join ' ')"
+        }
+    }
+}
+finally { Remove-Item -LiteralPath $outsideAllowance -Force -ErrorAction SilentlyContinue }
+$beforeSelect = @{}
+foreach ($target in $targets) {
+    $beforeSelect[$target] = if (Test-Path -LiteralPath $target -PathType Container) {
+        @(Get-KbpDirectoryManifest $target)
+    } else { $null }
+}
+$ErrorActionPreference = 'Continue'
+$selectOutput = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $launcher `
+        -Scenario 'live-cast-probe-select' -WhatIf 2>&1)
+$selectExit = $LASTEXITCODE
+$ErrorActionPreference = 'Stop'
+if ($selectExit -ne 0 -or -not (@($selectOutput | Where-Object { "$_" -like '*Runtime WhatIf preflight PASS*' }).Count -ge 1)) {
+    throw "Selection-only probe -WhatIf failed.: $($selectOutput -join ' ')"
+}
+foreach ($target in $targets) {
+    $after = if (Test-Path -LiteralPath $target -PathType Container) {
+        @(Get-KbpDirectoryManifest $target)
+    } else { $null }
+    if (($null -eq $beforeSelect[$target]) -ne ($null -eq $after) -or
+        ($null -ne $after -and -not (Test-KbpManifestEqual @($beforeSelect[$target]) @($after)))) {
+        throw "Selection-only probe -WhatIf changed: $target"
+    }
+}
+Write-Host 'Launcher -File WhatIf purity: PASS=8 FAIL=0'

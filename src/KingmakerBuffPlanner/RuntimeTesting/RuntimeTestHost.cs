@@ -9,6 +9,10 @@ using Kingmaker.Blueprints;
 using Kingmaker.UI;
 using KingmakerBuffPlanner.Discovery;
 using KingmakerBuffPlanner.Domain.Authoring;
+using KingmakerBuffPlanner.Execution;
+using KingmakerBuffPlanner.Domain.Planning;
+using KingmakerBuffPlanner.Domain.Providers;
+using KingmakerBuffPlanner.GameAdapters;
 using KingmakerBuffPlanner.Infrastructure;
 using KingmakerBuffPlanner.Planning;
 using KingmakerBuffPlanner.UI;
@@ -104,6 +108,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private readonly WorkspaceInteractionRecord _workspaceInteraction =
             new WorkspaceInteractionRecord();
         private ManualTerminalCoordinator _manualTerminal;
+        // Single-cast probe (dormant unless the owner's allowance is present).
+        private readonly SingleCastProbeRunRecord _probeRecord = new SingleCastProbeRunRecord();
+        private SingleCastProbeSelection _probeSelection;
+        private SingleCastProbeBoundary _probeBoundary;
+        private long _probeRunStartedMillis = -1;
         private readonly List<string> _interactionCasters = new List<string>();
         private readonly List<string> _interactionTargets = new List<string>();
         private readonly List<string> _interactionCastIds = new List<string>();
@@ -684,6 +693,38 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         new ManualTerminalCoordinator();
                     terminal.AppendAssertions(result, _manualReadyEvidence,
                         _workspaceInteractionEvidence);
+                }
+                else if (RuntimeTestProtocol.IsProbeScenario(_request.Scenario))
+                {
+                    // Probe acceptance (Unity-free rules in
+                    // SingleCastProbeRunRecord). A selection-only run is
+                    // never a gameplay claim; a casting run claims only what
+                    // the executor and the pool snapshot observed.
+                    IList<string> violations = _probeRecord.Violations();
+                    result.Assertions.Add(_probeRecord.Selected
+                        ? RuntimeTestAssertion.Pass("probe-selection", "one plain casting",
+                            _probeRecord.SelectionEvidence)
+                        : RuntimeTestAssertion.Fail("probe-selection", "one plain casting",
+                            _probeRecord.SelectionEvidence ?? "missing"));
+                    result.Assertions.Add(_probeRecord.CastingScenario
+                        ? (violations.Count == 0
+                            ? RuntimeTestAssertion.Pass("probe-native-cast",
+                                "allowance valid;1 confirmed;exact resource delta",
+                                "projection=" + _probeRecord.ProjectionId + ";pool=" +
+                                _probeRecord.PoolRemainingBefore + "->" + _probeRecord.PoolRemainingAfter)
+                            : RuntimeTestAssertion.Fail("probe-native-cast",
+                                "allowance valid;1 confirmed;exact resource delta",
+                                string.Join("|", violations.ToArray())))
+                        : (violations.Count == 0
+                            ? RuntimeTestAssertion.Pass("probe-selection-only-no-dispatch",
+                                "no boundary constructed", "boundary=False;submitted=False")
+                            : RuntimeTestAssertion.Fail("probe-selection-only-no-dispatch",
+                                "no boundary constructed", string.Join("|", violations.ToArray()))));
+                    if (violations.Count != 0)
+                    {
+                        result.Status = "FAIL";
+                        result.Stage = "probe-validation";
+                    }
                 }
                 else if (RuntimeTestProtocol.IsWorkspaceScenario(_request.Scenario))
                 {
@@ -1381,6 +1422,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 liveBudgetSeconds = 600 +
                     RuntimeTestProtocol.ReadManualHoldSeconds(
                         _request.Parameters);
+            if (RuntimeTestProtocol.IsProbeScenario(_request.Scenario))
+                liveBudgetSeconds = 600 + RuntimeTestProtocol.ProbeRunDeadlineSeconds;
             if (_livePhaseElapsed.Elapsed.TotalSeconds > liveBudgetSeconds)
                 throw new TimeoutException("Live UI scenario timed out;phase=" + _liveUiPhase +
                     ";elapsedSeconds=" + _livePhaseElapsed.Elapsed.TotalSeconds.ToString("F1",
@@ -1500,7 +1543,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     return false;
                 }
                 if (!_liveHotkeyMarkerWritten &&
-                    !RuntimeTestProtocol.IsManualWorkspaceScenario(
+                    !RuntimeTestProtocol.IsNoInputWorkspaceScenario(
                         _request.Scenario))
                 {
                     AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory, "hotkey-ready.json"),
@@ -1539,7 +1582,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 _workspaceControlSha256 =
                     Hashing.Sha256(_workspaceFrameCapture.FullPath);
                 _workspaceControlSamples = _workspaceFrameCapture.Samples;
-                if (RuntimeTestProtocol.IsManualWorkspaceScenario(
+                if (RuntimeTestProtocol.IsNoInputWorkspaceScenario(
                         _request.Scenario))
                 {
                     _liveHotkeyMarkerWritten = true;
@@ -1683,6 +1726,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         _liveUiPhase = 30;
                         return false;
                     }
+                    if (RuntimeTestProtocol.IsProbeScenario(_request.Scenario))
+                    {
+                        // Probe: no scripted authoring; selection (and, only
+                        // with the owner's allowance, one native cast).
+                        _liveUiPhase = 40;
+                        return false;
+                    }
                     // The guarded interaction sequence runs BEFORE the
                     // bisection close, against the live session the view
                     // owns (review R1/C4: direct session calls, labeled as
@@ -1691,6 +1741,18 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     _liveUiPhase = 25;
                 }
                 return false;
+            }
+            if (_liveUiPhase == 40)
+            {
+                return UpdateProbeSelection();
+            }
+            if (_liveUiPhase == 41)
+            {
+                return UpdateProbeRun();
+            }
+            if (_liveUiPhase == 42)
+            {
+                return CompleteProbe();
             }
             if (_liveUiPhase == 30)
             {
@@ -2309,6 +2371,192 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         // the document untouched. Direct session calls appear only where
         // labeled as such (selection scope for driving), never as
         // substitutes for the controls under test.
+        // ------------------------------------------------------------------
+        // Single-cast probe phases (40-42). Selection is discovery-driven
+        // and recorded in full before anything else; the boundary exists
+        // only in the casting scenario and only with a valid allowance.
+        // ------------------------------------------------------------------
+        private bool UpdateProbeSelection()
+        {
+            if (!BuffPlannerUiRoot.IsCastingWorkspaceOpen) return false;
+            CastingWorkspaceInputs inputs = BuffPlannerUiRoot.CastingWorkspaceInputsForRuntime();
+            if (inputs == null) return false;
+            _probeRecord.CastingScenario = RuntimeTestProtocol.IsCastingProbeScenario(_request.Scenario);
+            _probeSelection = SingleCastProbeSelector.Select(inputs, "probe");
+            _probeRecord.Selected = _probeSelection.Selected;
+            ExplicitStepConversion projection = _probeSelection.Projection;
+            CastStep step = _probeSelection.Selected ? projection.Plan.Steps[0] : null;
+            _probeRecord.ProjectionId = _probeSelection.Selected ? projection.ProjectionId : null;
+            _probeRecord.ReservedUnits = step == null ? 0 : step.Reservation.Units;
+            _probeRecord.PoolRemainingBefore = step == null ? (int?)null
+                : PoolRemaining(inputs, step.Reservation.PoolKey);
+            _probeRecord.SelectionEvidence = _probeSelection.Selected
+                ? "caster=" + _probeSelection.CasterUnitId + ";target=" + _probeSelection.TargetUnitId +
+                    ";source=" + _probeSelection.SourceId + ";provider=" + _probeSelection.Provider.Canonical +
+                    ";projection=" + projection.ProjectionId + ";considered=" + _probeSelection.CandidatesConsidered
+                : "refused:" + _probeSelection.Refusal + ";considered=" + _probeSelection.CandidatesConsidered;
+            AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory, "probe-selection.json"),
+                new JObject
+                {
+                    { "schemaVersion", 1 },
+                    { "runId", _request.RunId },
+                    { "scenario", _request.Scenario },
+                    { "selected", _probeSelection.Selected },
+                    { "refusal", _probeSelection.Refusal },
+                    { "casterUnitId", _probeSelection.CasterUnitId },
+                    { "targetUnitId", _probeSelection.TargetUnitId },
+                    { "sourceId", _probeSelection.SourceId },
+                    { "provider", _probeSelection.Provider == null ? null : _probeSelection.Provider.Canonical },
+                    { "projectionId", _probeRecord.ProjectionId },
+                    { "canonicalContract", _probeSelection.Selected ? projection.CanonicalContract : null },
+                    { "reservedPoolKey", step == null ? null : step.Reservation.PoolKey },
+                    { "reservedUnits", _probeRecord.ReservedUnits },
+                    { "poolRemainingBefore", _probeRecord.PoolRemainingBefore },
+                    { "candidatesConsidered", _probeSelection.CandidatesConsidered }
+                }.ToString(Formatting.Indented) + Environment.NewLine);
+            _log.Info("[KBP-PROBE] selection;" + _probeRecord.SelectionEvidence + ".");
+            if (!_probeRecord.CastingScenario || !_probeSelection.Selected)
+            {
+                _liveUiPhase = 42;
+                return false;
+            }
+            object raw;
+            string allowanceJson = _request.Parameters != null &&
+                _request.Parameters.TryGetValue("probeAllowance", out raw) ? raw as string : null;
+            string refusal;
+            SingleCastProbeAllowance allowance = allowanceJson == null ? null
+                : SingleCastProbeAllowance.Parse(allowanceJson, _request.RunId, out refusal);
+            if (allowanceJson == null) refusal = "absent";
+            else if (allowance != null) refusal = null;
+            else SingleCastProbeAllowance.Parse(allowanceJson, _request.RunId, out refusal);
+            _probeRecord.AllowanceStatus = allowance == null ? refusal : "valid";
+            if (allowance == null)
+            {
+                _log.Info("[KBP-PROBE] no valid allowance (" + refusal + "); no dispatch boundary constructed.");
+                _liveUiPhase = 42;
+                return false;
+            }
+            _probeBoundary = new SingleCastProbeBoundary(allowance,
+                () => new InstantCastExecutor(new KingmakerInstantCastAdapter(_log.Info), true));
+            _probeRecord.BoundaryConstructed = true;
+            CastingDispatchOutcome outcome = _probeBoundary.Submit(_probeSelection.Plan,
+                _probeSelection.Decision, "long", projection);
+            _probeRecord.Submitted = outcome.Submitted;
+            _probeRecord.SubmitReason = outcome.Reason;
+            _log.Info("[KBP-PROBE] boundary submit;submitted=" + outcome.Submitted +
+                ";reason=" + outcome.Reason + ".");
+            if (!outcome.Submitted)
+            {
+                _liveUiPhase = 42;
+                return false;
+            }
+            _probeRunStartedMillis = _workspaceCaptureElapsed.ElapsedMilliseconds;
+            _liveUiPhase = 41;
+            return false;
+        }
+
+        private bool UpdateProbeRun()
+        {
+            // One MoveNext per frame; stop marker or deadline disposes the
+            // boundary, which propagates to the executor's cleanup. Never
+            // retried.
+            bool deadline = _workspaceCaptureElapsed.ElapsedMilliseconds - _probeRunStartedMillis >
+                RuntimeTestProtocol.ProbeRunDeadlineSeconds * 1000L;
+            bool stop = File.Exists(Path.Combine(_request.EvidenceDirectory, "probe-stop.json"));
+            if (deadline || stop)
+            {
+                _probeRecord.DeadlineOrStop = true;
+                _log.Info("[KBP-PROBE] " + (stop ? "stop marker" : "deadline") + "; disposing the run.");
+                _probeBoundary.Dispose();
+                _probeRecord.BoundaryDisposed = true;
+                _liveUiPhase = 42;
+                return false;
+            }
+            bool moved;
+            try { moved = _probeBoundary.ActiveRun != null && _probeBoundary.ActiveRun.MoveNext(); }
+            catch (Exception exception)
+            {
+                _log.Error("[KBP-PROBE] run pump failed.", exception);
+                moved = false;
+            }
+            if (moved) return false;
+            _liveUiPhase = 42;
+            return false;
+        }
+
+        private bool CompleteProbe()
+        {
+            if (_probeBoundary != null)
+            {
+                _probeBoundary.Dispose();
+                _probeRecord.BoundaryDisposed = true;
+                _probeRecord.Outcome = _probeBoundary.Outcome;
+            }
+            if (_probeRecord.CastingScenario && _probeRecord.Submitted && _probeSelection != null)
+            {
+                CastingWorkspaceInputs after = BuffPlannerUiRoot.CastingWorkspaceInputsForRuntime();
+                CastStep step = _probeSelection.Projection.Plan.Steps[0];
+                _probeRecord.PoolRemainingAfter = after == null ? (int?)null
+                    : PoolRemaining(after, step.Reservation.PoolKey);
+            }
+            string closeFailure = null;
+            try { BuffPlannerUiRoot.CloseCastingWorkspaceForRuntime(); }
+            catch (Exception exception)
+            {
+                closeFailure = exception.GetType().Name + ":" + exception.Message;
+                _log.Error("[KBP-PROBE] production close failed.", exception);
+            }
+            _probeRecord.WorkspaceClosed = !BuffPlannerUiRoot.IsCastingWorkspaceOpen && closeFailure == null;
+            _probeRecord.InputLeaseReleased = !BuffPlannerUiRoot.IsCastingWorkspaceInputLeaseHeldForRuntime;
+            ExplicitCastingRunOutcome outcome = _probeRecord.Outcome;
+            AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory, "probe-outcome.json"),
+                new JObject
+                {
+                    { "schemaVersion", 1 },
+                    { "runId", _request.RunId },
+                    { "castingScenario", _probeRecord.CastingScenario },
+                    { "allowanceStatus", _probeRecord.AllowanceStatus },
+                    { "boundaryConstructed", _probeRecord.BoundaryConstructed },
+                    { "submitted", _probeRecord.Submitted },
+                    { "submitReason", _probeRecord.SubmitReason },
+                    { "deadlineOrStop", _probeRecord.DeadlineOrStop },
+                    { "outcomeProjectionId", outcome == null ? null : outcome.ProjectionId },
+                    { "allConfirmed", outcome != null && outcome.AllConfirmed },
+                    { "cancelled", outcome != null && outcome.Cancelled },
+                    { "haltReason", outcome == null ? null : outcome.HaltReason },
+                    { "entries", outcome == null ? new JArray() : new JArray(outcome.Entries.Select(entry =>
+                        (object)new JObject
+                        {
+                            { "castingId", entry.CastingId },
+                            { "processed", entry.Processed },
+                            { "nativeSubmissionReported", entry.NativeSubmissionReported },
+                            { "confirmed", entry.Confirmed },
+                            { "finalStatus", entry.FinalStatus },
+                            { "detail", entry.Detail }
+                        }).ToArray()) },
+                    { "poolRemainingBefore", _probeRecord.PoolRemainingBefore },
+                    { "poolRemainingAfter", _probeRecord.PoolRemainingAfter },
+                    { "reservedUnits", _probeRecord.ReservedUnits },
+                    { "workspaceClosed", _probeRecord.WorkspaceClosed },
+                    { "inputLeaseReleased", _probeRecord.InputLeaseReleased },
+                    { "closeFailure", closeFailure },
+                    { "violations", new JArray(_probeRecord.Violations().Cast<object>().ToArray()) }
+                }.ToString(Formatting.Indented) + Environment.NewLine);
+            _log.Info("[KBP-PROBE] terminal;violations=" + _probeRecord.Violations().Count + ".");
+            _liveInitialCatalogEvidence = "probe-scenario;workspaceRoot=active;legacyScreen=closed";
+            _workspaceInteractionEvidence = "probe;no-authoring";
+            _workspaceReopenEvidence = "probe;no-reopen-claim";
+            _completed = true;
+            return true;
+        }
+
+        private static int? PoolRemaining(CastingWorkspaceInputs inputs, string poolKey)
+        {
+            ResourcePoolSnapshot pool = inputs.Snapshot.ResourcePools.FirstOrDefault(
+                value => string.Equals(value.PoolKey, poolKey, StringComparison.Ordinal));
+            return pool == null ? (int?)null : pool.Remaining;
+        }
+
         private bool UpdateWorkspaceInteraction()
         {
             UI.CastingWorkspaceSession session =

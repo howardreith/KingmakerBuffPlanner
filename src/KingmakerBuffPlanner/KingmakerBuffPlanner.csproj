@@ -117,6 +117,7 @@
     <Compile Include="Execution\MaterialComponentAvailability.cs" />
     <Compile Include="Execution\HybridCastExecutor.cs" />
     <Compile Include="Execution\ExplicitCastingRunCoordinator.cs" />
+    <Compile Include="Execution\SingleCastProbe.cs" />
     <Compile Include="Diagnostics\ShareCastDiagnostics.cs" />
     <Compile Include="Compatibility\BrownFurPowerfulChangeProfile.cs" />
     <Compile Include="Compatibility\BrownFurPowerfulChangeCompatibility.cs" />
