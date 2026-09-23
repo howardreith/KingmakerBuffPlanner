@@ -763,6 +763,42 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         result.Stage = "inspection-validation";
                     }
                 }
+                else if (RuntimeTestProtocol.IsQualificationScenario(_request.Scenario))
+                {
+                    // Qualification acceptance (Unity-free rules in
+                    // CastingQualificationRecord): a selection-only run is a
+                    // forecast, never a gameplay claim; a casting run claims
+                    // exactly the judged steps.
+                    IList<string> violations = _qualificationRecord.Violations();
+                    CastingQualificationSelection selection = _qualificationRecord.Selection;
+                    bool selected = selection != null && selection.Selected &&
+                        _qualificationRecord.Forecast != null && _qualificationRecord.Forecast.Count == 3;
+                    result.Assertions.Add(selected
+                        ? RuntimeTestAssertion.Pass("qualification-selection", "recipe selected;3 forecast steps",
+                            string.Join(",", selection.Castings.Select(casting => casting.CastingId + "=" +
+                                casting.CasterUnitId + ">" + casting.DirectTargetUnitId).ToArray()))
+                        : RuntimeTestAssertion.Fail("qualification-selection", "recipe selected;3 forecast steps",
+                            selection == null ? "missing" : selection.Refusal));
+                    result.Assertions.Add(_qualificationRecord.CastingScenario
+                        ? (violations.Count == 0
+                            ? RuntimeTestAssertion.Pass("qualification-run",
+                                "stop/complete/repeat/recast as forecast", "planned=" +
+                                    _qualificationRecord.PlannedSubmissions + ";max=" +
+                                    _qualificationRecord.MaximumSubmissions)
+                            : RuntimeTestAssertion.Fail("qualification-run",
+                                "stop/complete/repeat/recast as forecast",
+                                string.Join("|", violations.ToArray())))
+                        : (violations.Count == 0 && _qualificationRecord.Submissions.Count == 0
+                            ? RuntimeTestAssertion.Pass("qualification-selection-only-no-dispatch",
+                                "no boundary;no submission", "submissions=0")
+                            : RuntimeTestAssertion.Fail("qualification-selection-only-no-dispatch",
+                                "no boundary;no submission", string.Join("|", violations.ToArray()))));
+                    if (!selected || violations.Count != 0)
+                    {
+                        result.Status = "FAIL";
+                        result.Stage = "qualification-validation";
+                    }
+                }
                 else if (RuntimeTestProtocol.IsProbeScenario(_request.Scenario))
                 {
                     // Probe acceptance (Unity-free rules in
@@ -1495,6 +1531,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         _request.Parameters);
             if (RuntimeTestProtocol.IsProbeScenario(_request.Scenario))
                 liveBudgetSeconds = 600 + RuntimeTestProtocol.ProbeRunDeadlineSeconds;
+            if (RuntimeTestProtocol.IsQualificationScenario(_request.Scenario))
+                liveBudgetSeconds = 600 + RuntimeTestProtocol.QualificationRunDeadlineSeconds;
             if (_livePhaseElapsed.Elapsed.TotalSeconds > liveBudgetSeconds)
                 throw new TimeoutException("Live UI scenario timed out;phase=" + _liveUiPhase +
                     ";elapsedSeconds=" + _livePhaseElapsed.Elapsed.TotalSeconds.ToString("F1",
@@ -1803,6 +1841,12 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         _liveUiPhase = 45;
                         return false;
                     }
+                    if (RuntimeTestProtocol.IsQualificationScenario(_request.Scenario))
+                    {
+                        // Qualification: the production-path driver.
+                        _liveUiPhase = 55;
+                        return false;
+                    }
                     if (RuntimeTestProtocol.IsProbeScenario(_request.Scenario))
                     {
                         // Probe: no scripted authoring; selection (and, only
@@ -1822,6 +1866,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (_liveUiPhase == 45)
             {
                 return UpdateInspection();
+            }
+            if (_liveUiPhase == 55)
+            {
+                return UpdateQualification();
             }
             if (_liveUiPhase == 40)
             {
@@ -2525,6 +2573,137 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private string _inspectionSummary = string.Empty;
         private string _inspectionFailure;
 
+        // Qualification scenario: the Unity-free driver runs the whole
+        // sequence over the production path; this host only builds it with
+        // the real adapters (fresh discovery, production executors, fresh
+        // native reads), pumps it once per update and publishes the record.
+        private bool UpdateQualification()
+        {
+            if (_qualificationDriver == null)
+            {
+                ProbeWorkspaceCloseResult closed = CloseProbeWorkspace();
+                _qualificationRecord.CastingScenario =
+                    RuntimeTestProtocol.IsCastingQualificationScenario(_request.Scenario);
+                CastingQualificationAllowance allowance = null;
+                if (_qualificationRecord.CastingScenario)
+                {
+                    object raw;
+                    string json = _request.Parameters.TryGetValue("qualificationAllowance", out raw)
+                        ? raw as string : null;
+                    string refusal = "absent";
+                    allowance = json == null ? null
+                        : CastingQualificationAllowance.Parse(json, _request.RunId, out refusal);
+                    _qualificationRecord.AllowanceStatus = allowance == null ? refusal : "parsed";
+                    if (allowance != null)
+                    {
+                        SingleCastProbeRuntimeIdentity measured = MeasureProbeRuntimeIdentity();
+                        string mismatch =
+                            measured.SourceCommit != allowance.SourceCommit ? "commit"
+                            : measured.PackageSha256 != allowance.PackageSha256 ? "package"
+                            : measured.DllSha256 != allowance.DllSha256 ? "dll"
+                            : measured.AssemblyMvid != allowance.AssemblyMvid ? "mvid" : null;
+                        if (mismatch != null)
+                        {
+                            _qualificationRecord.AllowanceStatus = "identity-mismatch:" + mismatch;
+                            allowance = null;
+                        }
+                    }
+                }
+                string campaignId = Kingmaker.Game.Instance == null || Kingmaker.Game.Instance.Player == null
+                    ? null : Kingmaker.Game.Instance.Player.GameId;
+                string modPath = _modEntry.Path;
+                var clock = System.Diagnostics.Stopwatch.StartNew();
+                _qualificationHost = new CastingExecutionHost(
+                    settings => BuffPlannerUiRoot.CreateCastingExecutorForRuntime(settings),
+                    () => clock.ElapsedMilliseconds);
+                _qualificationDriver = new CastingQualificationDriver(_qualificationRecord, allowance,
+                    campaignId, BuffPlannerUiRoot.CastingWorkspaceFreshInputsForRuntime,
+                    boundary => new CastingWorkspaceSession(modPath, campaignId, boundary),
+                    _qualificationHost,
+                    (step, label) => new KingmakerProbeObserver().Observe(step, label, _probeClock),
+                    () => clock.ElapsedMilliseconds,
+                    RuntimeTestProtocol.QualificationRunDeadlineSeconds * 1000L);
+                _log.Info("[KBP-QUAL] driver built;casting=" + _qualificationRecord.CastingScenario +
+                    ";allowance=" + _qualificationRecord.AllowanceStatus + ";workspaceClosed=" +
+                    closed.Closed + ";campaign=" + campaignId + ".");
+                return false;
+            }
+            _qualificationDriver.Update();
+            if (!_qualificationDriver.Completed) return false;
+            PublishQualificationRecord();
+            _liveInitialCatalogEvidence = "qualification-scenario;workspaceRoot=active;legacyScreen=closed";
+            _workspaceInteractionEvidence = "qualification;recipe-authoring";
+            _workspaceReopenEvidence = "qualification;session-reopened-from-disk";
+            _completed = true;
+            return true;
+        }
+
+        private readonly CastingQualificationRecord _qualificationRecord = new CastingQualificationRecord();
+        private CastingQualificationDriver _qualificationDriver;
+        private CastingExecutionHost _qualificationHost;
+
+        private void PublishQualificationRecord()
+        {
+            CastingQualificationRecord record = _qualificationRecord;
+            var steps = new JArray();
+            foreach (CastingQualificationStepResult step in record.Steps)
+            {
+                steps.Add(new JObject
+                {
+                    { "name", step.Name },
+                    { "applyAllowed", step.ApplyAllowed },
+                    { "applyReason", step.ApplyReason },
+                    { "projectionId", step.ProjectionId },
+                    { "terminal", step.Report == null ? null : step.Report.TerminalReason },
+                    { "entries", step.Report == null ? new JArray() : new JArray(step.Report.Entries
+                        .Select(entry => (object)(entry.CastingId + "=" + entry.State + ";submitted=" +
+                            entry.Submitted + ";spend=" + entry.SpendReported + ";free=" + entry.FreeCast +
+                            ";detail=" + entry.Detail)).ToArray()) },
+                    { "transitions", new JArray(step.Transitions.Cast<object>().ToArray()) },
+                    { "availability", new JArray(step.Availability.Cast<object>().ToArray()) },
+                    { "observations", new JArray(step.Observations.Cast<object>().ToArray()) }
+                });
+            }
+            CastingQualificationSelection selection = record.Selection;
+            AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory, "qual-outcome.json"),
+                new JObject
+                {
+                    { "schemaVersion", 1 },
+                    { "runId", _request.RunId },
+                    { "scenario", _request.Scenario },
+                    { "castingScenario", record.CastingScenario },
+                    { "allowanceStatus", record.AllowanceStatus },
+                    { "terminalReason", record.TerminalReason },
+                    { "selection", selection == null ? null : new JObject
+                        {
+                            { "selected", selection.Selected },
+                            { "refusal", selection.Refusal },
+                            { "sourceId", selection.SourceId },
+                            { "castings", new JArray(selection.Castings.Select(casting => (object)(
+                                casting.CastingId + "=" + casting.CasterUnitId + ">" +
+                                casting.DirectTargetUnitId)).ToArray()) },
+                            { "rejections", new JArray(selection.Rejections.Cast<object>().ToArray()) }
+                        } },
+                    { "forecast", record.Forecast == null ? new JArray() : new JArray(record.Forecast
+                        .Select(step => (object)new JObject
+                        {
+                            { "name", step.Name },
+                            { "projectionId", step.ProjectionId },
+                            { "refusal", step.Refusal },
+                            { "castingIds", new JArray(step.CastingIds.Cast<object>().ToArray()) },
+                            { "canonicalContract", step.CanonicalContract }
+                        }).ToArray()) },
+                    { "steps", steps },
+                    { "submissions", new JArray(record.Submissions.Cast<object>().ToArray()) },
+                    { "plannedSubmissions", record.PlannedSubmissions },
+                    { "maximumSubmissions", record.MaximumSubmissions },
+                    { "failures", new JArray(record.Failures.Cast<object>().ToArray()) },
+                    { "violations", new JArray(record.Violations().Cast<object>().ToArray()) }
+                }.ToString(Formatting.Indented) + Environment.NewLine);
+            _log.Info("[KBP-QUAL] published;terminal=" + record.TerminalReason + ";violations=" +
+                string.Join("|", record.Violations().ToArray()) + ".");
+        }
+
         private bool UpdateProbeSelection()
         {
             if (_probeOwner == null || !_probeOwner.BeginSelection())
@@ -2638,6 +2817,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (_shutdownReason == null)
                 _shutdownReason = string.IsNullOrEmpty(reason) ? "unspecified" : reason;
             if (_probeOwner != null) _probeOwner.Terminate(reason);
+            // The qualification run ends through the same host terminal (the
+            // in-flight executor restores temporary native state).
+            if (_qualificationDriver != null) _qualificationDriver.Terminate(reason);
+            if (_qualificationHost != null) _qualificationHost.Shutdown(reason);
         }
 
         private string _shutdownReason;
