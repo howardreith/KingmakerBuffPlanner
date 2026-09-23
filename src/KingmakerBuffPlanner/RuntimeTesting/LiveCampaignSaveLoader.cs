@@ -573,13 +573,26 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         }
 
         // Null while the reload is in progress; its evidence once the header
-        // protocol completed, the native saver is restored and the reloaded
-        // campaign's identity is stable over two frames. Throws on a
-        // violation or when the budget is spent.
-        internal string UpdateReload()
+        // protocol completed, the native saver is restored, the host saw the
+        // area unload and load again, and the reloaded campaign's identity
+        // is stable over two frames (live run casting-ws-reload-20260923-s1-01
+        // read the campaign mid-load: party 0). Throws on a violation or when
+        // the budget is spent; the events are written either way.
+        internal string UpdateReload(bool areaReloaded)
         {
             if (!_reloadStarted) return null;
             if (_reloadComplete) return ReloadEvidence;
+            try { return AdvanceReload(areaReloaded); }
+            catch (Exception exception)
+            {
+                Add("reload-failure", exception.GetType().Name + ":" + exception.Message);
+                WriteEventsEvidence();
+                throw;
+            }
+        }
+
+        private string AdvanceReload(bool areaReloaded)
+        {
             if (_reloadWrongThread)
                 throw new InvalidOperationException("The reload callback ran off the game thread.");
             if (_elapsed.ElapsedMilliseconds - _reloadStartedMillis > ReloadBudgetSeconds * 1000L)
@@ -599,7 +612,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 Add("reload-read-only-native-save-load-verified",
                     "headerUpdateSuppressed=1;commitSuppressed=1;nativeDescriptorRestored=true");
             }
-            string fingerprint = CurrentFingerprint();
+            if (!areaReloaded) return null;
+            string fingerprint = CurrentFingerprint(true);
             if (fingerprint == null) return null;
             if (string.Equals(fingerprint, _reloadLastFingerprint, StringComparison.Ordinal))
                 _reloadStableFingerprints++;
@@ -642,7 +656,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
 
         private void PollFingerprint()
         {
-            string value = CurrentFingerprint();
+            string value = CurrentFingerprint(false);
             if (value == null) return;
             if (string.Equals(value, _lastFingerprint, StringComparison.Ordinal))
                 _stableFingerprints++;
@@ -660,9 +674,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             }
         }
 
-        // The loaded campaign's identity; null before a player exists.
+        // The loaded campaign's identity; null before a player exists (and,
+        // while a reload is still populating the party, before it has one).
         // Throws when it is not the expected working campaign.
-        private string CurrentFingerprint()
+        private string CurrentFingerprint(bool waitWhileLoading)
         {
             object player = Game.Instance == null
                 ? null : MainMenuLoadContracts.ReadMember(Game.Instance, "Player");
@@ -678,6 +693,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 ";sceneType=" + (scene == null ? "" : scene.GetType().FullName) +
                 ";partyCount=" + partyCount +
                 ";mainCharacterType=" + (main == null ? "" : main.GetType().FullName);
+            if (waitWhileLoading && partyCount <= 0) return null;
             if (!string.Equals(gameId, Parameter("expectedGameId"), StringComparison.Ordinal) ||
                 partyCount <= 0)
                 throw new InvalidOperationException(
