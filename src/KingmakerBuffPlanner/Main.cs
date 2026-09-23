@@ -73,6 +73,13 @@ namespace KingmakerBuffPlanner
             _enabled = value;
             _log.Info("[KBP-BOOT] OnToggle invoked;value=" + value +
                 ";modEntry.Enabled=" + (modEntry != null && modEntry.Enabled) + ".");
+            // Review M3: disabling the mod must not leave a runtime probe run
+            // able to continue on its own; its owner terminates and cleans up.
+            if (!value && _runtimeTest != null)
+            {
+                try { _runtimeTest.Shutdown("mod-disabled"); }
+                catch (Exception exception) { _log.Error("[KBP-PROBE] disable shutdown failed.", exception); }
+            }
             BuffPlannerUiRoot.SetEnabled(value);
             return true;
         }
@@ -165,6 +172,11 @@ namespace KingmakerBuffPlanner
         private static bool OnUnload(UnityModManager.ModEntry modEntry)
         {
             _enabled = false;
+            if (_runtimeTest != null)
+            {
+                try { _runtimeTest.Shutdown("mod-unload"); }
+                catch (Exception exception) { _log.Error("[KBP-PROBE] unload shutdown failed.", exception); }
+            }
             _runtimeTest = null;
             BuffPlannerUiRoot.DestroyOwned();
             PlannerPointerOwnership.Uninstall();

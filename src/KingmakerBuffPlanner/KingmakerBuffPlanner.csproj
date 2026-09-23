@@ -118,6 +118,8 @@
     <Compile Include="Execution\HybridCastExecutor.cs" />
     <Compile Include="Execution\ExplicitCastingRunCoordinator.cs" />
     <Compile Include="Execution\SingleCastProbe.cs" />
+    <Compile Include="Execution\SingleCastProbeObservation.cs" />
+    <Compile Include="GameAdapters\KingmakerProbeObserver.cs" />
     <Compile Include="Diagnostics\ShareCastDiagnostics.cs" />
     <Compile Include="Compatibility\BrownFurPowerfulChangeProfile.cs" />
     <Compile Include="Compatibility\BrownFurPowerfulChangeCompatibility.cs" />

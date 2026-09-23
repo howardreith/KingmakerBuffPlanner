@@ -413,6 +413,9 @@ namespace KingmakerBuffPlanner.Tests
                 Run("single-cast-probe-is-dormant-and-one-shot",
                     () => TestSingleCastProbeIsDormantAndOneShot(root));
                 Run("single-cast-probe-run-record-rules", TestSingleCastProbeRunRecordRules);
+                Run("probe-observations-are-authoritative", TestProbeObservationsAreAuthoritative);
+                Run("probe-owner-terminal-cleanup", TestProbeOwnerTerminalCleanup);
+                Run("probe-owner-wiring-in-host-and-main", TestProbeOwnerWiringInHostAndMain);
             }
             finally
             {
@@ -9720,66 +9723,281 @@ namespace KingmakerBuffPlanner.Tests
             }
         }
 
-        // The probe run record's acceptance rules (the host only fills it).
+        // The probe run record's acceptance rules (the owner fills it).
         private static void TestSingleCastProbeRunRecordRules()
         {
             Func<SingleCastProbeRunRecord> selectOnly = () => new SingleCastProbeRunRecord
             {
                 CastingScenario = false, Selected = true, SelectionEvidence = "ok",
-                WorkspaceClosed = true, InputLeaseReleased = true
+                WorkspaceClosed = true, InputLeaseReleased = true, CleanupRecorded = true,
+                TerminalReason = "completed"
             };
             if (selectOnly().Violations().Count != 0)
                 throw new InvalidOperationException("A clean selection-only run was rejected.");
-            SingleCastProbeRunRecord touched = selectOnly();
-            touched.BoundaryConstructed = true;
-            if (!touched.Violations().Contains("selection-only-run-touched-dispatch"))
-                throw new InvalidOperationException("A selection-only run that touched dispatch passed.");
-            SingleCastProbeRunRecord notSelected = selectOnly();
-            notSelected.Selected = false;
-            SingleCastProbeRunRecord leaked = selectOnly();
-            leaked.InputLeaseReleased = false;
-            if (notSelected.Violations().Count == 0 || leaked.Violations().Count == 0)
-                throw new InvalidOperationException("A failed selection or leaked lease passed.");
-
-            // Casting run: build a real confirmed outcome for the projection.
-            PartyProviderSnapshot snapshot;
-            CastingWorkspaceInputs inputs = WorkspaceInputs(out snapshot);
-            SingleCastProbeSelection selection = SingleCastProbeSelector.Select(inputs, "fixture-campaign");
-            ExplicitCastingRunOutcome confirmed = null;
-            System.Collections.IEnumerator loop = new ExplicitCastingRunCoordinator(
-                    new InstantCastExecutor(new ScriptedInstantRuntime("none", "none"), true), 1)
-                .Run(selection.Projection, value => confirmed = value);
-            while (loop.MoveNext()) { }
-            Func<SingleCastProbeRunRecord> cast = () => new SingleCastProbeRunRecord
+            var selectMutations = new Dictionary<string, Action<SingleCastProbeRunRecord>>
             {
-                CastingScenario = true, Selected = true, SelectionEvidence = "ok",
-                ProjectionId = selection.Projection.ProjectionId, AllowanceStatus = "valid",
-                BoundaryConstructed = true, Submitted = true, Outcome = confirmed,
-                PoolRemainingBefore = 3, PoolRemainingAfter = 2, ReservedUnits = 1,
-                BoundaryDisposed = true, WorkspaceClosed = true, InputLeaseReleased = true
+                { "touched-dispatch", r => r.BoundaryConstructed = true },
+                { "not-selected", r => r.Selected = false },
+                { "leaked-lease", r => r.InputLeaseReleased = false },
+                { "cleanup-not-recorded", r => r.CleanupRecorded = false },
+                { "terminated", r => r.TerminalReason = "mod-unload" },
+                { "cleanup-failed", r => r.CleanupFailures.Add("workspace-close:x") }
             };
-            if (cast().Violations().Count != 0)
-                throw new InvalidOperationException("A clean confirmed probe was rejected: " +
-                    string.Join("|", cast().Violations().ToArray()));
-            var mutations = new Dictionary<string, Action<SingleCastProbeRunRecord>>
+            foreach (KeyValuePair<string, Action<SingleCastProbeRunRecord>> mutation in selectMutations)
             {
-                { "no-allowance", r => { r.AllowanceStatus = "absent"; r.Submitted = false; r.BoundaryConstructed = false; } },
-                { "not-submitted", r => r.Submitted = false },
-                { "no-resource-change", r => r.PoolRemainingAfter = 3 },
-                { "double-spend", r => r.PoolRemainingAfter = 1 },
-                { "unknown-pool", r => r.PoolRemainingAfter = null },
-                { "deadline", r => r.DeadlineOrStop = true },
-                { "not-disposed", r => r.BoundaryDisposed = false },
-                { "projection-mismatch", r => r.ProjectionId = new string('0', 64) },
-                { "no-outcome", r => r.Outcome = null }
-            };
-            foreach (KeyValuePair<string, Action<SingleCastProbeRunRecord>> mutation in mutations)
-            {
-                SingleCastProbeRunRecord record = cast();
+                SingleCastProbeRunRecord record = selectOnly();
                 mutation.Value(record);
                 if (record.Violations().Count == 0)
-                    throw new InvalidOperationException("A probe run passed with " + mutation.Key + ".");
+                    throw new InvalidOperationException("A selection-only run passed with " + mutation.Key + ".");
             }
+        }
+
+        // Review M2 test double: the ONLY stand-in is the native producer.
+        private sealed class ScriptedProbeObserver : IProbeObserver
+        {
+            private readonly Func<string, ProbeSequenceClock, ProbeObservation> _read;
+            internal readonly List<string> Phases = new List<string>();
+            internal ScriptedProbeObserver(Func<string, ProbeSequenceClock, ProbeObservation> read)
+            {
+                _read = read;
+            }
+            public ProbeObservation Observe(CastStep step, string phase, ProbeSequenceClock clock)
+            {
+                Phases.Add(phase);
+                return _read(phase, clock);
+            }
+        }
+
+        private static ExplicitStepConversion ZeroCostProjection(string kind)
+        {
+            List<ProviderPlanningOption> options;
+            List<CastEnhancementSnapshot> enhancements;
+            PartyProviderSnapshot party = ZeroCostParty(kind, out options, out enhancements);
+            var effects = CastingEffects("source-bulls", "source-communal");
+            ExplicitCastingPlan plan = new ExplicitCastingCompiler().Compile(CastingDocument(DirectCasting(
+                    "cast-free", "long", "unit-cleric", "unit-t1", "source-bulls", CastingBuffAbility)),
+                party, options, effects, enhancements);
+            return ExplicitCastingStepConverter.Convert(plan,
+                new CastingExecutionGate().Evaluate(plan, CastingApplyMode.Ordinary, "long"),
+                options, effects, ExplicitProjectionScope.SingleCastProbe);
+        }
+
+        private sealed class ProbeOwnerRun
+        {
+            internal SingleCastProbeRunOwner Owner;
+            internal ScriptedInstantRuntime Runtime;
+            internal ScriptedProbeObserver Observer;
+            internal int Closes;
+            internal readonly List<SingleCastProbeRunRecord> Published = new List<SingleCastProbeRunRecord>();
+            internal CastingDispatchOutcome Submitted;
+        }
+
+        // Composes the REAL owner, observation session, one-shot boundary,
+        // run coordinator and InstantCastExecutor; only the game runtime
+        // and the native observer are recording stand-ins (not gameplay).
+        private static ProbeOwnerRun StartProbeOwnerRun(string kind, string runtimeMode,
+            Func<string, ProbeSequenceClock, ProbeObservation> read, bool closeThrows = false)
+        {
+            ExplicitStepConversion projection = ZeroCostProjection(kind);
+            if (!projection.Converted)
+                throw new InvalidOperationException("Owner fixture projection failed: " + projection.Refusal);
+            var run = new ProbeOwnerRun();
+            run.Observer = new ScriptedProbeObserver(read);
+            var record = new SingleCastProbeRunRecord
+            {
+                CastingScenario = true, Selected = true, SelectionEvidence = "fixture",
+                ProjectionId = projection.ProjectionId, AllowanceStatus = "valid"
+            };
+            run.Owner = new SingleCastProbeRunOwner(record, () =>
+            {
+                run.Closes++;
+                if (closeThrows) throw new InvalidOperationException("fixture-close");
+                return new ProbeWorkspaceCloseResult(true, true, null);
+            }, published => run.Published.Add(published));
+            string allowanceJson = "{\"schemaVersion\":1,\"kind\":\"kbp-single-cast-probe\",\"runId\":\"run-owner\"," +
+                "\"sourceCommit\":\"0000000\",\"approvedProjectionId\":\"" + projection.ProjectionId +
+                "\",\"casterUnitId\":\"unit-cleric\",\"targetUnitId\":\"unit-t1\",\"sourceId\":\"source-bulls\"," +
+                "\"maximumNativeSubmissions\":1,\"approvedBy\":\"owner\"}";
+            string refusal;
+            SingleCastProbeAllowance allowance = SingleCastProbeAllowance.Parse(allowanceJson, "run-owner", out refusal);
+            if (allowance == null) throw new InvalidOperationException("Owner fixture allowance: " + refusal);
+            var boundary = new SingleCastProbeBoundary(allowance, () =>
+            {
+                run.Runtime = new ScriptedInstantRuntime("cast-free", runtimeMode);
+                return new InstantCastExecutor(run.Runtime, true);
+            });
+            var clock = new ProbeSequenceClock();
+            ExplicitCastingPlan plan = new ExplicitCastingPlan(new ResolvedCasting[0], new string[0]);
+            CastingApplyDecision decision = new CastingApplyDecision(true, CastingApplyMode.Ordinary, "long",
+                projection.CastingIds, new CastingOmission[0], new string[0]);
+            run.Submitted = run.Owner.Submit(boundary,
+                new SingleCastProbeObservationSession(run.Observer, clock, projection.Plan.Steps[0]),
+                plan, decision, projection, 0);
+            return run;
+        }
+
+        private static ProbeObservation Obs(string phase, ProbeSequenceClock clock, int available,
+            params ProbeEffectInstance[] effects)
+        {
+            return ProbeObservation.Read(phase, clock.Next(), DateTime.UtcNow, "unit-t1", available, effects);
+        }
+
+        private static void PumpToEnd(ProbeOwnerRun run)
+        {
+            int guard = 0;
+            while (!run.Owner.Pump(guard, 60000, false) && guard++ < 10000) { }
+        }
+
+        // Review M2: fresh, sequenced before/after observations judged
+        // through the actual owner -> session -> validator composition.
+        private static void TestProbeObservationsAreAuthoritative()
+        {
+            var effect = new ProbeEffectInstance("buff-effect", "instance-2", 900);
+            var oldEffect = new ProbeEffectInstance("buff-effect", "instance-1", 500);
+            var refreshedOld = new ProbeEffectInstance("buff-effect", "instance-1", 950);
+
+            // A real zero-cost result: new effect instance, availability unchanged.
+            ProbeOwnerRun free = StartProbeOwnerRun("unlimited", "free", (phase, clock) =>
+                phase == "before" ? Obs(phase, clock, 7) : Obs(phase, clock, 7, effect));
+            PumpToEnd(free);
+            SingleCastProbeRunRecord freeRecord = free.Published.Single();
+            if (freeRecord.Violations().Count != 0 || freeRecord.Observation.EffectOutcome != "new-instance" ||
+                freeRecord.Observation.ResourceOutcome != "free-unchanged")
+                throw new InvalidOperationException("A genuine zero-cost probe was rejected: " +
+                    string.Join("|", freeRecord.Violations().ToArray()));
+
+            // A genuine paid cast consumes exactly one available cast.
+            ProbeOwnerRun paid = StartProbeOwnerRun("finite", "none", (phase, clock) =>
+                phase == "before" ? Obs(phase, clock, 3) : Obs(phase, clock, 2, effect));
+            PumpToEnd(paid);
+            if (paid.Published.Single().Violations().Count != 0)
+                throw new InvalidOperationException("A genuine paid probe was rejected: " +
+                    string.Join("|", paid.Published.Single().Violations().ToArray()));
+
+            // Fast paid cast observed through STALE state: the after read
+            // returns the cached before observation.
+            ProbeObservation cached = null;
+            ProbeOwnerRun stale = StartProbeOwnerRun("finite", "none", (phase, clock) =>
+                phase == "before" ? (cached = Obs(phase, clock, 3)) : cached);
+            PumpToEnd(stale);
+            IList<string> staleViolations = stale.Published.Single().Violations();
+            if (!staleViolations.Any(value => value.Contains("observation-order-invalid")))
+                throw new InvalidOperationException("A cached after-observation was accepted.");
+
+            // Refresh failure: never falls back to the earlier success.
+            ProbeOwnerRun failedRefresh = StartProbeOwnerRun("finite", "none", (phase, clock) =>
+            {
+                if (phase == "after") throw new InvalidOperationException("fixture-refresh-failed");
+                return Obs(phase, clock, 3);
+            });
+            PumpToEnd(failedRefresh);
+            SingleCastProbeRunRecord failedRecord = failedRefresh.Published.Single();
+            if (!failedRecord.Violations().Any(value => value.Contains("after-observation-unavailable")) ||
+                failedRecord.Observation.After.Succeeded || failedRecord.Observation.ResourceOutcome != "unknown")
+                throw new InvalidOperationException("A failed refresh reused an old observation.");
+
+            // Already-present effect without a verified transition fails;
+            // a verified refresh of the same instance passes.
+            ProbeOwnerRun unchanged = StartProbeOwnerRun("unlimited", "free", (phase, clock) =>
+                Obs(phase, clock, 7, oldEffect));
+            PumpToEnd(unchanged);
+            if (!unchanged.Published.Single().Violations().Any(value => value.Contains("effect:transition-unverified")))
+                throw new InvalidOperationException("A pre-existing effect established a new cast.");
+            ProbeOwnerRun refreshed = StartProbeOwnerRun("unlimited", "free", (phase, clock) =>
+                phase == "before" ? Obs(phase, clock, 7, oldEffect) : Obs(phase, clock, 7, refreshedOld));
+            PumpToEnd(refreshed);
+            if (refreshed.Published.Single().Violations().Count != 0 ||
+                refreshed.Published.Single().Observation.EffectOutcome != "refreshed")
+                throw new InvalidOperationException("A verified refresh was rejected.");
+
+            // Unexpected paid-resource loss on a verified free source.
+            ProbeOwnerRun loss = StartProbeOwnerRun("unlimited", "free", (phase, clock) =>
+                phase == "before" ? Obs(phase, clock, 7) : Obs(phase, clock, 6, effect));
+            PumpToEnd(loss);
+            if (!loss.Published.Single().Violations().Any(value => value.Contains("unexpected-paid-resource-loss:1")))
+                throw new InvalidOperationException("A paid loss on a free source passed.");
+
+            // A missing resource read is never zero.
+            ProbeOwnerRun missing = StartProbeOwnerRun("unlimited", "free", (phase, clock) =>
+                phase == "before" ? ProbeObservation.Failed(phase, clock.Next(), DateTime.UtcNow, "fixture")
+                    : Obs(phase, clock, 7, effect));
+            if (missing.Submitted.Submitted || missing.Runtime != null)
+                throw new InvalidOperationException("A cast was submitted without a fresh before-observation.");
+        }
+
+        // Review M3 (Unity-bound wiring, checked structurally): disable,
+        // unload and the host failure path all route to the owner's terminal
+        // BEFORE state is dropped or the failure result is published, and
+        // the host never pumps or disposes a boundary itself.
+        private static void TestProbeOwnerWiringInHostAndMain()
+        {
+            string source = Path.Combine(FindRepositoryRoot(), "src", "KingmakerBuffPlanner");
+            string main = File.ReadAllText(Path.Combine(source, "Main.cs"));
+            string host = File.ReadAllText(Path.Combine(source, "RuntimeTesting", "RuntimeTestHost.cs"));
+            int toggle = main.IndexOf("private static bool OnToggle", StringComparison.Ordinal);
+            int unload = main.IndexOf("private static bool OnUnload", StringComparison.Ordinal);
+            int disabled = main.IndexOf("Shutdown(\"mod-disabled\")", StringComparison.Ordinal);
+            int unloaded = main.IndexOf("Shutdown(\"mod-unload\")", StringComparison.Ordinal);
+            int dropped = main.IndexOf("_runtimeTest = null;", unload, StringComparison.Ordinal);
+            if (disabled < toggle || disabled > main.IndexOf("}", main.IndexOf("return true;", toggle,
+                    StringComparison.Ordinal), StringComparison.Ordinal) ||
+                unloaded < unload || dropped < 0 || unloaded > dropped)
+                throw new InvalidOperationException("Main does not terminate the probe owner on disable/unload before dropping it.");
+            int hostFailure = host.IndexOf("Shutdown(\"host-exception:", StringComparison.Ordinal);
+            int failureWrite = host.IndexOf("TryWriteFailure(_startedAtUtc, exception);", hostFailure < 0 ? 0 : hostFailure,
+                StringComparison.Ordinal);
+            if (hostFailure < 0 || failureWrite < 0 || failureWrite - hostFailure > 600)
+                throw new InvalidOperationException("The host failure path does not terminate the probe before publishing.");
+            if (host.Contains("_probeBoundary") || !host.Contains("_probeOwner.Pump(") ||
+                !host.Contains("_probeOwner.Terminate(\"completed\")"))
+                throw new InvalidOperationException("The host bypasses the probe owner.");
+            if (host.Contains("PoolRemaining("))
+                throw new InvalidOperationException("The probe still reads resources through the cached UI discovery.");
+        }
+
+        // Review M3: the owner's single terminal path around a PENDING
+        // executor - outside stop, disable, unload, deadline and host
+        // failure - disposes the boundary (executor cleanup runs), takes a
+        // fresh after-read, closes the workspace, records cleanup and
+        // publishes exactly once; nothing is submitted later.
+        private static void TestProbeOwnerTerminalCleanup()
+        {
+            Func<string, ProbeSequenceClock, ProbeObservation> read = (phase, clock) => Obs(phase, clock, 7);
+            foreach (string reason in new[] { "stop", "mod-disabled", "mod-unload", "host-exception:Fixture:boom", "deadline" })
+            {
+                ProbeOwnerRun run = StartProbeOwnerRun("unlimited", "pending", read);
+                if (!run.Submitted.Submitted)
+                    throw new InvalidOperationException("Owner fixture did not submit: " + run.Submitted.Reason);
+                int frames = 0;
+                while (run.Runtime.Fired.Count == 0 && !run.Owner.Pump(frames, 60000, false) && frames++ < 1000) { }
+                if (run.Runtime.Fired.Count != 1 || run.Owner.Terminated)
+                    throw new InvalidOperationException("Owner fixture did not reach the pending confirmation.");
+                if (reason == "deadline") run.Owner.Pump(120000, 60000, false);
+                else if (reason == "stop") run.Owner.Pump(frames + 1, 60000, true);
+                else run.Owner.Terminate(reason);
+                run.Owner.Terminate("mod-unload");
+                run.Owner.Pump(999999, 60000, true);
+                SingleCastProbeRunRecord record = run.Published.SingleOrDefault();
+                if (record == null || run.Owner.PublishCount != 1 || run.Closes != 1)
+                    throw new InvalidOperationException(reason + ": terminal cleanup was not exactly once.");
+                if (record.TerminalReason != reason || !record.BoundaryDisposed || !record.CleanupRecorded ||
+                    record.Outcome == null || !record.Outcome.Cancelled || record.Outcome.AllConfirmed ||
+                    !run.Runtime.Cleaned.Contains("cast-free") || run.Runtime.Fired.Count != 1 ||
+                    record.Observation.After == null ||
+                    !record.Violations().Contains("probe-terminated:" + reason))
+                    throw new InvalidOperationException(reason + ": terminal outcome was not truthful: " +
+                        string.Join("|", record.Violations().ToArray()));
+            }
+            // A cleanup failure is appended; the primary reason is kept.
+            ProbeOwnerRun failing = StartProbeOwnerRun("unlimited", "pending", read, true);
+            int step = 0;
+            while (failing.Runtime.Fired.Count == 0 && !failing.Owner.Pump(step, 60000, false) && step++ < 1000) { }
+            failing.Owner.Terminate("host-exception:Fixture:primary");
+            SingleCastProbeRunRecord failed = failing.Published.Single();
+            if (failed.TerminalReason != "host-exception:Fixture:primary" ||
+                !failed.CleanupFailures.Any(value => value.StartsWith("workspace-close:", StringComparison.Ordinal)) ||
+                !failed.Violations().Any(value => value.StartsWith("probe-cleanup-failed:workspace-close", StringComparison.Ordinal)))
+                throw new InvalidOperationException("A cleanup failure replaced the primary reason or vanished.");
         }
 
         private static void TestValidNativeUiProbeRequest(string root)

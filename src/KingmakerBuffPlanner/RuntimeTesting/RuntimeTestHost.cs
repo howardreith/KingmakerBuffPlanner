@@ -111,8 +111,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         // Single-cast probe (dormant unless the owner's allowance is present).
         private readonly SingleCastProbeRunRecord _probeRecord = new SingleCastProbeRunRecord();
         private SingleCastProbeSelection _probeSelection;
-        private SingleCastProbeBoundary _probeBoundary;
-        private long _probeRunStartedMillis = -1;
+        private SingleCastProbeRunOwner _probeOwner;
+        private readonly ProbeSequenceClock _probeClock = new ProbeSequenceClock();
         private readonly List<string> _interactionCasters = new List<string>();
         private readonly List<string> _interactionTargets = new List<string>();
         private readonly List<string> _interactionCastIds = new List<string>();
@@ -179,6 +179,17 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 {
                     _completed = true;
                     _log.Error("Live UI runtime scenario failed.", exception);
+                    // Review M3: the probe owner's terminal cleanup runs BEFORE
+                    // the failure result is published; the primary failure is
+                    // kept and cleanup failures are appended by the owner.
+                    try
+                    {
+                        Shutdown("host-exception:" + exception.GetType().Name + ":" + exception.Message);
+                    }
+                    catch (Exception cleanup)
+                    {
+                        _log.Error("[KBP-PROBE] terminal cleanup after host failure failed.", cleanup);
+                    }
                     TryWriteFailure(_startedAtUtc, exception);
                     if (_request.ExitAfterCompletion) Application.Quit();
                     return true;
@@ -710,8 +721,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         ? (violations.Count == 0
                             ? RuntimeTestAssertion.Pass("probe-native-cast",
                                 "allowance valid;1 confirmed;exact resource delta",
-                                "projection=" + _probeRecord.ProjectionId + ";pool=" +
-                                _probeRecord.PoolRemainingBefore + "->" + _probeRecord.PoolRemainingAfter)
+                                "projection=" + _probeRecord.ProjectionId + ";effect=" +
+                                (_probeRecord.Observation == null ? "none" : _probeRecord.Observation.EffectOutcome) +
+                                ";resource=" +
+                                (_probeRecord.Observation == null ? "none" : _probeRecord.Observation.ResourceOutcome))
                             : RuntimeTestAssertion.Fail("probe-native-cast",
                                 "allowance valid;1 confirmed;exact resource delta",
                                 string.Join("|", violations.ToArray())))
@@ -2374,7 +2387,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         // ------------------------------------------------------------------
         // Single-cast probe phases (40-42). Selection is discovery-driven
         // and recorded in full before anything else; the boundary exists
-        // only in the casting scenario and only with a valid allowance.
+        // only in the casting scenario and only with a valid allowance. The
+        // SingleCastProbeRunOwner owns the boundary, the fresh observations
+        // and the ONE terminal cleanup path (reviews M2/M3); this host only
+        // routes frames, stop/deadline, host failures and disable/unload to it.
         // ------------------------------------------------------------------
         private bool UpdateProbeSelection()
         {
@@ -2382,23 +2398,26 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             CastingWorkspaceInputs inputs = BuffPlannerUiRoot.CastingWorkspaceInputsForRuntime();
             if (inputs == null) return false;
             _probeRecord.CastingScenario = RuntimeTestProtocol.IsCastingProbeScenario(_request.Scenario);
-            _probeSelection = SingleCastProbeSelector.Select(inputs, "probe");
+            _probeOwner = new SingleCastProbeRunOwner(_probeRecord, CloseProbeWorkspace, PublishProbeRecord);
+            _probeSelection = SingleCastProbeSelector.Select(inputs, "probe",
+                KingmakerProbeObserver.EffectPresent);
             _probeRecord.Selected = _probeSelection.Selected;
             ExplicitStepConversion projection = _probeSelection.Projection;
             CastStep step = _probeSelection.Selected ? projection.Plan.Steps[0] : null;
             _probeRecord.ProjectionId = _probeSelection.Selected ? projection.ProjectionId : null;
-            _probeRecord.ReservedUnits = step == null ? 0 : step.Reservation.Units;
-            _probeRecord.PoolRemainingBefore = step == null ? (int?)null
-                : PoolRemaining(inputs, step.Reservation.PoolKey);
             _probeRecord.SelectionEvidence = _probeSelection.Selected
                 ? "caster=" + _probeSelection.CasterUnitId + ";target=" + _probeSelection.TargetUnitId +
                     ";source=" + _probeSelection.SourceId + ";provider=" + _probeSelection.Provider.Canonical +
                     ";projection=" + projection.ProjectionId + ";considered=" + _probeSelection.CandidatesConsidered
                 : "refused:" + _probeSelection.Refusal + ";considered=" + _probeSelection.CandidatesConsidered;
+            // A read-only fresh observation of the selected casting (no
+            // submission): evidence for the proposal only.
+            ProbeObservation preview = step == null ? null
+                : new KingmakerProbeObserver().Observe(step, "selection-preview", _probeClock);
             AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory, "probe-selection.json"),
                 new JObject
                 {
-                    { "schemaVersion", 1 },
+                    { "schemaVersion", 2 },
                     { "runId", _request.RunId },
                     { "scenario", _request.Scenario },
                     { "selected", _probeSelection.Selected },
@@ -2410,140 +2429,63 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     { "projectionId", _probeRecord.ProjectionId },
                     { "canonicalContract", _probeSelection.Selected ? projection.CanonicalContract : null },
                     { "reservedPoolKey", step == null ? null : step.Reservation.PoolKey },
-                    { "reservedUnits", _probeRecord.ReservedUnits },
-                    { "poolRemainingBefore", _probeRecord.PoolRemainingBefore },
+                    { "reservedUnits", step == null ? 0 : step.Reservation.Units },
+                    { "reservationUnlimited", step != null && step.Reservation.Unlimited },
+                    { "selectionPreviewObservation", preview == null ? null : preview.Describe() },
                     { "candidatesConsidered", _probeSelection.CandidatesConsidered },
                     { "rejections", new JArray(_probeSelection.Rejections.Cast<object>().ToArray()) }
                 }.ToString(Formatting.Indented) + Environment.NewLine);
             _log.Info("[KBP-PROBE] selection;" + _probeRecord.SelectionEvidence + ".");
             if (!_probeRecord.CastingScenario || !_probeSelection.Selected)
             {
+                _probeOwner.Terminate("completed");
                 _liveUiPhase = 42;
                 return false;
             }
             object raw;
             string allowanceJson = _request.Parameters != null &&
                 _request.Parameters.TryGetValue("probeAllowance", out raw) ? raw as string : null;
-            string refusal;
+            string refusal = "absent";
             SingleCastProbeAllowance allowance = allowanceJson == null ? null
                 : SingleCastProbeAllowance.Parse(allowanceJson, _request.RunId, out refusal);
-            if (allowanceJson == null) refusal = "absent";
-            else if (allowance != null) refusal = null;
-            else SingleCastProbeAllowance.Parse(allowanceJson, _request.RunId, out refusal);
             _probeRecord.AllowanceStatus = allowance == null ? refusal : "valid";
             if (allowance == null)
             {
                 _log.Info("[KBP-PROBE] no valid allowance (" + refusal + "); no dispatch boundary constructed.");
+                _probeOwner.Terminate("completed");
                 _liveUiPhase = 42;
                 return false;
             }
-            _probeBoundary = new SingleCastProbeBoundary(allowance,
+            var boundary = new SingleCastProbeBoundary(allowance,
                 () => new InstantCastExecutor(new KingmakerInstantCastAdapter(_log.Info), true));
-            _probeRecord.BoundaryConstructed = true;
-            CastingDispatchOutcome outcome = _probeBoundary.Submit(_probeSelection.Plan,
-                _probeSelection.Decision, "long", projection);
-            _probeRecord.Submitted = outcome.Submitted;
-            _probeRecord.SubmitReason = outcome.Reason;
-            _log.Info("[KBP-PROBE] boundary submit;submitted=" + outcome.Submitted +
+            CastingDispatchOutcome outcome = _probeOwner.Submit(boundary,
+                new SingleCastProbeObservationSession(new KingmakerProbeObserver(), _probeClock, step),
+                _probeSelection.Plan, _probeSelection.Decision, projection,
+                _workspaceCaptureElapsed.ElapsedMilliseconds);
+            _log.Info("[KBP-PROBE] owner submit;submitted=" + outcome.Submitted +
                 ";reason=" + outcome.Reason + ".");
             if (!outcome.Submitted)
             {
+                _probeOwner.Terminate("completed");
                 _liveUiPhase = 42;
                 return false;
             }
-            _probeRunStartedMillis = _workspaceCaptureElapsed.ElapsedMilliseconds;
             _liveUiPhase = 41;
             return false;
         }
 
         private bool UpdateProbeRun()
         {
-            // One MoveNext per frame; stop marker or deadline disposes the
-            // boundary, which propagates to the executor's cleanup. Never
-            // retried.
-            bool deadline = _workspaceCaptureElapsed.ElapsedMilliseconds - _probeRunStartedMillis >
-                RuntimeTestProtocol.ProbeRunDeadlineSeconds * 1000L;
             bool stop = File.Exists(Path.Combine(_request.EvidenceDirectory, "probe-stop.json"));
-            if (deadline || stop)
-            {
-                _probeRecord.DeadlineOrStop = true;
-                _log.Info("[KBP-PROBE] " + (stop ? "stop marker" : "deadline") + "; disposing the run.");
-                _probeBoundary.Dispose();
-                _probeRecord.BoundaryDisposed = true;
+            if (_probeOwner.Pump(_workspaceCaptureElapsed.ElapsedMilliseconds,
+                    RuntimeTestProtocol.ProbeRunDeadlineSeconds * 1000L, stop))
                 _liveUiPhase = 42;
-                return false;
-            }
-            bool moved;
-            try { moved = _probeBoundary.ActiveRun != null && _probeBoundary.ActiveRun.MoveNext(); }
-            catch (Exception exception)
-            {
-                _log.Error("[KBP-PROBE] run pump failed.", exception);
-                moved = false;
-            }
-            if (moved) return false;
-            _liveUiPhase = 42;
             return false;
         }
 
         private bool CompleteProbe()
         {
-            if (_probeBoundary != null)
-            {
-                _probeBoundary.Dispose();
-                _probeRecord.BoundaryDisposed = true;
-                _probeRecord.Outcome = _probeBoundary.Outcome;
-            }
-            if (_probeRecord.CastingScenario && _probeRecord.Submitted && _probeSelection != null)
-            {
-                CastingWorkspaceInputs after = BuffPlannerUiRoot.CastingWorkspaceInputsForRuntime();
-                CastStep step = _probeSelection.Projection.Plan.Steps[0];
-                _probeRecord.PoolRemainingAfter = after == null ? (int?)null
-                    : PoolRemaining(after, step.Reservation.PoolKey);
-            }
-            string closeFailure = null;
-            try { BuffPlannerUiRoot.CloseCastingWorkspaceForRuntime(); }
-            catch (Exception exception)
-            {
-                closeFailure = exception.GetType().Name + ":" + exception.Message;
-                _log.Error("[KBP-PROBE] production close failed.", exception);
-            }
-            _probeRecord.WorkspaceClosed = !BuffPlannerUiRoot.IsCastingWorkspaceOpen && closeFailure == null;
-            _probeRecord.InputLeaseReleased = !BuffPlannerUiRoot.IsCastingWorkspaceInputLeaseHeldForRuntime;
-            ExplicitCastingRunOutcome outcome = _probeRecord.Outcome;
-            AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory, "probe-outcome.json"),
-                new JObject
-                {
-                    { "schemaVersion", 1 },
-                    { "runId", _request.RunId },
-                    { "castingScenario", _probeRecord.CastingScenario },
-                    { "allowanceStatus", _probeRecord.AllowanceStatus },
-                    { "boundaryConstructed", _probeRecord.BoundaryConstructed },
-                    { "submitted", _probeRecord.Submitted },
-                    { "submitReason", _probeRecord.SubmitReason },
-                    { "deadlineOrStop", _probeRecord.DeadlineOrStop },
-                    { "outcomeProjectionId", outcome == null ? null : outcome.ProjectionId },
-                    { "allConfirmed", outcome != null && outcome.AllConfirmed },
-                    { "cancelled", outcome != null && outcome.Cancelled },
-                    { "haltReason", outcome == null ? null : outcome.HaltReason },
-                    { "entries", outcome == null ? new JArray() : new JArray(outcome.Entries.Select(entry =>
-                        (object)new JObject
-                        {
-                            { "castingId", entry.CastingId },
-                            { "processed", entry.Processed },
-                            { "nativeSubmissionReported", entry.NativeSubmissionReported },
-                            { "confirmed", entry.Confirmed },
-                            { "finalStatus", entry.FinalStatus },
-                            { "detail", entry.Detail }
-                        }).ToArray()) },
-                    { "poolRemainingBefore", _probeRecord.PoolRemainingBefore },
-                    { "poolRemainingAfter", _probeRecord.PoolRemainingAfter },
-                    { "reservedUnits", _probeRecord.ReservedUnits },
-                    { "workspaceClosed", _probeRecord.WorkspaceClosed },
-                    { "inputLeaseReleased", _probeRecord.InputLeaseReleased },
-                    { "closeFailure", closeFailure },
-                    { "violations", new JArray(_probeRecord.Violations().Cast<object>().ToArray()) }
-                }.ToString(Formatting.Indented) + Environment.NewLine);
-            _log.Info("[KBP-PROBE] terminal;violations=" + _probeRecord.Violations().Count + ".");
+            if (_probeOwner != null) _probeOwner.Terminate("completed");
             _liveInitialCatalogEvidence = "probe-scenario;workspaceRoot=active;legacyScreen=closed";
             _workspaceInteractionEvidence = "probe;no-authoring";
             _workspaceReopenEvidence = "probe;no-reopen-claim";
@@ -2551,11 +2493,78 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             return true;
         }
 
-        private static int? PoolRemaining(CastingWorkspaceInputs inputs, string poolKey)
+        // Review M3: every non-normal end (host exception, mod disable,
+        // unload) reaches the SAME idempotent owner terminal.
+        internal void Shutdown(string reason)
         {
-            ResourcePoolSnapshot pool = inputs.Snapshot.ResourcePools.FirstOrDefault(
-                value => string.Equals(value.PoolKey, poolKey, StringComparison.Ordinal));
-            return pool == null ? (int?)null : pool.Remaining;
+            if (_probeOwner != null) _probeOwner.Terminate(reason);
+        }
+
+        private ProbeWorkspaceCloseResult CloseProbeWorkspace()
+        {
+            string failure = null;
+            try { BuffPlannerUiRoot.CloseCastingWorkspaceForRuntime(); }
+            catch (Exception exception)
+            {
+                failure = exception.GetType().Name + ":" + exception.Message;
+                _log.Error("[KBP-PROBE] production close failed.", exception);
+            }
+            return new ProbeWorkspaceCloseResult(!BuffPlannerUiRoot.IsCastingWorkspaceOpen,
+                !BuffPlannerUiRoot.IsCastingWorkspaceInputLeaseHeldForRuntime, failure);
+        }
+
+        private void PublishProbeRecord(SingleCastProbeRunRecord record)
+        {
+            ExplicitCastingRunOutcome outcome = record.Outcome;
+            SingleCastProbeObservationSession observation = record.Observation;
+            AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory, "probe-outcome.json"),
+                new JObject
+                {
+                    { "schemaVersion", 2 },
+                    { "runId", _request.RunId },
+                    { "castingScenario", record.CastingScenario },
+                    { "terminalReason", record.TerminalReason },
+                    { "allowanceStatus", record.AllowanceStatus },
+                    { "boundaryConstructed", record.BoundaryConstructed },
+                    { "submitted", record.Submitted },
+                    { "submitReason", record.SubmitReason },
+                    { "boundaryDisposed", record.BoundaryDisposed },
+                    { "invocation", new JObject
+                        {
+                            { "outcomeProjectionId", outcome == null ? null : outcome.ProjectionId },
+                            { "allConfirmed", outcome != null && outcome.AllConfirmed },
+                            { "cancelled", outcome != null && outcome.Cancelled },
+                            { "haltReason", outcome == null ? null : outcome.HaltReason },
+                            { "entries", outcome == null ? new JArray() : new JArray(outcome.Entries.Select(entry =>
+                                (object)new JObject
+                                {
+                                    { "castingId", entry.CastingId },
+                                    { "processed", entry.Processed },
+                                    { "nativeSubmissionReported", entry.NativeSubmissionReported },
+                                    { "confirmed", entry.Confirmed },
+                                    { "finalStatus", entry.FinalStatus },
+                                    { "detail", entry.Detail }
+                                }).ToArray()) }
+                        } },
+                    { "observation", observation == null ? null : new JObject
+                        {
+                            { "before", observation.Before == null ? null : observation.Before.Describe() },
+                            { "submissionSequence", observation.SubmissionSequence },
+                            { "after", observation.After == null ? null : observation.After.Describe() },
+                            { "effectOutcome", observation.EffectOutcome },
+                            { "resourceOutcome", observation.ResourceOutcome }
+                        } },
+                    { "cleanup", new JObject
+                        {
+                            { "recorded", record.CleanupRecorded },
+                            { "workspaceClosed", record.WorkspaceClosed },
+                            { "inputLeaseReleased", record.InputLeaseReleased },
+                            { "failures", new JArray(record.CleanupFailures.Cast<object>().ToArray()) }
+                        } },
+                    { "violations", new JArray(record.Violations().Cast<object>().ToArray()) }
+                }.ToString(Formatting.Indented) + Environment.NewLine);
+            _log.Info("[KBP-PROBE] terminal;reason=" + record.TerminalReason +
+                ";violations=" + record.Violations().Count + ".");
         }
 
         private bool UpdateWorkspaceInteraction()
