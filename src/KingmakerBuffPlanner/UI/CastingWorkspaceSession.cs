@@ -513,7 +513,9 @@ namespace KingmakerBuffPlanner.UI
                 .Select(unit => new WorkspaceTargetOption(
                     unit.UnitId, unit.DisplayName,
                     string.Equals(unit.UnitId, Draft.DirectTargetUnitId,
-                        StringComparison.Ordinal)))
+                        StringComparison.Ordinal),
+                    draftOption == null ? (bool?)null
+                        : draftOption.ReachableTargetIds.Contains(unit.UnitId)))
                 .ToList();
             var origins = new List<WorkspaceOriginOption>();
             if (draftOption != null)

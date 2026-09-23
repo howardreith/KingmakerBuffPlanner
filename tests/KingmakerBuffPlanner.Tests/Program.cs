@@ -13481,6 +13481,40 @@ namespace KingmakerBuffPlanner.Tests
             WorkspaceView view = session.BuildView(inputs);
             if (!view.Casters.Any(row => row.UnitId == "unit-wizard" && row.SelectedFocus))
                 throw new InvalidOperationException("The chosen caster is not shown as selected.");
+            // Recipient legality (red state) comes from the chosen caster's
+            // resolved option: reachable units are legal, others are not.
+            // The shared fixture makes every unit reachable, so the direct
+            // options are rebuilt with a single reachable recipient.
+            session.Draft.SourceId = "source-bulls";
+            session.Draft.TargetMode = CastingTargetMode.DirectTarget;
+            var restricted = inputs.ProviderOptions.Select(option =>
+                option.Provider != null
+                    ? new ProviderPlanningOption(option.Provider, new[] { "unit-t1" },
+                        option.LegalAnchorIds, option.EffectiveCasterLevel,
+                        option.ExpectedDurationRounds, option.ExecutionStrategy,
+                        option.ExecutionStrategyReason)
+                    : option).ToList();
+            var restrictedInputs = new CastingWorkspaceInputs(inputs.Snapshot,
+                restricted, inputs.EffectsBySource, inputs.Enhancements);
+            view = session.BuildView(restrictedInputs);
+            WorkspaceTargetOption reachable = view.Draft.Targets
+                .FirstOrDefault(target => target.UnitId == "unit-t1");
+            WorkspaceTargetOption unreachable = view.Draft.Targets
+                .FirstOrDefault(target => target.UnitId == "unit-t2");
+            if (reachable == null || reachable.Legal != true ||
+                unreachable == null || unreachable.Legal != false)
+                throw new InvalidOperationException("Recipient legality is wrong: " +
+                    string.Join(",", view.Draft.Targets.Select(t =>
+                        t.UnitId + ":" + t.Legal).ToArray()));
+            var fresh = new CastingWorkspaceSession(Path.Combine(modPath, "fresh"),
+                "workspace-campaign");
+            fresh.SelectBuff("source-bulls");
+            fresh.SelectRoutine("long");
+            WorkspaceView unknown = fresh.BuildView(inputs);
+            if (unknown.Draft != null && unknown.Draft.CasterUnitId == null &&
+                unknown.Draft.Targets.Any(target => target.Legal.HasValue))
+                throw new InvalidOperationException(
+                    "Legality was claimed before a caster was chosen.");
         }
 
         // Buff grid counts and the recipient coverage legend come from the
