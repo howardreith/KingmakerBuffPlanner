@@ -164,8 +164,8 @@ namespace KingmakerBuffPlanner.UI
             BuildHeader(frame);
             BuildRoutineBar(frame);
             BuildLanes(frame);
-            if (pageArt) LetPageShowThroughLanes(frame);
             BuildFooter(frame);
+            if (pageArt) LetPageShowThroughLanes(frame);
             PropagateUiLayer();
         }
 
@@ -223,10 +223,18 @@ namespace KingmakerBuffPlanner.UI
             foreach (ScrollRect scroll in frame.GetComponentsInChildren<ScrollRect>(true))
             {
                 Image panel = scroll.GetComponent<Image>();
+                // No fill at all: even a light parchment fill stacked into a
+                // heavy orange cast over the book (live frame qual-211523);
+                // the outline alone frames the box.
                 if (panel != null)
                     panel.color = new Color(panel.color.r, panel.color.g,
-                        panel.color.b, 0.28f);
+                        panel.color.b, 0f);
             }
+            // The book art has transparent margins: header and footer text
+            // sit on the dark world there, so they switch to light ink.
+            foreach (Text text in new[] { _headerTitle, _headerStatus,
+                _scopeLabel, _footerBudget, _footerResult })
+                if (text != null) text.color = _theme.ButtonText;
         }
 
         // Every factory-created GameObject defaults to layer 0; rebuilt rows
