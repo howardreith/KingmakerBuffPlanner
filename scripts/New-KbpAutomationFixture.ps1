@@ -460,12 +460,16 @@ foreach ($interrupted in $interruptedTransactions) {
     }
 }
 if (Test-Path -LiteralPath $runRoot) {
+    # Review O1: an existing run directory is NEVER removed here - not even
+    # for a RolledBack attempt. That removal used to happen before the
+    # preconditions, the seed checks and the outer ShouldProcess decision,
+    # so a refused retry destroyed the prior transaction and its evidence.
+    # A previous attempt is kept as recovery history; a new attempt needs a
+    # fresh RunId. This check mutates nothing.
     $prior = Get-KbpTransaction
-    if ($null -eq $prior -or $prior.status -cne 'RolledBack') {
-        throw "Run paths already exist: $runRoot (choose a new RunId or recover first)."
-    }
-    # A fully rolled-back prior attempt owns nothing; its record is replaced.
-    Remove-Item -LiteralPath $runRoot -Recurse -Force
+    $priorStatus = if ($null -eq $prior) { 'no-transaction-record' } else { [string]$prior.status }
+    throw ("Run paths already exist: $runRoot (status=$priorStatus). They are preserved as history; " +
+        "use a fresh -RunId for a new attempt, or -Recover an interrupted one.")
 }
 if (-not (Test-Path -LiteralPath $SaveRoot -PathType Container)) {
     throw "The exact Kingmaker save root is unavailable: $SaveRoot"

@@ -345,6 +345,149 @@ try {
     }
     $passed++
 
+    # --- Review O1: a refused retry must never delete a prior attempt ---
+    # A RolledBack attempt (transaction + retained evidence + an unexpected
+    # extra file) is arranged through the REAL script's own rollback, then
+    # every refusal/decline/success path is checked against byte snapshots
+    # of the save, state and archive roots.
+    function Get-O1TreeSnapshot {
+        param([string[]]$Roots)
+        $lines = New-Object System.Collections.Generic.List[string]
+        foreach ($snapshotRoot in $Roots) {
+            if (-not (Test-Path -LiteralPath $snapshotRoot)) { $lines.Add("absent|$snapshotRoot"); continue }
+            foreach ($item in @(Get-ChildItem -LiteralPath $snapshotRoot -Recurse -Force | Sort-Object FullName)) {
+                if ($item.PSIsContainer) { $lines.Add("D|" + $item.FullName) }
+                else { $lines.Add("F|" + $item.FullName + "|" + (Get-KbpSha256 $item.FullName)) }
+            }
+        }
+        return ($lines -join "`n")
+    }
+    $o1Saves = New-FixtureSeedRoot 'saves-o1'
+    New-TestSaveArchive -Path (Join-Path $o1Saves 'Manual_420_KBP_ADVANCED_OTHERFAMILY.zks') -Name 'Unrelated'
+    $o1State = Join-Path $root 'o1-state'
+    $o1Archive = Join-Path $root 'archive-o1'
+    $failed = $false
+    try {
+        & $bootstrapScript -RunId 'o1-prior' -SaveRoot $o1Saves -StateRoot $o1State `
+            -ArchiveRoot $o1Archive -FailAfterStage Staged -Confirm:$false | Out-Null
+    } catch { $failed = $true }
+    $o1Prior = Read-KbpJson (Join-Path $o1State 'o1-prior\transaction.json')
+    if (-not $failed -or $o1Prior.status -cne 'RolledBack') { throw 'O1 fixture: prior attempt was not RolledBack.' }
+    # Retained evidence and unexpected content inside the rolled-back run.
+    Set-Content -LiteralPath (Join-Path $o1State 'o1-prior\retained-evidence.txt') -Value 'evidence' -Encoding Ascii
+    New-Item -ItemType Directory -Path (Join-Path $o1State 'o1-prior\unexpected') | Out-Null
+    Set-Content -LiteralPath (Join-Path $o1State 'o1-prior\unexpected\foreign.bin') -Value 'foreign' -Encoding Ascii
+    $o1Roots = @($o1Saves, $o1State, $o1Archive)
+    $o1Before = Get-O1TreeSnapshot $o1Roots
+
+    # A. Same-ID retry (Advanced family, no advanced seed): refused, nothing changes.
+    $refusal = $null
+    try {
+        & $bootstrapScript -Family Advanced -RunId 'o1-prior' -SaveRoot $o1Saves -StateRoot $o1State `
+            -ArchiveRoot $o1Archive -Confirm:$false | Out-Null
+    } catch { $refusal = $_.Exception.Message }
+    if ($null -eq $refusal -or $refusal -notlike '*preserved as history*' -or
+        (Get-O1TreeSnapshot $o1Roots) -cne $o1Before) {
+        throw "O1-A: same-ID retry was not refused without mutation ($refusal)."
+    }
+    # Same-ID retry of the automation family (seed present) is refused too.
+    $refusal = $null
+    try {
+        & $bootstrapScript -RunId 'o1-prior' -SaveRoot $o1Saves -StateRoot $o1State `
+            -ArchiveRoot $o1Archive -Confirm:$false | Out-Null
+    } catch { $refusal = $_.Exception.Message }
+    if ($null -eq $refusal -or (Get-O1TreeSnapshot $o1Roots) -cne $o1Before) {
+        throw 'O1-A: same-ID automation retry mutated state.'
+    }
+
+    # B. Game-running precondition failure: same-ID AND a valid fresh ID.
+    $o1ProbeDir = Join-Path $root 'o1-guard-probe'
+    New-Item -ItemType Directory -Path $o1ProbeDir | Out-Null
+    Copy-Item (Join-Path $env:SystemRoot 'System32\cmd.exe') (Join-Path $o1ProbeDir 'Kingmaker.exe')
+    $o1Probe = Start-Process -FilePath (Join-Path $o1ProbeDir 'Kingmaker.exe') `
+        -ArgumentList '/c', 'ping', '-n', '30', '127.0.0.1', '>nul' -PassThru -WindowStyle Hidden
+    try {
+        foreach ($attemptId in @('o1-prior', 'o1-fresh-blocked')) {
+            $refusal = $null
+            try {
+                & $bootstrapScript -RunId $attemptId -SaveRoot $o1Saves -StateRoot $o1State `
+                    -ArchiveRoot (Join-Path $root ('archive-' + $attemptId)) -Confirm:$false | Out-Null
+            } catch { $refusal = $_.Exception.Message }
+            if ($null -eq $refusal -or (Get-O1TreeSnapshot $o1Roots) -cne $o1Before -or
+                (Test-Path -LiteralPath (Join-Path $root ('archive-' + $attemptId))) -or
+                (Test-Path -LiteralPath (Join-Path $o1State 'fixture.lock'))) {
+                throw "O1-B: precondition failure for $attemptId mutated state ($refusal)."
+            }
+            if ($attemptId -ceq 'o1-fresh-blocked' -and $refusal -notlike '*Kingmaker*') {
+                throw "O1-B: the fresh attempt was not refused by the game-running precondition ($refusal)."
+            }
+        }
+    }
+    finally {
+        if (-not $o1Probe.HasExited) {
+            try { Stop-Process -Id $o1Probe.Id -Force } catch { }
+            try { [void]$o1Probe.WaitForExit(15000) } catch { }
+        }
+    }
+
+    # C. WhatIf and a genuinely DECLINED confirmation reach the outer
+    # decision boundary (fresh ID, all prerequisites met) and mutate nothing.
+    $WhatIfPreference = $true
+    try {
+        $whatIfOut = & $bootstrapScript -RunId 'o1-fresh-whatif' -SaveRoot $o1Saves -StateRoot $o1State `
+            -ArchiveRoot (Join-Path $root 'archive-o1-fresh-whatif') 6>&1 | Out-String
+    }
+    finally { $WhatIfPreference = $false }
+    if ($whatIfOut -notlike '*Fixture bootstrap WhatIf PASS*' -or (Get-O1TreeSnapshot $o1Roots) -cne $o1Before -or
+        (Test-Path -LiteralPath (Join-Path $root 'archive-o1-fresh-whatif'))) {
+        throw 'O1-C: WhatIf did not reach the decision boundary purely.'
+    }
+    $ErrorActionPreference = 'Continue'
+    $declineOut = ('N' | & powershell.exe -NoProfile -Command ("& '" + $bootstrapScript +
+        "' -RunId 'o1-fresh-declined' -SaveRoot '" + $o1Saves + "' -StateRoot '" + $o1State +
+        "' -ArchiveRoot '" + (Join-Path $root 'archive-o1-fresh-declined') + "' -Confirm") 2>&1) -join "`n"
+    $ErrorActionPreference = 'Stop'
+    if ($declineOut -notlike '*Fixture bootstrap WhatIf PASS*' -or (Get-O1TreeSnapshot $o1Roots) -cne $o1Before -or
+        (Test-Path -LiteralPath (Join-Path $root 'archive-o1-fresh-declined'))) {
+        throw "O1-C: a declined confirmation mutated state or never reached the decision: $declineOut"
+    }
+
+    # D. A fresh attempt succeeds: prior history preserved byte-identical,
+    # the pair is created, seeds and unrelated/other-family saves unchanged,
+    # and the existing teardown still removes exactly the owned pair.
+    $o1PriorBefore = Get-O1TreeSnapshot @((Join-Path $o1State 'o1-prior'))
+    $o1OtherHashes = @{}
+    foreach ($file in @(Get-ChildItem -LiteralPath $o1Saves -File)) { $o1OtherHashes[$file.Name] = Get-KbpSha256 $file.FullName }
+    $o1FreshArchive = Join-Path $root 'archive-o1-fresh'
+    & $bootstrapScript -RunId 'o1-fresh' -SaveRoot $o1Saves -StateRoot $o1State -ArchiveRoot $o1FreshArchive -Confirm:$false | Out-Null
+    $o1Pair = @(Get-ChildItem -LiteralPath $o1Saves -File | Where-Object {
+        $_.Name -cmatch '_KBP_AUTOMATION_(BASELINE|WORKING)\.zks$' })
+    if ($o1Pair.Count -ne 2 -or (Get-O1TreeSnapshot @((Join-Path $o1State 'o1-prior'))) -cne $o1PriorBefore -or
+        (Read-KbpJson (Join-Path $o1State 'o1-fresh\transaction.json')).status -cne 'Completed') {
+        throw 'O1-D: the fresh attempt did not complete while preserving the prior history.'
+    }
+    foreach ($name in $o1OtherHashes.Keys) {
+        if ((Get-KbpSha256 (Join-Path $o1Saves $name)) -cne $o1OtherHashes[$name]) { throw "O1-D: $name changed." }
+    }
+    & $bootstrapScript -RunId 'o1-fresh' -SaveRoot $o1Saves -StateRoot $o1State -ArchiveRoot $o1FreshArchive `
+        -Teardown -Confirm:$false | Out-Null
+    if (@(Get-ChildItem -LiteralPath $o1Saves -File | Where-Object {
+            $_.Name -cmatch '_KBP_AUTOMATION_(BASELINE|WORKING)\.zks$' }).Count -ne 0 -or
+        (Get-O1TreeSnapshot @((Join-Path $o1State 'o1-prior'))) -cne $o1PriorBefore) {
+        throw 'O1-D: teardown did not remove exactly the owned pair while keeping history.'
+    }
+    foreach ($name in $o1OtherHashes.Keys) {
+        if ((Get-KbpSha256 (Join-Path $o1Saves $name)) -cne $o1OtherHashes[$name]) { throw "O1-D: teardown changed $name." }
+    }
+
+    # E. The unexpected retained content of the RolledBack attempt survived
+    # every path above.
+    if (-not (Test-Path -LiteralPath (Join-Path $o1State 'o1-prior\unexpected\foreign.bin')) -or
+        -not (Test-Path -LiteralPath (Join-Path $o1State 'o1-prior\retained-evidence.txt'))) {
+        throw 'O1-E: retained content of a RolledBack attempt was removed.'
+    }
+    $passed++
+
     # Repeated operation refuses (existing pair + existing run paths).
     $refused = $false
     try {
@@ -400,8 +543,20 @@ try {
             (Get-KbpSha256 (Join-Path $failRoot 'Manual_401_KBP_AUTOMATION_SEED.zks')) -cne $failSeedHash) {
             throw "Failure stage $stage mutated a protected save."
         }
-        # Safe retry with the same run id works after rollback.
-        & $bootstrapScript -RunId ('fail-' + $stage) -SaveRoot $failRoot -StateRoot $stateRoot `
+        # Review O1: reusing the rolled-back run id is refused and keeps the
+        # record byte-identical; a fresh run id then succeeds.
+        $failRecordPath = Join-Path $stateRoot ('fail-' + $stage + '\transaction.json')
+        $failRecordHash = Get-KbpSha256 $failRecordPath
+        $sameIdRefused = $false
+        try {
+            & $bootstrapScript -RunId ('fail-' + $stage) -SaveRoot $failRoot -StateRoot $stateRoot `
+                -ArchiveRoot (Join-Path $root ('archive-fail-' + $stage + '-same')) -Confirm:$false | Out-Null
+        } catch { $sameIdRefused = $true }
+        if (-not $sameIdRefused -or (Get-KbpSha256 $failRecordPath) -cne $failRecordHash -or
+            (Test-Path -LiteralPath (Join-Path $root ('archive-fail-' + $stage + '-same')))) {
+            throw "Same-id retry after rollback at stage $stage was not refused without mutation."
+        }
+        & $bootstrapScript -RunId ('fail-' + $stage + '-retry') -SaveRoot $failRoot -StateRoot $stateRoot `
             -ArchiveRoot (Join-Path $root ('archive-fail-' + $stage + '-retry')) -Confirm:$false | Out-Null
         if (-not (Test-Path -LiteralPath (Join-Path $failRoot 'Manual_402_KBP_AUTOMATION_BASELINE.zks'))) {
             throw "Retry after rollback at stage $stage did not succeed."
@@ -509,8 +664,13 @@ try {
             (Get-KbpSha256 (Join-Path $jRoot 'Manual_401_KBP_AUTOMATION_SEED.zks')) -cne $jSeedHash) {
             throw "Journal-window recovery ($journal) left residue or touched the seed."
         }
-        & $bootstrapScript -RunId ('n4-j-' + $journal) -SaveRoot $jRoot -StateRoot $jState `
+        # Review O1: a fresh run id retries; the rolled-back record stays.
+        $jRecordHash = Get-KbpSha256 (Join-Path $jState ('n4-j-' + $journal + '\transaction.json'))
+        & $bootstrapScript -RunId ('n4-j-' + $journal + '-retry') -SaveRoot $jRoot -StateRoot $jState `
             -ArchiveRoot (Join-Path $root ('archive-n4-j-' + $journal + '-retry')) -Confirm:$false | Out-Null
+        if ((Get-KbpSha256 (Join-Path $jState ('n4-j-' + $journal + '\transaction.json'))) -cne $jRecordHash) {
+            throw "Retry after journal-window recovery ($journal) changed the rolled-back record."
+        }
         if (-not (Test-Path -LiteralPath (Join-Path $jRoot 'Manual_402_KBP_AUTOMATION_BASELINE.zks'))) {
             throw "Retry after journal-window recovery ($journal) did not complete."
         }
@@ -822,11 +982,17 @@ try {
             (Get-KbpSha256 (Join-Path $winRoot 'Manual_400_PlayerCampaign.zks')) -cne $winPlayerHash) {
             throw "Recovery after the $move move window left residue or touched protected saves."
         }
-        # Retry succeeds after the clean rollback.
-        & $bootstrapScript -RunId ('r1-win-' + $move) -SaveRoot $winRoot -StateRoot $winState `
+        # Review O1: a fresh run id retries after the clean rollback; the
+        # rolled-back record is kept byte-identical as history.
+        $winRecordPath = Join-Path $winState ('r1-win-' + $move + '\transaction.json')
+        $winRecordHash = Get-KbpSha256 $winRecordPath
+        & $bootstrapScript -RunId ('r1-win-' + $move + '-retry') -SaveRoot $winRoot -StateRoot $winState `
             -ArchiveRoot (Join-Path $root ('archive-r1-win-' + $move + '-retry')) -Confirm:$false | Out-Null
         if (-not (Test-Path -LiteralPath (Join-Path $winRoot 'Manual_402_KBP_AUTOMATION_BASELINE.zks'))) {
             throw "Retry after the $move interruption window did not complete."
+        }
+        if ((Get-KbpSha256 $winRecordPath) -cne $winRecordHash) {
+            throw "Retry after the $move interruption window changed the rolled-back record."
         }
     }
     $passed++

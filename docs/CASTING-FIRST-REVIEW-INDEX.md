@@ -13,7 +13,60 @@ workspace dispatch boundary. The workspace renders in presenting
 sessions (display-path acceptance run `casting-ws-gseries-081000`);
 human usability and the native aesthetic pass remain open.
 
-## Current review dispositions — N-series at `7379dc8` (answered 2026-09-23)
+## Current review dispositions — O1 at `e964d2f` (answered 2026-09-23)
+
+The frozen probe checkout and artifact (`e964d2f`,
+`runtime-backups/probe-frozen/e964d2f…/`) are unchanged. Development now
+continues in a separate worktree on the same PR branch; the original
+checkout is detached at `e964d2f`.
+
+**O1 (P2) — a refused fixture retry deleted prior evidence before preflight.**
+Pro found this by source inspection; it was not reproduced under Windows
+PowerShell.
+
+- **Location:** `scripts/New-KbpAutomationFixture.ps1`, in the bootstrap
+  branch that handles an existing `$runRoot`.
+- **Behaviour at `e964d2f`:** when the prior transaction was
+  `RolledBack`, the script ran `Remove-Item -LiteralPath $runRoot -Recurse -Force`.
+  That happened before `Assert-KbpFixturePreconditions`, before the seed
+  lookup and validation, and before the outer `$PSCmdlet.ShouldProcess`
+  decision.
+- **Failure sequence:** a real, non-WhatIf retry reusing a rolled-back
+  RunId deleted the old run directory. A prerequisite then failed (for
+  example, a missing `KBP_ADVANCED_SEED`, a running game or an active
+  deployment), so the retry was refused but the previous
+  transaction and evidence were gone.
+- **Scope:** the path is inherited and is now shared by `-Family Advanced`;
+  the family parameter did not introduce it. The affected data were the
+  old fixture transaction and evidence, not ordinary saves. `-WhatIf`
+  itself did not delete these files; the finding is the mutation during a
+  real retry, ahead of the prerequisites and the outer decision.
+
+**Disposition (the preferred repair):** the script never removes an
+existing run directory, whatever its status. A same-ID retry is refused
+before anything else happens, the prior attempt is kept as recovery
+history, and a new attempt needs a fresh `-RunId`. Interrupted-run,
+`-Recover` and lock guards are unchanged.
+
+**Isolated regressions** (`Test-RuntimeHarness.ps1`, the real script
+against temporary roots, with byte snapshots of the save, state and
+archive roots):
+
+| Case | Result |
+| --- | --- |
+| A | A same-ID retry, both the Advanced family without an advanced seed and the automation family, is refused; the snapshots are unchanged. |
+| B | With a Kingmaker-named process running, a same-ID attempt and a valid fresh attempt are both refused. The fresh one is refused by the game-running precondition itself. No state, evidence, archive, save or lock change. |
+| C | `-WhatIf` and a genuinely declined confirmation ("N" on the prompt) on a fresh ID both reach the outer decision and mutate nothing. |
+| D | A fresh attempt completes. The prior history is byte-identical, the seed and the unrelated and other-family saves are unchanged, and teardown removes exactly the owned pair. |
+| E | The rolled-back attempt's retained evidence and an unexpected nested file survive every path. |
+
+Three existing harness tests had asserted the old "same-ID retry after
+rollback works" contract. They now assert both halves of the new one:
+the same-ID retry is refused with the record byte-identical, and a fresh
+ID succeeds. A mutant restoring the old delete-on-RolledBack behaviour
+fails case A.
+
+## Previous review dispositions — N-series at `7379dc8` (history)
 
 No cast was run; normal dispatch stays disabled. Source and recording-runtime evidence only.
 
