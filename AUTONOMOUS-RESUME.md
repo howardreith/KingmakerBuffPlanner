@@ -1,6 +1,16 @@
 # AUTONOMOUS-RESUME — top section is current; planning/CASTING-FIRST-MIGRATION-STATUS.md is the per-checkpoint tracker.
 
-## M-series (`1e3c95b` review): zero-cost path, authoritative observations, owned cleanup; concrete cantrip proposal — 2026-09-23 (LATEST)
+## N-series (`7379dc8` review): frozen-artifact binding, terminal shutdown, exact prepared-slot reads — 2026-09-23 (LATEST)
+
+N1–N3 fixed in `b9721c3`; advanced-copy fixture family in `bdac45f`; the
+active proposal is rewritten for the frozen artifact (the `7379dc8`
+version is kept in `docs/probe/history/`). The frozen package for the
+final commit is under `runtime-backups/probe-frozen/<commit>/` with
+`FREEZE.json`; its identity is in the PR #2 body. No cast was run, no
+allowance exists, and no live run was made in this slice. Evidence is
+source and recording-runtime tests only.
+
+## M-series (`1e3c95b` review): zero-cost path, authoritative observations, owned cleanup; concrete cantrip proposal — 2026-09-23 (history)
 
 The review-and-roadmap document named in the instructions was not on this
 machine; the work followed the pasted instructions. The L fixes, UI,

@@ -13,7 +13,19 @@ workspace dispatch boundary. The workspace renders in presenting
 sessions (display-path acceptance run `casting-ws-gseries-081000`);
 human usability and the native aesthetic pass remain open.
 
-## Current review dispositions — M-series at `1e3c95b` (answered 2026-09-23)
+## Current review dispositions — N-series at `7379dc8` (answered 2026-09-23)
+
+No cast was run; normal dispatch stays disabled. Source and recording-runtime evidence only.
+
+| Finding | Disposition | Commit | Tests (mutants caught) |
+| --- | --- | --- | --- |
+| N1 — approval did not bind the frozen artifact before execution | Allowance schema 2 binds commit, package, DLL and MVID; the launcher refuses a manifest mismatch before deploy; the owner runs the boundary preflight first, which measures the LOADED commit/package/DLL/MVID and refuses any mismatch with no observation, executor construction or submission | `b9721c3` | `probe-requires-frozen-artifact-identity` (3/3), 6 launcher binding cases |
+| N2 — shutdown was not terminal before the owner existed | The owner is created with the runtime host; after Shutdown, BeginSelection/Submit refuse and Update completes once as a shut-down failure before any work | `b9721c3` | `probe-shutdown-before-selection-is-terminal` (3/3) |
+| N3 — prepared-slot observation required a spendable slot | `ProbeSourceSlots.ReservedExactly` reads exactly the reserved tokens, consumed or not, never substituting; a prepared cast is judged by those tokens going available to consumed | `b9721c3` | `prepared-slot-observation-reads-exact-source` (3/3) |
+
+Advanced-copy tooling (`bdac45f`): `New-KbpAutomationFixture.ps1 -Family Advanced`, isolated test only.
+
+## Previous review dispositions — M-series at `1e3c95b` (history)
 
 Normal dispatch stays disabled; no cast was run. Evidence is source and
 recording-runtime tests plus selection-only live runs (no boundary

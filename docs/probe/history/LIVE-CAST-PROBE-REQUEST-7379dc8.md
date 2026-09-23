@@ -6,28 +6,7 @@ native cast unless the owner writes an allowance file for this exact run
 into the approvals directory (section 7). Claude does not create, edit or
 infer that file.
 
-The previous version of this proposal (for `7379dc8`) is kept verbatim in
-`docs/probe/history/LIVE-CAST-PROBE-REQUEST-7379dc8.md`. It is
-superseded: its artifact binding was insufficient (review N1). Its
-binary hashes are not reproduced.
-
 ## 1. What changed since the last request
-
-- **Frozen-artifact binding (review N1).** The allowance (schema 2)
-  now binds commit, package SHA-256, DLL SHA-256 and assembly MVID. The
-  launcher refuses a mismatch against the build manifest before
-  deploying. Before any observation, executor construction or
-  submission, the host measures the LOADED identity: the compiled-in
-  commit, the verified package, the hash of the loaded DLL file and the
-  loaded module's MVID. A same-commit replacement binary is refused.
-- **Terminal shutdown from creation (review N2).** The probe owner
-  exists from runtime-host creation. After a disable, unload or host
-  failure at any point, no later update or re-enable can select, arm or
-  submit.
-- **Exact prepared-slot observation (review N3).** Observation no longer
-  depends on a slot being spendable; it reads exactly the reserved
-  tokens. This is needed for the later paid prepared-slot probe, not for
-  this zero-token cantrip.
 
 - **Zero-cost native sources (review M1).** A known Unlimited pool
   (cantrips, at-will) is now one real zero-unit native reservation,
@@ -61,29 +40,38 @@ boundary. In each run the workspace closed, the input lease was released
 and transaction restoration was verified. No further equivalent
 selection runs are planned.
 
-## 3. Build identity and freeze
+## 3. Build identity
 
-The selection PASS (section 2) ran at `ea45807`. The selection code, the
-converter and the projection identity have not changed since. The N1–N3
-commits changed the boundary, the owner, the host shutdown path and the
-observer, but not selection or the ProjectionId.
+The selection PASS ran on this build:
 
-The cast would run on the **frozen artifact built at the final N-series
-handoff commit**. Builds are not byte-reproducible, so the artifact is
-frozen rather than rebuilt:
+| Item | Value |
+| --- | --- |
+| Source commit | `ea4580770f34ebd01103f83337337bfb9fda9a74` |
+| Package ZIP SHA-256 | `fb62b3444e81a13bc350a3dbca4fbb8c902cc8281fdc070026c779365a5d74c8` |
+| DLL SHA-256 | `d11b5973c48cbeaae6c03d330ac09578c4eecc9ccb5efb685c53bef156191ae3` |
+| Loaded MVID (runtime result) | `cfd81eab-970d-4a3d-9a95-191f794fcb62` |
+| Game / profile | 2.1.7, `full-user` |
 
-- The final gate's package ZIP and its build manifest are copied to
-  `C:\Dev\KingmakerBuffPlannerLab\runtime-backups\probe-frozen\<commit>\`
-  together with `FREEZE.json`, which records the commit, package SHA-256,
-  DLL SHA-256 and MVID.
-- The same four values appear in the PR #2 body and the handoff. They
-  are not in this file, because a commit cannot contain its own package
-  hash.
-- Before a run, the package in `artifacts/local-runtime/0.1.1-rc3/`
-  must hash to the frozen value. If anything was rebuilt, copy the
-  frozen ZIP and manifest back first. The launcher refuses an allowance
-  whose package, DLL or MVID differs from the manifest it deploys, and
-  the host refuses before submission if the loaded DLL or MVID differs.
+**Builds are not byte-reproducible.** Rebuilding `ea45807` in a
+separate checkout produced DLL `9578010b…` and MVID `c88466b8…`. Every
+commit also embeds its own id. So the approval cannot say "rebuild and
+match".
+
+What the approval binds instead:
+
+- **Source.** The cast runs at the **final handoff commit**. It differs
+  from `ea45807` only in documentation and one test that checks this
+  template; the probe, converter, observer and owner source is
+  identical.
+- **Binary.** The exact package that the final gate built at that commit
+  is already in `artifacts/local-runtime/0.1.1-rc3/`. Its ZIP/DLL/MVID
+  are recorded in the PR #2 body and the handoff. Do not rebuild or
+  commit before the run. If either happens, the recorded identity no
+  longer applies and the request must be refreshed.
+- **Behaviour.** The boundary recomputes the ProjectionId from the steps
+  it receives at cast time and refuses anything but
+  `ee8e76b2…`. The launcher refuses an allowance whose `sourceCommit`
+  differs from the build it deploys.
 
 ## 4. Fixture and storage
 
@@ -156,16 +144,16 @@ later paid-slot probe needs its own request and approval.
 | Item | Value |
 | --- | --- |
 | Proposed cast run id | `casting-probe-cast-20260923-01`. It is distinct from every selection run id, and the launcher refuses a reused id. |
-| Allowance scope | this run id, the frozen commit, package SHA-256, DLL SHA-256 and MVID (from `FREEZE.json`), the ProjectionId, caster, recipient and source id above, `maximumNativeSubmissions` 1 |
+| Allowance scope | this run id, `sourceCommit` = the final handoff commit (the build the launcher deploys), the ProjectionId, caster, recipient and source id above, `maximumNativeSubmissions` 1 |
 | Template | `docs/probe/ALLOWANCE-TEMPLATE-UNAPPROVED.json`. It sits outside the approvals directory and has an empty `approvedBy`, which the host refuses, so it cannot be used as-is. |
 | Deadline | 60 s run deadline; `probe-stop.json` in the run's evidence directory stops it |
 | Terminal cleanup | The owner disposes the boundary (executor cleanup), takes a fresh after-read, closes the workspace, releases the lease, records cleanup and publishes `probe-outcome.json` once. Mod disable, unload or a host exception take the same path. Then the transaction restores Mods. |
 
 If approved, the owner would copy the template to
 `C:\Dev\KingmakerBuffPlannerLab\approvals\casting-probe-cast-20260923-01.json`,
-copy the four `SET-FROM-FREEZE-RECORD` values from `FREEZE.json`, set
-`approvedBy` to their name, confirm the local package hash equals the
-frozen one, and launch from the checkout at the frozen commit:
+set `sourceCommit` to the final handoff commit and `approvedBy` to their
+name, and launch from the unchanged checkout at that commit, without
+rebuilding:
 
 ```powershell
 & 'scripts/Invoke-KingmakerRuntimeTest.ps1' -Scenario live-cast-probe `
@@ -175,13 +163,6 @@ frozen one, and launch from the checkout at the frozen commit:
 ```
 
 ## 8. Casting stays disabled everywhere else
-
-- A mismatched commit, package, DLL or MVID refuses with no observation,
-  no executor construction and no submission
-  (`probe-requires-frozen-artifact-identity`, launcher binding cases).
-- A shutdown at any point is terminal for the request
-  (`probe-shutdown-before-selection-is-terminal`,
-  `probe-owner-terminal-cleanup`).
 
 - The casting-first workspace always uses `DisabledCastingDispatchBoundary`
   (test `single-cast-probe-is-dormant-and-one-shot`).
