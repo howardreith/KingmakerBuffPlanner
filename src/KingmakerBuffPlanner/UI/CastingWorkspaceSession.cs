@@ -428,6 +428,9 @@ namespace KingmakerBuffPlanner.UI
             BuildFocusedEnhancements(view, inputs);
             foreach (WorkspaceOriginOption origin in BuildFocusedOrigins(inputs))
                 view._focusedOrigins.Add(origin);
+            view._selectedBuffCards.AddRange(ShowWholeRoutine
+                ? BuildCards(plan, selectedSource, false)
+                : cards);
             return view;
         }
 
@@ -1201,9 +1204,15 @@ namespace KingmakerBuffPlanner.UI
         private List<WorkspaceCastingCard> BuildCards(
             ExplicitCastingPlan plan, string selectedSource)
         {
+            return BuildCards(plan, selectedSource, ShowWholeRoutine);
+        }
+
+        private List<WorkspaceCastingCard> BuildCards(
+            ExplicitCastingPlan plan, string selectedSource, bool wholeRoutine)
+        {
             var cards = new List<WorkspaceCastingCard>();
             foreach (ResolvedCasting casting in plan.Castings
-                .Where(value => ShowWholeRoutine
+                .Where(value => wholeRoutine
                     ? string.Equals(value.RoutineId, SelectedRoutineId,
                         StringComparison.Ordinal)
                     : string.Equals(value.SourceId, selectedSource,

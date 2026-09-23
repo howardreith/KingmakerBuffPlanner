@@ -243,17 +243,20 @@ namespace KingmakerBuffPlanner.UI
             return result;
         }
 
-        // Which party members the given cards (already the selected buff)
-        // cover in the routine: a direct recipient or a predicted group
-        // beneficiary. Ready wins over not-ready.
+        // Which party members castings of ONE buff source cover in the
+        // routine: a direct recipient or a predicted group beneficiary.
+        // Ready wins over not-ready. The source filter is explicit (review
+        // K7): coverage never depends on which cards a list happens to show.
         public static WorkspaceRecipientCoverage CoverageFor(
-            IEnumerable<WorkspaceCastingCard> cards, string routineId,
-            string unitId)
+            IEnumerable<WorkspaceCastingCard> cards, string sourceId,
+            string routineId, string unitId)
         {
             WorkspaceRecipientCoverage best = WorkspaceRecipientCoverage.None;
             foreach (WorkspaceCastingCard card in cards ?? new WorkspaceCastingCard[0])
             {
                 if (card == null || !string.Equals(card.RoutineId, routineId,
+                        StringComparison.Ordinal) ||
+                    !string.Equals(card.SourceId, sourceId,
                         StringComparison.Ordinal)) continue;
                 bool covers = string.Equals(card.DirectTargetUnitId, unitId,
                         StringComparison.Ordinal) ||
@@ -536,6 +539,16 @@ namespace KingmakerBuffPlanner.UI
         public string EditingScopeLabel { get; private set; }
         public IReadOnlyList<string> Diagnostics { get; private set; }
         public WorkspaceDraftView Draft { get; private set; }
+
+        // Every casting of the SELECTED buff (all routines), independent of
+        // the castings lane's this-buff / whole-routine display scope; the
+        // recipient coverage colours are computed from these only.
+        public IReadOnlyList<WorkspaceCastingCard> SelectedBuffCards
+        {
+            get { return _selectedBuffCards; }
+        }
+        internal readonly List<WorkspaceCastingCard> _selectedBuffCards =
+            new List<WorkspaceCastingCard>();
         // Enhancement options for the FOCUSED casting, derived from that
         // casting's own caster and ability — never the next-casting draft
         // (review G1).

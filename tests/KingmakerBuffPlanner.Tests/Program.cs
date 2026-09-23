@@ -13608,15 +13608,41 @@ namespace KingmakerBuffPlanner.Tests
                 WorkspaceBuffSummary.CastingsBySource(session.Document.Castings, "short").Count != 0)
                 throw new InvalidOperationException("Per-routine buff counts are wrong.");
             WorkspaceView view = session.BuildView(inputs);
-            if (WorkspaceBuffSummary.CoverageFor(view.Cards, "long", "unit-t1") !=
+            if (WorkspaceBuffSummary.CoverageFor(view.SelectedBuffCards, "source-bulls", "long", "unit-t1") !=
                     WorkspaceRecipientCoverage.CoveredReady ||
-                WorkspaceBuffSummary.CoverageFor(view.Cards, "long", "unit-t2") !=
+                WorkspaceBuffSummary.CoverageFor(view.SelectedBuffCards, "source-bulls", "long", "unit-t2") !=
                     WorkspaceRecipientCoverage.CoveredNotReady ||
-                WorkspaceBuffSummary.CoverageFor(view.Cards, "long", "unit-t3") !=
+                WorkspaceBuffSummary.CoverageFor(view.SelectedBuffCards, "source-bulls", "long", "unit-t3") !=
                     WorkspaceRecipientCoverage.None ||
-                WorkspaceBuffSummary.CoverageFor(view.Cards, "short", "unit-t1") !=
+                WorkspaceBuffSummary.CoverageFor(view.SelectedBuffCards, "source-bulls", "short", "unit-t1") !=
                     WorkspaceRecipientCoverage.None)
                 throw new InvalidOperationException("Recipient coverage legend is wrong.");
+            // Review K7: another buff's Ready casting never colours the
+            // selected buff's recipients, and toggling the castings lane's
+            // scope changes the card list only, never the coverage.
+            if (WorkspaceBuffSummary.CoverageFor(view.SelectedBuffCards, "source-communal", "long", "unit-t1") !=
+                    WorkspaceRecipientCoverage.None ||
+                WorkspaceBuffSummary.CoverageFor(view.Cards, "source-communal", "long", "unit-t1") !=
+                    WorkspaceRecipientCoverage.None)
+                throw new InvalidOperationException("Another buff's casting coloured this buff's recipient.");
+            session.SelectBuff("source-communal");
+            WorkspaceView thisBuff = session.BuildView(inputs);
+            session.ShowWholeRoutine = true;
+            WorkspaceView wholeRoutine = session.BuildView(inputs);
+            session.ShowWholeRoutine = false;
+            foreach (string unit in new[] { "unit-t1", "unit-t2", "unit-t3" })
+            {
+                WorkspaceRecipientCoverage a = WorkspaceBuffSummary.CoverageFor(
+                    thisBuff.SelectedBuffCards, thisBuff.SelectedSourceId, "long", unit);
+                WorkspaceRecipientCoverage b = WorkspaceBuffSummary.CoverageFor(
+                    wholeRoutine.SelectedBuffCards, wholeRoutine.SelectedSourceId, "long", unit);
+                if (a != b || a != WorkspaceRecipientCoverage.None)
+                    throw new InvalidOperationException(
+                        "Whole-routine scope changed the selected buff's coverage for " + unit);
+            }
+            if (!wholeRoutine.Cards.Any(card => card.SourceId == "source-bulls"))
+                throw new InvalidOperationException("Whole-routine scope lost the other buff's cards.");
+            session.SelectBuff("source-bulls");
             // Castings lane scope: this buff vs. the whole routine, with no
             // document mutation either way.
             string beforeScope = session.DocumentIntentSignature();
