@@ -159,10 +159,36 @@ still disabled:
   in order. Live runs `...-221951`, `...-222501` (session Disc):
   interactions PASS, display black, restored verified.
 
-NEXT (exact action): animated-executor consumption test; decide with the
-owner the first gameplay-test scope (single-target, non-rod) — needs
-separate authority; meanwhile migration/rollback (charter §7) and
-enhancement chips; rerun `live-workspace-qual` when Active; continue `docs/UI-END-GOAL.md`: search
+- `b8ad634` the AnimatedCastExecutor likewise starts exactly one
+  native command per approved casting, in order, over the projection.
+- `28d8a83` enhancement toggles are compact chips (gold when selected).
+
+MIGRATION / ROLLBACK (charter §7). A read-only gap analysis found the
+schema-5→6 importer and migration service built and tested but NEVER
+invoked by the product. Now:
+- `85edff0` first workspace open with no candidate runs the migration
+  (legacy file untouched, exact original archived, candidate written +
+  reopened; discovery grouping kinds passed so group assignments are
+  not split as pinned); report exposed on the session and summarized
+  once in the footer; second open loads the candidate. Live log
+  (`...-224326`): `load=Absent;legacyImport=LegacyAbsent` (the fixture
+  has no legacy profile for the WORKING campaign).
+- `1767239` legacy `ProfileRepository.Save` quarantines a corrupt or
+  newer-schema primary byte-exactly (content-keyed `.orig`) before
+  overwriting it; the migration archive is byte-exact (BOM survives).
+- Rollback: `Restore-InstallLocal.ps1` deactivates schema-6 candidate
+  profiles (archived under the rollback evidence, recorded in the
+  install record) instead of merging them beside the older build.
+Remaining §7 gaps: legacy Load still returns a default on failure
+(no read-only refusal for a newer legacy schema), candidate write is not
+staged-then-activated, group/automatic drafts have no explicit
+acceptance UI, missing-reference checks against the catalogue.
+
+NEXT (exact action): owner decision on the first live gameplay-test
+scope (single-target, non-rod, dispatch enabled only for that run) —
+separate authority; meanwhile the remaining §7 gaps above and an
+import-review panel for imported drafts; rerun `live-workspace-qual`
+when Active; continue `docs/UI-END-GOAL.md`: search
 box, native parchment/frame pass (charter §6), per-caster popover,
 recipient invalid-target state; supervised session on the new layout — icon-first
 searchable buff grid with disambiguated variants, portrait strips with

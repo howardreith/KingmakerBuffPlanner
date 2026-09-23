@@ -59,6 +59,9 @@ try {
         -Value '{"newer":true}'
     Set-Content -LiteralPath (Join-Path $prior 'UserSettings\kingmaker-buff-planner-old.json') `
         -Value '{"older":true}'
+    # A casting-first (schema-6) candidate the prior binary cannot read.
+    Set-Content -LiteralPath (Join-Path $planner 'UserSettings\kingmaker-buff-planner-casting-abc.json') `
+        -Value '{"schemaVersion":6}'
 
     $installDir = Join-Path $state 'installations\test-install'
     New-Item -ItemType Directory -Path $installDir | Out-Null
@@ -96,6 +99,12 @@ try {
     $record = Read-KbpJson (Join-Path $installDir 'install.json')
     Assert-True ([string]$record.status -ceq 'RolledBack') 'Record status was not RolledBack.'
     Assert-True (@($record.rollbackPreservedProfiles).Count -eq 1) 'Preserved-profile list was not recorded.'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $planner 'UserSettings\kingmaker-buff-planner-casting-abc.json'))) `
+        'A schema-6 candidate profile was left active beside the rolled-back build.'
+    Assert-True (Test-Path -LiteralPath (Join-Path $evidence 'rollback-test-install\deactivated-candidate-profiles\kingmaker-buff-planner-casting-abc.json')) `
+        'The deactivated schema-6 candidate was not archived with the rollback evidence.'
+    Assert-True (@($record.rollbackDeactivatedCandidateProfiles).Count -eq 1) `
+        'Deactivated candidate profiles were not recorded.'
     Assert-True (Test-Path -LiteralPath (Join-Path (Join-Path $mods 'OtherMod') 'other.txt')) `
         'Unrelated mod was touched.'
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $state 'deployment.lock'))) 'Lock was not released.'

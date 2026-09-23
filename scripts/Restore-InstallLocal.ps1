@@ -127,7 +127,27 @@ try {
     }
 
     # Merge the preserved newer profiles back over the restored folder.
+    # Casting-first (schema-6) candidate profiles are DEACTIVATED, not
+    # merged (charter §7.3): the prior binary cannot read them, so they stay
+    # archived with this rollback's evidence (and in the rolled-back
+    # planner copy) instead of lingering beside the restored build. Legacy
+    # schema-5 profiles keep the newer-edits-win merge.
     $restoredSettings = Join-Path $planner 'UserSettings'
+    $deactivatedCandidates = @($preservedProfiles | Where-Object {
+        (Split-Path -Leaf $_) -like 'kingmaker-buff-planner-casting-*' })
+    if ($deactivatedCandidates.Count -ne 0) {
+        $candidateArchive = Join-Path $rollEvidence 'deactivated-candidate-profiles'
+        foreach ($relative in $deactivatedCandidates) {
+            $target = Join-Path $candidateArchive $relative
+            $targetDirectory = Split-Path -Parent $target
+            if (-not (Test-Path -LiteralPath $targetDirectory -PathType Container)) {
+                New-Item -ItemType Directory -Path $targetDirectory | Out-Null
+            }
+            Copy-Item -LiteralPath (Join-Path $preservedSettings $relative) -Destination $target
+        }
+    }
+    $preservedProfiles = @($preservedProfiles | Where-Object {
+        (Split-Path -Leaf $_) -notlike 'kingmaker-buff-planner-casting-*' })
     if ($preservedProfiles.Count -ne 0) {
         foreach ($relative in $preservedProfiles) {
             $source = Join-Path $preservedSettings $relative
@@ -162,9 +182,11 @@ try {
         -Value $rollEvidence -Force
     Add-Member -InputObject $install -MemberType NoteProperty -Name rollbackPreservedProfiles `
         -Value $preservedProfiles -Force
+    Add-Member -InputObject $install -MemberType NoteProperty -Name rollbackDeactivatedCandidateProfiles `
+        -Value $deactivatedCandidates -Force
     Write-KbpJsonAtomic $installStatePath $install
-    $summary = 'Install rollback: PASS=1 FAIL=0 installId={0} restoredVersion={1} preservedProfiles={2} evidence={3}'
-    Write-Host ($summary -f $InstallId, $priorVersion, $preservedProfiles.Count, $rollEvidence)
+    $summary = 'Install rollback: PASS=1 FAIL=0 installId={0} restoredVersion={1} preservedProfiles={2} deactivatedCandidateProfiles={3} evidence={4}'
+    Write-Host ($summary -f $InstallId, $priorVersion, $preservedProfiles.Count, $deactivatedCandidates.Count, $rollEvidence)
 }
 catch {
     $install.status = 'Installed'
