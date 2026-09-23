@@ -277,10 +277,10 @@ try {
 }
 finally { Remove-Item -LiteralPath $outsideQualification -Force -ErrorAction SilentlyContinue }
 function New-QualificationFixtureJson([hashtable]$Override) {
-    $value = [ordered]@{ schemaVersion = 3; kind = 'kbp-casting-qualification'; runId = 'qual-bind-test'
+    $value = [ordered]@{ schemaVersion = 4; kind = 'kbp-casting-qualification'; runId = 'qual-bind-test'
         sourceCommit = ('c' * 40); packageSha256 = ('a' * 64); dllSha256 = ('b' * 64)
         assemblyMvid = '11111111-2222-3333-4444-555555555555'; fixtureGameId = 'game'
-        recipe = 'zero-cost-mixed'; approvedProjectionIds = @(('d' * 64)); maximumNativeSubmissions = 6
+        recipe = 'zero-cost-mixed'; executionMode = 'instant'; approvedProjectionIds = @(('d' * 64)); maximumNativeSubmissions = 6
         approvedBy = 'Howie'; authority = 'owner mission 2026-09-23 section 4' }
     foreach ($key in $Override.Keys) { $value[$key] = $Override[$key] }
     return ($value | ConvertTo-Json -Compress)
@@ -295,11 +295,33 @@ $qualificationBindingCases = [ordered]@{
     'commit' = @{ sourceCommit = ('f' * 40) }; 'run-id' = @{ runId = 'other-run' }
     'kind' = @{ kind = 'kbp-single-cast-probe' }; 'recipe' = @{ recipe = 'other' }
     'submissions' = @{ maximumNativeSubmissions = 25 }
+    'schema' = @{ schemaVersion = 3 }; 'execution-mode' = @{ executionMode = 'hybrid' }
 }
 foreach ($case in $qualificationBindingCases.Keys) {
     $refusal = Get-KbpQualificationAllowanceBuildRefusal -AllowanceJson (New-QualificationFixtureJson $qualificationBindingCases[$case]) `
         -RunId 'qual-bind-test' -BuildManifest $manifestFixture
     if ($refusal -cne $case) { throw "Qualification binding case $case returned '$refusal'." }
+}
+# Schema 4 names the casting mode: an allowance without it is refused, and
+# the launcher's -ExecutionMode must be the approved one.
+$modeless = (New-QualificationFixtureJson @{}) -replace ',"executionMode":"instant"', ''
+if ((Get-KbpQualificationAllowanceBuildRefusal -AllowanceJson $modeless -RunId 'qual-bind-test' `
+        -BuildManifest $manifestFixture) -cne 'missing:executionMode') {
+    throw 'An allowance without a casting mode was not refused.'
+}
+$animatedJson = New-QualificationFixtureJson @{ executionMode = 'animated' }
+if ($null -ne (Get-KbpQualificationAllowanceBuildRefusal -AllowanceJson $animatedJson -RunId 'qual-bind-test' `
+        -BuildManifest $manifestFixture -ExecutionMode 'animated') -or
+    (Get-KbpQualificationAllowanceBuildRefusal -AllowanceJson $animatedJson -RunId 'qual-bind-test' `
+        -BuildManifest $manifestFixture -ExecutionMode 'instant') -cne 'execution-mode-differs' -or
+    (Get-KbpQualificationAllowanceBuildRefusal -AllowanceJson (New-QualificationFixtureJson @{}) -RunId 'qual-bind-test' `
+        -BuildManifest $manifestFixture -ExecutionMode 'animated') -cne 'execution-mode-differs') {
+    throw 'The qualification casting-mode binding is wrong.'
+}
+$launcherText = Get-Content -LiteralPath $launcher -Raw
+if ($launcherText -notmatch '-Recipe \$QualificationRecipe -ExecutionMode \$ExecutionMode' -or
+    $launcherText -match "live-cast-qual runs in instant mode only") {
+    throw 'The launcher does not bind the casting run to its allowance mode.'
 }
 # The finite recipe binds; a recipe named on the launcher must match.
 $finiteJson = New-QualificationFixtureJson @{ recipe = 'finite-direct-mixed' }

@@ -861,19 +861,24 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                                     ";qualificationRuns=" + (_qualificationHost == null ? 0
                                         : _qualificationHost.StartedRuns))));
                     // Review P3-4: evidence that is never vacuous - the player
-                    // routes stayed locked with no production run, and the
-                    // workspace closed with its input lease released.
+                    // routes stayed locked, the planner's host ran exactly the
+                    // runs the qualification boundary submitted (none before
+                    // it, none from any other route), and the workspace closed
+                    // with its input lease released.
+                    int boundaryRuns = _qualificationRecord.Submissions.Count(value =>
+                        value.StartsWith("submitted:", StringComparison.Ordinal));
                     bool playerRoutesQuiet = UI.NativeCastingSessionPolicy.Locked &&
-                        BuffPlannerUiRoot.CastingRunsStartedForRuntime == 0;
+                        _qualificationRunsBefore == 0 &&
+                        BuffPlannerUiRoot.CastingRunsStartedForRuntime == boundaryRuns;
                     result.Assertions.Add(playerRoutesQuiet && _qualificationWorkspaceClosed
                         ? RuntimeTestAssertion.Pass("qualification-player-routes-locked",
-                            "session locked;0 production runs;workspace closed",
-                            "locked=True;runs=0;closed=True")
+                            "session locked;host ran only the approved submissions;workspace closed",
+                            "locked=True;runs=" + boundaryRuns + ";submitted=" + boundaryRuns + ";closed=True")
                         : RuntimeTestAssertion.Fail("qualification-player-routes-locked",
-                            "session locked;0 production runs;workspace closed", "locked=" +
-                                UI.NativeCastingSessionPolicy.Locked + ";runs=" +
-                                BuffPlannerUiRoot.CastingRunsStartedForRuntime + ";closed=" +
-                                _qualificationWorkspaceClosed));
+                            "session locked;host ran only the approved submissions;workspace closed", "locked=" +
+                                UI.NativeCastingSessionPolicy.Locked + ";before=" + _qualificationRunsBefore +
+                                ";runs=" + BuffPlannerUiRoot.CastingRunsStartedForRuntime + ";submitted=" +
+                                boundaryRuns + ";closed=" + _qualificationWorkspaceClosed));
                     if (!selected || violations.Count != 0 || !playerRoutesQuiet ||
                         !_qualificationWorkspaceClosed)
                     {
@@ -2959,6 +2964,16 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     allowance = json == null ? null
                         : CastingQualificationAllowance.Parse(json, _request.RunId, out refusal);
                     _qualificationRecord.AllowanceStatus = allowance == null ? refusal : "parsed";
+                    // The launcher's casting mode and the allowance's must
+                    // be the same one.
+                    string requestedMode = _request.Parameters["executionMode"] as string;
+                    if (allowance != null && !string.Equals(allowance.ExecutionMode, requestedMode,
+                            StringComparison.Ordinal))
+                    {
+                        _qualificationRecord.AllowanceStatus = "execution-mode-mismatch:" +
+                            allowance.ExecutionMode + "/" + (requestedMode ?? "none");
+                        allowance = null;
+                    }
                     if (allowance != null)
                     {
                         SingleCastProbeRuntimeIdentity measured = MeasureProbeRuntimeIdentity();
@@ -2978,13 +2993,18 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     ? null : Kingmaker.Game.Instance.Player.GameId;
                 string modPath = _modEntry.Path;
                 object recipeRaw;
-                // The host deadline counts only running time, as in
-                // production; the run's own deadline stays wall-clock time
-                // and bounds a world that never runs (review P3-2).
+                // The planner's own execution host runs the approved runs:
+                // its root pumps it once per frame while the world runs and
+                // its deadline counts only running time; the run's own
+                // deadline stays wall-clock time and bounds a world that
+                // never runs (review P3-2). Each mod update ticks the root
+                // (one pump) and THEN this host, so the stop step's press
+                // always lands before the next pump: a casting that ended
+                // in that pump is followed by the stop, never by the next
+                // casting.
                 var clock = System.Diagnostics.Stopwatch.StartNew();
-                _qualificationHost = new CastingExecutionHost(
-                    settings => BuffPlannerUiRoot.CreateCastingExecutorForRuntime(settings),
-                    () => _qualificationWorldClock.Milliseconds);
+                _qualificationHost = BuffPlannerUiRoot.CastingHostForRuntime;
+                _qualificationRunsBefore = _qualificationHost.StartedRuns;
                 _qualificationDriver = new CastingQualificationDriver(_qualificationRecord, allowance,
                     campaignId, BuffPlannerUiRoot.CastingWorkspaceFreshInputsForRuntime,
                     boundary => new CastingWorkspaceSession(modPath, campaignId, boundary),
@@ -2994,13 +3014,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     RuntimeTestProtocol.QualificationRunDeadlineSeconds * 1000L,
                     _request.Parameters.TryGetValue("qualificationRecipe", out recipeRaw)
                         ? recipeRaw as string : null,
-                    () => BuffPlannerUiRoot.WorldRunsForCasting);
+                    () => BuffPlannerUiRoot.WorldRunsForCasting, true,
+                    BuffPlannerUiRoot.PressRoutineForRuntime);
                 _log.Info("[KBP-QUAL] driver built;casting=" + _qualificationRecord.CastingScenario +
                     ";allowance=" + _qualificationRecord.AllowanceStatus + ";workspaceClosed=" +
                     closed.Closed + ";campaign=" + campaignId + ".");
                 return false;
             }
-            _qualificationWorldClock.Advance(BuffPlannerUiRoot.WorldRunsForCasting, Time.deltaTime);
             _qualificationDriver.Update();
             if (!_qualificationDriver.Completed) return false;
             PublishQualificationRecord();
@@ -3014,7 +3034,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private readonly CastingQualificationRecord _qualificationRecord = new CastingQualificationRecord();
         private CastingQualificationDriver _qualificationDriver;
         private CastingExecutionHost _qualificationHost;
-        private readonly CastingWorldClock _qualificationWorldClock = new CastingWorldClock();
+        private int _qualificationRunsBefore = -1;
         private bool _qualificationWorkspaceClosed;
         private bool _qualificationPublished;
 
@@ -3094,6 +3114,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     { "submissions", new JArray(record.Submissions.Cast<object>().ToArray()) },
                     { "plannedSubmissions", record.PlannedSubmissions },
                     { "maximumSubmissions", record.MaximumSubmissions },
+                    { "executionMode", record.ExecutionMode },
+                    { "stopPress", record.StopPress },
+                    { "stopPressHandled", record.StopPressHandled },
+                    { "stopPressedInFlight", record.StopPressedInFlight.HasValue
+                        ? (JToken)record.StopPressedInFlight.Value : JValue.CreateNull() },
+                    { "hostRunsBefore", _qualificationRunsBefore },
+                    { "hostRunsStarted", _qualificationHost == null ? -1 : _qualificationHost.StartedRuns },
                     { "failures", new JArray(record.Failures.Cast<object>().ToArray()) },
                     { "violations", new JArray(record.Violations().Cast<object>().ToArray()) }
                 }.ToString(Formatting.Indented) + Environment.NewLine);

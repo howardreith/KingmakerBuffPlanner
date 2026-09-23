@@ -64,6 +64,8 @@ namespace KingmakerBuffPlanner.Tests
             Run("qualification-recipe-selection", TestQualificationRecipeSelection);
             Run("qualification-forecast-and-boundary", TestQualificationForecastAndBoundary);
             Run("qualification-driver-end-to-end", () => TestQualificationDriverEndToEnd(root));
+            Run("qualification-animated-player-stop", () => TestQualificationAnimatedPlayerStop(root));
+            Run("qualification-on-the-planner-pumped-host", () => TestQualificationOnOwnerPumpedHost(root));
             Run("qualification-finite-recipe", () => TestFiniteQualificationRecipe(root));
             Run("qualification-driver-refusals-and-deadline",
                 () => TestQualificationDriverRefusalsAndDeadline(root));
@@ -1080,8 +1082,10 @@ namespace KingmakerBuffPlanner.Tests
                 "_castingHost.Shutdown(\"ui-root-disabled\");",
                 "if (NativeCastingSessionPolicy.Locked)\r\n                return new DisabledCastingDispatchBoundary(NativeCastingSessionPolicy.LockReason);",
                 "try { inputs = BuildFreshCastingWorkspaceInputs(); }",
-                "_castingHost.RequestStop(\"player-stopped\");"
+                "_castingHost.RequestStop(CastingExecutionHost.PlayerStopReason);"
             };
+            if (CastingExecutionHost.PlayerStopReason != "player-stopped")
+                throw new InvalidOperationException("The player stop reason changed.");
             foreach (string fragment in required)
                 if (rootUi.Replace("\r\n", "\n").IndexOf(fragment.Replace("\r\n", "\n"),
                         StringComparison.Ordinal) < 0)
@@ -1341,11 +1345,14 @@ namespace KingmakerBuffPlanner.Tests
                 runtime.Started.Count != 0)
                 throw new InvalidOperationException("A stop before the first pump did not end the run at once.");
             host.Start(plan, decision, "long", projection, null);
+            if (host.ActiveCastingInFlight || host.ActiveStopRequested != null)
+                throw new InvalidOperationException("A run not pumped yet reported a cast in progress.");
             host.Pump();
-            if (!host.IsRunning || host.ActiveFinishedCastings != 0)
+            if (!host.IsRunning || host.ActiveFinishedCastings != 0 || !host.ActiveCastingInFlight)
                 throw new InvalidOperationException(
                     "The fixture did not leave the first cast in progress after one pump.");
-            if (!host.RequestStop("player-stopped") || !host.IsRunning)
+            if (!host.RequestStop("player-stopped") || !host.IsRunning ||
+                host.ActiveStopRequested != "player-stopped")
                 throw new InvalidOperationException("The player stop interrupted the cast in progress.");
             int guard = 0;
             while (host.IsRunning && guard++ < 1000) host.Pump();
@@ -1360,6 +1367,17 @@ namespace KingmakerBuffPlanner.Tests
                     (report == null ? "no report" : report.TerminalReason));
             if (host.RequestStop("player-stopped"))
                 throw new InvalidOperationException("A stop without a run reported success.");
+            var resting = new ScriptedAnimatedRuntime("none", "none");
+            var restingHost = new CastingExecutionHost(
+                settings => new AnimatedCastExecutor(resting, true), () => now);
+            restingHost.Start(plan, decision, "long", projection, null);
+            guard = 0;
+            while (restingHost.IsRunning && restingHost.ActiveFinishedCastings < 1 && guard++ < 1000)
+                restingHost.Pump();
+            if (!restingHost.IsRunning || restingHost.ActiveFinishedCastings != 1 ||
+                restingHost.ActiveCastingInFlight)
+                throw new InvalidOperationException("A run resting between castings reported a cast in progress.");
+            restingHost.Cancel("test-end");
         }
 
         // A cast submitted while the world was held (paused, dialog, or the
@@ -1421,12 +1439,42 @@ namespace KingmakerBuffPlanner.Tests
             if (probeRun == null || !probeRun.Contains("bool running = ProbeWorldRuns(out state);") ||
                 !probeRun.Contains("stop, running, state))") || Occurrences(host, "_probeOwner.Pump(") != 1)
                 throw new InvalidOperationException("The probe run is pumped without the world state.");
-            int advance = host.IndexOf("_qualificationWorldClock.Advance(BuffPlannerUiRoot.WorldRunsForCasting, Time.deltaTime);",
-                StringComparison.Ordinal);
-            int driverUpdate = host.IndexOf("_qualificationDriver.Update();", StringComparison.Ordinal);
-            if (!host.Contains("() => _qualificationWorldClock.Milliseconds);") || advance < 0 ||
-                driverUpdate < 0 || advance > driverUpdate)
-                throw new InvalidOperationException("The qualification host deadline counts held time.");
+            // The qualification runs on the planner's own host: its root pumps
+            // it (only while the world runs, above) and counts its deadline;
+            // the driver waits on it, and the stop is the root's routine
+            // press through the HUD's own routine entry.
+            string qualification = SourceBlock(host, "private bool UpdateQualification()");
+            string press = SourceBlock(root, "internal static bool PressRoutineForRuntime(string routineId)");
+            if (qualification == null ||
+                !qualification.Contains("_qualificationHost = BuffPlannerUiRoot.CastingHostForRuntime;") ||
+                !qualification.Replace("\r\n", "\n").Contains(
+                    "() => BuffPlannerUiRoot.WorldRunsForCasting, true,\n                    BuffPlannerUiRoot.PressRoutineForRuntime);") ||
+                qualification.Contains("new CastingExecutionHost(") || host.Contains("_qualificationHost.Pump(") ||
+                host.Contains("_qualificationWorldClock") || press == null ||
+                !press.Contains("_instance.ExecuteRoutineRequest(routineId)") ||
+                !root.Contains("() => { OpenSetup(); }, routineId => ExecuteRoutineRequest(routineId),"))
+                throw new InvalidOperationException("The qualification does not run on the planner's own pumped host.");
+            // One mod update ticks the root (one pump) before the test host,
+            // so the stop press precedes the next pump.
+            string modMain = File.ReadAllText(Path.Combine(directory.FullName, "src", "KingmakerBuffPlanner", "Main.cs"));
+            string core = SourceBlock(modMain, "private static void OnUpdateCore(");
+            int tickOwned = core == null ? -1 : core.IndexOf("BuffPlannerUiRoot.TickOwned(deltaTime);", StringComparison.Ordinal);
+            int hostUpdate = core == null ? -1 : core.IndexOf("if (runtime == null || !runtime.Update()) return;", StringComparison.Ordinal);
+            if (tickOwned < 0 || hostUpdate < 0 || tickOwned > hostUpdate ||
+                Occurrences(core, "BuffPlannerUiRoot.TickOwned(") != 1 || Occurrences(core, "runtime.Update()") != 1)
+                throw new InvalidOperationException("The root tick no longer precedes the test host in one mod update.");
+            // The launcher's casting mode must be the allowance's, and the
+            // acceptance counts the planner host's runs: none before the
+            // qualification, exactly the boundary's submissions after it.
+            string normalized = qualification.Replace("\r\n", "\n");
+            string acceptance = host.Replace("\r\n", "\n");
+            string mismatch = SourceBlock(normalized,
+                "if (allowance != null && !string.Equals(allowance.ExecutionMode, requestedMode,\n                            StringComparison.Ordinal))");
+            if (mismatch == null || !mismatch.Contains("allowance = null;") ||
+                !mismatch.Contains("_qualificationRecord.AllowanceStatus = \"execution-mode-mismatch:\" +") ||
+                !normalized.Contains("_qualificationRunsBefore = _qualificationHost.StartedRuns;") ||
+                !acceptance.Contains("bool playerRoutesQuiet = UI.NativeCastingSessionPolicy.Locked &&\n                        _qualificationRunsBefore == 0 &&\n                        BuffPlannerUiRoot.CastingRunsStartedForRuntime == boundaryRuns;"))
+                throw new InvalidOperationException("The live qualification no longer binds its mode or counts the host's runs.");
         }
 
         // The brace-balanced block after the first occurrence of a header,
@@ -2092,7 +2140,7 @@ namespace KingmakerBuffPlanner.Tests
         {
             var root = new JObject
             {
-                { "schemaVersion", 3 },
+                { "schemaVersion", 4 },
                 { "kind", "kbp-casting-qualification" },
                 { "runId", "qual-run-1" },
                 { "sourceCommit", new string('c', 40) },
@@ -2101,6 +2149,7 @@ namespace KingmakerBuffPlanner.Tests
                 { "assemblyMvid", "11111111-2222-3333-4444-555555555555" },
                 { "fixtureGameId", "fixture-game" },
                 { "recipe", "zero-cost-mixed" },
+                { "executionMode", "instant" },
                 { "approvedProjectionIds", new JArray(new string('d', 64), new string('e', 64)) },
                 { "maximumNativeSubmissions", 6 },
                 { "approvedBy", "Howie" },
@@ -2116,8 +2165,26 @@ namespace KingmakerBuffPlanner.Tests
             CastingQualificationAllowance valid = CastingQualificationAllowance.Parse(
                 QualificationAllowanceJson(), "qual-run-1", out refusal);
             if (valid == null || refusal != null || valid.ApprovedProjectionIds.Count != 2 ||
-                valid.MaximumNativeSubmissions != 6 || valid.Recipe != "zero-cost-mixed")
+                valid.MaximumNativeSubmissions != 6 || valid.Recipe != "zero-cost-mixed" ||
+                valid.ExecutionMode != "instant")
                 throw new InvalidOperationException("A valid qualification allowance was refused: " + refusal);
+            // Schema 4 names the casting mode; an allowance without one (the
+            // schema-3 shape) or with any other mode authorizes nothing.
+            foreach (KeyValuePair<string, Action<JObject>> item in new Dictionary<string, Action<JObject>>
+                {
+                    { "allowance-missing-member:executionMode", o => o.Remove("executionMode") },
+                    { "allowance-schema", o => o["schemaVersion"] = 3 },
+                    { "allowance-execution-mode", o => o["executionMode"] = "hybrid" }
+                })
+            {
+                if (CastingQualificationAllowance.Parse(QualificationAllowanceJson(item.Value),
+                        "qual-run-1", out refusal) != null || refusal != item.Key)
+                    throw new InvalidOperationException("Mode case " + item.Key + " returned " + refusal);
+            }
+            CastingQualificationAllowance animated = CastingQualificationAllowance.Parse(
+                QualificationAllowanceJson(o => o["executionMode"] = "animated"), "qual-run-1", out refusal);
+            if (animated == null || animated.ExecutionMode != "animated")
+                throw new InvalidOperationException("An animated allowance was refused: " + refusal);
             var cases = new Dictionary<string, Action<JObject>>
             {
                 { "allowance-unknown-member:extra", o => o["extra"] = 1 },
@@ -2229,7 +2296,10 @@ namespace KingmakerBuffPlanner.Tests
             // verified free pool would correctly fail the cast).
             var runtime = new ScriptedInstantRuntime("none", "free");
             var host = new CastingExecutionHost(settings => new InstantCastExecutor(runtime, true), () => now);
-            var boundary = new CastingQualificationBoundary(allowance, host, () => null);
+            var boundary = new CastingQualificationBoundary(allowance, host, () => new ExecutionProfile
+            {
+                Mode = "instant", AllowAnimatedFallback = true, OutOfCombatOnly = true
+            });
             Func<string, ActiveEffectSnapshot, CastingPlanDocument, CastingDispatchOutcome> submit =
                 (name, live, doc) =>
                 {
@@ -2259,6 +2329,31 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("The submission budget was exceeded: " +
                     overBudget.Reason + "|fired=" + runtime.Fired.Count + "|" +
                     string.Join(";", boundary.Submissions.ToArray()));
+            if (!boundary.Submissions.Any(value => value.EndsWith(";mode=instant", StringComparison.Ordinal)))
+                throw new InvalidOperationException("A submission did not record its casting mode.");
+            // The run executes only in the mode the allowance names: another
+            // mode, or no settings at all, is refused before the host and
+            // consumes neither the approved id nor the budget.
+            foreach (string wrongMode in new[] { "animated", null })
+            {
+                var modeHost = new CastingExecutionHost(settings => new InstantCastExecutor(runtime, true), () => now);
+                var modeBoundary = new CastingQualificationBoundary(allowance, modeHost, () => wrongMode == null
+                    ? null : new ExecutionProfile { Mode = wrongMode, AllowAnimatedFallback = true, OutOfCombatOnly = true });
+                ExplicitCastingPlan plan = new ExplicitCastingCompiler().Compile(document,
+                    inputs.Snapshot, inputs.ProviderOptions, inputs.EffectsBySource,
+                    inputs.Enhancements, "long", null, false, null);
+                CastingApplyDecision decision = new CastingExecutionGate().Evaluate(plan,
+                    CastingApplyMode.Ordinary, "long");
+                ExplicitStepConversion projection = ExplicitCastingStepConverter.Convert(plan,
+                    decision, inputs.ProviderOptions, inputs.EffectsBySource);
+                CastingDispatchOutcome outcome = modeBoundary.Submit(plan, decision, "long", projection);
+                if (outcome.Submitted ||
+                    outcome.Reason != "qualification-mode-not-approved:" + (wrongMode ?? "none") ||
+                    modeHost.StartedRuns != 0 || modeBoundary.PlannedSubmissions != 0 ||
+                    modeBoundary.DispositionReason != "qualification-armed" || runtime.Fired.Count != 3)
+                    throw new InvalidOperationException("A run in an unapproved mode (" + (wrongMode ?? "none") +
+                        ") reached the host: " + outcome.Reason);
+            }
         }
 
         // A tiny simulated game world for the qualification driver: a rule
@@ -2266,11 +2361,15 @@ namespace KingmakerBuffPlanner.Tests
         // target (no spend: the sources are verified free); fresh reads and
         // later compiles see exactly the world state.
         private sealed class SimulatedBuffWorld : IInstantCastRuntimeAdapter,
-            ICastEnhancementRuntimeAdapter
+            ICastRuntimeAdapter, ICastEnhancementRuntimeAdapter
         {
             internal readonly Dictionary<string, KeyValuePair<string, long>> Active =
                 new Dictionary<string, KeyValuePair<string, long>>(StringComparer.Ordinal);
             internal readonly List<string> Fired = new List<string>();
+            // Animated casts: each native command runs this many polls before
+            // it lands (the caster walks and casts), then the effect exists.
+            internal int AnimatedFrames = 5;
+            internal readonly List<string> AnimatedStarts = new List<string>();
             // Failure shapes: this casting lands but is never confirmed, or
             // reports a resource spent on its verified-free source.
             internal string UnconfirmedCasting;
@@ -2290,11 +2389,22 @@ namespace KingmakerBuffPlanner.Tests
             { return CastEnhancementPreparation.Pass(null); }
             public InstantCastResult Fire(CastStep step)
             {
+                Land(step);
+                return new InstantCastResult(true, true, step.AssignmentId != UnconfirmedCasting,
+                    step.AssignmentId == SpendOnFreeCasting, "simulated");
+            }
+
+            internal void Land(CastStep step)
+            {
                 Fired.Add(step.AssignmentId);
                 Active[step.TargetUnitIds[0]] = new KeyValuePair<string, long>(
                     "i" + (++_instances), Now + 600);
-                return new InstantCastResult(true, true, step.AssignmentId != UnconfirmedCasting,
-                    step.AssignmentId == SpendOnFreeCasting, "simulated");
+            }
+
+            public IAnimatedCastOperation StartAnimated(CastStep step)
+            {
+                AnimatedStarts.Add(step.AssignmentId);
+                return new SimulatedAnimatedOperation(this, step);
             }
             public bool EffectsObserved(CastStep step)
             {
@@ -2328,6 +2438,38 @@ namespace KingmakerBuffPlanner.Tests
                 return ProbeObservation.Read(label, ++_sequence, DateTime.UtcNow,
                     target, -1, instances);
             }
+        }
+
+        private sealed class SimulatedAnimatedOperation : IAnimatedCastOperation
+        {
+            private readonly SimulatedBuffWorld _world;
+            private readonly CastStep _step;
+            private int _polls;
+            private bool _landed;
+
+            internal SimulatedAnimatedOperation(SimulatedBuffWorld world, CastStep step)
+            {
+                _world = world;
+                _step = step;
+            }
+
+            public bool IsCompleted
+            {
+                get
+                {
+                    if (++_polls < _world.AnimatedFrames) return false;
+                    if (!_landed) { _landed = true; _world.Land(_step); }
+                    return true;
+                }
+            }
+            public bool IsStarted { get { return _polls > 0; } }
+            public bool TimedOut { get { return false; } }
+            public bool Succeeded { get { return _landed; } }
+            public bool EffectsObserved { get { return _landed && _world.EffectsObserved(_step); } }
+            public bool ResourceSpent { get { return false; } }
+            public bool HasResidualDeliveryState { get { return false; } }
+            public string Detail { get { return "simulated-animated;polls=" + _polls; } }
+            public void Dispose() { }
         }
 
         // A finite world: a prepared caster (exact slot tokens with native
@@ -2641,20 +2783,31 @@ namespace KingmakerBuffPlanner.Tests
         }
 
 
+        // The production executor choice: animated settings get the animated
+        // executor, instant settings the instant one.
+        private static CastingExecutionHost QualificationHost(SimulatedBuffWorld world, Func<long> clock)
+        {
+            return new CastingExecutionHost(settings => settings != null && settings.Mode == "animated"
+                ? (ICastExecutor)new AnimatedCastExecutor(world, true)
+                : new InstantCastExecutor(world, true), clock);
+        }
+
         private static CastingQualificationDriver NewQualificationDriver(string dir,
             SimulatedBuffWorld world, CastingQualificationRecord record,
             CastingQualificationAllowance allowance, Func<long> clock, Func<bool> worldRunning = null,
-            Func<long> hostClock = null)
+            Func<long> hostClock = null, CastingExecutionHost host = null, bool ownerPumpsHost = false,
+            Func<string, bool> pressRoutine = null)
         {
-            var host = new CastingExecutionHost(settings => new InstantCastExecutor(world, true), hostClock ?? clock);
+            host = host ?? QualificationHost(world, hostClock ?? clock);
             return new CastingQualificationDriver(record, allowance, "fixture-campaign",
                 () => QualificationInputs(true, true, world.Live(), world.OtherUnits),
                 boundary => new CastingWorkspaceSession(dir, "fixture-campaign", boundary),
-                host, world.Observe, clock, 240000, null, worldRunning);
+                host, world.Observe, clock, 240000, null, worldRunning, ownerPumpsHost, pressRoutine);
         }
 
         private static CastingQualificationAllowance ForecastAllowance(SimulatedBuffWorld world,
-            Func<IReadOnlyList<CastingQualificationStepForecast>, IEnumerable<string>> ids = null)
+            Func<IReadOnlyList<CastingQualificationStepForecast>, IEnumerable<string>> ids = null,
+            string mode = "instant")
         {
             CastingWorkspaceInputs inputs = QualificationInputs(true, true, world.Live(), world.OtherUnits);
             CastingQualificationSelection selection = CastingQualificationRecipe.SelectZeroCostMixed(
@@ -2667,9 +2820,123 @@ namespace KingmakerBuffPlanner.Tests
             return CastingQualificationAllowance.Parse(QualificationAllowanceJson(o =>
             {
                 o["fixtureGameId"] = "fixture-campaign";
+                o["executionMode"] = mode;
                 o["approvedProjectionIds"] = new JArray(approved.Cast<object>().ToArray());
                 o["maximumNativeSubmissions"] = 6;
             }), "qual-run-1", out refusal);
+        }
+
+        // Animated, the player default: the player's stop is pressed while
+        // the first cast is in progress; that cast completes, nothing after
+        // it starts, and every run executes in the approved mode.
+        private static void TestQualificationAnimatedPlayerStop(string root)
+        {
+            var world = new SimulatedBuffWorld();
+            CastingQualificationAllowance allowance = ForecastAllowance(world, null, "animated");
+            var record = new CastingQualificationRecord { CastingScenario = true, AllowanceStatus = "parsed" };
+            string dir = Path.Combine(root, "qa-animated");
+            Directory.CreateDirectory(dir);
+            long now = 0;
+            CastingQualificationDriver driver = NewQualificationDriver(dir, world, record, allowance, () => now);
+            for (int i = 0; i < 5000 && !driver.Completed; i++) { now += 16; world.Now = now; driver.Update(); }
+            IList<string> violations = record.Violations();
+            if (record.TerminalReason != "completed" || violations.Count != 0 ||
+                record.ExecutionMode != "animated" || record.StopPressedInFlight != true ||
+                !record.StopPressHandled ||
+                record.StopPress != "host-request;handled=True;inFlight=True;pending=player-stopped" ||
+                !world.Fired.SequenceEqual(new[] { "qual-cast-1", "qual-cast-2", "qual-cast-3", "qual-cast-1" }) ||
+                !world.AnimatedStarts.SequenceEqual(world.Fired) || record.Submissions.Count != 3 ||
+                record.Submissions.Any(value => !value.EndsWith(";mode=animated", StringComparison.Ordinal)) ||
+                record.Step("stop").Report.TerminalReason != "cancelled:" + CastingExecutionHost.PlayerStopReason)
+                throw new InvalidOperationException("The animated qualification was not accepted exactly: " +
+                    record.TerminalReason + "|" + string.Join("|", violations.ToArray()) + "|" + record.StopPress +
+                    "|fired=" + string.Join(",", world.Fired.ToArray()) + "|" +
+                    string.Join(";", record.Submissions.ToArray()));
+            // The rule: in animated mode a press that arrived only after the
+            // first cast finished is not the in-flight stop the step claims
+            // (in instant mode either is the player stop); a press the host
+            // did not take, or none, never passes.
+            record.StopPressedInFlight = false;
+            if (!record.Violations().SequenceEqual(new[] { "stop-press:not-in-flight:" + record.StopPress }))
+                throw new InvalidOperationException("A late animated stop press passed: " +
+                    string.Join("|", record.Violations().ToArray()));
+            record.ExecutionMode = "instant";
+            if (record.Violations().Count != 0)
+                throw new InvalidOperationException("An instant stop press between castings was refused.");
+            record.ExecutionMode = "animated";
+            record.StopPressedInFlight = true;
+            record.StopPressHandled = false;
+            if (!record.Violations().SequenceEqual(new[] { "stop-press:not-handled:" + record.StopPress }))
+                throw new InvalidOperationException("A stop press the host did not take passed.");
+            record.StopPress = null;
+            if (!record.Violations().SequenceEqual(new[] { "stop-press:none" }))
+                throw new InvalidOperationException("A run without a stop press passed.");
+        }
+
+        // The live shape: the planner's root owns and pumps the host, the
+        // driver never pumps it, and the stop is the root's routine press
+        // (here the host call that press makes).
+        private static void TestQualificationOnOwnerPumpedHost(string root)
+        {
+            var world = new SimulatedBuffWorld();
+            long now = 0;
+            CastingExecutionHost host = QualificationHost(world, () => now);
+            var presses = new List<string>();
+            var record = new CastingQualificationRecord { CastingScenario = true, AllowanceStatus = "parsed" };
+            string dir = Path.Combine(root, "qa-owner");
+            Directory.CreateDirectory(dir);
+            CastingQualificationDriver driver = NewQualificationDriver(dir, world, record,
+                ForecastAllowance(world, null, "animated"), () => now, null, null, host, true,
+                routine =>
+                {
+                    presses.Add(routine);
+                    return host.RequestStop(CastingExecutionHost.PlayerStopReason);
+                });
+            // Unpumped by its owner, the approved stop run never advances.
+            for (int i = 0; i < 50 && !driver.Completed; i++) { now += 16; driver.Update(); }
+            if (!host.IsRunning || world.AnimatedStarts.Count != 0 || driver.Phase != "stop-wait" ||
+                presses.Count != 0)
+                throw new InvalidOperationException("The driver pumped a host its owner pumps.");
+            // The owner pumps once per frame, after the driver's update.
+            for (int i = 0; i < 5000 && !driver.Completed; i++)
+            {
+                now += 16;
+                world.Now = now;
+                driver.Update();
+                host.Pump();
+            }
+            if (record.Violations().Count != 0 || record.TerminalReason != "completed" ||
+                !presses.SequenceEqual(new[] { CastingQualificationRecipe.RoutineId }) ||
+                record.StopPress != "routine-press;handled=True;inFlight=True;pending=player-stopped" ||
+                host.StartedRuns != 3 ||
+                !world.Fired.SequenceEqual(new[] { "qual-cast-1", "qual-cast-2", "qual-cast-3", "qual-cast-1" }))
+                throw new InvalidOperationException("The owner-pumped qualification was not accepted: " +
+                    string.Join("|", record.Violations().ToArray()) + "|" + record.StopPress);
+            // A press that never reaches the running host fails closed AT the
+            // stop step: that run completes, the step is judged wrong and
+            // nothing after it is submitted.
+            var deaf = new SimulatedBuffWorld();
+            CastingExecutionHost deafHost = QualificationHost(deaf, () => now);
+            var deafRecord = new CastingQualificationRecord { CastingScenario = true, AllowanceStatus = "parsed" };
+            string deafDir = Path.Combine(root, "qa-deaf");
+            Directory.CreateDirectory(deafDir);
+            CastingQualificationDriver deafDriver = NewQualificationDriver(deafDir, deaf, deafRecord,
+                ForecastAllowance(deaf, null, "animated"), () => now, null, null, deafHost, true, routine => true);
+            for (int i = 0; i < 5000 && !deafDriver.Completed; i++)
+            {
+                now += 16;
+                deaf.Now = now;
+                deafDriver.Update();
+                deafHost.Pump();
+            }
+            if (deafRecord.StopPressHandled || deafHost.StartedRuns != 1 ||
+                !deaf.Fired.SequenceEqual(new[] { "qual-cast-1", "qual-cast-2", "qual-cast-3" }) ||
+                !deafRecord.Failures.Contains("stop-wait:step:report:completed") ||
+                deafRecord.StopPress != "routine-press;handled=True;inFlight=True;pending=none" ||
+                deafRecord.Violations().Count == 0)
+                throw new InvalidOperationException("A stop press that never reached the host did not fail closed: " +
+                    string.Join("|", deafRecord.Violations().ToArray()) + "|fired=" +
+                    string.Join(",", deaf.Fired.ToArray()));
         }
 
         // The whole zero-cost-mixed qualification through the production
@@ -2769,7 +3036,7 @@ namespace KingmakerBuffPlanner.Tests
                 judged.Steps.Clear();
                 var stopStep = new CastingQualificationStepResult("stop");
                 stopStep.Report = new CastingRunReport("run-1", "long", CastingApplyMode.Ordinary, "p",
-                    "cancelled:" + CastingQualificationDriver.StopReason, true, false,
+                    "cancelled:" + CastingExecutionHost.PlayerStopReason, true, false,
                     new[]
                     {
                         new CastingOutcomeEntry("qual-cast-1", CastingOutcomeState.EffectConfirmed, true, true, false, "ok", true),

@@ -163,6 +163,9 @@ namespace KingmakerBuffPlanner.UI
     {
         public const long BaseDeadlineMillis = 20000;
         public const long PerCastingDeadlineMillis = 45000;
+        // The reason of the player's own stop (a routine press while a run
+        // is active): the cast in progress completes, the run then ends.
+        public const string PlayerStopReason = "player-stopped";
 
         private readonly Func<ExecutionProfile, ICastExecutor> _executorFactory;
         private readonly Func<long> _clockMillis;
@@ -190,6 +193,20 @@ namespace KingmakerBuffPlanner.UI
         public int ActiveFinishedCastings
         {
             get { return _active == null ? -1 : _active.FinishedCastings; }
+        }
+
+        // Whether a casting of the active run is in progress now: the run
+        // has been pumped and is not resting between castings.
+        public bool ActiveCastingInFlight
+        {
+            get { return _active != null && _active.Pumped && !_active.BetweenCastings; }
+        }
+
+        // The stop requested for the active run and not yet in effect (the
+        // cast in progress is finishing); null when none or idle.
+        public string ActiveStopRequested
+        {
+            get { return _active == null ? null : _active.StopRequested; }
         }
         public CastingRunReport LastReport { get; private set; }
         public int StartedRuns { get; private set; }

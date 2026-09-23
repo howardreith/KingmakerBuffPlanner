@@ -99,7 +99,8 @@ if ($Scenario -ceq 'live-cast-qual') {
         throw 'live-cast-qual requires -QualificationAllowancePath (the run-bound qualification allowance).'
     }
     if ([string]::IsNullOrWhiteSpace($RunId)) { throw 'live-cast-qual requires an explicit -RunId matching the allowance.' }
-    if ($ExecutionMode -cne 'instant') { throw 'live-cast-qual runs in instant mode only.' }
+    # The casting run executes in the mode its allowance approves (the
+    # selection run is mode-independent: projections do not sign it).
     $qualificationApprovals = [IO.Path]::GetFullPath((Join-Path $root '..\..\approvals')).TrimEnd('\') + '\'
     $qualificationFull = [IO.Path]::GetFullPath($QualificationAllowancePath)
     if (-not $qualificationFull.StartsWith($qualificationApprovals, [StringComparison]::OrdinalIgnoreCase) -or
@@ -108,7 +109,7 @@ if ($Scenario -ceq 'live-cast-qual') {
     }
     $qualificationAllowanceJson = [IO.File]::ReadAllText($qualificationFull)
     $qualificationRefusal = Get-KbpQualificationAllowanceBuildRefusal -AllowanceJson $qualificationAllowanceJson `
-        -RunId $RunId -BuildManifest $buildManifest -Recipe $QualificationRecipe
+        -RunId $RunId -BuildManifest $buildManifest -Recipe $QualificationRecipe -ExecutionMode $ExecutionMode
     if ($null -ne $qualificationRefusal) { throw "The qualification allowance was refused: $qualificationRefusal" }
 }
 elseif (-not [string]::IsNullOrWhiteSpace($QualificationAllowancePath)) {
