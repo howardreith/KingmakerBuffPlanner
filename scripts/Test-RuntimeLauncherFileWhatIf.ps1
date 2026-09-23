@@ -188,4 +188,31 @@ foreach ($target in $targets) {
         throw "Selection-only probe -WhatIf changed: $target"
     }
 }
-Write-Host 'Launcher -File WhatIf purity: PASS=8 FAIL=0'
+# Layer 6 (review N1): allowance-to-build binding. A same-commit
+# replacement (different package, DLL or MVID) is refused before deploy.
+. (Join-Path $PSScriptRoot 'RuntimeAutomation.Common.ps1')
+$manifestFixture = [pscustomobject]@{ commit = ('c' * 40); packageSha256 = ('a' * 64)
+    dllSha256 = ('b' * 64); assemblyMvid = '11111111-2222-3333-4444-555555555555' }
+function New-AllowanceFixtureJson([hashtable]$Override) {
+    $value = [ordered]@{ schemaVersion = 2; kind = 'kbp-single-cast-probe'; runId = 'probe-bind-test'
+        sourceCommit = ('c' * 40); packageSha256 = ('a' * 64); dllSha256 = ('b' * 64)
+        assemblyMvid = '11111111-2222-3333-4444-555555555555'; maximumNativeSubmissions = 1 }
+    foreach ($key in $Override.Keys) { $value[$key] = $Override[$key] }
+    return ($value | ConvertTo-Json -Compress)
+}
+if ($null -ne (Get-KbpProbeAllowanceBuildRefusal -AllowanceJson (New-AllowanceFixtureJson @{}) `
+        -RunId 'probe-bind-test' -BuildManifest $manifestFixture)) {
+    throw 'A matching allowance was refused by the build binding.'
+}
+$bindingCases = [ordered]@{
+    'package' = @{ packageSha256 = ('d' * 64) }; 'dll' = @{ dllSha256 = ('e' * 64) }
+    'mvid' = @{ assemblyMvid = '99999999-2222-3333-4444-555555555555' }
+    'commit' = @{ sourceCommit = ('f' * 40) }; 'run-id' = @{ runId = 'other-run' }
+    'submissions' = @{ maximumNativeSubmissions = 2 }
+}
+foreach ($case in $bindingCases.Keys) {
+    $refusal = Get-KbpProbeAllowanceBuildRefusal -AllowanceJson (New-AllowanceFixtureJson $bindingCases[$case]) `
+        -RunId 'probe-bind-test' -BuildManifest $manifestFixture
+    if ($refusal -cne $case) { throw "Allowance binding case $case returned '$refusal'." }
+}
+Write-Host 'Launcher -File WhatIf purity: PASS=9 FAIL=0'

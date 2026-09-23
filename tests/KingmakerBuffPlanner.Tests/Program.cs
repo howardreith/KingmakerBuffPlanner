@@ -416,6 +416,9 @@ namespace KingmakerBuffPlanner.Tests
                 Run("probe-observations-are-authoritative", TestProbeObservationsAreAuthoritative);
                 Run("probe-owner-terminal-cleanup", TestProbeOwnerTerminalCleanup);
                 Run("probe-owner-wiring-in-host-and-main", TestProbeOwnerWiringInHostAndMain);
+                Run("probe-requires-frozen-artifact-identity", TestProbeRequiresFrozenArtifactIdentity);
+                Run("probe-shutdown-before-selection-is-terminal", TestProbeShutdownBeforeSelectionIsTerminal);
+                Run("prepared-slot-observation-reads-exact-source", TestPreparedSlotObservationReadsExactSource);
             }
             finally
             {
@@ -9790,13 +9793,15 @@ namespace KingmakerBuffPlanner.Tests
             internal int Closes;
             internal readonly List<SingleCastProbeRunRecord> Published = new List<SingleCastProbeRunRecord>();
             internal CastingDispatchOutcome Submitted;
+            internal int FactoryCalls;
         }
 
         // Composes the REAL owner, observation session, one-shot boundary,
         // run coordinator and InstantCastExecutor; only the game runtime
         // and the native observer are recording stand-ins (not gameplay).
         private static ProbeOwnerRun StartProbeOwnerRun(string kind, string runtimeMode,
-            Func<string, ProbeSequenceClock, ProbeObservation> read, bool closeThrows = false)
+            Func<string, ProbeSequenceClock, ProbeObservation> read, bool closeThrows = false,
+            SingleCastProbeRuntimeIdentity loaded = null, string terminateFirst = null)
         {
             ExplicitStepConversion projection = ZeroCostProjection(kind);
             if (!projection.Converted)
@@ -9814,18 +9819,24 @@ namespace KingmakerBuffPlanner.Tests
                 if (closeThrows) throw new InvalidOperationException("fixture-close");
                 return new ProbeWorkspaceCloseResult(true, true, null);
             }, published => run.Published.Add(published));
-            string allowanceJson = "{\"schemaVersion\":1,\"kind\":\"kbp-single-cast-probe\",\"runId\":\"run-owner\"," +
-                "\"sourceCommit\":\"0000000\",\"approvedProjectionId\":\"" + projection.ProjectionId +
+            string allowanceJson = "{\"schemaVersion\":2,\"kind\":\"kbp-single-cast-probe\",\"runId\":\"run-owner\"," +
+                "\"sourceCommit\":\"" + ProbeIdentity.SourceCommit + "\",\"packageSha256\":\"" +
+                ProbeIdentity.PackageSha256 + "\",\"dllSha256\":\"" + ProbeIdentity.DllSha256 +
+                "\",\"assemblyMvid\":\"" + ProbeIdentity.AssemblyMvid +
+                "\",\"approvedProjectionId\":\"" + projection.ProjectionId +
                 "\",\"casterUnitId\":\"unit-cleric\",\"targetUnitId\":\"unit-t1\",\"sourceId\":\"source-bulls\"," +
                 "\"maximumNativeSubmissions\":1,\"approvedBy\":\"owner\"}";
             string refusal;
             SingleCastProbeAllowance allowance = SingleCastProbeAllowance.Parse(allowanceJson, "run-owner", out refusal);
             if (allowance == null) throw new InvalidOperationException("Owner fixture allowance: " + refusal);
+            run.FactoryCalls = 0;
             var boundary = new SingleCastProbeBoundary(allowance, () =>
             {
+                run.FactoryCalls++;
                 run.Runtime = new ScriptedInstantRuntime("cast-free", runtimeMode);
                 return new InstantCastExecutor(run.Runtime, true);
-            });
+            }, () => loaded ?? ProbeIdentity);
+            if (terminateFirst != null) run.Owner.Terminate(terminateFirst);
             var clock = new ProbeSequenceClock();
             ExplicitCastingPlan plan = new ExplicitCastingPlan(new ResolvedCasting[0], new string[0]);
             CastingApplyDecision decision = new CastingApplyDecision(true, CastingApplyMode.Ordinary, "long",
@@ -9923,6 +9934,136 @@ namespace KingmakerBuffPlanner.Tests
                     : Obs(phase, clock, 7, effect));
             if (missing.Submitted.Submitted || missing.Runtime != null)
                 throw new InvalidOperationException("A cast was submitted without a fresh before-observation.");
+        }
+
+        // Review N1: the approval binds the FROZEN artifact. Through the real
+        // pre-submission path (owner -> boundary preflight), any mismatch of
+        // commit, package, loaded DLL or loaded MVID - including a same-commit
+        // replacement binary - refuses with zero observation, zero executor
+        // construction and zero submission.
+        private static void TestProbeRequiresFrozenArtifactIdentity()
+        {
+            Func<string, ProbeSequenceClock, ProbeObservation> read = (phase, clock) => Obs(phase, clock, 7);
+            var mismatches = new Dictionary<string, SingleCastProbeRuntimeIdentity>
+            {
+                { "commit", new SingleCastProbeRuntimeIdentity(new string('d', 40), ProbeIdentity.PackageSha256,
+                    ProbeIdentity.DllSha256, ProbeIdentity.AssemblyMvid) },
+                { "package", new SingleCastProbeRuntimeIdentity(ProbeIdentity.SourceCommit, new string('e', 64),
+                    ProbeIdentity.DllSha256, ProbeIdentity.AssemblyMvid) },
+                // Same commit and package, replacement DLL.
+                { "dll", new SingleCastProbeRuntimeIdentity(ProbeIdentity.SourceCommit, ProbeIdentity.PackageSha256,
+                    new string('f', 64), ProbeIdentity.AssemblyMvid) },
+                // Same commit, package and file hash, different loaded module.
+                { "mvid", new SingleCastProbeRuntimeIdentity(ProbeIdentity.SourceCommit, ProbeIdentity.PackageSha256,
+                    ProbeIdentity.DllSha256, "99999999-2222-3333-4444-555555555555") }
+            };
+            foreach (KeyValuePair<string, SingleCastProbeRuntimeIdentity> mismatch in mismatches)
+            {
+                ProbeOwnerRun run = StartProbeOwnerRun("unlimited", "free", read, false, mismatch.Value);
+                if (run.Submitted.Submitted || run.Submitted.Reason != "probe-identity-mismatch:" + mismatch.Key ||
+                    run.FactoryCalls != 0 || run.Runtime != null || run.Observer.Phases.Count != 0)
+                    throw new InvalidOperationException("A " + mismatch.Key + " mismatch reached the game path: " +
+                        run.Submitted.Reason);
+            }
+            ProbeOwnerRun matching = StartProbeOwnerRun("unlimited", "free", read);
+            if (!matching.Submitted.Submitted || matching.FactoryCalls != 1 ||
+                matching.Owner.Record.MeasuredIdentity != ProbeIdentity.Describe())
+                throw new InvalidOperationException("The frozen artifact itself was refused: " + matching.Submitted.Reason);
+            // An allowance without the artifact identity is not an allowance.
+            string refusal;
+            if (SingleCastProbeAllowance.Parse("{\"schemaVersion\":2,\"kind\":\"kbp-single-cast-probe\"," +
+                    "\"runId\":\"r\",\"sourceCommit\":\"c\",\"packageSha256\":\"x\",\"dllSha256\":\"y\"," +
+                    "\"assemblyMvid\":\"z\",\"approvedProjectionId\":\"" + new string('0', 64) +
+                    "\",\"casterUnitId\":\"a\",\"targetUnitId\":\"b\",\"sourceId\":\"s\"," +
+                    "\"maximumNativeSubmissions\":1,\"approvedBy\":\"o\"}", "r", out refusal) != null ||
+                refusal != "allowance-artifact-identity")
+                throw new InvalidOperationException("An allowance without a valid artifact identity parsed: " + refusal);
+        }
+
+        // Review N2: a request shut down BEFORE selection (disable, unload,
+        // host failure) never selects, arms or submits afterwards; cleanup
+        // and publication still happen exactly once.
+        private static void TestProbeShutdownBeforeSelectionIsTerminal()
+        {
+            foreach (string reason in new[] { "mod-disabled", "mod-unload", "host-exception:Fixture:early" })
+            {
+                ProbeOwnerRun run = StartProbeOwnerRun("unlimited", "free",
+                    (phase, clock) => Obs(phase, clock, 7), false, null, reason);
+                if (run.Owner.BeginSelection() || run.Submitted.Submitted ||
+                    !run.Submitted.Reason.StartsWith("probe-owner-terminated:" + reason, StringComparison.Ordinal) ||
+                    run.FactoryCalls != 0 || run.Observer.Phases.Count != 0 || run.Published.Count != 1 ||
+                    run.Owner.Record.TerminalReason != reason || run.Owner.Record.BoundaryConstructed)
+                    throw new InvalidOperationException(reason + " before selection did not stay terminal.");
+                // "Re-enable" / later updates: pumping and terminating again change nothing.
+                run.Owner.Pump(10, 60000, false);
+                run.Owner.Terminate("completed");
+                if (run.Published.Count != 1 || run.Owner.Record.TerminalReason != reason || run.FactoryCalls != 0)
+                    throw new InvalidOperationException(reason + ": a later update resumed the request.");
+            }
+            string source = Path.Combine(FindRepositoryRoot(), "src", "KingmakerBuffPlanner");
+            string host = File.ReadAllText(Path.Combine(source, "RuntimeTesting", "RuntimeTestHost.cs"));
+            string main = File.ReadAllText(Path.Combine(source, "Main.cs"));
+            int ctor = host.IndexOf("private RuntimeTestHost(", StringComparison.Ordinal);
+            int ownerAtCreation = host.IndexOf("_probeOwner = new SingleCastProbeRunOwner(", StringComparison.Ordinal);
+            int update = host.IndexOf("internal bool Update()", StringComparison.Ordinal);
+            int shutdownCheck = host.IndexOf("if (_shutdownReason != null)", update, StringComparison.Ordinal);
+            int firstWork = host.IndexOf("_workspaceSelectionApplied", update, StringComparison.Ordinal);
+            if (ctor < 0 || ownerAtCreation < ctor || ownerAtCreation > update ||
+                host.IndexOf("_probeOwner = new SingleCastProbeRunOwner(", ownerAtCreation + 1, StringComparison.Ordinal) >= 0 ||
+                shutdownCheck < 0 || firstWork < 0 || shutdownCheck > firstWork ||
+                !host.Contains("!_probeOwner.BeginSelection()") ||
+                System.Text.RegularExpressions.Regex.Matches(main, @"RuntimeTestHost\.TryCreate\(").Count != 1 ||
+                main.IndexOf("RuntimeTestHost.TryCreate(", StringComparison.Ordinal) <
+                    main.IndexOf("static bool Load(", StringComparison.Ordinal))
+                throw new InvalidOperationException("Shutdown is not terminal from host creation.");
+        }
+
+        // Review N3: prepared-slot observation reads EXACTLY the reserved
+        // source even after it is consumed, never substitutes another slot,
+        // and judges the paid cast by those tokens going available -> used.
+        private static void TestPreparedSlotObservationReadsExactSource()
+        {
+            string failure;
+            var afterCast = new[]
+            {
+                new ProbeSlotView("t1", false, true, true),
+                new ProbeSlotView("t2", false, false, true),
+                new ProbeSlotView("t9", true, true, true)
+            };
+            IDictionary<string, bool> read = ProbeSourceSlots.ReservedExactly(afterCast, new[] { "t1", "t2" }, out failure);
+            if (read == null || read.Count != 2 || read["t1"] || read["t2"] || read.ContainsKey("t9"))
+                throw new InvalidOperationException("A consumed reserved slot was not read (or another slot was used): " + failure);
+            if (ProbeSourceSlots.ReservedExactly(new[] { new ProbeSlotView("t9", true, true, true) },
+                    new[] { "t1" }, out failure) != null || failure != "reserved-slot-missing:t1")
+                throw new InvalidOperationException("A missing reserved slot was substituted.");
+            if (ProbeSourceSlots.ReservedExactly(new[] { new ProbeSlotView("t1", true, true, false) },
+                    new[] { "t1" }, out failure) != null || failure != "reserved-slot-holds-other-spell:t1")
+                throw new InvalidOperationException("A reserved slot holding another spell was accepted.");
+
+            var effect = new ProbeEffectInstance("buff-effect", "instance-2", 900);
+            Func<bool, bool, Func<string, ProbeSequenceClock, ProbeObservation>> slots = (t1After, t2After) =>
+                (phase, clock) => phase == "before"
+                    ? ProbeObservation.Read(phase, clock.Next(), DateTime.UtcNow, "unit-t1", null, null,
+                        new Dictionary<string, bool> { { "t1", true }, { "t2", true } })
+                    : ProbeObservation.Read(phase, clock.Next(), DateTime.UtcNow, "unit-t1", null, new[] { effect },
+                        new Dictionary<string, bool> { { "t1", t1After }, { "t2", t2After } });
+            ProbeOwnerRun consumed = StartProbeOwnerRun("prepared-linked", "none", slots(false, false));
+            PumpToEnd(consumed);
+            SingleCastProbeRunRecord consumedRecord = consumed.Published.Single();
+            if (consumedRecord.Violations().Count != 0 ||
+                consumedRecord.Observation.ResourceOutcome != "reserved-slots-consumed")
+                throw new InvalidOperationException("A consumed prepared reservation was not recognized: " +
+                    string.Join("|", consumedRecord.Violations().ToArray()));
+            ProbeOwnerRun partial = StartProbeOwnerRun("prepared-linked", "none", slots(false, true));
+            PumpToEnd(partial);
+            if (!partial.Published.Single().Violations().Any(value => value.Contains("prepared-slot-mismatch")))
+                throw new InvalidOperationException("A partially consumed linked reservation passed.");
+            ProbeOwnerRun unread = StartProbeOwnerRun("prepared-linked", "none", (phase, clock) =>
+                ProbeObservation.Read(phase, clock.Next(), DateTime.UtcNow, "unit-t1", 3,
+                    phase == "before" ? new ProbeEffectInstance[0] : new[] { effect }, null));
+            PumpToEnd(unread);
+            if (unread.Published.Single().Observation.ResourceOutcome != "unknown")
+                throw new InvalidOperationException("A prepared cast without exact-slot reads was judged by counts.");
         }
 
         // Review M3 (Unity-bound wiring, checked structurally): disable,
@@ -15913,11 +16054,21 @@ namespace KingmakerBuffPlanner.Tests
         // run-bound allowance, and a default-refusing one-shot boundary
         // driving the REAL instant executor through a recording runtime. No
         // game cast; the production workspace never uses this boundary.
+        // The frozen artifact every test allowance approves, and the loaded
+        // identity a matching runtime measures.
+        private static readonly SingleCastProbeRuntimeIdentity ProbeIdentity =
+            new SingleCastProbeRuntimeIdentity(new string('c', 40), new string('a', 64),
+                new string('b', 64), "11111111-2222-3333-4444-555555555555");
+
         private static string ProbeAllowanceJson(string runId, SingleCastProbeSelection selection,
             string projectionId = null, int submissions = 1, string extra = "")
         {
-            return "{\"schemaVersion\":1,\"kind\":\"kbp-single-cast-probe\",\"runId\":\"" + runId +
-                "\",\"sourceCommit\":\"0000000\",\"approvedProjectionId\":\"" +
+            return "{\"schemaVersion\":2,\"kind\":\"kbp-single-cast-probe\",\"runId\":\"" + runId +
+                "\",\"sourceCommit\":\"" + ProbeIdentity.SourceCommit +
+                "\",\"packageSha256\":\"" + ProbeIdentity.PackageSha256 +
+                "\",\"dllSha256\":\"" + ProbeIdentity.DllSha256 +
+                "\",\"assemblyMvid\":\"" + ProbeIdentity.AssemblyMvid +
+                "\",\"approvedProjectionId\":\"" +
                 (projectionId ?? selection.Projection.ProjectionId) + "\",\"casterUnitId\":\"" +
                 selection.CasterUnitId + "\",\"targetUnitId\":\"" + selection.TargetUnitId +
                 "\",\"sourceId\":\"" + selection.SourceId + "\",\"maximumNativeSubmissions\":" +
@@ -15986,7 +16137,7 @@ namespace KingmakerBuffPlanner.Tests
             };
 
             // Default (no allowance): refused, executor never constructed.
-            var dormant = new SingleCastProbeBoundary(null, factory("none"));
+            var dormant = new SingleCastProbeBoundary(null, factory("none"), () => ProbeIdentity);
             CastingDispatchOutcome refused = dormant.Submit(selection.Plan, selection.Decision, "long",
                 selection.Projection);
             if (refused.Submitted || refused.Reason != "native-submission-disabled:no-probe-allowance" ||
@@ -15996,14 +16147,14 @@ namespace KingmakerBuffPlanner.Tests
             // Wrong approved id / wrong selection / wrong scope / tampered
             // steps: refused, allowance NOT consumed, nothing constructed.
             var wrongId = new SingleCastProbeBoundary(SingleCastProbeAllowance.Parse(
-                ProbeAllowanceJson("run-a", selection, new string('0', 64)), "run-a", out refusal), factory("none"));
+                ProbeAllowanceJson("run-a", selection, new string('0', 64)), "run-a", out refusal), factory("none"), () => ProbeIdentity);
             if (wrongId.Submit(selection.Plan, selection.Decision, "long", selection.Projection).Reason !=
                     "probe-projection-not-approved" || wrongId.AllowanceConsumed || factoryCalls != 0)
                 throw new InvalidOperationException("An unapproved projection was not refused.");
             ExplicitStepConversion standard = ExplicitCastingStepConverter.Convert(selection.Plan,
                 selection.Decision, inputs.ProviderOptions, inputs.EffectsBySource);
             var standardBoundary = new SingleCastProbeBoundary(SingleCastProbeAllowance.Parse(
-                ProbeAllowanceJson("run-a", selection, standard.ProjectionId), "run-a", out refusal), factory("none"));
+                ProbeAllowanceJson("run-a", selection, standard.ProjectionId), "run-a", out refusal), factory("none"), () => ProbeIdentity);
             if (!standardBoundary.Submit(selection.Plan, selection.Decision, "long", standard).Reason
                     .StartsWith("probe-scope-required:", StringComparison.Ordinal) || factoryCalls != 0)
                 throw new InvalidOperationException("A Standard-scope projection was not refused.");
@@ -16014,20 +16165,20 @@ namespace KingmakerBuffPlanner.Tests
                 new CastPlan(new[] { tamperedStep }, new TargetPlanOutcome[0], new string[0]),
                 selection.Projection.CastingIds.ToList(), ExplicitProjectionScope.SingleCastProbe,
                 selection.Projection.ProjectionId, selection.Projection.CanonicalContract);
-            var tamperBoundary = new SingleCastProbeBoundary(allowance, factory("none"));
+            var tamperBoundary = new SingleCastProbeBoundary(allowance, factory("none"), () => ProbeIdentity);
             if (tamperBoundary.Submit(selection.Plan, selection.Decision, "long", tampered).Reason !=
                     "probe-projection-tampered" || tamperBoundary.AllowanceConsumed || factoryCalls != 0)
                 throw new InvalidOperationException("A tampered projection was not refused.");
             string otherCaster = selection.CasterUnitId == "unit-cleric" ? "unit-wizard" : "unit-cleric";
             var mismatch = new SingleCastProbeBoundary(SingleCastProbeAllowance.Parse(
                 ProbeAllowanceJson("run-a", selection).Replace("\"casterUnitId\":\"" + selection.CasterUnitId,
-                    "\"casterUnitId\":\"" + otherCaster), "run-a", out refusal), factory("none"));
+                    "\"casterUnitId\":\"" + otherCaster), "run-a", out refusal), factory("none"), () => ProbeIdentity);
             if (mismatch.Submit(selection.Plan, selection.Decision, "long", selection.Projection).Reason !=
                     "probe-selection-not-approved" || factoryCalls != 0)
                 throw new InvalidOperationException("A different selection was not refused.");
 
             // Approved: exactly one native submission, then consumed.
-            var armed = new SingleCastProbeBoundary(allowance, factory("none"));
+            var armed = new SingleCastProbeBoundary(allowance, factory("none"), () => ProbeIdentity);
             CastingDispatchOutcome submitted = armed.Submit(selection.Plan, selection.Decision, "long",
                 selection.Projection);
             pump(armed);
@@ -16040,7 +16191,7 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("The probe allowance was reusable.");
 
             // Failure: no retry, allowance consumed.
-            var failing = new SingleCastProbeBoundary(allowance, factory("rejected"));
+            var failing = new SingleCastProbeBoundary(allowance, factory("rejected"), () => ProbeIdentity);
             failing.Submit(selection.Plan, selection.Decision, "long", selection.Projection);
             pump(failing);
             if (runtime.Fired.Count != 1 || failing.Outcome == null || failing.Outcome.AllConfirmed ||
@@ -16049,7 +16200,7 @@ namespace KingmakerBuffPlanner.Tests
 
             // Stop/deadline/teardown: disposing the boundary mid-confirmation
             // reaches the executor's cleanup and reports cancellation.
-            var pending = new SingleCastProbeBoundary(allowance, factory("pending"));
+            var pending = new SingleCastProbeBoundary(allowance, factory("pending"), () => ProbeIdentity);
             pending.Submit(selection.Plan, selection.Decision, "long", selection.Projection);
             while (runtime.Fired.Count == 0 && pending.ActiveRun.MoveNext()) { }
             pending.Dispose();

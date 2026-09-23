@@ -27,13 +27,19 @@ namespace KingmakerBuffPlanner.Execution
         public string CasterUnitId { get; private set; }
         public string TargetUnitId { get; private set; }
         public string SourceId { get; private set; }
+        // Review N1: the frozen artifact the owner approved. A same-commit
+        // replacement binary does not satisfy it.
+        public string PackageSha256 { get; private set; }
+        public string DllSha256 { get; private set; }
+        public string AssemblyMvid { get; private set; }
 
-        public const int AllowanceSchemaVersion = 1;
+        public const int AllowanceSchemaVersion = 2;
 
         private static readonly string[] Members =
         {
-            "schemaVersion", "kind", "runId", "sourceCommit", "approvedProjectionId",
-            "casterUnitId", "targetUnitId", "sourceId", "maximumNativeSubmissions", "approvedBy"
+            "schemaVersion", "kind", "runId", "sourceCommit", "packageSha256", "dllSha256",
+            "assemblyMvid", "approvedProjectionId", "casterUnitId", "targetUnitId", "sourceId",
+            "maximumNativeSubmissions", "approvedBy"
         };
 
         // Strict: exact member set, exact kind, the run id this process was
@@ -65,17 +71,23 @@ namespace KingmakerBuffPlanner.Execution
                 ApprovedProjectionId = Text(root, "approvedProjectionId"),
                 CasterUnitId = Text(root, "casterUnitId"),
                 TargetUnitId = Text(root, "targetUnitId"),
-                SourceId = Text(root, "sourceId")
+                SourceId = Text(root, "sourceId"),
+                PackageSha256 = Text(root, "packageSha256"),
+                DllSha256 = Text(root, "dllSha256"),
+                AssemblyMvid = Text(root, "assemblyMvid")
             };
             if (string.IsNullOrEmpty(Text(root, "approvedBy")))
             { refusal = "allowance-approver-missing"; return null; }
             if (string.IsNullOrEmpty(expectedRunId) ||
                 !string.Equals(allowance.RunId, expectedRunId, StringComparison.Ordinal))
             { refusal = "allowance-run-mismatch"; return null; }
-            if (allowance.ApprovedProjectionId == null ||
-                allowance.ApprovedProjectionId.Length != 64 ||
-                allowance.ApprovedProjectionId.Any(c => !(c >= '0' && c <= '9') && !(c >= 'a' && c <= 'f')))
+            if (!IsLowerHex64(allowance.ApprovedProjectionId))
             { refusal = "allowance-projection-id"; return null; }
+            Guid mvid;
+            if (!IsLowerHex64(allowance.PackageSha256) || !IsLowerHex64(allowance.DllSha256) ||
+                allowance.AssemblyMvid == null || !Guid.TryParse(allowance.AssemblyMvid, out mvid) ||
+                mvid.ToString("D") != allowance.AssemblyMvid)
+            { refusal = "allowance-artifact-identity"; return null; }
             if (string.IsNullOrEmpty(allowance.SourceCommit) ||
                 string.IsNullOrEmpty(allowance.CasterUnitId) ||
                 string.IsNullOrEmpty(allowance.TargetUnitId) ||
@@ -85,10 +97,43 @@ namespace KingmakerBuffPlanner.Execution
             return allowance;
         }
 
+        internal static bool IsLowerHex64(string value)
+        {
+            return value != null && value.Length == 64 &&
+                value.All(c => (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'));
+        }
+
         private static string Text(JObject root, string name)
         {
             JToken token = root[name];
             return token != null && token.Type == JTokenType.String ? (string)token : null;
+        }
+    }
+
+    // Review N1: the identity of the code actually loaded in this process,
+    // measured at submit time (commit compiled in, the launcher-verified
+    // package, the SHA-256 of the loaded DLL file and the loaded module's
+    // MVID).
+    public sealed class SingleCastProbeRuntimeIdentity
+    {
+        public SingleCastProbeRuntimeIdentity(string sourceCommit, string packageSha256,
+            string dllSha256, string assemblyMvid)
+        {
+            SourceCommit = sourceCommit;
+            PackageSha256 = packageSha256;
+            DllSha256 = dllSha256;
+            AssemblyMvid = assemblyMvid;
+        }
+
+        public string SourceCommit { get; private set; }
+        public string PackageSha256 { get; private set; }
+        public string DllSha256 { get; private set; }
+        public string AssemblyMvid { get; private set; }
+
+        public string Describe()
+        {
+            return "commit=" + SourceCommit + ";package=" + PackageSha256 + ";dll=" + DllSha256 +
+                ";mvid=" + AssemblyMvid;
         }
     }
 
@@ -254,14 +299,28 @@ namespace KingmakerBuffPlanner.Execution
     {
         private readonly SingleCastProbeAllowance _allowance;
         private readonly Func<ICastExecutor> _executorFactory;
+        private readonly Func<SingleCastProbeRuntimeIdentity> _runtimeIdentity;
         private bool _consumed;
         private bool _disposed;
 
         public SingleCastProbeBoundary(SingleCastProbeAllowance allowance,
-            Func<ICastExecutor> executorFactory)
+            Func<ICastExecutor> executorFactory,
+            Func<SingleCastProbeRuntimeIdentity> runtimeIdentity)
         {
             _allowance = allowance;
             _executorFactory = executorFactory;
+            _runtimeIdentity = runtimeIdentity;
+        }
+
+        // The last measured identity (evidence), null until measured.
+        public SingleCastProbeRuntimeIdentity MeasuredIdentity { get; private set; }
+
+        // Review N1: every check that can refuse, run BEFORE any observation,
+        // executor construction or submission. Submit re-runs it.
+        public string Preflight(ExplicitCastingPlan plan, CastingApplyDecision decision,
+            ExplicitStepConversion projection)
+        {
+            return Validate(plan, decision, projection);
         }
 
         public readonly List<string> Refusals = new List<string>();
@@ -319,6 +378,8 @@ namespace KingmakerBuffPlanner.Execution
             if (_allowance == null) return "native-submission-disabled:no-probe-allowance";
             if (_consumed) return "probe-allowance-consumed";
             if (_executorFactory == null) return "probe-executor-factory-missing";
+            string identity = IdentityRefusal();
+            if (identity != null) return identity;
             if (plan == null || decision == null || !decision.Allowed)
                 return "probe-decision-not-allowed";
             if (projection == null || !projection.Converted)
@@ -346,6 +407,27 @@ namespace KingmakerBuffPlanner.Execution
                 !string.Equals(step.TargetUnitIds[0], _allowance.TargetUnitId, StringComparison.Ordinal) ||
                 !string.Equals(step.SourceId, _allowance.SourceId, StringComparison.Ordinal))
                 return "probe-selection-not-approved";
+            return null;
+        }
+
+        private string IdentityRefusal()
+        {
+            SingleCastProbeRuntimeIdentity measured;
+            try { measured = _runtimeIdentity == null ? null : _runtimeIdentity(); }
+            catch (Exception exception)
+            {
+                return "probe-runtime-identity-unavailable:" + exception.GetType().Name;
+            }
+            MeasuredIdentity = measured;
+            if (measured == null) return "probe-runtime-identity-unavailable";
+            if (!string.Equals(measured.SourceCommit, _allowance.SourceCommit, StringComparison.Ordinal))
+                return "probe-identity-mismatch:commit";
+            if (!string.Equals(measured.PackageSha256, _allowance.PackageSha256, StringComparison.Ordinal))
+                return "probe-identity-mismatch:package";
+            if (!string.Equals(measured.DllSha256, _allowance.DllSha256, StringComparison.Ordinal))
+                return "probe-identity-mismatch:dll";
+            if (!string.Equals(measured.AssemblyMvid, _allowance.AssemblyMvid, StringComparison.Ordinal))
+                return "probe-identity-mismatch:mvid";
             return null;
         }
 
@@ -385,6 +467,7 @@ namespace KingmakerBuffPlanner.Execution
         // "completed", "deadline", "stop", "mod-disabled", "mod-unload",
         // "host-exception:..." - how the owner ended the run.
         public string TerminalReason { get; set; }
+        public string MeasuredIdentity { get; set; }
         public bool CleanupRecorded { get; set; }
         public List<string> CleanupFailures { get; } = new List<string>();
 
@@ -469,6 +552,14 @@ namespace KingmakerBuffPlanner.Execution
         }
 
         public SingleCastProbeRunRecord Record { get { return _record; } }
+
+        // Review N2: selection may begin only while the request is live.
+        // Once terminated (disable, unload, host failure, stop) it never
+        // becomes live again.
+        public bool BeginSelection()
+        {
+            return !_terminated;
+        }
         public bool Terminated { get { return _terminated; } }
         public bool Running { get { return !_terminated && _boundary != null && _boundary.ActiveRun != null; } }
         public int PublishCount { get; private set; }
@@ -480,10 +571,25 @@ namespace KingmakerBuffPlanner.Execution
             SingleCastProbeObservationSession observation, ExplicitCastingPlan plan,
             CastingApplyDecision decision, ExplicitStepConversion projection, long nowMillis)
         {
-            if (_terminated) throw new InvalidOperationException("probe-owner-terminated");
-            _boundary = boundary ?? throw new ArgumentNullException("boundary");
+            if (boundary == null) throw new ArgumentNullException("boundary");
+            // Review N2: a terminated request never arms or submits.
+            if (_terminated)
+                return new CastingDispatchOutcome(false, "probe-owner-terminated:" +
+                    _record.TerminalReason, projection == null ? new string[0] : projection.CastingIds);
+            _boundary = boundary;
             _record.BoundaryConstructed = true;
             _record.Observation = observation;
+            // Review N1: identity and every other refusal come first - no
+            // observation, executor construction or submission on refusal.
+            string preflight = boundary.Preflight(plan, decision, projection);
+            if (boundary.MeasuredIdentity != null)
+                _record.MeasuredIdentity = boundary.MeasuredIdentity.Describe();
+            if (preflight != null)
+            {
+                _record.Submitted = false;
+                _record.SubmitReason = preflight;
+                return new CastingDispatchOutcome(false, preflight, projection.CastingIds);
+            }
             ProbeObservation before = observation.ObserveBefore();
             if (!before.Succeeded)
             {

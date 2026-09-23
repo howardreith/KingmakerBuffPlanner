@@ -36,6 +36,57 @@ namespace KingmakerBuffPlanner.Execution
         public override string ToString() { return EffectId + "#" + InstanceKey + "@" + EndTimeTicks; }
     }
 
+    // Review N3: one memorized slot as the observer sees it. Observation
+    // is separate from spendability: a consumed slot is still THE source.
+    public sealed class ProbeSlotView
+    {
+        public ProbeSlotView(string tokenId, bool available, bool isMainSlot, bool matchesAbility)
+        {
+            TokenId = tokenId ?? string.Empty;
+            Available = available;
+            IsMainSlot = isMainSlot;
+            MatchesAbility = matchesAbility;
+        }
+
+        public string TokenId { get; private set; }
+        public bool Available { get; private set; }
+        public bool IsMainSlot { get; private set; }
+        public bool MatchesAbility { get; private set; }
+    }
+
+    public static class ProbeSourceSlots
+    {
+        // Exactly the reserved slots, whether or not they are still
+        // available; never another slot of the same spell. A missing or
+        // non-matching reserved slot is a failed read, not a substitution.
+        public static IDictionary<string, bool> ReservedExactly(IEnumerable<ProbeSlotView> slots,
+            IEnumerable<string> reservedTokenIds, out string failure)
+        {
+            failure = null;
+            var byToken = new Dictionary<string, ProbeSlotView>(StringComparer.Ordinal);
+            foreach (ProbeSlotView slot in slots ?? new ProbeSlotView[0])
+                if (slot != null && !byToken.ContainsKey(slot.TokenId)) byToken[slot.TokenId] = slot;
+            var result = new SortedDictionary<string, bool>(StringComparer.Ordinal);
+            foreach (string token in reservedTokenIds ?? new string[0])
+            {
+                ProbeSlotView slot;
+                if (!byToken.TryGetValue(token, out slot))
+                {
+                    failure = "reserved-slot-missing:" + token;
+                    return null;
+                }
+                if (!slot.MatchesAbility && slot.IsMainSlot)
+                {
+                    failure = "reserved-slot-holds-other-spell:" + token;
+                    return null;
+                }
+                result[token] = slot.Available;
+            }
+            if (result.Count == 0) failure = "no-reserved-slots";
+            return result.Count == 0 ? null : result;
+        }
+    }
+
     public sealed class ProbeObservation
     {
         private ProbeObservation() { }
@@ -50,16 +101,23 @@ namespace KingmakerBuffPlanner.Execution
         public int? AvailableForCast { get; private set; }
         // Expected-effect instances on the target; null = not read.
         public IReadOnlyList<ProbeEffectInstance> EffectInstances { get; private set; }
+        // Review N3: availability of EXACTLY the reserved prepared tokens;
+        // null for non-prepared reservations or when not read.
+        public IReadOnlyDictionary<string, bool> ReservedTokenAvailability { get; private set; }
 
         public static ProbeObservation Read(string phase, long sequence, DateTime capturedAtUtc,
-            string targetUnitId, int availableForCast, IEnumerable<ProbeEffectInstance> effectInstances)
+            string targetUnitId, int? availableForCast, IEnumerable<ProbeEffectInstance> effectInstances,
+            IDictionary<string, bool> reservedTokenAvailability = null)
         {
             return new ProbeObservation
             {
                 Phase = phase, Sequence = sequence, CapturedAtUtc = capturedAtUtc, Succeeded = true,
                 Failure = string.Empty, TargetUnitId = targetUnitId, AvailableForCast = availableForCast,
                 EffectInstances = new ReadOnlyCollection<ProbeEffectInstance>(
-                    (effectInstances ?? new ProbeEffectInstance[0]).Where(value => value != null).ToList())
+                    (effectInstances ?? new ProbeEffectInstance[0]).Where(value => value != null).ToList()),
+                ReservedTokenAvailability = reservedTokenAvailability == null ? null
+                    : new ReadOnlyDictionary<string, bool>(new SortedDictionary<string, bool>(
+                        reservedTokenAvailability, StringComparer.Ordinal))
             };
         }
 
@@ -76,7 +134,10 @@ namespace KingmakerBuffPlanner.Execution
         public string Describe()
         {
             return Phase + "#" + Sequence + (Succeeded
-                ? ";available=" + AvailableForCast + ";effects=[" +
+                ? ";available=" + AvailableForCast +
+                    (ReservedTokenAvailability == null ? string.Empty : ";slots=" + string.Join(",",
+                        ReservedTokenAvailability.Select(pair => pair.Key + ":" + pair.Value).ToArray())) +
+                    ";effects=[" +
                     string.Join(",", EffectInstances.Select(value => value.ToString()).ToArray()) + "]"
                 : ";failed=" + Failure);
         }
@@ -199,8 +260,33 @@ namespace KingmakerBuffPlanner.Execution
         private bool ResourceVerdict(out string outcome)
         {
             if (Before == null || After == null || !Before.Succeeded || !After.Succeeded ||
-                Before.AvailableForCast == null || After.AvailableForCast == null ||
                 _step.Reservation == null || !_step.Reservation.CostKnown)
+            {
+                outcome = "unknown";
+                return false;
+            }
+            // Review N3: a prepared reservation is judged by EXACTLY its
+            // reserved tokens: all available before, all consumed after.
+            if (_step.Reservation.TokenIds.Count != 0)
+            {
+                IReadOnlyDictionary<string, bool> before = Before.ReservedTokenAvailability;
+                IReadOnlyDictionary<string, bool> after = After.ReservedTokenAvailability;
+                if (before == null || after == null ||
+                    _step.Reservation.TokenIds.Any(token => !before.ContainsKey(token) || !after.ContainsKey(token)))
+                {
+                    outcome = "unknown";
+                    return false;
+                }
+                if (_step.Reservation.TokenIds.All(token => before[token] && !after[token]))
+                {
+                    outcome = "reserved-slots-consumed";
+                    return true;
+                }
+                outcome = "prepared-slot-mismatch:" + string.Join(",", _step.Reservation.TokenIds
+                    .Select(token => token + "=" + before[token] + ">" + after[token]).ToArray());
+                return false;
+            }
+            if (Before.AvailableForCast == null || After.AvailableForCast == null)
             {
                 outcome = "unknown";
                 return false;

@@ -246,6 +246,23 @@ namespace KingmakerBuffPlanner.GameAdapters
             return units;
         }
 
+        // Review N3: every memorized main slot of the provider's spellbook as
+        // an observation view - including consumed (unavailable) slots -
+        // for reading EXACTLY the reserved source after a cast.
+        internal static List<ProbeSlotView> ObserveSpellbookSlots(UnitEntityData caster, ProviderKey provider)
+        {
+            var views = new List<ProbeSlotView>();
+            if (provider.Ability.SourceKind != SourceKind.Spellbook) return views;
+            Spellbook book = caster.Descriptor.Spellbooks.FirstOrDefault(b => b != null &&
+                b.Blueprint != null && b.Blueprint.AssetGuid == provider.SpellbookGuid);
+            if (book == null) return views;
+            foreach (SpellSlot slot in book.GetAllMemorizedSpells().Where(s => s != null))
+                views.Add(new ProbeSlotView(SlotId(slot), slot.Available, slot.IsMainSlot,
+                    slot.Spell != null &&
+                    KingmakerAbilityVariants.Resolve(slot.Spell, provider.Ability) != null));
+            return views;
+        }
+
         private static string SlotId(SpellSlot slot)
         {
             return "level-" + slot.SpellLevel + "|type-" + (int)slot.Type + "|index-" + slot.Index;
