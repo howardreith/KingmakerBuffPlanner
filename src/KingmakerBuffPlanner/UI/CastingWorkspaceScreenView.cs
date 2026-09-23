@@ -225,8 +225,12 @@ namespace KingmakerBuffPlanner.UI
             searchRect.anchoredPosition = Vector2.zero;
             foreach (Text text in _buffSearch.GetComponentsInChildren<Text>(true))
             {
-                text.fontSize = 14;
-                text.resizeTextMaxSize = 14;
+                // The factory's 17px text with 5px insets was clipped to
+                // nothing in a 22px field (live frame qual-205126).
+                text.fontSize = 13;
+                text.resizeTextMaxSize = 13;
+                text.verticalOverflow = VerticalWrapMode.Overflow;
+                KingmakerUiFactory.Stretch(text.rectTransform, 8, 6, 1, 1);
             }
             _buffSearch.onValueChanged.AddListener(value =>
             {
@@ -561,15 +565,11 @@ namespace KingmakerBuffPlanner.UI
                     arrow.rectTransform.anchoredPosition = new Vector2(76f, 0f);
                     AddCardPortrait(entry, "TargetPortrait", card.DirectTargetUnitId, 102f);
                 }
-                string coverage = card.DirectTargetUnitId == null
-                    ? string.Empty
-                    : " · coverage " + card.PredictedBeneficiaryUnitIds.Count +
-                        "/" + card.RequiredCoverageUnitIds.Count;
+                string coverage = card.CoverageSummary.Length == 0
+                    ? string.Empty : " · " + card.CoverageSummary;
                 Text title = KingmakerUiFactory.CreateText(
                     "Title", entry, _theme,
-                    card.CastingId + " · " + card.RoutineId + " #" + card.Order +
-                    " · " + (string.IsNullOrEmpty(card.CasterDisplayName)
-                        ? "unresolved caster" : card.CasterDisplayName), 16,
+                    card.Headline + "   (" + card.Subtitle + ")", 16,
                     TextAnchor.MiddleLeft);
                 title.fontStyle = FontStyle.Bold;
                 KingmakerUiFactory.SetAnchors(title.rectTransform, 0f, 0.55f, 0.62f, 1f,

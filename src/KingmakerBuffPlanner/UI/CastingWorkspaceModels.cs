@@ -103,6 +103,39 @@ namespace KingmakerBuffPlanner.UI
         public ResolvedCastingReadiness Readiness { get; private set; }
         public IReadOnlyList<string> ReadinessReasons { get; private set; }
         public bool EditingFocus { get; private set; }
+
+        // Card headline: who casts it on whom — the casting as a player
+        // reads it, not its internal id.
+        public string Headline
+        {
+            get
+            {
+                string caster = string.IsNullOrEmpty(CasterDisplayName)
+                    ? "Unresolved caster" : CasterDisplayName;
+                string target = DirectTargetUnitId != null
+                    ? (DirectTargetDisplayName ?? DirectTargetUnitId)
+                    : (string.IsNullOrEmpty(OriginLabel) ? "group" : OriginLabel);
+                return caster + " → " + target;
+            }
+        }
+
+        public string Subtitle
+        {
+            get { return "Casting " + (Order + 1) + " in " + RoutineId; }
+        }
+
+        // Group castings only: predicted beneficiaries over intended
+        // coverage. A direct-target casting has no coverage ratio.
+        public string CoverageSummary
+        {
+            get
+            {
+                if (DirectTargetUnitId != null) return string.Empty;
+                return "coverage " + (PredictedBeneficiaryUnitIds == null ? 0
+                        : PredictedBeneficiaryUnitIds.Count) + "/" +
+                    (RequiredCoverageUnitIds == null ? 0 : RequiredCoverageUnitIds.Count);
+            }
+        }
     }
 
     // One budget line in the footer drill-down, copied from the shared

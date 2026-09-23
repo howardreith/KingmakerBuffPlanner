@@ -13521,6 +13521,16 @@ namespace KingmakerBuffPlanner.Tests
                 WorkspaceBuffSummary.CoverageFor(view.Cards, "short", "unit-t1") !=
                     WorkspaceRecipientCoverage.None)
                 throw new InvalidOperationException("Recipient coverage legend is wrong.");
+            WorkspaceCastingCard first = view.Cards.FirstOrDefault(card =>
+                card.DirectTargetUnitId == "unit-t1");
+            if (first == null || !first.Headline.EndsWith(" → " +
+                    (first.DirectTargetDisplayName ?? "unit-t1")) ||
+                first.Headline.Contains(first.CastingId) ||
+                first.CoverageSummary.Length != 0 ||
+                !first.Subtitle.StartsWith("Casting 1 in long"))
+                throw new InvalidOperationException("Card headline/coverage text is wrong: " +
+                    (first == null ? "missing" : first.Headline + " | " +
+                        first.CoverageSummary + " | " + first.Subtitle));
             WorkspaceSourceOption selected = view.Draft.Sources
                 .FirstOrDefault(source => source.SourceId == "source-bulls");
             if (selected == null || selected.IconAbility == null)
