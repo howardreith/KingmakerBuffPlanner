@@ -244,6 +244,14 @@ function Assert-KbpNoUnresolvedTransaction([string]$StateRoot) {
             throw "Unresolved runtime transaction exists: $($state.runId) status=$($state.status)"
         }
     }
+    # Review K6: an interrupted or unrecoverable install rollback is an
+    # unresolved transaction too.
+    foreach ($installFile in @(Get-ChildItem -LiteralPath $StateRoot -Filter install.json -File -Recurse -ErrorAction SilentlyContinue)) {
+        $record = Read-KbpJson $installFile.FullName
+        if (@('RollingBack', 'RollbackRecoveryNeeded') -ccontains [string]$record.status) {
+            throw "Unresolved install rollback exists: $($installFile.FullName) status=$($record.status)"
+        }
+    }
 }
 
 function Expand-KbpPackageToStaging {
