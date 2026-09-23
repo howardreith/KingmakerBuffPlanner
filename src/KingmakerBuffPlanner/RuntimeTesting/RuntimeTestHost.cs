@@ -2991,6 +2991,18 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 }
                 string campaignId = Kingmaker.Game.Instance == null || Kingmaker.Game.Instance.Player == null
                     ? null : Kingmaker.Game.Instance.Player.GameId;
+                // Read-only: how the game judges each caster's level-0
+                // spells (the command's own availability guard) before
+                // anything is authored or cast.
+                IList<string> cantrips = GameAdapters.KingmakerCantripDiagnostics.Describe();
+                AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory, "cantrip-diagnostics.json"),
+                    new JObject
+                    {
+                        { "schemaVersion", 1 },
+                        { "runId", _request.RunId },
+                        { "lines", new JArray(cantrips.Cast<object>().ToArray()) }
+                    }.ToString(Formatting.Indented) + Environment.NewLine);
+                _log.Info("[KBP-QUAL] cantrip diagnostics;lines=" + cantrips.Count + ".");
                 string modPath = _modEntry.Path;
                 object recipeRaw;
                 // The planner's own execution host runs the approved runs:
