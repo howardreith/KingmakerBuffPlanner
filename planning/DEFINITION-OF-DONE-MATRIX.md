@@ -1,6 +1,6 @@
 # Definition of Done Matrix
 
-## Casting-first migration — release buckets (updated 2026-09-23, 0.2.0-rc1: live qualification at `d35b38f`, in-game reload at `2024578`)
+## Casting-first migration — release buckets (updated 2026-09-23: release candidate 0.2.0-rc1 frozen at `f8562a6`; receipt `docs/evidence/rc-0.2.0-rc1-receipt.md`)
 
 No percentage or date is claimed; green unit tests do not measure
 readiness. Evidence words mean exactly this:
@@ -52,8 +52,9 @@ readiness. Evidence words mean exactly this:
 | Owner usability acceptance of the workspace | not accepted |
 | Source-type tabs, routine tabs with counts, per-card last-run outcome | source tabs invoked in game through their button handlers (callback coverage, not pointer reachability); routine tabs and last-run lines rendered in game frames; not accepted |
 | Player-facing resource names on cards and the budget footer; refusals in words; routine-wide header; editing label names the casting | **in-game** frames (`casting-ws-qual-20260923-r1-01`, `casting-ws-reload-20260923-s2-01`); not accepted |
-| Install/rollback on a real installation | stand-ins only (K6/L4/L5 isolated fixtures; the planner-mode and review-state files are covered) |
-| Release packaging and publisher gates | existing tooling; not exercised for casting-first |
+| Install/rollback on a real installation | **real installation, temporary**: the candidate's release package installed over the owner's 0.1.1-rc3 with Install-Local and rolled back with Restore-InstallLocal (`rc1-temp-deploy-20260923-01`); planner restored exactly, Mods manifest equal to before; failure handling on isolated fixtures (16 cases) |
+| Release packaging and publisher gates | Build-Release exercised for the candidate (two deterministic builds, validated, local-only); publisher gate tests 3/3; nothing published |
+| Candidate evidence on the frozen build | selection, native casting qualification, first-open import, in-game reload and the manual-session rehearsal all PASS on `f8562a6` |
 
 ### Bucket 4 — Full charter release
 
