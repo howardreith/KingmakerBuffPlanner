@@ -1,6 +1,12 @@
 [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
 param(
-    [ValidatePattern('^[A-Za-z0-9._-]{1,100}$')][string]$RunId = 'bootstrap-automation-fixture',
+    [ValidatePattern('^[A-Za-z0-9._-]{1,100}$')][string]$RunId,
+    # Fixture family. 'Automation' is the approved WORKING/BASELINE pair from
+    # KBP_AUTOMATION_SEED. 'Advanced' is the separately approved advanced-
+    # party copy from an owner-saved KBP_ADVANCED_SEED (see
+    # docs/ADVANCED-SAVE-COPY-INSPECTION-REQUEST.md); it shares every
+    # safeguard and never touches the automation pair or ordinary saves.
+    [ValidateSet('Automation', 'Advanced')][string]$Family = 'Automation',
     # -SaveRoot/-ArchiveRoot/-StateRoot/-ProcessName exist for the source-test
     # harness and for narrowly controlled process boundaries; defaults are the
     # exact production locations and the exact production process name.
@@ -53,10 +59,18 @@ Add-Type -AssemblyName System.IO.Compression.FileSystem
 # KBP_AUTOMATION_SEED — a deliberately disposable campaign saved by the
 # human through the ordinary in-game dialog.
 
+$fixturePrefix = if ($Family -ceq 'Advanced') { 'KBP_ADVANCED' } else { 'KBP_AUTOMATION' }
+$seedLabel = $fixturePrefix + '_SEED'
+$baselineLabel = $fixturePrefix + '_BASELINE'
+$workingLabel = $fixturePrefix + '_WORKING'
+if ([string]::IsNullOrWhiteSpace($RunId)) {
+    $RunId = if ($Family -ceq 'Advanced') { 'bootstrap-advanced-fixture' } else { 'bootstrap-automation-fixture' }
+}
 $repo = Get-KbpRepositoryRoot
 $lab = Split-Path -Parent (Split-Path -Parent $repo)
 if ([string]::IsNullOrWhiteSpace($ArchiveRoot)) {
-    $ArchiveRoot = Join-Path $lab ("runtime-backups\automation-fixture\" + $RunId)
+    $ArchiveRoot = Join-Path $lab ("runtime-backups\" + $(if ($Family -ceq 'Advanced') {
+        'advanced-fixture' } else { 'automation-fixture' }) + "\" + $RunId)
 }
 if ([string]::IsNullOrWhiteSpace($StateRoot)) {
     # Fixture lifecycle state lives in its OWN root, distinct from the
@@ -107,7 +121,7 @@ function Copy-KbpSaveWithHeaderName {
                 $reader = [IO.StreamReader]::new($entry.Open())
                 $header = $reader.ReadToEnd()
                 $reader.Dispose(); $reader = $null
-                $pattern = '"Name"\s*:\s*"KBP_AUTOMATION_SEED"'
+                $pattern = '"Name"\s*:\s*"' + $seedLabel + '"'
                 if ([regex]::Matches($header, $pattern).Count -ne 1) {
                     throw 'Seed header.json does not contain exactly one Name field to rewrite.'
                 }
@@ -188,11 +202,11 @@ function Publish-KbpStagedFixture {
     # the journaled destination does not exist yet, and recovery must
     # reconcile that as an unperformed operation.
     if ($script:failAfterJournal -ceq 'baseline' -and
-        $DestinationPath -cmatch 'KBP_AUTOMATION_BASELINE') {
+        $DestinationPath -cmatch $baselineLabel) {
         throw "Injected failure after journaling baseline."
     }
     if ($script:failAfterJournal -ceq 'working' -and
-        $DestinationPath -cmatch 'KBP_AUTOMATION_WORKING') {
+        $DestinationPath -cmatch $workingLabel) {
         throw "Injected failure after journaling working."
     }
     [IO.File]::Move($StagedPath, $DestinationPath)
@@ -221,7 +235,7 @@ function Assert-KbpOwnedArtifactPath {
         throw "Recorded artifact escapes the owned roots: $Path"
     }
     if ($inSave) {
-        if ($full -cnotmatch ('\\Manual_[0-9]+_KBP_AUTOMATION_' + $Role + '\.zks$')) {
+        if ($full -cnotmatch ('\\Manual_[0-9]+_' + $fixturePrefix + '_' + $Role + '\.zks$')) {
             throw "Recorded artifact does not match its role filename contract: $Path"
         }
         if ($Path -cmatch '(\.\.[\\/]|[\\/]\.\.)') {
@@ -238,7 +252,7 @@ function Assert-KbpOwnedArtifactPath {
             throw "Recorded artifact is absent: $Path"
         }
         $header = Read-KbpSaveHeader -Path $full
-        if ([string]$header.Name -cne ('KBP_AUTOMATION_' + $Role)) {
+        if ([string]$header.Name -cne ($fixturePrefix + '_' + $Role)) {
             throw "Artifact header does not match its role: $Path"
         }
         # Provenance: the stable campaign identity recorded for the run, not
@@ -276,7 +290,7 @@ function Invoke-KbpOwnedRollback {
     }
     foreach ($owned in @($Transaction.publishedPaths)) {
         if (-not $owned) { continue }
-        $role = if ($owned -cmatch 'KBP_AUTOMATION_BASELINE') { 'BASELINE' } else { 'WORKING' }
+        $role = if ($owned -cmatch $baselineLabel) { 'BASELINE' } else { 'WORKING' }
         # Validates containment, filename contract, header role, and campaign
         # provenance before any removal. A journaled-but-absent destination
         # (write-ahead intent never performed, or cleanup already completed
@@ -298,8 +312,8 @@ function Invoke-KbpOwnedRollback {
         Assert-KbpOwnedArtifactPath -Path $Transaction.stagingRoot -Role 'WORKING' -GameId $null -AllowAbsent
         # Staging lives under StateRoot and was created empty by this run:
         # refuse to recurse through foreign content.
-        $allowed = @('Manual_[0-9]+_KBP_AUTOMATION_BASELINE\.zks',
-            'Manual_[0-9]+_KBP_AUTOMATION_WORKING\.zks',
+        $allowed = @(('Manual_[0-9]+_' + $baselineLabel + '\.zks'),
+            ('Manual_[0-9]+_' + $workingLabel + '\.zks'),
             '^[0-9a-f]{32}\.partial$')
         foreach ($item in @(Get-ChildItem -LiteralPath $Transaction.stagingRoot -Force -ErrorAction SilentlyContinue)) {
             $ok = $false
@@ -458,24 +472,24 @@ if (-not (Test-Path -LiteralPath $SaveRoot -PathType Container)) {
 }
 Assert-KbpFixturePreconditions
 
-$automationFiles = @(Get-ChildItem -LiteralPath $SaveRoot -Filter '*KBP_AUTOMATION*' -File |
-    Where-Object { $_.Name -notmatch '^Manual_[0-9]+_KBP_AUTOMATION_SEED\.zks$' })
+$automationFiles = @(Get-ChildItem -LiteralPath $SaveRoot -Filter ('*' + $fixturePrefix + '*') -File |
+    Where-Object { $_.Name -notmatch ('^Manual_[0-9]+_' + $seedLabel + '\.zks$') })
 if ($automationFiles.Count -ne 0) {
-    throw ("Existing KBP_AUTOMATION artifact(s) present: " +
+    throw ("Existing $fixturePrefix artifact(s) present: " +
         (($automationFiles | Select-Object -ExpandProperty Name) -join ', ') +
         ". Tear down explicitly first.")
 }
-$seedFiles = @(Get-ChildItem -LiteralPath $SaveRoot -Filter '*_KBP_AUTOMATION_SEED.zks' -File)
+$seedFiles = @(Get-ChildItem -LiteralPath $SaveRoot -Filter ('*_' + $seedLabel + '.zks') -File)
 if ($seedFiles.Count -ne 1) {
-    throw "Expected exactly one KBP_AUTOMATION_SEED save; found $($seedFiles.Count). Create one disposable campaign save named exactly KBP_AUTOMATION_SEED, then rerun."
+    throw "Expected exactly one $seedLabel save; found $($seedFiles.Count). Create one disposable campaign save named exactly $seedLabel, then rerun."
 }
 $seed = $seedFiles[0]
-if ($seed.Name -notmatch '^Manual_[0-9]+_KBP_AUTOMATION_SEED\.zks$') {
+if ($seed.Name -notmatch ('^Manual_[0-9]+_' + $seedLabel + '\.zks$')) {
     throw "Seed file name is not the exact in-game shape: $($seed.Name)"
 }
 $seedHeader = Read-KbpSaveHeader -Path $seed.FullName
-if ([string]$seedHeader.Name -cne 'KBP_AUTOMATION_SEED') {
-    throw "Seed header Name is not exactly KBP_AUTOMATION_SEED: $($seedHeader.Name)"
+if ([string]$seedHeader.Name -cne $seedLabel) {
+    throw "Seed header Name is not exactly ${seedLabel}: $($seedHeader.Name)"
 }
 
 $allSaves = @(Get-ChildItem -LiteralPath $SaveRoot -Filter '*.zks' -File)
@@ -486,8 +500,8 @@ foreach ($file in $allSaves) {
         if ($index -gt $maxIndex) { $maxIndex = $index }
     }
 }
-$baselineName = 'Manual_' + ($maxIndex + 1) + '_KBP_AUTOMATION_BASELINE.zks'
-$workingName = 'Manual_' + ($maxIndex + 2) + '_KBP_AUTOMATION_WORKING.zks'
+$baselineName = 'Manual_' + ($maxIndex + 1) + '_' + $baselineLabel + '.zks'
+$workingName = 'Manual_' + ($maxIndex + 2) + '_' + $workingLabel + '.zks'
 $baselinePath = Join-Path $SaveRoot $baselineName
 $workingPath = Join-Path $SaveRoot $workingName
 if ((Test-Path -LiteralPath $baselinePath) -or (Test-Path -LiteralPath $workingPath)) {
@@ -523,11 +537,11 @@ try {
     $stagedBaseline = Join-Path $stagingRoot $baselineName
     $stagedWorking = Join-Path $stagingRoot $workingName
     $seedHash = Get-KbpSha256 $seed.FullName
-    Copy-KbpSaveWithHeaderName -SourcePath $seed.FullName -DestinationPath $stagedBaseline -NewName 'KBP_AUTOMATION_BASELINE'
-    Copy-KbpSaveWithHeaderName -SourcePath $seed.FullName -DestinationPath $stagedWorking -NewName 'KBP_AUTOMATION_WORKING'
+    Copy-KbpSaveWithHeaderName -SourcePath $seed.FullName -DestinationPath $stagedBaseline -NewName $baselineLabel
+    Copy-KbpSaveWithHeaderName -SourcePath $seed.FullName -DestinationPath $stagedWorking -NewName $workingLabel
     foreach ($staged in @(
-            @{ Path = $stagedBaseline; Expected = 'KBP_AUTOMATION_BASELINE' },
-            @{ Path = $stagedWorking; Expected = 'KBP_AUTOMATION_WORKING' })) {
+            @{ Path = $stagedBaseline; Expected = $baselineLabel },
+            @{ Path = $stagedWorking; Expected = $workingLabel })) {
         $header = Read-KbpSaveHeader -Path $staged.Path
         if ([string]$header.Name -cne $staged.Expected -or
             [string]$header.GameName -cne [string]$seedHeader.GameName -or

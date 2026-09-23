@@ -25,7 +25,15 @@ aesthetics.
    with (`full-user` or another), and whether Steam Cloud sync is on for
    Kingmaker.
 
-## What the tooling would do (needs implementation, within source authority)
+## Tooling status
+
+| Piece | Status |
+| --- | --- |
+| Sealed advanced pair from `KBP_ADVANCED_SEED` | **implemented**: `New-KbpAutomationFixture.ps1 -Family Advanced` (same staged, journaled, recoverable transaction as the automation pair; seed archived; every pre-existing save re-verified byte-identical). Isolated test in `Test-RuntimeHarness.ps1` (advanced pair produced under its own names, automation pair/seed and ordinary saves unchanged, refusal without an advanced seed). Not run against the real save folder. |
+| Launcher/host support for loading the advanced WORKING copy | not implemented (the save-pair lookup accepts only the automation pair) |
+| Mod inventory comparison, party-roster verification, save-folder before/after comparison | not implemented |
+
+## What the tooling does and will do
 
 This extends the existing guarded fixture design (`New-KbpAutomationFixture.ps1`)
 to a second, separate family. Nothing is shared with the current

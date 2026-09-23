@@ -306,6 +306,45 @@ try {
     }
     $passed++
 
+    # Advanced family (docs/ADVANCED-SAVE-COPY-INSPECTION-REQUEST.md): only an
+    # owner-saved KBP_ADVANCED_SEED is accepted; the automation pair, the
+    # automation seed and ordinary saves stay byte-identical; the sealed
+    # advanced pair and seed archive are produced under their own names.
+    $advancedRoot = New-FixtureSeedRoot 'saves-advanced'
+    New-TestSaveArchive -Path (Join-Path $advancedRoot 'Manual_410_KBP_ADVANCED_SEED.zks') `
+        -Name 'KBP_ADVANCED_SEED' -GameName 'Advanced Campaign' -GameId '66666666-7777-8888-9999-000000000000'
+    $before = @{}
+    foreach ($file in @(Get-ChildItem -LiteralPath $advancedRoot -File)) { $before[$file.Name] = Get-KbpSha256 $file.FullName }
+    $advancedArchive = Join-Path $root 'archive-advanced'
+    & $bootstrapScript -Family Advanced -RunId 'advanced-happy' -SaveRoot $advancedRoot `
+        -StateRoot $stateRoot -ArchiveRoot $advancedArchive -Confirm:$false | Out-Null
+    $advancedBaseline = Join-Path $advancedRoot 'Manual_411_KBP_ADVANCED_BASELINE.zks'
+    $advancedWorking = Join-Path $advancedRoot 'Manual_412_KBP_ADVANCED_WORKING.zks'
+    if (-not (Test-Path -LiteralPath $advancedBaseline) -or -not (Test-Path -LiteralPath $advancedWorking) -or
+        (Read-TestHeaderName $advancedBaseline) -cne 'KBP_ADVANCED_BASELINE' -or
+        (Read-TestHeaderName $advancedWorking) -cne 'KBP_ADVANCED_WORKING' -or
+        -not (Test-Path -LiteralPath (Join-Path $advancedArchive 'Manual_410_KBP_ADVANCED_SEED.zks')) -or
+        @(Get-ChildItem -LiteralPath $advancedRoot -Filter '*KBP_AUTOMATION_BASELINE*').Count -ne 0) {
+        throw 'Advanced-family bootstrap did not produce exactly the sealed advanced pair.'
+    }
+    foreach ($name in $before.Keys) {
+        if ((Get-KbpSha256 (Join-Path $advancedRoot $name)) -cne $before[$name]) {
+            throw "Advanced-family bootstrap changed $name."
+        }
+    }
+    if (Test-Path -LiteralPath (Join-Path $stateRoot 'fixture.lock')) { throw 'Advanced bootstrap kept the lock.' }
+    # Without an advanced seed the Advanced family refuses and writes nothing.
+    $noAdvancedRoot = New-FixtureSeedRoot 'saves-no-advanced'
+    $refused = $false
+    try {
+        & $bootstrapScript -Family Advanced -RunId 'advanced-refused' -SaveRoot $noAdvancedRoot `
+            -StateRoot $stateRoot -ArchiveRoot (Join-Path $root 'archive-no-advanced') -Confirm:$false | Out-Null
+    } catch { $refused = $_.Exception.Message -like '*KBP_ADVANCED_SEED*' }
+    if (-not $refused -or @(Get-ChildItem -LiteralPath $noAdvancedRoot -File).Count -ne 2) {
+        throw 'The Advanced family acted without an owner-saved advanced seed.'
+    }
+    $passed++
+
     # Repeated operation refuses (existing pair + existing run paths).
     $refused = $false
     try {
