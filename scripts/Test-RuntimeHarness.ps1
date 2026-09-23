@@ -1273,7 +1273,8 @@ try {
             ProfileId = 'full-user'; CompatibilityIdentity = $inspectIdentity
             AdvancedBindingManifest = $inspectBinding.manifestPath; SavePair = $inspectPair
             GameResultStatus = 'PASS'; HarnessSucceeded = $true; KingmakerExited = $true
-            TransactionStatePath = $txRestored; ProtectedSavesCompared = $true; ProtectedSaveFailure = $null
+            TransactionStatePath = $txRestored; RestoreFailure = $null
+            ProtectedSavesCompared = $true; ProtectedSaveFailure = $null
         }
         foreach ($key in $Override.Keys) { $arguments[$key] = $Override[$key] }
         return New-KbpRunCompletionRecord @arguments
@@ -1284,11 +1285,17 @@ try {
             @{ KingmakerExited = $false }, @{ TransactionStatePath = $txUnrestored },
             @{ TransactionStatePath = $txNoField }, @{ TransactionStatePath = (Join-Path $txRoot 'missing.json') },
             @{ TransactionStatePath = $null }, @{ ProtectedSavesCompared = $false },
-            @{ ProtectedSaveFailure = 'Protected saves changed during the run: changed:x' })) {
+            @{ ProtectedSaveFailure = 'Protected saves changed during the run: changed:x' },
+            @{ RestoreFailure = 'Kingmaker remains running; exact Mods restoration is intentionally blocked.' })) {
         $computed = New-TestCompletion $case
         if ($computed.complete) {
             throw ('A run was recorded complete although ' + (($case.Keys | ForEach-Object { $_ }) -join ',') + ' failed.')
         }
+    }
+    $blockedRestore = New-TestCompletion @{ RestoreFailure = 'Mods restoration failed' }
+    if ($blockedRestore.restorationVerified -or [string]$blockedRestore.restorationFailure -cne 'Mods restoration failed' -or
+        $null -ne (New-TestCompletion @{}).restorationFailure) {
+        throw 'The completion record does not carry the launcher restoration failure.'
     }
     $unrestored = New-TestCompletion @{ TransactionStatePath = $txUnrestored }
     if ($unrestored.restorationVerified -or -not $unrestored.protectedSavesClean -or $unrestored.gameResultStatus -cne 'PASS') {
@@ -1312,6 +1319,7 @@ try {
     foreach ($strictCase in @(
             @('live-cast-qual', 'Automation', $true), @('live-cast-qual-select', 'Automation', $false),
             @('live-advanced-inspect', 'Advanced', $true), @('live-advanced-inspect', 'Automation', $false),
+            @('live-cast-probe', 'Automation', $true),
             @('live-workspace-qual', 'Advanced', $true),
             @('live-cast-qual-select', 'Advanced', $true))) {
         $policy = Get-KbpProtectedSavePolicy -Scenario $strictCase[0] -FixtureFamily $strictCase[1] -WorkingFileName 'W.zks'
@@ -1324,6 +1332,25 @@ try {
         throw 'An automation UI run may change only its WORKING save.'
     }
     $launcherText = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'Invoke-KingmakerRuntimeTest.ps1') -Raw
+    # Review of f7726c9..1332ed8, P3-B: the restoration branch itself never
+    # throws (a throw would skip the save comparison and the record), both
+    # failure paths assign the failure, the policy feeds the comparison, the
+    # record receives the failure, and the run's failure is rethrown only
+    # after the finally.
+    if ($launcherText -notmatch '(?s)if \(\$running\.Count -eq 0\) \{(.*?)if \(\$null -ne \$restoreFailure\) \{') {
+        throw 'The launcher restoration branch was not found.'
+    }
+    $restoreBranch = $Matches[1]
+    if ($restoreBranch -match '\bthrow\b' -or $restoreBranch -match 'Write-Error' -or
+        ([regex]::Matches($restoreBranch, '\$restoreFailure = ')).Count -ne 2 -or
+        $launcherText -notmatch '\$allowedChanged = @\(\$savePolicy\.allowedChanged\)' -or
+        $launcherText -notmatch '-AllowedChangedFileNames \$allowedChanged' -or
+        $launcherText -notmatch '\$savePolicy\.newFilesBlocking' -or
+        $launcherText -notmatch '-RestoreFailure \$restoreFailure' -or
+        $launcherText -notmatch '(?s)catch \{[^{}]*\$runFailure = \$_\s*\}\s*finally \{' -or
+        $launcherText -notmatch "restoration-failure\.txt") {
+        throw 'The launcher can skip the save comparison or the completion record on a restoration failure, or drops the failure.'
+    }
     if ($launcherText -notmatch 'New-KbpRunCompletionRecord' -or $launcherText -notmatch 'Get-KbpProtectedSavePolicy' -or
         $launcherText -match 'Write-Error "Kingmaker remains running' -or
         $launcherText -notmatch "try \{ & \(Join-Path \`$PSScriptRoot 'Restore-Local\.ps1'\)") {

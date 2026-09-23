@@ -1560,15 +1560,10 @@ namespace KingmakerBuffPlanner.UI
 
         private void RebuildFooter(WorkspaceView view)
         {
-            var lines = new List<string>();
-            foreach (WorkspaceBudgetRow row in view.BudgetRows)
-            {
-                string line = row.Describe();
-                if (line != null) lines.Add(line);
-            }
+            IReadOnlyList<string> lines = WorkspaceBudgetRow.FooterLines(view.BudgetRows);
             _footerBudget.text = lines.Count == 0
                 ? "No resource demand yet."
-                : string.Join("   ", lines);
+                : string.Join("   ", lines.ToArray());
         }
     }
 }

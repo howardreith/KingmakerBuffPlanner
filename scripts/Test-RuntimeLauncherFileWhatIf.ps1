@@ -151,7 +151,15 @@ try {
         @{ Name = 'casting-probe-allowance-outside-approvals'; Expect = '*must be an existing file under*'
            Args = @('-Scenario', 'live-cast-probe', '-RunId', 'probe-gate-test', '-ProbeAllowancePath', $outsideAllowance, '-WhatIf') },
         @{ Name = 'selection-probe-with-allowance'; Expect = '*only valid with -Scenario live-cast-probe*'
-           Args = @('-Scenario', 'live-cast-probe-select', '-ProbeAllowancePath', $outsideAllowance, '-WhatIf') }
+           Args = @('-Scenario', 'live-cast-probe-select', '-ProbeAllowancePath', $outsideAllowance, '-WhatIf') },
+        # Review of f7726c9..1332ed8, P3-H: a probe needs the boot/load
+        # budget plus its world wait and deadline.
+        @{ Name = 'selection-probe-short-timeout'; Expect = '*TimeoutSeconds must be at least 600*'
+           Args = @('-Scenario', 'live-cast-probe-select', '-TimeoutSeconds', '300', '-WhatIf') },
+        # P3-J: a differently cased scenario binds as the canonical one, so
+        # every case-sensitive check below still applies to it.
+        @{ Name = 'uppercase-casting-qualification'; Expect = '*live-cast-qual requires -QualificationAllowancePath*'
+           Args = @('-Scenario', 'LIVE-CAST-QUAL', '-RunId', 'qual-case-test', '-TimeoutSeconds', '900', '-WhatIf') }
     )
     foreach ($case in $probeCases) {
         $ErrorActionPreference = 'Continue'
@@ -173,7 +181,7 @@ foreach ($target in $targets) {
 }
 $ErrorActionPreference = 'Continue'
 $selectOutput = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $launcher `
-        -Scenario 'live-cast-probe-select' -WhatIf 2>&1)
+        -Scenario 'live-cast-probe-select' -TimeoutSeconds 600 -WhatIf 2>&1)
 $selectExit = $LASTEXITCODE
 $ErrorActionPreference = 'Stop'
 if ($selectExit -ne 0 -or -not (@($selectOutput | Where-Object { "$_" -like '*Runtime WhatIf preflight PASS*' }).Count -ge 1)) {

@@ -540,16 +540,10 @@ namespace KingmakerBuffPlanner.UI
                     ? unit.UnitId : unit.DisplayName,
                 StringComparer.Ordinal);
             foreach (WorkspaceCastingCard card in cards)
-                card.ApplyDisplayNames(
-                    namesByUnit.TryGetValue(card.CasterUnitId ?? string.Empty,
-                        out string casterName) ? casterName : null,
-                    card.DirectTargetUnitId == null ? null
-                        : namesByUnit.TryGetValue(card.DirectTargetUnitId,
-                            out string targetName) ? targetName : null,
-                    id => id != null && namesByUnit.TryGetValue(id,
-                        out string unitName) ? unitName : id);
+                ApplyNames(card, namesByUnit);
             var budget = plan.BudgetLines
-                .Select(line => new WorkspaceBudgetRow(line, PoolLabel(line.PoolKey))).ToList();
+                .Select(line => new WorkspaceBudgetRow(line, BudgetLabel(line))).ToList();
+            WorkspaceBudgetRow.DisambiguateLabels(budget);
             CastingApplyDecision selectedGate = _gate.Evaluate(
                 plan, CastingApplyMode.Ordinary, SelectedRoutineId);
             CastingForecast onePass = _forecast.ForecastOnePass(
@@ -562,10 +556,21 @@ namespace KingmakerBuffPlanner.UI
                 ? WorkspaceEditingScope.ConfigureNextCasting
                 : WorkspaceEditingScope.EditingSingleCasting;
             // The casting as the player reads it (its place in the routine,
-            // who casts it on whom), never its internal id.
+            // who casts it on whom), never its internal id; found in the whole
+            // plan, not only among the selected buff's cards (review of
+            // f7726c9..1332ed8, P3-F).
             WorkspaceCastingCard focusedCard = EditingFocusCastingId == null ? null
                 : cards.FirstOrDefault(value => string.Equals(value.CastingId,
                     EditingFocusCastingId, StringComparison.Ordinal));
+            if (EditingFocusCastingId != null && focusedCard == null)
+            {
+                ResolvedCasting focused = plan.Castings.FirstOrDefault(value => string.Equals(
+                    value.CastingId, EditingFocusCastingId, StringComparison.Ordinal));
+                focusedCard = focused == null ? null : BuildCards(plan, focused.SourceId, false)
+                    .FirstOrDefault(value => string.Equals(value.CastingId,
+                        EditingFocusCastingId, StringComparison.Ordinal));
+                if (focusedCard != null) ApplyNames(focusedCard, namesByUnit);
+            }
             string scopeLabel = EditingFocusCastingId == null
                 ? "Configure next casting"
                 : focusedCard == null ? "Editing one casting"
@@ -1061,6 +1066,20 @@ namespace KingmakerBuffPlanner.UI
         // identifiers and never shown.
         private Dictionary<string, string> _poolLabels =
             new Dictionary<string, string>(StringComparer.Ordinal);
+        private Dictionary<string, string> _enhancementPoolLabels =
+            new Dictionary<string, string>(StringComparer.Ordinal);
+
+        private static void ApplyNames(WorkspaceCastingCard card, Dictionary<string, string> namesByUnit)
+        {
+            card.ApplyDisplayNames(
+                namesByUnit.TryGetValue(card.CasterUnitId ?? string.Empty,
+                    out string casterName) ? casterName : null,
+                card.DirectTargetUnitId == null ? null
+                    : namesByUnit.TryGetValue(card.DirectTargetUnitId,
+                        out string targetName) ? targetName : null,
+                id => id != null && namesByUnit.TryGetValue(id,
+                    out string unitName) ? unitName : id);
+        }
 
         private void RefreshPoolLabels(CastingWorkspaceInputs inputs)
         {
@@ -1080,15 +1099,60 @@ namespace KingmakerBuffPlanner.UI
                     var owners = drawing.Select(value => value.Key.CasterUnitId)
                         .Distinct(StringComparer.Ordinal).ToList();
                     var levels = drawing.Select(value => value.SpellLevel).Distinct().ToList();
+                    var sourceNames = drawing.Select(value => value.SourceDisplayName)
+                        .Where(value => !string.IsNullOrWhiteSpace(value))
+                        .Distinct(StringComparer.Ordinal).ToList();
                     string owner;
                     if (owners.Count != 1 || !names.TryGetValue(owners[0], out owner))
                         owner = null;
                     labels[pool.PoolKey] = WorkspacePoolLabels.Describe(pool.Kind,
                         pool.Kind == ResourcePoolKind.SpontaneousLevel && levels.Count == 1
-                            ? levels[0] : (int?)null, owner);
+                            ? levels[0] : (int?)null, owner,
+                        sourceNames.Count == 1 ? sourceNames[0] : null);
                 }
             }
             _poolLabels = labels;
+            // Enhancement pools (rods and the like): whose, and which pool.
+            var enhancementLabels = new Dictionary<string, string>(StringComparer.Ordinal);
+            if (inputs != null && inputs.Enhancements != null)
+            {
+                var unitNames = inputs.Snapshot.Units.ToDictionary(unit => unit.UnitId,
+                    unit => string.IsNullOrWhiteSpace(unit.DisplayName) ? unit.UnitId : unit.DisplayName,
+                    StringComparer.Ordinal);
+                foreach (IGrouping<string, CastEnhancementSnapshot> pool in inputs.Enhancements
+                    .Where(value => value != null && !string.IsNullOrEmpty(value.UsagePoolId))
+                    .GroupBy(value => value.UsagePoolId, StringComparer.Ordinal))
+                {
+                    var owners = pool.Select(value => value.CasterUnitId).Distinct(StringComparer.Ordinal).ToList();
+                    var poolNames = pool.Select(value => value.UsagePoolDisplayName)
+                        .Where(value => !string.IsNullOrWhiteSpace(value))
+                        .Distinct(StringComparer.Ordinal).ToList();
+                    string owner;
+                    if (owners.Count != 1 || !unitNames.TryGetValue(owners[0], out owner)) owner = null;
+                    string what = poolNames.Count == 1 ? poolNames[0] + " uses" : "enhancement uses";
+                    enhancementLabels[pool.Key] = owner == null ? what : owner + ": " + what;
+                }
+            }
+            _enhancementPoolLabels = enhancementLabels;
+        }
+
+        // A budget row's player-facing name by category (review of
+        // f7726c9..1332ed8, P3-D): native pools as above, enhancement pools
+        // by owner and pool name, material components by kind.
+        internal string BudgetLabel(CastingBudgetLine line)
+        {
+            if (line == null) return "resource";
+            switch (line.Category)
+            {
+                case CastingCostCategory.NativePool:
+                    return PoolLabel(line.PoolKey);
+                case CastingCostCategory.EnhancementPool:
+                    string label;
+                    return line.PoolKey != null && _enhancementPoolLabels.TryGetValue(line.PoolKey, out label)
+                        ? label : "enhancement uses";
+                default:
+                    return "material component";
+            }
         }
 
         internal string PoolLabel(string poolKey)
@@ -1107,7 +1171,9 @@ namespace KingmakerBuffPlanner.UI
                 case CastingCostCategory.Material:
                     return "material component" + count;
                 default:
-                    return "enhancement use" + count;
+                    string label;
+                    return (line.PoolKey != null && _enhancementPoolLabels.TryGetValue(line.PoolKey, out label)
+                        ? label : "enhancement use") + count;
             }
         }
 

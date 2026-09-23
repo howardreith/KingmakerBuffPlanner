@@ -22,7 +22,25 @@ after a close and reopen, each exactly as forecast). Finite-resource
 qualification waits for an owner-designated advanced seed. Human usability and the native aesthetic
 pass remain open.
 
-## Current review dispositions — independent review of `e7c5207..f7726c9` (answered 2026-09-23)
+## Current review dispositions — independent review of `f7726c9..1332ed8` (answered 2026-09-23)
+
+A second read-only review of the fixes above found no P0, P1 or P2 issue.
+All ten P3 items are addressed:
+
+| Finding | Disposition |
+| --- | --- |
+| P3-A: a restoration failure in a failed run was only a console warning; the completion record ignored it | `run-completion.json` carries `restorationFailure` and is never verified while it is set; the text is saved as `restoration-failure.txt`; the launcher holds the run's own error until the records are written and folds the restoration failure into it (a restoration failure and a save violation are reported together) |
+| P3-B: the harness source check could not catch a `throw` in the restoration branch | The check extracts the restoration branch (no `throw`, no `Write-Error`, both paths assign the failure) and pins the save policy feeding the comparison, the failure reaching the record and the held run error |
+| P3-C: the header-count test did not prove routine-wide counting | The test adds the same buff to another routine: Long counts 2 while the buff shows 3 cards |
+| P3-D: enhancement and material footer rows read "resource"; labels collided; a shortage could be truncated | Rows are named by kind (enhancement pools by owner and pool name, material components, ability pools by their source); same-looking finite pools are numbered; the footer lists shortages first and merges free pools |
+| P3-E: some refusals lost their advice | `targeting-requires-direct-target` and `targeting-invalid` are mapped; shape refusals are keyed on the mod's own messages |
+| P3-F: the editing label fell back to "Editing one casting" after a buff switch | The focused casting is found in the whole plan |
+| P3-G: the probe's `Pump` defaulted to a running world | The world state is a required argument |
+| P3-H: the probe's time budget had no launcher minimum | Probe scenarios need `-TimeoutSeconds` of at least 600 |
+| P3-I: the matrix overstated tab clicks, the player stop and the production pump | Worded as callback coverage, the host's immediate cancel and "not in game" for the production pump |
+| P3-J: `ValidateSet` binds case-insensitively; `live-cast-probe` had the loose save policy | The launcher continues with each value's canonical spelling; the probe allows no save change |
+
+## Previous review dispositions — independent review of `e7c5207..f7726c9` (history)
 
 A read-only independent review of the RC1-RC4 fixes, the world-running
 gate and the external Gunslinger fixture found no P0 or P1 issue. Fixed in
@@ -33,7 +51,7 @@ gate and the external Gunslinger fixture found no P0 or P1 issue. Fixed in
 | P2-1: the probe checked the world once, a frame before its rule fired, and pumped its confirmation frames without a check; the wait was bounded by 300 updates | Every probe pump (the fire and each confirmation frame) waits while the world is held; a stop and the wall-clock deadline still apply. The record carries the world state at the first step and the held pump count; the wait before submitting is bounded in elapsed time (`ProbeWorldWaitSeconds`) |
 | P3-1: the production world clock truncated each frame to whole milliseconds | `CastingWorldClock` accumulates double seconds; unit-tested at 60 fps and above 1000 updates a second |
 | P3-2: the qualification host deadline counted held time although this index said it did not | The qualification host uses the same world clock as production; the run's own 240-second deadline stays wall-clock as the hard bound. A driver test holds a step for 200 s: it completes under the world clock and fails under a wall clock |
-| P3-3: a failed restoration or a still-running Kingmaker skipped the protected-save comparison and `run-completion.json` | Restoration failures are captured, both records are written (restoration not verified), and the failure is thrown afterwards |
+| P3-3: a failed restoration or a still-running Kingmaker skipped the protected-save comparison and `run-completion.json` | Restoration failures are captured and no longer skip `run-completion.json` or, once the game has exited, the protected-save comparison. Since the follow-up review (P3-A) the record carries the failure (`restorationFailure`), it is saved as `restoration-failure.txt`, and the launcher folds it into the run's own error |
 | P3-4: an inspection that changed the WORKING save was recorded complete but could never qualify | The casting selection and every advanced-copy run, the inspection included, allow no save change |
 | P3-5: several tests were weaker than their commits claimed | The launcher computes its completion record and save policy through tested functions; the held-world driver tests cover the Begin and Wait gates separately; the source checks test the gate blocks themselves |
 

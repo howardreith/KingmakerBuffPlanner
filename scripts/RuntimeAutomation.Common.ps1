@@ -750,21 +750,23 @@ function Assert-KbpAdvancedInspectionPassed {
 }
 
 # Which save changes a run may make. A casting qualification, its selection
-# run and every advanced-copy run change no save at all: the inspection
-# must leave the bound WORKING bytes intact, or it could never qualify a
-# later casting run (review of e7c5207..f7726c9, P3-4). Other runs may
-# change only the WORKING save. New save files block on the advanced copy
-# and for the casting qualification.
+# run, the native casting probe and every advanced-copy run change no save
+# at all: the inspection must leave the bound WORKING bytes intact, or it
+# could never qualify a later casting run (review of e7c5207..f7726c9,
+# P3-4; f7726c9..1332ed8, P3-J). Other runs may change only the WORKING
+# save. New save files block on the advanced copy and for every native
+# casting run.
 function Get-KbpProtectedSavePolicy {
     param(
         [Parameter(Mandatory = $true)][string]$Scenario,
         [Parameter(Mandatory = $true)][string]$FixtureFamily,
         [Parameter(Mandatory = $true)][string]$WorkingFileName)
     $strict = $FixtureFamily -ceq 'Advanced' -or
-        @('live-cast-qual', 'live-cast-qual-select', 'live-advanced-inspect') -ccontains $Scenario
+        @('live-cast-qual', 'live-cast-qual-select', 'live-advanced-inspect', 'live-cast-probe') -ccontains $Scenario
     return [pscustomobject]@{
         allowedChanged = if ($strict) { @() } else { @($WorkingFileName) }
-        newFilesBlocking = $FixtureFamily -ceq 'Advanced' -or $Scenario -ceq 'live-cast-qual'
+        newFilesBlocking = $FixtureFamily -ceq 'Advanced' -or $Scenario -ceq 'live-cast-qual' -or
+            $Scenario -ceq 'live-cast-probe'
     }
 }
 
@@ -786,6 +788,9 @@ function New-KbpRunCompletionRecord {
         [bool]$HarnessSucceeded,
         [bool]$KingmakerExited,
         [string]$TransactionStatePath,
+        # The launcher's own restoration failure (a failed or blocked
+        # Restore-Local); never verified while it is set.
+        [string]$RestoreFailure,
         [bool]$ProtectedSavesCompared,
         [string]$ProtectedSaveFailure)
     $restored = $false
@@ -795,6 +800,7 @@ function New-KbpRunCompletionRecord {
         $restored = @($state.PSObject.Properties | ForEach-Object Name) -ccontains 'restorationVerified' -and
             [bool]$state.restorationVerified
     }
+    if (-not [string]::IsNullOrWhiteSpace($RestoreFailure)) { $restored = $false }
     $game = if ([string]::IsNullOrWhiteSpace($GameResultStatus)) { 'none' } else { $GameResultStatus }
     $clean = $ProtectedSavesCompared -and [string]::IsNullOrEmpty($ProtectedSaveFailure)
     return [ordered]@{
@@ -810,6 +816,7 @@ function New-KbpRunCompletionRecord {
         harnessSucceeded = $HarnessSucceeded
         kingmakerExited = $KingmakerExited
         restorationVerified = $restored
+        restorationFailure = if ([string]::IsNullOrWhiteSpace($RestoreFailure)) { $null } else { $RestoreFailure }
         protectedSavesCompared = $ProtectedSavesCompared
         protectedSavesClean = $clean
         complete = ($game -ceq 'PASS') -and $HarnessSucceeded -and $KingmakerExited -and $restored -and $clean

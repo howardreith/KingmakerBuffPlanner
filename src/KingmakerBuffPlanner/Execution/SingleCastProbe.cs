@@ -622,7 +622,7 @@ namespace KingmakerBuffPlanner.Execution
         // wall-clock deadline apply either way. Returns true once the run
         // has terminated.
         public bool Pump(long nowMillis, long deadlineMillis, bool stopRequested,
-            bool worldRunning = true, string worldState = null)
+            bool worldRunning, string worldState)
         {
             if (_terminated) return true;
             if (_boundary == null || _boundary.ActiveRun == null)
@@ -642,7 +642,7 @@ namespace KingmakerBuffPlanner.Execution
                 return false;
             }
             if (_record.FirstStepWorldState == null)
-                _record.FirstStepWorldState = string.IsNullOrEmpty(worldState) ? "running" : worldState;
+                _record.FirstStepWorldState = string.IsNullOrEmpty(worldState) ? "running;state-unreported" : worldState;
             bool moved;
             try { moved = _boundary.ActiveRun.MoveNext(); }
             catch (Exception exception)
