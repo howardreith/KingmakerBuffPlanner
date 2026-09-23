@@ -2136,11 +2136,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 // Settled: the guarded load completed with a stable campaign
                 // identity, the area unloaded and loaded again, the world
                 // runs and the HUD is back; then 60 rendered frames.
-                string loaded = _liveSaveLoader.UpdateReload();
                 bool areaCycled =
                     BuffPlannerUiRoot.LifecycleSignalsForRuntime("OnAreaBeginUnloading") > _reloadUnloadsBefore &&
                     BuffPlannerUiRoot.LifecycleSignalsForRuntime("OnAreaLoadingComplete") +
                         BuffPlannerUiRoot.LifecycleSignalsForRuntime("OnAreaActivated") > _reloadLoadsBefore;
+                string loaded = _liveSaveLoader.UpdateReload(areaCycled);
                 if (loaded == null || !areaCycled || !BuffPlannerUiRoot.WorldRunsForCasting ||
                     !BuffPlannerUiRoot.IsHudInstalledForRuntime)
                 {

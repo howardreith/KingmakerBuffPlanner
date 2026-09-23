@@ -1665,13 +1665,20 @@ namespace KingmakerBuffPlanner.Tests
                 !begin.Contains("_reloadSaver = new GuardedReadOnlySaver(descriptor,") ||
                 guard < 0 || load < 0 || guard > load)
                 throw new InvalidOperationException("The in-game reload is not guarded by the read-only saver.");
-            string update = SourceBlock(loader, "internal string UpdateReload()");
+            string update = SourceBlock(loader, "private string AdvanceReload(bool areaReloaded)");
             int complete = update == null ? -1 : update.IndexOf("if (!_reloadSaver.Complete) return null;", StringComparison.Ordinal);
             int restore = update == null ? -1 : update.IndexOf("descriptor.Saver = _reloadSaver.Native;", StringComparison.Ordinal);
+            int waitArea = update == null ? -1 : update.IndexOf("if (!areaReloaded) return null;", StringComparison.Ordinal);
+            int read = update == null ? -1 : update.IndexOf("string fingerprint = CurrentFingerprint(true);", StringComparison.Ordinal);
             if (update == null || complete < 0 || restore < 0 || complete > restore ||
                 !update.Contains("if (!ReferenceEquals(descriptor.Saver, _reloadSaver))") ||
-                !update.Contains("string fingerprint = CurrentFingerprint();"))
-                throw new InvalidOperationException("The reload restores the native saver before its protocol completed.");
+                waitArea < 0 || read < 0 || waitArea > read ||
+                !loader.Contains("string value = CurrentFingerprint(false);") ||
+                !loader.Contains("if (waitWhileLoading && partyCount <= 0) return null;"))
+                throw new InvalidOperationException("The reload restores the native saver early or reads the campaign mid-load.");
+            string wrapper = SourceBlock(loader, "internal string UpdateReload(bool areaReloaded)");
+            if (wrapper == null || !wrapper.Contains("WriteEventsEvidence();") || !wrapper.Contains("throw;"))
+                throw new InvalidOperationException("A failed reload does not leave its events.");
             int loads = 0;
             foreach (string file in Directory.GetFiles(Path.Combine(directory.FullName, "src", "KingmakerBuffPlanner"),
                 "*.cs", SearchOption.AllDirectories))
