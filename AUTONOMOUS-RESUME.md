@@ -92,6 +92,14 @@ known disconnected-session black backbuffer. Display-path acceptance of
 the new layout therefore waits for a connected session; session state
 is never changed by the agent.
 
+`2e82a14` added buff search (view-only filter) and Ready-by-default
+castings; `casting-ws-claude-qual-20260922-205126` again passed every
+interaction with black display frames (RDP Disc), restored verified. Its
+camera frames showed the coverage legend working, a clipped (blank)
+search field, a meaningless "coverage 1/0" on direct cards (inverted
+condition) and id-style card titles — all fixed next (cards read
+"Caster → Recipient (Casting n in routine)").
+
 NEXT (exact action): rerun `live-workspace-qual` when the RDP session is
 Active (check `query user` first); meanwhile continue `docs/UI-END-GOAL.md`: search
 box, native parchment/frame pass (charter §6), per-caster popover,
