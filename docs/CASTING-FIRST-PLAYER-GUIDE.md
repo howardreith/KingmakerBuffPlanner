@@ -102,10 +102,13 @@ else has passed source and recorded-runtime tests only.
 
 | Casting setting | In this version | Checked in the game |
 | --- | --- | --- |
-| Cantrips and other verified free sources, direct target | Runs, no resource spent | Yes: Resistance, cast by two casters on other party members; resources unchanged |
+| Cantrips (cast at will through the ability the class grants, as the game's action bar casts them) and other verified free sources, direct target | Runs, no resource spent | Yes, in both casting modes: Resistance cast by a bard and a sorcerer on other party members; resources unchanged |
+| Animated casting (the default) and Instant | Runs | Yes, both |
 | Several casters in one routine, each casting with its own caster | Runs | Yes (two casters, three castings) |
 | Skip if already active / Always recast | Runs | Yes, with free sources: an active effect is skipped, a repeat press casts nothing, Always recast casts again |
-| Stopping a running routine | Runs | Yes: the cast in progress finished and nothing after it started |
+| Stopping a running routine (press a routine button) | Runs | Yes: pressed during a cast in progress, that cast finished and nothing after it started |
+| Disabling the mod during a run | The run ends; a cast in progress is interrupted and cleaned up | Yes (animated): the cast in progress was interrupted and nothing landed; runs were possible again once the planner was enabled |
+| A cast the game refuses | The routine stops there; nothing after it runs | Yes, once, before the cantrip fix: the failed cast was reported, nothing was spent and the rest were not attempted |
 | Close and reopen the planner; the accepted plan survives | Runs | Yes |
 | Spellbook spells from prepared slots or spontaneous levels, direct target | Runs, budgeted in order | Not yet (the test party has only cantrips) |
 | Exact prepared slots and ability pools shared across castings | Runs, budgeted in order | Not yet |
@@ -141,13 +144,19 @@ The casting-first execution path has passed source tests, mutation tests
 and recorded-runtime tests, and on a disposable test campaign (never an
 ordinary save) it has cast in the game:
 
-- one Resistance cantrip through a one-cast probe: the effect appeared
-  and nothing was spent;
-- a two-caster Resistance routine through the same Apply a player uses:
-  stopped after its first cast, completed (skipping the buff already
-  active), pressed again (nothing to cast), and, after closing and
-  reopening the planner, recast with Always recast. Every step matched
-  its prediction; no save was written.
+- a two-caster Resistance routine, in animated and in instant mode,
+  through the same Apply a player uses and the planner's own per-frame
+  execution: stopped by a routine press during its first cast, completed
+  (skipping the buff already active), pressed again (nothing to cast),
+  recast with Always recast after closing and reopening the planner, and
+  disabled during a cast (interrupted, nothing landed, runs possible again
+  once enabled). Every step matched its prediction; no save was written.
+
+The animated run also found a defect in the previous candidate: a
+spontaneous caster's cantrip failed because it was cast from the
+spellbook's level-0 entry, which needs a level-0 slot these classes do
+not have. Cantrips are now cast at will through the ability the class
+grants, as in the game's own action bar.
 
 Spells that spend slots, group spells, metamagic and rods have not been
 cast in the game yet; they need a test campaign with a more advanced

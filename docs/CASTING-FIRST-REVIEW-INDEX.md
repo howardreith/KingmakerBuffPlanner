@@ -7,9 +7,9 @@ Reviewed baseline: `c182061354e9e761c09648ca779ab334588ba379`
 (`fd0e6dc..c182061`); this index covers the casting-first commits
 `c182061..HEAD` (61 commits at first publication).
 
-Status: **release candidate 0.2.0-rc1 frozen at `f8562a6` for the owner's
-final review** (receipt `docs/evidence/rc-0.2.0-rc1-receipt.md`); not a
-fully gameplay-qualified release. Casting-first is an opt-in planner mode (UMM setting, Classic
+Status: **release candidate 0.2.0-rc2 in preparation** (0.2.0-rc1, frozen
+at `f8562a6`, has the animated cantrip defect described below; its
+receipt stays as history); not a fully gameplay-qualified release. Casting-first is an opt-in planner mode (UMM setting, Classic
 by default). In ordinary play every routine route reaches the production
 dispatch boundary and the execution host; in an automated test session
 both player routes (casting-first and classic) refuse, and native casts
@@ -23,7 +23,20 @@ after a close and reopen, each exactly as forecast). Finite-resource
 qualification waits for an owner-designated advanced seed. Human usability and the native aesthetic
 pass remain open.
 
-## Current review dispositions — independent review of `1332ed8..542cd66` (answered 2026-09-23)
+## Findings from live qualification after rc1 (2026-09-23)
+
+The animated-mode qualification (the player default) found a defect in the
+frozen rc1 that source tests could not see. It is fixed at `70f135a`.
+
+| Finding | Disposition | Evidence |
+| --- | --- | --- |
+| In animated mode, the game's own cast command failed every spontaneous caster's cantrip: the planner submitted the spellbook's level-0 entry, and the game casts a cantrip at will only through the ability its class grants for it (no spellbook, count -1); the spellbook entry needs a level-0 slot and these books have 0 per day. Instant mode cast the entry only because the cast rule skips the availability check | A level-0 entry executes through the caster's at-will cantrip ability first (both modes), exactly as the game's action bar; validation is the cast command's own `IsAvailable`; discovery prices level 0 as free only with that ability behind it (otherwise a level-0 slot or a consumable prepared slot) | Failure `casting-qual-cast-20260923-a1-anim-01` (halted after the failed cast: nothing spent, nothing else started); diagnostics `casting-qual-select-20260923-d1-01`; the game's `UnitUseAbility.OnAction`, `AbilityData.IsAvailable`, `Spellbook.SpendInternal` read from its assembly |
+| The qualification's stop was a host cancel between castings, not the player's stop | The stop is the player's routine press through the HUD's routine entry while the first cast is in progress (the host's `RequestStop`); the cast completes and nothing after it starts | Source and mutation tests; in game on the fixed build |
+| The qualification used a private host its driver pumped | It runs on the planner's own host, pumped by the planner root once per frame while the world runs; the root's tick precedes the test host in each mod update, so the press lands before the next pump | Source checks; in game on the fixed build |
+| No in-game interruption of a cast in progress | Disable step: the planner's own disable and enable during a run; animated: while the cast is in progress (interrupted, cleaned up, nothing lands); instant: before the first step (nothing submitted); the host accepts runs again once enabled | Tests with an interrupted cast that lands anyway and a host that never resumes; in game on the fixed build |
+| An allowance did not state the casting mode | Schema 4 names instant or animated; the launcher, request protocol, host and boundary each refuse any other mode | Tests; 21 mutants killed |
+
+## Previous review dispositions — independent review of `1332ed8..542cd66` (answered 2026-09-23)
 
 A read-only review of the in-game reload, the grid order, the version bump
 and the docs found no P0. Both P1s concern the reload's save safety; no
