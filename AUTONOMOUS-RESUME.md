@@ -1,6 +1,31 @@
 # AUTONOMOUS-RESUME — top section is current; planning/CASTING-FIRST-MIGRATION-STATUS.md is the per-checkpoint tracker.
 
-## RC mission (2026-09-23, continued): review fixes, workspace text, in-game reload, 0.2.0-rc1 (LATEST)
+## Release candidate 0.2.0-rc1 frozen at `f8562a6` (LATEST)
+
+Receipt: `docs/evidence/rc-0.2.0-rc1-receipt.md` (identities, gate, the
+five runs on the frozen build, the temporary install and rollback, the
+migration audit, what is not established). Clean checkout
+`repo/KingmakerBuffPlanner-RC1`; frozen copy
+`runtime-backups/rc-frozen/f8562a6.../`.
+
+| Commit | Content |
+| --- | --- |
+| `85df35a`, `5b9f58b` | Launcher test timeouts; the scripted workspace casts pick a legal recipient for their caster (Aid Another cannot target its caster) |
+| `d7f7af6` | Restoration retries a transient sharing lock on the Mods folder moves |
+| `f8562a6` | No runtime transaction or local install while the Gunslinger lab's lease on the same installation is held (the two sessions check each other's locks) |
+
+On the frozen build: `casting-qual-select-20260923-rc1-01`,
+`casting-qual-cast-20260923-rc1-01` (native casts, zero violations),
+`casting-ws-import-20260923-rc1-01`, `casting-ws-reload-20260923-rc1-01`
+and `casting-ws-manual-20260923-rc1-rehearsal` all PASS and complete;
+temporary install and rollback `rc1-temp-deploy-20260923-01` restored the
+owner's planner exactly.
+
+Owner inputs: the `KBP_ADVANCED_SEED` (asked once), the supervised manual
+acceptance session (`docs/MANUAL-USABILITY-HANDOFF.md`), and the final
+review. Merge, release and permanent installation stay with the owner.
+
+## RC mission (2026-09-23, continued): review fixes, workspace text, in-game reload, 0.2.0-rc1 (history)
 
 Worktrees: dev `repo/KingmakerBuffPlanner-O1` (PR branch); gate and live
 runs from the clean detached `repo/KingmakerBuffPlanner-G` (moved to each
