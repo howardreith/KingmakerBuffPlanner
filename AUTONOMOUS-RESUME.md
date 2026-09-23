@@ -121,9 +121,27 @@ FULL PASS incl. `page=native` in presentation evidence.
 Disc), camera frame shows the finished page look. Open nit: lane titles
 clipped by the book's left edge.
 
-NEXT (exact action): nudge lane titles inside the book edge; per-caster
-popover (limits, Share Transmutation, Powerful Change) and an invalid
-target (red) state; rerun `live-workspace-qual` when Active; continue `docs/UI-END-GOAL.md`: search
+FURTHER SLICES (each gated + pushed + live-run; FULL PASS on the
+display path whenever the session was Active, black-frame-only FAIL
+with all interactions PASS when Disc; every run restored verified):
+- `f3f9509` red invalid-target state from the chosen caster's reachable
+  targets (illegal tiles not selectable); lanes inset inside the page
+  (`...-215709` FULL PASS).
+- `0a56785` retarget / origin / coverage choices as portrait tiles;
+  castings on the left page, inspector on the right (`...-220104`
+  FULL PASS incl. retarget through the tiles).
+- `f214553` Add Casting / Done pinned to the inspector title row
+  (`...-220517` FULL PASS).
+- `6a02a77` castings lane scope toggle: this buff / whole routine
+  (`...-220903`, session Disc: interactions PASS, display black).
+Per-caster popover deferred: the casting-first compiler accepts
+ICastingTargetingModifier but no implementation exists; the legacy
+Brown-Fur Share Transmutation adapter needs a transmuter the fixture
+party lacks (would be Not Run).
+
+NEXT (exact action): enhancement chips on cards / inspector; group
+castings' predicted beneficiaries on cards; rerun `live-workspace-qual`
+when Active; continue `docs/UI-END-GOAL.md`: search
 box, native parchment/frame pass (charter §6), per-caster popover,
 recipient invalid-target state; supervised session on the new layout — icon-first
 searchable buff grid with disambiguated variants, portrait strips with
