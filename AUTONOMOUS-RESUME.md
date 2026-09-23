@@ -16,12 +16,15 @@ detached at `e964d2f`, untouched.
 | `0228278` | `docs/CASTING-QUALIFICATION-REQUEST.md`: purpose, contracts, expectations and procedure for the first qualification run. |
 | `47caeef` | Fixes for the independent review of `ca0d636..325e4b3` (dispositions in `docs/CASTING-FIRST-REVIEW-INDEX.md`): launchable inspection scenario, exhausted rods waived by an active effect, acceptance never revoked by viewing, two-round expiry floor, graceful player stop, classic path locked in automation. |
 | `4097ca7` | Routine tabs show names, counts and a gold selected state; header states the routine's own Apply gate. |
+| `6adda37`, `0c9b04e` | Workspace: Spells / Abilities / Other tabs on the buff grid (the live scenario clicks them inside its no-mutation check); each casting card shows its own outcome in the last run. |
+| `af5f0ca` | Fixes for the second independent review (`54d330b..47caeef`): the qualification driver judges each step the moment it ends and stops at the first failed, uncertain or cancelled step (P0, no run had happened); 900-second harness floor; strict saves for the casting run; compatibility over exhausted rods; non-vacuous selection-only evidence; exact reopen digest. |
+| `ebf2329` | Qualification recipe `finite-direct-mixed` for the advanced copy: finite prepared exact slots, spontaneous levels, mixed casters, metamagic variants; spend-aware forecast; per-step availability and exact-token judging; casting on the advanced copy only with its allowance and after a passing inspection of the same pair. |
 
-Gates at `47caeef` (Windows PowerShell 5.1, non-interactive): source 42/42,
-protocol 285/285, harness 33/33, deploy WhatIf 5/5, launcher WhatIf 11/11,
+Gates at `ebf2329` (Windows PowerShell 5.1, non-interactive): source 42/42,
+protocol 287/287, harness 34/34, deploy WhatIf 5/5, launcher WhatIf 12/12,
 fixture 3/3, Restore-InstallLocal 16/16, publisher 3/3. Every new guard
-has a mutant that the tests catch (17 in slice 1, 8 + 2 drift in the
-review fixes).
+has a mutant that the tests catch (17 in slice 1, 8 + 2 drift and 4 in
+the two review-fix rounds, 8 for the finite recipe).
 
 Live runs this slice (no native cast):
 
@@ -43,7 +46,15 @@ Owner blockers:
    `full-user` is sealed at 0.0.133. Every automation-fixture run and the
    frozen probe are refused until the owner restores 0.0.133 or approves
    resealing (the frozen probe checkout cannot change, so it needs
-   0.0.133 back).
+   0.0.133 back). A third option exists for the dev branch only: three
+   Gunslinger lab backups of the live folder are byte-identical to the
+   sealed 0.0.133 directory, so `full-user` could stage Gunslinger from
+   an exact copy (the immutable-fixture mechanism of `3bd519b`). An
+   attempt to set that up was stopped by the tool permission classifier
+   as a shared-resource change and fully reverted; it is the owner's
+   decision. An inert read-only copy remains at
+   `C:\Dev\KingmakerBuffPlannerLab\examples\KingmakerGunslinger` (outside
+   the repo, unused) for the owner to keep or delete.
 3. No `KBP_ADVANCED_SEED` exists yet.
 4. The casting qualification needs its own owner-created allowance after
    `live-cast-qual-select` reports the projection ids

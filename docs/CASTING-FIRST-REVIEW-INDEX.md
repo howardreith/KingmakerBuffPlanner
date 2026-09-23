@@ -18,7 +18,33 @@ the frozen probe and the qualification await owner inputs (allowance
 files, the KingmakerGunslinger identity, an advanced seed). Human
 usability and the native aesthetic pass remain open.
 
-## Current review dispositions — RC review of `ca0d636..325e4b3` (answered 2026-09-23)
+## Current review dispositions — review of `54d330b..47caeef` (answered 2026-09-23)
+
+A second independent read-only review covered the qualification core,
+driver and scenarios, the run request and the RC review fixes. Every
+finding is fixed in `af5f0ca` with a regression test and a mutant the
+tests catch. Full gate at `af5f0ca`: source 42/42, protocol 286/286,
+harness 33/33, deploy WhatIf 5/5, launcher WhatIf 11/11, fixture 3/3,
+Restore-InstallLocal 16/16, publisher 3/3. No qualification run has
+happened, so no native cast was affected.
+
+| Finding | Disposition |
+| --- | --- |
+| P0: the driver judged the steps only at the end, so after a failed, uncertain or cancelled step (an unconfirmed first cast, a spend on a free source) it kept submitting | Fixed: each step is judged by the record's step rule the moment it ends, and repeat continues only on the exact no-op; anything else ends the run before another submission. Tests drive an unconfirmed cast, a spend on a free source and a refused repeat: each run fires exactly the casts before the failure |
+| P2: the harness could time out and abandon a live qualification run with the Mods folder unrestored | Fixed: the launcher refuses a qualification scenario with less than 900 seconds; the documented commands carry it |
+| P3: an exhausted rod could hide an incompatible enhancement set | Fixed: compatibility counts exhausted required enhancements |
+| P3: the selection-only assertion was vacuous | Fixed: it requires zero qualification runs, the locked player routes, zero production runs and a closed workspace |
+| P3: the reopen check accepted any stored acceptance | Fixed: the reopened session must restore exactly the digest just accepted |
+| P3: judge and evidence gaps (cleanup failures, other targets on recast, interrupted steps, shutdown) | Fixed: step rules check cleanup failures and the other targets; interrupted steps keep their report and reads; shutdown publishes the record |
+| P3: the workspace close result was ignored | Fixed: an unclosed workspace or a held input lease fails the run before any authoring |
+| P3: guide wording ("more than two rounds") | Fixed: "at least two rounds" |
+| P3: the protected-save check tolerated a changed WORKING save for the casting run | Fixed: a casting qualification must leave every save unchanged and create none |
+
+After the fixes, `finite-direct-mixed` (`ebf2329`) adds the
+advanced-copy recipe for finite prepared slots, spontaneous levels and
+metamagic variants, judged per step down to the exact prepared tokens.
+
+## Previous review dispositions — RC review of `ca0d636..325e4b3` (history)
 
 An independent read-only review of RC slice 1 found no P0. Every finding
 is fixed in `47caeef` with a regression test; the eight new mutants and
