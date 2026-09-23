@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using KingmakerBuffPlanner.Domain.Authoring;
+using KingmakerBuffPlanner.Domain.Identity;
 using KingmakerBuffPlanner.Domain.Providers;
 using KingmakerBuffPlanner.Planning;
 
@@ -135,14 +136,19 @@ namespace KingmakerBuffPlanner.UI
     {
         internal WorkspaceSourceOption(
             string sourceId, string displayName, bool selected,
-            string detail = null)
+            string detail = null, AbilityKey iconAbility = null)
         {
             SourceId = sourceId ?? string.Empty;
             DisplayName = string.IsNullOrWhiteSpace(displayName)
                 ? SourceId : displayName;
             Selected = selected;
             Detail = detail ?? string.Empty;
+            IconAbility = iconAbility;
         }
+
+        // The discovered ability whose native icon represents this buff in
+        // the grid; null when discovery supplied none (view shows a glyph).
+        public AbilityKey IconAbility { get; private set; }
 
         public string SourceId { get; private set; }
         public string DisplayName { get; private set; }
@@ -154,6 +160,61 @@ namespace KingmakerBuffPlanner.UI
         public string Label
         {
             get { return Detail.Length == 0 ? DisplayName : DisplayName + " — " + Detail; }
+        }
+    }
+
+    // Coverage of one party member by the selected buff's castings in the
+    // selected routine, using Bubble Buffs' legend: gray = no casting,
+    // green = covered by a Ready casting, amber = only covered by castings
+    // that are not Ready (draft, blocked, disabled).
+    public enum WorkspaceRecipientCoverage
+    {
+        None,
+        CoveredReady,
+        CoveredNotReady
+    }
+
+    public static class WorkspaceBuffSummary
+    {
+        // Number of castings per buff source in one routine — the counts
+        // shown on the buff grid cards.
+        public static IReadOnlyDictionary<string, int> CastingsBySource(
+            IEnumerable<PlannedCasting> castings, string routineId)
+        {
+            var result = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (PlannedCasting casting in castings ?? new PlannedCasting[0])
+            {
+                if (casting == null || !string.Equals(casting.RoutineId,
+                        routineId, StringComparison.Ordinal)) continue;
+                int count;
+                result.TryGetValue(casting.SourceId, out count);
+                result[casting.SourceId] = count + 1;
+            }
+            return result;
+        }
+
+        // Which party members the given cards (already the selected buff)
+        // cover in the routine: a direct recipient or a predicted group
+        // beneficiary. Ready wins over not-ready.
+        public static WorkspaceRecipientCoverage CoverageFor(
+            IEnumerable<WorkspaceCastingCard> cards, string routineId,
+            string unitId)
+        {
+            WorkspaceRecipientCoverage best = WorkspaceRecipientCoverage.None;
+            foreach (WorkspaceCastingCard card in cards ?? new WorkspaceCastingCard[0])
+            {
+                if (card == null || !string.Equals(card.RoutineId, routineId,
+                        StringComparison.Ordinal)) continue;
+                bool covers = string.Equals(card.DirectTargetUnitId, unitId,
+                        StringComparison.Ordinal) ||
+                    (card.PredictedBeneficiaryUnitIds != null &&
+                     card.PredictedBeneficiaryUnitIds.Contains(unitId));
+                if (!covers) continue;
+                if (card.Readiness == ResolvedCastingReadiness.Ready)
+                    return WorkspaceRecipientCoverage.CoveredReady;
+                best = WorkspaceRecipientCoverage.CoveredNotReady;
+            }
+            return best;
         }
     }
 

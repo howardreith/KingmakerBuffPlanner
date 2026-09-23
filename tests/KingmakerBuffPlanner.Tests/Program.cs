@@ -383,6 +383,8 @@ namespace KingmakerBuffPlanner.Tests
                     TestWorkspaceSourceLabelDisambiguation);
                 Run("workspace-choose-draft-caster",
                     () => TestWorkspaceChooseDraftCaster(root));
+                Run("workspace-buff-summary-and-coverage-legend",
+                    () => TestWorkspaceBuffSummaryAndCoverage(root));
             }
             finally
             {
@@ -13473,6 +13475,50 @@ namespace KingmakerBuffPlanner.Tests
             WorkspaceView view = session.BuildView(inputs);
             if (!view.Casters.Any(row => row.UnitId == "unit-wizard" && row.SelectedFocus))
                 throw new InvalidOperationException("The chosen caster is not shown as selected.");
+        }
+
+        // Buff grid counts and the recipient coverage legend come from the
+        // real session: per-routine casting counts per buff, and green /
+        // amber / gray coverage per party member for the selected buff.
+        private static void TestWorkspaceBuffSummaryAndCoverage(string root)
+        {
+            string modPath = Path.Combine(root, "casting-workspace-summary");
+            Directory.CreateDirectory(modPath);
+            PartyProviderSnapshot snapshot;
+            CastingWorkspaceInputs inputs = WorkspaceInputs(out snapshot);
+            var session = new CastingWorkspaceSession(modPath, "workspace-campaign");
+            session.SelectBuff("source-bulls");
+            session.SelectRoutine("long");
+            session.BuildView(inputs);
+            session.Draft.SourceId = "source-bulls";
+            session.Draft.TargetMode = CastingTargetMode.DirectTarget;
+            session.ChooseDraftCaster("unit-cleric");
+            session.Draft.DirectTargetUnitId = "unit-t1";
+            session.Draft.State = CastingAuthoringState.Ready;
+            Assert(session.AddCastingFromDraft(inputs).Applied);
+            session.Draft.DirectTargetUnitId = "unit-t2";
+            session.Draft.State = CastingAuthoringState.Draft;
+            Assert(session.AddCastingFromDraft(inputs).Applied);
+            IReadOnlyDictionary<string, int> counts = WorkspaceBuffSummary.CastingsBySource(
+                session.Document.Castings, "long");
+            int bulls;
+            if (!counts.TryGetValue("source-bulls", out bulls) || bulls != 2 ||
+                WorkspaceBuffSummary.CastingsBySource(session.Document.Castings, "short").Count != 0)
+                throw new InvalidOperationException("Per-routine buff counts are wrong.");
+            WorkspaceView view = session.BuildView(inputs);
+            if (WorkspaceBuffSummary.CoverageFor(view.Cards, "long", "unit-t1") !=
+                    WorkspaceRecipientCoverage.CoveredReady ||
+                WorkspaceBuffSummary.CoverageFor(view.Cards, "long", "unit-t2") !=
+                    WorkspaceRecipientCoverage.CoveredNotReady ||
+                WorkspaceBuffSummary.CoverageFor(view.Cards, "long", "unit-t3") !=
+                    WorkspaceRecipientCoverage.None ||
+                WorkspaceBuffSummary.CoverageFor(view.Cards, "short", "unit-t1") !=
+                    WorkspaceRecipientCoverage.None)
+                throw new InvalidOperationException("Recipient coverage legend is wrong.");
+            WorkspaceSourceOption selected = view.Draft.Sources
+                .FirstOrDefault(source => source.SourceId == "source-bulls");
+            if (selected == null || selected.IconAbility == null)
+                throw new InvalidOperationException("The buff grid has no icon ability for a discovered buff.");
         }
 
         // The Unity-bound host cannot be compiled here, so its wiring to the
