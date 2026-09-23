@@ -5,7 +5,17 @@ Linked from `AUTONOMOUS-RESUME.md`. Specification: the adopted
 `Kingmaker-Buff-Planner-Casting-First-Migration-Charter.md` (casting-first
 migration and native scroll UI charter v1.0, 2026-09-19).
 
-## CURRENT STATE — J-review repairs; implementer handoff Z → Claude — 2026-09-22
+## CURRENT STATE — K-review (`258a1d0`) answered — 2026-09-22
+
+K1–K7 are repaired in source (dispositions table in
+`docs/CASTING-FIRST-REVIEW-INDEX.md`); native dispatch remains disabled.
+Full Windows PowerShell 5.1 gate at `b243b02`: source 42/42, protocol
+242/242, harness 28/28, deploy WhatIf 5/5, launcher WhatIf 4/4, fixture
+3/3, Restore-InstallLocal 12/12, publisher 3/3. The first live cast is a
+prepared request only (`docs/LIVE-CAST-PROBE-REQUEST.md`), awaiting the
+owner's separate approval. The J-review section below is history.
+
+## J-review repairs; implementer handoff Z → Claude — 2026-09-22 (history)
 
 This section supersedes every earlier "CURRENT" label below; older
 checkpoints are **history** and keep their original failures and

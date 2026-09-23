@@ -14412,10 +14412,101 @@ namespace KingmakerBuffPlanner.Tests
             ExplicitCastingPlan enhPlan = CompileCastingPlan(CastingDocument(enhanced),
                 snapshot, options, enhancements, "source-bulls", "source-communal");
             CastingApplyDecision enhDecision = gate.Evaluate(enhPlan, CastingApplyMode.Ordinary, "long");
-            if (enhDecision.Allowed && !ExplicitCastingStepConverter.Convert(enhPlan, enhDecision,
+            if (!enhDecision.Allowed ||
+                !ExplicitCastingStepConverter.Convert(enhPlan, enhDecision, options, effects).Converted)
+                throw new InvalidOperationException(
+                    "Fixture precondition: the enhanced casting must convert in Standard scope.");
+            if (!ExplicitCastingStepConverter.Convert(enhPlan, enhDecision,
                     options, effects, ExplicitProjectionScope.SingleCastProbe).Refusal
                     .StartsWith("probe-unsupported:enhancement:", StringComparison.Ordinal))
                 throw new InvalidOperationException("The probe admitted an enhancement.");
+
+            // A fully covered group casting converts in Standard scope but
+            // is refused by the probe.
+            List<ProviderPlanningOption> fullGroupOptions;
+            List<CastEnhancementSnapshot> fullGroupEnhancements;
+            PartyProviderSnapshot fullGroupParty = CastingParty(CastingGroupAbility,
+                out fullGroupOptions, out fullGroupEnhancements, new[] { "unit-t1", "unit-t2" }, 3);
+            ExplicitCastingPlan groupPlan = CompileCastingPlan(CastingDocument(
+                    GroupCasting("cast-group", "long", "unit-cleric", "source-communal",
+                        CastingGroupAbility, new[] { "unit-t1", "unit-t2" })),
+                fullGroupParty, fullGroupOptions, fullGroupEnhancements, "source-bulls", "source-communal");
+            CastingApplyDecision groupDecision = gate.Evaluate(groupPlan, CastingApplyMode.Ordinary, "long");
+            if (!groupDecision.Allowed || !ExplicitCastingStepConverter.Convert(
+                    groupPlan, groupDecision, fullGroupOptions, effects).Converted)
+                throw new InvalidOperationException(
+                    "Fixture precondition: the covered group casting must convert in Standard scope.");
+            if (!ExplicitCastingStepConverter.Convert(groupPlan, groupDecision, fullGroupOptions,
+                    effects, ExplicitProjectionScope.SingleCastProbe).Refusal
+                    .StartsWith("probe-unsupported:group:cast-group", StringComparison.Ordinal))
+                throw new InvalidOperationException("The probe admitted a group casting.");
+
+            // A casting that carries a (disabled) targeting modifier: the
+            // standard scope ignores a disabled modifier; the probe admits
+            // no modifier selection at all.
+            PlannedCasting disabledShare = new PlannedCasting("cast-disabled-share", "long", 0,
+                plain.SourceId, plain.Ability, plain.CasterUnitId, null,
+                plain.TargetMode, plain.DirectTargetUnitId, null, null,
+                new[] { new TargetingModifierSelection("share", false, null) }, null,
+                plain.ExistingEffectPolicy, null, plain.State, null);
+            ExplicitCastingPlan disabledPlan = new ExplicitCastingCompiler().Compile(
+                CastingDocument(disabledShare), snapshot, options, effects, enhancements,
+                null, new ICastingTargetingModifier[]
+                {
+                    new FixtureShareCastingModifier("unit-wizard", new[] { "unit-t1", "unit-t2" })
+                });
+            CastingApplyDecision disabledDecision = gate.Evaluate(disabledPlan, CastingApplyMode.Ordinary, "long");
+            if (!disabledDecision.Allowed || !ExplicitCastingStepConverter.Convert(
+                    disabledPlan, disabledDecision, options, effects).Converted)
+                throw new InvalidOperationException(
+                    "Fixture precondition: the disabled-modifier casting must convert in Standard scope.");
+            if (!ExplicitCastingStepConverter.Convert(disabledPlan, disabledDecision, options,
+                    effects, ExplicitProjectionScope.SingleCastProbe).Refusal
+                    .StartsWith("probe-unsupported:targeting-modifier:", StringComparison.Ordinal))
+                throw new InvalidOperationException("The probe admitted a targeting-modifier selection.");
+
+            // A material component cost converts in Standard scope but is
+            // refused by the probe.
+            {
+                const string poolKey = "prepared-book";
+                var pool = new ResourcePoolSnapshot(poolKey,
+                    ResourcePoolKind.PreparedSlots, 1, 1, new ResourceTokenSnapshot[]
+                    {
+                        new ResourceTokenSnapshot("m1", CastingBuffAbility, 1,
+                            PreparedSlotKind.Common, true, true, new string[0])
+                    });
+                var provider = new ProviderSnapshot(
+                    new ProviderKey("unit-cleric", "book-prepared", CastingBuffAbility, string.Empty),
+                    CastingBuffAbility.BaseAbilityGuid, 1, poolKey, 0, new[] { "m1" },
+                    new MaterialRequirementSnapshot("diamond", 1, 2));
+                var materialSnapshot = new PartyProviderSnapshot(new[]
+                    {
+                        new UnitSnapshot("unit-cleric", "Cleric", false, string.Empty,
+                            new TargetValidationSnapshot(true, true, true, true)),
+                        new UnitSnapshot("unit-t1", "T1", false, string.Empty,
+                            new TargetValidationSnapshot(true, true, true, true))
+                    },
+                    new[] { provider }, new[] { pool });
+                var materialOptions = new[] { new ProviderPlanningOption(provider,
+                    new[] { "unit-cleric", "unit-t1" }, new[] { "unit-cleric" }, 10, 100) };
+                ExplicitCastingPlan materialPlan = new ExplicitCastingCompiler().Compile(
+                    CastingDocument(DirectCasting("cast-material", "long", "unit-cleric",
+                        "unit-t1", "source-bulls", CastingBuffAbility)),
+                    materialSnapshot, materialOptions, effects,
+                    new List<CastEnhancementSnapshot>());
+                CastingApplyDecision materialDecision = gate.Evaluate(materialPlan,
+                    CastingApplyMode.Ordinary, "long");
+                if (!materialDecision.Allowed || !materialPlan.CastingById("cast-material").Cost.Any(
+                        line => line.Category == CastingCostCategory.Material) ||
+                    !ExplicitCastingStepConverter.Convert(materialPlan, materialDecision,
+                        materialOptions, effects).Converted)
+                    throw new InvalidOperationException(
+                        "Fixture precondition: the material casting must convert in Standard scope.");
+                if (!ExplicitCastingStepConverter.Convert(materialPlan, materialDecision,
+                        materialOptions, effects, ExplicitProjectionScope.SingleCastProbe).Refusal
+                        .StartsWith("probe-unsupported:non-native-cost:cast-material", StringComparison.Ordinal))
+                    throw new InvalidOperationException("The probe admitted a material cost.");
+            }
 
             // The dispatch boundary receives the exact projection instance.
             string dir = Path.Combine(root, "k4-boundary");
