@@ -253,6 +253,20 @@ namespace KingmakerBuffPlanner.UI
     // only as a last resort an ordinal. Unique names get no detail.
     public static class WorkspaceSourceLabels
     {
+        // Buff grid search: every whitespace-separated term must appear in
+        // the full label (name plus disambiguating detail), ignoring case.
+        public static bool Matches(WorkspaceSourceOption source, string query)
+        {
+            if (source == null) return false;
+            if (string.IsNullOrWhiteSpace(query)) return true;
+            string label = source.Label;
+            foreach (string term in query.Split(new[] { ' ', '\t' },
+                StringSplitOptions.RemoveEmptyEntries))
+                if (label.IndexOf(term, StringComparison.OrdinalIgnoreCase) < 0)
+                    return false;
+            return true;
+        }
+
         public static IReadOnlyDictionary<string, string> Details(
             IEnumerable<WorkspaceSourceDescriptor> sources)
         {

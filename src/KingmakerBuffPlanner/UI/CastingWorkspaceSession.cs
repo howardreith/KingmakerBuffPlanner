@@ -1198,7 +1198,12 @@ namespace KingmakerBuffPlanner.UI
             new List<TargetingModifierSelection>();
         public List<AuthoredEnhancementSelection> Enhancements { get; } =
             new List<AuthoredEnhancementSelection>();
-        public CastingAuthoringState State { get; set; }
+        // New castings are Ready by default: a fully specified Add should
+        // produce a casting that will run (first supervised session: the
+        // extra Draft->Ready toggle was a stumbling block). A draft that
+        // cannot be Ready (no caster) is refused with its reason.
+        public CastingAuthoringState State { get; set; } =
+            CastingAuthoringState.Ready;
 
         internal PlannedCasting Materialize(string castingId, string routineId)
         {

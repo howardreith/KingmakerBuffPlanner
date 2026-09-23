@@ -35,6 +35,9 @@ namespace KingmakerBuffPlanner.UI
         private PlannerNativeThemeSurface _nativeTheme;
         private RectTransform _root;
         private RectTransform _buffGridContent;
+        private InputField _buffSearch;
+        private string _buffQuery = string.Empty;
+        private WorkspaceView _lastView;
         private Text _castingsTitle;
         private RectTransform _cardContent;
         private RectTransform _inspectorContent;
@@ -99,6 +102,7 @@ namespace KingmakerBuffPlanner.UI
                 (view.OnePassGate.Allowed ? "clear" :
                     view.OnePassGate.BlockingReasons.Count + " blocked");
             _scopeLabel.text = view.EditingScopeLabel;
+            _lastView = view;
             RebuildBuffGrid(view);
             RebuildCards(view);
             RebuildInspector(view);
@@ -212,6 +216,29 @@ namespace KingmakerBuffPlanner.UI
             buffs.offsetMax = new Vector2(-10f, 0f);
             Text buffTitle;
             _buffGridContent = BuildLanePanel(buffs, "Buffs", out buffTitle);
+            _buffSearch = KingmakerUiFactory.CreateInputField(
+                "BuffSearch", buffs, _theme, "Search buffs…");
+            RectTransform searchRect = RectOf(_buffSearch);
+            KingmakerUiFactory.SetAnchors(searchRect, 0.55f, 1f, 1f, 1f);
+            searchRect.pivot = new Vector2(0.5f, 1f);
+            searchRect.sizeDelta = new Vector2(0f, 22f);
+            searchRect.anchoredPosition = Vector2.zero;
+            foreach (Text text in _buffSearch.GetComponentsInChildren<Text>(true))
+            {
+                text.fontSize = 14;
+                text.resizeTextMaxSize = 14;
+            }
+            _buffSearch.onValueChanged.AddListener(value =>
+            {
+                // Filtering is view-only: it never touches the session,
+                // the draft or the document.
+                _buffQuery = value ?? string.Empty;
+                if (_lastView != null)
+                {
+                    RebuildBuffGrid(_lastView);
+                    PropagateUiLayer();
+                }
+            });
             UnityEngine.Object.DestroyImmediate(
                 _buffGridContent.GetComponent<VerticalLayoutGroup>());
             GridLayoutGroup grid =
@@ -354,8 +381,13 @@ namespace KingmakerBuffPlanner.UI
             IReadOnlyDictionary<string, int> counts =
                 WorkspaceBuffSummary.CastingsBySource(
                     _session.Document.Castings, view.SelectedRoutineId);
+            int shown = 0;
             foreach (WorkspaceSourceOption source in view.Draft.Sources)
             {
+                // The selected buff stays visible even when filtered out.
+                if (!source.Selected &&
+                    !WorkspaceSourceLabels.Matches(source, _buffQuery)) continue;
+                shown++;
                 WorkspaceSourceOption captured = source;
                 int count;
                 counts.TryGetValue(captured.SourceId, out count);
@@ -401,6 +433,13 @@ namespace KingmakerBuffPlanner.UI
                     12, TextAnchor.LowerLeft);
                 castings.color = count == 0 ? _theme.MutedBrownText : _theme.GreenSuccess;
                 KingmakerUiFactory.Stretch(castings.rectTransform, 66, 8, 3, 36);
+            }
+            if (shown == 0)
+            {
+                Text none = KingmakerUiFactory.CreateText("NoMatch", _buffGridContent,
+                    _theme, "No buff matches \"" + _buffQuery + "\".", 14,
+                    TextAnchor.MiddleLeft);
+                none.color = _theme.MutedBrownText;
             }
         }
 
