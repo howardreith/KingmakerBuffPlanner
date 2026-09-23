@@ -1,8 +1,31 @@
 # AUTONOMOUS-RESUME — top section is current; planning/CASTING-FIRST-MIGRATION-STATUS.md is the per-checkpoint tracker.
 
-## After rc1: animated mode, the player's stop, a cantrip defect (LATEST)
+## Release candidate 0.2.0-rc2 frozen at `ae0181d` (LATEST)
 
-Work toward a second candidate (0.2.0-rc1 stays frozen at `f8562a6`).
+Receipt: `docs/evidence/rc-0.2.0-rc2-receipt.md`. Clean checkout
+`repo/KingmakerBuffPlanner-RC2`; frozen copy
+`runtime-backups/rc-frozen/ae0181d.../` (package `35382731...`, DLL
+`5ec74d2f...`, MVID `5d780e27-...`). On the frozen build, all PASS and
+complete, restored, saves clean:
+- `casting-qual-select-20260923-rc2-01`;
+- `casting-qual-cast-20260923-rc2-anim-01` and `-rc2-inst-01` (every
+  step as forecast, zero violations);
+- `casting-ws-import-20260923-rc2-01`, `casting-ws-reload-20260923-rc2-01`;
+- `casting-ws-manual-20260923-rc2-rehearsal`.
+
+Temporary install and rollback `rc2-temp-deploy-20260923-01` restored the
+owner's 0.1.1-rc3 exactly (Mods manifest equal, 1117 entries). Gate at
+`ae0181d`: source 42, protocol 300, harness 35, package 4, deploy 5,
+launcher 12, fixture 3, restore 16, publisher 3.
+
+Owner inputs (unchanged): the `KBP_ADVANCED_SEED` (asked once), the
+supervised manual acceptance session (`docs/MANUAL-USABILITY-HANDOFF.md`,
+now on the RC2 checkout), and the final review. Merge, release and
+permanent installation stay with the owner.
+
+## After rc1: animated mode, the player's stop, a cantrip defect (history)
+
+Work toward the second candidate (0.2.0-rc1 stays frozen at `f8562a6`).
 
 | Commit | Content |
 | --- | --- |
@@ -21,9 +44,10 @@ level-0 entry needs a level-0 slot and these books have 0 per day. rc1
 submitted the spellbook entry: animated cantrips always failed natively;
 instant mode cast it only because the cast rule skips availability.
 
-Next: gate `70f135a`, freeze it (qualification-frozen), selection (four
-forecast steps), animated and instant qualification with the disable
-step; then 0.2.0-rc2 with the full RC evidence set.
+Then: `70f135a` gated and frozen (qualification-frozen); selection
+`casting-qual-select-20260923-a2-01` (four forecast steps), animated
+`casting-qual-cast-20260923-a2-anim-01` and instant `-a2-inst-01` PASS;
+0.2.0-rc2 built, frozen and run as above.
 
 ## Release candidate 0.2.0-rc1 frozen at `f8562a6`
 

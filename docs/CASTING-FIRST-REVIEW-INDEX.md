@@ -7,9 +7,10 @@ Reviewed baseline: `c182061354e9e761c09648ca779ab334588ba379`
 (`fd0e6dc..c182061`); this index covers the casting-first commits
 `c182061..HEAD` (61 commits at first publication).
 
-Status: **release candidate 0.2.0-rc2 in preparation** (0.2.0-rc1, frozen
-at `f8562a6`, has the animated cantrip defect described below; its
-receipt stays as history); not a fully gameplay-qualified release. Casting-first is an opt-in planner mode (UMM setting, Classic
+Status: **release candidate 0.2.0-rc2 frozen at `ae0181d` for the owner's
+final review** (receipt `docs/evidence/rc-0.2.0-rc2-receipt.md`); 0.2.0-rc1
+(`f8562a6`) has the animated cantrip defect described below and its
+receipt stays as history. Not a fully gameplay-qualified release. Casting-first is an opt-in planner mode (UMM setting, Classic
 by default). In ordinary play every routine route reaches the production
 dispatch boundary and the execution host; in an automated test session
 both player routes (casting-first and classic) refuse, and native casts
