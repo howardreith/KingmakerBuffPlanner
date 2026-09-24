@@ -114,6 +114,16 @@ namespace KingmakerBuffPlanner.Execution
         public string Disable { get; set; }
         public string DisabledAt { get; set; }
         public bool AcceptingAfterEnable { get; set; }
+        // The recover step's lifecycle evidence: the owner's probe (live
+        // subscriptions, HUD roots, planner roots, game mode) read just
+        // before the disable and again after the recover run, and the
+        // host's run counts then: nothing may be duplicated by the disable
+        // and enable, and every started run is reported exactly once.
+        public string LifecycleBefore { get; set; }
+        public string LifecycleAfter { get; set; }
+        public int RunsStarted { get; set; }
+        public int RunsReported { get; set; }
+        public string CallbackFailure { get; set; }
 
         private bool HasDisableStep
         {
@@ -126,7 +136,7 @@ namespace KingmakerBuffPlanner.Execution
             get
             {
                 return HasDisableStep
-                    ? StepNames.Concat(new[] { CastingQualificationForecast.Disable })
+                    ? StepNames.Concat(new[] { CastingQualificationForecast.Disable, CastingQualificationForecast.Recover })
                     : StepNames;
             }
         }
@@ -179,6 +189,15 @@ namespace KingmakerBuffPlanner.Execution
                 else if (DisabledAt != expectedAt)
                     violations.Add("disable:not-" + expectedAt + ":" + Disable);
                 else if (!AcceptingAfterEnable) violations.Add("disable:not-resumed:" + Disable);
+                // After the recover run: the same lifecycle state as before
+                // the disable, and exactly one report per started run.
+                int submitted = Submissions.Count(value => value.StartsWith("submitted:", StringComparison.Ordinal));
+                if (LifecycleBefore == null || LifecycleBefore != LifecycleAfter)
+                    violations.Add("lifecycle:" + (LifecycleBefore ?? "none") + ">" + (LifecycleAfter ?? "none"));
+                if (RunsStarted != submitted || RunsReported != submitted)
+                    violations.Add("runs:started=" + RunsStarted + ";reported=" + RunsReported +
+                        ";submitted=" + submitted);
+                if (CallbackFailure != null) violations.Add("callback:" + CallbackFailure);
             }
             return violations;
         }
@@ -251,8 +270,10 @@ namespace KingmakerBuffPlanner.Execution
                     rest.Any(id => step.TransitionOf(id) != "unchanged"))
                     failure = "effects:" + string.Join(",", step.Transitions.ToArray());
             }
-            else if (name == "recast")
+            else if (name == "recast" || name == CastingQualificationForecast.Recover)
             {
+                // recast, and recover (the same Always recast plan as a new
+                // run after the planner is enabled again).
                 string transition = step.TransitionOf(first);
                 if (step.Report.TerminalReason != "completed")
                     failure = "report:" + step.Report.TerminalReason;
@@ -413,6 +434,9 @@ namespace KingmakerBuffPlanner.Execution
         // The planner's own disable and enable (the root's SetEnabled);
         // without it the disable step shuts the host down and resumes it.
         private readonly Action<bool> _setPlannerEnabled;
+        // The owner's lifecycle state (subscriptions, roots, mode) as one
+        // comparable line; null means unprobed.
+        private readonly Func<string> _lifecycleProbe;
         private bool _stopPressed;
         private bool _disabled;
         private CastingQualificationBoundary _boundary;
@@ -430,8 +454,10 @@ namespace KingmakerBuffPlanner.Execution
             CastingExecutionHost host, Func<CastStep, string, ProbeObservation> observe,
             Func<long> clock, long deadlineMillis, string recipe = null,
             Func<bool> worldRunning = null, bool ownerPumpsHost = false,
-            Func<string, bool> pressRoutine = null, Action<bool> setPlannerEnabled = null)
+            Func<string, bool> pressRoutine = null, Action<bool> setPlannerEnabled = null,
+            Func<string> lifecycleProbe = null)
         {
+            _lifecycleProbe = lifecycleProbe;
             _requestedRecipe = recipe;
             _worldRunning = worldRunning;
             _ownerPumpsHost = ownerPumpsHost;
@@ -537,6 +563,8 @@ namespace KingmakerBuffPlanner.Execution
                     return;
                 case "disable": Begin(CastingQualificationForecast.Disable); return;
                 case "disable-wait": WaitDisable(); return;
+                case "recover": Begin(CastingQualificationForecast.Recover); return;
+                case "recover-wait": Wait(false, "done"); return;
                 default: Finish("completed"); return;
             }
         }
@@ -648,7 +676,7 @@ namespace KingmakerBuffPlanner.Execution
         private void WaitDisable()
         {
             if (_host.IsRunning && !_disabled && _host.ActiveCastingInFlight) DisablePlanner();
-            Wait(false, "done");
+            Wait(false, "recover");
         }
 
         // The planner's own disable, then enable, as the mod toggle drives
@@ -657,6 +685,7 @@ namespace KingmakerBuffPlanner.Execution
         // once enabled.
         private void DisablePlanner()
         {
+            Record.LifecycleBefore = Probe();
             _disabled = true;
             string at = !_host.IsRunning ? "after-run"
                 : _host.ActiveCastingInFlight ? "in-flight"
@@ -700,7 +729,21 @@ namespace KingmakerBuffPlanner.Execution
             // anything else is submitted.
             string failure = Record.StepFailure(finished.Name);
             if (failure != null) { Fail("step:" + failure); return; }
+            if (finished.Name == CastingQualificationForecast.Recover)
+            {
+                Record.LifecycleAfter = Probe();
+                Record.RunsStarted = _host.StartedRuns;
+                Record.RunsReported = _host.ReportedRuns;
+                Record.CallbackFailure = _host.LastCallbackFailure;
+            }
             _phase = next;
+        }
+
+        private string Probe()
+        {
+            if (_lifecycleProbe == null) return "unprobed";
+            try { return _lifecycleProbe() ?? "null"; }
+            catch (Exception exception) { return "probe-failed:" + exception.GetType().Name; }
         }
 
         // The player's stop, delivered once: a routine press exactly as the

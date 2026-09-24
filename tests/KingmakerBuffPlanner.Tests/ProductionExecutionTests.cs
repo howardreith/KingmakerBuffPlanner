@@ -1463,7 +1463,7 @@ namespace KingmakerBuffPlanner.Tests
             if (qualification == null ||
                 !qualification.Contains("_qualificationHost = BuffPlannerUiRoot.CastingHostForRuntime;") ||
                 !qualification.Replace("\r\n", "\n").Contains(
-                    "() => BuffPlannerUiRoot.WorldRunsForCasting, true,\n                    BuffPlannerUiRoot.PressRoutineForRuntime, BuffPlannerUiRoot.SetEnabled);") ||
+                    "() => BuffPlannerUiRoot.WorldRunsForCasting, true,\n                    BuffPlannerUiRoot.PressRoutineForRuntime, BuffPlannerUiRoot.SetEnabled,\n                    () => \"subscriptions=\" + BuffPlannerUiRoot.ActiveEventSubscriptionsForRuntime +") ||
                 qualification.Contains("new CastingExecutionHost(") || host.Contains("_qualificationHost.Pump(") ||
                 host.Contains("_qualificationWorldClock") || press == null ||
                 !press.Contains("_instance.ExecuteRoutineRequest(routineId)") ||
@@ -2285,10 +2285,11 @@ namespace KingmakerBuffPlanner.Tests
                 selection, inputs, "fixture-campaign");
             string shape = string.Join(";", steps.Select(step => step.Name + "=" +
                 string.Join(",", step.CastingIds.ToArray()) + (step.Refusal ?? string.Empty)).ToArray());
-            if (shape != "stop=qual-cast-1,qual-cast-2,qual-cast-3;complete=qual-cast-2,qual-cast-3;recast=qual-cast-1;disable=qual-cast-1" ||
+            if (shape != "stop=qual-cast-1,qual-cast-2,qual-cast-3;complete=qual-cast-2,qual-cast-3;recast=qual-cast-1;disable=qual-cast-1;recover=qual-cast-1" ||
                 steps.Any(step => step.ProjectionId == null) ||
                 steps.Select(step => step.ProjectionId).Distinct().Count() != 3 ||
-                steps[3].ProjectionId != steps[2].ProjectionId)
+                steps[3].ProjectionId != steps[2].ProjectionId ||
+                steps[4].ProjectionId != steps[3].ProjectionId)
                 throw new InvalidOperationException("The step forecast is wrong: " + shape);
             // The real state after the stop step (qual-cast-1 active) projects
             // exactly the forecast complete step.
@@ -2819,14 +2820,15 @@ namespace KingmakerBuffPlanner.Tests
             SimulatedBuffWorld world, CastingQualificationRecord record,
             CastingQualificationAllowance allowance, Func<long> clock, Func<bool> worldRunning = null,
             Func<long> hostClock = null, CastingExecutionHost host = null, bool ownerPumpsHost = false,
-            Func<string, bool> pressRoutine = null, Action<bool> setPlannerEnabled = null)
+            Func<string, bool> pressRoutine = null, Action<bool> setPlannerEnabled = null,
+            Func<string> lifecycleProbe = null)
         {
             host = host ?? QualificationHost(world, hostClock ?? clock);
             return new CastingQualificationDriver(record, allowance, "fixture-campaign",
                 () => QualificationInputs(true, true, world.Live(), world.OtherUnits),
                 boundary => new CastingWorkspaceSession(dir, "fixture-campaign", boundary),
                 host, world.Observe, clock, 240000, null, worldRunning, ownerPumpsHost, pressRoutine,
-                setPlannerEnabled);
+                setPlannerEnabled, lifecycleProbe);
         }
 
         private static CastingQualificationAllowance ForecastAllowance(SimulatedBuffWorld world,
@@ -2868,9 +2870,12 @@ namespace KingmakerBuffPlanner.Tests
                 record.ExecutionMode != "animated" || record.StopPressedInFlight != true ||
                 !record.StopPressHandled ||
                 record.StopPress != "host-request;handled=True;inFlight=True;pending=player-stopped" ||
-                !world.Fired.SequenceEqual(new[] { "qual-cast-1", "qual-cast-2", "qual-cast-3", "qual-cast-1" }) ||
+                !world.Fired.SequenceEqual(new[] { "qual-cast-1", "qual-cast-2", "qual-cast-3", "qual-cast-1", "qual-cast-1" }) ||
                 !world.AnimatedStarts.SequenceEqual(world.Fired.Concat(new[] { "qual-cast-1" })) ||
-                record.Submissions.Count != 4 ||
+                record.Submissions.Count != 5 ||
+                record.Step("recover").Report.TerminalReason != "completed" ||
+                record.RunsStarted != 5 || record.RunsReported != 5 || record.CallbackFailure != null ||
+                record.LifecycleBefore != "unprobed" || record.LifecycleAfter != "unprobed" ||
                 record.Submissions.Any(value => !value.EndsWith(";mode=animated", StringComparison.Ordinal)) ||
                 record.Step("stop").Report.TerminalReason != "cancelled:" + CastingExecutionHost.PlayerStopReason ||
                 record.DisabledAt != "in-flight" || !record.AcceptingAfterEnable ||
@@ -2946,8 +2951,13 @@ namespace KingmakerBuffPlanner.Tests
                 ForecastAllowance(stuck, null, "animated"), () => now, null, null, stuckHost, false, null,
                 enabled => { if (!enabled) stuckHost.Shutdown(CastingQualificationDriver.DisableReason); });
             for (int i = 0; i < 5000 && !stuckDriver.Completed; i++) { now += 16; stuck.Now = now; stuckDriver.Update(); }
-            if (stuckRecord.AcceptingAfterEnable ||
-                !stuckRecord.Violations().SequenceEqual(new[] { "disable:not-resumed:" + stuckRecord.Disable }) ||
+            // The recover run itself is refused by the host that never
+            // resumed: the run ends there, nothing more is submitted.
+            if (stuckRecord.AcceptingAfterEnable || stuckRecord.TerminalReason != "failed:recover" ||
+                !stuckRecord.Violations().SequenceEqual(new[]
+                {
+                    "recover:apply-refused:native-casting-unavailable:" + CastingQualificationDriver.DisableReason
+                }) ||
                 stuckRecord.Disable != "planner-disable;at=in-flight;ended=True;accepting=False")
                 throw new InvalidOperationException("A host that never resumed passed: " +
                     string.Join("|", stuckRecord.Violations().ToArray()));
@@ -3469,8 +3479,8 @@ namespace KingmakerBuffPlanner.Tests
                 !presses.SequenceEqual(new[] { CastingQualificationRecipe.RoutineId }) ||
                 record.StopPress != "routine-press;handled=True;inFlight=True;pending=player-stopped" ||
                 record.Disable != "planner-disable;at=in-flight;ended=True;accepting=True" ||
-                host.StartedRuns != 4 ||
-                !world.Fired.SequenceEqual(new[] { "qual-cast-1", "qual-cast-2", "qual-cast-3", "qual-cast-1" }))
+                host.StartedRuns != 5 ||
+                !world.Fired.SequenceEqual(new[] { "qual-cast-1", "qual-cast-2", "qual-cast-3", "qual-cast-1", "qual-cast-1" }))
                 throw new InvalidOperationException("The owner-pumped qualification was not accepted: " +
                     string.Join("|", record.Violations().ToArray()) + "|" + record.StopPress);
             // A press that never reaches the running host fails closed AT the
@@ -3519,8 +3529,8 @@ namespace KingmakerBuffPlanner.Tests
             if (!driver.Completed || record.TerminalReason != "completed" || violations.Count != 0)
                 throw new InvalidOperationException("The qualification did not pass: " +
                     record.TerminalReason + "|" + string.Join("|", violations.ToArray()) + "|" + steps);
-            if (!world.Fired.SequenceEqual(new[] { "qual-cast-1", "qual-cast-2", "qual-cast-3", "qual-cast-1" }) ||
-                record.PlannedSubmissions != 3 + 2 + 1 + 1)
+            if (!world.Fired.SequenceEqual(new[] { "qual-cast-1", "qual-cast-2", "qual-cast-3", "qual-cast-1", "qual-cast-1" }) ||
+                record.PlannedSubmissions != 3 + 2 + 1 + 1 + 1)
                 throw new InvalidOperationException("Unexpected submissions: " +
                     string.Join(",", world.Fired.ToArray()) + "|" + record.PlannedSubmissions);
             // Instant casts are atomic: the disable lands before the run's
@@ -3533,6 +3543,86 @@ namespace KingmakerBuffPlanner.Tests
                 record.Step("disable").Report.TerminalReason != "cancelled:" + CastingQualificationDriver.DisableReason)
                 throw new InvalidOperationException("The instant disable step was not before the run started: " +
                     record.Disable + "|" + disabled.State + "|" + record.Step("disable").Report.TerminalReason);
+            // The recover step is a NEW run after the enable (the stopped
+            // run never resumed): qual-cast-1 recast, the rest skipped, and
+            // every started run reported exactly once.
+            CastingQualificationStepResult recover = record.Step("recover");
+            if (recover == null || recover.Report.TerminalReason != "completed" ||
+                recover.Report.RunId == record.Step("disable").Report.RunId ||
+                recover.StateOf("qual-cast-1") != CastingOutcomeState.EffectConfirmed ||
+                recover.StateOf("qual-cast-2") != CastingOutcomeState.Skipped ||
+                record.RunsStarted != 5 || record.RunsReported != 5)
+                throw new InvalidOperationException("The recover step was not a new completed run: " +
+                    (recover == null ? "missing" : recover.Report.RunId + "|" + recover.Report.TerminalReason) +
+                    "|" + record.RunsStarted + "/" + record.RunsReported);
+            // The owner's lifecycle probe: the same state before the disable
+            // and after the recover passes; any change (a duplicated
+            // subscription, root or lease) fails the record.
+            foreach (bool drifting in new[] { false, true })
+            {
+                var probeWorld = new SimulatedBuffWorld();
+                var probeRecord = new CastingQualificationRecord { CastingScenario = true, AllowanceStatus = "parsed" };
+                string probeDir = Path.Combine(root, drifting ? "qualification-probe-drift" : "qualification-probe-same");
+                Directory.CreateDirectory(probeDir);
+                int reads = 0;
+                long probeNow = 0;
+                CastingQualificationDriver probeDriver = NewQualificationDriver(probeDir, probeWorld, probeRecord,
+                    ForecastAllowance(probeWorld), () => probeNow, null, null, null, false, null, null,
+                    () => drifting ? "subscriptions=" + (++reads) : "subscriptions=1");
+                for (int i = 0; i < 5000 && !probeDriver.Completed; i++)
+                {
+                    probeNow += 16;
+                    probeWorld.Now = probeNow;
+                    probeDriver.Update();
+                }
+                IList<string> probeViolations = probeRecord.Violations();
+                bool flagged = probeViolations.Contains("lifecycle:subscriptions=1>subscriptions=2");
+                if (probeRecord.TerminalReason != "completed" || (drifting ? !flagged || probeViolations.Count != 1
+                        : probeViolations.Count != 0 || probeRecord.LifecycleBefore != "subscriptions=1" ||
+                            probeRecord.LifecycleAfter != "subscriptions=1"))
+                    throw new InvalidOperationException("The lifecycle probe was judged wrong (drifting=" + drifting +
+                        "): " + string.Join("|", probeViolations.ToArray()));
+            }
+            // Run counts: a started run without its single report, or a
+            // callback failure, fails the record.
+            var counted = new CastingQualificationRecord { CastingScenario = true };
+            foreach (Action<CastingQualificationRecord> shape in new Action<CastingQualificationRecord>[]
+                {
+                    value => value.RunsReported = 4,
+                    value => value.RunsStarted = 6,
+                    value => value.CallbackFailure = "InvalidOperationException:boom"
+                })
+            {
+                CastingQualificationRecord copy = RecordWith(record, shape);
+                if (copy.Violations().Count == 0)
+                    throw new InvalidOperationException("A run-count or callback defect passed the record.");
+            }
+        }
+
+        // A judged copy of a completed record with one field changed.
+        private static CastingQualificationRecord RecordWith(CastingQualificationRecord source,
+            Action<CastingQualificationRecord> change)
+        {
+            var copy = new CastingQualificationRecord
+            {
+                CastingScenario = source.CastingScenario, AllowanceStatus = source.AllowanceStatus,
+                TerminalReason = source.TerminalReason, Selection = source.Selection, Roster = source.Roster,
+                Forecast = source.Forecast, Submissions = source.Submissions,
+                PlannedSubmissions = source.PlannedSubmissions, MaximumSubmissions = source.MaximumSubmissions,
+                ExecutionMode = source.ExecutionMode, StopPress = source.StopPress,
+                StopPressHandled = source.StopPressHandled, StopPressedInFlight = source.StopPressedInFlight,
+                Disable = source.Disable, DisabledAt = source.DisabledAt,
+                AcceptingAfterEnable = source.AcceptingAfterEnable, LifecycleBefore = source.LifecycleBefore,
+                LifecycleAfter = source.LifecycleAfter, RunsStarted = source.RunsStarted,
+                RunsReported = source.RunsReported, CallbackFailure = source.CallbackFailure
+            };
+            copy.Steps.AddRange(source.Steps);
+            copy.Failures.AddRange(source.Failures);
+            if (copy.Violations().Count != 0)
+                throw new InvalidOperationException("The copied record is not clean: " +
+                    string.Join("|", copy.Violations().ToArray()));
+            change(copy);
+            return copy;
         }
 
         // Nothing reaches the world unless the approved projections are
@@ -3558,7 +3648,7 @@ namespace KingmakerBuffPlanner.Tests
                 Path.Combine(root, "qualification-select"), selectWorld, selectOnly, null, () => now);
             for (int i = 0; i < 20 && !select.Completed; i++) select.Update();
             if (!select.Completed || selectWorld.Fired.Count != 0 || selectOnly.Violations().Count != 0 ||
-                selectOnly.Forecast.Count != 4)
+                selectOnly.Forecast.Count != 5)
                 throw new InvalidOperationException("The selection-only run misbehaved.");
             var slowWorld = new SimulatedBuffWorld();
             var slow = new CastingQualificationRecord { CastingScenario = true };
@@ -3633,7 +3723,7 @@ namespace KingmakerBuffPlanner.Tests
             CastingQualificationDriver smallDriver = NewQualificationDriver(smallDir, small, smallRecord,
                 smallAllowance, () => now);
             for (int i = 0; i < 400 && !smallDriver.Completed; i++) smallDriver.Update();
-            if (smallRecord.Violations().Count != 0 || small.Fired.Count != 4 || smallRecord.Roster.Count != 3)
+            if (smallRecord.Violations().Count != 0 || small.Fired.Count != 5 || smallRecord.Roster.Count != 3)
                 throw new InvalidOperationException("The three-unit qualification was not accepted: " +
                     string.Join("|", smallRecord.Violations().ToArray()));
             // A held world (paused, dialog, full-screen window) holds the
@@ -3654,7 +3744,7 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("A held world was cast into.");
             worldRuns = true;
             for (int i = 0; i < 400 && !heldDriver.Completed; i++) heldDriver.Update();
-            if (heldRecord.Violations().Count != 0 || heldWorld.Fired.Count != 4)
+            if (heldRecord.Violations().Count != 0 || heldWorld.Fired.Count != 5)
                 throw new InvalidOperationException("The run did not resume once the world ran: " +
                     string.Join("|", heldRecord.Violations().ToArray()));
             // Held in the middle of a step (after the complete step's first
@@ -3678,7 +3768,7 @@ namespace KingmakerBuffPlanner.Tests
                     midWorld.Fired.Count + ";phase=" + heldPhase);
             midRuns = true;
             for (int i = 0; i < 400 && !midDriver.Completed; i++) midDriver.Update();
-            if (midRecord.Violations().Count != 0 || midWorld.Fired.Count != 4)
+            if (midRecord.Violations().Count != 0 || midWorld.Fired.Count != 5)
                 throw new InvalidOperationException("The run did not resume after a mid-step hold: " +
                     string.Join("|", midRecord.Violations().ToArray()));
             // Review P3-2: the host deadline counts only running time. Held
@@ -3701,7 +3791,7 @@ namespace KingmakerBuffPlanner.Tests
                 for (int i = 0; i < 20; i++) { wall += 10000; longDriver.Update(); }
                 longRuns = true;
                 for (int i = 0; i < 400 && !longDriver.Completed; i++) { longDriver.Update(); wall += 16; running += 16; }
-                bool passed = longRecord.Violations().Count == 0 && longWorld.Fired.Count == 4;
+                bool passed = longRecord.Violations().Count == 0 && longWorld.Fired.Count == 5;
                 if (passed != worldClock)
                     throw new InvalidOperationException("A long hold " + (worldClock ? "failed a world-clock host: " :
                         "did not fail a wall-clock host: ") + string.Join("|", longRecord.Violations().ToArray()));
