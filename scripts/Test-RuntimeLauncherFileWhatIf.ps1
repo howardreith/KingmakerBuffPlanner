@@ -421,6 +421,10 @@ foreach ($case in $formatCases.Keys) {
         if ($refusal -cne $case) { throw "Binding format case $case returned '$refusal'." }
     }
 }
+if ((Get-KbpClassicAllowanceBuildRefusal -AllowanceJson (New-ClassicFixtureJson @{ compatibilityProfileId = 'other-profile' }) `
+        -RunId 'classic-bind-test' -BuildManifest $manifestFixture -ExecutionMode 'animated') -cne 'binding-format:compatibilityProfileId') {
+    throw 'Binding format case: an unknown profile passed.'
+}
 $probeBindingAt = $launcherText.IndexOf('Get-KbpAllowanceFixtureBindingRefusal -AllowanceJson $probeAllowanceJson')
 $workingRecheckAt = $launcherText.IndexOf('throw "The WORKING save changed after it was bound: $($savePair.working.fileName)"')
 $realDeployAt = $launcherText.IndexOf('$statePath = & (Join-Path $PSScriptRoot ''Deploy-Local.ps1'')')
