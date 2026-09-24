@@ -28,7 +28,7 @@ authority. Budget: 8 planned native invocations (3+2+1+1+1), 8 used.
 | --- | --- | --- |
 | stop | the player's stop pressed while qual-cast-1 was in progress; it completed, nothing later started | pressed before qual-cast-1 finished; the same outcome |
 | complete, repeat, recast | as forecast | as forecast |
-| disable | the planner disabled **while the cast was in progress**: interrupted and cleaned up, nothing landed | disabled **before the run's first step** (instant casts are atomic; recorded as `before-start`, not claimed as in flight) |
+| disable | the planner disabled **while the cast was in progress**: interrupted and cleaned up, nothing landed | disabled **before the run's first step**: the instant disable-before-start case, recorded as `before-start`. It is **not** an in-flight instant interruption (see the correction below) |
 | recover | a new run: qual-cast-1 new instance, the rest unchanged | the same |
 | lifecycle | `subscriptions=1;hudRoots=1;hudInstalled=True;plannerRoots=1;mode=Default` before and after | identical |
 | runs | started 5, reported 5, no callback failure | the same |
@@ -36,6 +36,20 @@ authority. Budget: 8 planned native invocations (3+2+1+1+1), 8 used.
 
 Every save was unchanged and none was created. The Mods folder was restored
 and verified, and `run-completion.json` is complete for every passing run.
+
+**Correction (batch 3 reviews B3 and B7).** An earlier version of this receipt
+and of the driver's comment called an instant cast "atomic within one pump".
+That is not accurate. The instant executor submits within one pump but
+confirms and cleans up over later frames. The instant disable step lands
+before the first submission, so it proves disable-before-start only, and no
+in-flight instant interruption is claimed. Also, in these runs (build
+`13f6d37`) the planner was enabled again in the same update as the disable.
+From the review fix that adds `Main.SetEnabledForRuntime`, the driver holds the disable over five whole updates
+through the mod toggle's own path, in which the planner root is not ticked.
+It requires that the host neither runs nor accepts a run while disabled, and
+that the lifecycle line comes from the owner's real probe. The runs above
+predate that stricter step. They stay valid for what they show, and the rc3
+qualification repeats the step under the stricter rule.
 
 ## Area transition: unavailable on this fixture
 

@@ -1561,7 +1561,7 @@ namespace KingmakerBuffPlanner.Tests
             if (qualification == null ||
                 !qualification.Contains("_qualificationHost = BuffPlannerUiRoot.CastingHostForRuntime;") ||
                 !qualification.Replace("\r\n", "\n").Contains(
-                    "() => BuffPlannerUiRoot.WorldRunsForCasting, true,\n                    BuffPlannerUiRoot.PressRoutineForRuntime, BuffPlannerUiRoot.SetEnabled,\n                    () => \"subscriptions=\" + BuffPlannerUiRoot.ActiveEventSubscriptionsForRuntime +") ||
+                    "() => BuffPlannerUiRoot.WorldRunsForCasting, true,\n                    BuffPlannerUiRoot.PressRoutineForRuntime, Main.SetEnabledForRuntime,\n                    () => \"subscriptions=\" + BuffPlannerUiRoot.ActiveEventSubscriptionsForRuntime +") ||
                 qualification.Contains("new CastingExecutionHost(") || host.Contains("_qualificationHost.Pump(") ||
                 host.Contains("_qualificationWorldClock") || press == null ||
                 !press.Contains("_instance.ExecuteRoutineRequest(routineId)") ||
@@ -1576,6 +1576,17 @@ namespace KingmakerBuffPlanner.Tests
             if (tickOwned < 0 || hostUpdate < 0 || tickOwned > hostUpdate ||
                 Occurrences(core, "BuffPlannerUiRoot.TickOwned(") != 1 || Occurrences(core, "runtime.Update()") != 1)
                 throw new InvalidOperationException("The root tick no longer precedes the test host in one mod update.");
+            // Review B7: the held disable is the mod toggle's own (the root is
+            // not ticked while disabled), without ending the runtime test.
+            string runtimeToggle = SourceBlock(modMain, "internal static void SetEnabledForRuntime(bool value)");
+            string toggle = SourceBlock(modMain, "private static bool OnToggle(UnityModManager.ModEntry modEntry, bool value)");
+            if (runtimeToggle == null || toggle == null || !runtimeToggle.Contains("_enabled = value;") ||
+                !runtimeToggle.Contains("BuffPlannerUiRoot.SetEnabled(value);") ||
+                runtimeToggle.Contains("_runtimeTest") || !toggle.Contains("_enabled = value;") ||
+                !toggle.Contains("BuffPlannerUiRoot.SetEnabled(value);") ||
+                !core.Replace("\r\n", "\n").Contains(
+                    "if (_enabled)\n            {\n                try\n                {\n                    BuffPlannerUiRoot.Ensure(_modPath, _log);"))
+                throw new InvalidOperationException("The qualification disable is not the mod toggle's own.");
             // The launcher's casting mode must be the allowance's, and the
             // acceptance counts the planner host's runs: none before the
             // qualification, exactly the boundary's submissions after it.
@@ -2923,6 +2934,7 @@ namespace KingmakerBuffPlanner.Tests
             Func<string> lifecycleProbe = null)
         {
             host = host ?? QualificationHost(world, hostClock ?? clock);
+            lifecycleProbe = lifecycleProbe ?? (() => "fixture-lifecycle=1");
             return new CastingQualificationDriver(record, allowance, "fixture-campaign",
                 () => QualificationInputs(true, true, world.Live(), world.OtherUnits),
                 boundary => new CastingWorkspaceSession(dir, "fixture-campaign", boundary),
@@ -2974,11 +2986,14 @@ namespace KingmakerBuffPlanner.Tests
                 record.Submissions.Count != 5 ||
                 record.Step("recover").Report.TerminalReason != "completed" ||
                 record.RunsStarted != 5 || record.RunsReported != 5 || record.CallbackFailure != null ||
-                record.LifecycleBefore != "unprobed" || record.LifecycleAfter != "unprobed" ||
+                record.LifecycleBefore != "fixture-lifecycle=1" || record.LifecycleAfter != "fixture-lifecycle=1" ||
                 record.Submissions.Any(value => !value.EndsWith(";mode=animated", StringComparison.Ordinal)) ||
                 record.Step("stop").Report.TerminalReason != "cancelled:" + CastingExecutionHost.PlayerStopReason ||
                 record.DisabledAt != "in-flight" || !record.AcceptingAfterEnable ||
-                record.Disable != "host-shutdown;at=in-flight;ended=True;accepting=True" ||
+                record.DisableHeldUpdates != CastingQualificationDriver.DisableHoldUpdates ||
+                record.AcceptingWhileDisabled || record.RunningWhileDisabled ||
+                record.Disable != "host-shutdown;at=in-flight;ended=True;held=5;acceptingWhileDisabled=False;" +
+                    "runningWhileDisabled=False;accepting=True" ||
                 record.Step("disable").Report.Entries.First(entry => entry.CastingId == "qual-cast-1").State !=
                     CastingOutcomeState.Cancelled)
                 throw new InvalidOperationException("The animated qualification was not accepted exactly: " +
@@ -3018,6 +3033,32 @@ namespace KingmakerBuffPlanner.Tests
             if (!record.Violations().SequenceEqual(new[] { "disable:not-resumed:" + record.Disable }))
                 throw new InvalidOperationException("A host that never resumed passed.");
             record.AcceptingAfterEnable = true;
+            // Review B7: the disable is held over whole updates with nothing
+            // running or accepted, and the lifecycle is a real probe's line.
+            record.DisableHeldUpdates = CastingQualificationDriver.DisableHoldUpdates - 1;
+            if (!record.Violations().SequenceEqual(new[] { "disable:not-held:" + record.Disable }))
+                throw new InvalidOperationException("A disable enabled again at once passed.");
+            record.DisableHeldUpdates = CastingQualificationDriver.DisableHoldUpdates;
+            foreach (Action<CastingQualificationRecord> active in new Action<CastingQualificationRecord>[]
+                { value => value.AcceptingWhileDisabled = true, value => value.RunningWhileDisabled = true })
+            {
+                active(record);
+                if (!record.Violations().SequenceEqual(new[] { "disable:active-while-disabled:" + record.Disable }))
+                    throw new InvalidOperationException("A host active while disabled passed.");
+                record.AcceptingWhileDisabled = false;
+                record.RunningWhileDisabled = false;
+            }
+            foreach (string stand in new[] { CastingQualificationDriver.Unprobed, "null", "probe-failed:Exception", "" })
+            {
+                record.LifecycleBefore = stand;
+                record.LifecycleAfter = stand;
+                if (!record.Violations().SequenceEqual(new[] { "lifecycle:" + stand + ">" + stand }))
+                    throw new InvalidOperationException("A lifecycle without a real probe passed: " + stand);
+            }
+            record.LifecycleBefore = "fixture-lifecycle=1";
+            record.LifecycleAfter = "fixture-lifecycle=1";
+            if (record.Violations().Count != 0)
+                throw new InvalidOperationException("The restored record is not clean.");
             record.Disable = null;
             if (!record.Violations().SequenceEqual(new[] { "disable:none" }))
                 throw new InvalidOperationException("A run without the disable step passed.");
@@ -3057,9 +3098,27 @@ namespace KingmakerBuffPlanner.Tests
                 {
                     "recover:apply-refused:native-casting-unavailable:" + CastingQualificationDriver.DisableReason
                 }) ||
-                stuckRecord.Disable != "planner-disable;at=in-flight;ended=True;accepting=False")
+                stuckRecord.Disable != "planner-disable;at=in-flight;ended=True;held=5;" +
+                    "acceptingWhileDisabled=False;runningWhileDisabled=False;accepting=False")
                 throw new InvalidOperationException("A host that never resumed passed: " +
                     string.Join("|", stuckRecord.Violations().ToArray()));
+            // A disable that leaves the host running and accepting is seen in
+            // the held updates, and the run never passes.
+            var deaf = new SimulatedBuffWorld();
+            var deafRecord = new CastingQualificationRecord { CastingScenario = true, AllowanceStatus = "parsed" };
+            string deafDir = Path.Combine(root, "qd-deaf-disable");
+            Directory.CreateDirectory(deafDir);
+            var toggles = new List<bool>();
+            CastingQualificationDriver deafDriver = NewQualificationDriver(deafDir, deaf, deafRecord,
+                ForecastAllowance(deaf, null, "animated"), () => now, null, null, null, false, null,
+                enabled => toggles.Add(enabled));
+            for (int i = 0; i < 5000 && !deafDriver.Completed; i++) { now += 16; deaf.Now = now; deafDriver.Update(); }
+            if (!deafRecord.AcceptingWhileDisabled || !deafRecord.RunningWhileDisabled ||
+                deafRecord.TerminalReason == "completed" || deafRecord.Violations().Count == 0 ||
+                !toggles.SequenceEqual(new[] { false, true }))
+                throw new InvalidOperationException("A disable that stopped nothing passed: " +
+                    deafRecord.TerminalReason + "|" + deafRecord.Disable + "|" +
+                    string.Join("|", deafRecord.Violations().ToArray()));
             // The step rule on a judged report: an instant run that ended
             // before its first step submitted nothing; a report claiming a
             // submission for it (or an animated one claiming none) is wrong.
@@ -4034,6 +4093,9 @@ namespace KingmakerBuffPlanner.Tests
             long now = 0;
             CastingExecutionHost host = QualificationHost(world, () => now);
             var presses = new List<string>();
+            // The owner (the planner root) is not ticked while the mod is
+            // disabled, as Main's update gates it.
+            bool ownerEnabled = true;
             var record = new CastingQualificationRecord { CastingScenario = true, AllowanceStatus = "parsed" };
             string dir = Path.Combine(root, "qa-owner");
             Directory.CreateDirectory(dir);
@@ -4046,6 +4108,7 @@ namespace KingmakerBuffPlanner.Tests
                 },
                 enabled =>
                 {
+                    ownerEnabled = enabled;
                     if (!enabled) host.Shutdown(CastingQualificationDriver.DisableReason);
                     else host.Resume();
                 });
@@ -4060,12 +4123,13 @@ namespace KingmakerBuffPlanner.Tests
                 now += 16;
                 world.Now = now;
                 driver.Update();
-                host.Pump();
+                if (ownerEnabled) host.Pump();
             }
             if (record.Violations().Count != 0 || record.TerminalReason != "completed" ||
                 !presses.SequenceEqual(new[] { CastingQualificationRecipe.RoutineId }) ||
                 record.StopPress != "routine-press;handled=True;inFlight=True;pending=player-stopped" ||
-                record.Disable != "planner-disable;at=in-flight;ended=True;accepting=True" ||
+                record.Disable != "planner-disable;at=in-flight;ended=True;held=5;acceptingWhileDisabled=False;" +
+                    "runningWhileDisabled=False;accepting=True" ||
                 host.StartedRuns != 5 ||
                 !world.Fired.SequenceEqual(new[] { "qual-cast-1", "qual-cast-2", "qual-cast-3", "qual-cast-1", "qual-cast-1" }))
                 throw new InvalidOperationException("The owner-pumped qualification was not accepted: " +
@@ -4120,12 +4184,14 @@ namespace KingmakerBuffPlanner.Tests
                 record.PlannedSubmissions != 3 + 2 + 1 + 1 + 1)
                 throw new InvalidOperationException("Unexpected submissions: " +
                     string.Join(",", world.Fired.ToArray()) + "|" + record.PlannedSubmissions);
-            // Instant casts are atomic: the disable lands before the run's
-            // first step, nothing is submitted, and the host resumes.
+            // The instant disable-before-start case (not an in-flight
+            // interruption): the disable lands before the run's first step,
+            // nothing is submitted, it is held, and the host resumes.
             CastingOutcomeEntry disabled = record.Step("disable").Report.Entries
                 .First(entry => entry.CastingId == "qual-cast-1");
             if (record.DisabledAt != "before-start" || !record.AcceptingAfterEnable ||
-                record.Disable != "host-shutdown;at=before-start;ended=True;accepting=True" ||
+                record.Disable != "host-shutdown;at=before-start;ended=True;held=5;acceptingWhileDisabled=False;" +
+                    "runningWhileDisabled=False;accepting=True" ||
                 disabled.State != CastingOutcomeState.NotProcessed || disabled.Submitted ||
                 record.Step("disable").Report.TerminalReason != "cancelled:" + CastingQualificationDriver.DisableReason)
                 throw new InvalidOperationException("The instant disable step was not before the run started: " +
@@ -4199,6 +4265,9 @@ namespace KingmakerBuffPlanner.Tests
                 ExecutionMode = source.ExecutionMode, StopPress = source.StopPress,
                 StopPressHandled = source.StopPressHandled, StopPressedInFlight = source.StopPressedInFlight,
                 Disable = source.Disable, DisabledAt = source.DisabledAt,
+                DisableHeldUpdates = source.DisableHeldUpdates,
+                AcceptingWhileDisabled = source.AcceptingWhileDisabled,
+                RunningWhileDisabled = source.RunningWhileDisabled,
                 AcceptingAfterEnable = source.AcceptingAfterEnable, LifecycleBefore = source.LifecycleBefore,
                 LifecycleAfter = source.LifecycleAfter, RunsStarted = source.RunsStarted,
                 RunsReported = source.RunsReported, CallbackFailure = source.CallbackFailure
