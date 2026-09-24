@@ -147,9 +147,12 @@ namespace KingmakerBuffPlanner.UI
                         ? "about to expire"
                         : why.Contains("missing-metamagic") || why.Contains("metamagic-unverified")
                             ? "without the planned metamagic"
-                            : why.Contains("equivalence-unproven")
+                            : why.Contains("equivalence-unproven") ||
+                              why.Contains("caster-level-unverified")
                                 ? "not provably as strong"
-                                : "not sufficient";
+                                : why.Contains("suppression-unreadable")
+                                    ? "possibly suppressed"
+                                    : "not sufficient";
                 return "present on " + unit + " but " + reason + " (will recast)";
             }
             return value;

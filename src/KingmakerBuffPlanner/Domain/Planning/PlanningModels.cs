@@ -338,7 +338,7 @@ namespace KingmakerBuffPlanner.Domain.Planning
     {
         public ActiveEffectInstance(EffectKind kind, string effectId,
             double? remainingRounds, int? casterLevel, int? metamagicMask,
-            bool suppressed = false)
+            bool suppressed = false, bool suppressionReadable = true)
         {
             if (string.IsNullOrWhiteSpace(effectId))
                 throw new ArgumentException("Effect ID is required.", "effectId");
@@ -355,6 +355,7 @@ namespace KingmakerBuffPlanner.Domain.Planning
             CasterLevel = casterLevel;
             MetamagicMask = metamagicMask;
             Suppressed = suppressed;
+            SuppressionReadable = suppressionReadable;
         }
 
         public EffectKind Kind { get; private set; }
@@ -363,6 +364,10 @@ namespace KingmakerBuffPlanner.Domain.Planning
         public int? CasterLevel { get; private set; }
         public int? MetamagicMask { get; private set; }
         public bool Suppressed { get; private set; }
+        // False when the game's suppression flag could not be read: the
+        // instance still shows as present, but it never proves an existing
+        // effect sufficient (review of rc4).
+        public bool SuppressionReadable { get; private set; }
 
         public ActiveEffectMarker Marker
         {

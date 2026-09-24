@@ -55,7 +55,8 @@ namespace KingmakerBuffPlanner.Planning
                 ? null : strengthUnprovableReason;
         }
 
-        // 0 = unknown.
+        // 0 = unknown: an existing instance is then never provably as
+        // strong (review of rc4).
         public int PlannedCasterLevel { get; private set; }
         // Native metamagic flags of the planned casting (spell variant plus
         // applied metamagic enhancements).
@@ -74,9 +75,10 @@ namespace KingmakerBuffPlanner.Planning
     // distinctions the legacy presence check could not make). An existing
     // effect satisfies a SkipAlreadyActive casting only when the COMPLETE
     // effect is present from instances that are
-    //   - not suppressed;
-    //   - not from a lower caster level than the planned caster (when both
-    //     are known);
+    //   - readably not suppressed;
+    //   - not from a lower caster level than the planned caster, with both
+    //     caster levels read (review of rc4: an unreadable one proves
+    //     nothing);
     //   - carrying every strength-affecting metamagic flag the planned
     //     casting applies (Empower, Maximize, Extend, Heighten);
     //   - not left with less than half of the planned casting's expected
@@ -152,8 +154,12 @@ namespace KingmakerBuffPlanner.Planning
         {
             if (requirement.StrengthUnprovableReason != null)
                 return "equivalence-unproven:" + requirement.StrengthUnprovableReason;
-            if (requirement.PlannedCasterLevel > 0 && instance.CasterLevel != null &&
-                instance.CasterLevel.Value < requirement.PlannedCasterLevel)
+            // Review of rc4: what cannot be read never establishes that an
+            // existing effect is sufficient; the casting keeps its step.
+            if (!instance.SuppressionReadable) return "suppression-unreadable";
+            if (requirement.PlannedCasterLevel <= 0) return "caster-level-unverified:planned";
+            if (instance.CasterLevel == null) return "caster-level-unverified";
+            if (instance.CasterLevel.Value < requirement.PlannedCasterLevel)
                 return "weaker-caster-level:" + instance.CasterLevel.Value + "<" +
                     requirement.PlannedCasterLevel;
             int plannedStrength = requirement.PlannedMetamagicMask & StrengthMetamagicMask;

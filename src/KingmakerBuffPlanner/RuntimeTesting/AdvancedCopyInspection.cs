@@ -4,6 +4,7 @@ using System.Linq;
 using Kingmaker;
 using Kingmaker.EntitySystem.Entities;
 using Kingmaker.UnitLogic;
+using KingmakerBuffPlanner.Domain.Effects;
 using KingmakerBuffPlanner.Domain.Planning;
 using KingmakerBuffPlanner.Domain.Providers;
 using KingmakerBuffPlanner.UI;
@@ -146,7 +147,14 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 {
                     { "instances", instances.Count },
                     { "timed", instances.Count(value => value.RemainingRounds != null) },
-                    { "suppressed", instances.Count(value => value.Suppressed) }
+                    { "suppressed", instances.Count(value => value.Suppressed) },
+                    // Review of rc4: an unreadable caster level or suppression
+                    // flag never proves an existing effect sufficient; these
+                    // show how often the game leaves one unreadable (worn
+                    // enchantments carry no caster level by design).
+                    { "buffCasterLevelUnread", instances.Count(value =>
+                        value.Kind != EffectKind.WornItemEnchantment && value.CasterLevel == null) },
+                    { "suppressionUnread", instances.Count(value => !value.SuppressionReadable) }
                 };
             }
             return result;

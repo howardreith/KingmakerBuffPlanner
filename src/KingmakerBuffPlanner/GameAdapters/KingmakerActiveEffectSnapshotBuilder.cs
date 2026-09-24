@@ -38,9 +38,11 @@ namespace KingmakerBuffPlanner.GameAdapters
                         EffectKind kind = string.IsNullOrWhiteSpace(buff.SourceAreaEffectId)
                             ? EffectKind.Buff
                             : EffectKind.AreaBuff;
+                        bool suppressionReadable;
+                        bool suppressed = Suppressed(buff, out suppressionReadable);
                         instances.Add(new ActiveEffectInstance(kind, buff.Blueprint.AssetGuid,
                             RemainingRounds(buff), CasterLevel(buff), Metamagic(buff),
-                            Suppressed(buff)));
+                            suppressed, suppressionReadable));
                     }
                     foreach (ItemSlot slot in unit.Descriptor.Body.CurrentEquipmentSlots)
                     {
@@ -101,10 +103,23 @@ namespace KingmakerBuffPlanner.GameAdapters
             catch (Exception) { return null; }
         }
 
-        private static bool Suppressed(Buff buff)
+        // An unreadable suppression flag is recorded as unreadable: the
+        // instance still shows as present (legacy parity), but it never
+        // proves an existing effect sufficient (review of rc4; the
+        // confirmation reader likewise never confirms from one).
+        private static bool Suppressed(Buff buff, out bool readable)
         {
-            try { return buff.IsSuppressed; }
-            catch (Exception) { return false; }
+            try
+            {
+                bool suppressed = buff.IsSuppressed;
+                readable = true;
+                return suppressed;
+            }
+            catch (Exception)
+            {
+                readable = false;
+                return false;
+            }
         }
     }
 }

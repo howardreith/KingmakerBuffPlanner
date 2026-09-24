@@ -394,6 +394,8 @@ namespace KingmakerBuffPlanner.Tests
                     TestExplicitCastingStepConversion);
                 Run("workspace-legacy-import-failures-block",
                     () => TestWorkspaceLegacyImportFailuresBlock(root));
+                Run("migration-archives-verified-not-trusted-by-name",
+                    () => TestMigrationArchivesVerified(root));
                 Run("casting-import-identity-collision-safe",
                     TestCastingImportIdentity);
                 Run("casting-import-preserves-unresolved-intent",
@@ -4616,8 +4618,10 @@ namespace KingmakerBuffPlanner.Tests
             string poolKey,
             int cost)
         {
+            // Caster level 1, as the game reports for any real provider (an
+            // unknown level never proves an existing effect sufficient).
             return new ProviderSnapshot(new ProviderKey(unitId, bookId, ability, "level-2"),
-                ability.BaseAbilityGuid, 2, poolKey, cost, null);
+                ability.BaseAbilityGuid, 2, poolKey, cost, null, null, 1);
         }
 
         private static PartyProviderSnapshot PlannerSnapshot(
@@ -14864,6 +14868,97 @@ namespace KingmakerBuffPlanner.Tests
                     groupCasting.PredictedBeneficiaryUnitIds.OrderBy(v => v, StringComparer.Ordinal)))
                 throw new InvalidOperationException("Group casting did not become one mass step: " +
                     (group.Converted ? group.Plan.Steps.Count.ToString() : group.Refusal));
+        }
+
+        // Review of rc4: an archive is reused only when it holds exactly the
+        // original bytes. A different file at the expected name is kept,
+        // never overwritten, and the original goes to the next numbered
+        // name; when every name holds other content the archive is refused
+        // (and a migration that needs it does not proceed).
+        private static void TestMigrationArchivesVerified(string root)
+        {
+            string dir = Path.Combine(root, "archive-verify");
+            Directory.CreateDirectory(dir);
+            byte[] original = new byte[] { 0xEF, 0xBB, 0xBF, (byte)'{', (byte)'}' };
+            byte[] other = System.Text.Encoding.ASCII.GetBytes("not the original");
+            string first = KingmakerBuffPlanner.Infrastructure.AtomicFile.WriteExactArchive(dir, "stem", original);
+            string again = KingmakerBuffPlanner.Infrastructure.AtomicFile.WriteExactArchive(dir, "stem", original);
+            if (Path.GetFileName(first) != "stem.orig" || again != first ||
+                !File.ReadAllBytes(first).SequenceEqual(original))
+                throw new InvalidOperationException("An exact archive was not written once and reused.");
+            File.WriteAllBytes(Path.Combine(dir, "taken.orig"), other);
+            string moved = KingmakerBuffPlanner.Infrastructure.AtomicFile.WriteExactArchive(dir, "taken", original);
+            if (Path.GetFileName(moved) != "taken.1.orig" || !File.ReadAllBytes(moved).SequenceEqual(original) ||
+                !File.ReadAllBytes(Path.Combine(dir, "taken.orig")).SequenceEqual(other))
+                throw new InvalidOperationException("A different archive was trusted or overwritten.");
+            File.WriteAllBytes(Path.Combine(dir, "full.orig"), other);
+            for (int index = 1; index <= KingmakerBuffPlanner.Infrastructure.AtomicFile.ArchiveAlternates; index++)
+                File.WriteAllBytes(Path.Combine(dir, "full." + index + ".orig"), other);
+            bool refused = false;
+            try { KingmakerBuffPlanner.Infrastructure.AtomicFile.WriteExactArchive(dir, "full", original); }
+            catch (IOException) { refused = true; }
+            if (!refused || Directory.GetFiles(dir, "full*.orig").Any(path => !File.ReadAllBytes(path).SequenceEqual(other)))
+                throw new InvalidOperationException("Archive names holding other content were not refused intact.");
+
+            // The casting migration's boundary archive.
+            BuffPlannerProfile valid = LegacyProfile();
+            valid.Routines[0].Assignments.Add(LegacyAssignment(
+                "source-bulls", CastingBuffAbility,
+                PinnedChild("legacy-bulls", 0, "unit-cleric", "unit-t1")));
+            string migrationDir = Path.Combine(root, "archive-verify-migration");
+            Directory.CreateDirectory(migrationDir);
+            var legacyRepository = new ProfileRepository(migrationDir);
+            legacyRepository.Save(valid);
+            string legacyPath = legacyRepository.GetProfilePath("legacy-campaign");
+            byte[] legacyBytes = File.ReadAllBytes(legacyPath);
+            string hash = KingmakerBuffPlanner.Infrastructure.Hashing.Sha256(legacyPath);
+            string boundary = Path.Combine(Path.GetDirectoryName(legacyPath),
+                "kbp-casting-" + hash.Substring(0, 24) + ".orig");
+            File.WriteAllBytes(boundary, other);
+            CastingMigrationResult migration = new CastingPlanMigrationService(migrationDir)
+                .Migrate("legacy-campaign");
+            if (migration.Status != CastingMigrationStatus.Migrated ||
+                Path.GetFileName(migration.ArchivePath) != "kbp-casting-" + hash.Substring(0, 24) + ".1.orig" ||
+                !File.ReadAllBytes(migration.ArchivePath).SequenceEqual(legacyBytes) ||
+                !File.ReadAllBytes(boundary).SequenceEqual(other) ||
+                !File.ReadAllBytes(legacyPath).SequenceEqual(legacyBytes))
+                throw new InvalidOperationException("The migration trusted a boundary archive by its name: " +
+                    migration.Status + " " + migration.ArchivePath + " " + migration.Warning);
+
+            // The Classic repository's pre-schema archive keeps the raw bytes
+            // (a byte-order mark included) and never trusts a name either.
+            string schemaDir = Path.Combine(root, "archive-verify-schema");
+            Directory.CreateDirectory(schemaDir);
+            var schemaRepository = new ProfileRepository(schemaDir);
+            JObject document = LegacyV4Document(ProfileFixture("campaign:archive"));
+            document["schemaVersion"] = 1;
+            document.Remove("ui");
+            document.Remove("execution");
+            string schemaPath = schemaRepository.GetProfilePath("campaign:archive");
+            Directory.CreateDirectory(Path.GetDirectoryName(schemaPath));
+            File.WriteAllText(schemaPath, document.ToString(), new System.Text.UTF8Encoding(true));
+            byte[] schemaBytes = File.ReadAllBytes(schemaPath);
+            string schemaStem = "kbp-pre-schema-" + Path.GetFileName(schemaPath)
+                .Replace("kingmaker-buff-planner-", string.Empty).Replace(".json", string.Empty);
+            File.WriteAllBytes(Path.Combine(Path.GetDirectoryName(schemaPath), schemaStem + ".orig"), other);
+            ProfileLoadResult loaded = schemaRepository.Load("campaign:archive");
+            string schemaArchive = Path.Combine(Path.GetDirectoryName(schemaPath), schemaStem + ".1.orig");
+            if (!loaded.Migrated || !File.Exists(schemaArchive) ||
+                !File.ReadAllBytes(schemaArchive).SequenceEqual(schemaBytes) || schemaBytes[0] != 0xEF ||
+                !File.ReadAllBytes(Path.Combine(Path.GetDirectoryName(schemaPath), schemaStem + ".orig")).SequenceEqual(other))
+                throw new InvalidOperationException("The pre-schema archive was not verified and byte-exact.");
+
+            // The quarantine of an unreadable primary.
+            File.WriteAllText(schemaPath, "{ not json");
+            byte[] unreadable = File.ReadAllBytes(schemaPath);
+            string quarantined = schemaRepository.QuarantineUnreadablePrimary(schemaPath);
+            string retaken = schemaRepository.QuarantineUnreadablePrimary(schemaPath);
+            File.WriteAllBytes(quarantined, other);
+            string moved2 = schemaRepository.QuarantineUnreadablePrimary(schemaPath);
+            if (retaken != quarantined || !moved2.EndsWith(".1.orig", StringComparison.Ordinal) ||
+                !File.ReadAllBytes(moved2).SequenceEqual(unreadable) ||
+                !File.ReadAllBytes(quarantined).SequenceEqual(other))
+                throw new InvalidOperationException("The quarantine trusted an archive by its name.");
         }
 
         // Review K1: every failed legacy import blocks the workspace instead

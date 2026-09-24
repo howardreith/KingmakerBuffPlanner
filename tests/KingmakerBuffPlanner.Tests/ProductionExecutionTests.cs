@@ -174,9 +174,35 @@ namespace KingmakerBuffPlanner.Tests
                 !weaker.Reasons.Any(reason => reason.StartsWith("weaker-caster-level:5<10",
                     StringComparison.Ordinal)))
                 throw new InvalidOperationException("A lower caster level counted as satisfied.");
-            if (assess(plain, buff, new[] { instance(5000, null, 0) }).Verdict !=
+            // Review of rc4: what cannot be read never proves sufficiency -
+            // an unreadable caster level, an unknown planned caster level or
+            // an unreadable suppression flag keeps the casting's step.
+            ExistingEffectRecipientAssessment unknownLevel = assess(plain, buff,
+                new[] { instance(5000, null, 0) });
+            if (unknownLevel.Verdict != ExistingEffectVerdict.Insufficient ||
+                !unknownLevel.Reasons.Contains("caster-level-unverified:buff-effect"))
+                throw new InvalidOperationException("An unreadable caster level proved an effect sufficient.");
+            ExistingEffectRecipientAssessment plannedUnknown = assess(
+                new ExistingEffectRequirement(0, 0, 6000, true), buff, new[] { instance(5000, 10, 0) });
+            if (plannedUnknown.Verdict != ExistingEffectVerdict.Insufficient ||
+                !plannedUnknown.Reasons.Contains("caster-level-unverified:planned:buff-effect"))
+                throw new InvalidOperationException("An unknown planned caster level proved an effect sufficient.");
+            var unreadableSuppression = new ActiveEffectInstance(EffectKind.Buff, "buff-effect", 5000, 10, 0,
+                false, false);
+            ExistingEffectRecipientAssessment unreadable = assess(plain, buff, new[] { unreadableSuppression });
+            if (unreadable.Verdict != ExistingEffectVerdict.Insufficient ||
+                !unreadable.Reasons.Contains("suppression-unreadable:buff-effect"))
+                throw new InvalidOperationException("An unreadable suppression flag proved an effect sufficient.");
+            if (assess(plain, buff, new[] { unreadableSuppression, instance(5000, 10, 0) }).Verdict !=
                     ExistingEffectVerdict.Sufficient)
-                throw new InvalidOperationException("An unknown caster level was treated as weaker.");
+                throw new InvalidOperationException("A readable sufficient instance was hidden by an unreadable one.");
+            if (CastingRunPresentation.DescribeExistingEffectNote(
+                    "existing-insufficient:unit-t1:caster-level-unverified:buff-effect") !=
+                    "present on unit-t1 but not provably as strong (will recast)" ||
+                CastingRunPresentation.DescribeExistingEffectNote(
+                    "existing-insufficient:unit-t1:suppression-unreadable:buff-effect") !=
+                    "present on unit-t1 but possibly suppressed (will recast)")
+                throw new InvalidOperationException("Unreadable existing-effect details are not described.");
             ExistingEffectRecipientAssessment shortLeft = assess(plain, buff,
                 new[] { instance(2000, 10, 0) });
             if (shortLeft.Verdict != ExistingEffectVerdict.Insufficient ||
@@ -383,7 +409,7 @@ namespace KingmakerBuffPlanner.Tests
                     snapshot, options, effects, enhancements, "long", null, false, live)
                     .CastingById("cast-g");
             Func<string, KeyValuePair<string, ActiveEffectInstance>> group = unit =>
-                On(unit, "group-effect", null, null, null);
+                On(unit, "group-effect", null, 1, null);
             ResolvedCasting requiredMet = compile(new[] { "unit-t1", "unit-t2" },
                 LiveEffects(group("unit-t1"), group("unit-t2")));
             if (requiredMet.Readiness != ResolvedCastingReadiness.AlreadySatisfied)
@@ -1842,7 +1868,7 @@ namespace KingmakerBuffPlanner.Tests
             Assert(AddDraftCasting(session, inputs, "unit-cleric", "unit-t1").Applied);
             var live = new CastingWorkspaceInputs(inputs.Snapshot, inputs.ProviderOptions,
                 inputs.EffectsBySource, inputs.Enhancements, null,
-                LiveEffects(On("unit-t1", "buff-effect", null, null, null)));
+                LiveEffects(On("unit-t1", "buff-effect", null, 1, null)));
             WorkspaceApplyResult result = session.Apply(CastingApplyMode.Ordinary, "long", live);
             if (result.Allowed || result.ReviewReason != "nothing-to-cast:1" ||
                 result.Dispatch != null || boundary.RecordedSubmissions.Count != 0 ||
@@ -1878,7 +1904,7 @@ namespace KingmakerBuffPlanner.Tests
             Dictionary<string, EffectExpression> effects =
                 CastingEffects("source-bulls", "source-communal");
             ActiveEffectSnapshot live = withSkippedAndDisabled
-                ? LiveEffects(On("unit-t3", "buff-effect", null, null, null)) : null;
+                ? LiveEffects(On("unit-t3", "buff-effect", null, 1, null)) : null;
             plan = new ExplicitCastingCompiler().Compile(CastingDocument(castings.ToArray()),
                 snapshot, options, effects, enhancements, "long", null, false, live);
             decision = new CastingExecutionGate().Evaluate(plan, CastingApplyMode.Ordinary, "long");
@@ -2442,7 +2468,7 @@ namespace KingmakerBuffPlanner.Tests
             Assert(AddDraftCasting(session, inputs, "unit-cleric", "unit-t1").Applied);
             var live = new CastingWorkspaceInputs(inputs.Snapshot, inputs.ProviderOptions,
                 inputs.EffectsBySource, inputs.Enhancements, null,
-                LiveEffects(On("unit-t1", "buff-effect", null, null, null)));
+                LiveEffects(On("unit-t1", "buff-effect", null, 1, null)));
             WorkspaceCastingCard card = session.BuildView(live).Cards.Single();
             if (card.StatusLabel != "Already active" || card.ExecutionLimitation != null ||
                 card.ExistingEffectNotes.Count != 1 ||
@@ -3482,7 +3508,7 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("The recipe selection is wrong: " + shape + "|" +
                     selection.Refusal + "|" + string.Join(";", selection.Rejections.ToArray()));
             CastingQualificationSelection freshOnly = CastingQualificationRecipe.SelectZeroCostMixed(
-                QualificationInputs(true, true, LiveEffects(On("unit-t1", "buff-effect", null, null, null))),
+                QualificationInputs(true, true, LiveEffects(On("unit-t1", "buff-effect", null, 1, null))),
                 "fixture-campaign");
             if (!freshOnly.Selected || freshOnly.Castings[0].DirectTargetUnitId != "unit-t2")
                 throw new InvalidOperationException("A target with the effect already active was chosen.");
@@ -3537,7 +3563,7 @@ namespace KingmakerBuffPlanner.Tests
             CastingPlanDocument document = CastingQualificationForecast.BuildDocument(
                 "fixture-campaign", selection.Castings);
             CastingQualificationStepForecast real = CastingQualificationForecast.Project("real",
-                document, inputs, LiveEffects(On("unit-t1", "buff-effect", 20, null, 0)));
+                document, inputs, LiveEffects(On("unit-t1", "buff-effect", 20, 1, 0)));
             if (real.ProjectionId != steps[1].ProjectionId)
                 throw new InvalidOperationException("The complete forecast differs from the real projection.");
             // Boundary: next approved id in order, budget respected.
@@ -3573,7 +3599,7 @@ namespace KingmakerBuffPlanner.Tests
                     while (host.IsRunning && guard++ < 1000) host.Pump();
                     return outcome;
                 };
-            ActiveEffectSnapshot afterStop = LiveEffects(On("unit-t1", "buff-effect", 20, null, 0));
+            ActiveEffectSnapshot afterStop = LiveEffects(On("unit-t1", "buff-effect", 20, 1, 0));
             if (submit("early", afterStop, document).Submitted ||
                 !boundary.Submissions[0].StartsWith("refused:qualification-projection-not-approved:step=0",
                     StringComparison.Ordinal))
@@ -3677,7 +3703,7 @@ namespace KingmakerBuffPlanner.Tests
 
             internal ActiveEffectSnapshot Live()
             {
-                return LiveEffects(Active.Select(pair => On(pair.Key, "buff-effect", 100, null, 0)).ToArray());
+                return LiveEffects(Active.Select(pair => On(pair.Key, "buff-effect", 100, 1, 0)).ToArray());
             }
 
             internal ProbeObservation Observe(CastStep step, string label)
@@ -3827,7 +3853,7 @@ namespace KingmakerBuffPlanner.Tests
 
             internal ActiveEffectSnapshot Live()
             {
-                return LiveEffects(Active.Select(pair => On(pair.Key, "buff-effect", 100, null, 0)).ToArray());
+                return LiveEffects(Active.Select(pair => On(pair.Key, "buff-effect", 100, 1, 0)).ToArray());
             }
 
             internal ProbeObservation Observe(CastStep step, string label)
@@ -3856,10 +3882,10 @@ namespace KingmakerBuffPlanner.Tests
                     new TargetValidationSnapshot(true, true, true, true))).ToList();
                 var wizard = new ProviderSnapshot(new ProviderKey("unit-wizard", "book-wizard",
                     Ability, "level-2"), Ability.BaseAbilityGuid, 2,
-                    "pool-unit-wizard", 1, Primaries);
+                    "pool-unit-wizard", 1, Primaries, null, 1);
                 var sorcerer = new ProviderSnapshot(new ProviderKey("unit-sorcerer", "book-sorcerer",
                     Ability, "level-2"), Ability.BaseAbilityGuid, 2,
-                    "pool-unit-sorcerer", 1, null);
+                    "pool-unit-sorcerer", 1, null, null, 1);
                 var pools = new[]
                 {
                     new ResourcePoolSnapshot("pool-unit-wizard", ResourcePoolKind.PreparedSlots, Tokens.Count,
