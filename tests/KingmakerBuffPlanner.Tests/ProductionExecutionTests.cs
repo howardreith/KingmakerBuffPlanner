@@ -3644,49 +3644,69 @@ namespace KingmakerBuffPlanner.Tests
                         out rejection) != null || string.IsNullOrEmpty(rejection))
                     throw new InvalidOperationException("An invalid physical request was accepted.");
             }
+            // The query comes from a tile label: four letters of its first
+            // word, then the fifth after the focus loss (review B5).
+            string derivedQuery;
+            string derivedSuffix;
+            if (!PhysicalWorkspaceRecord.DeriveQuery("Resistance", out derivedQuery, out derivedSuffix) ||
+                derivedQuery != "resi" || derivedSuffix != "s" ||
+                PhysicalWorkspaceRecord.DeriveQuery("Aid Another — AC Bonus", out derivedQuery, out derivedSuffix) ||
+                PhysicalWorkspaceRecord.DeriveQuery("Bull's Strength", out derivedQuery, out derivedSuffix) ||
+                !PhysicalWorkspaceRecord.DeriveQuery("Light", out derivedQuery, out derivedSuffix) ||
+                derivedQuery != "ligh" || derivedSuffix != "t")
+                throw new InvalidOperationException("The physical query is not derived from a tile's first word.");
             Func<PhysicalWorkspaceRecord> good = () =>
             {
                 var record = new PhysicalWorkspaceRecord
                 {
-                    ExpectedScreen = "1920x1080", ScreenWidth = 1920, ScreenHeight = 1080, SearchFocused = true,
-                    SearchText = PhysicalWorkspaceRecord.Query, ModeAfterTyping = "planner", GridOverflows = false,
-                    ScrollBefore = 1f, ScrollAfter = 1f, ClickedSource = "source-resistance",
-                    SelectedAfterClick = "source-resistance", FocusCycle = "minimized=True;restored=True;foreground=True",
-                    FocusLostObserved = true, FocusRegained = true, WorkspaceOpenAfterFocus = true,
-                    SearchTextAfterFocus = PhysicalWorkspaceRecord.Query + PhysicalWorkspaceRecord.QuerySuffix,
-                    ClosedByEscape = true, LeaseReleased = true, SelectionUnchanged = true, CameraUnchanged = true
+                    Query = "resi", QuerySuffix = "s", TargetSource = "source-resistance",
+                    ExpectedScreen = "1920x1080", ScreenWidth = 1920, ScreenHeight = 1080, OpenedPhysically = true,
+                    SearchFocused = true, SearchText = "resi", ModeAfterTyping = "planner", GridOverflows = true,
+                    ScrollBefore = 1f, ScrollAfter = 0.4f, SelectedBeforeClick = "source-aid",
+                    SelectedAfterClick = "source-resistance",
+                    FocusCycle = "minimized=True;lostForeground=True;restored=True;foreground=True",
+                    FocusRegained = true, WorkspaceOpenAfterFocus = true, SearchTextAfterFocus = "resis",
+                    ClosedByEscape = true, LeaseReleased = true, ModeAfterClose = "Default",
+                    SelectionUnchanged = true, CameraUnchanged = true
                 };
                 record.Acknowledged.AddRange(PhysicalWorkspaceRecord.Actions);
                 record.VisibleAfterQuery.Add("source-resistance|Resistance|False");
                 record.VisibleAfterQuery.Add("source-aid|Aid Another|True");
                 return record;
             };
-            if (good().Violations().Count != 0)
+            if (good().Violations().Count != 0 || good().WheelEvidence != "scrolled")
                 throw new InvalidOperationException("A clean physical run was refused: " +
                     string.Join("|", good().Violations().ToArray()));
             var shapes = new Dictionary<string, Action<PhysicalWorkspaceRecord>>
             {
                 { "screen:1920x1200!=1920x1080", r => r.ScreenHeight = 1200 },
+                { "workspace-opened-programmatically", r => r.OpenedPhysically = false },
                 { "unacknowledged:ws-focus-cycle", r => r.Acknowledged.Remove("ws-focus-cycle") },
+                { "query-not-derived", r => r.Query = null },
                 { "search-not-focused", r => r.SearchFocused = false },
-                { "typed:resi", r => r.SearchText = "resi" },
+                { "typed:res", r => r.SearchText = "res" },
                 { "unfiltered:source-light|Light|False", r => r.VisibleAfterQuery.Add("source-light|Light|False") },
-                { "no-match-shown", r => r.VisibleAfterQuery.RemoveAt(0) },
+                { "target-not-shown:source-resistance", r => r.VisibleAfterQuery.RemoveAt(0) },
                 { "typing-changed-mode:Inventory", r => r.ModeAfterTyping = "Inventory" },
-                { "wheel:no-scroll:0>0", r => { r.GridOverflows = true; r.ScrollBefore = 0f; r.ScrollAfter = 0f; } },
-                { "wheel:moved-without-overflow:1>0.5", r => r.ScrollAfter = 0.5f },
+                { "wheel:no-scroll:1>1", r => r.ScrollAfter = 1f },
+                { "wheel:moved-without-overflow:1>0.4", r => r.GridOverflows = false },
                 { "scroll-unread", r => r.ScrollAfter = null },
+                { "target-already-selected:source-resistance", r => r.SelectedBeforeClick = "source-resistance" },
                 { "tile-not-selected:source-resistance>source-aid", r => r.SelectedAfterClick = "source-aid" },
-                { "focus-cycle:minimized=False;restored=True;foreground=True",
-                    r => r.FocusCycle = "minimized=False;restored=True;foreground=True" },
+                { "focus-cycle:minimized=False", r => r.FocusCycle = "minimized=False" },
                 { "focus-not-regained", r => r.FocusRegained = false },
                 { "workspace-lost-on-focus", r => r.WorkspaceOpenAfterFocus = false },
-                { "typing-after-focus:resis", r => r.SearchTextAfterFocus = "resis" },
+                { "typing-after-focus:resi", r => r.SearchTextAfterFocus = "resi" },
                 { "escape-did-not-close", r => r.ClosedByEscape = false },
                 { "lease-held-after-close", r => r.LeaseReleased = false },
-                { "world-input-leaked:commands=1/0/0;selectionUnchanged=True;cameraUnchanged=True",
+                { "mode-after-close:EscMode", r => r.ModeAfterClose = "EscMode" },
+                { "world-input-leaked:commands=1/0/0;events=0/0;selectionUnchanged=True;cameraUnchanged=True",
                     r => r.PlayerCommands = 1 },
-                { "world-input-leaked:commands=0/0/0;selectionUnchanged=True;cameraUnchanged=False",
+                { "world-input-leaked:commands=0/0/0;events=1/0;selectionUnchanged=True;cameraUnchanged=True",
+                    r => r.SelectionEvents = 1 },
+                { "world-input-leaked:commands=0/0/0;events=0/1;selectionUnchanged=True;cameraUnchanged=True",
+                    r => r.AbilityTargetEvents = 1 },
+                { "world-input-leaked:commands=0/0/0;events=0/0;selectionUnchanged=True;cameraUnchanged=False",
                     r => r.CameraUnchanged = false }
             };
             foreach (KeyValuePair<string, Action<PhysicalWorkspaceRecord>> shape in shapes)
@@ -3697,6 +3717,13 @@ namespace KingmakerBuffPlanner.Tests
                     throw new InvalidOperationException("Physical judgement missed " + shape.Key + ": " +
                         string.Join("|", bad.Violations().ToArray()));
             }
+            // A grid whose content fits cannot scroll: the wheel is labeled
+            // not applicable (never claimed as scrolling), and passes.
+            PhysicalWorkspaceRecord fits = good();
+            fits.GridOverflows = false;
+            fits.ScrollAfter = 1f;
+            if (fits.Violations().Count != 0 || fits.WheelEvidence != "not-applicable:no-overflow")
+                throw new InvalidOperationException("A non-overflowing grid was judged as a scroll claim.");
             PhysicalWorkspaceRecord owner = good();
             owner.ExpectedScreen = null;
             owner.ScreenHeight = 1200;
