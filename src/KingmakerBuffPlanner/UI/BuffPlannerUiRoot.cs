@@ -264,6 +264,7 @@ namespace KingmakerBuffPlanner.UI
                 return "The planner mode could not be saved: " + exception.Message;
             }
             _plannerMode = mode;
+            if (_screen != null) _screen.DiscardUnshownResult();
             _log.Info("[KBP-MODE] planner mode set;mode=" + mode + ";store=" +
                 _plannerModeStore.FilePath + ".");
             return null;
@@ -1121,6 +1122,7 @@ namespace KingmakerBuffPlanner.UI
         // interruption.
         private void EndClassicRun(string reason)
         {
+            _closeScreenForClassicRun = false;
             IEnumerator run = _classicRunIterator;
             if (run == null) return;
             _classicRunIterator = null;
@@ -1166,7 +1168,7 @@ namespace KingmakerBuffPlanner.UI
                 // phase waits for the world (final review A1).
                 routine = _session.ExecuteRoutine(routineId,
                     observedCompletion, readyOnlyExplicit);
-                bool closeRequested = false;
+                bool closeDecided = false;
                 while (true)
                 {
                     bool moved = false;
@@ -1189,15 +1191,19 @@ namespace KingmakerBuffPlanner.UI
                         yield break;
                     }
                     if (!moved) yield break;
-                    // Final review A1 (re-review): an accepted run (the
-                    // session's checks passed and it is executing) closes the
-                    // open Classic screen, which pauses the game, so the party
+                    // Final review A1 (re-review, focused): decided once, right
+                    // after the press (the session accepts before its first
+                    // yield): an accepted run started from the open Classic
+                    // screen closes it, since it pauses the game, so the party
                     // casts at once; its result is shown the next time the
-                    // planner opens.
-                    if (!closeRequested && _session.IsExecuting && _screen != null && _screen.IsOpen)
+                    // planner opens. A planner opened later in the run stays
+                    // open, and the run waits for it to close.
+                    if (!closeDecided)
                     {
-                        closeRequested = true;
-                        _closeScreenForClassicRun = true;
+                        closeDecided = true;
+                        if (ClassicRunScreenPolicy.CloseAfterPress(_session.IsExecuting,
+                                _screen != null && _screen.IsOpen))
+                            _closeScreenForClassicRun = true;
                     }
                     yield return current;
                 }
@@ -1471,7 +1477,8 @@ namespace KingmakerBuffPlanner.UI
         {
             return new CastingWorkspaceSession(_modPath, campaignId, CreateDispatchBoundary(),
                 _session.Model == null ? null : _session.Model.SourceGroupings(),
-                _session.Model == null ? null : _session.Model.Profile);
+                () => _session.Model == null ? null
+                    : new ClassicPlanInMemory(_session.Model.Profile, _session.ClassicPrimarySha256));
         }
 
         // Ordinary play submits through the production boundary; a
@@ -1874,6 +1881,7 @@ namespace KingmakerBuffPlanner.UI
             if (_castingHost != null) _castingHost.Cancel("area-unloading");
             EndClassicRun("area-unloading");
             ReleasePlayerUi();
+            if (_screen != null) _screen.DiscardUnshownResult();
         }
 
         public void OnAreaDidLoad()
@@ -1948,7 +1956,11 @@ namespace KingmakerBuffPlanner.UI
             if (result.RoutineId == "long" && _runtimeFirstLongResult == null)
                 _runtimeFirstLongResult = result;
             _runtimeQuickResults[result.RoutineId] = result;
-            if (_screen != null) _screen.Present(result);
+            // Focused re-review: a Classic result is kept for the Classic
+            // screen only for this campaign, in Classic mode.
+            if (_screen != null && !CastingFirstActive)
+                _screen.Present(result, _session.Model == null || _session.Model.Profile == null
+                    ? null : _session.Model.Profile.CampaignId);
             _log.Info("Routine UI result: " + result.RoutineId + " " +
                 result.Disposition + " " + result.Message);
         }
@@ -1973,6 +1985,7 @@ namespace KingmakerBuffPlanner.UI
 
         private void ReleasePlayerUi()
         {
+            _closeScreenForClassicRun = false;
             CloseCastingWorkspace();
             if (_screen != null) _screen.Close();
             if (_hud != null) _hud.Dispose();

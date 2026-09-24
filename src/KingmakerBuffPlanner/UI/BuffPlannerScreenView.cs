@@ -190,14 +190,17 @@ namespace KingmakerBuffPlanner.UI
                 // the result line when it first appears, and in the status
                 // line for as long as it lasts.
                 string notice = _session.PersistenceNotice;
-                if (!string.IsNullOrEmpty(notice))
+                // Focused re-review: only a notice that refuses saves says so
+                // in the status line; a run waiting for the planner to close
+                // says that too.
+                if (_session.ClassicSavesRefused) _status.text += " | changes are not saved";
+                if (_session.IsExecuting)
+                    _status.text += " | a routine is waiting: close the planner to let it cast";
+                if (!string.IsNullOrEmpty(notice) &&
+                    !string.Equals(notice, _shownPersistenceNotice, StringComparison.Ordinal))
                 {
-                    _status.text += " | changes are not saved";
-                    if (!string.Equals(notice, _shownPersistenceNotice, StringComparison.Ordinal))
-                    {
-                        _shownPersistenceNotice = notice;
-                        _result.text = notice;
-                    }
+                    _shownPersistenceNotice = notice;
+                    _result.text = notice;
                 }
                 if (string.IsNullOrWhiteSpace(_result.text))
                     _result.text = _session.ProfileStatus.StartsWith("No prior profile",
@@ -436,7 +439,11 @@ namespace KingmakerBuffPlanner.UI
 
         internal void ShowResult(QuickExecutionResult result)
         {
-            if (_result != null) _result.text = result == null ? _session.Status : result.Message;
+            // Focused re-review: a persistence notice stays beside the result.
+            string notice = _session.PersistenceNotice;
+            if (_result != null)
+                _result.text = (result == null ? _session.Status : result.Message) +
+                    (string.IsNullOrEmpty(notice) ? string.Empty : " " + notice);
             RefreshAll(true);
         }
 

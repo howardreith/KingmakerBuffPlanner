@@ -60,10 +60,14 @@ namespace KingmakerBuffPlanner.Planning
             }
             if (pool.Kind != ResourcePoolKind.PreparedSlots)
             {
-                if (pool.Remaining < provider.UnitsPerCast)
+                // Focused re-review: a finite pool is never spent for nothing;
+                // an unverified zero cost reserves one unit, as the budget
+                // counts it.
+                int units = Math.Max(1, provider.UnitsPerCast);
+                if (pool.Remaining < units)
                     return Fail("insufficient-shared-resource", out reservation, out reason);
-                pool.Remaining -= provider.UnitsPerCast;
-                reservation = new ResourceReservation(pool.Key, provider.UnitsPerCast, new string[0]);
+                pool.Remaining -= units;
+                reservation = new ResourceReservation(pool.Key, units, new string[0]);
                 reason = string.Empty;
                 return true;
             }

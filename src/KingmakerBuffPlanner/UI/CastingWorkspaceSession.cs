@@ -195,7 +195,7 @@ namespace KingmakerBuffPlanner.UI
             string modPath, string campaignId,
             ICastingDispatchBoundary dispatchBoundary = null,
             IDictionary<string, CastGroupingKind> legacyGroupings = null,
-            BuffPlannerProfile legacyProfile = null)
+            Func<ClassicPlanInMemory> legacyProfile = null)
         {
             if (string.IsNullOrWhiteSpace(modPath))
                 throw new ArgumentException("Absolute mod path is required.", "modPath");
@@ -211,6 +211,7 @@ namespace KingmakerBuffPlanner.UI
             CastingPlanLoadResult loaded = _repository.Load(campaignId);
             LoadStatus = loaded.Status;
             LoadWarning = loaded.Warning;
+            LoadSourcePath = loaded.SourcePath;
             switch (loaded.Status)
             {
                 case CastingPlanLoadStatus.Loaded:
@@ -337,6 +338,25 @@ namespace KingmakerBuffPlanner.UI
             get { return File.Exists(_repository.GetProfilePath(CampaignId)); }
         }
         public CastingPlanLoadStatus LoadStatus { get; private set; }
+        // The file the last load read or refused (the newer one, for an
+        // unsupported plan).
+        public string LoadSourcePath { get; private set; }
+        // Focused re-review: what the last Reload did with castings added in
+        // the session while no plan file existed ("kept-unsaved" or
+        // "imported-into-unsaved"); null otherwise.
+        public string LastReloadNote { get; private set; }
+
+        // Whether a Save would be refused now: saving is blocked, or a backup
+        // was loaded because the main file could not be read and it is still
+        // there (the repository never overwrites it).
+        public bool SavesRefused
+        {
+            get
+            {
+                return PersistenceBlocked || (LoadStatus == CastingPlanLoadStatus.RecoveredFromBackup &&
+                    PrimaryPlanFileExists);
+            }
+        }
         public string LoadWarning { get; private set; }
         public bool PersistenceBlocked { get; private set; }
 
@@ -476,10 +496,17 @@ namespace KingmakerBuffPlanner.UI
         private readonly IDictionary<string, CastGroupingKind> _legacyGroupings;
         // Re-review: the classic planner's own in-memory plan (its sources
         // rebound to the party's abilities, which a casting-first refresh no
-        // longer saves); the first-open import reads it instead of the file's
-        // unrebound ids. The file itself is still read, archived and never
+        // longer saves), read when an import runs; the import uses it only
+        // while the classic file is still the bytes it came from (focused
+        // re-review). The file itself is still read, archived and never
         // written.
-        private readonly BuffPlannerProfile _legacyProfile;
+        private readonly Func<ClassicPlanInMemory> _legacyProfile;
+
+        private ClassicPlanInMemory ReadClassicPlanInMemory()
+        {
+            try { return _legacyProfile == null ? null : _legacyProfile(); }
+            catch (Exception) { return null; }
+        }
 
         private CastingPlanDocument BlockLegacyImport(string reason)
         {
@@ -492,13 +519,14 @@ namespace KingmakerBuffPlanner.UI
         public string MigrationWarning { get; private set; }
 
         private CastingPlanDocument MigrateLegacyOrEmpty(string modPath,
-            string campaignId, IDictionary<string, CastGroupingKind> groupings)
+            string campaignId, IDictionary<string, CastGroupingKind> groupings,
+            CastingPlanDocument unsaved = null)
         {
             if (!Path.IsPathRooted(modPath)) return NewDocument();
             try
             {
                 CastingMigrationResult migration = new CastingPlanMigrationService(modPath)
-                    .Migrate(campaignId, groupings, _legacyProfile);
+                    .Migrate(campaignId, groupings, ReadClassicPlanInMemory(), unsaved);
                 MigrationStatus = migration.Status;
                 MigrationWarning = migration.Warning;
                 switch (migration.Status)
@@ -1500,8 +1528,22 @@ namespace KingmakerBuffPlanner.UI
                     : CastingOrigin.CasterCentered();
             try
             {
-                return UpdateFocusedCasting(focused.WithTargeting(
+                AuthoringEditResult result = UpdateFocusedCasting(focused.WithTargeting(
                     mode, direct, origin, requiredCoverageUnitIds));
+                // Focused re-review: a group casting made single-target names
+                // the recipients it no longer reaches (Undo restores them).
+                if (result.Applied && focused.TargetMode != CastingTargetMode.DirectTarget &&
+                    mode == CastingTargetMode.DirectTarget)
+                {
+                    List<string> dropped = focused.RequiredCoverageUnitIds
+                        .Where(unitId => !string.Equals(unitId, direct, StringComparison.Ordinal))
+                        .Distinct(StringComparer.Ordinal).ToList();
+                    if (dropped.Count != 0)
+                        return new AuthoringEditResult(true, "it no longer reaches " + string.Join(", ",
+                                dropped.Select(unitId => UnitDisplayName(_lastInputs, unitId)).ToArray()) +
+                            " - add a casting for each, or Undo", result.Scope, result.AffectedCastingIds);
+                }
+                return result;
             }
             catch (ArgumentException exception)
             {
@@ -1828,47 +1870,42 @@ namespace KingmakerBuffPlanner.UI
         public CastingPlanLoadStatus Reload()
         {
             CastingPlanLoadResult loaded = _repository.Load(CampaignId);
-            if (LegacyImportBlocked && loaded.Status == CastingPlanLoadStatus.Absent)
+            LastReloadNote = null;
+            // Re-review, then focused re-review: with no plan file on disk
+            // (never saved, moved aside after it could not be read, or a
+            // classic import that was blocked and may now be repaired) a
+            // reload is a first open again. Saving is allowed unless the
+            // classic import is still blocked; the classic plan is imported,
+            // into the castings added in this session when there are any
+            // (never replacing them); nothing is discarded.
+            if (loaded.Status == CastingPlanLoadStatus.Absent)
             {
-                // Retry the blocked legacy import (after the owner repaired
-                // the legacy file); still blocked if it fails again.
                 LegacyImportBlocked = false;
                 LegacyImportBlockReason = null;
                 PersistenceBlocked = false;
-                ImportReport = null;
-                CastingPlanDocument retried = MigrateLegacyOrEmpty(
-                    _modPath, CampaignId, _legacyGroupings);
-                _authoring = new CastingAuthoringService(retried);
-                EditingFocusCastingId = null;
-                _savedIntentSignature = DocumentIntentSignature();
-                if (!LegacyImportBlocked && MigrationStatus == CastingMigrationStatus.Migrated)
-                    return LoadStatus;
-                return CastingPlanLoadStatus.Absent;
-            }
-            // Re-review: a plan blocked because its file could not be read is
-            // unblocked once that file and its backups were moved aside:
-            // nothing is on disk any more, so this is a first open again (the
-            // classic plan is imported into an empty document; castings
-            // authored meanwhile are kept and written by the next Save).
-            if (PersistenceBlocked && !LegacyImportBlocked && loaded.Status == CastingPlanLoadStatus.Absent)
-            {
-                PersistenceBlocked = false;
                 LoadStatus = CastingPlanLoadStatus.Absent;
                 LoadWarning = string.Empty;
-                if (_authoring.Document.Castings.Count == 0)
+                LoadSourcePath = string.Empty;
+                ImportReport = null;
+                bool unsaved = _authoring.Document.Castings.Count != 0;
+                CastingPlanDocument next = MigrateLegacyOrEmpty(_modPath, CampaignId, _legacyGroupings,
+                    unsaved ? _authoring.Document : null);
+                bool imported = !LegacyImportBlocked && LoadStatus == CastingPlanLoadStatus.Loaded;
+                if (imported || !unsaved)
                 {
-                    ImportReport = null;
-                    _authoring = new CastingAuthoringService(
-                        MigrateLegacyOrEmpty(_modPath, CampaignId, _legacyGroupings));
+                    _authoring = new CastingAuthoringService(next);
                     EditingFocusCastingId = null;
-                    _savedIntentSignature = DocumentIntentSignature();
                 }
+                // Only a plan written by the import is saved; anything else
+                // added or changed here stays unsaved until Save.
+                if (imported) _savedIntentSignature = DocumentIntentSignature();
+                if (unsaved) LastReloadNote = imported ? "imported-into-unsaved" : "kept-unsaved";
                 RaiseCastingIdMark(_authoring.Document.Castings.Select(value => value.CastingId));
-                // Absent, or Loaded when the classic plan was imported.
                 return LoadStatus;
             }
             LoadStatus = loaded.Status;
             LoadWarning = loaded.Warning;
+            LoadSourcePath = loaded.SourcePath;
             switch (loaded.Status)
             {
                 case CastingPlanLoadStatus.Loaded:
@@ -1877,6 +1914,8 @@ namespace KingmakerBuffPlanner.UI
                         loaded.Profile.ToDocument());
                     AdoptSettings(loaded.Profile);
                     PersistenceBlocked = false;
+                    LegacyImportBlocked = false;
+                    LegacyImportBlockReason = null;
                     // Focus cannot survive a document swap (review F4).
                     EditingFocusCastingId = null;
                     _savedIntentSignature = DocumentIntentSignature();
@@ -1884,9 +1923,29 @@ namespace KingmakerBuffPlanner.UI
                     break;
                 default:
                     PersistenceBlocked = true;
+                    LegacyImportBlocked = false;
+                    LegacyImportBlockReason = null;
                     break;
             }
             return loaded.Status;
+        }
+
+        // Focused re-review: whether the focused casting's buff is cast on a
+        // group (true) or on one target (false) by the compiler's own rule,
+        // or unknown (null); the focused single/group switch offers only the
+        // mode that buff can use.
+        public bool? FocusedCastingIsGroupAbility(CastingWorkspaceInputs inputs)
+        {
+            PlannedCasting focused = FocusedCasting();
+            if (focused == null || inputs == null || inputs.EffectsBySource == null) return null;
+            EffectExpression expression;
+            if (!inputs.EffectsBySource.TryGetValue(focused.SourceId, out expression) &&
+                (focused.Ability == null ||
+                    !inputs.EffectsBySource.TryGetValue(focused.Ability.Canonical, out expression)))
+                return null;
+            CastGroupingKind grouping;
+            if (!EffectExpressionTargetAnalysis.TryGetGrouping(expression, out grouping)) return null;
+            return grouping == CastGroupingKind.MassConfiguredTargets;
         }
 
         // ------------------------------------------------------------------

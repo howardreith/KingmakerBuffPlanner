@@ -13,14 +13,21 @@ namespace KingmakerBuffPlanner.Persistence
 {
     public sealed class ProfileLoadResult
     {
-        internal ProfileLoadResult(BuffPlannerProfile profile, bool recovered, bool migrated, string sourcePath, string warning)
+        internal ProfileLoadResult(BuffPlannerProfile profile, bool recovered, bool migrated, string sourcePath, string warning,
+            string primarySha256 = null)
         {
             Profile = profile;
             RecoveredFromBackup = recovered;
             Migrated = migrated;
             SourcePath = sourcePath ?? string.Empty;
             Warning = warning ?? string.Empty;
+            PrimarySha256 = primarySha256;
         }
+
+        // Re-review (focused): the SHA-256 of the primary file's bytes this
+        // profile was read from; null when it came from a backup or is a new
+        // default (the casting-first import binds the in-memory plan to it).
+        public string PrimarySha256 { get; private set; }
 
         public BuffPlannerProfile Profile { get; private set; }
         public bool RecoveredFromBackup { get; private set; }
@@ -59,7 +66,8 @@ namespace KingmakerBuffPlanner.Persistence
                     BuffPlannerProfile profile = Deserialize(original, campaignId, out migrated);
                     if (migrated)
                         ArchivePreMigrationOriginal(path, original);
-                    return new ProfileLoadResult(profile, i != 0, migrated, path, warning);
+                    return new ProfileLoadResult(profile, i != 0, migrated, path, warning,
+                        i == 0 ? TryHash(path) : null);
                 }
                 catch (Exception exception)
                 {
@@ -87,6 +95,12 @@ namespace KingmakerBuffPlanner.Persistence
             if (File.Exists(archive)) return;
             Directory.CreateDirectory(Path.GetDirectoryName(archive));
             AtomicFile.WriteUtf8(archive, original);
+        }
+
+        internal static string TryHash(string path)
+        {
+            try { return Hashing.Sha256(path); }
+            catch (Exception) { return null; }
         }
 
         public void Save(BuffPlannerProfile profile)

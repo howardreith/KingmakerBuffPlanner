@@ -26,6 +26,41 @@ after a close and reopen, each exactly as forecast). Finite-resource
 qualification waits for an owner-designated advanced seed. Human usability and the native aesthetic
 pass remain open.
 
+## Findings from the re-review of the rc4 fixes (2026-09-24)
+
+Three further independent read-only reviews of the rc4 fixes
+(`ea2a027..29213f8`): R-A (casting and the Classic path), R-B (UI and
+persistence) and R-C (harness). Their findings were fixed in
+`b1b3736..f47f527` except the ones marked as limitations, which the
+release notes and the guide state. Each fix has a mutant the tests
+catch: 5 C# mutants for R-A, 24 for R-B (one was equivalent: the line it
+removed was redundant and is gone) and 24 PowerShell mutants for
+R-C.
+
+| Finding | Disposition | Commit |
+| --- | --- | --- |
+| R-A1 (high/medium, Classic): the world gate wrapped the whole Classic run, so an APPLY from the open Classic screen ran none of its checks until the screen closed, dropped refusals and results, and left the screen editable | Checks and acceptance at the press; only the casting phase waits for the world (the casting-first host's rule); an accepted run closes the Classic screen; a result that arrives while it is closed is shown when it opens | `b1b3736` |
+| R-A2: a cast whose effect the game keeps as an existing instance (non-replacing stacking, a prolonged buff that outlasts the new one, a permanent effect) is reported unconfirmed and halts the routine | Known limitation, stated in the release notes; next iteration: stacking-aware planning or a distinct non-halting status | — |
+| R-A3: a new area instance of the same effect id confirmed a buff | Only an instance of an expected leaf kind and effect confirms | `b1b3736` |
+| R-A4: a party effect that also reaches pets was planned as pet-only (caster not a legal origin) | Party before pet | `b1b3736` |
+| R-A5: a funded casting whose finite cost reads 0 requested nothing | Requested = max(demand, reservation); an unfunded linked pair still records one (limitation) | `b1b3736` |
+| R-A6..9: pending parity, the import comment, test gaps, frame-counted windows | Parity and comment fixed with R-A1; the Classic route has no press-again-to-stop and confirmation windows count frames (next iteration) | `b1b3736` |
+| R-B1: the remedy the blocked-plan notice gave did not work in the session | Reload unblocks once the unreadable file and its backups are gone (castings added meanwhile kept and saved; an empty plan imports the classic one); notice names the remedy | `4555c9d` |
+| R-B2: a provider change dropped the same caster's enhancements silently | Same caster keeps them; another caster keeps its own and names the dropped ones (Undo restores) | `4555c9d`, `f6e5e4c` |
+| R-B3: no focused single/group switch, so an imported grouping-unknown casting could not become Ready | Focused **Make it a group casting** and **Or a single target** controls | `4555c9d` |
+| R-B4: provider labels never named the spellbook or level | Spellbook name (game display name, else class), spell level, kind of slot | `4555c9d` |
+| R-B5: two sources differing only by spell level in one spellbook could not be pinned | Refused as not pinnable with a player reason; never shown selected | `4555c9d`, `7523d88` |
+| R-B6: "" and no spellbook compared unequal | Normalized | `4555c9d` |
+| R-B7: a loaded plan's removed id could be reissued | Ids seen at load and reload stay below every issued id | `4555c9d`, `d315fcd` |
+| R-B8: the footer counted blocking reasons (drafts, import notices) | Counts this routine's castings short of a resource only in one pass | `4555c9d`, `7523d88` |
+| R-B9/10: notices misjudged a missing file, stayed stale after a save, or vanished | Missing and unreadable told apart; statuses current after a save; header indicator while saving is blocked; player-worded refusal | `4555c9d` |
+| R-B11: the import read the unrebound classic file | Imports the classic planner's in-memory plan of the same campaign; the file must still be readable and is archived | `4555c9d` |
+| R-B12/13: draft enhancements kept on a caster change; no out-of-combat control; raw review codes | Filtered; toggle; review items in words | `4555c9d` |
+| R-C1/2: the save snapshot was taken before the lock; a pending comparison could finish after the lock was released | Snapshot and WORKING check under the lock; the lock is kept until the comparison is made; Restore-Local refuses to skip a pending comparison, keeps everything when it cannot compare, and records a released run's comparison as unverifiable | `292d261`, `f47f527` |
+| R-C3/8: fixture and runtime could interleave; fixture changes ignored pending comparisons and violations | Each side re-checks the other's lock under its own; teardown re-checks before deleting; fixture changes wait for comparisons and reviews | `292d261` |
+| R-C4: the acknowledgement was not owner-only and loosely matched | Typed by the owner on the lab root; own folder; bound to the run and the record's bytes | `292d261`, `f47f527` |
+| R-C5..11: stale lock message, no-save scenarios, completion failures, stop-rule gaps, docs, rehearsal flag, combined failures | Fixed as listed in the commit messages | `292d261`, `f47f527` |
+
 ## Findings from the final review of rc3 (2026-09-24)
 
 Three independent read-only reviews of `fd0e6dc..ea2a027` (the rc3

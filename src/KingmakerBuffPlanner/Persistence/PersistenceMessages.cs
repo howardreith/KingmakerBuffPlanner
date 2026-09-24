@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace KingmakerBuffPlanner.Persistence
 {
@@ -35,11 +36,16 @@ namespace KingmakerBuffPlanner.Persistence
         // loaded; its warning lists the files that could not be read, by
         // name. Saves are refused only while the primary file itself cannot
         // be read (re-review): a missing primary is simply written again.
+        public static bool ClassicPrimaryUnreadable(string warning, string primaryFileName)
+        {
+            return !string.IsNullOrEmpty(warning) && !string.IsNullOrEmpty(primaryFileName) &&
+                warning.Contains(primaryFileName + ":");
+        }
+
         public static string ForClassicLoad(string sourcePath, bool recoveredFromBackup, string warning,
             string primaryFileName)
         {
-            bool primaryUnreadable = !string.IsNullOrEmpty(warning) && !string.IsNullOrEmpty(primaryFileName) &&
-                warning.Contains(primaryFileName + ":");
+            bool primaryUnreadable = ClassicPrimaryUnreadable(warning, primaryFileName);
             if (primaryUnreadable && string.IsNullOrEmpty(sourcePath))
                 return "Your saved planner setup could not be read or comes from a newer planner. It was " +
                     "left unchanged and a new setup is shown; changes are not saved while that file is " +
@@ -50,6 +56,12 @@ namespace KingmakerBuffPlanner.Persistence
                     "it aside to save here.";
             if (recoveredFromBackup)
                 return "Your saved planner setup file was missing, so its latest readable backup was loaded.";
+            // Focused re-review: a missing file whose backups cannot be read
+            // saves normally, but the saves replace those backups in turn.
+            if (string.IsNullOrEmpty(sourcePath) && !string.IsNullOrEmpty(warning))
+                return "Your saved planner setup file was missing and its backups could not be read, so a new " +
+                    "setup is shown. Saving works, but it replaces those backups in turn - move them out of " +
+                    "UserSettings to keep them.";
             return null;
         }
 
@@ -60,18 +72,42 @@ namespace KingmakerBuffPlanner.Persistence
                 "from a newer planner. It was left unchanged; move it aside to save here.";
         }
 
+        // The casting plan files a load could not use, by name: a newer one
+        // (the load stops there) or every unreadable one in the warning.
+        public static string UnusableCastingFiles(CastingPlanLoadStatus status, string sourcePath, string warning)
+        {
+            if (status == CastingPlanLoadStatus.UnsupportedSchema)
+                return string.IsNullOrEmpty(sourcePath) ? string.Empty : System.IO.Path.GetFileName(sourcePath);
+            if (string.IsNullOrEmpty(warning)) return string.Empty;
+            var names = new List<string>();
+            foreach (string entry in warning.Split(new[] { " | " }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                int colon = entry.IndexOf(':');
+                string name = (colon < 0 ? entry : entry.Substring(0, colon)).Trim();
+                if (name.Length != 0 && !names.Contains(name)) names.Add(name);
+            }
+            return string.Join(", ", names.ToArray());
+        }
+
         // Casting-first: the plan file as the session loaded it; a backup
         // loaded because the primary is missing (not unreadable) saves
         // normally (re-review).
-        public static string ForCastingLoad(CastingPlanLoadStatus status, bool primaryFileExists)
+        public static string ForCastingLoad(CastingPlanLoadStatus status, bool primaryFileExists,
+            string sourcePath = null, string warning = null)
         {
             switch (status)
             {
                 case CastingPlanLoadStatus.Corrupt:
                 case CastingPlanLoadStatus.UnsupportedSchema:
-                    return "Your casting plan could not be read or comes from a newer planner, so nothing " +
-                        "was loaded from it and saving is blocked. It was left unchanged: move it and its " +
-                        "backups (.bak1 to .bak3) out of UserSettings, then press Reload.";
+                    // Focused re-review: the files it could not use are named,
+                    // and only those are moved (a readable backup behind them
+                    // then loads).
+                    string files = UnusableCastingFiles(status, sourcePath, warning);
+                    return "Your casting plan could not be read or comes from a newer planner" +
+                        (files.Length == 0 ? string.Empty : " (" + files + ")") + ", so nothing was loaded " +
+                        "from it and saving is blocked. It was left unchanged: move " +
+                        (files.Length == 0 ? "that file" : "those files") + " out of UserSettings, then press " +
+                        "Reload - the newest readable backup is then loaded, or the planner starts over.";
                 case CastingPlanLoadStatus.RecoveredFromBackup:
                     return primaryFileExists
                         ? "Your casting plan could not be read, so its latest backup was loaded. The " +

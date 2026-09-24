@@ -130,6 +130,7 @@
     <Compile Include="Execution\FactSourceChoice.cs" />
     <Compile Include="Execution\AvailableCountJudgement.cs" />
     <Compile Include="Execution\WorldGatedEnumerator.cs" />
+    <Compile Include="UI\ClassicRunScreenPolicy.cs" />
     <Compile Include="Execution\AppliedEffectJudgement.cs" />
     <Compile Include="RuntimeTesting\LegacyProfileFixture.cs" />
     <Compile Include="Persistence\PersistenceMessages.cs" />
