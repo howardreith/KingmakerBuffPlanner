@@ -755,6 +755,25 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         result.Stage = "menu-diagnostic-validation";
                     }
                 }
+                // A requested window size (-DisplayMode) is judged against the
+                // screen the game actually has now.
+                object expectedScreenRaw;
+                if (!RuntimeTestProtocol.IsPhysicalWorkspaceScenario(_request.Scenario) &&
+                    _request.Parameters.TryGetValue("expectedScreen", out expectedScreenRaw))
+                {
+                    string actualScreen = Screen.width + "x" + Screen.height;
+                    bool screenMatches = actualScreen == expectedScreenRaw as string;
+                    result.Assertions.Add(screenMatches
+                        ? RuntimeTestAssertion.Pass("screen-size", expectedScreenRaw as string,
+                            actualScreen + ";fullScreen=" + Screen.fullScreen)
+                        : RuntimeTestAssertion.Fail("screen-size", expectedScreenRaw as string,
+                            actualScreen + ";fullScreen=" + Screen.fullScreen));
+                    if (!screenMatches)
+                    {
+                        result.Status = "FAIL";
+                        result.Stage = "screen-size";
+                    }
+                }
                 if (RuntimeTestProtocol.IsManualWorkspaceScenario(
                         _request.Scenario))
                 {

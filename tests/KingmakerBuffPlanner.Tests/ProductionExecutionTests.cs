@@ -3469,7 +3469,9 @@ namespace KingmakerBuffPlanner.Tests
             foreach (Action<Dictionary<string, object>> ok in new[]
                 {
                     set("live-workspace-physical", "KBP_AUTOMATION", null),
-                    set("live-workspace-physical", "KBP_AUTOMATION", "1920x1080")
+                    set("live-workspace-physical", "KBP_AUTOMATION", "1920x1080"),
+                    // The layout at another resolution, without physical input.
+                    set("live-workspace-qual", "KBP_AUTOMATION", "1920x1080")
                 })
             {
                 string path = WriteRequest(root, "physical-ok-" + Guid.NewGuid().ToString("N"), ok);
@@ -3481,7 +3483,9 @@ namespace KingmakerBuffPlanner.Tests
                 {
                     set("live-workspace-physical", "KBP_ADVANCED", null),
                     set("live-workspace-physical", "KBP_AUTOMATION", "wide"),
-                    set("live-workspace-qual", "KBP_AUTOMATION", "1920x1080")
+                    set("live-workspace-qual", "KBP_AUTOMATION", "wide"),
+                    set("live-workspace-import", "KBP_AUTOMATION", "1920x1080"),
+                    set("live-classic-select", "KBP_AUTOMATION", "1920x1080")
                 })
             {
                 string path = WriteRequest(root, "physical-bad-" + Guid.NewGuid().ToString("N"), bad);

@@ -444,10 +444,15 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             bool hasRecipe = request.Parameters.ContainsKey("qualificationRecipe");
             if (hasRecipe && !IsQualificationScenario(request.Scenario))
                 throw new InvalidDataException("qualification-recipe-only-with-qualification");
+            // A requested screen size exists only on the physical scenario and
+            // on the standard workspace scenario (the layout at another
+            // resolution, without physical input).
             bool hasScreen = request.Parameters.ContainsKey("expectedScreen");
-            if (hasScreen && !IsPhysicalWorkspaceScenario(request.Scenario))
-                throw new InvalidDataException("expected-screen-only-with-physical");
-            if (IsPhysicalWorkspaceScenario(request.Scenario))
+            bool screenScenario = IsPhysicalWorkspaceScenario(request.Scenario) ||
+                string.Equals(request.Scenario, "live-workspace-qual", StringComparison.Ordinal);
+            if (hasScreen && !screenScenario)
+                throw new InvalidDataException("expected-screen-only-with-workspace-display");
+            if (IsPhysicalWorkspaceScenario(request.Scenario) || hasScreen)
             {
                 if (hasScreen && !IsScreenSize(request.Parameters["expectedScreen"] as string))
                     throw new InvalidDataException("expected-screen");
