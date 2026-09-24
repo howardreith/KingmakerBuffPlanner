@@ -11,10 +11,11 @@ using Newtonsoft.Json.Linq;
 namespace KingmakerBuffPlanner.Execution
 {
     // The exact identity of a classic routine plan: every step's provider,
-    // source, anchor, targets, expected recipients, mass flag, reservation
-    // (pool, units, tokens, unlimited), enhancements and strategy, encoded
-    // with length prefixes (native token ids contain "|" and ",", so no
-    // delimiter is trusted) and hashed.
+    // source, assignment, anchor, targets, expected recipients, mass flag,
+    // reservation (pool, units, tokens, unlimited), material, enhancements
+    // (applied, omitted, usage per pool) and strategy, encoded with length
+    // prefixes (native token ids contain "|" and ",", so no delimiter is
+    // trusted) and hashed.
     public static class ClassicPlanDigest
     {
         public static string Canonical(CastPlan plan)
@@ -28,6 +29,7 @@ namespace KingmakerBuffPlanner.Execution
                 Field(builder, "index", index.ToString());
                 Field(builder, "provider", step.Provider == null ? string.Empty : step.Provider.Canonical);
                 Field(builder, "source", step.SourceId);
+                Field(builder, "assignment", step.AssignmentId);
                 Field(builder, "anchor", step.AnchorUnitId);
                 List(builder, "targets", step.TargetUnitIds);
                 List(builder, "recipients", step.ExpectedRecipientUnitIds);
@@ -37,7 +39,20 @@ namespace KingmakerBuffPlanner.Execution
                 Field(builder, "units", reservation == null ? "0" : reservation.Units.ToString());
                 Field(builder, "unlimited", reservation != null && reservation.Unlimited ? "1" : "0");
                 List(builder, "tokens", reservation == null ? null : reservation.TokenIds);
+                MaterialReservation material = step.MaterialReservation;
+                Field(builder, "material", material == null ? "none" : material.ItemGuid);
+                Field(builder, "material-count", material == null ? "0" : material.Count.ToString());
                 List(builder, "enhancements", step.EnhancementIds);
+                List(builder, "omitted", step.OmittedEnhancementIds);
+                List<KeyValuePair<string, int>> usage = (step.EnhancementUsageByPool ??
+                        new Dictionary<string, int>())
+                    .OrderBy(pair => pair.Key, StringComparer.Ordinal).ToList();
+                Field(builder, "usage#", usage.Count.ToString());
+                foreach (KeyValuePair<string, int> pair in usage)
+                {
+                    Field(builder, "usage-pool", pair.Key);
+                    Field(builder, "usage-units", pair.Value.ToString());
+                }
                 Field(builder, "strategy", step.ExecutionStrategy.ToString());
             }
             return builder.ToString();
