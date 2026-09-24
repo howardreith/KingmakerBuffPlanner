@@ -141,19 +141,29 @@ try {
     finally { $entryHold.Dispose() }
     $heldState = Read-KbpJson (Join-Path $stateRoot 'transactions\held-entry\transaction.json')
     if ($null -eq $entryMessage -or $entryMessage -like '*restoration also failed*' -or
+        $entryMessage -notmatch 'denied|being used by another process' -or
         [string]$heldState.status -cne 'Restored' -or -not [bool]$heldState.restorationVerified -or
         (Test-Path -LiteralPath (Join-Path $stateRoot 'deployment.lock')) -or
         (Test-Path -LiteralPath (Join-Path $stagingRoot 'held-entry')) -or
         -not (Test-KbpManifestEqual $heldBefore @(Get-KbpDirectoryManifest $heldMods))) {
         throw "A held live Mods folder did not end the entry as an exact no-op: $entryMessage / $($heldState.status)"
     }
-    # A transient hold is outlasted by the retry and the entry completes.
-    [void][KbpTestReadHold]::Hold((Join-Path $heldMods 'Existing\Info.json'), 250)
+    # A transient hold is outlasted by the retry and the entry completes. The
+    # hold is released only once the transaction is Prepared (review C9), so
+    # the first move is refused and the recorded attempts prove the retry.
+    if (-not ('KbpTestStateHold' -as [type])) {
+        Add-Type -TypeDefinition 'using System.IO; using System.Threading; public static class KbpTestStateHold { public static FileStream HoldUntil(string path, string statePath, string marker, int extraMs, int maxMs) { var stream = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read); new Thread(() => { var clock = System.Diagnostics.Stopwatch.StartNew(); while (clock.ElapsedMilliseconds < maxMs) { try { if (File.Exists(statePath) && File.ReadAllText(statePath).Contains(marker)) break; } catch (IOException) { } Thread.Sleep(10); } Thread.Sleep(extraMs); stream.Dispose(); }).Start(); return stream; } }'
+    }
+    $transientState = Join-Path $stateRoot 'transactions\held-entry-transient\transaction.json'
+    [void][KbpTestStateHold]::HoldUntil((Join-Path $heldMods 'Existing\Info.json'), $transientState,
+        '"Prepared"', 350, 60000)
     Enter-KbpRuntimeTransaction -PackagePath $package -KingmakerInstallDir $game `
         -StateRoot $stateRoot -StagingRoot $stagingRoot -BackupRoot $backupRoot `
-        -RunId 'held-entry-transient' -FixtureMode -KnownKingmakerProcessIds @() -MoveAttempts 10 -MoveDelayMilliseconds 100 | Out-Null
-    if (-not (Test-Path -LiteralPath (Join-Path $heldMods 'KingmakerBuffPlanner\Info.json'))) {
-        throw 'A transiently held live Mods folder was not staged after a retry.'
+        -RunId 'held-entry-transient' -FixtureMode -KnownKingmakerProcessIds @() -MoveAttempts 20 -MoveDelayMilliseconds 100 | Out-Null
+    $transientRecord = Read-KbpJson $transientState
+    if (-not (Test-Path -LiteralPath (Join-Path $heldMods 'KingmakerBuffPlanner\Info.json')) -or
+        [int]$transientRecord.originalMoveAttempts -lt 2) {
+        throw "A transiently held live Mods folder was not staged after a retry (attempts=$($transientRecord.originalMoveAttempts))."
     }
     $transientRestored = Restore-KbpRuntimeTransaction -RunId 'held-entry-transient' -StateRoot $stateRoot `
         -FixtureMode -KnownKingmakerProcessIds @()
@@ -176,6 +186,12 @@ try {
     if (-not $restored.stagedMutationObserved -or
         -not (Test-KbpManifestEqual $before @(Get-KbpDirectoryManifest (Join-Path $game 'Mods')))) {
         throw 'Staged mutation was not recorded while restoring the original.'
+    }
+    # Review C3: a staged tree that changed during the run is evidence (the
+    # change may be another lab's); it is kept, never deleted.
+    if (-not [bool]$restored.stagedQuarantineKept -or
+        -not (Test-Path -LiteralPath ([string]$restored.stagedQuarantine) -PathType Container)) {
+        throw 'A mutated staged tree was deleted during the restoration.'
     }
     $passed++
 
@@ -1353,6 +1369,61 @@ try {
         (Test-Path -LiteralPath (Join-Path $moveRoot 'stuck-moved'))) {
         throw 'A persistently held directory did not fail closed in place.'
     }
+    # Review C1: a display-mode registry snapshot kept beside its
+    # transaction blocks every later run or install until it is restored,
+    # and is restored exactly once (on a scratch key of this test).
+    $regName = 'KingmakerBuffPlannerLabTest-' + [Guid]::NewGuid().ToString('N')
+    $regKey = 'HKCU:\Software\' + $regName
+    $reg = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey('Software\' + $regName)
+    try {
+        $reg.SetValue('W', 1920, [Microsoft.Win32.RegistryValueKind]::DWord)
+        $reg.SetValue('B', [byte[]](1, 2, 0), [Microsoft.Win32.RegistryValueKind]::Binary)
+        $reg.SetValue('M', [string[]]@('a', 'b'), [Microsoft.Win32.RegistryValueKind]::MultiString)
+        $reg.SetValue('Q', [long]5000000000, [Microsoft.Win32.RegistryValueKind]::QWord)
+        $reg.SetValue('S', 'x', [Microsoft.Win32.RegistryValueKind]::String)
+        $guardRoot = Join-Path $root 'registry-guard'
+        $snapshotDirectory = Join-Path $guardRoot 'transactions\display-run'
+        New-Item -ItemType Directory -Path $snapshotDirectory -Force | Out-Null
+        $snapshotPath = Join-Path $snapshotDirectory 'display-registry.json'
+        Save-KbpRegistrySnapshotFile -Path $snapshotPath -KeyPath $regKey `
+            -Snapshot (Get-KbpRegistryValueSnapshot -KeyPath $regKey) -RunId 'display-run'
+        $guarded = $false
+        try { Assert-KbpNoUnresolvedTransaction $guardRoot }
+        catch { $guarded = $_.Exception.Message -like '*Unrestored game registry snapshot*' }
+        $reg.SetValue('W', 1600, [Microsoft.Win32.RegistryValueKind]::DWord)
+        $reg.DeleteValue('S')
+        $reg.SetValue('A', 'new', [Microsoft.Win32.RegistryValueKind]::String)
+        $reg.SetValue('M', [string[]]@('c'), [Microsoft.Win32.RegistryValueKind]::MultiString)
+        $restoredValues = @(Restore-KbpRegistrySnapshotFile -Path $snapshotPath -KnownKingmakerProcessIds @())
+        $again = @(Restore-KbpRegistrySnapshotFile -Path $snapshotPath -KnownKingmakerProcessIds @())
+        Assert-KbpNoUnresolvedTransaction $guardRoot
+        if (-not $guarded -or $restoredValues.Count -ne 4 -or $again.Count -ne 0 -or
+            [int]$reg.GetValue('W') -ne 1920 -or (@($reg.GetValue('M')) -join ',') -cne 'a,b' -or
+            $null -ne $reg.GetValue('A') -or [string]$reg.GetValue('S') -cne 'x' -or
+            [long]$reg.GetValue('Q') -ne 5000000000 -or (@($reg.GetValue('B')) -join ',') -cne '1,2,0' -or
+            -not [bool](Read-KbpJson $snapshotPath).restored) {
+            throw "The saved registry snapshot was not guarded and restored exactly once: $($restoredValues -join ', ')"
+        }
+    }
+    finally {
+        $reg.Dispose()
+        [Microsoft.Win32.Registry]::CurrentUser.DeleteSubKeyTree('Software\' + $regName, $false)
+    }
+    # Review C3: a restoration waits for the other lab's lease (bounded).
+    $waitLease = Join-Path $root 'foreign-wait.lock'
+    Wait-KbpNoForeignRuntimeLease -LeasePaths @($waitLease) -TimeoutSeconds 0
+    Set-Content -LiteralPath $waitLease -Value 'held' -Encoding ASCII
+    $waitRefused = $false
+    try { Wait-KbpNoForeignRuntimeLease -LeasePaths @($waitLease) -TimeoutSeconds 0 }
+    catch { $waitRefused = $_.Exception.Message -like '*still active*' }
+    Remove-Item -LiteralPath $waitLease -Force
+    $restoreBlock = (Get-Content -LiteralPath (Join-Path $PSScriptRoot 'RuntimeHarness.Common.ps1') -Raw)
+    $restoreStart = $restoreBlock.IndexOf('function Restore-KbpRuntimeTransaction')
+    $restoreWait = $restoreBlock.IndexOf('if (-not $FixtureMode) { Wait-KbpNoForeignRuntimeLease }', $restoreStart)
+    $restoreFirstMove = $restoreBlock.IndexOf('Move-KbpDirectoryWithRetry', $restoreStart)
+    if (-not $waitRefused -or $restoreWait -lt 0 -or $restoreWait -gt $restoreFirstMove) {
+        throw "The restoration does not wait for the other lab's lease before moving the Mods folder."
+    }
     # The owner's other project may hold a live lease on the same
     # installation: nothing starts while its lock exists.
     $foreignLease = Join-Path $root 'foreign-runtime.lock'
@@ -1517,10 +1588,14 @@ try {
     # before the save comparison and the completion record, and folds a
     # failure into the restoration failure.
     $finallyText = $launcherText.Substring($launcherText.IndexOf("`nfinally {"))
-    $registryAt = $finallyText.IndexOf('Restore-KbpRegistryValues -KeyPath $script:KbpGameRegistryKey')
+    $registryAt = $finallyText.IndexOf('Restore-KbpRegistrySnapshotFile -Path $displayRegistryPath')
+    $modsAt = $finallyText.IndexOf("Restore-Local.ps1') -RunId `$runId")
     $savesAt = $finallyText.IndexOf('Get-KbpProtectedSavePolicy -Scenario')
     $recordAt = $finallyText.IndexOf('New-KbpRunCompletionRecord')
-    if ($registryAt -lt 0 -or $savesAt -lt $registryAt -or $recordAt -lt $savesAt -or
+    $enteredAt = $launcherText.IndexOf('$transactionEntered = $true')
+    $snapshotAt = $launcherText.IndexOf('Save-KbpRegistrySnapshotFile -Path $displayRegistryPath')
+    if ($registryAt -lt 0 -or $modsAt -lt $registryAt -or $savesAt -lt $modsAt -or $recordAt -lt $savesAt -or
+        $enteredAt -lt 0 -or $snapshotAt -lt $enteredAt -or
         $finallyText -notmatch '\$restoreFailure = if \(\$null -eq \$restoreFailure\) \{ \$displayFailure \}') {
         throw 'The display-mode registry restoration is not inside the finally before the record, or drops its failure.'
     }
