@@ -157,13 +157,17 @@ namespace KingmakerBuffPlanner.Execution
         // Review N3: availability of EXACTLY the reserved prepared tokens;
         // null for non-prepared reservations or when not read.
         public IReadOnlyDictionary<string, bool> ReservedTokenAvailability { get; private set; }
+        // The game clock at the read, in ticks (the same scale as an
+        // instance's end time); null when not read.
+        public long? GameTimeTicks { get; private set; }
 
         public static ProbeObservation Read(string phase, long sequence, DateTime capturedAtUtc,
             string targetUnitId, int? availableForCast, IEnumerable<ProbeEffectInstance> effectInstances,
-            IDictionary<string, bool> reservedTokenAvailability = null)
+            IDictionary<string, bool> reservedTokenAvailability = null, long? gameTimeTicks = null)
         {
             return new ProbeObservation
             {
+                GameTimeTicks = gameTimeTicks,
                 Phase = phase, Sequence = sequence, CapturedAtUtc = capturedAtUtc, Succeeded = true,
                 Failure = string.Empty, TargetUnitId = targetUnitId, AvailableForCast = availableForCast,
                 EffectInstances = new ReadOnlyCollection<ProbeEffectInstance>(

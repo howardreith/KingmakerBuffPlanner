@@ -106,6 +106,7 @@ namespace KingmakerBuffPlanner.Tests
             Run("qualification-group-mixed-recipe", () => TestGroupQualificationRecipe(root));
             Run("qualification-enhanced-direct-recipe", () => TestEnhancedQualificationRecipe(root));
             Run("qualification-ability-pool-recipe", () => TestAbilityPoolQualificationRecipe(root));
+            Run("qualification-rod-extend-recipe", () => TestRodQualificationRecipe(root));
             Run("qualification-driver-refusals-and-deadline",
                 () => TestQualificationDriverRefusalsAndDeadline(root));
             Run("qualification-scenario-requests", () => TestQualificationScenarioRequests(root));
@@ -4391,6 +4392,15 @@ namespace KingmakerBuffPlanner.Tests
             // What the Instant cast reports about the provider's transaction.
             internal bool ReportProviderDirect = true;
             internal bool WithShare;
+            // The Extend rod: its charges, a duration text for the Strength
+            // spell, and failure shapes (the rod not applied, its charge kept).
+            internal const string RodId = "metamagic-rod|unit-arcanist|rod-guid";
+            internal int RodCharges = 3;
+            internal string DurationText = string.Empty;
+            internal bool RodIgnored;
+            internal bool RodChargeKept;
+            internal static readonly long DurationTicks = TimeSpan.FromSeconds(600).Ticks;
+            internal long NowTicks { get { return Now * TimeSpan.TicksPerMillisecond; } }
             // A second spellbook of the same caster that also holds the
             // Strength spell (Powerful Change does not qualify there).
             internal bool WithOtherBook;
@@ -4421,7 +4431,8 @@ namespace KingmakerBuffPlanner.Tests
                 Land(step);
                 return new InstantCastResult(true, true, EffectsObserved(step), true,
                     "simulated-enhanced;provider-direct:" + (ReportProviderDirect &&
-                        step.ExecutionStrategy == CastExecutionStrategy.ProviderDirectRuleCast) + ";");
+                        step.ExecutionStrategy == CastExecutionStrategy.ProviderDirectRuleCast) +
+                    ";strategy:" + step.ExecutionStrategy + ";");
             }
             public IAnimatedCastOperation StartAnimated(CastStep step)
             {
@@ -4448,9 +4459,12 @@ namespace KingmakerBuffPlanner.Tests
                 _baselines[step] = new EffectBaseline(step.ExpectedRecipientUnitIds.ToDictionary(unit => unit,
                     unit => (IEnumerable<ObservedEffectInstance>)Instances(unit), StringComparer.Ordinal));
                 bool enhanced = step.EnhancementIds.Contains(EnhancementId);
+                bool rod = step.EnhancementIds.Contains(RodId);
                 int bonus = enhanced && !IgnoreEnhancement ? PlainBonus + 2 : PlainBonus;
-                Active[step.TargetUnitIds[0] + "|strength-buff"] = Tuple.Create("i" + (++_instances), Now + 600,
+                Active[step.TargetUnitIds[0] + "|strength-buff"] = Tuple.Create("i" + (++_instances),
+                    NowTicks + (rod && !RodIgnored ? 2 : 1) * DurationTicks,
                     bonus == int.MinValue ? new string[0] : new[] { "Strength/Enhancement/" + bonus });
+                if (rod && !RodChargeKept) RodCharges--;
                 Remaining--;
                 if (enhanced) Reservoir -= ReservoirSpend;
                 else if (PlainSpendsReservoir) Reservoir--;
@@ -4479,11 +4493,14 @@ namespace KingmakerBuffPlanner.Tests
                 if (Active.TryGetValue(unit + "|strength-buff", out instance))
                     instances.Add(new ProbeEffectInstance("strength-buff", instance.Item1, instance.Item2,
                         UnreadModifiers ? null : instance.Item3));
-                return ProbeObservation.Read(label, ++_sequence, DateTime.UtcNow, unit, Remaining, instances, null);
+                return ProbeObservation.Read(label, ++_sequence, DateTime.UtcNow, unit, Remaining, instances, null,
+                    NowTicks);
             }
 
             internal CasterEnhancementObservation ObserveCaster(string caster, string pool)
             {
+                if (caster == "unit-arcanist" && pool == RodId)
+                    return CasterEnhancementObservation.Read(RodCharges, Toggles);
                 if (caster != "unit-arcanist" || pool != BrownFurPowerfulChangeProfile.UsagePoolId("unit-arcanist"))
                     return CasterEnhancementObservation.Failed("wrong-caster-or-pool:" + caster + "|" + pool);
                 return CasterEnhancementObservation.Read(Reservoir, Toggles);
@@ -4501,7 +4518,7 @@ namespace KingmakerBuffPlanner.Tests
                     new TargetValidationSnapshot(true, true, true, true))).ToList();
                 var strength = new ProviderSnapshot(new ProviderKey("unit-arcanist",
                         BrownFurPowerfulChangeProfile.CastingSpellbookGuid, Strength, "level-2"),
-                    "Strength Spell", 2, "pool-arcanist", 1, null, null, 10, 100);
+                    "Strength Spell", 2, "pool-arcanist", 1, null, null, 10, 100, string.Empty, DurationText);
                 var other = new ProviderSnapshot(new ProviderKey("unit-arcanist",
                         BrownFurPowerfulChangeProfile.CastingSpellbookGuid, Other, "level-1"),
                     "Other Spell", 1, "pool-arcanist-1", 1, null, null, 10, 100);
@@ -4535,9 +4552,9 @@ namespace KingmakerBuffPlanner.Tests
                 };
                 var enhancements = new List<CastEnhancementSnapshot>
                 {
-                    new CastEnhancementSnapshot("metamagic-rod|unit-arcanist|rod-guid", "unit-arcanist",
+                    new CastEnhancementSnapshot(RodId, "unit-arcanist",
                         "rod-guid", "Extend Metamagic Rod", string.Empty, CastEnhancementCategory.MetamagicRod,
-                        8, 6, 3, new string[0])
+                        8, 6, RodCharges, new string[0])
                 };
                 // As live: Powerful Change for a score no known spell raises
                 // (an empty list); it must never be offered.
@@ -4605,11 +4622,12 @@ namespace KingmakerBuffPlanner.Tests
             public void Dispose() { }
         }
 
-        private static CastingQualificationAllowance EnhancedAllowance(EnhancedBuffWorld world, string mode)
+        private static CastingQualificationAllowance EnhancedAllowance(EnhancedBuffWorld world, string mode,
+            string recipe = CastingQualificationRecipe.EnhancedDirect)
         {
             CastingWorkspaceInputs inputs = world.Inputs();
             CastingQualificationSelection selection =
-                CastingQualificationRecipe.SelectEnhancedDirect(inputs, "fixture-campaign");
+                CastingQualificationRecipe.Select(recipe, inputs, "fixture-campaign");
             IReadOnlyList<CastingQualificationStepForecast> forecast =
                 CastingQualificationForecast.Forecast(selection, inputs, "fixture-campaign");
             string refusal;
@@ -4617,14 +4635,14 @@ namespace KingmakerBuffPlanner.Tests
             {
                 o["fixtureGameId"] = "fixture-campaign";
                 o["executionMode"] = mode;
-                o["recipe"] = CastingQualificationRecipe.EnhancedDirect;
+                o["recipe"] = recipe;
                 o["approvedProjectionIds"] = new JArray(forecast.Select(step => (object)step.ProjectionId).ToArray());
                 o["maximumNativeSubmissions"] = 2;
             }), "qual-run-1", out refusal);
         }
 
         private static CastingQualificationRecord RunEnhanced(string dir, EnhancedBuffWorld world, string mode,
-            bool casterReads = true)
+            bool casterReads = true, string recipe = CastingQualificationRecipe.EnhancedDirect)
         {
             Directory.CreateDirectory(dir);
             long now = 0;
@@ -4633,7 +4651,7 @@ namespace KingmakerBuffPlanner.Tests
                 ? (ICastExecutor)new AnimatedCastExecutor(world, true)
                 : new InstantCastExecutor(world, true), clock);
             var record = new CastingQualificationRecord { CastingScenario = true, AllowanceStatus = "parsed" };
-            var driver = new CastingQualificationDriver(record, EnhancedAllowance(world, mode), "fixture-campaign",
+            var driver = new CastingQualificationDriver(record, EnhancedAllowance(world, mode, recipe), "fixture-campaign",
                 world.Inputs, boundary => new CastingWorkspaceSession(dir, "fixture-campaign", boundary),
                 host, world.Observe, clock, 240000, null, null, false, null, null,
                 () => "fixture-lifecycle=1", () => 0L, null,
@@ -5193,6 +5211,65 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("A wrong ability-pool outcome was not refused: " +
                     string.Join("|", freeRecord.Failures.ToArray()) + " / " + string.Join("|", refillRecord.Failures.ToArray()) +
                     " fired=" + string.Join(",", refill.Fired.ToArray()));
+        }
+
+        // The rod recipe (the next iteration after rc5): an Extend rod chosen on
+        // the casting through the workspace; the extended recipient's buff
+        // lasts twice as long at the same strength for exactly one charge;
+        // a spell without a caster-level duration is refused; a rod that is
+        // not applied, or a charge kept, fails where it happens.
+        private static void TestRodQualificationRecipe(string root)
+        {
+            string rod = EnhancedBuffWorld.RodId;
+            CastingWorkspaceInputs inputs = new EnhancedBuffWorld { DurationText = "1 minute/level" }.Inputs();
+            CastingQualificationSelection selection = CastingQualificationRecipe.SelectRodExtend(inputs, "fixture-campaign");
+            if (!selection.Selected || selection.Recipe != CastingQualificationRecipe.RodExtendDirect ||
+                selection.Castings.Count != 2 || selection.Castings[0].Enhancements.Count != 0 ||
+                !selection.Castings[1].Enhancements.Select(value => value.EnhancementId).SequenceEqual(new[] { rod }) ||
+                selection.Enhancement == null ||
+                selection.Enhancement.Kind != CastingQualificationEnhancement.DurationKind ||
+                selection.Enhancement.DurationFactor != 2.0 ||
+                !selection.Coverage.SequenceEqual(new[] { "spontaneous", "metamagic-rod", "extend", "route:DirectRuleCast" }))
+                throw new InvalidOperationException("The rod selection was wrong: " + selection.Refusal + " coverage=" +
+                    string.Join(",", selection.Coverage.ToArray()) + " rejections=" +
+                    string.Join(",", selection.Rejections.ToArray()));
+            CastingQualificationSelection fixedDuration = CastingQualificationRecipe.SelectRodExtend(
+                new EnhancedBuffWorld().Inputs(), "fixture-campaign");
+            if (fixedDuration.Selected ||
+                !fixedDuration.Rejections.Any(value => value.Contains("|duration-not-per-level:")))
+                throw new InvalidOperationException("A spell without a caster-level duration was taken for the rod: " +
+                    string.Join(",", fixedDuration.Rejections.ToArray()));
+            foreach (string mode in new[] { "instant", "animated" })
+            {
+                var run = new EnhancedBuffWorld { DurationText = "1 minute/level" };
+                CastingQualificationRecord record = RunEnhanced(Path.Combine(root, "qr-" + mode[0]), run, mode, true,
+                    CastingQualificationRecipe.RodExtendDirect);
+                IList<string> violations = record.Violations();
+                CastingQualificationStepResult plain = record.Step("plain");
+                CastingQualificationStepResult extended = record.Step("enhanced");
+                double? plainSeconds = plain == null ? null : plain.RemainingSecondsAfter["qual-cast-1"];
+                double? extendedSeconds = extended == null ? null : extended.RemainingSecondsAfter["qual-cast-2"];
+                if (violations.Count != 0 || record.TerminalReason != "completed" || run.RodCharges != 2 ||
+                    !run.Fired.SequenceEqual(new[] { "qual-cast-1", "qual-cast-2" }) ||
+                    plainSeconds == null || Math.Abs(plainSeconds.Value - 600) > 5 ||
+                    extendedSeconds == null || Math.Abs(extendedSeconds.Value - 1200) > 5 ||
+                    extended.CasterBefore.Resource != 3 || extended.CasterAfter.Resource != 2)
+                    throw new InvalidOperationException("The rod qualification (" + mode + ") did not pass exactly: " +
+                        record.TerminalReason + "|" + string.Join("|", violations.ToArray()) + "|" + plainSeconds + ">" +
+                        extendedSeconds + "|charges=" + run.RodCharges);
+            }
+            var ignored = new EnhancedBuffWorld { DurationText = "1 minute/level", RodIgnored = true };
+            CastingQualificationRecord ignoredRecord = RunEnhanced(Path.Combine(root, "qr-ignored"), ignored, "instant", true,
+                CastingQualificationRecipe.RodExtendDirect);
+            var kept = new EnhancedBuffWorld { DurationText = "1 minute/level", RodChargeKept = true };
+            CastingQualificationRecord keptRecord = RunEnhanced(Path.Combine(root, "qr-kept"), kept, "instant", true,
+                CastingQualificationRecipe.RodExtendDirect);
+            if (ignoredRecord.TerminalReason == "completed" ||
+                !ignoredRecord.Failures.Any(value => value.StartsWith("enhanced-wait:step:duration:qual-cast-2:", StringComparison.Ordinal)) ||
+                keptRecord.TerminalReason == "completed" ||
+                !keptRecord.Failures.Any(value => value.StartsWith("enhanced-wait:step:enhancement-resource:3>3:expected-spend=1", StringComparison.Ordinal)))
+                throw new InvalidOperationException("A wrong rod cast was not refused: " +
+                    string.Join("|", ignoredRecord.Failures.ToArray()) + " / " + string.Join("|", keptRecord.Failures.ToArray()));
         }
 
         // A finite world: a prepared caster (exact slot tokens with native
