@@ -4,6 +4,31 @@ using System.Linq;
 
 namespace KingmakerBuffPlanner.Execution
 {
+    // How discovery prices an authored level-0 spellbook entry (batch 3
+    // review A4): free through its at-will ability, a finite level-0 slot
+    // without one, or unresolved when the at-will choice is ambiguous.
+    public enum CantripPricing
+    {
+        Free,
+        Finite,
+        Unresolved
+    }
+
+    // How execution casts an authored spellbook entry (batch 3 review A2).
+    public enum CantripRoute
+    {
+        // Not a level-0 entry: its slot or known spell, as always.
+        Normal,
+        // A free level-0 casting: only through the at-will ability.
+        AtWillOnly,
+        // A finite level-0 casting: only through its slot or known entry.
+        SlotOnly,
+        // No reservation (discovery-time reads): the at-will ability first.
+        AtWillThenSlot,
+        // A free reservation for an entry that is never cast at will.
+        Refused
+    }
+
     // One of a caster's abilities considered for an authored level-0
     // spellbook entry, as the game judges it.
     public sealed class AtWillCantripCandidate
@@ -50,6 +75,32 @@ namespace KingmakerBuffPlanner.Execution
     public static class AtWillCantripChoice
     {
         public const string AmbiguousPrefix = "at-will-cantrip-ambiguous:";
+        // A free level-0 casting whose at-will ability is gone: refused,
+        // never paid from a level-0 slot instead.
+        public const string MissingRefusal = "at-will-cantrip-missing";
+        // A free reservation for a spellbook entry that is not cast at will
+        // would spend a slot the plan never reserved.
+        public const string FreeReservationRefusal = "free-reservation-for-slot-entry";
+
+        // Discovery (review A4): an ambiguous at-will choice stays an
+        // unresolved refusal; it is never repriced as a level-0 slot.
+        public static CantripPricing Price(bool atWillFound, string refusal)
+        {
+            if (atWillFound) return CantripPricing.Free;
+            return refusal == null ? CantripPricing.Finite : CantripPricing.Unresolved;
+        }
+
+        // Execution (review A2): the step's reservation decides, never the
+        // entry alone. A free level-0 casting is cast only at will; a finite
+        // one never takes the free route; without a reservation (reads made
+        // for discovery and targeting) the at-will ability is preferred.
+        public static CantripRoute Route(bool levelZeroEntry, bool? reservationUnlimited)
+        {
+            if (!levelZeroEntry)
+                return reservationUnlimited == true ? CantripRoute.Refused : CantripRoute.Normal;
+            if (reservationUnlimited == null) return CantripRoute.AtWillThenSlot;
+            return reservationUnlimited.Value ? CantripRoute.AtWillOnly : CantripRoute.SlotOnly;
+        }
 
         // The chosen candidate, or null: with no refusal when no at-will
         // ability exists (the authored entry is then cast only if the game

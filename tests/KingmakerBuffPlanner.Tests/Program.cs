@@ -8627,6 +8627,7 @@ namespace KingmakerBuffPlanner.Tests
             public bool Succeeded { get { return true; } }
             public bool EffectsObserved { get { return true; } }
             public bool ResourceSpent { get { return true; } }
+            public string ResourceCountViolation { get { return null; } }
             public bool HasResidualDeliveryState { get { return false; } }
             public string Detail { get { return "command-success"; } }
             public void Dispose() { }
@@ -8708,10 +8709,12 @@ namespace KingmakerBuffPlanner.Tests
                 if (Failing(step, "rejected"))
                     return new InstantCastResult(false, false, false, false, "fixture-rejected");
                 return new InstantCastResult(true, true, !Unconfirmed(step),
-                    !Free(step), "fixture");
+                    !Free(step), !Free(step), "fixture",
+                    _mode == "free-unread" ? "available-count-unread:unread>unread" : null);
             }
-            // "free" (every step) reports a genuine zero-cost cast: no spend.
-            private bool Free(CastStep step) { return _mode == "free"; }
+            // "free" (every step) reports a genuine zero-cost cast: no spend;
+            // "free-unread" spends nothing but its counts were never read.
+            private bool Free(CastStep step) { return _mode == "free" || _mode == "free-unread"; }
             private bool Pending(CastStep step)
             {
                 return Failing(step, "pending") || Failing(step, "pending-cleanup-throws");
@@ -8758,7 +8761,9 @@ namespace KingmakerBuffPlanner.Tests
             public bool Succeeded { get { return _succeeded; } }
             public bool EffectsObserved { get { return _succeeded && !_timedOut; } }
             internal bool Free;
+            internal string CountViolation;
             public bool ResourceSpent { get { return _succeeded && !Free; } }
+            public string ResourceCountViolation { get { return CountViolation; } }
             public bool HasResidualDeliveryState { get { return false; } }
             public string Detail { get { return "fixture-operation"; } }
             public void Dispose()
@@ -8805,7 +8810,11 @@ namespace KingmakerBuffPlanner.Tests
                     Failing(step, "timeout"),
                     Failing(step, "pending") || Failing(step, "pending-dispose-throws"),
                     Failing(step, "pending-dispose-throws"),
-                    () => DisposedOperations.Add(id)) { Free = _mode == "free" };
+                    () => DisposedOperations.Add(id))
+                {
+                    Free = _mode == "free" || _mode == "free-unread",
+                    CountViolation = _mode == "free-unread" ? "available-count-unread:unread>unread" : null
+                };
             }
         }
 
@@ -9340,6 +9349,7 @@ namespace KingmakerBuffPlanner.Tests
             public bool Succeeded { get { return _success; } }
             public bool EffectsObserved { get { return _success; } }
             public bool ResourceSpent { get { return _success; } }
+            public string ResourceCountViolation { get { return null; } }
             public bool HasResidualDeliveryState
             { get { return _residual; } }
             public string Detail
@@ -9386,6 +9396,7 @@ namespace KingmakerBuffPlanner.Tests
             public bool Succeeded { get { return false; } }
             public bool EffectsObserved { get { return false; } }
             public bool ResourceSpent { get { return false; } }
+            public string ResourceCountViolation { get { return null; } }
             public bool HasResidualDeliveryState { get { return false; } }
             public string Detail { get { return "throwing-operation"; } }
             public void Dispose() { _disposedCallback(); }
@@ -15302,6 +15313,20 @@ namespace KingmakerBuffPlanner.Tests
             if (!animatedSpendReport.Records.Any(record => record.Status == CastExecutionStatus.FailedExecution &&
                     record.Detail.StartsWith("unexpected-resource-spent-on-unlimited-source", StringComparison.Ordinal)))
                 throw new InvalidOperationException("An animated spend on a free source was not a failure.");
+            // Review A7: a free cast whose counts were never read is
+            // uncertainty in both executors, never a confirmed free cast.
+            var instantUnread = new ExecutionReport(freePlan);
+            Drain(new InstantCastExecutor(new ScriptedInstantRuntime("none", "free-unread"), true)
+                .Execute(freePlan, instantUnread));
+            var animatedUnread = new ExecutionReport(freePlan);
+            Drain(new AnimatedCastExecutor(new ScriptedAnimatedRuntime("none", "free-unread"), true)
+                .Execute(freePlan, animatedUnread));
+            foreach (ExecutionReport unread in new[] { instantUnread, animatedUnread })
+                if (unread.Failed == 0 || !unread.Records.Any(record =>
+                        record.Status == CastExecutionStatus.FailedExecution &&
+                        record.Detail.StartsWith(AvailableCountJudgement.UncertainPrefix +
+                            "available-count-unread:unread>unread;", StringComparison.Ordinal)))
+                    throw new InvalidOperationException("Unread counts on a free source were not uncertainty.");
             // A step with an unverified zero reservation never reaches either runtime.
             CastStep unverified = CloneStep(freePlan.Steps[0], reservation: new ResourceReservation(
                 "cantrips-cleric", 0, new string[0]));

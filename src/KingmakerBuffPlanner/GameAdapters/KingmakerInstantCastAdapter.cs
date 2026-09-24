@@ -198,7 +198,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                 TraceProvider(step, "Begin-accepted", providerStatus.Describe());
             }
 
-            int availableBefore = KingmakerAnimatedCastAdapter.SafeAvailableCount(
+            int? availableBefore = KingmakerAnimatedCastAdapter.SafeAvailableCount(
                 sourceAbility);
             RuleCastSpell rule;
             try
@@ -242,9 +242,12 @@ namespace KingmakerBuffPlanner.GameAdapters
                 try { sourceAbility.Spend(); }
                 catch (Exception exception) { spendFailure = exception; }
             }
-            int availableAfter = KingmakerAnimatedCastAdapter.SafeAvailableCount(
+            int? availableAfter = KingmakerAnimatedCastAdapter.SafeAvailableCount(
                 sourceAbility);
-            bool spent = availableBefore >= 0 && availableAfter >= 0 && availableAfter < availableBefore;
+            bool spent = AvailableCountJudgement.Spent(availableBefore, availableAfter);
+            // Review A7: a free casting must read unlimited and unchanged.
+            string countViolation = step.Reservation != null && step.Reservation.Unlimited
+                ? AvailableCountJudgement.FreeViolation(availableBefore, availableAfter) : null;
             bool providerSucceeded = !providerDirect ||
                 (providerStatus != null && providerStatus.Accepted &&
                     providerStatus.Committed &&
@@ -273,8 +276,8 @@ namespace KingmakerBuffPlanner.GameAdapters
                         providerCompletionFailure.GetType().FullName + ":" +
                         providerCompletionFailure.Message) +
                 ";spend-owner:source-ability-data" +
-                ";available-before:" + availableBefore +
-                ";available-after:" + availableAfter +
+                ";available-before:" + AvailableCountJudgement.Format(availableBefore) +
+                ";available-after:" + AvailableCountJudgement.Format(availableAfter) +
                 ";strategy:" + step.ExecutionStrategy +
                 ";strategy-reason:" + step.ExecutionStrategyReason +
                 ";carrier-guid:" + carrierGuid +
@@ -291,7 +294,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                 // Read in the frame of submission: the rule's buff lands on
                 // a later tick, so false here is normal; the executor's own
                 // later confirmation decides EffectConfirmed.
-                ";effects-observed-at-submit:" + observed);
+                ";effects-observed-at-submit:" + observed, countViolation);
         }
 
         public bool EffectsObserved(CastStep step)

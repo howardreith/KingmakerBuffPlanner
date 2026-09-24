@@ -148,6 +148,15 @@ namespace KingmakerBuffPlanner.Execution
                                     CastExecutionStatus.FailedExecution,
                                     "unexpected-resource-spent-on-unlimited-source;" +
                                     operation.Detail);
+                            else if (step.Reservation.Unlimited &&
+                                operation.ResourceCountViolation != null)
+                                // Review A7: counts that do not prove a free
+                                // cast free are uncertainty, never success.
+                                report.Add(index, step,
+                                    CastExecutionStatus.FailedExecution,
+                                    AvailableCountJudgement.UncertainPrefix +
+                                    operation.ResourceCountViolation + ";" +
+                                    operation.Detail);
                         }
                         catch (Exception exception)
                         { operationFailure = exception; }

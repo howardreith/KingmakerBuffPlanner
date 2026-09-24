@@ -12,6 +12,7 @@ using KingmakerBuffPlanner.Discovery;
 using KingmakerBuffPlanner.Domain.Effects;
 using KingmakerBuffPlanner.Domain.Identity;
 using KingmakerBuffPlanner.Domain.Providers;
+using KingmakerBuffPlanner.Execution;
 
 namespace KingmakerBuffPlanner.GameAdapters
 {
@@ -174,7 +175,14 @@ namespace KingmakerBuffPlanner.GameAdapters
                     spellbook.GetKnownSpells(0), unit, spellbook.Blueprint.AssetGuid)
                 .Concat(ExpandOwned(spellbook.GetCustomSpells(0), unit, spellbook.Blueprint.AssetGuid)))
             {
-                if (HasAtWillCantrip(unit, spellbook, selection))
+                string ambiguity;
+                CantripPricing pricing = PriceCantrip(unit, spellbook, selection, out ambiguity);
+                if (pricing == CantripPricing.Unresolved)
+                {
+                    TraceUnresolvedCantrip(unit, spellbook, selection, ambiguity);
+                    continue;
+                }
+                if (pricing == CantripPricing.Free)
                 {
                     if (!unlimitedAdded)
                         pools.Add(new ResourcePoolSnapshot(unlimitedKey, ResourcePoolKind.Unlimited, 0, 0, null));
@@ -193,14 +201,29 @@ namespace KingmakerBuffPlanner.GameAdapters
             }
         }
 
-        private static bool HasAtWillCantrip(UnitEntityData unit, Spellbook spellbook,
-            KingmakerAbilitySelection selection)
+        private static CantripPricing PriceCantrip(UnitEntityData unit, Spellbook spellbook,
+            KingmakerAbilitySelection selection, out string ambiguity)
         {
-            string ambiguity;
-            return KingmakerAtWillCantrips.Resolve(unit,
+            AbilityData atWill = KingmakerAtWillCantrips.Resolve(unit,
                 KingmakerAbilityVariants.ToAbilityKey(selection, SourceKind.Spellbook),
-                spellbook.CasterLevel, out ambiguity) != null;
+                spellbook.CasterLevel, out ambiguity);
+            return AtWillCantripChoice.Price(atWill != null, ambiguity);
         }
+
+        // Review A4: an ambiguous at-will cantrip is no provider at all (not
+        // a level-0 slot); the refusal stays visible in the discovery trace.
+        private void TraceUnresolvedCantrip(UnitEntityData unit, Spellbook spellbook,
+            KingmakerAbilitySelection selection, string ambiguity)
+        {
+            _rawCandidateCount++;
+            _sourceTraces.Add(new PartySourceDiscoveryTrace(
+                KingmakerAbilityVariants.ToAbilityKey(selection, SourceKind.Spellbook).Canonical,
+                selection.Concrete.Blueprint.AssetGuid, selection.DisplayName, unit.UniqueId,
+                spellbook.Blueprint.AssetGuid, !spellbook.Blueprint.Spontaneous, false,
+                UnresolvedCantripPrefix + ambiguity));
+        }
+
+        internal const string UnresolvedCantripPrefix = "unresolved-cantrip:";
 
         private void ScanPreparedSpellbook(
             UnitEntityData unit,
@@ -215,6 +238,7 @@ namespace KingmakerBuffPlanner.GameAdapters
             // cast consumes, as the game's own spend does.
             var cantripSlots = allSlots.Where(s => s.SpellLevel == 0).ToList();
             var atWillSlots = new HashSet<SpellSlot>(ReferenceEqualityComparer<SpellSlot>.Instance);
+            var unresolvedSlots = new HashSet<SpellSlot>(ReferenceEqualityComparer<SpellSlot>.Instance);
             if (cantripSlots.Count != 0)
             {
                 string unlimitedKey = PoolKey(unit.UniqueId, spellbook.Blueprint.AssetGuid, "unlimited");
@@ -224,9 +248,24 @@ namespace KingmakerBuffPlanner.GameAdapters
                 {
                     List<KingmakerAbilitySelection> selections = ExpandOwned(
                         new[] { group.First().Spell }, unit, spellbook.Blueprint.AssetGuid).ToList();
-                    if (selections.Count == 0 ||
-                        !selections.All(selection => HasAtWillCantrip(unit, spellbook, selection)))
+                    if (selections.Count == 0) continue;
+                    var pricings = new List<CantripPricing>();
+                    foreach (KingmakerAbilitySelection selection in selections)
+                    {
+                        string ambiguity;
+                        CantripPricing pricing = PriceCantrip(unit, spellbook, selection, out ambiguity);
+                        if (pricing == CantripPricing.Unresolved)
+                            TraceUnresolvedCantrip(unit, spellbook, selection, ambiguity);
+                        pricings.Add(pricing);
+                    }
+                    // Review A4: slots of an ambiguous cantrip are neither free
+                    // nor paid providers.
+                    if (pricings.Contains(CantripPricing.Unresolved))
+                    {
+                        foreach (SpellSlot slot in group) unresolvedSlots.Add(slot);
                         continue;
+                    }
+                    if (!pricings.All(pricing => pricing == CantripPricing.Free)) continue;
                     if (!unlimitedAdded)
                         pools.Add(new ResourcePoolSnapshot(unlimitedKey, ResourcePoolKind.Unlimited, 0, 0, null));
                     unlimitedAdded = true;
@@ -235,7 +274,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                         AddSpellProvider(unit, spellbook, selection, unlimitedKey, 0, new string[0], providers);
                 }
             }
-            var slots = allSlots.Where(s => !atWillSlots.Contains(s)).ToList();
+            var slots = allSlots.Where(s => !atWillSlots.Contains(s) && !unresolvedSlots.Contains(s)).ToList();
             if (slots.Count == 0) return;
             var ids = slots.ToDictionary(s => s, SlotId, ReferenceEqualityComparer<SpellSlot>.Instance);
             var tokens = new List<ResourceTokenSnapshot>();
@@ -300,8 +339,8 @@ namespace KingmakerBuffPlanner.GameAdapters
         {
             AbilityData data = selection.Concrete;
             AbilityData resourceContext = data.Resource != null ? data : selection.Source;
-            SourceKind sourceKind = resourceContext.Resource != null
-                ? SourceKind.AbilityResource : SourceKind.Fact;
+            SourceKind sourceKind;
+            string factPoolKey = FactPoolKey(unit.UniqueId, selection, out sourceKind);
             AbilityKey ability = KingmakerAbilityVariants.ToAbilityKey(selection, sourceKind);
             _rawCandidateCount++;
             EffectExpression expression;
@@ -319,7 +358,7 @@ namespace KingmakerBuffPlanner.GameAdapters
             int cost;
             if (resourceContext.Resource != null)
             {
-                string key = unit.UniqueId + "|resource|" + resourceContext.Resource.AssetGuid;
+                string key = factPoolKey;
                 int remaining = Math.Max(0,
                     unit.Descriptor.Resources.GetResourceAmount(resourceContext.Resource));
                 int capacity = Math.Max(remaining,
@@ -330,8 +369,7 @@ namespace KingmakerBuffPlanner.GameAdapters
             }
             else
             {
-                string key = unit.UniqueId + "|free|" +
-                    selection.SourceBlueprint.AssetGuid;
+                string key = factPoolKey;
                 pool = new ResourcePoolSnapshot(key, ResourcePoolKind.Unlimited, 0, 0, null);
                 cost = 0;
             }
@@ -345,6 +383,21 @@ namespace KingmakerBuffPlanner.GameAdapters
                 CasterLevel(data), ExpectedDurationRounds(data, duration),
                 Description(selection), duration, selection.SourceDisplayName,
                 selection.VariantOrder));
+        }
+
+        // The pool a fact-granted ability spends, as discovery prices it and
+        // execution binds it (review A3): the concrete or source ability's
+        // resource, else a free pool of the source blueprint.
+        internal static string FactPoolKey(string unitId, KingmakerAbilitySelection selection, out SourceKind kind)
+        {
+            AbilityData resourceContext = selection.Concrete.Resource != null ? selection.Concrete : selection.Source;
+            if (resourceContext.Resource != null)
+            {
+                kind = SourceKind.AbilityResource;
+                return unitId + "|resource|" + resourceContext.Resource.AssetGuid;
+            }
+            kind = SourceKind.Fact;
+            return unitId + "|free|" + selection.SourceBlueprint.AssetGuid;
         }
 
         private void AddSpellProvider(

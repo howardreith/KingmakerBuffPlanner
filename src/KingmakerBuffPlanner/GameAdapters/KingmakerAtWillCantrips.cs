@@ -35,10 +35,13 @@ namespace KingmakerBuffPlanner.GameAdapters
                 try { cantrip = fact.Blueprint.IsCantrip; }
                 catch (Exception) { cantrip = false; }
                 AbilityData match = cantrip ? KingmakerAbilityVariants.Resolve(fact.Data, requested) : null;
-                AbilityData judged = match ?? fact.Data;
+                // Review A10: only a cantrip of exactly the authored ability
+                // is asked for its spellbook, availability, count and caster
+                // level; no other ability is judged here at all.
+                if (match == null) continue;
                 candidates.Add(new KeyValuePair<AtWillCantripCandidate, AbilityData>(
-                    new AtWillCantripCandidate(fact.Blueprint.AssetGuid + "#" + index, cantrip, match != null,
-                        SafeHasSpellbook(judged), SafeAvailable(judged), SafeCount(judged), CasterLevel(judged)),
+                    new AtWillCantripCandidate(fact.Blueprint.AssetGuid + "#" + index, true, true,
+                        SafeHasSpellbook(match), SafeAvailable(match), SafeCount(match), CasterLevel(match)),
                     match));
             }
             AtWillCantripCandidate chosen = AtWillCantripChoice.Choose(
