@@ -231,6 +231,12 @@ if ($null -ne $qualificationAllowanceJson) {
         -WorkingSaveSha256 $allowanceWorkingSha256
     if ($null -ne $bindingRefusal) { throw "The qualification allowance was refused: $bindingRefusal" }
 }
+if ($null -ne $probeAllowanceJson) {
+    $bindingRefusal = Get-KbpAllowanceFixtureBindingRefusal -AllowanceJson $probeAllowanceJson `
+        -ProfileId $CompatibilityProfileId -CompatibilityIdentity (Get-KbpCompatibilityIdentityDigest $compatibilityProfile) `
+        -WorkingSaveSha256 $allowanceWorkingSha256
+    if ($null -ne $bindingRefusal) { throw "The probe allowance was refused: $bindingRefusal" }
+}
 if ($null -ne $classicAllowanceJson) {
     $bindingRefusal = Get-KbpAllowanceFixtureBindingRefusal -AllowanceJson $classicAllowanceJson `
         -ProfileId $CompatibilityProfileId -CompatibilityIdentity (Get-KbpCompatibilityIdentityDigest $compatibilityProfile) `
@@ -297,6 +303,15 @@ New-Item -ItemType Directory -Path $evidence | Out-Null
 # autosave) fails an advanced-copy run and is recorded otherwise.
 $protectedSaveRoot = Join-Path $env:USERPROFILE 'AppData\LocalLow\Owlcat Games\Pathfinder Kingmaker\Saved Games'
 $protectedBefore = if ($null -ne $savePair) { Get-KbpSaveFolderSnapshot -SaveRoot $protectedSaveRoot } else { $null }
+# Re-review: the WORKING save bound above (and by any allowance) is still the
+# same bytes when the protected snapshot is taken; nothing changed it in
+# between.
+if ($null -ne $savePair) {
+    $workingBefore = $protectedBefore[[string]$savePair.working.fileName]
+    if ($null -eq $workingBefore -or [string]$workingBefore.sha256 -cne [string]$savePair.working.sha256) {
+        throw "The WORKING save changed after it was bound: $($savePair.working.fileName)"
+    }
+}
 $protectedSaveFailure = $null
 $protectedSavesCompared = $false
 # A display mode changes the game's registry settings for this run only; the
@@ -732,6 +747,7 @@ public static class KbpPhysicalInput {
                     schemaVersion = 1; runId = $runId; actionId = $actionId
                     action = [string]$physical.action; sentAtUtc = [DateTime]::UtcNow.ToString('o')
                     processId = $process.Id
+                    text = if ([string]$physical.action -eq 'type') { [string]$physical.text } else { $null }
                     windowsClientCursor = [KbpPhysicalInput]::ClientCursor($process.MainWindowHandle)
                     detail = $deliveryDetail
                 })
@@ -769,7 +785,7 @@ public static class KbpPhysicalInput {
         $orchestration.baselineSaveSha256 = $afterPair.baseline.sha256
         Write-KbpJsonAtomic (Join-Path $evidence 'orchestration.json') $orchestration
     }
-    Write-Host "Runtime result PASS: $resultPath"
+    Write-Host "Runtime game result PASS (restoration and the completion record follow): $resultPath"
     $runSucceeded = $true
 }
 catch {
@@ -886,13 +902,23 @@ finally {
             $completionBinding = if ($null -eq $advancedBinding) { $null } else { [string]$advancedBinding.manifestPath }
             $completionGame = if ($null -ne $result) { [string]$result.status } else { $null }
             $completionExited = @(Get-Process -Name Kingmaker -ErrorAction SilentlyContinue).Count -eq 0
-            Write-KbpJsonAtomic (Join-Path $evidence 'run-completion.json') (New-KbpRunCompletionRecord `
+            $completionRecord = New-KbpRunCompletionRecord `
                 -RunId $runId -Scenario $Scenario -FixtureFamily $FixtureFamily -ProfileId $CompatibilityProfileId `
                 -CompatibilityIdentity $completionIdentity -AdvancedBindingManifest $completionBinding `
                 -SavePair $savePair -GameResultStatus $completionGame -HarnessSucceeded $runSucceeded `
                 -KingmakerExited $completionExited -TransactionStatePath $completionTransaction `
                 -RestoreFailure $restoreFailure `
-                -ProtectedSavesCompared $protectedSavesCompared -ProtectedSaveFailure $protectedSaveFailure)
+                -ProtectedSavesCompared $protectedSavesCompared -ProtectedSaveFailure $protectedSaveFailure
+            Write-KbpJsonAtomic (Join-Path $evidence 'run-completion.json') $completionRecord
+            # Re-review: the orchestration record ends with the run's final
+            # verdict, never the game's earlier PASS alone.
+            if ($null -ne (Get-Variable -Name orchestration -ErrorAction SilentlyContinue) -and $null -ne $orchestration) {
+                $orchestration.finalComplete = [bool]$completionRecord.complete
+                $orchestration.finalStatus = if ([bool]$completionRecord.complete) { 'PASS' } else { 'FAIL' }
+                $orchestration.stage = if ([bool]$completionRecord.complete) { 'completed' } else { 'incomplete' }
+                Write-KbpJsonAtomic (Join-Path $evidence 'orchestration.json') $orchestration
+            }
+            Write-Host ("Run completion: complete=" + [bool]$completionRecord.complete)
         }
         catch { Write-Warning "Run completion record not written: $($_.Exception.Message)" }
     }

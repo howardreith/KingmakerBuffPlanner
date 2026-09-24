@@ -9833,13 +9833,15 @@ namespace KingmakerBuffPlanner.Tests
                 if (closeThrows) throw new InvalidOperationException("fixture-close");
                 return new ProbeWorkspaceCloseResult(true, true, null);
             }, published => run.Published.Add(published));
-            string allowanceJson = "{\"schemaVersion\":2,\"kind\":\"kbp-single-cast-probe\",\"runId\":\"run-owner\"," +
+            string allowanceJson = "{\"schemaVersion\":3,\"kind\":\"kbp-single-cast-probe\",\"runId\":\"run-owner\"," +
                 "\"sourceCommit\":\"" + ProbeIdentity.SourceCommit + "\",\"packageSha256\":\"" +
                 ProbeIdentity.PackageSha256 + "\",\"dllSha256\":\"" + ProbeIdentity.DllSha256 +
                 "\",\"assemblyMvid\":\"" + ProbeIdentity.AssemblyMvid +
                 "\",\"approvedProjectionId\":\"" + projection.ProjectionId +
                 "\",\"casterUnitId\":\"unit-cleric\",\"targetUnitId\":\"unit-t1\",\"sourceId\":\"source-bulls\"," +
-                "\"maximumNativeSubmissions\":1,\"approvedBy\":\"owner\"}";
+                "\"maximumNativeSubmissions\":1,\"approvedBy\":\"owner\",\"compatibilityProfileId\":\"full-user\"," +
+                "\"compatibilityIdentity\":\"" + new string('f', 64) + "\",\"workingSaveSha256\":\"" +
+                new string('9', 64) + "\",\"purpose\":\"probe owner fixture\"}";
             string refusal;
             SingleCastProbeAllowance allowance = SingleCastProbeAllowance.Parse(allowanceJson, "run-owner", out refusal);
             if (allowance == null) throw new InvalidOperationException("Owner fixture allowance: " + refusal);
@@ -9985,11 +9987,13 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("The frozen artifact itself was refused: " + matching.Submitted.Reason);
             // An allowance without the artifact identity is not an allowance.
             string refusal;
-            if (SingleCastProbeAllowance.Parse("{\"schemaVersion\":2,\"kind\":\"kbp-single-cast-probe\"," +
+            if (SingleCastProbeAllowance.Parse("{\"schemaVersion\":3,\"kind\":\"kbp-single-cast-probe\"," +
                     "\"runId\":\"r\",\"sourceCommit\":\"c\",\"packageSha256\":\"x\",\"dllSha256\":\"y\"," +
                     "\"assemblyMvid\":\"z\",\"approvedProjectionId\":\"" + new string('0', 64) +
                     "\",\"casterUnitId\":\"a\",\"targetUnitId\":\"b\",\"sourceId\":\"s\"," +
-                    "\"maximumNativeSubmissions\":1,\"approvedBy\":\"o\"}", "r", out refusal) != null ||
+                    "\"maximumNativeSubmissions\":1,\"approvedBy\":\"o\",\"compatibilityProfileId\":\"full-user\"," +
+                    "\"compatibilityIdentity\":\"" + new string('f', 64) + "\",\"workingSaveSha256\":\"" +
+                    new string('9', 64) + "\",\"purpose\":\"p\"}", "r", out refusal) != null ||
                 refusal != "allowance-artifact-identity")
                 throw new InvalidOperationException("An allowance without a valid artifact identity parsed: " + refusal);
         }
@@ -16105,7 +16109,7 @@ namespace KingmakerBuffPlanner.Tests
         private static string ProbeAllowanceJson(string runId, SingleCastProbeSelection selection,
             string projectionId = null, int submissions = 1, string extra = "")
         {
-            return "{\"schemaVersion\":2,\"kind\":\"kbp-single-cast-probe\",\"runId\":\"" + runId +
+            return "{\"schemaVersion\":3,\"kind\":\"kbp-single-cast-probe\",\"runId\":\"" + runId +
                 "\",\"sourceCommit\":\"" + ProbeIdentity.SourceCommit +
                 "\",\"packageSha256\":\"" + ProbeIdentity.PackageSha256 +
                 "\",\"dllSha256\":\"" + ProbeIdentity.DllSha256 +
@@ -16114,7 +16118,9 @@ namespace KingmakerBuffPlanner.Tests
                 (projectionId ?? selection.Projection.ProjectionId) + "\",\"casterUnitId\":\"" +
                 selection.CasterUnitId + "\",\"targetUnitId\":\"" + selection.TargetUnitId +
                 "\",\"sourceId\":\"" + selection.SourceId + "\",\"maximumNativeSubmissions\":" +
-                submissions + ",\"approvedBy\":\"owner\"" + extra + "}";
+                submissions + ",\"approvedBy\":\"owner\",\"compatibilityProfileId\":\"full-user\"" +
+                ",\"compatibilityIdentity\":\"" + new string('f', 64) + "\",\"workingSaveSha256\":\"" +
+                new string('9', 64) + "\",\"purpose\":\"probe fixture\"" + extra + "}";
         }
 
         private static void TestSingleCastProbeIsDormantAndOneShot(string root)
@@ -16151,7 +16157,13 @@ namespace KingmakerBuffPlanner.Tests
                 { "allowance-submissions-not-one", ProbeAllowanceJson("run-a", selection, null, 2) },
                 { "allowance-unknown-member:retry", ProbeAllowanceJson("run-a", selection, null, 1, ",\"retry\":true") },
                 { "allowance-projection-id", ProbeAllowanceJson("run-a", selection, "ABC") },
-                { "allowance-unreadable", "{" }
+                { "allowance-unreadable", "{" },
+                // Schema 3: the same fixture binding as every casting allowance.
+                { "allowance-schema", ProbeAllowanceJson("run-a", selection).Replace("\"schemaVersion\":3", "\"schemaVersion\":2") },
+                { "allowance-profile", ProbeAllowanceJson("run-a", selection).Replace("\"full-user\"", "\"other-profile\"") },
+                { "allowance-working-save", ProbeAllowanceJson("run-a", selection).Replace(new string('9', 64), "short") },
+                { "allowance-purpose", ProbeAllowanceJson("run-a", selection).Replace("\"probe fixture\"", "\" \"") },
+                { "allowance-missing-member:purpose", ProbeAllowanceJson("run-a", selection).Replace(",\"purpose\":\"probe fixture\"", "") }
             };
             foreach (KeyValuePair<string, string> bad in badAllowances)
             {

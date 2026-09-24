@@ -313,8 +313,14 @@ namespace KingmakerBuffPlanner.UI
 
         internal static void TickOwned(float deltaTime)
         {
+            _ownedTicks++;
             if (_instance != null) _instance.Tick(deltaTime);
         }
+
+        // How often the mod's update has ticked the planner root (the
+        // qualification's held disable must see no tick).
+        private static long _ownedTicks;
+        internal static long OwnedTicksForRuntime { get { return _ownedTicks; } }
 
         internal static bool IsHudInstalled
         {

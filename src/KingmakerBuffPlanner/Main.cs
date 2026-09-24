@@ -14,6 +14,9 @@ namespace KingmakerBuffPlanner
         private static RuntimeTestHost _runtimeTest;
         private static string _modPath;
         private static bool _enabled;
+        // The mod manager's own toggle; the runtime qualification never
+        // enables a planner the manager has disabled.
+        private static bool _managerEnabled = true;
         private static bool _firstUpdateLogged;
         private static bool _hotkeyArmedLogged;
         private static string _lastSnapshot = "bootstrap-not-loaded";
@@ -70,6 +73,7 @@ namespace KingmakerBuffPlanner
 
         private static bool OnToggle(UnityModManager.ModEntry modEntry, bool value)
         {
+            _managerEnabled = value;
             _enabled = value;
             _log.Info("[KBP-BOOT] OnToggle invoked;value=" + value +
                 ";modEntry.Enabled=" + (modEntry != null && modEntry.Enabled) + ".");
@@ -85,11 +89,19 @@ namespace KingmakerBuffPlanner
         }
 
         // The mod manager's toggle as the runtime qualification drives it
-        // (batch 3 review B7): everything OnToggle does except ending the
-        // runtime test that drives it. While disabled the planner root is
-        // not ticked at all, exactly as for a player's disable.
+        // (batch 3 review B7): the same two effects as OnToggle (the update
+        // gate and the root's SetEnabled) without ending the runtime test
+        // that drives it. While disabled the planner root is not ticked, as
+        // with the manager's toggle (which also stops this mod's update as a
+        // whole, and would end the runtime test). It never enables a planner
+        // that the mod manager itself has disabled.
         internal static void SetEnabledForRuntime(bool value)
         {
+            if (value && !_managerEnabled)
+            {
+                _log.Info("[KBP-BOOT] runtime toggle;value=True refused: the mod manager disabled the mod.");
+                return;
+            }
             _enabled = value;
             _log.Info("[KBP-BOOT] runtime toggle;value=" + value + ".");
             BuffPlannerUiRoot.SetEnabled(value);

@@ -117,6 +117,11 @@ namespace KingmakerBuffPlanner.Execution
         public int DisableHeldUpdates { get; set; }
         public bool AcceptingWhileDisabled { get; set; }
         public bool RunningWhileDisabled { get; set; }
+        // Observed across the hold (re-review): how often the planner's
+        // owner ticked (null when unread; it must not tick while disabled)
+        // and how many runs the host started (none may start).
+        public long? OwnerTicksDuringHold { get; set; }
+        public int RunsStartedDuringHold { get; set; }
         public bool AcceptingAfterEnable { get; set; }
         // The recover step's lifecycle evidence: the owner's probe (live
         // subscriptions, HUD roots, planner roots, game mode) read just
@@ -191,15 +196,8 @@ namespace KingmakerBuffPlanner.Execution
             // planner is enabled.
             if (HasDisableStep)
             {
-                string expectedAt = ExecutionMode == "animated" ? "in-flight" : "before-start";
-                if (Disable == null) violations.Add("disable:none");
-                else if (DisabledAt != expectedAt)
-                    violations.Add("disable:not-" + expectedAt + ":" + Disable);
-                else if (DisableHeldUpdates < CastingQualificationDriver.DisableHoldUpdates)
-                    violations.Add("disable:not-held:" + Disable);
-                else if (AcceptingWhileDisabled || RunningWhileDisabled)
-                    violations.Add("disable:active-while-disabled:" + Disable);
-                else if (!AcceptingAfterEnable) violations.Add("disable:not-resumed:" + Disable);
+                string disableFailure = DisableFailure();
+                if (disableFailure != null) violations.Add(disableFailure);
                 // After the recover run: the same lifecycle state as before
                 // the disable, read by a real probe (review B7), and exactly
                 // one report per started run.
@@ -215,6 +213,23 @@ namespace KingmakerBuffPlanner.Execution
         }
 
         public static readonly string[] StepNames = { "stop", "complete", "repeat", "recast" };
+
+        // The disable rules, applied the moment the disable step ends (so a
+        // failed rule stops the run before the recover run is submitted)
+        // and again by Violations. Null when the disable is as required.
+        public string DisableFailure()
+        {
+            string expectedAt = ExecutionMode == "animated" ? "in-flight" : "before-start";
+            if (Disable == null) return "disable:none";
+            if (DisabledAt != expectedAt) return "disable:not-" + expectedAt + ":" + Disable;
+            if (DisableHeldUpdates < CastingQualificationDriver.DisableHoldUpdates) return "disable:not-held:" + Disable;
+            if (AcceptingWhileDisabled || RunningWhileDisabled) return "disable:active-while-disabled:" + Disable;
+            if (OwnerTicksDuringHold == null || OwnerTicksDuringHold.Value != 0)
+                return "disable:owner-ticked-while-disabled:" + Disable;
+            if (RunsStartedDuringHold != 0) return "disable:run-started-while-disabled:" + Disable;
+            if (!AcceptingAfterEnable) return "disable:not-resumed:" + Disable;
+            return null;
+        }
 
         // A lifecycle line from the owner's probe, not a stand-in for one.
         public static bool ProbeRead(string lifecycle)
@@ -456,6 +471,10 @@ namespace KingmakerBuffPlanner.Execution
         // The owner's lifecycle state (subscriptions, roots, mode) as one
         // comparable line; null means unprobed.
         private readonly Func<string> _lifecycleProbe;
+        // How often the planner's owner has ticked it (null: unobservable).
+        private readonly Func<long> _ownerTicks;
+        private long? _ownerTicksAtDisable;
+        private int _runsAtDisable;
         private bool _stopPressed;
         private bool _disabled;
         private bool _enabledAgain;
@@ -476,9 +495,10 @@ namespace KingmakerBuffPlanner.Execution
             Func<long> clock, long deadlineMillis, string recipe = null,
             Func<bool> worldRunning = null, bool ownerPumpsHost = false,
             Func<string, bool> pressRoutine = null, Action<bool> setPlannerEnabled = null,
-            Func<string> lifecycleProbe = null)
+            Func<string> lifecycleProbe = null, Func<long> ownerTicks = null)
         {
             _lifecycleProbe = lifecycleProbe;
+            _ownerTicks = ownerTicks;
             _requestedRecipe = recipe;
             _worldRunning = worldRunning;
             _ownerPumpsHost = ownerPumpsHost;
@@ -534,6 +554,20 @@ namespace KingmakerBuffPlanner.Execution
         private void Finish(string reason)
         {
             if (Completed) return;
+            // A run that ends during the held disable (deadline, exception,
+            // shutdown) never leaves the planner disabled behind it.
+            if (_disabled && !_enabledAgain)
+            {
+                try
+                {
+                    EnablePlanner();
+                    Record.Disable += ";enabled-at-finish";
+                }
+                catch (Exception exception)
+                {
+                    Record.Failures.Add("enable-at-finish:" + exception.GetType().Name + ":" + exception.Message);
+                }
+            }
             Completed = true;
             Record.TerminalReason = reason;
             if (_boundary != null)
@@ -722,9 +756,21 @@ namespace KingmakerBuffPlanner.Execution
                 if (_host.IsRunning) Record.RunningWhileDisabled = true;
                 Record.DisableHeldUpdates = ++_disabledUpdates;
                 if (_disabledUpdates < DisableHoldUpdates) return;
+                // Observed across the whole hold, before the enable.
+                long? ticks = ReadOwnerTicks();
+                Record.OwnerTicksDuringHold = ticks == null || _ownerTicksAtDisable == null
+                    ? (long?)null : ticks.Value - _ownerTicksAtDisable.Value;
+                Record.RunsStartedDuringHold = _host.StartedRuns - _runsAtDisable;
                 EnablePlanner();
             }
             Wait(false, "recover");
+        }
+
+        private long? ReadOwnerTicks()
+        {
+            if (_ownerTicks == null) return null;
+            try { return _ownerTicks(); }
+            catch (Exception) { return null; }
         }
 
         // The planner's own disable, as the mod toggle drives it: the host
@@ -739,6 +785,8 @@ namespace KingmakerBuffPlanner.Execution
                 : _host.ActiveFinishedCastings == 0 ? "before-start" : "between-castings";
             if (_setPlannerEnabled != null) _setPlannerEnabled(false);
             else _host.Shutdown(DisableReason);
+            _ownerTicksAtDisable = ReadOwnerTicks();
+            _runsAtDisable = _host.StartedRuns;
             Record.DisabledAt = at;
             Record.Disable = (_setPlannerEnabled != null ? "planner-disable" : "host-shutdown") +
                 ";at=" + at + ";ended=" + !_host.IsRunning;
@@ -753,7 +801,10 @@ namespace KingmakerBuffPlanner.Execution
             Record.AcceptingAfterEnable = _host.Accepting;
             Record.Disable += ";held=" + _disabledUpdates + ";acceptingWhileDisabled=" +
                 Record.AcceptingWhileDisabled + ";runningWhileDisabled=" + Record.RunningWhileDisabled +
-                ";accepting=" + _host.Accepting;
+                ";ownerTicks=" + (Record.OwnerTicksDuringHold.HasValue
+                    ? Record.OwnerTicksDuringHold.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                    : "unread") +
+                ";runsDuringHold=" + Record.RunsStartedDuringHold + ";accepting=" + _host.Accepting;
         }
 
         // Waits on the run (pumping it unless its owner does); the stop step
@@ -779,6 +830,16 @@ namespace KingmakerBuffPlanner.Execution
             // anything else is submitted.
             string failure = Record.StepFailure(finished.Name);
             if (failure != null) { Fail("step:" + failure); return; }
+            // Re-review: the disable rules (and a real probe line before it)
+            // are judged here, so a failed rule stops the run before the
+            // recover run is submitted.
+            if (finished.Name == CastingQualificationForecast.Disable)
+            {
+                string disableFailure = Record.DisableFailure() ??
+                    (CastingQualificationRecord.ProbeRead(Record.LifecycleBefore) ? null
+                        : "lifecycle-unprobed:" + (Record.LifecycleBefore ?? "none"));
+                if (disableFailure != null) { Fail("step:" + disableFailure); return; }
+            }
             if (finished.Name == CastingQualificationForecast.Recover)
             {
                 Record.LifecycleAfter = Probe();

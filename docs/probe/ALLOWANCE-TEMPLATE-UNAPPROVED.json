@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "kind": "kbp-single-cast-probe",
   "runId": "casting-probe-cast-20260923-01",
   "sourceCommit": "SET-FROM-FREEZE-RECORD",
@@ -11,5 +11,9 @@
   "targetUnitId": "050aa19a-1cf1-40f3-b28e-59d8c2fbfebf",
   "sourceId": "effect|fd7aa6ac895aeb318a5962d6fa358ee226c81e0cdb7dcd8d98ff163e5559df76",
   "maximumNativeSubmissions": 1,
-  "approvedBy": ""
+  "approvedBy": "",
+  "compatibilityProfileId": "SET-FROM-SELECTION-RUN",
+  "compatibilityIdentity": "SET-FROM-SELECTION-RUN",
+  "workingSaveSha256": "SET-FROM-SELECTION-RUN",
+  "purpose": ""
 }

@@ -32,14 +32,21 @@ namespace KingmakerBuffPlanner.Execution
         public string PackageSha256 { get; private set; }
         public string DllSha256 { get; private set; }
         public string AssemblyMvid { get; private set; }
+        // Schema 3 (re-review of the batch-3 fixes): the same fixture binding
+        // as every casting allowance.
+        public string CompatibilityProfileId { get; private set; }
+        public string CompatibilityIdentity { get; private set; }
+        public string WorkingSaveSha256 { get; private set; }
+        public string Purpose { get; private set; }
 
-        public const int AllowanceSchemaVersion = 2;
+        public const int AllowanceSchemaVersion = 3;
 
         private static readonly string[] Members =
         {
             "schemaVersion", "kind", "runId", "sourceCommit", "packageSha256", "dllSha256",
             "assemblyMvid", "approvedProjectionId", "casterUnitId", "targetUnitId", "sourceId",
-            "maximumNativeSubmissions", "approvedBy"
+            "maximumNativeSubmissions", "approvedBy", "compatibilityProfileId", "compatibilityIdentity",
+            "workingSaveSha256", "purpose"
         };
 
         // Strict: exact member set, exact kind, the run id this process was
@@ -74,7 +81,11 @@ namespace KingmakerBuffPlanner.Execution
                 SourceId = Text(root, "sourceId"),
                 PackageSha256 = Text(root, "packageSha256"),
                 DllSha256 = Text(root, "dllSha256"),
-                AssemblyMvid = Text(root, "assemblyMvid")
+                AssemblyMvid = Text(root, "assemblyMvid"),
+                CompatibilityProfileId = Text(root, "compatibilityProfileId"),
+                CompatibilityIdentity = Text(root, "compatibilityIdentity"),
+                WorkingSaveSha256 = Text(root, "workingSaveSha256"),
+                Purpose = Text(root, "purpose")
             };
             if (string.IsNullOrEmpty(Text(root, "approvedBy")))
             { refusal = "allowance-approver-missing"; return null; }
@@ -83,6 +94,9 @@ namespace KingmakerBuffPlanner.Execution
             { refusal = "allowance-run-mismatch"; return null; }
             if (!IsLowerHex64(allowance.ApprovedProjectionId))
             { refusal = "allowance-projection-id"; return null; }
+            refusal = AllowanceFixtureBinding.Refusal(allowance.CompatibilityProfileId,
+                allowance.CompatibilityIdentity, allowance.WorkingSaveSha256, allowance.Purpose);
+            if (refusal != null) return null;
             Guid mvid;
             if (!IsLowerHex64(allowance.PackageSha256) || !IsLowerHex64(allowance.DllSha256) ||
                 allowance.AssemblyMvid == null || !Guid.TryParse(allowance.AssemblyMvid, out mvid) ||
