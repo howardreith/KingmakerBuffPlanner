@@ -7,7 +7,9 @@ Reviewed baseline: `c182061354e9e761c09648ca779ab334588ba379`
 (`fd0e6dc..c182061`); this index covers the casting-first commits
 `c182061..HEAD` (61 commits at first publication).
 
-Status: **release candidate 0.2.0-rc3 in preparation.** 0.2.0-rc2 (frozen
+Status: **release candidate 0.2.0-rc4.** 0.2.0-rc3 (frozen at `ea2a027`,
+receipt `docs/evidence/rc-0.2.0-rc3-receipt.md`, superseded after its final
+review), 0.2.0-rc2 (frozen
 at `ae0181d`, receipt `docs/evidence/rc-0.2.0-rc2-receipt.md`) and 0.2.0-rc1
 (`f8562a6`, with the animated cantrip defect described below) keep their
 receipts as history. Not a fully gameplay-qualified release. Casting-first is an opt-in planner mode (UMM setting, Classic
@@ -23,6 +25,40 @@ qualification passed in game on `d35b38f`
 after a close and reopen, each exactly as forecast). Finite-resource
 qualification waits for an owner-designated advanced seed. Human usability and the native aesthetic
 pass remain open.
+
+## Findings from the final review of rc3 (2026-09-24)
+
+Three independent read-only reviews of `fd0e6dc..ea2a027` (the rc3
+candidate): A (domain, planning, execution, game adapters), B (UI,
+persistence, Main and lifecycle) and C (harness, installer, runtime
+testing). They found real defects, so rc3 was superseded by rc4. Every
+finding below was fixed, and each guard has a mutant the tests catch: 30
+C# mutants for the product fixes and 8 for C3/C5 (one of these survives
+as equivalent: the rehearsal flag on another scenario is already refused
+by the exact parameter count), and 24 PowerShell mutants for the harness,
+each verified to fail the intended check.
+
+| Finding | Disposition | Commit |
+| --- | --- | --- |
+| A1 (high, Classic regression): a Classic routine run while the game was paused, or from the open Classic screen, used up its casts' frame-counted confirmation windows, and the halting runner abandoned the rest | The Classic run advances only while the world runs (`WorldGatedEnumerator`), like the casting-first host; the open Classic screen says casting starts once it is closed | `49afb00`, `6b8bd9d` |
+| A2: an empty recipient set confirmed vacuously; a caster-centred group casting whose caster is no legal origin predicted every reachable unit | The compiler blocks `origin-caster-illegal` and `predicted-coverage-empty` with player reasons; the converter refuses a step with no recipient; an empty set never confirms | `49afb00`, `40948d6` |
+| A3: a cast was confirmed by the effect's presence, so a recast over an old, insufficient or suppressed instance "confirmed" though nothing landed | Both live adapters read each recipient's expected effects before submission and confirm only a new or refreshed, unsuppressed instance (`AppliedEffectJudgement`); an unreadable read means nothing is cast | `49afb00` |
+| A4: a linked prepared pair counted as one requested slot, hiding a later shortage | The budget records what a casting reserved | `49afb00` |
+| B1 (high): the first-open import refused every Classic plan saved by 0.0.19 (schema 4) | Import reads through the Classic loader's own in-memory migration; the file is not rewritten; the live import seed is a genuine schema-4 file | `49afb00` |
+| B2 (high, usability): a focused casting could not change caster, source, routine, order or recast policy, so imported automatic castings could never become Ready in place | Focused editor: caster and exact-source choices, routine and order, recast toggle; draft recast toggle; the plan's animated-fallback switch | `49afb00`, `7eb5eeb` |
+| B3: Add was refused for a caster with two ways to cast a buff, with no picker | The draft's **Cast from** picker; the focused casting can switch source | `49afb00` |
+| B4: load and save failures were never shown | Both planners show an unreadable or newer file, a loaded backup and a refused save | `49afb00` |
+| B5: casting-first refreshes could rewrite the Classic file | No Classic save while casting-first is active (checked when the save happens) | `49afb00` |
+| B6: the spellbook button waited for the Classic screen in casting-first mode | It waits for the workspace | `49afb00` |
+| B7: the HUD tooltip could describe another campaign; a removed casting's id was reused (its card showed the old last run); the whole-plan forecast was never shown | Campaign-checked tooltip and press results; ids never reissued in a session; the footer shows a one-pass shortage | `49afb00` |
+| C1: a protected-save violation was dropped when the run also failed, and later runs were not blocked | Every failure reported together; the violation recorded; later runs refused until the owner acknowledges it (`scripts/Confirm-KbpProtectedSaveReview.ps1`, owner-only) | `29213f8`, `edeffbd` |
+| C2: the protected-save baseline lived only in launcher memory | Kept beside the transaction; compared before the lock is released; a pending comparison is an unresolved transaction that `Restore-Local.ps1 -RunId` finishes | `29213f8`, `edeffbd` |
+| C3: the launcher could abandon a run the host was still inside its own limits for | The host stops at `-TimeoutSeconds` from the game's start less 10-45 s, and at once on the launcher's abort marker; the launcher then waits a bounded grace | `29213f8` |
+| C4: the allowance writer could not produce a finite-direct-mixed allowance; the request document was stale | Recipe from the selection, a purpose per recipe, budget = the forecast castings; document corrected | `29213f8` |
+| C5: a manual rehearsal looked like the owner's session in its records | Labelled in the request, orchestration and completion records, and the host's outcome | `29213f8` |
+| C6: the launcher trusted the host's probe PASS | The launcher reads `probe-outcome.json` | `29213f8` |
+| C7: the rollback's lock check was blocked by any game; `orchestration.json` kept a stale status; the launcher skipped host parser rules | Root-scoped check; status is the final verdict; the host's shape rules before launch | `29213f8` |
+| C8: fixture lock and lease rechecks, held keys, a missing completion record, an unbound process-id list | All fixed | `29213f8`, `edeffbd` |
 
 ## Findings from the batch-3 review round (2026-09-24)
 
