@@ -24,6 +24,15 @@ builds), `RC5-repro` and the G2 gate build. Frozen copy
 - Waiting on the owner: the connected session for the frame-judged runs
   and the supervised manual session; the worn-item enchantment decision;
   merge, release and permanent installation.
+- Next iteration, started on the LOCAL branch `codex/kingmaker-buff-planner-next`
+  (worktree `repo/KingmakerBuffPlanner-N1`, not pushed, so the PR branch stays
+  receipts-only after the candidate): `a0e0e5a`/`6af9242` the
+  `ability-pool-direct` recipe (the Mutagen: use, repeat, exhausted) and
+  the plain-buff shape for empty actions and same-branch conditions;
+  `75c8133`/`e2a4959` the `rod-extend-direct` recipe (an Extend rod chosen
+  on a casting: duration doubled at the same strength for one charge; game
+  clock on every read; rod charges read). 337 tests; mutants killed except
+  two redundant ability-pool checks. Live runs wait for a quiet window.
 - Next iteration (bounded, in the receipt): the Mutagen ability-pool
   qualification (the plain-buff check must first accept its shape), an
   Extend rod casting, a safe area-transition route check.
