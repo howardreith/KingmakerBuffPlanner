@@ -24,9 +24,11 @@ namespace KingmakerBuffPlanner.Execution
     {
         private CastingQualificationAllowance() { }
 
-        // Schema 4 names the casting mode the run is approved for; the
-        // boundary refuses a run in any other mode.
-        public const int AllowanceSchemaVersion = 4;
+        // Schema 4 named the casting mode the run is approved for (the
+        // boundary refuses a run in any other mode); schema 5 also binds
+        // the compatibility profile, its identity, the WORKING save and the
+        // purpose (batch 3 review C5).
+        public const int AllowanceSchemaVersion = 5;
         public const int MaximumSubmissionsCeiling = 24;
 
         public string RunId { get; private set; }
@@ -41,12 +43,16 @@ namespace KingmakerBuffPlanner.Execution
         public int MaximumNativeSubmissions { get; private set; }
         public string ApprovedBy { get; private set; }
         public string Authority { get; private set; }
+        public string CompatibilityProfileId { get; private set; }
+        public string CompatibilityIdentity { get; private set; }
+        public string WorkingSaveSha256 { get; private set; }
+        public string Purpose { get; private set; }
 
         private static readonly string[] Members =
         {
             "schemaVersion", "kind", "runId", "sourceCommit", "packageSha256", "dllSha256",
             "assemblyMvid", "fixtureGameId", "recipe", "executionMode", "approvedProjectionIds",
-            "maximumNativeSubmissions", "approvedBy", "authority"
+            "maximumNativeSubmissions", "approvedBy", "authority", "compatibilityProfileId", "compatibilityIdentity", "workingSaveSha256", "purpose"
         };
 
         public static CastingQualificationAllowance Parse(string json, string expectedRunId,
@@ -90,7 +96,11 @@ namespace KingmakerBuffPlanner.Execution
                     ids.Select(token => (string)token).ToList()),
                 MaximumNativeSubmissions = maximum,
                 ApprovedBy = Text(root, "approvedBy"),
-                Authority = Text(root, "authority")
+                Authority = Text(root, "authority"),
+                CompatibilityProfileId = Text(root, "compatibilityProfileId"),
+                CompatibilityIdentity = Text(root, "compatibilityIdentity"),
+                WorkingSaveSha256 = Text(root, "workingSaveSha256"),
+                Purpose = Text(root, "purpose")
             };
             if (string.IsNullOrEmpty(expectedRunId) ||
                 !string.Equals(allowance.RunId, expectedRunId, StringComparison.Ordinal))
@@ -104,6 +114,9 @@ namespace KingmakerBuffPlanner.Execution
             { refusal = "allowance-artifact-identity"; return null; }
             if (string.IsNullOrEmpty(allowance.FixtureGameId))
             { refusal = "allowance-fixture-missing"; return null; }
+            refusal = AllowanceFixtureBinding.Refusal(allowance.CompatibilityProfileId,
+                allowance.CompatibilityIdentity, allowance.WorkingSaveSha256, allowance.Purpose);
+            if (refusal != null) return null;
             if (!CastingQualificationRecipe.IsKnown(allowance.Recipe))
             { refusal = "allowance-recipe-unknown"; return null; }
             if (allowance.ExecutionMode != "instant" && allowance.ExecutionMode != "animated")
@@ -117,6 +130,43 @@ namespace KingmakerBuffPlanner.Execution
         {
             JToken token = root[name];
             return token != null && token.Type == JTokenType.String ? (string)token : null;
+        }
+    }
+
+    // The fixture binding every casting allowance carries (batch 3, section
+    // 3; review C5): the compatibility profile and its identity digest (the
+    // exact external mod copies), the WORKING save's bytes and the run's
+    // purpose. The launcher checks all of them against the profile and the
+    // save pair it resolves; the host re-checks the profile and the save.
+    public static class AllowanceFixtureBinding
+    {
+        public const int MaximumPurposeLength = 400;
+
+        public static bool IsKnownProfile(string profileId)
+        {
+            return profileId == "native-only" || profileId == "call-of-the-wild" ||
+                profileId == "human-reproduction" || profileId == "full-user";
+        }
+
+        // Null when the binding is well formed, else the refusal.
+        public static string Refusal(string profileId, string identity, string workingSaveSha256, string purpose)
+        {
+            if (!IsKnownProfile(profileId)) return "allowance-profile";
+            if (!SingleCastProbeAllowance.IsLowerHex64(identity)) return "allowance-compatibility-identity";
+            if (!SingleCastProbeAllowance.IsLowerHex64(workingSaveSha256)) return "allowance-working-save";
+            if (string.IsNullOrWhiteSpace(purpose) || purpose.Length > MaximumPurposeLength) return "allowance-purpose";
+            return null;
+        }
+
+        // The host's own check: the request's profile and WORKING save are
+        // the approved ones. Null when they are.
+        public static string RequestMismatch(string allowedProfileId, string allowedWorkingSaveSha256,
+            string requestProfileId, string requestWorkingSaveSha256)
+        {
+            if (!string.Equals(allowedProfileId, requestProfileId, StringComparison.Ordinal)) return "profile-mismatch";
+            if (!string.Equals(allowedWorkingSaveSha256, requestWorkingSaveSha256, StringComparison.Ordinal))
+                return "working-save-mismatch";
+            return null;
         }
     }
 

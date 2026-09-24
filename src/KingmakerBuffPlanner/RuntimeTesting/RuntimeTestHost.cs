@@ -3429,9 +3429,16 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             return true;
         }
 
+        // One string parameter of the request, or null.
+        private string RequestText(string name)
+        {
+            object raw;
+            return _request.Parameters.TryGetValue(name, out raw) ? raw as string : null;
+        }
+
         // The run-bound classic allowance: this run, this build, this
-        // campaign, this casting mode and routine, and exactly the plan the
-        // classic controls just authored.
+        // campaign, profile and WORKING save, this casting mode and routine,
+        // and exactly the plan the classic controls just authored.
         private ClassicCastAllowance ReadClassicAllowance()
         {
             object raw;
@@ -3450,13 +3457,15 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 : measured.DllSha256 != allowance.DllSha256 ? "identity-mismatch:dll"
                 : measured.AssemblyMvid != allowance.AssemblyMvid ? "identity-mismatch:mvid"
                 : !string.Equals(campaign, allowance.FixtureGameId, StringComparison.Ordinal) ? "fixture-mismatch"
-                : !string.Equals(_classicRecord.ExecutionMode, allowance.ExecutionMode, StringComparison.Ordinal)
+                : AllowanceFixtureBinding.RequestMismatch(allowance.CompatibilityProfileId,
+                    allowance.WorkingSaveSha256, _request.ProfileId, RequestText("workingSha256")) ??
+                (!string.Equals(_classicRecord.ExecutionMode, allowance.ExecutionMode, StringComparison.Ordinal)
                     ? "execution-mode-mismatch"
                 : allowance.RoutineId != "long" ? "routine-mismatch"
                 : !string.Equals(_classicRecord.PlanDigest, allowance.ApprovedPlanDigest, StringComparison.Ordinal)
                     ? "plan-differs-from-approval"
                 : _classicRecord.PlanSteps > allowance.MaximumNativeSubmissions ? "plan-over-budget"
-                : null;
+                : null);
             _classicRecord.AllowanceStatus = mismatch ?? "valid";
             return mismatch == null ? allowance : null;
         }
@@ -3669,6 +3678,16 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                             _qualificationRecord.AllowanceStatus = "identity-mismatch:" + mismatch;
                             allowance = null;
                         }
+                    }
+                    // Review C5: the approved profile and WORKING save are the
+                    // ones this run was launched with.
+                    string bindingMismatch = allowance == null ? null
+                        : AllowanceFixtureBinding.RequestMismatch(allowance.CompatibilityProfileId,
+                            allowance.WorkingSaveSha256, _request.ProfileId, RequestText("workingSha256"));
+                    if (bindingMismatch != null)
+                    {
+                        _qualificationRecord.AllowanceStatus = bindingMismatch;
+                        allowance = null;
                     }
                 }
                 string campaignId = Kingmaker.Game.Instance == null || Kingmaker.Game.Instance.Player == null

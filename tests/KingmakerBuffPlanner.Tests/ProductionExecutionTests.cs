@@ -2264,7 +2264,7 @@ namespace KingmakerBuffPlanner.Tests
         {
             var root = new JObject
             {
-                { "schemaVersion", 4 },
+                { "schemaVersion", 5 },
                 { "kind", "kbp-casting-qualification" },
                 { "runId", "qual-run-1" },
                 { "sourceCommit", new string('c', 40) },
@@ -2277,7 +2277,11 @@ namespace KingmakerBuffPlanner.Tests
                 { "approvedProjectionIds", new JArray(new string('d', 64), new string('e', 64)) },
                 { "maximumNativeSubmissions", 6 },
                 { "approvedBy", "Howie" },
-                { "authority", "owner mission 2026-09-23 section 4" }
+                { "authority", "owner mission 2026-09-23 section 4" },
+                { "compatibilityProfileId", "full-user" },
+                { "compatibilityIdentity", new string('f', 64) },
+                { "workingSaveSha256", new string('9', 64) },
+                { "purpose", "casting-first qualification fixture" }
             };
             if (mutate != null) mutate(root);
             return root.ToString();
@@ -2320,7 +2324,13 @@ namespace KingmakerBuffPlanner.Tests
                 { "allowance-artifact-identity", o => o["dllSha256"] = "short" },
                 { "allowance-fixture-missing", o => o["fixtureGameId"] = string.Empty },
                 { "allowance-recipe-unknown", o => o["recipe"] = "anything" },
-                { "allowance-approval-missing", o => o["approvedBy"] = string.Empty }
+                { "allowance-approval-missing", o => o["approvedBy"] = string.Empty },
+                // Review C5: the fixture binding is part of the approval.
+                { "allowance-missing-member:purpose", o => o.Remove("purpose") },
+                { "allowance-profile", o => o["compatibilityProfileId"] = "other-profile" },
+                { "allowance-compatibility-identity", o => o["compatibilityIdentity"] = "XYZ" },
+                { "allowance-working-save", o => o["workingSaveSha256"] = new string('9', 63) },
+                { "allowance-purpose", o => o["purpose"] = " " }
             };
             foreach (KeyValuePair<string, Action<JObject>> item in cases)
             {
@@ -2331,6 +2341,10 @@ namespace KingmakerBuffPlanner.Tests
             if (CastingQualificationAllowance.Parse(QualificationAllowanceJson(), "other-run",
                     out refusal) != null || refusal != "allowance-run-mismatch")
                 throw new InvalidOperationException("A different run used the allowance.");
+            // A schema-4 allowance (no fixture binding) authorizes nothing.
+            if (CastingQualificationAllowance.Parse(QualificationAllowanceJson(o => o["schemaVersion"] = 4),
+                    "qual-run-1", out refusal) != null || refusal != "allowance-schema")
+                throw new InvalidOperationException("A schema-4 allowance without its binding was accepted.");
             if (CastingQualificationAllowance.Parse(QualificationAllowanceJson(o =>
                     o["maximumNativeSubmissions"] = 0), "qual-run-1", out refusal) != null)
                 throw new InvalidOperationException("A zero submission budget was accepted.");
@@ -3336,25 +3350,45 @@ namespace KingmakerBuffPlanner.Tests
             {
                 var root = new JObject
                 {
-                    { "schemaVersion", 1 }, { "kind", "kbp-classic-cast" }, { "runId", "classic-run-1" },
+                    { "schemaVersion", 2 }, { "kind", "kbp-classic-cast" }, { "runId", "classic-run-1" },
                     { "sourceCommit", new string('c', 40) }, { "packageSha256", new string('a', 64) },
                     { "dllSha256", new string('b', 64) }, { "assemblyMvid", "11111111-2222-3333-4444-555555555555" },
                     { "fixtureGameId", "fixture-game" }, { "executionMode", "animated" }, { "routineId", "long" },
                     { "approvedPlanDigest", digest }, { "maximumNativeSubmissions", 3 },
-                    { "approvedBy", "Howie" }, { "authority", "owner mission 2026-09-23 batch 3 section 6" }
+                    { "approvedBy", "Howie" }, { "authority", "owner mission 2026-09-23 batch 3 section 6" },
+                    { "compatibilityProfileId", "full-user" }, { "compatibilityIdentity", new string('f', 64) },
+                    { "workingSaveSha256", new string('9', 64) }, { "purpose", "classic cast qualification fixture" }
                 };
                 if (mutate != null) mutate(root);
                 return root.ToString();
             };
             ClassicCastAllowance allowance = ClassicCastAllowance.Parse(allowanceJson(null), "classic-run-1", out refusal);
             if (allowance == null || refusal != null || allowance.ApprovedPlanDigest != digest ||
-                allowance.ExecutionMode != "animated" || allowance.MaximumNativeSubmissions != 3)
+                allowance.ExecutionMode != "animated" || allowance.MaximumNativeSubmissions != 3 ||
+                allowance.CompatibilityProfileId != "full-user" || allowance.WorkingSaveSha256 != new string('9', 64) ||
+                allowance.CompatibilityIdentity != new string('f', 64) ||
+                allowance.Purpose != "classic cast qualification fixture")
                 throw new InvalidOperationException("A valid classic allowance was refused: " + refusal);
+            // The host's re-check: the request's profile and WORKING save.
+            if (AllowanceFixtureBinding.RequestMismatch("full-user", new string('9', 64), "full-user",
+                    new string('9', 64)) != null ||
+                AllowanceFixtureBinding.RequestMismatch("full-user", new string('9', 64), "native-only",
+                    new string('9', 64)) != "profile-mismatch" ||
+                AllowanceFixtureBinding.RequestMismatch("full-user", new string('9', 64), "full-user",
+                    new string('8', 64)) != "working-save-mismatch" ||
+                AllowanceFixtureBinding.RequestMismatch("full-user", new string('9', 64), "full-user", null) !=
+                    "working-save-mismatch")
+                throw new InvalidOperationException("The host does not re-check the approved profile and save.");
             var cases = new Dictionary<string, Action<JObject>>
             {
                 { "allowance-unknown-member:extra", o => o["extra"] = 1 },
                 { "allowance-missing-member:approvedPlanDigest", o => o.Remove("approvedPlanDigest") },
-                { "allowance-schema", o => o["schemaVersion"] = 2 },
+                { "allowance-schema", o => o["schemaVersion"] = 1 },
+                { "allowance-missing-member:workingSaveSha256", o => o.Remove("workingSaveSha256") },
+                { "allowance-profile", o => o["compatibilityProfileId"] = "Full-User" },
+                { "allowance-compatibility-identity", o => o["compatibilityIdentity"] = new string('F', 64) },
+                { "allowance-working-save", o => o["workingSaveSha256"] = "short" },
+                { "allowance-purpose", o => o["purpose"] = new string('p', AllowanceFixtureBinding.MaximumPurposeLength + 1) },
                 { "allowance-kind", o => o["kind"] = "kbp-casting-qualification" },
                 { "allowance-submissions-range", o => o["maximumNativeSubmissions"] = 25 },
                 { "allowance-artifact-identity", o => o["dllSha256"] = "short" },
