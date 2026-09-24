@@ -3178,8 +3178,8 @@ namespace KingmakerBuffPlanner.Tests
                 {
                     CastingScenario = true, AllowanceStatus = "valid", ExecutionMode = "animated",
                     PlanDigest = digest, PlanSteps = 1, Grant = "consumed", GrantConsumed = true,
-                    GrantAttempts = 1, QuickDisposition = "Completed", Planned = 1, Submitted = 1,
-                    Confirmed = 1, Failed = 0, CastingFirstRuns = 0
+                    GrantAttempts = 1, QuickDisposition = "Completed", Planned = 1, Queued = 1, CastStarted = 1,
+                    Submitted = 0, Confirmed = 1, Failed = 0, CastingFirstRuns = 0
                 };
                 record.Steps.Add(new ClassicCastStepResult(0, "provider", true, "unit-t1")
                 {
@@ -3189,9 +3189,37 @@ namespace KingmakerBuffPlanner.Tests
                 record.FinitePools.Add("unit|book|spontaneous-1:2>2");
                 return record;
             };
-            if (good().Violations().Count != 0)
+            // The executor's own record of issuing: animated queues and starts
+            // a command (as observed live in classic-cast-20260924-00aca73-anim-01:
+            // queued=1;started=1;submitted=0), instant submits the rule.
+            Func<ClassicCastRecord> instant = () =>
+            {
+                ClassicCastRecord record = good();
+                record.ExecutionMode = "instant";
+                record.Queued = 0;
+                record.CastStarted = 0;
+                record.Submitted = 1;
+                return record;
+            };
+            if (good().Violations().Count != 0 || instant().Violations().Count != 0)
                 throw new InvalidOperationException("A clean classic cast was refused: " +
-                    string.Join("|", good().Violations().ToArray()));
+                    string.Join("|", good().Violations().ToArray()) + " / " +
+                    string.Join("|", instant().Violations().ToArray()));
+            var instantShapes = new Dictionary<string, Action<ClassicCastRecord>>
+            {
+                { "report:planned=1;queued=0;started=0;submitted=0;confirmed=1;failed=0;steps=1;mode=instant",
+                    r => r.Submitted = 0 },
+                { "report:planned=1;queued=1;started=1;submitted=0;confirmed=1;failed=0;steps=1;mode=instant",
+                    r => { r.Submitted = 0; r.Queued = 1; r.CastStarted = 1; } }
+            };
+            foreach (KeyValuePair<string, Action<ClassicCastRecord>> shape in instantShapes)
+            {
+                ClassicCastRecord bad = instant();
+                shape.Value(bad);
+                if (!bad.Violations().Contains(shape.Key))
+                    throw new InvalidOperationException("Classic instant judgement missed " + shape.Key + ": " +
+                        string.Join("|", bad.Violations().ToArray()));
+            }
             var shapes = new Dictionary<string, Action<ClassicCastRecord>>
             {
                 { "step0:status:TimedOutUnconfirmed", r => r.Steps[0].FinalStatus = "TimedOutUnconfirmed" },
@@ -3203,14 +3231,23 @@ namespace KingmakerBuffPlanner.Tests
                 { "step0:cantrip-not-at-will", r => r.Steps[0].Detail = "ok;resolution:known-spell:spellbook:b" },
                 { "grant:consumed", r => r.GrantAttempts = 2 },
                 { "disposition:Refused", r => r.QuickDisposition = "Refused" },
-                { "report:planned=1;submitted=1;confirmed=0;failed=1;steps=1", r => { r.Confirmed = 0; r.Failed = 1; } },
+                { "report:planned=1;queued=1;started=1;submitted=0;confirmed=0;failed=1;steps=1;mode=animated",
+                    r => { r.Confirmed = 0; r.Failed = 1; } },
                 { "finite-pool:unit|book|spontaneous-1:2>1", r => r.FinitePools[0] = "unit|book|spontaneous-1:2>1" },
                 { "casting-first-runs:1", r => r.CastingFirstRuns = 1 },
                 { "allowance:execution-mode-mismatch", r => r.AllowanceStatus = "execution-mode-mismatch" },
                 { "steps-observed:0", r => r.Steps.Clear() },
-                { "report:planned=2;submitted=1;confirmed=1;failed=0;steps=1", r => r.Planned = 2 },
-                { "report:planned=1;submitted=0;confirmed=1;failed=0;steps=1", r => r.Submitted = 0 },
-                { "report:planned=1;submitted=1;confirmed=1;failed=1;steps=1", r => r.Failed = 1 },
+                { "report:planned=2;queued=1;started=1;submitted=0;confirmed=1;failed=0;steps=1;mode=animated",
+                    r => r.Planned = 2 },
+                { "report:planned=1;queued=1;started=0;submitted=0;confirmed=1;failed=0;steps=1;mode=animated",
+                    r => r.CastStarted = 0 },
+                { "report:planned=1;queued=0;started=1;submitted=0;confirmed=1;failed=0;steps=1;mode=animated",
+                    r => r.Queued = 0 },
+                { "report:planned=1;queued=0;started=0;submitted=1;confirmed=1;failed=0;steps=1;mode=animated",
+                    r => { r.Queued = 0; r.CastStarted = 0; r.Submitted = 1; } },
+                { "report:planned=1;queued=1;started=1;submitted=0;confirmed=1;failed=1;steps=1;mode=animated",
+                    r => r.Failed = 1 },
+                { "mode:hybrid", r => r.ExecutionMode = "hybrid" },
                 { "finite-pool:unit|book|spontaneous-1:2", r => r.FinitePools[0] = "unit|book|spontaneous-1:2" }
             };
             foreach (KeyValuePair<string, Action<ClassicCastRecord>> shape in shapes)

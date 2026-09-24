@@ -3179,6 +3179,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 return;
             }
             _classicRecord.Planned = report.Planned;
+            _classicRecord.Queued = report.Queued;
+            _classicRecord.CastStarted = report.CastStarted;
             _classicRecord.Submitted = report.Submitted;
             _classicRecord.Confirmed = report.Confirmed;
             _classicRecord.Failed = report.Failed;
@@ -3276,8 +3278,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 { "planSteps", record.PlanSteps },
                 { "grant", record.Grant },
                 { "quickDisposition", record.QuickDisposition },
-                { "report", "planned=" + record.Planned + ";submitted=" + record.Submitted + ";confirmed=" +
-                    record.Confirmed + ";failed=" + record.Failed },
+                { "report", record.ReportLine },
                 { "castingFirstRuns", record.CastingFirstRuns },
                 { "steps", new JArray(record.Steps.Select(step => (object)new JObject
                     {
