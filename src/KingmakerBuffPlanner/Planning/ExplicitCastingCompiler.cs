@@ -119,12 +119,12 @@ namespace KingmakerBuffPlanner.Planning
         // instance unchanged.
         public IReadOnlyList<string> PreCoveredUnitIds { get; private set; }
 
-        // The execution strategy the applied enhancements require, when it
-        // differs from the source's own (null: the source's). The classic
-        // planner's rule: an enhancement that needs a native command casts
-        // through one; a provider-direct enhancement (Brown-Fur Powerful
-        // Change) casts through the provider's own transaction, since a
-        // plain rule cast never enrols it.
+        // The execution strategy of the resolved option with its targeting
+        // modifiers and applied enhancements (null when unresolved). The
+        // classic planner's rule: an enhancement that needs a native command
+        // casts through one; a provider-direct enhancement (Brown-Fur
+        // Powerful Change) casts through the provider's own transaction,
+        // since a plain rule cast never enrols it.
         public CastExecutionStrategy? ExecutionStrategy { get; private set; }
         public string ExecutionStrategyReason { get; private set; }
 
@@ -452,9 +452,10 @@ namespace KingmakerBuffPlanner.Planning
                 ResolveEnhancements(casting, option, enhancements, applied, omitted,
                     matched, intended, requiredExhausted, reasons, resourceReasons);
                 // The applied enhancements decide how the cast must execute,
-                // exactly as for the classic planner.
+                // exactly as for the classic planner. The effective strategy
+                // (after targeting modifiers too) is always recorded.
                 ProviderPlanningOption effective = CastEnhancementExecutionPolicy.Apply(matched, option);
-                if (effective != null && effective.ExecutionStrategy != option.ExecutionStrategy)
+                if (effective != null)
                 {
                     strategy = effective.ExecutionStrategy;
                     strategyReason = effective.ExecutionStrategyReason;

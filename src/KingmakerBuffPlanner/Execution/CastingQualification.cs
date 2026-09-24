@@ -837,10 +837,15 @@ namespace KingmakerBuffPlanner.Execution
                     };
                     var selection = new CastingQualificationSelection(null, sourceId, ability, castings,
                         considered, rejections, EnhancedDirect, coverage, chosen);
-                    string check = EnhancedForecastRefusal(CastingQualificationForecast.Forecast(
-                        selection, inputs, campaignId), castings, enhancement.EnhancementId);
+                    IReadOnlyList<CastingQualificationStepForecast> forecast =
+                        CastingQualificationForecast.Forecast(selection, inputs, campaignId);
+                    string check = EnhancedForecastRefusal(forecast, castings, enhancement.EnhancementId);
                     if (check != null) { reject(key + "|" + check); continue; }
-                    return selection;
+                    // The route the enhanced cast takes, reported with the
+                    // selection (and checked against what ran).
+                    coverage.Add("route:" + forecast[1].Projection.Plan.Steps[0].ExecutionStrategy);
+                    return new CastingQualificationSelection(null, sourceId, ability, castings,
+                        considered, rejections, EnhancedDirect, coverage, chosen);
                 }
                 if (!applicable) reject(enhancement.EnhancementId + "|no-applicable-plain-spell");
             }
@@ -867,6 +872,12 @@ namespace KingmakerBuffPlanner.Execution
             CastStep enhanced = forecast[1].Projection.Plan.Steps[0];
             if (!enhanced.EnhancementIds.SequenceEqual(new[] { enhancementId }))
                 return "enhancement-not-forecast:" + string.Join(",", enhanced.EnhancementIds.ToArray());
+            // Only a route the enhancement's provider takes part in: its own
+            // transaction or the game's own command (a plain rule cast never
+            // enrols it, so the enhancement would not be applied).
+            if (enhanced.ExecutionStrategy != CastExecutionStrategy.ProviderDirectRuleCast &&
+                enhanced.ExecutionStrategy != CastExecutionStrategy.NativeCommandRequired)
+                return "enhancement-route-unenrolled:" + enhanced.ExecutionStrategy;
             return null;
         }
 

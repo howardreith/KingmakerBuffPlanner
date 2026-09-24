@@ -4377,6 +4377,8 @@ namespace KingmakerBuffPlanner.Tests
             internal bool AlterPlainAfterEnhanced;
             internal bool UnreadModifiers;
             internal int PlainBonus = 4;
+            // What the Instant cast reports about the provider's transaction.
+            internal bool ReportProviderDirect = true;
             // How the enhancement executes: "direct" (the installed
             // provider's own transaction, as live), "native" (a native
             // command) or "none".
@@ -4399,7 +4401,9 @@ namespace KingmakerBuffPlanner.Tests
             public InstantCastResult Fire(CastStep step)
             {
                 Land(step);
-                return new InstantCastResult(true, true, EffectsObserved(step), true, "simulated-enhanced");
+                return new InstantCastResult(true, true, EffectsObserved(step), true,
+                    "simulated-enhanced;provider-direct:" + (ReportProviderDirect &&
+                        step.ExecutionStrategy == CastExecutionStrategy.ProviderDirectRuleCast) + ";");
             }
             public IAnimatedCastOperation StartAnimated(CastStep step)
             {
@@ -4621,7 +4625,10 @@ namespace KingmakerBuffPlanner.Tests
                 selection.Enhancement.Increase != 2 || selection.Enhancement.UnitsPerCast != 1 ||
                 selection.Enhancement.UsagePoolId != BrownFurPowerfulChangeProfile.UsagePoolId("unit-arcanist") ||
                 !selection.Coverage.SequenceEqual(new[]
-                    { "spontaneous", "class-feature-enhancement", "powerful-change:Strength" }))
+                {
+                    "spontaneous", "class-feature-enhancement", "powerful-change:Strength",
+                    "route:ProviderDirectRuleCast"
+                }))
                 throw new InvalidOperationException("The enhanced selection was wrong: " + selection.Refusal + " " +
                     string.Join(",", selection.Castings.Select(casting => casting.CastingId + "=" +
                         casting.DirectTargetUnitId + "+" + casting.Enhancements.Count).ToArray()) + " coverage=" +
@@ -4674,6 +4681,12 @@ namespace KingmakerBuffPlanner.Tests
                 !rodOnly.Rejections.Contains("metamagic-rod|unit-arcanist|rod-guid|not-a-supported-non-rod-enhancement"))
                 throw new InvalidOperationException("A rod was taken as the enhanced recipe's enhancement: " +
                     string.Join(",", rodOnly.Rejections.ToArray()));
+            CastingQualificationSelection unenrolled = CastingQualificationRecipe.SelectEnhancedDirect(
+                new EnhancedBuffWorld { Routing = "none" }.Inputs(), "fixture-campaign");
+            if (unenrolled.Selected || !unenrolled.Rejections.Any(value =>
+                    value.EndsWith("|enhancement-route-unenrolled:DirectRuleCast", StringComparison.Ordinal)))
+                throw new InvalidOperationException("An enhancement no provider would enrol was selected: " +
+                    string.Join(",", unenrolled.Rejections.ToArray()));
             CastingQualificationSelection dry = CastingQualificationRecipe.SelectEnhancedDirect(
                 new EnhancedBuffWorld { Reservoir = 0 }.Inputs(), "fixture-campaign");
             CastingQualificationSelection unlisted = CastingQualificationRecipe.SelectEnhancedDirect(
@@ -4735,7 +4748,9 @@ namespace KingmakerBuffPlanner.Tests
                 Tuple.Create<Action<EnhancedBuffWorld>, string, string[]>(value => value.PlainBonus = 0,
                     "plain-wait:step:modifiers:qual-cast-1:no-Strength/Enhancement/:Strength/Enhancement/0", first),
                 Tuple.Create<Action<EnhancedBuffWorld>, string, string[]>(value => value.PlainBonus = int.MinValue,
-                    "plain-wait:step:modifiers:qual-cast-1:no-Strength/Enhancement/:", first)
+                    "plain-wait:step:modifiers:qual-cast-1:no-Strength/Enhancement/:", first),
+                Tuple.Create<Action<EnhancedBuffWorld>, string, string[]>(value => value.ReportProviderDirect = false,
+                    "enhanced-wait:step:route:provider-direct:True:EffectConfirmed:", both)
             };
             int shapeIndex = 0;
             foreach (Tuple<Action<EnhancedBuffWorld>, string, string[]> shape in shapes)
@@ -4744,7 +4759,8 @@ namespace KingmakerBuffPlanner.Tests
                 shape.Item1(bad);
                 CastingQualificationRecord record = RunEnhanced(Path.Combine(root, "qe-bad" + (shapeIndex++)), bad,
                     "instant");
-                if (record.TerminalReason == "completed" || !record.Failures.Contains(shape.Item2) ||
+                if (record.TerminalReason == "completed" ||
+                    !record.Failures.Any(value => value.StartsWith(shape.Item2, StringComparison.Ordinal)) ||
                     !bad.Fired.SequenceEqual(shape.Item3))
                     throw new InvalidOperationException("A wrong enhanced cast was not refused as " + shape.Item2 +
                         ": " + record.TerminalReason + "|" + string.Join("|", record.Failures.ToArray()) +
