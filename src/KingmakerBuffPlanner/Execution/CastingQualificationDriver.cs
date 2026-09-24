@@ -465,6 +465,18 @@ namespace KingmakerBuffPlanner.Execution
                 return "states:" + States(step);
             if (step.TransitionOf(plain) != "unchanged" || step.TransitionOf(enhanced) != "new-instance")
                 return "effects:" + string.Join(",", step.Transitions.ToArray());
+            // The route that ran is the one forecast (review of the enhanced
+            // recipe): in Instant mode a provider-direct enhancement through
+            // the provider's own transaction; a native-command one, and every
+            // cast in Animated mode, through the game's own command.
+            CastStep forecastStep = ReservedStep(step.Name, enhanced, false);
+            CastingOutcomeEntry entry = step.Report.Entries.FirstOrDefault(value =>
+                string.Equals(value.CastingId, enhanced, StringComparison.Ordinal));
+            string route = ExecutionMode == "instant" && forecastStep != null &&
+                forecastStep.ExecutionStrategy == CastExecutionStrategy.ProviderDirectRuleCast
+                    ? ";provider-direct:True;" : "native-command-spend-completed";
+            if (entry == null || entry.Detail == null || !entry.Detail.Contains(route))
+                return "route:" + route.Trim(';') + ":" + (entry == null ? "none" : entry.Detail);
             string caster = CasterFailure(step, enhancement.UnitsPerCast);
             if (caster != null) return caster;
             CastingQualificationStepResult plainStep = Step(CastingQualificationForecast.Plain);

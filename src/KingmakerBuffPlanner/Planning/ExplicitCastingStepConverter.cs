@@ -274,8 +274,9 @@ namespace KingmakerBuffPlanner.Planning
             if (option.ReachableTargetIds == null ||
                 !option.ReachableTargetIds.Contains(casting.DirectTargetUnitId))
                 return "probe-unsupported:target-not-verified-reachable:" + id;
-            if (option.ExecutionStrategy != CastExecutionStrategy.DirectRuleCast)
-                return "probe-unsupported:strategy:" + option.ExecutionStrategy + ":" + id;
+            CastExecutionStrategy strategy = casting.ExecutionStrategy ?? option.ExecutionStrategy;
+            if (strategy != CastExecutionStrategy.DirectRuleCast)
+                return "probe-unsupported:strategy:" + strategy + ":" + id;
             if (!IsPlainCurrentTargetBuff(expected, ability))
                 return "probe-unsupported:effect-shape:" + id;
             return null;
