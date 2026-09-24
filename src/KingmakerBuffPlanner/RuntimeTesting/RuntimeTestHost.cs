@@ -3732,7 +3732,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     _request.Parameters.TryGetValue("qualificationRecipe", out recipeRaw)
                         ? recipeRaw as string : null,
                     () => BuffPlannerUiRoot.WorldRunsForCasting, true,
-                    BuffPlannerUiRoot.PressRoutineForRuntime, BuffPlannerUiRoot.SetEnabled,
+                    BuffPlannerUiRoot.PressRoutineForRuntime, Main.SetEnabledForRuntime,
                     () => "subscriptions=" + BuffPlannerUiRoot.ActiveEventSubscriptionsForRuntime +
                         ";hudRoots=" + BuffPlannerUiRoot.HudRootCountForRuntime +
                         ";hudInstalled=" + BuffPlannerUiRoot.IsHudInstalledForRuntime +
@@ -3856,6 +3856,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         ? (JToken)record.StopPressedInFlight.Value : JValue.CreateNull() },
                     { "disable", record.Disable },
                     { "disabledAt", record.DisabledAt },
+                    { "disableHeldUpdates", record.DisableHeldUpdates },
+                    { "acceptingWhileDisabled", record.AcceptingWhileDisabled },
+                    { "runningWhileDisabled", record.RunningWhileDisabled },
                     { "acceptingAfterEnable", record.AcceptingAfterEnable },
                     { "lifecycleBefore", record.LifecycleBefore },
                     { "lifecycleAfter", record.LifecycleAfter },

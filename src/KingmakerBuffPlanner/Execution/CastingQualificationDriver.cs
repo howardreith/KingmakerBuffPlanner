@@ -109,10 +109,14 @@ namespace KingmakerBuffPlanner.Execution
         public bool StopPressHandled { get; set; }
         public bool? StopPressedInFlight { get; set; }
         // The disable step: how the planner was disabled, at which point of
-        // the run ("in-flight", "before-start", ...), and whether the host
-        // accepted runs again once the planner was enabled.
+        // the run ("in-flight", "before-start", ...), the whole updates it
+        // stayed disabled (nothing may run or be accepted then), and whether
+        // the host accepted runs again once the planner was enabled.
         public string Disable { get; set; }
         public string DisabledAt { get; set; }
+        public int DisableHeldUpdates { get; set; }
+        public bool AcceptingWhileDisabled { get; set; }
+        public bool RunningWhileDisabled { get; set; }
         public bool AcceptingAfterEnable { get; set; }
         // The recover step's lifecycle evidence: the owner's probe (live
         // subscriptions, HUD roots, planner roots, game mode) read just
@@ -179,20 +183,28 @@ namespace KingmakerBuffPlanner.Execution
             else if (!StopPressHandled) violations.Add("stop-press:not-handled:" + StopPress);
             else if (ExecutionMode == "animated" && StopPressedInFlight != true)
                 violations.Add("stop-press:not-in-flight:" + StopPress);
-            // The disable lands while the animated cast is in progress, or
-            // (instant casts are atomic) before the run's first step; the
-            // host accepts runs again once the planner is enabled.
+            // The disable lands while the animated cast is in progress, or,
+            // for instant, before the run's first step (a disable-before-
+            // start case, never claimed as an in-flight instant
+            // interruption); it is held over whole updates with nothing
+            // running or accepted, and the host accepts runs again once the
+            // planner is enabled.
             if (HasDisableStep)
             {
                 string expectedAt = ExecutionMode == "animated" ? "in-flight" : "before-start";
                 if (Disable == null) violations.Add("disable:none");
                 else if (DisabledAt != expectedAt)
                     violations.Add("disable:not-" + expectedAt + ":" + Disable);
+                else if (DisableHeldUpdates < CastingQualificationDriver.DisableHoldUpdates)
+                    violations.Add("disable:not-held:" + Disable);
+                else if (AcceptingWhileDisabled || RunningWhileDisabled)
+                    violations.Add("disable:active-while-disabled:" + Disable);
                 else if (!AcceptingAfterEnable) violations.Add("disable:not-resumed:" + Disable);
                 // After the recover run: the same lifecycle state as before
-                // the disable, and exactly one report per started run.
+                // the disable, read by a real probe (review B7), and exactly
+                // one report per started run.
                 int submitted = Submissions.Count(value => value.StartsWith("submitted:", StringComparison.Ordinal));
-                if (LifecycleBefore == null || LifecycleBefore != LifecycleAfter)
+                if (!ProbeRead(LifecycleBefore) || LifecycleBefore != LifecycleAfter)
                     violations.Add("lifecycle:" + (LifecycleBefore ?? "none") + ">" + (LifecycleAfter ?? "none"));
                 if (RunsStarted != submitted || RunsReported != submitted)
                     violations.Add("runs:started=" + RunsStarted + ";reported=" + RunsReported +
@@ -203,6 +215,13 @@ namespace KingmakerBuffPlanner.Execution
         }
 
         public static readonly string[] StepNames = { "stop", "complete", "repeat", "recast" };
+
+        // A lifecycle line from the owner's probe, not a stand-in for one.
+        public static bool ProbeRead(string lifecycle)
+        {
+            return !string.IsNullOrEmpty(lifecycle) && lifecycle != CastingQualificationDriver.Unprobed &&
+                lifecycle != "null" && !lifecycle.StartsWith("probe-failed:", StringComparison.Ordinal);
+        }
 
         // The rule for ONE step, applied by the driver the moment the step
         // ends (the run stops at the first mismatch, before anything else
@@ -439,6 +458,8 @@ namespace KingmakerBuffPlanner.Execution
         private readonly Func<string> _lifecycleProbe;
         private bool _stopPressed;
         private bool _disabled;
+        private bool _enabledAgain;
+        private int _disabledUpdates;
         private CastingQualificationBoundary _boundary;
         private Dictionary<string, CastStep> _observeSteps;
         private CastingWorkspaceSession _session;
@@ -665,24 +686,50 @@ namespace KingmakerBuffPlanner.Execution
             }
             _running = step;
             _phase = name + "-wait";
-            // An instant cast is atomic within one pump: the instant run is
-            // disabled before its first step (each mod update ticks the
-            // planner root before this driver, so no pump has run yet).
+            // The instant run is disabled before its first step: each mod
+            // update ticks the planner root before this driver, so no pump
+            // has run and nothing was submitted. This is the instant
+            // disable-before-start case, not an in-flight interruption: an
+            // instant cast submits within one pump but confirms and cleans
+            // up over later frames, a window this step does not exercise.
             if (name == CastingQualificationForecast.Disable && _allowance.ExecutionMode != "animated")
                 DisablePlanner();
         }
 
-        // The animated run is disabled as soon as its cast is in progress.
+        // The number of whole updates the planner stays disabled before it
+        // is enabled again (review B7).
+        public const int DisableHoldUpdates = 5;
+        public const string Unprobed = "unprobed";
+
+        // The animated run is disabled as soon as its cast is in progress;
+        // either run then stays disabled over whole updates, with nothing
+        // running or accepted, before the planner is enabled again.
         private void WaitDisable()
         {
-            if (_host.IsRunning && !_disabled && _host.ActiveCastingInFlight) DisablePlanner();
+            if (!_disabled)
+            {
+                if (_host.IsRunning && _host.ActiveCastingInFlight)
+                {
+                    DisablePlanner();
+                    return;
+                }
+                Wait(false, "recover");
+                return;
+            }
+            if (!_enabledAgain)
+            {
+                if (_host.Accepting) Record.AcceptingWhileDisabled = true;
+                if (_host.IsRunning) Record.RunningWhileDisabled = true;
+                Record.DisableHeldUpdates = ++_disabledUpdates;
+                if (_disabledUpdates < DisableHoldUpdates) return;
+                EnablePlanner();
+            }
             Wait(false, "recover");
         }
 
-        // The planner's own disable, then enable, as the mod toggle drives
-        // them: the host ends the run through its owned terminal (the cast
-        // in progress is interrupted and cleaned up) and accepts runs again
-        // once enabled.
+        // The planner's own disable, as the mod toggle drives it: the host
+        // ends the run through its owned terminal (the cast in progress is
+        // interrupted and cleaned up) and refuses runs while disabled.
         private void DisablePlanner()
         {
             Record.LifecycleBefore = Probe();
@@ -690,20 +737,23 @@ namespace KingmakerBuffPlanner.Execution
             string at = !_host.IsRunning ? "after-run"
                 : _host.ActiveCastingInFlight ? "in-flight"
                 : _host.ActiveFinishedCastings == 0 ? "before-start" : "between-castings";
-            if (_setPlannerEnabled != null)
-            {
-                _setPlannerEnabled(false);
-                _setPlannerEnabled(true);
-            }
-            else
-            {
-                _host.Shutdown(DisableReason);
-                _host.Resume();
-            }
+            if (_setPlannerEnabled != null) _setPlannerEnabled(false);
+            else _host.Shutdown(DisableReason);
             Record.DisabledAt = at;
-            Record.AcceptingAfterEnable = _host.Accepting;
             Record.Disable = (_setPlannerEnabled != null ? "planner-disable" : "host-shutdown") +
-                ";at=" + at + ";ended=" + !_host.IsRunning + ";accepting=" + _host.Accepting;
+                ";at=" + at + ";ended=" + !_host.IsRunning;
+        }
+
+        // The enable after the held disable: the host accepts runs again.
+        private void EnablePlanner()
+        {
+            _enabledAgain = true;
+            if (_setPlannerEnabled != null) _setPlannerEnabled(true);
+            else _host.Resume();
+            Record.AcceptingAfterEnable = _host.Accepting;
+            Record.Disable += ";held=" + _disabledUpdates + ";acceptingWhileDisabled=" +
+                Record.AcceptingWhileDisabled + ";runningWhileDisabled=" + Record.RunningWhileDisabled +
+                ";accepting=" + _host.Accepting;
         }
 
         // Waits on the run (pumping it unless its owner does); the stop step
@@ -741,7 +791,7 @@ namespace KingmakerBuffPlanner.Execution
 
         private string Probe()
         {
-            if (_lifecycleProbe == null) return "unprobed";
+            if (_lifecycleProbe == null) return Unprobed;
             try { return _lifecycleProbe() ?? "null"; }
             catch (Exception exception) { return "probe-failed:" + exception.GetType().Name; }
         }

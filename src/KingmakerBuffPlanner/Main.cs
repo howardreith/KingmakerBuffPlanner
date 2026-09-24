@@ -84,6 +84,17 @@ namespace KingmakerBuffPlanner
             return true;
         }
 
+        // The mod manager's toggle as the runtime qualification drives it
+        // (batch 3 review B7): everything OnToggle does except ending the
+        // runtime test that drives it. While disabled the planner root is
+        // not ticked at all, exactly as for a player's disable.
+        internal static void SetEnabledForRuntime(bool value)
+        {
+            _enabled = value;
+            _log.Info("[KBP-BOOT] runtime toggle;value=" + value + ".");
+            BuffPlannerUiRoot.SetEnabled(value);
+        }
+
         private static void OnUpdate(UnityModManager.ModEntry modEntry, float deltaTime)
         {
             RuntimePerformanceDiagnostics.FrameStarted();
