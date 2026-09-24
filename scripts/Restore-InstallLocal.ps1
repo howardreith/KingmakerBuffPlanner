@@ -94,6 +94,13 @@ Assert-KbpNotRunning
 # The live game root is shared with the owner's other lab: no rollback while
 # its runtime lease is held (an isolated test root is not shared).
 $liveGameRoot = -not $PSBoundParameters.ContainsKey('GameRoot')
+if (-not $liveGameRoot) {
+    try {
+        $liveGameRoot = [IO.Path]::GetFullPath((Get-KbpGamePath)).TrimEnd('\').Equals(
+            $gameRootFull, [StringComparison]::OrdinalIgnoreCase)
+    }
+    catch { $liveGameRoot = $false }
+}
 if ($liveGameRoot) { Assert-KbpNoForeignRuntimeLease }
 Assert-KbpNoUnresolvedTransaction $StateRoot
 

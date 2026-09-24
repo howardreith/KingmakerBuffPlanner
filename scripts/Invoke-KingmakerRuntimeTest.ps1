@@ -284,10 +284,11 @@ $protectedSaveRoot = Join-Path $env:USERPROFILE 'AppData\LocalLow\Owlcat Games\P
 $protectedBefore = if ($null -ne $savePair) { Get-KbpSaveFolderSnapshot -SaveRoot $protectedSaveRoot } else { $null }
 $protectedSaveFailure = $null
 $protectedSavesCompared = $false
-# A display mode changes the game's registry settings for this run only:
-# the whole key is recorded now and restored byte-exact after exit.
-$displayRegistryBefore = if ($null -ne $displaySize) {
-    Get-KbpRegistryValueSnapshot -KeyPath $script:KbpGameRegistryKey } else { $null }
+# A display mode changes the game's registry settings for this run only; the
+# key is recorded once this run holds the lock (below) and kept beside its
+# transaction.
+$displayRegistryPath = $null
+$displayFailure = $null
 $restoreFailure = $null
 $runFailure = $null
 $runSucceeded = $false
@@ -297,6 +298,11 @@ try {
         -RunId $runId -CompatibilityProfileId $CompatibilityProfileId `
         -Confirm:$false | Select-Object -Last 1
     $transactionEntered = $true
+    if ($null -ne $displaySize) {
+        $displayRegistryPath = Join-Path $script:KbpRuntimeStateRoot "transactions\$runId\display-registry.json"
+        Save-KbpRegistrySnapshotFile -Path $displayRegistryPath -KeyPath $script:KbpGameRegistryKey `
+            -Snapshot (Get-KbpRegistryValueSnapshot -KeyPath $script:KbpGameRegistryKey) -RunId $runId
+    }
     $scenarioParameters = if ($null -ne $savePair) { @{
         workingSaveName = $savePair.working.name; workingFileName = $savePair.working.fileName
         workingSha256 = $savePair.working.sha256; baselineSaveName = $savePair.baseline.name
@@ -769,6 +775,21 @@ finally {
             try { [void]$process.WaitForExit(30000) }
             catch { Write-Warning "Unable to wait for launched Kingmaker exit: $($_.Exception.Message)" }
         }
+        # The display-mode registry comes back first, while this run still
+        # holds its lock (the Mods restoration below releases it); a blocked
+        # restoration keeps its snapshot for Restore-Local.ps1 -RunId.
+        if ($null -ne $displayRegistryPath -and (Test-Path -LiteralPath $displayRegistryPath)) {
+            if (@(Get-Process -Name Kingmaker -ErrorAction SilentlyContinue).Count -eq 0) {
+                try {
+                    $displayDifferences = @(Restore-KbpRegistrySnapshotFile -Path $displayRegistryPath)
+                    Write-KbpJsonAtomic (Join-Path $evidence 'display-mode.json') ([ordered]@{
+                        schemaVersion = 1; runId = $runId; displayMode = $DisplayMode; size = $displaySize
+                        restoredValues = @($displayDifferences); restorationVerified = $true
+                    })
+                }
+                catch { $displayFailure = 'Game registry restoration failed after the display-mode run (Restore-Local.ps1 -RunId ' + $runId + ' retries it): ' + $_.Exception.Message }
+            } else { $displayFailure = 'Kingmaker remains running; the game registry restoration is blocked (Restore-Local.ps1 -RunId ' + $runId + ' finishes it).' }
+        }
         $running = @(Get-Process -Name Kingmaker -ErrorAction SilentlyContinue)
         # Review of e7c5207..f7726c9, P3-3: a failed or blocked restoration
         # must not skip the protected-save comparison or the completion
@@ -795,28 +816,18 @@ finally {
             catch { Write-Warning "Restoration failure not recorded: $($_.Exception.Message)" }
         }
     }
-    # A display-mode run: the game's registry key back byte-exact once the game
-    # exited; never a throw here (the save comparison and the completion
-    # record still follow), a failure is folded into the restoration failure.
-    if ($null -ne $displayRegistryBefore) {
-        $displayFailure = $null
-        if (@(Get-Process -Name Kingmaker -ErrorAction SilentlyContinue).Count -eq 0) {
-            try {
-                $displayDifferences = @(Restore-KbpRegistryValues -KeyPath $script:KbpGameRegistryKey `
-                    -Snapshot $displayRegistryBefore)
-                Write-KbpJsonAtomic (Join-Path $evidence 'display-mode.json') ([ordered]@{
-                    schemaVersion = 1; runId = $runId; displayMode = $DisplayMode; size = $displaySize
-                    restoredValues = @($displayDifferences); restorationVerified = $true
-                })
-            }
-            catch { $displayFailure = 'Game registry restoration failed after the display-mode run: ' + $_.Exception.Message }
-        } else { $displayFailure = 'Kingmaker remains running; the game registry restoration is blocked.' }
-        if ($null -ne $displayFailure) {
-            Write-Warning $displayFailure
-            $restoreFailure = if ($null -eq $restoreFailure) { $displayFailure } else { $restoreFailure + ' | ' + $displayFailure }
-            try { [IO.File]::WriteAllText((Join-Path $evidence 'display-restoration-failure.txt'), $displayFailure + [Environment]::NewLine) }
-            catch { Write-Warning "Display restoration failure not recorded: $($_.Exception.Message)" }
-        }
+    # A display-mode restoration failure is folded into the restoration
+    # failure (never a throw here: the save comparison and the completion
+    # record still follow).
+    if ($null -ne $displayFailure) {
+        Write-Warning $displayFailure
+        $restoreFailure = if ($null -eq $restoreFailure) { $displayFailure } else { $restoreFailure + ' | ' + $displayFailure }
+        try { [IO.File]::WriteAllText((Join-Path $evidence 'display-restoration-failure.txt'), $displayFailure + [Environment]::NewLine) }
+        catch { Write-Warning "Display restoration failure not recorded: $($_.Exception.Message)" }
+    }
+    # Review C10: a comparison that cannot run is a failure, not a silence.
+    if ($null -ne $protectedBefore -and @(Get-Process -Name Kingmaker -ErrorAction SilentlyContinue).Count -ne 0) {
+        $protectedSaveFailure = 'Protected-save comparison skipped: Kingmaker is still running.'
     }
     if ($null -ne $protectedBefore -and @(Get-Process -Name Kingmaker -ErrorAction SilentlyContinue).Count -eq 0) {
         try {

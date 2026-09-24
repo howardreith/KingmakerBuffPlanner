@@ -59,6 +59,158 @@ function Confirm-KbpLockedWithoutForeignLease {
     }
 }
 
+# The game's own registry key: Unity PlayerPrefs (screen size and mode) and
+# the game's settings. A display-mode run restores it byte-exact.
+$script:KbpGameRegistryKey = 'HKCU:\Software\Owlcat Games\Pathfinder Kingmaker'
+
+function Get-KbpRegistryCanonical([string]$Kind, $Value) {
+    $data = if ($Value -is [byte[]]) { [Convert]::ToBase64String([byte[]]$Value) }
+        elseif ($Value -is [string[]]) { (@($Value) | ForEach-Object {
+            [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes([string]$_)) }) -join ',' }
+        else { [string]$Value }
+    return $Kind + ':' + $data
+}
+
+# Every value under one registry key, with its kind and exact data, in a
+# comparable canonical form.
+function Get-KbpRegistryValueSnapshot {
+    param([Parameter(Mandatory = $true)][string]$KeyPath)
+    $snapshot = [ordered]@{}
+    $key = Get-Item -LiteralPath $KeyPath -ErrorAction Stop
+    try {
+        foreach ($name in @($key.GetValueNames() | Sort-Object)) {
+            $kind = $key.GetValueKind($name)
+            $value = $key.GetValue($name, $null, [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+            $snapshot[$name] = [pscustomobject]@{ kind = [string]$kind; value = $value
+                canonical = Get-KbpRegistryCanonical ([string]$kind) $value }
+        }
+    }
+    finally { $key.Dispose() }
+    return $snapshot
+}
+
+function Compare-KbpRegistrySnapshot {
+    param([Parameter(Mandatory = $true)]$Before, [Parameter(Mandatory = $true)]$After)
+    $differences = New-Object System.Collections.Generic.List[string]
+    foreach ($name in @($Before.Keys)) {
+        if (-not $After.Contains($name)) { $differences.Add('removed:' + $name) }
+        elseif ($After[$name].canonical -cne $Before[$name].canonical) { $differences.Add('changed:' + $name) }
+    }
+    foreach ($name in @($After.Keys)) { if (-not $Before.Contains($name)) { $differences.Add('added:' + $name) } }
+    # Plain output: callers wrap it in @() (an empty result is no output).
+    return $differences.ToArray()
+}
+
+# Puts every value of the key back exactly as in the snapshot (changed and
+# removed values rewritten with their kind, added values deleted), then
+# verifies; returns what it restored.
+function Restore-KbpRegistryValues {
+    param([Parameter(Mandatory = $true)][string]$KeyPath, [Parameter(Mandatory = $true)]$Snapshot)
+    $differences = @(Compare-KbpRegistrySnapshot -Before $Snapshot -After (Get-KbpRegistryValueSnapshot -KeyPath $KeyPath))
+    if ($differences.Count -ne 0) {
+        if ($KeyPath -notmatch '^HKCU:\\(.+)$') { throw "Only HKCU keys are restored: $KeyPath" }
+        $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($Matches[1], $true)
+        if ($null -eq $key) { throw "Registry key is missing: $KeyPath" }
+        try {
+            foreach ($difference in $differences) {
+                $name = $difference.Substring($difference.IndexOf(':') + 1)
+                if ($difference.StartsWith('added:')) { $key.DeleteValue($name, $false) }
+                else {
+                    $key.SetValue($name, $Snapshot[$name].value,
+                        [Microsoft.Win32.RegistryValueKind]([string]$Snapshot[$name].kind))
+                }
+            }
+        }
+        finally { $key.Dispose() }
+    }
+    $remaining = @(Compare-KbpRegistrySnapshot -Before $Snapshot -After (Get-KbpRegistryValueSnapshot -KeyPath $KeyPath))
+    if ($remaining.Count -ne 0) { throw 'Registry restoration mismatch: ' + ($remaining -join ', ') }
+    # Plain output: what was restored (nothing when the key was unchanged).
+    return $differences
+}
+
+# A display-mode run's registry snapshot, kept beside its transaction: what a
+# blocked or interrupted restoration needs to finish later (Restore-Local.ps1
+# -RunId), and what keeps any later run or install from starting before it
+# did (Assert-KbpNoUnresolvedTransaction).
+function Save-KbpRegistrySnapshotFile {
+    param([Parameter(Mandatory = $true)][string]$Path, [Parameter(Mandatory = $true)][string]$KeyPath,
+        [Parameter(Mandatory = $true)]$Snapshot, [Parameter(Mandatory = $true)][string]$RunId)
+    $values = [ordered]@{}
+    foreach ($name in @($Snapshot.Keys)) {
+        $entry = $Snapshot[$name]
+        $data = if ($entry.value -is [byte[]]) { [Convert]::ToBase64String([byte[]]$entry.value) }
+            elseif ($entry.value -is [string[]]) { ,@($entry.value) }
+            else { [string]$entry.value }
+        $values[$name] = [ordered]@{ kind = [string]$entry.kind; data = $data }
+    }
+    Write-KbpJsonAtomic $Path ([ordered]@{
+        schemaVersion = 1; runId = $RunId; keyPath = $KeyPath; restored = $false
+        savedAtUtc = [DateTime]::UtcNow.ToString('o'); values = $values
+    })
+}
+
+function Read-KbpRegistrySnapshotFile {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    $file = Read-KbpJson $Path
+    if ([int]$file.schemaVersion -ne 1 -or [string]::IsNullOrWhiteSpace([string]$file.keyPath)) {
+        throw "Registry snapshot file is invalid: $Path"
+    }
+    $snapshot = [ordered]@{}
+    foreach ($property in @($file.values.PSObject.Properties)) {
+        $kind = [string]$property.Value.kind
+        $data = $property.Value.data
+        $value = switch ($kind) {
+            'Binary' { ,[Convert]::FromBase64String([string]$data) }
+            'DWord' { [int][string]$data }
+            'QWord' { [long][string]$data }
+            'MultiString' { ,[string[]]@($data) }
+            default { [string]$data }
+        }
+        $snapshot[$property.Name] = [pscustomobject]@{ kind = $kind; value = $value
+            canonical = Get-KbpRegistryCanonical $kind $value }
+    }
+    return [pscustomobject]@{ keyPath = [string]$file.keyPath; restored = [bool]$file.restored
+        runId = [string]$file.runId; snapshot = $snapshot }
+}
+
+function Complete-KbpRegistrySnapshotFile {
+    param([Parameter(Mandatory = $true)][string]$Path, [string[]]$RestoredValues)
+    $file = Read-KbpJson $Path
+    $file.restored = $true
+    $file | Add-Member -NotePropertyName restoredAtUtc -NotePropertyValue ([DateTime]::UtcNow.ToString('o')) -Force
+    $file | Add-Member -NotePropertyName restoredValues -NotePropertyValue @($RestoredValues) -Force
+    Write-KbpJsonAtomic $Path $file
+}
+
+# Puts back a saved snapshot that is not restored yet; the game must not run.
+function Restore-KbpRegistrySnapshotFile {
+    param([Parameter(Mandatory = $true)][string]$Path, [int[]]$KnownKingmakerProcessIds)
+    $saved = Read-KbpRegistrySnapshotFile -Path $Path
+    if ($saved.restored) { return }
+    if ($PSBoundParameters.ContainsKey('KnownKingmakerProcessIds')) {
+        Assert-KbpNotRunning -KnownProcessIds $KnownKingmakerProcessIds
+    } else { Assert-KbpNotRunning }
+    $restored = @(Restore-KbpRegistryValues -KeyPath $saved.keyPath -Snapshot $saved.snapshot)
+    Complete-KbpRegistrySnapshotFile -Path $Path -RestoredValues $restored
+    return $restored
+}
+
+# Waits (bounded) until no foreign runtime lease is held; throws otherwise.
+function Wait-KbpNoForeignRuntimeLease {
+    param([string[]]$LeasePaths = $script:KbpForeignRuntimeLeases,
+        [ValidateRange(0, 3600)][int]$TimeoutSeconds = 600, [ValidateRange(1, 60)][int]$PollSeconds = 5)
+    $clock = [Diagnostics.Stopwatch]::StartNew()
+    while ($true) {
+        $held = @($LeasePaths | Where-Object { -not [string]::IsNullOrWhiteSpace($_) -and (Test-Path -LiteralPath $_) })
+        if ($held.Count -eq 0) { return }
+        if ($clock.Elapsed.TotalSeconds -ge $TimeoutSeconds) {
+            throw "Another project's Kingmaker runtime lease is still active after $TimeoutSeconds s: $($held -join ', '). The restoration waits for it (Restore-Local.ps1 -RunId finishes it)."
+        }
+        Start-Sleep -Seconds $PollSeconds
+    }
+}
+
 function Assert-KbpNotRunning {
     param([int[]]$KnownProcessIds)
     $ids = if ($PSBoundParameters.ContainsKey('KnownProcessIds')) {
@@ -290,6 +442,13 @@ function Assert-KbpNoUnresolvedTransaction([string]$StateRoot) {
             throw "Unresolved runtime transaction exists: $($state.runId) status=$($state.status)"
         }
     }
+    # A display-mode run whose game registry was not restored yet.
+    foreach ($snapshotFile in @(Get-ChildItem -LiteralPath $StateRoot -Filter display-registry.json -File -Recurse -ErrorAction SilentlyContinue)) {
+        $snapshotState = Read-KbpJson $snapshotFile.FullName
+        if (-not [bool]$snapshotState.restored) {
+            throw "Unrestored game registry snapshot exists: $($snapshotFile.FullName) (Restore-Local.ps1 -RunId $($snapshotState.runId) restores it)."
+        }
+    }
     # Review K6: an interrupted or unrecoverable install rollback is an
     # unresolved transaction too.
     foreach ($installFile in @(Get-ChildItem -LiteralPath $StateRoot -Filter install.json -File -Recurse -ErrorAction SilentlyContinue)) {
@@ -364,10 +523,10 @@ function Enter-KbpRuntimeTransaction {
     } else {
         Confirm-KbpLockedWithoutForeignLease -LockPath $lockPath -RunId $RunId -Token $token -SkipForeignLease:$FixtureMode
     }
-    New-Item -ItemType Directory -Path $transactionRoot | Out-Null
-    New-Item -ItemType Directory -Path $backupRunRoot | Out-Null
     $statePath = Join-Path $transactionRoot 'transaction.json'
     try {
+    New-Item -ItemType Directory -Path $transactionRoot | Out-Null
+    New-Item -ItemType Directory -Path $backupRunRoot | Out-Null
     $mods = Join-Path $game 'Mods'
     $profileMods = if ($null -eq $CompatibilityProfile) { @() } else { @($CompatibilityProfile.mods) }
     $originalExisted = Test-Path -LiteralPath $mods -PathType Container
@@ -426,7 +585,11 @@ function Enter-KbpRuntimeTransaction {
                     Remove-Item -LiteralPath $owned -Force
                 }
             }
-            Remove-KbpOwnedLock $lockPath $RunId $token
+            try { Remove-KbpOwnedLock $lockPath $RunId $token }
+            catch {
+                throw ("Runtime entry failed before its state existed (" + $preStateFailure.Exception.Message +
+                    ") and its lock could not be released: " + $_.Exception.Message)
+            }
         }
         throw $preStateFailure
     }
@@ -459,11 +622,13 @@ function Enter-KbpRuntimeTransaction {
         $state.stagedManifest = @(Get-KbpDirectoryManifest $stagedMods)
         Write-KbpJsonAtomic $statePath $state
 
+        $originalMoveAttempts = 0
         if ($originalExisted) {
-            [void](Move-KbpDirectoryWithRetry -Source $mods -Destination $originalBackup `
-                -Attempts $MoveAttempts -DelayMilliseconds $MoveDelayMilliseconds)
+            $originalMoveAttempts = Move-KbpDirectoryWithRetry -Source $mods -Destination $originalBackup `
+                -Attempts $MoveAttempts -DelayMilliseconds $MoveDelayMilliseconds
         }
         $state.status = 'OriginalMoved'
+        $state.originalMoveAttempts = [int]$originalMoveAttempts
         Write-KbpJsonAtomic $statePath $state
         [void](Move-KbpDirectoryWithRetry -Source $stagedMods -Destination $mods `
             -Attempts $MoveAttempts -DelayMilliseconds $MoveDelayMilliseconds)
@@ -549,6 +714,9 @@ function Restore-KbpRuntimeTransaction {
     if ($state.schemaVersion -ne 1 -or $state.runId -cne $RunId) { throw 'Runtime transaction state identity is invalid.' }
     if ($state.status -ceq 'Restored') { return $state }
     Assert-KbpOwnedLock $state.lockPath $RunId $state.token
+    # Serialized with the owner's other lab (review C3): this run's Mods
+    # folder is never moved while that lab's runtime lease is held.
+    if (-not $FixtureMode) { Wait-KbpNoForeignRuntimeLease }
     $mods = [string]$state.modsPath
     $preActivationNoOp = $false
     try {
@@ -606,7 +774,12 @@ function Restore-KbpRuntimeTransaction {
             if ($quarantineSentinel.runId -cne $RunId -or $quarantineSentinel.token -cne $state.token) {
                 throw 'Staged quarantine ownership is ambiguous.'
             }
-            Remove-Item -LiteralPath $state.stagedQuarantine -Recurse -Force
+            # A staged tree that changed during the run is evidence (the
+            # change may be another lab's): it is kept, never deleted.
+            if ([bool]$state.stagedMutationObserved) {
+                $state | Add-Member -NotePropertyName stagedQuarantineKept -NotePropertyValue $true -Force
+            }
+            else { Remove-Item -LiteralPath $state.stagedQuarantine -Recurse -Force }
         }
         if (Test-Path -LiteralPath $state.stagingRunRoot -PathType Container) {
             $stagePath = [IO.Path]::GetFullPath([string]$state.stagingRunRoot)
