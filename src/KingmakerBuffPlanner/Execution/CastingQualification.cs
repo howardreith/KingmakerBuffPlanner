@@ -864,8 +864,7 @@ namespace KingmakerBuffPlanner.Execution
         // covered); mixed - every casting, the direct one skipped (its
         // recipient holds the effect at the direct caster's level), the
         // group casting covering the others with that recipient pre-covered,
-        // and the anchored casting (if any) covering its anchor's area. The
-        // repeat step (everything active) submits nothing.
+        // and the anchored casting (if any) covering its anchor's area.
         private static IReadOnlyList<CastingQualificationStepForecast> ForecastGroupMixed(
             CastingQualificationSelection selection, CastingWorkspaceInputs inputs, string campaignId)
         {

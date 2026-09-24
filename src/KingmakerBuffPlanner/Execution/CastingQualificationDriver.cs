@@ -223,7 +223,13 @@ namespace KingmakerBuffPlanner.Execution
         }
 
         public static readonly string[] StepNames = { "stop", "complete", "repeat", "recast" };
-        public static readonly string[] GroupStepNames = { "prime", "mixed", "repeat" };
+        // The group recipe ends after its mixed step: a repeat is not a
+        // no-op there, because the game replaces a covered recipient's
+        // longer instance with the group cast's shorter one (seen live,
+        // casting-qual-cast-20260924-adv-group-anim-01), so the direct
+        // casting is due again. Direct recipes show that a repeat casts
+        // nothing.
+        public static readonly string[] GroupStepNames = { "prime", "mixed" };
 
         // The disable rules, applied the moment the disable step ends (so a
         // failed rule stops the run before the recover run is submitted)
@@ -691,7 +697,7 @@ namespace KingmakerBuffPlanner.Execution
                 case "prime-wait": Wait(false, "group-author"); return;
                 case "group-author": GroupAuthor(); return;
                 case "mixed": Begin(CastingQualificationForecast.Mixed); return;
-                case "mixed-wait": Wait(false, "repeat"); return;
+                case "mixed-wait": Wait(false, "done"); return;
                 default: Finish("completed"); return;
             }
         }
@@ -991,7 +997,7 @@ namespace KingmakerBuffPlanner.Execution
             // Only the exact no-op (every casting already active) continues.
             string failure = Record.StepFailure("repeat");
             if (failure != null) { Fail("step:" + failure); return; }
-            _phase = CastingQualificationRecipe.IsGroupRecipe(Recipe) ? "done" : "recast-edit";
+            _phase = "recast-edit";
         }
 
         private void RecastEdit()

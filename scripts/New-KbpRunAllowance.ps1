@@ -117,7 +117,7 @@ else {
     $purposes = @{
         'zero-cost-mixed' = "zero-cost-mixed casting-first qualification in $ExecutionMode mode (stop, complete, repeat, recast, held disable, recover)"
         'finite-direct-mixed' = "finite-direct-mixed casting-first qualification in $ExecutionMode mode (paid spell slots: stop, complete, repeat, recast)"
-        'group-mixed' = "group-mixed casting-first qualification in $ExecutionMode mode (a direct casting primes one recipient; the caster-centred group casting then covers the others in one invocation with that recipient pre-covered, with a target-anchored group casting where one exists; repeat casts nothing)"
+        'group-mixed' = "group-mixed casting-first qualification in $ExecutionMode mode (a direct casting primes one recipient; the caster-centred group casting then covers the others in one invocation with that recipient pre-covered, with a target-anchored group casting where one exists)"
     }
     if ([string]$request.scenario -cne 'live-cast-qual-select' -or [bool]$outcome.castingScenario -or
         -not [bool]$outcome.selection.selected -or -not $purposes.ContainsKey($recipe) -or

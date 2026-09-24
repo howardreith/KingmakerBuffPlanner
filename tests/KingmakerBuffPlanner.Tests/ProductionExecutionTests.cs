@@ -3974,6 +3974,8 @@ namespace KingmakerBuffPlanner.Tests
             internal string MissRecipient;
             internal string DirectEffect = "shared-effect";
             internal int DirectCasterLevel = 9;
+            internal string GroupDurationText = string.Empty;
+            internal double LiveRemaining = 80;
             internal int AnimatedFrames = 3;
             internal long Now;
             private readonly Dictionary<CastStep, EffectBaseline> _baselines =
@@ -4068,7 +4070,7 @@ namespace KingmakerBuffPlanner.Tests
             internal ActiveEffectSnapshot Live()
             {
                 return LiveEffects(Active.Select(pair => On(pair.Key.Split('|')[0], pair.Key.Split('|')[1],
-                    80, 9, 0)).ToArray());
+                    LiveRemaining, 9, 0)).ToArray());
             }
 
             internal CastingWorkspaceInputs Inputs()
@@ -4078,7 +4080,8 @@ namespace KingmakerBuffPlanner.Tests
                 var direct = new ProviderSnapshot(new ProviderKey("unit-arcanist", "book-arcanist", Direct,
                     "level-1"), "Direct Ward", 1, "pool-arcanist", 1, null, null, DirectCasterLevel, 90);
                 var group = new ProviderSnapshot(new ProviderKey("unit-cleric", "book-cleric", Group,
-                    "level-2"), "Group Ward", 2, "pool-cleric", 1, new[] { Token }, null, 9, 90);
+                    "level-2"), "Group Ward", 2, "pool-cleric", 1, new[] { Token }, null, 9, 90,
+                    string.Empty, GroupDurationText);
                 var anchored = new ProviderSnapshot(new ProviderKey("unit-bard", "book-bard", Anchored,
                     "level-3"), "Anchored Arrows", 3, "pool-bard", 1, null, null, 9, 5400);
                 var pools = new[]
@@ -4278,13 +4281,35 @@ namespace KingmakerBuffPlanner.Tests
                         !mixed.Availability.Contains("qual-cast-2:1>0") ||
                         !mixed.Availability.Contains("qual-cast-1:2>2") ||
                         !mixed.Availability.Contains("qual-cast-3:3>2") ||
-                        record.Step("repeat").ApplyReason != "nothing-to-cast:3")
+                        record.Step("repeat") != null)
                         throw new InvalidOperationException("The group qualification (" + mode + ", keep=" + keep +
                             ") did not pass exactly: " + record.TerminalReason + "|" +
                             string.Join("|", violations.ToArray()) + "|fired=" + string.Join(",", run.Fired.ToArray()) +
                             "|" + (mixed == null ? "no-mixed" : string.Join(",", mixed.Transitions.ToArray()) + "|" +
                                 string.Join(",", mixed.Availability.ToArray())));
                 }
+            // A covered recipient whose instance outlasts the group cast is
+            // told so (the game may replace it with the shorter instance, as
+            // it did live on 2026-09-24); one that does not is not.
+            foreach (double remaining in new[] { 500d, 80d })
+            {
+                var outlasting = new GroupBuffWorld { GroupDurationText = "1 minute/level", LiveRemaining = remaining };
+                outlasting.Active["unit-t1|shared-effect"] = new KeyValuePair<string, long>("old", 99999);
+                CastingWorkspaceInputs outlastingInputs = outlasting.Inputs();
+                ResolvedCasting groupCasting = new ExplicitCastingCompiler().Compile(
+                        CastingQualificationForecast.BuildDocument("fixture-campaign", new[] { selection.Castings[1] }),
+                        outlastingInputs.Snapshot, outlastingInputs.ProviderOptions, outlastingInputs.EffectsBySource,
+                        outlastingInputs.Enhancements, "long", null, false, outlastingInputs.LiveEffects)
+                    .CastingById("qual-cast-2");
+                string expectedNote = remaining > 90 ? "already-covered-longer:unit-t1" : "already-covered:unit-t1";
+                if (!groupCasting.PreCoveredUnitIds.SequenceEqual(new[] { "unit-t1" }) ||
+                    !groupCasting.ExistingEffectNotes.Any(note => note.StartsWith(expectedNote, StringComparison.Ordinal)))
+                    throw new InvalidOperationException("The covered recipient's duration was not disclosed (" +
+                        remaining + "): " + string.Join(",", groupCasting.ExistingEffectNotes.ToArray()));
+            }
+            if (CastingRunPresentation.DescribeExistingEffectNote("already-covered-longer:unit-t1") !=
+                    "already active on unit-t1, lasting longer than this cast (the cast goes ahead for the others and may shorten it)")
+                throw new InvalidOperationException("The longer-lasting covered recipient is not described.");
             // A recipient the group cast misses: the casting is not confirmed
             // and the routine stops before the anchored casting is submitted.
             var missed = new GroupBuffWorld { MissRecipient = "unit-t2" };

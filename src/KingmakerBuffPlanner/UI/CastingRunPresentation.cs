@@ -137,6 +137,9 @@ namespace KingmakerBuffPlanner.UI
             if (value.StartsWith("already-covered:", StringComparison.Ordinal))
                 return "already active on " + FirstSegment(value, "already-covered:") +
                     " (the cast goes ahead for the others)";
+            if (value.StartsWith("already-covered-longer:", StringComparison.Ordinal))
+                return "already active on " + FirstSegment(value, "already-covered-longer:") +
+                    ", lasting longer than this cast (the cast goes ahead for the others and may shorten it)";
             if (value.StartsWith("existing-active-recast:", StringComparison.Ordinal))
                 return "active on " + FirstSegment(value, "existing-active-recast:") +
                     " but set to always recast";
