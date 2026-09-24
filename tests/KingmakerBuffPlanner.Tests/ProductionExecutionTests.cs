@@ -5158,6 +5158,7 @@ namespace KingmakerBuffPlanner.Tests
             // diagnostics included; the deadline is logged once; a PASS
             // published after the abort marker is a failure.
             if (host.Contains("_stopCheckCountdown") ||
+                !host.Contains("string waitingStop = LiveRunStopReason();") ||
                 !host.Contains("        private bool UpdateMenuDiagnosticScenario()\n        {\n            string stop = LiveRunStopReason();\n" +
                     "            if (stop != null)\n                throw new TimeoutException(\"Menu diagnostics stopped;\" + stop);") ||
                 !host.Contains("_log.Info(\"[KBP-RT] overall deadline \" + _processStartUtc.Value") ||

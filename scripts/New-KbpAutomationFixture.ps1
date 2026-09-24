@@ -67,7 +67,9 @@ if ([string]::IsNullOrWhiteSpace($RunId)) {
     $RunId = if ($Family -ceq 'Advanced') { 'bootstrap-advanced-fixture' } else { 'bootstrap-automation-fixture' }
 }
 $repo = Get-KbpRepositoryRoot
-$lab = Split-Path -Parent (Split-Path -Parent $repo)
+# Focused re-review: the lab root the runtime harness uses, wherever this
+# checkout lives, so both sides always check the same locks.
+$lab = $script:KbpLabRoot
 if ([string]::IsNullOrWhiteSpace($ArchiveRoot)) {
     $ArchiveRoot = Join-Path $lab ("runtime-backups\" + $(if ($Family -ceq 'Advanced') {
         'advanced-fixture' } else { 'automation-fixture' }) + "\" + $RunId)
@@ -182,8 +184,7 @@ function Get-KbpTransaction {
 # included, because those helpers use direct .NET I/O that WhatIf
 # preferences never suppress.
 function Assert-KbpFixtureDeploymentIdle {
-    $lab2 = Split-Path -Parent (Split-Path -Parent $repo)
-    $deploymentLock = Join-Path $lab2 'runtime-state\deployment.lock'
+    $deploymentLock = Join-Path $script:KbpRuntimeStateRoot 'deployment.lock'
     if (Test-Path -LiteralPath $deploymentLock -PathType Leaf) {
         throw "A runtime deployment transaction is active: $deploymentLock. Coordinate before fixture mutation."
     }
@@ -219,10 +220,9 @@ function Publish-KbpStagedFixture {
 # at the start and again right before the save folder is touched. A test
 # save root is not the game's and is not shared with that lab.
 function Assert-KbpFixtureForeignLeaseIdle {
-    $production = Join-Path $env:USERPROFILE 'AppData\LocalLow\Owlcat Games\Pathfinder Kingmaker\Saved Games'
-    if ([IO.Path]::GetFullPath($SaveRoot).TrimEnd('\') -ieq [IO.Path]::GetFullPath($production).TrimEnd('\')) {
-        Assert-KbpNoForeignRuntimeLease
-    }
+    # Focused re-review: every save root but a harness test root is treated
+    # as the game's own (a junction or another drive letter included).
+    if (-not (Test-KbpHarnessTestPath $SaveRoot)) { Assert-KbpNoForeignRuntimeLease }
 }
 
 function Assert-KbpFixturePreconditions {
@@ -236,8 +236,7 @@ function Assert-KbpFixturePreconditions {
 # run's protected-save comparison is pending or an unexpected save change
 # waits for the owner's review.
 function Assert-KbpFixtureSavesSettled {
-    $production = Join-Path $env:USERPROFILE 'AppData\LocalLow\Owlcat Games\Pathfinder Kingmaker\Saved Games'
-    if ([IO.Path]::GetFullPath($SaveRoot).TrimEnd('\') -ieq [IO.Path]::GetFullPath($production).TrimEnd('\')) {
+    if (-not (Test-KbpHarnessTestPath $SaveRoot)) {
         Assert-KbpNoPendingProtectedSaveComparison $script:KbpRuntimeStateRoot
         Assert-KbpNoUnacknowledgedSaveViolation -StateRoot $script:KbpRuntimeStateRoot
     }

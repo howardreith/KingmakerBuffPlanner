@@ -26,6 +26,30 @@ after a close and reopen, each exactly as forecast). Finite-resource
 qualification waits for an owner-designated advanced seed. Human usability and the native aesthetic
 pass remain open.
 
+## Findings from the focused review of the re-review fixes (2026-09-24)
+
+Three more independent read-only reviews of `b1b3736..f47f527` (FA casting
+and the Classic path, FB UI and persistence, FC harness). Their findings
+were fixed in `2bb91da` and the harness commit after it, except the ones
+marked as limitations (release notes, "Known limitations").
+
+| Finding | Disposition | Commit |
+| --- | --- | --- |
+| FB1 (high): a Reload after the player repaired an unreadable classic file imported the stale empty default the Classic planner held for it, and wrote it | The in-memory plan is read when the import runs and used only while the classic file is still the bytes it came from (recorded by the load and each save) | `2bb91da` |
+| FB2: a Reload with no plan file blocked saving (and toggled on each press) | Such a reload is a first open again: saving allowed, castings added in the session never discarded | `2bb91da` |
+| FB3/FB4: castings added while blocked were lost on other routes; the notice told players to move readable backups too | Castings added while the import was blocked are imported into and saved; only the named unusable files are to be moved; a reload that can replace unsaved changes asks for a second press | `2bb91da` |
+| FB5..FB7: "not saved" missing while a backup stands in for an unreadable file; both single/group switches always offered and dropped recipients unnamed; a missing Classic file with unreadable backups unannounced | Header uses whether saves are refused; only the buff's own mode is offered and dropped recipients are named; a non-blocking notice | `2bb91da` |
+| FA1 (medium, Classic): the Classic screen closed itself when reopened mid-run | Decided once at the press (`ClassicRunScreenPolicy`, tested); the flag reset on every end | `2bb91da` |
+| FA2/FA3: a kept result crossed campaigns and modes and hid the notice; a waiting run was not shown; "interrupted" for a run that never cast | Scoped to its campaign in Classic mode, dropped on area change and mode switch, shown beside the notice; waiting shown in the tooltip and screen; worded by what was cast | `2bb91da` |
+| FA4: an unverified zero cost on a finite pool reserved nothing while the budget counted one | The ledger reserves one unit | `2bb91da` |
+| FA5 (unverified): effects that reach pets as well as the party, a target or an area | Limitation stated (no test party has pets; next iteration with the advanced seed) | — |
+| FA6: tests pinned text | Pure policy, wrapped-expression confirmation cases; the world-gate text check follows the new rule | `2bb91da` |
+| FA7: APPLY now closes the Classic planner | For the owner to confirm (release notes and handoff) | — |
+| FC1 (medium): a comparison that can never be made kept the Mods folder moved and the lock held with no documented exit | `Restore-Local.ps1 -RunId <run> -CloseUnverifiableComparison` records it as unverifiable for the owner's review and restores; an unreadable baseline is kept aside and named in every refusal | harness commit |
+| FC2: a comparison was made even when the run no longer held its lock | Made only while the run holds its lock; otherwise closed as unverifiable | harness commit |
+| FC3: the owner's typed confirmation was skipped for any root that was not literally the lab's | Skipped only for a harness test root reached without a junction or link; redirected input refused; the fixture's production checks use the same rule | harness commit |
+| FC4..FC9: no-save scenarios recorded as clean; a stale acknowledgement could not be replaced; missing fields gave StrictMode errors; the Advanced recover hint; an unguarded working-save repair script; two lab-root definitions; scenarios outside the stop rule; untested launcher decisions | Recorded as not known; superseded by a new review; clear messages; hint added; script removed; one lab root; every scenario obeys the stop rule; the restoration decision is one tested rule | harness commit |
+
 ## Findings from the re-review of the rc4 fixes (2026-09-24)
 
 Three further independent read-only reviews of the rc4 fixes

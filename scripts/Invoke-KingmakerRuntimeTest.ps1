@@ -907,13 +907,15 @@ finally {
         # Review of e7c5207..f7726c9, P3-3: a failed or blocked restoration
         # must not skip the protected-save comparison or the completion
         # record; it is reported after both are written.
-        if ($running.Count -ne 0) {
+        # Re-review (harness): an unfinished protected-save comparison keeps
+        # this run's lock, so nothing can change the saves between the run
+        # and the comparison that finishes it (one tested rule).
+        $restoreDecision = Get-KbpRestorationDecision -TransactionEntered $true -KingmakerRunning ($running.Count -ne 0) `
+            -BaselineKept ($null -ne $protectedBaselinePath) -SavesCompared $protectedSavesCompared
+        if ($restoreDecision -ceq 'blocked-running') {
             $restoreFailure = "Kingmaker remains running; exact Mods restoration is intentionally blocked. Transaction: $runId"
         }
-        elseif ($null -ne $protectedBaselinePath -and -not $protectedSavesCompared) {
-            # Re-review (harness): an unfinished protected-save comparison
-            # keeps this run's lock, so nothing can change the saves between
-            # the run and the comparison that finishes it.
+        elseif ($restoreDecision -ceq 'withheld-pending') {
             $restoreFailure = "Mods restoration withheld until the protected saves of $runId are compared (Restore-Local.ps1 -RunId $runId compares, then restores)."
         }
         else {
