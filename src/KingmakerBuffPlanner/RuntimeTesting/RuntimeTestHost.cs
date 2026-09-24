@@ -3588,7 +3588,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             ClassicCastRecord record = _classicRecord;
             AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory, "classic-outcome.json"), new JObject
             {
-                { "schemaVersion", 1 },
+                { "schemaVersion", 2 },
                 { "runId", _request.RunId },
                 { "scenario", _request.Scenario },
                 { "castingScenario", record.CastingScenario },
@@ -3597,6 +3597,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 { "planDigest", record.PlanDigest },
                 { "planSteps", record.PlanSteps },
                 { "grant", record.Grant },
+                { "grantConsumed", record.GrantConsumed },
+                { "grantAttempts", record.GrantAttempts },
                 { "quickDisposition", record.QuickDisposition },
                 { "report", record.ReportLine },
                 { "castingFirstRuns", record.CastingFirstRuns },

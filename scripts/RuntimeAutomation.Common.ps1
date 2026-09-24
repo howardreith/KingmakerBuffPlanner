@@ -651,6 +651,95 @@ function Get-KbpQualificationAllowanceBuildRefusal {
     return $null
 }
 
+# Review C6: the launcher's own reading of a PASS run's scenario evidence,
+# independent of the host's verdict. A Classic cast ran exactly the approved
+# plan, once, under its grant; a Classic selection used no grant and ran no
+# Classic routine; a physical workspace run judged exactly the actions this
+# launcher delivered (every request acknowledged, none failed, the typed
+# text the one the host recorded). Other scenarios pass through.
+function Assert-KbpScenarioOutcome {
+    param([Parameter(Mandatory = $true)]$Request)
+    $scenario = [string]$Request.scenario
+    $directory = [string]$Request.evidenceDirectory
+    if ($scenario -ceq 'live-classic-select' -or $scenario -ceq 'live-classic-cast') {
+        $path = Join-Path $directory 'classic-outcome.json'
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw 'Classic outcome evidence is missing.' }
+        $outcome = Read-KbpJson $path
+        $cast = $scenario -ceq 'live-classic-cast'
+        $steps = @($outcome.steps)
+        if ([int]$outcome.schemaVersion -ne 2 -or [string]$outcome.runId -cne [string]$Request.runId -or
+            [string]$outcome.scenario -cne $scenario -or [bool]$outcome.castingScenario -ne $cast -or
+            @($outcome.violations).Count -ne 0 -or @($outcome.failures).Count -ne 0 -or
+            [string]$outcome.planDigest -cnotmatch '^[0-9a-f]{64}$' -or [int]$outcome.planSteps -lt 1 -or
+            [string]$outcome.executionMode -cne [string]$Request.parameters.executionMode -or
+            [bool]$outcome.grantArmedAtEnd -or [int]$outcome.castingFirstRuns -ne 0) {
+            throw "Classic outcome evidence is inconsistent with a PASS: $path"
+        }
+        if (-not $cast) {
+            if ([bool]$outcome.grantConsumed -or [int]$outcome.grantAttempts -ne 0 -or [bool]$outcome.classicRunSeen) {
+                throw 'A Classic selection run used a grant or ran a Classic routine.'
+            }
+            return
+        }
+        $allowance = [string]$Request.parameters.classicAllowance | ConvertFrom-Json
+        if ([string]$outcome.allowanceStatus -cne 'valid' -or
+            [string]$outcome.planDigest -cne [string]$allowance.approvedPlanDigest -or
+            [string]$outcome.executionMode -cne [string]$allowance.executionMode -or
+            [int]$outcome.planSteps -gt [int]$allowance.maximumNativeSubmissions -or
+            -not [bool]$outcome.grantConsumed -or [int]$outcome.grantAttempts -ne 1 -or
+            [string]$outcome.quickDisposition -cne 'Completed' -or $steps.Count -ne [int]$outcome.planSteps -or
+            @($steps | Where-Object { [string]$_.finalStatus -cne 'EffectConfirmed' }).Count -ne 0) {
+            throw "Classic cast evidence does not show exactly the approved plan run once under its grant: $path"
+        }
+        return
+    }
+    if ($scenario -ceq 'live-workspace-physical') {
+        $path = Join-Path $directory 'physical-workspace.json'
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw 'Physical workspace evidence is missing.' }
+        $record = Read-KbpJson $path
+        $expected = @('ws-click-search', 'ws-wheel-grid', 'ws-type-query', 'ws-click-tile',
+            'ws-focus-cycle', 'ws-click-search-again', 'ws-type-more', 'ws-escape')
+        $acknowledged = @($record.acknowledged | ForEach-Object { [string]$_ })
+        if ([string]$record.runId -cne [string]$Request.runId -or @($record.violations).Count -ne 0 -or
+            @($record.failures).Count -ne 0 -or -not [bool]$record.openedPhysically -or
+            ($acknowledged -join ',') -cne ($expected -join ',')) {
+            throw "Physical workspace evidence is inconsistent with a PASS: $path"
+        }
+        $expectedScreen = [string]$Request.parameters.expectedScreen
+        if (-not [string]::IsNullOrEmpty($expectedScreen) -and [string]$record.screen -cne $expectedScreen) {
+            throw "The physical run judged another screen: $($record.screen) (expected $expectedScreen)."
+        }
+        $typed = @{ 'ws-type-query' = [string]$record.query; 'ws-type-more' = [string]$record.querySuffix }
+        foreach ($actionId in $expected) {
+            $requestPath = Join-Path $directory ('physical-input-{0}.json' -f $actionId)
+            $ackPath = Join-Path $directory ('physical-input-{0}.ack.json' -f $actionId)
+            if (-not (Test-Path -LiteralPath $requestPath -PathType Leaf) -or
+                -not (Test-Path -LiteralPath $ackPath -PathType Leaf)) {
+                throw "Physical action $actionId has no request or no acknowledgement."
+            }
+            $sent = Read-KbpJson $requestPath
+            $ack = Read-KbpJson $ackPath
+            $failed = @($ack.PSObject.Properties | ForEach-Object Name) -ccontains 'deliveryFailed' -and [bool]$ack.deliveryFailed
+            if ([string]$sent.runId -cne [string]$Request.runId -or [string]$ack.runId -cne [string]$Request.runId -or
+                [string]$sent.actionId -cne $actionId -or [string]$ack.actionId -cne $actionId -or
+                [string]$ack.action -cne [string]$sent.action -or $failed) {
+                throw "Physical action $actionId was not delivered as the game requested it."
+            }
+            if ($typed.ContainsKey($actionId) -and
+                ([string]::IsNullOrEmpty($typed[$actionId]) -or [string]$sent.text -cne $typed[$actionId])) {
+                throw "Physical action $actionId typed text the host did not record."
+            }
+        }
+        foreach ($ackFile in @(Get-ChildItem -LiteralPath $directory -Filter 'physical-input-*.ack.json' -File)) {
+            $ack = Read-KbpJson $ackFile.FullName
+            if (@($ack.PSObject.Properties | ForEach-Object Name) -ccontains 'deliveryFailed' -and [bool]$ack.deliveryFailed) {
+                throw "A physical action failed delivery: $($ackFile.Name)"
+            }
+        }
+        return
+    }
+}
+
 # Review C5: a casting allowance names the compatibility profile, its exact
 # identity digest (the external mod copies) and the WORKING save it was
 # approved for. Checked against the profile and save pair this launcher

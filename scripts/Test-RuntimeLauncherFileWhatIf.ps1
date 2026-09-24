@@ -405,6 +405,116 @@ if ($bindingAt -lt 0 -or $qualificationBindingAt -lt 0 -or $pairAt -lt 0 -or $de
     $bindingAt -gt $deployAt -or $qualificationBindingAt -gt $deployAt) {
     throw 'The launcher does not bind allowances to the resolved profile and save before deploying.'
 }
+# Review C6: the launcher's own reading of Classic and physical evidence.
+$outcomeRoot = Join-Path $env:TEMP ('kbp-outcome-' + [Guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $outcomeRoot | Out-Null
+try {
+    $digest = 'd' * 64
+    $classicAllowance = New-ClassicFixtureJson @{ approvedPlanDigest = $digest }
+    function New-ClassicOutcomeCase([string]$Name, [string]$Scenario, [hashtable]$Override) {
+        $directory = Join-Path $outcomeRoot $Name
+        New-Item -ItemType Directory -Path $directory | Out-Null
+        $cast = $Scenario -ceq 'live-classic-cast'
+        $value = [ordered]@{
+            schemaVersion = 2; runId = 'classic-bind-test'; scenario = $Scenario; castingScenario = $cast
+            allowanceStatus = if ($cast) { 'valid' } else { 'not-read' }; executionMode = 'animated'
+            planDigest = $digest; planSteps = 1; grant = 'consumed'; grantConsumed = $cast
+            grantAttempts = if ($cast) { 1 } else { 0 }; quickDisposition = if ($cast) { 'Completed' } else { $null }
+            castingFirstRuns = 0; grantArmedAtEnd = $false; classicRunSeen = $false
+            steps = @(if ($cast) { [ordered]@{ index = 0; finalStatus = 'EffectConfirmed' } })
+            failures = @(); violations = @()
+        }
+        foreach ($key in $Override.Keys) { $value[$key] = $Override[$key] }
+        Write-KbpJsonAtomic (Join-Path $directory 'classic-outcome.json') $value
+        return [ordered]@{ runId = 'classic-bind-test'; scenario = $Scenario; evidenceDirectory = $directory
+            parameters = @{ executionMode = 'animated'; classicAllowance = $classicAllowance } }
+    }
+    Assert-KbpScenarioOutcome -Request (New-ClassicOutcomeCase 'cast-good' 'live-classic-cast' @{})
+    Assert-KbpScenarioOutcome -Request (New-ClassicOutcomeCase 'select-good' 'live-classic-select' @{})
+    $classicOutcomeCases = [ordered]@{
+        'other-digest' = @('live-classic-cast', @{ planDigest = ('e' * 64) })
+        'grant-twice' = @('live-classic-cast', @{ grantAttempts = 2 })
+        'grant-unused' = @('live-classic-cast', @{ grantConsumed = $false })
+        'invalid-allowance' = @('live-classic-cast', @{ allowanceStatus = 'plan-differs-from-approval' })
+        'over-budget' = @('live-classic-cast', @{ planSteps = 4 })
+        'unconfirmed' = @('live-classic-cast', @{ steps = @([ordered]@{ index = 0; finalStatus = 'TimedOutUnconfirmed' }) })
+        'violation' = @('live-classic-cast', @{ violations = @('step0:availability-unread') })
+        'old-schema' = @('live-classic-cast', @{ schemaVersion = 1 })
+        'other-mode' = @('live-classic-cast', @{ executionMode = 'instant' })
+        'armed' = @('live-classic-cast', @{ grantArmedAtEnd = $true })
+        'select-grant' = @('live-classic-select', @{ grantAttempts = 1 })
+        'select-run' = @('live-classic-select', @{ classicRunSeen = $true })
+    }
+    foreach ($case in $classicOutcomeCases.Keys) {
+        $caseRequest = New-ClassicOutcomeCase $case $classicOutcomeCases[$case][0] $classicOutcomeCases[$case][1]
+        $refusal = $null
+        try { Assert-KbpScenarioOutcome -Request $caseRequest }
+        catch { $refusal = $_.Exception.Message }
+        if ($null -eq $refusal -or $refusal -notlike '*Classic*') {
+            throw "Classic outcome case $case was not refused by the launcher's check: $refusal"
+        }
+    }
+    $physicalActions = @('ws-click-search', 'ws-wheel-grid', 'ws-type-query', 'ws-click-tile',
+        'ws-focus-cycle', 'ws-click-search-again', 'ws-type-more', 'ws-escape')
+    $physicalKinds = @{ 'ws-click-search' = 'click'; 'ws-wheel-grid' = 'wheel'; 'ws-type-query' = 'type'
+        'ws-click-tile' = 'click'; 'ws-focus-cycle' = 'focus-cycle'; 'ws-click-search-again' = 'click'
+        'ws-type-more' = 'type'; 'ws-escape' = 'key-escape' }
+    function New-PhysicalOutcomeCase([string]$Name, [scriptblock]$Tamper) {
+        $directory = Join-Path $outcomeRoot $Name
+        New-Item -ItemType Directory -Path $directory | Out-Null
+        foreach ($id in $physicalActions) {
+            $sent = [ordered]@{ schemaVersion = 1; runId = 'physical-run'; actionId = $id; action = $physicalKinds[$id] }
+            if ($id -ceq 'ws-type-query') { $sent.text = 'resi' }
+            if ($id -ceq 'ws-type-more') { $sent.text = 's' }
+            Write-KbpJsonAtomic (Join-Path $directory "physical-input-$id.json") $sent
+            Write-KbpJsonAtomic (Join-Path $directory "physical-input-$id.ack.json") ([ordered]@{
+                schemaVersion = 1; runId = 'physical-run'; actionId = $id; action = $physicalKinds[$id] })
+        }
+        $record = [ordered]@{ schemaVersion = 1; runId = 'physical-run'; expectedScreen = '1920x1080'
+            screen = '1920x1080'; openedPhysically = $true; query = 'resi'; querySuffix = 's'
+            acknowledged = $physicalActions; failures = @(); violations = @() }
+        Write-KbpJsonAtomic (Join-Path $directory 'physical-workspace.json') $record
+        if ($null -ne $Tamper) { & $Tamper $directory }
+        return [ordered]@{ runId = 'physical-run'; scenario = 'live-workspace-physical'; evidenceDirectory = $directory
+            parameters = @{ expectedScreen = '1920x1080' } }
+    }
+    Assert-KbpScenarioOutcome -Request (New-PhysicalOutcomeCase 'physical-good' $null)
+    $physicalOutcomeCases = [ordered]@{
+        'missing-ack' = { param($d) Remove-Item -LiteralPath (Join-Path $d 'physical-input-ws-wheel-grid.ack.json') }
+        'failed-ack' = { param($d) Write-KbpJsonAtomic (Join-Path $d 'physical-input-ws-escape.ack.json') ([ordered]@{
+            schemaVersion = 1; runId = 'physical-run'; actionId = 'ws-escape'; action = 'key-escape'; deliveryFailed = $true }) }
+        'other-action' = { param($d) Write-KbpJsonAtomic (Join-Path $d 'physical-input-ws-click-tile.ack.json') ([ordered]@{
+            schemaVersion = 1; runId = 'physical-run'; actionId = 'ws-click-tile'; action = 'hover' }) }
+        'other-text' = { param($d) Write-KbpJsonAtomic (Join-Path $d 'physical-input-ws-type-query.json') ([ordered]@{
+            schemaVersion = 1; runId = 'physical-run'; actionId = 'ws-type-query'; action = 'type'; text = 'ligh' }) }
+        'unacknowledged' = { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.acknowledged = @('ws-click-search'); Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r }
+        'other-screen' = { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.screen = '1920x1200'; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r }
+        'programmatic-open' = { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.openedPhysically = $false; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r }
+        'extra-failed-ack' = { param($d) Write-KbpJsonAtomic (Join-Path $d 'physical-input-ws-other.ack.json') ([ordered]@{
+            schemaVersion = 1; runId = 'physical-run'; actionId = 'ws-other'; action = 'click'; deliveryFailed = $true }) }
+    }
+    foreach ($case in $physicalOutcomeCases.Keys) {
+        $caseRequest = New-PhysicalOutcomeCase $case $physicalOutcomeCases[$case]
+        $refusal = $null
+        try { Assert-KbpScenarioOutcome -Request $caseRequest }
+        catch { $refusal = $_.Exception.Message }
+        if ($null -eq $refusal -or ($refusal -notlike '*hysical*' -and $refusal -notlike '*physical run*')) {
+            throw "Physical outcome case $case was not refused by the launcher's check: $refusal"
+        }
+    }
+}
+finally { Remove-Item -LiteralPath $outcomeRoot -Recurse -Force -ErrorAction SilentlyContinue }
+$passAt = $launcherText.IndexOf('if ($result.status -cne ''PASS'') { throw "Runtime scenario returned $($result.status)." }')
+$outcomeAt = $launcherText.IndexOf('Assert-KbpScenarioOutcome -Request $request')
+$hostSource = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\src\KingmakerBuffPlanner\RuntimeTesting\RuntimeTestHost.cs') -Raw
+if ($passAt -lt 0 -or $outcomeAt -lt $passAt -or
+    -not $hostSource.Contains('{ "grantConsumed", record.GrantConsumed },') -or
+    -not $hostSource.Contains('{ "grantAttempts", record.GrantAttempts },')) {
+    throw 'The launcher does not read the scenario evidence itself after a PASS.'
+}
 # Display modes: a window larger than the session's display is refused; the
 # Unity arguments name exactly the size; the owner's settings add none.
 if (-not (Test-KbpDisplayModeSupported -Size '1920x1080' -DisplaySize '1920x1200') -or

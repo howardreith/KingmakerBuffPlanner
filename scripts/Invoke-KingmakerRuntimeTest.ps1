@@ -757,6 +757,8 @@ public static class KbpPhysicalInput {
     $orchestration.completedAtUtc = [DateTime]::UtcNow.ToString('o')
     Write-KbpJsonAtomic (Join-Path $evidence 'orchestration.json') $orchestration
     if ($result.status -cne 'PASS') { throw "Runtime scenario returned $($result.status)." }
+    # Review C6: the launcher reads the scenario's own evidence itself.
+    Assert-KbpScenarioOutcome -Request $request
     if ($Scenario -ceq 'live-ui-bootstrap') {
         $afterPair = Get-KbpDisposableSavePair
         if ($afterPair.baseline.sha256 -cne $savePair.baseline.sha256) {
