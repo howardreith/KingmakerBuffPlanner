@@ -90,6 +90,16 @@ namespace KingmakerBuffPlanner.Persistence
                 { "campaignId", campaignId },
                 { "accepted", accepted }
             };
+            // A file this store refuses to read (another schema, another
+            // campaign, unreadable) is never replaced: a newer planner may
+            // own it, and its bytes stay exactly as they are. The session
+            // keeps its acceptance in memory and reports the warning.
+            if (File.Exists(path))
+            {
+                string refused = Load(campaignId).Warning;
+                if (refused.Length != 0)
+                    throw new InvalidOperationException("review-state-file-protected:" + refused);
+            }
             Directory.CreateDirectory(_settingsDirectory);
             AtomicFile.WriteUtf8(path, root.ToString(Formatting.Indented));
         }

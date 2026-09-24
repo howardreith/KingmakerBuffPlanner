@@ -64,6 +64,17 @@ namespace KingmakerBuffPlanner.Persistence
 
         public void Save(PlannerMode mode)
         {
+            // A mode file this store refuses to read (another schema, an
+            // unknown mode, unreadable) is never replaced: the toggle
+            // reports why and the file keeps its bytes.
+            if (File.Exists(FilePath))
+            {
+                string refused;
+                Load(out refused);
+                if (refused.Length != 0)
+                    throw new InvalidOperationException(FileName + " was left unchanged (" + refused +
+                        "): it is unreadable or from another planner version.");
+            }
             var root = new JObject
             {
                 { "schemaVersion", SchemaVersion },

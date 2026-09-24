@@ -136,6 +136,12 @@ namespace KingmakerBuffPlanner.Persistence
                     ReadFormatRevision(previous) > CastingPlanProfile.CurrentFormatRevision)
                     throw new InvalidDataException(
                         "refusing-to-overwrite-unreadable-or-newer-primary");
+                // A readable primary that names another campaign (a copied
+                // or misplaced file) is never replaced by this campaign's
+                // save (batch 3, section 11).
+                string owner = ReadCampaignId(previous);
+                if (owner != null && !string.Equals(owner, profile.CampaignId, StringComparison.Ordinal))
+                    throw new InvalidDataException("refusing-to-overwrite-another-campaigns-primary");
                 // A candidate write must round-trip before it can replace a
                 // readable primary; a malformed previous primary is never
                 // rotated into the backup chain.
@@ -173,6 +179,19 @@ namespace KingmakerBuffPlanner.Persistence
             catch (Exception)
             {
                 return 0;
+            }
+        }
+
+        private static string ReadCampaignId(string json)
+        {
+            try
+            {
+                JToken token = JObject.Parse(json)["campaignId"];
+                return token != null && token.Type == JTokenType.String ? (string)token : null;
+            }
+            catch (Exception)
+            {
+                return null;
             }
         }
 
