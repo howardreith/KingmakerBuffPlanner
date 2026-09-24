@@ -138,6 +138,9 @@ namespace KingmakerBuffPlanner.Execution
         bool Succeeded { get; }
         bool EffectsObserved { get; }
         bool ResourceSpent { get; }
+        // For a free (unlimited) reservation: null when the game's counts
+        // prove nothing was spent, else why they do not (review A7).
+        string ResourceCountViolation { get; }
         bool HasResidualDeliveryState { get; }
         string Detail { get; }
     }
@@ -195,7 +198,7 @@ namespace KingmakerBuffPlanner.Execution
 
         public InstantCastResult(bool submitted, bool succeeded,
             bool effectsObserved, bool resourceSpent, bool spendInvoked,
-            string detail)
+            string detail, string resourceCountViolation = null)
         {
             Submitted = submitted;
             Succeeded = succeeded;
@@ -203,6 +206,7 @@ namespace KingmakerBuffPlanner.Execution
             ResourceSpent = resourceSpent;
             SpendInvoked = spendInvoked;
             Detail = detail ?? string.Empty;
+            ResourceCountViolation = resourceCountViolation;
         }
         public bool Submitted { get; private set; }
         public bool Succeeded { get; private set; }
@@ -210,6 +214,8 @@ namespace KingmakerBuffPlanner.Execution
         public bool ResourceSpent { get; private set; }
         public bool SpendInvoked { get; private set; }
         public string Detail { get; private set; }
+        // As IAnimatedCastOperation.ResourceCountViolation (review A7).
+        public string ResourceCountViolation { get; private set; }
     }
 
     public sealed class InstantCastCompletion

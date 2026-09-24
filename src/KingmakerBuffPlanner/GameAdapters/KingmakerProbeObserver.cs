@@ -47,7 +47,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                     if (reserved == null)
                         return ProbeObservation.Failed(phase, clock.Next(), DateTime.UtcNow, failure);
                 }
-                AbilityData ability = KingmakerAnimatedCastAdapter.ResolveAbility(caster, step.Provider);
+                AbilityData ability = KingmakerAnimatedCastAdapter.ResolveAbility(caster, step);
                 int? available = ability == null ? (int?)null : ability.GetAvailableForCastCount();
                 if (available == null && reserved == null)
                     return ProbeObservation.Failed(phase, clock.Next(), DateTime.UtcNow, "source-ability-not-found");

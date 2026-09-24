@@ -69,6 +69,9 @@ namespace KingmakerBuffPlanner.Tests
             Run("qualification-disable-step-rules", () => TestQualificationDisableStepRules(root));
             Run("cantrips-cast-at-will-through-the-class-ability", TestCantripsCastAtWill);
             Run("at-will-cantrip-choice-refuses-what-is-not-the-authored-cantrip", TestAtWillCantripChoice);
+            Run("cantrip-route-follows-the-reservation-and-ambiguity-stays-unresolved", TestCantripRouteAndPricing);
+            Run("fact-source-choice-keeps-the-provider-kind-and-reserved-pool", TestFactSourceChoice);
+            Run("available-count-judgement-never-reads-unread-as-unlimited", TestAvailableCountJudgement);
             Run("capability-inventory-describes-the-party", TestCapabilityInventory);
             Run("classic-cast-grant-digest-allowance-and-judgement", TestClassicCastCore);
             Run("classic-runs-halt-after-a-failure-and-keep-cleanup", TestClassicHaltingRunner);
@@ -2581,6 +2584,7 @@ namespace KingmakerBuffPlanner.Tests
             public bool Succeeded { get { return _landed; } }
             public bool EffectsObserved { get { return _landed && _world.EffectsObserved(_step); } }
             public bool ResourceSpent { get { return false; } }
+            public string ResourceCountViolation { get { return null; } }
             public bool HasResidualDeliveryState { get { return false; } }
             public string Detail { get { return "simulated-animated;polls=" + _polls; } }
             public void Dispose()
@@ -3113,23 +3117,52 @@ namespace KingmakerBuffPlanner.Tests
             string adapter = source("KingmakerAnimatedCastAdapter.cs");
             string atWill = source("KingmakerAtWillCantrips.cs");
             string builder = source("KingmakerPartySnapshotBuilder.cs");
-            string resolve = SourceBlock(adapter, "private static AbilityData ResolveAbility(\n            UnitEntityData caster,\n            ProviderKey provider,\n            IReadOnlyList<string> reservedTokenIds,");
+            string resolve = SourceBlock(adapter, "private static AbilityData ResolveAbility(\n            UnitEntityData caster,\n            ProviderKey provider,\n            ResourceReservation reservation,");
             int atWillAt = resolve == null ? -1 : resolve.IndexOf(
                 "KingmakerAtWillCantrips.Resolve(caster, provider.Ability,", StringComparison.Ordinal);
             int memorizedAt = resolve == null ? -1 : resolve.IndexOf("book.GetAllMemorizedSpells()", StringComparison.Ordinal);
             if (atWillAt < 0 || memorizedAt < atWillAt ||
-                !resolve.Contains("if (provider.SourceInstanceId == AtWillSourceInstance)") ||
+                !resolve.Contains("CantripRoute route = AtWillCantripChoice.Route(provider.SourceInstanceId == AtWillSourceInstance,\n                    reservation == null ? (bool?)null : reservation.Unlimited);") ||
+                !resolve.Contains("if (route == CantripRoute.Refused)\n                {\n                    refusal = AtWillCantripChoice.FreeReservationRefusal;\n                    return null;") ||
+                !resolve.Contains("if (route == CantripRoute.AtWillOnly || route == CantripRoute.AtWillThenSlot)") ||
+                !resolve.Contains("if (route == CantripRoute.AtWillOnly)\n                    {\n                        refusal = AtWillCantripChoice.MissingRefusal;\n                        return null;") ||
+                !adapter.Contains("AbilityData ability = ResolveAbility(caster, step.Provider, step.Reservation,") ||
+                !source("KingmakerProbeObserver.cs").Contains(
+                    "AbilityData ability = KingmakerAnimatedCastAdapter.ResolveAbility(caster, step);") ||
                 !resolve.Contains("if (refusal != null) return null;") ||
                 !resolve.Contains("resolution = \"at-will-cantrip-ability;authored=spellbook:\" + provider.SpellbookGuid +") ||
                 !adapter.Contains("internal const string AtWillSourceInstance = \"level-0|heighten-0\";"))
                 throw new InvalidOperationException("A cantrip's level-0 entry is not cast through its at-will ability first.");
+            // Review A3: a fact casting is bound to its kind and reserved
+            // pool, priced by the same rule discovery uses.
+            if (!resolve.Contains("string poolKey = KingmakerPartySnapshotBuilder.FactPoolKey(caster.UniqueId, selection, out kind);") ||
+                !resolve.Contains("FactSourceCandidate chosen = FactSourceChoice.Choose(candidates.Select(pair => pair.Key),\n                    provider.Ability.SourceKind == SourceKind.AbilityResource,\n                    reservation == null ? null : reservation.PoolKey, out equivalents, out refusal);") ||
+                !resolve.Contains("SafeSpellbookBound(fact.Data), kind == SourceKind.AbilityResource, poolKey)") ||
+                !builder.Contains("string factPoolKey = FactPoolKey(unit.UniqueId, selection, out sourceKind);") ||
+                Occurrences(builder, "string key = factPoolKey;") != 2)
+                throw new InvalidOperationException("A fact casting is not bound to its kind and reserved pool.");
+            // Review A7: an unread count is null, and the free check is the
+            // Unity-free judgement in both paths.
+            string instantSource = source("KingmakerInstantCastAdapter.cs");
+            if (!adapter.Contains("internal static int? SafeAvailableCount(AbilityData ability)") ||
+                !adapter.Contains("catch (Exception) { return null; }") ||
+                !adapter.Contains("? AvailableCountJudgement.FreeViolation(_availableBefore, SafeAvailableCount(_sourceAbility))") ||
+                !instantSource.Contains("bool spent = AvailableCountJudgement.Spent(availableBefore, availableAfter);") ||
+                !instantSource.Contains("? AvailableCountJudgement.FreeViolation(availableBefore, availableAfter) : null;") ||
+                !instantSource.Contains("\";effects-observed-at-submit:\" + observed, countViolation);"))
+                throw new InvalidOperationException("Unread cast counts can still pass as unlimited.");
             string validate = SourceBlock(adapter, "internal CastRuntimeValidation ValidateSource(CastStep step,");
             if (validate == null || validate.Contains("resolved.Ability.IsAvailableForCast") ||
                 !validate.Contains("if (!resolved.Ability.IsAvailable) return CastRuntimeValidation.Fail(\"ability-unavailable\");"))
                 throw new InvalidOperationException("Validation is not the cast command's own availability guard.");
             string resolveAtWill = SourceBlock(atWill, "internal static AbilityData Resolve(UnitEntityData caster, AbilityKey requested,");
+            int matchGuardAt = resolveAtWill == null ? -1 : resolveAtWill.IndexOf("if (match == null) continue;",
+                StringComparison.Ordinal);
+            int judgedAt = resolveAtWill == null ? -1 : resolveAtWill.IndexOf(
+                "SafeHasSpellbook(match), SafeAvailable(match), SafeCount(match), CasterLevel(match)",
+                StringComparison.Ordinal);
             if (resolveAtWill == null || !resolveAtWill.Contains("AtWillCantripChoice.Choose(") ||
-                !resolveAtWill.Contains("SafeHasSpellbook(judged), SafeAvailable(judged), SafeCount(judged), CasterLevel(judged)") ||
+                matchGuardAt < 0 || judgedAt < matchGuardAt ||
                 !atWill.Contains("try { return data.IsAvailable; }") ||
                 !atWill.Contains("try { return data.GetAvailableForCastCount(); }"))
                 throw new InvalidOperationException("An ability is taken as at will without the game's own judgement.");
@@ -3146,11 +3179,14 @@ namespace KingmakerBuffPlanner.Tests
             string prepared = SourceBlock(builder, "private void ScanPreparedSpellbook(");
             if (spontaneous == null || spontaneous.Contains("ResourcePoolKind.Unlimited") ||
                 !spontaneous.Contains("ScanSpontaneousLevelZero(unit, spellbook, providers, pools);") ||
-                zero == null || !zero.Contains("if (HasAtWillCantrip(unit, spellbook, selection))") ||
+                zero == null ||
+                !zero.Contains("CantripPricing pricing = PriceCantrip(unit, spellbook, selection, out ambiguity);\n                if (pricing == CantripPricing.Unresolved)\n                {\n                    TraceUnresolvedCantrip(unit, spellbook, selection, ambiguity);\n                    continue;\n                }\n                if (pricing == CantripPricing.Free)") ||
                 !zero.Contains("ResourcePoolKind.SpontaneousLevel") ||
                 prepared == null ||
-                !prepared.Contains("!selections.All(selection => HasAtWillCantrip(unit, spellbook, selection)))") ||
-                !prepared.Contains("var slots = allSlots.Where(s => !atWillSlots.Contains(s)).ToList();"))
+                !prepared.Contains("if (pricings.Contains(CantripPricing.Unresolved))\n                    {\n                        foreach (SpellSlot slot in group) unresolvedSlots.Add(slot);\n                        continue;") ||
+                !prepared.Contains("if (!pricings.All(pricing => pricing == CantripPricing.Free)) continue;") ||
+                !prepared.Contains("var slots = allSlots.Where(s => !atWillSlots.Contains(s) && !unresolvedSlots.Contains(s)).ToList();") ||
+                !builder.Contains("return AtWillCantripChoice.Price(atWill != null, ambiguity);"))
                 throw new InvalidOperationException("A level-0 entry is priced as free without an at-will ability.");
         }
 
@@ -3897,6 +3933,96 @@ namespace KingmakerBuffPlanner.Tests
             if (AtWillCantripChoice.Choose(new[] { bard, sorcerer }, 2, out refusal) != null ||
                 refusal != AtWillCantripChoice.AmbiguousPrefix + "bard@cl3,sorcerer@cl1")
                 throw new InvalidOperationException("An ambiguous choice was guessed: " + refusal);
+        }
+
+        // Review A2/A4: the reservation, never the entry alone, routes a
+        // level-0 casting; an ambiguous at-will choice is priced unresolved.
+        private static void TestCantripRouteAndPricing()
+        {
+            var routes = new Dictionary<string, CantripRoute>
+            {
+                { "level0/free", AtWillCantripChoice.Route(true, true) },
+                { "level0/finite", AtWillCantripChoice.Route(true, false) },
+                { "level0/unreserved", AtWillCantripChoice.Route(true, null) },
+                { "other/free", AtWillCantripChoice.Route(false, true) },
+                { "other/finite", AtWillCantripChoice.Route(false, false) },
+                { "other/unreserved", AtWillCantripChoice.Route(false, null) }
+            };
+            var expected = new Dictionary<string, CantripRoute>
+            {
+                { "level0/free", CantripRoute.AtWillOnly },
+                { "level0/finite", CantripRoute.SlotOnly },
+                { "level0/unreserved", CantripRoute.AtWillThenSlot },
+                { "other/free", CantripRoute.Refused },
+                { "other/finite", CantripRoute.Normal },
+                { "other/unreserved", CantripRoute.Normal }
+            };
+            foreach (KeyValuePair<string, CantripRoute> item in expected)
+                if (routes[item.Key] != item.Value)
+                    throw new InvalidOperationException("Cantrip route " + item.Key + " was " + routes[item.Key]);
+            if (AtWillCantripChoice.Price(true, null) != CantripPricing.Free ||
+                AtWillCantripChoice.Price(false, null) != CantripPricing.Finite ||
+                AtWillCantripChoice.Price(false, AtWillCantripChoice.AmbiguousPrefix + "bard@cl3,sorcerer@cl1") !=
+                    CantripPricing.Unresolved)
+                throw new InvalidOperationException("An ambiguous at-will cantrip was priced as a slot or free.");
+            if (AtWillCantripChoice.MissingRefusal != "at-will-cantrip-missing" ||
+                AtWillCantripChoice.FreeReservationRefusal != "free-reservation-for-slot-entry")
+                throw new InvalidOperationException("The cantrip refusals changed.");
+        }
+
+        // Review A3: a Fact or AbilityResource casting is cast through an
+        // owned ability of its own kind and reserved pool, never another.
+        private static void TestFactSourceChoice()
+        {
+            var free = new FactSourceCandidate("free-a#1", false, false, "u|free|a");
+            var freeTwin = new FactSourceCandidate("free-a#4", false, false, "u|free|a");
+            var resource = new FactSourceCandidate("res-a#2", false, true, "u|resource|r1");
+            var otherResource = new FactSourceCandidate("res-b#3", false, true, "u|resource|r2");
+            var bound = new FactSourceCandidate("book#5", true, false, "u|free|a");
+            var all = new[] { bound, resource, free, otherResource, freeTwin };
+            int equivalents;
+            string refusal;
+            if (FactSourceChoice.Choose(all, false, "u|free|a", out equivalents, out refusal) != free ||
+                equivalents != 2 || refusal != null)
+                throw new InvalidOperationException("A free casting did not take its free, unbound source.");
+            if (FactSourceChoice.Choose(all, true, "u|resource|r2", out equivalents, out refusal) != otherResource ||
+                equivalents != 1 || refusal != null)
+                throw new InvalidOperationException("A resource casting did not take its reserved pool.");
+            // Free never becomes paid, paid never becomes free.
+            if (FactSourceChoice.Choose(new[] { resource, bound }, false, "u|free|a", out equivalents, out refusal) !=
+                    null || refusal == null ||
+                !refusal.StartsWith(FactSourceChoice.UnavailablePrefix + "free:u|free|a;seen=", StringComparison.Ordinal) ||
+                refusal.IndexOf("res-a#2/resource/u|resource|r1", StringComparison.Ordinal) < 0 ||
+                refusal.IndexOf("book#5/spellbook/u|free|a", StringComparison.Ordinal) < 0)
+                throw new InvalidOperationException("A free casting moved to a paid or spellbook source: " + refusal);
+            if (FactSourceChoice.Choose(new[] { free }, true, "u|resource|r1", out equivalents, out refusal) != null ||
+                refusal == null)
+                throw new InvalidOperationException("A paid casting moved to a free source.");
+            // A resource casting whose reserved pool is gone is refused even
+            // when another resource of the same ability remains.
+            if (FactSourceChoice.Choose(new[] { otherResource }, true, "u|resource|r1", out equivalents,
+                    out refusal) != null || refusal == null)
+                throw new InvalidOperationException("A casting moved to another resource pool.");
+            // Unreserved reads (discovery, targeting) keep the kind only.
+            if (FactSourceChoice.Choose(all, true, null, out equivalents, out refusal) != resource ||
+                equivalents != 1 || refusal != null)
+                throw new InvalidOperationException("An unreserved read ignored the kind.");
+        }
+
+        // Review A7: an unread count is never the game's unlimited.
+        private static void TestAvailableCountJudgement()
+        {
+            if (!AvailableCountJudgement.Spent(3, 2) || AvailableCountJudgement.Spent(3, 3) ||
+                AvailableCountJudgement.Spent(-1, -1) || AvailableCountJudgement.Spent(null, 2) ||
+                AvailableCountJudgement.Spent(3, null) || AvailableCountJudgement.Spent(-1, 2))
+                throw new InvalidOperationException("A spend was judged from unread or unlimited counts.");
+            if (AvailableCountJudgement.FreeViolation(-1, -1) != null ||
+                AvailableCountJudgement.FreeViolation(null, -1) != "available-count-unread:unread>-1" ||
+                AvailableCountJudgement.FreeViolation(-1, null) != "available-count-unread:-1>unread" ||
+                AvailableCountJudgement.FreeViolation(null, null) != "available-count-unread:unread>unread" ||
+                AvailableCountJudgement.FreeViolation(2, 2) != "available-count-not-unlimited:2>2" ||
+                AvailableCountJudgement.FreeViolation(-1, 0) != "available-count-not-unlimited:-1>0")
+                throw new InvalidOperationException("A free casting was judged free without unlimited counts.");
         }
 
         // The live shape: the planner's root owns and pumps the host, the

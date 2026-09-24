@@ -119,7 +119,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                     "sticky-touch-held-charge-already-active");
             UnitCommand command = UnitUseAbility.CreateCastCommand(resolved.Ability, resolved.Target);
             if (command == null) throw new InvalidOperationException("Kingmaker returned no cast command.");
-            int availableBefore = SafeAvailableCount(resolved.Ability);
+            int? availableBefore = SafeAvailableCount(resolved.Ability);
             UnitCommand previousCommand = resolved.Caster.Commands.PreviousCommand;
             resolved.Caster.Commands.AddToQueue(command);
             return new KingmakerAnimatedOperation(command, step,
@@ -145,7 +145,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                 return Fail("target-not-in-party", out reason);
             string resolution;
             string refusal;
-            AbilityData ability = ResolveAbility(caster, step.Provider, step.Reservation.TokenIds,
+            AbilityData ability = ResolveAbility(caster, step.Provider, step.Reservation,
                 out resolution, out refusal);
             if (ability == null) return Fail(refusal ?? "provider-ability-not-found", out reason);
             resolved = new ResolvedCast(caster, ability, new TargetWrapper(target)) { Resolution = resolution };
@@ -159,18 +159,28 @@ namespace KingmakerBuffPlanner.GameAdapters
             return ResolveAbility(caster, provider, null, out resolution, out refusal);
         }
 
+        // The step's own source, by its reservation (review A2): what a probe
+        // observes is what the step casts.
+        internal static AbilityData ResolveAbility(UnitEntityData caster, CastStep step)
+        {
+            string resolution;
+            string refusal;
+            return ResolveAbility(caster, step.Provider, step.Reservation, out resolution, out refusal);
+        }
+
         // resolution: how the authored provider became the ability data the
         // game casts (provenance for the evidence); refusal: why it cannot,
         // when that is more than "not found".
         private static AbilityData ResolveAbility(
             UnitEntityData caster,
             ProviderKey provider,
-            IReadOnlyList<string> reservedTokenIds,
+            ResourceReservation reservation,
             out string resolution,
             out string refusal)
         {
             resolution = null;
             refusal = null;
+            IReadOnlyList<string> reservedTokenIds = reservation == null ? null : reservation.TokenIds;
             if (provider.Ability.SourceKind == SourceKind.Spellbook)
             {
                 List<Spellbook> ownedBooks = caster.Descriptor.Spellbooks.Where(b => b != null &&
@@ -182,7 +192,17 @@ namespace KingmakerBuffPlanner.GameAdapters
                 // A level-0 entry is cast at will through the cantrip ability
                 // the class grants, exactly as the game's action bar casts
                 // it; the entry itself needs a level-0 slot the book lacks.
-                if (provider.SourceInstanceId == AtWillSourceInstance)
+                // The step's reservation decides the route (review A2): a
+                // free casting is never paid from a slot, and a paid one never
+                // turns free.
+                CantripRoute route = AtWillCantripChoice.Route(provider.SourceInstanceId == AtWillSourceInstance,
+                    reservation == null ? (bool?)null : reservation.Unlimited);
+                if (route == CantripRoute.Refused)
+                {
+                    refusal = AtWillCantripChoice.FreeReservationRefusal;
+                    return null;
+                }
+                if (route == CantripRoute.AtWillOnly || route == CantripRoute.AtWillThenSlot)
                 {
                     AbilityData atWill = KingmakerAtWillCantrips.Resolve(caster, provider.Ability,
                         book.CasterLevel, out refusal);
@@ -195,6 +215,11 @@ namespace KingmakerBuffPlanner.GameAdapters
                     // Ambiguous at-will abilities are refused, never guessed
                     // and never replaced by the slot-bound spellbook entry.
                     if (refusal != null) return null;
+                    if (route == CantripRoute.AtWillOnly)
+                    {
+                        refusal = AtWillCantripChoice.MissingRefusal;
+                        return null;
+                    }
                 }
                 if (reservedTokenIds != null && reservedTokenIds.Count != 0)
                 {
@@ -245,23 +270,45 @@ namespace KingmakerBuffPlanner.GameAdapters
             if (provider.Ability.SourceKind == SourceKind.AbilityResource ||
                 provider.Ability.SourceKind == SourceKind.Fact)
             {
-                foreach (Ability fact in caster.Descriptor.Abilities.Enumerable
-                    .Where(value => value != null && value.Data != null))
+                // Review A3: an owned ability of the provider's own kind (free
+                // or resource-bound) and, for a step, exactly its reserved
+                // pool, priced as discovery prices it; never one of another
+                // cost. Equivalent sources are counted in the provenance.
+                var candidates = new List<KeyValuePair<FactSourceCandidate, AbilityData>>();
+                int index = 0;
+                foreach (Ability fact in caster.Descriptor.Abilities.Enumerable)
                 {
-                    AbilityData match = KingmakerAbilityVariants.Resolve(
+                    index++;
+                    if (fact == null || fact.Data == null || fact.Data.Blueprint == null) continue;
+                    KingmakerAbilitySelection selection = KingmakerAbilityVariants.ResolveSelection(
                         fact.Data, provider.Ability);
-                    if (match != null)
-                    {
-                        resolution = "ability:" + provider.Ability.SourceKind;
-                        return match;
-                    }
+                    if (selection == null) continue;
+                    SourceKind kind;
+                    string poolKey = KingmakerPartySnapshotBuilder.FactPoolKey(caster.UniqueId, selection, out kind);
+                    candidates.Add(new KeyValuePair<FactSourceCandidate, AbilityData>(
+                        new FactSourceCandidate(fact.Data.Blueprint.AssetGuid + "#" + index,
+                            SafeSpellbookBound(fact.Data), kind == SourceKind.AbilityResource, poolKey),
+                        selection.Concrete));
                 }
-                return null;
+                int equivalents;
+                FactSourceCandidate chosen = FactSourceChoice.Choose(candidates.Select(pair => pair.Key),
+                    provider.Ability.SourceKind == SourceKind.AbilityResource,
+                    reservation == null ? null : reservation.PoolKey, out equivalents, out refusal);
+                if (chosen == null) return null;
+                resolution = "ability:" + provider.Ability.SourceKind + ";pool=" + chosen.PoolKey +
+                    ";fact=" + chosen.Identity + ";equivalent-sources=" + equivalents;
+                return candidates.First(pair => ReferenceEquals(pair.Key, chosen)).Value;
             }
             return null;
         }
 
         internal const string AtWillSourceInstance = "level-0|heighten-0";
+
+        private static bool SafeSpellbookBound(AbilityData data)
+        {
+            try { return data.Spellbook != null; }
+            catch (Exception) { return true; }
+        }
 
         private static bool SourceInstanceMatches(AbilityData data, string sourceInstance)
         {
@@ -324,10 +371,11 @@ namespace KingmakerBuffPlanner.GameAdapters
             return false;
         }
 
-        internal static int SafeAvailableCount(AbilityData ability)
+        // Null when unread (review A7); the game's own -1 means unlimited.
+        internal static int? SafeAvailableCount(AbilityData ability)
         {
-            try { return ability == null ? -1 : ability.GetAvailableForCastCount(); }
-            catch (Exception) { return -1; }
+            try { return ability == null ? (int?)null : ability.GetAvailableForCastCount(); }
+            catch (Exception) { return null; }
         }
 
         internal static bool CanTarget(AbilityData ability, TargetWrapper target)
@@ -390,7 +438,7 @@ namespace KingmakerBuffPlanner.GameAdapters
             private readonly AbilityData _sourceAbility;
             private readonly BlueprintAbility _deliveryBlueprint;
             private readonly UnitCommand _previousCommandAtStart;
-            private readonly int _availableBefore;
+            private readonly int? _availableBefore;
             private readonly string _resolution;
             private readonly AnimatedStickyTouchLifecycle _stickyLifecycle;
             private int _postCompletionFrames;
@@ -405,7 +453,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                 UnitEntityData caster, TargetWrapper target,
                 AbilityData sourceAbility,
                 BlueprintAbility deliveryBlueprint,
-                UnitCommand previousCommandAtStart, int availableBefore, string resolution)
+                UnitCommand previousCommandAtStart, int? availableBefore, string resolution)
             {
                 _resolution = resolution ?? "unrecorded";
                 _carrierCommand = command;
@@ -461,10 +509,16 @@ namespace KingmakerBuffPlanner.GameAdapters
             }
             public bool ResourceSpent
             {
+                get { return AvailableCountJudgement.Spent(_availableBefore, SafeAvailableCount(_sourceAbility)); }
+            }
+            // Review A7: a free casting must read unlimited and unchanged.
+            public string ResourceCountViolation
+            {
                 get
                 {
-                    int after = SafeAvailableCount(_sourceAbility);
-                    return _availableBefore >= 0 && after >= 0 && after < _availableBefore;
+                    return _step.Reservation != null && _step.Reservation.Unlimited
+                        ? AvailableCountJudgement.FreeViolation(_availableBefore, SafeAvailableCount(_sourceAbility))
+                        : null;
                 }
             }
             public bool EffectsObserved
@@ -530,9 +584,9 @@ namespace KingmakerBuffPlanner.GameAdapters
                             ? "ordinary-or-pending" :
                                 _stickyDecision.Detail) +
                         ";timed-out:" + _timedOut +
-                        ";available-before:" + _availableBefore +
+                        ";available-before:" + AvailableCountJudgement.Format(_availableBefore) +
                         ";available-after:" +
-                        SafeAvailableCount(_sourceAbility) +
+                        AvailableCountJudgement.Format(SafeAvailableCount(_sourceAbility)) +
                         ";carrier-guid:" + (_sourceAbility.Blueprint == null
                             ? "none" : _sourceAbility.Blueprint.AssetGuid) +
                         ";delivery-guid:" + (_deliveryBlueprint == null

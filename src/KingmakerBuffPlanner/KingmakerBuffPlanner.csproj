@@ -127,6 +127,8 @@
     <Compile Include="Execution\AtWillCantripChoice.cs" />
     <Compile Include="Execution\ClassicCastQualification.cs" />
     <Compile Include="Execution\HaltingPlanRunner.cs" />
+    <Compile Include="Execution\FactSourceChoice.cs" />
+    <Compile Include="Execution\AvailableCountJudgement.cs" />
     <Compile Include="Persistence\PersistenceMessages.cs" />
     <Compile Include="RuntimeTesting\PhysicalWorkspaceRecord.cs" />
     <Compile Include="Execution\CastingCapabilityInventory.cs" />
