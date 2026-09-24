@@ -4098,8 +4098,16 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("A casting moved to another resource pool.");
             // Unreserved reads (discovery, targeting) keep the kind only.
             if (FactSourceChoice.Choose(all, true, null, out equivalents, out refusal) != resource ||
-                equivalents != 1 || refusal != null)
+                equivalents != 1 || refusal != null ||
+                FactSourceChoice.Choose(new[] { free, resource }, true, null, out equivalents, out refusal) !=
+                    resource ||
+                FactSourceChoice.Choose(new[] { resource, free }, false, null, out equivalents, out refusal) != free)
                 throw new InvalidOperationException("An unreserved read ignored the kind.");
+            // The kind decides on its own, even where a pool key would match.
+            var mislabeled = new FactSourceCandidate("odd#9", false, true, "u|free|a");
+            if (FactSourceChoice.Choose(new[] { mislabeled }, false, "u|free|a", out equivalents, out refusal) != null ||
+                refusal == null)
+                throw new InvalidOperationException("A resource-bound ability served a free casting by pool key.");
         }
 
         // Review A7: an unread count is never the game's unlimited.
