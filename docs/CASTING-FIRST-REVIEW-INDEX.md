@@ -26,6 +26,48 @@ after a close and reopen, each exactly as forecast). Finite-resource
 qualification waits for an owner-designated advanced seed. Human usability and the native aesthetic
 pass remain open.
 
+## The owner's rc4 source review and the advanced seed (2026-09-24)
+
+The owner's review of the rc4 source (two findings) and the work for the
+owner-designated `KBP_ADVANCED_SEED` (a disposable *Beneath the Stolen
+Lands* save), each with its disposition:
+
+| Finding or request | Disposition |
+| --- | --- |
+| Unreadable suppression or required strength information must not establish that an existing effect is sufficient | Fixed in `cb684f2`: the live snapshot records an unreadable suppression flag as unreadable (it read as "not suppressed"); an instance whose caster level cannot be read, or a planned casting whose caster level is unknown, is never "at least as strong"; the casting keeps its step and the card says why ("not provably as strong", "possibly suppressed"). Test fixtures now carry caster level 1, as every provider in the game reports |
+| Reused migration archives must be verified against the exact original bytes, not trusted by file name | Fixed in `cb684f2`: `AtomicFile.WriteExactArchive` reuses a file only when its bytes are exactly the original's; a different file at the name is kept and the bytes go to the next numbered name; a new archive is read back and compared. Used by the casting migration's boundary archive, the Classic pre-schema archive (now raw bytes, byte-order mark included) and the unreadable-primary quarantine |
+| A mixed-coverage group case: one recipient already has an adequate, longer-lasting buff while another lacks it | `cbdc2fd`, tests `48b5402`: the group casting still casts once for the others; recipients whose existing effect is provably sufficient from readable detail (skip-if-active only) are pre-covered in the step and its approved identity; confirmation accepts their kept coverage only when the complete effect was present and unsuppressed before the cast and still is after it; every other recipient needs a new or refreshed instance. Qualified live by the `group-mixed` recipe |
+| Do not describe default skip-if-active as avoiding every unchanged-instance confirmation problem | `0c81925`: the release notes and the player guide now say it avoids the problem only when the casting is skipped, and name the cases where it does not |
+| Advanced compatibility profile for the Gunslinger 0.0.136 installation (mission batch 3, section 5) | `a134f0a`: `advanced-gunslinger-0136`, pinned by a test to the six approved values and staged from an exact external copy; BagOfTricks resealed in both profiles as a frozen copy (its resource-altering toggles verified off); the launcher and the host refuse the advanced copy under another profile and the advanced profile without the advanced copy |
+| Found live: the finite selection refused the advanced party (`casting-qual-select-20260924-adv-finite-01`, nothing cast) | `2e565bd`: every variant spell was rejected for its effect shape, because a variant's effect references the variant it casts while the plain-buff check accepted only the base spell. It now accepts either; rejections name the structure they saw; 160 rejections are kept (40 hid the second caster) |
+| Group buffs (mission batch 3, section 8) | `2e565bd`: the `group-mixed` recipe (prime a recipient with a direct spell; the caster-centred communal form then casts once for the others with that recipient pre-covered; a target-anchored group casting where one exists; repeat casts nothing), with per-recipient reads, one availability reading per casting, and its own step rules |
+
+Mutation of the new logic: 31 C# mutants. 28 were killed, after two
+tests were added for real gaps (`48b5402`: a recipient suppressed before
+the cast is not kept coverage; a covered recipient outside the required
+coverage is pre-covered) and two mutants that did not compile were
+re-formed. Three survive, each a second check of something already
+enforced: the group selection's forecast check (the earlier caster-level,
+duration and coverage rules leave no candidate it could refuse); "every
+other recipient is newly covered" in the mixed step (the executor's own
+confirmation already requires a new or refreshed instance, so the step
+fails earlier); and the mixed step's submission count (implied by the
+step's states, and the host never resubmits). PowerShell: the allowance
+recipe list is killed by the new allowance test (`6c0d2a7`); the staging,
+request and allowance-profile mutants are rerun when no live run is
+active (see the incident below).
+
+Incident (recorded, not a product defect): at 12:52 on 2026-09-24 the
+runtime-harness test suite was run for PowerShell mutation while a live
+run (`casting-qual-cast-20260924-adv-finite-anim-01`, game result PASS)
+was restoring. The suite's process-detection test starts a fake
+`Kingmaker.exe`; the launcher saw it, refused the restoration as
+designed, and the run ended incomplete. The guarded `Restore-Local.ps1`
+restored the Mods folder byte-exact and released the lock (transaction
+`Restored`, verified; saves compared clean). The case was run again under
+a new id. The harness suite and the gate are not run while a live run is
+active.
+
 ## Findings from the last review of the targeted fixes (2026-09-24)
 
 A final independent read-only review of `b783f60..1688af2` found no high
