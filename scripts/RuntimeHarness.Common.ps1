@@ -811,8 +811,14 @@ function Enter-KbpRuntimeTransaction {
             }
             $sourceMod = Get-KbpCompatibilitySourcePath $expectedMod $mods
             $sourceIdentity = Assert-KbpCompatibilityModIdentity $expectedMod $sourceMod
-            Copy-Item -LiteralPath $sourceMod -Destination $stagedMods -Recurse
+            # The staged directory takes the profile's directory name, so an
+            # external copy may carry its version in its own name (two
+            # copies of one mod side by side under the fixture root).
             $stagedMod = Join-Path $stagedMods ([string]$expectedMod.directoryName)
+            if (Test-Path -LiteralPath $stagedMod) {
+                throw "Compatibility profile stages one directory twice: $($expectedMod.directoryName)"
+            }
+            Copy-Item -LiteralPath $sourceMod -Destination $stagedMod -Recurse
             [void](Assert-KbpCompatibilityModIdentity $expectedMod $stagedMod)
             $state.compatibilityMods += @([ordered]@{
                 directoryName = [string]$expectedMod.directoryName

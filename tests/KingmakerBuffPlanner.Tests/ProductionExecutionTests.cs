@@ -2293,6 +2293,21 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("The session lock or its refusal reason is wrong.");
         }
 
+        // The advanced copy's request carries its own profile and that
+        // profile's fifteen optional mods (the launcher builds them from
+        // compatibility/profiles/advanced-gunslinger-0136.json).
+        private static void UseAdvancedProfile(Dictionary<string, object> request, int modCount = 15)
+        {
+            request["profileId"] = RuntimeTestProtocol.AdvancedProfileId;
+            request["expectedOptionalMods"] = Enumerable.Range(0, modCount).Select(index =>
+                (object)new Dictionary<string, object>
+                {
+                    { "ummId", "Fixture" + index }, { "version", "1.0" },
+                    { "assemblyName", "Fixture" + index + ".dll" },
+                    { "assemblySha256", new string((char)('a' + index % 6), 64) }
+                }).ToArray();
+        }
+
         // The inspection scenario is a no-input, non-casting workspace
         // scenario; the advanced family is accepted only for non-casting
         // scenarios, and a mixed pair is always refused.
@@ -2325,6 +2340,7 @@ namespace KingmakerBuffPlanner.Tests
                         { "expectedGameId", "66666666-7777-8888-9999-000000000000" },
                         { "executionMode", "instant" }
                     };
+                    if (workingFamily == "KBP_ADVANCED") UseAdvancedProfile(o);
                 };
             var accepted = new[]
             {
@@ -2377,6 +2393,39 @@ namespace KingmakerBuffPlanner.Tests
                     !rejection.Contains("live-save-family-scenario"))
                     throw new InvalidOperationException("The advanced-family refusal is for the wrong reason: " +
                         item.Key + ":" + rejection);
+            }
+            // The advanced copy runs only under its own profile, and that
+            // profile only with the advanced copy (mission batch 3, section 5).
+            var byReason = new[]
+            {
+                Tuple.Create("advanced-copy-full-user", (Action<Dictionary<string, object>>)(o =>
+                {
+                    set("live-advanced-inspect", "KBP_ADVANCED", "KBP_ADVANCED")(o);
+                    o["profileId"] = "full-user";
+                }), "live-save-family-profile"),
+                Tuple.Create("automation-copy-advanced-profile", (Action<Dictionary<string, object>>)(o =>
+                {
+                    set("live-workspace-qual", "KBP_AUTOMATION", "KBP_AUTOMATION")(o);
+                    UseAdvancedProfile(o);
+                }), "live-save-family-profile"),
+                Tuple.Create("advanced-profile-without-copy",
+                    (Action<Dictionary<string, object>>)(o => UseAdvancedProfile(o)),
+                    "advanced-profile-without-advanced-copy"),
+                Tuple.Create("advanced-profile-mod-count", (Action<Dictionary<string, object>>)(o =>
+                {
+                    set("live-advanced-inspect", "KBP_ADVANCED", "KBP_ADVANCED")(o);
+                    UseAdvancedProfile(o, 14);
+                }), "profile-mod-expectation")
+            };
+            foreach (Tuple<string, Action<Dictionary<string, object>>, string> item in byReason)
+            {
+                string path = WriteRequest(root, "family-profile-" + item.Item1, item.Item2);
+                string rejection;
+                RuntimeTestRequest request = ReadProtocol(
+                    new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path }, out rejection);
+                if (request != null || rejection == null || !rejection.Contains(item.Item3))
+                    throw new InvalidOperationException("The advanced profile case " + item.Item1 +
+                        " was not refused for " + item.Item3 + ": " + rejection);
             }
         }
 
@@ -4567,6 +4616,11 @@ namespace KingmakerBuffPlanner.Tests
                 AllowanceFixtureBinding.RequestMismatch("full-user", new string('9', 64), "full-user", null) !=
                     "working-save-mismatch")
                 throw new InvalidOperationException("The host does not re-check the approved profile and save.");
+            if (!AllowanceFixtureBinding.IsKnownProfile("advanced-gunslinger-0136") ||
+                AllowanceFixtureBinding.IsKnownProfile("advanced-gunslinger-0133") ||
+                AllowanceFixtureBinding.Refusal("advanced-gunslinger-0136", new string('f', 64),
+                    new string('9', 64), "advanced qualification") != null)
+                throw new InvalidOperationException("The advanced profile is not a known allowance profile.");
             var cases = new Dictionary<string, Action<JObject>>
             {
                 { "allowance-unknown-member:extra", o => o["extra"] = 1 },
@@ -6226,6 +6280,7 @@ namespace KingmakerBuffPlanner.Tests
                     };
                     if (allowance) parameters["qualificationAllowance"] = "{}";
                     o["parameters"] = parameters;
+                    if (family == "KBP_ADVANCED") UseAdvancedProfile(o);
                 };
             Func<Action<Dictionary<string, object>>, string, Action<Dictionary<string, object>>> recipe =
                 (inner, name) => o =>

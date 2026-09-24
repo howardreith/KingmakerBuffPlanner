@@ -203,6 +203,25 @@ foreach ($case in $familyCases) {
         throw "Advanced family case $($case.Name) was not refused as expected.: $($caseOutput -join ' ')"
     }
 }
+# Layer 7b (advanced profile, mission batch 3 section 5): the advanced copy
+# runs only under its own profile, and that profile only with the advanced
+# copy; both are refused before any save lookup, deployment or launch.
+$profileCases = @(
+    @{ Name = 'advanced-copy-full-user'; Args = @('-Scenario', 'live-advanced-inspect', '-FixtureFamily', 'Advanced', '-CompatibilityProfileId', 'full-user', '-WhatIf') },
+    @{ Name = 'automation-copy-advanced-profile'; Args = @('-Scenario', 'live-advanced-inspect', '-CompatibilityProfileId', 'advanced-gunslinger-0136', '-WhatIf') },
+    @{ Name = 'advanced-profile-smoke'; Args = @('-Scenario', 'mod-load-smoke', '-CompatibilityProfileId', 'advanced-gunslinger-0136', '-WhatIf') }
+)
+foreach ($case in $profileCases) {
+    $ErrorActionPreference = 'Continue'
+    $caseArgs = $case.Args
+    $caseOutput = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $launcher @caseArgs 2>&1)
+    $caseExit = $LASTEXITCODE
+    $ErrorActionPreference = 'Stop'
+    if ($caseExit -eq 0 -or -not (@($caseOutput | Where-Object {
+            "$_" -like '*runs only with -CompatibilityProfileId advanced-gunslinger-0136*' }).Count -ge 1)) {
+        throw "Advanced profile case $($case.Name) was not refused as expected.: $($caseOutput -join ' ')"
+    }
+}
 # Layer 8 (casting qualification): the casting run needs the run-bound
 # allowance under the lab approvals directory, the selection-only run never
 # takes one, and the build binding refuses a replacement artifact, another

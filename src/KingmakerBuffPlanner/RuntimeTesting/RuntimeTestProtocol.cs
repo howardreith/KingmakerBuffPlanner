@@ -9,6 +9,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
     internal static class RuntimeTestProtocol
     {
         internal const string ActivationFlag = "-kbpRuntimeTestRequest";
+
+        // The advanced copy's own compatibility profile (mission batch 3,
+        // section 5): the Gunslinger 0.0.136 installation its seed was
+        // created under. The advanced copy loads only under it, and it only
+        // with the advanced copy.
+        internal const string AdvancedProfileId = "advanced-gunslinger-0136";
+
         internal const string EvidenceRoot = @"C:\Dev\KingmakerBuffPlannerLab\runtime-evidence";
 
         internal static RuntimeTestRequest TryRead(string[] arguments, out string rejection)
@@ -77,7 +84,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (!IsSafeIdentifier(request.RunId)) throw new InvalidDataException("run-id");
             if (!IsSafeIdentifier(request.ProfileId) ||
                 (request.ProfileId != "native-only" && request.ProfileId != "call-of-the-wild" &&
-                 request.ProfileId != "human-reproduction" && request.ProfileId != "full-user"))
+                 request.ProfileId != "human-reproduction" && request.ProfileId != "full-user" &&
+                 request.ProfileId != AdvancedProfileId))
                 throw new InvalidDataException("profile-id");
             if (!IsKnownScenario(request.Scenario))
                 throw new InvalidDataException("scenario");
@@ -90,6 +98,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (request.TimeoutSeconds < 5 || request.TimeoutSeconds > 1800)
                 throw new InvalidDataException("timeout");
             ValidateParameters(request);
+            // A request that stages a save pair has had its family checked
+            // against the profile; any other request under the advanced
+            // profile has no advanced copy to run.
+            if (request.ProfileId == AdvancedProfileId && !request.Parameters.ContainsKey("workingSaveName"))
+                throw new InvalidDataException("advanced-profile-without-advanced-copy");
             if (request.ExpectedOptionalMods == null || request.ExpectedBlueprintGuids == null)
                 throw new InvalidDataException("compatibility-expectations");
             foreach (RuntimeExpectedOptionalMod mod in request.ExpectedOptionalMods)
@@ -104,7 +117,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if ((request.ProfileId == "native-only" && request.ExpectedOptionalMods.Count != 0) ||
                 (request.ProfileId == "call-of-the-wild" && request.ExpectedOptionalMods.Count != 1) ||
                 (request.ProfileId == "human-reproduction" && request.ExpectedOptionalMods.Count != 3) ||
-                (request.ProfileId == "full-user" && request.ExpectedOptionalMods.Count != 15))
+                (request.ProfileId == "full-user" && request.ExpectedOptionalMods.Count != 15) ||
+                (request.ProfileId == AdvancedProfileId && request.ExpectedOptionalMods.Count != 15))
                 throw new InvalidDataException("profile-mod-expectation");
             if ((request.ProfileId == "native-only" && request.ExpectedBlueprintGuids.Count != 0) ||
                 (request.ProfileId == "call-of-the-wild" && request.ExpectedBlueprintGuids.Count < 3))
@@ -622,6 +636,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (advanced && !IsAdvancedFamilyScenario(request.Scenario) &&
                 !(allowanceBound && IsCastingQualificationScenario(request.Scenario)))
                 throw new InvalidDataException("live-save-family-scenario");
+            if (advanced != (request.ProfileId == AdvancedProfileId))
+                throw new InvalidDataException("live-save-family-profile");
             if (string.Equals((string)request.Parameters["workingFileName"],
                 (string)request.Parameters["baselineFileName"], StringComparison.OrdinalIgnoreCase))
                 throw new InvalidDataException("live-save-files-not-distinct");
