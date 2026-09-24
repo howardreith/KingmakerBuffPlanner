@@ -202,9 +202,11 @@ foreach ($target in $targets) {
 $manifestFixture = [pscustomobject]@{ commit = ('c' * 40); packageSha256 = ('a' * 64)
     dllSha256 = ('b' * 64); assemblyMvid = '11111111-2222-3333-4444-555555555555' }
 function New-AllowanceFixtureJson([hashtable]$Override) {
-    $value = [ordered]@{ schemaVersion = 2; kind = 'kbp-single-cast-probe'; runId = 'probe-bind-test'
+    $value = [ordered]@{ schemaVersion = 3; kind = 'kbp-single-cast-probe'; runId = 'probe-bind-test'
         sourceCommit = ('c' * 40); packageSha256 = ('a' * 64); dllSha256 = ('b' * 64)
-        assemblyMvid = '11111111-2222-3333-4444-555555555555'; maximumNativeSubmissions = 1 }
+        assemblyMvid = '11111111-2222-3333-4444-555555555555'; maximumNativeSubmissions = 1
+        compatibilityProfileId = 'full-user'; compatibilityIdentity = ('e' * 64); workingSaveSha256 = ('9' * 64)
+        purpose = 'single-cast probe test' }
     foreach ($key in $Override.Keys) { $value[$key] = $Override[$key] }
     return ($value | ConvertTo-Json -Compress)
 }
@@ -216,7 +218,8 @@ $bindingCases = [ordered]@{
     'package' = @{ packageSha256 = ('d' * 64) }; 'dll' = @{ dllSha256 = ('e' * 64) }
     'mvid' = @{ assemblyMvid = '99999999-2222-3333-4444-555555555555' }
     'commit' = @{ sourceCommit = ('f' * 40) }; 'run-id' = @{ runId = 'other-run' }
-    'submissions' = @{ maximumNativeSubmissions = 2 }
+    'submissions' = @{ maximumNativeSubmissions = 2 }; 'schema' = @{ schemaVersion = 2 }
+    'purpose' = @{ purpose = '' }
 }
 foreach ($case in $bindingCases.Keys) {
     $refusal = Get-KbpProbeAllowanceBuildRefusal -AllowanceJson (New-AllowanceFixtureJson $bindingCases[$case]) `
@@ -375,7 +378,7 @@ if ((Get-KbpClassicAllowanceBuildRefusal -AllowanceJson (New-ClassicFixtureJson 
 # Review C5: both allowance kinds bind the profile, its identity and the
 # WORKING save; the launcher checks them against what it resolved before
 # anything is deployed.
-foreach ($fixtureJson in @((New-QualificationFixtureJson @{}), (New-ClassicFixtureJson @{}))) {
+foreach ($fixtureJson in @((New-QualificationFixtureJson @{}), (New-ClassicFixtureJson @{}), (New-AllowanceFixtureJson @{}))) {
     $bindingCases = [ordered]@{
         'profile' = @('native-only', ('e' * 64), ('9' * 64))
         'compatibility-identity' = @('full-user', ('f' * 64), ('9' * 64))
@@ -396,13 +399,43 @@ foreach ($fixtureJson in @((New-QualificationFixtureJson @{}), (New-ClassicFixtu
         throw 'An allowance without a resolved WORKING save was accepted.'
     }
 }
+# Re-review: the launcher refuses what the host's parser would refuse only
+# after launch (JSON strings, a known profile, lowercase hashes, a purpose of
+# at most 400 characters), for every allowance kind.
+$formatCases = [ordered]@{
+    'purpose' = @{ purpose = ('p' * 401) }
+    'binding-format:compatibilityProfileId' = @{ compatibilityProfileId = @('full-user') }
+    'binding-format:workingSaveSha256' = @{ workingSaveSha256 = ('A' * 64) }
+    'binding-format:compatibilityIdentity' = @{ compatibilityIdentity = @(('e' * 64)) }
+}
+foreach ($case in $formatCases.Keys) {
+    $override = $formatCases[$case]
+    $refusals = @(
+        (Get-KbpQualificationAllowanceBuildRefusal -AllowanceJson (New-QualificationFixtureJson $override) `
+            -RunId 'qual-bind-test' -BuildManifest $manifestFixture),
+        (Get-KbpClassicAllowanceBuildRefusal -AllowanceJson (New-ClassicFixtureJson $override) `
+            -RunId 'classic-bind-test' -BuildManifest $manifestFixture -ExecutionMode 'animated'),
+        (Get-KbpProbeAllowanceBuildRefusal -AllowanceJson (New-AllowanceFixtureJson $override) `
+            -RunId 'probe-bind-test' -BuildManifest $manifestFixture))
+    foreach ($refusal in $refusals) {
+        if ($refusal -cne $case) { throw "Binding format case $case returned '$refusal'." }
+    }
+}
+$probeBindingAt = $launcherText.IndexOf('Get-KbpAllowanceFixtureBindingRefusal -AllowanceJson $probeAllowanceJson')
+$workingRecheckAt = $launcherText.IndexOf('throw "The WORKING save changed after it was bound: $($savePair.working.fileName)"')
+$realDeployAt = $launcherText.IndexOf('$statePath = & (Join-Path $PSScriptRoot ''Deploy-Local.ps1'')')
+$finalStatusAt = $launcherText.IndexOf('$orchestration.finalStatus = if ([bool]$completionRecord.complete)')
+if ($probeBindingAt -lt 0 -or $workingRecheckAt -lt 0 -or $realDeployAt -lt 0 -or $finalStatusAt -lt 0 -or
+    $workingRecheckAt -gt $realDeployAt -or $finalStatusAt -lt $realDeployAt) {
+    throw 'The launcher does not bind the probe allowance, re-check the WORKING save, or record the final status.'
+}
 $bindingAt = $launcherText.IndexOf('Get-KbpAllowanceFixtureBindingRefusal -AllowanceJson $classicAllowanceJson')
 $qualificationBindingAt = $launcherText.IndexOf('Get-KbpAllowanceFixtureBindingRefusal -AllowanceJson $qualificationAllowanceJson')
 $deployAt = $launcherText.IndexOf("-RunId 'runtime-whatif-preflight'")
 $pairAt = $launcherText.IndexOf('Get-KbpDisposableSavePair -Family $FixtureFamily')
 if ($bindingAt -lt 0 -or $qualificationBindingAt -lt 0 -or $pairAt -lt 0 -or $deployAt -lt 0 -or
-    $bindingAt -lt $pairAt -or $qualificationBindingAt -lt $pairAt -or
-    $bindingAt -gt $deployAt -or $qualificationBindingAt -gt $deployAt) {
+    $bindingAt -lt $pairAt -or $qualificationBindingAt -lt $pairAt -or $probeBindingAt -lt $pairAt -or
+    $bindingAt -gt $deployAt -or $qualificationBindingAt -gt $deployAt -or $probeBindingAt -gt $deployAt) {
     throw 'The launcher does not bind allowances to the resolved profile and save before deploying.'
 }
 # Review C6: the launcher's own reading of Classic and physical evidence.
@@ -468,8 +501,11 @@ try {
             if ($id -ceq 'ws-type-more') { $sent.text = 's' }
             Write-KbpJsonAtomic (Join-Path $directory "physical-input-$id.json") $sent
             Write-KbpJsonAtomic (Join-Path $directory "physical-input-$id.ack.json") ([ordered]@{
-                schemaVersion = 1; runId = 'physical-run'; actionId = $id; action = $physicalKinds[$id] })
+                schemaVersion = 1; runId = 'physical-run'; actionId = $id; action = $physicalKinds[$id]
+                processId = 4242; text = if ($sent.Contains('text')) { $sent.text } else { $null } })
         }
+        Write-KbpJsonAtomic (Join-Path $directory 'orchestration.json') ([ordered]@{
+            runId = 'physical-run'; kingmakerProcessId = 4242; plannerHotkeySentAtUtc = '2026-09-24T00:00:00Z' })
         $record = [ordered]@{ schemaVersion = 1; runId = 'physical-run'; expectedScreen = '1920x1080'
             screen = '1920x1080'; openedPhysically = $true; query = 'resi'; querySuffix = 's'
             acknowledged = $physicalActions; failures = @(); violations = @() }
@@ -495,6 +531,15 @@ try {
             $r.openedPhysically = $false; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r }
         'extra-failed-ack' = { param($d) Write-KbpJsonAtomic (Join-Path $d 'physical-input-ws-other.ack.json') ([ordered]@{
             schemaVersion = 1; runId = 'physical-run'; actionId = 'ws-other'; action = 'click'; deliveryFailed = $true }) }
+        'extra-request' = { param($d) Write-KbpJsonAtomic (Join-Path $d 'physical-input-ws-extra.json') ([ordered]@{
+            schemaVersion = 1; runId = 'physical-run'; actionId = 'ws-extra'; action = 'click' }) }
+        'host-fallback-open' = { param($d) Write-KbpJsonAtomic (Join-Path $d 'programmatic-open.json') ([ordered]@{ opened = $true }) }
+        'no-hotkey-sent' = { param($d) Write-KbpJsonAtomic (Join-Path $d 'orchestration.json') ([ordered]@{
+            runId = 'physical-run'; kingmakerProcessId = 4242 }) }
+        'ack-other-process' = { param($d) Write-KbpJsonAtomic (Join-Path $d 'physical-input-ws-click-search.ack.json') ([ordered]@{
+            schemaVersion = 1; runId = 'physical-run'; actionId = 'ws-click-search'; action = 'click'; processId = 7; text = $null }) }
+        'ack-other-text' = { param($d) Write-KbpJsonAtomic (Join-Path $d 'physical-input-ws-type-more.ack.json') ([ordered]@{
+            schemaVersion = 1; runId = 'physical-run'; actionId = 'ws-type-more'; action = 'type'; processId = 4242; text = 'x' }) }
     }
     foreach ($case in $physicalOutcomeCases.Keys) {
         $caseRequest = New-PhysicalOutcomeCase $case $physicalOutcomeCases[$case]
@@ -503,6 +548,49 @@ try {
         catch { $refusal = $_.Exception.Message }
         if ($null -eq $refusal -or ($refusal -notlike '*hysical*' -and $refusal -notlike '*physical run*')) {
             throw "Physical outcome case $case was not refused by the launcher's check: $refusal"
+        }
+    }
+    # The qualification's own evidence: exactly the approved projections,
+    # the approved mode, within the budget, completed without violations.
+    $qualAllowance = New-QualificationFixtureJson @{ approvedProjectionIds = @(('1' * 64), ('2' * 64)); executionMode = 'animated'
+        maximumNativeSubmissions = 8 }
+    function New-QualOutcomeCase([string]$Name, [string]$Scenario, [hashtable]$Override) {
+        $directory = Join-Path $outcomeRoot $Name
+        New-Item -ItemType Directory -Path $directory | Out-Null
+        $cast = $Scenario -ceq 'live-cast-qual'
+        $value = [ordered]@{
+            schemaVersion = 1; runId = 'qual-bind-test'; scenario = $Scenario; castingScenario = $cast
+            allowanceStatus = if ($cast) { 'valid' } else { 'not-required' }; terminalReason = 'completed'
+            selection = [ordered]@{ selected = $true; recipe = 'zero-cost-mixed' }
+            forecast = @([ordered]@{ name = 'stop'; projectionId = ('1' * 64) }, [ordered]@{ name = 'complete'; projectionId = ('2' * 64) })
+            plannedSubmissions = 5; maximumSubmissions = if ($cast) { 8 } else { 0 }; executionMode = 'animated'
+            failures = @(); violations = @()
+        }
+        foreach ($key in $Override.Keys) { $value[$key] = $Override[$key] }
+        Write-KbpJsonAtomic (Join-Path $directory 'qual-outcome.json') $value
+        return [ordered]@{ runId = 'qual-bind-test'; scenario = $Scenario; evidenceDirectory = $directory
+            parameters = @{ executionMode = 'animated'; qualificationAllowance = $qualAllowance } }
+    }
+    Assert-KbpScenarioOutcome -Request (New-QualOutcomeCase 'qual-cast-good' 'live-cast-qual' @{})
+    Assert-KbpScenarioOutcome -Request (New-QualOutcomeCase 'qual-select-good' 'live-cast-qual-select' @{})
+    $qualOutcomeCases = [ordered]@{
+        'other-projections' = @('live-cast-qual', @{ forecast = @([ordered]@{ name = 'stop'; projectionId = ('3' * 64) }) })
+        'over-budget' = @('live-cast-qual', @{ plannedSubmissions = 9 })
+        'other-maximum' = @('live-cast-qual', @{ maximumSubmissions = 24 })
+        'other-mode' = @('live-cast-qual', @{ executionMode = 'instant' })
+        'invalid-allowance' = @('live-cast-qual', @{ allowanceStatus = 'identity-mismatch:dll' })
+        'violation' = @('live-cast-qual', @{ violations = @('recover:missing') })
+        'not-completed' = @('live-cast-qual', @{ terminalReason = 'failed:disable-wait' })
+        'select-casting' = @('live-cast-qual-select', @{ castingScenario = $true })
+        'select-unselected' = @('live-cast-qual-select', @{ selection = [ordered]@{ selected = $false } })
+    }
+    foreach ($case in $qualOutcomeCases.Keys) {
+        $caseRequest = New-QualOutcomeCase ('qual-' + $case) $qualOutcomeCases[$case][0] $qualOutcomeCases[$case][1]
+        $refusal = $null
+        try { Assert-KbpScenarioOutcome -Request $caseRequest }
+        catch { $refusal = $_.Exception.Message }
+        if ($null -eq $refusal -or $refusal -notlike '*ualification*') {
+            throw "Qualification outcome case $case was not refused by the launcher's check: $refusal"
         }
     }
 }
@@ -514,6 +602,32 @@ if ($passAt -lt 0 -or $outcomeAt -lt $passAt -or
     -not $hostSource.Contains('{ "grantConsumed", record.GrantConsumed },') -or
     -not $hostSource.Contains('{ "grantAttempts", record.GrantAttempts },')) {
     throw 'The launcher does not read the scenario evidence itself after a PASS.'
+}
+# Re-review: every key the launcher's outcome check reads is one the host
+# writes, and the judged physical actions are the record's own list.
+$pinnedKeys = @('"schemaVersion", 2', '"runId", _request.RunId', '"scenario", _request.Scenario',
+    '"castingScenario", record.CastingScenario', '"allowanceStatus", record.AllowanceStatus',
+    '"executionMode", record.ExecutionMode', '"planDigest", record.PlanDigest', '"planSteps", record.PlanSteps',
+    '"quickDisposition", record.QuickDisposition', '"castingFirstRuns", record.CastingFirstRuns',
+    '"grantArmedAtEnd", record.GrantArmedAtEnd', '"classicRunSeen", record.ClassicRunSeen',
+    '"finalStatus", step.FinalStatus', '"openedPhysically", record.OpenedPhysically',
+    '"screen", record.ScreenWidth + "x" + record.ScreenHeight', '"query", record.Query',
+    '"querySuffix", record.QuerySuffix', '"acknowledged", new JArray(record.Acknowledged',
+    '"terminalReason", record.TerminalReason', '"selected", selection.Selected',
+    '"plannedSubmissions", record.PlannedSubmissions', '"maximumSubmissions", record.MaximumSubmissions',
+    '"projectionId", step.ProjectionId', '"failures", new JArray(record.Failures',
+    '"violations", new JArray(record.Violations()', '\"actionId\":', '\"action\":', '\"runId\":')
+foreach ($key in $pinnedKeys) {
+    if (-not $hostSource.Contains($key)) { throw "The host no longer writes a key the launcher reads: $key" }
+}
+$recordSource = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\src\KingmakerBuffPlanner\RuntimeTesting\PhysicalWorkspaceRecord.cs') -Raw
+$actionsBlock = [regex]::Match($recordSource, 'public static readonly string\[\] Actions =\s*\{([^}]*)\}').Groups[1].Value
+$recordActions = @([regex]::Matches($actionsBlock, '"([^"]+)"') | ForEach-Object { $_.Groups[1].Value })
+$launcherActionsBlock = [regex]::Match((Get-Content -LiteralPath (Join-Path $PSScriptRoot 'RuntimeAutomation.Common.ps1') -Raw),
+    "expected = @\(([^)]*)\)").Groups[1].Value
+$launcherActions = @([regex]::Matches($launcherActionsBlock, "'([^']+)'") | ForEach-Object { $_.Groups[1].Value })
+if ($recordActions.Count -ne 8 -or ($recordActions -join ',') -cne ($launcherActions -join ',')) {
+    throw "The launcher's judged physical actions differ from the record's: $($launcherActions -join ',')"
 }
 # The allowance writer (review C5): what it writes from recorded selection
 # evidence is exactly what the launcher's own checks accept, bound to the

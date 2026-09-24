@@ -593,10 +593,13 @@ function Get-KbpProbeAllowanceBuildRefusal {
     catch { return 'unreadable' }
     if ($null -eq $allowance) { return 'unreadable' }
     $names = @($allowance.PSObject.Properties | ForEach-Object Name)
-    foreach ($required in @('kind', 'runId', 'sourceCommit', 'packageSha256', 'dllSha256', 'assemblyMvid',
-            'maximumNativeSubmissions')) {
+    foreach ($required in @('schemaVersion', 'kind', 'runId', 'sourceCommit', 'packageSha256', 'dllSha256',
+            'assemblyMvid', 'maximumNativeSubmissions', 'compatibilityProfileId', 'compatibilityIdentity',
+            'workingSaveSha256', 'purpose')) {
         if ($names -cnotcontains $required) { return "missing:$required" }
     }
+    if (-not ($allowance.schemaVersion -is [int] -or $allowance.schemaVersion -is [long]) -or
+        [int]$allowance.schemaVersion -ne 3) { return 'schema' }
     if ([string]$allowance.kind -cne 'kbp-single-cast-probe') { return 'kind' }
     if ([string]$allowance.runId -cne $RunId) { return 'run-id' }
     if ([string]$allowance.sourceCommit -cne [string]$BuildManifest.commit) { return 'commit' }
@@ -605,6 +608,8 @@ function Get-KbpProbeAllowanceBuildRefusal {
     if ([string]$allowance.assemblyMvid -cne [string]$BuildManifest.assemblyMvid) { return 'mvid' }
     if (-not ($allowance.maximumNativeSubmissions -is [int] -or $allowance.maximumNativeSubmissions -is [long]) -or
         [int]$allowance.maximumNativeSubmissions -ne 1) { return 'submissions' }
+    $bindingFormat = Get-KbpAllowanceBindingFormatRefusal -Allowance $allowance
+    if ($null -ne $bindingFormat) { return $bindingFormat }
     return $null
 }
 
@@ -647,7 +652,26 @@ function Get-KbpQualificationAllowanceBuildRefusal {
         [int]$allowance.maximumNativeSubmissions -lt 1 -or [int]$allowance.maximumNativeSubmissions -gt 24) {
         return 'submissions'
     }
-    if ([string]::IsNullOrWhiteSpace([string]$allowance.purpose)) { return 'purpose' }
+    $bindingFormat = Get-KbpAllowanceBindingFormatRefusal -Allowance $allowance
+    if ($null -ne $bindingFormat) { return $bindingFormat }
+    return $null
+}
+
+# The fixture binding's own form, with the host parser's rules (re-review:
+# the launcher must not accept what the host would refuse only after
+# launch): JSON strings, a known profile, lowercase SHA-256 identity and
+# WORKING save, and a purpose of at most 400 characters.
+function Get-KbpAllowanceBindingFormatRefusal {
+    param([Parameter(Mandatory = $true)]$Allowance)
+    foreach ($name in @('compatibilityProfileId', 'compatibilityIdentity', 'workingSaveSha256', 'purpose')) {
+        if (-not ($Allowance.$name -is [string])) { return "binding-format:$name" }
+    }
+    if (@('native-only', 'call-of-the-wild', 'human-reproduction', 'full-user') -cnotcontains $Allowance.compatibilityProfileId) {
+        return 'binding-format:compatibilityProfileId'
+    }
+    if ($Allowance.compatibilityIdentity -cnotmatch '^[0-9a-f]{64}$') { return 'binding-format:compatibilityIdentity' }
+    if ($Allowance.workingSaveSha256 -cnotmatch '^[0-9a-f]{64}$') { return 'binding-format:workingSaveSha256' }
+    if ([string]::IsNullOrWhiteSpace($Allowance.purpose) -or $Allowance.purpose.Length -gt 400) { return 'purpose' }
     return $null
 }
 
@@ -661,6 +685,29 @@ function Assert-KbpScenarioOutcome {
     param([Parameter(Mandatory = $true)]$Request)
     $scenario = [string]$Request.scenario
     $directory = [string]$Request.evidenceDirectory
+    if ($scenario -ceq 'live-cast-qual-select' -or $scenario -ceq 'live-cast-qual') {
+        $path = Join-Path $directory 'qual-outcome.json'
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw 'Qualification outcome evidence is missing.' }
+        $outcome = Read-KbpJson $path
+        $cast = $scenario -ceq 'live-cast-qual'
+        if ([string]$outcome.runId -cne [string]$Request.runId -or [string]$outcome.scenario -cne $scenario -or
+            [bool]$outcome.castingScenario -ne $cast -or @($outcome.violations).Count -ne 0 -or
+            @($outcome.failures).Count -ne 0 -or $null -eq $outcome.selection -or
+            -not [bool]$outcome.selection.selected -or [string]$outcome.terminalReason -cne 'completed') {
+            throw "Qualification outcome evidence is inconsistent with a PASS: $path"
+        }
+        if (-not $cast) { return }
+        $allowance = [string]$Request.parameters.qualificationAllowance | ConvertFrom-Json
+        $forecastIds = @($outcome.forecast | ForEach-Object { [string]$_.projectionId })
+        if ([string]$outcome.allowanceStatus -cne 'valid' -or
+            ($forecastIds -join ',') -cne (@($allowance.approvedProjectionIds) -join ',') -or
+            [string]$outcome.executionMode -cne [string]$allowance.executionMode -or
+            [int]$outcome.maximumSubmissions -ne [int]$allowance.maximumNativeSubmissions -or
+            [int]$outcome.plannedSubmissions -gt [int]$allowance.maximumNativeSubmissions) {
+            throw "Qualification evidence does not show exactly the approved projections within the budget: $path"
+        }
+        return
+    }
     if ($scenario -ceq 'live-classic-select' -or $scenario -ceq 'live-classic-cast') {
         $path = Join-Path $directory 'classic-outcome.json'
         if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw 'Classic outcome evidence is missing.' }
@@ -709,6 +756,23 @@ function Assert-KbpScenarioOutcome {
         if (-not [string]::IsNullOrEmpty($expectedScreen) -and [string]$record.screen -cne $expectedScreen) {
             throw "The physical run judged another screen: $($record.screen) (expected $expectedScreen)."
         }
+        # The launcher's own facts: it sent the planner hotkey, the host did
+        # not fall back to its programmatic open, and every request of the
+        # run is one of the eight judged actions.
+        $orchestration = Read-KbpJson (Join-Path $directory 'orchestration.json')
+        $orchestrationNames = @($orchestration.PSObject.Properties | ForEach-Object Name)
+        if ($orchestrationNames -cnotcontains 'plannerHotkeySentAtUtc' -or
+            [string]::IsNullOrEmpty([string]$orchestration.plannerHotkeySentAtUtc) -or
+            $orchestrationNames -cnotcontains 'kingmakerProcessId' -or
+            (Test-Path -LiteralPath (Join-Path $directory 'programmatic-open.json'))) {
+            throw 'The physical run was not opened through the planner hotkey this launcher sent.'
+        }
+        $requestNames = @(Get-ChildItem -LiteralPath $directory -Filter 'physical-input-*.json' -File |
+            Where-Object { $_.Name -notlike '*.ack.json' } | ForEach-Object Name | Sort-Object)
+        $expectedNames = @($expected | ForEach-Object { 'physical-input-{0}.json' -f $_ } | Sort-Object)
+        if (($requestNames -join ',') -cne ($expectedNames -join ',')) {
+            throw "The physical run requested other actions than the judged eight: $($requestNames -join ',')"
+        }
         $typed = @{ 'ws-type-query' = [string]$record.query; 'ws-type-more' = [string]$record.querySuffix }
         foreach ($actionId in $expected) {
             $requestPath = Join-Path $directory ('physical-input-{0}.json' -f $actionId)
@@ -725,8 +789,14 @@ function Assert-KbpScenarioOutcome {
                 [string]$ack.action -cne [string]$sent.action -or $failed) {
                 throw "Physical action $actionId was not delivered as the game requested it."
             }
+            if ([string]$ack.processId -cne [string]$orchestration.kingmakerProcessId) {
+                throw "Physical action $actionId was acknowledged for another process."
+            }
             if ($typed.ContainsKey($actionId) -and
-                ([string]::IsNullOrEmpty($typed[$actionId]) -or [string]$sent.text -cne $typed[$actionId])) {
+                ([string]::IsNullOrEmpty($typed[$actionId]) -or
+                    @($sent.PSObject.Properties | ForEach-Object Name) -cnotcontains 'text' -or
+                    @($ack.PSObject.Properties | ForEach-Object Name) -cnotcontains 'text' -or
+                    [string]$sent.text -cne $typed[$actionId] -or [string]$ack.text -cne $typed[$actionId])) {
                 throw "Physical action $actionId typed text the host did not record."
             }
         }
@@ -821,7 +891,8 @@ function Get-KbpClassicAllowanceBuildRefusal {
         [int]$allowance.maximumNativeSubmissions -lt 1 -or [int]$allowance.maximumNativeSubmissions -gt 24) {
         return 'submissions'
     }
-    if ([string]::IsNullOrWhiteSpace([string]$allowance.purpose)) { return 'purpose' }
+    $bindingFormat = Get-KbpAllowanceBindingFormatRefusal -Allowance $allowance
+    if ($null -ne $bindingFormat) { return $bindingFormat }
     return $null
 }
 

@@ -3429,6 +3429,30 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             return true;
         }
 
+        // The optional mods the request names, loaded exactly as expected,
+        // checked BEFORE anything is cast (the final result checks them
+        // again for every scenario). Null when they are.
+        private string OptionalModMismatch()
+        {
+            foreach (RuntimeExpectedOptionalMod expected in _request.ExpectedOptionalMods)
+            {
+                string name = Path.GetFileNameWithoutExtension(expected.AssemblyName);
+                List<Assembly> loaded = AppDomain.CurrentDomain.GetAssemblies().Where(a =>
+                    string.Equals(a.GetName().Name, name, StringComparison.Ordinal)).ToList();
+                if (loaded.Count != 1)
+                    return "optional-mod-mismatch:" + expected.UmmId + ":assemblies=" + loaded.Count;
+                string hash;
+                try { hash = Hashing.Sha256(LoadedAssemblyIdentity.ResolveCanonicalFile(loaded[0].Location)); }
+                catch (Exception exception)
+                {
+                    return "optional-mod-mismatch:" + expected.UmmId + ":" + exception.GetType().Name;
+                }
+                if (!string.Equals(hash, expected.AssemblySha256, StringComparison.Ordinal))
+                    return "optional-mod-mismatch:" + expected.UmmId + ":sha256";
+            }
+            return null;
+        }
+
         // One string parameter of the request, or null.
         private string RequestText(string name)
         {
@@ -3459,6 +3483,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 : !string.Equals(campaign, allowance.FixtureGameId, StringComparison.Ordinal) ? "fixture-mismatch"
                 : AllowanceFixtureBinding.RequestMismatch(allowance.CompatibilityProfileId,
                     allowance.WorkingSaveSha256, _request.ProfileId, RequestText("workingSha256")) ??
+                OptionalModMismatch() ??
                 (!string.Equals(_classicRecord.ExecutionMode, allowance.ExecutionMode, StringComparison.Ordinal)
                     ? "execution-mode-mismatch"
                 : allowance.RoutineId != "long" ? "routine-mismatch"
@@ -3685,7 +3710,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     // ones this run was launched with.
                     string bindingMismatch = allowance == null ? null
                         : AllowanceFixtureBinding.RequestMismatch(allowance.CompatibilityProfileId,
-                            allowance.WorkingSaveSha256, _request.ProfileId, RequestText("workingSha256"));
+                            allowance.WorkingSaveSha256, _request.ProfileId, RequestText("workingSha256")) ??
+                            OptionalModMismatch();
                     if (bindingMismatch != null)
                     {
                         _qualificationRecord.AllowanceStatus = bindingMismatch;
@@ -3759,7 +3785,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         ";hudInstalled=" + BuffPlannerUiRoot.IsHudInstalledForRuntime +
                         ";plannerRoots=" + UnityEngine.Object.FindObjectsOfType<BuffPlannerUiRoot>().Length +
                         ";mode=" + (Kingmaker.Game.Instance == null ? "none"
-                            : Kingmaker.Game.Instance.CurrentMode.ToString()));
+                            : Kingmaker.Game.Instance.CurrentMode.ToString()),
+                    () => BuffPlannerUiRoot.OwnedTicksForRuntime);
                 _log.Info("[KBP-QUAL] driver built;casting=" + _qualificationRecord.CastingScenario +
                     ";allowance=" + _qualificationRecord.AllowanceStatus + ";workspaceClosed=" +
                     closed.Closed + ";campaign=" + campaignId + ".");
@@ -3880,6 +3907,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     { "disableHeldUpdates", record.DisableHeldUpdates },
                     { "acceptingWhileDisabled", record.AcceptingWhileDisabled },
                     { "runningWhileDisabled", record.RunningWhileDisabled },
+                    { "ownerTicksDuringHold", record.OwnerTicksDuringHold.HasValue
+                        ? (JToken)record.OwnerTicksDuringHold.Value : JValue.CreateNull() },
+                    { "runsStartedDuringHold", record.RunsStartedDuringHold },
                     { "acceptingAfterEnable", record.AcceptingAfterEnable },
                     { "lifecycleBefore", record.LifecycleBefore },
                     { "lifecycleAfter", record.LifecycleAfter },
@@ -3955,6 +3985,17 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             string refusal = "absent";
             SingleCastProbeAllowance allowance = allowanceJson == null ? null
                 : SingleCastProbeAllowance.Parse(allowanceJson, _request.RunId, out refusal);
+            // The approved profile and WORKING save, and the optional mods
+            // loaded exactly as requested, before anything is cast.
+            string probeBinding = allowance == null ? null
+                : AllowanceFixtureBinding.RequestMismatch(allowance.CompatibilityProfileId,
+                    allowance.WorkingSaveSha256, _request.ProfileId, RequestText("workingSha256")) ??
+                    OptionalModMismatch();
+            if (probeBinding != null)
+            {
+                refusal = probeBinding;
+                allowance = null;
+            }
             _probeRecord.AllowanceStatus = allowance == null ? refusal : "valid";
             if (allowance == null)
             {
