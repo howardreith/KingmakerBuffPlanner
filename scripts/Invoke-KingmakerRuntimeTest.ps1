@@ -782,25 +782,6 @@ finally {
         } else {
             $restoreFailure = "Kingmaker remains running; exact Mods restoration is intentionally blocked. Transaction: $runId"
         }
-        if ($null -ne $displayRegistryBefore) {
-            if (@(Get-Process -Name Kingmaker -ErrorAction SilentlyContinue).Count -eq 0) {
-                try {
-                    $displayDifferences = Restore-KbpRegistryValues -KeyPath $script:KbpGameRegistryKey `
-                        -Snapshot $displayRegistryBefore
-                    Write-KbpJsonAtomic (Join-Path $evidence 'display-mode.json') ([ordered]@{
-                        schemaVersion = 1; runId = $runId; displayMode = $DisplayMode; size = $displaySize
-                        restoredValues = @($displayDifferences); restorationVerified = $true
-                    })
-                }
-                catch {
-                    $displayFailure = 'Game registry restoration failed after the display-mode run: ' + $_.Exception.Message
-                    $restoreFailure = if ($null -eq $restoreFailure) { $displayFailure } else { $restoreFailure + ' | ' + $displayFailure }
-                }
-            } else {
-                $displayFailure = 'Kingmaker remains running; the game registry restoration is blocked.'
-                $restoreFailure = if ($null -eq $restoreFailure) { $displayFailure } else { $restoreFailure + ' | ' + $displayFailure }
-            }
-        }
         if ($null -ne $restoreFailure) {
             Write-Warning $restoreFailure
             # Review of f7726c9..1332ed8, P3-A: the reason is kept beside
@@ -812,6 +793,29 @@ finally {
                 }
             }
             catch { Write-Warning "Restoration failure not recorded: $($_.Exception.Message)" }
+        }
+    }
+    # A display-mode run: the game's registry key back byte-exact once the game
+    # exited; never a throw here (the save comparison and the completion
+    # record still follow), a failure is folded into the restoration failure.
+    if ($null -ne $displayRegistryBefore) {
+        $displayFailure = $null
+        if (@(Get-Process -Name Kingmaker -ErrorAction SilentlyContinue).Count -eq 0) {
+            try {
+                $displayDifferences = Restore-KbpRegistryValues -KeyPath $script:KbpGameRegistryKey `
+                    -Snapshot $displayRegistryBefore
+                Write-KbpJsonAtomic (Join-Path $evidence 'display-mode.json') ([ordered]@{
+                    schemaVersion = 1; runId = $runId; displayMode = $DisplayMode; size = $displaySize
+                    restoredValues = @($displayDifferences); restorationVerified = $true
+                })
+            }
+            catch { $displayFailure = 'Game registry restoration failed after the display-mode run: ' + $_.Exception.Message }
+        } else { $displayFailure = 'Kingmaker remains running; the game registry restoration is blocked.' }
+        if ($null -ne $displayFailure) {
+            Write-Warning $displayFailure
+            $restoreFailure = if ($null -eq $restoreFailure) { $displayFailure } else { $restoreFailure + ' | ' + $displayFailure }
+            try { [IO.File]::WriteAllText((Join-Path $evidence 'display-restoration-failure.txt'), $displayFailure + [Environment]::NewLine) }
+            catch { Write-Warning "Display restoration failure not recorded: $($_.Exception.Message)" }
         }
     }
     if ($null -ne $protectedBefore -and @(Get-Process -Name Kingmaker -ErrorAction SilentlyContinue).Count -eq 0) {

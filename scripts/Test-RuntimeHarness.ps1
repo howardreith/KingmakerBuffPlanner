@@ -1513,6 +1513,17 @@ try {
         $launcherText -notmatch "restoration-failure\.txt") {
         throw 'The launcher can skip the save comparison or the completion record on a restoration failure, or drops the failure.'
     }
+    # A display-mode run restores the game's registry key inside the finally,
+    # before the save comparison and the completion record, and folds a
+    # failure into the restoration failure.
+    $finallyText = $launcherText.Substring($launcherText.IndexOf("`nfinally {"))
+    $registryAt = $finallyText.IndexOf('Restore-KbpRegistryValues -KeyPath $script:KbpGameRegistryKey')
+    $savesAt = $finallyText.IndexOf('Get-KbpProtectedSavePolicy -Scenario')
+    $recordAt = $finallyText.IndexOf('New-KbpRunCompletionRecord')
+    if ($registryAt -lt 0 -or $savesAt -lt $registryAt -or $recordAt -lt $savesAt -or
+        $finallyText -notmatch '\$restoreFailure = if \(\$null -eq \$restoreFailure\) \{ \$displayFailure \}') {
+        throw 'The display-mode registry restoration is not inside the finally before the record, or drops its failure.'
+    }
     if ($launcherText -notmatch 'New-KbpRunCompletionRecord' -or $launcherText -notmatch 'Get-KbpProtectedSavePolicy' -or
         $launcherText -match 'Write-Error "Kingmaker remains running' -or
         $launcherText -notmatch "try \{ & \(Join-Path \`$PSScriptRoot 'Restore-Local\.ps1'\)") {
