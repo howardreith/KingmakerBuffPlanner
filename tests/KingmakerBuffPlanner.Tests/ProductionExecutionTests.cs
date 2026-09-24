@@ -71,6 +71,7 @@ namespace KingmakerBuffPlanner.Tests
             Run("at-will-cantrip-choice-refuses-what-is-not-the-authored-cantrip", TestAtWillCantripChoice);
             Run("capability-inventory-describes-the-party", TestCapabilityInventory);
             Run("classic-cast-grant-digest-allowance-and-judgement", TestClassicCastCore);
+            Run("read-only-game-diagnostics-never-act", TestReadOnlyGameDiagnostics);
             Run("qualification-finite-recipe", () => TestFiniteQualificationRecipe(root));
             Run("qualification-driver-refusals-and-deadline",
                 () => TestQualificationDriverRefusalsAndDeadline(root));
@@ -3264,6 +3265,37 @@ namespace KingmakerBuffPlanner.Tests
             select.GrantAttempts = 1;
             if (!select.Violations().Contains("select-grant-used"))
                 throw new InvalidOperationException("A selection run used the classic grant.");
+        }
+
+        // The area and cantrip diagnostics only read: no transition is used,
+        // evaluated or loaded, nothing is saved, cast, spent or moved.
+        private static void TestReadOnlyGameDiagnostics()
+        {
+            DirectoryInfo directory = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
+            while (directory != null && !File.Exists(Path.Combine(directory.FullName, "KingmakerBuffPlanner.sln")))
+                directory = directory.Parent;
+            if (directory == null) throw new InvalidOperationException("Repository root was not discoverable.");
+            string adapters = Path.Combine(directory.FullName, "src", "KingmakerBuffPlanner", "GameAdapters");
+            string[] forbidden =
+            {
+                "LoadArea(", "ExecuteTransition", "CheckRestrictions(", "Teleport", "SaveManager", "MakeAutoSave",
+                "AreaTransitionGroupCommand", "UnitAreaTransition", ".Run(", ".Spend(", "Commands.Run",
+                "CurrentValue =", "Rulebook", ".Position =", "Interact("
+            };
+            foreach (string name in new[] { "KingmakerAreaDiagnostics.cs", "KingmakerCantripDiagnostics.cs" })
+            {
+                // Code only: comments may name what the code never calls.
+                string text = string.Join("\n", File.ReadAllText(Path.Combine(adapters, name)).Split('\n')
+                    .Select(line => line.IndexOf("//", StringComparison.Ordinal) < 0 ? line
+                        : line.Substring(0, line.IndexOf("//", StringComparison.Ordinal))).ToArray());
+                string found = forbidden.FirstOrDefault(value => text.Contains(value));
+                if (found != null)
+                    throw new InvalidOperationException(name + " acts on the game: " + found);
+            }
+            string area = File.ReadAllText(Path.Combine(adapters, "KingmakerAreaDiagnostics.cs"));
+            if (!area.Contains("FindObjectsOfType<AreaTransition>()") || !area.Contains("AutosaveEnabled.CurrentValue") ||
+                !area.Contains("transition.AutoSaveMode"))
+                throw new InvalidOperationException("The area diagnostics do not record transitions and autosave.");
         }
 
         // The length-prefixed classic canonical form read back field by field.

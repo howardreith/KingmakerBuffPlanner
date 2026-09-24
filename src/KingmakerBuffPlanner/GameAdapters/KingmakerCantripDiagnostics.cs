@@ -14,7 +14,9 @@ namespace KingmakerBuffPlanner.GameAdapters
     // spellbook's spells per day and remaining level-0 slots, each level-0
     // spellbook spell's availability (the command's own IsAvailable guard,
     // CanSpend and count), and each cantrip ability fact with its spellbook
-    // binding. Nothing is cast, spent or changed.
+    // binding; and each book's level-1 known (and, for prepared books,
+    // memorized) spells, the party's finite spells. Nothing is cast, spent
+    // or changed.
     internal static class KingmakerCantripDiagnostics
     {
         internal static IList<string> Describe()
@@ -45,6 +47,12 @@ namespace KingmakerBuffPlanner.GameAdapters
                     foreach (AbilityData known in Safe(() => book.GetKnownSpells(0).ToList(), new List<AbilityData>()))
                         lines.Add("  known0=" + Describe(known) + ";canSpend=" +
                             Safe(() => book.CanSpend(known, false).ToString()));
+                    foreach (AbilityData known in Safe(() => book.GetKnownSpells(1).ToList(), new List<AbilityData>()))
+                        lines.Add("  known1=" + Describe(known));
+                    if (!spontaneous)
+                        foreach (SpellSlot slot in Safe(() => book.GetMemorizedSpells(1).ToList(), new List<SpellSlot>()))
+                            lines.Add("  memorized1=" + (slot == null ? "none"
+                                : Describe(slot.Spell) + ";slotAvailable=" + slot.Available));
                 }
                 foreach (Ability fact in Safe(() => unit.Descriptor.Abilities.Enumerable.ToList(), new List<Ability>()))
                 {

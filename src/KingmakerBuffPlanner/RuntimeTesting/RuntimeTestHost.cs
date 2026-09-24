@@ -3372,6 +3372,17 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         { "lines", new JArray(cantrips.Cast<object>().ToArray()) }
                     }.ToString(Formatting.Indented) + Environment.NewLine);
                 _log.Info("[KBP-QUAL] cantrip diagnostics;lines=" + cantrips.Count + ".");
+                // Read-only: the loaded area, the autosave setting and every
+                // area transition present (mission batch 3, section 9).
+                IList<string> areaLines = GameAdapters.KingmakerAreaDiagnostics.Describe();
+                AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory, "area-diagnostics.json"),
+                    new JObject
+                    {
+                        { "schemaVersion", 1 },
+                        { "runId", _request.RunId },
+                        { "lines", new JArray(areaLines.Cast<object>().ToArray()) }
+                    }.ToString(Formatting.Indented) + Environment.NewLine);
+                _log.Info("[KBP-QUAL] area diagnostics;lines=" + areaLines.Count + ".");
                 // Read-only: every capability the planner's own discovery
                 // sees (providers, pools, targeting shapes, enhancements).
                 IList<string> capabilities = CastingCapabilityInventory.Describe(
