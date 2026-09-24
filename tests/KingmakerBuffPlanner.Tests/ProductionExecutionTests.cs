@@ -5402,6 +5402,11 @@ namespace KingmakerBuffPlanner.Tests
                 CastingCapabilityInventory.Shape(null) != "none" ||
                 CastingCapabilityInventory.Describe(null).Single() != "inputs-unavailable")
                 throw new InvalidOperationException("Effect shapes were not described exactly.");
+            if (CastingCapabilityInventory.Leaves(new SequenceEffectExpression(new EffectExpression[] { direct, area })) !=
+                    "AreaBuff:buff-b,Buff:buff-a" ||
+                CastingCapabilityInventory.Leaves(null) != "none" ||
+                !lines.Any(line => line.StartsWith("provider=", StringComparison.Ordinal) && line.Contains(";leaves=")))
+                throw new InvalidOperationException("Effect leaves were not listed exactly.");
         }
 
         // The at-will choice (live runs a1-anim-01 and d1-01): only a cantrip
