@@ -5,7 +5,19 @@ Linked from `AUTONOMOUS-RESUME.md`. Specification: the adopted
 `Kingmaker-Buff-Planner-Casting-First-Migration-Charter.md` (casting-first
 migration and native scroll UI charter v1.0, 2026-09-19).
 
-## CURRENT STATE — N-series answered; frozen cantrip proposal — 2026-09-23
+## CURRENT STATE — advanced seed qualification toward rc5 — 2026-09-24
+
+rc4 (`863a182`) was reviewed by the owner, who also designated the
+disposable Beneath the Stolen Lands save `KBP_ADVANCED_SEED`. The two
+rc4 source findings are fixed. The advanced profile (Gunslinger 0.0.136)
+is registered. On that save, the finite (prepared and spontaneous) and
+group (caster-centred, target-anchored, mixed coverage) qualifications
+passed in both casting modes. The non-rod enhancement recipe (Brown-Fur
+Powerful Change) and a casting-first routing fix for enhanced castings
+await their live runs. The details, commits and run ids are in the top
+section of `AUTONOMOUS-RESUME.md` and in `docs/CASTING-FIRST-REVIEW-INDEX.md`.
+
+## CURRENT STATE — N-series answered; frozen cantrip proposal — 2026-09-23 (history)
 
 N1 (frozen-artifact binding checked before any native path), N2 (shutdown
 terminal from host creation) and N3 (exact prepared-slot observation) are
