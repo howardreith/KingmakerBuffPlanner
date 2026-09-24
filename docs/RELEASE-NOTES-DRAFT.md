@@ -42,6 +42,11 @@ review of the work, found more. All are fixed. For a player:
   run with Share applied to the caster's own target.
 - **The card names the character.** Notes about a buff already on a
   recipient now name the character instead of an internal id.
+- **Only enhancements the casting can take are offered.** Powerful Change
+  for an ability score that none of the caster's spells raises was
+  offered on every spell (choosing it blocked the casting). The workspace
+  now offers exactly the enhancements the planner would accept for that
+  casting's source.
 - **Archived plans are checked byte for byte.** When a plan is migrated,
   its original is archived. An archive already at the expected name is
   reused only when it holds exactly the original bytes. A different file

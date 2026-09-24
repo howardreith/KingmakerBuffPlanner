@@ -61,6 +61,7 @@ Independent read-only review of the unpushed work (`45ba833..f7e4b34`,
 | The compiler stored a strategy only when it differed, while the converter fell back to the pre-modifier option | Fixed in `3868c39`: the effective strategy is always recorded and used (also by the probe refusal) |
 | Archive names could run out: after ten distinct originals, a readable pre-schema settings file would load as unreadable and block saving | Fixed: after the numbered names the bytes go to a name keyed by their own hash (reused for the same bytes); only a keyed name holding other bytes refuses |
 | The mixed-coverage notes named recipients by raw unit id | Fixed: the card names the character (every existing-effect note) |
+| Found live in the enhanced runs (`casting-qual-cast-20260924-adv-enh-*`): for Bull's Strength the workspace offered Powerful Change for Constitution, Dexterity, Intelligence and Wisdom too, because an enhancement with an empty spell list read as "any spell" (right for rods, wrong for class features) | Fixed: the focused casting and the draft offer an enhancement exactly when the compiler would accept it for the casting's providers; with no provider to judge, a class feature only for a spell it lists. A test models the live case (Powerful Change for a score no known spell raises is never offered) |
 
 Mutation of the new logic: 31 C# mutants. 28 were killed, after two
 tests were added for real gaps (`48b5402`: a recipient suppressed before
