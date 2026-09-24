@@ -468,7 +468,22 @@ namespace KingmakerBuffPlanner.GameAdapters
                 source.SpellLevel, poolKey, cost, tokens,
                 ToMaterialRequirement(selection), CasterLevel(data),
                 ExpectedDurationRounds(data, duration), Description(selection),
-                duration, selection.SourceDisplayName, selection.VariantOrder));
+                duration, selection.SourceDisplayName, selection.VariantOrder,
+                SpellbookName(spellbook)));
+        }
+
+        // The spellbook as the game names it, else its class; empty when
+        // neither can be read.
+        private static string SpellbookName(Spellbook spellbook)
+        {
+            try
+            {
+                string name = spellbook.Blueprint.DisplayName;
+                if (string.IsNullOrWhiteSpace(name) && spellbook.Blueprint.CharacterClass != null)
+                    name = spellbook.Blueprint.CharacterClass.Name;
+                return name ?? string.Empty;
+            }
+            catch (Exception) { return string.Empty; }
         }
 
         private static int CasterLevel(AbilityData data)

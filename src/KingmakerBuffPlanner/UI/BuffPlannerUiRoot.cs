@@ -1470,7 +1470,8 @@ namespace KingmakerBuffPlanner.UI
         private CastingWorkspaceSession CreateCastingSession(string campaignId)
         {
             return new CastingWorkspaceSession(_modPath, campaignId, CreateDispatchBoundary(),
-                _session.Model == null ? null : _session.Model.SourceGroupings());
+                _session.Model == null ? null : _session.Model.SourceGroupings(),
+                _session.Model == null ? null : _session.Model.Profile);
         }
 
         // Ordinary play submits through the production boundary; a

@@ -194,7 +194,8 @@ namespace KingmakerBuffPlanner.UI
         public CastingWorkspaceSession(
             string modPath, string campaignId,
             ICastingDispatchBoundary dispatchBoundary = null,
-            IDictionary<string, CastGroupingKind> legacyGroupings = null)
+            IDictionary<string, CastGroupingKind> legacyGroupings = null,
+            BuffPlannerProfile legacyProfile = null)
         {
             if (string.IsNullOrWhiteSpace(modPath))
                 throw new ArgumentException("Absolute mod path is required.", "modPath");
@@ -204,6 +205,7 @@ namespace KingmakerBuffPlanner.UI
             _repository = new CastingPlanRepository(modPath);
             _modPath = modPath;
             _legacyGroupings = legacyGroupings;
+            _legacyProfile = legacyProfile;
             _dispatch = dispatchBoundary ?? new DisabledCastingDispatchBoundary();
             CampaignId = campaignId;
             CastingPlanLoadResult loaded = _repository.Load(campaignId);
@@ -238,6 +240,7 @@ namespace KingmakerBuffPlanner.UI
             // The dirty baseline covers every load state — an absent or
             // blocked candidate starts exactly as clean as a loaded one.
             _savedIntentSignature = DocumentIntentSignature();
+            RaiseCastingIdMark(_authoring.Document.Castings.Select(value => value.CastingId));
             SelectedRoutineId = "long";
             // Accepted review state from an earlier session: it authorizes
             // only contents whose digest still matches exactly.
@@ -294,6 +297,20 @@ namespace KingmakerBuffPlanner.UI
             get { return _executionSettings.AllowAnimatedFallback; }
         }
 
+        public bool OutOfCombatOnly
+        {
+            get { return _executionSettings.OutOfCombatOnly; }
+        }
+
+        // Re-review: the out-of-combat rule the executors honour gets a
+        // casting-first control.
+        public void SetOutOfCombatOnly(bool value)
+        {
+            ExecutionProfile next = CopyOf(_executionSettings);
+            next.OutOfCombatOnly = value;
+            _executionSettings = next;
+        }
+
         // "animated" (native casting animations, the default) or "instant".
         public void SetExecutionMode(string mode)
         {
@@ -312,6 +329,13 @@ namespace KingmakerBuffPlanner.UI
         }
 
         public string CampaignId { get; private set; }
+        // Whether the plan's primary file exists now (a backup loaded while it
+        // is missing saves normally; one loaded while it is unreadable does
+        // not). Read when the planner opens and on Reload.
+        public bool PrimaryPlanFileExists
+        {
+            get { return File.Exists(_repository.GetProfilePath(CampaignId)); }
+        }
         public CastingPlanLoadStatus LoadStatus { get; private set; }
         public string LoadWarning { get; private set; }
         public bool PersistenceBlocked { get; private set; }
@@ -381,8 +405,35 @@ namespace KingmakerBuffPlanner.UI
         // casting (draft) and focus it. Never edits an existing casting.
         public void ChooseDraftCaster(string casterUnitId)
         {
+            string previous = Draft.CasterUnitId;
             SelectCaster(casterUnitId);
             Draft.CasterUnitId = SelectedCasterUnitId;
+            // Re-review: enhancements belong to their caster (a rod in someone's
+            // pack); another caster keeps only the ones it has (judged once the
+            // party has been read).
+            if (_lastInputs != null && !string.Equals(previous, Draft.CasterUnitId, StringComparison.Ordinal))
+            {
+                HashSet<string> owned = EnhancementIdsOf(Draft.CasterUnitId);
+                Draft.Enhancements.RemoveAll(selection => selection == null ||
+                    !owned.Contains(selection.EnhancementId));
+            }
+        }
+
+        private HashSet<string> EnhancementIdsOf(string casterUnitId)
+        {
+            IEnumerable<CastEnhancementSnapshot> available = _lastInputs == null || _lastInputs.Enhancements == null
+                ? (IEnumerable<CastEnhancementSnapshot>)new CastEnhancementSnapshot[0] : _lastInputs.Enhancements;
+            return new HashSet<string>(available.Where(value => value != null &&
+                    string.Equals(value.CasterUnitId, casterUnitId, StringComparison.Ordinal))
+                .Select(value => value.EnhancementId), StringComparer.Ordinal);
+        }
+
+        private string EnhancementName(string enhancementId)
+        {
+            CastEnhancementSnapshot match = _lastInputs == null || _lastInputs.Enhancements == null ? null
+                : _lastInputs.Enhancements.FirstOrDefault(value => value != null &&
+                    string.Equals(value.EnhancementId, enhancementId, StringComparison.Ordinal));
+            return match == null || string.IsNullOrWhiteSpace(match.DisplayName) ? enhancementId : match.DisplayName;
         }
 
         private static string SourceKindName(SourceKind kind)
@@ -423,6 +474,12 @@ namespace KingmakerBuffPlanner.UI
         public string LegacyImportBlockReason { get; private set; }
         private readonly string _modPath;
         private readonly IDictionary<string, CastGroupingKind> _legacyGroupings;
+        // Re-review: the classic planner's own in-memory plan (its sources
+        // rebound to the party's abilities, which a casting-first refresh no
+        // longer saves); the first-open import reads it instead of the file's
+        // unrebound ids. The file itself is still read, archived and never
+        // written.
+        private readonly BuffPlannerProfile _legacyProfile;
 
         private CastingPlanDocument BlockLegacyImport(string reason)
         {
@@ -441,7 +498,7 @@ namespace KingmakerBuffPlanner.UI
             try
             {
                 CastingMigrationResult migration = new CastingPlanMigrationService(modPath)
-                    .Migrate(campaignId, groupings);
+                    .Migrate(campaignId, groupings, _legacyProfile);
                 MigrationStatus = migration.Status;
                 MigrationWarning = migration.Warning;
                 switch (migration.Status)
@@ -593,6 +650,11 @@ namespace KingmakerBuffPlanner.UI
             List<ResolvedCasting> routineCastings = plan.Castings.Where(value => string.Equals(
                 value.RoutineId, SelectedRoutineId, StringComparison.Ordinal)).ToList();
             view.RoutineCastingCount = routineCastings.Count;
+            view.OnePassShortCount = onePass.Plan.Castings.Count(value =>
+                string.Equals(value.RoutineId, SelectedRoutineId, StringComparison.Ordinal) &&
+                value.Readiness == ResolvedCastingReadiness.Blocked &&
+                plan.Castings.Any(alone => string.Equals(alone.CastingId, value.CastingId,
+                    StringComparison.Ordinal) && alone.IsExecutable));
             view.RoutineReadyCount = routineCastings.Count(value =>
                 value.Readiness == ResolvedCastingReadiness.Ready);
             BuildFocusedEnhancements(view, inputs);
@@ -942,16 +1004,38 @@ namespace KingmakerBuffPlanner.UI
                         value.Provider.Key.CasterUnitId, key.CasterUnitId, StringComparison.Ordinal) &&
                     string.Equals(value.Provider.Key.Ability.Canonical, key.Ability.Canonical,
                         StringComparison.Ordinal));
-                bool selected = sameAbility && (selectedSpellbook == null
-                    ? sameCount == 1
-                    : string.Equals(key.SpellbookGuid, selectedSpellbook, StringComparison.Ordinal));
+                string keyBook = string.IsNullOrEmpty(key.SpellbookGuid) ? null : key.SpellbookGuid;
+                // Twins (one spell at two levels of one spellbook) are never
+                // shown as the casting's source: it cannot pin one of them.
+                bool selected = sameAbility && TwinCount(inputs, key) == 1 &&
+                    (string.IsNullOrEmpty(selectedSpellbook)
+                        ? sameCount == 1
+                        : string.Equals(keyBook, selectedSpellbook, StringComparison.Ordinal));
                 string casterName = UnitDisplayName(inputs, key.CasterUnitId);
+                ResourcePoolSnapshot pool = inputs.Snapshot == null ? null : inputs.Snapshot.ResourcePools
+                    .FirstOrDefault(value => string.Equals(value.PoolKey, option.Provider.ResourcePoolKey,
+                        StringComparison.Ordinal));
                 choices.Add(new WorkspaceProviderChoice(key.Canonical, key.CasterUnitId, casterName,
-                    WorkspaceProviderLabels.Describe(casterName, PoolLabel(option.Provider.ResourcePoolKey),
-                        option.Provider.EffectiveCasterLevel, key.Ability.MetamagicMask), selected));
+                    WorkspaceProviderLabels.Describe(casterName, option.Provider.SourceBookName,
+                        option.Provider.SpellLevel, pool == null ? (ResourcePoolKind?)null : pool.Kind,
+                        PoolLabel(option.Provider.ResourcePoolKey), option.Provider.EffectiveCasterLevel,
+                        key.Ability.MetamagicMask), selected));
             }
             WorkspaceProviderLabels.Disambiguate(choices);
             return choices;
+        }
+
+        // Options of one caster that share an ability and a spellbook differ
+        // only by spell level (the same spell known at two levels); a casting
+        // records caster, ability and spellbook, so it cannot pin one of them.
+        private static int TwinCount(CastingWorkspaceInputs inputs, ProviderKey key)
+        {
+            string book = string.IsNullOrEmpty(key.SpellbookGuid) ? null : key.SpellbookGuid;
+            return inputs.ProviderOptions.Count(option => option != null && option.Provider != null &&
+                string.Equals(option.Provider.Key.CasterUnitId, key.CasterUnitId, StringComparison.Ordinal) &&
+                string.Equals(option.Provider.Key.Ability.Canonical, key.Ability.Canonical, StringComparison.Ordinal) &&
+                string.Equals(string.IsNullOrEmpty(option.Provider.Key.SpellbookGuid) ? null
+                    : option.Provider.Key.SpellbookGuid, book, StringComparison.Ordinal));
         }
 
         private static ProviderPlanningOption FindProviderOption(CastingWorkspaceInputs inputs,
@@ -1508,6 +1592,8 @@ namespace KingmakerBuffPlanner.UI
             ProviderPlanningOption option = FindProviderOption(_lastInputs, source, providerKey);
             if (option == null)
                 return AuthoringEditResult.Refuse("provider-unavailable:" + providerKey);
+            if (TwinCount(_lastInputs, option.Provider.Key) > 1)
+                return AuthoringEditResult.Refuse("provider-not-pinnable:" + providerKey);
             ChooseDraftCaster(option.Provider.Key.CasterUnitId);
             Draft.Ability = option.Provider.Key.Ability;
             Draft.SpellbookGuid = option.Provider.Key.SpellbookGuid;
@@ -1534,26 +1620,46 @@ namespace KingmakerBuffPlanner.UI
             if (option == null)
                 return AuthoringEditResult.Refuse("provider-unavailable:" + providerKey);
             ProviderKey key = option.Provider.Key;
-            if (string.Equals(focused.CasterUnitId, key.CasterUnitId, StringComparison.Ordinal) &&
-                focused.Ability != null && string.Equals(focused.Ability.Canonical,
+            if (TwinCount(_lastInputs, key) > 1)
+                return AuthoringEditResult.Refuse("provider-not-pinnable:" + providerKey);
+            // An item's or ability's source has no spellbook ("" in the key,
+            // null in the casting); both mean none (re-review).
+            string keyBook = string.IsNullOrEmpty(key.SpellbookGuid) ? null : key.SpellbookGuid;
+            string focusedBook = string.IsNullOrEmpty(focused.SpellbookGuid) ? null : focused.SpellbookGuid;
+            bool sameCaster = string.Equals(focused.CasterUnitId, key.CasterUnitId, StringComparison.Ordinal);
+            if (sameCaster && focused.Ability != null && string.Equals(focused.Ability.Canonical,
                     key.Ability.Canonical, StringComparison.Ordinal) &&
-                string.Equals(focused.SpellbookGuid, key.SpellbookGuid, StringComparison.Ordinal))
+                string.Equals(focusedBook, keyBook, StringComparison.Ordinal))
                 return AuthoringEditResult.Refuse("provider-unchanged");
-            IEnumerable<CastEnhancementSnapshot> available = _lastInputs.Enhancements ??
-                (IEnumerable<CastEnhancementSnapshot>)new CastEnhancementSnapshot[0];
-            var owned = new HashSet<string>(available.Where(value => value != null &&
-                    string.Equals(value.CasterUnitId, key.CasterUnitId, StringComparison.Ordinal))
-                .Select(value => value.EnhancementId), StringComparer.Ordinal);
+            // Re-review: the same caster keeps every enhancement (a rod not
+            // discovered right now stays visible as unavailable); another
+            // caster keeps only the ones it has, and the edit names the ones
+            // it could not take (Undo restores them).
+            List<AuthoredEnhancementSelection> kept;
+            var dropped = new List<string>();
+            if (sameCaster)
+                kept = focused.Enhancements.Where(value => value != null).ToList();
+            else
+            {
+                HashSet<string> owned = EnhancementIdsOf(key.CasterUnitId);
+                kept = focused.Enhancements.Where(value => value != null && owned.Contains(value.EnhancementId)).ToList();
+                dropped.AddRange(focused.Enhancements.Where(value => value != null && !owned.Contains(value.EnhancementId))
+                    .Select(value => EnhancementName(value.EnhancementId)));
+            }
+            AuthoringEditResult result;
             try
             {
-                return UpdateFocusedCasting(focused.WithProvider(key.CasterUnitId, key.Ability,
-                    key.SpellbookGuid, focused.Enhancements.Where(value => value != null &&
-                        owned.Contains(value.EnhancementId)).ToList()));
+                result = UpdateFocusedCasting(focused.WithProvider(key.CasterUnitId, key.Ability,
+                    keyBook, kept));
             }
             catch (ArgumentException exception)
             {
                 return AuthoringEditResult.Refuse("provider-invalid:" + exception.Message);
             }
+            if (result.Applied && dropped.Count != 0)
+                return new AuthoringEditResult(true, "the new caster does not have " + string.Join(", ", dropped) +
+                    " (Undo restores " + (dropped.Count == 1 ? "it" : "them") + ")", result.Scope, result.AffectedCastingIds);
+            return result;
         }
 
         // Final review B2: skip the casting while its effect is already on
@@ -1612,6 +1718,7 @@ namespace KingmakerBuffPlanner.UI
         {
             if (EditingFocusCastingId == null)
                 return AuthoringEditResult.Refuse("no-editing-focus");
+            RaiseCastingIdMark(new[] { EditingFocusCastingId });
             AuthoringEditResult result = _authoring.RemoveCasting(
                 EditingFocusCastingId);
             if (result.Applied)
@@ -1650,7 +1757,7 @@ namespace KingmakerBuffPlanner.UI
         {
             if (PersistenceBlocked)
                 throw new InvalidOperationException(
-                    "Candidate persistence is blocked: " + LoadStatus +
+                    "Candidate persistence is blocked: " + (LegacyImportBlocked ? "legacy-import" : LoadStatus.ToString()) +
                     " " + LoadWarning);
             // The loaded (or imported) player settings are written back
             // unchanged unless the player changed them - never reset to
@@ -1658,6 +1765,10 @@ namespace KingmakerBuffPlanner.UI
             _repository.Save(CastingPlanProfile.FromDocument(
                 _authoring.Document, _uiSettings, _executionSettings));
             _savedIntentSignature = DocumentIntentSignature();
+            // The primary is now written and current: a notice about a
+            // missing file and a loaded backup no longer applies.
+            LoadStatus = CastingPlanLoadStatus.Loaded;
+            LoadWarning = string.Empty;
         }
 
         // Canonical authored-document comparison (review G5): the EXISTING
@@ -1735,6 +1846,28 @@ namespace KingmakerBuffPlanner.UI
                     return LoadStatus;
                 return CastingPlanLoadStatus.Absent;
             }
+            // Re-review: a plan blocked because its file could not be read is
+            // unblocked once that file and its backups were moved aside:
+            // nothing is on disk any more, so this is a first open again (the
+            // classic plan is imported into an empty document; castings
+            // authored meanwhile are kept and written by the next Save).
+            if (PersistenceBlocked && !LegacyImportBlocked && loaded.Status == CastingPlanLoadStatus.Absent)
+            {
+                PersistenceBlocked = false;
+                LoadStatus = CastingPlanLoadStatus.Absent;
+                LoadWarning = string.Empty;
+                if (_authoring.Document.Castings.Count == 0)
+                {
+                    ImportReport = null;
+                    _authoring = new CastingAuthoringService(
+                        MigrateLegacyOrEmpty(_modPath, CampaignId, _legacyGroupings));
+                    EditingFocusCastingId = null;
+                    _savedIntentSignature = DocumentIntentSignature();
+                }
+                RaiseCastingIdMark(_authoring.Document.Castings.Select(value => value.CastingId));
+                // Absent, or Loaded when the classic plan was imported.
+                return LoadStatus;
+            }
             LoadStatus = loaded.Status;
             LoadWarning = loaded.Warning;
             switch (loaded.Status)
@@ -1748,6 +1881,7 @@ namespace KingmakerBuffPlanner.UI
                     // Focus cannot survive a document swap (review F4).
                     EditingFocusCastingId = null;
                     _savedIntentSignature = DocumentIntentSignature();
+                    RaiseCastingIdMark(_authoring.Document.Castings.Select(value => value.CastingId));
                     break;
                 default:
                     PersistenceBlocked = true;
@@ -1955,20 +2089,27 @@ namespace KingmakerBuffPlanner.UI
         // removed casting that once had the same id.
         private int _highestIssuedCastingIndex;
 
-        private string NextCastingId()
+        // Re-review: the mark is raised by every id the session has seen - a
+        // loaded or reloaded plan's, a removed casting's, a run's - not only
+        // by the ids it issued.
+        private void RaiseCastingIdMark(IEnumerable<string> ids)
         {
-            int highest = _highestIssuedCastingIndex;
-            IEnumerable<string> used = _authoring.Document.Castings.Select(value => value.CastingId)
-                .Concat(LastRunReport == null ? new string[0]
-                    : LastRunReport.Entries.Select(entry => entry.CastingId));
-            foreach (string id in used)
+            foreach (string id in ids ?? new string[0])
             {
                 int index;
                 if (id != null && id.StartsWith("cast-", StringComparison.Ordinal) &&
                     int.TryParse(id.Substring(5), NumberStyles.None, CultureInfo.InvariantCulture,
-                        out index) && index > highest)
-                    highest = index;
+                        out index) && index > _highestIssuedCastingIndex)
+                    _highestIssuedCastingIndex = index;
             }
+        }
+
+        private string NextCastingId()
+        {
+            RaiseCastingIdMark(_authoring.Document.Castings.Select(value => value.CastingId)
+                .Concat(LastRunReport == null ? new string[0]
+                    : LastRunReport.Entries.Select(entry => entry.CastingId)));
+            int highest = _highestIssuedCastingIndex;
             string candidate;
             do
             {
