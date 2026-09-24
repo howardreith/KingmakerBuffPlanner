@@ -105,6 +105,7 @@ namespace KingmakerBuffPlanner.Tests
             Run("qualification-finite-recipe", () => TestFiniteQualificationRecipe(root));
             Run("qualification-group-mixed-recipe", () => TestGroupQualificationRecipe(root));
             Run("qualification-enhanced-direct-recipe", () => TestEnhancedQualificationRecipe(root));
+            Run("qualification-ability-pool-recipe", () => TestAbilityPoolQualificationRecipe(root));
             Run("qualification-driver-refusals-and-deadline",
                 () => TestQualificationDriverRefusalsAndDeadline(root));
             Run("qualification-scenario-requests", () => TestQualificationScenarioRequests(root));
@@ -4896,6 +4897,282 @@ namespace KingmakerBuffPlanner.Tests
                 !blindRecord.Failures.Any(value => value.Contains("before-read:caster:caster-observer-missing")))
                 throw new InvalidOperationException("An enhanced step ran without its caster reads: " +
                     blindRecord.TerminalReason + "|" + string.Join("|", blindRecord.Failures.ToArray()));
+        }
+
+        // An ability-pool world (the next iteration after rc5): an alchemist
+        // whose Mutagen, a self-only ability with a single-use pool, gives its
+        // buff through an empty action and a condition whose branches apply
+        // the same buff (the live shape); a domain power with nine uses; and
+        // an ability whose condition changes the outcome. Failure shapes: a
+        // cast that spends nothing, a pool refilled after its use.
+        private sealed class AbilityPoolWorld : IInstantCastRuntimeAdapter, ICastRuntimeAdapter,
+            ICastEnhancementRuntimeAdapter
+        {
+            internal static readonly AbilityKey Mutagen =
+                new AbilityKey("mutagen", null, 0, SourceKind.AbilityResource, null);
+            internal static readonly AbilityKey Domain =
+                new AbilityKey("domain-power", null, 0, SourceKind.AbilityResource, null);
+            internal static readonly AbilityKey Odd =
+                new AbilityKey("odd-power", null, 0, SourceKind.AbilityResource, null);
+            internal static readonly string[] Units = { "unit-alchemist", "unit-cleric", "unit-t1" };
+            internal readonly Dictionary<string, KeyValuePair<string, long>> Active =
+                new Dictionary<string, KeyValuePair<string, long>>(StringComparer.Ordinal);
+            internal readonly List<string> Fired = new List<string>();
+            internal int MutagenUses = 1;
+            internal bool SpendNothing;
+            internal bool RefillAfterUse;
+            // The Mutagen is gone once the Always recast edit is reviewed, so
+            // the exhausted Apply is refused for another reason (the caster
+            // can no longer cast it).
+            internal bool CasterLeavesBeforeExhausted;
+            private int _inputsAfterUse;
+            internal int AnimatedFrames = 3;
+            internal long Now;
+            private readonly Dictionary<CastStep, EffectBaseline> _baselines =
+                new Dictionary<CastStep, EffectBaseline>();
+            private int _instances;
+            private long _sequence;
+
+            public bool IsInCombat { get { return false; } }
+            public CastRuntimeValidation Validate(CastStep step) { return CastRuntimeValidation.Pass(); }
+            public CastEnhancementPreparation PrepareEnhancements(CastStep step)
+            { return CastEnhancementPreparation.Pass(null); }
+            public InstantCastResult Fire(CastStep step)
+            {
+                Land(step);
+                return new InstantCastResult(true, true, EffectsObserved(step), true, "simulated-ability");
+            }
+            public IAnimatedCastOperation StartAnimated(CastStep step)
+            {
+                return new LandingAnimatedOperation(AnimatedFrames, () => Land(step), () => EffectsObserved(step));
+            }
+            public InstantCastCompletion InspectCompletion(CastStep step)
+            { return InstantCastCompletion.Settled("simulated-settled"); }
+            public InstantCastCompletion Cleanup(CastStep step)
+            { return InstantCastCompletion.Settled("simulated-clean"); }
+
+            private List<ObservedEffectInstance> Instances(string unit)
+            {
+                var instances = new List<ObservedEffectInstance>();
+                KeyValuePair<string, long> instance;
+                if (Active.TryGetValue(unit + "|mutagen-buff", out instance))
+                    instances.Add(new ObservedEffectInstance(EffectKind.Buff, "mutagen-buff", instance.Key,
+                        instance.Value, false));
+                return instances;
+            }
+
+            internal void Land(CastStep step)
+            {
+                Fired.Add(step.AssignmentId);
+                _baselines[step] = new EffectBaseline(step.ExpectedRecipientUnitIds.ToDictionary(unit => unit,
+                    unit => (IEnumerable<ObservedEffectInstance>)Instances(unit), StringComparer.Ordinal));
+                Active[step.TargetUnitIds[0] + "|mutagen-buff"] = new KeyValuePair<string, long>(
+                    "i" + (++_instances), Now + 600);
+                if (!SpendNothing) MutagenUses--;
+            }
+
+            public bool EffectsObserved(CastStep step)
+            {
+                EffectBaseline baseline;
+                return _baselines.TryGetValue(step, out baseline) &&
+                    AppliedEffectJudgement.AllReached(step.ExpectedRecipientUnitIds, step.ExpectedEffects,
+                        baseline, Instances);
+            }
+
+            internal ProbeObservation Observe(CastStep step, string label)
+            {
+                string unit = step.TargetUnitIds[0];
+                var instances = new List<ProbeEffectInstance>();
+                KeyValuePair<string, long> instance;
+                if (Active.TryGetValue(unit + "|mutagen-buff", out instance))
+                    instances.Add(new ProbeEffectInstance("mutagen-buff", instance.Key, instance.Value));
+                return ProbeObservation.Read(label, ++_sequence, DateTime.UtcNow, unit, MutagenUses, instances, null);
+            }
+
+            internal ActiveEffectSnapshot Live()
+            {
+                return LiveEffects(Active.Select(pair => On(pair.Key.Split('|')[0], pair.Key.Split('|')[1],
+                    500, 9, 0)).ToArray());
+            }
+
+            internal static EffectExpression MutagenEffect()
+            {
+                var leaf = new EffectLeafExpression(EffectKind.Buff, "mutagen-buff", EffectTarget.CurrentTarget,
+                    "fixture", "fixture/mutagen");
+                return new ReferencedAbilityExpression("mutagen", new SequenceEffectExpression(new EffectExpression[]
+                {
+                    new SequenceEffectExpression(new EffectExpression[]
+                    {
+                        new EmptyEffectExpression(),
+                        new ConditionalEffectExpression("feral",
+                            new SequenceEffectExpression(new EffectExpression[] { leaf }),
+                            new SequenceEffectExpression(new EffectExpression[] { leaf }))
+                    })
+                }));
+            }
+
+            internal CastingWorkspaceInputs Inputs()
+            {
+                // The refilled shape: after the use step, the pool holds a use
+                // again (as if restored between the steps).
+                if (RefillAfterUse && Fired.Count == 1) MutagenUses = 1;
+                if (Fired.Count == 1) _inputsAfterUse++;
+                bool gone = CasterLeavesBeforeExhausted && _inputsAfterUse >= 3;
+                List<UnitSnapshot> units = Units.Select(id => new UnitSnapshot(id, id, false, string.Empty,
+                    new TargetValidationSnapshot(true, true, true, true))).ToList();
+                var mutagen = new ProviderSnapshot(new ProviderKey("unit-alchemist", null, Mutagen, "ability"),
+                    "Mutagen", 0, "pool-mutagen", 1, null, null, 9, 900);
+                var domain = new ProviderSnapshot(new ProviderKey("unit-cleric", null, Domain, "ability"),
+                    "Domain Power", 0, "pool-domain", 1, null, null, 9, 90);
+                var odd = new ProviderSnapshot(new ProviderKey("unit-cleric", null, Odd, "ability"),
+                    "Odd Power", 0, "pool-odd", 1, null, null, 9, 90);
+                var pools = new[]
+                {
+                    new ResourcePoolSnapshot("pool-mutagen", ResourcePoolKind.AbilityResource, 1, MutagenUses, null),
+                    new ResourcePoolSnapshot("pool-domain", ResourcePoolKind.AbilityResource, 9, 9, null),
+                    new ResourcePoolSnapshot("pool-odd", ResourcePoolKind.AbilityResource, 1, 1, null)
+                };
+                List<string> everyone = Units.ToList();
+                var options = new List<ProviderPlanningOption>
+                {
+                    new ProviderPlanningOption(mutagen, new[] { "unit-alchemist" }, new[] { "unit-alchemist" }, 9, 900,
+                        CastExecutionStrategy.DirectRuleCast, "fixture-mutagen",
+                        new Dictionary<string, IEnumerable<string>>(StringComparer.Ordinal)),
+                    new ProviderPlanningOption(domain, everyone, new[] { "unit-cleric" }, 9, 90,
+                        CastExecutionStrategy.DirectRuleCast, "fixture-domain",
+                        new Dictionary<string, IEnumerable<string>>(StringComparer.Ordinal)),
+                    new ProviderPlanningOption(odd, everyone, new[] { "unit-cleric" }, 9, 90,
+                        CastExecutionStrategy.DirectRuleCast, "fixture-odd",
+                        new Dictionary<string, IEnumerable<string>>(StringComparer.Ordinal))
+                };
+                var effects = new Dictionary<string, EffectExpression>(StringComparer.Ordinal)
+                {
+                    { Mutagen.Canonical, MutagenEffect() },
+                    { Domain.Canonical, new EffectLeafExpression(EffectKind.Buff, "domain-buff",
+                        EffectTarget.CurrentTarget, "fixture", "fixture/domain") },
+                    { Odd.Canonical, new ConditionalEffectExpression("odd",
+                        new EffectLeafExpression(EffectKind.Buff, "odd-a", EffectTarget.CurrentTarget, "fixture", "fixture/odd-a"),
+                        new EffectLeafExpression(EffectKind.Buff, "odd-b", EffectTarget.CurrentTarget, "fixture", "fixture/odd-b")) }
+                };
+                if (gone) options.RemoveAt(0);
+                return new CastingWorkspaceInputs(new PartyProviderSnapshot(units,
+                        gone ? new[] { domain, odd } : new[] { mutagen, domain, odd }, pools), options, effects,
+                    new CastEnhancementSnapshot[0], null, Live());
+            }
+        }
+
+        private static CastingQualificationRecord RunAbilityPool(string dir, AbilityPoolWorld world, string mode)
+        {
+            Directory.CreateDirectory(dir);
+            long now = 0;
+            Func<long> clock = () => now;
+            CastingWorkspaceInputs inputs = world.Inputs();
+            CastingQualificationSelection selection =
+                CastingQualificationRecipe.SelectAbilityPool(inputs, "fixture-campaign");
+            IReadOnlyList<CastingQualificationStepForecast> forecast =
+                CastingQualificationForecast.Forecast(selection, inputs, "fixture-campaign");
+            string refusal;
+            CastingQualificationAllowance allowance = CastingQualificationAllowance.Parse(
+                QualificationAllowanceJson(o =>
+                {
+                    o["fixtureGameId"] = "fixture-campaign";
+                    o["executionMode"] = mode;
+                    o["recipe"] = CastingQualificationRecipe.AbilityPoolDirect;
+                    o["approvedProjectionIds"] = new JArray(forecast.Select(step => (object)step.ProjectionId).ToArray());
+                    o["maximumNativeSubmissions"] = 1;
+                }), "qual-run-1", out refusal);
+            var host = new CastingExecutionHost(settings => settings != null && settings.Mode == "animated"
+                ? (ICastExecutor)new AnimatedCastExecutor(world, true)
+                : new InstantCastExecutor(world, true), clock);
+            var record = new CastingQualificationRecord { CastingScenario = true, AllowanceStatus = "parsed" };
+            var driver = new CastingQualificationDriver(record, allowance, "fixture-campaign", world.Inputs,
+                boundary => new CastingWorkspaceSession(dir, "fixture-campaign", boundary),
+                host, world.Observe, clock, 240000, null, null, false, null, null,
+                () => "fixture-lifecycle=1", () => 0L);
+            for (int i = 0; i < 4000 && !driver.Completed; i++) { now += 16; world.Now = now; driver.Update(); }
+            return record;
+        }
+
+        // The ability-pool recipe (the next iteration after rc5): the plain-
+        // buff shape that lets the Mutagen qualify; selection and forecast;
+        // the driver in both modes (use, repeat, exhausted); a cast that
+        // spends nothing and a refilled pool are refused where they happen.
+        private static void TestAbilityPoolQualificationRecipe(string root)
+        {
+            var leafA = new EffectLeafExpression(EffectKind.Buff, "a", EffectTarget.CurrentTarget, "f", "f/a");
+            var leafB = new EffectLeafExpression(EffectKind.Buff, "b", EffectTarget.CurrentTarget, "f", "f/b");
+            if (!ExplicitCastingStepConverter.IsPlainCurrentTargetBuff(new SequenceEffectExpression(
+                    new EffectExpression[] { new EmptyEffectExpression(), leafA }), "x") ||
+                !ExplicitCastingStepConverter.IsPlainCurrentTargetBuff(new ConditionalEffectExpression("c", leafA,
+                    new SequenceEffectExpression(new EffectExpression[] { leafA })), "x") ||
+                ExplicitCastingStepConverter.IsPlainCurrentTargetBuff(new ConditionalEffectExpression("c", leafA, leafB), "x") ||
+                ExplicitCastingStepConverter.IsPlainCurrentTargetBuff(new SequenceEffectExpression(
+                    new EffectExpression[] { new EmptyEffectExpression() }), "x") ||
+                !ExplicitCastingStepConverter.IsPlainCurrentTargetBuff(AbilityPoolWorld.MutagenEffect(), "mutagen"))
+                throw new InvalidOperationException("The plain-buff shape rule for empty actions and conditions was wrong.");
+            var world = new AbilityPoolWorld();
+            CastingWorkspaceInputs inputs = world.Inputs();
+            CastingQualificationSelection selection = CastingQualificationRecipe.SelectAbilityPool(inputs, "fixture-campaign");
+            if (!selection.Selected || selection.Recipe != CastingQualificationRecipe.AbilityPoolDirect ||
+                selection.Castings.Count != 1 ||
+                selection.Castings[0].Ability.Canonical != AbilityPoolWorld.Mutagen.Canonical ||
+                selection.Castings[0].CasterUnitId != "unit-alchemist" ||
+                selection.Castings[0].DirectTargetUnitId != "unit-alchemist" ||
+                !selection.Coverage.SequenceEqual(new[] { "ability-pool", "single-use", "self" }))
+                throw new InvalidOperationException("The ability-pool selection was wrong: " + selection.Refusal + " " +
+                    string.Join(",", selection.Rejections.ToArray()));
+            // Refused: a spent pool, a pool with more than one use, and an
+            // ability whose condition changes the outcome.
+            CastingQualificationSelection none = CastingQualificationRecipe.SelectAbilityPool(
+                new AbilityPoolWorld { MutagenUses = 0 }.Inputs(), "fixture-campaign");
+            if (none.Selected ||
+                !none.Rejections.Any(value => value.Contains("mutagen") && value.EndsWith("|pool-not-single-use:0", StringComparison.Ordinal)) ||
+                !none.Rejections.Any(value => value.Contains("domain-power") && value.EndsWith("|pool-not-single-use:2", StringComparison.Ordinal)) ||
+                !none.Rejections.Any(value => value.Contains("odd-power") && value.Contains("|effect-shape:")))
+                throw new InvalidOperationException("An ability-pool selection that cannot qualify was made: " +
+                    string.Join(",", none.Rejections.ToArray()));
+            foreach (string mode in new[] { "instant", "animated" })
+            {
+                var run = new AbilityPoolWorld();
+                CastingQualificationRecord record = RunAbilityPool(Path.Combine(root, "qa-" + mode[0]), run, mode);
+                IList<string> violations = record.Violations();
+                CastingQualificationStepResult use = record.Step("use");
+                CastingQualificationStepResult repeat = record.Step("repeat");
+                CastingQualificationStepResult exhausted = record.Step("exhausted");
+                if (violations.Count != 0 || record.TerminalReason != "completed" || record.ExecutionMode != mode ||
+                    !run.Fired.SequenceEqual(new[] { "qual-cast-1" }) || run.MutagenUses != 0 ||
+                    use == null || !use.Availability.SequenceEqual(new[] { "qual-cast-1:1>0" }) ||
+                    use.TransitionOf("qual-cast-1") != "new-instance" ||
+                    repeat == null || repeat.ApplyReason != "nothing-to-cast:1" ||
+                    exhausted == null || exhausted.ApplyAllowed ||
+                    !exhausted.ApplyReason.StartsWith("apply-refused:blocked-casting:qual-cast-1:resource-pool-exhausted:pool-mutagen", StringComparison.Ordinal) ||
+                    !exhausted.Availability.SequenceEqual(new[] { "qual-cast-1:0>0" }) ||
+                    exhausted.TransitionOf("qual-cast-1") != "unchanged" || record.ExhaustedAccepted == null)
+                    throw new InvalidOperationException("The ability-pool qualification (" + mode + ") did not pass exactly: " +
+                        record.TerminalReason + "|" + string.Join("|", violations.ToArray()) + "|fired=" +
+                        string.Join(",", run.Fired.ToArray()) + "|" + (exhausted == null ? "no-exhausted"
+                            : exhausted.ApplyReason + "|" + string.Join(",", exhausted.Availability.ToArray())));
+            }
+            // A cast that spends nothing fails its use step; a pool refilled
+            // after its use makes the exhausted step not a refusal.
+            var free = new AbilityPoolWorld { SpendNothing = true };
+            CastingQualificationRecord freeRecord = RunAbilityPool(Path.Combine(root, "qa-free"), free, "instant");
+            var refill = new AbilityPoolWorld { RefillAfterUse = true };
+            CastingQualificationRecord refillRecord = RunAbilityPool(Path.Combine(root, "qa-refill"), refill, "instant");
+            var gone = new AbilityPoolWorld { CasterLeavesBeforeExhausted = true };
+            CastingQualificationRecord goneRecord = RunAbilityPool(Path.Combine(root, "qa-gone"), gone, "instant");
+            if (goneRecord.TerminalReason == "completed" || !goneRecord.Failures.Any(value =>
+                    value.StartsWith("exhausted:step:refused-for-another-reason:", StringComparison.Ordinal)))
+                throw new InvalidOperationException("An exhausted step refused for another reason passed: " +
+                    goneRecord.TerminalReason + "|" + string.Join("|", goneRecord.Failures.ToArray()));
+            if (freeRecord.TerminalReason == "completed" ||
+                !freeRecord.Failures.Any(value => value.StartsWith("use-wait:step:resource:qual-cast-1:1>1", StringComparison.Ordinal)) ||
+                refillRecord.TerminalReason == "completed" ||
+                !refillRecord.Failures.Any(value => value.StartsWith("exhausted:step:", StringComparison.Ordinal)) ||
+                !refill.Fired.SequenceEqual(new[] { "qual-cast-1" }))
+                throw new InvalidOperationException("A wrong ability-pool outcome was not refused: " +
+                    string.Join("|", freeRecord.Failures.ToArray()) + " / " + string.Join("|", refillRecord.Failures.ToArray()) +
+                    " fired=" + string.Join(",", refill.Fired.ToArray()));
         }
 
         // A finite world: a prepared caster (exact slot tokens with native

@@ -305,9 +305,23 @@ namespace KingmakerBuffPlanner.Planning
                 return leaf.Kind == EffectKind.Buff && leaf.Target == EffectTarget.CurrentTarget;
             var sequence = expression as SequenceEffectExpression;
             if (sequence != null)
-                return sequence.Children.Count != 0 &&
-                    sequence.Children.All(child =>
-                        IsPlainCurrentTargetBuff(child, castAbilityGuid, castVariantGuid));
+            {
+                // An empty action (nothing the planner tracks, such as a
+                // mutagen's removal of an earlier mutagen) adds no effect;
+                // the rest must be plain, and something must act.
+                List<EffectExpression> acting = sequence.Children
+                    .Where(child => !(child is EmptyEffectExpression)).ToList();
+                return acting.Count != 0 && acting.All(child =>
+                    IsPlainCurrentTargetBuff(child, castAbilityGuid, castVariantGuid));
+            }
+            var conditional = expression as ConditionalEffectExpression;
+            if (conditional != null)
+                // A condition whose branches apply exactly the same plain
+                // buffs does not change the outcome.
+                return IsPlainCurrentTargetBuff(conditional.WhenTrue, castAbilityGuid, castVariantGuid) &&
+                    IsPlainCurrentTargetBuff(conditional.WhenFalse, castAbilityGuid, castVariantGuid) &&
+                    new HashSet<string>(PlainLeafKeys(conditional.WhenTrue), StringComparer.Ordinal)
+                        .SetEquals(PlainLeafKeys(conditional.WhenFalse));
             var reference = expression as ReferencedAbilityExpression;
             if (reference != null)
                 return ((!string.IsNullOrEmpty(castAbilityGuid) &&
@@ -316,6 +330,29 @@ namespace KingmakerBuffPlanner.Planning
                         string.Equals(reference.AbilityId, castVariantGuid, StringComparison.Ordinal))) &&
                     IsPlainCurrentTargetBuff(reference.Child, castAbilityGuid, castVariantGuid);
             return false;
+        }
+
+        private static IEnumerable<string> PlainLeafKeys(EffectExpression expression)
+        {
+            var leaf = expression as EffectLeafExpression;
+            if (leaf != null) { yield return leaf.Kind + "|" + leaf.EffectId + "|" + leaf.Target; yield break; }
+            var sequence = expression as SequenceEffectExpression;
+            if (sequence != null)
+            {
+                foreach (EffectExpression child in sequence.Children)
+                    foreach (string key in PlainLeafKeys(child)) yield return key;
+                yield break;
+            }
+            var conditional = expression as ConditionalEffectExpression;
+            if (conditional != null)
+            {
+                foreach (string key in PlainLeafKeys(conditional.WhenTrue)) yield return key;
+                foreach (string key in PlainLeafKeys(conditional.WhenFalse)) yield return key;
+                yield break;
+            }
+            var reference = expression as ReferencedAbilityExpression;
+            if (reference != null)
+                foreach (string key in PlainLeafKeys(reference.Child)) yield return key;
         }
 
         // The Standard-scope contract check alone, for disclosure BEFORE

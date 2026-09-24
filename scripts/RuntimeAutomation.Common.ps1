@@ -815,7 +815,7 @@ function Get-KbpQualificationAllowanceBuildRefusal {
     if ([string]$allowance.packageSha256 -cne [string]$BuildManifest.packageSha256) { return 'package' }
     if ([string]$allowance.dllSha256 -cne [string]$BuildManifest.dllSha256) { return 'dll' }
     if ([string]$allowance.assemblyMvid -cne [string]$BuildManifest.assemblyMvid) { return 'mvid' }
-    if (@('zero-cost-mixed', 'finite-direct-mixed', 'group-mixed', 'enhanced-direct') -cnotcontains [string]$allowance.recipe) { return 'recipe' }
+    if (@('zero-cost-mixed', 'finite-direct-mixed', 'group-mixed', 'enhanced-direct', 'ability-pool-direct') -cnotcontains [string]$allowance.recipe) { return 'recipe' }
     if (-not [string]::IsNullOrEmpty($Recipe) -and [string]$allowance.recipe -cne $Recipe) { return 'recipe-differs' }
     if (@('instant', 'animated') -cnotcontains [string]$allowance.executionMode) { return 'execution-mode' }
     if (-not [string]::IsNullOrEmpty($ExecutionMode) -and [string]$allowance.executionMode -cne $ExecutionMode) {
