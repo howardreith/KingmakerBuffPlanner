@@ -51,6 +51,21 @@ namespace KingmakerBuffPlanner.Persistence
     // revalidated before the migration is reported as complete. The legacy
     // schema-5 file itself is never modified — an error at any step leaves
     // the original bytes recoverable and the old UI unaffected.
+    // Re-review (focused): the classic planner's in-memory plan of a campaign
+    // and the SHA-256 of the primary file it was read from or last saved to
+    // (null when it came from a backup or is a new default).
+    public sealed class ClassicPlanInMemory
+    {
+        public ClassicPlanInMemory(BuffPlannerProfile profile, string primarySha256)
+        {
+            Profile = profile;
+            PrimarySha256 = primarySha256;
+        }
+
+        public BuffPlannerProfile Profile { get; private set; }
+        public string PrimarySha256 { get; private set; }
+    }
+
     public sealed class CastingPlanMigrationService
     {
         private readonly CastingPlanImporter _importer = new CastingPlanImporter();
@@ -68,7 +83,8 @@ namespace KingmakerBuffPlanner.Persistence
         public CastingMigrationResult Migrate(
             string campaignId,
             IDictionary<string, CastGroupingKind> groupingsBySourceId = null,
-            BuffPlannerProfile legacyInMemory = null)
+            ClassicPlanInMemory legacyInMemory = null,
+            CastingPlanDocument unsavedDocument = null)
         {
             if (string.IsNullOrWhiteSpace(campaignId))
                 throw new ArgumentException("Exact campaign ID is required.", "campaignId");
@@ -102,11 +118,17 @@ namespace KingmakerBuffPlanner.Persistence
             }
             // Re-review: the classic planner's own in-memory plan of this
             // campaign (its sources rebound to the party's current abilities)
-            // is imported when given; the file above still had to be readable,
-            // and it is archived exactly and never written.
-            if (legacyInMemory != null &&
-                string.Equals(legacyInMemory.CampaignId, campaignId, StringComparison.Ordinal))
-                legacy = legacyInMemory;
+            // is imported in place of the file's - only while the file is
+            // still exactly the bytes that plan was read from or saved to
+            // (focused re-review: a default made because the file could not
+            // be read, or a plan read before the file changed, never stands
+            // in for it). The file above still had to be readable, and it is
+            // archived exactly and never written.
+            if (legacyInMemory != null && legacyInMemory.Profile != null &&
+                string.Equals(legacyInMemory.Profile.CampaignId, campaignId, StringComparison.Ordinal) &&
+                !string.IsNullOrEmpty(legacyInMemory.PrimarySha256) &&
+                string.Equals(legacyInMemory.PrimarySha256, legacyHash, StringComparison.OrdinalIgnoreCase))
+                legacy = legacyInMemory.Profile;
             // A newer-schema candidate must not be buried by a migration;
             // the operator resolves it explicitly first.
             CastingPlanLoadResult existingCandidate =
@@ -121,6 +143,12 @@ namespace KingmakerBuffPlanner.Persistence
                 existingCandidate.Status == CastingPlanLoadStatus.RecoveredFromBackup
                     ? existingCandidate.Profile.ToDocument()
                     : null;
+            // Focused re-review: castings added in the session while no plan
+            // file existed are imported into, never replaced.
+            if (existingDocument == null && existingCandidate.Status == CastingPlanLoadStatus.Absent &&
+                unsavedDocument != null &&
+                string.Equals(unsavedDocument.CampaignId, campaignId, StringComparison.Ordinal))
+                existingDocument = unsavedDocument;
             CastingImportResult imported = _importer.Import(
                 legacy, existingDocument, groupingsBySourceId);
             string archivePath = ArchiveBoundaryOriginal(legacyPath, legacyBytes);

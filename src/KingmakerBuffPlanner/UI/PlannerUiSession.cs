@@ -68,10 +68,14 @@ namespace KingmakerBuffPlanner.UI
             string refusal = _profiles.LastSaveRefusal;
             if (refusal == null)
             {
-                // A save that went through ends any earlier notice.
+                // A save that went through ends any earlier notice, and the
+                // file is now the bytes of this plan (focused re-review).
                 PersistenceNotice = null;
+                ClassicSavesRefused = false;
+                ClassicPrimarySha256 = ProfileRepository.TryHash(_profiles.GetProfilePath(profile.CampaignId));
                 return;
             }
+            ClassicSavesRefused = true;
             PersistenceNotice = PersistenceMessages.ForClassicSaveRefusal(refusal);
             _log.Info("[KBP-PROFILE] Classic save refused: " + refusal + ".");
         }
@@ -87,6 +91,23 @@ namespace KingmakerBuffPlanner.UI
         // was loaded instead, or a change was not saved; null when all is
         // well. The Classic screen always shows it.
         internal string PersistenceNotice { get; private set; }
+        // Focused re-review: whether Classic saves are refused now (the main
+        // file cannot be read, or the last save was refused); other notices
+        // do not stop saving.
+        internal bool ClassicSavesRefused { get; private set; }
+        // The SHA-256 of the main Classic file this plan was read from or
+        // last saved to; null when it came from a backup or is a new default.
+        internal string ClassicPrimarySha256 { get; private set; }
+        // A Classic run that has been accepted but waits for the world to run
+        // (a paused game, or a planner window open).
+        internal bool ClassicRunHeld
+        {
+            get
+            {
+                Func<bool> worldRuns = ClassicWorldRuns;
+                return IsExecuting && worldRuns != null && !worldRuns();
+            }
+        }
         internal PartyCatalogDiscoveryDiagnostics CatalogDiscovery { get; private set; }
         internal IReadOnlyList<ProviderPlanningOption> ProviderOptions
         {
@@ -108,6 +129,7 @@ namespace KingmakerBuffPlanner.UI
                     string.IsNullOrWhiteSpace(Game.Instance.Player.GameId))
                 {
                     Model = null;
+                    ClassicPrimarySha256 = null;
                     _snapshot = null;
                     _activeEffects = null;
                     _effects = null;
@@ -126,9 +148,11 @@ namespace KingmakerBuffPlanner.UI
                     snapshotBuilder.EffectsBySource, StringComparer.Ordinal);
                 ProfileLoadResult loaded = _profiles.Load(campaignId);
                 PlannerHotkey.SetBinding(loaded.Profile.Ui.Hotkey);
+                string primaryName = System.IO.Path.GetFileName(_profiles.GetProfilePath(campaignId));
                 PersistenceNotice = PersistenceMessages.ForClassicLoad(loaded.SourcePath,
-                    loaded.RecoveredFromBackup, loaded.Warning,
-                    System.IO.Path.GetFileName(_profiles.GetProfilePath(campaignId)));
+                    loaded.RecoveredFromBackup, loaded.Warning, primaryName);
+                ClassicSavesRefused = PersistenceMessages.ClassicPrimaryUnreadable(loaded.Warning, primaryName);
+                ClassicPrimarySha256 = loaded.PrimarySha256;
                 ProfileStatus = string.IsNullOrEmpty(loaded.SourcePath)
                     ? (string.IsNullOrEmpty(loaded.Warning)
                         ? "No prior profile was found; using a new schema "
@@ -810,8 +834,12 @@ namespace KingmakerBuffPlanner.UI
         {
             IsExecuting = false;
             string name = RoutineDisplayName(routineId);
-            Status = name + " stopped before it finished (" + (reason ?? "stopped") +
-                "): the cast in progress was interrupted and cleaned up, and nothing after it was attempted.";
+            // Focused re-review: a run that never submitted a cast says so.
+            bool submitted = LastExecutionReport != null && LastExecutionReport.Submitted > 0;
+            Status = name + " stopped before it finished (" + (reason ?? "stopped") + "): " +
+                (submitted
+                    ? "the cast in progress was interrupted and cleaned up, and nothing after it was attempted."
+                    : "it had not cast anything yet, and nothing was attempted.");
             _log.Info("[KBP-QUICK] classic run ended by its owner;group=" + routineId +
                 ";reason=" + (reason ?? "stopped") + ".");
             return new QuickExecutionResult(routineId, name,

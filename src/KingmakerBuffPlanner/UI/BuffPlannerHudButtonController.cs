@@ -901,7 +901,10 @@ namespace KingmakerBuffPlanner.UI
             }
             string name = char.ToUpperInvariant(routineId[0]) + routineId.Substring(1);
             if (_session.Model == null) return "Load a campaign to run " + name + ".";
-            if (_session.IsExecuting) return "A buff routine is already executing.";
+            if (_session.IsExecuting)
+                return _session.ClassicRunHeld
+                    ? "A buff routine is waiting to cast: it continues once the game runs and no planner window is open."
+                    : "A buff routine is already executing.";
             RoutineProfile routine = _session.Model.Profile.Routines
                 .FirstOrDefault(item => item.RoutineId == routineId);
             if (routine == null || routine.Assignments.Count == 0)

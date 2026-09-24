@@ -1766,8 +1766,8 @@ namespace KingmakerBuffPlanner.Tests
                 !line.Traces.Contains("cast-a") || !line.Traces.Contains("cast-b"))
                 throw new InvalidOperationException("The linked-slot budget line hid a shortage: requested=" +
                     line.RequestedUsage + ";allocated=" + line.AllocatedUsage + ";unmet=" + line.UnmetDemand);
-            // Re-review: a zero cost on a finite pool is unverified; it still
-            // requests one unit, so the line shows the shortage.
+            // Re-review, then focused re-review: a zero cost on a finite pool
+            // is unverified; it requests and reserves one unit.
             const string zeroPool = "unit-b|spontaneous-1";
             var zeroSource = new ResourcePoolSnapshot(zeroPool, ResourcePoolKind.SpontaneousLevel, 3, 3, null);
             ProviderSnapshot zeroCost = Provider("opposed", zeroPool, 0, new string[0]);
@@ -1775,7 +1775,7 @@ namespace KingmakerBuffPlanner.Tests
             Assert(zeroLedger.TryReserveAtomically("cast-z", zeroCost, zeroLedger.DemandsFor(zeroCost, null),
                 out cost, out reason));
             CastingBudgetLine zeroLine = zeroLedger.BuildReport().Single(value => value.PoolKey == zeroPool);
-            if (zeroLine.RequestedUsage != 1 || zeroLine.AllocatedUsage != 0 || zeroLine.UnmetDemand != 1)
+            if (zeroLine.RequestedUsage != 1 || zeroLine.AllocatedUsage != 1 || zeroLine.UnmetDemand != 0)
                 throw new InvalidOperationException("An unverified zero cost hid its demand: requested=" +
                     zeroLine.RequestedUsage + ";allocated=" + zeroLine.AllocatedUsage);
         }
@@ -3730,7 +3730,7 @@ namespace KingmakerBuffPlanner.Tests
                 hud.Contains("_feedback") ||
                 hud.Contains("void Present(QuickExecutionResult") ||
                 uiRoot.Contains("_hud.Present(result)") ||
-                !uiRoot.Contains("_screen.Present(result)") ||
+                !uiRoot.Contains("_screen.Present(result,") ||
                 !uiRoot.Contains("Routine UI result:") ||
                 !screen.Contains("result.Message") ||
                 !session.Contains("[KBP-QUICK]") ||

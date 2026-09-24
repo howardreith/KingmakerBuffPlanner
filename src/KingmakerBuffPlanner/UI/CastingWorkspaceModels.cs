@@ -665,6 +665,11 @@ namespace KingmakerBuffPlanner.UI
 
         public static string DescribeReviewItem(string item)
         {
+            return DescribeReviewItem(item, null);
+        }
+
+        public static string DescribeReviewItem(string item, Func<string, string> unitName)
+        {
             string value = item ?? string.Empty;
             if (value == "automatic-caster-pending-review")
                 return "the old plan let the planner pick any caster; choose one";
@@ -675,7 +680,16 @@ namespace KingmakerBuffPlanner.UI
             if (value == "no-recipient:pending-review")
                 return "the old plan named no recipient; choose one";
             if (value.StartsWith("grouping-unknown:", StringComparison.Ordinal))
-                return "the old plan did not say single target or group; choose";
+            {
+                // Focused re-review: the recipients the old plan named.
+                int targetsAt = value.IndexOf("targets=", StringComparison.Ordinal);
+                string[] ids = targetsAt < 0 ? new string[0]
+                    : value.Substring(targetsAt + 8).Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+                // Names only: without a way to name them, no ids are shown.
+                return "the old plan did not say single target or group" +
+                    (ids.Length == 0 || unitName == null ? string.Empty
+                        : " (it named " + string.Join(", ", ids.Select(unitName).ToArray()) + ")") + "; choose";
+            }
             if (value.StartsWith("provider-pin:", StringComparison.Ordinal))
                 return "the old plan used one exact source; check it";
             if (value.StartsWith("enhancement:", StringComparison.Ordinal))

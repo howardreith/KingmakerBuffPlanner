@@ -30,6 +30,7 @@ namespace KingmakerBuffPlanner.UI
 
         private readonly CastingWorkspaceSession _session;
         private readonly Func<CastingWorkspaceInputs> _inputs;
+        private float _reloadArmedUntil;
         private readonly Func<CastingWorkspaceInputs> _freshInputs;
         private readonly Action _close;
         private Button _modeButton;
@@ -113,7 +114,7 @@ namespace KingmakerBuffPlanner.UI
                 view.SelectedRoutineGate.BlockingReasons.Count) +
                 // Re-review: a plan that cannot be saved says so for as long as
                 // it lasts, not only in the first footer message.
-                (!_session.PersistenceBlocked ? string.Empty
+                (!_session.SavesRefused ? string.Empty
                     : _session.LegacyImportBlocked ? " · not saved: the classic plan could not be imported"
                     : " · not saved: the plan file cannot be read");
             _scopeLabel.text = view.EditingScopeLabel;
@@ -124,7 +125,8 @@ namespace KingmakerBuffPlanner.UI
                 // Final review B4: a plan file that could not be used is
                 // announced when the planner opens, before anything else.
                 string import = PersistenceMessages.ForCastingLoad(_session.LoadStatus,
-                    _session.PrimaryPlanFileExists) ?? DescribeImport(_session);
+                    _session.PrimaryPlanFileExists, _session.LoadSourcePath, _session.LoadWarning) ??
+                    DescribeImport(_session);
                 if (import != null) _footerResult.text = import;
             }
             RebuildBuffGrid(view);
@@ -624,14 +626,29 @@ namespace KingmakerBuffPlanner.UI
             _reloadButton = KingmakerUiFactory.CreateButton(
                 "Reload", footer, _theme, "Reload", () => Click(() =>
                 {
+                    // Focused re-review: a reload that can replace unsaved
+                    // changes asks for a second press first.
+                    if (_session.IsDirty && Time.unscaledTime > _reloadArmedUntil)
+                    {
+                        _reloadArmedUntil = Time.unscaledTime + 5f;
+                        _footerResult.text = "Reload replaces this plan with the saved one, and unsaved changes " +
+                            "can be lost. Press Reload again to continue.";
+                        return;
+                    }
+                    _reloadArmedUntil = 0f;
                     CastingPlanLoadStatus status = _session.Reload();
                     _footerResult.text = _session.LegacyImportBlocked
                         ? DescribeImport(_session)
-                        : PersistenceMessages.ForCastingLoad(status, _session.PrimaryPlanFileExists) ??
-                            (_session.ImportReport != null ? DescribeImport(_session)
-                                : status == CastingPlanLoadStatus.Absent
-                                    ? "No casting plan is saved yet; Save writes one."
-                                    : "Reloaded the saved casting plan.");
+                        : PersistenceMessages.ForCastingLoad(status, _session.PrimaryPlanFileExists,
+                            _session.LoadSourcePath, _session.LoadWarning) ??
+                            (_session.LastReloadNote == "kept-unsaved"
+                                ? "No casting plan is saved yet; your castings were kept. Save writes them."
+                                : _session.LastReloadNote == "imported-into-unsaved"
+                                    ? "Your classic plan was imported alongside your castings and saved."
+                                    : _session.ImportReport != null ? DescribeImport(_session)
+                                    : status == CastingPlanLoadStatus.Absent
+                                        ? "No casting plan is saved yet; Save writes one."
+                                        : "Reloaded the saved casting plan.");
                     RefreshView();
                 }));
             KingmakerUiFactory.SetAnchors(RectOf(_reloadButton), 0.43f, 0.2f, 0.51f, 0.8f);
@@ -1174,11 +1191,13 @@ namespace KingmakerBuffPlanner.UI
             if (focused.Provenance != null &&
                 focused.Provenance.UnresolvedReviewItems.Count != 0)
             {
+                Func<string, string> reviewUnitName = unitId => UnitName(view, unitId);
                 AddInspectorCaption("Imported: needs review");
                 Text items = KingmakerUiFactory.CreateText(
                     "ImportReviewItems", _inspectorContent, _theme,
                     string.Join("\n", focused.Provenance.UnresolvedReviewItems
-                        .Select(WorkspaceReasonText.DescribeReviewItem).ToArray()) +
+                        .Select(item => WorkspaceReasonText.DescribeReviewItem(item, reviewUnitName))
+                        .ToArray()) +
                     "\nThis casting cannot run until the review is resolved.",
                     12, TextAnchor.UpperLeft);
                 items.color = _theme.MutedBrownText;
@@ -1268,6 +1287,7 @@ namespace KingmakerBuffPlanner.UI
             KingmakerUiFactory.AddLayout(RectOf(recastPolicy), 30f);
             bool directRecord = focused.TargetMode ==
                 Domain.Authoring.CastingTargetMode.DirectTarget;
+            bool? groupAbility = _session.FocusedCastingIsGroupAbility(_inputs());
             AddInspectorCaption(directRecord
                 ? "Retarget (direct)" : "Group targeting");
             if (directRecord)
@@ -1290,20 +1310,24 @@ namespace KingmakerBuffPlanner.UI
                             RefreshView();
                         }));
                 }
-                // Re-review: a single-target casting can become a group casting
-                // centred on its caster (its target becomes the required
-                // coverage).
-                Button toGroup = KingmakerUiFactory.CreateButton(
-                    "FocusedMode.Group", _inspectorContent, _theme,
-                    "Make it a group casting (centred on the caster)", () => Click(() =>
-                    {
-                        SurfaceRefusal(_session.SetFocusedTargeting(
-                            Domain.Authoring.CastingTargetMode.CasterCenteredOrigin, null, null,
-                            focused.DirectTargetUnitId == null ? null : new[] { focused.DirectTargetUnitId }),
-                            "mode");
-                        RefreshView();
-                    }));
-                KingmakerUiFactory.AddLayout(RectOf(toGroup), 30f);
+                // Re-review: a single-target casting of a group buff can become
+                // a group casting centred on its caster (its target becomes the
+                // required coverage); offered only for a group buff (focused
+                // re-review).
+                if (groupAbility == true)
+                {
+                    Button toGroup = KingmakerUiFactory.CreateButton(
+                        "FocusedMode.Group", _inspectorContent, _theme,
+                        "Make it a group casting (centred on the caster)", () => Click(() =>
+                        {
+                            SurfaceRefusal(_session.SetFocusedTargeting(
+                                Domain.Authoring.CastingTargetMode.CasterCenteredOrigin, null, null,
+                                focused.DirectTargetUnitId == null ? null : new[] { focused.DirectTargetUnitId }),
+                                "mode");
+                            RefreshView();
+                        }));
+                    KingmakerUiFactory.AddLayout(RectOf(toGroup), 30f);
+                }
             }
             else
             {
@@ -1371,23 +1395,29 @@ namespace KingmakerBuffPlanner.UI
                             RefreshView();
                         }));
                 }
-                // Re-review: a group casting (for example an imported one whose
-                // old plan did not say single target or group) can become a
-                // single-target casting on a chosen member.
-                AddInspectorCaption("Or a single target");
-                RectTransform singleRow = CreateTileRow("FocusedSingleTiles");
-                foreach (WorkspaceTargetOption target in view.Draft.Targets)
+                // Re-review: a group casting of a single-target buff (for
+                // example an imported one whose old plan did not say single
+                // target or group) can become a single-target casting on a
+                // chosen member; offered only for a single-target buff
+                // (focused re-review), and the recipients it no longer reaches
+                // are named.
+                if (groupAbility == false)
                 {
-                    WorkspaceTargetOption captured = target;
-                    CreatePortraitTile("FocusedSingle." + captured.UnitId, singleRow,
-                        captured.UnitId, captured.DisplayName, false, Color.white,
-                        () => Click(() =>
-                        {
-                            SurfaceRefusal(_session.SetFocusedTargeting(
-                                Domain.Authoring.CastingTargetMode.DirectTarget,
-                                captured.UnitId, null, null), "mode");
-                            RefreshView();
-                        }));
+                    AddInspectorCaption("Or a single target");
+                    RectTransform singleRow = CreateTileRow("FocusedSingleTiles");
+                    foreach (WorkspaceTargetOption target in view.Draft.Targets)
+                    {
+                        WorkspaceTargetOption captured = target;
+                        CreatePortraitTile("FocusedSingle." + captured.UnitId, singleRow,
+                            captured.UnitId, captured.DisplayName, false, Color.white,
+                            () => Click(() =>
+                            {
+                                SurfaceRefusal(_session.SetFocusedTargeting(
+                                    Domain.Authoring.CastingTargetMode.DirectTarget,
+                                    captured.UnitId, null, null), "mode");
+                                RefreshView();
+                            }));
+                    }
                 }
             }
             AddInspectorCaption("Enhancements (this casting)");

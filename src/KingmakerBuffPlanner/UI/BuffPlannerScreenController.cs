@@ -54,11 +54,13 @@ namespace KingmakerBuffPlanner.UI
                     throw new InvalidOperationException("Kingmaker campaign UI is not available.");
                 _view = new BuffPlannerScreenView(StaticCanvas.Instance, _session,
                     _diagnostics, () => Close(), _quickExecute, _quickExecuteReadyOnly);
-                if (_unshownResult != null)
-                {
+                // Focused re-review: only a result of this campaign is shown.
+                if (_unshownResult != null && ClassicRunScreenPolicy.ShowStashedResult(_unshownResultCampaign,
+                        _session.Model == null || _session.Model.Profile == null
+                            ? null : _session.Model.Profile.CampaignId))
                     _view.ShowResult(_unshownResult);
-                    _unshownResult = null;
-                }
+                _unshownResult = null;
+                _unshownResultCampaign = null;
                 _readiness.Reset();
                 _validationTick = 0;
                 LastFailure = "candidate-awaiting-deferred-readiness";
@@ -93,13 +95,26 @@ namespace KingmakerBuffPlanner.UI
         }
 
         // A result that arrives while the screen is closed (an accepted run
-        // closes it) is shown the next time the screen opens.
+        // closes it) is shown the next time the screen opens - for the same
+        // campaign only, and dropped on an area change or a mode switch
+        // (focused re-review).
         private QuickExecutionResult _unshownResult;
+        private string _unshownResultCampaign;
 
-        internal void Present(QuickExecutionResult result)
+        internal void Present(QuickExecutionResult result, string campaignId)
         {
             if (_view != null) _view.ShowResult(result);
-            else _unshownResult = result;
+            else
+            {
+                _unshownResult = result;
+                _unshownResultCampaign = campaignId;
+            }
+        }
+
+        internal void DiscardUnshownResult()
+        {
+            _unshownResult = null;
+            _unshownResultCampaign = null;
         }
 
         internal void Tick()
