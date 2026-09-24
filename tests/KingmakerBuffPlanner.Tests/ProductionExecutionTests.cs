@@ -4373,6 +4373,9 @@ namespace KingmakerBuffPlanner.Tests
             internal bool LeaveToggleOn;
             internal bool HideEnhancementAfterPlain;
             internal bool OmitPowerfulChange;
+            internal bool PlainSpendsReservoir;
+            internal bool AlterPlainAfterEnhanced;
+            internal bool UnreadModifiers;
             internal string[] Whitelist = { "strength-spell" };
             internal int AnimatedFrames = 3;
             internal long Now;
@@ -4423,7 +4426,14 @@ namespace KingmakerBuffPlanner.Tests
                     new[] { "Strength/Enhancement/" + bonus });
                 Remaining--;
                 if (enhanced) Reservoir -= ReservoirSpend;
+                else if (PlainSpendsReservoir) Reservoir--;
                 if (enhanced && LeaveToggleOn) Toggles[Toggle] = true;
+                if (enhanced && AlterPlainAfterEnhanced)
+                {
+                    Tuple<string, long, string[]> plain = Active["unit-t1|strength-buff"];
+                    Active["unit-t1|strength-buff"] = Tuple.Create(plain.Item1, plain.Item2,
+                        new[] { "Strength/Enhancement/5" });
+                }
             }
 
             public bool EffectsObserved(CastStep step)
@@ -4441,7 +4451,7 @@ namespace KingmakerBuffPlanner.Tests
                 Tuple<string, long, string[]> instance;
                 if (Active.TryGetValue(unit + "|strength-buff", out instance))
                     instances.Add(new ProbeEffectInstance("strength-buff", instance.Item1, instance.Item2,
-                        instance.Item3));
+                        UnreadModifiers ? null : instance.Item3));
                 return ProbeObservation.Read(label, ++_sequence, DateTime.UtcNow, unit, Remaining, instances, null);
             }
 
@@ -4668,28 +4678,39 @@ namespace KingmakerBuffPlanner.Tests
                                 string.Join(",", enhanced.Observations.ToArray())));
             }
             // The enhanced cast must raise exactly the enhancement's modifier,
-            // spend exactly its units and leave every toggle as it was.
-            var shapes = new List<KeyValuePair<Action<EnhancedBuffWorld>, string>>
+            // spend exactly its units, leave every toggle as it was and the
+            // plain recipient's modifiers alone; the plain cast must spend
+            // nothing of the enhancement's resource; unread modifiers never
+            // pass. Each wrong step stops the run where it happens.
+            string[] both = { "qual-cast-1", "qual-cast-2" };
+            string[] first = { "qual-cast-1" };
+            var shapes = new List<Tuple<Action<EnhancedBuffWorld>, string, string[]>>
             {
-                new KeyValuePair<Action<EnhancedBuffWorld>, string>(value => value.IgnoreEnhancement = true,
-                    "modifiers:qual-cast-2:Strength/Enhancement/4!=Strength/Enhancement/6"),
-                new KeyValuePair<Action<EnhancedBuffWorld>, string>(value => value.ReservoirSpend = 2,
-                    "enhancement-resource:4>2:expected-spend=1"),
-                new KeyValuePair<Action<EnhancedBuffWorld>, string>(value => value.LeaveToggleOn = true,
-                    "cleanup:activatables-changed:" + EnhancedBuffWorld.Toggle)
+                Tuple.Create<Action<EnhancedBuffWorld>, string, string[]>(value => value.IgnoreEnhancement = true,
+                    "enhanced-wait:step:modifiers:qual-cast-2:Strength/Enhancement/4!=Strength/Enhancement/6", both),
+                Tuple.Create<Action<EnhancedBuffWorld>, string, string[]>(value => value.ReservoirSpend = 2,
+                    "enhanced-wait:step:enhancement-resource:4>2:expected-spend=1", both),
+                Tuple.Create<Action<EnhancedBuffWorld>, string, string[]>(value => value.LeaveToggleOn = true,
+                    "enhanced-wait:step:cleanup:activatables-changed:" + EnhancedBuffWorld.Toggle, both),
+                Tuple.Create<Action<EnhancedBuffWorld>, string, string[]>(value => value.AlterPlainAfterEnhanced = true,
+                    "enhanced-wait:step:modifiers:qual-cast-1:changed:Strength/Enhancement/5", both),
+                Tuple.Create<Action<EnhancedBuffWorld>, string, string[]>(value => value.PlainSpendsReservoir = true,
+                    "plain-wait:step:enhancement-resource:4>3:expected-spend=0", first),
+                Tuple.Create<Action<EnhancedBuffWorld>, string, string[]>(value => value.UnreadModifiers = true,
+                    "plain-wait:step:modifiers:qual-cast-1:unread", first)
             };
             int shapeIndex = 0;
-            foreach (KeyValuePair<Action<EnhancedBuffWorld>, string> shape in shapes)
+            foreach (Tuple<Action<EnhancedBuffWorld>, string, string[]> shape in shapes)
             {
                 var bad = new EnhancedBuffWorld();
-                shape.Key(bad);
+                shape.Item1(bad);
                 CastingQualificationRecord record = RunEnhanced(Path.Combine(root, "qe-bad" + (shapeIndex++)), bad,
                     "instant");
-                if (record.TerminalReason == "completed" ||
-                    !record.Failures.Contains("enhanced-wait:step:" + shape.Value) ||
-                    !bad.Fired.SequenceEqual(new[] { "qual-cast-1", "qual-cast-2" }))
-                    throw new InvalidOperationException("A wrong enhanced cast was not refused as " + shape.Value +
-                        ": " + record.TerminalReason + "|" + string.Join("|", record.Violations().ToArray()));
+                if (record.TerminalReason == "completed" || !record.Failures.Contains(shape.Item2) ||
+                    !bad.Fired.SequenceEqual(shape.Item3))
+                    throw new InvalidOperationException("A wrong enhanced cast was not refused as " + shape.Item2 +
+                        ": " + record.TerminalReason + "|" + string.Join("|", record.Failures.ToArray()) +
+                        "|fired=" + string.Join(",", bad.Fired.ToArray()));
             }
             // The enhancement is chosen only through the workspace's option:
             // withdrawn after the plain step, nothing more is cast.
