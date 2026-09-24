@@ -4925,6 +4925,12 @@ namespace KingmakerBuffPlanner.Tests
             // the exhausted Apply is refused for another reason (the caster
             // can no longer cast it).
             internal bool CasterLeavesBeforeExhausted;
+            // The Mutagen reaches every member (a recipient other than the
+            // caster is then preferred).
+            internal bool MutagenReachesAll;
+            // The game's own count shows a use again at the exhausted step
+            // while the planner's pool is empty.
+            internal bool NativeCountDisagrees;
             private int _inputsAfterUse;
             internal int AnimatedFrames = 3;
             internal long Now;
@@ -4986,7 +4992,8 @@ namespace KingmakerBuffPlanner.Tests
                 KeyValuePair<string, long> instance;
                 if (Active.TryGetValue(unit + "|mutagen-buff", out instance))
                     instances.Add(new ProbeEffectInstance("mutagen-buff", instance.Key, instance.Value));
-                return ProbeObservation.Read(label, ++_sequence, DateTime.UtcNow, unit, MutagenUses, instances, null);
+                int available = NativeCountDisagrees && _inputsAfterUse >= 3 ? MutagenUses + 1 : MutagenUses;
+                return ProbeObservation.Read(label, ++_sequence, DateTime.UtcNow, unit, available, instances, null);
             }
 
             internal ActiveEffectSnapshot Live()
@@ -5035,7 +5042,8 @@ namespace KingmakerBuffPlanner.Tests
                 List<string> everyone = Units.ToList();
                 var options = new List<ProviderPlanningOption>
                 {
-                    new ProviderPlanningOption(mutagen, new[] { "unit-alchemist" }, new[] { "unit-alchemist" }, 9, 900,
+                    new ProviderPlanningOption(mutagen, MutagenReachesAll ? everyone : new List<string> { "unit-alchemist" },
+                        new[] { "unit-alchemist" }, 9, 900,
                         CastExecutionStrategy.DirectRuleCast, "fixture-mutagen",
                         new Dictionary<string, IEnumerable<string>>(StringComparer.Ordinal)),
                     new ProviderPlanningOption(domain, everyone, new[] { "unit-cleric" }, 9, 90,
@@ -5159,6 +5167,18 @@ namespace KingmakerBuffPlanner.Tests
             CastingQualificationRecord freeRecord = RunAbilityPool(Path.Combine(root, "qa-free"), free, "instant");
             var refill = new AbilityPoolWorld { RefillAfterUse = true };
             CastingQualificationRecord refillRecord = RunAbilityPool(Path.Combine(root, "qa-refill"), refill, "instant");
+            CastingQualificationSelection toAlly = CastingQualificationRecipe.SelectAbilityPool(
+                new AbilityPoolWorld { MutagenReachesAll = true }.Inputs(), "fixture-campaign");
+            if (!toAlly.Selected || toAlly.Castings[0].DirectTargetUnitId == "unit-alchemist" ||
+                toAlly.Coverage.Last() != "ally")
+                throw new InvalidOperationException("An ability that reaches others was not aimed at another member: " +
+                    (toAlly.Selected ? toAlly.Castings[0].DirectTargetUnitId : toAlly.Refusal));
+            var disagrees = new AbilityPoolWorld { NativeCountDisagrees = true };
+            CastingQualificationRecord disagreeRecord = RunAbilityPool(Path.Combine(root, "qa-count"), disagrees, "instant");
+            if (disagreeRecord.TerminalReason == "completed" || !disagreeRecord.Failures.Any(value =>
+                    value.StartsWith("exhausted:step:resource:qual-cast-1:", StringComparison.Ordinal)))
+                throw new InvalidOperationException("An exhausted step whose native count disagreed passed: " +
+                    disagreeRecord.TerminalReason + "|" + string.Join("|", disagreeRecord.Failures.ToArray()));
             var gone = new AbilityPoolWorld { CasterLeavesBeforeExhausted = true };
             CastingQualificationRecord goneRecord = RunAbilityPool(Path.Combine(root, "qa-gone"), gone, "instant");
             if (goneRecord.TerminalReason == "completed" || !goneRecord.Failures.Any(value =>
