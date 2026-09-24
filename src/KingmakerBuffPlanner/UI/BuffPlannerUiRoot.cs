@@ -1880,6 +1880,10 @@ namespace KingmakerBuffPlanner.UI
             // An area change (including loading another save) ends a running
             // routine through its owned terminal; new runs remain possible.
             if (_castingHost != null) _castingHost.Cancel("area-unloading");
+            // Last review: a result kept from before is dropped (another save
+            // of the same playthrough shares its campaign); the interruption
+            // of a running routine, reported next, is kept.
+            if (_screen != null) _screen.DiscardUnshownResult();
             EndClassicRun("area-unloading");
             ReleasePlayerUi();
         }

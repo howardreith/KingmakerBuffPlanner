@@ -32,6 +32,7 @@ if ([string]::IsNullOrWhiteSpace($ReviewedBy) -or [string]::IsNullOrWhiteSpace($
 }
 $violation = Read-KbpJson $recordPath
 $violationRun = if ($null -ne $violation.PSObject.Properties['runId']) { [string]$violation.runId } else { '' }
+$violationBlocking = if ($null -ne $violation.PSObject.Properties['blocking']) { @($violation.blocking) } else { @('unknown') }
 if ($violationRun -cne $RunId) {
     throw "The violation record for $RunId is malformed (it names run '$violationRun'); inspect and resolve it by hand."
 }
@@ -50,17 +51,17 @@ if (Test-Path -LiteralPath $acknowledgementPath) {
         [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssZ') + '.json')
 }
 if (-not $PSCmdlet.ShouldProcess($RunId, 'acknowledge the reviewed protected-save violation (' +
-        (@($violation.blocking) -join ', ') + ')')) { return }
+        ($violationBlocking -join ', ') + ')')) { return }
 if ($production) {
     if ([Console]::IsInputRedirected) {
         throw 'The acknowledgement is typed by the owner at the keyboard; redirected input is refused.'
     }
     $typed = Read-Host ('Type the run id ' + $RunId + ' to confirm you reviewed what changed (' +
-        (@($violation.blocking) -join ', ') + ')')
+        ($violationBlocking -join ', ') + ')')
     if ([string]$typed -cne $RunId) { throw 'The typed run id does not match; nothing was acknowledged.' }
 }
 $body = [ordered]@{
-    schemaVersion = 1; runId = $RunId; blocking = @($violation.blocking)
+    schemaVersion = 1; runId = $RunId; blocking = $violationBlocking
     violationRecordSha256 = $recordSha256
     reviewedBy = $ReviewedBy; note = $Note; acknowledgedAtUtc = [DateTime]::UtcNow.ToString('o')
 }

@@ -1316,6 +1316,28 @@ namespace KingmakerBuffPlanner.Tests
                 new CastingWorkspaceSession(mergeDir, "workspace-campaign").OutOfCombatOnly != chosenOutOfCombat)
                 throw new InvalidOperationException("Castings added while the classic import was blocked were not kept: " +
                     string.Join(",", merged.ToArray()) + "|" + blocked.LastReloadNote);
+            // Last review: when the player changed no setting in the session,
+            // the classic plan's own settings are imported with the merge.
+            string keepDir = Path.Combine(root, "reload-merge-settings");
+            Directory.CreateDirectory(keepDir);
+            var keepClassic = new ProfileRepository(keepDir);
+            string keepPath = keepClassic.GetProfilePath("workspace-campaign");
+            Directory.CreateDirectory(Path.GetDirectoryName(keepPath));
+            File.WriteAllText(keepPath, "{ not json");
+            var untouched = new CastingWorkspaceSession(keepDir, "workspace-campaign", new DisabledCastingDispatchBoundary(),
+                PerTarget("source-bulls"));
+            Assert(AddDraftCasting(untouched, inputs, "unit-wizard", "unit-t2").Applied);
+            File.Delete(keepPath);
+            BuffPlannerProfile instantLegacy = BuffPlannerProfile.CreateDefault("workspace-campaign");
+            instantLegacy.Execution.Mode = "instant";
+            instantLegacy.Routines[0].Assignments.Add(LegacyAssignment("source-bulls", CastingBuffAbility,
+                PinnedChild("legacy-bulls", 0, "unit-cleric", "unit-t1")));
+            keepClassic.Save(instantLegacy);
+            untouched.Reload();
+            if (untouched.LastReloadNote != "imported-into-unsaved" || untouched.ExecutionMode != "instant" ||
+                new CastingWorkspaceSession(keepDir, "workspace-campaign").ExecutionMode != "instant")
+                throw new InvalidOperationException("The classic plan's settings were dropped by a merge the player did not change: " +
+                    untouched.ExecutionMode);
         }
 
         // Focused re-review: the close is decided once, at the press, for an
@@ -1694,6 +1716,22 @@ namespace KingmakerBuffPlanner.Tests
                         .Load("legacy-campaign").Profile.ToDocument().Castings.Single().SourceId != "source-bulls")
                     throw new InvalidOperationException("A plan in memory not read from the file's bytes was imported.");
             }
+            // Last review: the bytes are decoded exactly like File.ReadAllText
+            // (with and without a byte-order mark), and the hash is theirs.
+            string bomDir = Path.Combine(root, "import-bom");
+            Directory.CreateDirectory(bomDir);
+            var bomRepository = new ProfileRepository(bomDir);
+            bomRepository.Save(onDisk);
+            string bomPath = bomRepository.GetProfilePath("legacy-campaign");
+            byte[] plain = File.ReadAllBytes(bomPath);
+            byte[] withBom = new byte[] { 0xEF, 0xBB, 0xBF }.Concat(plain).ToArray();
+            File.WriteAllBytes(bomPath, withBom);
+            ProfileLoadResult bomLoad = bomRepository.Load("legacy-campaign");
+            if (ProfileRepository.DecodeFileText(withBom) != File.ReadAllText(bomPath) ||
+                ProfileRepository.DecodeFileText(plain) != System.Text.Encoding.UTF8.GetString(plain) ||
+                bomLoad.RecoveredFromBackup || bomLoad.PrimarySha256 != KingmakerBuffPlanner.Infrastructure.Hashing.Sha256(bomPath) ||
+                bomLoad.Profile.Routines[0].Assignments.Count != 1)
+                throw new InvalidOperationException("A Classic file with a byte-order mark was read or hashed differently.");
             // The Classic load says which bytes it read: the main file's hash,
             // or none for a backup or a new default.
             ProfileLoadResult primaryLoad = repository.Load("legacy-campaign");
@@ -5416,7 +5454,9 @@ namespace KingmakerBuffPlanner.Tests
                 !rootSource.Contains("        private void ReleasePlayerUi()\n        {\n            _closeScreenForClassicRun = false;") ||
                 !rootSource.Contains("                if (_closeScreenForClassicRun)\n                {\n                    _closeScreenForClassicRun = false;") ||
                 !rootSource.Contains("if (_screen != null && !CastingFirstActive)\n                _screen.Present(result,") ||
-                System.Text.RegularExpressions.Regex.Matches(rootSource, "_screen.DiscardUnshownResult\\(\\);").Count != 1 ||
+                System.Text.RegularExpressions.Regex.Matches(rootSource, "_screen.DiscardUnshownResult\\(\\);").Count != 2 ||
+                !rootSource.Contains("if (_screen != null) _screen.DiscardUnshownResult();\n            EndClassicRun(\"area-unloading\");") ||
+                !sessionSource.Contains("\" casts were confirmed; a cast in progress, if any, was cleaned up, and nothing after it was attempted.\"") ||
                 !controllerSource.Contains("                _unshownResult = result;\n                _unshownResultCampaign = campaignId;") ||
                 !controllerSource.Contains("ClassicRunScreenPolicy.ShowStashedResult(_unshownResultCampaign,") ||
                 !controllerSource.Contains("                    _view.ShowResult(_unshownResult);") ||

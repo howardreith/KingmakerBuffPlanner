@@ -601,16 +601,23 @@ function Assert-KbpNoUnacknowledgedSaveViolation {
     if (-not (Test-Path -LiteralPath $folder -PathType Container)) { return }
     foreach ($record in @(Get-ChildItem -LiteralPath $folder -Filter '*.json' -File | Sort-Object Name)) {
         # Focused re-review: a record or acknowledgement missing a field
-        # still blocks, with the record's own name in the message.
-        $violation = Read-KbpJson $record.FullName
+        # still blocks, with the record's own name in the message; last
+        # review: so does one that cannot be read at all.
+        try { $violation = Read-KbpJson $record.FullName }
+        catch {
+            throw ("The protected-save violation record $($record.Name) cannot be read. No run starts until the " +
+                "owner has inspected and resolved it by hand.")
+        }
         $recordRun = if ($null -ne $violation.PSObject.Properties['runId']) { [string]$violation.runId } else { '' }
         $blocking = if ($null -ne $violation.PSObject.Properties['blocking']) { @($violation.blocking) -join ', ' } else { 'unknown' }
         $acknowledgement = Join-Path (Join-Path $folder 'acknowledged') ($record.BaseName + '.json')
         $acknowledged = $false
         if ($recordRun -ceq $record.BaseName -and (Test-Path -LiteralPath $acknowledgement -PathType Leaf)) {
-            $ack = Read-KbpJson $acknowledgement
-            $ackRun = if ($null -ne $ack.PSObject.Properties['runId']) { [string]$ack.runId } else { '' }
-            $ackSha = if ($null -ne $ack.PSObject.Properties['violationRecordSha256']) { [string]$ack.violationRecordSha256 } else { '' }
+            $ack = $null
+            try { $ack = Read-KbpJson $acknowledgement } catch { }
+            $ackRun = if ($null -ne $ack -and $null -ne $ack.PSObject.Properties['runId']) { [string]$ack.runId } else { '' }
+            $ackSha = if ($null -ne $ack -and $null -ne $ack.PSObject.Properties['violationRecordSha256']) {
+                [string]$ack.violationRecordSha256 } else { '' }
             $acknowledged = $ackRun -ceq $recordRun -and $ackSha -ceq (Get-KbpSha256 $record.FullName)
         }
         if ($recordRun -cne $record.BaseName) {

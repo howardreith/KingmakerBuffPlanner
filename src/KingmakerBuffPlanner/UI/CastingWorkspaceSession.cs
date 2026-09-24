@@ -260,8 +260,14 @@ namespace KingmakerBuffPlanner.UI
         // review then simply requires a fresh acceptance.
         public string ReviewStoreWarning { get; private set; }
 
+        // Last review: whether the player changed the execution settings in
+        // this session since they were last read from a plan (a merge into
+        // castings added in the session writes them only then).
+        private bool _executionSettingsChosen;
+
         private void AdoptSettings(CastingPlanProfile profile)
         {
+            _executionSettingsChosen = false;
             _uiSettings = profile == null || profile.Ui == null
                 ? UiProfile.Default()
                 : new UiProfile { Scale = profile.Ui.Scale, Hotkey = profile.Ui.Hotkey };
@@ -310,6 +316,7 @@ namespace KingmakerBuffPlanner.UI
             ExecutionProfile next = CopyOf(_executionSettings);
             next.OutOfCombatOnly = value;
             _executionSettings = next;
+            _executionSettingsChosen = true;
         }
 
         // "animated" (native casting animations, the default) or "instant".
@@ -320,6 +327,7 @@ namespace KingmakerBuffPlanner.UI
             ExecutionProfile next = CopyOf(_executionSettings);
             next.Mode = mode;
             _executionSettings = next;
+            _executionSettingsChosen = true;
         }
 
         public void SetAllowAnimatedFallback(bool allow)
@@ -327,6 +335,7 @@ namespace KingmakerBuffPlanner.UI
             ExecutionProfile next = CopyOf(_executionSettings);
             next.AllowAnimatedFallback = allow;
             _executionSettings = next;
+            _executionSettingsChosen = true;
         }
 
         public string CampaignId { get; private set; }
@@ -531,8 +540,8 @@ namespace KingmakerBuffPlanner.UI
                 IDictionary<string, CastGroupingKind> effectiveGroupings =
                     inMemory != null && inMemory.Groupings != null ? inMemory.Groupings : groupings;
                 CastingMigrationResult migration = new CastingPlanMigrationService(modPath)
-                    .Migrate(campaignId, effectiveGroupings, inMemory, unsaved,
-                        unsaved == null ? null : _uiSettings, unsaved == null ? null : _executionSettings);
+                    .Migrate(campaignId, effectiveGroupings, inMemory, unsaved, null,
+                        unsaved == null || !_executionSettingsChosen ? null : _executionSettings);
                 MigrationStatus = migration.Status;
                 MigrationWarning = migration.Warning;
                 switch (migration.Status)

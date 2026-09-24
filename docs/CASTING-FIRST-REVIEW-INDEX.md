@@ -26,6 +26,22 @@ after a close and reopen, each exactly as forecast). Finite-resource
 qualification waits for an owner-designated advanced seed. Human usability and the native aesthetic
 pass remain open.
 
+## Findings from the last review of the targeted fixes (2026-09-24)
+
+A final independent read-only review of `b783f60..1688af2` found no high
+severity problem; its findings were fixed in the commit after `1688af2`:
+a merge into castings added in the session writes the session's
+execution settings only when the player changed them there (otherwise the
+classic plan's own settings are imported); closing an impossible
+comparison tries it once more after the game is known to be closed; the
+archive holds exactly the bytes parsed; a result kept from before an area
+change is dropped while the interruption it reports is kept; an
+interrupted run reports how many of its casts were confirmed; unreadable
+violation records and acknowledgements, a record without its blocking
+list and a lost lock are named for the owner. The Classic planner's
+groupings are used with its plan at import time whether or not the plan
+itself is used: they describe the party's sources, not the plan's bytes.
+
 ## Findings from the targeted review of the focused fixes (2026-09-24)
 
 One more independent read-only review of `f47f527..b783f60`. Fixed in the

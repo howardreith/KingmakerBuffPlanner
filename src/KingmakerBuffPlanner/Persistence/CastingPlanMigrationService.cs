@@ -102,10 +102,12 @@ namespace KingmakerBuffPlanner.Persistence
                     string.Empty, string.Empty, string.Empty);
             string legacyBytes;
             string legacyHash;
+            byte[] legacyRaw;
             try
             {
-                // Focused re-review: the hash is of the very bytes parsed.
-                byte[] legacyRaw = File.ReadAllBytes(legacyPath);
+                // Focused re-review: the hash is of the very bytes parsed, and
+                // they are the bytes archived.
+                legacyRaw = File.ReadAllBytes(legacyPath);
                 legacyBytes = ProfileRepository.DecodeFileText(legacyRaw);
                 legacyHash = Hashing.Sha256Bytes(legacyRaw);
             }
@@ -161,7 +163,7 @@ namespace KingmakerBuffPlanner.Persistence
                 existingDocument = unsavedDocument;
             CastingImportResult imported = _importer.Import(
                 legacy, existingDocument, groupingsBySourceId);
-            string archivePath = ArchiveBoundaryOriginal(legacyPath, legacyBytes);
+            string archivePath = ArchiveBoundaryOriginal(legacyPath, legacyRaw, legacyHash);
             // Write the candidate, reopen it, and revalidate before the
             // migration is reported complete; the legacy bytes are never
             // touched by any failure here.
@@ -207,15 +209,14 @@ namespace KingmakerBuffPlanner.Persistence
         // bytes — a BOM or non-UTF-8 encoding survives — and is keyed by the
         // same file hash the migration reports.
         private static string ArchiveBoundaryOriginal(
-            string legacyPath, string legacyBytes)
+            string legacyPath, byte[] legacyRaw, string hash)
         {
             string directory = Path.GetDirectoryName(legacyPath);
-            string hash = Hashing.Sha256(legacyPath);
             string archive = Path.Combine(directory,
                 "kbp-casting-" + (hash.Length <= 24 ? hash : hash.Substring(0, 24)) + ".orig");
             if (File.Exists(archive)) return archive;
             Directory.CreateDirectory(directory);
-            AtomicFile.WriteBytes(archive, File.ReadAllBytes(legacyPath));
+            AtomicFile.WriteBytes(archive, legacyRaw);
             return archive;
         }
 
