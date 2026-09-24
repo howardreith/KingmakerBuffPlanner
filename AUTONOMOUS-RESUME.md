@@ -72,6 +72,29 @@ Worklist (updated as slices land; 2026-09-24 status in brackets):
    identical package `8a835fa6…`.]
 9. Independent reviews, rc3, full gate, native qualification on rc3,
    receipt, PR handoff.
+   [Review round (A source/budgets/execution, B UI/lifecycle/persistence,
+   C harness) findings fixed, 2026-09-24:
+   - `6cc75d9` Classic safety: halting runner, owned terminal, grant disarm.
+   - `275fa59` harness: registry snapshot, lease-aware restore, entry gaps.
+   - `ce3311a` persistence: invalid primaries kept, refusals shown.
+   - `b3ab18d` physical scenario: physical open, focus, real selection change.
+   - `b3723c6` source resolution (A2 reservation-driven cantrip route, A3
+     pool-bound facts, A4 ambiguous cantrips unresolved, A7 unread counts
+     uncertain, A10 cheap filter).
+   - `b03e16f` held disable through the mod toggle path, real lifecycle
+     probe (B7); instant disable labeled disable-before-start (B3).
+   - `ec52531` allowance binding: profile, identity, WORKING save, purpose
+     (Classic schema 2, qualification schema 5) (C5).
+   - `953c511` launcher reads Classic and physical evidence itself (C6).
+   Mutants: 32 C# (one survivor, fixed by `09b349d`) and 12 PowerShell,
+   all killed. Full gates PASS at `ec52531` and `953c511` (protocol 311,
+   harness 36, launcher 12, deploy 5, restore 16). A focused re-review of
+   these fixes is running before rc3. Allowances are now written by the
+   in-repo `scripts/New-KbpRunAllowance.ps1` (Classic schema 2,
+   qualification schema 5), bound from the frozen build record and the
+   selection run's evidence (profile, identity and WORKING save from its
+   `run-completion.json`), exclusive creation; its output is tested
+   against the launcher's own checks.]
 
 Shared installation (2026-09-24): the owner's Gunslinger lab runs the same
 game. Its runs are serialized with ours by its lease file and our

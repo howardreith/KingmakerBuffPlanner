@@ -515,6 +515,109 @@ if ($passAt -lt 0 -or $outcomeAt -lt $passAt -or
     -not $hostSource.Contains('{ "grantAttempts", record.GrantAttempts },')) {
     throw 'The launcher does not read the scenario evidence itself after a PASS.'
 }
+# The allowance writer (review C5): what it writes from recorded selection
+# evidence is exactly what the launcher's own checks accept, bound to the
+# selection run's profile, identity and WORKING save; it never overwrites,
+# never reuses a run id and refuses unclean or mismatched evidence.
+$writerRoot = Join-Path $env:TEMP ('kbp-writer-' + [Guid]::NewGuid().ToString('N'))
+$writerScript = Join-Path $PSScriptRoot 'New-KbpRunAllowance.ps1'
+try {
+    $writerHead = (& git -C (Join-Path $PSScriptRoot '..') rev-parse HEAD).Trim()
+    $writerApprovals = Join-Path $writerRoot 'approvals'
+    $writerEvidence = Join-Path $writerRoot 'evidence'
+    $writerBackups = Join-Path $writerRoot 'backups'
+    foreach ($directory in @($writerApprovals, $writerEvidence, (Join-Path $writerBackups "rc-frozen\$writerHead"))) {
+        New-Item -ItemType Directory -Path $directory -Force | Out-Null
+    }
+    $writerFreeze = [ordered]@{ schemaVersion = 1; commit = $writerHead; packageSha256 = ('a' * 64); dllSha256 = ('b' * 64)
+        assemblyMvid = '11111111-2222-3333-4444-555555555555'; version = '0.0.0-test' }
+    Write-KbpJsonAtomic (Join-Path $writerBackups "rc-frozen\$writerHead\FREEZE.json") $writerFreeze
+    $writerManifest = [pscustomobject]@{ commit = $writerHead; packageSha256 = ('a' * 64); dllSha256 = ('b' * 64)
+        assemblyMvid = '11111111-2222-3333-4444-555555555555' }
+    function New-WriterSelection([string]$Name, [string]$Scenario, [string]$Mode, [hashtable]$Files, [string]$Status = 'PASS') {
+        $directory = Join-Path $writerEvidence $Name
+        New-Item -ItemType Directory -Path $directory | Out-Null
+        Write-KbpJsonAtomic (Join-Path $directory 'runtime-result.json') ([ordered]@{ status = $Status })
+        Write-KbpJsonAtomic (Join-Path $directory 'runtime-request.json') ([ordered]@{
+            scenario = $Scenario; expectedCommit = $writerHead; expectedPackageSha256 = ('a' * 64)
+            expectedDllSha256 = ('b' * 64); profileId = 'full-user'
+            parameters = [ordered]@{ expectedGameId = 'game'; workingSha256 = ('9' * 64); executionMode = $Mode } })
+        Write-KbpJsonAtomic (Join-Path $directory 'run-completion.json') ([ordered]@{
+            complete = $true; profileId = 'full-user'; compatibilityIdentity = ('e' * 64)
+            fixture = [ordered]@{ workingSha256 = ('9' * 64); gameId = 'game' } })
+        foreach ($file in $Files.Keys) { Write-KbpJsonAtomic (Join-Path $directory $file) $Files[$file] }
+    }
+    $forecastIds = @(('1' * 64), ('2' * 64), ('3' * 64), ('3' * 64), ('3' * 64))
+    New-WriterSelection 'qual-select' 'live-cast-qual-select' 'instant' @{ 'qual-outcome.json' = [ordered]@{
+        castingScenario = $false; violations = @()
+        selection = [ordered]@{ selected = $true; recipe = 'zero-cost-mixed'; castings = @('qual-cast-1', 'qual-cast-2', 'qual-cast-3') }
+        forecast = @(
+            [ordered]@{ name = 'stop'; projectionId = $forecastIds[0]; castingIds = @('qual-cast-1', 'qual-cast-2', 'qual-cast-3') },
+            [ordered]@{ name = 'complete'; projectionId = $forecastIds[1]; castingIds = @('qual-cast-2', 'qual-cast-3') },
+            [ordered]@{ name = 'recast'; projectionId = $forecastIds[2]; castingIds = @('qual-cast-1') },
+            [ordered]@{ name = 'disable'; projectionId = $forecastIds[3]; castingIds = @('qual-cast-1') },
+            [ordered]@{ name = 'recover'; projectionId = $forecastIds[4]; castingIds = @('qual-cast-1') }) } }
+    $classicPlan = [ordered]@{ executionMode = 'animated'; planDigest = ('d' * 64)
+        steps = @([ordered]@{ index = 0; provider = 'p'; targets = @('t'); pool = 'x|unlimited'; unlimited = $true }) }
+    $classicSelection = [ordered]@{ castingScenario = $false; planDigest = ('d' * 64); planSteps = 1; violations = @() }
+    New-WriterSelection 'classic-select' 'live-classic-select' 'animated' @{
+        'classic-plan.json' = $classicPlan; 'classic-outcome.json' = $classicSelection }
+    New-WriterSelection 'classic-failed' 'live-classic-select' 'animated' @{
+        'classic-plan.json' = $classicPlan; 'classic-outcome.json' = $classicSelection } 'FAIL'
+    $writerCommon = @{ ExpectedCommit = $writerHead; FreezeKind = 'rc-frozen'; ApprovedBy = 'Howie'
+        Authority = 'writer test'; ApprovalsRoot = $writerApprovals; EvidenceRoot = $writerEvidence; BackupRoot = $writerBackups }
+    $qualPath = & $writerScript -Kind qualification -RunId 'qual-run' -SelectionRunId 'qual-select' -ExecutionMode animated @writerCommon |
+        Select-Object -Last 1
+    $qualJson = [IO.File]::ReadAllText($qualPath)
+    $qualWritten = $qualJson | ConvertFrom-Json
+    if ($null -ne (Get-KbpQualificationAllowanceBuildRefusal -AllowanceJson $qualJson -RunId 'qual-run' `
+            -BuildManifest $writerManifest -Recipe 'zero-cost-mixed' -ExecutionMode 'animated') -or
+        $null -ne (Get-KbpAllowanceFixtureBindingRefusal -AllowanceJson $qualJson -ProfileId 'full-user' `
+            -CompatibilityIdentity ('e' * 64) -WorkingSaveSha256 ('9' * 64)) -or
+        [int]$qualWritten.maximumNativeSubmissions -ne 8 -or
+        ((@($qualWritten.approvedProjectionIds) -join ',') -cne ($forecastIds -join ',')) -or
+        -not (Test-Path -LiteralPath (Join-Path $writerApprovals 'qual-run.authorization.md') -PathType Leaf)) {
+        throw 'The written qualification allowance is not what the launcher accepts.'
+    }
+    $classicPath = & $writerScript -Kind classic -RunId 'classic-run' -SelectionRunId 'classic-select' -ExecutionMode animated @writerCommon |
+        Select-Object -Last 1
+    $classicJson = [IO.File]::ReadAllText($classicPath)
+    if ($null -ne (Get-KbpClassicAllowanceBuildRefusal -AllowanceJson $classicJson -RunId 'classic-run' `
+            -BuildManifest $writerManifest -ExecutionMode 'animated') -or
+        $null -ne (Get-KbpAllowanceFixtureBindingRefusal -AllowanceJson $classicJson -ProfileId 'full-user' `
+            -CompatibilityIdentity ('e' * 64) -WorkingSaveSha256 ('9' * 64)) -or
+        [string]($classicJson | ConvertFrom-Json).approvedPlanDigest -cne ('d' * 64)) {
+        throw 'The written Classic allowance is not what the launcher accepts.'
+    }
+    $classicBytes = [IO.File]::ReadAllBytes($classicPath)
+    $writerRefusals = [ordered]@{
+        'existing-allowance' = @{ Kind = 'classic'; RunId = 'classic-run'; SelectionRunId = 'classic-select'; ExecutionMode = 'animated' }
+        'failed-selection' = @{ Kind = 'classic'; RunId = 'classic-run-2'; SelectionRunId = 'classic-failed'; ExecutionMode = 'animated' }
+        'other-mode' = @{ Kind = 'classic'; RunId = 'classic-run-3'; SelectionRunId = 'classic-select'; ExecutionMode = 'instant' }
+        'other-kind-evidence' = @{ Kind = 'qualification'; RunId = 'qual-run-2'; SelectionRunId = 'classic-select'; ExecutionMode = 'animated' }
+        'reused-run-id' = @{ Kind = 'classic'; RunId = 'classic-select'; SelectionRunId = 'classic-select'; ExecutionMode = 'animated' }
+    }
+    foreach ($case in $writerRefusals.Keys) {
+        $arguments = $writerRefusals[$case]
+        $refused = $false
+        try { & $writerScript @arguments @writerCommon | Out-Null }
+        catch { $refused = $true }
+        if (-not $refused) { throw "The allowance writer accepted case $case." }
+        if ($case -cne 'existing-allowance' -and
+            (Test-Path -LiteralPath (Join-Path $writerApprovals ($arguments.RunId + '.json')))) {
+            throw "The allowance writer left an allowance for refused case $case."
+        }
+    }
+    $otherCommon = @{} + $writerCommon
+    $otherCommon.ExpectedCommit = ('0' * 40)
+    $refused = $false
+    try { & $writerScript -Kind classic -RunId 'classic-run-4' -SelectionRunId 'classic-select' -ExecutionMode animated @otherCommon | Out-Null }
+    catch { $refused = $true }
+    if (-not $refused -or -not [Linq.Enumerable]::SequenceEqual([byte[]]$classicBytes, [byte[]][IO.File]::ReadAllBytes($classicPath))) {
+        throw 'The allowance writer accepted another commit or changed an existing allowance.'
+    }
+}
+finally { Remove-Item -LiteralPath $writerRoot -Recurse -Force -ErrorAction SilentlyContinue }
 # Display modes: a window larger than the session's display is refused; the
 # Unity arguments name exactly the size; the owner's settings add none.
 if (-not (Test-KbpDisplayModeSupported -Size '1920x1080' -DisplaySize '1920x1200') -or
