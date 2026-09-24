@@ -13,7 +13,8 @@ namespace KingmakerBuffPlanner.Execution
     // units and pets, every resource pool, every provider option (source,
     // caster, spellbook, level, pool and remaining count, reserved tokens,
     // caster level, duration, execution strategy, reachable targets, legal
-    // anchors and anchor coverage, effect shape) and every enhancement.
+    // anchors and anchor coverage, effect shape and the exact effect ids it
+    // applies) and every enhancement.
     // Nothing is cast, spent or changed.
     public static class CastingCapabilityInventory
     {
@@ -68,7 +69,7 @@ namespace KingmakerBuffPlanner.Execution
                     ";cl=" + provider.EffectiveCasterLevel + ";rounds=" + provider.ExpectedDurationRounds +
                     ";strategy=" + option.ExecutionStrategy + ";targets=" + option.ReachableTargetIds.Count +
                     ";anchors=" + option.LegalAnchorIds.Count + ";widestAnchorCoverage=" + widest +
-                    ";shape=" + Shape(effect));
+                    ";shape=" + Shape(effect) + ";leaves=" + Leaves(effect));
             }
             foreach (CastEnhancementSnapshot enhancement in inputs.Enhancements ?? new CastEnhancementSnapshot[0])
                 lines.Add("enhancement=" + enhancement.EnhancementId + ";name=" + enhancement.DisplayName +
@@ -76,6 +77,17 @@ namespace KingmakerBuffPlanner.Execution
                     ";metamagic=" + enhancement.MetamagicMask + ";maxLevel=" + enhancement.MaximumSpellLevel +
                     ";uses=" + (enhancement.RemainingUses.HasValue ? enhancement.RemainingUses.Value.ToString() : "unlimited"));
             return lines;
+        }
+
+        // The exact effects a source applies ("Kind:id", sorted), so two
+        // sources that apply the same buff (for example a spell and its
+        // communal form) can be recognised from evidence.
+        public static string Leaves(EffectExpression effect)
+        {
+            var leaves = new SortedSet<string>(StringComparer.Ordinal);
+            foreach (EffectLeafExpression leaf in CastingQualificationForecast.Leaves(effect))
+                leaves.Add(leaf.Kind + ":" + leaf.EffectId);
+            return leaves.Count == 0 ? "none" : string.Join(",", leaves.ToArray());
         }
 
         // The recipients an effect reaches, from its leaf and targeted
