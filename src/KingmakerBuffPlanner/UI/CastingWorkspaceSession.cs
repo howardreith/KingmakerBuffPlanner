@@ -1718,7 +1718,6 @@ namespace KingmakerBuffPlanner.UI
         {
             if (EditingFocusCastingId == null)
                 return AuthoringEditResult.Refuse("no-editing-focus");
-            RaiseCastingIdMark(new[] { EditingFocusCastingId });
             AuthoringEditResult result = _authoring.RemoveCasting(
                 EditingFocusCastingId);
             if (result.Applied)
@@ -2090,8 +2089,8 @@ namespace KingmakerBuffPlanner.UI
         private int _highestIssuedCastingIndex;
 
         // Re-review: the mark is raised by every id the session has seen - a
-        // loaded or reloaded plan's, a removed casting's, a run's - not only
-        // by the ids it issued.
+        // loaded or reloaded plan's and a run's - not only by the ids it
+        // issued (a removed casting's id was seen when it entered the plan).
         private void RaiseCastingIdMark(IEnumerable<string> ids)
         {
             foreach (string id in ids ?? new string[0])
