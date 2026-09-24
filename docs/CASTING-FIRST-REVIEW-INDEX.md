@@ -7,10 +7,10 @@ Reviewed baseline: `c182061354e9e761c09648ca779ab334588ba379`
 (`fd0e6dc..c182061`); this index covers the casting-first commits
 `c182061..HEAD` (61 commits at first publication).
 
-Status: **release candidate 0.2.0-rc2 frozen at `ae0181d` for the owner's
-final review** (receipt `docs/evidence/rc-0.2.0-rc2-receipt.md`); 0.2.0-rc1
-(`f8562a6`) has the animated cantrip defect described below and its
-receipt stays as history. Not a fully gameplay-qualified release. Casting-first is an opt-in planner mode (UMM setting, Classic
+Status: **release candidate 0.2.0-rc3 in preparation.** 0.2.0-rc2 (frozen
+at `ae0181d`, receipt `docs/evidence/rc-0.2.0-rc2-receipt.md`) and 0.2.0-rc1
+(`f8562a6`, with the animated cantrip defect described below) keep their
+receipts as history. Not a fully gameplay-qualified release. Casting-first is an opt-in planner mode (UMM setting, Classic
 by default). In ordinary play every routine route reaches the production
 dispatch boundary and the execution host; in an automated test session
 both player routes (casting-first and classic) refuse, and native casts
@@ -23,6 +23,39 @@ qualification passed in game on `d35b38f`
 after a close and reopen, each exactly as forecast). Finite-resource
 qualification waits for an owner-designated advanced seed. Human usability and the native aesthetic
 pass remain open.
+
+## Findings from the batch-3 review round (2026-09-24)
+
+Three independent read-only reviews of `ae0181d..30c8483`, each given the
+diff, its callers, the requirements and the evidence: A (discovery, source
+resolution, budgets, native execution, effects), B (UI, lifecycle,
+persistence, migration) and C (harness authorization, observations,
+terminal state, restoration). Every finding below was fixed before rc3,
+and each guard has a mutant that the tests catch. A focused re-review of
+the fixes by two further independent read-only reviewers (source
+resolution; harness and lifecycle) found the issues in the last rows,
+which were fixed and mutation-tested the same way.
+
+| Finding | Disposition | Commit |
+| --- | --- | --- |
+| The Classic route (the default mode) kept casting after a failed or uncertain cast; it had no owned terminal (a disable or area change stopped only the casting-first host, and teardown skipped the executor's cleanup); the test grant stayed armed when unused | Classic routines run through `HaltingPlanRunner` (one step at a time, stop at the first unconfirmed step, the rest reported as not attempted); the planner root owns the Classic run and ends it through its terminal on disable, area change and teardown; the grant is disarmed at every end | `6cc75d9` |
+| Resolution chose free or paid by the entry, not the plan: a free cantrip whose ability was missing could be paid from a slot, and a paid level-0 casting could turn free | The step's reservation routes the cast: free only at will (a missing ability is refused), finite never at will, a free reservation for a slot entry refused; probes read the step's own source | `b3723c6` |
+| A fact-granted ability could resolve to a source of the other cost kind or another pool | Resolution keeps the provider's kind, skips spellbook-bound abilities and, for a step, uses exactly the reserved pool (same key as discovery); provenance records pool, fact and equivalents | `b3723c6`, `09b349d` |
+| An ambiguous at-will cantrip was repriced as a level-0 slot | It is offered as no provider; the refusal stays in the discovery trace | `b3723c6` |
+| An unreadable cast count looked like the game's "unlimited" (-1) | Unread is null; a free casting whose counts are unread or finite fails as uncertainty | `b3723c6` |
+| The at-will lookup asked every ability for availability, count and caster level | Only a cantrip of exactly the authored ability is judged | `b3723c6` |
+| The plan repository overwrote a primary that parses but that its own load rejects; refused saves were silent | Such a file is kept byte-for-byte and the save refused; Save and Accept show the refusal in player words | `ce3311a` |
+| The display-mode registry snapshot lived only in memory; restoration could move the Mods folder under the other lab's lease or delete a changed staged tree; entry gaps; a skipped save comparison could pass | Snapshot file restored under the lock, refused while unrestored; the lease is waited for; a changed staged tree is kept; entry gaps closed; a skipped comparison fails | `275fa59` |
+| The physical scenario could pass with a programmatic open, typing into an unfocused field, "selecting" an already selected tile, or a wheel over a grid that cannot scroll | Physical open required; typing only into the focused field; the query names an unselected tile and the click must change the selection; wheel evidence labeled honestly | `b3ab18d` |
+| The instant disable step was described as an in-flight interruption ("atomic within one pump") | Labeled disable-before-start in the driver, record rule and receipts; no in-flight instant interruption is claimed | `b03e16f` |
+| The disable was enabled again in the same frame and the lifecycle comparison passed without a probe | The disable goes through the mod toggle's own path and is held for five updates (nothing may run or be accepted); a real probe line is required | `b03e16f` |
+| The Classic allowance did not bind the profile, the WORKING save or a purpose | Classic schema 2 and qualification schema 5 bind profile, identity digest, WORKING save and purpose; the launcher checks them against what it resolved and the host re-checks; an in-repo writer produces them and is tested against those checks | `ec52531`, `f93f0ad` |
+| The launcher trusted the host's PASS for Classic and physical runs | The launcher reads `classic-outcome.json` (digest, mode, grant used once, every step confirmed) and `physical-workspace.json` against its own acknowledgements | `953c511` |
+| Re-review, high: after the A2 change the probe observer lost a consumed reserved prepared slot, so a finite qualification with a prepared caster could not pass | Observation reads the reserved slot even when consumed (it is still the source); execution still needs it available | `f3b778e` |
+| Re-review: one cantrip granted by two classes also reached the planner as a fact-granted ability, bypassing the A4 refusal | One ability from one pool at two caster levels is ambiguous: discovery offers neither and execution refuses such equivalents; execution walks abilities in discovery's order and records the caster level | `f3b778e` |
+| Re-review: unread counts on a paid source passed as "nothing spent"; the probe accepted any unchanged count as free; at-will provenance was thin | Both are uncertainty; one free rule everywhere; the provenance names the class ability, its caster level, the candidates and the reserved pool | `f3b778e` |
+| Re-review: a failed disable rule still let the recover run submit; the probe allowance was unbound; a run ending during the hold left the planner disabled; the hold only read flags the disable itself set | The rules apply at the disable step; probe schema 3 carries the binding; the planner is enabled again at finish unless the mod manager disabled it; the hold observes the root's own ticks and the host's started runs | `31e56d7`, `af1b051`, `f903e69` |
+| Re-review: the launcher accepted allowances the host refuses only after launch, took physical facts from the host, and left a stale PASS in `orchestration.json` | The host's format rules in the launcher; exactly the eight requests, the hotkey it sent, its own acknowledgements; the final verdict written after restoration; optional mods verified before any cast; every key the launcher reads pinned to the host | `31e56d7`, `9e55e68` |
 
 ## Findings from live qualification after rc1 (2026-09-23)
 
