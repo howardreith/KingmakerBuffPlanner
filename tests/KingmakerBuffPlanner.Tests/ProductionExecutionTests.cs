@@ -1587,6 +1587,16 @@ namespace KingmakerBuffPlanner.Tests
                 !core.Replace("\r\n", "\n").Contains(
                     "if (_enabled)\n            {\n                try\n                {\n                    BuffPlannerUiRoot.Ensure(_modPath, _log);"))
                 throw new InvalidOperationException("The qualification disable is not the mod toggle's own.");
+            // Re-review: the runtime toggle never enables a planner the mod
+            // manager disabled; the hold observes the root's own ticks; the
+            // optional mods are verified before any cast on every allowance.
+            string tickOwnedBody = SourceBlock(root, "internal static void TickOwned(float deltaTime)");
+            if (!runtimeToggle.Contains("if (value && !_managerEnabled)") ||
+                !toggle.Contains("_managerEnabled = value;") ||
+                tickOwnedBody == null || !tickOwnedBody.Contains("_ownedTicks++;") ||
+                !qualification.Contains("() => BuffPlannerUiRoot.OwnedTicksForRuntime);") ||
+                Occurrences(host, "OptionalModMismatch()") != 4)
+                throw new InvalidOperationException("The hold or the pre-cast identity checks are not wired.");
             // The launcher's casting mode must be the allowance's, and the
             // acceptance counts the planner host's runs: none before the
             // qualification, exactly the boundary's submissions after it.
