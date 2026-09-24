@@ -104,13 +104,22 @@ namespace KingmakerBuffPlanner.Execution
         public int MaximumSubmissions { get; private set; }
         public int Attempts { get; private set; }
         public bool Consumed { get; private set; }
+        // Set when the scenario that armed the grant ends, used or not: no
+        // later Classic execution in the session can use it.
+        public bool Disarmed { get; private set; }
         public string LastRefusal { get; private set; }
+
+        public void Disarm()
+        {
+            Disarmed = true;
+        }
 
         public bool TryConsume(string routineId, string planDigest, string executionMode,
             int plannedSteps, out string refusal)
         {
             Attempts++;
-            refusal = Consumed ? "classic-grant-consumed"
+            refusal = Disarmed ? "classic-grant-disarmed"
+                : Consumed ? "classic-grant-consumed"
                 : !string.Equals(routineId, RoutineId, StringComparison.Ordinal)
                     ? "classic-grant-routine:" + (routineId ?? "none")
                 : !string.Equals(executionMode, ExecutionMode, StringComparison.Ordinal)
@@ -130,7 +139,7 @@ namespace KingmakerBuffPlanner.Execution
         {
             return "run=" + RunId + ";routine=" + RoutineId + ";mode=" + ExecutionMode + ";max=" +
                 MaximumSubmissions + ";attempts=" + Attempts + ";consumed=" + Consumed +
-                ";lastRefusal=" + (LastRefusal ?? "none");
+                ";disarmed=" + Disarmed + ";lastRefusal=" + (LastRefusal ?? "none");
         }
     }
 
@@ -271,14 +280,21 @@ namespace KingmakerBuffPlanner.Execution
         public string QuickDisposition { get; set; }
         public int Planned { get; set; }
         // How the executor issued each step: the animated executor queues
-        // and starts a native command (Queued, CastStarted), the instant
-        // executor submits the rule (Submitted); neither records the other.
+        // and starts a native command (Queued, CastStarted); the instant
+        // executor submits the rule (Submitted, then CastStarted) and never
+        // queues. The judgement requires Queued and CastStarted in animated
+        // mode and Submitted in instant mode.
         public int Queued { get; set; }
         public int CastStarted { get; set; }
         public int Submitted { get; set; }
         public int Confirmed { get; set; }
         public int Failed { get; set; }
         public int CastingFirstRuns { get; set; }
+        // Read at the end of the run: whether a grant is still armed (it
+        // must be disarmed or never armed), and, for a selection run,
+        // whether any Classic run or result appeared.
+        public bool GrantArmedAtEnd { get; set; }
+        public bool ClassicRunSeen { get; set; }
         public List<ClassicCastStepResult> Steps { get; } = new List<ClassicCastStepResult>();
         // "<poolKey>:<remaining before>><remaining after>" for every finite
         // pool of the party: no finite resource may change for free casts.
@@ -299,9 +315,11 @@ namespace KingmakerBuffPlanner.Execution
             var violations = new List<string>(Failures);
             if (PlanSteps < 1 || string.IsNullOrEmpty(PlanDigest)) violations.Add("plan:" + PlanSteps);
             if (CastingFirstRuns != 0) violations.Add("casting-first-runs:" + CastingFirstRuns);
+            if (GrantArmedAtEnd) violations.Add("grant-still-armed");
             if (!CastingScenario)
             {
                 if (GrantAttempts != 0 || GrantConsumed) violations.Add("select-grant-used");
+                if (ClassicRunSeen) violations.Add("select-classic-run");
                 return violations;
             }
             if (violations.Count != 0) return violations;
@@ -344,8 +362,9 @@ namespace KingmakerBuffPlanner.Execution
             if (step.AvailableBefore.Value >= 0 || step.AvailableAfter.Value != step.AvailableBefore.Value)
                 return "availability:" + step.AvailableBefore + ">" + step.AvailableAfter;
             string detail = step.Detail ?? string.Empty;
-            if (detail.IndexOf(";resolution:", StringComparison.Ordinal) < 0 &&
-                !detail.StartsWith("resolution:", StringComparison.Ordinal))
+            if ((detail.IndexOf(";resolution:", StringComparison.Ordinal) < 0 &&
+                    !detail.StartsWith("resolution:", StringComparison.Ordinal)) ||
+                detail.IndexOf("resolution:unrecorded", StringComparison.Ordinal) >= 0)
                 return "resolution-unrecorded";
             if (step.LevelZeroSpellbook &&
                 detail.IndexOf("resolution:at-will-cantrip-ability", StringComparison.Ordinal) < 0)

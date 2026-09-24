@@ -45,7 +45,19 @@ Worklist (updated as slices land; 2026-09-24 status in brackets):
    Escape through OS input; 1920x1080 as a borderless window with the game
    registry restored byte-exact. 2560x1440 is larger than this RDP session
    (1920x1200 physical, 125% scaling) and is refused without changing any
-   display setting. Live runs pending.]
+   display setting (`phys_2560_refusal`: "unsupported on this session's
+   display (1920x1200); nothing was changed").
+   PHYSICAL INPUT NEEDS A CONNECTED SESSION: the owner's session 2 is
+   Disconnected (`query session`), so no window can take the foreground.
+   `ws-physical-20260924-81b359f-owner-01` failed closed at its first
+   delivery ("Kingmaker foreground activation failed"; 82/83 assertions
+   passed, the workspace opened through the labeled programmatic fallback).
+   Not repeated; no session or RDP setting was touched. With the session
+   connected, run from a clean built worktree:
+   `Invoke-KingmakerRuntimeTest.ps1 -Scenario live-workspace-physical
+   -CompatibilityProfileId full-user -TimeoutSeconds 900 [-DisplayMode
+   windowed-1920x1080] -Confirm:$false`. The layout at 1920x1080 without
+   input runs as `live-workspace-qual -DisplayMode windowed-1920x1080`.]
 7. Persistence and import gaps; install and rollback of the final artifact.
    [Persistence DONE `f524acf` from an independent audit: the review and
    planner-mode stores no longer overwrite newer or unreadable files, the

@@ -134,9 +134,11 @@ namespace KingmakerBuffPlanner.UI
             {
                 // A running routine ends through its owned terminal (the
                 // executor restores any temporary native state) before the
-                // player UI is released.
+                // player UI is released: the casting-first host's run and a
+                // Classic run alike.
                 if (_instance._castingHost != null)
                     _instance._castingHost.Shutdown("mod-disabled");
+                _instance.EndClassicRun("mod-disabled");
                 _instance.SuspendHudInstall("mod-disabled");
                 _instance.ReleasePlayerUi();
             }
@@ -757,7 +759,9 @@ namespace KingmakerBuffPlanner.UI
             if (string.IsNullOrEmpty(targetUnitId)) return false;
             if (!model.IsTargetWanted("long", targetUnitId) &&
                 !_instance._screen.View.DispatchTargetForRuntime(targetUnitId)) return false;
-            if (model.Profile.Execution.Mode != executionMode) model.ToggleExecutionMode();
+            // The casting mode through the Classic settings panel's own control.
+            if (model.Profile.Execution.Mode != executionMode &&
+                !_instance._screen.View.ToggleExecutionModeForRuntime()) return false;
             _instance._screen.View.RefreshCatalogForRuntime();
             return model.IsAssigned("long") && model.IsTargetWanted("long", targetUnitId) &&
                 model.Profile.Execution.Mode == executionMode;
@@ -969,7 +973,7 @@ namespace KingmakerBuffPlanner.UI
                 (_castingHost != null && _castingHost.IsRunning))
                 return false;
             _quickStartPending = true;
-            StartCoroutine(ExecuteQuickRoutine(routineId, completed, false));
+            StartClassicRun(routineId, completed, false);
             return true;
         }
 
@@ -982,7 +986,7 @@ namespace KingmakerBuffPlanner.UI
                 (_castingHost != null && _castingHost.IsRunning))
                 return false;
             _quickStartPending = true;
-            StartCoroutine(ExecuteQuickRoutine(routineId, completed, true));
+            StartClassicRun(routineId, completed, true);
             return true;
         }
 
@@ -1087,6 +1091,57 @@ namespace KingmakerBuffPlanner.UI
             if (completed != null) completed(result);
         }
 
+        // The running Classic routine, owned here (batch 3 review): the
+        // coroutine, its outer iterator and the completion to present.
+        private IEnumerator _classicRunIterator;
+        private Coroutine _classicRunCoroutine;
+        private string _classicRunRoutineId;
+        private Action<QuickExecutionResult> _classicRunCompleted;
+
+        private void StartClassicRun(string routineId, Action<QuickExecutionResult> completed,
+            bool readyOnlyExplicit)
+        {
+            IEnumerator run = ExecuteQuickRoutine(routineId, completed, readyOnlyExplicit);
+            _classicRunIterator = run;
+            _classicRunRoutineId = routineId;
+            _classicRunCompleted = completed;
+            _classicRunCoroutine = StartCoroutine(run);
+        }
+
+        // The Classic run's owned terminal (mod disabled, area change,
+        // teardown, a runtime scenario's end): the coroutine stops and its
+        // iterators are disposed, which runs the executor's cleanup for the
+        // cast in progress; a run that had not reported yet reports its
+        // interruption.
+        private void EndClassicRun(string reason)
+        {
+            IEnumerator run = _classicRunIterator;
+            if (run == null) return;
+            _classicRunIterator = null;
+            if (_classicRunCoroutine != null) StopCoroutine(_classicRunCoroutine);
+            _classicRunCoroutine = null;
+            try
+            {
+                IDisposable disposable = run as IDisposable;
+                if (disposable != null) disposable.Dispose();
+            }
+            catch (Exception exception)
+            {
+                _log.Error("[KBP-QUICK] classic run cleanup failed;reason=" + reason + ".", exception);
+            }
+            if (_session != null && _session.IsExecuting)
+            {
+                QuickExecutionResult result = _session.EndInterruptedExecution(_classicRunRoutineId, reason);
+                if (_classicRunCompleted != null) _classicRunCompleted(result);
+            }
+            _classicRunCompleted = null;
+        }
+
+        internal static void EndClassicRunForRuntime(string reason)
+        {
+            if (_instance != null) _instance.EndClassicRun(reason);
+        }
+
         private IEnumerator ExecuteQuickRoutine(
             string routineId,
             Action<QuickExecutionResult> completed,
@@ -1098,9 +1153,10 @@ namespace KingmakerBuffPlanner.UI
                 completedCalled = true;
                 if (completed != null) completed(result);
             };
+            IEnumerator routine = null;
             try
             {
-                IEnumerator routine = _session.ExecuteRoutine(routineId,
+                routine = _session.ExecuteRoutine(routineId,
                     observedCompletion, readyOnlyExplicit);
                 while (true)
                 {
@@ -1130,6 +1186,24 @@ namespace KingmakerBuffPlanner.UI
             finally
             {
                 _quickStartPending = false;
+                // A run stopped early still runs the session's own finally
+                // (the executor's cleanup): the inner iterator is disposed
+                // here, never abandoned.
+                IDisposable inner = routine as IDisposable;
+                if (inner != null)
+                {
+                    try { inner.Dispose(); }
+                    catch (Exception exception)
+                    {
+                        _log.Error("[KBP-QUICK] classic routine cleanup failed.", exception);
+                    }
+                }
+                if (completedCalled && ReferenceEquals(_classicRunCompleted, completed))
+                {
+                    _classicRunIterator = null;
+                    _classicRunCoroutine = null;
+                    _classicRunCompleted = null;
+                }
             }
         }
 
@@ -1748,6 +1822,7 @@ namespace KingmakerBuffPlanner.UI
             // An area change (including loading another save) ends a running
             // routine through its owned terminal; new runs remain possible.
             if (_castingHost != null) _castingHost.Cancel("area-unloading");
+            EndClassicRun("area-unloading");
             ReleasePlayerUi();
         }
 
@@ -1860,6 +1935,7 @@ namespace KingmakerBuffPlanner.UI
             // End any casting run first, through its owned terminal, while
             // the result can still be logged and presented.
             if (_castingHost != null) _castingHost.Shutdown("root-teardown");
+            EndClassicRun("root-teardown");
             StopAllCoroutines();
             CloseCastingWorkspace();
             if (_castingWorkspaceSession != null)

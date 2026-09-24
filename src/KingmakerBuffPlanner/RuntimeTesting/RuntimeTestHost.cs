@@ -891,7 +891,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                                 string.Join("|", violations.ToArray())))
                         : (violations.Count == 0
                             ? RuntimeTestAssertion.Pass("classic-select-no-dispatch", "no grant;no run",
-                                "grantAttempts=0;castingFirstRuns=0")
+                                "grantArmed=" + _classicRecord.GrantArmedAtEnd + ";grantAttempts=" +
+                                    _classicRecord.GrantAttempts + ";castingFirstRuns=" +
+                                    _classicRecord.CastingFirstRuns + ";classicRun=" + _classicRecord.ClassicRunSeen)
                             : RuntimeTestAssertion.Fail("classic-select-no-dispatch", "no grant;no run",
                                 string.Join("|", violations.ToArray()))));
                     bool classicLocked = UI.NativeCastingSessionPolicy.Locked && _classicWorkspaceClosed;
@@ -3310,6 +3312,12 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 if (_classicRecord.PlanSteps < 1) return FailClassic("classic-plan-empty");
                 if (!_classicRecord.CastingScenario)
                 {
+                    // Measured, not assumed: no grant, no casting-first run,
+                    // no Classic run or result.
+                    _classicRecord.GrantArmedAtEnd = UI.NativeCastingSessionPolicy.ClassicGrant != null;
+                    _classicRecord.CastingFirstRuns = BuffPlannerUiRoot.CastingRunsStartedForRuntime;
+                    _classicRecord.ClassicRunSeen = BuffPlannerUiRoot.IsExecutingForRuntime ||
+                        BuffPlannerUiRoot.QuickResultForRuntime("long") != null;
                     PublishClassicRecord();
                     _completed = true;
                     return true;
@@ -3366,6 +3374,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     return false;
                 }
                 JudgeClassicRun(quick);
+                EndClassicScenario("classic-scenario-completed");
                 PublishClassicRecord();
                 _completed = true;
                 return true;
@@ -3373,10 +3382,21 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             return false;
         }
 
+        // The scenario's end: a Classic run still going is ended through its
+        // owned terminal and the grant is disarmed, used or not.
+        private void EndClassicScenario(string reason)
+        {
+            BuffPlannerUiRoot.EndClassicRunForRuntime(reason);
+            UI.NativeCastingSessionPolicy.DisarmClassicGrant();
+            _classicRecord.GrantArmedAtEnd = UI.NativeCastingSessionPolicy.ClassicGrant != null &&
+                !UI.NativeCastingSessionPolicy.ClassicGrant.Disarmed;
+        }
+
         private bool FailClassic(string failure)
         {
             _classicRecord.Failures.Add(failure);
             _log.Info("[KBP-CLASSIC] failed;" + failure + ".");
+            EndClassicScenario("classic-scenario-failed");
             if (_classicGrant != null)
             {
                 _classicRecord.Grant = _classicGrant.Describe();
@@ -3550,6 +3570,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 { "quickDisposition", record.QuickDisposition },
                 { "report", record.ReportLine },
                 { "castingFirstRuns", record.CastingFirstRuns },
+                { "grantArmedAtEnd", record.GrantArmedAtEnd },
+                { "classicRunSeen", record.ClassicRunSeen },
                 { "steps", new JArray(record.Steps.Select(step => (object)new JObject
                     {
                         { "index", step.StepIndex },
@@ -4021,6 +4043,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 !_classicPublished)
             {
                 _classicRecord.Failures.Add("shutdown:" + reason);
+                try { EndClassicScenario("shutdown:" + reason); }
+                catch (Exception exception) { _log.Error("[KBP-CLASSIC] run not ended at shutdown.", exception); }
                 try { PublishClassicRecord(); }
                 catch (Exception exception)
                 {
