@@ -7,49 +7,71 @@ casting-first planner is an opt-in, experimental mode.
 
 ## What changed since 0.2.0-rc3
 
-rc3's final independent review found defects, and rc4 fixes them. For a
-player:
+rc3's final independent review found defects, and rc4 fixes them; a
+second independent review of those fixes found more, fixed here too. For
+a player:
 
 - **Classic routines no longer give up while the game is paused.** A
   classic routine now advances only while the game runs. **APPLY** in the
-  open classic planner starts casting once you close the planner (the
-  planner pauses the game), and the planner says so. In rc3 a paused game
-  made the first cast look unconfirmed, and the rest of the routine was
-  abandoned.
+  open classic planner checks the routine at once (a refusal is shown
+  there), then closes the planner and casts; the result is shown when the
+  planner opens again. In rc3 a paused game made the first cast look
+  unconfirmed, and the rest of the routine was abandoned.
 - **Plans saved by 0.0.19 import.** The first time the casting-first
   planner opens a campaign, a classic plan saved by the released 0.0.19
   (or older) is imported through the classic planner's own reading. Its
   file is not rewritten. rc3 refused such plans.
 - **A cast counts only if it landed.** A cast is confirmed only when this
   cast put the effect there: a new effect, or the old one renewed to a
-  later end. An effect that was already there, or one the game
-  suppresses, never confirms a cast. A group casting that would reach
-  nobody, or whose caster cannot be its origin, is blocked with a reason
-  instead of running.
+  later end, of the buff the spell grants (another effect of the same
+  name does not count). An effect that was already there, or one the
+  game suppresses, never confirms a cast. A group casting that would
+  reach nobody, or whose caster cannot be its origin, is blocked with a
+  reason instead of running; a party buff that also reaches pets is
+  planned as a party buff.
 - **Every casting can be fully edited.** Editing one casting now changes
-  its caster and exact source (the spellbook level, item or ability), its
-  routine and its place in it, and whether it is cast again when the buff
-  is already there. An imported casting whose classic plan let the
-  planner pick any caster gets its caster here and can be marked Ready in
-  place. A caster who can cast a buff in more than one way picks the
-  exact one when adding it. The animated fallback for Instant mode has a
-  switch.
-- **Unreadable files are announced.** Both planners say when their saved
-  file could not be read or comes from a newer version, when a backup was
-  loaded instead, and when a change was not saved.
+  its caster and exact source, its routine and its place in it, whether
+  it is cast again when the buff is already there, and whether it is a
+  single-target or a group casting. Sources are named exactly: the
+  spellbook, its spell level and the kind of slot, or the item or
+  ability. The same caster keeps its enhancements when it switches
+  source; another caster keeps only the ones it has, and the planner
+  names the ones it dropped (Undo restores them). An imported casting
+  whose classic plan let the planner pick any caster, or did not say
+  single target or group, can be completed and marked Ready in place. A
+  caster who can cast a buff in more than one way picks the exact one
+  when adding it; a spell known at two levels of one spellbook is refused
+  with the reason (this version cannot pin one). The animated fallback
+  and the out-of-combat rule have switches.
+- **Unreadable files are announced, and the remedy works.** Both
+  planners say when their saved file could not be read or comes from a
+  newer version, when a backup was loaded instead (and whether saving is
+  refused because of it), and when a change was not saved; the
+  casting-first header says so for as long as saving is blocked. Moving
+  the unreadable casting plan and its backups aside and pressing Reload
+  lets it save again, keeping castings added meanwhile.
 - **Smaller fixes.** The casting-first planner never rewrites the classic
   plan file. The spellbook button opens the casting-first planner
   properly. The HUD tooltip never describes another campaign. A new
-  casting never reuses a removed casting's number. The footer says when
-  all routines together would run short of a resource. A linked
-  opposition-school slot pair counts as two slots in the budget.
+  casting never reuses the number of a casting it has shown, even after
+  a reload. The footer counts the castings of the selected routine that
+  would run short of a resource if every routine ran in one pass. A
+  linked opposition-school slot pair counts as two slots in the budget,
+  and a slot whose cost could not be read counts as one. The first
+  import uses the classic planner's own copy of the plan, matched to the
+  party's current abilities.
 - **Test harness (not player-facing).** A changed ordinary save is
   reported with every other failure and blocks later test runs until the
   owner has reviewed it. The save comparison survives a launcher that
   stops early. A live test run stops itself before its time limit and on
-  the launcher's abort signal. Finite-resource test approvals can be
-  written. A rehearsal of the manual session is labelled as one. More of
-  the game's own checks run before a test launches.
+  the launcher's abort signal, checked on every frame. Finite-resource
+  test approvals can be written. A rehearsal of the manual session is
+  labelled as one. More of the game's own checks run before a test
+  launches. After the second review: the saves are read and compared
+  while the test run holds its lock, which is kept until the comparison
+  is made; fixture changes and test runs cannot overlap; the owner's
+  acknowledgement of a save change is typed by the owner and bound to
+  that exact record; an incomplete run never reports success.
 
 ## What changed in 0.2.0-rc3 (history)
 
@@ -148,6 +170,22 @@ described in `docs/MANUAL-USABILITY-HANDOFF.md`.
 The finite-resource and group qualification is prepared and waits for an
 owner-designated advanced test save (`docs/ADVANCED-SEED-COMPATIBILITY.md`):
 the automation party's finite spell levels hold no buff.
+
+## Known limitations
+
+- A cast counts only when it put its effect there. When the game keeps an
+  existing instance instead (a buff that does not replace itself, a
+  longer-lasting instance already present, a permanent effect), the cast
+  is reported as not confirmed and the routine stops there. The default
+  **If the buff is already there: skip this casting** avoids casting over
+  such an instance.
+- The classic planner has no press-again-to-stop: a started classic
+  routine runs to its end or to its first unconfirmed cast.
+- The wait for a cast's confirmation is counted in game frames.
+- A spell known at two levels of one spellbook cannot be pinned to one
+  level; the planner refuses that choice with the reason.
+- A linked opposition-school slot pair that cannot be funded shows one
+  requested slot in the budget.
 
 ## Not supported in this version (shown on the card, refused by Apply)
 
