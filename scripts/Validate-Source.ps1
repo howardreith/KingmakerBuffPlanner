@@ -170,7 +170,7 @@ if ($hudSource.Contains('"Feedback"') -or
     $hudSource.Contains('_feedback') -or
     $hudSource.Contains('void Present(QuickExecutionResult') -or
     $uiRootSource.Contains('_hud.Present(result)') -or
-    -not $uiRootSource.Contains('_screen.Present(result)') -or
+    -not $uiRootSource.Contains('_screen.Present(result,') -or
     -not $uiRootSource.Contains('Routine UI result:')) {
     throw 'Quick results must remain in the planner footer and UMM log, never a floating HUD object.'
 }
