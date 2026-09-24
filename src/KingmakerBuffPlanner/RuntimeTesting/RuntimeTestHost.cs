@@ -2928,6 +2928,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 {
                     JObject inspection = AdvancedCopyInspection.Collect(inputs);
                     inspection["runId"] = _request.RunId;
+                    // Mission batch 3, section 7: the party's real
+                    // capabilities as the planner's own discovery sees them
+                    // (spellbooks, pools and tokens, variants, targeting
+                    // shapes, pets, enhancements), read-only, so the
+                    // qualification cases are chosen from them.
+                    inspection["capabilities"] = new JArray(CastingCapabilityInventory
+                        .Describe(inputs).Cast<object>().ToArray());
                     object working;
                     inspection["workingSaveName"] = _request.Parameters.TryGetValue(
                         "workingSaveName", out working) ? working as string : null;
