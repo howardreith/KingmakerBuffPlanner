@@ -628,7 +628,10 @@ namespace KingmakerBuffPlanner.UI
                 preview.Plan.Steps.Count + ".");
             Status = "Executing " + routineId + " routine: " + preview.Plan.Steps.Count + " planned casts.";
             _log.Info("Routine plan: " + DescribePlan(preview.Plan));
-            IEnumerator work = executor.Execute(preview.Plan, LastExecutionReport);
+            // Failures stop later castings (batch 3, section 6): the runner
+            // halts after the first step that did not confirm its effect.
+            var runner = new HaltingPlanRunner(executor);
+            IEnumerator work = runner.Run(preview.Plan, LastExecutionReport);
             Exception failure = null;
             try
             {
@@ -677,6 +680,9 @@ namespace KingmakerBuffPlanner.UI
                 "; spend-invoked=" + report.SpendInvocations +
                 "; spent=" + report.ResourcesSpent + "; failed=" + report.Failed +
                 "; skipped=" + report.Skipped + "; unfulfilled=" + report.Unfulfilled + "." +
+                (runner.HaltedAfterStep == null ? string.Empty
+                    : " Stopped after cast " + (runner.HaltedAfterStep.Value + 1) +
+                        " did not confirm; the later casts were not attempted.") +
                 variantReselection;
             if (fallbackWarnings.Count != 0)
                 Status = "Instant mode was not fully satisfied. " +
@@ -747,6 +753,24 @@ namespace KingmakerBuffPlanner.UI
                     step.MaterialReservation.ItemGuid + "x" + step.MaterialReservation.Count) +
                 ";expected=" +
                 KingmakerAnimatedCastAdapter.ExpectedEffectIds(step.ExpectedEffects)).ToArray());
+        }
+
+        // The Classic run ended by its owner (mod disabled, area change,
+        // teardown): disposing the run already ran the executor's cleanup
+        // for the cast in progress; this records the outcome for the player.
+        internal QuickExecutionResult EndInterruptedExecution(string routineId, string reason)
+        {
+            IsExecuting = false;
+            string name = RoutineDisplayName(routineId);
+            Status = name + " stopped before it finished (" + (reason ?? "stopped") +
+                "): the cast in progress was interrupted and cleaned up, and nothing after it was attempted.";
+            _log.Info("[KBP-QUICK] classic run ended by its owner;group=" + routineId +
+                ";reason=" + (reason ?? "stopped") + ".");
+            return new QuickExecutionResult(routineId, name,
+                QuickExecutionDisposition.Failed, Status,
+                LastExecutionReport == null ? 0 : LastExecutionReport.Planned,
+                LastExecutionReport == null ? 0 : LastExecutionReport.Submitted,
+                LastExecutionReport == null ? 0 : LastExecutionReport.Confirmed);
         }
 
         internal QuickExecutionResult AbortUnexpectedExecution(

@@ -37,6 +37,13 @@ namespace KingmakerBuffPlanner.UI
             return true;
         }
 
+        // Ends the single-use exception once its scenario ends (used or not).
+        internal static void DisarmClassicGrant()
+        {
+            Execution.ClassicCastGrant grant = ClassicGrant;
+            if (grant != null) grant.Disarm();
+        }
+
         // Whether the locked classic route may execute this plan now (once).
         internal static bool TryConsumeClassicGrant(string routineId, string planDigest,
             string executionMode, int plannedSteps, out string refusal)

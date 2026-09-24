@@ -1940,6 +1940,13 @@ namespace KingmakerBuffPlanner.UI
         internal bool IsOpen { get { return Root.gameObject.activeSelf; } }
         internal void Show(bool value) { Root.gameObject.SetActive(value); }
 
+        internal bool InvokeCastingModeForRuntime()
+        {
+            if (_mode == null || !_mode.interactable) return false;
+            _mode.onClick.Invoke();
+            return true;
+        }
+
         internal void Bind(PlannerSettingsViewModel model, bool interactable)
         {
             Set(_mode, "Casting mode: " + model.CastingMode, interactable);

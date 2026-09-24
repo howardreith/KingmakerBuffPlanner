@@ -71,6 +71,7 @@ namespace KingmakerBuffPlanner.Tests
             Run("at-will-cantrip-choice-refuses-what-is-not-the-authored-cantrip", TestAtWillCantripChoice);
             Run("capability-inventory-describes-the-party", TestCapabilityInventory);
             Run("classic-cast-grant-digest-allowance-and-judgement", TestClassicCastCore);
+            Run("classic-runs-halt-after-a-failure-and-keep-cleanup", TestClassicHaltingRunner);
             Run("read-only-game-diagnostics-never-act", TestReadOnlyGameDiagnostics);
             Run("physical-workspace-requests-and-judgement", () => TestPhysicalWorkspace(root));
             Run("persistence-round-trip-gaps-and-campaign-isolation",
@@ -3212,6 +3213,12 @@ namespace KingmakerBuffPlanner.Tests
                 grant.TryConsume("long", digest, "animated", 3, out refusal) ||
                 refusal != "classic-grant-consumed" || grant.Attempts != 7 || !grant.Consumed)
                 throw new InvalidOperationException("The classic grant is not single-use and exact: " + refusal);
+            // A grant whose scenario ended is disarmed, used or not.
+            var unused = new ClassicCastGrant("run-2", "long", digest, "animated", 3);
+            unused.Disarm();
+            if (unused.TryConsume("long", digest, "animated", 3, out refusal) || refusal != "classic-grant-disarmed" ||
+                unused.Consumed || !unused.Describe().Contains("disarmed=True"))
+                throw new InvalidOperationException("A disarmed classic grant executed: " + refusal);
             Func<Action<JObject>, string> allowanceJson = mutate =>
             {
                 var root = new JObject
@@ -3286,6 +3293,8 @@ namespace KingmakerBuffPlanner.Tests
                 record.Queued = 0;
                 record.CastStarted = 0;
                 record.Submitted = 1;
+                // The instant executor records Submitted, then CastStarted.
+                record.CastStarted = 1;
                 return record;
             };
             if (good().Violations().Count != 0 || instant().Violations().Count != 0)
@@ -3294,7 +3303,7 @@ namespace KingmakerBuffPlanner.Tests
                     string.Join("|", instant().Violations().ToArray()));
             var instantShapes = new Dictionary<string, Action<ClassicCastRecord>>
             {
-                { "report:planned=1;queued=0;started=0;submitted=0;confirmed=1;failed=0;steps=1;mode=instant",
+                { "report:planned=1;queued=0;started=1;submitted=0;confirmed=1;failed=0;steps=1;mode=instant",
                     r => r.Submitted = 0 },
                 { "report:planned=1;queued=1;started=1;submitted=0;confirmed=1;failed=0;steps=1;mode=instant",
                     r => { r.Submitted = 0; r.Queued = 1; r.CastStarted = 1; } }
@@ -3335,6 +3344,7 @@ namespace KingmakerBuffPlanner.Tests
                 { "report:planned=1;queued=1;started=1;submitted=0;confirmed=1;failed=1;steps=1;mode=animated",
                     r => r.Failed = 1 },
                 { "mode:hybrid", r => r.ExecutionMode = "hybrid" },
+                { "grant-still-armed", r => r.GrantArmedAtEnd = true },
                 { "finite-pool:unit|book|spontaneous-1:2", r => r.FinitePools[0] = "unit|book|spontaneous-1:2" }
             };
             foreach (KeyValuePair<string, Action<ClassicCastRecord>> shape in shapes)
@@ -3351,6 +3361,111 @@ namespace KingmakerBuffPlanner.Tests
             select.GrantAttempts = 1;
             if (!select.Violations().Contains("select-grant-used"))
                 throw new InvalidOperationException("A selection run used the classic grant.");
+            // An executor that wrote no provenance says so explicitly; that
+            // is never accepted as a recorded resolution.
+            ClassicCastRecord unrecorded = good();
+            unrecorded.Steps[0].Detail = "ok;resolution:unrecorded";
+            if (!unrecorded.Violations().Contains("step0:resolution-unrecorded"))
+                throw new InvalidOperationException("An unrecorded resolution was accepted.");
+            var seen = new ClassicCastRecord { CastingScenario = false, PlanDigest = digest, PlanSteps = 1,
+                ClassicRunSeen = true };
+            var armed = new ClassicCastRecord { CastingScenario = false, PlanDigest = digest, PlanSteps = 1,
+                GrantArmedAtEnd = true };
+            if (!seen.Violations().Contains("select-classic-run") || !armed.Violations().Contains("grant-still-armed"))
+                throw new InvalidOperationException("A selection run's dispatch readings were not judged.");
+        }
+
+        // Batch 3, section 6 (reviews A5, B2, C2): a Classic routine stops
+        // after the first cast that did not confirm, records the rest as
+        // halted, keeps every record the executor wrote (cleanup included),
+        // and a run stopped by its owner disposes the step in progress.
+        private static void TestClassicHaltingRunner()
+        {
+            CastingWorkspaceInputs inputs = QualificationInputs(true, true, null);
+            CastingQualificationSelection selection = CastingQualificationRecipe.SelectZeroCostMixed(
+                inputs, "fixture-campaign");
+            CastPlan plan = CastingQualificationForecast.Forecast(selection, inputs, "fixture-campaign")[0]
+                .Projection.Plan;
+            if (plan.Steps.Count != 3) throw new InvalidOperationException("The runner fixture needs three steps.");
+            Func<int, ScriptedExecutor> failing = failAt => new ScriptedExecutor((single, stepReport) =>
+            {
+                int position = plan.Steps.ToList().IndexOf(single.Steps[0]);
+                return new ScriptedIterator(2, false, false, () => stepReport.Add(0, single.Steps[0],
+                    position == failAt ? CastExecutionStatus.FailedExecution : CastExecutionStatus.EffectConfirmed,
+                    position == failAt ? "fixture-failed" : "fixture-confirmed"));
+            });
+            // A failure at step 1 (the second cast): step 2 never starts.
+            ScriptedExecutor second = failing(1);
+            var runner = new HaltingPlanRunner(second);
+            var report = new ExecutionReport(plan);
+            System.Collections.IEnumerator run = runner.Run(plan, report);
+            int guard = 0;
+            while (run.MoveNext() && guard++ < 1000) { }
+            if (second.Executed.Count != 2 || runner.HaltedAfterStep != 1 || report.Confirmed != 1 ||
+                !report.Records.Any(record => record.StepIndex == 2 &&
+                    record.Detail == HaltingPlanRunner.HaltedDetailPrefix + "1") ||
+                !report.Records.Any(record => record.StepIndex == 1 && record.Detail == "fixture-failed"))
+                throw new InvalidOperationException("A Classic run continued after a failed cast: executed=" +
+                    second.Executed.Count + ";halted=" + runner.HaltedAfterStep);
+            // A confirmed step that also recorded a failure halts too.
+            var mixed = new ScriptedExecutor((single, report2) => new ScriptedIterator(1, false, false, () =>
+            {
+                report2.Add(0, single.Steps[0], CastExecutionStatus.EffectConfirmed, "fixture-confirmed");
+                report2.Add(0, single.Steps[0], CastExecutionStatus.FailedExecution,
+                    "unexpected-resource-spent-on-unlimited-source");
+            }));
+            var mixedRunner = new HaltingPlanRunner(mixed);
+            System.Collections.IEnumerator mixedRun = mixedRunner.Run(plan, new ExecutionReport(plan));
+            guard = 0;
+            while (mixedRun.MoveNext() && guard++ < 1000) { }
+            if (mixed.Executed.Count != 1 || mixedRunner.HaltedAfterStep != 0)
+                throw new InvalidOperationException("A confirmed step with a failure record did not halt the run.");
+            // All confirmed: every step runs, nothing halted.
+            ScriptedExecutor clean = failing(-1);
+            var cleanRunner = new HaltingPlanRunner(clean);
+            var cleanReport = new ExecutionReport(plan);
+            System.Collections.IEnumerator cleanRun = cleanRunner.Run(plan, cleanReport);
+            guard = 0;
+            while (cleanRun.MoveNext() && guard++ < 1000) { }
+            if (clean.Executed.Count != 3 || cleanRunner.HaltedAfterStep != null || cleanReport.Confirmed != 3)
+                throw new InvalidOperationException("A clean Classic run did not cast every step.");
+            // Stopped by its owner mid-step: disposing the run disposes the
+            // step in progress exactly once, and nothing later starts.
+            ScriptedIterator inProgress = null;
+            var hanging = new ScriptedExecutor((single, report3) =>
+                inProgress = new ScriptedIterator(int.MaxValue, false, false, null));
+            var hangingRunner = new HaltingPlanRunner(hanging);
+            System.Collections.IEnumerator hangingRun = hangingRunner.Run(plan, new ExecutionReport(plan));
+            hangingRun.MoveNext();
+            hangingRun.MoveNext();
+            ((IDisposable)hangingRun).Dispose();
+            if (inProgress == null || inProgress.Disposed != 1 || hanging.Executed.Count != 1)
+                throw new InvalidOperationException("A stopped Classic run abandoned the cast in progress.");
+            // The production wiring: the Classic session runs through the
+            // runner, and the root ends a Classic run on disable, area change
+            // and teardown, disposing the session's iterator.
+            DirectoryInfo directory = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
+            while (directory != null && !File.Exists(Path.Combine(directory.FullName, "KingmakerBuffPlanner.sln")))
+                directory = directory.Parent;
+            if (directory == null) throw new InvalidOperationException("Repository root was not discoverable.");
+            string ui = Path.Combine(directory.FullName, "src", "KingmakerBuffPlanner", "UI");
+            string session = File.ReadAllText(Path.Combine(ui, "PlannerUiSession.cs")).Replace("\r\n", "\n");
+            string root = File.ReadAllText(Path.Combine(ui, "BuffPlannerUiRoot.cs")).Replace("\r\n", "\n");
+            string enable = SourceBlock(root, "internal static void SetEnabled(bool enabled)");
+            string unload = SourceBlock(root, "public void OnAreaBeginUnloading()");
+            string teardown = SourceBlock(root, "private void ReleaseAll()");
+            string quick = SourceBlock(root, "private IEnumerator ExecuteQuickRoutine(");
+            if (!session.Contains("var runner = new HaltingPlanRunner(executor);") ||
+                !session.Contains("IEnumerator work = runner.Run(preview.Plan, LastExecutionReport);") ||
+                session.Contains("executor.Execute(preview.Plan, LastExecutionReport)") ||
+                enable == null || !enable.Contains("_instance.EndClassicRun(\"mod-disabled\");") ||
+                unload == null || !unload.Contains("EndClassicRun(\"area-unloading\");") ||
+                teardown == null || teardown.IndexOf("EndClassicRun(\"root-teardown\");", StringComparison.Ordinal) < 0 ||
+                teardown.IndexOf("EndClassicRun(\"root-teardown\");", StringComparison.Ordinal) >
+                    teardown.IndexOf("StopAllCoroutines();", StringComparison.Ordinal) ||
+                quick == null || !quick.Contains("IDisposable inner = routine as IDisposable;") ||
+                Occurrences(root, "StartCoroutine(ExecuteQuickRoutine(") != 0)
+                throw new InvalidOperationException("The Classic run is not owned: halting, disable, area change or teardown.");
         }
 
         // Batch 3, section 11: disk round trips of what the other tests leave

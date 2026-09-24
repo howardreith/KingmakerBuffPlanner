@@ -383,6 +383,12 @@ namespace KingmakerBuffPlanner.UI
 
         internal void RefreshCatalogForRuntime() { RefreshCatalog(true); }
 
+        // The casting-mode control of the settings panel, invoked as a click.
+        internal bool ToggleExecutionModeForRuntime()
+        {
+            return _settings != null && _settings.InvokeCastingModeForRuntime();
+        }
+
         internal string DispatchCatalogControlsForRuntime()
         {
             var evidence = new List<string>();
