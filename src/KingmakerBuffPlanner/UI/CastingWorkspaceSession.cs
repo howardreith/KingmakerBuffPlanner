@@ -744,6 +744,34 @@ namespace KingmakerBuffPlanner.UI
             return origins;
         }
 
+        // Whether an enhancement is offered for a casting of this ability by
+        // its caster: exactly the compiler's applicability for the casting's
+        // providers (a class feature only for the spells it lists, a rod by
+        // its list or spell level), or, with no provider to judge, a class
+        // feature only for a spell it lists. Live qualification showed
+        // Powerful Change for scores with no qualifying spell offered on
+        // every spell, because an empty list read as "any spell".
+        internal static bool OffersEnhancement(CastEnhancementSnapshot enhancement, AbilityKey ability,
+            string spellbookGuid, CastingWorkspaceInputs inputs)
+        {
+            if (enhancement == null || ability == null) return false;
+            List<ProviderSnapshot> providers = (inputs == null || inputs.ProviderOptions == null
+                    ? new ProviderPlanningOption[0] : inputs.ProviderOptions)
+                .Where(option => option != null && option.Provider != null &&
+                    string.Equals(option.Provider.Key.CasterUnitId, enhancement.CasterUnitId,
+                        StringComparison.Ordinal) &&
+                    string.Equals(option.Provider.Key.Ability.Canonical, ability.Canonical,
+                        StringComparison.Ordinal) &&
+                    (spellbookGuid == null || string.Equals(option.Provider.Key.SpellbookGuid,
+                        spellbookGuid, StringComparison.Ordinal)))
+                .Select(option => option.Provider).ToList();
+            if (providers.Count != 0) return providers.Any(provider => enhancement.IsApplicable(provider));
+            bool listed = enhancement.AbilityWhiteList.Contains(ability.BaseAbilityGuid) ||
+                enhancement.AbilityWhiteList.Contains(ability.VariantGuid);
+            return listed || (enhancement.Category != CastEnhancementCategory.ClassFeature &&
+                enhancement.AbilityWhiteList.Count == 0);
+        }
+
         // Enhancement options for the FOCUSED record, derived from that
         // record's own caster and ability — not the draft's (review G1).
         private void BuildFocusedEnhancements(
@@ -765,10 +793,8 @@ namespace KingmakerBuffPlanner.UI
                     !string.Equals(enhancement.CasterUnitId,
                         focused.CasterUnitId, StringComparison.Ordinal))
                     continue;
-                bool qualified = enhancement.AbilityWhiteList.Count == 0 ||
-                    enhancement.AbilityWhiteList.Contains(baseGuid) ||
-                    enhancement.AbilityWhiteList.Contains(variantGuid);
-                if (!qualified) continue;
+                if (!OffersEnhancement(enhancement, focused.Ability, focused.SpellbookGuid, inputs))
+                    continue;
                 view._focusedEnhancements.Add(new WorkspaceEnhancementOption(
                     enhancement.EnhancementId, enhancement.DisplayName,
                     focused.Enhancements.Any(selection => selection != null &&
@@ -907,10 +933,7 @@ namespace KingmakerBuffPlanner.UI
                     if (enhancement == null ||
                         !string.Equals(enhancement.CasterUnitId, draftCaster,
                             StringComparison.Ordinal)) continue;
-                    bool qualified = enhancement.AbilityWhiteList.Count == 0 ||
-                        enhancement.AbilityWhiteList.Contains(baseGuid) ||
-                        enhancement.AbilityWhiteList.Contains(variantGuid);
-                    if (!qualified) continue;
+                    if (!OffersEnhancement(enhancement, enhancementAbility, null, inputs)) continue;
                     enhancements.Add(new WorkspaceEnhancementOption(
                         enhancement.EnhancementId, enhancement.DisplayName,
                         Draft.Enhancements.Any(selection => selection != null &&

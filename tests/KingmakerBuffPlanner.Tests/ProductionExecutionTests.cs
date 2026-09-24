@@ -4389,6 +4389,8 @@ namespace KingmakerBuffPlanner.Tests
             internal bool ReportProviderDirect = true;
             internal bool WithShare;
             internal const string ShareId = "share-transmutation|unit-arcanist|share-toggle";
+            internal static readonly string DexterityId =
+                BrownFurPowerfulChangeProfile.EnhancementId("unit-arcanist", "d1f274d1a129eedd8ef44efdb3426d7f");
             // How the enhancement executes: "direct" (the installed
             // provider's own transaction, as live), "native" (a native
             // command) or "none".
@@ -4525,6 +4527,15 @@ namespace KingmakerBuffPlanner.Tests
                         "rod-guid", "Extend Metamagic Rod", string.Empty, CastEnhancementCategory.MetamagicRod,
                         8, 6, 3, new string[0])
                 };
+                // As live: Powerful Change for a score no known spell raises
+                // (an empty list); it must never be offered.
+                enhancements.Add(new CastEnhancementSnapshot(DexterityId, "unit-arcanist",
+                    "d1f274d1a129eedd8ef44efdb3426d7f", "Powerful Change: Dexterity", string.Empty,
+                    CastEnhancementCategory.ClassFeature, 0, 0, Reservoir, new string[0],
+                    "Powerful Change: Dexterity", new[] { BrownFurPowerfulChangeProfile.CastingSpellbookGuid },
+                    BrownFurPowerfulChangeProfile.UsagePoolId("unit-arcanist"), false,
+                    "brown-fur-powerful-change", 1, false, "brown-fur-powerful-change", "Arcane Reservoir",
+                    Routing == "direct" ? "brown-fur-direct-cast-v1" : null));
                 if (WithShare)
                     enhancements.Add(new CastEnhancementSnapshot(ShareId, "unit-arcanist", "share-toggle",
                         "Share Transmutation", string.Empty, CastEnhancementCategory.ClassFeature, 0, 0, Reservoir,
@@ -4707,6 +4718,21 @@ namespace KingmakerBuffPlanner.Tests
                     "an enhancement that changes whom the spell reaches (such as Share Transmutation) is not executed yet")
                 throw new InvalidOperationException("Share Transmutation chosen as an enhancement was not refused: " +
                     sharedCasting.Readiness + " " + string.Join(",", sharedCasting.ReadinessReasons.ToArray()));
+            // The draft editor offers what the compiler would accept for the
+            // chosen source: the rod and Powerful Change: Strength, never a
+            // score no known spell raises.
+            string draftDir = Path.Combine(root, "qe-draft");
+            Directory.CreateDirectory(draftDir);
+            var draftSession = new CastingWorkspaceSession(draftDir, "fixture-campaign",
+                new DisabledCastingDispatchBoundary());
+            draftSession.Draft.SourceId = selection.SourceId;
+            draftSession.Draft.TargetMode = CastingTargetMode.DirectTarget;
+            draftSession.Draft.CasterUnitId = "unit-arcanist";
+            List<string> draftOffers = draftSession.BuildView(inputs).Draft.Enhancements
+                .Select(option => option.EnhancementId).ToList();
+            if (!draftOffers.SequenceEqual(new[] { "metamagic-rod|unit-arcanist|rod-guid", id }))
+                throw new InvalidOperationException("The draft offered enhancements the casting cannot take: " +
+                    string.Join(",", draftOffers.ToArray()));
             // Refused: only a rod (not a supported non-rod enhancement); no
             // reservoir point left; no plain spell the enhancement applies to.
             CastingQualificationSelection rodOnly = CastingQualificationRecipe.SelectEnhancedDirect(
