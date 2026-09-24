@@ -144,15 +144,27 @@ Every guard added since rc2 has a mutant that the tests catch. Mutants
 show that the tests would notice a broken guard; they are not evidence
 of behavior in the game.
 
-**Native gameplay.** These are guarded runs on the disposable automation
-campaign, never an ordinary save. Each run checked in game that it had
-loaded the build it staged (commit, package, DLL and MVID). The receipt
-(`docs/evidence/rc-0.2.0-rc4-receipt.md`, added after the freeze) lists
-the runs made on the frozen rc4 candidate itself: the Classic Long
-routine in both casting modes, the casting-first zero-cost qualification
-in both modes (stop, complete, repeat, recast, disable, recover), the
-first-open import of a genuine 0.0.19 (schema 4) plan, and the finite
-selection on this party. The rc3 receipt keeps the runs made on rc3.
+**Native gameplay.** These are guarded runs on disposable test campaigns,
+never an ordinary save. Each run checked in game that it had loaded the
+build it staged (commit, package, DLL and MVID).
+- On the automation campaign: the Classic Long routine in both casting
+  modes; the casting-first zero-cost qualification in both modes (stop,
+  complete, repeat, recast, disable, recover); and the first-open import
+  of a genuine 0.0.19 (schema 4) plan.
+- On the owner's advanced test campaign, a disposable *Beneath the Stolen
+  Lands* save (`docs/evidence/advanced-fixture-20260924-receipt.md`),
+  each in both modes:
+  - finite prepared and spontaneous resources, with exact slots and
+    counts;
+  - group buffs: one cast and one slot for four beneficiaries, a
+    target-anchored group, and a recipient already covered;
+  - Powerful Change chosen on a casting: the enhanced recipient got +6
+    where the plain one got +4, exactly one Arcane Reservoir point was
+    spent, and the caster's toggles were left as they were.
+
+The receipt (`docs/evidence/rc-0.2.0-rc5-receipt.md`, added after the
+freeze) lists the runs made on the frozen rc5 candidate itself; earlier
+receipts keep the runs made on earlier candidates.
 
 **Restoration:** every run moved the owner's Mods folder aside, staged
 only the candidate and the approved mod set, and restored the folder
@@ -163,21 +175,21 @@ Every save was compared before and after.
 described in `docs/MANUAL-USABILITY-HANDOFF.md`.
 
 **Not yet checked in the game:**
-- spells that spend prepared slots or spontaneous levels;
-- ability pools;
-- group spells, metamagic variants and rods;
-- an area change during a run (the test campaign's only exit autosaves
-  and ends the prologue);
-- pets;
+- ability pools (the advanced party's Mutagen and domain powers were
+  inventoried, not cast);
+- metamagic variants and rods (no metamagic spell was prepared, and the
+  rods were not used);
+- an area change during a run (the automation campaign's only exit
+  autosaves and ends the prologue);
+- pets (neither test party has any);
 - keyboard and mouse input from a person, and any check that judges game
   frames (the workspace layout at 1920×1200 and 1920×1080, the in-game
   reload, the manual-session rehearsal): game frames render black while
   the owner's remote session is disconnected, so these wait for a
   connected session.
 
-The finite-resource and group qualification is prepared and waits for an
-owner-designated advanced test save (`docs/ADVANCED-SEED-COMPATIBILITY.md`):
-the automation party's finite spell levels hold no buff.
+The advanced campaign's evidence is labelled as that fixture: it does
+not prove behaviour specific to the main campaign.
 
 ## Known limitations
 

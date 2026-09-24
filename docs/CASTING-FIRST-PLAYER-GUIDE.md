@@ -187,11 +187,13 @@ else has passed source and recorded-runtime tests only.
 | A free cantrip whose class ability is gone when the routine runs | Refused; it is never cast from a spell slot instead | Not in the game (source tests) |
 | A cast whose resource use the game cannot report | Treated as uncertain; the routine stops there | Not in the game (source tests) |
 | Close and reopen the planner; the accepted plan survives | Runs | Yes |
-| Spellbook spells from prepared slots or spontaneous levels, direct target | Runs, budgeted in order | Not yet (the test party has only cantrips) |
-| Exact prepared slots and ability pools shared across castings | Runs, budgeted in order | Not yet |
-| Group spells, caster-centred or anchored origin, predicted coverage | Runs | Not yet |
+| Spellbook spells from prepared slots or spontaneous levels, direct target | Runs, budgeted in order | Yes, on the owner's advanced test campaign (a *Beneath the Stolen Lands* save), both modes: a spontaneous level and one exact prepared slot each spent exactly once per cast, the rest untouched |
+| Exact prepared slots shared across castings | Runs, budgeted in order | Yes (advanced campaign): the slot a casting reserved was the one spent |
+| Ability pools (for example Mutagen, domain powers) | Runs, budgeted in order | Not yet |
+| Group spells, caster-centred or anchored origin, predicted coverage | Runs | Yes (advanced campaign), both modes: a communal spell reached all four members for one cast and one slot; a target-anchored group spell centred on a member; a member who already had the buff was counted as covered |
+| A per-casting class-feature enhancement (Brown-Fur Powerful Change) | Runs; in Instant mode through the provider's own transaction | Yes (advanced campaign), both modes: the enhanced recipient got +6 where the plain cast gave +4, one Arcane Reservoir point was spent, and the caster's toggles were left as they were |
 | Metamagic spell variants, metamagic rods (any matching rod) | Runs | Not yet |
-| Targeting modifiers (for example Share Transmutation) | Shown as "cannot run in this version"; Apply refuses | n/a |
+| Share Transmutation and other ways of changing whom a spell reaches (as a targeting modifier or an enhancement) | Shown as "cannot run in this version" or "not executed yet"; Apply refuses | n/a |
 | A specific physical rod or item | Shown as "cannot run in this version"; Apply refuses | n/a |
 | Group castings whose required recipients are outside the predicted area | Shown as "cannot run in this version"; Apply refuses | n/a |
 
