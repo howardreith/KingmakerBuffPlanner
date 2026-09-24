@@ -68,6 +68,7 @@ namespace KingmakerBuffPlanner.Tests
             Run("qualification-on-the-planner-pumped-host", () => TestQualificationOnOwnerPumpedHost(root));
             Run("qualification-disable-step-rules", () => TestQualificationDisableStepRules(root));
             Run("cantrips-cast-at-will-through-the-class-ability", TestCantripsCastAtWill);
+            Run("at-will-cantrip-choice-refuses-what-is-not-the-authored-cantrip", TestAtWillCantripChoice);
             Run("capability-inventory-describes-the-party", TestCapabilityInventory);
             Run("qualification-finite-recipe", () => TestFiniteQualificationRecipe(root));
             Run("qualification-driver-refusals-and-deadline",
@@ -3000,22 +3001,34 @@ namespace KingmakerBuffPlanner.Tests
             string adapter = source("KingmakerAnimatedCastAdapter.cs");
             string atWill = source("KingmakerAtWillCantrips.cs");
             string builder = source("KingmakerPartySnapshotBuilder.cs");
-            string resolve = SourceBlock(adapter, "private static AbilityData ResolveAbility(\n            UnitEntityData caster,\n            ProviderKey provider,\n            IReadOnlyList<string> reservedTokenIds)");
+            string resolve = SourceBlock(adapter, "private static AbilityData ResolveAbility(\n            UnitEntityData caster,\n            ProviderKey provider,\n            IReadOnlyList<string> reservedTokenIds,");
             int atWillAt = resolve == null ? -1 : resolve.IndexOf(
                 "KingmakerAtWillCantrips.Resolve(caster, provider.Ability,", StringComparison.Ordinal);
             int memorizedAt = resolve == null ? -1 : resolve.IndexOf("book.GetAllMemorizedSpells()", StringComparison.Ordinal);
             if (atWillAt < 0 || memorizedAt < atWillAt ||
                 !resolve.Contains("if (provider.SourceInstanceId == AtWillSourceInstance)") ||
+                !resolve.Contains("if (refusal != null) return null;") ||
+                !resolve.Contains("resolution = \"at-will-cantrip-ability;authored=spellbook:\" + provider.SpellbookGuid +") ||
                 !adapter.Contains("internal const string AtWillSourceInstance = \"level-0|heighten-0\";"))
                 throw new InvalidOperationException("A cantrip's level-0 entry is not cast through its at-will ability first.");
             string validate = SourceBlock(adapter, "internal CastRuntimeValidation ValidateSource(CastStep step,");
             if (validate == null || validate.Contains("resolved.Ability.IsAvailableForCast") ||
                 !validate.Contains("if (!resolved.Ability.IsAvailable) return CastRuntimeValidation.Fail(\"ability-unavailable\");"))
                 throw new InvalidOperationException("Validation is not the cast command's own availability guard.");
-            string isAtWill = SourceBlock(atWill, "internal static bool IsAtWill(AbilityData data)");
-            if (isAtWill == null || !isAtWill.Contains("data.Spellbook == null && data.IsAvailable &&") ||
-                !isAtWill.Contains("data.GetAvailableForCastCount() < 0"))
+            string resolveAtWill = SourceBlock(atWill, "internal static AbilityData Resolve(UnitEntityData caster, AbilityKey requested,");
+            if (resolveAtWill == null || !resolveAtWill.Contains("AtWillCantripChoice.Choose(") ||
+                !resolveAtWill.Contains("SafeHasSpellbook(judged), SafeAvailable(judged), SafeCount(judged), CasterLevel(judged)") ||
+                !atWill.Contains("try { return data.IsAvailable; }") ||
+                !atWill.Contains("try { return data.GetAvailableForCastCount(); }"))
                 throw new InvalidOperationException("An ability is taken as at will without the game's own judgement.");
+            // Both execution paths validate with the command's own guard and
+            // resolve through the same adapter, which records provenance.
+            string instant = source("KingmakerInstantCastAdapter.cs");
+            if (!instant.Contains(".ValidateSource(step, false);") ||
+                Occurrences(instant, "KingmakerAnimatedCastAdapter.TryResolve(") < 2 ||
+                !instant.Contains("\";resolution:\" + (resolved.Resolution ?? \"unrecorded\") +") ||
+                !adapter.Contains("\";resolution:\" + _resolution +"))
+                throw new InvalidOperationException("An execution path skips the shared guard or its provenance.");
             string spontaneous = SourceBlock(builder, "private void ScanSpontaneousSpellbook(");
             string zero = SourceBlock(builder, "private void ScanSpontaneousLevelZero(");
             string prepared = SourceBlock(builder, "private void ScanPreparedSpellbook(");
@@ -3052,6 +3065,48 @@ namespace KingmakerBuffPlanner.Tests
                 CastingCapabilityInventory.Shape(null) != "none" ||
                 CastingCapabilityInventory.Describe(null).Single() != "inputs-unavailable")
                 throw new InvalidOperationException("Effect shapes were not described exactly.");
+        }
+
+        // The at-will choice (live runs a1-anim-01 and d1-01): only a cantrip
+        // of exactly the authored ability, unbound to a spellbook, available
+        // and unlimited, qualifies; name- or effect-alikes, variants,
+        // metamagic forms, spellbook-bound and finite abilities never do;
+        // abilities from several classes resolve by the authored spellbook's
+        // caster level, and are refused when that cannot decide.
+        private static void TestAtWillCantripChoice()
+        {
+            Func<string, bool, bool, bool, bool, int, int, AtWillCantripCandidate> make =
+                (id, cantrip, matches, book, available, count, cl) =>
+                    new AtWillCantripCandidate(id, cantrip, matches, book, available, count, cl);
+            string refusal;
+            if (AtWillCantripChoice.Choose(new AtWillCantripCandidate[0], 1, out refusal) != null || refusal != null)
+                throw new InvalidOperationException("A missing grant chose something or refused.");
+            var misfits = new[]
+            {
+                make("same-name-not-cantrip", false, true, false, true, -1, 1),
+                make("other-variant-or-metamagic", true, false, false, true, -1, 1),
+                make("spellbook-bound", true, true, true, true, -1, 1),
+                make("unavailable", true, true, false, false, -1, 1),
+                make("finite", true, true, false, true, 3, 1),
+                make("no-count", true, true, false, true, 0, 1)
+            };
+            foreach (AtWillCantripCandidate misfit in misfits)
+                if (AtWillCantripChoice.Choose(new[] { misfit }, 1, out refusal) != null || refusal != null)
+                    throw new InvalidOperationException("Not an at-will cantrip, but chosen: " + misfit.Identity);
+            AtWillCantripCandidate fact = make("fact", true, true, false, true, -1, 1);
+            if (AtWillCantripChoice.Choose(misfits.Concat(new[] { fact }), 1, out refusal) != fact || refusal != null)
+                throw new InvalidOperationException("The one at-will cantrip was not chosen among misfits.");
+            AtWillCantripCandidate bard = make("bard", true, true, false, true, -1, 3);
+            AtWillCantripCandidate sorcerer = make("sorcerer", true, true, false, true, -1, 1);
+            if (AtWillCantripChoice.Choose(new[] { bard, sorcerer }, 1, out refusal) != sorcerer ||
+                AtWillCantripChoice.Choose(new[] { bard, sorcerer }, 3, out refusal) != bard)
+                throw new InvalidOperationException("The authored spellbook's caster level did not decide.");
+            AtWillCantripCandidate twin = make("twin", true, true, false, true, -1, 3);
+            if (AtWillCantripChoice.Choose(new[] { bard, twin }, 1, out refusal) != bard || refusal != null)
+                throw new InvalidOperationException("Equivalent at-will abilities were refused.");
+            if (AtWillCantripChoice.Choose(new[] { bard, sorcerer }, 2, out refusal) != null ||
+                refusal != AtWillCantripChoice.AmbiguousPrefix + "bard@cl3,sorcerer@cl1")
+                throw new InvalidOperationException("An ambiguous choice was guessed: " + refusal);
         }
 
         // The live shape: the planner's root owns and pumps the host, the

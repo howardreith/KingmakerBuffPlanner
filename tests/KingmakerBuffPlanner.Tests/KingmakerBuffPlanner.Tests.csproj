@@ -59,6 +59,7 @@
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\SingleCastProbe.cs"><Link>Execution\SingleCastProbe.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\CastingQualification.cs"><Link>Execution\CastingQualification.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\CastingCapabilityInventory.cs"><Link>Execution\CastingCapabilityInventory.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\AtWillCantripChoice.cs"><Link>Execution\AtWillCantripChoice.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\CastingQualificationDriver.cs"><Link>Execution\CastingQualificationDriver.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\SingleCastProbeObservation.cs"><Link>Execution\SingleCastProbeObservation.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\MaterialComponentAvailability.cs"><Link>Execution\MaterialComponentAvailability.cs</Link></Compile>

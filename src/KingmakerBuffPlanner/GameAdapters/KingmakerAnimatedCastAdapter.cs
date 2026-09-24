@@ -124,7 +124,7 @@ namespace KingmakerBuffPlanner.GameAdapters
             resolved.Caster.Commands.AddToQueue(command);
             return new KingmakerAnimatedOperation(command, step,
                 resolved.Caster, resolved.Target, resolved.Ability,
-                delivery, previousCommand, availableBefore);
+                delivery, previousCommand, availableBefore, resolved.Resolution);
         }
 
         internal static bool TryResolve(CastStep step, out ResolvedCast resolved, out string reason)
@@ -143,27 +143,34 @@ namespace KingmakerBuffPlanner.GameAdapters
             UnitEntityData target;
             if (string.IsNullOrEmpty(targetId) || !units.TryGetValue(targetId, out target))
                 return Fail("target-not-in-party", out reason);
-            AbilityData ability = ResolveAbility(caster, step);
-            if (ability == null) return Fail("provider-ability-not-found", out reason);
-            resolved = new ResolvedCast(caster, ability, new TargetWrapper(target));
+            string resolution;
+            string refusal;
+            AbilityData ability = ResolveAbility(caster, step.Provider, step.Reservation.TokenIds,
+                out resolution, out refusal);
+            if (ability == null) return Fail(refusal ?? "provider-ability-not-found", out reason);
+            resolved = new ResolvedCast(caster, ability, new TargetWrapper(target)) { Resolution = resolution };
             return true;
-        }
-
-        private static AbilityData ResolveAbility(UnitEntityData caster, CastStep step)
-        {
-            return ResolveAbility(caster, step.Provider, step.Reservation.TokenIds);
         }
 
         internal static AbilityData ResolveAbility(UnitEntityData caster, ProviderKey provider)
         {
-            return ResolveAbility(caster, provider, null);
+            string resolution;
+            string refusal;
+            return ResolveAbility(caster, provider, null, out resolution, out refusal);
         }
 
+        // resolution: how the authored provider became the ability data the
+        // game casts (provenance for the evidence); refusal: why it cannot,
+        // when that is more than "not found".
         private static AbilityData ResolveAbility(
             UnitEntityData caster,
             ProviderKey provider,
-            IReadOnlyList<string> reservedTokenIds)
+            IReadOnlyList<string> reservedTokenIds,
+            out string resolution,
+            out string refusal)
         {
+            resolution = null;
+            refusal = null;
             if (provider.Ability.SourceKind == SourceKind.Spellbook)
             {
                 List<Spellbook> ownedBooks = caster.Descriptor.Spellbooks.Where(b => b != null &&
@@ -178,8 +185,16 @@ namespace KingmakerBuffPlanner.GameAdapters
                 if (provider.SourceInstanceId == AtWillSourceInstance)
                 {
                     AbilityData atWill = KingmakerAtWillCantrips.Resolve(caster, provider.Ability,
-                        book.CasterLevel);
-                    if (atWill != null) return atWill;
+                        book.CasterLevel, out refusal);
+                    if (atWill != null)
+                    {
+                        resolution = "at-will-cantrip-ability;authored=spellbook:" + provider.SpellbookGuid +
+                            "/level-0;cast=" + KingmakerStickyTouchCastAdapter.Identity(atWill);
+                        return atWill;
+                    }
+                    // Ambiguous at-will abilities are refused, never guessed
+                    // and never replaced by the slot-bound spellbook entry.
+                    if (refusal != null) return null;
                 }
                 if (reservedTokenIds != null && reservedTokenIds.Count != 0)
                 {
@@ -189,7 +204,11 @@ namespace KingmakerBuffPlanner.GameAdapters
                     {
                         AbilityData match = KingmakerAbilityVariants.Resolve(
                             slot.Spell, provider.Ability);
-                        if (match != null) return match;
+                        if (match != null)
+                        {
+                            resolution = "reserved-memorized-slot:" + SlotId(slot);
+                            return match;
+                        }
                     }
                     return null;
                 }
@@ -198,16 +217,28 @@ namespace KingmakerBuffPlanner.GameAdapters
                 {
                     AbilityData match = KingmakerAbilityVariants.Resolve(
                         slot.Spell, provider.Ability);
-                    if (match != null) return match;
+                    if (match != null)
+                    {
+                        resolution = "memorized-slot:" + SlotId(slot);
+                        return match;
+                    }
                 }
                 AbilityData known = ResolveSource(
                     book.GetAllKnownSpells(), provider);
-                if (known != null) return known;
+                if (known != null)
+                {
+                    resolution = "known-spell:spellbook:" + provider.SpellbookGuid;
+                    return known;
+                }
                 for (int level = 0; level <= book.MaxSpellLevel; level++)
                 {
                     AbilityData custom = ResolveSource(
                         book.GetCustomSpells(level), provider);
-                    if (custom != null) return custom;
+                    if (custom != null)
+                    {
+                        resolution = "custom-spell:spellbook:" + provider.SpellbookGuid;
+                        return custom;
+                    }
                 }
                 return null;
             }
@@ -219,7 +250,11 @@ namespace KingmakerBuffPlanner.GameAdapters
                 {
                     AbilityData match = KingmakerAbilityVariants.Resolve(
                         fact.Data, provider.Ability);
-                    if (match != null) return match;
+                    if (match != null)
+                    {
+                        resolution = "ability:" + provider.Ability.SourceKind;
+                        return match;
+                    }
                 }
                 return null;
             }
@@ -342,6 +377,8 @@ namespace KingmakerBuffPlanner.GameAdapters
             internal UnitEntityData Caster;
             internal AbilityData Ability;
             internal TargetWrapper Target;
+            // How the authored provider became this ability (provenance).
+            internal string Resolution;
         }
 
         private sealed class KingmakerAnimatedOperation : IAnimatedCastOperation
@@ -354,6 +391,7 @@ namespace KingmakerBuffPlanner.GameAdapters
             private readonly BlueprintAbility _deliveryBlueprint;
             private readonly UnitCommand _previousCommandAtStart;
             private readonly int _availableBefore;
+            private readonly string _resolution;
             private readonly AnimatedStickyTouchLifecycle _stickyLifecycle;
             private int _postCompletionFrames;
             private int _pollFrames;
@@ -367,8 +405,9 @@ namespace KingmakerBuffPlanner.GameAdapters
                 UnitEntityData caster, TargetWrapper target,
                 AbilityData sourceAbility,
                 BlueprintAbility deliveryBlueprint,
-                UnitCommand previousCommandAtStart, int availableBefore)
+                UnitCommand previousCommandAtStart, int availableBefore, string resolution)
             {
+                _resolution = resolution ?? "unrecorded";
                 _carrierCommand = command;
                 _step = step;
                 _caster = caster;
@@ -499,6 +538,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                         ";delivery-guid:" + (_deliveryBlueprint == null
                             ? "none" : _deliveryBlueprint.AssetGuid) +
                         ";expected-effects:" + ExpectedEffectIds(_step.ExpectedEffects) +
+                        ";resolution:" + _resolution +
                         ";targets:" + string.Join(",",
                             _step.ExpectedRecipientUnitIds.ToArray()) +
                         ";effects-observed:" + EffectsObserved;

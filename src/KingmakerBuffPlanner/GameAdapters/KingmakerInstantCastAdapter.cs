@@ -279,6 +279,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                 ";strategy-reason:" + step.ExecutionStrategyReason +
                 ";carrier-guid:" + carrierGuid +
                 ";delivery-guid:" + deliveryGuid +
+                ";resolution:" + (resolved.Resolution ?? "unrecorded") +
                 ";source-ability-data:" +
                 KingmakerStickyTouchCastAdapter.Identity(sourceAbility) +
                 ";execution-ability-data:" +
