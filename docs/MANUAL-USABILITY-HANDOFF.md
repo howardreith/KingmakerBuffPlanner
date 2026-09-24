@@ -1,22 +1,40 @@
 # Supervised manual usability session — implemented procedure
 
-**Release-candidate session (0.2.0-rc2).** This is the one consolidated
+**Release-candidate session (0.2.0-rc4).** This is the one consolidated
 manual acceptance session the mission asks for near the end. It runs the
 frozen candidate from its own clean checkout,
-`C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner-RC2`
-(commit `ae0181d`; identities in `docs/evidence/rc-0.2.0-rc2-receipt.md`).
-The procedure was rehearsed on that build
-(`casting-ws-manual-20260923-rc2-rehearsal`, done marker written
-automatically, labeled rehearsal). In this session the planner authors and saves
-but cannot cast: native casting is disabled in every automated or
-supervised test session, and the candidate's casting was qualified
-separately by the guarded runs listed in the receipt.
+`C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner-RC4`
+(commit `863a182`; identities in `docs/evidence/rc-0.2.0-rc4-receipt.md`).
+The procedure was rehearsed end to end on rc2
+(`casting-ws-manual-20260923-rc2-rehearsal`); its rehearsal on the rc4
+build judges game frames, so it runs first once your session is connected
+(with the other deferred frame-judged runs listed in the receipt), before
+you are asked to take part. In this session the planner authors and saves but cannot cast:
+native casting is disabled in every automated or supervised test session,
+and the candidate's casting was qualified separately by the guarded runs
+listed in the receipt.
 
-What to look at first, because it changed since your last session: the
-buff grid with its Spells / Abilities / Other tabs; routine tabs with
-counts; card costs and the footer naming whose resource and what kind;
-the header counting the routine; the inspector naming the casting being
-edited; refusals that say what to do next.
+What to look at first, because it changed since your last session (rc2):
+- **Edit one casting** (press Edit on a card): **Cast by (this
+  casting)** names each exact source (for example "Linzi: Bard level 1
+  (spell slot), caster level 5"); **Routine and order**; **If the buff is
+  already there** (skip or cast again); the single/group switch where the
+  buff allows it; enhancements that follow the caster (the footer names
+  any the new caster does not have; Undo brings them back).
+- **The next casting**: **Cast from** when a caster has more than one way
+  to cast the buff; a spell known at two levels of one spellbook is
+  refused with its reason.
+- **Plan settings**: the animated fallback for Instant mode and **Cast
+  only out of combat**.
+- **Save / Reload**: the header says "not saved" while saving is refused;
+  a Reload that could replace unsaved changes asks for a second press.
+- **The classic planner** (the default mode): APPLY now closes the planner
+  so the party casts at once, and the result appears when you reopen it.
+  This changes the default planner's behaviour and is yours to confirm;
+  casting is disabled in this session, so it can only be seen in ordinary
+  play after installing the candidate.
+- The buff grid tabs, routine tabs with counts, card costs, the footer
+  naming whose resource and what kind, and refusals that say what to do.
 
 Every mechanism below is implemented in the pushed harness (scenario
 `live-workspace-manual`), rehearsed end to end before you are asked to
@@ -27,7 +45,7 @@ and legacy quick execution remain disabled; nothing can cast a buff.
 ## The supported command (exact)
 
 ```powershell
-& 'C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner-RC2\scripts\Invoke-KingmakerRuntimeTest.ps1' `
+& 'C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner-RC4\scripts\Invoke-KingmakerRuntimeTest.ps1' `
     -Scenario live-workspace-manual -CompatibilityProfileId full-user `
     -RunId casting-ws-manual-HHmm -ManualHoldSeconds 900 `
     -TimeoutSeconds 1500 -Confirm:$false
