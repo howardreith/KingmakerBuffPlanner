@@ -72,6 +72,8 @@ namespace KingmakerBuffPlanner.Tests
             Run("capability-inventory-describes-the-party", TestCapabilityInventory);
             Run("classic-cast-grant-digest-allowance-and-judgement", TestClassicCastCore);
             Run("read-only-game-diagnostics-never-act", TestReadOnlyGameDiagnostics);
+            Run("persistence-round-trip-gaps-and-campaign-isolation",
+                () => TestPersistenceRoundTripAndCampaignIsolation(root));
             Run("qualification-finite-recipe", () => TestFiniteQualificationRecipe(root));
             Run("qualification-driver-refusals-and-deadline",
                 () => TestQualificationDriverRefusalsAndDeadline(root));
@@ -530,6 +532,35 @@ namespace KingmakerBuffPlanner.Tests
                 "\"accepted\":{\"long\":\"XYZ\"}}");
             if (store.Load("campaign-a").AcceptedDigests.Count != 0)
                 throw new InvalidOperationException("An invalid digest was honoured.");
+            // Batch 3, section 11: a file the store refuses to read (newer
+            // schema, another campaign, unreadable, invalid) is never
+            // replaced by a save; its bytes stay exactly as they were.
+            foreach (string content in new[]
+                {
+                    "{ not json",
+                    "{\"schemaVersion\":2,\"campaignId\":\"campaign-a\",\"accepted\":{}}",
+                    "{\"schemaVersion\":1,\"campaignId\":\"campaign-other\",\"accepted\":{}}",
+                    "{\"schemaVersion\":1,\"campaignId\":\"campaign-a\",\"accepted\":{\"long\":\"XYZ\"}}"
+                })
+            {
+                File.WriteAllText(path, content);
+                byte[] before = File.ReadAllBytes(path);
+                bool kept = false;
+                try { store.Save("campaign-a", new Dictionary<string, string> { { "long", digest } }); }
+                catch (InvalidOperationException exception)
+                {
+                    kept = exception.Message.StartsWith("review-state-file-protected:review-state-ignored:",
+                        StringComparison.Ordinal);
+                }
+                if (!kept || !File.ReadAllBytes(path).SequenceEqual(before))
+                    throw new InvalidOperationException("A review file the store refuses was replaced: " + content);
+            }
+            File.Delete(path);
+            store.Save("campaign-a", new Dictionary<string, string> { { "long", digest } });
+            if (store.Load("campaign-a").AcceptedDigests.Count != 1)
+                throw new InvalidOperationException("A save after removing the protected file failed.");
+            File.WriteAllText(path, "{\"schemaVersion\":1,\"campaignId\":\"campaign-a\"," +
+                "\"accepted\":{\"long\":\"XYZ\"}}");
             bool refused = false;
             try { store.Save("campaign-a", new Dictionary<string, string> { { "long", "bad" } }); }
             catch (ArgumentException) { refused = true; }
@@ -564,6 +595,27 @@ namespace KingmakerBuffPlanner.Tests
             if (store.Load(out warning) != PlannerMode.Classic ||
                 !warning.StartsWith("planner-mode-ignored:unreadable", StringComparison.Ordinal))
                 throw new InvalidOperationException("A corrupt mode file activated casting-first.");
+            // Batch 3, section 11: the toggle never replaces a mode file the
+            // store refuses to read; it reports why and keeps the bytes.
+            foreach (string content in new[]
+                {
+                    "garbage", "{\"schemaVersion\":2,\"mode\":\"casting-first\"}",
+                    "{\"schemaVersion\":1,\"mode\":\"turbo\"}"
+                })
+            {
+                File.WriteAllText(store.FilePath, content);
+                byte[] before = File.ReadAllBytes(store.FilePath);
+                string message = null;
+                try { store.Save(PlannerMode.CastingFirst); }
+                catch (InvalidOperationException exception) { message = exception.Message; }
+                if (message == null || !message.StartsWith("planner-mode.json was left unchanged (planner-mode-ignored:",
+                        StringComparison.Ordinal) || !File.ReadAllBytes(store.FilePath).SequenceEqual(before))
+                    throw new InvalidOperationException("A mode file the store refuses was replaced: " + content);
+            }
+            File.Delete(store.FilePath);
+            store.Save(PlannerMode.CastingFirst);
+            if (store.Load(out warning) != PlannerMode.CastingFirst || warning.Length != 0)
+                throw new InvalidOperationException("A save after removing the protected mode file failed.");
         }
 
         private static AuthoringEditResult AddDraftCasting(CastingWorkspaceSession session,
@@ -670,6 +722,29 @@ namespace KingmakerBuffPlanner.Tests
                     .StartsWith("native-submission-disabled", StringComparison.Ordinal))
                 throw new InvalidOperationException(
                     "Presenting other material revoked the stored acceptance.");
+            // A review file from a newer planner: the session ignores it,
+            // an acceptance holds for this session only, and the file keeps
+            // its bytes (the save is refused and reported).
+            string newerDir = Path.Combine(root, "acceptance-newer-review");
+            Directory.CreateDirectory(newerDir);
+            string newerPath = new CastingReviewStore(newerDir).PathFor("workspace-campaign");
+            Directory.CreateDirectory(Path.GetDirectoryName(newerPath));
+            File.WriteAllText(newerPath, "{\"schemaVersion\":2,\"campaignId\":\"workspace-campaign\"}");
+            byte[] newerBytes = File.ReadAllBytes(newerPath);
+            var newer = new CastingWorkspaceSession(newerDir, "workspace-campaign",
+                new DisabledCastingDispatchBoundary());
+            Assert(AddDraftCasting(newer, inputs, "unit-cleric", "unit-t1").Applied);
+            newer.Save();
+            newer.PresentForReview(inputs);
+            Assert(newer.AcceptPresentedPlan(inputs));
+            if (!newer.ReviewStoreWarning.StartsWith(
+                    "review-state-save-failed:InvalidOperationException:review-state-file-protected:",
+                    StringComparison.Ordinal) ||
+                !File.ReadAllBytes(newerPath).SequenceEqual(newerBytes) ||
+                !newer.Apply(CastingApplyMode.Ordinary, "long", inputs).ReviewReason
+                    .StartsWith("native-submission-disabled", StringComparison.Ordinal))
+                throw new InvalidOperationException("A newer review file was replaced or the acceptance lost: " +
+                    newer.ReviewStoreWarning);
         }
 
         // Nothing to submit is an honest no-op before review: every casting
@@ -3275,6 +3350,87 @@ namespace KingmakerBuffPlanner.Tests
             select.GrantAttempts = 1;
             if (!select.Violations().Contains("select-grant-used"))
                 throw new InvalidOperationException("A selection run used the classic grant.");
+        }
+
+        // Batch 3, section 11: disk round trips of what the other tests leave
+        // out (one caster casting the same spell from two spellbooks, a
+        // variant child, metamagic, a non-default existing-effect policy),
+        // two campaigns in ONE settings directory never touching each
+        // other, and a copied file refused for the other campaign and never
+        // overwritten.
+        private static void TestPersistenceRoundTripAndCampaignIsolation(string root)
+        {
+            string dir = Path.Combine(root, "persistence-gaps");
+            Directory.CreateDirectory(dir);
+            var variant = new AbilityKey(CastingBuffAbility.BaseAbilityGuid, "variant-child-guid", 0,
+                CastingBuffAbility.SourceKind, null);
+            var empowered = new AbilityKey(CastingBuffAbility.BaseAbilityGuid, string.Empty, 2,
+                CastingBuffAbility.SourceKind, null);
+            CastingPlanDocument a = CampaignDocument("campaign-a",
+                DirectCasting("book-a", "long", "unit-sorc", "unit-t1", "source-bulls", CastingBuffAbility,
+                    null, "spellbook-a"),
+                DirectCasting("book-b", "long", "unit-sorc", "unit-t2", "source-bulls", CastingBuffAbility,
+                    null, "spellbook-b"),
+                DirectCasting("child", "long", "unit-cleric", "unit-t1", "source-bulls", variant, null, "spellbook-c"),
+                DirectCasting("meta", "short", "unit-cleric", "unit-t2", "source-bulls", empowered, null, "spellbook-c"),
+                DirectCasting("always", "short", "unit-wizard", "unit-t3", "source-bulls", CastingBuffAbility,
+                    null, "spellbook-w", CastingAuthoringState.Ready, ExistingEffectPolicy.Overwrite));
+            var repository = new CastingPlanRepository(dir);
+            repository.Save(CastingPlanProfile.FromDocument(a));
+            CastingPlanLoadResult loadedA = repository.Load("campaign-a");
+            if (loadedA.Status != CastingPlanLoadStatus.Loaded)
+                throw new InvalidOperationException("The gap document did not load: " + loadedA.Warning);
+            Dictionary<string, PlannedCasting> byId = loadedA.Profile.ToDocument().Castings
+                .ToDictionary(casting => casting.CastingId, StringComparer.Ordinal);
+            if (byId.Count != 5 ||
+                byId["book-a"].SpellbookGuid != "spellbook-a" || byId["book-b"].SpellbookGuid != "spellbook-b" ||
+                byId["book-a"].Ability.Canonical != byId["book-b"].Ability.Canonical ||
+                byId["book-a"].DirectTargetUnitId != "unit-t1" || byId["book-b"].DirectTargetUnitId != "unit-t2" ||
+                byId["child"].Ability.VariantGuid != "variant-child-guid" ||
+                byId["child"].Ability.Canonical != variant.Canonical ||
+                byId["meta"].Ability.MetamagicMask != 2 || byId["meta"].Ability.Canonical != empowered.Canonical ||
+                byId["always"].ExistingEffectPolicy != ExistingEffectPolicy.Overwrite ||
+                byId["book-a"].ExistingEffectPolicy != ExistingEffectPolicy.SkipAlreadyActive)
+                throw new InvalidOperationException("A spellbook, variant, metamagic or policy drifted on disk.");
+            string pathA = repository.GetProfilePath("campaign-a");
+            byte[] bytesA = File.ReadAllBytes(pathA);
+            repository.Save(CastingPlanProfile.FromDocument(loadedA.Profile.ToDocument()));
+            if (!File.ReadAllBytes(pathA).SequenceEqual(bytesA))
+                throw new InvalidOperationException("The gap document is not byte-stable across a round trip.");
+            // Campaign B in the same settings directory.
+            CastingPlanDocument b = CampaignDocument("campaign-b",
+                DirectCasting("b-only", "long", "unit-wizard", "unit-t1", "source-bulls", CastingBuffAbility));
+            repository.Save(CastingPlanProfile.FromDocument(b));
+            string pathB = repository.GetProfilePath("campaign-b");
+            if (string.Equals(pathA, pathB, StringComparison.OrdinalIgnoreCase) ||
+                Path.GetDirectoryName(pathA) != Path.GetDirectoryName(pathB) ||
+                !File.ReadAllBytes(pathA).SequenceEqual(bytesA) ||
+                repository.Load("campaign-a").Profile.ToDocument().Castings.Count != 5 ||
+                repository.Load("campaign-b").Profile.ToDocument().Castings.Single().CastingId != "b-only")
+                throw new InvalidOperationException("Two campaigns in one directory touched each other.");
+            // A's file copied over B's name is refused for B and never
+            // overwritten by B's save.
+            File.Copy(pathA, pathB, true);
+            byte[] copied = File.ReadAllBytes(pathB);
+            CastingPlanLoadResult mismatch = repository.Load("campaign-b");
+            bool refusedSave = false;
+            try { repository.Save(CastingPlanProfile.FromDocument(b)); }
+            catch (InvalidDataException exception)
+            {
+                refusedSave = exception.Message == "refusing-to-overwrite-another-campaigns-primary";
+            }
+            if (mismatch.Status == CastingPlanLoadStatus.Loaded || mismatch.Profile != null && mismatch.Profile
+                    .ToDocument().Castings.Any(casting => casting.CastingId == "book-a") ||
+                !refusedSave || !File.ReadAllBytes(pathB).SequenceEqual(copied) ||
+                !File.ReadAllBytes(pathA).SequenceEqual(bytesA))
+                throw new InvalidOperationException("A copied campaign file was honoured or overwritten: " +
+                    mismatch.Status + " " + mismatch.Warning + " refusedSave=" + refusedSave);
+        }
+
+        private static CastingPlanDocument CampaignDocument(string campaignId, params PlannedCasting[] castings)
+        {
+            CastingPlanDocument fixture = CastingDocument(castings);
+            return new CastingPlanDocument(campaignId, fixture.Routines, fixture.Castings);
         }
 
         // The area and cantrip diagnostics only read: no transition is used,
