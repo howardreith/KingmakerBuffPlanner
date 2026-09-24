@@ -755,6 +755,10 @@ namespace KingmakerBuffPlanner.UI
             string spellbookGuid, CastingWorkspaceInputs inputs)
         {
             if (enhancement == null || ability == null) return false;
+            // An enhancement that changes whom the spell reaches (Share
+            // Transmutation) is not executed in this version: never offered,
+            // only listed while a casting still holds it.
+            if (enhancement.AffectsTargeting) return false;
             List<ProviderSnapshot> providers = (inputs == null || inputs.ProviderOptions == null
                     ? new ProviderPlanningOption[0] : inputs.ProviderOptions)
                 .Where(option => option != null && option.Provider != null &&
@@ -793,7 +797,12 @@ namespace KingmakerBuffPlanner.UI
                     !string.Equals(enhancement.CasterUnitId,
                         focused.CasterUnitId, StringComparison.Ordinal))
                     continue;
-                if (!OffersEnhancement(enhancement, focused.Ability, focused.SpellbookGuid, inputs))
+                bool chosen = focused.Enhancements.Any(selection => selection != null &&
+                    string.Equals(selection.EnhancementId, enhancement.EnhancementId,
+                        StringComparison.Ordinal));
+                // A chosen enhancement is always listed: its chip is the only
+                // control that removes it (re-review of the offer fix).
+                if (!chosen && !OffersEnhancement(enhancement, focused.Ability, focused.SpellbookGuid, inputs))
                     continue;
                 view._focusedEnhancements.Add(new WorkspaceEnhancementOption(
                     enhancement.EnhancementId, enhancement.DisplayName,
@@ -933,7 +942,11 @@ namespace KingmakerBuffPlanner.UI
                     if (enhancement == null ||
                         !string.Equals(enhancement.CasterUnitId, draftCaster,
                             StringComparison.Ordinal)) continue;
-                    if (!OffersEnhancement(enhancement, enhancementAbility, null, inputs)) continue;
+                    bool chosen = Draft.Enhancements.Any(selection => selection != null &&
+                        string.Equals(selection.EnhancementId, enhancement.EnhancementId,
+                            StringComparison.Ordinal));
+                    if (!chosen && !OffersEnhancement(enhancement, enhancementAbility, Draft.SpellbookGuid, inputs))
+                        continue;
                     enhancements.Add(new WorkspaceEnhancementOption(
                         enhancement.EnhancementId, enhancement.DisplayName,
                         Draft.Enhancements.Any(selection => selection != null &&

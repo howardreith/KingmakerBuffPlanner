@@ -14897,7 +14897,7 @@ namespace KingmakerBuffPlanner.Tests
             File.WriteAllBytes(Path.Combine(dir, "full.orig"), other);
             for (int index = 1; index <= KingmakerBuffPlanner.Infrastructure.AtomicFile.ArchiveAlternates; index++)
                 File.WriteAllBytes(Path.Combine(dir, "full." + index + ".orig"), other);
-            string keyedName = "full.sha256-" + KingmakerBuffPlanner.Infrastructure.Hashing.Sha256Bytes(original)
+            string keyedName = "full.h" + KingmakerBuffPlanner.Infrastructure.Hashing.Sha256Bytes(original)
                 .Substring(0, 16) + ".orig";
             string keyed = KingmakerBuffPlanner.Infrastructure.AtomicFile.WriteExactArchive(dir, "full", original);
             string keyedAgain = KingmakerBuffPlanner.Infrastructure.AtomicFile.WriteExactArchive(dir, "full", original);
@@ -14910,7 +14910,7 @@ namespace KingmakerBuffPlanner.Tests
             File.WriteAllBytes(Path.Combine(dir, "clash.orig"), other);
             for (int index = 1; index <= KingmakerBuffPlanner.Infrastructure.AtomicFile.ArchiveAlternates; index++)
                 File.WriteAllBytes(Path.Combine(dir, "clash." + index + ".orig"), other);
-            File.WriteAllBytes(Path.Combine(dir, "clash.sha256-" + KingmakerBuffPlanner.Infrastructure.Hashing
+            File.WriteAllBytes(Path.Combine(dir, "clash.h" + KingmakerBuffPlanner.Infrastructure.Hashing
                 .Sha256Bytes(original).Substring(0, 16) + ".orig"), other);
             bool refused = false;
             try { KingmakerBuffPlanner.Infrastructure.AtomicFile.WriteExactArchive(dir, "clash", original); }

@@ -4318,7 +4318,9 @@ namespace KingmakerBuffPlanner.Tests
                     "already active on Fighter, lasting longer than this cast (the cast goes ahead for the others and may shorten it)" ||
                 CastingRunPresentation.DescribeExistingEffectNote("existing-insufficient:unit-t1:weaker-caster-level:3<9",
                     unit => unit == "unit-t1" ? "Fighter" : unit) !=
-                    CastingRunPresentation.DescribeExistingEffectNote("existing-insufficient:Fighter:weaker-caster-level:3<9"))
+                    CastingRunPresentation.DescribeExistingEffectNote("existing-insufficient:Fighter:weaker-caster-level:3<9") ||
+                CastingRunPresentation.DescribeExistingEffectNote("existing-incomplete:unit-t1:partial:shared-effect",
+                    unit => unit == "unit-t1" ? "Fighter" : unit) != "partly present on Fighter (will cast)")
                 throw new InvalidOperationException("The covered recipient is not described by name.");
             // A recipient the group cast misses: the casting is not confirmed
             // and the routine stops before the anchored casting is submitted.
@@ -4388,6 +4390,9 @@ namespace KingmakerBuffPlanner.Tests
             // What the Instant cast reports about the provider's transaction.
             internal bool ReportProviderDirect = true;
             internal bool WithShare;
+            // A second spellbook of the same caster that also holds the
+            // Strength spell (Powerful Change does not qualify there).
+            internal bool WithOtherBook;
             internal const string ShareId = "share-transmutation|unit-arcanist|share-toggle";
             internal static readonly string DexterityId =
                 BrownFurPowerfulChangeProfile.EnhancementId("unit-arcanist", "d1f274d1a129eedd8ef44efdb3426d7f");
@@ -4499,6 +4504,8 @@ namespace KingmakerBuffPlanner.Tests
                 var other = new ProviderSnapshot(new ProviderKey("unit-arcanist",
                         BrownFurPowerfulChangeProfile.CastingSpellbookGuid, Other, "level-1"),
                     "Other Spell", 1, "pool-arcanist-1", 1, null, null, 10, 100);
+                var otherBook = new ProviderSnapshot(new ProviderKey("unit-arcanist", "book-other", Strength,
+                    "level-2"), "Strength Spell", 2, "pool-arcanist", 1, null, null, 10, 100);
                 var pools = new[]
                 {
                     new ResourcePoolSnapshot("pool-arcanist", ResourcePoolKind.SpontaneousLevel, 3, Remaining, null),
@@ -4514,6 +4521,10 @@ namespace KingmakerBuffPlanner.Tests
                         CastExecutionStrategy.DirectRuleCast, "fixture-other",
                         new Dictionary<string, IEnumerable<string>>(StringComparer.Ordinal))
                 };
+                if (WithOtherBook)
+                    options.Add(new ProviderPlanningOption(otherBook, everyone, new[] { "unit-arcanist" }, 10, 100,
+                        CastExecutionStrategy.DirectRuleCast, "fixture-other-book",
+                        new Dictionary<string, IEnumerable<string>>(StringComparer.Ordinal)));
                 var effects = new Dictionary<string, EffectExpression>(StringComparer.Ordinal)
                 {
                     { Strength.Canonical, new EffectLeafExpression(EffectKind.Buff, "strength-buff",
@@ -4552,7 +4563,8 @@ namespace KingmakerBuffPlanner.Tests
                         "brown-fur-powerful-change", 1, false, "brown-fur-powerful-change", "Arcane Reservoir",
                         Routing == "direct" ? "brown-fur-direct-cast-v1" : null));
                 return new CastingWorkspaceInputs(new PartyProviderSnapshot(units,
-                        new[] { strength, other }, pools), options, effects, enhancements, null, Live());
+                        WithOtherBook ? new[] { strength, other, otherBook } : new[] { strength, other }, pools),
+                    options, effects, enhancements, null, Live());
             }
         }
 
@@ -4733,6 +4745,49 @@ namespace KingmakerBuffPlanner.Tests
             if (!draftOffers.SequenceEqual(new[] { "metamagic-rod|unit-arcanist|rod-guid", id }))
                 throw new InvalidOperationException("The draft offered enhancements the casting cannot take: " +
                     string.Join(",", draftOffers.ToArray()));
+            // A chosen enhancement is always listed, even one the casting
+            // cannot take (its chip is the only way to remove it); Share is
+            // never offered, only listed while chosen; a pinned spellbook
+            // limits the offers to what that book can take.
+            draftSession.Draft.Enhancements.Add(new AuthoredEnhancementSelection(EnhancedBuffWorld.DexterityId, true, null));
+            List<string> chosenOffers = draftSession.BuildView(inputs).Draft.Enhancements
+                .Select(option => option.EnhancementId + (option.Selected ? "*" : string.Empty)).ToList();
+            CastingWorkspaceInputs shareDraftInputs = new EnhancedBuffWorld { WithShare = true }.Inputs();
+            draftSession.Draft.Enhancements.Clear();
+            List<string> shareOffers = draftSession.BuildView(shareDraftInputs).Draft.Enhancements
+                .Select(option => option.EnhancementId).ToList();
+            draftSession.Draft.Enhancements.Add(new AuthoredEnhancementSelection(EnhancedBuffWorld.ShareId, true, null));
+            List<string> shareChosen = draftSession.BuildView(shareDraftInputs).Draft.Enhancements
+                .Select(option => option.EnhancementId + (option.Selected ? "*" : string.Empty)).ToList();
+            draftSession.Draft.Enhancements.Clear();
+            CastingWorkspaceInputs bookInputs = new EnhancedBuffWorld { WithOtherBook = true }.Inputs();
+            AuthoringEditResult pinned = draftSession.ChooseDraftProvider(new ProviderKey("unit-arcanist", "book-other",
+                EnhancedBuffWorld.Strength, "level-2").Canonical, bookInputs);
+            List<string> otherBookOffers = draftSession.BuildView(bookInputs).Draft.Enhancements
+                .Select(option => option.EnhancementId).ToList();
+            draftSession.Draft.SpellbookGuid = null;
+            draftSession.Draft.Ability = null;
+            // The same for the focused casting: a chosen enhancement it
+            // cannot take stays listed (and removable).
+            AuthoringEditResult held = draftSession.AddCastingForRuntime(selection.Castings[0].WithEnhancementSelections(
+                new[] { new AuthoredEnhancementSelection(EnhancedBuffWorld.DexterityId, true, null) }));
+            draftSession.FocusCasting(selection.Castings[0].CastingId);
+            List<string> focusedList = draftSession.BuildView(inputs).FocusedEnhancements
+                .Select(option => option.EnhancementId + (option.Selected ? "*" : string.Empty)).ToList();
+            if (!held.Applied || !focusedList.SequenceEqual(new[]
+                    { "metamagic-rod|unit-arcanist|rod-guid", EnhancedBuffWorld.DexterityId + "*", id }))
+                throw new InvalidOperationException("The focused casting's enhancement list was wrong: " +
+                    string.Join(",", focusedList.ToArray()));
+            if (!chosenOffers.SequenceEqual(new[]
+                    { "metamagic-rod|unit-arcanist|rod-guid", EnhancedBuffWorld.DexterityId + "*", id }) ||
+                shareOffers.Contains(EnhancedBuffWorld.ShareId) ||
+                !shareChosen.Contains(EnhancedBuffWorld.ShareId + "*") ||
+                !pinned.Applied ||
+                !otherBookOffers.SequenceEqual(new[] { "metamagic-rod|unit-arcanist|rod-guid" }))
+                throw new InvalidOperationException("The draft's enhancement list was wrong: chosen=" +
+                    string.Join(",", chosenOffers.ToArray()) + " share=" + string.Join(",", shareOffers.ToArray()) +
+                    " shareChosen=" + string.Join(",", shareChosen.ToArray()) + " otherBook=" +
+                    string.Join(",", otherBookOffers.ToArray()));
             // Refused: only a rod (not a supported non-rod enhancement); no
             // reservoir point left; no plain spell the enhancement applies to.
             CastingQualificationSelection rodOnly = CastingQualificationRecipe.SelectEnhancedDirect(
