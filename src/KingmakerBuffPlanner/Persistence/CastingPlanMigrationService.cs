@@ -207,17 +207,14 @@ namespace KingmakerBuffPlanner.Persistence
         // MAX_PATH even under deep settings directories.
         // Byte-exact (review of §7.1): the archive copies the file's raw
         // bytes — a BOM or non-UTF-8 encoding survives — and is keyed by the
-        // same file hash the migration reports.
+        // same file hash the migration reports. An archive already at that
+        // name is reused only when its bytes are exactly these (review of
+        // rc4); otherwise it is kept and the bytes go to a numbered name.
         private static string ArchiveBoundaryOriginal(
             string legacyPath, byte[] legacyRaw, string hash)
         {
-            string directory = Path.GetDirectoryName(legacyPath);
-            string archive = Path.Combine(directory,
-                "kbp-casting-" + (hash.Length <= 24 ? hash : hash.Substring(0, 24)) + ".orig");
-            if (File.Exists(archive)) return archive;
-            Directory.CreateDirectory(directory);
-            AtomicFile.WriteBytes(archive, legacyRaw);
-            return archive;
+            return AtomicFile.WriteExactArchive(Path.GetDirectoryName(legacyPath),
+                "kbp-casting-" + (hash.Length <= 24 ? hash : hash.Substring(0, 24)), legacyRaw);
         }
 
         // The Classic loader's own reading of the primary Classic file (final

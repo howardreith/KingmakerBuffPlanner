@@ -67,7 +67,7 @@ namespace KingmakerBuffPlanner.Persistence
                     string original = DecodeFileText(raw);
                     BuffPlannerProfile profile = Deserialize(original, campaignId, out migrated);
                     if (migrated)
-                        ArchivePreMigrationOriginal(path, original);
+                        ArchivePreMigrationOriginal(path, raw);
                     return new ProfileLoadResult(profile, i != 0, migrated, path, warning,
                         i == 0 ? Hashing.Sha256Bytes(raw) : null);
                 }
@@ -81,22 +81,18 @@ namespace KingmakerBuffPlanner.Persistence
         }
 
         // The rotating .bak chain is overwritten by ordinary saves; a schema
-        // migration preserves the exact original once, outside that chain,
-        // so a failed migration always leaves a recoverable pre-migration file.
-        // The rotating .bak chain is overwritten by ordinary saves; a schema
-        // migration preserves the exact original once, outside that chain,
-        // so a failed migration always leaves a recoverable pre-migration
-        // file. The short name keeps the full path far below MAX_PATH even
-        // under deep settings directories.
-        private void ArchivePreMigrationOriginal(string primary, string original)
+        // migration preserves the exact original bytes once, outside that
+        // chain, so a failed migration always leaves a recoverable
+        // pre-migration file. An archive already at the name is reused only
+        // when it holds exactly these bytes (review of rc4). The short name
+        // keeps the full path far below MAX_PATH even under deep settings
+        // directories.
+        private void ArchivePreMigrationOriginal(string primary, byte[] original)
         {
-            string archive = Path.Combine(Path.GetDirectoryName(primary),
+            AtomicFile.WriteExactArchive(Path.GetDirectoryName(primary),
                 "kbp-pre-schema-" + Path.GetFileName(primary)
                     .Replace("kingmaker-buff-planner-", string.Empty)
-                    .Replace(".json", string.Empty) + ".orig");
-            if (File.Exists(archive)) return;
-            Directory.CreateDirectory(Path.GetDirectoryName(archive));
-            AtomicFile.WriteUtf8(archive, original);
+                    .Replace(".json", string.Empty), original);
         }
 
         // The text of a settings file exactly as File.ReadAllText reads it
@@ -169,12 +165,10 @@ namespace KingmakerBuffPlanner.Persistence
             using (SHA256 sha = SHA256.Create())
                 hash = BitConverter.ToString(sha.ComputeHash(bytes))
                     .Replace("-", string.Empty).ToLowerInvariant();
-            string archive = Path.Combine(Path.GetDirectoryName(primary),
+            return AtomicFile.WriteExactArchive(Path.GetDirectoryName(primary),
                 "kbp-unreadable-" + Path.GetFileName(primary)
                     .Replace("kingmaker-buff-planner-", string.Empty)
-                    .Replace(".json", string.Empty) + "-" + hash.Substring(0, 16) + ".orig");
-            if (!File.Exists(archive)) AtomicFile.WriteBytes(archive, bytes);
-            return archive;
+                    .Replace(".json", string.Empty) + "-" + hash.Substring(0, 16), bytes);
         }
 
         internal string GetProfilePath(string campaignId)
