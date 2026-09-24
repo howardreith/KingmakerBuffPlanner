@@ -140,6 +140,7 @@
     <Compile Include="GameAdapters\KingmakerBuffSourceDiscovery.cs" />
     <Compile Include="GameAdapters\KingmakerAtWillCantrips.cs" />
     <Compile Include="GameAdapters\KingmakerCantripDiagnostics.cs" />
+    <Compile Include="GameAdapters\KingmakerAreaDiagnostics.cs" />
     <Compile Include="GameAdapters\KingmakerCastEnhancementAdapter.cs" />
     <Compile Include="GameAdapters\CastEnhancementNaming.cs" />
     <Compile Include="GameAdapters\KingmakerPowerfulChangeBlueprintAnalyzer.cs" />
