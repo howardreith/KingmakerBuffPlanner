@@ -1169,6 +1169,8 @@ namespace KingmakerBuffPlanner.UI
                 // step is not judged unconfirmed and the rest not halted.
                 routine = new WorldGatedEnumerator(_session.ExecuteRoutine(routineId,
                     observedCompletion, readyOnlyExplicit), () => WorldRunsForCasting);
+                var worldGate = (WorldGatedEnumerator)routine;
+                bool waitingNoticeShown = false;
                 while (true)
                 {
                     bool moved = false;
@@ -1191,6 +1193,13 @@ namespace KingmakerBuffPlanner.UI
                         yield break;
                     }
                     if (!moved) yield break;
+                    // A run waiting for the game says so on the open Classic
+                    // screen, which itself pauses the game.
+                    if (!waitingNoticeShown && worldGate.HeldFrames > 0 && _screen != null && _screen.IsOpen)
+                    {
+                        waitingNoticeShown = true;
+                        _screen.PresentNotice(QuickExecutionText.WaitingForWorld);
+                    }
                     yield return current;
                 }
             }
