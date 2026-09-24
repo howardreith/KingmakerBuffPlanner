@@ -928,6 +928,10 @@ namespace KingmakerBuffPlanner.Tests
             WorkspaceProviderChoice second = view.DraftProviders.Single(value =>
                 value.ProviderKey.Contains("book-cleric-second"));
             Assert(session.ChooseDraftProvider(second.ProviderKey, inputs).Applied);
+            List<WorkspaceProviderChoice> picked = session.BuildView(inputs).DraftProviders.ToList();
+            if (picked.Count(value => value.Selected) != 1 ||
+                !picked.Single(value => value.Selected).ProviderKey.Contains("book-cleric-second"))
+                throw new InvalidOperationException("The picked source is not the one shown selected.");
             AuthoringEditResult added = session.AddCastingFromDraft(inputs);
             PlannedCasting casting = session.Document.Castings.SingleOrDefault();
             if (!added.Applied || casting == null || casting.SpellbookGuid != "book-cleric-second" ||
@@ -977,6 +981,20 @@ namespace KingmakerBuffPlanner.Tests
                     ExistingEffectPolicy.SkipAlreadyActive ||
                 session.SetFocusedRecastPolicy(ExistingEffectPolicy.Overwrite).Applied)
                 throw new InvalidOperationException("The recast choice did not stay with its own casting.");
+            // A new caster keeps only the enhancements that caster has (a rod
+            // in someone else's pack is not carried over).
+            session.FocusCasting(first);
+            PlannedCasting clericCasting = session.Document.Castings.Single(value => value.CastingId == first);
+            Assert(session.UpdateFocusedCasting(clericCasting.WithEnhancementSelections(new[]
+            {
+                new AuthoredEnhancementSelection("extend-cleric", false, null)
+            })).Applied);
+            WorkspaceProviderChoice wizard = session.BuildView(inputs).FocusedProviders.Single(value =>
+                value.CasterUnitId == "unit-wizard");
+            Assert(session.SetFocusedProvider(wizard.ProviderKey, inputs).Applied);
+            PlannedCasting switched = session.Document.Castings.Single(value => value.CastingId == first);
+            if (switched.CasterUnitId != "unit-wizard" || switched.Enhancements.Count != 0)
+                throw new InvalidOperationException("Another caster's enhancement was carried to the new caster.");
             session.FocusCasting(null);
             session.Draft.ExistingEffectPolicy = ExistingEffectPolicy.Overwrite;
             Assert(AddDraftCasting(session, inputs, "unit-cleric", "unit-t3").Applied);
