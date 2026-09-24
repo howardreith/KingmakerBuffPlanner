@@ -1,6 +1,42 @@
 # AUTONOMOUS-RESUME — top section is current; planning/CASTING-FIRST-MIGRATION-STATUS.md is the per-checkpoint tracker.
 
-## Batch 3 mission (2026-09-23): Classic regression, finite and group qualification, lifecycle (LATEST)
+## Release candidate 0.2.0-rc4 frozen at `863a182` (2026-09-24, LATEST)
+
+rc3 (`ea2a027`) was superseded after its final review; rc4 fixes those
+findings and four further independent review rounds of the fixes
+(re-review, focused, targeted, last), listed with commits in
+`docs/CASTING-FIRST-REVIEW-INDEX.md`. Mutation after the final review of
+rc3: 52 C# and 41 PowerShell mutants, each killed by its check (one
+equivalent removed, three survivors answered with tests).
+
+Candidate `863a182047950a75d7aafc548aa7b52a54c71b99`: package `9093cfd0...`,
+DLL `d7081c0d...`, MVID `61b9aaa5-786d-4e18-b929-a6a6caa5b443`; the same
+bytes from RC4 (two deterministic builds), RC4-repro and G2. Frozen copy
+`runtime-backups/rc-frozen/863a182.../`; clean checkout
+`repo/KingmakerBuffPlanner-RC4`; receipt
+`docs/evidence/rc-0.2.0-rc4-receipt.md`. Gate at the candidate: source 42,
+protocol 331, harness 37, package 4, deploy 5, launcher 12, fixture 3,
+restore 16, publisher 3.
+
+On the frozen build (all restored, saves compared clean under the lock):
+Classic select and cast in both modes PASS (Resistance through the at-will
+cantrip ability, confirmed by a new instance, pools unchanged, grant once);
+casting-first qualification select and both modes PASS (stop, complete,
+repeat, recast, disable, recover, 8 of 8 submissions); first-open import of
+a genuine schema-4 file PASS; the finite selection refused as expected
+(`no-eligible-qualification-recipe`). Temporary install and rollback of the
+exact package PASS; the owner's 0.1.1-rc3 (DLL `78407dd4...`) restored.
+
+Deferred (owner's session disconnected since 23:34 on 09-23, black frames):
+in-game reload, layout at 1920x1200 and 1920x1080, manual rehearsal,
+physical input - commands in the receipt, run them once the session is
+connected. Owner inputs: the `KBP_ADVANCED_SEED` (finite, group, metamagic,
+pets), the supervised manual session (`docs/MANUAL-USABILITY-HANDOFF.md`,
+RC4 checkout; includes confirming that Classic APPLY now closes the
+planner), and the final review. Merge, release, tag and permanent install
+stay with the owner; PR #2 stays a draft.
+
+## Batch 3 mission (2026-09-23): Classic regression, finite and group qualification, lifecycle
 
 Reconciled at start: PR #2 head `b042e36` (draft); candidate rc2 `ae0181d`
 (package `35382731...`, DLL `5ec74d2f...`, MVID `5d780e27-...`); installed
