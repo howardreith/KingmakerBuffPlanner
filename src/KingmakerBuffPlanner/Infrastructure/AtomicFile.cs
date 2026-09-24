@@ -48,8 +48,11 @@ namespace KingmakerBuffPlanner.Infrastructure
         // of rc4): a file already at the name is reused only when it holds
         // exactly these bytes; a different file there is kept, never
         // overwritten, and the bytes go to the next free numbered name
-        // (stem.1.orig to stem.9.orig); a new archive is read back and
-        // compared before its path is returned.
+        // (stem.1.orig to stem.9.orig), then to the name keyed by the
+        // bytes' own hash (so the names never run out: a readable settings
+        // file must not turn unreadable because ten other originals were
+        // archived); a new archive is read back and compared before its
+        // path is returned.
         internal static string WriteExactArchive(string directory, string stem, byte[] bytes)
         {
             if (bytes == null) throw new ArgumentNullException("bytes");
@@ -68,7 +71,17 @@ namespace KingmakerBuffPlanner.Infrastructure
                     throw new IOException("archive-read-back-differs:" + Path.GetFileName(path));
                 return path;
             }
-            throw new IOException("archive-names-hold-other-content:" + stem);
+            string keyed = Path.Combine(directory, stem + ".sha256-" +
+                Hashing.Sha256Bytes(bytes).Substring(0, 16) + ".orig");
+            if (File.Exists(keyed))
+            {
+                if (SameBytes(File.ReadAllBytes(keyed), bytes)) return keyed;
+                throw new IOException("archive-names-hold-other-content:" + stem);
+            }
+            WriteBytes(keyed, bytes);
+            if (!SameBytes(File.ReadAllBytes(keyed), bytes))
+                throw new IOException("archive-read-back-differs:" + Path.GetFileName(keyed));
+            return keyed;
         }
 
         private static bool SameBytes(byte[] left, byte[] right)

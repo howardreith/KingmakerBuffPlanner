@@ -1060,7 +1060,7 @@ namespace KingmakerBuffPlanner.UI
                 KingmakerUiFactory.SetAnchors(status.rectTransform, 0.55f, 0.55f, 0.98f, 0.92f);
                 Text detail = KingmakerUiFactory.CreateText(
                     "Detail", entry, _theme,
-                    BuildCardDetail(card), 13, TextAnchor.UpperLeft);
+                    BuildCardDetail(view, card), 13, TextAnchor.UpperLeft);
                 KingmakerUiFactory.SetAnchors(detail.rectTransform, 0f, 0.05f, 0.85f, 0.55f,
                     176f, 8f, 2f, 2f);
                 Button edit = KingmakerUiFactory.CreateButton(
@@ -1090,7 +1090,7 @@ namespace KingmakerBuffPlanner.UI
             image.color = portrait == null ? new Color(0f, 0f, 0f, 0.08f) : Color.white;
         }
 
-        private static string BuildCardDetail(WorkspaceCastingCard card)
+        private static string BuildCardDetail(WorkspaceView view, WorkspaceCastingCard card)
         {
             var parts = new List<string>();
             if (card.DirectTargetUnitId != null)
@@ -1120,7 +1120,8 @@ namespace KingmakerBuffPlanner.UI
                     CastingRunPresentation.DescribeLimitation(card.ExecutionLimitation));
             if (card.ExistingEffectNotes.Count != 0)
                 parts.Add("Existing effect: " + string.Join("; ", card.ExistingEffectNotes
-                    .Select(CastingRunPresentation.DescribeExistingEffectNote).ToArray()));
+                    .Select(note => CastingRunPresentation.DescribeExistingEffectNote(note,
+                        unitId => UnitName(view, unitId))).ToArray()));
             if (card.LastRunOutcome != null) parts.Add("Last run: " + card.LastRunOutcome);
             return string.Join("  ·  ", parts);
         }

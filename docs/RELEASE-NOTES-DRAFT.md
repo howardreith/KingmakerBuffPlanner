@@ -202,6 +202,23 @@ the automation party's finite spell levels hold no buff.
   qualification run); the card warns when a recipient's effect outlasts
   the cast, and a casting that gave the longer effect may then be due
   again the next time the routine runs.
+- An enchantment a spell puts on a worn item (Magic Weapon, Magic Fang)
+  is cast again even when it is already there: this version does not
+  read that enchantment's caster level, and a strength the planner cannot
+  read never proves an existing effect good enough. If the game then
+  keeps the enchantment unchanged, the cast is reported as not confirmed
+  and the routine stops there.
+- Within one routine, a group casting after a casting that gives one of
+  its recipients the same buff: that recipient counts as already covered
+  only if its buff was there before the routine started. Otherwise the
+  group cast must reach it too, and if the game keeps the earlier cast's
+  longer buff, the group cast is reported as not confirmed and the
+  routine stops there.
+- In Instant mode, a casting whose enhancement needs the game's own cast
+  (for example Powerful Change when the Brown-Fur provider offers no
+  direct transaction) is cast that way, with its animation. The planner
+  records the route in its log, but the card does not show it and the
+  accepted plan does not include it.
 - The classic planner has no press-again-to-stop: a started classic
   routine runs to its end or to its first unconfirmed cast.
 - The wait for a cast's confirmation is counted in game frames.
@@ -221,7 +238,8 @@ the automation party's finite spell levels hold no buff.
 
 ## Not supported in this version (shown on the card, refused by Apply)
 
-- Targeting modifiers such as Share Transmutation.
+- Share Transmutation and other ways of changing whom a spell reaches,
+  whether chosen as a targeting modifier or as an enhancement.
 - A specific physical rod or item.
 - Group castings whose required recipients are outside the predicted
   area.

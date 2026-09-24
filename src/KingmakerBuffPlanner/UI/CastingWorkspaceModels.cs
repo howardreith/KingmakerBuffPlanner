@@ -656,6 +656,8 @@ namespace KingmakerBuffPlanner.UI
                 case "targeting-modifier-unavailable": return "a required targeting modifier is not available";
                 case "enhancements-unvalidated": return "an enhancement could not be checked";
                 case "enhancement-incompatible": return "an enhancement does not fit this casting";
+                case "enhancement-changes-targeting":
+                    return "an enhancement that changes whom the spell reaches (such as Share Transmutation) is not executed yet";
                 case "import-review-unresolved": return "imported: needs your review";
                 case "already-active": return "already active";
                 case "present-effect-not-sufficient": return "the active effect is weaker or about to expire";

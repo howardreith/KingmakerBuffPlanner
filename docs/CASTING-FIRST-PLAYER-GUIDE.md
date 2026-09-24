@@ -160,7 +160,10 @@ Protection from Alignment with the communal form's): when a recipient's
 effect lasts longer than this cast gives, the card says "... lasting
 longer than this cast (the cast goes ahead for the others and may shorten
 it)", and a casting that gave the longer effect may be due again the next
-time the routine runs. For a group casting the
+time the routine runs. The recipient must have had its buff before the
+routine started: a buff given by an earlier casting in the same routine
+does not count, so the group cast must reach that recipient too. For a
+group casting the
 intended recipients are its required coverage, or everyone it would
 reach when no coverage is required. A casting whose buff is already
 active does not need a free slot, so running a routine again right after
