@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Linq;
+using KingmakerBuffPlanner.Compatibility;
 using KingmakerBuffPlanner.Domain.Authoring;
 using KingmakerBuffPlanner.Domain.Effects;
 using KingmakerBuffPlanner.Domain.Identity;
@@ -176,8 +178,9 @@ namespace KingmakerBuffPlanner.Execution
         internal CastingQualificationSelection(string refusal, string sourceId, AbilityKey ability,
             IList<PlannedCasting> castings, int candidatesConsidered, IList<string> rejections,
             string recipe = CastingQualificationRecipe.ZeroCostMixed,
-            IEnumerable<string> coverage = null)
+            IEnumerable<string> coverage = null, CastingQualificationEnhancement enhancement = null)
         {
+            Enhancement = enhancement;
             Recipe = recipe ?? CastingQualificationRecipe.ZeroCostMixed;
             Coverage = new ReadOnlyCollection<string>((coverage ?? new string[0]).ToList());
             Refusal = refusal ?? string.Empty;
@@ -200,6 +203,41 @@ namespace KingmakerBuffPlanner.Execution
         public IReadOnlyList<PlannedCasting> Castings { get; private set; }
         public int CandidatesConsidered { get; private set; }
         public IReadOnlyList<string> Rejections { get; private set; }
+        // The enhanced recipe's enhancement (null for the other recipes).
+        public CastingQualificationEnhancement Enhancement { get; private set; }
+    }
+
+    // The per-casting enhancement the enhanced recipe exercises: its id and
+    // name, the caster resource that pays for it and the units one cast
+    // spends, and what it must do: raise the named stat's modifier of the
+    // named descriptor by the given amount over the plain casting's.
+    public sealed class CastingQualificationEnhancement
+    {
+        internal CastingQualificationEnhancement(string enhancementId, string displayName,
+            string casterUnitId, string usagePoolId, int unitsPerCast, string stat, string descriptor,
+            int increase)
+        {
+            EnhancementId = enhancementId;
+            DisplayName = displayName;
+            CasterUnitId = casterUnitId;
+            UsagePoolId = usagePoolId;
+            UnitsPerCast = unitsPerCast;
+            Stat = stat;
+            Descriptor = descriptor;
+            Increase = increase;
+        }
+
+        public string EnhancementId { get; private set; }
+        public string DisplayName { get; private set; }
+        public string CasterUnitId { get; private set; }
+        public string UsagePoolId { get; private set; }
+        public int UnitsPerCast { get; private set; }
+        public string Stat { get; private set; }
+        public string Descriptor { get; private set; }
+        public int Increase { get; private set; }
+
+        // "<stat>/<descriptor>/" - the modifier this enhancement raises.
+        public string ModifierPrefix { get { return Stat + "/" + Descriptor + "/"; } }
     }
 
     // Deterministic authoring recipes for guarded qualification runs. The
@@ -210,11 +248,22 @@ namespace KingmakerBuffPlanner.Execution
         public const string ZeroCostMixed = "zero-cost-mixed";
         public const string FiniteDirectMixed = "finite-direct-mixed";
         public const string GroupMixed = "group-mixed";
+        public const string EnhancedDirect = "enhanced-direct";
         public const string RoutineId = "long";
 
         public static bool IsKnown(string recipe)
         {
-            return recipe == ZeroCostMixed || recipe == FiniteDirectMixed || recipe == GroupMixed;
+            return recipe == ZeroCostMixed || recipe == FiniteDirectMixed || recipe == GroupMixed ||
+                recipe == EnhancedDirect;
+        }
+
+        // The recipes that cast their first casting alone and then add the
+        // rest to the plan (group-mixed: prime, mixed; enhanced-direct:
+        // plain, enhanced) instead of the stop / complete / repeat / recast
+        // sequence.
+        public static bool IsTwoPhase(string recipe)
+        {
+            return recipe == GroupMixed || recipe == EnhancedDirect;
         }
 
         // The group recipe's own steps (prime, mixed, repeat) replace the
@@ -235,7 +284,7 @@ namespace KingmakerBuffPlanner.Execution
 
         public static int ForecastSteps(string recipe)
         {
-            if (IsGroupRecipe(recipe)) return 2;
+            if (IsTwoPhase(recipe)) return 2;
             return HasDisableStep(recipe) ? 5 : 3;
         }
 
@@ -245,6 +294,7 @@ namespace KingmakerBuffPlanner.Execution
             if (recipe == FiniteDirectMixed) return SelectFiniteDirectMixed(inputs, campaignId);
             if (recipe == ZeroCostMixed) return SelectZeroCostMixed(inputs, campaignId);
             if (recipe == GroupMixed) return SelectGroupMixed(inputs, campaignId);
+            if (recipe == EnhancedDirect) return SelectEnhancedDirect(inputs, campaignId);
             return new CastingQualificationSelection("unknown-recipe:" + recipe, null, null,
                 null, 0, null, recipe);
         }
@@ -613,7 +663,7 @@ namespace KingmakerBuffPlanner.Execution
                     // Where one exists: a target-anchored group source with
                     // another effect, on a member other than its caster,
                     // whose covered members all lack it; the longest-lasting
-                    // first, so it is still active for the repeat step.
+                    // first.
                     GroupSource anchored = null;
                     string anchor = null;
                     foreach (GroupSource candidate in sources.Where(value => value != group && value != direct &&
@@ -675,6 +725,149 @@ namespace KingmakerBuffPlanner.Execution
             }
             return new CastingQualificationSelection("no-eligible-qualification-recipe", null, null,
                 null, considered, rejections, GroupMixed);
+        }
+
+        // enhanced-direct (mission batch 3, section 8: a supported non-rod
+        // per-casting enhancement through the real UI, service and execution
+        // chain). The one such enhancement in this version is Brown-Fur
+        // Powerful Change (Share Transmutation, a targeting modifier, stays
+        // refused; rods are metamagic): one Arcane Reservoir point raises the
+        // enhancement bonus a qualifying transmutation gives to the chosen
+        // score by 2, the provider's documented increase below level 20. One
+        // plain direct buff the enhancement applies to, cast twice by its
+        // caster from the same source on two recipients without it:
+        //   qual-cast-1 = plain (the plain step casts it alone),
+        //   qual-cast-2 = with the enhancement, chosen on the casting through
+        //                 the workspace's own option for it (the enhanced
+        //                 step; qual-cast-1 is skipped as active).
+        public const int PowerfulChangeIncrease = 2;
+
+        public static CastingQualificationSelection SelectEnhancedDirect(
+            CastingWorkspaceInputs inputs, string campaignId)
+        {
+            if (inputs == null) throw new ArgumentNullException("inputs");
+            var rejections = new List<string>();
+            Action<string> reject = value =>
+            {
+                if (rejections.Count < MaximumRecordedRejections) rejections.Add(value);
+            };
+            var pools = inputs.Snapshot.ResourcePools.ToDictionary(
+                pool => pool.PoolKey, pool => pool, StringComparer.Ordinal);
+            var targetable = new HashSet<string>(inputs.Snapshot.Units
+                .Where(unit => unit.TargetValidation.Alive && unit.TargetValidation.Conscious &&
+                    unit.TargetValidation.Friendly && unit.TargetValidation.Targetable)
+                .Select(unit => unit.UnitId), StringComparer.Ordinal);
+            int considered = 0;
+            foreach (CastEnhancementSnapshot enhancement in (inputs.Enhancements ??
+                    (IEnumerable<CastEnhancementSnapshot>)new CastEnhancementSnapshot[0])
+                .Where(value => value != null)
+                .OrderBy(value => value.EnhancementId, StringComparer.Ordinal))
+            {
+                BrownFurPowerfulChangeToggleContract contract =
+                    BrownFurPowerfulChangeProfile.Find(enhancement.SourceBlueprintGuid);
+                if (contract == null || enhancement.Category != CastEnhancementCategory.ClassFeature ||
+                    enhancement.AffectsTargeting || enhancement.MetamagicMask != 0 ||
+                    enhancement.EnhancementId != BrownFurPowerfulChangeProfile.EnhancementId(
+                        enhancement.CasterUnitId, contract.ActivatableGuid) ||
+                    enhancement.UsagePoolId != BrownFurPowerfulChangeProfile.UsagePoolId(enhancement.CasterUnitId))
+                {
+                    reject(enhancement.EnhancementId + "|not-a-supported-non-rod-enhancement");
+                    continue;
+                }
+                considered++;
+                if (enhancement.RemainingUses == null ||
+                    enhancement.RemainingUses.Value < enhancement.UsageUnitsPerCast)
+                {
+                    reject(enhancement.EnhancementId + "|uses:" + (enhancement.RemainingUses == null ? "unread"
+                        : enhancement.RemainingUses.Value.ToString(CultureInfo.InvariantCulture)));
+                    continue;
+                }
+                bool applicable = false;
+                foreach (ProviderPlanningOption option in inputs.ProviderOptions
+                    .Where(value => value != null && value.Provider != null &&
+                        value.Provider.Key.CasterUnitId == enhancement.CasterUnitId)
+                    .OrderBy(value => value.Provider.Key.Canonical, StringComparer.Ordinal))
+                {
+                    ProviderSnapshot provider = option.Provider;
+                    AbilityKey ability = provider.Key.Ability;
+                    if (ability.SourceKind != SourceKind.Spellbook || ability.MetamagicMask != 0 ||
+                        !string.IsNullOrEmpty(ability.SpecialSourceId) || !enhancement.IsApplicable(provider))
+                        continue;
+                    applicable = true;
+                    string key = enhancement.EnhancementId + "+" + provider.Key.Canonical;
+                    string sourceId = SingleCastProbeSelector.SourceIdFor(inputs.EffectsBySource, ability);
+                    ResourcePoolSnapshot pool;
+                    if (option.ExecutionStrategy != CastExecutionStrategy.DirectRuleCast)
+                    { reject(key + "|strategy:" + option.ExecutionStrategy); continue; }
+                    if (!pools.TryGetValue(provider.ResourcePoolKey, out pool))
+                    { reject(key + "|pool-unread"); continue; }
+                    if (sourceId == null) { reject(key + "|no-source"); continue; }
+                    EffectExpression expected = inputs.EffectsBySource[sourceId];
+                    if (!ExplicitCastingStepConverter.IsPlainCurrentTargetBuff(expected, ability))
+                    {
+                        reject(key + "|effect-shape:" + CastingCapabilityInventory.Structure(expected));
+                        continue;
+                    }
+                    if (CastsAvailable(inputs, provider, 2) < 2) { reject(key + "|fewer-than-two-casts"); continue; }
+                    List<string> targets = RecipientsPerCasting(inputs, targetable, expected,
+                        new[] { option, option });
+                    if (targets.Count < 2) { reject(key + "|fewer-than-two-fresh-recipients"); continue; }
+                    var castings = new List<PlannedCasting>
+                    {
+                        new PlannedCasting(CastingIds[0], RoutineId, 0, sourceId, ability,
+                            provider.Key.CasterUnitId, provider.Key.SpellbookGuid,
+                            CastingTargetMode.DirectTarget, targets[0], null, null, null, null,
+                            ExistingEffectPolicy.SkipAlreadyActive, null, CastingAuthoringState.Ready, null),
+                        new PlannedCasting(CastingIds[1], RoutineId, 1, sourceId, ability,
+                            provider.Key.CasterUnitId, provider.Key.SpellbookGuid,
+                            CastingTargetMode.DirectTarget, targets[1], null, null, null,
+                            new[] { new AuthoredEnhancementSelection(enhancement.EnhancementId, true, null) },
+                            ExistingEffectPolicy.SkipAlreadyActive, null, CastingAuthoringState.Ready, null)
+                    };
+                    var chosen = new CastingQualificationEnhancement(enhancement.EnhancementId,
+                        enhancement.DisplayName, enhancement.CasterUnitId, enhancement.UsagePoolId,
+                        enhancement.UsageUnitsPerCast, contract.Score.ToString(), "Enhancement",
+                        PowerfulChangeIncrease);
+                    var coverage = new List<string>
+                    {
+                        pool.Kind == ResourcePoolKind.PreparedSlots ? "prepared"
+                            : pool.Kind == ResourcePoolKind.SpontaneousLevel ? "spontaneous"
+                            : pool.Kind == ResourcePoolKind.Unlimited ? "free" : pool.Kind.ToString(),
+                        "class-feature-enhancement", "powerful-change:" + contract.Score
+                    };
+                    var selection = new CastingQualificationSelection(null, sourceId, ability, castings,
+                        considered, rejections, EnhancedDirect, coverage, chosen);
+                    string check = EnhancedForecastRefusal(CastingQualificationForecast.Forecast(
+                        selection, inputs, campaignId), castings, enhancement.EnhancementId);
+                    if (check != null) { reject(key + "|" + check); continue; }
+                    return selection;
+                }
+                if (!applicable) reject(enhancement.EnhancementId + "|no-applicable-plain-spell");
+            }
+            return new CastingQualificationSelection("no-eligible-qualification-recipe", null, null,
+                null, considered, rejections, EnhancedDirect);
+        }
+
+        // The enhanced recipe's forecast must be exactly: plain - the plain
+        // casting alone, with no enhancement; enhanced - the enhanced casting
+        // alone (the plain one skipped as active), carrying exactly the
+        // enhancement. Null when it is.
+        internal static string EnhancedForecastRefusal(IReadOnlyList<CastingQualificationStepForecast> forecast,
+            IList<PlannedCasting> castings, string enhancementId)
+        {
+            if (forecast == null || forecast.Count != 2) return "forecast-steps";
+            foreach (CastingQualificationStepForecast step in forecast)
+                if (step.Refusal != null || step.Projection == null)
+                    return "not-executable:" + step.Name + ":" + (step.Refusal ?? "none");
+            if (!forecast[0].CastingIds.SequenceEqual(new[] { castings[0].CastingId }) ||
+                forecast[0].Projection.Plan.Steps[0].EnhancementIds.Count != 0)
+                return "plain-castings:" + string.Join(",", forecast[0].CastingIds.ToArray());
+            if (!forecast[1].CastingIds.SequenceEqual(new[] { castings[1].CastingId }))
+                return "enhanced-castings:" + string.Join(",", forecast[1].CastingIds.ToArray());
+            CastStep enhanced = forecast[1].Projection.Plan.Steps[0];
+            if (!enhanced.EnhancementIds.SequenceEqual(new[] { enhancementId }))
+                return "enhancement-not-forecast:" + string.Join(",", enhanced.EnhancementIds.ToArray());
+            return null;
         }
 
         // The group recipe's forecast must be exactly: prime - the direct
@@ -799,6 +992,8 @@ namespace KingmakerBuffPlanner.Execution
         public const string Recover = "recover";
         public const string Prime = "prime";
         public const string Mixed = "mixed";
+        public const string Plain = "plain";
+        public const string Enhanced = "enhanced";
 
         public static IReadOnlyList<CastingQualificationStepForecast> Forecast(
             CastingQualificationSelection selection, CastingWorkspaceInputs inputs,
@@ -807,7 +1002,9 @@ namespace KingmakerBuffPlanner.Execution
             if (selection == null || !selection.Selected)
                 throw new ArgumentException("A selected recipe is required.", "selection");
             if (CastingQualificationRecipe.IsGroupRecipe(selection.Recipe))
-                return ForecastGroupMixed(selection, inputs, campaignId);
+                return ForecastTwoPhase(selection, inputs, campaignId, Prime, Mixed);
+            if (selection.Recipe == CastingQualificationRecipe.EnhancedDirect)
+                return ForecastTwoPhase(selection, inputs, campaignId, Plain, Enhanced);
             CastingPlanDocument document = BuildDocument(campaignId, selection.Castings);
             EffectExpression expected = inputs.EffectsBySource[selection.SourceId];
             PlannedCasting firstCasting = selection.Castings[0];
@@ -860,17 +1057,21 @@ namespace KingmakerBuffPlanner.Execution
             return new ReadOnlyCollection<CastingQualificationStepForecast>(steps);
         }
 
-        // group-mixed: prime - the direct casting alone (its recipient
-        // covered); mixed - every casting, the direct one skipped (its
-        // recipient holds the effect at the direct caster's level), the
-        // group casting covering the others with that recipient pre-covered,
-        // and the anchored casting (if any) covering its anchor's area.
-        private static IReadOnlyList<CastingQualificationStepForecast> ForecastGroupMixed(
-            CastingQualificationSelection selection, CastingWorkspaceInputs inputs, string campaignId)
+        // The two-phase recipes. group-mixed: prime - the direct casting
+        // alone (its recipient covered); mixed - every casting, the direct
+        // one skipped (its recipient holds the effect at the direct caster's
+        // level), the group casting covering the others with that recipient
+        // pre-covered, and the anchored casting (if any) covering its
+        // anchor's area. enhanced-direct: plain - the plain casting alone;
+        // enhanced - both, the plain one skipped, the enhanced one cast with
+        // its enhancement.
+        private static IReadOnlyList<CastingQualificationStepForecast> ForecastTwoPhase(
+            CastingQualificationSelection selection, CastingWorkspaceInputs inputs, string campaignId,
+            string firstName, string secondName)
         {
             PlannedCasting direct = selection.Castings[0];
             var steps = new List<CastingQualificationStepForecast>();
-            CastingQualificationStepForecast prime = Project(Prime,
+            CastingQualificationStepForecast prime = Project(firstName,
                 BuildDocument(campaignId, new[] { direct }), inputs, inputs.LiveEffects);
             steps.Add(prime);
             var spent = new List<ResourceReservation>();
@@ -879,7 +1080,7 @@ namespace KingmakerBuffPlanner.Execution
             ProviderSnapshot provider = inputs.Snapshot.Providers.FirstOrDefault(value =>
                 value.Key.CasterUnitId == direct.CasterUnitId &&
                 value.Key.Ability.Canonical == direct.Ability.Canonical);
-            steps.Add(Project(Mixed, BuildDocument(campaignId, selection.Castings), afterPrime,
+            steps.Add(Project(secondName, BuildDocument(campaignId, selection.Castings), afterPrime,
                 WithGranted(afterPrime, inputs.EffectsBySource[direct.SourceId], new[]
                 {
                     new EffectGrant(direct.DirectTargetUnitId,

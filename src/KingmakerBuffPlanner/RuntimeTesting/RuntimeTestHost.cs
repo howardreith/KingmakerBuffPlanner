@@ -3865,7 +3865,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                             : Kingmaker.Game.Instance.CurrentMode.ToString()),
                     () => BuffPlannerUiRoot.OwnedTicksForRuntime,
                     (step, recipient, label) => new KingmakerProbeObserver().ObserveRecipient(
-                        step, recipient, label, _probeClock));
+                        step, recipient, label, _probeClock),
+                    (caster, pool) => new KingmakerProbeObserver().ObserveCaster(caster, pool));
                 _log.Info("[KBP-QUAL] driver built;casting=" + _qualificationRecord.CastingScenario +
                     ";allowance=" + _qualificationRecord.AllowanceStatus + ";workspaceClosed=" +
                     closed.Closed + ";campaign=" + campaignId + ".");
@@ -3931,6 +3932,21 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     { "unreadTokenCastings", new JArray(step.UnreadTokenCastings.Cast<object>().ToArray()) },
                     { "cleanupFailures", step.Report == null ? new JArray()
                         : new JArray(step.Report.CleanupFailures.Cast<object>().ToArray()) },
+                    // The enhanced recipe's caster reads and per-casting
+                    // stat modifiers (before > after).
+                    { "caster", step.CasterBefore == null && step.CasterAfter == null ? null
+                        : (step.CasterBefore == null ? "none" : step.CasterBefore.Describe()) + " > " +
+                            (step.CasterAfter == null ? "none" : step.CasterAfter.Describe()) },
+                    { "modifiers", new JArray(step.ModifiersAfter.Keys.OrderBy(key => key, StringComparer.Ordinal)
+                        .Select(key =>
+                        {
+                            IReadOnlyList<string> before;
+                            step.ModifiersBefore.TryGetValue(key, out before);
+                            IReadOnlyList<string> after = step.ModifiersAfter[key];
+                            return (object)(key + ":" + (before == null ? "unread" : "[" +
+                                string.Join(";", before.ToArray()) + "]") + ">" + (after == null ? "unread"
+                                    : "[" + string.Join(";", after.ToArray()) + "]"));
+                        }).ToArray()) },
                     { "observations", new JArray(step.Observations.Cast<object>().ToArray()) }
                 });
             }
@@ -3960,9 +3976,22 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                             { "sourceId", selection.SourceId },
                             { "castings", new JArray(selection.Castings.Select(casting => (object)(
                                 casting.CastingId + "=" + casting.CasterUnitId + ">" +
-                                casting.DirectTargetUnitId)).ToArray()) },
+                                casting.DirectTargetUnitId + (casting.Enhancements.Count == 0 ? string.Empty
+                                    : "+" + string.Join("+", casting.Enhancements.Where(value => value != null)
+                                        .Select(value => value.EnhancementId).ToArray())))).ToArray()) },
+                            { "enhancement", selection.Enhancement == null ? null : new JObject
+                                {
+                                    { "enhancementId", selection.Enhancement.EnhancementId },
+                                    { "name", selection.Enhancement.DisplayName },
+                                    { "casterUnitId", selection.Enhancement.CasterUnitId },
+                                    { "usagePoolId", selection.Enhancement.UsagePoolId },
+                                    { "unitsPerCast", selection.Enhancement.UnitsPerCast },
+                                    { "modifier", selection.Enhancement.ModifierPrefix },
+                                    { "increase", selection.Enhancement.Increase }
+                                } },
                             { "rejections", new JArray(selection.Rejections.Cast<object>().ToArray()) }
                         } },
+                    { "enhancementOptions", new JArray(record.EnhancementOptions.Cast<object>().ToArray()) },
                     { "forecast", record.Forecast == null ? new JArray() : new JArray(record.Forecast
                         .Select(step => (object)new JObject
                         {

@@ -3,8 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using Kingmaker;
+using Kingmaker.Blueprints;
 using Kingmaker.EntitySystem.Entities;
+using Kingmaker.EntitySystem.Stats;
 using Kingmaker.UnitLogic.Abilities;
+using Kingmaker.UnitLogic.Abilities.Blueprints;
+using Kingmaker.UnitLogic.ActivatableAbilities;
 using Kingmaker.UnitLogic.Buffs;
 using KingmakerBuffPlanner.Domain.Effects;
 using KingmakerBuffPlanner.Domain.Planning;
@@ -101,8 +105,69 @@ namespace KingmakerBuffPlanner.GameAdapters
                 .Where(buff => buff != null && buff.Blueprint != null && ids.Contains(buff.Blueprint.AssetGuid))
                 .Select(buff => new ProbeEffectInstance(buff.Blueprint.AssetGuid,
                     RuntimeHelpers.GetHashCode(buff).ToString(System.Globalization.CultureInfo.InvariantCulture),
-                    buff.EndTime.Ticks))
+                    buff.EndTime.Ticks, Modifiers(unit, buff)))
                 .ToList();
+        }
+
+        // The stat modifiers one buff instance gives its unit, each
+        // "<stat>/<descriptor>/<value>" (the modifier's source is the
+        // instance itself); null when they cannot be read.
+        private static List<string> Modifiers(UnitEntityData unit, Buff buff)
+        {
+            try
+            {
+                var result = new List<string>();
+                foreach (ModifiableValue stat in unit.Descriptor.Stats.GetList())
+                {
+                    if (stat == null) continue;
+                    foreach (ModifiableValue.Modifier modifier in stat.Modifiers)
+                        if (modifier != null && ReferenceEquals(modifier.Source, buff))
+                            result.Add(stat.Type + "/" + modifier.ModDescriptor + "/" +
+                                modifier.ModValue.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                }
+                return result;
+            }
+            catch (Exception) { return null; }
+        }
+
+        // The enhanced recipe's caster read: the amount of the enhancement's
+        // own resource (a "class-feature-resource|<caster>|<resource>" pool)
+        // and every activatable ability of the caster, on or off.
+        public CasterEnhancementObservation ObserveCaster(string casterUnitId, string usagePoolId)
+        {
+            try
+            {
+                if (Game.Instance == null || Game.Instance.Player == null)
+                    return CasterEnhancementObservation.Failed("player-state-unavailable");
+                UnitEntityData caster;
+                if (!KingmakerAnimatedCastAdapter.CollectUnits().TryGetValue(casterUnitId ?? string.Empty,
+                        out caster) || caster.Descriptor == null)
+                    return CasterEnhancementObservation.Failed("caster-not-in-party");
+                string[] parts = (usagePoolId ?? string.Empty).Split('|');
+                if (parts.Length != 3 || parts[0] != "class-feature-resource" || parts[1] != casterUnitId)
+                    return CasterEnhancementObservation.Failed("pool-not-a-caster-resource:" + usagePoolId);
+                BlueprintAbilityResource resource =
+                    ResourcesLibrary.TryGetBlueprint<BlueprintAbilityResource>(parts[2]);
+                if (resource == null)
+                    return CasterEnhancementObservation.Failed("resource-blueprint-missing:" + parts[2]);
+                int amount = caster.Descriptor.Resources.GetResourceAmount(resource);
+                var activatables = new Dictionary<string, bool>(StringComparer.Ordinal);
+                foreach (ActivatableAbility ability in caster.Descriptor.ActivatableAbilities.Enumerable)
+                {
+                    if (ability == null || ability.Blueprint == null) continue;
+                    string key = ability.Blueprint.AssetGuid;
+                    for (int index = 2; activatables.ContainsKey(key); index++)
+                        key = ability.Blueprint.AssetGuid + "#" +
+                            index.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    activatables[key] = ability.IsOn;
+                }
+                return CasterEnhancementObservation.Read(amount, activatables);
+            }
+            catch (Exception exception)
+            {
+                return CasterEnhancementObservation.Failed("native-read-exception:" +
+                    exception.GetType().Name + ":" + exception.Message);
+            }
         }
     }
 }
