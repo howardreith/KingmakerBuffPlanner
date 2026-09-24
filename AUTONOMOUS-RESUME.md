@@ -1,19 +1,32 @@
 # AUTONOMOUS-RESUME — top section is current; planning/CASTING-FIRST-MIGRATION-STATUS.md is the per-checkpoint tracker.
 
-## Release candidate 0.2.0-rc5 frozen at `27234a4` (2026-09-24, LATEST)
+## Release candidate 0.2.0-rc5 frozen at `27234a4`; chain done (2026-09-24, LATEST)
 
 Candidate `27234a445e95f2fc399857a880c35de0f397359f`: package
 `a05f1a83...`, DLL `785e1b79...`, MVID `171a1599-fef3-419b-b748-2833a10f9d75`;
 the same bytes from `repo/KingmakerBuffPlanner-RC5` (two deterministic
-builds) and `RC5-repro`. Frozen copy `runtime-backups/rc-frozen/27234a4.../`.
-Gate at `a1d787d` passed (source 42, protocol 335, harness 38, package 4,
-deploy WhatIf 5, launcher WhatIf 12, fixture 3, Restore-InstallLocal 16,
-publisher 3); the gate at the candidate and the rc5 chain
-(`scratchpad/rc5_chain.ps1`: Classic and zero-cost in both modes, import,
-frame runs deferred while disconnected, advanced inspection, finite, group
-and enhanced in both modes, temporary install and rollback) run when the
-Gunslinger session's final batch leaves the installation quiet. Then the
-receipt `docs/evidence/rc-0.2.0-rc5-receipt.md`, the PR title and body.
+builds), `RC5-repro` and the G2 gate build. Frozen copy
+`runtime-backups/rc-frozen/27234a4.../`. Receipt
+`docs/evidence/rc-0.2.0-rc5-receipt.md`; advanced fixture receipt
+`docs/evidence/advanced-fixture-20260924-receipt.md`.
+
+- Gate at the candidate: source 42, protocol 335, harness 38, package 4,
+  deploy WhatIf 5, launcher WhatIf 12, fixture 3, Restore-InstallLocal 16,
+  publisher 3.
+- Chain (`scratchpad/rc5_chain.ps1`, status `rc5_chain.status`): Classic
+  select/cast in both modes, zero-cost select and both modes, import:
+  PASS. `casting-ws-reload-20260924-rc5-01` FAIL on black frames (the
+  session showed as connected at the check and disconnected before the
+  frames; restored, saves clean; not a product result); layout and
+  rehearsal deferred. Advanced: inspection, finite, group and enhanced,
+  each selection plus both modes: PASS. Temporary install and rollback:
+  PASS (0.1.1-rc3 restored exactly, 1117 entries).
+- Waiting on the owner: the connected session for the frame-judged runs
+  and the supervised manual session; the worn-item enchantment decision;
+  merge, release and permanent installation.
+- Next iteration (bounded, in the receipt): the Mutagen ability-pool
+  qualification (the plain-buff check must first accept its shape), an
+  Extend rod casting, a safe area-transition route check.
 
 ## Advanced seed and the path to rc5 (2026-09-24)
 
