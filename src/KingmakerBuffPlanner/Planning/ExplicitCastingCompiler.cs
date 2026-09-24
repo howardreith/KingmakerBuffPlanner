@@ -919,14 +919,22 @@ namespace KingmakerBuffPlanner.Planning
             // existing effect is already sufficient. They are named for the
             // step (every predicted recipient is assessed, required coverage
             // or not), and their note says the cast goes ahead for the
-            // others - never "skipped".
+            // others - never "skipped" - and, when their effect outlasts what
+            // this casting gives, that the game may replace it with the
+            // shorter one (seen live: a communal form replaced a longer
+            // direct instance).
             if (skip && !allSufficient && casting.TargetMode != CastingTargetMode.DirectTarget &&
                 predicted != null)
             {
                 for (int index = 0; index < notes.Count; index++)
                     if (notes[index].StartsWith("already-active:", StringComparison.Ordinal))
-                        notes[index] = "already-covered:" +
-                            notes[index].Substring("already-active:".Length);
+                    {
+                        string rest = notes[index].Substring("already-active:".Length);
+                        int split = rest.IndexOf(':');
+                        string unit = split < 0 ? rest : rest.Substring(0, split);
+                        notes[index] = CoveredNotePrefix(InstancesFor(liveEffects, unit), expression,
+                            requirement) + rest;
+                    }
                 foreach (string unitId in predicted)
                 {
                     if (string.IsNullOrEmpty(unitId) || preCoveredUnitIds.Contains(unitId)) continue;
@@ -940,11 +948,59 @@ namespace KingmakerBuffPlanner.Planning
                         unitId, expression, InstancesFor(liveEffects, unitId), ignored, requirement);
                     if (extra.Verdict != ExistingEffectVerdict.Sufficient) continue;
                     preCoveredUnitIds.Add(unitId);
-                    notes.Add("already-covered:" + unitId + (extra.Reasons.Count == 0 ? string.Empty
-                        : ":" + string.Join("|", extra.Reasons.ToArray())));
+                    notes.Add(CoveredNotePrefix(InstancesFor(liveEffects, unitId), expression, requirement) +
+                        unitId + (extra.Reasons.Count == 0 ? string.Empty
+                            : ":" + string.Join("|", extra.Reasons.ToArray())));
                 }
             }
             return skip && allSufficient;
+        }
+
+        // "already-covered-longer:" when a live, unsuppressed instance of the
+        // effect outlasts what the planned casting gives (compared only when
+        // that duration is a trustworthy estimate; a permanent instance
+        // outlasts any), else "already-covered:".
+        private static string CoveredNotePrefix(IEnumerable<ActiveEffectInstance> instances,
+            EffectExpression expression, ExistingEffectRequirement requirement)
+        {
+            if (!requirement.DurationComparable || requirement.PlannedExpectedRounds <= 0)
+                return "already-covered:";
+            double planned = requirement.PlannedExpectedRounds *
+                ((requirement.PlannedMetamagicMask & ExistingEffectSufficiency.ExtendMetamagicFlag) != 0 ? 2.0 : 1.0);
+            var effects = new HashSet<string>(LeafEffectIds(expression), StringComparer.Ordinal);
+            bool outlasts = (instances ?? new ActiveEffectInstance[0]).Any(value => value != null &&
+                !value.Suppressed && effects.Contains(value.EffectId) &&
+                (value.RemainingRounds == null || value.RemainingRounds.Value > planned));
+            return outlasts ? "already-covered-longer:" : "already-covered:";
+        }
+
+        private static IEnumerable<string> LeafEffectIds(EffectExpression expression)
+        {
+            var leaf = expression as EffectLeafExpression;
+            if (leaf != null) { yield return leaf.EffectId; yield break; }
+            var sequence = expression as SequenceEffectExpression;
+            if (sequence != null)
+            {
+                foreach (EffectExpression child in sequence.Children)
+                    foreach (string id in LeafEffectIds(child)) yield return id;
+                yield break;
+            }
+            var conditional = expression as ConditionalEffectExpression;
+            if (conditional != null)
+            {
+                foreach (string id in LeafEffectIds(conditional.WhenTrue)) yield return id;
+                foreach (string id in LeafEffectIds(conditional.WhenFalse)) yield return id;
+                yield break;
+            }
+            var targeted = expression as TargetedEffectExpression;
+            if (targeted != null)
+            {
+                foreach (string id in LeafEffectIds(targeted.Child)) yield return id;
+                yield break;
+            }
+            var referenced = expression as ReferencedAbilityExpression;
+            if (referenced != null)
+                foreach (string id in LeafEffectIds(referenced.Child)) yield return id;
         }
 
         private static IEnumerable<ActiveEffectInstance> InstancesFor(

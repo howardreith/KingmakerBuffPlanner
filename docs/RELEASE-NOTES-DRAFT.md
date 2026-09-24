@@ -27,7 +27,9 @@ a player:
   name does not count). An effect that was already there, or one the
   game suppresses, never confirms a cast. The exception is a group
   casting cast for recipients that lack the buff while others already
-  have a provably good-enough one: those may keep theirs unchanged. A group casting that would
+  have a provably good-enough one: those may keep theirs unchanged, or
+  the game may replace it with this cast's (the card warns when theirs
+  lasts longer than this cast). A group casting that would
   reach nobody, or whose caster cannot be its origin, is blocked with a
   reason instead of running; a party buff that also reaches pets is
   planned as a party buff.
@@ -195,7 +197,11 @@ the automation party's finite spell levels hold no buff.
   under **Always recast**. The one case handled is a group casting that
   casts because some recipients lack the buff: a recipient whose existing
   effect was provably good enough may keep it unchanged, and only the
-  others need the effect to land.
+  others need the effect to land. The game may also replace that
+  recipient's longer effect with this cast's shorter one (it did in the
+  qualification run); the card warns when a recipient's effect outlasts
+  the cast, and a casting that gave the longer effect may then be due
+  again the next time the routine runs.
 - The classic planner has no press-again-to-stop: a started classic
   routine runs to its end or to its first unconfirmed cast.
 - The wait for a cast's confirmation is counted in game frames.

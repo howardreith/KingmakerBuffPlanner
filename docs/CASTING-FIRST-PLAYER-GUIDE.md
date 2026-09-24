@@ -154,7 +154,13 @@ good-enough one (for example a longer-lasting casting from earlier). It
 is cast once for the others, at its usual cost; the card says "already
 active on ... (the cast goes ahead for the others)". Those recipients may
 keep their effect unchanged; every other recipient still needs the effect
-to land. For a group casting the
+to land. The game may instead replace their effect with this cast's
+shorter one (in the qualification run it replaced a fighter's longer
+Protection from Alignment with the communal form's): when a recipient's
+effect lasts longer than this cast gives, the card says "... lasting
+longer than this cast (the cast goes ahead for the others and may shorten
+it)", and a casting that gave the longer effect may be due again the next
+time the routine runs. For a group casting the
 intended recipients are its required coverage, or everyone it would
 reach when no coverage is required. A casting whose buff is already
 active does not need a free slot, so running a routine again right after
