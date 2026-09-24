@@ -87,15 +87,17 @@ namespace KingmakerBuffPlanner.Persistence
                 }
                 // A newer-schema file is reported as such and never silently
                 // resolved through an older sibling or backup.
+                // Focused re-review: files that could not be read before it are
+                // still named.
                 if (schema > CastingPlanProfile.CurrentSchemaVersion)
                     return new CastingPlanLoadResult(
                         CastingPlanLoadStatus.UnsupportedSchema, null, path,
-                        "schema-version-newer:" + schema);
+                        AppendWarning(warnings, "schema-version-newer:" + schema));
                 int revision = ReadFormatRevision(json);
                 if (revision > CastingPlanProfile.CurrentFormatRevision)
                     return new CastingPlanLoadResult(
                         CastingPlanLoadStatus.UnsupportedSchema, null, path,
-                        "format-revision-newer:" + revision);
+                        AppendWarning(warnings, "format-revision-newer:" + revision));
                 try
                 {
                     CastingPlanProfile profile = Deserialize(json, campaignId);

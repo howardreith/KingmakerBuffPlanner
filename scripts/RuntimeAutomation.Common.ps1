@@ -354,15 +354,19 @@ function Close-KbpUnverifiableProtectedSaveComparison {
         [Parameter(Mandatory = $true)][string]$Reason,
         [Parameter(Mandatory = $true)][string]$EvidenceDirectory,
         [string]$StateRoot = $script:KbpRuntimeStateRoot,
-        # Focused re-review: the run, for a baseline that cannot be read.
-        [string]$RunId)
+        # Focused re-review: the run, for a baseline that cannot be read,
+        # and why the comparison could not be made.
+        [string]$RunId,
+        [string]$Detail)
     try { $baseline = Read-KbpJson $BaselinePath }
     catch {
         if ([string]::IsNullOrWhiteSpace($RunId)) { throw }
-        # The unreadable baseline is kept beside a closed one naming why.
+        # The unreadable baseline is copied aside first and replaced by the
+        # closed one last, so an interruption leaves it pending (targeted
+        # review).
         $kept = Join-Path (Split-Path -Parent $BaselinePath) ('protected-saves-before.unreadable-' +
             [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssZ') + '.json')
-        Move-Item -LiteralPath $BaselinePath -Destination $kept
+        Copy-Item -LiteralPath $BaselinePath -Destination $kept
         $baseline = [pscustomobject]@{
             schemaVersion = 1; runId = $RunId; scenario = 'unknown'; fixtureFamily = 'unknown'
             workingFileName = ''; saveRoot = ''; compared = $false; blocking = @(); files = @()
@@ -378,6 +382,7 @@ function Close-KbpUnverifiableProtectedSaveComparison {
         Write-KbpJsonAtomic $record ([ordered]@{
             schemaVersion = 1; runId = [string]$baseline.runId; scenario = [string]$baseline.scenario
             fixtureFamily = [string]$baseline.fixtureFamily; blocking = $blocking
+            detail = if ([string]::IsNullOrWhiteSpace($Detail)) { $null } else { $Detail }
             evidenceDirectory = $EvidenceDirectory; recordedAtUtc = [DateTime]::UtcNow.ToString('o')
         })
     }

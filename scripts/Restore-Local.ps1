@@ -55,40 +55,53 @@ $evidenceDirectory = Join-Path $EvidenceRoot $RunId
 if ($pending) {
     # Focused re-review: compared only while this run still holds its lock
     # (a lock removed by hand, or already released, means another operation
-    # may have changed the saves since); otherwise, or when the owner's
-    # agent closes a comparison that can never be made, it is recorded as
+    # may have changed the saves since); otherwise it is recorded as
     # unverifiable for the owner's review instead.
     $state = Read-KbpJson $statePath
-    $unverifiableReason = if ($CloseUnverifiableComparison) { 'comparison-failed' }
-        elseif ([string]$state.status -ceq 'Restored') { 'lock-released-before-comparison' }
+    $unverifiableReason = if ([string]$state.status -ceq 'Restored') { 'lock-released-before-comparison' }
         elseif (-not (Test-KbpRunLockHeld -State $state -RunId $RunId)) { 'lock-not-held' }
         else { $null }
     if ($null -ne $unverifiableReason) {
         $unverifiable = Close-KbpUnverifiableProtectedSaveComparison -BaselinePath $baselinePath `
             -Reason $unverifiableReason -EvidenceDirectory $evidenceDirectory -StateRoot $StateRoot -RunId $RunId
         $recorded = "recorded as $(@($unverifiable) -join ', ') for the owner's review"
-        if (-not $CloseUnverifiableComparison) {
-            throw "The protected saves of run $RunId can no longer be compared under its lock; $recorded."
+        if ($unverifiableReason -ceq 'lock-not-held') {
+            throw ("The protected saves of run $RunId can no longer be compared under its lock; $recorded. Its " +
+                "deployment lock is missing or not its own, so this script cannot restore the Mods folder either: " +
+                "the owner inspects runtime-state\deployment.lock and the Mods folder.")
         }
-        $saveFailure = "The protected saves of run $RunId were not compared; $recorded."
-        $pending = $false
+        throw "The protected saves of run $RunId can no longer be compared under its lock; $recorded."
     }
 }
 if ($pending) {
+    $comparison = $null
     try {
         $comparison = Complete-KbpProtectedSaveComparison -BaselinePath $baselinePath -EvidenceDirectory $evidenceDirectory `
             -StateRoot $StateRoot
     }
     catch {
-        throw ("The protected-save comparison of run $RunId failed; the Mods folder was not restored and the run's lock " +
-            "is kept. Fix the cause and run Restore-Local.ps1 -RunId $RunId again; if it can never be made, " +
-            "Restore-Local.ps1 -RunId $RunId -CloseUnverifiableComparison records it for the owner's review and " +
-            "restores: " + $_.Exception.Message)
+        $compareError = $_.Exception.Message
+        if (-not $CloseUnverifiableComparison) {
+            throw ("The protected-save comparison of run $RunId failed; the Mods folder was not restored and the run's lock " +
+                "is kept. Fix the cause and run Restore-Local.ps1 -RunId $RunId again; if it can never be made, " +
+                "Restore-Local.ps1 -RunId $RunId -CloseUnverifiableComparison records it for the owner's review and " +
+                "restores: " + $compareError)
+        }
+        # Targeted review: closed only after the comparison was tried and
+        # failed, never while the game runs (a passing cause), and with why.
+        Assert-KbpNotRunning
+        $unverifiable = Close-KbpUnverifiableProtectedSaveComparison -BaselinePath $baselinePath `
+            -Reason 'comparison-failed' -Detail $compareError -EvidenceDirectory $evidenceDirectory `
+            -StateRoot $StateRoot -RunId $RunId
+        $saveFailure = "The protected saves of run $RunId could not be compared ($compareError); recorded as " +
+            "$(@($unverifiable) -join ', ') for the owner's review."
     }
-    if (@($comparison.blocking).Count -ne 0) {
-        $saveFailure = "Protected saves changed during run ${RunId}: " + (@($comparison.blocking) -join ', ')
+    if ($null -ne $comparison) {
+        if (@($comparison.blocking).Count -ne 0) {
+            $saveFailure = "Protected saves changed during run ${RunId}: " + (@($comparison.blocking) -join ', ')
+        }
+        else { Write-Host "Protected saves: clean run=$RunId" }
     }
-    else { Write-Host "Protected saves: clean run=$RunId" }
 }
 # Re-review (harness): a restoration failure never hides a save violation.
 try {

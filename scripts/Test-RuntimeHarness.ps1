@@ -1857,6 +1857,15 @@ try {
     if (@(Get-ChildItem -LiteralPath (Join-Path $ackFolder 'acknowledged') -Filter 'tamper-run.superseded-*.json' -File).Count -ne 1) {
         throw 'A superseded acknowledgement was not kept.'
     }
+    # Targeted review: an unreadable acknowledgement is superseded too.
+    [IO.File]::WriteAllText((Join-Path $ackFolder 'acknowledged\tamper-run.json'), '{ garbage')
+    Write-KbpJsonAtomic (Join-Path $ackFolder 'tamper-run.json') ([ordered]@{ schemaVersion = 1; runId = 'tamper-run'; blocking = @('changed:c') })
+    Start-Sleep -Seconds 1
+    & $confirmScript -RunId 'tamper-run' -ReviewedBy 'harness test' -Note 'third' -StateRoot $ackState -Confirm:$false | Out-Null
+    Assert-KbpNoUnacknowledgedSaveViolation -StateRoot $ackState
+    if (@(Get-ChildItem -LiteralPath (Join-Path $ackFolder 'acknowledged') -Filter 'tamper-run.superseded-*.json' -File).Count -ne 2) {
+        throw 'An unreadable acknowledgement was not superseded.'
+    }
     $oddState = Join-Path $savesRoot 'odd-state'
     $oddFolder = Join-Path $oddState 'protected-save-violations'
     New-Item -ItemType Directory -Path $oddFolder -Force | Out-Null
@@ -1867,7 +1876,7 @@ try {
     Write-KbpJsonAtomic (Join-Path $oddFolder 'other.json') ([ordered]@{ schemaVersion = 1; runId = 'someone-else'; blocking = @('changed:a') })
     $mismatchRefused = $false
     try { & $confirmScript -RunId 'other' -ReviewedBy 'harness test' -Note 'x' -StateRoot $oddState -Confirm:$false | Out-Null }
-    catch { $mismatchRefused = $_.Exception.Message -like '*names run someone-else*' }
+    catch { $mismatchRefused = $_.Exception.Message -like '*malformed (it names run ''someone-else'')*' }
     if (-not $mismatchRefused) { throw 'A violation record naming another run was acknowledged.' }
     # Nor does an acknowledgement planted for it lift the block.
     New-Item -ItemType Directory -Path (Join-Path $oddFolder 'acknowledged') -Force | Out-Null
@@ -1876,7 +1885,7 @@ try {
     Remove-Item -LiteralPath (Join-Path $oddFolder 'odd.acknowledged.json') -Force
     $plantedBlocks = $false
     try { Assert-KbpNoUnacknowledgedSaveViolation -StateRoot $oddState }
-    catch { $plantedBlocks = $_.Exception.Message -like '*Run someone-else changed protected saves*' }
+    catch { $plantedBlocks = $_.Exception.Message -like '*record other.json is malformed (it names run ''someone-else'')*' }
     if (-not $plantedBlocks) { throw 'An acknowledgement planted for a record naming another run lifted it.' }
     # Focused re-review: a record missing a field still blocks, named by
     # its file, with the owner's command in the message.
@@ -1886,7 +1895,7 @@ try {
     Write-KbpJsonAtomic (Join-Path $fieldFolder 'nofield.json') ([ordered]@{ schemaVersion = 1; blocking = @('changed:a') })
     $fieldMessage = ''
     try { Assert-KbpNoUnacknowledgedSaveViolation -StateRoot $fieldState } catch { $fieldMessage = $_.Exception.Message }
-    if ($fieldMessage -notlike 'Run nofield changed protected saves (changed:a).*Confirm-KbpProtectedSaveReview.ps1 -RunId nofield.') {
+    if ($fieldMessage -notlike 'The protected-save violation record nofield.json is malformed (it names run '''')*resolved it by hand.') {
         throw ('A violation record missing its run did not block clearly: ' + $fieldMessage)
     }
     # Restore-Local against a test state root (each transaction is a stand-in
@@ -1934,9 +1943,11 @@ try {
     $closedMessage = ''
     try { & $restoreScript -RunId 'rl-fail' -CloseUnverifiableComparison -StateRoot $rlState -EvidenceRoot $rlEvidence -Confirm:$false }
     catch { $closedMessage = $_.Exception.Message }
-    if ($closedMessage -notlike 'The protected saves of run rl-fail were not compared; recorded as unverifiable:comparison-failed*| Restoration: *' -or
+    $closedRecord = Join-Path $rlState 'protected-save-violations\rl-fail.json'
+    if ($closedMessage -notlike 'The protected saves of run rl-fail could not be compared (*); recorded as unverifiable:comparison-failed*| Restoration: *' -or
         -not [bool](Read-KbpJson $failBaseline).compared -or
-        -not (Test-Path -LiteralPath (Join-Path $rlState 'protected-save-violations\rl-fail.json') -PathType Leaf)) {
+        -not (Test-Path -LiteralPath $closedRecord -PathType Leaf) -or
+        [string](Read-KbpJson $closedRecord).detail -notlike '*Save root is unavailable*') {
         throw ('A comparison that can never be made was not closed for the owner: ' + $closedMessage)
     }
     $closeRefused = $false

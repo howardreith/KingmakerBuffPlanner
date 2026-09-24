@@ -26,6 +26,24 @@ after a close and reopen, each exactly as forecast). Finite-resource
 qualification waits for an owner-designated advanced seed. Human usability and the native aesthetic
 pass remain open.
 
+## Findings from the targeted review of the focused fixes (2026-09-24)
+
+One more independent read-only review of `f47f527..b783f60`. Fixed in the
+commit after `7654b70` unless marked.
+
+| Finding | Disposition |
+| --- | --- |
+| Reserving one unit for an unverified zero cost made it look verified, so the review-M1 refusals could no longer fire | Reverted; the rule is pinned by a test |
+| "It had not cast anything" was decided on submitted casts, which the animated executor never records | Decided on any cast put to the game (queued, submitted, started, spent or confirmed), tested |
+| An unreadable baseline was moved aside before the record and the closed baseline were written | Copied aside first, the closed baseline written last |
+| Closing an impossible comparison never tried it or checked the game had exited | Tries the comparison first, refuses while the game runs, records why it failed |
+| A merge into unsaved castings adopted the Classic plan's settings | The session's own settings are written |
+| An area change dropped the interruption result | Kept (the campaign check covers another save) |
+| Messages naming commands that cannot work (a malformed record, a missing run, an unreadable acknowledgement, a lost lock) | Named as malformed for the owner; an unreadable acknowledgement is superseded; the lost-lock message says the Mods folder needs the owner too |
+| The hash was of a second read | The bytes parsed are the bytes hashed |
+| A newer plan dropped the warnings before it | Kept, and every unusable file is named |
+| Groupings captured when the session was built | Read with the Classic plan at import time |
+
 ## Findings from the focused review of the re-review fixes (2026-09-24)
 
 Three more independent read-only reviews of `b1b3736..f47f527` (FA casting
@@ -41,7 +59,7 @@ marked as limitations (release notes, "Known limitations").
 | FB5..FB7: "not saved" missing while a backup stands in for an unreadable file; both single/group switches always offered and dropped recipients unnamed; a missing Classic file with unreadable backups unannounced | Header uses whether saves are refused; only the buff's own mode is offered and dropped recipients are named; a non-blocking notice | `2bb91da` |
 | FA1 (medium, Classic): the Classic screen closed itself when reopened mid-run | Decided once at the press (`ClassicRunScreenPolicy`, tested); the flag reset on every end | `2bb91da` |
 | FA2/FA3: a kept result crossed campaigns and modes and hid the notice; a waiting run was not shown; "interrupted" for a run that never cast | Scoped to its campaign in Classic mode, dropped on area change and mode switch, shown beside the notice; waiting shown in the tooltip and screen; worded by what was cast | `2bb91da` |
-| FA4: an unverified zero cost on a finite pool reserved nothing while the budget counted one | The ledger reserves one unit | `2bb91da` |
+| FA4: an unverified zero cost on a finite pool reserved nothing while the budget counted one | Kept by design (review M1): it reserves nothing, shows short by one and is refused before any cast. Reserving one unit (`2bb91da`) made the cost look known and was reverted after the targeted review | reverted |
 | FA5 (unverified): effects that reach pets as well as the party, a target or an area | Limitation stated (no test party has pets; next iteration with the advanced seed) | — |
 | FA6: tests pinned text | Pure policy, wrapped-expression confirmation cases; the world-gate text check follows the new rule | `2bb91da` |
 | FA7: APPLY now closes the Classic planner | For the owner to confirm (release notes and handoff) | — |

@@ -1478,7 +1478,8 @@ namespace KingmakerBuffPlanner.UI
             return new CastingWorkspaceSession(_modPath, campaignId, CreateDispatchBoundary(),
                 _session.Model == null ? null : _session.Model.SourceGroupings(),
                 () => _session.Model == null ? null
-                    : new ClassicPlanInMemory(_session.Model.Profile, _session.ClassicPrimarySha256));
+                    : new ClassicPlanInMemory(_session.Model.Profile, _session.ClassicPrimarySha256,
+                        _session.Model.SourceGroupings()));
         }
 
         // Ordinary play submits through the production boundary; a
@@ -1881,7 +1882,6 @@ namespace KingmakerBuffPlanner.UI
             if (_castingHost != null) _castingHost.Cancel("area-unloading");
             EndClassicRun("area-unloading");
             ReleasePlayerUi();
-            if (_screen != null) _screen.DiscardUnshownResult();
         }
 
         public void OnAreaDidLoad()

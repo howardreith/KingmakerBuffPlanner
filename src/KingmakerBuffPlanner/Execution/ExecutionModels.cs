@@ -96,6 +96,19 @@ namespace KingmakerBuffPlanner.Execution
         public int Confirmed { get { return _records.Count(r => r.Status == CastExecutionStatus.EffectConfirmed); } }
         public int SuccessfullyObserved { get { return Confirmed; } }
         public int ResourcesSpent { get { return _records.Count(r => r.Status == CastExecutionStatus.ResourceSpent); } }
+        // Whether any cast was put to the game (queued, submitted, started,
+        // spent or confirmed) - the animated executor queues and starts,
+        // the instant one submits.
+        public bool AnyCastAttempted
+        {
+            get
+            {
+                return _records.Any(r => r.Status == CastExecutionStatus.Queued ||
+                    r.Status == CastExecutionStatus.Submitted || r.Status == CastExecutionStatus.CastStarted ||
+                    r.Status == CastExecutionStatus.SpendInvoked || r.Status == CastExecutionStatus.ResourceSpent ||
+                    r.Status == CastExecutionStatus.EffectConfirmed);
+            }
+        }
         public int Failed
         {
             get

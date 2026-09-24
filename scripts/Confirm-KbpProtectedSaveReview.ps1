@@ -31,14 +31,19 @@ if ([string]::IsNullOrWhiteSpace($ReviewedBy) -or [string]::IsNullOrWhiteSpace($
     throw 'Name the reviewer and say what was reviewed.'
 }
 $violation = Read-KbpJson $recordPath
-if ([string]$violation.runId -cne $RunId) { throw "The violation record names run $($violation.runId), not $RunId." }
+$violationRun = if ($null -ne $violation.PSObject.Properties['runId']) { [string]$violation.runId } else { '' }
+if ($violationRun -cne $RunId) {
+    throw "The violation record for $RunId is malformed (it names run '$violationRun'); inspect and resolve it by hand."
+}
 $recordSha256 = Get-KbpSha256 $recordPath
 # Focused re-review: an acknowledgement of this exact record ends here; one
 # of an earlier version of the record is superseded by a new review.
 $superseded = $null
 if (Test-Path -LiteralPath $acknowledgementPath) {
-    $existing = Read-KbpJson $acknowledgementPath
-    $existingSha = if ($null -ne $existing.PSObject.Properties['violationRecordSha256']) {
+    # An unreadable acknowledgement is superseded like a stale one.
+    $existing = $null
+    try { $existing = Read-KbpJson $acknowledgementPath } catch { }
+    $existingSha = if ($null -ne $existing -and $null -ne $existing.PSObject.Properties['violationRecordSha256']) {
         [string]$existing.violationRecordSha256 } else { '' }
     if ($existingSha -ceq $recordSha256) { throw "The violation of run $RunId is already acknowledged." }
     $superseded = Join-Path $acknowledgedFolder ($RunId + '.superseded-' +

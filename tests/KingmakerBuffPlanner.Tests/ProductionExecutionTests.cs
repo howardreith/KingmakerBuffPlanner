@@ -48,7 +48,8 @@ namespace KingmakerBuffPlanner.Tests
             Run("footer-counts-only-this-routines-one-pass-shortfalls", () => TestFooterCountsOnlyShortfalls(root));
             Run("reload-without-a-plan-file-never-blocks-or-discards", () => TestReloadWithoutPlanFile(root));
             Run("classic-screen-policy-closes-once-and-scopes-results", TestClassicRunScreenPolicy);
-            Run("finite-pool-zero-cost-reserves-one-unit", TestFinitePoolZeroCostReservesOne);
+            Run("finite-pool-zero-cost-stays-an-unknown-cost", TestFinitePoolZeroCostStaysUnknown);
+            Run("an-interrupted-run-says-whether-it-cast", TestInterruptedRunWording);
             Run("imported-grouping-unknown-becomes-single-target", () => TestImportedGroupingUnknownBecomesSingleTarget(root));
             Run("first-open-import-reads-the-rebound-classic-plan", () => TestImportFromReboundClassicPlan(root));
             Run("classic-file-and-hud-stay-with-their-mode-and-campaign", TestClassicSaveAndHudScoping);
@@ -875,6 +876,17 @@ namespace KingmakerBuffPlanner.Tests
                 "C:\\x\\UserSettings\\plan.json.bak1", string.Empty);
             string corruptNotice = PersistenceMessages.ForCastingLoad(CastingPlanLoadStatus.Corrupt, true,
                 "C:\\x\\plan.json", "plan.json:invalid:x | plan.json.bak2:schema-version-missing");
+            string newerDir = Path.Combine(root, "pn-newer");
+            string newerPlan = new CastingPlanRepository(newerDir).GetProfilePath("notice-campaign");
+            Directory.CreateDirectory(Path.GetDirectoryName(newerPlan));
+            File.WriteAllText(newerPlan, "{ not json");
+            File.WriteAllText(newerPlan + ".bak1", "{\"schemaVersion\":99}");
+            CastingPlanLoadResult newerLoad = new CastingPlanRepository(newerDir).Load("notice-campaign");
+            string bothFiles = PersistenceMessages.UnusableCastingFiles(newerLoad.Status, newerLoad.SourcePath,
+                newerLoad.Warning);
+            if (newerLoad.Status != CastingPlanLoadStatus.UnsupportedSchema ||
+                bothFiles != Path.GetFileName(newerPlan) + ", " + Path.GetFileName(newerPlan) + ".bak1")
+                throw new InvalidOperationException("A newer plan behind an unreadable one did not name both: " + bothFiles);
             if (!newerNotice.Contains("(plan.json.bak1)") || !corruptNotice.Contains("(plan.json, plan.json.bak2)") ||
                 !corruptNotice.Contains("move those files out of UserSettings"))
                 throw new InvalidOperationException("The casting notices do not name the files to move: " + corruptNotice);
@@ -1288,6 +1300,8 @@ namespace KingmakerBuffPlanner.Tests
             Assert(blocked.LegacyImportBlocked);
             Assert(AddDraftCasting(blocked, inputs, "unit-wizard", "unit-t2").Applied);
             string authored = blocked.Document.Castings.Single().CastingId;
+            bool chosenOutOfCombat = !blocked.OutOfCombatOnly;
+            blocked.SetOutOfCombatOnly(chosenOutOfCombat);
             File.Delete(classicPath);
             BuffPlannerProfile legacy = BuffPlannerProfile.CreateDefault("workspace-campaign");
             legacy.Routines[0].Assignments.Add(LegacyAssignment("source-bulls", CastingBuffAbility,
@@ -1297,7 +1311,9 @@ namespace KingmakerBuffPlanner.Tests
             List<string> merged = blocked.Document.Castings.Select(value => value.CastingId).ToList();
             if (blocked.LegacyImportBlocked || blocked.PersistenceBlocked || merged.Count != 2 ||
                 !merged.Contains(authored) || blocked.IsDirty || blocked.LastReloadNote != "imported-into-unsaved" ||
-                new CastingWorkspaceSession(mergeDir, "workspace-campaign").Document.Castings.Count != 2)
+                new CastingWorkspaceSession(mergeDir, "workspace-campaign").Document.Castings.Count != 2 ||
+                blocked.OutOfCombatOnly != chosenOutOfCombat ||
+                new CastingWorkspaceSession(mergeDir, "workspace-campaign").OutOfCombatOnly != chosenOutOfCombat)
                 throw new InvalidOperationException("Castings added while the classic import was blocked were not kept: " +
                     string.Join(",", merged.ToArray()) + "|" + blocked.LastReloadNote);
         }
@@ -1319,23 +1335,46 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("A kept Classic result is shown for another campaign.");
         }
 
-        // Focused re-review: a finite pool is never spent for nothing - an
-        // unverified zero cost reserves one unit, and is refused when none
-        // is left.
-        private static void TestFinitePoolZeroCostReservesOne()
+        // Review M1, kept after the focused re-review: an unverified zero cost
+        // on a finite pool reserves nothing and stays an unknown cost (which
+        // the executors and the step converter refuse before any cast).
+        private static void TestFinitePoolZeroCostStaysUnknown()
         {
             var pool = new ResourcePoolSnapshot("pool-z", ResourcePoolKind.SpontaneousLevel, 1, 1, null);
             var free = new ProviderSnapshot(new ProviderKey("unit-z", "book-z", CastingBuffAbility, "level-1"),
                 CastingBuffAbility.BaseAbilityGuid, 1, "pool-z", 0, null);
             var ledger = new ResourceLedger(new[] { pool });
             ResourceReservation first;
-            ResourceReservation second;
             string reason;
             bool firstOk = ledger.TryReserve(free, out first, out reason);
-            bool secondOk = ledger.TryReserve(free, out second, out reason);
-            if (!firstOk || first.Units != 1 || secondOk || reason != "insufficient-shared-resource")
-                throw new InvalidOperationException("A zero cost on a finite pool was not reserved as one unit: " +
-                    (first == null ? "none" : first.Units.ToString()) + "|" + reason);
+            if (!firstOk || first.Units != 0 || first.CostKnown || first.Unlimited)
+                throw new InvalidOperationException("An unverified zero cost on a finite pool looked known: " +
+                    (first == null ? "none" : first.Units + "|" + first.CostKnown));
+        }
+
+        // Targeted review: an interrupted run says whether it had put any cast
+        // to the game - the animated executor queues and starts, the instant
+        // one submits.
+        private static void TestInterruptedRunWording()
+        {
+            CastingWorkspaceInputs inputs = QualificationInputs(true, true, null);
+            CastingQualificationSelection selection = CastingQualificationRecipe.SelectZeroCostMixed(
+                inputs, "fixture-campaign");
+            CastPlan plan = CastingQualificationForecast.Forecast(selection, inputs, "fixture-campaign")[0]
+                .Projection.Plan;
+            foreach (CastExecutionStatus attempted in new[] { CastExecutionStatus.Queued,
+                    CastExecutionStatus.Submitted, CastExecutionStatus.CastStarted,
+                    CastExecutionStatus.ResourceSpent, CastExecutionStatus.EffectConfirmed })
+            {
+                var report = new ExecutionReport(plan);
+                report.Add(0, plan.Steps[0], attempted, "fixture");
+                if (!report.AnyCastAttempted)
+                    throw new InvalidOperationException("A run that put a cast to the game said it had not: " + attempted);
+            }
+            var refused = new ExecutionReport(plan);
+            refused.Add(0, plan.Steps[0], CastExecutionStatus.FailedValidation, "fixture");
+            if (refused.AnyCastAttempted || new ExecutionReport(plan).AnyCastAttempted)
+                throw new InvalidOperationException("A run that cast nothing said it had cast.");
         }
 
         private static bool? GroupAbilityOfFocus(string root, CastingWorkspaceInputs groupInputs)
@@ -1660,6 +1699,21 @@ namespace KingmakerBuffPlanner.Tests
             ProfileLoadResult primaryLoad = repository.Load("legacy-campaign");
             if (primaryLoad.PrimarySha256 != legacyHash)
                 throw new InvalidOperationException("The Classic load did not record the main file's bytes.");
+            // Targeted review: the Classic planner's groupings of the same
+            // refresh are used for the import (a single-target buff is not
+            // left as "grouping unknown" when the session was built without).
+            string groupingDir = Path.Combine(root, "import-fresh-groupings");
+            Directory.CreateDirectory(groupingDir);
+            var groupingRepository = new ProfileRepository(groupingDir);
+            groupingRepository.Save(onDisk);
+            string groupingHash = KingmakerBuffPlanner.Infrastructure.Hashing.Sha256(
+                groupingRepository.GetProfilePath("legacy-campaign"));
+            var groupingSession = new CastingWorkspaceSession(groupingDir, "legacy-campaign",
+                new DisabledCastingDispatchBoundary(), null,
+                () => new ClassicPlanInMemory(onDisk, groupingHash, PerTarget("source-bulls")));
+            if (groupingSession.Document.Castings.Count != 1 ||
+                groupingSession.Document.Castings.Single().TargetMode != CastingTargetMode.DirectTarget)
+                throw new InvalidOperationException("The Classic planner's own groupings were not used for the import.");
             // The reviewer's case end to end: the Classic planner holds a new
             // default because its file could not be read; the first import is
             // blocked; the player repairs the file and presses Reload.
@@ -1699,8 +1753,9 @@ namespace KingmakerBuffPlanner.Tests
                 "KingmakerBuffPlanner", "UI", name)).Replace("\r\n", "\n");
             if (!source("BuffPlannerUiRoot.cs").Contains("_session.Model == null ? null : _session.Model.SourceGroupings(),\n" +
                     "                () => _session.Model == null ? null\n" +
-                    "                    : new ClassicPlanInMemory(_session.Model.Profile, _session.ClassicPrimarySha256));") ||
-                !source("CastingWorkspaceSession.cs").Contains(".Migrate(campaignId, groupings, ReadClassicPlanInMemory(), unsaved);") ||
+                    "                    : new ClassicPlanInMemory(_session.Model.Profile, _session.ClassicPrimarySha256,\n" +
+                    "                        _session.Model.SourceGroupings()));") ||
+                !source("CastingWorkspaceSession.cs").Contains(".Migrate(campaignId, effectiveGroupings, inMemory, unsaved,") ||
                 !source("PlannerUiSession.cs").Contains("ClassicPrimarySha256 = loaded.PrimarySha256;") ||
                 !source("PlannerUiSession.cs").Contains(
                     "ClassicPrimarySha256 = ProfileRepository.TryHash(_profiles.GetProfilePath(profile.CampaignId));"))
@@ -5361,11 +5416,12 @@ namespace KingmakerBuffPlanner.Tests
                 !rootSource.Contains("        private void ReleasePlayerUi()\n        {\n            _closeScreenForClassicRun = false;") ||
                 !rootSource.Contains("                if (_closeScreenForClassicRun)\n                {\n                    _closeScreenForClassicRun = false;") ||
                 !rootSource.Contains("if (_screen != null && !CastingFirstActive)\n                _screen.Present(result,") ||
-                System.Text.RegularExpressions.Regex.Matches(rootSource, "_screen.DiscardUnshownResult\\(\\);").Count != 2 ||
+                System.Text.RegularExpressions.Regex.Matches(rootSource, "_screen.DiscardUnshownResult\\(\\);").Count != 1 ||
                 !controllerSource.Contains("                _unshownResult = result;\n                _unshownResultCampaign = campaignId;") ||
                 !controllerSource.Contains("ClassicRunScreenPolicy.ShowStashedResult(_unshownResultCampaign,") ||
                 !controllerSource.Contains("                    _view.ShowResult(_unshownResult);") ||
                 !sessionSource.Contains("\"it had not cast anything yet, and nothing was attempted.\"") ||
+                !sessionSource.Contains("bool submitted = LastExecutionReport != null && LastExecutionReport.AnyCastAttempted;") ||
                 !File.ReadAllText(Path.Combine(directory.FullName, "src", "KingmakerBuffPlanner", "UI",
                     "BuffPlannerHudButtonController.cs")).Contains("return _session.ClassicRunHeld"))
                 throw new InvalidOperationException("The Classic run's checks, gate, screen close or result are not where they belong.");
