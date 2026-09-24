@@ -1878,6 +1878,17 @@ try {
     try { Assert-KbpNoUnacknowledgedSaveViolation -StateRoot $oddState }
     catch { $plantedBlocks = $_.Exception.Message -like '*Run someone-else changed protected saves*' }
     if (-not $plantedBlocks) { throw 'An acknowledgement planted for a record naming another run lifted it.' }
+    # Focused re-review: a record missing a field still blocks, named by
+    # its file, with the owner's command in the message.
+    $fieldState = Join-Path $savesRoot 'field-state'
+    $fieldFolder = Join-Path $fieldState 'protected-save-violations'
+    New-Item -ItemType Directory -Path $fieldFolder -Force | Out-Null
+    Write-KbpJsonAtomic (Join-Path $fieldFolder 'nofield.json') ([ordered]@{ schemaVersion = 1; blocking = @('changed:a') })
+    $fieldMessage = ''
+    try { Assert-KbpNoUnacknowledgedSaveViolation -StateRoot $fieldState } catch { $fieldMessage = $_.Exception.Message }
+    if ($fieldMessage -notlike 'Run nofield changed protected saves (changed:a).*Confirm-KbpProtectedSaveReview.ps1 -RunId nofield.') {
+        throw ('A violation record missing its run did not block clearly: ' + $fieldMessage)
+    }
     # Restore-Local against a test state root (each transaction is a stand-in
     # whose lock does not exist, so nothing can be restored): -Skip is refused
     # while the comparison is pending; a comparison that cannot be made
