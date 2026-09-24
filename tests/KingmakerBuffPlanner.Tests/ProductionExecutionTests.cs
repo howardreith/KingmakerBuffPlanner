@@ -1206,9 +1206,15 @@ namespace KingmakerBuffPlanner.Tests
             Assert(editor.RemoveFocusedCasting().Applied);
             editor.Save();
             watcher.Reload();
+            string[] afterReload = watcher.Document.Castings.Select(value => value.CastingId).ToArray();
             Assert(AddDraftCasting(watcher, inputs, "unit-wizard", "unit-t1").Applied);
-            if (watcher.Document.Castings.Any(value => value.CastingId == top))
-                throw new InvalidOperationException("A casting removed elsewhere had its id issued again after a reload: " + top);
+            string issued = watcher.Document.Castings.Select(value => value.CastingId)
+                .Single(value => !afterReload.Contains(value));
+            // Every id the session has seen stays below the ones it issues.
+            if (int.Parse(issued.Substring(5), System.Globalization.CultureInfo.InvariantCulture) <=
+                    int.Parse(top.Substring(5), System.Globalization.CultureInfo.InvariantCulture))
+                throw new InvalidOperationException("After a reload the session issued " + issued +
+                    ", not above " + top + " which it had shown.");
         }
 
         // Re-review: the footer counts this routine's castings that are ready
