@@ -260,6 +260,30 @@ namespace KingmakerBuffPlanner.RuntimeTesting
 
         internal const int QualificationRunDeadlineSeconds = 240;
 
+        // Final review C3: a live run is bounded by the launcher's own
+        // TimeoutSeconds, counted from the game's start, less a margin in
+        // which the host ends the run and publishes its result (a tenth of
+        // the timeout, 10 to 45 seconds); the launcher's abort marker,
+        // written at its own deadline, ends the run at once. Either stop is
+        // taken before any further native submission (the host's terminal
+        // shutdown). Null while the run may continue.
+        internal const string AbortMarkerFileName = "abort.json";
+
+        internal static int OverallDeadlineMarginSeconds(int timeoutSeconds)
+        {
+            return Math.Min(45, Math.Max(10, timeoutSeconds / 10));
+        }
+
+        internal static string RunStopReason(DateTime nowUtc, DateTime processStartUtc,
+            int timeoutSeconds, bool abortMarkerPresent)
+        {
+            if (abortMarkerPresent) return "aborted-by-launcher";
+            if (nowUtc >= processStartUtc.AddSeconds(
+                    timeoutSeconds - OverallDeadlineMarginSeconds(timeoutSeconds)))
+                return "overall-deadline";
+            return null;
+        }
+
         // Classic cast scenarios (mission batch 3, section 6): the Classic
         // planner, the default mode, authored through its own screen
         // controls. "live-classic-select" records the classic plan and its
@@ -346,6 +370,14 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 StringComparison.Ordinal);
         }
 
+        internal static bool IsManualRehearsal(
+            System.Collections.Generic.IDictionary<string, object> parameters)
+        {
+            object raw;
+            return parameters != null && parameters.TryGetValue("manualRehearsal", out raw) &&
+                raw is bool && (bool)raw;
+        }
+
         internal static int ReadManualHoldSeconds(
             System.Collections.Generic.IDictionary<string, object> parameters)
         {
@@ -421,17 +453,26 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     "expectedGameName", "expectedGameId", "executionMode",
                     "manualHoldSeconds"
                 };
-                if (request.Parameters.Count != manualExact.Length ||
+                // Final review C5: a rehearsal of the manual session is
+                // labelled in its own request (manualRehearsal: true).
+                bool rehearsal = request.Parameters.ContainsKey("manualRehearsal");
+                if (rehearsal && !IsManualRehearsal(request.Parameters))
+                    throw new InvalidDataException("manual-rehearsal-invalid");
+                int manualTotal = manualExact.Length + (rehearsal ? 1 : 0);
+                if (request.Parameters.Count != manualTotal ||
                     manualExact.Any(name =>
                         !request.Parameters.ContainsKey(name)))
                     throw new InvalidDataException("manual-save-parameters");
-                ValidateLiveSaveParameters(request, manualExact.Length);
+                ValidateLiveSaveParameters(request, manualTotal);
                 ReadManualHoldSeconds(request.Parameters);
                 return;
             }
             if (request.Parameters.ContainsKey("manualHoldSeconds"))
                 throw new InvalidDataException(
                     "manual-hold-seconds-only-with-manual-scenario");
+            if (request.Parameters.ContainsKey("manualRehearsal"))
+                throw new InvalidDataException(
+                    "manual-rehearsal-only-with-manual-scenario");
             // The probe allowance exists only on the casting probe scenario
             // (never on selection-only or any other scenario), as a string
             // the host parses strictly against this run id.

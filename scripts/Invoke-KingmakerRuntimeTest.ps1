@@ -225,10 +225,11 @@ $advancedInspectionRunId = if ($FixtureFamily -ceq 'Advanced' -and $Scenario -ce
 # Review C5: a casting allowance must name this profile, its exact identity
 # and this WORKING save; anything else is refused before any deployment.
 $allowanceWorkingSha256 = if ($null -eq $savePair) { $null } else { [string]$savePair.working.sha256 }
+$allowanceGameId = if ($null -eq $savePair) { $null } else { [string]$savePair.working.gameId }
 if ($null -ne $qualificationAllowanceJson) {
     $bindingRefusal = Get-KbpAllowanceFixtureBindingRefusal -AllowanceJson $qualificationAllowanceJson `
         -ProfileId $CompatibilityProfileId -CompatibilityIdentity (Get-KbpCompatibilityIdentityDigest $compatibilityProfile) `
-        -WorkingSaveSha256 $allowanceWorkingSha256
+        -WorkingSaveSha256 $allowanceWorkingSha256 -FixtureGameId $allowanceGameId
     if ($null -ne $bindingRefusal) { throw "The qualification allowance was refused: $bindingRefusal" }
 }
 if ($null -ne $probeAllowanceJson) {
@@ -240,7 +241,7 @@ if ($null -ne $probeAllowanceJson) {
 if ($null -ne $classicAllowanceJson) {
     $bindingRefusal = Get-KbpAllowanceFixtureBindingRefusal -AllowanceJson $classicAllowanceJson `
         -ProfileId $CompatibilityProfileId -CompatibilityIdentity (Get-KbpCompatibilityIdentityDigest $compatibilityProfile) `
-        -WorkingSaveSha256 $allowanceWorkingSha256
+        -WorkingSaveSha256 $allowanceWorkingSha256 -FixtureGameId $allowanceGameId
     if ($null -ne $bindingRefusal) { throw "The classic allowance was refused: $bindingRefusal" }
 }
 $steamSafety = Assert-KbpSteamSafety -SteamPath $SteamPath
@@ -296,6 +297,9 @@ if ((Test-Path -LiteralPath $evidence) -or (Test-Path -LiteralPath $transactionR
 }
 $transactionEntered = $false
 $process = $null
+# Final review C1: no run starts while an earlier run's protected-save
+# violation waits for the owner's review.
+Assert-KbpNoUnacknowledgedSaveViolation
 New-Item -ItemType Directory -Path $evidence | Out-Null
 # Protected-save comparison: every save-folder file before launch, compared
 # after restoration. Only the run WORKING copy may change; a changed or
@@ -314,6 +318,8 @@ if ($null -ne $savePair) {
 }
 $protectedSaveFailure = $null
 $protectedSavesCompared = $false
+$protectedBaselinePath = $null
+$completionFailure = $null
 # A display mode changes the game's registry settings for this run only; the
 # key is recorded once this run holds the lock (below) and kept beside its
 # transaction.
@@ -328,6 +334,13 @@ try {
         -RunId $runId -CompatibilityProfileId $CompatibilityProfileId `
         -Confirm:$false | Select-Object -Last 1
     $transactionEntered = $true
+    # Final review C2: the protected-save baseline is kept beside the
+    # transaction before anything runs.
+    if ($null -ne $protectedBefore) {
+        $protectedBaselinePath = Save-KbpProtectedSaveBaseline -TransactionDirectory (Split-Path -Parent $statePath) `
+            -RunId $runId -Scenario $Scenario -FixtureFamily $FixtureFamily `
+            -WorkingFileName ([string]$savePair.working.fileName) -SaveRoot $protectedSaveRoot -Snapshot $protectedBefore
+    }
     if ($null -ne $displaySize) {
         $displayRegistryPath = Join-Path $script:KbpRuntimeStateRoot "transactions\$runId\display-registry.json"
         Save-KbpRegistrySnapshotFile -Path $displayRegistryPath -KeyPath $script:KbpGameRegistryKey `
@@ -348,6 +361,8 @@ try {
         # The manual scenario always stages the WORKING save pair; its hold
         # parameter merges into that parameter set (never replaces it).
         $scenarioParameters.manualHoldSeconds = $ManualHoldSeconds
+        # Final review C5: a rehearsal is labelled in its own request.
+        if ($ManualRehearseDone) { $scenarioParameters.manualRehearsal = $true }
     }
     if ($null -ne $probeAllowanceJson) {
         # The host re-parses the allowance strictly against this run id.
@@ -381,6 +396,7 @@ try {
         advancedBindingManifest = if ($null -eq $advancedBinding) { $null } else { $advancedBinding.manifestPath }
         advancedInspectionRunId = $advancedInspectionRunId
         status = 'IN PROGRESS'; stage = 'request-written'; steamSafety = $steamSafety
+        manualRehearsal = [bool]$ManualRehearseDone
         packagePath = $package; packageSha256 = $buildManifest.packageSha256
         transactionStatePath = $statePath; startedAtUtc = [DateTime]::UtcNow.ToString('o')
     }
@@ -538,6 +554,10 @@ public static class KbpPhysicalInput {
     $physicalDeliveryAttempts = @{}
     $nextWindowSampleUtc = [DateTime]::UtcNow
     $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds + 15)
+    # Final review C3: at the deadline the host is told to stop (abort.json;
+    # it takes no further native submission and publishes a FAIL result),
+    # and the launcher waits a bounded grace for that result.
+    $abortWrittenUtc = $null
     }
     catch {
         # Preserve the exact pre-loop failure with its position and stack so
@@ -576,7 +596,21 @@ public static class KbpPhysicalInput {
             }
         }
         if ($process.HasExited) { throw 'Kingmaker exited before committing the atomic runtime result.' }
-        if ([DateTime]::UtcNow -ge $deadline) { throw 'Runtime result timed out; launched Kingmaker was left running and restoration is blocked.' }
+        if ([DateTime]::UtcNow -ge $deadline) {
+            if ($null -eq $abortWrittenUtc) {
+                $abortWrittenUtc = [DateTime]::UtcNow
+                try {
+                    [IO.File]::WriteAllText((Join-Path $evidence 'abort.json'),
+                        ('{"stage":"abort","by":"launcher-deadline","atUtc":"' + $abortWrittenUtc.ToString('o') + '"}' +
+                            [Environment]::NewLine))
+                }
+                catch { Write-Warning "Abort marker not written: $($_.Exception.Message)" }
+                Write-Warning 'Runtime deadline reached: abort marker written; waiting up to 120 s for the game to stop the run.'
+            }
+            elseif ([DateTime]::UtcNow -ge $abortWrittenUtc.AddSeconds(120)) {
+                throw 'Runtime result timed out and the abort marker was not honoured within 120 s; launched Kingmaker was left running and restoration is blocked.'
+            }
+        }
         if ([DateTime]::UtcNow -ge $nextWindowSampleUtc) {
             $nextWindowSampleUtc = [DateTime]::UtcNow.AddSeconds(5)
             # Passive observation only: a sampler failure must never abort the
@@ -794,6 +828,11 @@ catch {
     $runFailure = $_
 }
 finally {
+    # Final review C8: a key held by an interrupted chord is always released.
+    try {
+        if ($null -ne ('KbpPhysicalInput' -as [type])) { [KbpPhysicalInput]::ReleaseTrackedKeys() }
+    }
+    catch { Write-Warning "Held keys not released: $($_.Exception.Message)" }
     try {
         # In non-interactive hosts the finally's own Write-Error can displace
         # the original terminating error from the output stream; persist the
@@ -825,12 +864,42 @@ finally {
                 catch { $displayFailure = 'Game registry restoration failed after the display-mode run (Restore-Local.ps1 -RunId ' + $runId + ' retries it): ' + $_.Exception.Message }
             } else { $displayFailure = 'Kingmaker remains running; the game registry restoration is blocked (Restore-Local.ps1 -RunId ' + $runId + ' finishes it).' }
         }
+    }
+    # Final review C2: the protected saves are compared before the Mods
+    # restoration releases this run's lock, so the other lab (which checks
+    # that lock) cannot have run in between. A comparison that cannot run
+    # is a failure, not a silence (review C10): it stays pending beside the
+    # transaction for Restore-Local.ps1 -RunId and blocks later runs.
+    if ($null -ne $protectedBefore) {
+        if (@(Get-Process -Name Kingmaker -ErrorAction SilentlyContinue).Count -ne 0) {
+            $protectedSaveFailure = 'Protected-save comparison skipped: Kingmaker is still running (Restore-Local.ps1 -RunId ' +
+                $runId + ' finishes it once the game has exited).'
+        }
+        else {
+            try {
+                $comparison = if ($null -ne $protectedBaselinePath) {
+                    Complete-KbpProtectedSaveComparison -BaselinePath $protectedBaselinePath -EvidenceDirectory $evidence
+                } else {
+                    Invoke-KbpProtectedSaveComparison -Before $protectedBefore -RunId $runId -Scenario $Scenario `
+                        -FixtureFamily $FixtureFamily -WorkingFileName ([string]$savePair.working.fileName) `
+                        -SaveRoot $protectedSaveRoot -EvidenceDirectory $evidence
+                }
+                $protectedSavesCompared = $true
+                if (@($comparison.blocking).Count -ne 0) {
+                    $protectedSaveFailure = 'Protected saves changed during the run: ' + (@($comparison.blocking) -join ', ')
+                }
+            }
+            catch { $protectedSaveFailure = 'Protected-save comparison failed: ' + $_.Exception.Message }
+        }
+        if ($null -ne $protectedSaveFailure) { Write-Warning $protectedSaveFailure }
+    }
+    if ($transactionEntered) {
         $running = @(Get-Process -Name Kingmaker -ErrorAction SilentlyContinue)
         # Review of e7c5207..f7726c9, P3-3: a failed or blocked restoration
         # must not skip the protected-save comparison or the completion
         # record; it is reported after both are written.
         if ($running.Count -eq 0) {
-            try { & (Join-Path $PSScriptRoot 'Restore-Local.ps1') -RunId $runId -Confirm:$false }
+            try { & (Join-Path $PSScriptRoot 'Restore-Local.ps1') -RunId $runId -SkipProtectedSaveComparison -Confirm:$false }
             catch {
                 $restoreFailure = "Mods restoration failed for $runId (Restore-Local.ps1 -RunId $runId recovers it once the cause is fixed): " +
                     $_.Exception.Message
@@ -860,33 +929,6 @@ finally {
         try { [IO.File]::WriteAllText((Join-Path $evidence 'display-restoration-failure.txt'), $displayFailure + [Environment]::NewLine) }
         catch { Write-Warning "Display restoration failure not recorded: $($_.Exception.Message)" }
     }
-    # Review C10: a comparison that cannot run is a failure, not a silence.
-    if ($null -ne $protectedBefore -and @(Get-Process -Name Kingmaker -ErrorAction SilentlyContinue).Count -ne 0) {
-        $protectedSaveFailure = 'Protected-save comparison skipped: Kingmaker is still running.'
-    }
-    if ($null -ne $protectedBefore -and @(Get-Process -Name Kingmaker -ErrorAction SilentlyContinue).Count -eq 0) {
-        try {
-            $savePolicy = Get-KbpProtectedSavePolicy -Scenario $Scenario -FixtureFamily $FixtureFamily `
-                -WorkingFileName ([string]$savePair.working.fileName)
-            $allowedChanged = @($savePolicy.allowedChanged)
-            $violations = Compare-KbpSaveFolderSnapshot -Before $protectedBefore `
-                -After (Get-KbpSaveFolderSnapshot -SaveRoot $protectedSaveRoot) `
-                -AllowedChangedFileNames $allowedChanged
-            # A casting qualification writes no save at all (review P3-9):
-            # even the WORKING save and new autosaves count against it.
-            $blocking = @($violations | Where-Object { $_ -notlike 'new:*' -or $savePolicy.newFilesBlocking })
-            Write-KbpJsonAtomic (Join-Path $evidence 'protected-saves.json') ([ordered]@{
-                schemaVersion = 1; runId = $runId; fixtureFamily = $FixtureFamily
-                allowedChanged = @($allowedChanged)
-                violations = @($violations); blocking = @($blocking)
-            })
-            $protectedSavesCompared = $true
-            if ($blocking.Count -ne 0) {
-                $protectedSaveFailure = 'Protected saves changed during the run: ' + ($blocking -join ', ')
-            }
-        }
-        catch { $protectedSaveFailure = 'Protected-save comparison failed: ' + $_.Exception.Message }
-    }
     # Review RC3: the whole-run terminal record, written last. Game-level
     # success (runtime-result.json) is kept separate: a run is complete
     # only when the harness itself succeeded, Kingmaker exited, the Mods
@@ -908,29 +950,38 @@ finally {
                 -SavePair $savePair -GameResultStatus $completionGame -HarnessSucceeded $runSucceeded `
                 -KingmakerExited $completionExited -TransactionStatePath $completionTransaction `
                 -RestoreFailure $restoreFailure `
-                -ProtectedSavesCompared $protectedSavesCompared -ProtectedSaveFailure $protectedSaveFailure
+                -ProtectedSavesCompared $protectedSavesCompared -ProtectedSaveFailure $protectedSaveFailure `
+                -ManualRehearsal ([bool]$ManualRehearseDone)
             Write-KbpJsonAtomic (Join-Path $evidence 'run-completion.json') $completionRecord
             # Re-review: the orchestration record ends with the run's final
             # verdict, never the game's earlier PASS alone.
             if ($null -ne (Get-Variable -Name orchestration -ErrorAction SilentlyContinue) -and $null -ne $orchestration) {
                 $orchestration.finalComplete = [bool]$completionRecord.complete
                 $orchestration.finalStatus = if ([bool]$completionRecord.complete) { 'PASS' } else { 'FAIL' }
+                # Final review C7: the record's status is the run's final
+                # verdict; the game's own status is kept beside it.
+                $orchestration.gameStatus = if ($null -ne $result) { [string]$result.status } else { 'none' }
+                $orchestration.status = $orchestration.finalStatus
                 $orchestration.stage = if ([bool]$completionRecord.complete) { 'completed' } else { 'incomplete' }
                 Write-KbpJsonAtomic (Join-Path $evidence 'orchestration.json') $orchestration
             }
             Write-Host ("Run completion: complete=" + [bool]$completionRecord.complete)
         }
-        catch { Write-Warning "Run completion record not written: $($_.Exception.Message)" }
+        catch {
+            # Final review C8: a run without its completion record never
+            # exits as a success.
+            $completionFailure = 'Run completion record not written: ' + $_.Exception.Message
+            Write-Warning $completionFailure
+        }
     }
 }
-# The run's own failure wins; a restoration failure is folded into it, and
-# a restoration failure and a save violation are reported together.
-if ($null -ne $runFailure) {
-    if ($null -ne $restoreFailure) { throw ($runFailure.Exception.Message + ' | Restoration: ' + $restoreFailure) }
-    throw $runFailure
-}
-if ($null -ne $restoreFailure -and $null -ne $protectedSaveFailure) {
-    throw ($restoreFailure + ' | ' + $protectedSaveFailure)
-}
-if ($null -ne $restoreFailure) { throw $restoreFailure }
-if ($null -ne $protectedSaveFailure) { throw $protectedSaveFailure }
+# Final review C1: every failure is reported together - the run's own, the
+# restoration's, the protected saves' and a missing completion record - so a
+# save violation is never hidden behind a failed run.
+$failureParts = New-Object System.Collections.Generic.List[string]
+if ($null -ne $runFailure) { $failureParts.Add($runFailure.Exception.Message) }
+if ($null -ne $restoreFailure) { $failureParts.Add('Restoration: ' + $restoreFailure) }
+if ($null -ne $protectedSaveFailure) { $failureParts.Add('Protected saves: ' + $protectedSaveFailure) }
+if ($null -ne $completionFailure) { $failureParts.Add($completionFailure) }
+if ($failureParts.Count -eq 1 -and $null -ne $runFailure) { throw $runFailure }
+if ($failureParts.Count -ne 0) { throw ($failureParts -join ' | ') }

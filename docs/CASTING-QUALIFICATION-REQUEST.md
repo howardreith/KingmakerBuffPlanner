@@ -75,21 +75,26 @@ violations.
 1. The one-cast Resistance probe on the current candidate has run.
 2. Selection run (non-casting):
    `Invoke-KingmakerRuntimeTest.ps1 -Scenario live-cast-qual-select -CompatibilityProfileId full-user -TimeoutSeconds 900 -RunId <fresh>`.
-   900 seconds is a time budget (boot and load plus the 240-second run
-   deadline), not a guarantee: the launcher refuses less, and a run that
-   still outlives it is reported as failed, its Mods restoration stays
+   900 seconds is the whole run's budget, counted from the game's start:
+   the launcher refuses less. The game host stops the run itself 60
+   seconds before it ends (no further native submission; the run fails
+   as `overall-deadline`), and at its own deadline the launcher writes an
+   abort marker (`abort.json`) that the host obeys at once, then waits up
+   to 120 seconds for the game to finish (final review C3). A game that
+   still does not stop is reported as failed, its Mods restoration stays
    blocked while Kingmaker runs, and `Restore-Local.ps1 -RunId <runId>`
    recovers it once the game has exited.
    It writes `qual-outcome.json` with the selection, the party roster it
    saw, and the three forecast projection ids and contracts.
-3. Claude writes the allowance (schema 3) under the owner's delegated
-   mission authority, once, exclusively, under
-   `C:\Dev\KingmakerBuffPlannerLab\approvals\<runId>.json`, with the
-   fields `runId`, `sourceCommit`, `packageSha256`, `dllSha256`,
-   `assemblyMvid`, `fixtureGameId`, `recipe`, `approvedProjectionIds`
-   (the three forecast ids in order), `maximumNativeSubmissions` = 6,
-   `approvedBy` and `authority`. The build identity comes from the
-   selection run's build manifest.
+3. Claude writes the allowance under the owner's delegated mission
+   authority with `scripts\New-KbpRunAllowance.ps1 -Kind qualification`
+   (schema 5), once, exclusively, under
+   `C:\Dev\KingmakerBuffPlannerLab\approvals\<runId>.json`. The writer
+   takes the recipe, the forecast projection ids (in order) and the
+   profile, identity and WORKING save from the selection run's evidence,
+   the build identity from the frozen build, and sets
+   `maximumNativeSubmissions` to the sum of the forecast castings, which
+   is exactly how the host's boundary counts them.
 4. Casting run:
    `Invoke-KingmakerRuntimeTest.ps1 -Scenario live-cast-qual -CompatibilityProfileId full-user -TimeoutSeconds 900 -RunId <runId> -QualificationAllowancePath <file>`.
    It makes one attempt and never retries.
@@ -136,7 +141,8 @@ It covers the mission section 8 items the automation party cannot:
   stopped); complete: `qual-cast-2`; recast: `qual-cast-1` with the next
   reserved slot. The forecast simulates exactly what each earlier step
   spends, so the three ids are the ones the run will submit.
-- **Budget.** 3 native submissions.
+- **Budget.** The sum of the forecast castings: 4 (stop 2, complete 1,
+  recast 1), exactly as the host's boundary counts planned castings.
 - **Resources, judged per step.** Each casting's native availability must
   drop by exactly the confirmed casts from its pool (for prepared slots,
   of the same spell) and never otherwise. A confirmed prepared casting must
@@ -155,9 +161,10 @@ It covers the mission section 8 items the automation party cannot:
    `Invoke-KingmakerRuntimeTest.ps1 -Scenario live-cast-qual-select -FixtureFamily Advanced -QualificationRecipe finite-direct-mixed -CompatibilityProfileId <profile> -TimeoutSeconds 900 -RunId <fresh>`.
    `qual-outcome.json` records the selection, its coverage and the three
    forecast projection ids and contracts.
-4. Claude writes the allowance under the delegated authority (schema 3,
-   recipe `finite-direct-mixed`, the three ids in order,
-   `maximumNativeSubmissions` 3) under
+4. Claude writes the allowance under the delegated authority with
+   `scripts\New-KbpRunAllowance.ps1 -Kind qualification` (schema 5; the
+   recipe `finite-direct-mixed` and the three ids in order come from the
+   selection run, and `maximumNativeSubmissions` is 4) under
    `approvals\<runId>.json`.
 5. Casting run:
    `Invoke-KingmakerRuntimeTest.ps1 -Scenario live-cast-qual -FixtureFamily Advanced -QualificationRecipe finite-direct-mixed -CompatibilityProfileId <profile> -TimeoutSeconds 900 -RunId <runId> -QualificationAllowancePath <file>`.

@@ -123,7 +123,8 @@ if (-not $PSCmdlet.ShouldProcess($planner,
 $token = [Guid]::NewGuid().ToString('N')
 $lockPath = Join-Path $StateRoot 'deployment.lock'
 New-KbpOwnedLock $lockPath $InstallId $token
-Confirm-KbpLockedWithoutForeignLease -LockPath $lockPath -RunId $InstallId -Token $token -SkipForeignLease:(-not $liveGameRoot)
+Confirm-KbpLockedWithoutForeignLease -LockPath $lockPath -RunId $InstallId -Token $token -SkipForeignLease:(-not $liveGameRoot) `
+    -GameRoot $gameRootFull
 # The lock is released only after a CLEAN state has been durably recorded
 # (review L4): any ambiguous outcome keeps it.
 $keepLock = $true

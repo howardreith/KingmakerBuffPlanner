@@ -46,10 +46,19 @@ function Confirm-KbpLockedWithoutForeignLease {
         [Parameter(Mandatory = $true)][string]$Token,
         [string[]]$LeasePaths = $script:KbpForeignRuntimeLeases,
         [switch]$SkipForeignLease,
-        [int[]]$KnownProcessIds)
+        [int[]]$KnownProcessIds,
+        # Final review C7: an operation on one game root (the install
+        # rollback) is blocked only by a game running from that root.
+        [string]$GameRoot,
+        [object[]]$Processes)
     try {
         if (-not $SkipForeignLease) { Assert-KbpNoForeignRuntimeLease -LeasePaths $LeasePaths }
-        if ($PSBoundParameters.ContainsKey('KnownProcessIds')) {
+        if (-not [string]::IsNullOrEmpty($GameRoot)) {
+            if ($PSBoundParameters.ContainsKey('Processes')) {
+                Assert-KbpGameRootNotRunning -GameRoot $GameRoot -Processes $Processes
+            } else { Assert-KbpGameRootNotRunning -GameRoot $GameRoot }
+        }
+        elseif ($PSBoundParameters.ContainsKey('KnownProcessIds')) {
             Assert-KbpNotRunning -KnownProcessIds $KnownProcessIds
         } else { Assert-KbpNotRunning }
     }
@@ -517,9 +526,23 @@ function Remove-KbpOwnedLock([string]$LockPath, [string]$RunId, [string]$Token) 
     Remove-Item -LiteralPath $LockPath -Force
 }
 
-function Assert-KbpNoUnresolvedTransaction([string]$StateRoot) {
+function Assert-KbpNoUnresolvedTransaction([string]$StateRoot,
+    [string]$FixtureLockPath = (Join-Path $script:KbpLabRoot 'runtime-fixture-state\fixture.lock')) {
     $lock = Join-Path $StateRoot 'deployment.lock'
     if (Test-Path -LiteralPath $lock) { throw "Unresolved runtime deployment lock exists: $lock" }
+    # Final review C8: a fixture bootstrap or teardown in progress (or one
+    # interrupted and awaiting -Recover) blocks a runtime entry.
+    if (-not [string]::IsNullOrWhiteSpace($FixtureLockPath) -and (Test-Path -LiteralPath $FixtureLockPath)) {
+        throw "A fixture bootstrap or teardown holds its lock: $FixtureLockPath (New-KbpAutomationFixture.ps1 -Recover finishes an interrupted one)."
+    }
+    # Final review C2: a run whose protected-save comparison is still
+    # pending is unresolved until Restore-Local.ps1 -RunId finishes it.
+    foreach ($baselineFile in @(Get-ChildItem -LiteralPath $StateRoot -Filter protected-saves-before.json -File -Recurse -ErrorAction SilentlyContinue)) {
+        $baseline = Read-KbpJson $baselineFile.FullName
+        if (-not [bool]$baseline.compared) {
+            throw "The protected-save comparison of run $($baseline.runId) is pending (Restore-Local.ps1 -RunId $($baseline.runId) finishes it once the game has exited)."
+        }
+    }
     foreach ($stateFile in @(Get-ChildItem -LiteralPath $StateRoot -Filter transaction.json -File -Recurse -ErrorAction SilentlyContinue)) {
         $state = Read-KbpJson $stateFile.FullName
         if ($state.status -cne 'Restored') {
@@ -724,7 +747,14 @@ function Enter-KbpRuntimeTransaction {
     catch {
         $entryFailure = $_
         try {
-            Restore-KbpRuntimeTransaction -RunId $RunId -StateRoot $StateRoot -FixtureMode:$FixtureMode -KnownKingmakerProcessIds $KnownKingmakerProcessIds | Out-Null
+            # Final review C8: the process ids are passed on only when the
+            # caller gave them; passing an unbound (null) list would switch
+            # off the live running-game check of the restoration.
+            $restoreArguments = @{ RunId = $RunId; StateRoot = $StateRoot; FixtureMode = $FixtureMode }
+            if ($PSBoundParameters.ContainsKey('KnownKingmakerProcessIds')) {
+                $restoreArguments.KnownKingmakerProcessIds = $KnownKingmakerProcessIds
+            }
+            Restore-KbpRuntimeTransaction @restoreArguments | Out-Null
         }
         catch {
             throw "Runtime entry failed and restoration also failed. Entry: $($entryFailure.Exception.Message) Restore: $($_.Exception.Message)"

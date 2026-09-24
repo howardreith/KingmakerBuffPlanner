@@ -215,9 +215,20 @@ function Publish-KbpStagedFixture {
     }
 }
 
+# Final review C8: the other lab's lease is checked with the deployment lock,
+# at the start and again right before the save folder is touched. A test
+# save root is not the game's and is not shared with that lab.
+function Assert-KbpFixtureForeignLeaseIdle {
+    $production = Join-Path $env:USERPROFILE 'AppData\LocalLow\Owlcat Games\Pathfinder Kingmaker\Saved Games'
+    if ([IO.Path]::GetFullPath($SaveRoot).TrimEnd('\') -ieq [IO.Path]::GetFullPath($production).TrimEnd('\')) {
+        Assert-KbpNoForeignRuntimeLease
+    }
+}
+
 function Assert-KbpFixturePreconditions {
     Assert-KbpFixtureGameClosed
     Assert-KbpFixtureDeploymentIdle
+    Assert-KbpFixtureForeignLeaseIdle
 }
 
 # Containment + identity validation for any path about to be removed by
@@ -597,8 +608,9 @@ try {
     Write-KbpJsonAtomic $transactionPath $transaction
     if ($FailAfterStage -ceq 'ManifestWritten') { throw "Injected failure after stage ManifestWritten." }
 
-    # Real running-game recheck immediately before touching SaveRoot.
-    Assert-KbpFixtureGameClosed
+    # Real running-game, deployment-lock and other-lab lease recheck
+    # immediately before touching SaveRoot (final review C8).
+    Assert-KbpFixturePreconditions
     # Write-ahead ownership journal: each destination is recorded BEFORE its
     # move, so an interruption at any point leaves the published file
     # represented in the recovery record. Recovery validates identity before

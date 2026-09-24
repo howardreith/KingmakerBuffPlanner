@@ -1705,8 +1705,41 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             return true;
         }
 
+        private DateTime? _processStartUtc;
+        private int _stopCheckCountdown;
+
+        // Final review C3: the run's own overall deadline and the launcher's
+        // abort marker (see RuntimeTestProtocol.RunStopReason), checked every
+        // few updates from the first one on, the campaign load included.
+        private string LiveRunStopReason()
+        {
+            if (_stopCheckCountdown-- > 0) return null;
+            _stopCheckCountdown = 10;
+            if (_processStartUtc == null)
+            {
+                try
+                {
+                    _processStartUtc = System.Diagnostics.Process.GetCurrentProcess().StartTime
+                        .ToUniversalTime();
+                }
+                catch (Exception) { _processStartUtc = _startedAtUtc; }
+            }
+            bool abort;
+            try
+            {
+                abort = File.Exists(Path.Combine(_request.EvidenceDirectory,
+                    RuntimeTestProtocol.AbortMarkerFileName));
+            }
+            catch (Exception) { abort = true; }
+            return RuntimeTestProtocol.RunStopReason(DateTime.UtcNow, _processStartUtc.Value,
+                _request.TimeoutSeconds, abort);
+        }
+
         private bool UpdateLiveUiScenario()
         {
+            string stop = LiveRunStopReason();
+            if (stop != null)
+                throw new TimeoutException("Live run stopped;" + stop + ";phase=" + _liveUiPhase);
             if (_liveSaveLoader == null)
                 _liveSaveLoader = new LiveCampaignSaveLoader(_request, _log);
             if (!_liveSaveLoader.IsComplete)
@@ -2183,8 +2216,19 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     !deadlineElapsed && File.Exists(Path.Combine(
                         _request.EvidenceDirectory, "manual-done.json")));
                 if (request == ManualTerminalRequest.None) return false;
+                // Final review C5: a rehearsal is labelled as one.
+                bool rehearsal = RuntimeTestProtocol.IsManualRehearsal(_request.Parameters);
+                if (!rehearsal && request == ManualTerminalRequest.Completed)
+                {
+                    try
+                    {
+                        rehearsal = ManualTerminalPolicy.IsRehearsalMarker(File.ReadAllText(
+                            Path.Combine(_request.EvidenceDirectory, "manual-done.json")));
+                    }
+                    catch (Exception) { rehearsal = false; }
+                }
                 _manualTerminal = new ManualTerminalCoordinator();
-                _manualTerminal.Begin(request, now);
+                _manualTerminal.Begin(request, now, rehearsal);
                 _manualOutcome = _manualTerminal.OutcomeText;
                 _log.Info("[KBP-MANUAL] terminal request observed;outcome=" +
                     _manualOutcome + ";final capture requested (bounded " +

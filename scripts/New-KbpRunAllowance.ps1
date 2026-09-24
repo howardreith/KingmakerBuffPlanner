@@ -15,8 +15,10 @@ param(
 
 # One run-bound casting allowance, written mechanically from recorded
 # evidence (batch 3, section 3; review C5): a Classic cast allowance
-# (kbp-classic-cast, schema 2) or a zero-cost-mixed casting-qualification
-# allowance (kbp-casting-qualification, schema 5). It binds:
+# (kbp-classic-cast, schema 2) or a casting-qualification allowance
+# (kbp-casting-qualification, schema 5) for the recipe the selection run
+# selected (zero-cost-mixed or finite-direct-mixed; final review C4). It
+# binds:
 # - the frozen build (commit, package, DLL, MVID) of this checkout's HEAD;
 # - the selection run's plan digest (Classic) or ordered forecast
 #   projections (qualification), made with that build in this mode;
@@ -108,10 +110,24 @@ if ($Kind -ceq 'classic') {
 }
 else {
     $outcome = Read-KbpJson (Join-Path $selectionDir 'qual-outcome.json')
+    # Final review C4: the recipe is the one the selection run selected;
+    # each recipe has its own purpose, and the budget below is the sum of
+    # the forecast castings, exactly as the host's boundary counts them.
+    $recipe = [string]$outcome.selection.recipe
+    $purposes = @{
+        'zero-cost-mixed' = "zero-cost-mixed casting-first qualification in $ExecutionMode mode (stop, complete, repeat, recast, held disable, recover)"
+        'finite-direct-mixed' = "finite-direct-mixed casting-first qualification in $ExecutionMode mode (paid spell slots: stop, complete, repeat, recast)"
+    }
     if ([string]$request.scenario -cne 'live-cast-qual-select' -or [bool]$outcome.castingScenario -or
-        -not [bool]$outcome.selection.selected -or [string]$outcome.selection.recipe -cne 'zero-cost-mixed' -or
+        -not [bool]$outcome.selection.selected -or -not $purposes.ContainsKey($recipe) -or
         @($outcome.violations).Count -ne 0) {
-        throw 'The selection run is not a clean zero-cost-mixed qualification selection; no allowance is written.'
+        throw 'The selection run is not a clean qualification selection of a known recipe; no allowance is written.'
+    }
+    $requestedRecipe = if (@($request.parameters.PSObject.Properties | ForEach-Object Name) -ccontains 'qualificationRecipe') {
+        [string]$request.parameters.qualificationRecipe } else { '' }
+    if ((-not [string]::IsNullOrEmpty($requestedRecipe) -and $requestedRecipe -cne $recipe) -or
+        ([string]::IsNullOrEmpty($requestedRecipe) -and $recipe -cne 'zero-cost-mixed')) {
+        throw "The selection run was asked for another recipe than the $recipe it selected; no allowance is written."
     }
     $forecast = @($outcome.forecast)
     $ids = @($forecast | ForEach-Object { [string]$_.projectionId })
@@ -121,12 +137,12 @@ else {
         $budget -lt 1 -or $budget -gt 24) {
         throw 'The forecast does not name 1..8 projection ids with a 1..24 submission budget; no allowance is written.'
     }
-    $purpose = "zero-cost-mixed casting-first qualification in $ExecutionMode mode (stop, complete, repeat, recast, held disable, recover)"
+    $purpose = $purposes[$recipe]
     $allowance = [ordered]@{
         schemaVersion = 5; kind = 'kbp-casting-qualification'; runId = $RunId
         sourceCommit = [string]$freeze.commit; packageSha256 = [string]$freeze.packageSha256
         dllSha256 = [string]$freeze.dllSha256; assemblyMvid = [string]$freeze.assemblyMvid
-        fixtureGameId = $gameId; recipe = 'zero-cost-mixed'; executionMode = $ExecutionMode
+        fixtureGameId = $gameId; recipe = $recipe; executionMode = $ExecutionMode
         approvedProjectionIds = $ids; maximumNativeSubmissions = $budget
         approvedBy = $ApprovedBy; authority = $Authority
         compatibilityProfileId = $profileId; compatibilityIdentity = $identity; workingSaveSha256 = $workingSha256
