@@ -60,7 +60,8 @@ try {
     New-Item -ItemType Directory -Path (Join-Path $mods 'Existing') -Force | Out-Null
     Set-Content -LiteralPath (Join-Path $game 'Kingmaker.exe') -Value 'fixture' -Encoding Ascii
     Set-Content -LiteralPath (Join-Path $mods 'Existing\Info.json') -Value '{"Id":"Existing"}' -Encoding Ascii
-    $runId = 'pre-activation-interruption'
+    foreach ($interruptedStatus in @('Preparing', 'Prepared')) {
+    $runId = 'pre-activation-interruption-' + $interruptedStatus.ToLowerInvariant()
     $token = [Guid]::NewGuid().ToString('N')
     $lockPath = Join-Path $stateRoot 'deployment.lock'
     $transactionRoot = Join-Path $stateRoot ('transactions\' + $runId)
@@ -73,7 +74,7 @@ try {
     $before = @(Get-KbpDirectoryManifest $mods)
     $statePath = Join-Path $transactionRoot 'transaction.json'
     Write-KbpJsonAtomic $statePath ([ordered]@{
-        schemaVersion = 1; runId = $runId; token = $token; status = 'Preparing'
+        schemaVersion = 1; runId = $runId; token = $token; status = $interruptedStatus
         modsPath = $mods; originalExisted = $true; originalManifest = $before
         originalBackup = Join-Path $backupRunRoot 'Mods.original'
         stagedQuarantine = Join-Path $backupRunRoot 'Mods.staged'
@@ -86,7 +87,79 @@ try {
     if (-not $restored.restorationVerified -or
         -not (Test-KbpManifestEqual $before @(Get-KbpDirectoryManifest $mods)) -or
         (Test-Path -LiteralPath $stagingRunRoot) -or (Test-Path -LiteralPath $lockPath)) {
-        throw 'Pre-activation interruption did not recover as an exact no-op.'
+        throw "Pre-activation interruption ($interruptedStatus) did not recover as an exact no-op."
+    }
+    }
+    $passed++
+    # Live run casting-qual-select-20260924-45bff28-01: a sharing lock on the
+    # live Mods folder refused the original's move after the staged tree was
+    # Prepared. The move is retried within its bound; a lock that outlasts it
+    # ends the entry with the entry's own failure, and the automatic
+    # restoration is an exact no-op (lock released, staging removed, the
+    # original untouched), never a fail-closed ambiguity.
+    $game = Join-Path $root 'game-held-entry'
+    $heldMods = Join-Path $game 'Mods'
+    New-Item -ItemType Directory -Path (Join-Path $heldMods 'Existing') -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $game 'Kingmaker.exe') -Value 'fixture' -Encoding Ascii
+    Set-Content -LiteralPath (Join-Path $heldMods 'Existing\Info.json') -Value '{"Id":"Existing"}' -Encoding Ascii
+    $heldBefore = @(Get-KbpDirectoryManifest $heldMods)
+    if (-not ('KbpTestHold' -as [type])) {
+        Add-Type -TypeDefinition 'using System.IO; using System.Threading; public static class KbpTestHold { public static FileStream Hold(string path, int releaseAfterMs) { var stream = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.None); if (releaseAfterMs >= 0) new Thread(() => { Thread.Sleep(releaseAfterMs); stream.Dispose(); }).Start(); return stream; } }'
+    }
+    if (-not ('KbpTestReadHold' -as [type])) {
+        Add-Type -TypeDefinition 'using System.IO; using System.Threading; public static class KbpTestReadHold { public static FileStream Hold(string path, int releaseAfterMs) { var stream = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read); if (releaseAfterMs >= 0) new Thread(() => { Thread.Sleep(releaseAfterMs); stream.Dispose(); }).Start(); return stream; } }'
+    }
+    # A read that fails before the transaction state exists (a file held
+    # exclusively): nothing was moved, so the run-owned directories go and
+    # the lock is released; no unresolved lock is left behind.
+    $readHold = [KbpTestHold]::Hold((Join-Path $heldMods 'Existing\Info.json'), -1)
+    $readMessage = $null
+    try {
+        Enter-KbpRuntimeTransaction -PackagePath $package -KingmakerInstallDir $game `
+            -StateRoot $stateRoot -StagingRoot $stagingRoot -BackupRoot $backupRoot `
+            -RunId 'held-read' -FixtureMode -KnownKingmakerProcessIds @() -MoveAttempts 3 -MoveDelayMilliseconds 100 | Out-Null
+    }
+    catch { $readMessage = $_.Exception.Message }
+    finally { $readHold.Dispose() }
+    if ($null -eq $readMessage -or (Test-Path -LiteralPath (Join-Path $stateRoot 'deployment.lock')) -or
+        (Test-Path -LiteralPath (Join-Path $stateRoot 'transactions\held-read')) -or
+        (Test-Path -LiteralPath (Join-Path $backupRoot 'held-read')) -or
+        (Test-Path -LiteralPath (Join-Path $stagingRoot 'held-read')) -or
+        -not (Test-KbpManifestEqual $heldBefore @(Get-KbpDirectoryManifest $heldMods))) {
+        throw "A read failure before the transaction state left a lock or run-owned paths: $readMessage"
+    }
+    # Readable but not movable (the live failure): the entry ends with its
+    # own failure and the restoration is an exact no-op.
+    $entryHold = [KbpTestReadHold]::Hold((Join-Path $heldMods 'Existing\Info.json'), -1)
+    $entryMessage = $null
+    try {
+        Enter-KbpRuntimeTransaction -PackagePath $package -KingmakerInstallDir $game `
+            -StateRoot $stateRoot -StagingRoot $stagingRoot -BackupRoot $backupRoot `
+            -RunId 'held-entry' -FixtureMode -KnownKingmakerProcessIds @() -MoveAttempts 3 -MoveDelayMilliseconds 100 | Out-Null
+    }
+    catch { $entryMessage = $_.Exception.Message }
+    finally { $entryHold.Dispose() }
+    $heldState = Read-KbpJson (Join-Path $stateRoot 'transactions\held-entry\transaction.json')
+    if ($null -eq $entryMessage -or $entryMessage -like '*restoration also failed*' -or
+        [string]$heldState.status -cne 'Restored' -or -not [bool]$heldState.restorationVerified -or
+        (Test-Path -LiteralPath (Join-Path $stateRoot 'deployment.lock')) -or
+        (Test-Path -LiteralPath (Join-Path $stagingRoot 'held-entry')) -or
+        -not (Test-KbpManifestEqual $heldBefore @(Get-KbpDirectoryManifest $heldMods))) {
+        throw "A held live Mods folder did not end the entry as an exact no-op: $entryMessage / $($heldState.status)"
+    }
+    # A transient hold is outlasted by the retry and the entry completes.
+    [void][KbpTestReadHold]::Hold((Join-Path $heldMods 'Existing\Info.json'), 250)
+    Enter-KbpRuntimeTransaction -PackagePath $package -KingmakerInstallDir $game `
+        -StateRoot $stateRoot -StagingRoot $stagingRoot -BackupRoot $backupRoot `
+        -RunId 'held-entry-transient' -FixtureMode -KnownKingmakerProcessIds @() -MoveAttempts 10 -MoveDelayMilliseconds 100 | Out-Null
+    if (-not (Test-Path -LiteralPath (Join-Path $heldMods 'KingmakerBuffPlanner\Info.json'))) {
+        throw 'A transiently held live Mods folder was not staged after a retry.'
+    }
+    $transientRestored = Restore-KbpRuntimeTransaction -RunId 'held-entry-transient' -StateRoot $stateRoot `
+        -FixtureMode -KnownKingmakerProcessIds @()
+    if (-not $transientRestored.restorationVerified -or
+        -not (Test-KbpManifestEqual $heldBefore @(Get-KbpDirectoryManifest $heldMods))) {
+        throw 'The transiently held entry did not restore exactly.'
     }
     $passed++
 
@@ -1334,7 +1407,9 @@ try {
         throw "A foreign project's runtime lease does not stop a transaction, a local install or a rollback."
     }
     $commonText = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'RuntimeHarness.Common.ps1') -Raw
-    if (([regex]::Matches($commonText, '\[void\]\(Move-KbpDirectoryWithRetry -Source ')).Count -ne 2 -or
+    if (([regex]::Matches($commonText, '\[void\]\(Move-KbpDirectoryWithRetry -Source ')).Count -ne 4 -or
+        $commonText -match 'Move-Item -LiteralPath \$mods -Destination \$originalBackup' -or
+        $commonText -match 'Move-Item -LiteralPath \$stagedMods -Destination \$mods' -or
         $commonText -match 'Move-Item -LiteralPath \$mods -Destination \$state\.stagedQuarantine' -or
         $commonText -match 'Move-Item -LiteralPath \$state\.originalBackup -Destination \$mods') {
         throw 'Restoration does not move the Mods folders through the bounded retry.'
