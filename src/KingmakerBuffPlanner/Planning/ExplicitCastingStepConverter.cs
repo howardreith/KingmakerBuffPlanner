@@ -283,10 +283,12 @@ namespace KingmakerBuffPlanner.Planning
         }
 
         // A plain buff on the chosen target: one or more buff leaves aimed at
-        // the current target, optionally in sequences, optionally under the
-        // discovery wrapper that references THE CAST ABILITY ITSELF.
-        // Conditionals, references to any OTHER ability, area/party/caster
-        // targets and worn-item enchantments are unmodeled for the probe.
+        // the current target, optionally in sequences (empty actions ignored),
+        // optionally under the discovery wrapper that references THE CAST
+        // ABILITY ITSELF, optionally under a condition whose two branches
+        // apply exactly the same plain buffs. Any other condition, references
+        // to any OTHER ability, area/party/caster targets and worn-item
+        // enchantments are unmodeled for the probe.
         // The cast ability itself is its base spell, or for a variant
         // provider the variant it casts (advanced fixture, 2026-09-24: every
         // variant spell's effect is wrapped in a reference to the variant, so
