@@ -4399,8 +4399,12 @@ namespace KingmakerBuffPlanner.Tests
             internal string DurationText = string.Empty;
             internal bool RodIgnored;
             internal bool RodChargeKept;
+            internal bool RodChangesStrength;
+            internal bool PlainZeroDuration;
+            internal bool WithEmpowerRod;
             internal static readonly long DurationTicks = TimeSpan.FromSeconds(600).Ticks;
-            internal long NowTicks { get { return Now * TimeSpan.TicksPerMillisecond; } }
+            // The game clock starts an hour in (it is never zero in play).
+            internal long NowTicks { get { return (Now + 3600000) * TimeSpan.TicksPerMillisecond; } }
             // A second spellbook of the same caster that also holds the
             // Strength spell (Powerful Change does not qualify there).
             internal bool WithOtherBook;
@@ -4461,8 +4465,10 @@ namespace KingmakerBuffPlanner.Tests
                 bool enhanced = step.EnhancementIds.Contains(EnhancementId);
                 bool rod = step.EnhancementIds.Contains(RodId);
                 int bonus = enhanced && !IgnoreEnhancement ? PlainBonus + 2 : PlainBonus;
+                if (rod && RodChangesStrength) bonus++;
+                long duration = !rod && PlainZeroDuration ? 0 : (rod && !RodIgnored ? 2 : 1) * DurationTicks;
                 Active[step.TargetUnitIds[0] + "|strength-buff"] = Tuple.Create("i" + (++_instances),
-                    NowTicks + (rod && !RodIgnored ? 2 : 1) * DurationTicks,
+                    NowTicks + duration,
                     bonus == int.MinValue ? new string[0] : new[] { "Strength/Enhancement/" + bonus });
                 if (rod && !RodChargeKept) RodCharges--;
                 Remaining--;
@@ -4550,12 +4556,17 @@ namespace KingmakerBuffPlanner.Tests
                     { Other.Canonical, new EffectLeafExpression(EffectKind.Buff, "other-buff",
                         EffectTarget.CurrentTarget, "fixture", "fixture/other") }
                 };
-                var enhancements = new List<CastEnhancementSnapshot>
+                var enhancements = new List<CastEnhancementSnapshot>();
+                if (WithEmpowerRod)
+                    enhancements.Add(new CastEnhancementSnapshot("metamagic-rod|unit-arcanist|empower-guid", "unit-arcanist",
+                        "empower-guid", "Empower Metamagic Rod", string.Empty, CastEnhancementCategory.MetamagicRod,
+                        1, 6, 3, new string[0]));
+                enhancements.AddRange(new List<CastEnhancementSnapshot>
                 {
                     new CastEnhancementSnapshot(RodId, "unit-arcanist",
                         "rod-guid", "Extend Metamagic Rod", string.Empty, CastEnhancementCategory.MetamagicRod,
                         8, 6, RodCharges, new string[0])
-                };
+                });
                 // As live: Powerful Change for a score no known spell raises
                 // (an empty list); it must never be offered.
                 enhancements.Add(new CastEnhancementSnapshot(DexterityId, "unit-arcanist",
@@ -5233,6 +5244,12 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("The rod selection was wrong: " + selection.Refusal + " coverage=" +
                     string.Join(",", selection.Coverage.ToArray()) + " rejections=" +
                     string.Join(",", selection.Rejections.ToArray()));
+            CastingQualificationSelection besideEmpower = CastingQualificationRecipe.SelectRodExtend(
+                new EnhancedBuffWorld { DurationText = "1 minute/level", WithEmpowerRod = true }.Inputs(), "fixture-campaign");
+            if (!besideEmpower.Selected || besideEmpower.Enhancement.EnhancementId != rod ||
+                !besideEmpower.Rejections.Contains("metamagic-rod|unit-arcanist|empower-guid|not-an-extend-rod"))
+                throw new InvalidOperationException("A rod other than Extend was taken, or refused silently: " +
+                    string.Join(",", besideEmpower.Rejections.ToArray()));
             CastingQualificationSelection fixedDuration = CastingQualificationRecipe.SelectRodExtend(
                 new EnhancedBuffWorld().Inputs(), "fixture-campaign");
             if (fixedDuration.Selected ||
@@ -5264,6 +5281,16 @@ namespace KingmakerBuffPlanner.Tests
             var kept = new EnhancedBuffWorld { DurationText = "1 minute/level", RodChargeKept = true };
             CastingQualificationRecord keptRecord = RunEnhanced(Path.Combine(root, "qr-kept"), kept, "instant", true,
                 CastingQualificationRecipe.RodExtendDirect);
+            var stronger = new EnhancedBuffWorld { DurationText = "1 minute/level", RodChangesStrength = true };
+            CastingQualificationRecord strongerRecord = RunEnhanced(Path.Combine(root, "qr-stronger"), stronger, "instant", true,
+                CastingQualificationRecipe.RodExtendDirect);
+            var instant = new EnhancedBuffWorld { DurationText = "1 minute/level", PlainZeroDuration = true };
+            CastingQualificationRecord instantRecord = RunEnhanced(Path.Combine(root, "qr-zero"), instant, "instant", true,
+                CastingQualificationRecipe.RodExtendDirect);
+            if (!strongerRecord.Failures.Any(value => value.StartsWith("enhanced-wait:step:modifiers:qual-cast-2:", StringComparison.Ordinal)) ||
+                !instantRecord.Failures.Any(value => value.StartsWith("plain-wait:step:duration:qual-cast-1:", StringComparison.Ordinal)))
+                throw new InvalidOperationException("A rod cast of another strength, or a plain cast with no duration, passed: " +
+                    string.Join("|", strongerRecord.Failures.ToArray()) + " / " + string.Join("|", instantRecord.Failures.ToArray()));
             if (ignoredRecord.TerminalReason == "completed" ||
                 !ignoredRecord.Failures.Any(value => value.StartsWith("enhanced-wait:step:duration:qual-cast-2:", StringComparison.Ordinal)) ||
                 keptRecord.TerminalReason == "completed" ||
