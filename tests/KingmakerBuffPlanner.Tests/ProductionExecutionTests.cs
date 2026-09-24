@@ -45,6 +45,7 @@ namespace KingmakerBuffPlanner.Tests
             Run("provider-choices-name-the-book-and-refuse-twins", () => TestProviderLabelsAndTwins(root));
             Run("next-casting-enhancements-follow-its-caster", () => TestDraftEnhancementsFollowTheCaster(root));
             Run("out-of-combat-setting-is-saved", () => TestOutOfCombatSettingSaved(root));
+            Run("footer-counts-only-this-routines-one-pass-shortfalls", () => TestFooterCountsOnlyShortfalls(root));
             Run("imported-grouping-unknown-becomes-single-target", () => TestImportedGroupingUnknownBecomesSingleTarget(root));
             Run("first-open-import-reads-the-rebound-classic-plan", () => TestImportFromReboundClassicPlan(root));
             Run("classic-file-and-hud-stay-with-their-mode-and-campaign", TestClassicSaveAndHudScoping);
@@ -1192,6 +1193,53 @@ namespace KingmakerBuffPlanner.Tests
             Assert(AddDraftCasting(reopened, inputs, "unit-cleric", "unit-t5").Applied);
             if (reopened.Document.Castings.Any(value => value.CastingId == highest))
                 throw new InvalidOperationException("A loaded plan's removed casting id was issued again: " + highest);
+            // A casting this session showed and another session removed is
+            // not given to the next casting after a reload either.
+            reopened.Save();
+            string top = reopened.Document.Castings.Select(value => value.CastingId)
+                .OrderBy(value => int.Parse(value.Substring(5), System.Globalization.CultureInfo.InvariantCulture)).Last();
+            var watcher = new CastingWorkspaceSession(dir, "workspace-campaign",
+                new DisabledCastingDispatchBoundary());
+            var editor = new CastingWorkspaceSession(dir, "workspace-campaign",
+                new DisabledCastingDispatchBoundary());
+            editor.FocusCasting(top);
+            Assert(editor.RemoveFocusedCasting().Applied);
+            editor.Save();
+            watcher.Reload();
+            Assert(AddDraftCasting(watcher, inputs, "unit-wizard", "unit-t1").Applied);
+            if (watcher.Document.Castings.Any(value => value.CastingId == top))
+                throw new InvalidOperationException("A casting removed elsewhere had its id issued again after a reload: " + top);
+        }
+
+        // Re-review: the footer counts this routine's castings that are ready
+        // on their own but short of a resource when every routine runs in
+        // one pass - not castings already short on their own.
+        private static void TestFooterCountsOnlyShortfalls(string root)
+        {
+            string dir = Path.Combine(root, "footer-short-count");
+            Directory.CreateDirectory(dir);
+            PartyProviderSnapshot snapshot;
+            CastingWorkspaceInputs inputs = WorkspaceInputs(out snapshot, remainingPerCaster: 1);
+            var session = new CastingWorkspaceSession(dir, "workspace-campaign",
+                new DisabledCastingDispatchBoundary());
+            Assert(AddDraftCasting(session, inputs, "unit-cleric", "unit-t1").Applied);
+            session.SelectRoutine("short");
+            session.BuildView(inputs);
+            foreach (string target in new[] { "unit-t2", "unit-t3" })
+            {
+                session.Draft.SourceId = "source-bulls";
+                session.Draft.TargetMode = CastingTargetMode.DirectTarget;
+                session.ChooseDraftCaster("unit-cleric");
+                session.Draft.DirectTargetUnitId = target;
+                session.Draft.State = CastingAuthoringState.Ready;
+                AuthoringEditResult added = session.AddCastingFromDraft(inputs);
+                if (!added.Applied)
+                    throw new InvalidOperationException("A short-routine casting was refused: " + added.Reason);
+            }
+            WorkspaceView view = session.BuildView(inputs);
+            if (view.OnePassShortCount != 1)
+                throw new InvalidOperationException("The footer did not count exactly the one-pass shortfall: " +
+                    view.OnePassShortCount);
         }
 
         // Re-review: a provider choice names its exact source (the spellbook,
@@ -1258,6 +1306,13 @@ namespace KingmakerBuffPlanner.Tests
                 focusedChoices.Single(value => value.Selected).CasterUnitId != "unit-wizard")
                 throw new InvalidOperationException("The focused casting took a source it cannot pin: " +
                     focusedPinned.Reason);
+            // A casting already on the twins' spellbook (an older plan's) shows
+            // neither twin as its source.
+            Assert(session.UpdateFocusedCasting(session.Document.Castings.Single().WithProvider("unit-cleric",
+                CastingBuffAbility, clericOption.Provider.Key.SpellbookGuid,
+                new AuthoredEnhancementSelection[0])).Applied);
+            if (session.BuildView(inputs).FocusedProviders.Any(value => value.Selected))
+                throw new InvalidOperationException("A source the casting cannot pin was shown as its source.");
             // An item's source has no spellbook: "" in its key, none in the
             // casting - the same source, so choosing it again is no change.
             string itemDir = Path.Combine(root, "provider-no-spellbook");
