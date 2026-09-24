@@ -100,7 +100,7 @@ function New-KbpRuntimeRequest {
         [ValidateSet('native-only', 'call-of-the-wild', 'human-reproduction', 'full-user')][string]$ProfileId = 'native-only',
         [object[]]$ExpectedOptionalMods = @(), [string[]]$ExpectedBlueprintGuids = @(),
         [hashtable]$Parameters = @{},
-        [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'live-ui-bootstrap', 'ui-native-contract-probe', 'final-no-save-core', 'performance-probe', 'launch-render-diagnostic', 'menu-input-diagnostic', 'live-workspace-qual', 'live-workspace-reload', 'live-workspace-import', 'live-workspace-manual', 'live-cast-probe-select', 'live-cast-probe', 'live-advanced-inspect', 'live-cast-qual-select', 'live-cast-qual', 'live-classic-select', 'live-classic-cast')][string]$Scenario = 'mod-load-smoke')
+        [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'live-ui-bootstrap', 'ui-native-contract-probe', 'final-no-save-core', 'performance-probe', 'launch-render-diagnostic', 'menu-input-diagnostic', 'live-workspace-qual', 'live-workspace-reload', 'live-workspace-import', 'live-workspace-manual', 'live-cast-probe-select', 'live-cast-probe', 'live-advanced-inspect', 'live-cast-qual-select', 'live-cast-qual', 'live-classic-select', 'live-classic-cast', 'live-workspace-physical')][string]$Scenario = 'mod-load-smoke')
     # This ValidateSet must equal the launcher's -Scenario set exactly
     # (Test-RuntimeHarness builds a request for every launcher scenario).
     return [ordered]@{
@@ -647,6 +647,99 @@ function Get-KbpQualificationAllowanceBuildRefusal {
     return $null
 }
 
+# The game's own registry key: Unity PlayerPrefs (screen size and mode) and
+# the game's settings. A display-mode run restores it byte-exact.
+$script:KbpGameRegistryKey = 'HKCU:\Software\Owlcat Games\Pathfinder Kingmaker'
+
+# This session's primary display in physical pixels, measured in a separate
+# DPI-aware process (this process keeps its own, proven DPI context).
+function Get-KbpSessionDisplaySize {
+    $script = 'Add-Type -TypeDefinition ''using System; using System.Runtime.InteropServices; public static class KbpDisplayProbe { [DllImport("user32.dll")] public static extern bool SetProcessDPIAware(); [DllImport("user32.dll")] public static extern int GetSystemMetrics(int index); }''; [void][KbpDisplayProbe]::SetProcessDPIAware(); [string][KbpDisplayProbe]::GetSystemMetrics(0) + ''x'' + [string][KbpDisplayProbe]::GetSystemMetrics(1)'
+    # Encoded: the embedded quotes survive the child command line intact.
+    $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
+    $output = @(& powershell.exe -NoProfile -NonInteractive -EncodedCommand $encoded 2>$null)
+    $size = [string]($output | Select-Object -Last 1)
+    if ($size -notmatch '^[0-9]{3,5}x[0-9]{3,5}$') { throw "The session display size could not be measured: $size" }
+    return $size
+}
+
+# Whether a <width>x<height> window fits the display.
+function Test-KbpDisplayModeSupported {
+    param([Parameter(Mandatory = $true)][string]$Size, [Parameter(Mandatory = $true)][string]$DisplaySize)
+    if ($Size -notmatch '^([0-9]+)x([0-9]+)$') { return $false }
+    $width = [int]$Matches[1]; $height = [int]$Matches[2]
+    if ($DisplaySize -notmatch '^([0-9]+)x([0-9]+)$') { return $false }
+    return $width -le [int]$Matches[1] -and $height -le [int]$Matches[2]
+}
+
+# Unity's own launch arguments for a borderless window of an exact size
+# (none for the owner's settings).
+function Get-KbpDisplayModeArguments {
+    param([string]$Size)
+    if ([string]::IsNullOrEmpty($Size)) { return @() }
+    if ($Size -notmatch '^([0-9]+)x([0-9]+)$') { throw "Display size is invalid: $Size" }
+    return @('-screen-fullscreen', '0', '-popupwindow', '-screen-width', $Matches[1], '-screen-height', $Matches[2])
+}
+
+# Every value under one registry key, with its kind and exact data, in a
+# comparable canonical form.
+function Get-KbpRegistryValueSnapshot {
+    param([Parameter(Mandatory = $true)][string]$KeyPath)
+    $snapshot = [ordered]@{}
+    $key = Get-Item -LiteralPath $KeyPath -ErrorAction Stop
+    try {
+        foreach ($name in @($key.GetValueNames() | Sort-Object)) {
+            $kind = $key.GetValueKind($name)
+            $value = $key.GetValue($name, $null, [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+            $canonical = if ($value -is [byte[]]) { [Convert]::ToBase64String([byte[]]$value) }
+                elseif ($value -is [string[]]) { (@($value) | ForEach-Object {
+                    [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes([string]$_)) }) -join ',' }
+                else { [string]$value }
+            $snapshot[$name] = [pscustomobject]@{ kind = [string]$kind; value = $value; canonical = [string]$kind + ':' + $canonical }
+        }
+    }
+    finally { $key.Dispose() }
+    return $snapshot
+}
+
+function Compare-KbpRegistrySnapshot {
+    param([Parameter(Mandatory = $true)]$Before, [Parameter(Mandatory = $true)]$After)
+    $differences = New-Object System.Collections.Generic.List[string]
+    foreach ($name in @($Before.Keys)) {
+        if (-not $After.Contains($name)) { $differences.Add('removed:' + $name) }
+        elseif ($After[$name].canonical -cne $Before[$name].canonical) { $differences.Add('changed:' + $name) }
+    }
+    foreach ($name in @($After.Keys)) { if (-not $Before.Contains($name)) { $differences.Add('added:' + $name) } }
+    return ,@($differences)
+}
+
+# Puts every value of the key back exactly as in the snapshot (changed and
+# removed values rewritten with their kind, added values deleted), then
+# verifies; returns what it restored.
+function Restore-KbpRegistryValues {
+    param([Parameter(Mandatory = $true)][string]$KeyPath, [Parameter(Mandatory = $true)]$Snapshot)
+    $differences = Compare-KbpRegistrySnapshot -Before $Snapshot -After (Get-KbpRegistryValueSnapshot -KeyPath $KeyPath)
+    if ($differences.Count -ne 0) {
+        if ($KeyPath -notmatch '^HKCU:\\(.+)$') { throw "Only HKCU keys are restored: $KeyPath" }
+        $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($Matches[1], $true)
+        if ($null -eq $key) { throw "Registry key is missing: $KeyPath" }
+        try {
+            foreach ($difference in $differences) {
+                $name = $difference.Substring($difference.IndexOf(':') + 1)
+                if ($difference.StartsWith('added:')) { $key.DeleteValue($name, $false) }
+                else {
+                    $key.SetValue($name, $Snapshot[$name].value,
+                        [Microsoft.Win32.RegistryValueKind]([string]$Snapshot[$name].kind))
+                }
+            }
+        }
+        finally { $key.Dispose() }
+    }
+    $remaining = Compare-KbpRegistrySnapshot -Before $Snapshot -After (Get-KbpRegistryValueSnapshot -KeyPath $KeyPath)
+    if ($remaining.Count -ne 0) { throw 'Registry restoration mismatch: ' + ($remaining -join ', ') }
+    return ,@($differences)
+}
+
 # The classic cast allowance (kind kbp-classic-cast, schema 1) must name this
 # run, this build, one casting mode (the launcher's) and a 1..24 budget.
 function Get-KbpClassicAllowanceBuildRefusal {
@@ -808,12 +901,12 @@ function Get-KbpProtectedSavePolicy {
     $strict = $FixtureFamily -ceq 'Advanced' -or
         @('live-cast-qual', 'live-cast-qual-select', 'live-advanced-inspect', 'live-cast-probe',
             'live-workspace-reload', 'live-workspace-import', 'live-classic-select',
-            'live-classic-cast') -ccontains $Scenario
+            'live-classic-cast', 'live-workspace-physical') -ccontains $Scenario
     return [pscustomobject]@{
         allowedChanged = if ($strict) { @() } else { @($WorkingFileName) }
         newFilesBlocking = $FixtureFamily -ceq 'Advanced' -or
             @('live-cast-qual', 'live-cast-probe', 'live-workspace-reload', 'live-workspace-import',
-                'live-classic-cast') -ccontains $Scenario
+                'live-classic-cast', 'live-workspace-physical') -ccontains $Scenario
     }
 }
 

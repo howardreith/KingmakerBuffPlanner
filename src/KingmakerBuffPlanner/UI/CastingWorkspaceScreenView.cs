@@ -132,6 +132,90 @@ namespace KingmakerBuffPlanner.UI
             return (RectTransform)component.transform;
         }
 
+        // Runtime evidence for the physical-input scenario (batch 3,
+        // section 10): where a named part of this view is on screen, in
+        // Unity screen pixels (origin bottom left); null when absent,
+        // inactive or off screen. Parts: "search", "buff-grid",
+        // "tile:<sourceId>".
+        internal Vector2? ScreenPointForRuntime(string part)
+        {
+            RectTransform rect = null;
+            if (part == "search") rect = _buffSearch == null ? null : RectOf(_buffSearch);
+            else if (part == "buff-grid")
+            {
+                ScrollRect scroll = BuffScroll();
+                rect = scroll == null ? null : RectOf(scroll);
+            }
+            else if (part != null && part.StartsWith("tile:", StringComparison.Ordinal) && _buffGridContent != null)
+                rect = _buffGridContent.Find("Source." + part.Substring(5)) as RectTransform;
+            if (rect == null || !rect.gameObject.activeInHierarchy) return null;
+            Canvas canvas = rect.GetComponentInParent<Canvas>();
+            Camera camera = canvas == null || canvas.renderMode == RenderMode.ScreenSpaceOverlay
+                ? null : canvas.worldCamera;
+            var corners = new Vector3[4];
+            rect.GetWorldCorners(corners);
+            Vector2 center = RectTransformUtility.WorldToScreenPoint(camera, (corners[0] + corners[2]) * 0.5f);
+            if (center.x < 1f || center.y < 1f || center.x > Screen.width - 1 || center.y > Screen.height - 1)
+                return null;
+            return center;
+        }
+
+        private ScrollRect BuffScroll()
+        {
+            return _buffGridContent == null ? null : _buffGridContent.GetComponentInParent<ScrollRect>();
+        }
+
+        internal string SearchTextForRuntime
+        {
+            get { return _buffSearch == null ? null : _buffSearch.text; }
+        }
+
+        internal bool SearchFocusedForRuntime
+        {
+            get { return _buffSearch != null && _buffSearch.isFocused; }
+        }
+
+        // "<sourceId>|<label>|<selected>" for every buff tile shown now.
+        internal IList<string> VisibleSourcesForRuntime()
+        {
+            var tiles = new List<string>();
+            if (_buffGridContent == null) return tiles;
+            foreach (Transform child in _buffGridContent)
+            {
+                if (child == null || !child.name.StartsWith("Source.", StringComparison.Ordinal)) continue;
+                Transform label = child.Find("Name");
+                Text text = label == null ? null : label.GetComponent<Text>();
+                tiles.Add(child.name.Substring("Source.".Length) + "|" +
+                    (text == null ? string.Empty : text.text) + "|" + (child.Find("Selected") != null));
+            }
+            return tiles;
+        }
+
+        internal float? BuffGridScrollForRuntime
+        {
+            get
+            {
+                ScrollRect scroll = BuffScroll();
+                return scroll == null ? (float?)null : scroll.verticalNormalizedPosition;
+            }
+        }
+
+        internal bool BuffGridOverflowsForRuntime
+        {
+            get
+            {
+                ScrollRect scroll = BuffScroll();
+                if (scroll == null || scroll.content == null) return false;
+                RectTransform viewport = scroll.viewport != null ? scroll.viewport : RectOf(scroll);
+                return scroll.content.rect.height > viewport.rect.height + 1f;
+            }
+        }
+
+        internal string SelectedSourceIdForRuntime
+        {
+            get { return _lastView == null ? null : _lastView.SelectedSourceId; }
+        }
+
         // The legacy import summary is shown once, on the first refresh
         // after the session imported it.
         private bool _importAnnounced;

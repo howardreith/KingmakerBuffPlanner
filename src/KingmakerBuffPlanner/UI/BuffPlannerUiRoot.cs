@@ -339,6 +339,14 @@ namespace KingmakerBuffPlanner.UI
             get { return _instance != null && _instance._castingWorkspace != null; }
         }
 
+        // The open casting-first view, for the physical-input scenario's
+        // read-only evidence (screen points, search, tiles, scroll); null
+        // when closed.
+        internal static CastingWorkspaceScreenView CastingWorkspaceViewForRuntime
+        {
+            get { return _instance == null ? null : _instance._castingWorkspace; }
+        }
+
         // Read-only runtime postcondition for the manual terminal step
         // (review J2): the production close must release the input lease.
         internal static bool IsCastingWorkspaceInputLeaseHeldForRuntime
