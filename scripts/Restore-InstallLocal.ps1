@@ -91,6 +91,10 @@ if (-not (Test-Path -LiteralPath $backupPlanner -PathType Container)) {
 }
 Assert-KbpPlannerIdentity $backupPlanner $priorVersion
 Assert-KbpNotRunning
+# The live game root is shared with the owner's other lab: no rollback while
+# its runtime lease is held (an isolated test root is not shared).
+$liveGameRoot = -not $PSBoundParameters.ContainsKey('GameRoot')
+if ($liveGameRoot) { Assert-KbpNoForeignRuntimeLease }
 Assert-KbpNoUnresolvedTransaction $StateRoot
 
 # A failed attempt keeps its evidence; a retry gets fresh owned paths.
@@ -112,6 +116,7 @@ if (-not $PSCmdlet.ShouldProcess($planner,
 $token = [Guid]::NewGuid().ToString('N')
 $lockPath = Join-Path $StateRoot 'deployment.lock'
 New-KbpOwnedLock $lockPath $InstallId $token
+Confirm-KbpLockedWithoutForeignLease -LockPath $lockPath -RunId $InstallId -Token $token -SkipForeignLease:(-not $liveGameRoot)
 # The lock is released only after a CLEAN state has been durably recorded
 # (review L4): any ambiguous outcome keeps it.
 $keepLock = $true

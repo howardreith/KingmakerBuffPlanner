@@ -88,6 +88,7 @@ foreach ($path in @($stateRoot, $stageRoot, $backupRoot, $evidenceRoot)) {
     if (Test-Path -LiteralPath $path) { throw "Install-owned path already exists: $path" }
 }
 New-KbpOwnedLock $lockPath $InstallId $token
+Confirm-KbpLockedWithoutForeignLease -LockPath $lockPath -RunId $InstallId -Token $token
 New-Item -ItemType Directory -Path $stateRoot, $backupRoot, $evidenceRoot | Out-Null
 $statePath = Join-Path $stateRoot 'install.json'
 $backupPlanner = Join-Path $backupRoot 'KingmakerBuffPlanner.prior'

@@ -33,6 +33,32 @@ function Assert-KbpNoForeignRuntimeLease {
     }
 }
 
+# Double-checked cross-project lease, run once this project's own lock is
+# held: a foreign lease or a game process that appeared after the first
+# checks refuses the operation before anything is created or moved, and this
+# project's lock is released again. The other lab checks this lab's lock
+# before it takes its lease, so this narrows the remaining race to that
+# lab's own check-then-lease step.
+function Confirm-KbpLockedWithoutForeignLease {
+    param(
+        [Parameter(Mandatory = $true)][string]$LockPath,
+        [Parameter(Mandatory = $true)][string]$RunId,
+        [Parameter(Mandatory = $true)][string]$Token,
+        [string[]]$LeasePaths = $script:KbpForeignRuntimeLeases,
+        [switch]$SkipForeignLease,
+        [int[]]$KnownProcessIds)
+    try {
+        if (-not $SkipForeignLease) { Assert-KbpNoForeignRuntimeLease -LeasePaths $LeasePaths }
+        if ($PSBoundParameters.ContainsKey('KnownProcessIds')) {
+            Assert-KbpNotRunning -KnownProcessIds $KnownProcessIds
+        } else { Assert-KbpNotRunning }
+    }
+    catch {
+        Remove-KbpOwnedLock $LockPath $RunId $Token
+        throw
+    }
+}
+
 function Assert-KbpNotRunning {
     param([int[]]$KnownProcessIds)
     $ids = if ($PSBoundParameters.ContainsKey('KnownProcessIds')) {
@@ -327,6 +353,12 @@ function Enter-KbpRuntimeTransaction {
         if (Test-Path -LiteralPath $path) { throw "Run-owned path already exists: $path" }
     }
     New-KbpOwnedLock $lockPath $RunId $token
+    if ($PSBoundParameters.ContainsKey('KnownKingmakerProcessIds')) {
+        Confirm-KbpLockedWithoutForeignLease -LockPath $lockPath -RunId $RunId -Token $token `
+            -SkipForeignLease:$FixtureMode -KnownProcessIds $KnownKingmakerProcessIds
+    } else {
+        Confirm-KbpLockedWithoutForeignLease -LockPath $lockPath -RunId $RunId -Token $token -SkipForeignLease:$FixtureMode
+    }
     New-Item -ItemType Directory -Path $transactionRoot | Out-Null
     New-Item -ItemType Directory -Path $backupRunRoot | Out-Null
     $statePath = Join-Path $transactionRoot 'transaction.json'

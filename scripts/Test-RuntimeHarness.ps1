@@ -1289,13 +1289,49 @@ try {
     try { Assert-KbpNoForeignRuntimeLease -LeasePaths @($foreignLease) }
     catch { $refusedForeign = $_.Exception.Message -like '*runtime lease is active*' }
     Remove-Item -LiteralPath $foreignLease -Force
+    # Double-checked after this project's own lock: a lease (or a game
+    # process) that appeared after the first check releases the lock and
+    # refuses; with neither, the lock stays held.
+    $leaseLock = Join-Path $root 'double-check.lock'
+    New-KbpOwnedLock $leaseLock 'double-check' 'token-1'
+    Set-Content -LiteralPath $foreignLease -Value 'held' -Encoding ASCII
+    $refusedAfterLock = $false
+    try {
+        Confirm-KbpLockedWithoutForeignLease -LockPath $leaseLock -RunId 'double-check' -Token 'token-1' `
+            -LeasePaths @($foreignLease) -KnownProcessIds @()
+    }
+    catch { $refusedAfterLock = $_.Exception.Message -like '*runtime lease is active*' }
+    if (-not $refusedAfterLock -or (Test-Path -LiteralPath $leaseLock)) {
+        throw 'A lease that appeared after the lock did not release the lock and refuse.'
+    }
+    New-KbpOwnedLock $leaseLock 'double-check' 'token-2'
+    $refusedRunning = $false
+    try {
+        Confirm-KbpLockedWithoutForeignLease -LockPath $leaseLock -RunId 'double-check' -Token 'token-2' `
+            -LeasePaths @($foreignLease) -SkipForeignLease -KnownProcessIds @(4242)
+    }
+    catch { $refusedRunning = $_.Exception.Message -like '*Kingmaker is running*' }
+    Remove-Item -LiteralPath $foreignLease -Force
+    if (-not $refusedRunning -or (Test-Path -LiteralPath $leaseLock)) {
+        throw 'A game process that appeared after the lock did not release the lock and refuse.'
+    }
+    New-KbpOwnedLock $leaseLock 'double-check' 'token-3'
+    Confirm-KbpLockedWithoutForeignLease -LockPath $leaseLock -RunId 'double-check' -Token 'token-3' `
+        -LeasePaths @($foreignLease) -KnownProcessIds @()
+    if (-not (Test-Path -LiteralPath $leaseLock)) { throw 'A clear double-check released the lock.' }
+    Remove-KbpOwnedLock $leaseLock 'double-check' 'token-3'
     $installText = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'Install-Local.ps1') -Raw
     $harnessText = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'RuntimeHarness.Common.ps1') -Raw
+    $rollbackText = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'Restore-InstallLocal.ps1') -Raw
     if (-not $refusedForeign -or
         @($script:KbpForeignRuntimeLeases) -notcontains 'C:\Dev\KingmakerGunslingerLab\compatibility-state\compatibility.lock' -or
         $harnessText -notmatch 'if \(-not \$FixtureMode\) \{ Assert-KbpNoForeignRuntimeLease \}' -or
-        $installText -notmatch '(?m)^Assert-KbpNoForeignRuntimeLease\s*$') {
-        throw "A foreign project's runtime lease does not stop a transaction or a local install."
+        $harnessText -notmatch '(?s)New-KbpOwnedLock \$lockPath \$RunId \$token\s+if \(\$PSBoundParameters\.ContainsKey\(''KnownKingmakerProcessIds''\)\) \{\s+Confirm-KbpLockedWithoutForeignLease ' -or
+        $installText -notmatch '(?m)^Assert-KbpNoForeignRuntimeLease\s*$' -or
+        $installText -notmatch '(?m)^New-KbpOwnedLock \$lockPath \$InstallId \$token\r?\nConfirm-KbpLockedWithoutForeignLease -LockPath \$lockPath -RunId \$InstallId -Token \$token\s*$' -or
+        $rollbackText -notmatch '(?m)^if \(\$liveGameRoot\) \{ Assert-KbpNoForeignRuntimeLease \}' -or
+        $rollbackText -notmatch '(?m)^New-KbpOwnedLock \$lockPath \$InstallId \$token\r?\nConfirm-KbpLockedWithoutForeignLease ') {
+        throw "A foreign project's runtime lease does not stop a transaction, a local install or a rollback."
     }
     $commonText = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'RuntimeHarness.Common.ps1') -Raw
     if (([regex]::Matches($commonText, '\[void\]\(Move-KbpDirectoryWithRetry -Source ')).Count -ne 2 -or
