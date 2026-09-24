@@ -129,18 +129,54 @@ namespace KingmakerBuffPlanner.Execution
             if (referenced != null) CollectLeafMarkers(referenced.Child, leaves);
         }
 
+        // Mixed coverage (owner, 2026-09-24): a recipient the plan proved
+        // already adequately covered (skip-if-active, from readable detail)
+        // may keep its coverage unchanged - a game that leaves a
+        // longer-lasting instance in place has not failed the cast - but only
+        // while the complete effect was present and unsuppressed before the
+        // cast and still is after it. Every other recipient needs a new or
+        // refreshed instance, and at least one such recipient must exist.
         public static bool AllReached(IReadOnlyList<string> recipients, EffectExpression expected,
-            EffectBaseline baseline, Func<string, IEnumerable<ObservedEffectInstance>> readAfter)
+            EffectBaseline baseline, Func<string, IEnumerable<ObservedEffectInstance>> readAfter,
+            IEnumerable<string> preCovered = null)
         {
             if (recipients == null || recipients.Count == 0 || baseline == null || readAfter == null)
                 return false;
+            var kept = new HashSet<string>(preCovered ?? new string[0], StringComparer.Ordinal);
+            bool delivered = false;
             foreach (string unitId in recipients)
             {
                 IReadOnlyList<ObservedEffectInstance> before;
                 if (!baseline.TryGet(unitId, out before)) return false;
-                if (!Reached(expected, before, readAfter(unitId))) return false;
+                IEnumerable<ObservedEffectInstance> after = readAfter(unitId);
+                if (kept.Contains(unitId))
+                {
+                    if (!Reached(expected, before, after) && !StillCovered(expected, before, after))
+                        return false;
+                    continue;
+                }
+                if (!Reached(expected, before, after)) return false;
+                delivered = true;
             }
-            return true;
+            return delivered;
+        }
+
+        // The complete expected effect over unsuppressed instances both
+        // before and after the cast: a pre-covered recipient's kept coverage.
+        public static bool StillCovered(EffectExpression expected,
+            IEnumerable<ObservedEffectInstance> before, IEnumerable<ObservedEffectInstance> after)
+        {
+            return expected != null && before != null && after != null &&
+                Complete(expected, before) && Complete(expected, after);
+        }
+
+        private static bool Complete(EffectExpression expected, IEnumerable<ObservedEffectInstance> instances)
+        {
+            var markers = new HashSet<ActiveEffectMarker>(instances
+                .Where(value => value != null && !value.Suppressed)
+                .Select(value => new ActiveEffectMarker(value.Kind, value.EffectId)));
+            return new EffectPresenceEvaluator().EvaluateTyped(expected, markers, null).Kind ==
+                EffectPresenceKind.Complete;
         }
     }
 }

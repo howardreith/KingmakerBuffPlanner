@@ -230,7 +230,8 @@ namespace KingmakerBuffPlanner.Planning
                     option.ExecutionStrategyReason,
                     casting.AppliedEnhancementIds,
                     enhancementUsage,
-                    casting.OmittedEnhancementIds));
+                    casting.OmittedEnhancementIds,
+                    mass ? casting.PreCoveredUnitIds : null));
                 ids.Add(casting.CastingId);
             }
             if (steps.Count == 0)
@@ -358,7 +359,7 @@ namespace KingmakerBuffPlanner.Planning
                 CastStep step = steps[index];
                 if (step.Provider == null || step.Reservation == null)
                     throw new NotSupportedException("step-incomplete:" + index);
-                stepArray.Add(new JObject
+                var stepObject = new JObject
                 {
                     { "index", index },
                     { "castingId", step.AssignmentId },
@@ -387,7 +388,13 @@ namespace KingmakerBuffPlanner.Planning
                     { "enhancementIds", Ordered(step.EnhancementIds) },
                     { "omittedEnhancementIds", Sorted(step.OmittedEnhancementIds) },
                     { "enhancementUsageByPool", UsageByPool(step.EnhancementUsageByPool) }
-                });
+                };
+                // Mixed coverage: only a step that names pre-covered
+                // recipients carries the key, so every other identity is
+                // unchanged.
+                if (step.PreCoveredRecipientUnitIds.Count != 0)
+                    stepObject.Add("preCoveredRecipientUnitIds", Sorted(step.PreCoveredRecipientUnitIds));
+                stepArray.Add(stepObject);
             }
             var root = new JObject
             {

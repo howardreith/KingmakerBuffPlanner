@@ -65,7 +65,8 @@ namespace KingmakerBuffPlanner.Planning
             MigrationProvenance provenance,
             IReadOnlyList<CastingCostLine> cost = null,
             IReadOnlyList<string> existingEffectNotes = null,
-            IReadOnlyList<string> costShape = null)
+            IReadOnlyList<string> costShape = null,
+            IReadOnlyList<string> preCoveredUnitIds = null)
         {
             CastingId = castingId;
             RoutineId = routineId;
@@ -96,6 +97,8 @@ namespace KingmakerBuffPlanner.Planning
                 (existingEffectNotes ?? new string[0]).ToList());
             CostShape = new ReadOnlyCollection<string>(
                 (costShape ?? new string[0]).ToList());
+            PreCoveredUnitIds = new ReadOnlyCollection<string>(
+                (preCoveredUnitIds ?? new string[0]).ToList());
         }
 
         // Disclosure of the live existing-effect assessment for this
@@ -103,6 +106,14 @@ namespace KingmakerBuffPlanner.Planning
         // but insufficient (why it still casts), or present and recast by
         // an always-recast policy. Informational; never a blocking reason.
         public IReadOnlyList<string> ExistingEffectNotes { get; private set; }
+
+        // Mixed coverage (owner, 2026-09-24): the predicted recipients of a
+        // group casting that still casts whose existing effect the plan
+        // proved sufficient from readable detail (skip-if-active only). The
+        // cast goes ahead for the others; a recipient here is confirmed by
+        // keeping its coverage, since a game may leave a longer-lasting
+        // instance unchanged.
+        public IReadOnlyList<string> PreCoveredUnitIds { get; private set; }
 
         // The casting's would-be cost vector as "category:pool:units",
         // independent of whether it reserves now (an already-satisfied
@@ -129,7 +140,7 @@ namespace KingmakerBuffPlanner.Planning
                 TargetingModifiers, Enhancements, AppliedEnhancementIds,
                 OmittedEnhancementIds, ExistingEffectPolicy, IgnoredPresenceMarkers,
                 readiness, readinessReasons, CapableCasterUnitIds, Provenance, cost,
-                ExistingEffectNotes, costShape ?? CostShape);
+                ExistingEffectNotes, costShape ?? CostShape, PreCoveredUnitIds);
         }
 
         public string CastingId { get; private set; }
@@ -434,11 +445,12 @@ namespace KingmakerBuffPlanner.Planning
             // exhaustion alone is overridden by a sufficient active effect.
             var existingNotes = new List<string>();
             var satisfiedUnits = new List<string>();
+            var preCovered = new List<string>();
             bool alreadyActive = liveEffects != null && option != null &&
                 reasons.Count == 0 && casting.State == CastingAuthoringState.Ready &&
                 AssessExistingEffects(casting, option.Provider,
                     matched.Concat(requiredExhausted).ToList(), predicted,
-                    effectsBySource, liveEffects, existingNotes, satisfiedUnits);
+                    effectsBySource, liveEffects, existingNotes, satisfiedUnits, preCovered);
             if (alreadyActive)
                 reasons.Add("already-active:" + string.Join(",", satisfiedUnits.ToArray()));
             else
@@ -476,7 +488,7 @@ namespace KingmakerBuffPlanner.Planning
                 readiness,
                 reasons.Distinct(StringComparer.Ordinal)
                     .OrderBy(value => value, StringComparer.Ordinal).ToList(),
-                capableCasters, casting.Provenance, null, existingNotes);
+                capableCasters, casting.Provenance, null, existingNotes, null, preCovered);
         }
 
         // Applies the casting's enabled targeting modifiers in authored
@@ -857,7 +869,8 @@ namespace KingmakerBuffPlanner.Planning
             IReadOnlyDictionary<string, EffectExpression> effectsBySource,
             ActiveEffectSnapshot liveEffects,
             List<string> notes,
-            List<string> satisfiedUnitIds)
+            List<string> satisfiedUnitIds,
+            List<string> preCoveredUnitIds)
         {
             EffectExpression expression;
             if (!effectsBySource.TryGetValue(casting.SourceId, out expression) &&
@@ -899,6 +912,36 @@ namespace KingmakerBuffPlanner.Planning
                         if (detail.Length != 0)
                             notes.Add("existing-incomplete:" + unitId + detail);
                         break;
+                }
+            }
+            // Mixed coverage (owner, 2026-09-24): a group casting that still
+            // casts under skip-if-active also reaches recipients whose
+            // existing effect is already sufficient. They are named for the
+            // step (every predicted recipient is assessed, required coverage
+            // or not), and their note says the cast goes ahead for the
+            // others - never "skipped".
+            if (skip && !allSufficient && casting.TargetMode != CastingTargetMode.DirectTarget &&
+                predicted != null)
+            {
+                for (int index = 0; index < notes.Count; index++)
+                    if (notes[index].StartsWith("already-active:", StringComparison.Ordinal))
+                        notes[index] = "already-covered:" +
+                            notes[index].Substring("already-active:".Length);
+                foreach (string unitId in predicted)
+                {
+                    if (string.IsNullOrEmpty(unitId) || preCoveredUnitIds.Contains(unitId)) continue;
+                    if (satisfiedUnitIds.Contains(unitId))
+                    {
+                        preCoveredUnitIds.Add(unitId);
+                        continue;
+                    }
+                    if (recipients.Contains(unitId)) continue;
+                    ExistingEffectRecipientAssessment extra = ExistingEffectSufficiency.Assess(
+                        unitId, expression, InstancesFor(liveEffects, unitId), ignored, requirement);
+                    if (extra.Verdict != ExistingEffectVerdict.Sufficient) continue;
+                    preCoveredUnitIds.Add(unitId);
+                    notes.Add("already-covered:" + unitId + (extra.Reasons.Count == 0 ? string.Empty
+                        : ":" + string.Join("|", extra.Reasons.ToArray())));
                 }
             }
             return skip && allSufficient;

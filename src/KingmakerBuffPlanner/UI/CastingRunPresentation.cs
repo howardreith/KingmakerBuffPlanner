@@ -134,6 +134,9 @@ namespace KingmakerBuffPlanner.UI
             string value = note ?? string.Empty;
             if (value.StartsWith("already-active:", StringComparison.Ordinal))
                 return "already active on " + FirstSegment(value, "already-active:") + " (skipped)";
+            if (value.StartsWith("already-covered:", StringComparison.Ordinal))
+                return "already active on " + FirstSegment(value, "already-covered:") +
+                    " (the cast goes ahead for the others)";
             if (value.StartsWith("existing-active-recast:", StringComparison.Ordinal))
                 return "active on " + FirstSegment(value, "existing-active-recast:") +
                     " but set to always recast";

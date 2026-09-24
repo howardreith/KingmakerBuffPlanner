@@ -27,6 +27,8 @@ namespace KingmakerBuffPlanner.Tests
             Run("live-existing-effect-skip-in-compiler", TestLiveExistingEffectSkipInCompiler);
             Run("group-existing-effect-uses-intended-recipients",
                 TestGroupExistingEffectRecipients);
+            Run("group-mixed-coverage-keeps-adequate-recipients",
+                TestMixedCoverageGroupCasting);
             Run("review-signature-skip-flip-is-harmless", TestReviewSignatureSkipFlipIsHarmless);
             Run("review-state-is-per-routine-and-restorable", TestReviewStatePerRoutine);
             Run("review-store-round-trip-and-refusals", () => TestReviewStore(root));
@@ -429,6 +431,154 @@ namespace KingmakerBuffPlanner.Tests
                 compile(new string[0], LiveEffects(everyone)).Readiness !=
                     ResolvedCastingReadiness.AlreadySatisfied)
                 throw new InvalidOperationException("Every beneficiary active did not skip.");
+        }
+
+        // Mixed coverage (owner, 2026-09-24): one recipient already has an
+        // adequate, longer-lasting instance while the others lack it. Under
+        // the default skip-if-active the group casting still casts once (one
+        // record, one invocation, one unit of cost), names the covered
+        // recipient for its step, and confirmation accepts that recipient's
+        // kept coverage while every other recipient needs a new or
+        // refreshed instance. Under always-recast nothing is exempt, and an
+        // unreadable detail never makes a recipient pre-covered.
+        private static void TestMixedCoverageGroupCasting()
+        {
+            List<ProviderPlanningOption> options;
+            List<CastEnhancementSnapshot> enhancements;
+            PartyProviderSnapshot snapshot = CastingParty(CastingGroupAbility,
+                out options, out enhancements, new[] { "unit-t1", "unit-t2", "unit-t3" }, 3,
+                new Dictionary<string, IEnumerable<string>>(StringComparer.Ordinal)
+                {
+                    { "unit-cleric", new[] { "unit-t1", "unit-t2", "unit-t3" } }
+                });
+            Dictionary<string, EffectExpression> effects =
+                CastingEffects("source-bulls", "source-communal");
+            var compiler = new ExplicitCastingCompiler();
+            Func<ExistingEffectPolicy, ActiveEffectSnapshot, ExplicitCastingPlan> compile =
+                (policy, live) => compiler.Compile(CastingDocument(new PlannedCasting(
+                        "cast-g", "long", 0, "source-communal", CastingGroupAbility, "unit-cleric", null,
+                        CastingTargetMode.CasterCenteredOrigin, null, CastingOrigin.CasterCentered(),
+                        new string[0], null, null, policy, null, CastingAuthoringState.Ready, null)),
+                    snapshot, options, effects, enhancements, "long", null, false, live);
+            Func<ExplicitCastingPlan, CastStep> step = plan =>
+            {
+                ExplicitStepConversion conversion = ExplicitCastingStepConverter.Convert(plan,
+                    new CastingExecutionGate().Evaluate(plan, CastingApplyMode.Ordinary, "long"),
+                    options, effects);
+                if (!conversion.Converted || conversion.Plan.Steps.Count != 1)
+                    throw new InvalidOperationException("The group casting did not convert to one step: " +
+                        conversion.Refusal);
+                return conversion.Plan.Steps[0];
+            };
+            // unit-t1 holds an adequate instance: readable caster level, no
+            // expiry, so it outlasts the planned casting.
+            ActiveEffectSnapshot mixed = LiveEffects(On("unit-t1", "group-effect", null, 1, 0));
+            ResolvedCasting casting = compile(ExistingEffectPolicy.SkipAlreadyActive, mixed)
+                .CastingById("cast-g");
+            if (casting.Readiness != ResolvedCastingReadiness.Ready ||
+                !casting.PreCoveredUnitIds.SequenceEqual(new[] { "unit-t1" }) ||
+                !casting.ExistingEffectNotes.Any(note =>
+                    note.StartsWith("already-covered:unit-t1", StringComparison.Ordinal)) ||
+                casting.ExistingEffectNotes.Any(note =>
+                    note.StartsWith("already-active:", StringComparison.Ordinal)) ||
+                casting.Cost.Count(line => line.Category == CastingCostCategory.NativePool) != 1 ||
+                casting.Cost.Single(line => line.Category == CastingCostCategory.NativePool).Units != 1)
+                throw new InvalidOperationException("The mixed-coverage casting is not one covered-aware cast: " +
+                    casting.Readiness + "|" + string.Join(",", casting.PreCoveredUnitIds.ToArray()) + "|" +
+                    string.Join(",", casting.ExistingEffectNotes.ToArray()));
+            if (CastingRunPresentation.DescribeExistingEffectNote("already-covered:unit-t1") !=
+                    "already active on unit-t1 (the cast goes ahead for the others)")
+                throw new InvalidOperationException("The covered recipient is not described.");
+            CastStep mixedStep = step(compile(ExistingEffectPolicy.SkipAlreadyActive, mixed));
+            ExplicitCastingPlan plainPlan = compile(ExistingEffectPolicy.SkipAlreadyActive, LiveEffects());
+            ExplicitStepConversion plain = ExplicitCastingStepConverter.Convert(plainPlan,
+                new CastingExecutionGate().Evaluate(plainPlan, CastingApplyMode.Ordinary, "long"),
+                options, effects);
+            ExplicitCastingPlan mixedPlan = compile(ExistingEffectPolicy.SkipAlreadyActive, mixed);
+            ExplicitStepConversion mixedConversion = ExplicitCastingStepConverter.Convert(mixedPlan,
+                new CastingExecutionGate().Evaluate(mixedPlan, CastingApplyMode.Ordinary, "long"),
+                options, effects);
+            if (!mixedStep.MassCast || !mixedStep.PreCoveredRecipientUnitIds.SequenceEqual(new[] { "unit-t1" }) ||
+                !mixedStep.ExpectedRecipientUnitIds.Contains("unit-t1") ||
+                !mixedStep.ExpectedRecipientUnitIds.Contains("unit-t2") ||
+                mixedStep.Reservation.Units != 1 || !plain.Converted ||
+                plain.Plan.Steps[0].PreCoveredRecipientUnitIds.Count != 0 ||
+                plain.CanonicalContract.Contains("preCoveredRecipientUnitIds") ||
+                !mixedConversion.CanonicalContract.Contains("\"preCoveredRecipientUnitIds\":[\"unit-t1\"]") ||
+                mixedConversion.ProjectionId == plain.ProjectionId)
+                throw new InvalidOperationException("The step does not carry the covered recipient in its identity.");
+
+            // Confirmation: the kept coverage of unit-t1 and a new instance on
+            // every other recipient.
+            EffectExpression expected = effects["source-communal"];
+            Func<string, long, ObservedEffectInstance> seen = (key, end) =>
+                new ObservedEffectInstance(EffectKind.Buff, "group-effect", key, end, false);
+            IReadOnlyList<string> recipients = mixedStep.ExpectedRecipientUnitIds;
+            Func<string, IEnumerable<ObservedEffectInstance>, EffectBaseline> baselineWith = (t1, t1Before) =>
+                new EffectBaseline(recipients.ToDictionary(unit => unit,
+                    unit => unit == t1 ? t1Before : (IEnumerable<ObservedEffectInstance>)new ObservedEffectInstance[0],
+                    StringComparer.Ordinal));
+            EffectBaseline baseline = baselineWith("unit-t1", new[] { seen("old", 9000) });
+            Func<IEnumerable<ObservedEffectInstance>, string, IEnumerable<ObservedEffectInstance>,
+                Func<string, IEnumerable<ObservedEffectInstance>>> afterWith = (t1After, missing, missingAfter) =>
+                    unit => unit == "unit-t1" ? t1After
+                        : unit == missing ? missingAfter
+                        : new[] { seen("new-" + unit, 600) };
+            IEnumerable<ObservedEffectInstance> kept = new[] { seen("old", 9000) };
+            IEnumerable<ObservedEffectInstance> none = new ObservedEffectInstance[0];
+            IReadOnlyList<string> covered = mixedStep.PreCoveredRecipientUnitIds;
+            if (!AppliedEffectJudgement.AllReached(recipients, expected, baseline,
+                    afterWith(kept, null, null), covered))
+                throw new InvalidOperationException("Kept coverage on the covered recipient was not accepted.");
+            if (AppliedEffectJudgement.AllReached(recipients, expected, baseline,
+                    afterWith(kept, null, null)))
+                throw new InvalidOperationException("Without the plan's proof, an unchanged instance confirmed.");
+            if (AppliedEffectJudgement.AllReached(recipients, expected, baseline,
+                    afterWith(kept, "unit-t2", none), covered))
+                throw new InvalidOperationException("A recipient that lacked the effect was not required.");
+            if (AppliedEffectJudgement.AllReached(recipients, expected, baseline,
+                    afterWith(none, null, null), covered))
+                throw new InvalidOperationException("Coverage lost during the cast was accepted.");
+            if (AppliedEffectJudgement.AllReached(recipients, expected, baseline,
+                    afterWith(new[] { new ObservedEffectInstance(EffectKind.Buff, "group-effect", "old", 9000, true) },
+                        null, null), covered))
+                throw new InvalidOperationException("A suppressed kept instance was accepted.");
+            if (!AppliedEffectJudgement.AllReached(recipients, expected, baseline,
+                    afterWith(new[] { seen("replaced", 600) }, null, null), covered))
+                throw new InvalidOperationException("A replaced instance on the covered recipient was refused.");
+            // Coverage gone before the cast (expired since planning): the
+            // recipient needs a new instance like any other.
+            EffectBaseline expiredBaseline = baselineWith("unit-t1", none);
+            if (AppliedEffectJudgement.AllReached(recipients, expected, expiredBaseline,
+                    afterWith(none, null, null), covered) ||
+                !AppliedEffectJudgement.AllReached(recipients, expected, expiredBaseline,
+                    afterWith(new[] { seen("fresh", 600) }, null, null), covered))
+                throw new InvalidOperationException("An expired covered recipient was not treated as uncovered.");
+            if (AppliedEffectJudgement.AllReached(recipients, expected, baseline,
+                    unit => new[] { seen("old", 9000) }, recipients))
+                throw new InvalidOperationException("A cast that delivered to no one was confirmed.");
+
+            // Always recast: every recipient must be reached; nothing is exempt.
+            ResolvedCasting recast = compile(ExistingEffectPolicy.Overwrite, mixed).CastingById("cast-g");
+            if (recast.Readiness != ResolvedCastingReadiness.Ready || recast.PreCoveredUnitIds.Count != 0 ||
+                !recast.ExistingEffectNotes.Any(note =>
+                    note.StartsWith("existing-active-recast:unit-t1", StringComparison.Ordinal)) ||
+                step(compile(ExistingEffectPolicy.Overwrite, mixed)).PreCoveredRecipientUnitIds.Count != 0)
+                throw new InvalidOperationException("Always-recast exempted a recipient.");
+            // An unreadable caster level never proves the recipient covered.
+            ResolvedCasting unreadable = compile(ExistingEffectPolicy.SkipAlreadyActive,
+                LiveEffects(On("unit-t1", "group-effect", null, null, 0))).CastingById("cast-g");
+            if (unreadable.Readiness != ResolvedCastingReadiness.Ready || unreadable.PreCoveredUnitIds.Count != 0 ||
+                !unreadable.ExistingEffectNotes.Any(note =>
+                    note.StartsWith("existing-insufficient:unit-t1", StringComparison.Ordinal) &&
+                    note.Contains("caster-level-unverified")))
+                throw new InvalidOperationException("An unreadable caster level made a recipient pre-covered.");
+            // Every recipient covered: one skip, no step.
+            ActiveEffectSnapshot all = LiveEffects(casting.PredictedBeneficiaryUnitIds
+                .Select(unit => On(unit, "group-effect", null, 1, 0)).ToArray());
+            if (compile(ExistingEffectPolicy.SkipAlreadyActive, all).CastingById("cast-g").Readiness !=
+                    ResolvedCastingReadiness.AlreadySatisfied)
+                throw new InvalidOperationException("A fully covered group casting did not skip.");
         }
 
         // A skip that flips with live effects is a harmless refresh; what a
