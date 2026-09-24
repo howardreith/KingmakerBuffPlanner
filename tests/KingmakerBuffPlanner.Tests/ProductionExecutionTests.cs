@@ -102,6 +102,7 @@ namespace KingmakerBuffPlanner.Tests
             Run("persistence-round-trip-gaps-and-campaign-isolation",
                 () => TestPersistenceRoundTripAndCampaignIsolation(root));
             Run("qualification-finite-recipe", () => TestFiniteQualificationRecipe(root));
+            Run("qualification-group-mixed-recipe", () => TestGroupQualificationRecipe(root));
             Run("qualification-driver-refusals-and-deadline",
                 () => TestQualificationDriverRefusalsAndDeadline(root));
             Run("qualification-scenario-requests", () => TestQualificationScenarioRequests(root));
@@ -2878,7 +2879,9 @@ namespace KingmakerBuffPlanner.Tests
             if (!runtimeToggle.Contains("if (value && !_managerEnabled)") ||
                 !toggle.Contains("_managerEnabled = value;") ||
                 tickOwnedBody == null || !tickOwnedBody.Contains("_ownedTicks++;") ||
-                !qualification.Contains("() => BuffPlannerUiRoot.OwnedTicksForRuntime);") ||
+                !qualification.Contains("() => BuffPlannerUiRoot.OwnedTicksForRuntime,") ||
+                // Group casting reads: each expected recipient read natively.
+                !qualification.Contains("new KingmakerProbeObserver().ObserveRecipient(") ||
                 Occurrences(host, "OptionalModMismatch()") != 4)
                 throw new InvalidOperationException("The hold or the pre-cast identity checks are not wired.");
             // The launcher's casting mode must be the allowance's, and the
@@ -3912,6 +3915,376 @@ namespace KingmakerBuffPlanner.Tests
                 _landed = true;
                 _world.Land(_step);
             }
+        }
+
+        // The group world (mission batch 3, section 8; the owner's mixed-
+        // coverage case of 2026-09-24): an arcanist with a direct buff, a
+        // cleric with a caster-centred group buff of the SAME effect (one
+        // prepared slot) and a bard with a target-anchored group buff of
+        // another effect. A cast lands on its target or on every expected
+        // recipient; a recipient already holding the effect keeps that
+        // instance unchanged when KeepExisting (a game that keeps a
+        // longer-lasting instance), or receives a new one. Confirmation is
+        // the production judgement over the reads taken as the cast lands.
+        private sealed class GroupBuffWorld : IInstantCastRuntimeAdapter, ICastRuntimeAdapter,
+            ICastEnhancementRuntimeAdapter
+        {
+            internal static readonly AbilityKey Direct =
+                new AbilityKey("direct-spell", null, 0, SourceKind.Spellbook, null);
+            internal static readonly AbilityKey Group =
+                new AbilityKey("group-spell", null, 0, SourceKind.Spellbook, null);
+            internal static readonly AbilityKey Anchored =
+                new AbilityKey("anchored-spell", null, 0, SourceKind.Spellbook, null);
+            internal static readonly string[] Units =
+                { "unit-arcanist", "unit-bard", "unit-cleric", "unit-t1", "unit-t2" };
+            // "<unit>|<effect>" -> (instance key, end).
+            internal readonly Dictionary<string, KeyValuePair<string, long>> Active =
+                new Dictionary<string, KeyValuePair<string, long>>(StringComparer.Ordinal);
+            internal readonly List<string> Fired = new List<string>();
+            internal readonly Dictionary<string, int> Remaining = new Dictionary<string, int>(StringComparer.Ordinal)
+            {
+                { "pool-arcanist", 3 }, { "pool-bard", 3 }
+            };
+            internal readonly string Token = PreparedSlotIds.Format(2, 0, 0);
+            internal bool TokenAvailable = true;
+            internal bool KeepExisting = true;
+            internal string MissRecipient;
+            internal string DirectEffect = "shared-effect";
+            internal int DirectCasterLevel = 9;
+            internal int AnimatedFrames = 3;
+            internal long Now;
+            private readonly Dictionary<CastStep, EffectBaseline> _baselines =
+                new Dictionary<CastStep, EffectBaseline>();
+            private int _instances;
+            private long _sequence;
+
+            public bool IsInCombat { get { return false; } }
+            public CastRuntimeValidation Validate(CastStep step) { return CastRuntimeValidation.Pass(); }
+            public CastEnhancementPreparation PrepareEnhancements(CastStep step)
+            { return CastEnhancementPreparation.Pass(null); }
+            public InstantCastResult Fire(CastStep step)
+            {
+                Land(step);
+                return new InstantCastResult(true, true, EffectsObserved(step), true, "simulated-group");
+            }
+            public IAnimatedCastOperation StartAnimated(CastStep step) { return new GroupAnimatedOperation(this, step); }
+            public InstantCastCompletion InspectCompletion(CastStep step)
+            { return InstantCastCompletion.Settled("simulated-settled"); }
+            public InstantCastCompletion Cleanup(CastStep step)
+            { return InstantCastCompletion.Settled("simulated-clean"); }
+
+            private static List<string> EffectIds(CastStep step)
+            {
+                return CastingQualificationForecast.Leaves(step.ExpectedEffects)
+                    .Select(leaf => leaf.EffectId).Distinct(StringComparer.Ordinal).ToList();
+            }
+
+            private List<ObservedEffectInstance> Instances(string unit, CastStep step)
+            {
+                var instances = new List<ObservedEffectInstance>();
+                foreach (string effect in EffectIds(step))
+                {
+                    KeyValuePair<string, long> instance;
+                    if (Active.TryGetValue(unit + "|" + effect, out instance))
+                        instances.Add(new ObservedEffectInstance(EffectKind.Buff, effect, instance.Key,
+                            instance.Value, false));
+                }
+                return instances;
+            }
+
+            // Reads every recipient, then lands the cast and spends its source.
+            internal void Land(CastStep step)
+            {
+                Fired.Add(step.AssignmentId);
+                _baselines[step] = new EffectBaseline(step.ExpectedRecipientUnitIds.ToDictionary(unit => unit,
+                    unit => (IEnumerable<ObservedEffectInstance>)Instances(unit, step), StringComparer.Ordinal));
+                foreach (string unit in step.ExpectedRecipientUnitIds)
+                {
+                    if (unit == MissRecipient) continue;
+                    foreach (string effect in EffectIds(step))
+                    {
+                        string key = unit + "|" + effect;
+                        if (KeepExisting && Active.ContainsKey(key)) continue;
+                        Active[key] = new KeyValuePair<string, long>("i" + (++_instances), Now + 600);
+                    }
+                }
+                if (step.Reservation.TokenIds.Count != 0) TokenAvailable = false;
+                else Remaining[step.Reservation.PoolKey]--;
+            }
+
+            public bool EffectsObserved(CastStep step)
+            {
+                EffectBaseline baseline;
+                return _baselines.TryGetValue(step, out baseline) &&
+                    AppliedEffectJudgement.AllReached(step.ExpectedRecipientUnitIds, step.ExpectedEffects,
+                        baseline, unit => Instances(unit, step), step.PreCoveredRecipientUnitIds);
+            }
+
+            internal ProbeObservation Observe(CastStep step, string label)
+            {
+                return ObserveRecipient(step, step.TargetUnitIds[0], label);
+            }
+
+            internal ProbeObservation ObserveRecipient(CastStep step, string unit, string label)
+            {
+                var instances = new List<ProbeEffectInstance>();
+                foreach (string effect in EffectIds(step))
+                {
+                    KeyValuePair<string, long> instance;
+                    if (Active.TryGetValue(unit + "|" + effect, out instance))
+                        instances.Add(new ProbeEffectInstance(effect, instance.Key, instance.Value));
+                }
+                bool prepared = step.Reservation.TokenIds.Count != 0;
+                int available = prepared ? (TokenAvailable ? 1 : 0) : Remaining[step.Reservation.PoolKey];
+                Dictionary<string, bool> reserved = prepared
+                    ? new Dictionary<string, bool>(StringComparer.Ordinal) { { Token, TokenAvailable } } : null;
+                return ProbeObservation.Read(label, ++_sequence, DateTime.UtcNow, unit, available,
+                    instances, reserved);
+            }
+
+            internal ActiveEffectSnapshot Live()
+            {
+                return LiveEffects(Active.Select(pair => On(pair.Key.Split('|')[0], pair.Key.Split('|')[1],
+                    80, 9, 0)).ToArray());
+            }
+
+            internal CastingWorkspaceInputs Inputs()
+            {
+                List<UnitSnapshot> units = Units.Select(id => new UnitSnapshot(id, id, false, string.Empty,
+                    new TargetValidationSnapshot(true, true, true, true))).ToList();
+                var direct = new ProviderSnapshot(new ProviderKey("unit-arcanist", "book-arcanist", Direct,
+                    "level-1"), "Direct Ward", 1, "pool-arcanist", 1, null, null, DirectCasterLevel, 90);
+                var group = new ProviderSnapshot(new ProviderKey("unit-cleric", "book-cleric", Group,
+                    "level-2"), "Group Ward", 2, "pool-cleric", 1, new[] { Token }, null, 9, 90);
+                var anchored = new ProviderSnapshot(new ProviderKey("unit-bard", "book-bard", Anchored,
+                    "level-3"), "Anchored Arrows", 3, "pool-bard", 1, null, null, 9, 5400);
+                var pools = new[]
+                {
+                    new ResourcePoolSnapshot("pool-arcanist", ResourcePoolKind.SpontaneousLevel, 3,
+                        Remaining["pool-arcanist"], null),
+                    new ResourcePoolSnapshot("pool-cleric", ResourcePoolKind.PreparedSlots, 1, TokenAvailable ? 1 : 0,
+                        new[] { new ResourceTokenSnapshot(Token, Group, 2, PreparedSlotKind.Common,
+                            TokenAvailable, true, null) }),
+                    new ResourcePoolSnapshot("pool-bard", ResourcePoolKind.SpontaneousLevel, 3,
+                        Remaining["pool-bard"], null)
+                };
+                List<string> everyone = Units.ToList();
+                var options = new List<ProviderPlanningOption>
+                {
+                    new ProviderPlanningOption(direct, everyone, new[] { "unit-arcanist" }, 9, 90,
+                        CastExecutionStrategy.DirectRuleCast, "fixture-direct",
+                        new Dictionary<string, IEnumerable<string>>(StringComparer.Ordinal)),
+                    new ProviderPlanningOption(group, everyone, new[] { "unit-cleric" }, 9, 90,
+                        CastExecutionStrategy.DirectRuleCast, "fixture-group",
+                        new Dictionary<string, IEnumerable<string>>(StringComparer.Ordinal)
+                        {
+                            { "unit-cleric", everyone }
+                        }),
+                    new ProviderPlanningOption(anchored, everyone, new[] { "unit-t1", "unit-t2" }, 9, 5400,
+                        CastExecutionStrategy.DirectRuleCast, "fixture-anchored",
+                        new Dictionary<string, IEnumerable<string>>(StringComparer.Ordinal)
+                        {
+                            { "unit-t1", new[] { "unit-t1", "unit-t2" } },
+                            { "unit-t2", new[] { "unit-t1", "unit-t2" } }
+                        })
+                };
+                var effects = new Dictionary<string, EffectExpression>(StringComparer.Ordinal)
+                {
+                    { Direct.Canonical, new EffectLeafExpression(EffectKind.Buff, DirectEffect,
+                        EffectTarget.CurrentTarget, "fixture", "fixture/direct") },
+                    { Group.Canonical, new EffectLeafExpression(EffectKind.Buff, "shared-effect",
+                        EffectTarget.AlliedAreaRecipients, "fixture", "fixture/group") },
+                    { Anchored.Canonical, new EffectLeafExpression(EffectKind.Buff, "anchored-effect",
+                        EffectTarget.AlliedAreaRecipients, "fixture", "fixture/anchored") }
+                };
+                return new CastingWorkspaceInputs(new PartyProviderSnapshot(units,
+                        new[] { direct, group, anchored }, pools), options, effects,
+                    new CastEnhancementSnapshot[0], null, Live());
+            }
+        }
+
+        private sealed class GroupAnimatedOperation : IAnimatedCastOperation
+        {
+            private readonly GroupBuffWorld _world;
+            private readonly CastStep _step;
+            private int _polls;
+            private bool _landed;
+
+            internal GroupAnimatedOperation(GroupBuffWorld world, CastStep step)
+            {
+                _world = world;
+                _step = step;
+            }
+
+            public bool IsCompleted
+            {
+                get
+                {
+                    if (++_polls < _world.AnimatedFrames) return false;
+                    if (!_landed) { _landed = true; _world.Land(_step); }
+                    return true;
+                }
+            }
+            public bool IsStarted { get { return _polls > 0; } }
+            public bool TimedOut { get { return false; } }
+            public bool Succeeded { get { return _landed; } }
+            public bool EffectsObserved { get { return _landed && _world.EffectsObserved(_step); } }
+            public bool ResourceSpent { get { return _landed; } }
+            public string ResourceCountViolation { get { return null; } }
+            public bool HasResidualDeliveryState { get { return false; } }
+            public string Detail { get { return "simulated-group-animated;polls=" + _polls; } }
+            public void Dispose() { }
+        }
+
+        private static CastingQualificationAllowance GroupAllowance(GroupBuffWorld world, string mode)
+        {
+            CastingWorkspaceInputs inputs = world.Inputs();
+            CastingQualificationSelection selection =
+                CastingQualificationRecipe.SelectGroupMixed(inputs, "fixture-campaign");
+            IReadOnlyList<CastingQualificationStepForecast> forecast =
+                CastingQualificationForecast.Forecast(selection, inputs, "fixture-campaign");
+            string refusal;
+            return CastingQualificationAllowance.Parse(QualificationAllowanceJson(o =>
+            {
+                o["fixtureGameId"] = "fixture-campaign";
+                o["executionMode"] = mode;
+                o["recipe"] = CastingQualificationRecipe.GroupMixed;
+                o["approvedProjectionIds"] = new JArray(forecast.Select(step => (object)step.ProjectionId).ToArray());
+                o["maximumNativeSubmissions"] = 3;
+            }), "qual-run-1", out refusal);
+        }
+
+        private static CastingQualificationDriver NewGroupDriver(string dir, GroupBuffWorld world,
+            CastingQualificationRecord record, CastingQualificationAllowance allowance, Func<long> clock,
+            bool recipientReads = true)
+        {
+            Directory.CreateDirectory(dir);
+            var host = new CastingExecutionHost(settings => settings != null && settings.Mode == "animated"
+                ? (ICastExecutor)new AnimatedCastExecutor(world, true)
+                : new InstantCastExecutor(world, true), clock);
+            return new CastingQualificationDriver(record, allowance, "fixture-campaign", world.Inputs,
+                boundary => new CastingWorkspaceSession(dir, "fixture-campaign", boundary),
+                host, world.Observe, clock, 240000, null, null, false, null, null,
+                () => "fixture-lifecycle=1", () => 0L,
+                recipientReads ? world.ObserveRecipient : (Func<CastStep, string, string, ProbeObservation>)null);
+        }
+
+        // The group recipe (mission batch 3, section 8, and the owner's
+        // mixed-coverage case): selection, forecast and the driver run in
+        // both modes, with the game keeping or replacing the covered
+        // recipient's instance; one invocation and one unit of cost per
+        // group casting; a missed recipient stops the routine before the
+        // next casting; group reads need the recipient observer.
+        private static void TestGroupQualificationRecipe(string root)
+        {
+            var world = new GroupBuffWorld();
+            CastingWorkspaceInputs inputs = world.Inputs();
+            CastingQualificationSelection selection =
+                CastingQualificationRecipe.SelectGroupMixed(inputs, "fixture-campaign");
+            if (!selection.Selected || selection.Recipe != CastingQualificationRecipe.GroupMixed ||
+                selection.Castings.Count != 3 ||
+                selection.Castings[0].CasterUnitId != "unit-arcanist" ||
+                selection.Castings[0].DirectTargetUnitId != "unit-t1" ||
+                selection.Castings[1].CasterUnitId != "unit-cleric" ||
+                selection.Castings[1].TargetMode != CastingTargetMode.CasterCenteredOrigin ||
+                selection.Castings[2].CasterUnitId != "unit-bard" ||
+                selection.Castings[2].TargetMode != CastingTargetMode.AnchoredOrigin ||
+                selection.Castings[2].Origin.AnchorUnitId != "unit-t1" ||
+                !selection.Coverage.SequenceEqual(new[]
+                    { "caster-centred", "mixed-coverage", "target-anchored", "spontaneous", "prepared" }))
+                throw new InvalidOperationException("The group selection was wrong: " + selection.Refusal + " " +
+                    string.Join(",", selection.Castings.Select(casting => casting.CastingId + "=" +
+                        casting.CasterUnitId + ">" + casting.DirectTargetUnitId).ToArray()) + " coverage=" +
+                    string.Join(",", selection.Coverage.ToArray()) + " rejections=" +
+                    string.Join(",", selection.Rejections.ToArray()));
+            IReadOnlyList<CastingQualificationStepForecast> forecast =
+                CastingQualificationForecast.Forecast(selection, inputs, "fixture-campaign");
+            CastStep groupStep = forecast.Count == 2 && forecast[1].Projection != null
+                ? forecast[1].Projection.Plan.Steps[0] : null;
+            if (forecast.Count != CastingQualificationRecipe.ForecastSteps(CastingQualificationRecipe.GroupMixed) ||
+                !forecast[0].CastingIds.SequenceEqual(new[] { "qual-cast-1" }) ||
+                !forecast[1].CastingIds.SequenceEqual(new[] { "qual-cast-2", "qual-cast-3" }) ||
+                groupStep == null || !groupStep.MassCast || groupStep.ExpectedRecipientUnitIds.Count != 5 ||
+                !groupStep.PreCoveredRecipientUnitIds.SequenceEqual(new[] { "unit-t1" }) ||
+                groupStep.Reservation.TokenIds.Single() != world.Token ||
+                !forecast[1].Projection.Plan.Steps[1].ExpectedRecipientUnitIds.SequenceEqual(
+                    new[] { "unit-t1", "unit-t2" }))
+                throw new InvalidOperationException("The group forecast was wrong: " +
+                    string.Join(" | ", forecast.Select(step => step.Name + ":" + (step.Refusal ??
+                        string.Join(",", step.CastingIds.ToArray()))).ToArray()));
+            // Refused shapes: no direct source of the same effects, a
+            // recipient already covered, a weaker direct caster.
+            var different = new GroupBuffWorld { DirectEffect = "other-effect" };
+            CastingQualificationSelection noShared =
+                CastingQualificationRecipe.SelectGroupMixed(different.Inputs(), "fixture-campaign");
+            var covered = new GroupBuffWorld();
+            covered.Active["unit-t2|shared-effect"] = new KeyValuePair<string, long>("old", 5000);
+            CastingQualificationSelection alreadyCovered =
+                CastingQualificationRecipe.SelectGroupMixed(covered.Inputs(), "fixture-campaign");
+            var weaker = new GroupBuffWorld { DirectCasterLevel = 5 };
+            CastingQualificationSelection weakerDirect =
+                CastingQualificationRecipe.SelectGroupMixed(weaker.Inputs(), "fixture-campaign");
+            if (noShared.Selected || !noShared.Rejections.Any(value =>
+                    value.EndsWith("|no-direct-source-with-the-same-effects", StringComparison.Ordinal)) ||
+                alreadyCovered.Selected || !alreadyCovered.Rejections.Any(value =>
+                    value.EndsWith("|a-recipient-already-covered", StringComparison.Ordinal)) ||
+                weakerDirect.Selected || !weakerDirect.Rejections.Any(value =>
+                    value.EndsWith("|direct-caster-level-lower", StringComparison.Ordinal)))
+                throw new InvalidOperationException("A group selection that cannot prove mixed coverage was made.");
+            foreach (string mode in new[] { "instant", "animated" })
+                foreach (bool keep in new[] { true, false })
+                {
+                    var run = new GroupBuffWorld { KeepExisting = keep };
+                    var record = new CastingQualificationRecord { CastingScenario = true, AllowanceStatus = "parsed" };
+                    long now = 0;
+                    CastingQualificationDriver driver = NewGroupDriver(
+                        Path.Combine(root, "qg-" + mode[0] + (keep ? "k" : "r")), run, record,
+                        GroupAllowance(run, mode), () => now);
+                    for (int i = 0; i < 4000 && !driver.Completed; i++) { now += 16; run.Now = now; driver.Update(); }
+                    IList<string> violations = record.Violations();
+                    CastingQualificationStepResult mixed = record.Step("mixed");
+                    if (violations.Count != 0 || record.TerminalReason != "completed" ||
+                        record.ExecutionMode != mode ||
+                        !run.Fired.SequenceEqual(new[] { "qual-cast-1", "qual-cast-2", "qual-cast-3" }) ||
+                        run.TokenAvailable || run.Remaining["pool-arcanist"] != 2 || run.Remaining["pool-bard"] != 2 ||
+                        mixed == null ||
+                        !mixed.Transitions.Contains("qual-cast-2@unit-t1:" + (keep ? "unchanged" : "new-instance")) ||
+                        !mixed.Transitions.Contains("qual-cast-2@unit-t2:new-instance") ||
+                        !mixed.Transitions.Contains("qual-cast-2@unit-cleric:new-instance") ||
+                        !mixed.Transitions.Contains("qual-cast-3@unit-t2:new-instance") ||
+                        !mixed.Availability.Contains("qual-cast-2:1>0") ||
+                        !mixed.Availability.Contains("qual-cast-1:2>2") ||
+                        !mixed.Availability.Contains("qual-cast-3:3>2") ||
+                        record.Step("repeat").ApplyReason != "nothing-to-cast:3")
+                        throw new InvalidOperationException("The group qualification (" + mode + ", keep=" + keep +
+                            ") did not pass exactly: " + record.TerminalReason + "|" +
+                            string.Join("|", violations.ToArray()) + "|fired=" + string.Join(",", run.Fired.ToArray()) +
+                            "|" + (mixed == null ? "no-mixed" : string.Join(",", mixed.Transitions.ToArray()) + "|" +
+                                string.Join(",", mixed.Availability.ToArray())));
+                }
+            // A recipient the group cast misses: the casting is not confirmed
+            // and the routine stops before the anchored casting is submitted.
+            var missed = new GroupBuffWorld { MissRecipient = "unit-t2" };
+            var missedRecord = new CastingQualificationRecord { CastingScenario = true, AllowanceStatus = "parsed" };
+            long missedNow = 0;
+            CastingQualificationDriver missedDriver = NewGroupDriver(Path.Combine(root, "qg-miss"),
+                missed, missedRecord, GroupAllowance(missed, "instant"), () => missedNow);
+            for (int i = 0; i < 6000 && !missedDriver.Completed; i++) { missedNow += 16; missed.Now = missedNow; missedDriver.Update(); }
+            if (missedRecord.TerminalReason == "completed" || missedRecord.Violations().Count == 0 ||
+                !missed.Fired.SequenceEqual(new[] { "qual-cast-1", "qual-cast-2" }))
+                throw new InvalidOperationException("A group cast that missed a recipient passed or went on: " +
+                    missedRecord.TerminalReason + "|fired=" + string.Join(",", missed.Fired.ToArray()));
+            // Without the recipient reads a group step never starts.
+            var blind = new GroupBuffWorld();
+            var blindRecord = new CastingQualificationRecord { CastingScenario = true, AllowanceStatus = "parsed" };
+            long blindNow = 0;
+            CastingQualificationDriver blindDriver = NewGroupDriver(Path.Combine(root, "qg-blind"),
+                blind, blindRecord, GroupAllowance(blind, "instant"), () => blindNow, false);
+            for (int i = 0; i < 4000 && !blindDriver.Completed; i++) { blindNow += 16; blind.Now = blindNow; blindDriver.Update(); }
+            if (blindRecord.TerminalReason == "completed" || !blind.Fired.SequenceEqual(new[] { "qual-cast-1" }) ||
+                !blindRecord.Failures.Any(value => value.Contains("recipient-observer-missing")))
+                throw new InvalidOperationException("A group step ran without its recipient reads: " +
+                    blindRecord.TerminalReason + "|" + string.Join("|", blindRecord.Failures.ToArray()));
         }
 
         // A finite world: a prepared caster (exact slot tokens with native
@@ -5402,6 +5775,24 @@ namespace KingmakerBuffPlanner.Tests
                 CastingCapabilityInventory.Shape(null) != "none" ||
                 CastingCapabilityInventory.Describe(null).Single() != "inputs-unavailable")
                 throw new InvalidOperationException("Effect shapes were not described exactly.");
+            // A variant provider's effect is wrapped in a reference to the
+            // variant it casts: still a plain buff of the cast ability itself
+            // (advanced fixture, 2026-09-24), while a reference to any other
+            // ability is not.
+            var variantAbility = new AbilityKey("base-guid", "variant-guid", 0, SourceKind.Spellbook, null);
+            var wrapped = new ReferencedAbilityExpression("variant-guid", direct);
+            if (!ExplicitCastingStepConverter.IsPlainCurrentTargetBuff(wrapped, variantAbility) ||
+                !ExplicitCastingStepConverter.IsPlainCurrentTargetBuff(
+                    new ReferencedAbilityExpression("base-guid", direct), variantAbility) ||
+                ExplicitCastingStepConverter.IsPlainCurrentTargetBuff(
+                    new ReferencedAbilityExpression("other-guid", direct), variantAbility) ||
+                ExplicitCastingStepConverter.IsPlainCurrentTargetBuff(wrapped,
+                    new AbilityKey("base-guid", null, 0, SourceKind.Spellbook, null)) ||
+                CastingCapabilityInventory.Structure(wrapped) != "ref:variant-(leaf:Buff:direct)" ||
+                CastingCapabilityInventory.Structure(new SequenceEffectExpression(new EffectExpression[] { direct, area })) !=
+                    "seq(leaf:Buff:direct,leaf:AreaBuff:allied-area)")
+                throw new InvalidOperationException("A variant's own reference was not a plain buff, or structure is wrong: " +
+                    CastingCapabilityInventory.Structure(wrapped));
             if (CastingCapabilityInventory.Leaves(new SequenceEffectExpression(new EffectExpression[] { direct, area })) !=
                     "AreaBuff:buff-b,Buff:buff-a" ||
                 CastingCapabilityInventory.Leaves(null) != "none" ||

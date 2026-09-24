@@ -139,11 +139,17 @@ namespace KingmakerBuffPlanner.Execution
             get { return Selection != null && CastingQualificationRecipe.HasDisableStep(Selection.Recipe); }
         }
 
+        private bool IsGroup
+        {
+            get { return Selection != null && CastingQualificationRecipe.IsGroupRecipe(Selection.Recipe); }
+        }
+
         // The judged steps of this record's recipe, in order.
         public IEnumerable<string> JudgedSteps
         {
             get
             {
+                if (IsGroup) return GroupStepNames;
                 return HasDisableStep
                     ? StepNames.Concat(new[] { CastingQualificationForecast.Disable, CastingQualificationForecast.Recover })
                     : StepNames;
@@ -183,11 +189,15 @@ namespace KingmakerBuffPlanner.Execution
             // The stop is the player's own: pressed once and taken by the
             // host as the player stop. An animated cast spans many frames,
             // so there the press must land while the first cast is in
-            // progress (the stop waits for it to complete).
-            if (StopPress == null) violations.Add("stop-press:none");
-            else if (!StopPressHandled) violations.Add("stop-press:not-handled:" + StopPress);
-            else if (ExecutionMode == "animated" && StopPressedInFlight != true)
-                violations.Add("stop-press:not-in-flight:" + StopPress);
+            // progress (the stop waits for it to complete). The group
+            // recipe has no stop step.
+            if (!IsGroup)
+            {
+                if (StopPress == null) violations.Add("stop-press:none");
+                else if (!StopPressHandled) violations.Add("stop-press:not-handled:" + StopPress);
+                else if (ExecutionMode == "animated" && StopPressedInFlight != true)
+                    violations.Add("stop-press:not-in-flight:" + StopPress);
+            }
             // The disable lands while the animated cast is in progress, or,
             // for instant, before the run's first step (a disable-before-
             // start case, never claimed as an in-flight instant
@@ -213,6 +223,7 @@ namespace KingmakerBuffPlanner.Execution
         }
 
         public static readonly string[] StepNames = { "stop", "complete", "repeat", "recast" };
+        public static readonly string[] GroupStepNames = { "prime", "mixed", "repeat" };
 
         // The disable rules, applied the moment the disable step ends (so a
         // failed rule stops the run before the recover run is submitted)
@@ -304,6 +315,19 @@ namespace KingmakerBuffPlanner.Execution
                     rest.Any(id => step.TransitionOf(id) != "unchanged"))
                     failure = "effects:" + string.Join(",", step.Transitions.ToArray());
             }
+            else if (name == CastingQualificationForecast.Prime)
+            {
+                // The direct casting alone reaches its recipient.
+                if (step.Report.TerminalReason != "completed")
+                    failure = "report:" + step.Report.TerminalReason;
+                else if (step.StateOf(first) != CastingOutcomeState.EffectConfirmed ||
+                    step.Report.Entries.Count != 1 || step.Report.Submitted != 1)
+                    failure = "states:" + States(step);
+                else if (step.TransitionOf(first) != "new-instance")
+                    failure = "effects:" + string.Join(",", step.Transitions.ToArray());
+            }
+            else if (name == CastingQualificationForecast.Mixed)
+                failure = MixedFailure(step, castings);
             else if (name == "recast" || name == CastingQualificationForecast.Recover)
             {
                 // recast, and recover (the same Always recast plan as a new
@@ -321,6 +345,44 @@ namespace KingmakerBuffPlanner.Execution
             else return "unknown-step";
             if (failure != null) return failure;
             return ResourceFailure(step, castings);
+        }
+
+        // The mixed step (group recipe): the direct casting is skipped (its
+        // recipient holds the effect); each group casting runs once (one
+        // invocation, one unit of cost whatever the number of beneficiaries)
+        // and is confirmed; the pre-covered recipient keeps, refreshes or
+        // receives the effect, and every other expected recipient receives
+        // a new instance. The direct casting's recipient is the group
+        // casting's only pre-covered recipient.
+        private string MixedFailure(CastingQualificationStepResult step, IReadOnlyList<PlannedCasting> castings)
+        {
+            string first = castings[0].CastingId;
+            List<string> groups = castings.Skip(1).Select(value => value.CastingId).ToList();
+            if (step.Report.TerminalReason != "completed") return "report:" + step.Report.TerminalReason;
+            if (step.StateOf(first) != CastingOutcomeState.Skipped ||
+                groups.Any(id => step.StateOf(id) != CastingOutcomeState.EffectConfirmed) ||
+                step.Report.Submitted != groups.Count)
+                return "states:" + States(step);
+            string kept = step.TransitionOf(first);
+            if (kept != "unchanged" && kept != "refreshed" && kept != "new-instance")
+                return "effects:" + first + ":" + kept;
+            foreach (string id in groups)
+            {
+                CastStep cast = ReservedStep(step.Name, id, false);
+                if (cast == null || !cast.MassCast) return "group-step-missing:" + id;
+                foreach (string recipient in cast.ExpectedRecipientUnitIds)
+                {
+                    string transition = step.TransitionOf(id + "@" + recipient);
+                    bool ok = cast.PreCoveredRecipientUnitIds.Contains(recipient)
+                        ? transition == "unchanged" || transition == "refreshed" || transition == "new-instance"
+                        : transition == "new-instance";
+                    if (!ok) return "effects:" + id + "@" + recipient + ":" + transition;
+                }
+            }
+            CastStep grouped = ReservedStep(step.Name, groups[0], false);
+            if (!grouped.PreCoveredRecipientUnitIds.SequenceEqual(new[] { castings[0].DirectTargetUnitId }))
+                return "pre-covered:" + string.Join(",", grouped.PreCoveredRecipientUnitIds.ToArray());
+            return null;
         }
 
         // Resources of one step: each casting's native availability drops by
@@ -453,6 +515,9 @@ namespace KingmakerBuffPlanner.Execution
         private readonly Func<ICastingDispatchBoundary, CastingWorkspaceSession> _openSession;
         private readonly CastingExecutionHost _host;
         private readonly Func<CastStep, string, ProbeObservation> _observe;
+        // A read of one expected recipient of a group casting (its source
+        // and that recipient's effects); null where no recipe needs it.
+        private readonly Func<CastStep, string, string, ProbeObservation> _observeRecipient;
         private readonly Func<long> _clock;
         private readonly long _deadlineMillis;
         private readonly string _requestedRecipe;
@@ -495,8 +560,10 @@ namespace KingmakerBuffPlanner.Execution
             Func<long> clock, long deadlineMillis, string recipe = null,
             Func<bool> worldRunning = null, bool ownerPumpsHost = false,
             Func<string, bool> pressRoutine = null, Action<bool> setPlannerEnabled = null,
-            Func<string> lifecycleProbe = null, Func<long> ownerTicks = null)
+            Func<string> lifecycleProbe = null, Func<long> ownerTicks = null,
+            Func<CastStep, string, string, ProbeObservation> observeRecipient = null)
         {
+            _observeRecipient = observeRecipient;
             _lifecycleProbe = lifecycleProbe;
             _ownerTicks = ownerTicks;
             _requestedRecipe = recipe;
@@ -620,6 +687,11 @@ namespace KingmakerBuffPlanner.Execution
                 case "disable-wait": WaitDisable(); return;
                 case "recover": Begin(CastingQualificationForecast.Recover); return;
                 case "recover-wait": Wait(false, "done"); return;
+                case "prime": Begin(CastingQualificationForecast.Prime); return;
+                case "prime-wait": Wait(false, "group-author"); return;
+                case "group-author": GroupAuthor(); return;
+                case "mixed": Begin(CastingQualificationForecast.Mixed); return;
+                case "mixed-wait": Wait(false, "repeat"); return;
                 default: Finish("completed"); return;
             }
         }
@@ -677,7 +749,11 @@ namespace KingmakerBuffPlanner.Execution
         private void Author()
         {
             _session = _openSession(_boundary);
-            foreach (PlannedCasting casting in Record.Selection.Castings)
+            // The group recipe primes with its direct casting alone; the
+            // group castings join after the prime step.
+            bool group = CastingQualificationRecipe.IsGroupRecipe(Recipe);
+            foreach (PlannedCasting casting in group
+                ? Record.Selection.Castings.Take(1) : Record.Selection.Castings)
             {
                 AuthoringEditResult added = _session.AddCastingForRuntime(casting);
                 if (!added.Applied) { Fail("author-refused:" + casting.CastingId + ":" + added.Reason); return; }
@@ -688,7 +764,24 @@ namespace KingmakerBuffPlanner.Execution
             _session.PresentForReview(inputs);
             if (!_session.AcceptPresentedPlan(inputs)) { Fail("accept-refused"); return; }
             _startedMillis = _clock();
-            _phase = "stop";
+            _phase = group ? "prime" : "stop";
+        }
+
+        // Group recipe: after the prime step the group castings join the
+        // plan (the direct casting stays, now covering its recipient), and
+        // the changed plan is reviewed and accepted like any edit.
+        private void GroupAuthor()
+        {
+            foreach (PlannedCasting casting in Record.Selection.Castings.Skip(1))
+            {
+                AuthoringEditResult added = _session.AddCastingForRuntime(casting);
+                if (!added.Applied) { Fail("author-refused:" + casting.CastingId + ":" + added.Reason); return; }
+            }
+            _session.Save();
+            CastingWorkspaceInputs inputs = _freshInputs();
+            _session.PresentForReview(inputs);
+            if (!_session.AcceptPresentedPlan(inputs)) { Fail("group-accept-refused"); return; }
+            _phase = "mixed";
         }
 
         private void Begin(string name)
@@ -898,7 +991,7 @@ namespace KingmakerBuffPlanner.Execution
             // Only the exact no-op (every casting already active) continues.
             string failure = Record.StepFailure("repeat");
             if (failure != null) { Fail("step:" + failure); return; }
-            _phase = "recast-edit";
+            _phase = CastingQualificationRecipe.IsGroupRecipe(Recipe) ? "done" : "recast-edit";
         }
 
         private void RecastEdit()
@@ -941,23 +1034,24 @@ namespace KingmakerBuffPlanner.Execution
             if (steps == null || steps.Count == 0) return "nothing-to-observe";
             foreach (KeyValuePair<string, CastStep> pair in steps
                 .OrderBy(value => value.Key, StringComparer.Ordinal))
-            {
-                ProbeObservation observation;
-                if (observations == null || !observations.TryGetValue(pair.Key, out observation) ||
-                    observation == null)
-                    return pair.Key + ":missing";
-                if (!observation.Succeeded) return pair.Key + ":failed:" + observation.Failure;
-                string target = pair.Value.TargetUnitIds.FirstOrDefault();
-                if (!string.Equals(observation.TargetUnitId, target, StringComparison.Ordinal))
-                    return pair.Key + ":wrong-target:" + observation.TargetUnitId;
-                if (observation.EffectInstances == null) return pair.Key + ":effects-unread";
-                if (observation.AvailableForCast == null) return pair.Key + ":availability-unread";
-                ResourceReservation reservation = pair.Value.Reservation;
-                if (reservation != null && reservation.TokenIds.Count != 0 &&
-                    (observation.ReservedTokenAvailability == null ||
-                     reservation.TokenIds.Any(id => !observation.ReservedTokenAvailability.ContainsKey(id))))
-                    return pair.Key + ":tokens-unread";
-            }
+                foreach (KeyValuePair<string, string> read in ReadsOf(pair.Key, pair.Value))
+                {
+                    ProbeObservation observation;
+                    if (observations == null || !observations.TryGetValue(read.Key, out observation) ||
+                        observation == null)
+                        return read.Key + ":missing";
+                    if (!observation.Succeeded) return read.Key + ":failed:" + observation.Failure;
+                    string target = read.Value ?? pair.Value.TargetUnitIds.FirstOrDefault();
+                    if (!string.Equals(observation.TargetUnitId, target, StringComparison.Ordinal))
+                        return read.Key + ":wrong-target:" + observation.TargetUnitId;
+                    if (observation.EffectInstances == null) return read.Key + ":effects-unread";
+                    if (observation.AvailableForCast == null) return read.Key + ":availability-unread";
+                    ResourceReservation reservation = pair.Value.Reservation;
+                    if (reservation != null && reservation.TokenIds.Count != 0 &&
+                        (observation.ReservedTokenAvailability == null ||
+                         reservation.TokenIds.Any(id => !observation.ReservedTokenAvailability.ContainsKey(id))))
+                        return read.Key + ":tokens-unread";
+                }
             return null;
         }
 
@@ -981,6 +1075,24 @@ namespace KingmakerBuffPlanner.Execution
             return steps;
         }
 
+        // The reads one casting takes: its own target, or for a group
+        // casting every expected recipient (key "<castingId>@<unit>", value
+        // the unit); each read carries the casting's source availability.
+        internal static IEnumerable<KeyValuePair<string, string>> ReadsOf(string castingId, CastStep step)
+        {
+            if (!step.MassCast)
+                return new[] { new KeyValuePair<string, string>(castingId, null) };
+            return step.ExpectedRecipientUnitIds.Select(unit =>
+                new KeyValuePair<string, string>(castingId + "@" + unit, unit)).ToList();
+        }
+
+        // The casting a read belongs to.
+        internal static string CastingOfRead(string readKey)
+        {
+            int at = readKey.IndexOf('@');
+            return at < 0 ? readKey : readKey.Substring(0, at);
+        }
+
         // Fresh native reads of every recipe casting target and source.
         private Dictionary<string, ProbeObservation> ObserveAll(CastingQualificationStepResult step,
             string label)
@@ -989,31 +1101,44 @@ namespace KingmakerBuffPlanner.Execution
             if (_observe == null || _observeSteps == null) return observations;
             foreach (KeyValuePair<string, CastStep> pair in _observeSteps
                 .OrderBy(value => value.Key, StringComparer.Ordinal))
-            {
-                string castingId = pair.Key;
-                ProbeObservation observation;
-                try { observation = _observe(pair.Value, label + ":" + castingId); }
-                catch (Exception exception)
+                foreach (KeyValuePair<string, string> read in ReadsOf(pair.Key, pair.Value))
                 {
-                    observation = ProbeObservation.Failed(label, 0, DateTime.UtcNow,
-                        "observer-exception:" + exception.GetType().Name);
+                    ProbeObservation observation;
+                    try
+                    {
+                        observation = read.Value == null
+                            ? _observe(pair.Value, label + ":" + read.Key)
+                            : _observeRecipient == null
+                                ? ProbeObservation.Failed(label, 0, DateTime.UtcNow, "recipient-observer-missing")
+                                : _observeRecipient(pair.Value, read.Value, label + ":" + read.Key);
+                    }
+                    catch (Exception exception)
+                    {
+                        observation = ProbeObservation.Failed(label, 0, DateTime.UtcNow,
+                            "observer-exception:" + exception.GetType().Name);
+                    }
+                    observations[read.Key] = observation;
+                    step.Observations.Add(read.Key + ":" + (observation == null ? "null" : observation.Describe()));
                 }
-                observations[castingId] = observation;
-                step.Observations.Add(castingId + ":" + (observation == null ? "null" : observation.Describe()));
-            }
             return observations;
         }
 
         private void ObserveTransitions(CastingQualificationStepResult step, string label)
         {
             Dictionary<string, ProbeObservation> after = ObserveAll(step, label);
-            foreach (KeyValuePair<string, ProbeObservation> pair in after)
+            var sources = new HashSet<string>(StringComparer.Ordinal);
+            foreach (KeyValuePair<string, ProbeObservation> pair in after
+                .OrderBy(value => value.Key, StringComparer.Ordinal))
             {
                 ProbeObservation before;
                 _before.TryGetValue(pair.Key, out before);
                 step.Transitions.Add(pair.Key + ":" + Transition(before, pair.Value));
-                step.Availability.Add(pair.Key + ":" + Available(before) + ">" + Available(pair.Value));
-                RecordTokens(step, pair.Key, before, pair.Value);
+                // One availability and token record per casting: a group
+                // casting's reads all carry the same source.
+                string castingId = CastingOfRead(pair.Key);
+                if (!sources.Add(castingId)) continue;
+                step.Availability.Add(castingId + ":" + Available(before) + ">" + Available(pair.Value));
+                RecordTokens(step, castingId, before, pair.Value);
             }
         }
 

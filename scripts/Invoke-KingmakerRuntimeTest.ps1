@@ -34,7 +34,7 @@ param(
     # Qualification recipe (qualification scenarios only): the selection
     # run defaults to zero-cost-mixed; a casting run takes its recipe from
     # the allowance, and when this is given as well it must name the same.
-    [ValidateSet('zero-cost-mixed', 'finite-direct-mixed')][string]$QualificationRecipe,
+    [ValidateSet('zero-cost-mixed', 'finite-direct-mixed', 'group-mixed')][string]$QualificationRecipe,
     # Classic cast (live-classic-cast only): the run-bound kbp-classic-cast
     # allowance under the lab approvals directory naming the exact classic
     # plan digest (from a live-classic-select run), the casting mode and a

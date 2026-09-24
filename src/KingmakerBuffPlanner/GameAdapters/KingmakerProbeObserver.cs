@@ -21,6 +21,20 @@ namespace KingmakerBuffPlanner.GameAdapters
     {
         public ProbeObservation Observe(CastStep step, string phase, ProbeSequenceClock clock)
         {
+            return ObserveUnit(step, step == null ? null : step.TargetUnitIds.FirstOrDefault(), phase, clock);
+        }
+
+        // One expected recipient of a group casting: the same source reads,
+        // and that recipient's instances of the expected effects.
+        public ProbeObservation ObserveRecipient(CastStep step, string recipientUnitId, string phase,
+            ProbeSequenceClock clock)
+        {
+            return ObserveUnit(step, recipientUnitId, phase, clock);
+        }
+
+        private ProbeObservation ObserveUnit(CastStep step, string targetId, string phase,
+            ProbeSequenceClock clock)
+        {
             try
             {
                 if (Game.Instance == null || Game.Instance.Player == null)
@@ -31,7 +45,6 @@ namespace KingmakerBuffPlanner.GameAdapters
                 Dictionary<string, UnitEntityData> units = KingmakerAnimatedCastAdapter.CollectUnits();
                 UnitEntityData caster;
                 UnitEntityData target;
-                string targetId = step.TargetUnitIds.FirstOrDefault();
                 if (!units.TryGetValue(step.Provider.CasterUnitId, out caster) || caster.Descriptor == null)
                     return ProbeObservation.Failed(phase, clock.Next(), DateTime.UtcNow, "caster-not-in-party");
                 if (string.IsNullOrEmpty(targetId) || !units.TryGetValue(targetId, out target) ||
