@@ -3175,6 +3175,29 @@ namespace KingmakerBuffPlanner.Tests
                         "before recover: " + shapeRecord.TerminalReason + "|started=" + world.AnimatedStarts.Count + "|" +
                         string.Join("|", shapeRecord.Failures.ToArray()));
             }
+            // A lifecycle probe that fails before the disable stops the run at
+            // the disable step: the recover run is never submitted.
+            {
+                var world = new SimulatedBuffWorld();
+                var probeRecord = new CastingQualificationRecord { CastingScenario = true, AllowanceStatus = "parsed" };
+                string probeDir = Path.Combine(root, "qd-probe-fails");
+                Directory.CreateDirectory(probeDir);
+                CastingQualificationDriver probeDriver = NewQualificationDriver(probeDir, world, probeRecord,
+                    ForecastAllowance(world, null, "animated"), () => now, null, null, null, false, null, null,
+                    () => { throw new InvalidOperationException("fixture-probe"); });
+                for (int i = 0; i < 5000 && !probeDriver.Completed; i++)
+                {
+                    now += 16;
+                    world.Now = now;
+                    probeDriver.Update();
+                }
+                if (probeRecord.TerminalReason != "failed:disable-wait" || world.AnimatedStarts.Count != 5 ||
+                    !probeRecord.Failures.Contains(
+                        "disable-wait:step:lifecycle-unprobed:probe-failed:InvalidOperationException"))
+                    throw new InvalidOperationException("A failed lifecycle probe did not stop the run before recover: " +
+                        probeRecord.TerminalReason + "|started=" + world.AnimatedStarts.Count + "|" +
+                        string.Join("|", probeRecord.Failures.ToArray()));
+            }
             // A run that ends during the hold (here its deadline) enables the
             // planner again; it never leaves it disabled.
             {
