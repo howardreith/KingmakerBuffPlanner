@@ -801,7 +801,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                             "search typing, wheel, press target, focus loss, Escape (OS input)",
                             "screen=" + _physicalRecord.ScreenWidth + "x" + _physicalRecord.ScreenHeight +
                                 ";text=" + _physicalRecord.SearchTextAfterFocus + ";selected=" +
-                                _physicalRecord.SelectedAfterClick + ";overflow=" + _physicalRecord.GridOverflows)
+                                _physicalRecord.SelectedBeforeClick + ">" + _physicalRecord.SelectedAfterClick +
+                                ";wheel=" + _physicalRecord.WheelEvidence)
                         : RuntimeTestAssertion.Fail("physical-workspace",
                             "search typing, wheel, press target, focus loss, Escape (OS input)",
                             string.Join("|", violations.ToArray())));
@@ -3057,7 +3058,6 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private readonly PhysicalWorkspaceRecord _physicalRecord = new PhysicalWorkspaceRecord();
         private int _physicalStep;
         private string _physicalPending;
-        private string _physicalTile;
         private string _physicalModeBefore;
         private bool _physicalPublished;
         private System.Diagnostics.Stopwatch _physicalClock;
@@ -3075,10 +3075,14 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 _physicalRecord.ScreenWidth = Screen.width;
                 _physicalRecord.ScreenHeight = Screen.height;
                 _physicalRecord.FullScreen = Screen.fullScreen;
+                // The workspace must have opened through the physical hotkey,
+                // not the host's labeled programmatic fallback (review C4).
+                _physicalRecord.OpenedPhysically = !_workspaceProgrammaticOpen;
                 _physicalModeBefore = GameModeName();
                 BuffPlannerUiRoot.BeginPhysicalInputProbe();
                 _log.Info("[KBP-PHYSICAL] started;screen=" + Screen.width + "x" + Screen.height +
-                    ";fullScreen=" + Screen.fullScreen + ";mode=" + _physicalModeBefore + ".");
+                    ";fullScreen=" + Screen.fullScreen + ";mode=" + _physicalModeBefore +
+                    ";openedPhysically=" + _physicalRecord.OpenedPhysically + ".");
             }
             if (_physicalClock.Elapsed.TotalSeconds > PhysicalDeadlineSeconds)
                 return FinishPhysical("deadline:step" + _physicalStep);
@@ -3106,10 +3110,27 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             }
             if (_physicalStep == 1)
             {
-                // Focus first (a click focuses an input field), then the
-                // wheel over the unfiltered grid.
+                // Focus first; nothing is typed into a field that is not
+                // focused (letters would reach the game as hotkeys).
                 if (!view.SearchFocusedForRuntime && settled < 3) return false;
                 _physicalRecord.SearchFocused = view.SearchFocusedForRuntime;
+                if (!_physicalRecord.SearchFocused) return FinishPhysical("search-not-focused-before-typing");
+                // The query names a tile that is NOT selected now, so the
+                // click below must change the selection (review B5).
+                _physicalRecord.SelectedBeforeClick = view.SelectedSourceIdForRuntime;
+                foreach (string tile in view.VisibleSourcesForRuntime())
+                {
+                    string[] parts = tile.Split('|');
+                    string query;
+                    string suffix;
+                    if (parts.Length != 3 || parts[2] == "True" || parts[0] == _physicalRecord.SelectedBeforeClick ||
+                        !PhysicalWorkspaceRecord.DeriveQuery(parts[1], out query, out suffix)) continue;
+                    _physicalRecord.TargetSource = parts[0];
+                    _physicalRecord.Query = query;
+                    _physicalRecord.QuerySuffix = suffix;
+                    break;
+                }
+                if (_physicalRecord.TargetSource == null) return FinishPhysical("no-unselected-target-tile");
                 Vector2? grid = view.ScreenPointForRuntime("buff-grid");
                 if (grid == null) return FinishPhysical("grid-not-on-screen");
                 _physicalRecord.GridOverflows = view.BuffGridOverflowsForRuntime;
@@ -3120,32 +3141,25 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             {
                 if (settled < 1) return false;
                 _physicalRecord.ScrollAfter = view.BuffGridScrollForRuntime;
+                if (!view.SearchFocusedForRuntime) return FinishPhysical("search-focus-lost-before-typing");
                 return RequestPhysical("ws-type-query", "type", Vector2.zero,
-                    ",\"text\":" + JsonConvert.ToString(PhysicalWorkspaceRecord.Query), 3);
+                    ",\"text\":" + JsonConvert.ToString(_physicalRecord.Query), 3);
             }
             if (_physicalStep == 3)
             {
-                if (view.SearchTextForRuntime != PhysicalWorkspaceRecord.Query && settled < 3) return false;
+                if (view.SearchTextForRuntime != _physicalRecord.Query && settled < 3) return false;
                 if (settled < 0.5) return false;
                 _physicalRecord.SearchText = view.SearchTextForRuntime;
                 _physicalRecord.ModeAfterTyping = GameModeName() == _physicalModeBefore ? "planner" : GameModeName();
-                IList<string> visible = view.VisibleSourcesForRuntime();
-                _physicalRecord.VisibleAfterQuery.AddRange(visible);
-                // A matching tile that is not selected yet, else the match.
-                string pick = visible.Where(tile => tile.Split('|').Length == 3 &&
-                        tile.Split('|')[1].IndexOf(PhysicalWorkspaceRecord.Query, StringComparison.OrdinalIgnoreCase) >= 0)
-                    .OrderBy(tile => tile.Split('|')[2] == "True" ? 1 : 0).FirstOrDefault();
-                if (pick == null) return FinishPhysical("no-matching-tile");
-                _physicalTile = pick.Split('|')[0];
-                Vector2? tilePoint = view.ScreenPointForRuntime("tile:" + _physicalTile);
-                if (tilePoint == null) return FinishPhysical("tile-not-on-screen:" + _physicalTile);
+                _physicalRecord.VisibleAfterQuery.AddRange(view.VisibleSourcesForRuntime());
+                Vector2? tilePoint = view.ScreenPointForRuntime("tile:" + _physicalRecord.TargetSource);
+                if (tilePoint == null) return FinishPhysical("target-tile-not-on-screen:" + _physicalRecord.TargetSource);
                 CaptureScreenshot(Path.Combine(_request.EvidenceDirectory, "workspace-physical-query.png"));
                 return RequestPhysical("ws-click-tile", "click", tilePoint.Value, null, 4);
             }
             if (_physicalStep == 4)
             {
-                if (view.SelectedSourceIdForRuntime != _physicalTile && settled < 3) return false;
-                _physicalRecord.ClickedSource = _physicalTile;
+                if (view.SelectedSourceIdForRuntime != _physicalRecord.TargetSource && settled < 3) return false;
                 _physicalRecord.SelectedAfterClick = view.SelectedSourceIdForRuntime;
                 return RequestPhysical("ws-focus-cycle", "focus-cycle", Vector2.zero, null, 5);
             }
@@ -3155,8 +3169,6 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 // (the game may not update while minimized); it must regain
                 // focus with the workspace still open.
                 if (!Application.isFocused && settled < 10) return false;
-                _physicalRecord.FocusLostObserved = _physicalRecord.FocusCycle != null &&
-                    _physicalRecord.FocusCycle.IndexOf("minimized=True", StringComparison.Ordinal) >= 0;
                 _physicalRecord.FocusRegained = Application.isFocused;
                 _physicalRecord.WorkspaceOpenAfterFocus = BuffPlannerUiRoot.IsCastingWorkspaceOpen;
                 view = BuffPlannerUiRoot.CastingWorkspaceViewForRuntime;
@@ -3167,12 +3179,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (_physicalStep == 6)
             {
                 if (!view.SearchFocusedForRuntime && settled < 3) return false;
+                if (!view.SearchFocusedForRuntime) return FinishPhysical("search-not-focused-after-focus-loss");
                 return RequestPhysical("ws-type-more", "type", Vector2.zero,
-                    ",\"text\":" + JsonConvert.ToString(PhysicalWorkspaceRecord.QuerySuffix), 7);
+                    ",\"text\":" + JsonConvert.ToString(_physicalRecord.QuerySuffix), 7);
             }
             if (_physicalStep == 7)
             {
-                string expected = PhysicalWorkspaceRecord.Query + PhysicalWorkspaceRecord.QuerySuffix;
+                string expected = _physicalRecord.Query + _physicalRecord.QuerySuffix;
                 if (view.SearchTextForRuntime != expected && settled < 3) return false;
                 _physicalRecord.SearchTextAfterFocus = view.SearchTextForRuntime;
                 CaptureScreenshot(Path.Combine(_request.EvidenceDirectory, "workspace-physical-after-focus.png"));
@@ -3185,6 +3198,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 _physicalRecord.ClosedByEscape = !BuffPlannerUiRoot.IsCastingWorkspaceOpen;
                 _physicalRecord.LeaseReleased = !BuffPlannerUiRoot.IsCastingWorkspaceInputLeaseHeldForRuntime;
                 _physicalRecord.ModeAfterClose = GameModeName();
+                CaptureScreenshot(Path.Combine(_request.EvidenceDirectory, "workspace-physical-closed.png"));
                 return FinishPhysical(null);
             }
             return false;
@@ -3212,6 +3226,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 _physicalRecord.PlayerCommands = isolation.PlayerCommandCount;
                 _physicalRecord.MovementCommands = isolation.MovementCommandCount;
                 _physicalRecord.AbilityCommands = isolation.AbilityCommandCount;
+                _physicalRecord.SelectionEvents = isolation.SelectionEventCount;
+                _physicalRecord.AbilityTargetEvents = isolation.AbilityTargetEventCount;
                 _physicalRecord.SelectionUnchanged = isolation.SelectionUnchanged;
                 _physicalRecord.CameraUnchanged = isolation.CameraUnchanged;
             }
@@ -3232,6 +3248,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 { "expectedScreen", record.ExpectedScreen },
                 { "screen", record.ScreenWidth + "x" + record.ScreenHeight },
                 { "fullScreen", record.FullScreen },
+                { "openedPhysically", record.OpenedPhysically },
+                { "query", record.Query },
+                { "querySuffix", record.QuerySuffix },
+                { "targetSource", record.TargetSource },
+                { "selectedBeforeClick", record.SelectedBeforeClick },
                 { "acknowledged", new JArray(record.Acknowledged.Cast<object>().ToArray()) },
                 { "searchFocused", record.SearchFocused },
                 { "searchText", record.SearchText },
@@ -3241,7 +3262,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 { "gridOverflows", record.GridOverflows },
                 { "scrollBefore", record.ScrollBefore.HasValue ? (JToken)record.ScrollBefore.Value : JValue.CreateNull() },
                 { "scrollAfter", record.ScrollAfter.HasValue ? (JToken)record.ScrollAfter.Value : JValue.CreateNull() },
-                { "clickedSource", record.ClickedSource },
+                { "wheelEvidence", record.WheelEvidence },
                 { "selectedAfterClick", record.SelectedAfterClick },
                 { "focusCycle", record.FocusCycle },
                 { "focusRegained", record.FocusRegained },
@@ -3251,8 +3272,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 { "leaseReleased", record.LeaseReleased },
                 { "modeAfterClose", record.ModeAfterClose },
                 { "isolation", "commands=" + record.PlayerCommands + "/" + record.MovementCommands + "/" +
-                    record.AbilityCommands + ";selectionUnchanged=" + record.SelectionUnchanged +
-                    ";cameraUnchanged=" + record.CameraUnchanged },
+                    record.AbilityCommands + ";events=" + record.SelectionEvents + "/" + record.AbilityTargetEvents +
+                    ";selectionUnchanged=" + record.SelectionUnchanged + ";cameraUnchanged=" + record.CameraUnchanged },
                 { "failures", new JArray(record.Failures.Cast<object>().ToArray()) },
                 { "violations", new JArray(record.Violations().Cast<object>().ToArray()) }
             }.ToString(Formatting.Indented) + Environment.NewLine);

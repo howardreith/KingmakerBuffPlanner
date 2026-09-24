@@ -478,7 +478,9 @@ public static class KbpPhysicalInput {
     mouse_event(0x0800, 0, 0, unchecked((uint)delta), UIntPtr.Zero);
   }
   // The game window's own focus loss: minimized, then restored and
-  // activated again. No other window is touched or activated.
+  // activated again. The harness activates no other window; while the game
+  // is minimized the OS gives the foreground to the next window in its
+  // order, as it does for a player.
   public static string FocusCycle(IntPtr window) {
     if (window == IntPtr.Zero) throw new InvalidOperationException("No Kingmaker window.");
     ShowWindow(window, 6);
