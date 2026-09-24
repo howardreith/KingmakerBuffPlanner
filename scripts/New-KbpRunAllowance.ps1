@@ -171,7 +171,7 @@ $record = @(
     "- Purpose: $purpose.",
     "- Build: commit $($freeze.commit), version $($freeze.version), package $($freeze.packageSha256),",
     "  DLL $($freeze.dllSha256), MVID $($freeze.assemblyMvid) (frozen under $FreezeKind\$($freeze.commit)).",
-    "- Selection evidence: $SelectionRunId (PASS, complete, $ExecutionMode mode).",
+    "- Selection evidence: $SelectionRunId (PASS, complete; the selection ran in $([string]$request.parameters.executionMode) mode, this allowance approves $ExecutionMode).",
     "- Fixture: campaign $gameId, WORKING save SHA-256 $workingSha256; profile $profileId with identity",
     "  $identity. The launcher refuses any other profile, identity or WORKING save.",
     "- Maximum native submissions: $($allowance.maximumNativeSubmissions). No retry, no save write."

@@ -280,6 +280,13 @@ if ($null -ne (Get-KbpQualificationAllowanceBuildRefusal -AllowanceJson (New-Qua
         -RunId 'qual-bind-test' -BuildManifest $manifestFixture)) {
     throw 'A matching qualification allowance was refused by the build binding.'
 }
+# Every recipe the host knows can be approved (the group recipe included).
+foreach ($knownRecipe in @('finite-direct-mixed', 'group-mixed')) {
+    if ($null -ne (Get-KbpQualificationAllowanceBuildRefusal -AllowanceJson (New-QualificationFixtureJson @{ recipe = $knownRecipe }) `
+            -RunId 'qual-bind-test' -BuildManifest $manifestFixture -Recipe $knownRecipe)) {
+        throw "A $knownRecipe qualification allowance was refused by the build binding."
+    }
+}
 $qualificationBindingCases = [ordered]@{
     'package' = @{ packageSha256 = ('d' * 64) }; 'dll' = @{ dllSha256 = ('e' * 64) }
     'mvid' = @{ assemblyMvid = '99999999-2222-3333-4444-555555555555' }
