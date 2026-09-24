@@ -1478,7 +1478,8 @@ try {
         throw "A foreign project's runtime lease does not stop a transaction, a local install or a rollback."
     }
     $commonText = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'RuntimeHarness.Common.ps1') -Raw
-    if (([regex]::Matches($commonText, '\[void\]\(Move-KbpDirectoryWithRetry -Source ')).Count -ne 4 -or
+    if (([regex]::Matches($commonText, '\[void\]\(Move-KbpDirectoryWithRetry -Source ')).Count -ne 3 -or
+        $commonText -notmatch '\$originalMoveAttempts = Move-KbpDirectoryWithRetry -Source \$mods -Destination \$originalBackup' -or
         $commonText -match 'Move-Item -LiteralPath \$mods -Destination \$originalBackup' -or
         $commonText -match 'Move-Item -LiteralPath \$stagedMods -Destination \$mods' -or
         $commonText -match 'Move-Item -LiteralPath \$mods -Destination \$state\.stagedQuarantine' -or
