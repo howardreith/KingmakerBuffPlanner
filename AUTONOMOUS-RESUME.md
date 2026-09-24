@@ -24,12 +24,29 @@ Done so far (O1 branch, not yet pushed as of this note):
   effect leaves; `2e565bd` variant spells are plain buffs of themselves
   (the finite selection had refused every variant) and the `group-mixed`
   qualification recipe.
+- `0c03930` the group recipe ends after its mixed step, and a pre-covered
+  recipient whose effect outlasts the cast gets its own note ("... may
+  shorten it"): in `casting-qual-cast-20260924-adv-group-anim-01` the
+  game replaced the fighter's longer direct instance with the communal
+  one, so the old repeat step found the direct casting due again.
+- `9d530bc` + `fefd5ec` the `enhanced-direct` recipe (section 8's non-rod
+  per-casting enhancement): Brown-Fur Powerful Change chosen on the
+  casting through the workspace's own option; native reads of the
+  Arcane Reservoir, every activatable ability of the caster, and the stat
+  modifiers each effect instance gives.
 - Live (advanced copy, from checkout `repo/KingmakerBuffPlanner-A1`,
   builds frozen under `runtime-backups/qualification-frozen/`):
   `advanced-inspect-20260924-01` PASS (non-casting; campaign
   cb1f405d..., Tenebrous Depths I, party level 9, no pets, no unreadable
   buff detail); `casting-qual-select-20260924-adv-finite-01` refused
-  (the variant-shape defect, fixed in `2e565bd`; nothing cast).
+  (the variant-shape defect, fixed in `2e565bd`; nothing cast); finite:
+  selection `-adv-finite-02`, `-adv-finite-anim-02` and
+  `-adv-finite-inst-01` PASS (`-adv-finite-anim-01`'s game result was
+  PASS but its restoration was refused: the harness incident in the
+  review index; restored by the guarded `Restore-Local.ps1`); group:
+  selection `-adv-group-01` PASS, `-adv-group-anim-01` FAIL at the
+  repeat step (above); selection `-adv-group-02`, `-adv-group-anim-02`
+  and `-adv-group-inst-01` PASS on `0c03930`.
 
 Coordination: the Gunslinger development session shares this Kingmaker
 installation. Each side takes its own lock (ours
@@ -37,11 +54,12 @@ installation. Each side takes its own lock (ours
 quiet, and messages before and after a batch; our runs stage frozen copies
 of Gunslinger and BagOfTricks and restore its installed state.
 
-Next: finite and group selections and casting runs on `2e565bd` (both
-modes), a full gate, push, the non-rod enhancement case (Powerful Change)
-if it can be observed, then rc5: freeze, chain (Classic regression,
-zero-cost, import, advanced inspect, finite, group), install/rollback,
-receipt, handoff.
+Next: the enhanced selection and casting runs on `9d530bc` (both modes;
+C# mutation of the new rules in `repo/KingmakerBuffPlanner-M`), a full
+gate while neither lab runs the game, push, then rc5: freeze, chain
+(Classic regression, zero-cost, import, advanced inspect, finite, group,
+enhanced), install/rollback, the advanced fixture receipt (labelled a
+Beneath the Stolen Lands fixture), handoff.
 
 ## Release candidate 0.2.0-rc4 frozen at `863a182` (2026-09-24)
 
