@@ -93,11 +93,40 @@ namespace KingmakerBuffPlanner.Execution
                 if (!ends.TryGetValue(prior.Identity, out end) || prior.EndTimeTicks > end)
                     ends[prior.Identity] = prior.EndTimeTicks;
             }
+            // Re-review: the new or refreshed instance must be of an expected
+            // kind as well as an expected effect (an area instance of the same
+            // buff does not show that the buff itself landed).
+            var leaves = new HashSet<string>(StringComparer.Ordinal);
+            CollectLeafMarkers(expected, leaves);
             return live.Any(value =>
             {
+                if (!leaves.Contains(value.Kind + ":" + value.EffectId)) return false;
                 long end;
                 return !ends.TryGetValue(value.Identity, out end) || value.EndTimeTicks > end;
             });
+        }
+
+        private static void CollectLeafMarkers(EffectExpression expression, ISet<string> leaves)
+        {
+            var leaf = expression as EffectLeafExpression;
+            if (leaf != null) { leaves.Add(leaf.Kind + ":" + leaf.EffectId); return; }
+            var sequence = expression as SequenceEffectExpression;
+            if (sequence != null)
+            {
+                foreach (EffectExpression child in sequence.Children) CollectLeafMarkers(child, leaves);
+                return;
+            }
+            var conditional = expression as ConditionalEffectExpression;
+            if (conditional != null)
+            {
+                CollectLeafMarkers(conditional.WhenTrue, leaves);
+                CollectLeafMarkers(conditional.WhenFalse, leaves);
+                return;
+            }
+            var targeted = expression as TargetedEffectExpression;
+            if (targeted != null) { CollectLeafMarkers(targeted.Child, leaves); return; }
+            var referenced = expression as ReferencedAbilityExpression;
+            if (referenced != null) CollectLeafMarkers(referenced.Child, leaves);
         }
 
         public static bool AllReached(IReadOnlyList<string> recipients, EffectExpression expected,

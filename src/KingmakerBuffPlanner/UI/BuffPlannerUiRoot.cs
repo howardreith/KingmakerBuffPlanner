@@ -1162,15 +1162,11 @@ namespace KingmakerBuffPlanner.UI
             IEnumerator routine = null;
             try
             {
-                // Final review A1: the Classic routine advances only while
-                // the world runs, as the casting-first host is pumped; a paused
-                // game or an open full-screen window (the Classic screen
-                // itself) never uses up a cast's confirmation window, so a
-                // step is not judged unconfirmed and the rest not halted.
-                routine = new WorldGatedEnumerator(_session.ExecuteRoutine(routineId,
-                    observedCompletion, readyOnlyExplicit), () => WorldRunsForCasting);
-                var worldGate = (WorldGatedEnumerator)routine;
-                bool waitingNoticeShown = false;
+                // The session's own checks run at the press; only its casting
+                // phase waits for the world (final review A1).
+                routine = _session.ExecuteRoutine(routineId,
+                    observedCompletion, readyOnlyExplicit);
+                bool closeRequested = false;
                 while (true)
                 {
                     bool moved = false;
@@ -1193,12 +1189,15 @@ namespace KingmakerBuffPlanner.UI
                         yield break;
                     }
                     if (!moved) yield break;
-                    // A run waiting for the game says so on the open Classic
-                    // screen, which itself pauses the game.
-                    if (!waitingNoticeShown && worldGate.HeldFrames > 0 && _screen != null && _screen.IsOpen)
+                    // Final review A1 (re-review): an accepted run (the
+                    // session's checks passed and it is executing) closes the
+                    // open Classic screen, which pauses the game, so the party
+                    // casts at once; its result is shown the next time the
+                    // planner opens.
+                    if (!closeRequested && _session.IsExecuting && _screen != null && _screen.IsOpen)
                     {
-                        waitingNoticeShown = true;
-                        _screen.PresentNotice(QuickExecutionText.WaitingForWorld);
+                        closeRequested = true;
+                        _closeScreenForClassicRun = true;
                     }
                     yield return current;
                 }
@@ -1233,6 +1232,8 @@ namespace KingmakerBuffPlanner.UI
             _log = log;
             _session = new PlannerUiSession(modPath, log);
             _session.ClassicSavesSuppressed = () => CastingFirstActive;
+            _session.ClassicWorldRuns = () => WorldRunsForCasting && _castingWorkspace == null &&
+                (_screen == null || !_screen.IsOpen);
             _plannerModeStore = new PlannerModeStore(modPath);
             string modeWarning;
             _plannerMode = _plannerModeStore.Load(out modeWarning);
@@ -1391,6 +1392,7 @@ namespace KingmakerBuffPlanner.UI
             // (ReleaseAll) is the defined discard point and logs it.
         }
 
+        private bool _closeScreenForClassicRun;
         private DateTime _lastWorkspaceInputsRefreshUtc = DateTime.MinValue;
         private static readonly TimeSpan WorkspaceInputsRefreshMinimum =
             TimeSpan.FromSeconds(2);
@@ -1695,6 +1697,17 @@ namespace KingmakerBuffPlanner.UI
                 }
                 if (_screen.LifecycleState != PlannerScreenLifecycleState.Closed &&
                     Input.GetKeyDown(KeyCode.Escape)) _screen.Close();
+                // The close an accepted Classic run asked for, one frame after
+                // the press (never inside the button's own callback).
+                if (_closeScreenForClassicRun)
+                {
+                    _closeScreenForClassicRun = false;
+                    if (_screen.LifecycleState != PlannerScreenLifecycleState.Closed)
+                    {
+                        _screen.Close();
+                        _log.Info("[KBP-QUICK] Classic screen closed for the accepted run.");
+                    }
+                }
                 long screenStartedAt = RuntimePerformanceDiagnostics.BeginOperation();
                 try { _screen.Tick(); }
                 finally

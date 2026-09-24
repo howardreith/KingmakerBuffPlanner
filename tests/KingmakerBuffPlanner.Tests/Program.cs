@@ -1766,6 +1766,18 @@ namespace KingmakerBuffPlanner.Tests
                 !line.Traces.Contains("cast-a") || !line.Traces.Contains("cast-b"))
                 throw new InvalidOperationException("The linked-slot budget line hid a shortage: requested=" +
                     line.RequestedUsage + ";allocated=" + line.AllocatedUsage + ";unmet=" + line.UnmetDemand);
+            // Re-review: a zero cost on a finite pool is unverified; it still
+            // requests one unit, so the line shows the shortage.
+            const string zeroPool = "unit-b|spontaneous-1";
+            var zeroSource = new ResourcePoolSnapshot(zeroPool, ResourcePoolKind.SpontaneousLevel, 3, 3, null);
+            ProviderSnapshot zeroCost = Provider("opposed", zeroPool, 0, new string[0]);
+            var zeroLedger = new CastingBudgetLedger(Snapshot(new[] { zeroCost }, new[] { zeroSource }), null);
+            Assert(zeroLedger.TryReserveAtomically("cast-z", zeroCost, zeroLedger.DemandsFor(zeroCost, null),
+                out cost, out reason));
+            CastingBudgetLine zeroLine = zeroLedger.BuildReport().Single(value => value.PoolKey == zeroPool);
+            if (zeroLine.RequestedUsage != 1 || zeroLine.AllocatedUsage != 0 || zeroLine.UnmetDemand != 1)
+                throw new InvalidOperationException("An unverified zero cost hid its demand: requested=" +
+                    zeroLine.RequestedUsage + ";allocated=" + zeroLine.AllocatedUsage);
         }
 
         private static void TestPreparedDomainEligibility()

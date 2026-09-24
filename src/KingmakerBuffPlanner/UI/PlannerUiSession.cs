@@ -51,6 +51,11 @@ namespace KingmakerBuffPlanner.UI
         // as Classic is the mode.
         internal Func<bool> ClassicSavesSuppressed { get; set; }
 
+        // Final review A1 (re-review): whether the world runs for a Classic
+        // run's casting phase; set by the planner root to the casting-first
+        // host's own rule (the world runs, and no planner window is open).
+        internal Func<bool> ClassicWorldRuns { get; set; }
+
         private void SaveClassicProfile(BuffPlannerProfile profile)
         {
             Func<bool> suppressed = ClassicSavesSuppressed;
@@ -661,7 +666,14 @@ namespace KingmakerBuffPlanner.UI
             // Failures stop later castings (batch 3, section 6): the runner
             // halts after the first step that did not confirm its effect.
             var runner = new HaltingPlanRunner(executor);
-            IEnumerator work = runner.Run(preview.Plan, LastExecutionReport);
+            // Final review A1 (re-review): only the casting phase waits for
+            // the world. The checks above ran at the press, so a refusal
+            // reaches the open screen at once, and IsExecuting now holds the
+            // screen and the HUD; a paused game or an open window never uses
+            // up a cast's frame-counted confirmation window.
+            Func<bool> worldRuns = ClassicWorldRuns ?? (() => true);
+            IEnumerator work = new WorldGatedEnumerator(runner.Run(preview.Plan, LastExecutionReport),
+                worldRuns);
             Exception failure = null;
             try
             {
