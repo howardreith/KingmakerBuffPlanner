@@ -196,9 +196,10 @@ namespace KingmakerBuffPlanner.GameAdapters
         private static bool HasAtWillCantrip(UnitEntityData unit, Spellbook spellbook,
             KingmakerAbilitySelection selection)
         {
+            string ambiguity;
             return KingmakerAtWillCantrips.Resolve(unit,
                 KingmakerAbilityVariants.ToAbilityKey(selection, SourceKind.Spellbook),
-                spellbook.CasterLevel) != null;
+                spellbook.CasterLevel, out ambiguity) != null;
         }
 
         private void ScanPreparedSpellbook(

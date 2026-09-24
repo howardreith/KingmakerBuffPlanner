@@ -4,6 +4,7 @@ using System.Linq;
 using Kingmaker.EntitySystem.Entities;
 using Kingmaker.UnitLogic.Abilities;
 using KingmakerBuffPlanner.Domain.Identity;
+using KingmakerBuffPlanner.Execution;
 
 namespace KingmakerBuffPlanner.GameAdapters
 {
@@ -16,39 +17,51 @@ namespace KingmakerBuffPlanner.GameAdapters
     // casting-qual-select-20260923-d1-01).
     internal static class KingmakerAtWillCantrips
     {
-        // The caster's at-will cantrip ability for the requested ability,
-        // or null. Several matching abilities (one per class) resolve to
-        // the one at the preferred caster level, else the first.
+        // The caster's at-will cantrip ability for the requested ability, by
+        // the Unity-free rule AtWillCantripChoice; null with no refusal when
+        // none exists, null with a refusal when the choice is ambiguous.
         internal static AbilityData Resolve(UnitEntityData caster, AbilityKey requested,
-            int preferredCasterLevel)
+            int preferredCasterLevel, out string refusal)
         {
+            refusal = null;
             if (caster == null || caster.Descriptor == null || requested == null) return null;
-            var candidates = new List<AbilityData>();
+            var candidates = new List<KeyValuePair<AtWillCantripCandidate, AbilityData>>();
+            int index = 0;
             foreach (Ability fact in caster.Descriptor.Abilities.Enumerable)
             {
+                index++;
                 if (fact == null || fact.Data == null || fact.Blueprint == null) continue;
                 bool cantrip;
                 try { cantrip = fact.Blueprint.IsCantrip; }
                 catch (Exception) { cantrip = false; }
-                if (!cantrip) continue;
-                AbilityData match = KingmakerAbilityVariants.Resolve(fact.Data, requested);
-                if (match != null && IsAtWill(match)) candidates.Add(match);
+                AbilityData match = cantrip ? KingmakerAbilityVariants.Resolve(fact.Data, requested) : null;
+                AbilityData judged = match ?? fact.Data;
+                candidates.Add(new KeyValuePair<AtWillCantripCandidate, AbilityData>(
+                    new AtWillCantripCandidate(fact.Blueprint.AssetGuid + "#" + index, cantrip, match != null,
+                        SafeHasSpellbook(judged), SafeAvailable(judged), SafeCount(judged), CasterLevel(judged)),
+                    match));
             }
-            if (candidates.Count <= 1) return candidates.FirstOrDefault();
-            return candidates.FirstOrDefault(value => CasterLevel(value) == preferredCasterLevel) ??
-                candidates[0];
+            AtWillCantripCandidate chosen = AtWillCantripChoice.Choose(
+                candidates.Select(pair => pair.Key), preferredCasterLevel, out refusal);
+            return chosen == null ? null : candidates.First(pair => ReferenceEquals(pair.Key, chosen)).Value;
         }
 
-        // The game's own judgement: no spellbook resource, available, and
-        // an unlimited count.
-        internal static bool IsAtWill(AbilityData data)
+        private static bool SafeHasSpellbook(AbilityData data)
         {
-            try
-            {
-                return data != null && data.Spellbook == null && data.IsAvailable &&
-                    data.GetAvailableForCastCount() < 0;
-            }
+            try { return data.Spellbook != null; }
+            catch (Exception) { return true; }
+        }
+
+        private static bool SafeAvailable(AbilityData data)
+        {
+            try { return data.IsAvailable; }
             catch (Exception) { return false; }
+        }
+
+        private static int SafeCount(AbilityData data)
+        {
+            try { return data.GetAvailableForCastCount(); }
+            catch (Exception) { return 0; }
         }
 
         private static int CasterLevel(AbilityData data)
