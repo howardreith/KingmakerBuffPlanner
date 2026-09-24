@@ -23,6 +23,9 @@ namespace KingmakerBuffPlanner.GameAdapters
             new Dictionary<string, EffectExpression>(StringComparer.Ordinal);
         private readonly List<PartySourceDiscoveryTrace> _sourceTraces =
             new List<PartySourceDiscoveryTrace>();
+        // Fact providers refused as ambiguous (one ability, one pool, two
+        // caster levels); later duplicates are refused too.
+        private readonly HashSet<ProviderKey> _ambiguousFactKeys = new HashSet<ProviderKey>();
         private readonly List<PartyVariantEligibilityTrace> _variantTraces =
             new List<PartyVariantEligibilityTrace>();
         private readonly List<PartySpellbookRoleTrace> _spellbookRoleTraces =
@@ -49,6 +52,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                 throw new InvalidOperationException("Kingmaker player state is unavailable.");
             _effectsBySource.Clear();
             _sourceTraces.Clear();
+            _ambiguousFactKeys.Clear();
             _variantTraces.Clear();
             _spellbookRoleTraces.Clear();
             _rawCandidateCount = 0;
@@ -224,6 +228,7 @@ namespace KingmakerBuffPlanner.GameAdapters
         }
 
         internal const string UnresolvedCantripPrefix = "unresolved-cantrip:";
+        internal const string UnresolvedFactPrefix = "unresolved-fact:";
 
         private void ScanPreparedSpellbook(
             UnitEntityData unit,
@@ -250,18 +255,23 @@ namespace KingmakerBuffPlanner.GameAdapters
                         new[] { group.First().Spell }, unit, spellbook.Blueprint.AssetGuid).ToList();
                     if (selections.Count == 0) continue;
                     var pricings = new List<CantripPricing>();
+                    var ambiguities = new List<string>();
                     foreach (KingmakerAbilitySelection selection in selections)
                     {
                         string ambiguity;
-                        CantripPricing pricing = PriceCantrip(unit, spellbook, selection, out ambiguity);
-                        if (pricing == CantripPricing.Unresolved)
-                            TraceUnresolvedCantrip(unit, spellbook, selection, ambiguity);
-                        pricings.Add(pricing);
+                        pricings.Add(PriceCantrip(unit, spellbook, selection, out ambiguity));
+                        ambiguities.Add(ambiguity);
                     }
                     // Review A4: slots of an ambiguous cantrip are neither free
-                    // nor paid providers.
-                    if (pricings.Contains(CantripPricing.Unresolved))
+                    // nor paid providers; every variant of the group is traced
+                    // (the re-review: siblings never vanish silently).
+                    int firstUnresolved = pricings.IndexOf(CantripPricing.Unresolved);
+                    if (firstUnresolved >= 0)
                     {
+                        for (int variant = 0; variant < selections.Count; variant++)
+                            TraceUnresolvedCantrip(unit, spellbook, selections[variant],
+                                pricings[variant] == CantripPricing.Unresolved ? ambiguities[variant]
+                                    : "group-of:" + ambiguities[firstUnresolved]);
                         foreach (SpellSlot slot in group) unresolvedSlots.Add(slot);
                         continue;
                     }
@@ -376,7 +386,25 @@ namespace KingmakerBuffPlanner.GameAdapters
             if (poolKeys.Add(pool.PoolKey)) pools.Add(pool);
             var keyForProvider = new ProviderKey(
                 unit.UniqueId, string.Empty, ability, string.Empty);
-            if (providers.Any(provider => provider.Key.Equals(keyForProvider))) return;
+            if (_ambiguousFactKeys.Contains(keyForProvider)) return;
+            ProviderSnapshot existing = providers.FirstOrDefault(provider => provider.Key.Equals(keyForProvider));
+            if (existing != null)
+            {
+                // Re-review of A4: the same ability from the same pool at two
+                // caster levels (one cantrip granted by two classes) is
+                // ambiguous; neither is offered, the refusal stays traced.
+                if (string.Equals(existing.ResourcePoolKey, pool.PoolKey, StringComparison.Ordinal) &&
+                    existing.EffectiveCasterLevel != CasterLevel(data))
+                {
+                    providers.Remove(existing);
+                    _ambiguousFactKeys.Add(keyForProvider);
+                    _sourceTraces.Add(new PartySourceDiscoveryTrace(
+                        ability.Canonical, data.Blueprint.AssetGuid, selection.DisplayName, unit.UniqueId,
+                        string.Empty, false, false, UnresolvedFactPrefix + "caster-levels:" +
+                        existing.EffectiveCasterLevel + "," + CasterLevel(data)));
+                }
+                return;
+            }
             string duration = DurationText(selection);
             providers.Add(new ProviderSnapshot(keyForProvider, selection.DisplayName, 0,
                 pool.PoolKey, cost, null, ToMaterialRequirement(selection),

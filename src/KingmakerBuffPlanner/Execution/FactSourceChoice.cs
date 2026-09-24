@@ -8,12 +8,14 @@ namespace KingmakerBuffPlanner.Execution
     // AbilityResource provider (same base ability, variant and metamagic).
     public sealed class FactSourceCandidate
     {
-        public FactSourceCandidate(string identity, bool spellbookBound, bool resourceBound, string poolKey)
+        public FactSourceCandidate(string identity, bool spellbookBound, bool resourceBound, string poolKey,
+            int casterLevel = -1)
         {
             Identity = identity ?? string.Empty;
             SpellbookBound = spellbookBound;
             ResourceBound = resourceBound;
             PoolKey = poolKey ?? string.Empty;
+            CasterLevel = casterLevel;
         }
 
         public string Identity { get; private set; }
@@ -23,11 +25,13 @@ namespace KingmakerBuffPlanner.Execution
         public bool ResourceBound { get; private set; }
         // The pool discovery prices it from.
         public string PoolKey { get; private set; }
+        // The game's caster level for it (-1 when unread).
+        public int CasterLevel { get; private set; }
 
         public string Describe()
         {
             return Identity + "/" + (SpellbookBound ? "spellbook" : ResourceBound ? "resource" : "free") +
-                "/" + PoolKey;
+                "/" + PoolKey + "@cl" + CasterLevel;
         }
     }
 
@@ -35,11 +39,15 @@ namespace KingmakerBuffPlanner.Execution
     // (batch 3 review A3): one of the provider's own kind (free or
     // resource-bound, never the other), unbound to a spellbook, and, when
     // the step reserved a pool, exactly from that pool. Candidates sharing
-    // that pool spend the same thing and are equivalent; when none is left
-    // the casting is refused, never moved to a source of another cost.
+    // that pool spend the same thing; they are equivalent only at one caster
+    // level (the re-review: one cantrip granted by two classes at different
+    // levels is ambiguous and refused, never an enumeration-order guess).
+    // When none is left the casting is refused, never moved to a source of
+    // another cost.
     public static class FactSourceChoice
     {
         public const string UnavailablePrefix = "fact-source-unavailable:";
+        public const string AmbiguousPrefix = "fact-source-ambiguous:";
 
         public static FactSourceCandidate Choose(IEnumerable<FactSourceCandidate> candidates,
             bool resourceBound, string reservedPoolKey, out int equivalents, out string refusal)
@@ -59,8 +67,14 @@ namespace KingmakerBuffPlanner.Execution
                     string.Join(",", seen.Select(value => value.Describe()).ToArray());
                 return null;
             }
-            equivalents = eligible.Count(value => string.Equals(value.PoolKey, eligible[0].PoolKey,
-                StringComparison.Ordinal));
+            List<FactSourceCandidate> same = eligible.Where(value => string.Equals(value.PoolKey,
+                eligible[0].PoolKey, StringComparison.Ordinal)).ToList();
+            equivalents = same.Count;
+            if (same.Select(value => value.CasterLevel).Distinct().Count() > 1)
+            {
+                refusal = AmbiguousPrefix + string.Join(",", same.Select(value => value.Describe()).ToArray());
+                return null;
+            }
             return eligible[0];
         }
     }

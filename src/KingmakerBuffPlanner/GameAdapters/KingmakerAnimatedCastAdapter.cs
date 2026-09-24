@@ -160,12 +160,14 @@ namespace KingmakerBuffPlanner.GameAdapters
         }
 
         // The step's own source, by its reservation (review A2): what a probe
-        // observes is what the step casts.
+        // observes is what the step casts. Observation reads a reserved
+        // prepared slot even after the cast consumed it (review N3: a
+        // consumed slot is still the source); execution needs it available.
         internal static AbilityData ResolveAbility(UnitEntityData caster, CastStep step)
         {
             string resolution;
             string refusal;
-            return ResolveAbility(caster, step.Provider, step.Reservation, out resolution, out refusal);
+            return ResolveAbility(caster, step.Provider, step.Reservation, out resolution, out refusal, true);
         }
 
         // resolution: how the authored provider became the ability data the
@@ -176,7 +178,8 @@ namespace KingmakerBuffPlanner.GameAdapters
             ProviderKey provider,
             ResourceReservation reservation,
             out string resolution,
-            out string refusal)
+            out string refusal,
+            bool forObservation = false)
         {
             resolution = null;
             refusal = null;
@@ -204,12 +207,17 @@ namespace KingmakerBuffPlanner.GameAdapters
                 }
                 if (route == CantripRoute.AtWillOnly || route == CantripRoute.AtWillThenSlot)
                 {
+                    string atWillProvenance;
                     AbilityData atWill = KingmakerAtWillCantrips.Resolve(caster, provider.Ability,
-                        book.CasterLevel, out refusal);
+                        book.CasterLevel, out refusal, out atWillProvenance);
                     if (atWill != null)
                     {
+                        // Provenance (re-review): the chosen class ability, its
+                        // caster level, how many at-will abilities qualified and
+                        // the pool the plan reserved.
                         resolution = "at-will-cantrip-ability;authored=spellbook:" + provider.SpellbookGuid +
-                            "/level-0;cast=" + KingmakerStickyTouchCastAdapter.Identity(atWill);
+                            "/level-0;cast=" + KingmakerStickyTouchCastAdapter.Identity(atWill) + ";" +
+                            atWillProvenance + ";pool=" + (reservation == null ? "unreserved" : reservation.PoolKey);
                         return atWill;
                     }
                     // Ambiguous at-will abilities are refused, never guessed
@@ -224,7 +232,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                 if (reservedTokenIds != null && reservedTokenIds.Count != 0)
                 {
                     foreach (SpellSlot slot in book.GetAllMemorizedSpells().Where(s => s != null &&
-                        s.Spell != null && s.Available && s.IsMainSlot &&
+                        s.Spell != null && (forObservation || s.Available) && s.IsMainSlot &&
                         reservedTokenIds.Contains(SlotId(s))))
                     {
                         AbilityData match = KingmakerAbilityVariants.Resolve(
@@ -276,18 +284,29 @@ namespace KingmakerBuffPlanner.GameAdapters
                 // cost. Equivalent sources are counted in the provenance.
                 var candidates = new List<KeyValuePair<FactSourceCandidate, AbilityData>>();
                 int index = 0;
-                foreach (Ability fact in caster.Descriptor.Abilities.Enumerable)
+                // In discovery's own order (by blueprint, stable), so the
+                // first of equivalent sources is the one discovery priced.
+                foreach (Ability fact in caster.Descriptor.Abilities.Enumerable
+                    .Where(value => value != null && value.Data != null && value.Data.Blueprint != null)
+                    .OrderBy(value => value.Blueprint.AssetGuid, StringComparer.Ordinal))
                 {
                     index++;
-                    if (fact == null || fact.Data == null || fact.Data.Blueprint == null) continue;
+                    // Cheap filter first: only the authored ability or its
+                    // parent can match (re-review: no variant expansion of
+                    // unrelated abilities).
+                    BlueprintAbility blueprint = fact.Data.Blueprint;
+                    if (blueprint.AssetGuid != provider.Ability.BaseAbilityGuid &&
+                        (blueprint.Parent == null || blueprint.Parent.AssetGuid != provider.Ability.BaseAbilityGuid))
+                        continue;
                     KingmakerAbilitySelection selection = KingmakerAbilityVariants.ResolveSelection(
                         fact.Data, provider.Ability);
                     if (selection == null) continue;
                     SourceKind kind;
                     string poolKey = KingmakerPartySnapshotBuilder.FactPoolKey(caster.UniqueId, selection, out kind);
                     candidates.Add(new KeyValuePair<FactSourceCandidate, AbilityData>(
-                        new FactSourceCandidate(fact.Data.Blueprint.AssetGuid + "#" + index,
-                            SafeSpellbookBound(fact.Data), kind == SourceKind.AbilityResource, poolKey),
+                        new FactSourceCandidate(blueprint.AssetGuid + "#" + index,
+                            SafeSpellbookBound(fact.Data), kind == SourceKind.AbilityResource, poolKey,
+                            SafeCasterLevel(selection.Concrete)),
                         selection.Concrete));
                 }
                 int equivalents;
@@ -296,7 +315,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                     reservation == null ? null : reservation.PoolKey, out equivalents, out refusal);
                 if (chosen == null) return null;
                 resolution = "ability:" + provider.Ability.SourceKind + ";pool=" + chosen.PoolKey +
-                    ";fact=" + chosen.Identity + ";equivalent-sources=" + equivalents;
+                    ";fact=" + chosen.Identity + ";cl=" + chosen.CasterLevel + ";equivalent-sources=" + equivalents;
                 return candidates.First(pair => ReferenceEquals(pair.Key, chosen)).Value;
             }
             return null;
@@ -308,6 +327,12 @@ namespace KingmakerBuffPlanner.GameAdapters
         {
             try { return data.Spellbook != null; }
             catch (Exception) { return true; }
+        }
+
+        private static int SafeCasterLevel(AbilityData data)
+        {
+            try { return data.CalculateParams().CasterLevel; }
+            catch (Exception) { return -1; }
         }
 
         private static bool SourceInstanceMatches(AbilityData data, string sourceInstance)
@@ -511,14 +536,14 @@ namespace KingmakerBuffPlanner.GameAdapters
             {
                 get { return AvailableCountJudgement.Spent(_availableBefore, SafeAvailableCount(_sourceAbility)); }
             }
-            // Review A7: a free casting must read unlimited and unchanged.
+            // Review A7: a free casting must read unlimited and unchanged; a
+            // finite one must read both of its counts (re-review).
             public string ResourceCountViolation
             {
                 get
                 {
-                    return _step.Reservation != null && _step.Reservation.Unlimited
-                        ? AvailableCountJudgement.FreeViolation(_availableBefore, SafeAvailableCount(_sourceAbility))
-                        : null;
+                    return AvailableCountJudgement.Violation(_step.Reservation, _availableBefore,
+                        SafeAvailableCount(_sourceAbility));
                 }
             }
             public bool EffectsObserved

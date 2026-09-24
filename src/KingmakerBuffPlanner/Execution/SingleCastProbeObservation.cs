@@ -292,15 +292,29 @@ namespace KingmakerBuffPlanner.Execution
                 return false;
             }
             int delta = Before.AvailableForCast.Value - After.AvailableForCast.Value;
-            int expected = _step.Reservation.Unlimited ? 0 : 1;
+            // Re-review: a free step is proven free by the same rule as the
+            // executors and the Classic judgement (unlimited and unchanged).
+            if (_step.Reservation.Unlimited)
+            {
+                string violation = AvailableCountJudgement.FreeViolation(Before.AvailableForCast,
+                    After.AvailableForCast);
+                if (violation == null)
+                {
+                    outcome = "free-unchanged";
+                    return true;
+                }
+                outcome = Before.AvailableForCast.Value >= 0 && After.AvailableForCast.Value >= 0 && delta > 0
+                    ? "unexpected-paid-resource-loss:" + delta
+                    : "free-not-proven:" + violation;
+                return false;
+            }
+            int expected = 1;
             if (delta == expected)
             {
-                outcome = _step.Reservation.Unlimited ? "free-unchanged" : "decreased-by-one";
+                outcome = "decreased-by-one";
                 return true;
             }
-            outcome = _step.Reservation.Unlimited && delta > 0
-                ? "unexpected-paid-resource-loss:" + delta
-                : "delta-mismatch:expected=" + expected + ";observed=" + delta;
+            outcome = "delta-mismatch:expected=" + expected + ";observed=" + delta;
             return false;
         }
     }

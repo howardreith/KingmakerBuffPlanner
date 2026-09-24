@@ -23,7 +23,17 @@ namespace KingmakerBuffPlanner.GameAdapters
         internal static AbilityData Resolve(UnitEntityData caster, AbilityKey requested,
             int preferredCasterLevel, out string refusal)
         {
+            string provenance;
+            return Resolve(caster, requested, preferredCasterLevel, out refusal, out provenance);
+        }
+
+        // provenance: the chosen class ability with its caster level and how
+        // many at-will abilities qualified (re-review: at-will provenance).
+        internal static AbilityData Resolve(UnitEntityData caster, AbilityKey requested,
+            int preferredCasterLevel, out string refusal, out string provenance)
+        {
             refusal = null;
+            provenance = null;
             if (caster == null || caster.Descriptor == null || requested == null) return null;
             var candidates = new List<KeyValuePair<AtWillCantripCandidate, AbilityData>>();
             int index = 0;
@@ -46,7 +56,10 @@ namespace KingmakerBuffPlanner.GameAdapters
             }
             AtWillCantripCandidate chosen = AtWillCantripChoice.Choose(
                 candidates.Select(pair => pair.Key), preferredCasterLevel, out refusal);
-            return chosen == null ? null : candidates.First(pair => ReferenceEquals(pair.Key, chosen)).Value;
+            if (chosen == null) return null;
+            provenance = "ability=" + chosen.Identity + "@cl" + chosen.CasterLevel + ";at-will-candidates=" +
+                candidates.Count(pair => pair.Key.AtWill);
+            return candidates.First(pair => ReferenceEquals(pair.Key, chosen)).Value;
         }
 
         private static bool SafeHasSpellbook(AbilityData data)

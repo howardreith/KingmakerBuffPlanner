@@ -1635,7 +1635,7 @@ namespace KingmakerBuffPlanner.Tests
         {
             var effect = new ProbeEffectInstance("buff-effect", "instance-2", 900);
             Func<string, ProbeSequenceClock, ProbeObservation> read = (phase, clock) =>
-                phase == "before" ? Obs(phase, clock, 7) : Obs(phase, clock, 7, effect);
+                phase == "before" ? Obs(phase, clock, -1) : Obs(phase, clock, -1, effect);
             ProbeOwnerRun held = StartProbeOwnerRun("unlimited", "free", read);
             for (int frame = 1; frame <= 50; frame++)
                 if (held.Owner.Pump(frame, 60000, false, false, "mode=FullScreenUi;paused=False"))
@@ -3284,7 +3284,13 @@ namespace KingmakerBuffPlanner.Tests
                 !resolve.Contains("if (route == CantripRoute.Refused)\n                {\n                    refusal = AtWillCantripChoice.FreeReservationRefusal;\n                    return null;") ||
                 !resolve.Contains("if (route == CantripRoute.AtWillOnly || route == CantripRoute.AtWillThenSlot)") ||
                 !resolve.Contains("if (route == CantripRoute.AtWillOnly)\n                    {\n                        refusal = AtWillCantripChoice.MissingRefusal;\n                        return null;") ||
-                !adapter.Contains("AbilityData ability = ResolveAbility(caster, step.Provider, step.Reservation,") ||
+                !adapter.Contains("AbilityData ability = ResolveAbility(caster, step.Provider, step.Reservation,\n                out resolution, out refusal);") ||
+                // Re-review: observation reads a consumed reserved slot (it is
+                // still the source); execution needs it available.
+                !adapter.Contains("return ResolveAbility(caster, step.Provider, step.Reservation, out resolution, out refusal, true);") ||
+                !resolve.Contains("s.Spell != null && (forObservation || s.Available) && s.IsMainSlot &&") ||
+                !resolve.Contains("atWillProvenance + \";pool=\" + (reservation == null ? \"unreserved\" : reservation.PoolKey);") ||
+                !atWill.Contains("provenance = \"ability=\" + chosen.Identity + \"@cl\" + chosen.CasterLevel + \";at-will-candidates=\" +") ||
                 !source("KingmakerProbeObserver.cs").Contains(
                     "AbilityData ability = KingmakerAnimatedCastAdapter.ResolveAbility(caster, step);") ||
                 !resolve.Contains("if (refusal != null) return null;") ||
@@ -3295,7 +3301,11 @@ namespace KingmakerBuffPlanner.Tests
             // pool, priced by the same rule discovery uses.
             if (!resolve.Contains("string poolKey = KingmakerPartySnapshotBuilder.FactPoolKey(caster.UniqueId, selection, out kind);") ||
                 !resolve.Contains("FactSourceCandidate chosen = FactSourceChoice.Choose(candidates.Select(pair => pair.Key),\n                    provider.Ability.SourceKind == SourceKind.AbilityResource,\n                    reservation == null ? null : reservation.PoolKey, out equivalents, out refusal);") ||
-                !resolve.Contains("SafeSpellbookBound(fact.Data), kind == SourceKind.AbilityResource, poolKey)") ||
+                !resolve.Contains("SafeSpellbookBound(fact.Data), kind == SourceKind.AbilityResource, poolKey,\n                            SafeCasterLevel(selection.Concrete))") ||
+                !resolve.Contains(".OrderBy(value => value.Blueprint.AssetGuid, StringComparer.Ordinal))") ||
+                !resolve.Contains("(blueprint.Parent == null || blueprint.Parent.AssetGuid != provider.Ability.BaseAbilityGuid))") ||
+                !builder.Contains("existing.EffectiveCasterLevel != CasterLevel(data))") ||
+                !builder.Contains("_ambiguousFactKeys.Add(keyForProvider);") ||
                 !builder.Contains("string factPoolKey = FactPoolKey(unit.UniqueId, selection, out sourceKind);") ||
                 Occurrences(builder, "string key = factPoolKey;") != 2)
                 throw new InvalidOperationException("A fact casting is not bound to its kind and reserved pool.");
@@ -3304,16 +3314,16 @@ namespace KingmakerBuffPlanner.Tests
             string instantSource = source("KingmakerInstantCastAdapter.cs");
             if (!adapter.Contains("internal static int? SafeAvailableCount(AbilityData ability)") ||
                 !adapter.Contains("catch (Exception) { return null; }") ||
-                !adapter.Contains("? AvailableCountJudgement.FreeViolation(_availableBefore, SafeAvailableCount(_sourceAbility))") ||
+                !adapter.Contains("return AvailableCountJudgement.Violation(_step.Reservation, _availableBefore,") ||
                 !instantSource.Contains("bool spent = AvailableCountJudgement.Spent(availableBefore, availableAfter);") ||
-                !instantSource.Contains("? AvailableCountJudgement.FreeViolation(availableBefore, availableAfter) : null;") ||
+                !instantSource.Contains("string countViolation = AvailableCountJudgement.Violation(step.Reservation, availableBefore, availableAfter);") ||
                 !instantSource.Contains("\";effects-observed-at-submit:\" + observed, countViolation);"))
                 throw new InvalidOperationException("Unread cast counts can still pass as unlimited.");
             string validate = SourceBlock(adapter, "internal CastRuntimeValidation ValidateSource(CastStep step,");
             if (validate == null || validate.Contains("resolved.Ability.IsAvailableForCast") ||
                 !validate.Contains("if (!resolved.Ability.IsAvailable) return CastRuntimeValidation.Fail(\"ability-unavailable\");"))
                 throw new InvalidOperationException("Validation is not the cast command's own availability guard.");
-            string resolveAtWill = SourceBlock(atWill, "internal static AbilityData Resolve(UnitEntityData caster, AbilityKey requested,");
+            string resolveAtWill = SourceBlock(atWill, "internal static AbilityData Resolve(UnitEntityData caster, AbilityKey requested,\n            int preferredCasterLevel, out string refusal, out string provenance)");
             int matchGuardAt = resolveAtWill == null ? -1 : resolveAtWill.IndexOf("if (match == null) continue;",
                 StringComparison.Ordinal);
             int judgedAt = resolveAtWill == null ? -1 : resolveAtWill.IndexOf(
@@ -3341,7 +3351,8 @@ namespace KingmakerBuffPlanner.Tests
                 !zero.Contains("CantripPricing pricing = PriceCantrip(unit, spellbook, selection, out ambiguity);\n                if (pricing == CantripPricing.Unresolved)\n                {\n                    TraceUnresolvedCantrip(unit, spellbook, selection, ambiguity);\n                    continue;\n                }\n                if (pricing == CantripPricing.Free)") ||
                 !zero.Contains("ResourcePoolKind.SpontaneousLevel") ||
                 prepared == null ||
-                !prepared.Contains("if (pricings.Contains(CantripPricing.Unresolved))\n                    {\n                        foreach (SpellSlot slot in group) unresolvedSlots.Add(slot);\n                        continue;") ||
+                !prepared.Contains("int firstUnresolved = pricings.IndexOf(CantripPricing.Unresolved);") ||
+                !prepared.Contains(": \"group-of:\" + ambiguities[firstUnresolved]);\n                        foreach (SpellSlot slot in group) unresolvedSlots.Add(slot);\n                        continue;") ||
                 !prepared.Contains("if (!pricings.All(pricing => pricing == CantripPricing.Free)) continue;") ||
                 !prepared.Contains("var slots = allSlots.Where(s => !atWillSlots.Contains(s) && !unresolvedSlots.Contains(s)).ToList();") ||
                 !builder.Contains("return AtWillCantripChoice.Price(atWill != null, ambiguity);"))
@@ -4188,6 +4199,20 @@ namespace KingmakerBuffPlanner.Tests
                     resource ||
                 FactSourceChoice.Choose(new[] { resource, free }, false, null, out equivalents, out refusal) != free)
                 throw new InvalidOperationException("An unreserved read ignored the kind.");
+            // Re-review: one pool at two caster levels (a cantrip granted by
+            // two classes) is ambiguous, reserved or not; one level is not.
+            var clThree = new FactSourceCandidate("class-a#1", false, false, "u|free|r", 3);
+            var clOne = new FactSourceCandidate("class-b#2", false, false, "u|free|r", 1);
+            var clThreeTwin = new FactSourceCandidate("class-c#3", false, false, "u|free|r", 3);
+            foreach (string reserved in new[] { "u|free|r", null })
+                if (FactSourceChoice.Choose(new[] { clThree, clOne }, false, reserved, out equivalents, out refusal) != null ||
+                    refusal == null || !refusal.StartsWith(FactSourceChoice.AmbiguousPrefix, StringComparison.Ordinal) ||
+                    refusal.IndexOf("class-a#1/free/u|free|r@cl3", StringComparison.Ordinal) < 0 ||
+                    refusal.IndexOf("class-b#2/free/u|free|r@cl1", StringComparison.Ordinal) < 0)
+                    throw new InvalidOperationException("Two caster levels were guessed between: " + refusal);
+            if (FactSourceChoice.Choose(new[] { clThree, clThreeTwin }, false, "u|free|r", out equivalents, out refusal) !=
+                    clThree || equivalents != 2 || refusal != null)
+                throw new InvalidOperationException("Equivalent sources at one caster level were refused.");
             // The kind decides on its own, even where a pool key would match.
             var mislabeled = new FactSourceCandidate("odd#9", false, true, "u|free|a");
             if (FactSourceChoice.Choose(new[] { mislabeled }, false, "u|free|a", out equivalents, out refusal) != null ||
@@ -4207,8 +4232,28 @@ namespace KingmakerBuffPlanner.Tests
                 AvailableCountJudgement.FreeViolation(-1, null) != "available-count-unread:-1>unread" ||
                 AvailableCountJudgement.FreeViolation(null, null) != "available-count-unread:unread>unread" ||
                 AvailableCountJudgement.FreeViolation(2, 2) != "available-count-not-unlimited:2>2" ||
-                AvailableCountJudgement.FreeViolation(-1, 0) != "available-count-not-unlimited:-1>0")
+                AvailableCountJudgement.FreeViolation(-1, 0) != "available-count-not-unlimited:-1>0" ||
+                AvailableCountJudgement.FreeViolation(0, 0) != "available-count-not-unlimited:0>0")
                 throw new InvalidOperationException("A free casting was judged free without unlimited counts.");
+            // The last slot or charge is a spend.
+            if (!AvailableCountJudgement.Spent(1, 0) || AvailableCountJudgement.Spent(0, 0))
+                throw new InvalidOperationException("The last use was not judged as a spend.");
+            // Re-review: a finite casting must read both counts as finite.
+            if (AvailableCountJudgement.FiniteViolation(3, 2) != null || AvailableCountJudgement.FiniteViolation(0, 0) != null ||
+                AvailableCountJudgement.FiniteViolation(null, 2) != "available-count-unread:unread>2" ||
+                AvailableCountJudgement.FiniteViolation(3, null) != "available-count-unread:3>unread" ||
+                AvailableCountJudgement.FiniteViolation(-1, -1) != "available-count-not-finite:-1>-1")
+                throw new InvalidOperationException("A finite casting's counts were judged wrongly.");
+            var free = new ResourceReservation("pool-free", 0, new string[0], true);
+            var paid = new ResourceReservation("pool-paid", 1, new string[0]);
+            if (AvailableCountJudgement.Violation(null, null, null) != null ||
+                AvailableCountJudgement.Violation(free, -1, -1) != null ||
+                AvailableCountJudgement.Violation(free, 3, 3) != "available-count-not-unlimited:3>3" ||
+                AvailableCountJudgement.Violation(paid, 3, 2) != null ||
+                AvailableCountJudgement.Violation(paid, null, 2) != "available-count-unread:unread>2" ||
+                AvailableCountJudgement.PrefixFor(free) != AvailableCountJudgement.UncertainPrefix ||
+                AvailableCountJudgement.PrefixFor(paid) != AvailableCountJudgement.FiniteUncertainPrefix)
+                throw new InvalidOperationException("The reservation's count rule is wrong.");
         }
 
         // The live shape: the planner's root owns and pumps the host, the

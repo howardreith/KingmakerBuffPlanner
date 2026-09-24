@@ -8708,9 +8708,9 @@ namespace KingmakerBuffPlanner.Tests
                 if (Failing(step, "throw")) throw new InvalidOperationException("fixture-submit");
                 if (Failing(step, "rejected"))
                     return new InstantCastResult(false, false, false, false, "fixture-rejected");
-                return new InstantCastResult(true, true, !Unconfirmed(step),
-                    !Free(step), !Free(step), "fixture",
-                    _mode == "free-unread" ? "available-count-unread:unread>unread" : null);
+                bool spent = !Free(step) && _mode != "finite-unread";
+                return new InstantCastResult(true, true, !Unconfirmed(step), spent, spent, "fixture",
+                    _mode == "free-unread" || _mode == "finite-unread" ? "available-count-unread:unread>unread" : null);
             }
             // "free" (every step) reports a genuine zero-cost cast: no spend;
             // "free-unread" spends nothing but its counts were never read.
@@ -8812,8 +8812,9 @@ namespace KingmakerBuffPlanner.Tests
                     Failing(step, "pending-dispose-throws"),
                     () => DisposedOperations.Add(id))
                 {
-                    Free = _mode == "free" || _mode == "free-unread",
-                    CountViolation = _mode == "free-unread" ? "available-count-unread:unread>unread" : null
+                    Free = _mode == "free" || _mode == "free-unread" || _mode == "finite-unread",
+                    CountViolation = _mode == "free-unread" || _mode == "finite-unread"
+                        ? "available-count-unread:unread>unread" : null
                 };
             }
         }
@@ -9885,7 +9886,7 @@ namespace KingmakerBuffPlanner.Tests
 
             // A real zero-cost result: new effect instance, availability unchanged.
             ProbeOwnerRun free = StartProbeOwnerRun("unlimited", "free", (phase, clock) =>
-                phase == "before" ? Obs(phase, clock, 7) : Obs(phase, clock, 7, effect));
+                phase == "before" ? Obs(phase, clock, -1) : Obs(phase, clock, -1, effect));
             PumpToEnd(free);
             SingleCastProbeRunRecord freeRecord = free.Published.Single();
             if (freeRecord.Violations().Count != 0 || freeRecord.Observation.EffectOutcome != "new-instance" ||
@@ -9931,7 +9932,7 @@ namespace KingmakerBuffPlanner.Tests
             if (!unchanged.Published.Single().Violations().Any(value => value.Contains("effect:transition-unverified")))
                 throw new InvalidOperationException("A pre-existing effect established a new cast.");
             ProbeOwnerRun refreshed = StartProbeOwnerRun("unlimited", "free", (phase, clock) =>
-                phase == "before" ? Obs(phase, clock, 7, oldEffect) : Obs(phase, clock, 7, refreshedOld));
+                phase == "before" ? Obs(phase, clock, -1, oldEffect) : Obs(phase, clock, -1, refreshedOld));
             PumpToEnd(refreshed);
             if (refreshed.Published.Single().Violations().Count != 0 ||
                 refreshed.Published.Single().Observation.EffectOutcome != "refreshed")
@@ -9943,6 +9944,14 @@ namespace KingmakerBuffPlanner.Tests
             PumpToEnd(loss);
             if (!loss.Published.Single().Violations().Any(value => value.Contains("unexpected-paid-resource-loss:1")))
                 throw new InvalidOperationException("A paid loss on a free source passed.");
+            // Re-review: an unchanged finite count does not prove a free cast
+            // (the executors and the Classic judgement need -1 > -1 too).
+            ProbeOwnerRun finiteUnchanged = StartProbeOwnerRun("unlimited", "free", (phase, clock) =>
+                phase == "before" ? Obs(phase, clock, 7) : Obs(phase, clock, 7, effect));
+            PumpToEnd(finiteUnchanged);
+            if (!finiteUnchanged.Published.Single().Violations().Any(value =>
+                    value.Contains("free-not-proven:available-count-not-unlimited:7>7")))
+                throw new InvalidOperationException("An unchanged finite count proved a free cast.");
 
             // A missing resource read is never zero.
             ProbeOwnerRun missing = StartProbeOwnerRun("unlimited", "free", (phase, clock) =>
@@ -15331,6 +15340,21 @@ namespace KingmakerBuffPlanner.Tests
                         record.Detail.StartsWith(AvailableCountJudgement.UncertainPrefix +
                             "available-count-unread:unread>unread;", StringComparison.Ordinal)))
                     throw new InvalidOperationException("Unread counts on a free source were not uncertainty.");
+            // Re-review: a paid (finite) cast whose counts were never read is
+            // uncertainty too, never a confirmed cast that spent nothing.
+            CastPlan paidPlan = paidProjection.Plan;
+            var instantFiniteUnread = new ExecutionReport(paidPlan);
+            Drain(new InstantCastExecutor(new ScriptedInstantRuntime("none", "finite-unread"), true)
+                .Execute(paidPlan, instantFiniteUnread));
+            var animatedFiniteUnread = new ExecutionReport(paidPlan);
+            Drain(new AnimatedCastExecutor(new ScriptedAnimatedRuntime("none", "finite-unread"), true)
+                .Execute(paidPlan, animatedFiniteUnread));
+            foreach (ExecutionReport unread in new[] { instantFiniteUnread, animatedFiniteUnread })
+                if (unread.Failed == 0 || !unread.Records.Any(record =>
+                        record.Status == CastExecutionStatus.FailedExecution &&
+                        record.Detail.StartsWith(AvailableCountJudgement.FiniteUncertainPrefix +
+                            "available-count-unread:unread>unread;", StringComparison.Ordinal)))
+                    throw new InvalidOperationException("Unread counts on a paid source were not uncertainty.");
             // A step with an unverified zero reservation never reaches either runtime.
             CastStep unverified = CloneStep(freePlan.Steps[0], reservation: new ResourceReservation(
                 "cantrips-cleric", 0, new string[0]));

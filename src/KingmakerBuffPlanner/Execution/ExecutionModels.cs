@@ -138,8 +138,9 @@ namespace KingmakerBuffPlanner.Execution
         bool Succeeded { get; }
         bool EffectsObserved { get; }
         bool ResourceSpent { get; }
-        // For a free (unlimited) reservation: null when the game's counts
-        // prove nothing was spent, else why they do not (review A7).
+        // Null when the game's counts are what the reservation needs (a free
+        // one unlimited and unchanged, a finite one read on both sides),
+        // else why they are not (review A7 and its re-review).
         string ResourceCountViolation { get; }
         bool HasResidualDeliveryState { get; }
         string Detail { get; }

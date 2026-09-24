@@ -1,4 +1,5 @@
 using System.Globalization;
+using KingmakerBuffPlanner.Planning;
 
 namespace KingmakerBuffPlanner.Execution
 {
@@ -10,6 +11,7 @@ namespace KingmakerBuffPlanner.Execution
     public static class AvailableCountJudgement
     {
         public const string UncertainPrefix = "unlimited-source-count-uncertain:";
+        public const string FiniteUncertainPrefix = "finite-source-count-uncertain:";
 
         public static bool Spent(int? before, int? after)
         {
@@ -25,6 +27,32 @@ namespace KingmakerBuffPlanner.Execution
             if (before.Value >= 0 || after.Value != before.Value)
                 return "available-count-not-unlimited:" + Format(before) + ">" + Format(after);
             return null;
+        }
+
+        // A finite (paid) casting must read both counts as finite
+        // (re-review): an unread count is uncertainty, never "nothing spent".
+        // Whether the spend matched the reservation is judged by the
+        // qualification's own observations.
+        public static string FiniteViolation(int? before, int? after)
+        {
+            if (!before.HasValue || !after.HasValue)
+                return "available-count-unread:" + Format(before) + ">" + Format(after);
+            if (before.Value < 0 || after.Value < 0)
+                return "available-count-not-finite:" + Format(before) + ">" + Format(after);
+            return null;
+        }
+
+        // The violation for a step's reservation, or null (also for none).
+        public static string Violation(ResourceReservation reservation, int? before, int? after)
+        {
+            if (reservation == null) return null;
+            return reservation.Unlimited ? FreeViolation(before, after) : FiniteViolation(before, after);
+        }
+
+        // The failure prefix for a reservation's count violation.
+        public static string PrefixFor(ResourceReservation reservation)
+        {
+            return reservation != null && reservation.Unlimited ? UncertainPrefix : FiniteUncertainPrefix;
         }
 
         public static string Format(int? count)
