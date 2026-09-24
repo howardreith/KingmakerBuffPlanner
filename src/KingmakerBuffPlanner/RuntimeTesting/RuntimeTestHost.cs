@@ -276,6 +276,20 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     return true;
                 }
             }
+            // Focused re-review: every other scenario obeys the same stop rule
+            // while it waits (the catalog's resource library, the performance
+            // window, the UI smoke, the native probe).
+            string waitingStop = LiveRunStopReason();
+            if (waitingStop != null)
+            {
+                _completed = true;
+                var stopped = new TimeoutException("Runtime scenario stopped;" + waitingStop + ";scenario=" +
+                    _request.Scenario);
+                _log.Error("Runtime scenario stopped by its overall deadline or the launcher's abort.", stopped);
+                TryWriteFailure(_startedAtUtc, stopped);
+                if (_request.ExitAfterCompletion) Application.Quit();
+                return true;
+            }
             if (RuntimeTestProtocol.IsCatalogScenario(_request.Scenario) &&
                 ResourcesLibrary.LibraryObject == null)
                 return false;

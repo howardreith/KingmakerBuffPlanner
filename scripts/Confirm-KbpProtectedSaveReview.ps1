@@ -18,22 +18,38 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'RuntimeHarness.Common.ps1')
 if ([string]::IsNullOrEmpty($StateRoot)) { $StateRoot = $script:KbpRuntimeStateRoot }
-$production = [IO.Path]::GetFullPath($StateRoot).TrimEnd('\').Equals($script:KbpRuntimeStateRoot, [StringComparison]::OrdinalIgnoreCase)
+# Focused re-review: only a harness test root skips the typed
+# confirmation; any other root (a junction or another drive letter for the
+# lab's included) is treated as the lab's own.
+$production = -not (Test-KbpHarnessTestPath $StateRoot)
 $folder = Join-Path $StateRoot 'protected-save-violations'
 $recordPath = Join-Path $folder ($RunId + '.json')
 if (-not (Test-Path -LiteralPath $recordPath -PathType Leaf)) { throw "No protected-save violation is recorded for run $RunId." }
 $acknowledgedFolder = Join-Path $folder 'acknowledged'
 $acknowledgementPath = Join-Path $acknowledgedFolder ($RunId + '.json')
-if (Test-Path -LiteralPath $acknowledgementPath) { throw "The violation of run $RunId is already acknowledged." }
 if ([string]::IsNullOrWhiteSpace($ReviewedBy) -or [string]::IsNullOrWhiteSpace($Note)) {
     throw 'Name the reviewer and say what was reviewed.'
 }
 $violation = Read-KbpJson $recordPath
 if ([string]$violation.runId -cne $RunId) { throw "The violation record names run $($violation.runId), not $RunId." }
 $recordSha256 = Get-KbpSha256 $recordPath
+# Focused re-review: an acknowledgement of this exact record ends here; one
+# of an earlier version of the record is superseded by a new review.
+$superseded = $null
+if (Test-Path -LiteralPath $acknowledgementPath) {
+    $existing = Read-KbpJson $acknowledgementPath
+    $existingSha = if ($null -ne $existing.PSObject.Properties['violationRecordSha256']) {
+        [string]$existing.violationRecordSha256 } else { '' }
+    if ($existingSha -ceq $recordSha256) { throw "The violation of run $RunId is already acknowledged." }
+    $superseded = Join-Path $acknowledgedFolder ($RunId + '.superseded-' +
+        [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssZ') + '.json')
+}
 if (-not $PSCmdlet.ShouldProcess($RunId, 'acknowledge the reviewed protected-save violation (' +
         (@($violation.blocking) -join ', ') + ')')) { return }
 if ($production) {
+    if ([Console]::IsInputRedirected) {
+        throw 'The acknowledgement is typed by the owner at the keyboard; redirected input is refused.'
+    }
     $typed = Read-Host ('Type the run id ' + $RunId + ' to confirm you reviewed what changed (' +
         (@($violation.blocking) -join ', ') + ')')
     if ([string]$typed -cne $RunId) { throw 'The typed run id does not match; nothing was acknowledged.' }
@@ -44,6 +60,7 @@ $body = [ordered]@{
     reviewedBy = $ReviewedBy; note = $Note; acknowledgedAtUtc = [DateTime]::UtcNow.ToString('o')
 }
 New-Item -ItemType Directory -Path $acknowledgedFolder -Force | Out-Null
+if ($null -ne $superseded) { Move-Item -LiteralPath $acknowledgementPath -Destination $superseded }
 $stream = [IO.File]::Open($acknowledgementPath, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
 try {
     $bytes = [Text.UTF8Encoding]::new($false).GetBytes(($body | ConvertTo-Json -Compress) + [Environment]::NewLine)

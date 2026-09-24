@@ -3,6 +3,11 @@ param(
     [Parameter(Mandatory = $true)][ValidatePattern('^[A-Za-z0-9._-]{1,100}$')][string]$RunId,
     # The launcher compares the protected saves itself (before calling this).
     [switch]$SkipProtectedSaveComparison,
+    # Focused re-review: for a comparison that can never be made (its
+    # baseline or a save cannot be read), this records it as an unverifiable
+    # change - so no later run or fixture change starts until the owner has
+    # reviewed it - then restores the Mods folder and releases the lock.
+    [switch]$CloseUnverifiableComparison,
     # Test seams: the lab's own roots unless a test names others.
     [string]$StateRoot,
     [string]$EvidenceRoot)
@@ -16,11 +21,19 @@ if ([string]::IsNullOrEmpty($EvidenceRoot)) { $EvidenceRoot = $script:KbpRuntime
 $statePath = Join-Path $StateRoot ('transactions\' + $RunId + '\transaction.json')
 if (-not (Test-Path -LiteralPath $statePath -PathType Leaf)) { throw "Runtime transaction state is missing: $statePath" }
 $baselinePath = Join-Path (Split-Path -Parent $statePath) 'protected-saves-before.json'
-$pending = (Test-Path -LiteralPath $baselinePath -PathType Leaf) -and -not [bool](Read-KbpJson $baselinePath).compared
+$pending = $false
+if (Test-Path -LiteralPath $baselinePath -PathType Leaf) {
+    # An unreadable baseline is a pending comparison that cannot be made.
+    try { $pending = -not [bool](Read-KbpJson $baselinePath).compared }
+    catch { $pending = $true }
+}
 # Re-review (harness): the launcher skips the comparison only after making
 # it; while it is pending, it is never skipped.
 if ($SkipProtectedSaveComparison -and $pending) {
     throw "Refusing -SkipProtectedSaveComparison: the protected-save comparison of run $RunId is pending (run Restore-Local.ps1 -RunId $RunId without it)."
+}
+if ($CloseUnverifiableComparison -and -not $pending) {
+    throw "Refusing -CloseUnverifiableComparison: no protected-save comparison of run $RunId is pending."
 }
 if (-not $PSCmdlet.ShouldProcess($RunId, 'restore and hash-verify the exact pre-run Mods state')) { return }
 # A display-mode run's saved game registry comes back first (the game must
@@ -39,11 +52,27 @@ if (Test-Path -LiteralPath $registryPath -PathType Leaf) {
 # unverifiable for the owner's review instead of being compared.
 $saveFailure = $null
 $evidenceDirectory = Join-Path $EvidenceRoot $RunId
-if ($pending -and [string](Read-KbpJson $statePath).status -ceq 'Restored') {
-    $unverifiable = Close-KbpUnverifiableProtectedSaveComparison -BaselinePath $baselinePath `
-        -Reason 'lock-released-before-comparison' -EvidenceDirectory $evidenceDirectory -StateRoot $StateRoot
-    throw ("The protected saves of run $RunId can no longer be compared (its lock was released first); " +
-        "recorded as $(@($unverifiable) -join ', ') for the owner's review.")
+if ($pending) {
+    # Focused re-review: compared only while this run still holds its lock
+    # (a lock removed by hand, or already released, means another operation
+    # may have changed the saves since); otherwise, or when the owner's
+    # agent closes a comparison that can never be made, it is recorded as
+    # unverifiable for the owner's review instead.
+    $state = Read-KbpJson $statePath
+    $unverifiableReason = if ($CloseUnverifiableComparison) { 'comparison-failed' }
+        elseif ([string]$state.status -ceq 'Restored') { 'lock-released-before-comparison' }
+        elseif (-not (Test-KbpRunLockHeld -State $state -RunId $RunId)) { 'lock-not-held' }
+        else { $null }
+    if ($null -ne $unverifiableReason) {
+        $unverifiable = Close-KbpUnverifiableProtectedSaveComparison -BaselinePath $baselinePath `
+            -Reason $unverifiableReason -EvidenceDirectory $evidenceDirectory -StateRoot $StateRoot -RunId $RunId
+        $recorded = "recorded as $(@($unverifiable) -join ', ') for the owner's review"
+        if (-not $CloseUnverifiableComparison) {
+            throw "The protected saves of run $RunId can no longer be compared under its lock; $recorded."
+        }
+        $saveFailure = "The protected saves of run $RunId were not compared; $recorded."
+        $pending = $false
+    }
 }
 if ($pending) {
     try {
@@ -52,7 +81,9 @@ if ($pending) {
     }
     catch {
         throw ("The protected-save comparison of run $RunId failed; the Mods folder was not restored and the run's lock " +
-            "is kept (fix the cause, then run Restore-Local.ps1 -RunId $RunId again): " + $_.Exception.Message)
+            "is kept. Fix the cause and run Restore-Local.ps1 -RunId $RunId again; if it can never be made, " +
+            "Restore-Local.ps1 -RunId $RunId -CloseUnverifiableComparison records it for the owner's review and " +
+            "restores: " + $_.Exception.Message)
     }
     if (@($comparison.blocking).Count -ne 0) {
         $saveFailure = "Protected saves changed during run ${RunId}: " + (@($comparison.blocking) -join ', ')

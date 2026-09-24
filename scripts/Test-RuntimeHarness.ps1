@@ -1594,7 +1594,8 @@ try {
     # Re-review (harness): a scenario without a fixture save compares no
     # saves and is complete when everything else is; a reported save failure
     # still counts, and a scenario with saves still needs its comparison.
-    if (-not (New-TestCompletion @{ SavePair = $null; ProtectedSavesCompared = $false; ProtectedSavesApplicable = $false }).complete -or
+    $noSaves = New-TestCompletion @{ SavePair = $null; ProtectedSavesCompared = $false; ProtectedSavesApplicable = $false }
+    if (-not $noSaves.complete -or $null -ne $noSaves.protectedSavesClean -or $noSaves.protectedSavesApplicable -or
         (New-TestCompletion @{ SavePair = $null; ProtectedSavesCompared = $false; ProtectedSavesApplicable = $false
             ProtectedSaveFailure = 'Protected-save comparison failed: x' }).complete -or
         (New-TestCompletion @{ ProtectedSavesCompared = $false; ProtectedSavesApplicable = $true }).complete) {
@@ -1643,7 +1644,19 @@ try {
     # failure paths assign the failure, the policy feeds the comparison, the
     # record receives the failure, and the run's failure is rethrown only
     # after the finally.
-    if ($launcherText -notmatch '(?s)if \(\$running\.Count -ne 0\) \{(.*?)if \(\$null -ne \$restoreFailure\) \{') {
+    # Focused re-review: the restoration decision is one tested rule.
+    foreach ($decisionCase in @(
+            @($false, $false, $false, $false, 'none'), @($false, $true, $true, $false, 'none'),
+            @($true, $true, $true, $true, 'blocked-running'), @($true, $true, $false, $false, 'blocked-running'),
+            @($true, $false, $true, $false, 'withheld-pending'), @($true, $false, $true, $true, 'restore'),
+            @($true, $false, $false, $false, 'restore'))) {
+        $decided = Get-KbpRestorationDecision -TransactionEntered $decisionCase[0] -KingmakerRunning $decisionCase[1] `
+            -BaselineKept $decisionCase[2] -SavesCompared $decisionCase[3]
+        if ($decided -cne $decisionCase[4]) {
+            throw ('The restoration decision for ' + ($decisionCase[0..3] -join ',') + ' was ' + $decided + '.')
+        }
+    }
+    if ($launcherText -notmatch '(?s)if \(\$restoreDecision -ceq ''blocked-running''\) \{(.*?)if \(\$null -ne \$restoreFailure\) \{') {
         throw 'The launcher restoration branch was not found.'
     }
     $restoreBranch = $Matches[1]
@@ -1837,6 +1850,13 @@ try {
     $tamperBlocks = $false
     try { Assert-KbpNoUnacknowledgedSaveViolation -StateRoot $ackState } catch { $tamperBlocks = $true }
     if (-not $tamperBlocks) { throw 'An acknowledgement of another version of the record lifted the block.' }
+    # Focused re-review: the owner can review the changed record again; the
+    # earlier acknowledgement is kept as superseded.
+    & $confirmScript -RunId 'tamper-run' -ReviewedBy 'harness test' -Note 'second' -StateRoot $ackState -Confirm:$false | Out-Null
+    Assert-KbpNoUnacknowledgedSaveViolation -StateRoot $ackState
+    if (@(Get-ChildItem -LiteralPath (Join-Path $ackFolder 'acknowledged') -Filter 'tamper-run.superseded-*.json' -File).Count -ne 1) {
+        throw 'A superseded acknowledgement was not kept.'
+    }
     $oddState = Join-Path $savesRoot 'odd-state'
     $oddFolder = Join-Path $oddState 'protected-save-violations'
     New-Item -ItemType Directory -Path $oddFolder -Force | Out-Null
@@ -1868,12 +1888,17 @@ try {
     $rlRoot = Join-Path $savesRoot 'restore-local'
     $rlState = Join-Path $rlRoot 'state'
     $rlEvidence = Join-Path $rlRoot 'evidence'
-    function New-RlTransaction([string]$Run, [string]$Status, [string]$RecordedSaveRoot) {
-        $directory = Join-Path $rlState ('transactions\' + $Run)
+    function New-RlTransaction([string]$Run, [string]$Status, [string]$RecordedSaveRoot, [switch]$HoldLock,
+        [string]$Root = $rlState) {
+        $directory = Join-Path $Root ('transactions\' + $Run)
         New-Item -ItemType Directory -Path $directory -Force | Out-Null
         New-Item -ItemType Directory -Path (Join-Path $rlEvidence $Run) -Force | Out-Null
+        # A stand-in: schema 0 is never restorable, so a restoration fails at
+        # once, before any lease wait or Mods path; its lock is a test file.
+        $lock = Join-Path $rlRoot ($Run + '.lock')
+        if ($HoldLock) { New-KbpOwnedLock $lock $Run 't' }
         Write-KbpJsonAtomic (Join-Path $directory 'transaction.json') ([ordered]@{
-            schemaVersion = 1; runId = $Run; status = $Status; lockPath = (Join-Path $rlRoot 'no-such.lock'); token = 't' })
+            schemaVersion = 0; runId = $Run; status = $Status; lockPath = $lock; token = 't' })
         return (Save-KbpProtectedSaveBaseline -TransactionDirectory $directory -RunId $Run -Scenario 'live-cast-qual' `
             -FixtureFamily 'Automation' -WorkingFileName 'Manual_2_WORKING.zks' -SaveRoot $RecordedSaveRoot `
             -Snapshot (Get-KbpSaveFolderSnapshot -SaveRoot $saveFolder))
@@ -1885,13 +1910,53 @@ try {
     if (-not $skipRefused -or [bool](Read-KbpJson $skipBaseline).compared) {
         throw 'Restore-Local skipped a pending protected-save comparison.'
     }
-    $failBaseline = New-RlTransaction 'rl-fail' 'Deployed' (Join-Path $rlRoot 'missing-saves')
+    $failBaseline = New-RlTransaction 'rl-fail' 'Deployed' (Join-Path $rlRoot 'missing-saves') -HoldLock
     $failKept = $false
     try { & $restoreScript -RunId 'rl-fail' -StateRoot $rlState -EvidenceRoot $rlEvidence -Confirm:$false }
     catch { $failKept = $_.Exception.Message -like '*the Mods folder was not restored and the run''s lock is kept*' }
     if (-not $failKept -or [bool](Read-KbpJson $failBaseline).compared -or
         [string](Read-KbpJson (Join-Path $rlState 'transactions\rl-fail\transaction.json')).status -cne 'Deployed') {
         throw 'Restore-Local went on after a protected-save comparison that could not be made.'
+    }
+    # Focused re-review: the way out of a comparison that can never be made -
+    # recorded as unverifiable for the owner's review, then restored.
+    $closedMessage = ''
+    try { & $restoreScript -RunId 'rl-fail' -CloseUnverifiableComparison -StateRoot $rlState -EvidenceRoot $rlEvidence -Confirm:$false }
+    catch { $closedMessage = $_.Exception.Message }
+    if ($closedMessage -notlike 'The protected saves of run rl-fail were not compared; recorded as unverifiable:comparison-failed*| Restoration: *' -or
+        -not [bool](Read-KbpJson $failBaseline).compared -or
+        -not (Test-Path -LiteralPath (Join-Path $rlState 'protected-save-violations\rl-fail.json') -PathType Leaf)) {
+        throw ('A comparison that can never be made was not closed for the owner: ' + $closedMessage)
+    }
+    $closeRefused = $false
+    try { & $restoreScript -RunId 'rl-fail' -CloseUnverifiableComparison -StateRoot $rlState -EvidenceRoot $rlEvidence -Confirm:$false }
+    catch { $closeRefused = $_.Exception.Message -like 'Refusing -CloseUnverifiableComparison*' }
+    if (-not $closeRefused) { throw 'A comparison that is not pending was closed again.' }
+    # A pending comparison whose lock is no longer the run's is never made.
+    $noLockBaseline = New-RlTransaction 'rl-nolock' 'Deployed' $saveFolder
+    $noLockMessage = ''
+    try { & $restoreScript -RunId 'rl-nolock' -StateRoot $rlState -EvidenceRoot $rlEvidence -Confirm:$false }
+    catch { $noLockMessage = $_.Exception.Message }
+    if ($noLockMessage -notlike '*can no longer be compared under its lock; recorded as unverifiable:lock-not-held*' -or
+        -not [bool](Read-KbpJson $noLockBaseline).compared) {
+        throw ('A comparison without its lock was made: ' + $noLockMessage)
+    }
+    # An unreadable baseline blocks every entry with the way out named, and
+    # is closed as unverifiable (kept aside) by that way out.
+    $corruptState = Join-Path $rlRoot 'corrupt-state'
+    $corruptBaseline = New-RlTransaction 'rl-corrupt' 'Deployed' $saveFolder -HoldLock -Root $corruptState
+    [IO.File]::WriteAllText($corruptBaseline, '{ not json')
+    $corruptBlocks = ''
+    try { Assert-KbpNoPendingProtectedSaveComparison $corruptState } catch { $corruptBlocks = $_.Exception.Message }
+    $corruptMessage = ''
+    try { & $restoreScript -RunId 'rl-corrupt' -CloseUnverifiableComparison -StateRoot $corruptState -EvidenceRoot $rlEvidence -Confirm:$false }
+    catch { $corruptMessage = $_.Exception.Message }
+    $keptAside = @(Get-ChildItem -LiteralPath (Split-Path -Parent $corruptBaseline) -Filter 'protected-saves-before.unreadable-*.json' -File)
+    Assert-KbpNoPendingProtectedSaveComparison $corruptState
+    if ($corruptBlocks -notlike '*baseline of run rl-corrupt cannot be read: Restore-Local.ps1 -RunId rl-corrupt -CloseUnverifiableComparison*' -or
+        $corruptMessage -notlike '*recorded as unverifiable:baseline-unreadable*' -or $keptAside.Count -ne 1 -or
+        [IO.File]::ReadAllText($keptAside[0].FullName) -cne '{ not json') {
+        throw ('An unreadable baseline was not closed for the owner: ' + $corruptBlocks + ' / ' + $corruptMessage)
     }
     $releasedBaseline = New-RlTransaction 'rl-late' 'Restored' $saveFolder
     $releasedClosed = $false
@@ -1901,7 +1966,7 @@ try {
         -not (Test-Path -LiteralPath (Join-Path $rlState 'protected-save-violations\rl-late.json') -PathType Leaf)) {
         throw 'Restore-Local compared, or ignored, a pending comparison whose lock was already released.'
     }
-    $null = New-RlTransaction 'rl-both' 'Deployed' $saveFolder
+    $null = New-RlTransaction 'rl-both' 'Deployed' $saveFolder -HoldLock
     [IO.File]::WriteAllText((Join-Path $saveFolder 'Manual_1_Ordinary.zks'), 'changed again')
     $bothMessage = ''
     try { & $restoreScript -RunId 'rl-both' -StateRoot $rlState -EvidenceRoot $rlEvidence -Confirm:$false }
@@ -1909,8 +1974,17 @@ try {
     if ($bothMessage -notlike 'Protected saves changed during run rl-both: changed:Manual_1_Ordinary.zks | Restoration: *') {
         throw ('Restore-Local lost a save violation to a restoration failure: ' + $bothMessage)
     }
+    # Only a harness test root skips the typed confirmation.
+    if (-not (Test-KbpHarnessTestPath $ackState) -or (Test-KbpHarnessTestPath $script:KbpRuntimeStateRoot) -or
+        (Test-KbpHarnessTestPath $env:TEMP) -or (Test-KbpHarnessTestPath '')) {
+        throw 'The harness test root is not told apart from the lab root.'
+    }
+    $harnessCommon = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'RuntimeHarness.Common.ps1'))
     $confirmText = [IO.File]::ReadAllText($confirmScript)
-    if (-not $confirmText.Contains('if ($production) {') -or -not $confirmText.Contains('$typed = Read-Host (') -or
+    if (-not $harnessCommon.Contains('(($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { return $false }') -or
+        -not $confirmText.Contains('$production = -not (Test-KbpHarnessTestPath $StateRoot)') -or
+        -not $confirmText.Contains('if ([Console]::IsInputRedirected) {') -or
+        -not $confirmText.Contains('if ($production) {') -or -not $confirmText.Contains('$typed = Read-Host (') -or
         -not $confirmText.Contains("if ([string]`$typed -cne `$RunId) { throw 'The typed run id does not match; nothing was acknowledged.' }")) {
         throw 'The acknowledgement does not ask the owner at the keyboard on the lab state root.'
     }
@@ -1942,7 +2016,8 @@ try {
     if ($enteredAt2 -lt 0 -or $snapshotAt2 -lt $enteredAt2 -or $baselineAt2 -lt $snapshotAt2 -or $workingAt2 -lt $baselineAt2 -or
         ([regex]::Matches($launcherText, 'Get-KbpSaveFolderSnapshot -SaveRoot \$protectedSaveRoot')).Count -ne 1 -or
         -not $launcherText.Contains('if ($transactionEntered -and $null -ne $protectedBefore) {') -or
-        -not $launcherText.Contains('elseif ($null -ne $protectedBaselinePath -and -not $protectedSavesCompared) {') -or
+        -not $launcherText.Contains("elseif (`$restoreDecision -ceq 'withheld-pending') {") -or
+        -not $launcherText.Contains('-BaselineKept ($null -ne $protectedBaselinePath) -SavesCompared $protectedSavesCompared') -or
         -not $launcherText.Contains('if ($null -ne $abortWrittenUtc -and [string]$result.status -ceq ''PASS'') {') -or
         -not $launcherText.Contains("if (`$ManualRehearseDone -and `$Scenario -cne 'live-workspace-manual') {") -or
         -not $launcherText.Contains('-ProtectedSavesApplicable ($null -ne $savePair)') -or

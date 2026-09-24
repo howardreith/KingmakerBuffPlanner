@@ -321,6 +321,29 @@ function Complete-KbpProtectedSaveComparison {
     return $comparison
 }
 
+# Focused re-review: what the launcher does with the Mods folder at the end
+# of a run, as one tested rule: nothing without a transaction; blocked while
+# the game runs; withheld while a kept protected-save comparison is
+# unfinished (the lock stays until Restore-Local.ps1 -RunId compares);
+# otherwise restored.
+function Get-KbpRestorationDecision {
+    param([bool]$TransactionEntered, [bool]$KingmakerRunning, [bool]$BaselineKept, [bool]$SavesCompared)
+    if (-not $TransactionEntered) { return 'none' }
+    if ($KingmakerRunning) { return 'blocked-running' }
+    if ($BaselineKept -and -not $SavesCompared) { return 'withheld-pending' }
+    return 'restore'
+}
+
+# Whether the run still holds its deployment lock (its own run and token).
+function Test-KbpRunLockHeld {
+    param([Parameter(Mandatory = $true)]$State, [Parameter(Mandatory = $true)][string]$RunId)
+    try {
+        Assert-KbpOwnedLock ([string]$State.lockPath) $RunId ([string]$State.token)
+        return $true
+    }
+    catch { return $false }
+}
+
 # Re-review (harness): a pending comparison whose run's lock was already
 # released can no longer be attributed to that run (another operation may
 # have changed the saves since). It is closed as unverifiable: recorded as a
@@ -330,8 +353,22 @@ function Close-KbpUnverifiableProtectedSaveComparison {
         [Parameter(Mandatory = $true)][string]$BaselinePath,
         [Parameter(Mandatory = $true)][string]$Reason,
         [Parameter(Mandatory = $true)][string]$EvidenceDirectory,
-        [string]$StateRoot = $script:KbpRuntimeStateRoot)
-    $baseline = Read-KbpJson $BaselinePath
+        [string]$StateRoot = $script:KbpRuntimeStateRoot,
+        # Focused re-review: the run, for a baseline that cannot be read.
+        [string]$RunId)
+    try { $baseline = Read-KbpJson $BaselinePath }
+    catch {
+        if ([string]::IsNullOrWhiteSpace($RunId)) { throw }
+        # The unreadable baseline is kept beside a closed one naming why.
+        $kept = Join-Path (Split-Path -Parent $BaselinePath) ('protected-saves-before.unreadable-' +
+            [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssZ') + '.json')
+        Move-Item -LiteralPath $BaselinePath -Destination $kept
+        $baseline = [pscustomobject]@{
+            schemaVersion = 1; runId = $RunId; scenario = 'unknown'; fixtureFamily = 'unknown'
+            workingFileName = ''; saveRoot = ''; compared = $false; blocking = @(); files = @()
+        }
+        $Reason = 'baseline-unreadable'
+    }
     if ([bool]$baseline.compared) { return @($baseline.blocking) }
     $blocking = @('unverifiable:' + $Reason)
     $folder = Join-Path $StateRoot 'protected-save-violations'
@@ -1276,7 +1313,8 @@ function New-KbpRunCompletionRecord {
         # Final review C5: a rehearsal of the manual session says so.
         [bool]$ManualRehearsal,
         # Re-review (harness): a scenario without a fixture save compares
-        # no saves; its saves count as clean unless a failure is reported.
+        # no saves; focused re-review: its saves are then recorded as not
+        # known (null), never as clean, and a reported failure still counts.
         [bool]$ProtectedSavesApplicable = $true)
     $restored = $false
     if (-not [string]::IsNullOrWhiteSpace($TransactionStatePath) -and
@@ -1288,7 +1326,8 @@ function New-KbpRunCompletionRecord {
     if (-not [string]::IsNullOrWhiteSpace($RestoreFailure)) { $restored = $false }
     $game = if ([string]::IsNullOrWhiteSpace($GameResultStatus)) { 'none' } else { $GameResultStatus }
     $clean = if ($ProtectedSavesApplicable) { $ProtectedSavesCompared -and [string]::IsNullOrEmpty($ProtectedSaveFailure) }
-        else { [string]::IsNullOrEmpty($ProtectedSaveFailure) }
+        elseif ([string]::IsNullOrEmpty($ProtectedSaveFailure)) { $null } else { $false }
+    $savesSettled = ($clean -eq $true) -or (-not $ProtectedSavesApplicable -and $null -eq $clean)
     return [ordered]@{
         schemaVersion = 1; runId = $RunId; scenario = $Scenario; fixtureFamily = $FixtureFamily
         profileId = $ProfileId
@@ -1307,7 +1346,7 @@ function New-KbpRunCompletionRecord {
         protectedSavesCompared = $ProtectedSavesCompared
         protectedSavesClean = $clean
         manualRehearsal = $ManualRehearsal
-        complete = ($game -ceq 'PASS') -and $HarnessSucceeded -and $KingmakerExited -and $restored -and $clean
+        complete = ($game -ceq 'PASS') -and $HarnessSucceeded -and $KingmakerExited -and $restored -and $savesSettled
         completedAtUtc = [DateTime]::UtcNow.ToString('o')
     }
 }

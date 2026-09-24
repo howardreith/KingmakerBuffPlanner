@@ -531,6 +531,26 @@ function Remove-KbpOwnedLock([string]$LockPath, [string]$RunId, [string]$Token) 
     Remove-Item -LiteralPath $LockPath -Force
 }
 
+# Focused re-review: a harness test path is inside this checkout's
+# artifacts\runtime-harness-tests and reached without a junction, link or
+# mount point on the way; every other path is treated as the lab's own.
+function Test-KbpHarnessTestPath([string]$Path) {
+    if ([string]::IsNullOrWhiteSpace($Path)) { return $false }
+    $root = [IO.Path]::GetFullPath((Join-Path (Get-KbpRepositoryRoot) 'artifacts\runtime-harness-tests')).TrimEnd('\')
+    $full = [IO.Path]::GetFullPath($Path).TrimEnd('\')
+    if (-not $full.StartsWith($root + '\', [StringComparison]::OrdinalIgnoreCase)) { return $false }
+    $current = $full
+    while ($true) {
+        if (Test-Path -LiteralPath $current) {
+            $item = Get-Item -LiteralPath $current -Force
+            if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { return $false }
+        }
+        if ($current.Length -le $root.Length) { break }
+        $current = Split-Path -Parent $current
+    }
+    return $true
+}
+
 # The lab's fixture lock guards the lab's own runtime state only; a test
 # state root has none unless a test names one (re-review, harness).
 function Get-KbpDefaultFixtureLockPath([string]$StateRoot) {
@@ -549,15 +569,21 @@ function Assert-KbpFixtureLockAbsent([string]$FixtureLockPath) {
     $holder = 'unknown'
     try { $holder = [string](Read-KbpJson $FixtureLockPath).runId } catch { }
     throw ("The fixture lock of run $holder exists: $FixtureLockPath. A fixture bootstrap or teardown is running, " +
-        "or one was interrupted: New-KbpAutomationFixture.ps1 -Recover -RunId $holder rolls back an interrupted " +
-        "bootstrap; after an interrupted teardown the owner checks the save folder before the lock is removed.")
+        "or one was interrupted: New-KbpAutomationFixture.ps1 -Recover -RunId $holder (with -Family Advanced for " +
+        "the advanced fixture) rolls back an interrupted bootstrap; after an interrupted teardown the owner checks " +
+        "the save folder before the lock is removed.")
 }
 
 # Final review C2: a run whose protected-save comparison is still pending is
 # unresolved until Restore-Local.ps1 -RunId finishes it.
 function Assert-KbpNoPendingProtectedSaveComparison([string]$StateRoot) {
     foreach ($baselineFile in @(Get-ChildItem -LiteralPath $StateRoot -Filter protected-saves-before.json -File -Recurse -ErrorAction SilentlyContinue)) {
-        $baseline = Read-KbpJson $baselineFile.FullName
+        $baselineRun = Split-Path -Leaf (Split-Path -Parent $baselineFile.FullName)
+        try { $baseline = Read-KbpJson $baselineFile.FullName }
+        catch {
+            throw ("The protected-save baseline of run $baselineRun cannot be read: Restore-Local.ps1 -RunId $baselineRun " +
+                "-CloseUnverifiableComparison records it for the owner's review and restores.")
+        }
         if (-not [bool]$baseline.compared) {
             throw "The protected-save comparison of run $($baseline.runId) is pending (Restore-Local.ps1 -RunId $($baseline.runId) finishes it once the game has exited)."
         }
@@ -574,18 +600,23 @@ function Assert-KbpNoUnacknowledgedSaveViolation {
     $folder = Join-Path $StateRoot 'protected-save-violations'
     if (-not (Test-Path -LiteralPath $folder -PathType Container)) { return }
     foreach ($record in @(Get-ChildItem -LiteralPath $folder -Filter '*.json' -File | Sort-Object Name)) {
+        # Focused re-review: a record or acknowledgement missing a field
+        # still blocks, with the record's own name in the message.
         $violation = Read-KbpJson $record.FullName
-        $recordRun = [string]$violation.runId
+        $recordRun = if ($null -ne $violation.PSObject.Properties['runId']) { [string]$violation.runId } else { '' }
+        $blocking = if ($null -ne $violation.PSObject.Properties['blocking']) { @($violation.blocking) -join ', ' } else { 'unknown' }
         $acknowledgement = Join-Path (Join-Path $folder 'acknowledged') ($record.BaseName + '.json')
         $acknowledged = $false
         if ($recordRun -ceq $record.BaseName -and (Test-Path -LiteralPath $acknowledgement -PathType Leaf)) {
             $ack = Read-KbpJson $acknowledgement
-            $acknowledged = [string]$ack.runId -ceq $recordRun -and
-                [string]$ack.violationRecordSha256 -ceq (Get-KbpSha256 $record.FullName)
+            $ackRun = if ($null -ne $ack.PSObject.Properties['runId']) { [string]$ack.runId } else { '' }
+            $ackSha = if ($null -ne $ack.PSObject.Properties['violationRecordSha256']) { [string]$ack.violationRecordSha256 } else { '' }
+            $acknowledged = $ackRun -ceq $recordRun -and $ackSha -ceq (Get-KbpSha256 $record.FullName)
         }
         if (-not $acknowledged) {
-            throw ("Run $recordRun changed protected saves ($(@($violation.blocking) -join ', ')). " +
-                "No run starts until the owner has reviewed it and run scripts\Confirm-KbpProtectedSaveReview.ps1 -RunId $recordRun.")
+            $named = if ([string]::IsNullOrEmpty($recordRun)) { $record.BaseName } else { $recordRun }
+            throw ("Run $named changed protected saves ($blocking). " +
+                "No run starts until the owner has reviewed it and run scripts\Confirm-KbpProtectedSaveReview.ps1 -RunId $named.")
         }
     }
 }

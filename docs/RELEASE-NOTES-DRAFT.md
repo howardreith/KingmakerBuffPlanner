@@ -49,7 +49,10 @@ a player:
   refused because of it), and when a change was not saved; the
   casting-first header says so for as long as saving is blocked. Moving
   the unreadable casting plan and its backups aside and pressing Reload
-  lets it save again, keeping castings added meanwhile.
+  lets it save again, keeping castings added meanwhile. Only the files
+  the planner names are to be moved; a reload never discards castings
+  added in the session without a second press, and a classic plan
+  repaired after a failed import is imported (never an empty stand-in).
 - **Smaller fixes.** The casting-first planner never rewrites the classic
   plan file. The spellbook button opens the casting-first planner
   properly. The HUD tooltip never describes another campaign. A new
@@ -71,7 +74,11 @@ a player:
   while the test run holds its lock, which is kept until the comparison
   is made; fixture changes and test runs cannot overlap; the owner's
   acknowledgement of a save change is typed by the owner and bound to
-  that exact record; an incomplete run never reports success.
+  that exact record; an incomplete run never reports success. After a
+  focused review of those fixes: a comparison that can never be made has
+  a recorded way out for the owner's review, a comparison is made only
+  while the run still holds its lock, and every scenario obeys the run's
+  stop rule.
 
 ## What changed in 0.2.0-rc3 (history)
 
@@ -186,6 +193,15 @@ the automation party's finite spell levels hold no buff.
   level; the planner refuses that choice with the reason.
 - A linked opposition-school slot pair that cannot be funded shows one
   requested slot in the budget.
+- Pets: a buff that reaches the party and pets is planned for every unit
+  its party effect names; whether the game's party action reaches other
+  members' pets is not proven (no test party has pets), so such a cast
+  can be reported unconfirmed and stop the routine. A buff that reaches a
+  chosen target or an area and also the caster's pet is planned for the
+  pet only.
+- APPLY in the open classic planner now closes the planner so the party
+  casts at once (the planner pauses the game). This changes the default
+  planner's behaviour and is for the owner to confirm.
 
 ## Not supported in this version (shown on the card, refused by Apply)
 

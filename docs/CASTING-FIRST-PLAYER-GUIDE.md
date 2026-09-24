@@ -183,7 +183,9 @@ ability pool changed. A classic routine now also stops at the first cast
 that is not confirmed, and it casts only while the game runs: **APPLY**
 in the open classic planner checks the routine at once, then closes the
 planner and casts (the game is paused while the planner is open); the
-result is shown when you open the planner again.
+result is shown when you open the planner again. If you open the planner
+again while the routine is still running, it waits until you close it,
+and the planner and the HUD button say so.
 
 ## Files
 
