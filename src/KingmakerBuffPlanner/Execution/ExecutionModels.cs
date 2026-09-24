@@ -40,6 +40,8 @@ namespace KingmakerBuffPlanner.Execution
             TargetUnitIds = new ReadOnlyCollection<string>(step.TargetUnitIds.ToList());
             ExpectedRecipientUnitIds = new ReadOnlyCollection<string>(
                 step.ExpectedRecipientUnitIds.ToList());
+            PreCoveredRecipientUnitIds = new ReadOnlyCollection<string>(
+                step.PreCoveredRecipientUnitIds.ToList());
             ResourcePoolKey = step.Reservation == null ? string.Empty : step.Reservation.PoolKey;
             ResourceTokenIds = new ReadOnlyCollection<string>(step.Reservation == null
                 ? new List<string>() : step.Reservation.TokenIds.ToList());
@@ -60,6 +62,7 @@ namespace KingmakerBuffPlanner.Execution
         public string CasterUnitId { get; private set; }
         public IReadOnlyList<string> TargetUnitIds { get; private set; }
         public IReadOnlyList<string> ExpectedRecipientUnitIds { get; private set; }
+        public IReadOnlyList<string> PreCoveredRecipientUnitIds { get; private set; }
         public string ResourcePoolKey { get; private set; }
         public IReadOnlyList<string> ResourceTokenIds { get; private set; }
         public IReadOnlyList<string> EnhancementIds { get; private set; }

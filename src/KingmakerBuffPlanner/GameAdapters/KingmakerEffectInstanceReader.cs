@@ -73,7 +73,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                         UnitEntityData unit;
                         return units.TryGetValue(unitId, out unit) && unit.Descriptor != null
                             ? Instances(unit, ids) : null;
-                    });
+                    }, step.PreCoveredRecipientUnitIds);
             }
             catch (Exception) { return false; }
         }

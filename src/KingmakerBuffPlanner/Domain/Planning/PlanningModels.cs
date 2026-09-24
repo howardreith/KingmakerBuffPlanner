@@ -524,7 +524,8 @@ namespace KingmakerBuffPlanner.Domain.Planning
             string executionStrategyReason,
             IEnumerable<string> enhancementIds = null,
             IDictionary<string, int> enhancementUsageByPool = null,
-            IEnumerable<string> omittedEnhancementIds = null)
+            IEnumerable<string> omittedEnhancementIds = null,
+            IEnumerable<string> preCoveredRecipientUnitIds = null)
         {
             SourceId = sourceId ?? string.Empty;
             AssignmentId = assignmentId ?? sourceId ?? string.Empty;
@@ -533,6 +534,10 @@ namespace KingmakerBuffPlanner.Domain.Planning
             TargetUnitIds = new ReadOnlyCollection<string>(targetUnitIds.OrderBy(v => v, StringComparer.Ordinal).ToList());
             ExpectedRecipientUnitIds = new ReadOnlyCollection<string>(
                 (expectedRecipientUnitIds ?? targetUnitIds).Where(v => !string.IsNullOrWhiteSpace(v))
+                    .Distinct(StringComparer.Ordinal).OrderBy(v => v, StringComparer.Ordinal).ToList());
+            PreCoveredRecipientUnitIds = new ReadOnlyCollection<string>(
+                (preCoveredRecipientUnitIds ?? new string[0])
+                    .Where(v => !string.IsNullOrWhiteSpace(v) && ExpectedRecipientUnitIds.Contains(v))
                     .Distinct(StringComparer.Ordinal).OrderBy(v => v, StringComparer.Ordinal).ToList());
             Reservation = reservation;
             MaterialReservation = materialReservation;
@@ -559,6 +564,11 @@ namespace KingmakerBuffPlanner.Domain.Planning
         public string AnchorUnitId { get; private set; }
         public IReadOnlyList<string> TargetUnitIds { get; private set; }
         public IReadOnlyList<string> ExpectedRecipientUnitIds { get; private set; }
+        // Expected recipients the plan proved already adequately covered
+        // (mixed coverage under skip-if-active): confirmation accepts their
+        // kept coverage; every other recipient needs a new or refreshed
+        // instance.
+        public IReadOnlyList<string> PreCoveredRecipientUnitIds { get; private set; }
         public ResourceReservation Reservation { get; private set; }
         public MaterialReservation MaterialReservation { get; private set; }
         public EffectExpression ExpectedEffects { get; private set; }
