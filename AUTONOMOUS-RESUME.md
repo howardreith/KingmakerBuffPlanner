@@ -11,20 +11,48 @@ not running; the owner's RDP session is active. External dependency: no
 automation party has finite spontaneous slots (bard 2, sorcerer 5 at
 level 1; diagnostics `casting-qual-select-20260923-d1-01`).
 
-Worklist (updated as slices land):
+Worklist (updated as slices land; 2026-09-24 status in brackets):
 1. Capability inventory of the automation party (read-only, live).
+   [DONE `ca05fe3`, run `casting-qual-select-20260923-inv-01`: only free
+   cantrips, Heal skill and Aid Another; finite spontaneous pools exist but
+   hold no buff.]
 2. Classic regression: resolver negatives in source; a bounded Classic
    cantrip cast through Classic's own routes, animated and instant.
+   [DONE. Scenarios `live-classic-select`/`live-classic-cast` (`cca152f`,
+   single-use grant, 45 mutants killed). Instant PASS
+   `classic-cast-20260924-00aca73-inst-01`; animated PASS
+   `classic-cast-20260924-da0ee32-anim-02` after the mode-aware judgement
+   fix `d6d5e33`. Receipt `docs/evidence/classic-cast-20260924-receipt.md`.]
 3. Finite spontaneous qualification on the automation party, both modes.
+   [UNAVAILABLE on this fixture: its finite pools hold no buff. Needs the
+   advanced seed.]
 4. Group behavior with whatever the party really has; otherwise it waits
-   for the seed.
+   for the seed. [Waits for the seed: the party has no group buff.]
 5. Lifecycle: stop while pending, disable/unload, target loss, refusal,
    re-enable, a new accepted run; an area transition only on a safe route.
+   [Recover step `b63da88`: a new accepted run after the re-enable, the
+   lifecycle probe and run counts (8 mutants killed); live run pending.
+   Read-only area diagnostics `da0ee32` (live collection pending). An area
+   transition autosaves through `Game.LoadArea` for BeforeExit transitions
+   while autosave is on, and the save folder holds the owner's rotating
+   `Auto_N` files, so no transition is attempted unless the diagnostics show
+   a route without an autosave.]
 6. UI and physical input, 1920x1080 and other resolutions (session active).
 7. Persistence and import gaps; install and rollback of the final artifact.
 8. Build reproducibility across checkouts (bounded, secondary).
 9. Independent reviews, rc3, full gate, native qualification on rc3,
    receipt, PR handoff.
+
+Shared installation (2026-09-24): the owner's Gunslinger lab runs the same
+game. Its runs are serialized with ours by its lease file and our
+deployment lock, which is now double-checked after taking it (`16cd178`).
+A launch that finds its game running is refused before deployment (two such
+refusals today, recorded in the Classic receipt). Gates also need the game
+closed (the rollback tests check for a running game). The installed
+Gunslinger is now **0.0.139** (manifest `ee7af9cc…`, DLL `a53e53c9…`), not
+the 0.0.136 identity named for the conditional advanced profile. That
+profile is therefore NOT created. Every other full-user entry and the
+external 0.0.133 copy match exactly.
 
 ## Release candidate 0.2.0-rc2 frozen at `ae0181d`
 
