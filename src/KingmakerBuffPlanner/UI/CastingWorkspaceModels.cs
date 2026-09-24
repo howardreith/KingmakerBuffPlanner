@@ -497,6 +497,8 @@ namespace KingmakerBuffPlanner.UI
                     return "it is already cast first in its routine.";
                 case "already-last":
                     return "it is already cast last in its routine.";
+                case "provider-not-pinnable":
+                    return "that character knows this spell at more than one level in the same spellbook, and this version cannot pick one of them; cast it another way.";
                 default:
                     return head.Length == 0 ? "not possible right now." : head.Replace('-', ' ') + ".";
             }
@@ -537,13 +539,15 @@ namespace KingmakerBuffPlanner.UI
     // footer says so; nothing is added while the whole plan fits.
     public static class WorkspaceFooterText
     {
-        public static string WholePlan(CastingApplyDecision onePass)
+        // shortCount: the selected routine's castings that are ready on their
+        // own but short of a resource when every routine runs in one pass
+        // (re-review: drafts, disabled castings and import notices are not
+        // shortages).
+        public static string WholePlan(int shortCount)
         {
-            if (onePass == null || onePass.Allowed || onePass.BlockingReasons.Count == 0)
-                return string.Empty;
-            int blocked = onePass.BlockingReasons.Count;
-            return "All routines in one pass: " + blocked +
-                (blocked == 1 ? " casting" : " castings") + " would be blocked.";
+            if (shortCount <= 0) return string.Empty;
+            return "Running every routine in one pass leaves " + shortCount +
+                (shortCount == 1 ? " casting" : " castings") + " of this routine short of a resource.";
         }
     }
 
@@ -571,15 +575,29 @@ namespace KingmakerBuffPlanner.UI
 
     public static class WorkspaceProviderLabels
     {
-        // What the player reads on a provider choice: whose resource it
-        // spends and which one, its caster level, and any metamagic.
-        public static string Describe(string casterName, string resourceLabel,
-            int casterLevel, int metamagicMask)
+        // What the player reads on a provider choice: whose it is and which
+        // exact source - a spellbook by name and spell level with the kind of
+        // slot it spends (re-review), or an item's or ability's resource -
+        // then its caster level and any metamagic.
+        public static string Describe(string casterName, string bookName, int spellLevel,
+            ResourcePoolKind? poolKind, string resourceLabel, int casterLevel, int metamagicMask)
         {
-            string resource = string.IsNullOrWhiteSpace(resourceLabel) ? "resource" : resourceLabel;
-            string label = !string.IsNullOrEmpty(casterName) &&
-                !resource.StartsWith(casterName + ":", StringComparison.Ordinal)
-                    ? casterName + ": " + resource : resource;
+            string label;
+            if (!string.IsNullOrWhiteSpace(bookName))
+            {
+                string slot = poolKind == ResourcePoolKind.Unlimited ? "free"
+                    : poolKind == ResourcePoolKind.PreparedSlots ? "prepared slot"
+                    : poolKind == ResourcePoolKind.SpontaneousLevel ? "spell slot" : "uses";
+                label = (string.IsNullOrEmpty(casterName) ? string.Empty : casterName + ": ") +
+                    bookName + " level " + spellLevel + " (" + slot + ")";
+            }
+            else
+            {
+                string resource = string.IsNullOrWhiteSpace(resourceLabel) ? "resource" : resourceLabel;
+                label = !string.IsNullOrEmpty(casterName) &&
+                    !resource.StartsWith(casterName + ":", StringComparison.Ordinal)
+                        ? casterName + ": " + resource : resource;
+            }
             if (casterLevel > 0) label += ", caster level " + casterLevel;
             if (metamagicMask != 0) label += ", with metamagic";
             return label;
@@ -1026,6 +1044,10 @@ namespace KingmakerBuffPlanner.UI
             new List<WorkspaceProviderChoice>();
         internal readonly List<WorkspaceProviderChoice> _draftProviders =
             new List<WorkspaceProviderChoice>();
+
+        // Re-review: the selected routine's castings that are ready on their
+        // own but short of a resource when every routine runs in one pass.
+        public int OnePassShortCount { get; internal set; }
 
         // Header caption for the selected buff: the discovered display name
         // of the selected source; never the raw source key when a name was

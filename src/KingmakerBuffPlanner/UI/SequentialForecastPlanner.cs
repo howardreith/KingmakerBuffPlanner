@@ -243,7 +243,7 @@ namespace KingmakerBuffPlanner.UI
                     provider.EligibleTokenIds, material, provider.EffectiveCasterLevel,
                     provider.ExpectedDurationRounds, provider.Description,
                     provider.DurationText, provider.SourceDisplayName,
-                    provider.VariantOrder));
+                    provider.VariantOrder, provider.SourceBookName));
             }
             return new PartyProviderSnapshot(original.Units, providers, pools);
         }

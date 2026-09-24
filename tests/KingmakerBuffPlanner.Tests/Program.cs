@@ -13147,12 +13147,20 @@ namespace KingmakerBuffPlanner.Tests
                 shortView.OnePassGate.BlockingReasons.Count == 0)
                 throw new InvalidOperationException(
                     "The one-pass forecast hid the real one-charge conflict.");
-            // Final review B7: the footer shows it.
-            if (WorkspaceFooterText.WholePlan(shortView.OnePassGate) !=
-                    "All routines in one pass: 1 casting would be blocked." ||
-                WorkspaceFooterText.WholePlan(null) != string.Empty)
+            // Final review B7 and its re-review: the footer counts the
+            // selected routine's castings that are ready alone but short of a
+            // resource in one pass (here the short routine's, not the long's).
+            session.SelectRoutine("long");
+            int longShort = session.BuildView(inputs).OnePassShortCount;
+            session.SelectRoutine("short");
+            if (shortView.OnePassShortCount != 1 || longShort != 0 ||
+                WorkspaceFooterText.WholePlan(shortView.OnePassShortCount) !=
+                    "Running every routine in one pass leaves 1 casting of this routine short of a resource." ||
+                WorkspaceFooterText.WholePlan(2) !=
+                    "Running every routine in one pass leaves 2 castings of this routine short of a resource." ||
+                WorkspaceFooterText.WholePlan(0) != string.Empty)
                 throw new InvalidOperationException("The whole-plan forecast is not shown: " +
-                    WorkspaceFooterText.WholePlan(shortView.OnePassGate));
+                    shortView.OnePassShortCount + "/" + longShort);
 
             session.PresentForReview(inputs);
             WorkspaceApplyResult shortApply =

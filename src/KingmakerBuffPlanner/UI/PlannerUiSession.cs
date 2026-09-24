@@ -66,7 +66,12 @@ namespace KingmakerBuffPlanner.UI
             }
             _profiles.Save(profile);
             string refusal = _profiles.LastSaveRefusal;
-            if (refusal == null) return;
+            if (refusal == null)
+            {
+                // A save that went through ends any earlier notice.
+                PersistenceNotice = null;
+                return;
+            }
             PersistenceNotice = PersistenceMessages.ForClassicSaveRefusal(refusal);
             _log.Info("[KBP-PROFILE] Classic save refused: " + refusal + ".");
         }
@@ -122,7 +127,8 @@ namespace KingmakerBuffPlanner.UI
                 ProfileLoadResult loaded = _profiles.Load(campaignId);
                 PlannerHotkey.SetBinding(loaded.Profile.Ui.Hotkey);
                 PersistenceNotice = PersistenceMessages.ForClassicLoad(loaded.SourcePath,
-                    loaded.RecoveredFromBackup, loaded.Warning);
+                    loaded.RecoveredFromBackup, loaded.Warning,
+                    System.IO.Path.GetFileName(_profiles.GetProfilePath(campaignId)));
                 ProfileStatus = string.IsNullOrEmpty(loaded.SourcePath)
                     ? (string.IsNullOrEmpty(loaded.Warning)
                         ? "No prior profile was found; using a new schema "

@@ -110,7 +110,12 @@ namespace KingmakerBuffPlanner.UI
             _headerStatus.text = WorkspaceHeaderText.Describe(
                 _session.RoutineDisplayName(view.SelectedRoutineId), view.RoutineCastingCount,
                 view.RoutineReadyCount, view.SelectedRoutineGate.Allowed,
-                view.SelectedRoutineGate.BlockingReasons.Count);
+                view.SelectedRoutineGate.BlockingReasons.Count) +
+                // Re-review: a plan that cannot be saved says so for as long as
+                // it lasts, not only in the first footer message.
+                (!_session.PersistenceBlocked ? string.Empty
+                    : _session.LegacyImportBlocked ? " · not saved: the classic plan could not be imported"
+                    : " · not saved: the plan file cannot be read");
             _scopeLabel.text = view.EditingScopeLabel;
             _lastView = view;
             if (!_importAnnounced && _footerResult != null)
@@ -118,8 +123,8 @@ namespace KingmakerBuffPlanner.UI
                 _importAnnounced = true;
                 // Final review B4: a plan file that could not be used is
                 // announced when the planner opens, before anything else.
-                string import = PersistenceMessages.ForCastingLoad(_session.LoadStatus) ??
-                    DescribeImport(_session);
+                string import = PersistenceMessages.ForCastingLoad(_session.LoadStatus,
+                    _session.PrimaryPlanFileExists) ?? DescribeImport(_session);
                 if (import != null) _footerResult.text = import;
             }
             RebuildBuffGrid(view);
@@ -608,7 +613,7 @@ namespace KingmakerBuffPlanner.UI
                     try
                     {
                         _session.Save();
-                        _footerResult.text = "Candidate saved.";
+                        _footerResult.text = "Casting plan saved.";
                     }
                     catch (Exception exception)
                     {
@@ -622,9 +627,11 @@ namespace KingmakerBuffPlanner.UI
                     CastingPlanLoadStatus status = _session.Reload();
                     _footerResult.text = _session.LegacyImportBlocked
                         ? DescribeImport(_session)
-                        : PersistenceMessages.ForCastingLoad(status) ??
-                            (_session.ImportReport != null
-                                ? DescribeImport(_session) : "Reloaded: " + status);
+                        : PersistenceMessages.ForCastingLoad(status, _session.PrimaryPlanFileExists) ??
+                            (_session.ImportReport != null ? DescribeImport(_session)
+                                : status == CastingPlanLoadStatus.Absent
+                                    ? "No casting plan is saved yet; Save writes one."
+                                    : "Reloaded the saved casting plan.");
                     RefreshView();
                 }));
             KingmakerUiFactory.SetAnchors(RectOf(_reloadButton), 0.43f, 0.2f, 0.51f, 0.8f);
@@ -1170,7 +1177,8 @@ namespace KingmakerBuffPlanner.UI
                 AddInspectorCaption("Imported: needs review");
                 Text items = KingmakerUiFactory.CreateText(
                     "ImportReviewItems", _inspectorContent, _theme,
-                    string.Join("\n", focused.Provenance.UnresolvedReviewItems.ToArray()) +
+                    string.Join("\n", focused.Provenance.UnresolvedReviewItems
+                        .Select(WorkspaceReasonText.DescribeReviewItem).ToArray()) +
                     "\nThis casting cannot run until the review is resolved.",
                     12, TextAnchor.UpperLeft);
                 items.color = _theme.MutedBrownText;
@@ -1282,6 +1290,20 @@ namespace KingmakerBuffPlanner.UI
                             RefreshView();
                         }));
                 }
+                // Re-review: a single-target casting can become a group casting
+                // centred on its caster (its target becomes the required
+                // coverage).
+                Button toGroup = KingmakerUiFactory.CreateButton(
+                    "FocusedMode.Group", _inspectorContent, _theme,
+                    "Make it a group casting (centred on the caster)", () => Click(() =>
+                    {
+                        SurfaceRefusal(_session.SetFocusedTargeting(
+                            Domain.Authoring.CastingTargetMode.CasterCenteredOrigin, null, null,
+                            focused.DirectTargetUnitId == null ? null : new[] { focused.DirectTargetUnitId }),
+                            "mode");
+                        RefreshView();
+                    }));
+                KingmakerUiFactory.AddLayout(RectOf(toGroup), 30f);
             }
             else
             {
@@ -1346,6 +1368,24 @@ namespace KingmakerBuffPlanner.UI
                                         : focused.Origin.AnchorUnitId,
                                     coverage);
                             SurfaceRefusal(result, "coverage");
+                            RefreshView();
+                        }));
+                }
+                // Re-review: a group casting (for example an imported one whose
+                // old plan did not say single target or group) can become a
+                // single-target casting on a chosen member.
+                AddInspectorCaption("Or a single target");
+                RectTransform singleRow = CreateTileRow("FocusedSingleTiles");
+                foreach (WorkspaceTargetOption target in view.Draft.Targets)
+                {
+                    WorkspaceTargetOption captured = target;
+                    CreatePortraitTile("FocusedSingle." + captured.UnitId, singleRow,
+                        captured.UnitId, captured.DisplayName, false, Color.white,
+                        () => Click(() =>
+                        {
+                            SurfaceRefusal(_session.SetFocusedTargeting(
+                                Domain.Authoring.CastingTargetMode.DirectTarget,
+                                captured.UnitId, null, null), "mode");
                             RefreshView();
                         }));
                 }
@@ -1731,6 +1771,17 @@ namespace KingmakerBuffPlanner.UI
                     RefreshView();
                 }));
             KingmakerUiFactory.AddLayout(RectOf(fallback), 30f);
+            Button outOfCombat = KingmakerUiFactory.CreateButton(
+                "OutOfCombatOnly", _inspectorContent, _theme,
+                (_session.OutOfCombatOnly ? "[x] " : "[  ] ") + "Cast only out of combat",
+                () => Click(() =>
+                {
+                    _session.SetOutOfCombatOnly(!_session.OutOfCombatOnly);
+                    _footerResult.text = "Out-of-combat only " +
+                        (_session.OutOfCombatOnly ? "on" : "off") + " (Save to keep it).";
+                    RefreshView();
+                }));
+            KingmakerUiFactory.AddLayout(RectOf(outOfCombat), 30f);
         }
 
         private void AddInspectorCaption(string caption)
@@ -1791,7 +1842,7 @@ namespace KingmakerBuffPlanner.UI
             _footerBudget.text = lines.Count == 0
                 ? "No resource demand yet."
                 : string.Join("   ", lines.ToArray());
-            string wholePlan = WorkspaceFooterText.WholePlan(view.OnePassGate);
+            string wholePlan = WorkspaceFooterText.WholePlan(view.OnePassShortCount);
             if (wholePlan.Length != 0) _footerBudget.text += "   " + wholePlan;
         }
     }

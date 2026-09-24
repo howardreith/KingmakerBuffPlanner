@@ -67,7 +67,8 @@ namespace KingmakerBuffPlanner.Persistence
 
         public CastingMigrationResult Migrate(
             string campaignId,
-            IDictionary<string, CastGroupingKind> groupingsBySourceId = null)
+            IDictionary<string, CastGroupingKind> groupingsBySourceId = null,
+            BuffPlannerProfile legacyInMemory = null)
         {
             if (string.IsNullOrWhiteSpace(campaignId))
                 throw new ArgumentException("Exact campaign ID is required.", "campaignId");
@@ -99,6 +100,13 @@ namespace KingmakerBuffPlanner.Persistence
                     CastingMigrationStatus.LegacyUnreadable, null, string.Empty,
                     legacyHash, string.Empty, "invalid:" + exception.Message);
             }
+            // Re-review: the classic planner's own in-memory plan of this
+            // campaign (its sources rebound to the party's current abilities)
+            // is imported when given; the file above still had to be readable,
+            // and it is archived exactly and never written.
+            if (legacyInMemory != null &&
+                string.Equals(legacyInMemory.CampaignId, campaignId, StringComparison.Ordinal))
+                legacy = legacyInMemory;
             // A newer-schema candidate must not be buried by a migration;
             // the operator resolves it explicitly first.
             CastingPlanLoadResult existingCandidate =

@@ -42,6 +42,11 @@ namespace KingmakerBuffPlanner.Tests
             Run("multi-provider-caster-picks-the-exact-source", () => TestExactProviderPicker(root));
             Run("focused-casting-routine-order-and-recast", () => TestFocusedRoutineOrderAndRecast(root));
             Run("planners-show-unusable-files-and-refused-saves", () => TestPersistenceNoticesShown(root));
+            Run("provider-choices-name-the-book-and-refuse-twins", () => TestProviderLabelsAndTwins(root));
+            Run("next-casting-enhancements-follow-its-caster", () => TestDraftEnhancementsFollowTheCaster(root));
+            Run("out-of-combat-setting-is-saved", () => TestOutOfCombatSettingSaved(root));
+            Run("imported-grouping-unknown-becomes-single-target", () => TestImportedGroupingUnknownBecomesSingleTarget(root));
+            Run("first-open-import-reads-the-rebound-classic-plan", () => TestImportFromReboundClassicPlan(root));
             Run("classic-file-and-hud-stay-with-their-mode-and-campaign", TestClassicSaveAndHudScoping);
             Run("native-boundary-refuses-non-standard-or-tampered", TestNativeBoundaryRefusals);
             Run("execution-host-runs-reports-and-halts", TestExecutionHostRunsAndHalts);
@@ -789,15 +794,16 @@ namespace KingmakerBuffPlanner.Tests
             Directory.CreateDirectory(dir);
             var profiles = new ProfileRepository(dir);
             ProfileLoadResult absent = profiles.Load("notice-campaign");
+            string primaryName = Path.GetFileName(profiles.GetProfilePath("notice-campaign"));
             if (PersistenceMessages.ForClassicLoad(absent.SourcePath, absent.RecoveredFromBackup,
-                    absent.Warning) != null)
+                    absent.Warning, primaryName) != null)
                 throw new InvalidOperationException("A missing Classic setup was reported as unreadable.");
             string primary = profiles.GetProfilePath("notice-campaign");
             Directory.CreateDirectory(Path.GetDirectoryName(primary));
             File.WriteAllText(primary, "{ not json");
             ProfileLoadResult unreadable = profiles.Load("notice-campaign");
             string loadNotice = PersistenceMessages.ForClassicLoad(unreadable.SourcePath,
-                unreadable.RecoveredFromBackup, unreadable.Warning);
+                unreadable.RecoveredFromBackup, unreadable.Warning, primaryName);
             profiles.Save(unreadable.Profile);
             string saveNotice = PersistenceMessages.ForClassicSaveRefusal(profiles.LastSaveRefusal);
             if (loadNotice == null || !loadNotice.StartsWith("Your saved planner setup could not be read",
@@ -805,16 +811,61 @@ namespace KingmakerBuffPlanner.Tests
                 !saveNotice.StartsWith("Not saved:", StringComparison.Ordinal) ||
                 File.ReadAllText(primary) != "{ not json")
                 throw new InvalidOperationException("An unreadable Classic setup or refused save was not reported.");
-            if (PersistenceMessages.ForClassicLoad("backup.json", true, "primary: bad") == null ||
-                PersistenceMessages.ForClassicLoad("primary.json", false, string.Empty) != null ||
+            string recoveredNotice = PersistenceMessages.ForClassicLoad("primary.json.bak1", true,
+                "primary.json: bad", "primary.json");
+            if (recoveredNotice == null || !recoveredNotice.Contains("changes are not saved") ||
+                PersistenceMessages.ForClassicLoad("primary.json", false, string.Empty, "primary.json") != null ||
                 PersistenceMessages.ForClassicSaveRefusal(null) != null)
                 throw new InvalidOperationException("Classic load notices misjudged a backup or a clean load.");
-            if (PersistenceMessages.ForCastingLoad(CastingPlanLoadStatus.Corrupt) == null ||
-                PersistenceMessages.ForCastingLoad(CastingPlanLoadStatus.UnsupportedSchema) == null ||
-                PersistenceMessages.ForCastingLoad(CastingPlanLoadStatus.RecoveredFromBackup) == null ||
-                PersistenceMessages.ForCastingLoad(CastingPlanLoadStatus.Loaded) != null ||
-                PersistenceMessages.ForCastingLoad(CastingPlanLoadStatus.Absent) != null)
+            // Re-review: only an unreadable primary refuses saves; a missing
+            // one is written again, and its notice says so.
+            string missingNotice = PersistenceMessages.ForClassicLoad("primary.json.bak1", true, string.Empty,
+                "primary.json");
+            if (missingNotice != "Your saved planner setup file was missing, so its latest readable backup was loaded." ||
+                PersistenceMessages.ForClassicLoad(string.Empty, false, "primary.json.bak1: bad", "primary.json") != null)
+                throw new InvalidOperationException("A missing Classic file was reported as refusing saves: " +
+                    missingNotice);
+            string missingDir = Path.Combine(root, "pn-missing");
+            Directory.CreateDirectory(missingDir);
+            var missingProfiles = new ProfileRepository(missingDir);
+            string missingPath = missingProfiles.GetProfilePath("notice-campaign");
+            Directory.CreateDirectory(Path.GetDirectoryName(missingPath));
+            File.WriteAllText(missingPath + ".bak1", "{ not json");
+            ProfileLoadResult onlyBadBackup = missingProfiles.Load("notice-campaign");
+            if (PersistenceMessages.ForClassicLoad(onlyBadBackup.SourcePath, onlyBadBackup.RecoveredFromBackup,
+                    onlyBadBackup.Warning, Path.GetFileName(missingPath)) != null)
+                throw new InvalidOperationException("A missing Classic file with a bad backup claimed saves are refused.");
+            missingProfiles.Save(onlyBadBackup.Profile);
+            if (missingProfiles.LastSaveRefusal != null || !File.Exists(missingPath))
+                throw new InvalidOperationException("A missing Classic file was not written again.");
+            File.Delete(missingPath + ".bak1");
+            File.Move(missingPath, missingPath + ".bak1");
+            ProfileLoadResult goodBackup = missingProfiles.Load("notice-campaign");
+            if (!goodBackup.RecoveredFromBackup || PersistenceMessages.ForClassicLoad(goodBackup.SourcePath,
+                    goodBackup.RecoveredFromBackup, goodBackup.Warning, Path.GetFileName(missingPath)) != missingNotice)
+                throw new InvalidOperationException("A backup loaded for a missing Classic file was not announced as such.");
+            if (PersistenceMessages.ForCastingLoad(CastingPlanLoadStatus.Corrupt, true) == null ||
+                PersistenceMessages.ForCastingLoad(CastingPlanLoadStatus.UnsupportedSchema, true) == null ||
+                PersistenceMessages.ForCastingLoad(CastingPlanLoadStatus.RecoveredFromBackup, true) == null ||
+                PersistenceMessages.ForCastingLoad(CastingPlanLoadStatus.Loaded, true) != null ||
+                PersistenceMessages.ForCastingLoad(CastingPlanLoadStatus.Absent, false) != null)
                 throw new InvalidOperationException("Casting-first load notices misjudged a status.");
+            // Re-review: the notice names the remedy that works (the file and
+            // its backups moved aside, then Reload), and a backup loaded for a
+            // missing file does not claim saves are refused.
+            if (!PersistenceMessages.ForCastingLoad(CastingPlanLoadStatus.Corrupt, true).Contains(
+                    "move it and its backups (.bak1 to .bak3) out of UserSettings, then press Reload") ||
+                !PersistenceMessages.ForCastingLoad(CastingPlanLoadStatus.RecoveredFromBackup, true).Contains(
+                    "saving is refused") ||
+                PersistenceMessages.ForCastingLoad(CastingPlanLoadStatus.RecoveredFromBackup, false) !=
+                    "Your casting plan file was missing, so its latest backup was loaded.")
+                throw new InvalidOperationException("Casting-first notices name the wrong remedy or claim.");
+            if (!PersistenceMessages.ForSaveFailure(new InvalidOperationException(
+                    "Candidate persistence is blocked: Corrupt x")).EndsWith("then press Reload.", StringComparison.Ordinal) ||
+                !PersistenceMessages.ForSaveFailure(new InvalidOperationException(
+                    "Candidate persistence is blocked: legacy-import x")).StartsWith(
+                    "Not saved: your classic plan could not be imported", StringComparison.Ordinal))
+                throw new InvalidOperationException("A blocked Save is not told in the player's words.");
             // A casting-first plan that cannot be read opens blocked, and its
             // notice is what the view shows first.
             string castingDir = Path.Combine(dir, "casting");
@@ -823,21 +874,81 @@ namespace KingmakerBuffPlanner.Tests
             Directory.CreateDirectory(Path.GetDirectoryName(plan));
             File.WriteAllText(plan, "{ not json");
             var blocked = new CastingWorkspaceSession(castingDir, "notice-campaign");
-            if (!blocked.PersistenceBlocked || PersistenceMessages.ForCastingLoad(blocked.LoadStatus) == null)
+            if (!blocked.PersistenceBlocked || PersistenceMessages.ForCastingLoad(blocked.LoadStatus,
+                    blocked.PrimaryPlanFileExists) == null)
                 throw new InvalidOperationException("An unreadable casting plan opened without a notice: " +
                     blocked.LoadStatus);
+            // Re-review: the remedy works in the same session - with the
+            // unreadable file moved aside, Reload unblocks it and Save writes
+            // the plan (and the status is current after the save).
+            File.Delete(plan);
+            CastingPlanLoadStatus reloadedStatus = blocked.Reload();
+            blocked.Save();
+            if (reloadedStatus != CastingPlanLoadStatus.Absent || blocked.PersistenceBlocked ||
+                !File.Exists(plan) || blocked.LoadStatus != CastingPlanLoadStatus.Loaded)
+                throw new InvalidOperationException("Moving the unreadable plan aside did not unblock the session: " +
+                    reloadedStatus);
+            // Castings authored while the plan was blocked are kept, shown as
+            // unsaved, and written by the next Save.
+            string keptDir = Path.Combine(root, "pn-kept");
+            Directory.CreateDirectory(keptDir);
+            string keptPlan = new CastingPlanRepository(keptDir).GetProfilePath("workspace-campaign");
+            Directory.CreateDirectory(Path.GetDirectoryName(keptPlan));
+            File.WriteAllText(keptPlan, "{ not json");
+            PartyProviderSnapshot keptSnapshot;
+            CastingWorkspaceInputs keptInputs = WorkspaceInputs(out keptSnapshot);
+            var kept = new CastingWorkspaceSession(keptDir, "workspace-campaign", new DisabledCastingDispatchBoundary());
+            Assert(kept.PersistenceBlocked);
+            Assert(AddDraftCasting(kept, keptInputs, "unit-cleric", "unit-t1").Applied);
+            File.Delete(keptPlan);
+            kept.Reload();
+            if (kept.PersistenceBlocked || kept.Document.Castings.Count != 1 || !kept.IsDirty)
+                throw new InvalidOperationException("Castings authored while the plan was blocked were lost or looked saved.");
+            kept.Save();
+            if (new CastingWorkspaceSession(keptDir, "workspace-campaign").Document.Castings.Count != 1)
+                throw new InvalidOperationException("The kept casting was not saved.");
+            // A backup loaded because the primary is missing saves normally;
+            // the save makes the primary current.
+            string backupDir = Path.Combine(root, "pn-bak");
+            Directory.CreateDirectory(backupDir);
+            var first = new CastingWorkspaceSession(backupDir, "workspace-campaign", new DisabledCastingDispatchBoundary());
+            Assert(AddDraftCasting(first, keptInputs, "unit-cleric", "unit-t1").Applied);
+            first.Save();
+            first.Save();
+            string backupPlan = new CastingPlanRepository(backupDir).GetProfilePath("workspace-campaign");
+            File.Delete(backupPlan);
+            var fromBackup = new CastingWorkspaceSession(backupDir, "workspace-campaign", new DisabledCastingDispatchBoundary());
+            if (fromBackup.LoadStatus != CastingPlanLoadStatus.RecoveredFromBackup || fromBackup.PrimaryPlanFileExists ||
+                PersistenceMessages.ForCastingLoad(fromBackup.LoadStatus, fromBackup.PrimaryPlanFileExists) !=
+                    "Your casting plan file was missing, so its latest backup was loaded.")
+                throw new InvalidOperationException("A backup loaded for a missing plan was announced wrongly: " +
+                    fromBackup.LoadStatus);
+            fromBackup.Save();
+            if (fromBackup.LoadStatus != CastingPlanLoadStatus.Loaded || !fromBackup.PrimaryPlanFileExists ||
+                PersistenceMessages.ForCastingLoad(fromBackup.LoadStatus, fromBackup.PrimaryPlanFileExists) != null)
+                throw new InvalidOperationException("The load status stayed stale after a save.");
             DirectoryInfo directory = new DirectoryInfo(Environment.CurrentDirectory);
             while (directory != null && !File.Exists(Path.Combine(directory.FullName, "KingmakerBuffPlanner.sln")))
                 directory = directory.Parent;
             Func<string, string> source = name => File.ReadAllText(Path.Combine(directory.FullName, "src",
                 "KingmakerBuffPlanner", "UI", name)).Replace("\r\n", "\n");
             string session = source("PlannerUiSession.cs");
-            if (!session.Contains("PersistenceNotice = PersistenceMessages.ForClassicLoad(loaded.SourcePath,") ||
+            string workspaceSource = source("CastingWorkspaceScreenView.cs");
+            string castingSession = source("CastingWorkspaceSession.cs");
+            if (!session.Contains("PersistenceNotice = PersistenceMessages.ForClassicLoad(loaded.SourcePath,\n" +
+                    "                    loaded.RecoveredFromBackup, loaded.Warning,\n" +
+                    "                    System.IO.Path.GetFileName(_profiles.GetProfilePath(campaignId)));") ||
                 !session.Contains("PersistenceNotice = PersistenceMessages.ForClassicSaveRefusal(refusal);") ||
+                !session.Contains("                // A save that went through ends any earlier notice.\n" +
+                    "                PersistenceNotice = null;\n                return;") ||
                 !source("BuffPlannerScreenView.cs").Contains("string notice = _session.PersistenceNotice;") ||
-                !source("CastingWorkspaceScreenView.cs").Contains(
-                    "string import = PersistenceMessages.ForCastingLoad(_session.LoadStatus) ??") ||
-                !source("CastingWorkspaceScreenView.cs").Contains(": PersistenceMessages.ForCastingLoad(status) ??"))
+                !workspaceSource.Contains("string import = PersistenceMessages.ForCastingLoad(_session.LoadStatus,\n" +
+                    "                    _session.PrimaryPlanFileExists) ?? DescribeImport(_session);") ||
+                !workspaceSource.Contains(": PersistenceMessages.ForCastingLoad(status, _session.PrimaryPlanFileExists) ??") ||
+                !workspaceSource.Contains("                (!_session.PersistenceBlocked ? string.Empty\n" +
+                    "                    : _session.LegacyImportBlocked ? \" · not saved: the classic plan could not be imported\"\n" +
+                    "                    : \" · not saved: the plan file cannot be read\");") ||
+                !castingSession.Contains("\"Candidate persistence is blocked: \" + (LegacyImportBlocked ? \"legacy-import\" : LoadStatus.ToString()) +"))
                 throw new InvalidOperationException("A planner does not show its persistence notice.");
         }
 
@@ -939,9 +1050,19 @@ namespace KingmakerBuffPlanner.Tests
                 !session.CompilePlan(inputs).CastingById(casting.CastingId).IsExecutable)
                 throw new InvalidOperationException("The picked source was not the one authored: " + added.Reason);
             session.FocusCasting(casting.CastingId);
+            // Re-review: the same caster keeps its enhancements when it
+            // switches books.
+            Assert(session.UpdateFocusedCasting(session.Document.Castings.Single().WithEnhancementSelections(new[]
+            {
+                new AuthoredEnhancementSelection("extend-cleric", false, null)
+            })).Applied);
             WorkspaceProviderChoice other = session.BuildView(inputs).FocusedProviders.Single(value =>
                 value.CasterUnitId == "unit-cleric" && !value.ProviderKey.Contains("book-cleric-second"));
-            Assert(session.SetFocusedProvider(other.ProviderKey, inputs).Applied);
+            AuthoringEditResult otherBook = session.SetFocusedProvider(other.ProviderKey, inputs);
+            if (!otherBook.Applied || otherBook.Reason.Length != 0 ||
+                session.Document.Castings.Single().Enhancements.Count != 1)
+                throw new InvalidOperationException("Switching books dropped the caster's own enhancement: " +
+                    otherBook.Reason);
             if (session.Document.Castings.Single().SpellbookGuid != firstBook.Provider.Key.SpellbookGuid ||
                 session.SetFocusedProvider(other.ProviderKey, inputs).Applied ||
                 !session.CompilePlan(inputs).CastingById(casting.CastingId).IsExecutable)
@@ -992,10 +1113,16 @@ namespace KingmakerBuffPlanner.Tests
             })).Applied);
             WorkspaceProviderChoice wizard = session.BuildView(inputs).FocusedProviders.Single(value =>
                 value.CasterUnitId == "unit-wizard");
-            Assert(session.SetFocusedProvider(wizard.ProviderKey, inputs).Applied);
+            AuthoringEditResult toWizard = session.SetFocusedProvider(wizard.ProviderKey, inputs);
             PlannedCasting switched = session.Document.Castings.Single(value => value.CastingId == first);
-            if (switched.CasterUnitId != "unit-wizard" || switched.Enhancements.Count != 0)
-                throw new InvalidOperationException("Another caster's enhancement was carried to the new caster.");
+            if (!toWizard.Applied || switched.CasterUnitId != "unit-wizard" || switched.Enhancements.Count != 0 ||
+                toWizard.Reason != "the new caster does not have Fixture extend-cleric (Undo restores it)")
+                throw new InvalidOperationException("Another caster's enhancement was carried over or dropped silently: " +
+                    toWizard.Reason);
+            session.Undo();
+            PlannedCasting restored = session.Document.Castings.Single(value => value.CastingId == first);
+            if (restored.CasterUnitId != "unit-cleric" || restored.Enhancements.Count != 1)
+                throw new InvalidOperationException("Undo did not restore the dropped enhancement.");
             session.FocusCasting(null);
             session.Draft.ExistingEffectPolicy = ExistingEffectPolicy.Overwrite;
             Assert(AddDraftCasting(session, inputs, "unit-cleric", "unit-t3").Applied);
@@ -1017,7 +1144,16 @@ namespace KingmakerBuffPlanner.Tests
                 "_session.MoveFocusedCastingWithinRoutine(1)",
                 "_session.SetFocusedRecastPolicy(recastFocused",
                 "_session.Draft.ExistingEffectPolicy = recastDraft",
-                "_session.SetAllowAnimatedFallback(!_session.AllowAnimatedFallback);"
+                "_session.SetAllowAnimatedFallback(!_session.AllowAnimatedFallback);",
+                // Re-review: the out-of-combat rule, the target-mode switches
+                // and review items in words.
+                "_session.SetOutOfCombatOnly(!_session.OutOfCombatOnly);",
+                "\"FocusedMode.Group\", _inspectorContent, _theme,",
+                "Domain.Authoring.CastingTargetMode.CasterCenteredOrigin, null, null,\n" +
+                    "                            focused.DirectTargetUnitId == null ? null : new[] { focused.DirectTargetUnitId }),",
+                "CreatePortraitTile(\"FocusedSingle.\" + captured.UnitId, singleRow,",
+                ".Select(WorkspaceReasonText.DescribeReviewItem).ToArray()) +",
+                "WorkspaceFooterText.WholePlan(view.OnePassShortCount);"
             })
                 if (!view.Contains(wiring))
                     throw new InvalidOperationException("The focused editor has no control for: " + wiring);
@@ -1043,6 +1179,270 @@ namespace KingmakerBuffPlanner.Tests
             if (ids.Length != 2 || ids.Contains(removed) || ids.Distinct(StringComparer.Ordinal).Count() != 2)
                 throw new InvalidOperationException("A removed casting's id was issued again: " +
                     string.Join(",", ids));
+            // Re-review: a loaded plan's ids count too - the highest one,
+            // removed after the planner reopens, is not issued again.
+            Assert(AddDraftCasting(session, inputs, "unit-wizard", "unit-t4").Applied);
+            session.Save();
+            string highest = session.Document.Castings.Select(value => value.CastingId)
+                .OrderBy(value => int.Parse(value.Substring(5), System.Globalization.CultureInfo.InvariantCulture)).Last();
+            var reopened = new CastingWorkspaceSession(dir, "workspace-campaign",
+                new DisabledCastingDispatchBoundary());
+            reopened.FocusCasting(highest);
+            Assert(reopened.RemoveFocusedCasting().Applied);
+            Assert(AddDraftCasting(reopened, inputs, "unit-cleric", "unit-t5").Applied);
+            if (reopened.Document.Castings.Any(value => value.CastingId == highest))
+                throw new InvalidOperationException("A loaded plan's removed casting id was issued again: " + highest);
+        }
+
+        // Re-review: a provider choice names its exact source (the spellbook,
+        // its spell level and the kind of slot); two options that differ only
+        // by spell level in one spellbook cannot be pinned by a casting and
+        // are refused with a reason, never authored; an item's source without
+        // a spellbook is the same source whether it is recorded as none or
+        // empty.
+        private static void TestProviderLabelsAndTwins(string root)
+        {
+            if (WorkspaceProviderLabels.Describe("Linzi", "Bard", 1, ResourcePoolKind.SpontaneousLevel, "pool", 5, 0) !=
+                    "Linzi: Bard level 1 (spell slot), caster level 5" ||
+                WorkspaceProviderLabels.Describe("Hedwirg", "Wizard", 2, ResourcePoolKind.PreparedSlots, "pool", 7, 1) !=
+                    "Hedwirg: Wizard level 2 (prepared slot), caster level 7, with metamagic" ||
+                WorkspaceProviderLabels.Describe("Tartuccio", "Sorcerer", 0, ResourcePoolKind.Unlimited, "pool", 3, 0) !=
+                    "Tartuccio: Sorcerer level 0 (free), caster level 3" ||
+                WorkspaceProviderLabels.Describe("Linzi", string.Empty, 1, ResourcePoolKind.ItemCharges,
+                    "Wand of Shield", 1, 0) != "Linzi: Wand of Shield, caster level 1")
+                throw new InvalidOperationException("A provider label does not name its exact source.");
+            string dir = Path.Combine(root, "provider-twins");
+            Directory.CreateDirectory(dir);
+            PartyProviderSnapshot baseSnapshot;
+            CastingWorkspaceInputs baseInputs = WorkspaceInputs(out baseSnapshot);
+            ProviderPlanningOption clericOption = baseInputs.ProviderOptions.Single(value =>
+                value.Provider.Key.CasterUnitId == "unit-cleric");
+            var twin = new ProviderSnapshot(new ProviderKey("unit-cleric", clericOption.Provider.Key.SpellbookGuid,
+                    CastingBuffAbility, "level-3"), CastingBuffAbility.BaseAbilityGuid, 3,
+                clericOption.Provider.ResourcePoolKey, 1, null, null, 10, sourceBookName: "Cleric");
+            var snapshot = new PartyProviderSnapshot(baseSnapshot.Units,
+                baseSnapshot.Providers.Concat(new[] { twin }).ToList(), baseSnapshot.ResourcePools);
+            var inputs = new CastingWorkspaceInputs(snapshot, baseInputs.ProviderOptions.Concat(new[]
+                {
+                    new ProviderPlanningOption(twin, clericOption.ReachableTargetIds,
+                        clericOption.LegalAnchorIds, 10, 100)
+                }).ToList(), baseInputs.EffectsBySource, baseInputs.Enhancements);
+            var session = new CastingWorkspaceSession(dir, "workspace-campaign",
+                new DisabledCastingDispatchBoundary());
+            session.SelectBuff("source-bulls");
+            session.SelectRoutine("long");
+            session.BuildView(inputs);
+            session.Draft.SourceId = "source-bulls";
+            session.Draft.TargetMode = CastingTargetMode.DirectTarget;
+            session.ChooseDraftCaster("unit-cleric");
+            WorkspaceProviderChoice twinChoice = session.BuildView(inputs).DraftProviders.SingleOrDefault(value =>
+                value.ProviderKey.EndsWith("|level-3", StringComparison.Ordinal));
+            AuthoringEditResult pinned = twinChoice == null ? null
+                : session.ChooseDraftProvider(twinChoice.ProviderKey, inputs);
+            if (twinChoice == null || twinChoice.Label != "unit-cleric: Cleric level 3 (spell slot), caster level 10" ||
+                pinned.Applied || !pinned.Reason.StartsWith("provider-not-pinnable:", StringComparison.Ordinal) ||
+                !WorkspaceRefusalText.Describe(pinned.Reason).StartsWith(
+                    "that character knows this spell at more than one level", StringComparison.Ordinal))
+                throw new InvalidOperationException("A source the casting cannot pin was offered or authored: " +
+                    (twinChoice == null ? "missing" : twinChoice.Label + "|" + pinned.Reason));
+            Assert(AddDraftCasting(session, inputs, "unit-wizard", "unit-t1").Applied);
+            string wizardCasting = session.Document.Castings.Single().CastingId;
+            session.FocusCasting(wizardCasting);
+            List<WorkspaceProviderChoice> focusedChoices = session.BuildView(inputs).FocusedProviders.ToList();
+            WorkspaceProviderChoice focusedTwin = focusedChoices.Single(value =>
+                value.ProviderKey.EndsWith("|level-3", StringComparison.Ordinal));
+            AuthoringEditResult focusedPinned = session.SetFocusedProvider(focusedTwin.ProviderKey, inputs);
+            if (focusedPinned.Applied || !focusedPinned.Reason.StartsWith("provider-not-pinnable:", StringComparison.Ordinal) ||
+                session.Document.Castings.Single().CasterUnitId != "unit-wizard" ||
+                focusedChoices.Count(value => value.Selected) != 1 ||
+                focusedChoices.Single(value => value.Selected).CasterUnitId != "unit-wizard")
+                throw new InvalidOperationException("The focused casting took a source it cannot pin: " +
+                    focusedPinned.Reason);
+            // An item's source has no spellbook: "" in its key, none in the
+            // casting - the same source, so choosing it again is no change.
+            string itemDir = Path.Combine(root, "provider-no-spellbook");
+            Directory.CreateDirectory(itemDir);
+            var item = new ProviderSnapshot(new ProviderKey("unit-cleric", null, CastingBuffAbility, "item-wand"),
+                CastingBuffAbility.BaseAbilityGuid, 1, clericOption.Provider.ResourcePoolKey, 1, null, null, 5);
+            var itemSnapshot = new PartyProviderSnapshot(baseSnapshot.Units, baseSnapshot.Providers
+                .Where(value => value.Key.CasterUnitId != "unit-cleric").Concat(new[] { item }).ToList(),
+                baseSnapshot.ResourcePools);
+            var itemInputs = new CastingWorkspaceInputs(itemSnapshot, baseInputs.ProviderOptions
+                .Where(value => value.Provider.Key.CasterUnitId != "unit-cleric")
+                .Concat(new[] { new ProviderPlanningOption(item, clericOption.ReachableTargetIds,
+                    clericOption.LegalAnchorIds, 5, 100) }).ToList(),
+                baseInputs.EffectsBySource, baseInputs.Enhancements);
+            var itemCasting = new PlannedCasting("cast-item", "long", 0, "source-bulls", CastingBuffAbility,
+                "unit-cleric", null, CastingTargetMode.DirectTarget, "unit-t1", null, null, null, null,
+                ExistingEffectPolicy.SkipAlreadyActive, null, CastingAuthoringState.Ready, null);
+            new CastingPlanRepository(itemDir).Save(CastingPlanProfile.FromDocument(new CastingPlanDocument(
+                "workspace-campaign", new[]
+                {
+                    new RoutineDefinition("long", "Long"),
+                    new RoutineDefinition("important", "Important"),
+                    new RoutineDefinition("short", "Short")
+                }, new[] { itemCasting })));
+            var itemSession = new CastingWorkspaceSession(itemDir, "workspace-campaign",
+                new DisabledCastingDispatchBoundary());
+            itemSession.FocusCasting("cast-item");
+            WorkspaceProviderChoice itemChoice = itemSession.BuildView(itemInputs).FocusedProviders.Single(value =>
+                value.CasterUnitId == "unit-cleric");
+            AuthoringEditResult same = itemSession.SetFocusedProvider(itemChoice.ProviderKey, itemInputs);
+            if (!itemChoice.Selected || same.Applied || same.Reason != "provider-unchanged" || itemSession.IsDirty)
+                throw new InvalidOperationException("A source without a spellbook was not recognised as unchanged: " +
+                    same.Reason);
+            // The game adapter names the spellbook as the game shows it.
+            DirectoryInfo directory = new DirectoryInfo(Environment.CurrentDirectory);
+            while (directory != null && !File.Exists(Path.Combine(directory.FullName, "KingmakerBuffPlanner.sln")))
+                directory = directory.Parent;
+            string builder = File.ReadAllText(Path.Combine(directory.FullName, "src", "KingmakerBuffPlanner",
+                "GameAdapters", "KingmakerPartySnapshotBuilder.cs")).Replace("\r\n", "\n");
+            string forecast = File.ReadAllText(Path.Combine(directory.FullName, "src", "KingmakerBuffPlanner",
+                "UI", "SequentialForecastPlanner.cs")).Replace("\r\n", "\n");
+            if (!builder.Contains("duration, selection.SourceDisplayName, selection.VariantOrder,\n" +
+                    "                SpellbookName(spellbook)));") ||
+                !builder.Contains("string name = spellbook.Blueprint.DisplayName;") ||
+                !builder.Contains("name = spellbook.Blueprint.CharacterClass.Name;") ||
+                !forecast.Contains("provider.VariantOrder, provider.SourceBookName));"))
+                throw new InvalidOperationException("The spellbook's name is not read or not kept.");
+        }
+
+        // Re-review: the next casting's enhancements belong to its caster; a
+        // new caster keeps only the ones it has.
+        private static void TestDraftEnhancementsFollowTheCaster(string root)
+        {
+            string dir = Path.Combine(root, "draft-enhancements-follow-caster");
+            Directory.CreateDirectory(dir);
+            PartyProviderSnapshot snapshot;
+            CastingWorkspaceInputs inputs = WorkspaceInputs(out snapshot);
+            var session = new CastingWorkspaceSession(dir, "workspace-campaign",
+                new DisabledCastingDispatchBoundary());
+            session.SelectBuff("source-bulls");
+            session.SelectRoutine("long");
+            session.BuildView(inputs);
+            session.Draft.SourceId = "source-bulls";
+            session.ChooseDraftCaster("unit-cleric");
+            session.Draft.Enhancements.Add(new AuthoredEnhancementSelection("extend-cleric", false, null));
+            session.ChooseDraftCaster("unit-cleric");
+            int keptForSameCaster = session.Draft.Enhancements.Count;
+            session.ChooseDraftCaster("unit-wizard");
+            if (keptForSameCaster != 1 || session.Draft.Enhancements.Count != 0)
+                throw new InvalidOperationException("The next casting carried an enhancement to a caster without it.");
+        }
+
+        // Re-review: the out-of-combat rule has a casting-first control; the
+        // change is unsaved until Save, then kept.
+        private static void TestOutOfCombatSettingSaved(string root)
+        {
+            string dir = Path.Combine(root, "out-of-combat-setting");
+            Directory.CreateDirectory(dir);
+            var session = new CastingWorkspaceSession(dir, "workspace-campaign",
+                new DisabledCastingDispatchBoundary());
+            bool before = session.OutOfCombatOnly;
+            session.SetOutOfCombatOnly(!before);
+            if (session.OutOfCombatOnly == before || !session.IsDirty ||
+                session.ExecutionSettings.OutOfCombatOnly == before)
+                throw new InvalidOperationException("The out-of-combat change did not take or looked saved.");
+            session.Save();
+            if (new CastingWorkspaceSession(dir, "workspace-campaign").OutOfCombatOnly == before)
+                throw new InvalidOperationException("The out-of-combat setting was not saved.");
+        }
+
+        // Re-review: an imported casting whose old plan did not say single
+        // target or group becomes a single-target casting in the focused
+        // editor, then Ready in place.
+        private static void TestImportedGroupingUnknownBecomesSingleTarget(string root)
+        {
+            string dir = Path.Combine(root, "imported-grouping-unknown");
+            Directory.CreateDirectory(dir);
+            PartyProviderSnapshot snapshot;
+            CastingWorkspaceInputs inputs = WorkspaceInputs(out snapshot);
+            var imported = new PlannedCasting("cast-unknown", "long", 0, "source-bulls", CastingBuffAbility,
+                "unit-cleric", "book-unit-cleric", CastingTargetMode.CasterCenteredOrigin, null,
+                CastingOrigin.CasterCentered(), new[] { "unit-t1", "unit-t2" }, null, null,
+                ExistingEffectPolicy.SkipAlreadyActive, null, CastingAuthoringState.Draft,
+                new MigrationProvenance("cast-unknown", 5, "long", string.Empty, "grouping-unknown",
+                    new[] { "grouping-unknown:single-or-group-pending-review;targets=unit-t1,unit-t2" }, null));
+            new CastingPlanRepository(dir).Save(CastingPlanProfile.FromDocument(new CastingPlanDocument(
+                "workspace-campaign", new[]
+                {
+                    new RoutineDefinition("long", "Long"),
+                    new RoutineDefinition("important", "Important"),
+                    new RoutineDefinition("short", "Short")
+                }, new[] { imported })));
+            var session = new CastingWorkspaceSession(dir, "workspace-campaign",
+                new DisabledCastingDispatchBoundary());
+            session.FocusCasting("cast-unknown");
+            AuthoringEditResult single = session.SetFocusedTargeting(CastingTargetMode.DirectTarget,
+                "unit-t1", null, null);
+            AuthoringEditResult resolved = session.ResolveFocusedImportReview();
+            AuthoringEditResult ready = session.SetFocusedCastingState(CastingAuthoringState.Ready);
+            PlannedCasting after = session.Document.Castings.Single();
+            ResolvedCasting compiled = session.CompilePlan(inputs).CastingById("cast-unknown");
+            if (!single.Applied || !resolved.Applied || !ready.Applied || after.CastingId != "cast-unknown" ||
+                after.TargetMode != CastingTargetMode.DirectTarget || after.DirectTargetUnitId != "unit-t1" ||
+                compiled == null || !compiled.IsExecutable)
+                throw new InvalidOperationException("The imported casting did not become a Ready single-target casting: " +
+                    single.Reason + "|" + resolved.Reason + "|" + ready.Reason + "|" + (compiled == null ? "none"
+                        : string.Join(",", compiled.ReadinessReasons.ToArray())));
+        }
+
+        // Re-review: the first-open import reads the classic planner's own
+        // in-memory plan of this campaign (its sources rebound to the party);
+        // the file must still be readable, is archived exactly and is never
+        // written; another campaign's plan in memory is never imported.
+        private static void TestImportFromReboundClassicPlan(string root)
+        {
+            string dir = Path.Combine(root, "import-rebound-classic");
+            Directory.CreateDirectory(dir);
+            var repository = new ProfileRepository(dir);
+            BuffPlannerProfile onDisk = LegacyProfile();
+            onDisk.Routines[0].Assignments.Add(LegacyAssignment("source-bulls", CastingBuffAbility,
+                PinnedChild("legacy-bulls", 0, "unit-cleric", "unit-t1")));
+            repository.Save(onDisk);
+            string legacyPath = repository.GetProfilePath("legacy-campaign");
+            string bytes = File.ReadAllText(legacyPath);
+            BuffPlannerProfile rebound = LegacyProfile();
+            rebound.Routines[0].Assignments.Add(LegacyAssignment("source-bulls-rebound", CastingBuffAbility,
+                PinnedChild("legacy-bulls", 0, "unit-cleric", "unit-t1")));
+            CastingMigrationResult result = new CastingPlanMigrationService(dir).Migrate("legacy-campaign",
+                PerTarget("source-bulls-rebound"), rebound);
+            CastingPlanLoadResult candidate = new CastingPlanRepository(dir).Load("legacy-campaign");
+            if (result.Status != CastingMigrationStatus.Migrated || candidate.Status != CastingPlanLoadStatus.Loaded ||
+                candidate.Profile.ToDocument().Castings.Single().SourceId != "source-bulls-rebound" ||
+                File.ReadAllText(legacyPath) != bytes || File.ReadAllText(result.ArchivePath) != bytes)
+                throw new InvalidOperationException("The rebound classic plan was not the one imported: " +
+                    result.Status + " " + result.Warning);
+            string otherDir = Path.Combine(root, "import-rebound-other-campaign");
+            Directory.CreateDirectory(otherDir);
+            new ProfileRepository(otherDir).Save(onDisk);
+            BuffPlannerProfile otherCampaign = LegacyProfile();
+            otherCampaign.CampaignId = "another-campaign";
+            otherCampaign.Routines[0].Assignments.Add(LegacyAssignment("source-bulls-rebound", CastingBuffAbility,
+                PinnedChild("legacy-bulls", 0, "unit-cleric", "unit-t1")));
+            CastingMigrationResult other = new CastingPlanMigrationService(otherDir).Migrate("legacy-campaign",
+                PerTarget("source-bulls"), otherCampaign);
+            if (other.Status != CastingMigrationStatus.Migrated || new CastingPlanRepository(otherDir)
+                    .Load("legacy-campaign").Profile.ToDocument().Castings.Single().SourceId != "source-bulls")
+                throw new InvalidOperationException("Another campaign's plan in memory was imported.");
+            string badDir = Path.Combine(root, "import-rebound-unreadable");
+            Directory.CreateDirectory(badDir);
+            string badPath = new ProfileRepository(badDir).GetProfilePath("legacy-campaign");
+            Directory.CreateDirectory(Path.GetDirectoryName(badPath));
+            File.WriteAllText(badPath, "{ not json");
+            if (new CastingPlanMigrationService(badDir).Migrate("legacy-campaign", PerTarget("source-bulls-rebound"),
+                    rebound).Status != CastingMigrationStatus.LegacyUnreadable ||
+                File.ReadAllText(badPath) != "{ not json")
+                throw new InvalidOperationException("An unreadable classic file was bypassed by the plan in memory.");
+            DirectoryInfo directory = new DirectoryInfo(Environment.CurrentDirectory);
+            while (directory != null && !File.Exists(Path.Combine(directory.FullName, "KingmakerBuffPlanner.sln")))
+                directory = directory.Parent;
+            Func<string, string> source = name => File.ReadAllText(Path.Combine(directory.FullName, "src",
+                "KingmakerBuffPlanner", "UI", name)).Replace("\r\n", "\n");
+            if (!source("BuffPlannerUiRoot.cs").Contains("_session.Model == null ? null : _session.Model.SourceGroupings(),\n" +
+                    "                _session.Model == null ? null : _session.Model.Profile);") ||
+                !source("CastingWorkspaceSession.cs").Contains(".Migrate(campaignId, groupings, _legacyProfile);"))
+                throw new InvalidOperationException("The workspace does not import the rebound classic plan.");
         }
 
         // Final review B5-B7: casting-first refreshes never save the Classic

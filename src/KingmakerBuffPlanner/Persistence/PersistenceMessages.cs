@@ -17,8 +17,12 @@ namespace KingmakerBuffPlanner.Persistence
                 detail.StartsWith("refusing-to-overwrite-unreadable-or-newer-primary", StringComparison.Ordinal))
                 return "Not saved: the plan file could not be read or comes from a newer planner. " +
                     "It was left unchanged; move it aside to save here.";
+            if (detail.StartsWith("Candidate persistence is blocked: legacy-import", StringComparison.Ordinal))
+                return "Not saved: your classic plan could not be imported, and nothing is saved until it is. " +
+                    "Repair or restore it, then press Reload.";
             if (detail.StartsWith("Candidate persistence is blocked", StringComparison.Ordinal))
-                return "Not saved: " + detail;
+                return "Not saved: your casting plan file could not be read or comes from a newer planner. " +
+                    "Move it and its backups (.bak1 to .bak3) out of UserSettings, then press Reload.";
             return "Not saved: " + (detail.Length == 0 ? "the plan could not be written." : detail);
         }
 
@@ -28,18 +32,24 @@ namespace KingmakerBuffPlanner.Persistence
         // by an ordinary save, so every notice also says saving is refused.
 
         // Classic: the load result names no source when nothing could be
-        // loaded; its warning lists the files that could not be read.
-        public static string ForClassicLoad(string sourcePath, bool recoveredFromBackup, string warning)
+        // loaded; its warning lists the files that could not be read, by
+        // name. Saves are refused only while the primary file itself cannot
+        // be read (re-review): a missing primary is simply written again.
+        public static string ForClassicLoad(string sourcePath, bool recoveredFromBackup, string warning,
+            string primaryFileName)
         {
-            if (string.IsNullOrEmpty(warning)) return null;
-            if (string.IsNullOrEmpty(sourcePath))
+            bool primaryUnreadable = !string.IsNullOrEmpty(warning) && !string.IsNullOrEmpty(primaryFileName) &&
+                warning.Contains(primaryFileName + ":");
+            if (primaryUnreadable && string.IsNullOrEmpty(sourcePath))
                 return "Your saved planner setup could not be read or comes from a newer planner. It was " +
                     "left unchanged and a new setup is shown; changes are not saved while that file is " +
                     "there - move it aside to save here.";
-            if (recoveredFromBackup)
+            if (primaryUnreadable && recoveredFromBackup)
                 return "Your saved planner setup could not be read, so its latest backup was loaded. The " +
                     "unreadable file was left unchanged; changes are not saved while it is there - move " +
                     "it aside to save here.";
+            if (recoveredFromBackup)
+                return "Your saved planner setup file was missing, so its latest readable backup was loaded.";
             return null;
         }
 
@@ -50,20 +60,24 @@ namespace KingmakerBuffPlanner.Persistence
                 "from a newer planner. It was left unchanged; move it aside to save here.";
         }
 
-        // Casting-first: the plan file as the session loaded it.
-        public static string ForCastingLoad(CastingPlanLoadStatus status)
+        // Casting-first: the plan file as the session loaded it; a backup
+        // loaded because the primary is missing (not unreadable) saves
+        // normally (re-review).
+        public static string ForCastingLoad(CastingPlanLoadStatus status, bool primaryFileExists)
         {
             switch (status)
             {
                 case CastingPlanLoadStatus.Corrupt:
                 case CastingPlanLoadStatus.UnsupportedSchema:
-                    return "Your casting plan could not be read or comes from a newer planner. It was " +
-                        "left unchanged and an empty plan is shown; saving is blocked until that file " +
-                        "is moved aside.";
+                    return "Your casting plan could not be read or comes from a newer planner, so nothing " +
+                        "was loaded from it and saving is blocked. It was left unchanged: move it and its " +
+                        "backups (.bak1 to .bak3) out of UserSettings, then press Reload.";
                 case CastingPlanLoadStatus.RecoveredFromBackup:
-                    return "Your casting plan could not be read, so its latest backup was loaded. The " +
-                        "unreadable file was left unchanged; saving is refused while it is there - move " +
-                        "it aside to save here.";
+                    return primaryFileExists
+                        ? "Your casting plan could not be read, so its latest backup was loaded. The " +
+                            "unreadable file was left unchanged; saving is refused while it is there - move " +
+                            "it aside to save here."
+                        : "Your casting plan file was missing, so its latest backup was loaded.";
                 default:
                     return null;
             }
