@@ -14,6 +14,12 @@
     <LangVersion>7.3</LangVersion>
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>
+    <!-- Worktree-independent output (mission batch 3, section 12): the
+         project directory is mapped in every path the compiler embeds,
+         including the PDB path in the PE debug directory, the only
+         path-dependent bytes of two otherwise identical builds of 67fa087
+         in the G and G2 worktrees. -->
+    <PathMap>$(MSBuildProjectDirectory)=/_/src/KingmakerBuffPlanner</PathMap>
     <WarningLevel>4</WarningLevel>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <KbpSourceRevision Condition="'$(KbpSourceRevision)' == ''">UNKNOWN</KbpSourceRevision>

@@ -3574,6 +3574,13 @@ namespace KingmakerBuffPlanner.Tests
                 if (found != null)
                     throw new InvalidOperationException(name + " acts on the game: " + found);
             }
+            // Batch 3, section 12: builds are worktree-independent (the
+            // compiler maps the project directory in every embedded path).
+            string project = File.ReadAllText(Path.Combine(directory.FullName, "src", "KingmakerBuffPlanner",
+                "KingmakerBuffPlanner.csproj"));
+            if (!project.Contains("<Deterministic>true</Deterministic>") ||
+                !project.Contains("<PathMap>$(MSBuildProjectDirectory)=/_/src/KingmakerBuffPlanner</PathMap>"))
+                throw new InvalidOperationException("The build embeds the checkout path.");
             string area = File.ReadAllText(Path.Combine(adapters, "KingmakerAreaDiagnostics.cs"));
             if (!area.Contains("FindObjectsOfType<AreaTransition>()") || !area.Contains("AutosaveEnabled.CurrentValue") ||
                 !area.Contains("transition.AutoSaveMode"))
