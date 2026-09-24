@@ -66,8 +66,12 @@ namespace KingmakerBuffPlanner.Planning
             IReadOnlyList<CastingCostLine> cost = null,
             IReadOnlyList<string> existingEffectNotes = null,
             IReadOnlyList<string> costShape = null,
-            IReadOnlyList<string> preCoveredUnitIds = null)
+            IReadOnlyList<string> preCoveredUnitIds = null,
+            CastExecutionStrategy? executionStrategy = null,
+            string executionStrategyReason = null)
         {
+            ExecutionStrategy = executionStrategy;
+            ExecutionStrategyReason = executionStrategyReason;
             CastingId = castingId;
             RoutineId = routineId;
             Order = order;
@@ -115,6 +119,15 @@ namespace KingmakerBuffPlanner.Planning
         // instance unchanged.
         public IReadOnlyList<string> PreCoveredUnitIds { get; private set; }
 
+        // The execution strategy the applied enhancements require, when it
+        // differs from the source's own (null: the source's). The classic
+        // planner's rule: an enhancement that needs a native command casts
+        // through one; a provider-direct enhancement (Brown-Fur Powerful
+        // Change) casts through the provider's own transaction, since a
+        // plain rule cast never enrols it.
+        public CastExecutionStrategy? ExecutionStrategy { get; private set; }
+        public string ExecutionStrategyReason { get; private set; }
+
         // The casting's would-be cost vector as "category:pool:units",
         // independent of whether it reserves now (an already-satisfied
         // casting keeps the shape of what it would spend). The review
@@ -140,7 +153,8 @@ namespace KingmakerBuffPlanner.Planning
                 TargetingModifiers, Enhancements, AppliedEnhancementIds,
                 OmittedEnhancementIds, ExistingEffectPolicy, IgnoredPresenceMarkers,
                 readiness, readinessReasons, CapableCasterUnitIds, Provenance, cost,
-                ExistingEffectNotes, costShape ?? CostShape, PreCoveredUnitIds);
+                ExistingEffectNotes, costShape ?? CostShape, PreCoveredUnitIds,
+                ExecutionStrategy, ExecutionStrategyReason);
         }
 
         public string CastingId { get; private set; }
@@ -431,9 +445,21 @@ namespace KingmakerBuffPlanner.Planning
             var matched = new List<CastEnhancementSnapshot>();
             var intended = new List<CastEnhancementSnapshot>();
             var requiredExhausted = new List<CastEnhancementSnapshot>();
+            CastExecutionStrategy? strategy = null;
+            string strategyReason = null;
             if (option != null)
+            {
                 ResolveEnhancements(casting, option, enhancements, applied, omitted,
                     matched, intended, requiredExhausted, reasons, resourceReasons);
+                // The applied enhancements decide how the cast must execute,
+                // exactly as for the classic planner.
+                ProviderPlanningOption effective = CastEnhancementExecutionPolicy.Apply(matched, option);
+                if (effective != null && effective.ExecutionStrategy != option.ExecutionStrategy)
+                {
+                    strategy = effective.ExecutionStrategy;
+                    strategyReason = effective.ExecutionStrategyReason;
+                }
+            }
             else
                 foreach (AuthoredEnhancementSelection selection in casting.Enhancements)
                     if (selection.Required)
@@ -488,7 +514,8 @@ namespace KingmakerBuffPlanner.Planning
                 readiness,
                 reasons.Distinct(StringComparer.Ordinal)
                     .OrderBy(value => value, StringComparer.Ordinal).ToList(),
-                capableCasters, casting.Provenance, null, existingNotes, null, preCovered);
+                capableCasters, casting.Provenance, null, existingNotes, null, preCovered,
+                strategy, strategyReason);
         }
 
         // Applies the casting's enabled targeting modifiers in authored

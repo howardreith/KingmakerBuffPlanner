@@ -226,8 +226,9 @@ namespace KingmakerBuffPlanner.Planning
                         : new MaterialReservation(material.ItemGuid, material.Units),
                     expected,
                     mass,
-                    option.ExecutionStrategy,
-                    option.ExecutionStrategyReason,
+                    casting.ExecutionStrategy ?? option.ExecutionStrategy,
+                    casting.ExecutionStrategy == null ? option.ExecutionStrategyReason
+                        : casting.ExecutionStrategyReason,
                     casting.AppliedEnhancementIds,
                     enhancementUsage,
                     casting.OmittedEnhancementIds,
