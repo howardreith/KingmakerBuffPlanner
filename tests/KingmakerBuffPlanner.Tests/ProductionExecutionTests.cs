@@ -1052,18 +1052,22 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("The picked source was not the one authored: " + added.Reason);
             session.FocusCasting(casting.CastingId);
             // Re-review: the same caster keeps its enhancements when it
-            // switches books.
+            // switches books - also one not discovered right now (a rod
+            // briefly out of its pack stays visible as unavailable).
             Assert(session.UpdateFocusedCasting(session.Document.Castings.Single().WithEnhancementSelections(new[]
             {
-                new AuthoredEnhancementSelection("extend-cleric", false, null)
+                new AuthoredEnhancementSelection("extend-cleric", false, null),
+                new AuthoredEnhancementSelection("rod-not-discovered-now", false, null)
             })).Applied);
             WorkspaceProviderChoice other = session.BuildView(inputs).FocusedProviders.Single(value =>
                 value.CasterUnitId == "unit-cleric" && !value.ProviderKey.Contains("book-cleric-second"));
             AuthoringEditResult otherBook = session.SetFocusedProvider(other.ProviderKey, inputs);
             if (!otherBook.Applied || otherBook.Reason.Length != 0 ||
-                session.Document.Castings.Single().Enhancements.Count != 1)
+                session.Document.Castings.Single().Enhancements.Count != 2)
                 throw new InvalidOperationException("Switching books dropped the caster's own enhancement: " +
                     otherBook.Reason);
+            Assert(session.UpdateFocusedCasting(session.Document.Castings.Single().WithEnhancementSelections(
+                new AuthoredEnhancementSelection[0])).Applied);
             if (session.Document.Castings.Single().SpellbookGuid != firstBook.Provider.Key.SpellbookGuid ||
                 session.SetFocusedProvider(other.ProviderKey, inputs).Applied ||
                 !session.CompilePlan(inputs).CastingById(casting.CastingId).IsExecutable)
