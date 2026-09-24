@@ -62,12 +62,14 @@ namespace KingmakerBuffPlanner.Persistence
                 try
                 {
                     bool migrated;
-                    string original = File.ReadAllText(path);
+                    // Focused re-review: the hash is of the very bytes parsed.
+                    byte[] raw = File.ReadAllBytes(path);
+                    string original = DecodeFileText(raw);
                     BuffPlannerProfile profile = Deserialize(original, campaignId, out migrated);
                     if (migrated)
                         ArchivePreMigrationOriginal(path, original);
                     return new ProfileLoadResult(profile, i != 0, migrated, path, warning,
-                        i == 0 ? TryHash(path) : null);
+                        i == 0 ? Hashing.Sha256Bytes(raw) : null);
                 }
                 catch (Exception exception)
                 {
@@ -95,6 +97,14 @@ namespace KingmakerBuffPlanner.Persistence
             if (File.Exists(archive)) return;
             Directory.CreateDirectory(Path.GetDirectoryName(archive));
             AtomicFile.WriteUtf8(archive, original);
+        }
+
+        // The text of a settings file exactly as File.ReadAllText reads it
+        // (UTF-8, byte-order mark detected), from bytes already read.
+        internal static string DecodeFileText(byte[] raw)
+        {
+            using (var reader = new StreamReader(new MemoryStream(raw), Encoding.UTF8, true))
+                return reader.ReadToEnd();
         }
 
         internal static string TryHash(string path)

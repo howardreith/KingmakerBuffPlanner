@@ -525,8 +525,14 @@ namespace KingmakerBuffPlanner.UI
             if (!Path.IsPathRooted(modPath)) return NewDocument();
             try
             {
+                // Focused re-review: the Classic planner's groupings of the
+                // same refresh as its plan, when it gives them.
+                ClassicPlanInMemory inMemory = ReadClassicPlanInMemory();
+                IDictionary<string, CastGroupingKind> effectiveGroupings =
+                    inMemory != null && inMemory.Groupings != null ? inMemory.Groupings : groupings;
                 CastingMigrationResult migration = new CastingPlanMigrationService(modPath)
-                    .Migrate(campaignId, groupings, ReadClassicPlanInMemory(), unsaved);
+                    .Migrate(campaignId, effectiveGroupings, inMemory, unsaved,
+                        unsaved == null ? null : _uiSettings, unsaved == null ? null : _executionSettings);
                 MigrationStatus = migration.Status;
                 MigrationWarning = migration.Warning;
                 switch (migration.Status)

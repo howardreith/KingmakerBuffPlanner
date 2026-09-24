@@ -835,7 +835,7 @@ namespace KingmakerBuffPlanner.UI
             IsExecuting = false;
             string name = RoutineDisplayName(routineId);
             // Focused re-review: a run that never submitted a cast says so.
-            bool submitted = LastExecutionReport != null && LastExecutionReport.Submitted > 0;
+            bool submitted = LastExecutionReport != null && LastExecutionReport.AnyCastAttempted;
             Status = name + " stopped before it finished (" + (reason ?? "stopped") + "): " +
                 (submitted
                     ? "the cast in progress was interrupted and cleaned up, and nothing after it was attempted."

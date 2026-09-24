@@ -613,10 +613,15 @@ function Assert-KbpNoUnacknowledgedSaveViolation {
             $ackSha = if ($null -ne $ack.PSObject.Properties['violationRecordSha256']) { [string]$ack.violationRecordSha256 } else { '' }
             $acknowledged = $ackRun -ceq $recordRun -and $ackSha -ceq (Get-KbpSha256 $record.FullName)
         }
+        if ($recordRun -cne $record.BaseName) {
+            # Targeted review: a record that does not name its own run cannot
+            # be acknowledged by the script; the owner resolves it by hand.
+            throw ("The protected-save violation record $($record.Name) is malformed (it names run '$recordRun'). " +
+                "No run starts until the owner has inspected and resolved it by hand.")
+        }
         if (-not $acknowledged) {
-            $named = if ([string]::IsNullOrEmpty($recordRun)) { $record.BaseName } else { $recordRun }
-            throw ("Run $named changed protected saves ($blocking). " +
-                "No run starts until the owner has reviewed it and run scripts\Confirm-KbpProtectedSaveReview.ps1 -RunId $named.")
+            throw ("Run $recordRun changed protected saves ($blocking). " +
+                "No run starts until the owner has reviewed it and run scripts\Confirm-KbpProtectedSaveReview.ps1 -RunId $recordRun.")
         }
     }
 }

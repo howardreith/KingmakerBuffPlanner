@@ -15,6 +15,14 @@ namespace KingmakerBuffPlanner.Infrastructure
             }
         }
 
+        internal static string Sha256Bytes(byte[] bytes)
+        {
+            using (var hash = SHA256.Create())
+            {
+                return ToHex(hash.ComputeHash(bytes ?? new byte[0]));
+            }
+        }
+
         // Deterministic content hash for exact-byte archival identity.
         internal static string Sha256Text(string text)
         {

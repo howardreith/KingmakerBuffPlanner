@@ -76,15 +76,20 @@ namespace KingmakerBuffPlanner.Persistence
         // (the load stops there) or every unreadable one in the warning.
         public static string UnusableCastingFiles(CastingPlanLoadStatus status, string sourcePath, string warning)
         {
-            if (status == CastingPlanLoadStatus.UnsupportedSchema)
-                return string.IsNullOrEmpty(sourcePath) ? string.Empty : System.IO.Path.GetFileName(sourcePath);
-            if (string.IsNullOrEmpty(warning)) return string.Empty;
             var names = new List<string>();
-            foreach (string entry in warning.Split(new[] { " | " }, StringSplitOptions.RemoveEmptyEntries))
+            // Unreadable files named in the warning (a file name is the part
+            // before its first colon), then the newer file the load stopped at.
+            foreach (string entry in (warning ?? string.Empty).Split(new[] { " | " }, StringSplitOptions.RemoveEmptyEntries))
             {
                 int colon = entry.IndexOf(':');
                 string name = (colon < 0 ? entry : entry.Substring(0, colon)).Trim();
-                if (name.Length != 0 && !names.Contains(name)) names.Add(name);
+                if (name.IndexOf(".json", StringComparison.OrdinalIgnoreCase) >= 0 && !names.Contains(name))
+                    names.Add(name);
+            }
+            if (status == CastingPlanLoadStatus.UnsupportedSchema && !string.IsNullOrEmpty(sourcePath))
+            {
+                string newer = System.IO.Path.GetFileName(sourcePath);
+                if (!names.Contains(newer)) names.Add(newer);
             }
             return string.Join(", ", names.ToArray());
         }

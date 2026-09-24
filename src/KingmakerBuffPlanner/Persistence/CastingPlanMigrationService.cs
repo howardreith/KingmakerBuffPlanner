@@ -56,14 +56,19 @@ namespace KingmakerBuffPlanner.Persistence
     // (null when it came from a backup or is a new default).
     public sealed class ClassicPlanInMemory
     {
-        public ClassicPlanInMemory(BuffPlannerProfile profile, string primarySha256)
+        public ClassicPlanInMemory(BuffPlannerProfile profile, string primarySha256,
+            IDictionary<string, CastGroupingKind> groupings = null)
         {
             Profile = profile;
             PrimarySha256 = primarySha256;
+            Groupings = groupings;
         }
 
         public BuffPlannerProfile Profile { get; private set; }
         public string PrimarySha256 { get; private set; }
+        // The Classic planner's own reading of each source's grouping, as of
+        // the same refresh (null when unknown).
+        public IDictionary<string, CastGroupingKind> Groupings { get; private set; }
     }
 
     public sealed class CastingPlanMigrationService
@@ -84,7 +89,9 @@ namespace KingmakerBuffPlanner.Persistence
             string campaignId,
             IDictionary<string, CastGroupingKind> groupingsBySourceId = null,
             ClassicPlanInMemory legacyInMemory = null,
-            CastingPlanDocument unsavedDocument = null)
+            CastingPlanDocument unsavedDocument = null,
+            UiProfile unsavedUi = null,
+            ExecutionProfile unsavedExecution = null)
         {
             if (string.IsNullOrWhiteSpace(campaignId))
                 throw new ArgumentException("Exact campaign ID is required.", "campaignId");
@@ -94,9 +101,13 @@ namespace KingmakerBuffPlanner.Persistence
                     CastingMigrationStatus.LegacyAbsent, null, string.Empty,
                     string.Empty, string.Empty, string.Empty);
             string legacyBytes;
+            string legacyHash;
             try
             {
-                legacyBytes = File.ReadAllText(legacyPath);
+                // Focused re-review: the hash is of the very bytes parsed.
+                byte[] legacyRaw = File.ReadAllBytes(legacyPath);
+                legacyBytes = ProfileRepository.DecodeFileText(legacyRaw);
+                legacyHash = Hashing.Sha256Bytes(legacyRaw);
             }
             catch (Exception exception)
             {
@@ -104,7 +115,6 @@ namespace KingmakerBuffPlanner.Persistence
                     CastingMigrationStatus.LegacyUnreadable, null, string.Empty,
                     string.Empty, string.Empty, "unreadable:" + exception.Message);
             }
-            string legacyHash = Hashing.Sha256(legacyPath);
             BuffPlannerProfile legacy;
             try
             {
@@ -155,9 +165,13 @@ namespace KingmakerBuffPlanner.Persistence
             // Write the candidate, reopen it, and revalidate before the
             // migration is reported complete; the legacy bytes are never
             // touched by any failure here.
+            // Merged into castings added in the session: the session's own
+            // settings are kept (focused re-review).
+            bool mergedIntoUnsaved = existingDocument != null && ReferenceEquals(existingDocument, unsavedDocument);
             CastingPlanProfile candidate = CastingPlanProfile.FromDocument(
                 imported.Document,
-                legacy.Ui, legacy.Execution);
+                mergedIntoUnsaved && unsavedUi != null ? unsavedUi : legacy.Ui,
+                mergedIntoUnsaved && unsavedExecution != null ? unsavedExecution : legacy.Execution);
             try
             {
                 _candidateRepository.Save(candidate);
