@@ -45,8 +45,8 @@ param(
     # non-casting scenarios and only when it matches its guarded bootstrap
     # manifest exactly.
     [ValidateSet('Automation', 'Advanced')][string]$FixtureFamily = 'Automation',
-    # Game window mode for live-workspace-physical (mission batch 3,
-    # section 10): the owner's own settings, or a borderless window of an
+    # Game window mode for live-workspace-physical and live-workspace-qual
+    # (mission batch 3, section 10): the owner's own settings, or a borderless window of an
     # exact size through Unity's launch arguments. A size larger than this
     # session's display is refused before anything changes; the game's
     # registry key (Unity PlayerPrefs) is restored byte-exact after exit.
@@ -148,8 +148,8 @@ elseif (-not [string]::IsNullOrWhiteSpace($ClassicAllowancePath)) {
 }
 $displaySize = $null
 if ($DisplayMode -cne 'owner') {
-    if ($Scenario -cne 'live-workspace-physical') {
-        throw '-DisplayMode is only valid with -Scenario live-workspace-physical.'
+    if ($Scenario -cne 'live-workspace-physical' -and $Scenario -cne 'live-workspace-qual') {
+        throw '-DisplayMode is only valid with -Scenario live-workspace-physical or live-workspace-qual.'
     }
     $displaySize = $DisplayMode.Substring('windowed-'.Length)
     $sessionDisplay = Get-KbpSessionDisplaySize

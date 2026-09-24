@@ -271,8 +271,8 @@ try {
            Args = @('-Scenario', 'live-classic-select', '-ClassicAllowancePath', $outsideQualification, '-TimeoutSeconds', '900', '-WhatIf') },
         @{ Name = 'classic-select-short-timeout'; Expect = '*at least 900*'
            Args = @('-Scenario', 'live-classic-select', '-WhatIf') },
-        @{ Name = 'display-mode-other-scenario'; Expect = '*only valid with -Scenario live-workspace-physical*'
-           Args = @('-Scenario', 'live-workspace-qual', '-DisplayMode', 'windowed-1920x1080', '-WhatIf') },
+        @{ Name = 'display-mode-other-scenario'; Expect = '*only valid with -Scenario live-workspace-physical or live-workspace-qual*'
+           Args = @('-Scenario', 'live-workspace-import', '-DisplayMode', 'windowed-1920x1080', '-WhatIf') },
         @{ Name = 'physical-short-timeout'; Expect = '*at least 900*'
            Args = @('-Scenario', 'live-workspace-physical', '-WhatIf') }
     )
