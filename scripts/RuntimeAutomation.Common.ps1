@@ -710,7 +710,8 @@ function Compare-KbpRegistrySnapshot {
         elseif ($After[$name].canonical -cne $Before[$name].canonical) { $differences.Add('changed:' + $name) }
     }
     foreach ($name in @($After.Keys)) { if (-not $Before.Contains($name)) { $differences.Add('added:' + $name) } }
-    return ,@($differences)
+    # Plain output: callers wrap it in @() (an empty result is no output).
+    return $differences.ToArray()
 }
 
 # Puts every value of the key back exactly as in the snapshot (changed and
@@ -718,7 +719,7 @@ function Compare-KbpRegistrySnapshot {
 # verifies; returns what it restored.
 function Restore-KbpRegistryValues {
     param([Parameter(Mandatory = $true)][string]$KeyPath, [Parameter(Mandatory = $true)]$Snapshot)
-    $differences = Compare-KbpRegistrySnapshot -Before $Snapshot -After (Get-KbpRegistryValueSnapshot -KeyPath $KeyPath)
+    $differences = @(Compare-KbpRegistrySnapshot -Before $Snapshot -After (Get-KbpRegistryValueSnapshot -KeyPath $KeyPath))
     if ($differences.Count -ne 0) {
         if ($KeyPath -notmatch '^HKCU:\\(.+)$') { throw "Only HKCU keys are restored: $KeyPath" }
         $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($Matches[1], $true)
@@ -735,9 +736,10 @@ function Restore-KbpRegistryValues {
         }
         finally { $key.Dispose() }
     }
-    $remaining = Compare-KbpRegistrySnapshot -Before $Snapshot -After (Get-KbpRegistryValueSnapshot -KeyPath $KeyPath)
+    $remaining = @(Compare-KbpRegistrySnapshot -Before $Snapshot -After (Get-KbpRegistryValueSnapshot -KeyPath $KeyPath))
     if ($remaining.Count -ne 0) { throw 'Registry restoration mismatch: ' + ($remaining -join ', ') }
-    return ,@($differences)
+    # Plain output: what was restored (nothing when the key was unchanged).
+    return $differences
 }
 
 # The classic cast allowance (kind kbp-classic-cast, schema 1) must name this

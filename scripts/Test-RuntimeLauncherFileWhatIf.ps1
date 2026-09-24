@@ -397,7 +397,7 @@ try {
     $scratch.SetValue('Added_h4', 'new', [Microsoft.Win32.RegistryValueKind]::String)
     $restoredValues = @(Restore-KbpRegistryValues -KeyPath $scratchKey -Snapshot $snapshot)
     $after = Get-KbpRegistryValueSnapshot -KeyPath $scratchKey
-    if ((Compare-KbpRegistrySnapshot -Before $snapshot -After $after).Count -ne 0 -or $restoredValues.Count -ne 4 -or
+    if (@(Compare-KbpRegistrySnapshot -Before $snapshot -After $after).Count -ne 0 -or $restoredValues.Count -ne 4 -or
         [int]$scratch.GetValue('Screenmanager Resolution Width_h182942802') -ne 1920 -or
         $scratch.GetValueKind('Large_h3') -ne [Microsoft.Win32.RegistryValueKind]::QWord -or
         $null -ne $scratch.GetValue('Added_h4')) {

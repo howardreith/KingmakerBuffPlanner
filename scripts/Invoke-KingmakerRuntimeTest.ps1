@@ -802,8 +802,8 @@ finally {
         $displayFailure = $null
         if (@(Get-Process -Name Kingmaker -ErrorAction SilentlyContinue).Count -eq 0) {
             try {
-                $displayDifferences = Restore-KbpRegistryValues -KeyPath $script:KbpGameRegistryKey `
-                    -Snapshot $displayRegistryBefore
+                $displayDifferences = @(Restore-KbpRegistryValues -KeyPath $script:KbpGameRegistryKey `
+                    -Snapshot $displayRegistryBefore)
                 Write-KbpJsonAtomic (Join-Path $evidence 'display-mode.json') ([ordered]@{
                     schemaVersion = 1; runId = $runId; displayMode = $DisplayMode; size = $displaySize
                     restoredValues = @($displayDifferences); restorationVerified = $true
