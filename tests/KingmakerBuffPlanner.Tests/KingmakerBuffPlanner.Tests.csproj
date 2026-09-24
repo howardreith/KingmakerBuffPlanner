@@ -64,6 +64,9 @@
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\HaltingPlanRunner.cs"><Link>Execution\HaltingPlanRunner.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\FactSourceChoice.cs"><Link>Execution\FactSourceChoice.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\AvailableCountJudgement.cs"><Link>Execution\AvailableCountJudgement.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\WorldGatedEnumerator.cs"><Link>Execution\WorldGatedEnumerator.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\AppliedEffectJudgement.cs"><Link>Execution\AppliedEffectJudgement.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\RuntimeTesting\LegacyProfileFixture.cs"><Link>RuntimeTesting\LegacyProfileFixture.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Persistence\PersistenceMessages.cs"><Link>Persistence\PersistenceMessages.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\RuntimeTesting\PhysicalWorkspaceRecord.cs"><Link>RuntimeTesting\PhysicalWorkspaceRecord.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\CastingQualificationDriver.cs"><Link>Execution\CastingQualificationDriver.cs</Link></Compile>

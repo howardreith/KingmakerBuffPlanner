@@ -169,30 +169,15 @@ namespace KingmakerBuffPlanner.Persistence
             return archive;
         }
 
+        // The Classic loader's own contract (final review B1): a file the
+        // Classic planner loads is imported, including one written by a
+        // released version with an older schema (0.0.19 wrote schema 4),
+        // migrated in memory only; a file it refuses is not imported. The
+        // Classic file's bytes are never rewritten here.
         private static BuffPlannerProfile JsonConvertDeserialize(
             string json, string campaignId)
         {
-            // Reuse the legacy repository's strict parsing by round-tripping
-            // through its own loader contract: a profile that the old UI
-            // could not load is not migrated.
-            return ParseLegacy(json, campaignId);
-        }
-
-        private static BuffPlannerProfile ParseLegacy(string json, string campaignId)
-        {
-            var settings = new Newtonsoft.Json.JsonSerializerSettings
-            {
-                MissingMemberHandling = Newtonsoft.Json.MissingMemberHandling.Error
-            };
-            BuffPlannerProfile profile = Newtonsoft.Json.JsonConvert
-                .DeserializeObject<BuffPlannerProfile>(json, settings);
-            if (profile == null ||
-                profile.SchemaVersion != BuffPlannerProfile.CurrentSchemaVersion)
-                throw new InvalidDataException("schema-version");
-            if (!string.Equals(profile.CampaignId, campaignId,
-                    StringComparison.Ordinal))
-                throw new InvalidDataException("campaign-id-mismatch");
-            return profile;
+            return ProfileRepository.ReadForImport(json, campaignId);
         }
     }
 }

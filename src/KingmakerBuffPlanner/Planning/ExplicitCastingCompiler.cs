@@ -749,9 +749,27 @@ namespace KingmakerBuffPlanner.Planning
                 reasons.Add("origin-anchor-illegal:" + anchorId);
                 return null;
             }
+            // Final review A2: a caster-centred casting is aimed at its
+            // caster, so the caster must be a legal origin exactly as an
+            // anchor must be; otherwise its prediction would fall back to
+            // every reachable unit (an over-prediction) or to nobody, and the
+            // cast would fail only at run time.
+            if (casting.TargetMode == CastingTargetMode.CasterCenteredOrigin &&
+                !option.LegalAnchorIds.Contains(anchorId))
+            {
+                reasons.Add("origin-caster-illegal:" + anchorId);
+                return null;
+            }
             // One invocation; beneficiaries are derived edges, never extra
             // castings, and uncovered intent stays visible as gaps.
             IReadOnlyList<string> predicted = option.CoveredTargetIdsForAnchor(anchorId);
+            if (predicted == null || predicted.Count == 0)
+            {
+                // Final review A2: nobody is predicted to be reached, so there
+                // is nothing to cast for and nothing a run could confirm.
+                reasons.Add("predicted-coverage-empty:" + anchorId);
+                return null;
+            }
             var covered = new HashSet<string>(predicted, StringComparer.Ordinal);
             gaps.AddRange(casting.RequiredCoverageUnitIds
                 .Where(unitId => !covered.Contains(unitId))

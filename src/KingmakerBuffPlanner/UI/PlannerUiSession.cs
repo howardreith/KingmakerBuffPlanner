@@ -43,6 +43,28 @@ namespace KingmakerBuffPlanner.UI
 
         internal PlannerSetupModel Model { get; private set; }
         internal string Status { get; private set; }
+
+        // Final review B5: while casting-first mode is active its refreshes
+        // must never rewrite the Classic plan file (the Classic model saves
+        // when it rebinds assignments to the party's current abilities). The
+        // check runs at save time, so the Classic screen saves again as soon
+        // as Classic is the mode.
+        internal Func<bool> ClassicSavesSuppressed { get; set; }
+
+        private void SaveClassicProfile(BuffPlannerProfile profile)
+        {
+            Func<bool> suppressed = ClassicSavesSuppressed;
+            if (suppressed != null && suppressed())
+            {
+                _log.Info("[KBP-PROFILE] Classic save skipped: the casting-first planner is active.");
+                return;
+            }
+            _profiles.Save(profile);
+            string refusal = _profiles.LastSaveRefusal;
+            if (refusal == null) return;
+            PersistenceNotice = PersistenceMessages.ForClassicSaveRefusal(refusal);
+            _log.Info("[KBP-PROFILE] Classic save refused: " + refusal + ".");
+        }
         internal bool IsExecuting { get; private set; }
         internal RoutinePlanResult LastPreview { get; private set; }
         // Routine identity of LastPreview; the material-change gate only
@@ -51,6 +73,10 @@ namespace KingmakerBuffPlanner.UI
         private readonly PlannerReviewCoordinator _review = new PlannerReviewCoordinator();
         internal ExecutionReport LastExecutionReport { get; private set; }
         internal string ProfileStatus { get; private set; }
+        // Final review B4: the saved Classic setup could not be read, a backup
+        // was loaded instead, or a change was not saved; null when all is
+        // well. The Classic screen always shows it.
+        internal string PersistenceNotice { get; private set; }
         internal PartyCatalogDiscoveryDiagnostics CatalogDiscovery { get; private set; }
         internal IReadOnlyList<ProviderPlanningOption> ProviderOptions
         {
@@ -90,8 +116,12 @@ namespace KingmakerBuffPlanner.UI
                     snapshotBuilder.EffectsBySource, StringComparer.Ordinal);
                 ProfileLoadResult loaded = _profiles.Load(campaignId);
                 PlannerHotkey.SetBinding(loaded.Profile.Ui.Hotkey);
+                PersistenceNotice = PersistenceMessages.ForClassicLoad(loaded.SourcePath,
+                    loaded.RecoveredFromBackup, loaded.Warning);
                 ProfileStatus = string.IsNullOrEmpty(loaded.SourcePath)
-                    ? "No prior profile was found; using a new schema " +
+                    ? (string.IsNullOrEmpty(loaded.Warning)
+                        ? "No prior profile was found; using a new schema "
+                        : "The saved profile could not be read (it is kept unchanged); using a new schema ") +
                         BuffPlannerProfile.CurrentSchemaVersion + " profile."
                     : "Loaded profile " + loaded.SourcePath + "; schema=" +
                         loaded.Profile.SchemaVersion + "; migrated=" + loaded.Migrated +
@@ -114,7 +144,7 @@ namespace KingmakerBuffPlanner.UI
                 _targeting = new EffectiveProviderOptionResolver(
                     new ICastTargetingModifier[] { _shareTargeting });
                 Model = new PlannerSetupModel(loaded.Profile, snapshot, active, effects,
-                    _providerOptions, _profiles.Save, _enhancements,
+                    _providerOptions, SaveClassicProfile, _enhancements,
                     _targeting);
                 if (Model.VariantReselectionNotices.Count != 0)
                 {

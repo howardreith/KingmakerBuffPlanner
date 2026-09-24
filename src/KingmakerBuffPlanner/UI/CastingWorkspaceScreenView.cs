@@ -116,7 +116,10 @@ namespace KingmakerBuffPlanner.UI
             if (!_importAnnounced && _footerResult != null)
             {
                 _importAnnounced = true;
-                string import = DescribeImport(_session);
+                // Final review B4: a plan file that could not be used is
+                // announced when the planner opens, before anything else.
+                string import = PersistenceMessages.ForCastingLoad(_session.LoadStatus) ??
+                    DescribeImport(_session);
                 if (import != null) _footerResult.text = import;
             }
             RebuildBuffGrid(view);
@@ -619,8 +622,9 @@ namespace KingmakerBuffPlanner.UI
                     CastingPlanLoadStatus status = _session.Reload();
                     _footerResult.text = _session.LegacyImportBlocked
                         ? DescribeImport(_session)
-                        : _session.ImportReport != null
-                            ? DescribeImport(_session) : "Reloaded: " + status;
+                        : PersistenceMessages.ForCastingLoad(status) ??
+                            (_session.ImportReport != null
+                                ? DescribeImport(_session) : "Reloaded: " + status);
                     RefreshView();
                 }));
             KingmakerUiFactory.SetAnchors(RectOf(_reloadButton), 0.43f, 0.2f, 0.51f, 0.8f);
@@ -1184,6 +1188,76 @@ namespace KingmakerBuffPlanner.UI
                     }));
                 KingmakerUiFactory.AddLayout(RectOf(resolve), 30f);
             }
+            // Final review B2/B3: who casts this casting, from exactly which
+            // spellbook level, item or ability; an imported casting whose old
+            // plan let the planner pick any caster gets its caster here.
+            AddInspectorCaption("Cast by (this casting)");
+            if (view.FocusedProviders.Count == 0)
+            {
+                Text noProvider = KingmakerUiFactory.CreateText(
+                    "NoFocusedProvider", _inspectorContent, _theme,
+                    "Nobody in the party can cast this buff right now.", 13,
+                    TextAnchor.MiddleLeft);
+                noProvider.color = _theme.MutedBrownText;
+                KingmakerUiFactory.AddLayout(noProvider.rectTransform, 26f);
+            }
+            for (int index = 0; index < view.FocusedProviders.Count; index++)
+            {
+                WorkspaceProviderChoice captured = view.FocusedProviders[index];
+                Button provider = KingmakerUiFactory.CreateButton(
+                    "FocusedProvider." + index, _inspectorContent, _theme,
+                    (captured.Selected ? "[x] " : "[  ] ") + captured.Label,
+                    () => Click(() =>
+                    {
+                        SurfaceRefusal(_session.SetFocusedProvider(captured.ProviderKey, _inputs()), "caster");
+                        RefreshView();
+                    }));
+                KingmakerUiFactory.AddLayout(RectOf(provider), 30f);
+            }
+            AddInspectorCaption("Routine and order");
+            RectTransform focusedRoutineRow = CreateChipRow("FocusedRoutineChips");
+            foreach (string routineId in view.RoutineIds)
+            {
+                string capturedRoutine = routineId;
+                Button move = KingmakerUiFactory.CreateButton(
+                    "FocusedRoutine." + capturedRoutine, focusedRoutineRow, _theme,
+                    _session.RoutineDisplayName(capturedRoutine), () => Click(() =>
+                    {
+                        SurfaceRefusal(_session.MoveFocusedCastingToRoutine(capturedRoutine), "move");
+                        RefreshView();
+                    }));
+                StyleChip(move, string.Equals(focused.RoutineId, capturedRoutine,
+                    StringComparison.Ordinal));
+            }
+            RectTransform focusedOrderRow = CreateChipRow("FocusedOrderChips");
+            Button earlier = KingmakerUiFactory.CreateButton(
+                "FocusedOrder.Earlier", focusedOrderRow, _theme, "Cast earlier", () => Click(() =>
+                {
+                    SurfaceRefusal(_session.MoveFocusedCastingWithinRoutine(-1), "move");
+                    RefreshView();
+                }));
+            StyleChip(earlier, false);
+            Button later = KingmakerUiFactory.CreateButton(
+                "FocusedOrder.Later", focusedOrderRow, _theme, "Cast later", () => Click(() =>
+                {
+                    SurfaceRefusal(_session.MoveFocusedCastingWithinRoutine(1), "move");
+                    RefreshView();
+                }));
+            StyleChip(later, false);
+            AddInspectorCaption("If the buff is already there");
+            bool recastFocused = focused.ExistingEffectPolicy ==
+                Domain.Planning.ExistingEffectPolicy.Overwrite;
+            Button recastPolicy = KingmakerUiFactory.CreateButton(
+                "FocusedRecastPolicy", _inspectorContent, _theme,
+                recastFocused ? "[x] Cast it again anyway" : "[  ] Cast it again anyway (now: skip it)",
+                () => Click(() =>
+                {
+                    SurfaceRefusal(_session.SetFocusedRecastPolicy(recastFocused
+                        ? Domain.Planning.ExistingEffectPolicy.SkipAlreadyActive
+                        : Domain.Planning.ExistingEffectPolicy.Overwrite), "recast");
+                    RefreshView();
+                }));
+            KingmakerUiFactory.AddLayout(RectOf(recastPolicy), 30f);
             bool directRecord = focused.TargetMode ==
                 Domain.Authoring.CastingTargetMode.DirectTarget;
             AddInspectorCaption(directRecord
@@ -1408,6 +1482,26 @@ namespace KingmakerBuffPlanner.UI
                         RefreshView();
                     }));
             }
+            // Final review B3: a caster who can cast this buff in more than
+            // one way (two spellbooks, or a spell and an item) picks the
+            // exact one here; otherwise Add is refused as ambiguous.
+            if (view.DraftProviders.Count > 1)
+            {
+                AddInspectorCaption("Cast from");
+                for (int index = 0; index < view.DraftProviders.Count; index++)
+                {
+                    WorkspaceProviderChoice captured = view.DraftProviders[index];
+                    Button choose = KingmakerUiFactory.CreateButton(
+                        "DraftProvider." + index, _inspectorContent, _theme,
+                        (captured.Selected ? "[x] " : "[  ] ") + captured.Label,
+                        () => Click(() =>
+                        {
+                            SurfaceRefusal(_session.ChooseDraftProvider(captured.ProviderKey, _inputs()), "source");
+                            RefreshView();
+                        }));
+                    KingmakerUiFactory.AddLayout(RectOf(choose), 30f);
+                }
+            }
             AddInspectorCaption("Targeting");
             bool direct = draft.TargetMode ==
                 Domain.Authoring.CastingTargetMode.DirectTarget;
@@ -1605,6 +1699,38 @@ namespace KingmakerBuffPlanner.UI
                     RefreshView();
                 }));
             KingmakerUiFactory.AddLayout(RectOf(state), 30f);
+            // Final review B2: whether the new casting is skipped while its
+            // effect is already on the target, or cast again anyway.
+            AddInspectorCaption("If the buff is already there");
+            bool recastDraft = _session.Draft.ExistingEffectPolicy ==
+                Domain.Planning.ExistingEffectPolicy.Overwrite;
+            Button draftRecast = KingmakerUiFactory.CreateButton(
+                "DraftRecastPolicy", _inspectorContent, _theme,
+                recastDraft ? "[x] Cast it again anyway" : "[  ] Cast it again anyway (now: skip it)",
+                () => Click(() =>
+                {
+                    _session.Draft.ExistingEffectPolicy = recastDraft
+                        ? Domain.Planning.ExistingEffectPolicy.SkipAlreadyActive
+                        : Domain.Planning.ExistingEffectPolicy.Overwrite;
+                    RefreshView();
+                }));
+            KingmakerUiFactory.AddLayout(RectOf(draftRecast), 30f);
+            // Final review B2: the plan's animated fallback (the player guide
+            // describes it): in Instant mode, a buff that cannot be cast
+            // instantly is cast with its animation instead of being refused.
+            AddInspectorCaption("Plan settings");
+            Button fallback = KingmakerUiFactory.CreateButton(
+                "AnimatedFallback", _inspectorContent, _theme,
+                (_session.AllowAnimatedFallback ? "[x] " : "[  ] ") +
+                    "Instant mode: animate buffs that cannot be instant",
+                () => Click(() =>
+                {
+                    _session.SetAllowAnimatedFallback(!_session.AllowAnimatedFallback);
+                    _footerResult.text = "Animated fallback " +
+                        (_session.AllowAnimatedFallback ? "on" : "off") + " (Save to keep it).";
+                    RefreshView();
+                }));
+            KingmakerUiFactory.AddLayout(RectOf(fallback), 30f);
         }
 
         private void AddInspectorCaption(string caption)
@@ -1665,6 +1791,8 @@ namespace KingmakerBuffPlanner.UI
             _footerBudget.text = lines.Count == 0
                 ? "No resource demand yet."
                 : string.Join("   ", lines.ToArray());
+            string wholePlan = WorkspaceFooterText.WholePlan(view.OnePassGate);
+            if (wholePlan.Length != 0) _footerBudget.text += "   " + wholePlan;
         }
     }
 }

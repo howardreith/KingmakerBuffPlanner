@@ -119,12 +119,18 @@ namespace KingmakerBuffPlanner.GameAdapters
                     "sticky-touch-held-charge-already-active");
             UnitCommand command = UnitUseAbility.CreateCastCommand(resolved.Ability, resolved.Target);
             if (command == null) throw new InvalidOperationException("Kingmaker returned no cast command.");
+            // Final review A3: the read before submission that confirmation
+            // is judged against; without it nothing is queued.
+            string baselineFailure;
+            EffectBaseline baseline = KingmakerEffectInstanceReader.ReadBaseline(step, out baselineFailure);
+            if (baseline == null)
+                throw new InvalidOperationException("effect-baseline-unreadable:" + baselineFailure);
             int? availableBefore = SafeAvailableCount(resolved.Ability);
             UnitCommand previousCommand = resolved.Caster.Commands.PreviousCommand;
             resolved.Caster.Commands.AddToQueue(command);
             return new KingmakerAnimatedOperation(command, step,
                 resolved.Caster, resolved.Target, resolved.Ability,
-                delivery, previousCommand, availableBefore, resolved.Resolution);
+                delivery, previousCommand, availableBefore, resolved.Resolution, baseline);
         }
 
         internal static bool TryResolve(CastStep step, out ResolvedCast resolved, out string reason)
@@ -465,6 +471,7 @@ namespace KingmakerBuffPlanner.GameAdapters
             private readonly UnitCommand _previousCommandAtStart;
             private readonly int? _availableBefore;
             private readonly string _resolution;
+            private readonly EffectBaseline _baseline;
             private readonly AnimatedStickyTouchLifecycle _stickyLifecycle;
             private int _postCompletionFrames;
             private int _pollFrames;
@@ -478,9 +485,11 @@ namespace KingmakerBuffPlanner.GameAdapters
                 UnitEntityData caster, TargetWrapper target,
                 AbilityData sourceAbility,
                 BlueprintAbility deliveryBlueprint,
-                UnitCommand previousCommandAtStart, int? availableBefore, string resolution)
+                UnitCommand previousCommandAtStart, int? availableBefore, string resolution,
+                EffectBaseline baseline)
             {
                 _resolution = resolution ?? "unrecorded";
+                _baseline = baseline;
                 _carrierCommand = command;
                 _step = step;
                 _caster = caster;
@@ -546,23 +555,18 @@ namespace KingmakerBuffPlanner.GameAdapters
                         SafeAvailableCount(_sourceAbility));
                 }
             }
+            // Final review A3: only an instance this attempt put there
+            // confirms, judged against the read taken before the command was
+            // queued; presence alone never does, and an empty recipient set
+            // confirms nothing (A2).
             public bool EffectsObserved
             {
                 get
                 {
                     if (_observed == true) return true;
-                    try
-                    {
-                        var active = new KingmakerActiveEffectSnapshotBuilder().Build();
-                        var evaluator = new EffectPresenceEvaluator();
-                        bool observed = _step.ExpectedRecipientUnitIds.All(
-                            targetId =>
-                            evaluator.EvaluateTyped(_step.ExpectedEffects, active.GetEffects(targetId), null).Kind ==
-                                EffectPresenceKind.Complete);
-                        if (observed) _observed = true;
-                        return observed;
-                    }
-                    catch (Exception) { return false; }
+                    bool observed = KingmakerEffectInstanceReader.AppliedByThisAttempt(_step, _baseline);
+                    if (observed) _observed = true;
+                    return observed;
                 }
             }
             public bool HasResidualDeliveryState

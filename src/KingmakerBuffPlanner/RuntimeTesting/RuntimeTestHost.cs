@@ -2962,10 +2962,14 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     }
                 });
                 repository.Save(profile);
+                // Final review B1: the seed is a genuine schema-4 document, as
+                // the released 0.0.19 wrote it; the first open must migrate it
+                // in memory and import it without rewriting it.
+                AtomicFile.WriteUtf8(path, LegacyProfileFixture.ToSchema4Json(File.ReadAllText(path)));
                 _importClassicPath = path;
                 _importClassicSha256 = Hashing.Sha256(path);
                 _importExpectedCastings = targets.Count;
-                _importSeedEvidence = "campaign=" + campaignId + ";source=" + selection.SourceId +
+                _importSeedEvidence = "campaign=" + campaignId + ";schema=4;source=" + selection.SourceId +
                     ";targets=" + string.Join(",", targets.ToArray()) + ";classicSha256=" + _importClassicSha256;
                 _log.Info("[KBP-IMPORT] classic plan seeded before the first open;" + _importSeedEvidence + ".");
             }

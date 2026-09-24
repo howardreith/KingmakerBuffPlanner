@@ -129,6 +129,9 @@
     <Compile Include="Execution\HaltingPlanRunner.cs" />
     <Compile Include="Execution\FactSourceChoice.cs" />
     <Compile Include="Execution\AvailableCountJudgement.cs" />
+    <Compile Include="Execution\WorldGatedEnumerator.cs" />
+    <Compile Include="Execution\AppliedEffectJudgement.cs" />
+    <Compile Include="RuntimeTesting\LegacyProfileFixture.cs" />
     <Compile Include="Persistence\PersistenceMessages.cs" />
     <Compile Include="RuntimeTesting\PhysicalWorkspaceRecord.cs" />
     <Compile Include="Execution\CastingCapabilityInventory.cs" />
@@ -136,6 +139,7 @@
     <Compile Include="Execution\CastingQualificationDriver.cs" />
     <Compile Include="Execution\SingleCastProbeObservation.cs" />
     <Compile Include="GameAdapters\KingmakerProbeObserver.cs" />
+    <Compile Include="GameAdapters\KingmakerEffectInstanceReader.cs" />
     <Compile Include="Diagnostics\ShareCastDiagnostics.cs" />
     <Compile Include="Compatibility\BrownFurPowerfulChangeProfile.cs" />
     <Compile Include="Compatibility\BrownFurPowerfulChangeCompatibility.cs" />

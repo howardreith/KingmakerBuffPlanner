@@ -462,7 +462,7 @@ namespace KingmakerBuffPlanner.UI
                     if (detail.StartsWith("no-provider-for-source-and-caster", StringComparison.Ordinal))
                         return "that character cannot cast this buff.";
                     if (detail.StartsWith("exact-source-ambiguous", StringComparison.Ordinal))
-                        return "that character can cast it in more than one way; pick the exact spell or item first.";
+                        return "that character can cast it in more than one way; pick one under Cast from.";
                     return "the party could not be read; close and reopen the planner.";
                 case "no-editing-focus":
                 case "focused-casting-missing":
@@ -487,6 +487,16 @@ namespace KingmakerBuffPlanner.UI
                 case "no-import-review":
                 case "no-import-notices":
                     return "there is nothing to review.";
+                case "provider-unavailable":
+                    return "that character can no longer cast this buff that way.";
+                case "provider-unchanged":
+                case "recast-policy-unchanged":
+                case "routine-unchanged":
+                    return "it already is.";
+                case "already-first":
+                    return "it is already cast first in its routine.";
+                case "already-last":
+                    return "it is already cast last in its routine.";
                 default:
                     return head.Length == 0 ? "not possible right now." : head.Replace('-', ' ') + ".";
             }
@@ -517,6 +527,76 @@ namespace KingmakerBuffPlanner.UI
                     if (message.IndexOf("caster", StringComparison.OrdinalIgnoreCase) >= 0)
                         return "choose who casts it first.";
                     return "this casting is not complete yet.";
+            }
+        }
+    }
+
+    // Final review B7: the whole-plan forecast is shown, not only computed:
+    // when every routine run one after another would leave castings blocked
+    // (for example two routines relying on the same last charge), the
+    // footer says so; nothing is added while the whole plan fits.
+    public static class WorkspaceFooterText
+    {
+        public static string WholePlan(CastingApplyDecision onePass)
+        {
+            if (onePass == null || onePass.Allowed || onePass.BlockingReasons.Count == 0)
+                return string.Empty;
+            int blocked = onePass.BlockingReasons.Count;
+            return "All routines in one pass: " + blocked +
+                (blocked == 1 ? " casting" : " castings") + " would be blocked.";
+        }
+    }
+
+    // Final review B2/B3: one exact way to cast the buff - who casts it,
+    // and from which spellbook level, item or ability - as the provider
+    // picker offers it for the next casting or for the focused one.
+    public sealed class WorkspaceProviderChoice
+    {
+        internal WorkspaceProviderChoice(string providerKey, string casterUnitId,
+            string casterName, string label, bool selected)
+        {
+            ProviderKey = providerKey ?? string.Empty;
+            CasterUnitId = casterUnitId ?? string.Empty;
+            CasterName = casterName ?? string.Empty;
+            Label = label ?? string.Empty;
+            Selected = selected;
+        }
+
+        public string ProviderKey { get; private set; }
+        public string CasterUnitId { get; private set; }
+        public string CasterName { get; private set; }
+        public string Label { get; internal set; }
+        public bool Selected { get; private set; }
+    }
+
+    public static class WorkspaceProviderLabels
+    {
+        // What the player reads on a provider choice: whose resource it
+        // spends and which one, its caster level, and any metamagic.
+        public static string Describe(string casterName, string resourceLabel,
+            int casterLevel, int metamagicMask)
+        {
+            string resource = string.IsNullOrWhiteSpace(resourceLabel) ? "resource" : resourceLabel;
+            string label = !string.IsNullOrEmpty(casterName) &&
+                !resource.StartsWith(casterName + ":", StringComparison.Ordinal)
+                    ? casterName + ": " + resource : resource;
+            if (casterLevel > 0) label += ", caster level " + casterLevel;
+            if (metamagicMask != 0) label += ", with metamagic";
+            return label;
+        }
+
+        // Choices that would read the same get an ordinal, so no two
+        // choices on screen look alike.
+        public static void Disambiguate(IList<WorkspaceProviderChoice> choices)
+        {
+            foreach (IGrouping<string, WorkspaceProviderChoice> same in (choices ??
+                    new WorkspaceProviderChoice[0])
+                .GroupBy(value => value.Label, StringComparer.Ordinal)
+                .Where(group => group.Count() > 1).ToList())
+            {
+                int index = 1;
+                foreach (WorkspaceProviderChoice choice in same)
+                    choice.Label += " (option " + index++ + ")";
             }
         }
     }
@@ -552,6 +632,8 @@ namespace KingmakerBuffPlanner.UI
                 case "target-unreachable": return "the caster cannot target this recipient";
                 case "target-mode-mismatch": return "the buff cannot be cast this way";
                 case "origin-anchor-illegal": return "the group spell cannot be centred there";
+                case "origin-caster-illegal": return "the group spell cannot be centred on its caster; centre it on a party member";
+                case "predicted-coverage-empty": return "no party member would be reached";
                 case "ability-targeting-unsupported": return "this buff's targeting is not supported";
                 case "targeting-modifier-unavailable": return "a required targeting modifier is not available";
                 case "enhancements-unvalidated": return "an enhancement could not be checked";
@@ -928,6 +1010,22 @@ namespace KingmakerBuffPlanner.UI
             new List<WorkspaceEnhancementOption>();
         internal readonly List<WorkspaceOriginOption> _focusedOrigins =
             new List<WorkspaceOriginOption>();
+
+        // Final review B2/B3: the exact providers for the focused casting's
+        // buff (every capable caster, and each source of a caster that has
+        // several) and for the next casting's chosen caster.
+        public IReadOnlyList<WorkspaceProviderChoice> FocusedProviders
+        {
+            get { return _focusedProviders; }
+        }
+        public IReadOnlyList<WorkspaceProviderChoice> DraftProviders
+        {
+            get { return _draftProviders; }
+        }
+        internal readonly List<WorkspaceProviderChoice> _focusedProviders =
+            new List<WorkspaceProviderChoice>();
+        internal readonly List<WorkspaceProviderChoice> _draftProviders =
+            new List<WorkspaceProviderChoice>();
 
         // Header caption for the selected buff: the discovered display name
         // of the selected source; never the raw source key when a name was
