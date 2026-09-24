@@ -288,7 +288,10 @@ namespace KingmakerBuffPlanner.GameAdapters
                 KingmakerAnimatedCastAdapter.ExpectedEffectIds(step.ExpectedEffects) + ";targets:" +
                 string.Join(",", step.ExpectedRecipientUnitIds.ToArray()) +
                 ";carrier-command-created:false;delivery-command-created:false" +
-                ";effects-observed:" + observed);
+                // Read in the frame of submission: the rule's buff lands on
+                // a later tick, so false here is normal; the executor's own
+                // later confirmation decides EffectConfirmed.
+                ";effects-observed-at-submit:" + observed);
         }
 
         public bool EffectsObserved(CastStep step)
