@@ -11180,7 +11180,8 @@ namespace KingmakerBuffPlanner.Tests
             Func<string, string> read = relative => File.ReadAllText(Path.Combine(sourceRoot.FullName, "src",
                 "KingmakerBuffPlanner", relative)).Replace("\r\n", "\n");
             if (!read(Path.Combine("Planning", "ExplicitCastingStepConverter.cs")).Contains(
-                    "return ExplicitStepConversion.Refuse(\"no-predicted-recipients:\" + castingId);") ||
+                    "if (recipients == null || !recipients.Any(value => !string.IsNullOrWhiteSpace(value)))\n" +
+                    "                    return ExplicitStepConversion.Refuse(\"no-predicted-recipients:\" + castingId);") ||
                 AppliedEffectJudgement.AllReached(new string[0], Leaf("buff-effect"),
                     new EffectBaseline(null), unitId => new ObservedEffectInstance[0]))
                 throw new InvalidOperationException("An empty recipient set can still be converted or confirmed.");

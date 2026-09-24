@@ -998,7 +998,9 @@ namespace KingmakerBuffPlanner.Tests
             session.FocusCasting(null);
             session.Draft.ExistingEffectPolicy = ExistingEffectPolicy.Overwrite;
             Assert(AddDraftCasting(session, inputs, "unit-cleric", "unit-t3").Applied);
-            if (session.Document.Castings.Last().ExistingEffectPolicy != ExistingEffectPolicy.Overwrite)
+            PlannedCasting added = session.Document.Castings.Single(value =>
+                value.CastingId != first && value.CastingId != second);
+            if (added.ExistingEffectPolicy != ExistingEffectPolicy.Overwrite)
                 throw new InvalidOperationException("The next casting's recast choice was not kept.");
             DirectoryInfo directory = new DirectoryInfo(Environment.CurrentDirectory);
             while (directory != null && !File.Exists(Path.Combine(directory.FullName, "KingmakerBuffPlanner.sln")))
