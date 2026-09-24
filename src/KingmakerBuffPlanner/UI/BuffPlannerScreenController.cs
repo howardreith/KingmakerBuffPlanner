@@ -92,6 +92,11 @@ namespace KingmakerBuffPlanner.UI
             if (_view != null) _view.ShowResult(result);
         }
 
+        internal void PresentNotice(string text)
+        {
+            if (_view != null) _view.ShowNotice(text);
+        }
+
         internal void Tick()
         {
             if (_state.State == PlannerScreenLifecycleState.OpeningPresentation)

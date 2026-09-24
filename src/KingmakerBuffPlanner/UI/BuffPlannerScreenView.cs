@@ -440,6 +440,11 @@ namespace KingmakerBuffPlanner.UI
             RefreshAll(true);
         }
 
+        internal void ShowNotice(string text)
+        {
+            if (IsAlive && _result != null) _result.text = text ?? string.Empty;
+        }
+
         public void Dispose()
         {
             if (_disposed) return;

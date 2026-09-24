@@ -4643,6 +4643,11 @@ namespace KingmakerBuffPlanner.Tests
                 "BuffPlannerUiRoot.cs")).Replace("\r\n", "\n");
             if (!rootSource.Contains("routine = new WorldGatedEnumerator(_session.ExecuteRoutine(routineId,\n                    observedCompletion, readyOnlyExplicit), () => WorldRunsForCasting);"))
                 throw new InvalidOperationException("The Classic run is not gated on the world running.");
+            // A held run tells the open Classic screen why nothing happens yet.
+            if (!rootSource.Contains("if (!waitingNoticeShown && worldGate.HeldFrames > 0 && _screen != null && _screen.IsOpen)") ||
+                !rootSource.Contains("_screen.PresentNotice(QuickExecutionText.WaitingForWorld);") ||
+                !QuickExecutionText.WaitingForWorld.StartsWith("Casting starts when the game runs", StringComparison.Ordinal))
+                throw new InvalidOperationException("A Classic run held by the open screen does not say so.");
         }
 
         // A cast's confirmation window of three frames: it confirms only if
