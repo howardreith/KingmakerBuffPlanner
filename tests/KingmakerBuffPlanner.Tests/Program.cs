@@ -16627,25 +16627,33 @@ namespace KingmakerBuffPlanner.Tests
                 File.ReadAllText(sessionLegacyPath) != sessionLegacyBytes)
                 throw new InvalidOperationException("First open did not import the legacy plan: " +
                     opened.MigrationStatus + " " + opened.MigrationWarning);
+            var reopened = new CastingWorkspaceSession(sessionBoundary, "legacy-campaign");
+            if (reopened.MigrationStatus != null || reopened.ImportReport != null ||
+                reopened.Document.Castings.Count != 2)
+                throw new InvalidOperationException(
+                    "A second open imported again instead of loading the candidate.");
             // Batch 3, section 11: USING the casting-first workspace (save,
             // casting mode, present, accept, apply) never touches the
             // Classic profile's bytes.
             byte[] sessionLegacyRaw = File.ReadAllBytes(sessionLegacyPath);
             PartyProviderSnapshot usedSnapshot;
             CastingWorkspaceInputs usedInputs = WorkspaceInputs(out usedSnapshot);
-            opened.Save();
-            opened.SetExecutionMode("animated");
-            opened.Save();
-            opened.PresentForReview(usedInputs);
-            opened.AcceptPresentedPlan(usedInputs);
-            opened.Apply(CastingApplyMode.Ordinary, "long", usedInputs);
+            // Review B10: every step must really happen (a ready casting, an
+            // accepted plan, an Apply that reaches the dispatch boundary), so
+            // the check cannot pass on an earlier refusal.
+            Assert(AddDraftCasting(reopened, usedInputs, "unit-cleric", "unit-t1").Applied);
+            reopened.Save();
+            reopened.SetExecutionMode("animated");
+            reopened.Save();
+            reopened.PresentForReview(usedInputs);
+            bool usedAccepted = reopened.AcceptPresentedPlan(usedInputs);
+            WorkspaceApplyResult usedApply = reopened.Apply(CastingApplyMode.Ordinary, "long", usedInputs);
+            if (!usedAccepted || usedApply == null || usedApply.ReviewReason == null ||
+                !usedApply.ReviewReason.StartsWith("native-submission-disabled", StringComparison.Ordinal))
+                throw new InvalidOperationException("The workspace use did not reach the dispatch boundary: accepted=" +
+                    usedAccepted + ";apply=" + (usedApply == null ? "none" : usedApply.ReviewReason));
             if (!File.ReadAllBytes(sessionLegacyPath).SequenceEqual(sessionLegacyRaw))
                 throw new InvalidOperationException("Using the casting-first workspace changed the Classic profile.");
-            var reopened = new CastingWorkspaceSession(sessionBoundary, "legacy-campaign");
-            if (reopened.MigrationStatus != null || reopened.ImportReport != null ||
-                reopened.Document.Castings.Count != 2)
-                throw new InvalidOperationException(
-                    "A second open imported again instead of loading the candidate.");
             var fresh = new CastingWorkspaceSession(
                 Path.Combine(sessionBoundary, "no-legacy"), "legacy-campaign");
             if (fresh.MigrationStatus != CastingMigrationStatus.LegacyAbsent ||

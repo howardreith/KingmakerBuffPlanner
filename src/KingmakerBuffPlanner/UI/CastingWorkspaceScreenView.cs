@@ -601,8 +601,16 @@ namespace KingmakerBuffPlanner.UI
             _saveButton = KingmakerUiFactory.CreateButton(
                 "Save", footer, _theme, "Save", () => Click(() =>
                 {
-                    _session.Save();
-                    _footerResult.text = "Candidate saved.";
+                    // A refused save (a protected file) is told, never silent.
+                    try
+                    {
+                        _session.Save();
+                        _footerResult.text = "Candidate saved.";
+                    }
+                    catch (Exception exception)
+                    {
+                        _footerResult.text = PersistenceMessages.ForSaveFailure(exception);
+                    }
                 }));
             KingmakerUiFactory.SetAnchors(RectOf(_saveButton), 0.34f, 0.2f, 0.42f, 0.8f);
             _reloadButton = KingmakerUiFactory.CreateButton(
@@ -627,9 +635,10 @@ namespace KingmakerBuffPlanner.UI
                 "Accept", footer, _theme, "Accept Plan", () => Click(() =>
                 {
                     bool accepted = _session.AcceptPresentedPlan(_inputs());
-                    _footerResult.text = accepted
-                        ? "Plan accepted."
-                        : "Acceptance refused: plan changed or not presented.";
+                    string reviewWarning = PersistenceMessages.ForReviewWarning(_session.ReviewStoreWarning);
+                    _footerResult.text = !accepted
+                        ? "Acceptance refused: plan changed or not presented."
+                        : reviewWarning ?? "Plan accepted.";
                 }));
             KingmakerUiFactory.SetAnchors(RectOf(_acceptButton), 0.71f, 0.15f, 0.83f, 0.85f);
             _applyButton = KingmakerUiFactory.CreateButton(
