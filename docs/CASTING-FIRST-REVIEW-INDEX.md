@@ -7,7 +7,9 @@ Reviewed baseline: `c182061354e9e761c09648ca779ab334588ba379`
 (`fd0e6dc..c182061`); this index covers the casting-first commits
 `c182061..HEAD` (61 commits at first publication).
 
-Status: **release candidate 0.2.0-rc4.** 0.2.0-rc3 (frozen at `ea2a027`,
+Status: **release candidate 0.2.0-rc5.** 0.2.0-rc4 (frozen at `863a182`,
+receipt `docs/evidence/rc-0.2.0-rc4-receipt.md`, superseded after the
+owner's review of its source), 0.2.0-rc3 (frozen at `ea2a027`,
 receipt `docs/evidence/rc-0.2.0-rc3-receipt.md`, superseded after its final
 review), 0.2.0-rc2 (frozen
 at `ae0181d`, receipt `docs/evidence/rc-0.2.0-rc2-receipt.md`) and 0.2.0-rc1
@@ -22,9 +24,10 @@ Resistance probe confirmed its effect in game on
 `320a1b6` (`casting-probe-cast-20260923-p2-02`), and the zero-cost
 qualification passed in game on `d35b38f`
 (`casting-qual-cast-20260923-q1-01`: stop, complete, repeat and a recast
-after a close and reopen, each exactly as forecast). Finite-resource
-qualification waits for an owner-designated advanced seed. Human usability and the native aesthetic
-pass remain open.
+after a close and reopen, each exactly as forecast). On the owner's
+advanced seed (a disposable Beneath the Stolen Lands save) the finite,
+group and enhanced qualifications followed; see the section below and the
+rc5 receipt. Human usability and the native aesthetic pass remain open.
 
 ## The owner's rc4 source review and the advanced seed (2026-09-24)
 
