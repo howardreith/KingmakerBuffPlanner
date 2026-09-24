@@ -4957,6 +4957,16 @@ namespace KingmakerBuffPlanner.Tests
                 !launcher.Contains("(Join-Path $evidence 'abort.json')") ||
                 !launcher.Contains("$abortWrittenUtc.AddSeconds(120)"))
                 throw new InvalidOperationException("The host or the launcher does not enforce the run's stop rule.");
+            // Re-review (harness): checked on every update, the menu
+            // diagnostics included; the deadline is logged once; a PASS
+            // published after the abort marker is a failure.
+            if (host.Contains("_stopCheckCountdown") ||
+                !host.Contains("        private bool UpdateMenuDiagnosticScenario()\n        {\n            string stop = LiveRunStopReason();\n" +
+                    "            if (stop != null)\n                throw new TimeoutException(\"Menu diagnostics stopped;\" + stop);") ||
+                !host.Contains("_log.Info(\"[KBP-RT] overall deadline \" + _processStartUtc.Value") ||
+                !launcher.Contains("if ($null -ne $abortWrittenUtc -and [string]$result.status -ceq 'PASS') {"))
+                throw new InvalidOperationException("The stop rule is not checked on every update or in the menu diagnostics, " +
+                    "the deadline is not logged, or a PASS after the abort is accepted.");
         }
 
         // Final review A3: presence alone never confirms. Only an instance

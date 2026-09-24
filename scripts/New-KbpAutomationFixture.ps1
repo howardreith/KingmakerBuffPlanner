@@ -229,6 +229,18 @@ function Assert-KbpFixturePreconditions {
     Assert-KbpFixtureGameClosed
     Assert-KbpFixtureDeploymentIdle
     Assert-KbpFixtureForeignLeaseIdle
+    Assert-KbpFixtureSavesSettled
+}
+
+# Re-review (harness): the game's save folder is not changed while a runtime
+# run's protected-save comparison is pending or an unexpected save change
+# waits for the owner's review.
+function Assert-KbpFixtureSavesSettled {
+    $production = Join-Path $env:USERPROFILE 'AppData\LocalLow\Owlcat Games\Pathfinder Kingmaker\Saved Games'
+    if ([IO.Path]::GetFullPath($SaveRoot).TrimEnd('\') -ieq [IO.Path]::GetFullPath($production).TrimEnd('\')) {
+        Assert-KbpNoPendingProtectedSaveComparison $script:KbpRuntimeStateRoot
+        Assert-KbpNoUnacknowledgedSaveViolation -StateRoot $script:KbpRuntimeStateRoot
+    }
 }
 
 # Containment + identity validation for any path about to be removed by
@@ -435,13 +447,21 @@ if ($Teardown) {
         $teardownToken = [Guid]::NewGuid().ToString('N')
         New-KbpOwnedLock $lockPath $RunId $teardownToken
         $deleted = $false
+        $deleting = $false
         try {
+            # Re-review (harness): rechecked while this lock is held (a
+            # runtime entry re-checks this lock once it holds its own), before
+            # anything is deleted.
+            Assert-KbpFixturePreconditions
+            $deleting = $true
             Remove-Item -LiteralPath $baselinePath -Force
             Remove-Item -LiteralPath $workingPath -Force
             $deleted = $true
         }
         finally {
-            if ($deleted) {
+            # A refusal before any deletion releases the lock; an interrupted
+            # deletion keeps it for the owner's inspection.
+            if ($deleted -or -not $deleting) {
                 Remove-KbpOwnedLock $lockPath $RunId $teardownToken
             }
         }

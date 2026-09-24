@@ -1532,7 +1532,8 @@ try {
     if (-not $refusedForeign -or
         @($script:KbpForeignRuntimeLeases) -notcontains 'C:\Dev\KingmakerGunslingerLab\compatibility-state\compatibility.lock' -or
         $harnessText -notmatch 'if \(-not \$FixtureMode\) \{ Assert-KbpNoForeignRuntimeLease \}' -or
-        $harnessText -notmatch '(?s)New-KbpOwnedLock \$lockPath \$RunId \$token\s+if \(\$PSBoundParameters\.ContainsKey\(''KnownKingmakerProcessIds''\)\) \{\s+Confirm-KbpLockedWithoutForeignLease ' -or
+        $harnessText -notmatch '(?s)New-KbpOwnedLock \$lockPath \$RunId \$token\s+\$fixtureLock = Get-KbpDefaultFixtureLockPath \$StateRoot\s+if \(\$PSBoundParameters\.ContainsKey\(''KnownKingmakerProcessIds''\)\) \{\s+Confirm-KbpLockedWithoutForeignLease ' -or
+        ([regex]::Matches($harnessText, '-FixtureLockPath \$fixtureLock')).Count -ne 2 -or
         $installText -notmatch '(?m)^Assert-KbpNoForeignRuntimeLease\s*$' -or
         $installText -notmatch '(?m)^New-KbpOwnedLock \$lockPath \$InstallId \$token\r?\nConfirm-KbpLockedWithoutForeignLease -LockPath \$lockPath -RunId \$InstallId -Token \$token\s*$' -or
         $rollbackText -notmatch '(?m)^if \(\$liveGameRoot\) \{ Assert-KbpNoForeignRuntimeLease \}' -or
@@ -1590,6 +1591,15 @@ try {
         $null -ne (New-TestCompletion @{}).restorationFailure) {
         throw 'The completion record does not carry the launcher restoration failure.'
     }
+    # Re-review (harness): a scenario without a fixture save compares no
+    # saves and is complete when everything else is; a reported save failure
+    # still counts, and a scenario with saves still needs its comparison.
+    if (-not (New-TestCompletion @{ SavePair = $null; ProtectedSavesCompared = $false; ProtectedSavesApplicable = $false }).complete -or
+        (New-TestCompletion @{ SavePair = $null; ProtectedSavesCompared = $false; ProtectedSavesApplicable = $false
+            ProtectedSaveFailure = 'Protected-save comparison failed: x' }).complete -or
+        (New-TestCompletion @{ ProtectedSavesCompared = $false; ProtectedSavesApplicable = $true }).complete) {
+        throw 'The completion record misjudges a scenario without saves.'
+    }
     $unrestored = New-TestCompletion @{ TransactionStatePath = $txUnrestored }
     if ($unrestored.restorationVerified -or -not $unrestored.protectedSavesClean -or $unrestored.gameResultStatus -cne 'PASS') {
         throw 'The completion record misreports its individual conditions.'
@@ -1633,7 +1643,7 @@ try {
     # failure paths assign the failure, the policy feeds the comparison, the
     # record receives the failure, and the run's failure is rethrown only
     # after the finally.
-    if ($launcherText -notmatch '(?s)if \(\$running\.Count -eq 0\) \{(.*?)if \(\$null -ne \$restoreFailure\) \{') {
+    if ($launcherText -notmatch '(?s)if \(\$running\.Count -ne 0\) \{(.*?)if \(\$null -ne \$restoreFailure\) \{') {
         throw 'The launcher restoration branch was not found.'
     }
     $restoreBranch = $Matches[1]
@@ -1641,7 +1651,7 @@ try {
     # the launcher and Restore-Local both use.
     $automationText = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'RuntimeAutomation.Common.ps1') -Raw
     if ($restoreBranch -match '\bthrow\b' -or $restoreBranch -match 'Write-Error' -or
-        ([regex]::Matches($restoreBranch, '\$restoreFailure = ')).Count -ne 2 -or
+        ([regex]::Matches($restoreBranch, '\$restoreFailure = ')).Count -ne 3 -or
         $automationText -notmatch '\$allowedChanged = @\(\$savePolicy\.allowedChanged\)' -or
         $automationText -notmatch '-AllowedChangedFileNames \$allowedChanged' -or
         $automationText -notmatch '\$savePolicy\.newFilesBlocking' -or
@@ -1765,8 +1775,85 @@ try {
     [IO.File]::WriteAllText($fixtureLock, 'lock')
     $fixtureBlocks = $false
     try { Assert-KbpNoUnresolvedTransaction $saveState -FixtureLockPath $fixtureLock }
-    catch { $fixtureBlocks = $_.Exception.Message -like '*fixture bootstrap or teardown holds its lock*' }
+    catch { $fixtureBlocks = $_.Exception.Message -like '*The fixture lock of run unknown exists*' }
     if (-not $fixtureBlocks) { throw 'A fixture lock did not refuse a runtime entry.' }
+    # Re-review (harness): the message names the lock's run and what ends an
+    # interrupted operation; only the lab's own state root has a default
+    # fixture lock; a runtime entry re-checks it under its own lock and
+    # releases that lock when refused.
+    $namedLock = Join-Path $savesRoot 'named-fixture.lock'
+    Write-KbpJsonAtomic $namedLock ([ordered]@{ runId = 'bootstrap-x'; token = 't' })
+    $namedMessage = ''
+    try { Assert-KbpFixtureLockAbsent $namedLock } catch { $namedMessage = $_.Exception.Message }
+    if ($namedMessage -notlike '*fixture lock of run bootstrap-x exists*' -or
+        $namedMessage -notlike '*-Recover -RunId bootstrap-x*' -or $namedMessage -notlike '*interrupted teardown*' -or
+        (Get-KbpDefaultFixtureLockPath $saveState) -cne '' -or
+        (Get-KbpDefaultFixtureLockPath $script:KbpRuntimeStateRoot) -cne (Join-Path $script:KbpLabRoot 'runtime-fixture-state\fixture.lock')) {
+        throw 'The fixture lock message or its default location is wrong.'
+    }
+    $entryLock = Join-Path $savesRoot 'entry.lock'
+    New-KbpOwnedLock $entryLock 'entry-test' 'token'
+    $entryRefused = $false
+    try {
+        Confirm-KbpLockedWithoutForeignLease -LockPath $entryLock -RunId 'entry-test' -Token 'token' -SkipForeignLease `
+            -KnownProcessIds @() -FixtureLockPath $namedLock
+    }
+    catch { $entryRefused = $_.Exception.Message -like '*fixture lock of run bootstrap-x*' }
+    if (-not $entryRefused -or (Test-Path -LiteralPath $entryLock)) {
+        throw 'A runtime entry did not re-check the fixture lock under its own lock, or kept its lock when refused.'
+    }
+    # A pending comparison whose run's lock was already released is closed
+    # as unverifiable for the owner's review, never compared.
+    $lateState = Join-Path $savesRoot 'late-state'
+    $lateTransaction = Join-Path $lateState 'transactions\late-run'
+    New-Item -ItemType Directory -Path $lateTransaction -Force | Out-Null
+    $lateBaseline = Save-KbpProtectedSaveBaseline -TransactionDirectory $lateTransaction -RunId 'late-run' `
+        -Scenario 'live-cast-qual' -FixtureFamily 'Automation' -WorkingFileName 'Manual_2_WORKING.zks' `
+        -SaveRoot $saveFolder -Snapshot (Get-KbpSaveFolderSnapshot -SaveRoot $saveFolder)
+    $late = Close-KbpUnverifiableProtectedSaveComparison -BaselinePath $lateBaseline -Reason 'lock-released-before-comparison' `
+        -EvidenceDirectory $saveEvidence -StateRoot $lateState
+    $lateBlocks = $false
+    try { Assert-KbpNoUnacknowledgedSaveViolation -StateRoot $lateState }
+    catch { $lateBlocks = $_.Exception.Message -like '*unverifiable:lock-released-before-comparison*' }
+    Assert-KbpNoPendingProtectedSaveComparison $lateState
+    if ((@($late) -join ',') -cne 'unverifiable:lock-released-before-comparison' -or -not $lateBlocks -or
+        -not [bool](Read-KbpJson $lateBaseline).compared) {
+        throw 'A comparison whose lock was released was not closed as unverifiable for the owner.'
+    }
+    # Acknowledgements live in their own folder and name the exact record:
+    # a changed record needs a new review; a run id ending in .acknowledged
+    # is an ordinary violation; a record naming another run is refused.
+    $ackState = Join-Path $savesRoot 'ack-state'
+    $ackFolder = Join-Path $ackState 'protected-save-violations'
+    New-Item -ItemType Directory -Path $ackFolder -Force | Out-Null
+    Write-KbpJsonAtomic (Join-Path $ackFolder 'tamper-run.json') ([ordered]@{ schemaVersion = 1; runId = 'tamper-run'; blocking = @('changed:a') })
+    & $confirmScript -RunId 'tamper-run' -ReviewedBy 'harness test' -Note 'first' -StateRoot $ackState -Confirm:$false | Out-Null
+    Assert-KbpNoUnacknowledgedSaveViolation -StateRoot $ackState
+    if (-not (Test-Path -LiteralPath (Join-Path $ackFolder 'acknowledged\tamper-run.json') -PathType Leaf) -or
+        (Test-Path -LiteralPath (Join-Path $ackFolder 'tamper-run.acknowledged.json'))) {
+        throw 'The acknowledgement is not kept in its own folder.'
+    }
+    Write-KbpJsonAtomic (Join-Path $ackFolder 'tamper-run.json') ([ordered]@{ schemaVersion = 1; runId = 'tamper-run'; blocking = @('changed:a', 'changed:b') })
+    $tamperBlocks = $false
+    try { Assert-KbpNoUnacknowledgedSaveViolation -StateRoot $ackState } catch { $tamperBlocks = $true }
+    if (-not $tamperBlocks) { throw 'An acknowledgement of another version of the record lifted the block.' }
+    $oddState = Join-Path $savesRoot 'odd-state'
+    $oddFolder = Join-Path $oddState 'protected-save-violations'
+    New-Item -ItemType Directory -Path $oddFolder -Force | Out-Null
+    Write-KbpJsonAtomic (Join-Path $oddFolder 'odd.acknowledged.json') ([ordered]@{ schemaVersion = 1; runId = 'odd.acknowledged'; blocking = @('changed:a') })
+    $oddBlocks = $false
+    try { Assert-KbpNoUnacknowledgedSaveViolation -StateRoot $oddState } catch { $oddBlocks = $true }
+    if (-not $oddBlocks) { throw 'A run whose id ends in .acknowledged escaped the violation check.' }
+    Write-KbpJsonAtomic (Join-Path $oddFolder 'other.json') ([ordered]@{ schemaVersion = 1; runId = 'someone-else'; blocking = @('changed:a') })
+    $mismatchRefused = $false
+    try { & $confirmScript -RunId 'other' -ReviewedBy 'harness test' -Note 'x' -StateRoot $oddState -Confirm:$false | Out-Null }
+    catch { $mismatchRefused = $_.Exception.Message -like '*names run someone-else*' }
+    if (-not $mismatchRefused) { throw 'A violation record naming another run was acknowledged.' }
+    $confirmText = [IO.File]::ReadAllText($confirmScript)
+    if (-not $confirmText.Contains('if ($production) {') -or -not $confirmText.Contains('$typed = Read-Host (') -or
+        -not $confirmText.Contains("if ([string]`$typed -cne `$RunId) { throw 'The typed run id does not match; nothing was acknowledged.' }")) {
+        throw 'The acknowledgement does not ask the owner at the keyboard on the lab state root.'
+    }
     # The launcher refuses before creating evidence, compares before the Mods
     # restoration releases its lock, and reports every failure together;
     # Restore-Local finishes a pending comparison before restoring.
@@ -1781,9 +1868,57 @@ try {
         -not $launcherText.Contains('$completionFailure = ''Run completion record not written: ''') -or
         -not $launcherText.Contains('$orchestration.status = $orchestration.finalStatus') -or
         $restoreText.IndexOf('Complete-KbpProtectedSaveComparison') -lt 0 -or
-        -not $restoreText.Contains('if (-not $SkipProtectedSaveComparison -and (Test-Path -LiteralPath $baselinePath -PathType Leaf)) {') -or
         $restoreText.IndexOf('Complete-KbpProtectedSaveComparison') -gt $restoreText.IndexOf('Restore-KbpRuntimeTransaction -RunId')) {
         throw 'The launcher or Restore-Local does not keep the protected-save order.'
+    }
+    # Re-review (harness): the launcher reads the saves only under its lock,
+    # compares only an entered run, keeps the lock while a comparison is
+    # unfinished, refuses a PASS after its abort, keeps the rehearsal to the
+    # manual session, and never exits a success with an incomplete record.
+    $enteredAt2 = $launcherText.IndexOf('$transactionEntered = $true')
+    $snapshotAt2 = $launcherText.IndexOf('$protectedBefore = Get-KbpSaveFolderSnapshot -SaveRoot $protectedSaveRoot')
+    $baselineAt2 = $launcherText.IndexOf('$protectedBaselinePath = Save-KbpProtectedSaveBaseline')
+    $workingAt2 = $launcherText.IndexOf('throw "The WORKING save changed after it was bound:')
+    if ($enteredAt2 -lt 0 -or $snapshotAt2 -lt $enteredAt2 -or $baselineAt2 -lt $snapshotAt2 -or $workingAt2 -lt $baselineAt2 -or
+        ([regex]::Matches($launcherText, 'Get-KbpSaveFolderSnapshot -SaveRoot \$protectedSaveRoot')).Count -ne 1 -or
+        -not $launcherText.Contains('if ($transactionEntered -and $null -ne $protectedBefore) {') -or
+        -not $launcherText.Contains('elseif ($null -ne $protectedBaselinePath -and -not $protectedSavesCompared) {') -or
+        -not $launcherText.Contains('if ($null -ne $abortWrittenUtc -and [string]$result.status -ceq ''PASS'') {') -or
+        -not $launcherText.Contains("if (`$ManualRehearseDone -and `$Scenario -cne 'live-workspace-manual') {") -or
+        -not $launcherText.Contains('-ProtectedSavesApplicable ($null -ne $savePair)') -or
+        -not $launcherText.Contains('if ($null -ne $completionRecord -and -not [bool]$completionRecord.complete) {') -or
+        -not $launcherText.Contains("`$orchestration.finalStatus = 'FAIL'")) {
+        throw 'The launcher reads the saves outside its lock, releases it before a comparison, or lets an incomplete run pass.'
+    }
+    # Restore-Local refuses to skip a pending comparison, never restores after
+    # a comparison that could not be made, closes a comparison whose lock was
+    # released as unverifiable, and never loses a violation to a restoration
+    # failure.
+    $restoreLf = $restoreText.Replace("`r`n", "`n")
+    $skipAt = $restoreLf.IndexOf('throw "Refusing -SkipProtectedSaveComparison:')
+    $processAt = $restoreLf.IndexOf('if (-not $PSCmdlet.ShouldProcess(')
+    $unverifiableAt = $restoreLf.IndexOf('Close-KbpUnverifiableProtectedSaveComparison -BaselinePath $baselinePath')
+    $compareAt2 = $restoreLf.IndexOf('$comparison = Complete-KbpProtectedSaveComparison -BaselinePath $baselinePath')
+    $failedCompareAt = $restoreLf.IndexOf('throw ("The protected-save comparison of run $RunId failed; the Mods folder was not restored')
+    $restoreCallAt = $restoreLf.IndexOf('$state = Restore-KbpRuntimeTransaction -RunId $RunId')
+    if ($skipAt -lt 0 -or $skipAt -gt $processAt -or $unverifiableAt -lt $processAt -or $compareAt2 -lt $unverifiableAt -or
+        $failedCompareAt -lt $compareAt2 -or $restoreCallAt -lt $failedCompareAt -or
+        -not $restoreLf.Contains("if (`$null -ne `$saveFailure) { throw (`$saveFailure + ' | Restoration: ' + `$_.Exception.Message) }")) {
+        throw 'Restore-Local can skip a pending comparison, restore after a failed one, compare after a released lock, or lose a save violation.'
+    }
+    # A fixture teardown re-checks under its own lock before deleting, and
+    # every fixture change waits for pending comparisons and the owner's
+    # review of a save violation.
+    $fixtureText = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'New-KbpAutomationFixture.ps1')).Replace("`r`n", "`n")
+    $teardownLockAt = $fixtureText.IndexOf('New-KbpOwnedLock $lockPath $RunId $teardownToken')
+    $teardownCheckAt = if ($teardownLockAt -lt 0) { -1 } else { $fixtureText.IndexOf('Assert-KbpFixturePreconditions', $teardownLockAt) }
+    $teardownDeleteAt = if ($teardownLockAt -lt 0) { -1 } else { $fixtureText.IndexOf('Remove-Item -LiteralPath $baselinePath -Force', $teardownLockAt) }
+    if ($teardownLockAt -lt 0 -or $teardownCheckAt -lt 0 -or $teardownDeleteAt -lt $teardownCheckAt -or
+        -not $fixtureText.Contains('if ($deleted -or -not $deleting) {') -or
+        -not $fixtureText.Contains("    Assert-KbpFixtureSavesSettled`n}") -or
+        -not $fixtureText.Contains('Assert-KbpNoPendingProtectedSaveComparison $script:KbpRuntimeStateRoot') -or
+        -not $fixtureText.Contains('Assert-KbpNoUnacknowledgedSaveViolation -StateRoot $script:KbpRuntimeStateRoot')) {
+        throw 'A fixture teardown deletes before re-checking under its lock, or a fixture change ignores the save checks.'
     }
     # Final review C7: the install rollback's lock confirmation is blocked
     # only by a game running from its own root.

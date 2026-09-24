@@ -1692,6 +1692,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
 
         private bool UpdateMenuDiagnosticScenario()
         {
+            string stop = LiveRunStopReason();
+            if (stop != null)
+                throw new TimeoutException("Menu diagnostics stopped;" + stop);
             if (_menuDiagnostic == null)
                 _menuDiagnostic = new MenuRenderDiagnostic(
                     _request, _log,
@@ -1706,15 +1709,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         }
 
         private DateTime? _processStartUtc;
-        private int _stopCheckCountdown;
 
-        // Final review C3: the run's own overall deadline and the launcher's
-        // abort marker (see RuntimeTestProtocol.RunStopReason), checked every
-        // few updates from the first one on, the campaign load included.
+        // Final review C3 and its re-review: the run's own overall deadline
+        // and the launcher's abort marker (see RuntimeTestProtocol.RunStopReason),
+        // checked on every update from the first one on, the campaign load and
+        // the menu diagnostics included; the deadline is logged once.
         private string LiveRunStopReason()
         {
-            if (_stopCheckCountdown-- > 0) return null;
-            _stopCheckCountdown = 10;
             if (_processStartUtc == null)
             {
                 try
@@ -1723,6 +1724,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         .ToUniversalTime();
                 }
                 catch (Exception) { _processStartUtc = _startedAtUtc; }
+                int margin = RuntimeTestProtocol.OverallDeadlineMarginSeconds(_request.TimeoutSeconds);
+                _log.Info("[KBP-RT] overall deadline " + _processStartUtc.Value
+                    .AddSeconds(_request.TimeoutSeconds - margin).ToString("o") + ";timeout=" +
+                    _request.TimeoutSeconds + ";margin=" + margin + ".");
             }
             bool abort;
             try

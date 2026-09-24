@@ -50,8 +50,13 @@ function Confirm-KbpLockedWithoutForeignLease {
         # Final review C7: an operation on one game root (the install
         # rollback) is blocked only by a game running from that root.
         [string]$GameRoot,
-        [object[]]$Processes)
+        [object[]]$Processes,
+        # Re-review (harness): a runtime entry re-checks the fixture lock once
+        # its own lock is held, as a fixture operation re-checks this lock
+        # once it holds its own, so the two can never both proceed.
+        [string]$FixtureLockPath)
     try {
+        Assert-KbpFixtureLockAbsent $FixtureLockPath
         if (-not $SkipForeignLease) { Assert-KbpNoForeignRuntimeLease -LeasePaths $LeasePaths }
         if (-not [string]::IsNullOrEmpty($GameRoot)) {
             if ($PSBoundParameters.ContainsKey('Processes')) {
@@ -526,23 +531,73 @@ function Remove-KbpOwnedLock([string]$LockPath, [string]$RunId, [string]$Token) 
     Remove-Item -LiteralPath $LockPath -Force
 }
 
-function Assert-KbpNoUnresolvedTransaction([string]$StateRoot,
-    [string]$FixtureLockPath = (Join-Path $script:KbpLabRoot 'runtime-fixture-state\fixture.lock')) {
-    $lock = Join-Path $StateRoot 'deployment.lock'
-    if (Test-Path -LiteralPath $lock) { throw "Unresolved runtime deployment lock exists: $lock" }
-    # Final review C8: a fixture bootstrap or teardown in progress (or one
-    # interrupted and awaiting -Recover) blocks a runtime entry.
-    if (-not [string]::IsNullOrWhiteSpace($FixtureLockPath) -and (Test-Path -LiteralPath $FixtureLockPath)) {
-        throw "A fixture bootstrap or teardown holds its lock: $FixtureLockPath (New-KbpAutomationFixture.ps1 -Recover finishes an interrupted one)."
+# The lab's fixture lock guards the lab's own runtime state only; a test
+# state root has none unless a test names one (re-review, harness).
+function Get-KbpDefaultFixtureLockPath([string]$StateRoot) {
+    if (-not [string]::IsNullOrWhiteSpace($StateRoot) -and
+        [IO.Path]::GetFullPath($StateRoot).TrimEnd('\').Equals($script:KbpRuntimeStateRoot, [StringComparison]::OrdinalIgnoreCase)) {
+        return (Join-Path $script:KbpLabRoot 'runtime-fixture-state\fixture.lock')
     }
-    # Final review C2: a run whose protected-save comparison is still
-    # pending is unresolved until Restore-Local.ps1 -RunId finishes it.
+    return ''
+}
+
+# Final review C8 and its re-review: a fixture bootstrap or teardown in
+# progress, or one that was interrupted, blocks a runtime entry; the message
+# names the lock's run and what ends an interrupted one.
+function Assert-KbpFixtureLockAbsent([string]$FixtureLockPath) {
+    if ([string]::IsNullOrWhiteSpace($FixtureLockPath) -or -not (Test-Path -LiteralPath $FixtureLockPath)) { return }
+    $holder = 'unknown'
+    try { $holder = [string](Read-KbpJson $FixtureLockPath).runId } catch { }
+    throw ("The fixture lock of run $holder exists: $FixtureLockPath. A fixture bootstrap or teardown is running, " +
+        "or one was interrupted: New-KbpAutomationFixture.ps1 -Recover -RunId $holder rolls back an interrupted " +
+        "bootstrap; after an interrupted teardown the owner checks the save folder before the lock is removed.")
+}
+
+# Final review C2: a run whose protected-save comparison is still pending is
+# unresolved until Restore-Local.ps1 -RunId finishes it.
+function Assert-KbpNoPendingProtectedSaveComparison([string]$StateRoot) {
     foreach ($baselineFile in @(Get-ChildItem -LiteralPath $StateRoot -Filter protected-saves-before.json -File -Recurse -ErrorAction SilentlyContinue)) {
         $baseline = Read-KbpJson $baselineFile.FullName
         if (-not [bool]$baseline.compared) {
             throw "The protected-save comparison of run $($baseline.runId) is pending (Restore-Local.ps1 -RunId $($baseline.runId) finishes it once the game has exited)."
         }
     }
+}
+
+# Every later run (and fixture change) is refused while a recorded
+# protected-save violation has no owner acknowledgement
+# (scripts\Confirm-KbpProtectedSaveReview.ps1). Re-review (harness): the
+# acknowledgements live in their own folder, and each must name its record's
+# run and the exact bytes of the record it acknowledged.
+function Assert-KbpNoUnacknowledgedSaveViolation {
+    param([string]$StateRoot = $script:KbpRuntimeStateRoot)
+    $folder = Join-Path $StateRoot 'protected-save-violations'
+    if (-not (Test-Path -LiteralPath $folder -PathType Container)) { return }
+    foreach ($record in @(Get-ChildItem -LiteralPath $folder -Filter '*.json' -File | Sort-Object Name)) {
+        $violation = Read-KbpJson $record.FullName
+        $recordRun = [string]$violation.runId
+        $acknowledgement = Join-Path (Join-Path $folder 'acknowledged') ($record.BaseName + '.json')
+        $acknowledged = $false
+        if ($recordRun -ceq $record.BaseName -and (Test-Path -LiteralPath $acknowledgement -PathType Leaf)) {
+            $ack = Read-KbpJson $acknowledgement
+            $acknowledged = [string]$ack.runId -ceq $recordRun -and
+                [string]$ack.violationRecordSha256 -ceq (Get-KbpSha256 $record.FullName)
+        }
+        if (-not $acknowledged) {
+            throw ("Run $recordRun changed protected saves ($(@($violation.blocking) -join ', ')). " +
+                "No run starts until the owner has reviewed it and run scripts\Confirm-KbpProtectedSaveReview.ps1 -RunId $recordRun.")
+        }
+    }
+}
+
+function Assert-KbpNoUnresolvedTransaction([string]$StateRoot, [string]$FixtureLockPath) {
+    if (-not $PSBoundParameters.ContainsKey('FixtureLockPath')) {
+        $FixtureLockPath = Get-KbpDefaultFixtureLockPath $StateRoot
+    }
+    $lock = Join-Path $StateRoot 'deployment.lock'
+    if (Test-Path -LiteralPath $lock) { throw "Unresolved runtime deployment lock exists: $lock" }
+    Assert-KbpFixtureLockAbsent $FixtureLockPath
+    Assert-KbpNoPendingProtectedSaveComparison $StateRoot
     foreach ($stateFile in @(Get-ChildItem -LiteralPath $StateRoot -Filter transaction.json -File -Recurse -ErrorAction SilentlyContinue)) {
         $state = Read-KbpJson $stateFile.FullName
         if ($state.status -cne 'Restored') {
@@ -624,11 +679,13 @@ function Enter-KbpRuntimeTransaction {
         if (Test-Path -LiteralPath $path) { throw "Run-owned path already exists: $path" }
     }
     New-KbpOwnedLock $lockPath $RunId $token
+    $fixtureLock = Get-KbpDefaultFixtureLockPath $StateRoot
     if ($PSBoundParameters.ContainsKey('KnownKingmakerProcessIds')) {
         Confirm-KbpLockedWithoutForeignLease -LockPath $lockPath -RunId $RunId -Token $token `
-            -SkipForeignLease:$FixtureMode -KnownProcessIds $KnownKingmakerProcessIds
+            -SkipForeignLease:$FixtureMode -KnownProcessIds $KnownKingmakerProcessIds -FixtureLockPath $fixtureLock
     } else {
-        Confirm-KbpLockedWithoutForeignLease -LockPath $lockPath -RunId $RunId -Token $token -SkipForeignLease:$FixtureMode
+        Confirm-KbpLockedWithoutForeignLease -LockPath $lockPath -RunId $RunId -Token $token -SkipForeignLease:$FixtureMode `
+            -FixtureLockPath $fixtureLock
     }
     $statePath = Join-Path $transactionRoot 'transaction.json'
     try {

@@ -168,6 +168,10 @@ if (-not [string]::IsNullOrWhiteSpace($QualificationRecipe) -and
     $Scenario -cne 'live-cast-qual' -and $Scenario -cne 'live-cast-qual-select') {
     throw '-QualificationRecipe is only valid with -Scenario live-cast-qual-select or live-cast-qual.'
 }
+# Re-review (harness): the rehearsal of the manual session is that session's.
+if ($ManualRehearseDone -and $Scenario -cne 'live-workspace-manual') {
+    throw '-ManualRehearseDone is only valid with -Scenario live-workspace-manual.'
+}
 # Review P2-2: a qualification run needs the boot/load budget (600 s) plus
 # its own deadline (240 s) inside the harness wait, or the harness would
 # abandon a live run with the Mods folder unrestored.
@@ -301,21 +305,14 @@ $process = $null
 # violation waits for the owner's review.
 Assert-KbpNoUnacknowledgedSaveViolation
 New-Item -ItemType Directory -Path $evidence | Out-Null
-# Protected-save comparison: every save-folder file before launch, compared
-# after restoration. Only the run WORKING copy may change; a changed or
-# removed file always fails the run, and a new file (for example an
-# autosave) fails an advanced-copy run and is recorded otherwise.
+# Protected-save comparison: every save-folder file once this run holds its
+# deployment lock (below), compared before the lock is released. Only the
+# run WORKING copy may change; a changed or removed file always fails the
+# run, and a new file (for example an autosave) fails an advanced-copy run
+# and is recorded otherwise.
 $protectedSaveRoot = Join-Path $env:USERPROFILE 'AppData\LocalLow\Owlcat Games\Pathfinder Kingmaker\Saved Games'
-$protectedBefore = if ($null -ne $savePair) { Get-KbpSaveFolderSnapshot -SaveRoot $protectedSaveRoot } else { $null }
-# Re-review: the WORKING save bound above (and by any allowance) is still the
-# same bytes when the protected snapshot is taken; nothing changed it in
-# between.
-if ($null -ne $savePair) {
-    $workingBefore = $protectedBefore[[string]$savePair.working.fileName]
-    if ($null -eq $workingBefore -or [string]$workingBefore.sha256 -cne [string]$savePair.working.sha256) {
-        throw "The WORKING save changed after it was bound: $($savePair.working.fileName)"
-    }
-}
+$protectedBefore = $null
+$completionRecord = $null
 $protectedSaveFailure = $null
 $protectedSavesCompared = $false
 $protectedBaselinePath = $null
@@ -334,12 +331,19 @@ try {
         -RunId $runId -CompatibilityProfileId $CompatibilityProfileId `
         -Confirm:$false | Select-Object -Last 1
     $transactionEntered = $true
-    # Final review C2: the protected-save baseline is kept beside the
-    # transaction before anything runs.
-    if ($null -ne $protectedBefore) {
+    # Final review C2 and its re-review: the saves are read only once this
+    # run holds its lock (the other lab checks it), the baseline is kept
+    # beside the transaction before anything runs, and the WORKING save bound
+    # above (and by any allowance) must still be the same bytes.
+    if ($null -ne $savePair) {
+        $protectedBefore = Get-KbpSaveFolderSnapshot -SaveRoot $protectedSaveRoot
         $protectedBaselinePath = Save-KbpProtectedSaveBaseline -TransactionDirectory (Split-Path -Parent $statePath) `
             -RunId $runId -Scenario $Scenario -FixtureFamily $FixtureFamily `
             -WorkingFileName ([string]$savePair.working.fileName) -SaveRoot $protectedSaveRoot -Snapshot $protectedBefore
+        $workingBefore = $protectedBefore[[string]$savePair.working.fileName]
+        if ($null -eq $workingBefore -or [string]$workingBefore.sha256 -cne [string]$savePair.working.sha256) {
+            throw "The WORKING save changed after it was bound: $($savePair.working.fileName)"
+        }
     }
     if ($null -ne $displaySize) {
         $displayRegistryPath = Join-Path $script:KbpRuntimeStateRoot "transactions\$runId\display-registry.json"
@@ -801,6 +805,11 @@ public static class KbpPhysicalInput {
     }
     $result = Read-KbpJson $resultPath
     Assert-KbpRuntimeResult -Result $result -Request $request -BuildManifest $buildManifest
+    # Re-review (harness): a result published after the deadline's abort
+    # marker is never a pass.
+    if ($null -ne $abortWrittenUtc -and [string]$result.status -ceq 'PASS') {
+        throw 'The game reported PASS after the launcher''s deadline abort; the run is treated as failed.'
+    }
     if (-not $process.WaitForExit(30000)) { throw 'Kingmaker did not exit after committing its result; restoration is blocked.' }
     $orchestration.status = $result.status
     $orchestration.stage = 'result-validated'
@@ -870,7 +879,7 @@ finally {
     # that lock) cannot have run in between. A comparison that cannot run
     # is a failure, not a silence (review C10): it stays pending beside the
     # transaction for Restore-Local.ps1 -RunId and blocks later runs.
-    if ($null -ne $protectedBefore) {
+    if ($transactionEntered -and $null -ne $protectedBefore) {
         if (@(Get-Process -Name Kingmaker -ErrorAction SilentlyContinue).Count -ne 0) {
             $protectedSaveFailure = 'Protected-save comparison skipped: Kingmaker is still running (Restore-Local.ps1 -RunId ' +
                 $runId + ' finishes it once the game has exited).'
@@ -898,14 +907,21 @@ finally {
         # Review of e7c5207..f7726c9, P3-3: a failed or blocked restoration
         # must not skip the protected-save comparison or the completion
         # record; it is reported after both are written.
-        if ($running.Count -eq 0) {
+        if ($running.Count -ne 0) {
+            $restoreFailure = "Kingmaker remains running; exact Mods restoration is intentionally blocked. Transaction: $runId"
+        }
+        elseif ($null -ne $protectedBaselinePath -and -not $protectedSavesCompared) {
+            # Re-review (harness): an unfinished protected-save comparison
+            # keeps this run's lock, so nothing can change the saves between
+            # the run and the comparison that finishes it.
+            $restoreFailure = "Mods restoration withheld until the protected saves of $runId are compared (Restore-Local.ps1 -RunId $runId compares, then restores)."
+        }
+        else {
             try { & (Join-Path $PSScriptRoot 'Restore-Local.ps1') -RunId $runId -SkipProtectedSaveComparison -Confirm:$false }
             catch {
                 $restoreFailure = "Mods restoration failed for $runId (Restore-Local.ps1 -RunId $runId recovers it once the cause is fixed): " +
                     $_.Exception.Message
             }
-        } else {
-            $restoreFailure = "Kingmaker remains running; exact Mods restoration is intentionally blocked. Transaction: $runId"
         }
         if ($null -ne $restoreFailure) {
             Write-Warning $restoreFailure
@@ -951,7 +967,7 @@ finally {
                 -KingmakerExited $completionExited -TransactionStatePath $completionTransaction `
                 -RestoreFailure $restoreFailure `
                 -ProtectedSavesCompared $protectedSavesCompared -ProtectedSaveFailure $protectedSaveFailure `
-                -ManualRehearsal ([bool]$ManualRehearseDone)
+                -ManualRehearsal ([bool]$ManualRehearseDone) -ProtectedSavesApplicable ($null -ne $savePair)
             Write-KbpJsonAtomic (Join-Path $evidence 'run-completion.json') $completionRecord
             # Re-review: the orchestration record ends with the run's final
             # verdict, never the game's earlier PASS alone.
@@ -972,6 +988,18 @@ finally {
             # exits as a success.
             $completionFailure = 'Run completion record not written: ' + $_.Exception.Message
             Write-Warning $completionFailure
+            # Re-review (harness): nor does its orchestration record keep the
+            # game's earlier PASS.
+            try {
+                if ($null -ne (Get-Variable -Name orchestration -ErrorAction SilentlyContinue) -and $null -ne $orchestration) {
+                    $orchestration.finalComplete = $false
+                    $orchestration.finalStatus = 'FAIL'
+                    $orchestration.status = 'FAIL'
+                    $orchestration.stage = 'incomplete'
+                    Write-KbpJsonAtomic (Join-Path $evidence 'orchestration.json') $orchestration
+                }
+            }
+            catch { Write-Warning "Orchestration record not updated: $($_.Exception.Message)" }
         }
     }
 }
@@ -985,3 +1013,10 @@ if ($null -ne $protectedSaveFailure) { $failureParts.Add('Protected saves: ' + $
 if ($null -ne $completionFailure) { $failureParts.Add($completionFailure) }
 if ($failureParts.Count -eq 1 -and $null -ne $runFailure) { throw $runFailure }
 if ($failureParts.Count -ne 0) { throw ($failureParts -join ' | ') }
+# Re-review (harness): an incomplete run never exits as a success, even when
+# no single step reported a failure.
+if ($null -ne $completionRecord -and -not [bool]$completionRecord.complete) {
+    throw ("Run $runId is not complete: game=$($completionRecord.gameResultStatus) harness=$($completionRecord.harnessSucceeded) " +
+        "kingmakerExited=$($completionRecord.kingmakerExited) restored=$($completionRecord.restorationVerified) " +
+        "protectedSavesClean=$($completionRecord.protectedSavesClean)")
+}
