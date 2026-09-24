@@ -941,7 +941,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         ? RuntimeTestAssertion.Pass("qualification-selection",
                             "recipe selected;" + forecastSteps + " forecast steps",
                             string.Join(",", selection.Castings.Select(casting => casting.CastingId + "=" +
-                                casting.CasterUnitId + ">" + casting.DirectTargetUnitId).ToArray()))
+                                casting.CasterUnitId + ">" + (casting.DirectTargetUnitId ??
+                                    (casting.Origin == null ? string.Empty
+                                        : casting.Origin.IsCasterCentered ? "caster-centred"
+                                        : "anchor:" + casting.Origin.AnchorUnitId))).ToArray()))
                         : RuntimeTestAssertion.Fail("qualification-selection",
                             "recipe selected;" + forecastSteps + " forecast steps",
                             selection == null ? "missing" : selection.Refusal));
@@ -3860,7 +3863,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         ";plannerRoots=" + UnityEngine.Object.FindObjectsOfType<BuffPlannerUiRoot>().Length +
                         ";mode=" + (Kingmaker.Game.Instance == null ? "none"
                             : Kingmaker.Game.Instance.CurrentMode.ToString()),
-                    () => BuffPlannerUiRoot.OwnedTicksForRuntime);
+                    () => BuffPlannerUiRoot.OwnedTicksForRuntime,
+                    (step, recipient, label) => new KingmakerProbeObserver().ObserveRecipient(
+                        step, recipient, label, _probeClock));
                 _log.Info("[KBP-QUAL] driver built;casting=" + _qualificationRecord.CastingScenario +
                     ";allowance=" + _qualificationRecord.AllowanceStatus + ";workspaceClosed=" +
                     closed.Closed + ";campaign=" + campaignId + ".");

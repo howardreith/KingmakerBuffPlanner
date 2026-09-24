@@ -69,7 +69,8 @@ namespace KingmakerBuffPlanner.Execution
                     ";cl=" + provider.EffectiveCasterLevel + ";rounds=" + provider.ExpectedDurationRounds +
                     ";strategy=" + option.ExecutionStrategy + ";targets=" + option.ReachableTargetIds.Count +
                     ";anchors=" + option.LegalAnchorIds.Count + ";widestAnchorCoverage=" + widest +
-                    ";shape=" + Shape(effect) + ";leaves=" + Leaves(effect));
+                    ";shape=" + Shape(effect) + ";leaves=" + Leaves(effect) +
+                    ";structure=" + Structure(effect));
             }
             foreach (CastEnhancementSnapshot enhancement in inputs.Enhancements ?? new CastEnhancementSnapshot[0])
                 lines.Add("enhancement=" + enhancement.EnhancementId + ";name=" + enhancement.DisplayName +
@@ -88,6 +89,36 @@ namespace KingmakerBuffPlanner.Execution
             foreach (EffectLeafExpression leaf in CastingQualificationForecast.Leaves(effect))
                 leaves.Add(leaf.Kind + ":" + leaf.EffectId);
             return leaves.Count == 0 ? "none" : string.Join(",", leaves.ToArray());
+        }
+
+        // A compact form of an effect expression's structure (at most 160
+        // characters), so evidence shows why a source is or is not a plain
+        // buff: leaf:<kind>:<target>, seq(...), cond(...), to:<target>(...),
+        // ref:<first 8 of the ability id>(...), empty.
+        public static string Structure(EffectExpression effect)
+        {
+            string text = StructureOf(effect);
+            return text.Length <= 160 ? text : text.Substring(0, 157) + "...";
+        }
+
+        private static string StructureOf(EffectExpression expression)
+        {
+            if (expression == null) return "none";
+            var leaf = expression as EffectLeafExpression;
+            if (leaf != null) return "leaf:" + leaf.Kind + ":" + Name(leaf.Target);
+            var sequence = expression as SequenceEffectExpression;
+            if (sequence != null)
+                return "seq(" + string.Join(",", sequence.Children.Select(StructureOf).ToArray()) + ")";
+            var conditional = expression as ConditionalEffectExpression;
+            if (conditional != null)
+                return "cond(" + StructureOf(conditional.WhenTrue) + "|" + StructureOf(conditional.WhenFalse) + ")";
+            var targeted = expression as TargetedEffectExpression;
+            if (targeted != null) return "to:" + Name(targeted.Target) + "(" + StructureOf(targeted.Child) + ")";
+            var referenced = expression as ReferencedAbilityExpression;
+            if (referenced != null)
+                return "ref:" + (referenced.AbilityId ?? string.Empty).PadRight(8).Substring(0, 8).Trim() +
+                    "(" + StructureOf(referenced.Child) + ")";
+            return expression is EmptyEffectExpression ? "empty" : expression.GetType().Name;
         }
 
         // The recipients an effect reaches, from its leaf and targeted

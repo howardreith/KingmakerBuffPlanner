@@ -209,11 +209,19 @@ namespace KingmakerBuffPlanner.Execution
     {
         public const string ZeroCostMixed = "zero-cost-mixed";
         public const string FiniteDirectMixed = "finite-direct-mixed";
+        public const string GroupMixed = "group-mixed";
         public const string RoutineId = "long";
 
         public static bool IsKnown(string recipe)
         {
-            return recipe == ZeroCostMixed || recipe == FiniteDirectMixed;
+            return recipe == ZeroCostMixed || recipe == FiniteDirectMixed || recipe == GroupMixed;
+        }
+
+        // The group recipe's own steps (prime, mixed, repeat) replace the
+        // stop / complete / repeat / recast sequence.
+        public static bool IsGroupRecipe(string recipe)
+        {
+            return recipe == GroupMixed;
         }
 
         // The zero-cost recipe ends with the disable and recover steps (its
@@ -227,6 +235,7 @@ namespace KingmakerBuffPlanner.Execution
 
         public static int ForecastSteps(string recipe)
         {
+            if (IsGroupRecipe(recipe)) return 2;
             return HasDisableStep(recipe) ? 5 : 3;
         }
 
@@ -235,10 +244,11 @@ namespace KingmakerBuffPlanner.Execution
         {
             if (recipe == FiniteDirectMixed) return SelectFiniteDirectMixed(inputs, campaignId);
             if (recipe == ZeroCostMixed) return SelectZeroCostMixed(inputs, campaignId);
+            if (recipe == GroupMixed) return SelectGroupMixed(inputs, campaignId);
             return new CastingQualificationSelection("unknown-recipe:" + recipe, null, null,
                 null, 0, null, recipe);
         }
-        public const int MaximumRecordedRejections = 40;
+        public const int MaximumRecordedRejections = 160;
         internal static readonly string[] CastingIds = { "qual-cast-1", "qual-cast-2", "qual-cast-3" };
 
         // Plain spellbook buffs from verified free sources, cast by rule.
@@ -264,10 +274,12 @@ namespace KingmakerBuffPlanner.Execution
                 else if (!pools.TryGetValue(provider.ResourcePoolKey, out pool) ||
                     pool.Kind != ResourcePoolKind.Unlimited)
                     reject(provider.Key.Canonical + "|not-verified-free");
-                else if (sourceId == null ||
-                    !ExplicitCastingStepConverter.IsPlainCurrentTargetBuff(
-                        inputs.EffectsBySource[sourceId], ability.BaseAbilityGuid))
-                    reject(provider.Key.Canonical + "|effect-shape");
+                else if (sourceId == null)
+                    reject(provider.Key.Canonical + "|effect-shape:no-source");
+                else if (!ExplicitCastingStepConverter.IsPlainCurrentTargetBuff(
+                        inputs.EffectsBySource[sourceId], ability))
+                    reject(provider.Key.Canonical + "|effect-shape:" +
+                        CastingCapabilityInventory.Structure(inputs.EffectsBySource[sourceId]));
                 else
                     eligible.Add(option);
             }
@@ -385,10 +397,12 @@ namespace KingmakerBuffPlanner.Execution
                     (pool.Kind != ResourcePoolKind.PreparedSlots &&
                      pool.Kind != ResourcePoolKind.SpontaneousLevel))
                     reject(provider.Key.Canonical + "|not-finite-spellbook-pool");
-                else if (sourceId == null ||
-                    !ExplicitCastingStepConverter.IsPlainCurrentTargetBuff(
-                        inputs.EffectsBySource[sourceId], ability.BaseAbilityGuid))
-                    reject(provider.Key.Canonical + "|effect-shape");
+                else if (sourceId == null)
+                    reject(provider.Key.Canonical + "|effect-shape:no-source");
+                else if (!ExplicitCastingStepConverter.IsPlainCurrentTargetBuff(
+                        inputs.EffectsBySource[sourceId], ability))
+                    reject(provider.Key.Canonical + "|effect-shape:" +
+                        CastingCapabilityInventory.Structure(inputs.EffectsBySource[sourceId]));
                 else
                     eligible.Add(new KeyValuePair<string, ProviderPlanningOption>(sourceId, option));
             }
@@ -464,6 +478,226 @@ namespace KingmakerBuffPlanner.Execution
             }
             return new CastingQualificationSelection("no-eligible-qualification-recipe", null, null,
                 null, considered, rejections, FiniteDirectMixed);
+        }
+
+        // One provider option the group recipe considers: its source, the
+        // expected effects and the exact effects ("Kind:id") it applies.
+        private sealed class GroupSource
+        {
+            internal GroupSource(ProviderPlanningOption option, string sourceId, EffectExpression expected)
+            {
+                Option = option;
+                SourceId = sourceId;
+                Expected = expected;
+                Leaves = new HashSet<string>(CastingQualificationForecast.Leaves(expected)
+                    .Select(leaf => leaf.Kind + ":" + leaf.EffectId), StringComparer.Ordinal);
+            }
+
+            internal ProviderPlanningOption Option { get; private set; }
+            internal ProviderSnapshot Provider { get { return Option.Provider; } }
+            internal string Caster { get { return Option.Provider.Key.CasterUnitId; } }
+            internal string SourceId { get; private set; }
+            internal EffectExpression Expected { get; private set; }
+            internal HashSet<string> Leaves { get; private set; }
+        }
+
+        // Every provider, in order, reserves one cast from the current pools
+        // by the same ledger the compiler budgets with.
+        internal static bool CastableTogether(CastingWorkspaceInputs inputs,
+            IEnumerable<ProviderSnapshot> providers)
+        {
+            var ledger = new ResourceLedger(inputs.Snapshot.ResourcePools);
+            foreach (ProviderSnapshot provider in providers)
+            {
+                ResourceReservation reservation;
+                string reason;
+                if (!ledger.TryReserve(provider, out reservation, out reason)) return false;
+            }
+            return true;
+        }
+
+        private static bool IsAreaShaped(EffectExpression expected)
+        {
+            string shape = CastingCapabilityInventory.Shape(expected);
+            return shape.Contains("allied-area") || shape.Contains("party");
+        }
+
+        // Group coverage (mission batch 3, section 8; the owner's mixed-
+        // coverage case, 2026-09-24): a caster-centred group source G and a
+        // direct source D that applies exactly the same effects, so one
+        // recipient X already holds an adequate instance (D, cast alone
+        // first) while G's other predicted recipients lack it; and, where
+        // one exists, a target-anchored group source A with another effect,
+        // anchored on a member other than its caster.
+        //   qual-cast-1 = D on X (direct; the prime step casts it alone),
+        //   qual-cast-2 = G around its caster (the mixed step: one invocation
+        //                 and one unit of cost; X pre-covered, the others
+        //                 newly covered),
+        //   qual-cast-3 = A on its anchor (the mixed step), when found.
+        // D's caster level and duration are at least G's, so X's instance is
+        // provably as strong; the sources can pay every cast together; and
+        // the forecast must show X pre-covered in G's step.
+        public static CastingQualificationSelection SelectGroupMixed(
+            CastingWorkspaceInputs inputs, string campaignId)
+        {
+            if (inputs == null) throw new ArgumentNullException("inputs");
+            var rejections = new List<string>();
+            Action<string> reject = value =>
+            {
+                if (rejections.Count < MaximumRecordedRejections) rejections.Add(value);
+            };
+            var targetable = new HashSet<string>(inputs.Snapshot.Units
+                .Where(unit => unit.TargetValidation.Alive && unit.TargetValidation.Conscious &&
+                    unit.TargetValidation.Friendly && unit.TargetValidation.Targetable)
+                .Select(unit => unit.UnitId), StringComparer.Ordinal);
+            var pools = inputs.Snapshot.ResourcePools.ToDictionary(
+                pool => pool.PoolKey, pool => pool, StringComparer.Ordinal);
+            var sources = new List<GroupSource>();
+            foreach (ProviderPlanningOption option in inputs.ProviderOptions
+                .Where(value => value != null && value.Provider != null)
+                .OrderBy(value => value.Provider.Key.Canonical, StringComparer.Ordinal))
+            {
+                ProviderSnapshot provider = option.Provider;
+                AbilityKey ability = provider.Key.Ability;
+                if (ability.SourceKind != SourceKind.Spellbook || ability.MetamagicMask != 0 ||
+                    !string.IsNullOrEmpty(ability.SpecialSourceId))
+                    continue;
+                string sourceId = SingleCastProbeSelector.SourceIdFor(inputs.EffectsBySource, ability);
+                if (option.ExecutionStrategy != CastExecutionStrategy.DirectRuleCast)
+                    reject(provider.Key.Canonical + "|strategy:" + option.ExecutionStrategy);
+                else if (sourceId == null)
+                    reject(provider.Key.Canonical + "|no-source");
+                else if (CastsAvailable(inputs, provider, 1) < 1)
+                    reject(provider.Key.Canonical + "|no-cast");
+                else
+                    sources.Add(new GroupSource(option, sourceId, inputs.EffectsBySource[sourceId]));
+            }
+            var casters = new HashSet<string>(sources.Select(value => value.Caster), StringComparer.Ordinal);
+            int considered = 0;
+            foreach (GroupSource group in sources.Where(value => IsAreaShaped(value.Expected) &&
+                value.Option.LegalAnchorIds.Contains(value.Caster)))
+            {
+                considered++;
+                string groupKey = group.Provider.Key.Canonical;
+                List<string> covered = group.Option.CoveredTargetIdsForAnchor(group.Caster)
+                    .Where(unit => targetable.Contains(unit)).ToList();
+                if (covered.Count < 2) { reject(groupKey + "|fewer-than-two-recipients"); continue; }
+                if (covered.Any(unit => EffectActive(inputs.LiveEffects, unit, group.Expected)))
+                {
+                    reject(groupKey + "|a-recipient-already-covered");
+                    continue;
+                }
+                List<GroupSource> directs = sources.Where(value => value != group &&
+                        value.Leaves.SetEquals(group.Leaves) &&
+                        ExplicitCastingStepConverter.IsPlainCurrentTargetBuff(value.Expected,
+                            value.Provider.Key.Ability))
+                    .ToList();
+                if (directs.Count == 0) { reject(groupKey + "|no-direct-source-with-the-same-effects"); continue; }
+                foreach (GroupSource direct in directs)
+                {
+                    string pair = direct.Provider.Key.Canonical + "+" + groupKey;
+                    if (direct.Provider.EffectiveCasterLevel < group.Provider.EffectiveCasterLevel)
+                    { reject(pair + "|direct-caster-level-lower"); continue; }
+                    if (direct.Provider.ExpectedDurationRounds < group.Provider.ExpectedDurationRounds)
+                    { reject(pair + "|direct-duration-shorter"); continue; }
+                    string recipient = covered.Where(unit =>
+                            !string.Equals(unit, direct.Caster, StringComparison.Ordinal) &&
+                            direct.Option.ReachableTargetIds.Contains(unit))
+                        .OrderBy(unit => string.Equals(unit, group.Caster, StringComparison.Ordinal) ? 1 : 0)
+                        .ThenBy(unit => casters.Contains(unit) ? 1 : 0)
+                        .ThenBy(unit => unit, StringComparer.Ordinal)
+                        .FirstOrDefault();
+                    if (recipient == null) { reject(pair + "|no-direct-recipient"); continue; }
+                    if (!CastableTogether(inputs, new[] { direct.Provider, group.Provider }))
+                    { reject(pair + "|not-castable-together"); continue; }
+                    // Where one exists: a target-anchored group source with
+                    // another effect, on a member other than its caster,
+                    // whose covered members all lack it; the longest-lasting
+                    // first, so it is still active for the repeat step.
+                    GroupSource anchored = null;
+                    string anchor = null;
+                    foreach (GroupSource candidate in sources.Where(value => value != group && value != direct &&
+                            IsAreaShaped(value.Expected) && !value.Leaves.Overlaps(group.Leaves))
+                        .OrderByDescending(value => value.Provider.ExpectedDurationRounds)
+                        .ThenBy(value => value.Provider.Key.Canonical, StringComparer.Ordinal))
+                    {
+                        string origin = candidate.Option.LegalAnchorIds.Where(unit =>
+                                !string.Equals(unit, candidate.Caster, StringComparison.Ordinal) &&
+                                targetable.Contains(unit) &&
+                                candidate.Option.CoveredTargetIdsForAnchor(unit).Count >= 2 &&
+                                candidate.Option.CoveredTargetIdsForAnchor(unit).All(member =>
+                                    !EffectActive(inputs.LiveEffects, member, candidate.Expected)))
+                            .OrderBy(unit => unit, StringComparer.Ordinal)
+                            .FirstOrDefault();
+                        if (origin == null || !CastableTogether(inputs,
+                                new[] { direct.Provider, group.Provider, candidate.Provider }))
+                            continue;
+                        anchored = candidate;
+                        anchor = origin;
+                        break;
+                    }
+                    var castings = new List<PlannedCasting>
+                    {
+                        new PlannedCasting(CastingIds[0], RoutineId, 0, direct.SourceId,
+                            direct.Provider.Key.Ability, direct.Caster, direct.Provider.Key.SpellbookGuid,
+                            CastingTargetMode.DirectTarget, recipient, null, null, null, null,
+                            ExistingEffectPolicy.SkipAlreadyActive, null, CastingAuthoringState.Ready, null),
+                        new PlannedCasting(CastingIds[1], RoutineId, 1, group.SourceId,
+                            group.Provider.Key.Ability, group.Caster, group.Provider.Key.SpellbookGuid,
+                            CastingTargetMode.CasterCenteredOrigin, null, CastingOrigin.CasterCentered(),
+                            new string[0], null, null, ExistingEffectPolicy.SkipAlreadyActive, null,
+                            CastingAuthoringState.Ready, null)
+                    };
+                    if (anchored != null)
+                        castings.Add(new PlannedCasting(CastingIds[2], RoutineId, 2, anchored.SourceId,
+                            anchored.Provider.Key.Ability, anchored.Caster, anchored.Provider.Key.SpellbookGuid,
+                            CastingTargetMode.AnchoredOrigin, null, CastingOrigin.Anchored(anchor),
+                            new string[0], null, null, ExistingEffectPolicy.SkipAlreadyActive, null,
+                            CastingAuthoringState.Ready, null));
+                    var coverage = new List<string> { "caster-centred", "mixed-coverage" };
+                    if (anchored != null) coverage.Add("target-anchored");
+                    foreach (GroupSource used in new[] { direct, group, anchored }.Where(value => value != null))
+                    {
+                        ResourcePoolSnapshot pool;
+                        string kind = !pools.TryGetValue(used.Provider.ResourcePoolKey, out pool) ? "unknown"
+                            : pool.Kind == ResourcePoolKind.PreparedSlots ? "prepared"
+                            : pool.Kind == ResourcePoolKind.SpontaneousLevel ? "spontaneous"
+                            : pool.Kind == ResourcePoolKind.Unlimited ? "free" : pool.Kind.ToString();
+                        if (!coverage.Contains(kind)) coverage.Add(kind);
+                    }
+                    var selection = new CastingQualificationSelection(null, group.SourceId,
+                        group.Provider.Key.Ability, castings, considered, rejections, GroupMixed, coverage);
+                    string check = GroupForecastRefusal(CastingQualificationForecast.Forecast(
+                        selection, inputs, campaignId), castings, recipient);
+                    if (check != null) { reject(pair + "|" + check); continue; }
+                    return selection;
+                }
+            }
+            return new CastingQualificationSelection("no-eligible-qualification-recipe", null, null,
+                null, considered, rejections, GroupMixed);
+        }
+
+        // The group recipe's forecast must be exactly: prime - the direct
+        // casting alone; mixed - the group casting (and the anchored one),
+        // the direct casting skipped, and the group casting's step naming
+        // the direct casting's recipient as pre-covered. Null when it is.
+        internal static string GroupForecastRefusal(IReadOnlyList<CastingQualificationStepForecast> forecast,
+            IList<PlannedCasting> castings, string preCovered)
+        {
+            if (forecast == null || forecast.Count != 2) return "forecast-steps";
+            foreach (CastingQualificationStepForecast step in forecast)
+                if (step.Refusal != null || step.Projection == null)
+                    return "not-executable:" + step.Name + ":" + (step.Refusal ?? "none");
+            if (!forecast[0].CastingIds.SequenceEqual(new[] { castings[0].CastingId }))
+                return "prime-castings:" + string.Join(",", forecast[0].CastingIds.ToArray());
+            if (!forecast[1].CastingIds.SequenceEqual(castings.Skip(1).Select(value => value.CastingId)))
+                return "mixed-castings:" + string.Join(",", forecast[1].CastingIds.ToArray());
+            CastStep group = forecast[1].Projection.Plan.Steps[0];
+            if (!group.MassCast || group.ExpectedRecipientUnitIds.Count < 2 ||
+                !group.PreCoveredRecipientUnitIds.SequenceEqual(new[] { preCovered }))
+                return "mixed-coverage-not-forecast:" +
+                    string.Join(",", group.PreCoveredRecipientUnitIds.ToArray());
+            return null;
         }
 
         // Review RC4: recipients are chosen per casting, in recipe order.
@@ -563,6 +797,8 @@ namespace KingmakerBuffPlanner.Execution
         public const string Recast = "recast";
         public const string Disable = "disable";
         public const string Recover = "recover";
+        public const string Prime = "prime";
+        public const string Mixed = "mixed";
 
         public static IReadOnlyList<CastingQualificationStepForecast> Forecast(
             CastingQualificationSelection selection, CastingWorkspaceInputs inputs,
@@ -570,6 +806,8 @@ namespace KingmakerBuffPlanner.Execution
         {
             if (selection == null || !selection.Selected)
                 throw new ArgumentException("A selected recipe is required.", "selection");
+            if (CastingQualificationRecipe.IsGroupRecipe(selection.Recipe))
+                return ForecastGroupMixed(selection, inputs, campaignId);
             CastingPlanDocument document = BuildDocument(campaignId, selection.Castings);
             EffectExpression expected = inputs.EffectsBySource[selection.SourceId];
             PlannedCasting firstCasting = selection.Castings[0];
@@ -619,6 +857,35 @@ namespace KingmakerBuffPlanner.Execution
                 steps.Add(Project(Recover, recastDocument, afterRecast,
                     WithGranted(afterRecast, expected, selection.Castings.Select(grant))));
             }
+            return new ReadOnlyCollection<CastingQualificationStepForecast>(steps);
+        }
+
+        // group-mixed: prime - the direct casting alone (its recipient
+        // covered); mixed - every casting, the direct one skipped (its
+        // recipient holds the effect at the direct caster's level), the
+        // group casting covering the others with that recipient pre-covered,
+        // and the anchored casting (if any) covering its anchor's area. The
+        // repeat step (everything active) submits nothing.
+        private static IReadOnlyList<CastingQualificationStepForecast> ForecastGroupMixed(
+            CastingQualificationSelection selection, CastingWorkspaceInputs inputs, string campaignId)
+        {
+            PlannedCasting direct = selection.Castings[0];
+            var steps = new List<CastingQualificationStepForecast>();
+            CastingQualificationStepForecast prime = Project(Prime,
+                BuildDocument(campaignId, new[] { direct }), inputs, inputs.LiveEffects);
+            steps.Add(prime);
+            var spent = new List<ResourceReservation>();
+            if (prime.Projection != null) spent.Add(prime.Projection.Plan.Steps[0].Reservation);
+            CastingWorkspaceInputs afterPrime = WithSpent(inputs, spent);
+            ProviderSnapshot provider = inputs.Snapshot.Providers.FirstOrDefault(value =>
+                value.Key.CasterUnitId == direct.CasterUnitId &&
+                value.Key.Ability.Canonical == direct.Ability.Canonical);
+            steps.Add(Project(Mixed, BuildDocument(campaignId, selection.Castings), afterPrime,
+                WithGranted(afterPrime, inputs.EffectsBySource[direct.SourceId], new[]
+                {
+                    new EffectGrant(direct.DirectTargetUnitId,
+                        provider == null ? 0 : provider.EffectiveCasterLevel, direct.Ability.MetamagicMask)
+                })));
             return new ReadOnlyCollection<CastingQualificationStepForecast>(steps);
         }
 

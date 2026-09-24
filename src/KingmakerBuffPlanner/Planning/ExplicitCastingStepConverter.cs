@@ -275,7 +275,7 @@ namespace KingmakerBuffPlanner.Planning
                 return "probe-unsupported:target-not-verified-reachable:" + id;
             if (option.ExecutionStrategy != CastExecutionStrategy.DirectRuleCast)
                 return "probe-unsupported:strategy:" + option.ExecutionStrategy + ":" + id;
-            if (!IsPlainCurrentTargetBuff(expected, ability.BaseAbilityGuid))
+            if (!IsPlainCurrentTargetBuff(expected, ability))
                 return "probe-unsupported:effect-shape:" + id;
             return null;
         }
@@ -285,8 +285,18 @@ namespace KingmakerBuffPlanner.Planning
         // discovery wrapper that references THE CAST ABILITY ITSELF.
         // Conditionals, references to any OTHER ability, area/party/caster
         // targets and worn-item enchantments are unmodeled for the probe.
+        // The cast ability itself is its base spell, or for a variant
+        // provider the variant it casts (advanced fixture, 2026-09-24: every
+        // variant spell's effect is wrapped in a reference to the variant, so
+        // matching only the base spell refused all of them).
+        internal static bool IsPlainCurrentTargetBuff(EffectExpression expression, AbilityKey ability)
+        {
+            return ability != null &&
+                IsPlainCurrentTargetBuff(expression, ability.BaseAbilityGuid, ability.VariantGuid);
+        }
+
         internal static bool IsPlainCurrentTargetBuff(EffectExpression expression,
-            string castAbilityGuid)
+            string castAbilityGuid, string castVariantGuid = null)
         {
             var leaf = expression as EffectLeafExpression;
             if (leaf != null)
@@ -294,12 +304,15 @@ namespace KingmakerBuffPlanner.Planning
             var sequence = expression as SequenceEffectExpression;
             if (sequence != null)
                 return sequence.Children.Count != 0 &&
-                    sequence.Children.All(child => IsPlainCurrentTargetBuff(child, castAbilityGuid));
+                    sequence.Children.All(child =>
+                        IsPlainCurrentTargetBuff(child, castAbilityGuid, castVariantGuid));
             var reference = expression as ReferencedAbilityExpression;
             if (reference != null)
-                return !string.IsNullOrEmpty(castAbilityGuid) &&
-                    string.Equals(reference.AbilityId, castAbilityGuid, StringComparison.Ordinal) &&
-                    IsPlainCurrentTargetBuff(reference.Child, castAbilityGuid);
+                return ((!string.IsNullOrEmpty(castAbilityGuid) &&
+                        string.Equals(reference.AbilityId, castAbilityGuid, StringComparison.Ordinal)) ||
+                    (!string.IsNullOrEmpty(castVariantGuid) &&
+                        string.Equals(reference.AbilityId, castVariantGuid, StringComparison.Ordinal))) &&
+                    IsPlainCurrentTargetBuff(reference.Child, castAbilityGuid, castVariantGuid);
             return false;
         }
 
