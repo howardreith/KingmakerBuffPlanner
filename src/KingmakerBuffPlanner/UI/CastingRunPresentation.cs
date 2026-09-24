@@ -131,7 +131,26 @@ namespace KingmakerBuffPlanner.UI
         // One live existing-effect verdict in words.
         internal static string DescribeExistingEffectNote(string note)
         {
+            return DescribeExistingEffectNote(note, null);
+        }
+
+        // The same, naming the unit through the given resolver (the
+        // workspace's character names; review: raw ids told the player
+        // nothing).
+        internal static string DescribeExistingEffectNote(string note, Func<string, string> unitName)
+        {
             string value = note ?? string.Empty;
+            if (unitName != null)
+                foreach (string prefix in new[] { "already-active:", "already-covered:", "already-covered-longer:",
+                    "existing-active-recast:", "existing-insufficient:" })
+                    if (value.StartsWith(prefix, StringComparison.Ordinal))
+                    {
+                        string unit = FirstSegment(value, prefix);
+                        string name = unitName(unit);
+                        if (!string.IsNullOrEmpty(name) && name.IndexOf(':') < 0)
+                            value = prefix + name + value.Substring(prefix.Length + unit.Length);
+                        break;
+                    }
             if (value.StartsWith("already-active:", StringComparison.Ordinal))
                 return "already active on " + FirstSegment(value, "already-active:") + " (skipped)";
             if (value.StartsWith("already-covered:", StringComparison.Ordinal))

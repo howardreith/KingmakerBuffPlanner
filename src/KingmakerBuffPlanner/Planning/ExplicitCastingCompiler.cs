@@ -839,6 +839,14 @@ namespace KingmakerBuffPlanner.Planning
                 string failure = null;
                 if (snapshot == null)
                     failure = "enhancement-unavailable:" + selection.EnhancementId;
+                else if (snapshot.AffectsTargeting)
+                    // An enhancement that changes whom the spell reaches
+                    // (Share Transmutation) is not executed in this version:
+                    // the casting's targeting never applies it, so it would
+                    // arm the enhancement on the caster's own target
+                    // (review of the enhanced recipe). It stays selected and
+                    // visible, and blocks.
+                    failure = "enhancement-changes-targeting:" + selection.EnhancementId;
                 else
                 {
                     string applicability = snapshot.ApplicabilityFailure(option.Provider);

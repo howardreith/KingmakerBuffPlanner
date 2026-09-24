@@ -3374,9 +3374,11 @@ namespace KingmakerBuffPlanner.Tests
                 directory = directory.Parent;
             string view = File.ReadAllText(Path.Combine(directory.FullName, "src", "KingmakerBuffPlanner",
                 "UI", "CastingWorkspaceScreenView.cs"));
-            string detail = SourceBlock(view, "private static string BuildCardDetail(WorkspaceCastingCard card)");
+            string detail = SourceBlock(view,
+                "private static string BuildCardDetail(WorkspaceView view, WorkspaceCastingCard card)");
             if (detail == null || !detail.Contains(".Select(WorkspaceReasonText.Describe)") ||
                 !detail.Contains(".Select(WorkspaceReasonText.DescribeReviewItem)") ||
+                !detail.Contains("unitId => UnitName(view, unitId)") ||
                 detail.Contains("string.Join(\", \", card.ReadinessReasons)"))
                 throw new InvalidOperationException("Cards still print reason codes.");
         }
@@ -4310,8 +4312,14 @@ namespace KingmakerBuffPlanner.Tests
                         remaining + "): " + string.Join(",", groupCasting.ExistingEffectNotes.ToArray()));
             }
             if (CastingRunPresentation.DescribeExistingEffectNote("already-covered-longer:unit-t1") !=
-                    "already active on unit-t1, lasting longer than this cast (the cast goes ahead for the others and may shorten it)")
-                throw new InvalidOperationException("The longer-lasting covered recipient is not described.");
+                    "already active on unit-t1, lasting longer than this cast (the cast goes ahead for the others and may shorten it)" ||
+                CastingRunPresentation.DescribeExistingEffectNote("already-covered-longer:unit-t1",
+                    unit => unit == "unit-t1" ? "Fighter" : unit) !=
+                    "already active on Fighter, lasting longer than this cast (the cast goes ahead for the others and may shorten it)" ||
+                CastingRunPresentation.DescribeExistingEffectNote("existing-insufficient:unit-t1:weaker-caster-level:3<9",
+                    unit => unit == "unit-t1" ? "Fighter" : unit) !=
+                    CastingRunPresentation.DescribeExistingEffectNote("existing-insufficient:Fighter:weaker-caster-level:3<9"))
+                throw new InvalidOperationException("The covered recipient is not described by name.");
             // A recipient the group cast misses: the casting is not confirmed
             // and the routine stops before the anchored casting is submitted.
             var missed = new GroupBuffWorld { MissRecipient = "unit-t2" };
@@ -4379,6 +4387,8 @@ namespace KingmakerBuffPlanner.Tests
             internal int PlainBonus = 4;
             // What the Instant cast reports about the provider's transaction.
             internal bool ReportProviderDirect = true;
+            internal bool WithShare;
+            internal const string ShareId = "share-transmutation|unit-arcanist|share-toggle";
             // How the enhancement executes: "direct" (the installed
             // provider's own transaction, as live), "native" (a native
             // command) or "none".
@@ -4515,6 +4525,13 @@ namespace KingmakerBuffPlanner.Tests
                         "rod-guid", "Extend Metamagic Rod", string.Empty, CastEnhancementCategory.MetamagicRod,
                         8, 6, 3, new string[0])
                 };
+                if (WithShare)
+                    enhancements.Add(new CastEnhancementSnapshot(ShareId, "unit-arcanist", "share-toggle",
+                        "Share Transmutation", string.Empty, CastEnhancementCategory.ClassFeature, 0, 0, Reservoir,
+                        Whitelist, "Share Transmutation", new[] { BrownFurPowerfulChangeProfile.CastingSpellbookGuid },
+                        BrownFurPowerfulChangeProfile.UsagePoolId("unit-arcanist"), false,
+                        "brown-fur-share-transmutation", 1, true, "brown-fur-share-transmutation", "Arcane Reservoir",
+                        "brown-fur-direct-cast-v1"));
                 if (!OmitPowerfulChange && (!HideEnhancementAfterPlain || Fired.Count == 0))
                     enhancements.Add(new CastEnhancementSnapshot(EnhancementId, "unit-arcanist", Toggle,
                         "Powerful Change: Strength", string.Empty, CastEnhancementCategory.ClassFeature, 0, 0,
@@ -4673,6 +4690,23 @@ namespace KingmakerBuffPlanner.Tests
                             projected.Projection.Plan.Steps.Select(step => step.ExecutionStrategy + "/" +
                                 step.ExecutionStrategyReason).ToArray())));
             }
+            // Share Transmutation chosen as an enhancement (it changes whom the
+            // spell reaches, which the casting's targeting never applies):
+            // the casting stays visible and blocks with its reason.
+            CastingWorkspaceInputs shareInputs = new EnhancedBuffWorld { WithShare = true }.Inputs();
+            PlannedCasting shared = selection.Castings[0].WithEnhancementSelections(new[]
+                { new AuthoredEnhancementSelection(EnhancedBuffWorld.ShareId, true, null) });
+            ResolvedCasting sharedCasting = new ExplicitCastingCompiler().Compile(
+                    CastingQualificationForecast.BuildDocument("fixture-campaign", new[] { shared }),
+                    shareInputs.Snapshot, shareInputs.ProviderOptions, shareInputs.EffectsBySource,
+                    shareInputs.Enhancements, "long", null, false, shareInputs.LiveEffects)
+                .CastingById("qual-cast-1");
+            if (sharedCasting.IsExecutable ||
+                !sharedCasting.ReadinessReasons.Contains("enhancement-changes-targeting:" + EnhancedBuffWorld.ShareId) ||
+                WorkspaceReasonText.Describe("enhancement-changes-targeting:" + EnhancedBuffWorld.ShareId) !=
+                    "an enhancement that changes whom the spell reaches (such as Share Transmutation) is not executed yet")
+                throw new InvalidOperationException("Share Transmutation chosen as an enhancement was not refused: " +
+                    sharedCasting.Readiness + " " + string.Join(",", sharedCasting.ReadinessReasons.ToArray()));
             // Refused: only a rod (not a supported non-rod enhancement); no
             // reservoir point left; no plain spell the enhancement applies to.
             CastingQualificationSelection rodOnly = CastingQualificationRecipe.SelectEnhancedDirect(

@@ -14891,13 +14891,31 @@ namespace KingmakerBuffPlanner.Tests
             if (Path.GetFileName(moved) != "taken.1.orig" || !File.ReadAllBytes(moved).SequenceEqual(original) ||
                 !File.ReadAllBytes(Path.Combine(dir, "taken.orig")).SequenceEqual(other))
                 throw new InvalidOperationException("A different archive was trusted or overwritten.");
+            // Every numbered name taken: the bytes go to the name keyed by
+            // their own hash (reused for the same bytes), the others intact;
+            // only a keyed name holding other bytes refuses.
             File.WriteAllBytes(Path.Combine(dir, "full.orig"), other);
             for (int index = 1; index <= KingmakerBuffPlanner.Infrastructure.AtomicFile.ArchiveAlternates; index++)
                 File.WriteAllBytes(Path.Combine(dir, "full." + index + ".orig"), other);
+            string keyedName = "full.sha256-" + KingmakerBuffPlanner.Infrastructure.Hashing.Sha256Bytes(original)
+                .Substring(0, 16) + ".orig";
+            string keyed = KingmakerBuffPlanner.Infrastructure.AtomicFile.WriteExactArchive(dir, "full", original);
+            string keyedAgain = KingmakerBuffPlanner.Infrastructure.AtomicFile.WriteExactArchive(dir, "full", original);
+            if (Path.GetFileName(keyed) != keyedName || keyedAgain != keyed ||
+                !File.ReadAllBytes(keyed).SequenceEqual(original) ||
+                Directory.GetFiles(dir, "full*.orig").Where(path => path != keyed)
+                    .Any(path => !File.ReadAllBytes(path).SequenceEqual(other)))
+                throw new InvalidOperationException("Archive names holding other content were not kept intact, " +
+                    "or the bytes were not archived under their own hash.");
+            File.WriteAllBytes(Path.Combine(dir, "clash.orig"), other);
+            for (int index = 1; index <= KingmakerBuffPlanner.Infrastructure.AtomicFile.ArchiveAlternates; index++)
+                File.WriteAllBytes(Path.Combine(dir, "clash." + index + ".orig"), other);
+            File.WriteAllBytes(Path.Combine(dir, "clash.sha256-" + KingmakerBuffPlanner.Infrastructure.Hashing
+                .Sha256Bytes(original).Substring(0, 16) + ".orig"), other);
             bool refused = false;
-            try { KingmakerBuffPlanner.Infrastructure.AtomicFile.WriteExactArchive(dir, "full", original); }
+            try { KingmakerBuffPlanner.Infrastructure.AtomicFile.WriteExactArchive(dir, "clash", original); }
             catch (IOException) { refused = true; }
-            if (!refused || Directory.GetFiles(dir, "full*.orig").Any(path => !File.ReadAllBytes(path).SequenceEqual(other)))
+            if (!refused || Directory.GetFiles(dir, "clash*.orig").Any(path => !File.ReadAllBytes(path).SequenceEqual(other)))
                 throw new InvalidOperationException("Archive names holding other content were not refused intact.");
 
             // The casting migration's boundary archive.
