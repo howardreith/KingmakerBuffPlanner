@@ -211,6 +211,71 @@ function Wait-KbpNoForeignRuntimeLease {
     }
 }
 
+# The other lab's activity signature for a live comparison window: its
+# lease files, the entries of its state folders (each of its runs adds one)
+# and how many Kingmaker processes run. Equal quiet signatures around a
+# window mean the other lab did not start, run or end a run inside it.
+function Get-KbpForeignActivitySignature {
+    param([string[]]$LeasePaths = $script:KbpForeignRuntimeLeases,
+        [scriptblock]$GameCount = { @(Get-Process -Name Kingmaker -ErrorAction SilentlyContinue).Count })
+    $parts = New-Object System.Collections.Generic.List[string]
+    foreach ($lease in @($LeasePaths | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })) {
+        $parts.Add('lease=' + [bool](Test-Path -LiteralPath $lease))
+        $state = Split-Path -Parent $lease
+        $entries = if (Test-Path -LiteralPath $state -PathType Container) {
+            @(Get-ChildItem -LiteralPath $state -Force -ErrorAction SilentlyContinue | ForEach-Object Name | Sort-Object) -join ','
+        } else { '' }
+        $parts.Add('entries=' + $entries)
+    }
+    $parts.Add('game=' + [int](& $GameCount))
+    return ($parts -join ';')
+}
+
+# A live-state purity window. The owner's other lab rewrites the shared Mods
+# folder under its own lease, so a comparison it overlapped proves nothing
+# either way. The action runs between two snapshots of the targets. A
+# change in a window the other lab left quiet fails at once. A change in a
+# window it overlapped is inconclusive: the case waits for quiet and runs
+# again, at most $Attempts times, and fails if it never gets a quiet window.
+function Invoke-KbpLivePurityWindow {
+    param(
+        [Parameter(Mandatory = $true)][string]$Label,
+        [Parameter(Mandatory = $true)][string[]]$Targets,
+        [Parameter(Mandatory = $true)][scriptblock]$Action,
+        [ValidateRange(1, 5)][int]$Attempts = 3,
+        [string[]]$LeasePaths = $script:KbpForeignRuntimeLeases,
+        [scriptblock]$GameCount = { @(Get-Process -Name Kingmaker -ErrorAction SilentlyContinue).Count },
+        [ValidateRange(0, 3600)][int]$LeaseWaitSeconds = 1800)
+    for ($attempt = 1; $attempt -le $Attempts; $attempt++) {
+        Wait-KbpNoForeignRuntimeLease -LeasePaths $LeasePaths -TimeoutSeconds $LeaseWaitSeconds
+        $signatureBefore = Get-KbpForeignActivitySignature -LeasePaths $LeasePaths -GameCount $GameCount
+        $before = @{}
+        foreach ($target in $Targets) {
+            $before[$target] = if (Test-Path -LiteralPath $target -PathType Container) {
+                @(Get-KbpDirectoryManifest $target)
+            } else { $null }
+        }
+        & $Action
+        $changed = @()
+        foreach ($target in $Targets) {
+            $after = if (Test-Path -LiteralPath $target -PathType Container) {
+                @(Get-KbpDirectoryManifest $target)
+            } else { $null }
+            if (($null -eq $before[$target]) -ne ($null -eq $after) -or
+                ($null -ne $after -and -not (Test-KbpManifestEqual @($before[$target]) @($after)))) {
+                $changed += @($target)
+            }
+        }
+        $signatureAfter = Get-KbpForeignActivitySignature -LeasePaths $LeasePaths -GameCount $GameCount
+        if (@($changed).Count -eq 0) { return }
+        $quiet = $signatureBefore -ceq $signatureAfter -and $signatureBefore -notmatch 'lease=True' -and
+            $signatureBefore -match ';game=0$'
+        if ($quiet) { throw "$Label changed: $($changed -join ', ')" }
+        Write-Host "${Label}: the other lab was active during the comparison; the case runs again once it is quiet."
+    }
+    throw "$Label changed in each of $Attempts comparisons, each overlapped by the other lab."
+}
+
 function Assert-KbpNotRunning {
     param([int[]]$KnownProcessIds)
     $ids = if ($PSBoundParameters.ContainsKey('KnownProcessIds')) {
@@ -220,6 +285,25 @@ function Assert-KbpNotRunning {
     }
     $ids = @($ids | Where-Object { $null -ne $_ -and [int]$_ -gt 0 })
     if (@($ids).Count -ne 0) { throw "Pathfinder: Kingmaker is running (PID(s): $($ids -join ', '))." }
+}
+
+# No Kingmaker may run from this game root. A game running from another
+# installation (for example the owner's other lab testing an isolated copy)
+# holds no file here; a process whose path cannot be read blocks (fail
+# closed).
+function Assert-KbpGameRootNotRunning {
+    param([Parameter(Mandatory = $true)][string]$GameRoot, [object[]]$Processes)
+    $root = [IO.Path]::GetFullPath($GameRoot).TrimEnd('\') + '\'
+    $candidates = if ($PSBoundParameters.ContainsKey('Processes')) { @($Processes) }
+        else { @(Get-Process -Name Kingmaker -ErrorAction SilentlyContinue) }
+    $blocking = @($candidates | Where-Object { $null -ne $_ } | Where-Object {
+        $path = $null
+        try { $path = [string]$_.Path } catch { $path = $null }
+        [string]::IsNullOrEmpty($path) -or $path.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)
+    })
+    if ($blocking.Count -ne 0) {
+        throw "Pathfinder: Kingmaker is running from $root (PID(s): $(@($blocking | ForEach-Object { $_.Id }) -join ', '))."
+    }
 }
 
 function Get-KbpRelativePath([string]$Root, [string]$Path) {
