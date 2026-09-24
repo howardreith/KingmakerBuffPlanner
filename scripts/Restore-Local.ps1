@@ -2,13 +2,18 @@
 param(
     [Parameter(Mandatory = $true)][ValidatePattern('^[A-Za-z0-9._-]{1,100}$')][string]$RunId,
     # The launcher compares the protected saves itself (before calling this).
-    [switch]$SkipProtectedSaveComparison)
+    [switch]$SkipProtectedSaveComparison,
+    # Test seams: the lab's own roots unless a test names others.
+    [string]$StateRoot,
+    [string]$EvidenceRoot)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'RuntimeAutomation.Common.ps1')
+if ([string]::IsNullOrEmpty($StateRoot)) { $StateRoot = $script:KbpRuntimeStateRoot }
+if ([string]::IsNullOrEmpty($EvidenceRoot)) { $EvidenceRoot = $script:KbpRuntimeEvidenceRoot }
 
-$statePath = Join-Path $script:KbpRuntimeStateRoot ('transactions\' + $RunId + '\transaction.json')
+$statePath = Join-Path $StateRoot ('transactions\' + $RunId + '\transaction.json')
 if (-not (Test-Path -LiteralPath $statePath -PathType Leaf)) { throw "Runtime transaction state is missing: $statePath" }
 $baselinePath = Join-Path (Split-Path -Parent $statePath) 'protected-saves-before.json'
 $pending = (Test-Path -LiteralPath $baselinePath -PathType Leaf) -and -not [bool](Read-KbpJson $baselinePath).compared
@@ -33,16 +38,17 @@ if (Test-Path -LiteralPath $registryPath -PathType Leaf) {
 # restored), and one whose lock was already released is recorded as
 # unverifiable for the owner's review instead of being compared.
 $saveFailure = $null
-$evidenceDirectory = Join-Path $script:KbpRuntimeEvidenceRoot $RunId
+$evidenceDirectory = Join-Path $EvidenceRoot $RunId
 if ($pending -and [string](Read-KbpJson $statePath).status -ceq 'Restored') {
     $unverifiable = Close-KbpUnverifiableProtectedSaveComparison -BaselinePath $baselinePath `
-        -Reason 'lock-released-before-comparison' -EvidenceDirectory $evidenceDirectory
+        -Reason 'lock-released-before-comparison' -EvidenceDirectory $evidenceDirectory -StateRoot $StateRoot
     throw ("The protected saves of run $RunId can no longer be compared (its lock was released first); " +
         "recorded as $(@($unverifiable) -join ', ') for the owner's review.")
 }
 if ($pending) {
     try {
-        $comparison = Complete-KbpProtectedSaveComparison -BaselinePath $baselinePath -EvidenceDirectory $evidenceDirectory
+        $comparison = Complete-KbpProtectedSaveComparison -BaselinePath $baselinePath -EvidenceDirectory $evidenceDirectory `
+            -StateRoot $StateRoot
     }
     catch {
         throw ("The protected-save comparison of run $RunId failed; the Mods folder was not restored and the run's lock " +
@@ -55,7 +61,7 @@ if ($pending) {
 }
 # Re-review (harness): a restoration failure never hides a save violation.
 try {
-    $state = Restore-KbpRuntimeTransaction -RunId $RunId -StateRoot $script:KbpRuntimeStateRoot
+    $state = Restore-KbpRuntimeTransaction -RunId $RunId -StateRoot $StateRoot
 }
 catch {
     if ($null -ne $saveFailure) { throw ($saveFailure + ' | Restoration: ' + $_.Exception.Message) }
