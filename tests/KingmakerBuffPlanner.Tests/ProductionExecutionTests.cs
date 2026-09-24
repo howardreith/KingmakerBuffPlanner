@@ -3066,10 +3066,47 @@ namespace KingmakerBuffPlanner.Tests
             string digest = ClassicPlanDigest.Of(stop);
             if (digest.Length != 64 || digest != ClassicPlanDigest.Of(stop) ||
                 digest == ClassicPlanDigest.Of(complete) ||
-                !ClassicPlanDigest.Canonical(stop).Contains("provider=") ||
                 !ClassicPlanDigest.Canonical(stop).StartsWith("steps=1:3;", StringComparison.Ordinal))
                 throw new InvalidOperationException("The classic plan digest is not exact: " +
                     ClassicPlanDigest.Canonical(stop));
+            // Every field of every step, length-exact, in order.
+            foreach (CastPlan plan in new[] { stop, complete })
+            {
+                List<KeyValuePair<string, string>> parsed = ParseClassicCanonical(ClassicPlanDigest.Canonical(plan));
+                List<KeyValuePair<string, string>> expected = ExpectedClassicCanonical(plan);
+                if (!parsed.SequenceEqual(expected))
+                    throw new InvalidOperationException("The classic canonical plan misses or alters a field: " +
+                        ClassicPlanDigest.Canonical(plan));
+            }
+            // Any change to what the step would do changes the digest, and
+            // ids with delimiter characters stay unambiguous.
+            CastStep template = stop.Steps[0];
+            Func<IEnumerable<string>, ResourceReservation, MaterialReservation, IEnumerable<string>,
+                IDictionary<string, int>, CastPlan> variant = (targets, reservation, material, enhancements, usage) =>
+                new CastPlan(new[]
+                {
+                    new CastStep(template.SourceId, template.AssignmentId, template.Provider, template.AnchorUnitId,
+                        targets ?? template.TargetUnitIds, template.ExpectedRecipientUnitIds,
+                        reservation ?? template.Reservation, material ?? template.MaterialReservation,
+                        template.ExpectedEffects, template.MassCast, template.ExecutionStrategy,
+                        template.ExecutionStrategyReason, enhancements ?? template.EnhancementIds,
+                        usage ?? template.EnhancementUsageByPool.ToDictionary(pair => pair.Key, pair => pair.Value),
+                        template.OmittedEnhancementIds)
+                }, new TargetPlanOutcome[0], new string[0]);
+            string same = ClassicPlanDigest.Of(variant(null, null, null, null, null));
+            var joined = new ResourceReservation("pool|a,b", 1, new[] { "tok|1,2;x=3:4" });
+            var split = new ResourceReservation("pool|a,b", 1, new[] { "tok|1,2", "x=3:4" });
+            string joinedDigest = ClassicPlanDigest.Of(variant(null, joined, null, null, null));
+            List<string> tokens = ParseClassicCanonical(ClassicPlanDigest.Canonical(variant(null, joined, null, null, null)))
+                .Where(pair => pair.Key == "tokens").Select(pair => pair.Value).ToList();
+            if (same != ClassicPlanDigest.Of(new CastPlan(new[] { template }, new TargetPlanOutcome[0], new string[0])) ||
+                ClassicPlanDigest.Of(variant(new[] { "unit-other" }, null, null, null, null)) == same ||
+                joinedDigest == same || joinedDigest == ClassicPlanDigest.Of(variant(null, split, null, null, null)) ||
+                tokens.Count != 1 || tokens[0] != "tok|1,2;x=3:4" ||
+                ClassicPlanDigest.Of(variant(null, null, new MaterialReservation("item-guid", 1), null, null)) == same ||
+                ClassicPlanDigest.Of(variant(null, null, null, new[] { "metamagic-extend" }, null)) == same ||
+                ClassicPlanDigest.Of(variant(null, null, null, null, new Dictionary<string, int> { { "rod-pool", 1 } })) == same)
+                throw new InvalidOperationException("A different classic step kept the approved digest.");
             var grant = new ClassicCastGrant("run-1", "long", digest, "animated", 3);
             string refusal;
             if (grant.TryConsume("short", digest, "animated", 3, out refusal) ||
@@ -3122,6 +3159,15 @@ namespace KingmakerBuffPlanner.Tests
             if (ClassicCastAllowance.Parse(allowanceJson(null), "other-run", out refusal) != null ||
                 refusal != "allowance-run-mismatch")
                 throw new InvalidOperationException("A classic allowance served another run.");
+            if (ClassicCastAllowance.Parse(allowanceJson(o => o["assemblyMvid"] = "11111111-2222-3333-4444-55555555555A"),
+                    "classic-run-1", out refusal) != null || refusal != "allowance-artifact-identity" ||
+                ClassicCastAllowance.Parse(allowanceJson(o => o["fixtureGameId"] = string.Empty),
+                    "classic-run-1", out refusal) != null || refusal != "allowance-fixture-missing" ||
+                ClassicCastAllowance.Parse(allowanceJson(o => o["maximumNativeSubmissions"] = "3"),
+                    "classic-run-1", out refusal) != null || refusal != "allowance-submissions" ||
+                ClassicCastAllowance.Parse("not json", "classic-run-1", out refusal) != null ||
+                refusal != "allowance-unreadable")
+                throw new InvalidOperationException("A malformed classic allowance was accepted: " + refusal);
             Func<ClassicCastRecord> good = () =>
             {
                 var record = new ClassicCastRecord
@@ -3156,7 +3202,12 @@ namespace KingmakerBuffPlanner.Tests
                 { "report:planned=1;submitted=1;confirmed=0;failed=1;steps=1", r => { r.Confirmed = 0; r.Failed = 1; } },
                 { "finite-pool:unit|book|spontaneous-1:2>1", r => r.FinitePools[0] = "unit|book|spontaneous-1:2>1" },
                 { "casting-first-runs:1", r => r.CastingFirstRuns = 1 },
-                { "allowance:execution-mode-mismatch", r => r.AllowanceStatus = "execution-mode-mismatch" }
+                { "allowance:execution-mode-mismatch", r => r.AllowanceStatus = "execution-mode-mismatch" },
+                { "steps-observed:0", r => r.Steps.Clear() },
+                { "report:planned=2;submitted=1;confirmed=1;failed=0;steps=1", r => r.Planned = 2 },
+                { "report:planned=1;submitted=0;confirmed=1;failed=0;steps=1", r => r.Submitted = 0 },
+                { "report:planned=1;submitted=1;confirmed=1;failed=1;steps=1", r => r.Failed = 1 },
+                { "finite-pool:unit|book|spontaneous-1:2", r => r.FinitePools[0] = "unit|book|spontaneous-1:2" }
             };
             foreach (KeyValuePair<string, Action<ClassicCastRecord>> shape in shapes)
             {
@@ -3172,6 +3223,69 @@ namespace KingmakerBuffPlanner.Tests
             select.GrantAttempts = 1;
             if (!select.Violations().Contains("select-grant-used"))
                 throw new InvalidOperationException("A selection run used the classic grant.");
+        }
+
+        // The length-prefixed classic canonical form read back field by field.
+        private static List<KeyValuePair<string, string>> ParseClassicCanonical(string canonical)
+        {
+            var fields = new List<KeyValuePair<string, string>>();
+            int at = 0;
+            while (at < canonical.Length)
+            {
+                int equals = canonical.IndexOf('=', at);
+                int colon = canonical.IndexOf(':', equals);
+                int length = int.Parse(canonical.Substring(equals + 1, colon - equals - 1));
+                if (colon + 1 + length >= canonical.Length || canonical[colon + 1 + length] != ';')
+                    throw new InvalidOperationException("A classic canonical field is not length-exact at " + at + ".");
+                fields.Add(new KeyValuePair<string, string>(canonical.Substring(at, equals - at),
+                    canonical.Substring(colon + 1, length)));
+                at = colon + 2 + length;
+            }
+            return fields;
+        }
+
+        // The specified classic canonical fields of a plan, in order.
+        private static List<KeyValuePair<string, string>> ExpectedClassicCanonical(CastPlan plan)
+        {
+            var fields = new List<KeyValuePair<string, string>>();
+            Action<string, string> add = (name, value) =>
+                fields.Add(new KeyValuePair<string, string>(name, value ?? string.Empty));
+            Action<string, IEnumerable<string>> addList = (name, values) =>
+            {
+                List<string> items = (values ?? new string[0]).ToList();
+                add(name + "#", items.Count.ToString());
+                foreach (string item in items) add(name, item);
+            };
+            add("steps", plan.Steps.Count.ToString());
+            for (int index = 0; index < plan.Steps.Count; index++)
+            {
+                CastStep step = plan.Steps[index];
+                add("index", index.ToString());
+                add("provider", step.Provider.Canonical);
+                add("source", step.SourceId);
+                add("assignment", step.AssignmentId);
+                add("anchor", step.AnchorUnitId);
+                addList("targets", step.TargetUnitIds);
+                addList("recipients", step.ExpectedRecipientUnitIds);
+                add("mass", step.MassCast ? "1" : "0");
+                add("pool", step.Reservation == null ? "none" : step.Reservation.PoolKey);
+                add("units", step.Reservation == null ? "0" : step.Reservation.Units.ToString());
+                add("unlimited", step.Reservation != null && step.Reservation.Unlimited ? "1" : "0");
+                addList("tokens", step.Reservation == null ? null : step.Reservation.TokenIds);
+                add("material", step.MaterialReservation == null ? "none" : step.MaterialReservation.ItemGuid);
+                add("material-count", step.MaterialReservation == null ? "0" : step.MaterialReservation.Count.ToString());
+                addList("enhancements", step.EnhancementIds);
+                addList("omitted", step.OmittedEnhancementIds);
+                add("usage#", step.EnhancementUsageByPool.Count.ToString());
+                foreach (KeyValuePair<string, int> pair in step.EnhancementUsageByPool.OrderBy(pair => pair.Key,
+                    StringComparer.Ordinal))
+                {
+                    add("usage-pool", pair.Key);
+                    add("usage-units", pair.Value.ToString());
+                }
+                add("strategy", step.ExecutionStrategy.ToString());
+            }
+            return fields;
         }
 
         // The read-only capability inventory lists every unit, pool and
