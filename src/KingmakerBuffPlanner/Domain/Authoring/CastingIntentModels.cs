@@ -275,6 +275,30 @@ namespace KingmakerBuffPlanner.Domain.Authoring
                 IgnoredPresenceMarkers, State, Provenance);
         }
 
+        // Final review B2/B3: who casts it and from exactly which source
+        // (ability and spellbook) change together; the enhancements passed
+        // are the ones the caller kept for the new caster.
+        public PlannedCasting WithProvider(string casterUnitId, AbilityKey ability,
+            string spellbookGuid, IEnumerable<AuthoredEnhancementSelection> enhancements)
+        {
+            return new PlannedCasting(CastingId, RoutineId, Order, SourceId,
+                ability, casterUnitId, spellbookGuid, TargetMode,
+                DirectTargetUnitId, Origin, RequiredCoverageUnitIds,
+                TargetingModifiers, enhancements, ExistingEffectPolicy,
+                IgnoredPresenceMarkers, State, Provenance);
+        }
+
+        // Final review B2: whether an effect already on the target skips
+        // this casting or it is cast again.
+        public PlannedCasting WithExistingEffectPolicy(ExistingEffectPolicy policy)
+        {
+            return new PlannedCasting(CastingId, RoutineId, Order, SourceId,
+                Ability, CasterUnitId, SpellbookGuid, TargetMode,
+                DirectTargetUnitId, Origin, RequiredCoverageUnitIds,
+                TargetingModifiers, Enhancements, policy,
+                IgnoredPresenceMarkers, State, Provenance);
+        }
+
         public string CastingId { get; private set; }
         public string RoutineId { get; private set; }
         public int Order { get; private set; }

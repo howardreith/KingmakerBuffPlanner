@@ -199,6 +199,10 @@ namespace KingmakerBuffPlanner.Planning
                     default:
                         return ExplicitStepConversion.Refuse("target-mode-unsupported:" + castingId);
                 }
+                // Final review A2: a step with no expected recipient could
+                // never be confirmed; it is never executed.
+                if (recipients == null || !recipients.Any(value => !string.IsNullOrWhiteSpace(value)))
+                    return ExplicitStepConversion.Refuse("no-predicted-recipients:" + castingId);
 
                 var enhancementUsage = new Dictionary<string, int>(StringComparer.Ordinal);
                 foreach (CastingCostLine line in casting.Cost.Where(line =>

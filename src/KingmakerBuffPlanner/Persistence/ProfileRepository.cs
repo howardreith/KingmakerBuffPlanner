@@ -160,6 +160,15 @@ namespace KingmakerBuffPlanner.Persistence
                 "kingmaker-buff-planner-" + CampaignHash(campaignId) + ".json");
         }
 
+        // The Classic loader's own strict reading of a Classic file, for the
+        // casting-first import (final review B1): an older schema is migrated
+        // in memory exactly as Load migrates it, and nothing is written.
+        internal static BuffPlannerProfile ReadForImport(string json, string campaignId)
+        {
+            bool migrated;
+            return Deserialize(json, campaignId, out migrated);
+        }
+
         private static BuffPlannerProfile Deserialize(string json, string campaignId, out bool migrated)
         {
             RejectDuplicateProperties(json);

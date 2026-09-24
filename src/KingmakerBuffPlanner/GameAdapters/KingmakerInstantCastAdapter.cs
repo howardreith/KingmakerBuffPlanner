@@ -28,6 +28,10 @@ namespace KingmakerBuffPlanner.GameAdapters
         private readonly Dictionary<CastStep, BrownFurDirectCastLease>
             _providerTransactions =
                 new Dictionary<CastStep, BrownFurDirectCastLease>();
+        // Final review A3: each fired step's read of its recipients' expected
+        // effects, taken before submission.
+        private readonly Dictionary<CastStep, EffectBaseline> _baselines =
+            new Dictionary<CastStep, EffectBaseline>();
 
         private readonly Action<string> _diagnostic;
 
@@ -140,6 +144,15 @@ namespace KingmakerBuffPlanner.GameAdapters
             if (!KingmakerAnimatedCastAdapter.TryResolve(step, out resolved, out reason))
                 return new InstantCastResult(false, false, false, false, false,
                     "final-resolution:" + reason);
+            // Final review A3: each expected recipient's instances of the
+            // expected effects, read before anything is submitted; without
+            // that read no confirmation is possible, so nothing is cast.
+            string baselineFailure;
+            EffectBaseline baseline = KingmakerEffectInstanceReader.ReadBaseline(step, out baselineFailure);
+            if (baseline == null)
+                return new InstantCastResult(false, false, false, false, false,
+                    "effect-baseline-unreadable:" + baselineFailure);
+            _baselines[step] = baseline;
             AbilityData sourceAbility = resolved.Ability;
             AbilityData executionAbility = sourceAbility;
             StickyTouchCastResolution stickyResolution = null;
@@ -297,17 +310,15 @@ namespace KingmakerBuffPlanner.GameAdapters
                 ";effects-observed-at-submit:" + observed, countViolation);
         }
 
+        // Final review A3: only an instance this attempt put there - new, or
+        // refreshed to a later end, and not suppressed - confirms, judged
+        // against the read taken before submission; presence alone never
+        // does, and an empty recipient set confirms nothing (A2).
         public bool EffectsObserved(CastStep step)
         {
-            try
-            {
-                var active = new KingmakerActiveEffectSnapshotBuilder().Build();
-                var evaluator = new EffectPresenceEvaluator();
-                return step.ExpectedRecipientUnitIds.All(targetId =>
-                    evaluator.EvaluateTyped(step.ExpectedEffects, active.GetEffects(targetId), null).Kind ==
-                        EffectPresenceKind.Complete);
-            }
-            catch (Exception) { return false; }
+            EffectBaseline baseline;
+            if (step == null || !_baselines.TryGetValue(step, out baseline)) return false;
+            return KingmakerEffectInstanceReader.AppliedByThisAttempt(step, baseline);
         }
 
         public InstantCastCompletion InspectCompletion(CastStep step)

@@ -598,6 +598,17 @@ namespace KingmakerBuffPlanner.UI
             BuildFocusedEnhancements(view, inputs);
             foreach (WorkspaceOriginOption origin in BuildFocusedOrigins(inputs))
                 view._focusedOrigins.Add(origin);
+            // Final review B2/B3: the provider pickers.
+            PlannedCasting focusedRecord = FocusedCasting();
+            if (focusedRecord != null)
+                view._focusedProviders.AddRange(ProviderChoices(inputs, focusedRecord.SourceId,
+                    null, focusedRecord.CasterUnitId, focusedRecord.Ability,
+                    focusedRecord.SpellbookGuid));
+            string providerDraftCaster = Draft.CasterUnitId ?? SelectedCasterUnitId;
+            if (!string.IsNullOrEmpty(providerDraftCaster))
+                view._draftProviders.AddRange(ProviderChoices(inputs,
+                    string.IsNullOrEmpty(Draft.SourceId) ? selectedSource : Draft.SourceId,
+                    providerDraftCaster, providerDraftCaster, Draft.Ability, Draft.SpellbookGuid));
             view._selectedBuffCards.AddRange(ShowWholeRoutine
                 ? BuildCards(plan, selectedSource, false)
                 : cards);
@@ -618,10 +629,7 @@ namespace KingmakerBuffPlanner.UI
                     StringComparison.Ordinal));
             if (focused == null || string.IsNullOrEmpty(focused.CasterUnitId))
                 return origins;
-            int candidates;
-            ProviderPlanningOption option = FindDraftOption(
-                inputs, focused.SourceId, focused.CasterUnitId,
-                out candidates);
+            ProviderPlanningOption option = FindRecordOption(inputs, focused);
             if (option == null) return origins;
             foreach (string anchor in option.LegalAnchorIds)
                 origins.Add(new WorkspaceOriginOption(anchor,
@@ -877,6 +885,87 @@ namespace KingmakerBuffPlanner.UI
                     match = option;
             }
             return match;
+        }
+
+        // The record's own provider: its caster, ability and spellbook when
+        // they single one out (final review B3: a caster with several ways
+        // to cast the buff), else the draft rule's choice.
+        private ProviderPlanningOption FindRecordOption(CastingWorkspaceInputs inputs,
+            PlannedCasting record)
+        {
+            int candidates;
+            ProviderPlanningOption fallback = FindDraftOption(
+                inputs, record.SourceId, record.CasterUnitId, out candidates);
+            if (candidates <= 1 || record.Ability == null) return fallback;
+            ProviderPlanningOption exact = inputs.ProviderOptions.FirstOrDefault(option =>
+                option != null && option.Provider != null &&
+                string.Equals(option.Provider.Key.CasterUnitId, record.CasterUnitId,
+                    StringComparison.Ordinal) &&
+                string.Equals(option.Provider.Key.Ability.Canonical, record.Ability.Canonical,
+                    StringComparison.Ordinal) &&
+                (record.SpellbookGuid == null || string.Equals(option.Provider.Key.SpellbookGuid,
+                    record.SpellbookGuid, StringComparison.Ordinal)));
+            return exact ?? fallback;
+        }
+
+        // Final review B2/B3: every exact provider that can cast the given
+        // buff - each capable caster, and each spellbook level, item or
+        // ability of a caster that has several. onlyCaster narrows the list
+        // to one caster (the next casting's chosen caster).
+        internal List<WorkspaceProviderChoice> ProviderChoices(CastingWorkspaceInputs inputs,
+            string sourceId, string onlyCaster, string selectedCaster, AbilityKey selectedAbility,
+            string selectedSpellbook)
+        {
+            var choices = new List<WorkspaceProviderChoice>();
+            EffectExpression expression;
+            if (inputs == null || inputs.ProviderOptions == null || inputs.EffectsBySource == null ||
+                string.IsNullOrEmpty(sourceId) ||
+                !inputs.EffectsBySource.TryGetValue(sourceId, out expression))
+                return choices;
+            List<ProviderPlanningOption> options = inputs.ProviderOptions
+                .Where(value => value != null && value.Provider != null &&
+                    (onlyCaster == null || string.Equals(value.Provider.Key.CasterUnitId,
+                        onlyCaster, StringComparison.Ordinal)) &&
+                    OptionServesExpression(inputs, value, expression))
+                .OrderBy(value => UnitDisplayName(inputs, value.Provider.Key.CasterUnitId),
+                    StringComparer.InvariantCultureIgnoreCase)
+                .ThenBy(value => value.Provider.Key.Canonical, StringComparer.Ordinal)
+                .ToList();
+            foreach (ProviderPlanningOption option in options)
+            {
+                ProviderKey key = option.Provider.Key;
+                bool sameAbility = selectedAbility != null && string.Equals(key.CasterUnitId,
+                        selectedCaster, StringComparison.Ordinal) &&
+                    string.Equals(key.Ability.Canonical, selectedAbility.Canonical,
+                        StringComparison.Ordinal);
+                int sameCount = options.Count(value => string.Equals(
+                        value.Provider.Key.CasterUnitId, key.CasterUnitId, StringComparison.Ordinal) &&
+                    string.Equals(value.Provider.Key.Ability.Canonical, key.Ability.Canonical,
+                        StringComparison.Ordinal));
+                bool selected = sameAbility && (selectedSpellbook == null
+                    ? sameCount == 1
+                    : string.Equals(key.SpellbookGuid, selectedSpellbook, StringComparison.Ordinal));
+                string casterName = UnitDisplayName(inputs, key.CasterUnitId);
+                choices.Add(new WorkspaceProviderChoice(key.Canonical, key.CasterUnitId, casterName,
+                    WorkspaceProviderLabels.Describe(casterName, PoolLabel(option.Provider.ResourcePoolKey),
+                        option.Provider.EffectiveCasterLevel, key.Ability.MetamagicMask), selected));
+            }
+            WorkspaceProviderLabels.Disambiguate(choices);
+            return choices;
+        }
+
+        private static ProviderPlanningOption FindProviderOption(CastingWorkspaceInputs inputs,
+            string sourceId, string providerKey)
+        {
+            EffectExpression expression;
+            if (inputs == null || inputs.ProviderOptions == null || inputs.EffectsBySource == null ||
+                string.IsNullOrEmpty(sourceId) || string.IsNullOrEmpty(providerKey) ||
+                !inputs.EffectsBySource.TryGetValue(sourceId, out expression))
+                return null;
+            return inputs.ProviderOptions.FirstOrDefault(option => option != null &&
+                option.Provider != null && string.Equals(option.Provider.Key.Canonical,
+                    providerKey, StringComparison.Ordinal) &&
+                OptionServesExpression(inputs, option, expression));
         }
 
         private static bool OptionServesExpression(
@@ -1401,6 +1490,113 @@ namespace KingmakerBuffPlanner.UI
             return AuthoringEditResult.Accept("draft-targeting", new string[0]);
         }
 
+        private PlannedCasting FocusedCasting()
+        {
+            return EditingFocusCastingId == null ? null : _authoring.Document.Castings
+                .FirstOrDefault(value => value != null && string.Equals(
+                    value.CastingId, EditingFocusCastingId, StringComparison.Ordinal));
+        }
+
+        // Final review B3: the next casting uses exactly this provider (its
+        // caster, and its spellbook level, item or ability), so a caster who
+        // can cast the buff in several ways can still author it.
+        public AuthoringEditResult ChooseDraftProvider(string providerKey,
+            CastingWorkspaceInputs inputs = null)
+        {
+            if (inputs != null) _lastInputs = inputs;
+            string source = string.IsNullOrEmpty(Draft.SourceId) ? SelectedSourceId : Draft.SourceId;
+            ProviderPlanningOption option = FindProviderOption(_lastInputs, source, providerKey);
+            if (option == null)
+                return AuthoringEditResult.Refuse("provider-unavailable:" + providerKey);
+            ChooseDraftCaster(option.Provider.Key.CasterUnitId);
+            Draft.Ability = option.Provider.Key.Ability;
+            Draft.SpellbookGuid = option.Provider.Key.SpellbookGuid;
+            _resolvedDraftKey = DraftResolutionKey();
+            return AuthoringEditResult.Accept("draft-provider", new string[0]);
+        }
+
+        // Final review B2/B3: the focused casting is cast by exactly this
+        // provider instead - its caster, ability and spellbook change
+        // together and everything else stays. This is how an imported
+        // casting whose old plan let the planner pick any caster gets its
+        // caster in place. Enhancements belong to their caster (a rod in
+        // someone's pack), so only those the new caster has are kept.
+        public AuthoringEditResult SetFocusedProvider(string providerKey,
+            CastingWorkspaceInputs inputs = null)
+        {
+            if (inputs != null) _lastInputs = inputs;
+            if (EditingFocusCastingId == null)
+                return AuthoringEditResult.Refuse("no-editing-focus");
+            PlannedCasting focused = FocusedCasting();
+            if (focused == null)
+                return AuthoringEditResult.Refuse("focused-casting-missing");
+            ProviderPlanningOption option = FindProviderOption(_lastInputs, focused.SourceId, providerKey);
+            if (option == null)
+                return AuthoringEditResult.Refuse("provider-unavailable:" + providerKey);
+            ProviderKey key = option.Provider.Key;
+            if (string.Equals(focused.CasterUnitId, key.CasterUnitId, StringComparison.Ordinal) &&
+                focused.Ability != null && string.Equals(focused.Ability.Canonical,
+                    key.Ability.Canonical, StringComparison.Ordinal) &&
+                string.Equals(focused.SpellbookGuid, key.SpellbookGuid, StringComparison.Ordinal))
+                return AuthoringEditResult.Refuse("provider-unchanged");
+            IEnumerable<CastEnhancementSnapshot> available = _lastInputs.Enhancements ??
+                (IEnumerable<CastEnhancementSnapshot>)new CastEnhancementSnapshot[0];
+            var owned = new HashSet<string>(available.Where(value => value != null &&
+                    string.Equals(value.CasterUnitId, key.CasterUnitId, StringComparison.Ordinal))
+                .Select(value => value.EnhancementId), StringComparer.Ordinal);
+            try
+            {
+                return UpdateFocusedCasting(focused.WithProvider(key.CasterUnitId, key.Ability,
+                    key.SpellbookGuid, focused.Enhancements.Where(value => value != null &&
+                        owned.Contains(value.EnhancementId)).ToList()));
+            }
+            catch (ArgumentException exception)
+            {
+                return AuthoringEditResult.Refuse("provider-invalid:" + exception.Message);
+            }
+        }
+
+        // Final review B2: skip the casting while its effect is already on
+        // the target, or cast it again anyway.
+        public AuthoringEditResult SetFocusedRecastPolicy(ExistingEffectPolicy policy)
+        {
+            PlannedCasting focused = FocusedCasting();
+            if (focused == null)
+                return AuthoringEditResult.Refuse("no-editing-focus");
+            if (focused.ExistingEffectPolicy == policy)
+                return AuthoringEditResult.Refuse("recast-policy-unchanged");
+            return UpdateFocusedCasting(focused.WithExistingEffectPolicy(policy));
+        }
+
+        // Final review B2: move the focused casting to the end of another
+        // routine, or one place earlier or later in its own.
+        public AuthoringEditResult MoveFocusedCastingToRoutine(string routineId)
+        {
+            PlannedCasting focused = FocusedCasting();
+            if (focused == null)
+                return AuthoringEditResult.Refuse("no-editing-focus");
+            if (string.Equals(focused.RoutineId, routineId, StringComparison.Ordinal))
+                return AuthoringEditResult.Refuse("routine-unchanged");
+            int count = _authoring.Document.Castings.Count(value => value != null &&
+                string.Equals(value.RoutineId, routineId, StringComparison.Ordinal));
+            return MoveFocusedCasting(routineId, count);
+        }
+
+        public AuthoringEditResult MoveFocusedCastingWithinRoutine(int delta)
+        {
+            PlannedCasting focused = FocusedCasting();
+            if (focused == null)
+                return AuthoringEditResult.Refuse("no-editing-focus");
+            List<PlannedCasting> routine = _authoring.Document.Castings.Where(value =>
+                value != null && string.Equals(value.RoutineId, focused.RoutineId,
+                    StringComparison.Ordinal)).ToList();
+            int position = routine.FindIndex(value => string.Equals(value.CastingId,
+                focused.CastingId, StringComparison.Ordinal)) + delta;
+            if (position < 0) return AuthoringEditResult.Refuse("already-first");
+            if (position >= routine.Count) return AuthoringEditResult.Refuse("already-last");
+            return MoveFocusedCasting(focused.RoutineId, position);
+        }
+
         public AuthoringEditResult UpdateFocusedCasting(PlannedCasting replacement)
         {
             if (EditingFocusCastingId == null)
@@ -1753,17 +1949,35 @@ namespace KingmakerBuffPlanner.UI
                 new PlannedCasting[0]);
         }
 
+        // Final review B7: an id is never issued twice in a session. A new
+        // casting gets an id above every id the document, the last run or
+        // an earlier Add has used, so its card never shows the run of a
+        // removed casting that once had the same id.
+        private int _highestIssuedCastingIndex;
+
         private string NextCastingId()
         {
-            int index = _authoring.Document.Castings.Count + 1;
+            int highest = _highestIssuedCastingIndex;
+            IEnumerable<string> used = _authoring.Document.Castings.Select(value => value.CastingId)
+                .Concat(LastRunReport == null ? new string[0]
+                    : LastRunReport.Entries.Select(entry => entry.CastingId));
+            foreach (string id in used)
+            {
+                int index;
+                if (id != null && id.StartsWith("cast-", StringComparison.Ordinal) &&
+                    int.TryParse(id.Substring(5), NumberStyles.None, CultureInfo.InvariantCulture,
+                        out index) && index > highest)
+                    highest = index;
+            }
             string candidate;
             do
             {
-                candidate = "cast-" + index;
-                index++;
+                highest++;
+                candidate = "cast-" + highest;
             }
             while (_authoring.Document.Castings.Any(
                 value => value.CastingId == candidate));
+            _highestIssuedCastingIndex = highest;
             return candidate;
         }
     }
@@ -1791,6 +2005,10 @@ namespace KingmakerBuffPlanner.UI
         // cannot be Ready (no caster) is refused with its reason.
         public CastingAuthoringState State { get; set; } =
             CastingAuthoringState.Ready;
+        // Final review B2: whether the new casting is skipped while its
+        // effect is already on the target (the default) or cast again.
+        public ExistingEffectPolicy ExistingEffectPolicy { get; set; } =
+            ExistingEffectPolicy.SkipAlreadyActive;
 
         internal PlannedCasting Materialize(string castingId, string routineId)
         {
@@ -1803,7 +2021,7 @@ namespace KingmakerBuffPlanner.UI
                     "The draft needs an ability before it can become a casting."),
                 CasterUnitId, SpellbookGuid, TargetMode, DirectTargetUnitId,
                 Origin, RequiredCoverageUnitIds, TargetingModifiers,
-                Enhancements, ExistingEffectPolicy.SkipAlreadyActive, null,
+                Enhancements, ExistingEffectPolicy, null,
                 // A brand-new casting is a draft or ready intent; parking a
                 // record before it exists is not a meaningful action.
                 State == CastingAuthoringState.Disabled

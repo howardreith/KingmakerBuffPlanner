@@ -36,6 +36,7 @@ namespace KingmakerBuffPlanner.UI
         private Image _blocker;
         private Text _status;
         private Text _result;
+        private string _shownPersistenceNotice;
         private Text _catalogSummary;
         private Text _routineLegend;
         private Text _tooltip;
@@ -184,6 +185,20 @@ namespace KingmakerBuffPlanner.UI
             {
                 _status.text = model.Snapshot.Units.Count + " targets | " +
                     model.Sources.Count + " buffs found";
+                // Final review B4: a saved setup that could not be read, or a
+                // change that was not saved, is always shown: once in full in
+                // the result line when it first appears, and in the status
+                // line for as long as it lasts.
+                string notice = _session.PersistenceNotice;
+                if (!string.IsNullOrEmpty(notice))
+                {
+                    _status.text += " | changes are not saved";
+                    if (!string.Equals(notice, _shownPersistenceNotice, StringComparison.Ordinal))
+                    {
+                        _shownPersistenceNotice = notice;
+                        _result.text = notice;
+                    }
+                }
                 if (string.IsNullOrWhiteSpace(_result.text))
                     _result.text = _session.ProfileStatus.StartsWith("No prior profile",
                         StringComparison.Ordinal) ? "New planner setup created for this campaign." :

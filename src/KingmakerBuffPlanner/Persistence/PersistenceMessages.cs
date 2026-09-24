@@ -22,6 +22,53 @@ namespace KingmakerBuffPlanner.Persistence
             return "Not saved: " + (detail.Length == 0 ? "the plan could not be written." : detail);
         }
 
+        // Final review B4: what the player is told when a planner opens and
+        // its saved file could not be used, or a change was not saved. Null
+        // when all is well. A file that could not be read is never replaced
+        // by an ordinary save, so every notice also says saving is refused.
+
+        // Classic: the load result names no source when nothing could be
+        // loaded; its warning lists the files that could not be read.
+        public static string ForClassicLoad(string sourcePath, bool recoveredFromBackup, string warning)
+        {
+            if (string.IsNullOrEmpty(warning)) return null;
+            if (string.IsNullOrEmpty(sourcePath))
+                return "Your saved planner setup could not be read or comes from a newer planner. It was " +
+                    "left unchanged and a new setup is shown; changes are not saved while that file is " +
+                    "there - move it aside to save here.";
+            if (recoveredFromBackup)
+                return "Your saved planner setup could not be read, so its latest backup was loaded. The " +
+                    "unreadable file was left unchanged; changes are not saved while it is there - move " +
+                    "it aside to save here.";
+            return null;
+        }
+
+        public static string ForClassicSaveRefusal(string refusal)
+        {
+            if (string.IsNullOrEmpty(refusal)) return null;
+            return "Not saved: the saved planner setup for this campaign could not be read or comes " +
+                "from a newer planner. It was left unchanged; move it aside to save here.";
+        }
+
+        // Casting-first: the plan file as the session loaded it.
+        public static string ForCastingLoad(CastingPlanLoadStatus status)
+        {
+            switch (status)
+            {
+                case CastingPlanLoadStatus.Corrupt:
+                case CastingPlanLoadStatus.UnsupportedSchema:
+                    return "Your casting plan could not be read or comes from a newer planner. It was " +
+                        "left unchanged and an empty plan is shown; saving is blocked until that file " +
+                        "is moved aside.";
+                case CastingPlanLoadStatus.RecoveredFromBackup:
+                    return "Your casting plan could not be read, so its latest backup was loaded. The " +
+                        "unreadable file was left unchanged; saving is refused while it is there - move " +
+                        "it aside to save here.";
+                default:
+                    return null;
+            }
+        }
+
         // Null when the review state was saved (or nothing is wrong).
         public static string ForReviewWarning(string warning)
         {

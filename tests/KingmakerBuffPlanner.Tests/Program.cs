@@ -130,6 +130,7 @@ namespace KingmakerBuffPlanner.Tests
                 Run("localized-variant-formatting-does-not-parse-English", TestLocalizedVariantFormatting);
                 Run("spontaneous-providers-share-one-pool", TestSpontaneousSharedPool);
                 Run("prepared-opposition-consumes-linked-slots", TestPreparedLinkedSlots);
+                Run("casting-budget-counts-linked-slots-as-requested", TestCastingBudgetLinkedSlots);
                 Run("prepared-domain-slot-eligibility-is-preserved", TestPreparedDomainEligibility);
                 Run("unlimited-pool-is-explicit", TestUnlimitedPool);
                 Run("party-snapshot-orders-by-stable-id", TestPartySnapshotOrdering);
@@ -1737,6 +1738,34 @@ namespace KingmakerBuffPlanner.Tests
                 reservation.TokenIds.Count != 2 || reservation.Units != 2 ||
                 ledger.GetRemaining(poolKey) != 0 || ledger.TryReserve(provider, out reservation, out reason))
                 throw new InvalidOperationException("Linked opposition slots were not consumed exactly once.");
+        }
+
+        // Final review A4: a casting that reserves a linked opposition pair
+        // requests two slots, not one, so a second casting of the same pool
+        // that cannot be funded leaves a visible shortage on the pool line.
+        private static void TestCastingBudgetLinkedSlots()
+        {
+            const string poolKey = "unit-a|book-a|prepared";
+            var main = new ResourceTokenSnapshot("slot-0", Ability("opposed", string.Empty, 0), 3,
+                PreparedSlotKind.Opposition, true, true, new[] { "slot-1" });
+            var linked = new ResourceTokenSnapshot("slot-1", Ability("opposed", string.Empty, 0), 3,
+                PreparedSlotKind.Opposition, true, false, new string[0]);
+            var pool = new ResourcePoolSnapshot(poolKey, ResourcePoolKind.PreparedSlots, 2, 2,
+                new[] { main, linked });
+            ProviderSnapshot provider = Provider("opposed", poolKey, 1, new[] { "slot-0" });
+            var ledger = new CastingBudgetLedger(Snapshot(new[] { provider }, new[] { pool }), null);
+            IReadOnlyList<CastingDemand> demands = ledger.DemandsFor(provider, null);
+            IReadOnlyList<CastingCostLine> cost;
+            string reason;
+            if (!ledger.TryReserveAtomically("cast-a", provider, demands, out cost, out reason) ||
+                ledger.TryReserveAtomically("cast-b", provider, demands, out cost, out reason))
+                throw new InvalidOperationException("The linked pair was not reserved exactly once.");
+            ledger.RecordUnfunded("cast-b", demands);
+            CastingBudgetLine line = ledger.BuildReport().Single(value => value.PoolKey == poolKey);
+            if (line.RequestedUsage != 3 || line.AllocatedUsage != 2 || line.UnmetDemand != 1 ||
+                !line.Traces.Contains("cast-a") || !line.Traces.Contains("cast-b"))
+                throw new InvalidOperationException("The linked-slot budget line hid a shortage: requested=" +
+                    line.RequestedUsage + ";allocated=" + line.AllocatedUsage + ";unmet=" + line.UnmetDemand);
         }
 
         private static void TestPreparedDomainEligibility()
@@ -11102,6 +11131,59 @@ namespace KingmakerBuffPlanner.Tests
             if (service.Document.Castings.Count != 1)
                 throw new InvalidOperationException(
                     "Compilation mutated the authored document.");
+            // Final review A2: a caster-centred casting whose prediction is
+            // empty, or whose caster is no legal origin (its prediction would
+            // fall back to every reachable unit), is blocked with a visible
+            // reason and never runs.
+            List<ProviderPlanningOption> emptyOptions;
+            List<CastEnhancementSnapshot> emptyEnhancements;
+            PartyProviderSnapshot emptySnapshot = CastingParty(CastingGroupAbility, out emptyOptions,
+                out emptyEnhancements, required, 3, new Dictionary<string, IEnumerable<string>>(StringComparer.Ordinal)
+                {
+                    { "unit-cleric", new string[0] }
+                });
+            ExplicitCastingPlan emptyPlan = CompileCastingPlan(service.Document, emptySnapshot, emptyOptions,
+                emptyEnhancements, "source-bulls", "source-communal");
+            if (emptyPlan.Castings[0].IsExecutable ||
+                !emptyPlan.Castings[0].ReadinessReasons.Any(reason =>
+                    reason.StartsWith("predicted-coverage-empty:", StringComparison.Ordinal)) ||
+                WorkspaceReasonText.Describe("predicted-coverage-empty:unit-cleric") !=
+                    "no party member would be reached")
+                throw new InvalidOperationException("An empty group prediction was executable.");
+            List<ProviderPlanningOption> unknownOptions;
+            List<CastEnhancementSnapshot> unknownEnhancements;
+            PartyProviderSnapshot unknownSnapshot = CastingParty(CastingGroupAbility, out unknownOptions,
+                out unknownEnhancements, required, 3, coverage);
+            for (int index = 0; index < unknownOptions.Count; index++)
+            {
+                ProviderPlanningOption option = unknownOptions[index];
+                if (option.Provider.Key.CasterUnitId != "unit-cleric" ||
+                    option.Provider.Key.Ability.BaseAbilityGuid != CastingGroupAbility.BaseAbilityGuid) continue;
+                unknownOptions[index] = new ProviderPlanningOption(option.Provider, option.ReachableTargetIds,
+                    new[] { "unit-t1" }, option.EffectiveCasterLevel, option.ExpectedDurationRounds,
+                    option.ExecutionStrategy, option.ExecutionStrategyReason,
+                    new Dictionary<string, IEnumerable<string>>(StringComparer.Ordinal) { { "unit-t1", covered } });
+            }
+            ExplicitCastingPlan unknownPlan = CompileCastingPlan(service.Document, unknownSnapshot, unknownOptions,
+                unknownEnhancements, "source-bulls", "source-communal");
+            if (unknownPlan.Castings[0].IsExecutable ||
+                !unknownPlan.Castings[0].ReadinessReasons.Any(reason =>
+                    reason.StartsWith("origin-caster-illegal:unit-cleric", StringComparison.Ordinal)) ||
+                WorkspaceReasonText.Describe("origin-caster-illegal:unit-cleric") !=
+                    "the group spell cannot be centred on its caster; centre it on a party member")
+                throw new InvalidOperationException("A caster-centred casting whose caster is no legal origin was executable: " +
+                    string.Join("|", unknownPlan.Castings[0].ReadinessReasons.ToArray()));
+            // Defence in depth at the converter and the adapters.
+            DirectoryInfo sourceRoot = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
+            while (sourceRoot != null && !File.Exists(Path.Combine(sourceRoot.FullName, "KingmakerBuffPlanner.sln")))
+                sourceRoot = sourceRoot.Parent;
+            Func<string, string> read = relative => File.ReadAllText(Path.Combine(sourceRoot.FullName, "src",
+                "KingmakerBuffPlanner", relative)).Replace("\r\n", "\n");
+            if (!read(Path.Combine("Planning", "ExplicitCastingStepConverter.cs")).Contains(
+                    "return ExplicitStepConversion.Refuse(\"no-predicted-recipients:\" + castingId);") ||
+                AppliedEffectJudgement.AllReached(new string[0], Leaf("buff-effect"),
+                    new EffectBaseline(null), unitId => new ObservedEffectInstance[0]))
+                throw new InvalidOperationException("An empty recipient set can still be converted or confirmed.");
         }
 
         private static void Assert(bool condition)
@@ -13005,6 +13087,12 @@ namespace KingmakerBuffPlanner.Tests
                 shortView.OnePassGate.BlockingReasons.Count == 0)
                 throw new InvalidOperationException(
                     "The one-pass forecast hid the real one-charge conflict.");
+            // Final review B7: the footer shows it.
+            if (WorkspaceFooterText.WholePlan(shortView.OnePassGate) !=
+                    "All routines in one pass: 1 casting would be blocked." ||
+                WorkspaceFooterText.WholePlan(null) != string.Empty)
+                throw new InvalidOperationException("The whole-plan forecast is not shown: " +
+                    WorkspaceFooterText.WholePlan(shortView.OnePassGate));
 
             session.PresentForReview(inputs);
             WorkspaceApplyResult shortApply =
@@ -16693,6 +16781,42 @@ namespace KingmakerBuffPlanner.Tests
                 reopened.Document.Castings.Count != 2)
                 throw new InvalidOperationException(
                     "A second open imported again instead of loading the candidate.");
+            // Final review B1: a Classic file written by a released version
+            // (schema 4 in 0.0.19; schema 1 earlier) imports on first open
+            // through the Classic loader's own in-memory migration. Its bytes
+            // stay exactly as they were and the archive holds them exactly.
+            string schema5Json = File.ReadAllText(sessionLegacyPath);
+            foreach (int oldSchema in new[] { 4, 1 })
+            {
+                string oldBoundary = Path.Combine(root, "casting-migration-v" + oldSchema);
+                Directory.CreateDirectory(oldBoundary);
+                string oldPath = new ProfileRepository(oldBoundary).GetProfilePath("legacy-campaign");
+                JObject oldDocument = JObject.Parse(LegacyProfileFixture.ToSchema4Json(schema5Json));
+                if (oldSchema == 1)
+                {
+                    oldDocument["schemaVersion"] = 1;
+                    oldDocument.Remove("ui");
+                    oldDocument.Remove("execution");
+                }
+                Directory.CreateDirectory(Path.GetDirectoryName(oldPath));
+                File.WriteAllText(oldPath, oldDocument.ToString());
+                byte[] oldBytes = File.ReadAllBytes(oldPath);
+                var upgraded = new CastingWorkspaceSession(oldBoundary, "legacy-campaign",
+                    null, PerTarget("source-bulls"));
+                if (upgraded.MigrationStatus != CastingMigrationStatus.Migrated ||
+                    upgraded.ImportReport == null || upgraded.ImportReport.ResultingCastingCount != 2 ||
+                    upgraded.PersistenceBlocked || upgraded.Document.Castings.Count != 2 ||
+                    !File.ReadAllBytes(oldPath).SequenceEqual(oldBytes) ||
+                    Directory.GetFiles(oldBoundary, "kbp-casting-*.orig", SearchOption.AllDirectories).Length != 1 ||
+                    !File.ReadAllBytes(Directory.GetFiles(oldBoundary, "kbp-casting-*.orig",
+                        SearchOption.AllDirectories)[0]).SequenceEqual(oldBytes))
+                    throw new InvalidOperationException("A schema-" + oldSchema + " Classic file did not import: " +
+                        upgraded.MigrationStatus + " " + upgraded.MigrationWarning);
+            }
+            // The live scenario's seed is a real schema-4 file.
+            if (JObject.Parse(LegacyProfileFixture.ToSchema4Json(schema5Json))["schemaVersion"].Value<int>() != 4 ||
+                JObject.Parse(LegacyProfileFixture.ToSchema4Json(schema5Json)).SelectTokens("routines[*].assignments[*].castingAssignments").Any())
+                throw new InvalidOperationException("The schema-4 fixture still has schema-5 casting children.");
             // Batch 3, section 11: USING the casting-first workspace (save,
             // casting mode, present, accept, apply) never touches the
             // Classic profile's bytes.

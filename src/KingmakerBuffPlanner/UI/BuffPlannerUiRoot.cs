@@ -1063,7 +1063,7 @@ namespace KingmakerBuffPlanner.UI
                 _log.Info("[KBP-CF-RUN] refused;routine=" + routineId + ";mode=" + mode +
                     ";reason=" + result.ReviewReason + ".");
                 session.RecordAttempt(refusal);
-                _lastCastingPress[routineId] = refusal;
+                _lastCastingPress[PressKey(session, routineId)] = refusal;
                 CompleteQuick(completed, new QuickExecutionResult(routineId, name,
                     QuickExecutionDisposition.Refused, refusal,
                     result.GateDecision == null ? 0 : result.GateDecision.ExecutableCastingIds.Count,
@@ -1162,8 +1162,13 @@ namespace KingmakerBuffPlanner.UI
             IEnumerator routine = null;
             try
             {
-                routine = _session.ExecuteRoutine(routineId,
-                    observedCompletion, readyOnlyExplicit);
+                // Final review A1: the Classic routine advances only while
+                // the world runs, as the casting-first host is pumped; a paused
+                // game or an open full-screen window (the Classic screen
+                // itself) never uses up a cast's confirmation window, so a
+                // step is not judged unconfirmed and the rest not halted.
+                routine = new WorldGatedEnumerator(_session.ExecuteRoutine(routineId,
+                    observedCompletion, readyOnlyExplicit), () => WorldRunsForCasting);
                 while (true)
                 {
                     bool moved = false;
@@ -1218,6 +1223,7 @@ namespace KingmakerBuffPlanner.UI
             _modPath = modPath;
             _log = log;
             _session = new PlannerUiSession(modPath, log);
+            _session.ClassicSavesSuppressed = () => CastingFirstActive;
             _plannerModeStore = new PlannerModeStore(modPath);
             string modeWarning;
             _plannerMode = _plannerModeStore.Load(out modeWarning);
@@ -1247,10 +1253,12 @@ namespace KingmakerBuffPlanner.UI
             _spellbookEntry = new BuffPlannerSpellbookEntryController(
                 value => _log.Info(value),
                 () => OpenSetup(),
-                () => _screen != null && _screen.IsOpen,
+                // Final review B6: in casting-first mode the planner that
+                // opens is the workspace, not the Classic screen.
+                () => (_screen != null && _screen.IsOpen) || _castingWorkspace != null,
                 PlannerUiTheme.Resolve(null),
-                () => _screen != null && _screen.LifecycleState ==
-                    PlannerScreenLifecycleState.Open,
+                () => (_screen != null && _screen.LifecycleState ==
+                    PlannerScreenLifecycleState.Open) || _castingWorkspace != null,
                 RequestNativeEscapeVeil);
             try
             {
@@ -1500,7 +1508,7 @@ namespace KingmakerBuffPlanner.UI
             string name = session == null ? routineId : session.RoutineDisplayName(routineId);
             if (session != null) session.RecordRunReport(report);
             LogRunReport(report, session);
-            _lastCastingPress[routineId] = CastingRunPresentation.Describe(report, name,
+            _lastCastingPress[PressKey(session, routineId)] = CastingRunPresentation.Describe(report, name,
                 session == null ? (Func<string, string>)null : session.CastingLabel);
             Func<string, string> label = null;
             if (session != null) label = session.CastingLabel;
@@ -1537,6 +1545,13 @@ namespace KingmakerBuffPlanner.UI
                         ? name + " is running. Press again to stop it after the cast in progress."
                         : "Another routine is running. Press to stop it after the cast in progress.");
             CastingWorkspaceSession session = _castingWorkspaceSession;
+            // Final review B7: a session, or a press result, kept from another
+            // campaign never describes the one now loaded.
+            string loadedCampaignId = Game.Instance == null || Game.Instance.Player == null
+                ? null : Game.Instance.Player.GameId;
+            if (session != null && !string.Equals(session.CampaignId, loadedCampaignId,
+                    StringComparison.Ordinal))
+                session = null;
             if (session == null)
                 return "Cast " + name + " (casting-first planner). Open the planner to " +
                     "review and accept the routine first.";
@@ -1564,11 +1579,17 @@ namespace KingmakerBuffPlanner.UI
                     break;
             }
             string last;
-            _lastCastingPress.TryGetValue(routineId, out last);
+            _lastCastingPress.TryGetValue(PressKey(session, routineId), out last);
             return "Cast " + name + ": " + castings + (castings == 1 ? " casting" : " castings") +
                 ", " + session.ExecutionMode + " mode" + acceptance +
                 (string.IsNullOrEmpty(last) ? string.Empty
                     : " Last: " + (last.Length <= 180 ? last : last.Substring(0, 177) + "..."));
+        }
+
+        // A press result belongs to the campaign whose session produced it.
+        private static string PressKey(CastingWorkspaceSession session, string routineId)
+        {
+            return (session == null ? string.Empty : session.CampaignId) + "|" + routineId;
         }
 
         private void LogRunStarted(string routineId, CastingApplyMode mode,

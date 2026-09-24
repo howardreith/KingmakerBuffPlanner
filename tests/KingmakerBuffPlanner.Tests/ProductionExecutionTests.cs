@@ -36,6 +36,13 @@ namespace KingmakerBuffPlanner.Tests
             Run("session-acceptance-survives-reopen",
                 () => TestSessionAcceptanceSurvivesReopen(root));
             Run("session-apply-nothing-to-cast", () => TestSessionApplyNothingToCast(root));
+            Run("session-never-reissues-a-casting-id", () => TestSessionCastingIdsNotReused(root));
+            Run("imported-automatic-casting-becomes-ready-in-place",
+                () => TestImportedAutomaticCastingReadyInPlace(root));
+            Run("multi-provider-caster-picks-the-exact-source", () => TestExactProviderPicker(root));
+            Run("focused-casting-routine-order-and-recast", () => TestFocusedRoutineOrderAndRecast(root));
+            Run("planners-show-unusable-files-and-refused-saves", () => TestPersistenceNoticesShown(root));
+            Run("classic-file-and-hud-stay-with-their-mode-and-campaign", TestClassicSaveAndHudScoping);
             Run("native-boundary-refuses-non-standard-or-tampered", TestNativeBoundaryRefusals);
             Run("execution-host-runs-reports-and-halts", TestExecutionHostRunsAndHalts);
             Run("execution-host-cancel-deadline-shutdown", TestExecutionHostCancelDeadlineShutdown);
@@ -69,6 +76,8 @@ namespace KingmakerBuffPlanner.Tests
             Run("qualification-disable-step-rules", () => TestQualificationDisableStepRules(root));
             Run("cantrips-cast-at-will-through-the-class-ability", TestCantripsCastAtWill);
             Run("at-will-cantrip-choice-refuses-what-is-not-the-authored-cantrip", TestAtWillCantripChoice);
+            Run("classic-run-advances-only-while-the-world-runs", TestWorldGatedClassicRun);
+            Run("confirmation-needs-an-instance-this-attempt-applied", TestAppliedEffectJudgement);
             Run("cantrip-route-follows-the-reservation-and-ambiguity-stays-unresolved", TestCantripRouteAndPricing);
             Run("fact-source-choice-keeps-the-provider-kind-and-reserved-pool", TestFactSourceChoice);
             Run("available-count-judgement-never-reads-unread-as-unlimited", TestAvailableCountJudgement);
@@ -768,6 +777,280 @@ namespace KingmakerBuffPlanner.Tests
             if (!workspaceView.Contains("_footerResult.text = PersistenceMessages.ForSaveFailure(exception);") ||
                 !workspaceView.Contains("PersistenceMessages.ForReviewWarning(_session.ReviewStoreWarning)"))
                 throw new InvalidOperationException("The workspace does not show persistence refusals.");
+        }
+
+        // Final review B4: both planners tell the player when their saved file
+        // could not be used or a change was not saved, and tell an
+        // unreadable file apart from none at all.
+        private static void TestPersistenceNoticesShown(string root)
+        {
+            string dir = Path.Combine(root, "persistence-notices");
+            Directory.CreateDirectory(dir);
+            var profiles = new ProfileRepository(dir);
+            ProfileLoadResult absent = profiles.Load("notice-campaign");
+            if (PersistenceMessages.ForClassicLoad(absent.SourcePath, absent.RecoveredFromBackup,
+                    absent.Warning) != null)
+                throw new InvalidOperationException("A missing Classic setup was reported as unreadable.");
+            string primary = profiles.GetProfilePath("notice-campaign");
+            Directory.CreateDirectory(Path.GetDirectoryName(primary));
+            File.WriteAllText(primary, "{ not json");
+            ProfileLoadResult unreadable = profiles.Load("notice-campaign");
+            string loadNotice = PersistenceMessages.ForClassicLoad(unreadable.SourcePath,
+                unreadable.RecoveredFromBackup, unreadable.Warning);
+            profiles.Save(unreadable.Profile);
+            string saveNotice = PersistenceMessages.ForClassicSaveRefusal(profiles.LastSaveRefusal);
+            if (loadNotice == null || !loadNotice.StartsWith("Your saved planner setup could not be read",
+                    StringComparison.Ordinal) || saveNotice == null ||
+                !saveNotice.StartsWith("Not saved:", StringComparison.Ordinal) ||
+                File.ReadAllText(primary) != "{ not json")
+                throw new InvalidOperationException("An unreadable Classic setup or refused save was not reported.");
+            if (PersistenceMessages.ForClassicLoad("backup.json", true, "primary: bad") == null ||
+                PersistenceMessages.ForClassicLoad("primary.json", false, string.Empty) != null ||
+                PersistenceMessages.ForClassicSaveRefusal(null) != null)
+                throw new InvalidOperationException("Classic load notices misjudged a backup or a clean load.");
+            if (PersistenceMessages.ForCastingLoad(CastingPlanLoadStatus.Corrupt) == null ||
+                PersistenceMessages.ForCastingLoad(CastingPlanLoadStatus.UnsupportedSchema) == null ||
+                PersistenceMessages.ForCastingLoad(CastingPlanLoadStatus.RecoveredFromBackup) == null ||
+                PersistenceMessages.ForCastingLoad(CastingPlanLoadStatus.Loaded) != null ||
+                PersistenceMessages.ForCastingLoad(CastingPlanLoadStatus.Absent) != null)
+                throw new InvalidOperationException("Casting-first load notices misjudged a status.");
+            // A casting-first plan that cannot be read opens blocked, and its
+            // notice is what the view shows first.
+            string castingDir = Path.Combine(dir, "casting");
+            Directory.CreateDirectory(castingDir);
+            string plan = new CastingPlanRepository(castingDir).GetProfilePath("notice-campaign");
+            Directory.CreateDirectory(Path.GetDirectoryName(plan));
+            File.WriteAllText(plan, "{ not json");
+            var blocked = new CastingWorkspaceSession(castingDir, "notice-campaign");
+            if (!blocked.PersistenceBlocked || PersistenceMessages.ForCastingLoad(blocked.LoadStatus) == null)
+                throw new InvalidOperationException("An unreadable casting plan opened without a notice: " +
+                    blocked.LoadStatus);
+            DirectoryInfo directory = new DirectoryInfo(Environment.CurrentDirectory);
+            while (directory != null && !File.Exists(Path.Combine(directory.FullName, "KingmakerBuffPlanner.sln")))
+                directory = directory.Parent;
+            Func<string, string> source = name => File.ReadAllText(Path.Combine(directory.FullName, "src",
+                "KingmakerBuffPlanner", "UI", name)).Replace("\r\n", "\n");
+            string session = source("PlannerUiSession.cs");
+            if (!session.Contains("PersistenceNotice = PersistenceMessages.ForClassicLoad(loaded.SourcePath,") ||
+                !session.Contains("PersistenceNotice = PersistenceMessages.ForClassicSaveRefusal(refusal);") ||
+                !source("BuffPlannerScreenView.cs").Contains("string notice = _session.PersistenceNotice;") ||
+                !source("CastingWorkspaceScreenView.cs").Contains(
+                    "string import = PersistenceMessages.ForCastingLoad(_session.LoadStatus) ??") ||
+                !source("CastingWorkspaceScreenView.cs").Contains(": PersistenceMessages.ForCastingLoad(status) ??"))
+                throw new InvalidOperationException("A planner does not show its persistence notice.");
+        }
+
+        // Final review B2: an imported casting whose old plan let the planner
+        // pick any caster becomes Ready in place, through the controls the
+        // focused editor shows: pick who casts it, resolve the review, mark
+        // it Ready. Its id and its import provenance are kept.
+        private static void TestImportedAutomaticCastingReadyInPlace(string root)
+        {
+            string dir = Path.Combine(root, "imported-automatic-ready");
+            Directory.CreateDirectory(dir);
+            PartyProviderSnapshot snapshot;
+            CastingWorkspaceInputs inputs = WorkspaceInputs(out snapshot);
+            var imported = new PlannedCasting("cast-auto", "long", 0, "source-bulls", CastingBuffAbility,
+                null, null, CastingTargetMode.DirectTarget, "unit-t1", null, null, null, null,
+                ExistingEffectPolicy.SkipAlreadyActive, null, CastingAuthoringState.Draft,
+                new MigrationProvenance("cast-auto", 5, "long", string.Empty, "unit-t1",
+                    new[] { "automatic-caster-pending-review" }, null));
+            new CastingPlanRepository(dir).Save(CastingPlanProfile.FromDocument(new CastingPlanDocument(
+                "workspace-campaign", new[]
+                {
+                    new RoutineDefinition("long", "Long"),
+                    new RoutineDefinition("important", "Important"),
+                    new RoutineDefinition("short", "Short")
+                }, new[] { imported })));
+            var session = new CastingWorkspaceSession(dir, "workspace-campaign",
+                new DisabledCastingDispatchBoundary());
+            session.FocusCasting("cast-auto");
+            WorkspaceView view = session.BuildView(inputs);
+            WorkspaceProviderChoice cleric = view.FocusedProviders.FirstOrDefault(value =>
+                value.CasterUnitId == "unit-cleric");
+            if (view.FocusedProviders.Count != 2 || cleric == null ||
+                view.FocusedProviders.Any(value => value.Selected))
+                throw new InvalidOperationException("The focused editor did not offer the capable casters: " +
+                    string.Join("|", view.FocusedProviders.Select(value => value.Label).ToArray()));
+            if (session.SetFocusedCastingState(CastingAuthoringState.Ready).Applied)
+                throw new InvalidOperationException("An imported casting without a caster was marked Ready.");
+            AuthoringEditResult chosen = session.SetFocusedProvider(cleric.ProviderKey, inputs);
+            AuthoringEditResult resolved = session.ResolveFocusedImportReview();
+            AuthoringEditResult ready = session.SetFocusedCastingState(CastingAuthoringState.Ready);
+            PlannedCasting after = session.Document.Castings.Single();
+            ResolvedCasting compiled = session.CompilePlan(inputs).CastingById("cast-auto");
+            if (!chosen.Applied || !resolved.Applied || !ready.Applied || after.CastingId != "cast-auto" ||
+                after.CasterUnitId != "unit-cleric" || after.Provenance == null ||
+                after.Provenance.UnresolvedReviewItems.Count != 0 || compiled == null || !compiled.IsExecutable ||
+                !session.BuildView(inputs).FocusedProviders.Single(value =>
+                    value.CasterUnitId == "unit-cleric").Selected)
+                throw new InvalidOperationException("The imported casting did not become Ready in place: " +
+                    chosen.Reason + "|" + resolved.Reason + "|" + ready.Reason + "|" + (compiled == null ? "none"
+                        : string.Join(",", compiled.ReadinessReasons.ToArray())));
+        }
+
+        // Final review B3: a caster with the same buff in two spellbooks picks
+        // the exact one. Add without a pick is refused with a reason that
+        // points at the picker; the focused casting can switch books.
+        private static void TestExactProviderPicker(string root)
+        {
+            string dir = Path.Combine(root, "exact-provider-picker");
+            Directory.CreateDirectory(dir);
+            PartyProviderSnapshot baseSnapshot;
+            CastingWorkspaceInputs baseInputs = WorkspaceInputs(out baseSnapshot);
+            ProviderPlanningOption firstBook = baseInputs.ProviderOptions.Single(value =>
+                value.Provider.Key.CasterUnitId == "unit-cleric");
+            var secondBook = new ProviderSnapshot(new ProviderKey("unit-cleric", "book-cleric-second",
+                    CastingBuffAbility, "level-2"), CastingBuffAbility.BaseAbilityGuid, 2,
+                firstBook.Provider.ResourcePoolKey, 1, null, null, 12);
+            var snapshot = new PartyProviderSnapshot(baseSnapshot.Units,
+                baseSnapshot.Providers.Concat(new[] { secondBook }).ToList(), baseSnapshot.ResourcePools);
+            var inputs = new CastingWorkspaceInputs(snapshot, baseInputs.ProviderOptions.Concat(new[]
+                {
+                    new ProviderPlanningOption(secondBook, firstBook.ReachableTargetIds,
+                        firstBook.LegalAnchorIds, 12, 100)
+                }).ToList(), baseInputs.EffectsBySource, baseInputs.Enhancements);
+            var session = new CastingWorkspaceSession(dir, "workspace-campaign",
+                new DisabledCastingDispatchBoundary());
+            AuthoringEditResult ambiguous = AddDraftCasting(session, inputs, "unit-cleric", "unit-t1");
+            if (ambiguous.Applied || !ambiguous.Reason.StartsWith(
+                    "draft-ability-unresolved:exact-source-ambiguous", StringComparison.Ordinal) ||
+                WorkspaceRefusalText.Describe(ambiguous.Reason) !=
+                    "that character can cast it in more than one way; pick one under Cast from.")
+                throw new InvalidOperationException("An ambiguous Add was not refused towards the picker: " +
+                    ambiguous.Reason);
+            WorkspaceView view = session.BuildView(inputs);
+            if (view.DraftProviders.Count != 2 ||
+                view.DraftProviders.Select(value => value.Label).Distinct(StringComparer.Ordinal).Count() != 2 ||
+                view.DraftProviders.Any(value => value.CasterUnitId != "unit-cleric"))
+                throw new InvalidOperationException("The draft did not offer each of the caster's sources: " +
+                    string.Join("|", view.DraftProviders.Select(value => value.Label).ToArray()));
+            WorkspaceProviderChoice second = view.DraftProviders.Single(value =>
+                value.ProviderKey.Contains("book-cleric-second"));
+            Assert(session.ChooseDraftProvider(second.ProviderKey, inputs).Applied);
+            AuthoringEditResult added = session.AddCastingFromDraft(inputs);
+            PlannedCasting casting = session.Document.Castings.SingleOrDefault();
+            if (!added.Applied || casting == null || casting.SpellbookGuid != "book-cleric-second" ||
+                !session.CompilePlan(inputs).CastingById(casting.CastingId).IsExecutable)
+                throw new InvalidOperationException("The picked source was not the one authored: " + added.Reason);
+            session.FocusCasting(casting.CastingId);
+            WorkspaceProviderChoice other = session.BuildView(inputs).FocusedProviders.Single(value =>
+                value.CasterUnitId == "unit-cleric" && !value.ProviderKey.Contains("book-cleric-second"));
+            Assert(session.SetFocusedProvider(other.ProviderKey, inputs).Applied);
+            if (session.Document.Castings.Single().SpellbookGuid != firstBook.Provider.Key.SpellbookGuid ||
+                session.SetFocusedProvider(other.ProviderKey, inputs).Applied ||
+                !session.CompilePlan(inputs).CastingById(casting.CastingId).IsExecutable)
+                throw new InvalidOperationException("The focused casting did not switch books exactly once.");
+        }
+
+        // Final review B2: the focused casting moves between routines and
+        // within its own, and the recast choice (the focused casting's and
+        // the next casting's) is kept. The view wires every control to these
+        // session commands.
+        private static void TestFocusedRoutineOrderAndRecast(string root)
+        {
+            string dir = Path.Combine(root, "focused-routine-order-recast");
+            Directory.CreateDirectory(dir);
+            PartyProviderSnapshot snapshot;
+            CastingWorkspaceInputs inputs = WorkspaceInputs(out snapshot);
+            var session = new CastingWorkspaceSession(dir, "workspace-campaign",
+                new DisabledCastingDispatchBoundary());
+            Assert(AddDraftCasting(session, inputs, "unit-cleric", "unit-t1").Applied);
+            Assert(AddDraftCasting(session, inputs, "unit-wizard", "unit-t2").Applied);
+            string first = session.Document.Castings[0].CastingId;
+            string second = session.Document.Castings[1].CastingId;
+            session.FocusCasting(second);
+            Assert(session.MoveFocusedCastingWithinRoutine(-1).Applied);
+            string[] longOrder = session.Document.Castings.Where(value => value.RoutineId == "long")
+                .Select(value => value.CastingId).ToArray();
+            if (longOrder.Length != 2 || longOrder[0] != second || longOrder[1] != first ||
+                session.MoveFocusedCastingWithinRoutine(-1).Reason != "already-first")
+                throw new InvalidOperationException("The focused casting did not move earlier exactly once.");
+            Assert(session.MoveFocusedCastingToRoutine("short").Applied);
+            PlannedCasting moved = session.Document.Castings.Single(value => value.CastingId == second);
+            if (moved.RoutineId != "short" || session.MoveFocusedCastingToRoutine("short").Applied)
+                throw new InvalidOperationException("The focused casting did not move to another routine.");
+            Assert(session.SetFocusedRecastPolicy(ExistingEffectPolicy.Overwrite).Applied);
+            if (session.Document.Castings.Single(value => value.CastingId == second).ExistingEffectPolicy !=
+                    ExistingEffectPolicy.Overwrite ||
+                session.Document.Castings.Single(value => value.CastingId == first).ExistingEffectPolicy !=
+                    ExistingEffectPolicy.SkipAlreadyActive ||
+                session.SetFocusedRecastPolicy(ExistingEffectPolicy.Overwrite).Applied)
+                throw new InvalidOperationException("The recast choice did not stay with its own casting.");
+            session.FocusCasting(null);
+            session.Draft.ExistingEffectPolicy = ExistingEffectPolicy.Overwrite;
+            Assert(AddDraftCasting(session, inputs, "unit-cleric", "unit-t3").Applied);
+            if (session.Document.Castings.Last().ExistingEffectPolicy != ExistingEffectPolicy.Overwrite)
+                throw new InvalidOperationException("The next casting's recast choice was not kept.");
+            DirectoryInfo directory = new DirectoryInfo(Environment.CurrentDirectory);
+            while (directory != null && !File.Exists(Path.Combine(directory.FullName, "KingmakerBuffPlanner.sln")))
+                directory = directory.Parent;
+            string view = File.ReadAllText(Path.Combine(directory.FullName, "src", "KingmakerBuffPlanner", "UI",
+                "CastingWorkspaceScreenView.cs")).Replace("\r\n", "\n");
+            foreach (string wiring in new[]
+            {
+                "_session.SetFocusedProvider(captured.ProviderKey, _inputs())",
+                "_session.ChooseDraftProvider(captured.ProviderKey, _inputs())",
+                "_session.MoveFocusedCastingToRoutine(capturedRoutine)",
+                "_session.MoveFocusedCastingWithinRoutine(-1)",
+                "_session.MoveFocusedCastingWithinRoutine(1)",
+                "_session.SetFocusedRecastPolicy(recastFocused",
+                "_session.Draft.ExistingEffectPolicy = recastDraft",
+                "_session.SetAllowAnimatedFallback(!_session.AllowAnimatedFallback);"
+            })
+                if (!view.Contains(wiring))
+                    throw new InvalidOperationException("The focused editor has no control for: " + wiring);
+        }
+
+        // Final review B7: a removed casting's id is never issued again in the
+        // session, so a new card never shows the removed casting's last run.
+        private static void TestSessionCastingIdsNotReused(string root)
+        {
+            string dir = Path.Combine(root, "casting-ids-not-reused");
+            Directory.CreateDirectory(dir);
+            PartyProviderSnapshot snapshot;
+            CastingWorkspaceInputs inputs = WorkspaceInputs(out snapshot);
+            var session = new CastingWorkspaceSession(dir, "workspace-campaign",
+                new DisabledCastingDispatchBoundary());
+            Assert(AddDraftCasting(session, inputs, "unit-cleric", "unit-t1").Applied);
+            Assert(AddDraftCasting(session, inputs, "unit-wizard", "unit-t2").Applied);
+            string removed = session.Document.Castings[1].CastingId;
+            session.FocusCasting(removed);
+            Assert(session.RemoveFocusedCasting().Applied);
+            Assert(AddDraftCasting(session, inputs, "unit-cleric", "unit-t3").Applied);
+            string[] ids = session.Document.Castings.Select(value => value.CastingId).ToArray();
+            if (ids.Length != 2 || ids.Contains(removed) || ids.Distinct(StringComparer.Ordinal).Count() != 2)
+                throw new InvalidOperationException("A removed casting's id was issued again: " +
+                    string.Join(",", ids));
+        }
+
+        // Final review B5-B7: casting-first refreshes never save the Classic
+        // file (checked when the save happens, so Classic saves again once it
+        // is the mode); the spellbook handoff waits for the workspace in
+        // casting-first mode; the HUD tooltip never describes another
+        // campaign's session or press result.
+        private static void TestClassicSaveAndHudScoping()
+        {
+            DirectoryInfo directory = new DirectoryInfo(Environment.CurrentDirectory);
+            while (directory != null && !File.Exists(Path.Combine(directory.FullName, "KingmakerBuffPlanner.sln")))
+                directory = directory.Parent;
+            Func<string, string> source = name => File.ReadAllText(Path.Combine(directory.FullName, "src",
+                "KingmakerBuffPlanner", "UI", name)).Replace("\r\n", "\n");
+            string session = source("PlannerUiSession.cs");
+            string root = source("BuffPlannerUiRoot.cs");
+            if (!session.Contains("_providerOptions, SaveClassicProfile, _enhancements,") ||
+                session.Contains("_profiles.Save,") ||
+                !session.Contains("if (suppressed != null && suppressed())") ||
+                !root.Contains("_session.ClassicSavesSuppressed = () => CastingFirstActive;"))
+                throw new InvalidOperationException("Casting-first refreshes can still save the Classic file.");
+            if (!root.Contains("() => (_screen != null && _screen.IsOpen) || _castingWorkspace != null,") ||
+                !root.Contains("PlannerScreenLifecycleState.Open) || _castingWorkspace != null,"))
+                throw new InvalidOperationException("The spellbook handoff ignores the casting-first workspace.");
+            if (!root.Contains("if (session != null && !string.Equals(session.CampaignId, loadedCampaignId,") ||
+                System.Text.RegularExpressions.Regex.Matches(root, "_lastCastingPress\\[PressKey\\(session, routineId\\)\\]").Count != 2 ||
+                !root.Contains("_lastCastingPress.TryGetValue(PressKey(session, routineId), out last);") ||
+                System.Text.RegularExpressions.Regex.IsMatch(root, "_lastCastingPress\\[routineId\\]"))
+                throw new InvalidOperationException("The HUD tooltip can describe another campaign.");
         }
 
         // Nothing to submit is an honest no-op before review: every casting
@@ -4155,6 +4438,200 @@ namespace KingmakerBuffPlanner.Tests
             if (AtWillCantripChoice.Choose(new[] { bard, sorcerer }, 2, out refusal) != null ||
                 refusal != AtWillCantripChoice.AmbiguousPrefix + "bard@cl3,sorcerer@cl1")
                 throw new InvalidOperationException("An ambiguous choice was guessed: " + refusal);
+        }
+
+        // Final review A3: presence alone never confirms. Only an instance
+        // that is new or refreshed against the read taken before submission,
+        // and not suppressed, confirms a recipient; every recipient must be
+        // reached, and an empty set or a missing read confirms nothing. Both
+        // live adapters read before submitting and judge by this rule.
+        private static void TestAppliedEffectJudgement()
+        {
+            EffectExpression expected = new EffectLeafExpression(EffectKind.Buff, "buff-a",
+                EffectTarget.CurrentTarget, "fixture", "fixture/a");
+            Func<string, long, bool, ObservedEffectInstance> instance = (key, end, suppressed) =>
+                new ObservedEffectInstance(EffectKind.Buff, "buff-a", key, end, suppressed);
+            var none = new ObservedEffectInstance[0];
+            var old = new[] { instance("1", 100, false) };
+            var cases = new[]
+            {
+                new { Name = "new-instance", Before = none, After = new[] { instance("2", 200, false) }, Reached = true },
+                new { Name = "unchanged-old-instance", Before = old, After = old, Reached = false },
+                new { Name = "refreshed", Before = old, After = new[] { instance("1", 160, false) }, Reached = true },
+                new { Name = "shortened", Before = old, After = new[] { instance("1", 90, false) }, Reached = false },
+                new { Name = "replaced", Before = old, After = new[] { instance("3", 100, false) }, Reached = true },
+                new { Name = "new-but-suppressed", Before = none, After = new[] { instance("2", 200, true) }, Reached = false },
+                new { Name = "old-now-unsuppressed", Before = new[] { instance("1", 100, true) }, After = old, Reached = false },
+                new { Name = "gone", Before = old, After = none, Reached = false },
+                new { Name = "other-effect", Before = none,
+                    After = new[] { new ObservedEffectInstance(EffectKind.Buff, "buff-b", "9", 500, false) }, Reached = false },
+                new { Name = "other-kind", Before = none,
+                    After = new[] { new ObservedEffectInstance(EffectKind.AreaBuff, "buff-a", "4", 500, false) }, Reached = false },
+                new { Name = "old-kept-plus-new", Before = old, After = new[] { old[0], instance("5", 300, false) }, Reached = true },
+                new { Name = "new-suppressed-beside-old", Before = old, After = new[] { old[0], instance("6", 300, true) }, Reached = false }
+            };
+            foreach (var value in cases)
+                if (AppliedEffectJudgement.Reached(expected, value.Before, value.After) != value.Reached)
+                    throw new InvalidOperationException("Effect confirmation misjudged: " + value.Name + ".");
+            if (AppliedEffectJudgement.Reached(expected, null, old) ||
+                AppliedEffectJudgement.Reached(expected, none, null))
+                throw new InvalidOperationException("A missing read confirmed an effect.");
+            // Both leaves of a sequence must be present (not suppressed); one
+            // of them new is enough to show this attempt landed.
+            EffectExpression pair = new SequenceEffectExpression(new EffectExpression[]
+            {
+                expected,
+                new EffectLeafExpression(EffectKind.Buff, "buff-b", EffectTarget.CurrentTarget, "fixture", "fixture/b")
+            });
+            var oldB = new ObservedEffectInstance(EffectKind.Buff, "buff-b", "7", 100, false);
+            if (!AppliedEffectJudgement.Reached(pair, new[] { oldB }, new[] { oldB, instance("8", 200, false) }) ||
+                AppliedEffectJudgement.Reached(pair, none, new[] { instance("8", 200, false) }) ||
+                AppliedEffectJudgement.Reached(pair, new[] { old[0], oldB }, new[] { old[0], oldB }))
+                throw new InvalidOperationException("A sequence of expected effects was misjudged.");
+            // Every recipient; none is never enough.
+            var baseline = new EffectBaseline(new Dictionary<string, IEnumerable<ObservedEffectInstance>>(StringComparer.Ordinal)
+            {
+                { "unit-a", none },
+                { "unit-b", old }
+            });
+            Func<string, IEnumerable<ObservedEffectInstance>> fresh = unitId => new[] { instance("n-" + unitId, 400, false) };
+            if (!AppliedEffectJudgement.AllReached(new[] { "unit-a", "unit-b" }, expected, baseline, fresh) ||
+                AppliedEffectJudgement.AllReached(new string[0], expected, baseline, fresh) ||
+                AppliedEffectJudgement.AllReached(new[] { "unit-a", "unit-c" }, expected, baseline, fresh) ||
+                AppliedEffectJudgement.AllReached(new[] { "unit-a", "unit-b" }, expected, baseline,
+                    unitId => unitId == "unit-b" ? old : fresh(unitId)) ||
+                AppliedEffectJudgement.AllReached(new[] { "unit-a" }, expected, baseline, unitId => null) ||
+                AppliedEffectJudgement.AllReached(new[] { "unit-a" }, expected, null, fresh))
+                throw new InvalidOperationException("Recipients were confirmed without each being reached.");
+            // The live adapters read before submitting and judge by the rule.
+            DirectoryInfo directory = new DirectoryInfo(Environment.CurrentDirectory);
+            while (directory != null && !File.Exists(Path.Combine(directory.FullName, "KingmakerBuffPlanner.sln")))
+                directory = directory.Parent;
+            Func<string, string> source = name => File.ReadAllText(Path.Combine(directory.FullName, "src",
+                "KingmakerBuffPlanner", "GameAdapters", name)).Replace("\r\n", "\n");
+            string instant = source("KingmakerInstantCastAdapter.cs");
+            string animated = source("KingmakerAnimatedCastAdapter.cs");
+            string reader = source("KingmakerEffectInstanceReader.cs");
+            const string read = "EffectBaseline baseline = KingmakerEffectInstanceReader.ReadBaseline(step, out baselineFailure);";
+            int instantRead = instant.IndexOf(read, StringComparison.Ordinal);
+            int animatedRead = animated.IndexOf(read, StringComparison.Ordinal);
+            if (instantRead < 0 || instantRead > instant.IndexOf("rule = Rulebook.Trigger(new RuleCastSpell(", StringComparison.Ordinal) ||
+                instantRead > instant.IndexOf("BrownFurDirectCastCompatibility.TryBegin(", StringComparison.Ordinal) ||
+                !instant.Contains("return KingmakerEffectInstanceReader.AppliedByThisAttempt(step, baseline);") ||
+                animatedRead < 0 || animatedRead > animated.IndexOf("resolved.Caster.Commands.AddToQueue(command);", StringComparison.Ordinal) ||
+                !animated.Contains("bool observed = KingmakerEffectInstanceReader.AppliedByThisAttempt(_step, _baseline);") ||
+                animated.Contains("new KingmakerActiveEffectSnapshotBuilder().Build();") ||
+                instant.Contains("new KingmakerActiveEffectSnapshotBuilder().Build();") ||
+                !reader.Contains("return AppliedEffectJudgement.AllReached(step.ExpectedRecipientUnitIds,") ||
+                !reader.Contains("catch (Exception) { return true; }"))
+                throw new InvalidOperationException("A live adapter confirms by presence or without its read before submission.");
+        }
+
+        // Final review A1: a Classic routine held by a paused world (or an
+        // open full-screen window) is not advanced at all, so a step's
+        // frame-counted confirmation window cannot expire while its cast
+        // cannot land; the halting runner then halts nothing. Disposing the
+        // gate runs the routine's cleanup.
+        private static void TestWorldGatedClassicRun()
+        {
+            CastingWorkspaceInputs inputs = QualificationInputs(true, true, null);
+            CastingQualificationSelection selection = CastingQualificationRecipe.SelectZeroCostMixed(
+                inputs, "fixture-campaign");
+            CastPlan plan = CastingQualificationForecast.Forecast(selection, inputs, "fixture-campaign")[0]
+                .Projection.Plan;
+            bool worldRuns = false;
+            var windows = new List<WindowIterator>();
+            Func<ScriptedExecutor> executorFor = () => new ScriptedExecutor((single, stepReport) =>
+            {
+                var window = new WindowIterator(() => worldRuns, confirmed => stepReport.Add(0, single.Steps[0],
+                    confirmed ? CastExecutionStatus.EffectConfirmed : CastExecutionStatus.TimedOutUnconfirmed,
+                    "fixture-window"));
+                windows.Add(window);
+                return window;
+            });
+            // Without the gate a held world uses up the first window and the
+            // halting runner abandons the rest (the regression).
+            ScriptedExecutor ungatedExecutor = executorFor();
+            var ungatedReport = new ExecutionReport(plan);
+            System.Collections.IEnumerator ungated = new HaltingPlanRunner(ungatedExecutor).Run(plan, ungatedReport);
+            for (int frame = 0; frame < 50 && ungated.MoveNext(); frame++) { }
+            worldRuns = true;
+            int guard = 0;
+            while (ungated.MoveNext() && guard++ < 1000) { }
+            if (ungatedReport.Confirmed != 0 || ungatedExecutor.Executed.Count != 1)
+                throw new InvalidOperationException("The fixture does not reproduce the held-world regression.");
+            // With the gate nothing advances while the world is held.
+            worldRuns = false;
+            windows.Clear();
+            ScriptedExecutor executor = executorFor();
+            var report = new ExecutionReport(plan);
+            var gate = new WorldGatedEnumerator(new HaltingPlanRunner(executor).Run(plan, report), () => worldRuns);
+            for (int frame = 0; frame < 50; frame++) gate.MoveNext();
+            worldRuns = true;
+            guard = 0;
+            while (gate.MoveNext() && guard++ < 1000) { }
+            gate.Dispose();
+            if (gate.HeldFrames != 50 || windows.Any(window => window.HeldAdvances != 0) || report.Confirmed != 3 ||
+                report.Failed != 0 || executor.Executed.Count != 3)
+                throw new InvalidOperationException("A held world used up a Classic step's window: held=" +
+                    gate.HeldFrames + ";confirmed=" + report.Confirmed + ";executed=" + executor.Executed.Count);
+            // Disposed while held, the routine's cleanup still runs.
+            bool disposed = false;
+            var cleanup = new WorldGatedEnumerator(new DisposalProbe(() => disposed = true), () => false);
+            cleanup.MoveNext();
+            cleanup.Dispose();
+            if (!disposed || cleanup.MoveNext())
+                throw new InvalidOperationException("Disposing a held Classic run skipped its cleanup.");
+            DirectoryInfo directory = new DirectoryInfo(Environment.CurrentDirectory);
+            while (directory != null && !File.Exists(Path.Combine(directory.FullName, "KingmakerBuffPlanner.sln")))
+                directory = directory.Parent;
+            string rootSource = File.ReadAllText(Path.Combine(directory.FullName, "src", "KingmakerBuffPlanner", "UI",
+                "BuffPlannerUiRoot.cs")).Replace("\r\n", "\n");
+            if (!rootSource.Contains("routine = new WorldGatedEnumerator(_session.ExecuteRoutine(routineId,\n                    observedCompletion, readyOnlyExplicit), () => WorldRunsForCasting);"))
+                throw new InvalidOperationException("The Classic run is not gated on the world running.");
+        }
+
+        // A cast's confirmation window of three frames: it confirms only if
+        // every frame passed while the world ran (a cast cannot land while
+        // the world is held).
+        private sealed class WindowIterator : System.Collections.IEnumerator, IDisposable
+        {
+            private readonly Func<bool> _worldRuns;
+            private readonly Action<bool> _finish;
+            private int _frames;
+            private bool _done;
+            internal WindowIterator(Func<bool> worldRuns, Action<bool> finish)
+            {
+                _worldRuns = worldRuns;
+                _finish = finish;
+            }
+            internal int HeldAdvances { get; private set; }
+            public object Current { get { return null; } }
+            public bool MoveNext()
+            {
+                if (_done) return false;
+                if (!_worldRuns()) HeldAdvances++;
+                if (_frames < 3)
+                {
+                    _frames++;
+                    return true;
+                }
+                _done = true;
+                _finish(HeldAdvances == 0);
+                return false;
+            }
+            public void Reset() { }
+            public void Dispose() { }
+        }
+
+        private sealed class DisposalProbe : System.Collections.IEnumerator, IDisposable
+        {
+            private readonly Action _disposed;
+            internal DisposalProbe(Action disposed) { _disposed = disposed; }
+            public object Current { get { return null; } }
+            public bool MoveNext() { return true; }
+            public void Reset() { }
+            public void Dispose() { _disposed(); }
         }
 
         // Review A2/A4: the reservation, never the entry alone, routes a
