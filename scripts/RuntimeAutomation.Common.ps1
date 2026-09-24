@@ -220,6 +220,124 @@ function Compare-KbpSaveFolderSnapshot {
     return ,$violations.ToArray()
 }
 
+# Final review C1/C2: a run's protected-save baseline is kept beside its
+# transaction, not only in the launcher's memory, so a comparison the
+# launcher could not make (the game outlived it, or it was stopped) is
+# finished by Restore-Local.ps1 -RunId; until then the transaction counts as
+# unresolved. A blocking violation is recorded where every later run sees it
+# and blocks them until the owner has reviewed and acknowledged it.
+function Save-KbpProtectedSaveBaseline {
+    param(
+        [Parameter(Mandatory = $true)][string]$TransactionDirectory,
+        [Parameter(Mandatory = $true)][string]$RunId,
+        [Parameter(Mandatory = $true)][string]$Scenario,
+        [Parameter(Mandatory = $true)][string]$FixtureFamily,
+        [Parameter(Mandatory = $true)][string]$WorkingFileName,
+        [Parameter(Mandatory = $true)][string]$SaveRoot,
+        [Parameter(Mandatory = $true)]$Snapshot)
+    $files = @(foreach ($name in @($Snapshot.Keys)) {
+        [ordered]@{ name = [string]$name; length = [long]$Snapshot[$name].length; sha256 = [string]$Snapshot[$name].sha256 }
+    })
+    $path = Join-Path $TransactionDirectory 'protected-saves-before.json'
+    Write-KbpJsonAtomic $path ([ordered]@{
+        schemaVersion = 1; runId = $RunId; scenario = $Scenario; fixtureFamily = $FixtureFamily
+        workingFileName = $WorkingFileName; saveRoot = $SaveRoot; compared = $false; blocking = @()
+        files = $files
+    })
+    return $path
+}
+
+# Compares the saves now with the run's baseline under the run's policy,
+# writes the run's protected-saves.json and, for a blocking violation, the
+# run's violation record under the state root.
+function Invoke-KbpProtectedSaveComparison {
+    param(
+        [Parameter(Mandatory = $true)]$Before,
+        [Parameter(Mandatory = $true)][string]$RunId,
+        [Parameter(Mandatory = $true)][string]$Scenario,
+        [Parameter(Mandatory = $true)][string]$FixtureFamily,
+        [Parameter(Mandatory = $true)][string]$WorkingFileName,
+        [Parameter(Mandatory = $true)][string]$SaveRoot,
+        [Parameter(Mandatory = $true)][string]$EvidenceDirectory,
+        [string]$StateRoot = $script:KbpRuntimeStateRoot)
+    $savePolicy = Get-KbpProtectedSavePolicy -Scenario $Scenario -FixtureFamily $FixtureFamily `
+        -WorkingFileName $WorkingFileName
+    $allowedChanged = @($savePolicy.allowedChanged)
+    $violations = Compare-KbpSaveFolderSnapshot -Before $Before `
+        -After (Get-KbpSaveFolderSnapshot -SaveRoot $SaveRoot) -AllowedChangedFileNames $allowedChanged
+    # A casting qualification writes no save at all (review P3-9): even the
+    # WORKING save and new autosaves count against it.
+    $blocking = @($violations | Where-Object { $_ -notlike 'new:*' -or $savePolicy.newFilesBlocking })
+    if (Test-Path -LiteralPath $EvidenceDirectory -PathType Container) {
+        Write-KbpJsonAtomic (Join-Path $EvidenceDirectory 'protected-saves.json') ([ordered]@{
+            schemaVersion = 1; runId = $RunId; fixtureFamily = $FixtureFamily
+            allowedChanged = @($allowedChanged)
+            violations = @($violations); blocking = @($blocking)
+        })
+    }
+    if ($blocking.Count -ne 0) {
+        $folder = Join-Path $StateRoot 'protected-save-violations'
+        New-Item -ItemType Directory -Path $folder -Force | Out-Null
+        $record = Join-Path $folder ($RunId + '.json')
+        if (-not (Test-Path -LiteralPath $record)) {
+            Write-KbpJsonAtomic $record ([ordered]@{
+                schemaVersion = 1; runId = $RunId; scenario = $Scenario; fixtureFamily = $FixtureFamily
+                blocking = @($blocking); evidenceDirectory = $EvidenceDirectory
+                recordedAtUtc = [DateTime]::UtcNow.ToString('o')
+            })
+        }
+    }
+    return [pscustomobject]@{ violations = @($violations); blocking = @($blocking) }
+}
+
+# Finishes a run's pending comparison from its kept baseline (once: an
+# already compared baseline returns its recorded result). Kingmaker must
+# not run.
+function Complete-KbpProtectedSaveComparison {
+    param(
+        [Parameter(Mandatory = $true)][string]$BaselinePath,
+        [Parameter(Mandatory = $true)][string]$EvidenceDirectory,
+        [string]$StateRoot = $script:KbpRuntimeStateRoot,
+        [int[]]$KnownProcessIds)
+    $baseline = Read-KbpJson $BaselinePath
+    if ([bool]$baseline.compared) {
+        return [pscustomobject]@{ violations = @(); blocking = @($baseline.blocking) }
+    }
+    if ($PSBoundParameters.ContainsKey('KnownProcessIds')) {
+        Assert-KbpNotRunning -KnownProcessIds $KnownProcessIds
+    } else { Assert-KbpNotRunning }
+    $before = [ordered]@{}
+    foreach ($file in @($baseline.files)) {
+        $before[[string]$file.name] = [pscustomobject]@{ length = [long]$file.length; sha256 = [string]$file.sha256 }
+    }
+    $comparison = Invoke-KbpProtectedSaveComparison -Before $before -RunId ([string]$baseline.runId) `
+        -Scenario ([string]$baseline.scenario) -FixtureFamily ([string]$baseline.fixtureFamily) `
+        -WorkingFileName ([string]$baseline.workingFileName) -SaveRoot ([string]$baseline.saveRoot) `
+        -EvidenceDirectory $EvidenceDirectory -StateRoot $StateRoot
+    $baseline.compared = $true
+    $baseline.blocking = @($comparison.blocking)
+    $baseline | Add-Member -NotePropertyName comparedAtUtc -NotePropertyValue ([DateTime]::UtcNow.ToString('o')) -Force
+    Write-KbpJsonAtomic $BaselinePath $baseline
+    return $comparison
+}
+
+# Every later run is refused while a recorded violation has no owner
+# acknowledgement (scripts\Confirm-KbpProtectedSaveReview.ps1).
+function Assert-KbpNoUnacknowledgedSaveViolation {
+    param([string]$StateRoot = $script:KbpRuntimeStateRoot)
+    $folder = Join-Path $StateRoot 'protected-save-violations'
+    if (-not (Test-Path -LiteralPath $folder -PathType Container)) { return }
+    foreach ($record in @(Get-ChildItem -LiteralPath $folder -Filter '*.json' -File |
+            Where-Object { $_.Name -notlike '*.acknowledged.json' } | Sort-Object Name)) {
+        $acknowledgement = Join-Path $folder ($record.BaseName + '.acknowledged.json')
+        if (-not (Test-Path -LiteralPath $acknowledgement -PathType Leaf)) {
+            $violation = Read-KbpJson $record.FullName
+            throw ("Run $($violation.runId) changed protected saves ($(@($violation.blocking) -join ', ')). " +
+                "No run starts until the owner has reviewed it and run scripts\Confirm-KbpProtectedSaveReview.ps1 -RunId $($violation.runId).")
+        }
+    }
+}
+
 function Wait-KbpNewKingmakerProcess {
     param([int[]]$PreexistingIds, [int]$TimeoutSeconds)
     $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
@@ -610,7 +728,7 @@ function Get-KbpProbeAllowanceBuildRefusal {
         [int]$allowance.maximumNativeSubmissions -ne 1) { return 'submissions' }
     $bindingFormat = Get-KbpAllowanceBindingFormatRefusal -Allowance $allowance
     if ($null -ne $bindingFormat) { return $bindingFormat }
-    return $null
+    return Get-KbpAllowanceShapeRefusal -Allowance $allowance -Kind probe
 }
 
 # Casting-qualification allowance (schema 5) against THIS build, before any
@@ -654,6 +772,54 @@ function Get-KbpQualificationAllowanceBuildRefusal {
     }
     $bindingFormat = Get-KbpAllowanceBindingFormatRefusal -Allowance $allowance
     if ($null -ne $bindingFormat) { return $bindingFormat }
+    return Get-KbpAllowanceShapeRefusal -Allowance $allowance -Kind qualification
+}
+
+# Final review C7: the host parsers' shape rules, checked before anything is
+# deployed so a malformed allowance is refused before launch: exactly the
+# kind's members, a named approver (and authority), a fixture campaign, the
+# approved projection ids (1..8 lowercase SHA-256) or the probe's one
+# projection and its distinct caster, target and source.
+function Get-KbpAllowanceShapeRefusal {
+    param([Parameter(Mandatory = $true)]$Allowance,
+        [Parameter(Mandatory = $true)][ValidateSet('qualification', 'classic', 'probe')][string]$Kind)
+    $members = @{
+        qualification = @('schemaVersion', 'kind', 'runId', 'sourceCommit', 'packageSha256', 'dllSha256',
+            'assemblyMvid', 'fixtureGameId', 'recipe', 'executionMode', 'approvedProjectionIds',
+            'maximumNativeSubmissions', 'approvedBy', 'authority', 'compatibilityProfileId',
+            'compatibilityIdentity', 'workingSaveSha256', 'purpose')
+        classic = @('schemaVersion', 'kind', 'runId', 'sourceCommit', 'packageSha256', 'dllSha256',
+            'assemblyMvid', 'fixtureGameId', 'executionMode', 'routineId', 'approvedPlanDigest',
+            'maximumNativeSubmissions', 'approvedBy', 'authority', 'compatibilityProfileId',
+            'compatibilityIdentity', 'workingSaveSha256', 'purpose')
+        probe = @('schemaVersion', 'kind', 'runId', 'sourceCommit', 'packageSha256', 'dllSha256',
+            'assemblyMvid', 'approvedProjectionId', 'casterUnitId', 'targetUnitId', 'sourceId',
+            'maximumNativeSubmissions', 'approvedBy', 'compatibilityProfileId', 'compatibilityIdentity',
+            'workingSaveSha256', 'purpose')
+    }[$Kind]
+    $names = @($Allowance.PSObject.Properties | ForEach-Object Name)
+    foreach ($name in $names) { if ($members -cnotcontains $name) { return "unknown:$name" } }
+    foreach ($name in $members) { if ($names -cnotcontains $name) { return "missing:$name" } }
+    if (-not ($Allowance.approvedBy -is [string]) -or [string]::IsNullOrEmpty($Allowance.approvedBy)) { return 'approved-by' }
+    if ($Kind -cne 'probe') {
+        if (-not ($Allowance.authority -is [string]) -or [string]::IsNullOrEmpty($Allowance.authority)) { return 'authority' }
+        if (-not ($Allowance.fixtureGameId -is [string]) -or [string]::IsNullOrEmpty($Allowance.fixtureGameId)) { return 'fixture-game-id' }
+    }
+    if ($Kind -ceq 'qualification') {
+        $ids = @($Allowance.approvedProjectionIds)
+        if (-not ($Allowance.approvedProjectionIds -is [array]) -or $ids.Count -lt 1 -or $ids.Count -gt 8 -or
+            @($ids | Where-Object { -not ($_ -is [string]) -or $_ -cnotmatch '^[0-9a-f]{64}$' }).Count -ne 0) {
+            return 'projection-ids'
+        }
+    }
+    if ($Kind -ceq 'probe') {
+        if (-not ($Allowance.approvedProjectionId -is [string]) -or
+            $Allowance.approvedProjectionId -cnotmatch '^[0-9a-f]{64}$') { return 'projection-id' }
+        foreach ($name in @('casterUnitId', 'targetUnitId', 'sourceId')) {
+            if (-not ($Allowance.$name -is [string]) -or [string]::IsNullOrEmpty($Allowance.$name)) { return 'selection' }
+        }
+        if ([string]$Allowance.casterUnitId -ceq [string]$Allowance.targetUnitId) { return 'selection' }
+    }
     return $null
 }
 
@@ -705,6 +871,38 @@ function Assert-KbpScenarioOutcome {
             [int]$outcome.maximumSubmissions -ne [int]$allowance.maximumNativeSubmissions -or
             [int]$outcome.plannedSubmissions -gt [int]$allowance.maximumNativeSubmissions) {
             throw "Qualification evidence does not show exactly the approved projections within the budget: $path"
+        }
+        return
+    }
+    # Final review C6: a probe PASS is read by the launcher too. A selection
+    # submits nothing; a cast used a valid allowance, submitted at most once,
+    # exactly the approved projection, from the measured build it was
+    # launched with, and cleaned up.
+    if ($scenario -ceq 'live-cast-probe-select' -or $scenario -ceq 'live-cast-probe') {
+        $path = Join-Path $directory 'probe-outcome.json'
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw 'Probe outcome evidence is missing.' }
+        $outcome = Read-KbpJson $path
+        $cast = $scenario -ceq 'live-cast-probe'
+        $entries = @($outcome.invocation.entries)
+        if ([string]$outcome.runId -cne [string]$Request.runId -or [bool]$outcome.castingScenario -ne $cast -or
+            [string]$outcome.terminalReason -cne 'completed' -or @($outcome.violations).Count -ne 0 -or
+            -not [bool]$outcome.cleanup.recorded -or @($outcome.cleanup.failures).Count -ne 0) {
+            throw "Probe outcome evidence is inconsistent with a PASS: $path"
+        }
+        if (-not $cast) {
+            if ([bool]$outcome.submitted -or $entries.Count -ne 0) { throw "A probe selection submitted a cast: $path" }
+            return
+        }
+        $allowance = [string]$Request.parameters.probeAllowance | ConvertFrom-Json
+        $approved = [string]$allowance.approvedProjectionId
+        $identity = 'commit=' + [string]$Request.expectedCommit + ';package=' + [string]$Request.expectedPackageSha256 +
+            ';dll=' + [string]$Request.expectedDllSha256 + ';mvid=' + [string]$allowance.assemblyMvid
+        $submissions = @($entries | Where-Object { [bool]$_.nativeSubmissionReported }).Count
+        if ([string]$outcome.allowanceStatus -cne 'valid' -or -not [bool]$outcome.submitted -or
+            $submissions -gt 1 -or [string]$outcome.invocation.outcomeProjectionId -cne $approved -or
+            [string]$outcome.submitReason -cne ('probe-submitted:' + $approved) -or
+            [string]$outcome.measuredIdentity -cne $identity) {
+            throw "Probe evidence does not show one submission of the approved projection by the measured build: $path"
         }
         return
     }
@@ -815,7 +1013,10 @@ function Assert-KbpScenarioOutcome {
 # approved for. Checked against the profile and save pair this launcher
 # resolved, before anything is deployed. $null when they match.
 function Get-KbpAllowanceFixtureBindingRefusal {
-    param([string]$AllowanceJson, [string]$ProfileId, [string]$CompatibilityIdentity, [string]$WorkingSaveSha256)
+    param([string]$AllowanceJson, [string]$ProfileId, [string]$CompatibilityIdentity, [string]$WorkingSaveSha256,
+        # Final review C7: an allowance that names its fixture campaign names
+        # the WORKING save's campaign.
+        [string]$FixtureGameId)
     try { $allowance = $AllowanceJson | ConvertFrom-Json }
     catch { return 'unreadable' }
     if ($null -eq $allowance) { return 'unreadable' }
@@ -824,6 +1025,10 @@ function Get-KbpAllowanceFixtureBindingRefusal {
         [string]$allowance.compatibilityIdentity -cne $CompatibilityIdentity) { return 'compatibility-identity' }
     if ([string]::IsNullOrEmpty($WorkingSaveSha256) -or
         [string]$allowance.workingSaveSha256 -cne $WorkingSaveSha256) { return 'working-save' }
+    if (@($allowance.PSObject.Properties | ForEach-Object Name) -ccontains 'fixtureGameId' -and
+        ([string]::IsNullOrEmpty($FixtureGameId) -or [string]$allowance.fixtureGameId -cne $FixtureGameId)) {
+        return 'fixture-game-id'
+    }
     return $null
 }
 
@@ -893,7 +1098,7 @@ function Get-KbpClassicAllowanceBuildRefusal {
     }
     $bindingFormat = Get-KbpAllowanceBindingFormatRefusal -Allowance $allowance
     if ($null -ne $bindingFormat) { return $bindingFormat }
-    return $null
+    return Get-KbpAllowanceShapeRefusal -Allowance $allowance -Kind classic
 }
 
 # Advanced-copy binding: the pair found by name must be exactly the pair the
@@ -1054,7 +1259,9 @@ function New-KbpRunCompletionRecord {
         # Restore-Local); never verified while it is set.
         [string]$RestoreFailure,
         [bool]$ProtectedSavesCompared,
-        [string]$ProtectedSaveFailure)
+        [string]$ProtectedSaveFailure,
+        # Final review C5: a rehearsal of the manual session says so.
+        [bool]$ManualRehearsal)
     $restored = $false
     if (-not [string]::IsNullOrWhiteSpace($TransactionStatePath) -and
         (Test-Path -LiteralPath $TransactionStatePath -PathType Leaf)) {
@@ -1081,6 +1288,7 @@ function New-KbpRunCompletionRecord {
         restorationFailure = if ([string]::IsNullOrWhiteSpace($RestoreFailure)) { $null } else { $RestoreFailure }
         protectedSavesCompared = $ProtectedSavesCompared
         protectedSavesClean = $clean
+        manualRehearsal = $ManualRehearsal
         complete = ($game -ceq 'PASS') -and $HarnessSucceeded -and $KingmakerExited -and $restored -and $clean
         completedAtUtc = [DateTime]::UtcNow.ToString('o')
     }

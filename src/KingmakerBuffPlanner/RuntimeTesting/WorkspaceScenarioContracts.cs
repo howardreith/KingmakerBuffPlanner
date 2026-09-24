@@ -363,6 +363,28 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             return ManualTerminalRequest.None;
         }
 
+        // Final review C5: a completion by the launcher's rehearsal (its
+        // request says so, or its done marker says by=rehearsal) is labelled
+        // as a rehearsal, never as the owner's session.
+        internal static string OutcomeText(ManualTerminalRequest request, bool rehearsal)
+        {
+            if (rehearsal && request == ManualTerminalRequest.Completed)
+                return "manual-completed;by=rehearsal-marker;rehearsal-not-acceptance";
+            return OutcomeText(request);
+        }
+
+        internal static bool IsRehearsalMarker(string doneMarkerJson)
+        {
+            try
+            {
+                Newtonsoft.Json.Linq.JObject marker = Newtonsoft.Json.Linq.JObject.Parse(doneMarkerJson ?? string.Empty);
+                Newtonsoft.Json.Linq.JToken by = marker["by"];
+                return by != null && by.Type == Newtonsoft.Json.Linq.JTokenType.String &&
+                    (string)by == "rehearsal";
+            }
+            catch (Exception) { return false; }
+        }
+
         internal static string OutcomeText(ManualTerminalRequest request)
         {
             switch (request)
@@ -461,9 +483,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         internal bool WorkspaceClosed { get; private set; }
         internal string CloseEvidence { get; private set; }
 
+        internal bool Rehearsal { get; private set; }
+
         internal string OutcomeText
         {
-            get { return ManualTerminalPolicy.OutcomeText(Request); }
+            get { return ManualTerminalPolicy.OutcomeText(Request, Rehearsal); }
         }
 
         internal bool CaptureResolved
@@ -478,13 +502,14 @@ namespace KingmakerBuffPlanner.RuntimeTesting
 
         // Called once, when the hold observes a terminal request; the host
         // then requests the final capture.
-        internal void Begin(ManualTerminalRequest request, long nowMillis)
+        internal void Begin(ManualTerminalRequest request, long nowMillis, bool rehearsal = false)
         {
             if (request == ManualTerminalRequest.None)
                 throw new ArgumentException("A terminal request is required.");
             if (Request != ManualTerminalRequest.None)
                 throw new InvalidOperationException("Terminal step already begun.");
             Request = request;
+            Rehearsal = rehearsal;
             _captureStartedMillis = nowMillis;
             CaptureState = ManualFinalCaptureState.Pending;
             CaptureEvidence = "pending";

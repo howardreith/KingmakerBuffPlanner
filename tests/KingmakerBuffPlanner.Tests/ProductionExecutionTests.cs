@@ -77,6 +77,7 @@ namespace KingmakerBuffPlanner.Tests
             Run("cantrips-cast-at-will-through-the-class-ability", TestCantripsCastAtWill);
             Run("at-will-cantrip-choice-refuses-what-is-not-the-authored-cantrip", TestAtWillCantripChoice);
             Run("classic-run-advances-only-while-the-world-runs", TestWorldGatedClassicRun);
+            Run("live-run-stops-at-its-overall-deadline-or-abort-marker", TestLiveRunStopRule);
             Run("confirmation-needs-an-instance-this-attempt-applied", TestAppliedEffectJudgement);
             Run("cantrip-route-follows-the-reservation-and-ambiguity-stays-unresolved", TestCantripRouteAndPricing);
             Run("fact-source-choice-keeps-the-provider-kind-and-reserved-pool", TestFactSourceChoice);
@@ -4458,6 +4459,39 @@ namespace KingmakerBuffPlanner.Tests
             if (AtWillCantripChoice.Choose(new[] { bard, sorcerer }, 2, out refusal) != null ||
                 refusal != AtWillCantripChoice.AmbiguousPrefix + "bard@cl3,sorcerer@cl1")
                 throw new InvalidOperationException("An ambiguous choice was guessed: " + refusal);
+        }
+
+        // Final review C3: a live run stops itself before the launcher's own
+        // deadline (TimeoutSeconds from the game's start, less a 10-45 s
+        // margin) and at once when the launcher's abort marker appears; the
+        // host checks it at the top of every live update, load included, and
+        // the launcher writes the marker at its deadline and waits a bounded
+        // grace.
+        private static void TestLiveRunStopRule()
+        {
+            DateTime start = new DateTime(2026, 9, 24, 0, 0, 0, DateTimeKind.Utc);
+            if (RuntimeTestProtocol.OverallDeadlineMarginSeconds(900) != 45 ||
+                RuntimeTestProtocol.OverallDeadlineMarginSeconds(180) != 18 ||
+                RuntimeTestProtocol.OverallDeadlineMarginSeconds(5) != 10 ||
+                RuntimeTestProtocol.RunStopReason(start.AddSeconds(854), start, 900, false) != null ||
+                RuntimeTestProtocol.RunStopReason(start.AddSeconds(855), start, 900, false) != "overall-deadline" ||
+                RuntimeTestProtocol.RunStopReason(start.AddSeconds(1), start, 900, true) != "aborted-by-launcher" ||
+                RuntimeTestProtocol.RunStopReason(start.AddSeconds(161), start, 180, false) != null ||
+                RuntimeTestProtocol.RunStopReason(start.AddSeconds(162), start, 180, false) != "overall-deadline")
+                throw new InvalidOperationException("The live run's stop rule is wrong.");
+            DirectoryInfo directory = new DirectoryInfo(Environment.CurrentDirectory);
+            while (directory != null && !File.Exists(Path.Combine(directory.FullName, "KingmakerBuffPlanner.sln")))
+                directory = directory.Parent;
+            string host = File.ReadAllText(Path.Combine(directory.FullName, "src", "KingmakerBuffPlanner",
+                "RuntimeTesting", "RuntimeTestHost.cs")).Replace("\r\n", "\n");
+            string launcher = File.ReadAllText(Path.Combine(directory.FullName, "scripts",
+                "Invoke-KingmakerRuntimeTest.ps1")).Replace("\r\n", "\n");
+            if (!host.Contains("private bool UpdateLiveUiScenario()\n        {\n            string stop = LiveRunStopReason();\n" +
+                    "            if (stop != null)\n                throw new TimeoutException(") ||
+                !host.Contains("RuntimeTestProtocol.AbortMarkerFileName") ||
+                !launcher.Contains("(Join-Path $evidence 'abort.json')") ||
+                !launcher.Contains("$abortWrittenUtc.AddSeconds(120)"))
+                throw new InvalidOperationException("The host or the launcher does not enforce the run's stop rule.");
         }
 
         // Final review A3: presence alone never confirms. Only an instance

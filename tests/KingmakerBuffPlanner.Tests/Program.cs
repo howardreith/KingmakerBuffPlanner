@@ -9670,8 +9670,55 @@ namespace KingmakerBuffPlanner.Tests
                     {
                         saveSet(o);
                         o["scenario"] = "live-workspace-qual";
+                    }),
+                // Final review C5: the rehearsal label is a boolean true, and
+                // only on the manual scenario.
+                new KeyValuePair<string, Action<Dictionary<string, object>>>(
+                    "rehearsal-not-boolean", o =>
+                    {
+                        saveSet(o);
+                        ((Dictionary<string, object>)o["parameters"])
+                            ["manualRehearsal"] = "yes";
+                    }),
+                new KeyValuePair<string, Action<Dictionary<string, object>>>(
+                    "rehearsal-false", o =>
+                    {
+                        saveSet(o);
+                        ((Dictionary<string, object>)o["parameters"])
+                            ["manualRehearsal"] = false;
+                    }),
+                new KeyValuePair<string, Action<Dictionary<string, object>>>(
+                    "rehearsal-on-automation", o =>
+                    {
+                        saveSet(o);
+                        var parameters = (Dictionary<string, object>)o["parameters"];
+                        parameters.Remove("manualHoldSeconds");
+                        parameters["manualRehearsal"] = true;
+                        o["scenario"] = "live-workspace-qual";
                     })
             };
+            string rehearsalPath = WriteRequest(root, "manual-rehearsal", o =>
+            {
+                saveSet(o);
+                ((Dictionary<string, object>)o["parameters"])["manualRehearsal"] = true;
+            });
+            RuntimeTestRequest rehearsal = ReadProtocol(
+                new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, rehearsalPath },
+                out rejection);
+            if (rehearsal == null || rejection.Length != 0 ||
+                !RuntimeTestProtocol.IsManualRehearsal(rehearsal.Parameters) ||
+                RuntimeTestProtocol.IsManualRehearsal(request.Parameters))
+                throw new InvalidOperationException("A labelled manual rehearsal request was mishandled: " + rejection);
+            if (ManualTerminalPolicy.OutcomeText(ManualTerminalRequest.Completed, true) !=
+                    "manual-completed;by=rehearsal-marker;rehearsal-not-acceptance" ||
+                ManualTerminalPolicy.OutcomeText(ManualTerminalRequest.Completed, false) !=
+                    "manual-completed;by=done-marker" ||
+                ManualTerminalPolicy.OutcomeText(ManualTerminalRequest.Cancelled, true) !=
+                    "manual-cancelled;by=stop-marker" ||
+                !ManualTerminalPolicy.IsRehearsalMarker("{\"stage\":\"manual-done\",\"by\":\"rehearsal\"}") ||
+                ManualTerminalPolicy.IsRehearsalMarker("{\"stage\":\"manual-done\",\"by\":\"owner\"}") ||
+                ManualTerminalPolicy.IsRehearsalMarker("not json"))
+                throw new InvalidOperationException("A rehearsal completion is not labelled as one.");
             foreach (KeyValuePair<string, Action<Dictionary<string, object>>> item in cases)
             {
                 string path = WriteRequest(root, "manual-bad-" + item.Key, item.Value);

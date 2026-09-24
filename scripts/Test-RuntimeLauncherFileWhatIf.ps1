@@ -158,6 +158,8 @@ function New-AllowanceFixtureJson([hashtable]$Override) {
     $value = [ordered]@{ schemaVersion = 3; kind = 'kbp-single-cast-probe'; runId = 'probe-bind-test'
         sourceCommit = ('c' * 40); packageSha256 = ('a' * 64); dllSha256 = ('b' * 64)
         assemblyMvid = '11111111-2222-3333-4444-555555555555'; maximumNativeSubmissions = 1
+        approvedProjectionId = ('f' * 64); casterUnitId = 'caster'; targetUnitId = 'target'; sourceId = 'source'
+        approvedBy = 'Howie'
         compatibilityProfileId = 'full-user'; compatibilityIdentity = ('e' * 64); workingSaveSha256 = ('9' * 64)
         purpose = 'single-cast probe test' }
     foreach ($key in $Override.Keys) { $value[$key] = $Override[$key] }
@@ -328,6 +330,32 @@ if ((Get-KbpClassicAllowanceBuildRefusal -AllowanceJson (New-ClassicFixtureJson 
         -BuildManifest $manifestFixture -ExecutionMode 'instant') -cne 'execution-mode-differs') {
     throw 'A classic allowance ran in another casting mode.'
 }
+# Final review C7: what the host's parsers refuse after launch is refused
+# before anything is deployed.
+$shapeCases = @(
+    @('qualification', (New-QualificationFixtureJson @{ extra = 'x' }), 'unknown:extra'),
+    @('qualification', (New-QualificationFixtureJson @{ approvedBy = '' }), 'approved-by'),
+    @('qualification', (New-QualificationFixtureJson @{ authority = '' }), 'authority'),
+    @('qualification', (New-QualificationFixtureJson @{ fixtureGameId = '' }), 'fixture-game-id'),
+    @('qualification', (New-QualificationFixtureJson @{ approvedProjectionIds = @('NOTHEX') }), 'projection-ids'),
+    @('qualification', (New-QualificationFixtureJson @{ approvedProjectionIds = @(1..9 | ForEach-Object { ('d' * 64) }) }), 'projection-ids'),
+    @('classic', (New-ClassicFixtureJson @{ extra = 'x' }), 'unknown:extra'),
+    @('classic', (New-ClassicFixtureJson @{ approvedBy = '' }), 'approved-by'),
+    @('probe', (New-AllowanceFixtureJson @{ extra = 'x' }), 'unknown:extra'),
+    @('probe', (New-AllowanceFixtureJson @{ approvedProjectionId = 'x' }), 'projection-id'),
+    @('probe', (New-AllowanceFixtureJson @{ targetUnitId = 'caster' }), 'selection'),
+    @('probe', (New-AllowanceFixtureJson @{ sourceId = '' }), 'selection'),
+    @('probe', (New-AllowanceFixtureJson @{ approvedBy = '' }), 'approved-by'))
+foreach ($shapeCase in $shapeCases) {
+    $shapeRefusal = switch ($shapeCase[0]) {
+        'qualification' { Get-KbpQualificationAllowanceBuildRefusal -AllowanceJson $shapeCase[1] -RunId 'qual-bind-test' -BuildManifest $manifestFixture }
+        'classic' { Get-KbpClassicAllowanceBuildRefusal -AllowanceJson $shapeCase[1] -RunId 'classic-bind-test' -BuildManifest $manifestFixture }
+        'probe' { Get-KbpProbeAllowanceBuildRefusal -AllowanceJson $shapeCase[1] -RunId 'probe-bind-test' -BuildManifest $manifestFixture }
+    }
+    if ($shapeRefusal -cne $shapeCase[2]) {
+        throw "A malformed $($shapeCase[0]) allowance was not refused before launch as $($shapeCase[2]): $shapeRefusal"
+    }
+}
 # Review C5: both allowance kinds bind the profile, its identity and the
 # WORKING save; the launcher checks them against what it resolved before
 # anything is deployed.
@@ -338,17 +366,24 @@ foreach ($fixtureJson in @((New-QualificationFixtureJson @{}), (New-ClassicFixtu
         'working-save' = @('full-user', ('e' * 64), ('8' * 64))
     }
     if ($null -ne (Get-KbpAllowanceFixtureBindingRefusal -AllowanceJson $fixtureJson -ProfileId 'full-user' `
-            -CompatibilityIdentity ('e' * 64) -WorkingSaveSha256 ('9' * 64))) {
+            -CompatibilityIdentity ('e' * 64) -WorkingSaveSha256 ('9' * 64) -FixtureGameId 'game')) {
         throw 'A matching allowance fixture binding was refused.'
+    }
+    # Final review C7: an allowance naming a fixture campaign names this one.
+    $namesCampaign = @(($fixtureJson | ConvertFrom-Json).PSObject.Properties | ForEach-Object Name) -ccontains 'fixtureGameId'
+    $otherCampaign = Get-KbpAllowanceFixtureBindingRefusal -AllowanceJson $fixtureJson -ProfileId 'full-user' `
+        -CompatibilityIdentity ('e' * 64) -WorkingSaveSha256 ('9' * 64) -FixtureGameId 'other-game'
+    if (($namesCampaign -and $otherCampaign -cne 'fixture-game-id') -or (-not $namesCampaign -and $null -ne $otherCampaign)) {
+        throw "An allowance for another fixture campaign was not refused: $otherCampaign"
     }
     foreach ($case in $bindingCases.Keys) {
         $values = $bindingCases[$case]
         $refusal = Get-KbpAllowanceFixtureBindingRefusal -AllowanceJson $fixtureJson -ProfileId $values[0] `
-            -CompatibilityIdentity $values[1] -WorkingSaveSha256 $values[2]
+            -CompatibilityIdentity $values[1] -WorkingSaveSha256 $values[2] -FixtureGameId 'game'
         if ($refusal -cne $case) { throw "Allowance fixture binding case $case returned '$refusal'." }
     }
     if ((Get-KbpAllowanceFixtureBindingRefusal -AllowanceJson $fixtureJson -ProfileId 'full-user' `
-            -CompatibilityIdentity ('e' * 64) -WorkingSaveSha256 $null) -cne 'working-save') {
+            -CompatibilityIdentity ('e' * 64) -WorkingSaveSha256 $null -FixtureGameId 'game') -cne 'working-save') {
         throw 'An allowance without a resolved WORKING save was accepted.'
     }
 }
@@ -541,6 +576,53 @@ try {
         'select-casting' = @('live-cast-qual-select', @{ castingScenario = $true })
         'select-unselected' = @('live-cast-qual-select', @{ selection = [ordered]@{ selected = $false } })
     }
+    # Final review C6: the launcher reads a probe PASS too.
+    $probeAllowanceJson = New-AllowanceFixtureJson @{}
+    function New-ProbeOutcomeCase([string]$Name, [string]$Scenario, [hashtable]$Override) {
+        $directory = Join-Path $outcomeRoot $Name
+        New-Item -ItemType Directory -Path $directory | Out-Null
+        $cast = $Scenario -ceq 'live-cast-probe'
+        $value = [ordered]@{
+            schemaVersion = 2; runId = 'probe-bind-test'; castingScenario = $cast; terminalReason = 'completed'
+            allowanceStatus = if ($cast) { 'valid' } else { 'not-read' }; submitted = $cast
+            submitReason = if ($cast) { 'probe-submitted:' + ('f' * 64) } else { $null }
+            measuredIdentity = 'commit=' + ('c' * 40) + ';package=' + ('a' * 64) + ';dll=' + ('b' * 64) +
+                ';mvid=11111111-2222-3333-4444-555555555555'
+            invocation = [ordered]@{ outcomeProjectionId = if ($cast) { ('f' * 64) } else { $null }
+                entries = @(if ($cast) { [ordered]@{ castingId = 'probe-cast-1'; nativeSubmissionReported = $true } }) }
+            cleanup = [ordered]@{ recorded = $true; failures = @() }; violations = @()
+        }
+        foreach ($key in $Override.Keys) { $value[$key] = $Override[$key] }
+        Write-KbpJsonAtomic (Join-Path $directory 'probe-outcome.json') $value
+        return [ordered]@{ runId = 'probe-bind-test'; scenario = $Scenario; evidenceDirectory = $directory
+            expectedCommit = ('c' * 40); expectedPackageSha256 = ('a' * 64); expectedDllSha256 = ('b' * 64)
+            parameters = @{ probeAllowance = $probeAllowanceJson } }
+    }
+    Assert-KbpScenarioOutcome -Request (New-ProbeOutcomeCase 'probe-cast-good' 'live-cast-probe' @{})
+    Assert-KbpScenarioOutcome -Request (New-ProbeOutcomeCase 'probe-select-good' 'live-cast-probe-select' @{})
+    $probeOutcomeCases = [ordered]@{
+        'invalid-allowance' = @('live-cast-probe', @{ allowanceStatus = 'identity-mismatch:dll' })
+        'not-submitted' = @('live-cast-probe', @{ submitted = $false })
+        'other-projection' = @('live-cast-probe', @{ submitReason = 'probe-submitted:' + ('e' * 64) })
+        'other-outcome-projection' = @('live-cast-probe', @{ invocation = [ordered]@{ outcomeProjectionId = ('e' * 64)
+            entries = @([ordered]@{ castingId = 'probe-cast-1'; nativeSubmissionReported = $true }) } })
+        'two-submissions' = @('live-cast-probe', @{ invocation = [ordered]@{ outcomeProjectionId = ('f' * 64)
+            entries = @([ordered]@{ castingId = 'a'; nativeSubmissionReported = $true },
+                [ordered]@{ castingId = 'b'; nativeSubmissionReported = $true }) } })
+        'other-build' = @('live-cast-probe', @{ measuredIdentity = 'commit=' + ('0' * 40) })
+        'cleanup-failed' = @('live-cast-probe', @{ cleanup = [ordered]@{ recorded = $true; failures = @('lease') } })
+        'violation' = @('live-cast-probe', @{ violations = @('after:missing') })
+        'select-submitted' = @('live-cast-probe-select', @{ submitted = $true })
+    }
+    foreach ($case in $probeOutcomeCases.Keys) {
+        $caseRequest = New-ProbeOutcomeCase ('probe-' + $case) $probeOutcomeCases[$case][0] $probeOutcomeCases[$case][1]
+        $refusal = $null
+        try { Assert-KbpScenarioOutcome -Request $caseRequest }
+        catch { $refusal = $_.Exception.Message }
+        if ($null -eq $refusal -or $refusal -notlike '*robe*') {
+            throw "Probe outcome case $case was not refused by the launcher's check: $refusal"
+        }
+    }
     foreach ($case in $qualOutcomeCases.Keys) {
         $caseRequest = New-QualOutcomeCase ('qual-' + $case) $qualOutcomeCases[$case][0] $qualOutcomeCases[$case][1]
         $refusal = $null
@@ -552,6 +634,19 @@ try {
     }
 }
 finally { Remove-Item -LiteralPath $outcomeRoot -Recurse -Force -ErrorAction SilentlyContinue }
+# Final review C5/C8: a rehearsal is labelled in the request, the
+# orchestration record and the completion record; held keys are released in
+# the launcher's final cleanup.
+$launcherLf = $launcherText.Replace("`r`n", "`n")
+if (-not $launcherLf.Contains('if ($ManualRehearseDone) { $scenarioParameters.manualRehearsal = $true }') -or
+    -not $launcherLf.Contains('manualRehearsal = [bool]$ManualRehearseDone') -or
+    -not $launcherLf.Contains('-ManualRehearsal ([bool]$ManualRehearseDone)') -or
+    -not $launcherLf.Contains("finally {`n    # Final review C8: a key held by an interrupted chord is always released.")) {
+    throw 'The rehearsal is not labelled in every record, or held keys are not released at the end.'
+}
+$rehearsalRecord = New-KbpRunCompletionRecord -RunId 'r' -Scenario 'live-workspace-manual' -FixtureFamily 'Automation' `
+    -ProfileId 'full-user' -ManualRehearsal $true
+if (-not [bool]$rehearsalRecord.manualRehearsal) { throw 'The completion record does not label a rehearsal.' }
 $passAt = $launcherText.IndexOf('if ($result.status -cne ''PASS'') { throw "Runtime scenario returned $($result.status)." }')
 $outcomeAt = $launcherText.IndexOf('Assert-KbpScenarioOutcome -Request $request')
 $hostSource = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\src\KingmakerBuffPlanner\RuntimeTesting\RuntimeTestHost.cs') -Raw
@@ -628,6 +723,27 @@ try {
             [ordered]@{ name = 'recast'; projectionId = $forecastIds[2]; castingIds = @('qual-cast-1') },
             [ordered]@{ name = 'disable'; projectionId = $forecastIds[3]; castingIds = @('qual-cast-1') },
             [ordered]@{ name = 'recover'; projectionId = $forecastIds[4]; castingIds = @('qual-cast-1') }) } }
+    # Final review C4: a finite-direct-mixed selection (asked for with
+    # -QualificationRecipe) gets a finite allowance whose budget is the
+    # sum of its forecast castings (stop 2 + complete 1 + recast 1).
+    $finiteIds = @(('4' * 64), ('5' * 64), ('6' * 64))
+    New-WriterSelection 'finite-select' 'live-cast-qual-select' 'instant' @{ 'qual-outcome.json' = [ordered]@{
+        castingScenario = $false; violations = @()
+        selection = [ordered]@{ selected = $true; recipe = 'finite-direct-mixed'; castings = @('qual-cast-1', 'qual-cast-2') }
+        forecast = @(
+            [ordered]@{ name = 'stop'; projectionId = $finiteIds[0]; castingIds = @('qual-cast-1', 'qual-cast-2') },
+            [ordered]@{ name = 'complete'; projectionId = $finiteIds[1]; castingIds = @('qual-cast-2') },
+            [ordered]@{ name = 'recast'; projectionId = $finiteIds[2]; castingIds = @('qual-cast-1') }) } }
+    $finiteRequestPath = Join-Path $writerEvidence 'finite-select\runtime-request.json'
+    $finiteRequest = Read-KbpJson $finiteRequestPath
+    $finiteRequest.parameters | Add-Member -NotePropertyName qualificationRecipe -NotePropertyValue 'finite-direct-mixed'
+    Write-KbpJsonAtomic $finiteRequestPath $finiteRequest
+    # The same finite selection recorded as asked for the default recipe is
+    # inconsistent evidence and is refused.
+    New-WriterSelection 'finite-unasked' 'live-cast-qual-select' 'instant' @{ 'qual-outcome.json' = [ordered]@{
+        castingScenario = $false; violations = @()
+        selection = [ordered]@{ selected = $true; recipe = 'finite-direct-mixed'; castings = @('qual-cast-1', 'qual-cast-2') }
+        forecast = @([ordered]@{ name = 'stop'; projectionId = $finiteIds[0]; castingIds = @('qual-cast-1', 'qual-cast-2') }) } }
     $classicPlan = [ordered]@{ executionMode = 'animated'; planDigest = ('d' * 64)
         steps = @([ordered]@{ index = 0; provider = 'p'; targets = @('t'); pool = 'x|unlimited'; unlimited = $true }) }
     $classicSelection = [ordered]@{ castingScenario = $false; planDigest = ('d' * 64); planSteps = 1; violations = @() }
@@ -644,11 +760,24 @@ try {
     if ($null -ne (Get-KbpQualificationAllowanceBuildRefusal -AllowanceJson $qualJson -RunId 'qual-run' `
             -BuildManifest $writerManifest -Recipe 'zero-cost-mixed' -ExecutionMode 'animated') -or
         $null -ne (Get-KbpAllowanceFixtureBindingRefusal -AllowanceJson $qualJson -ProfileId 'full-user' `
-            -CompatibilityIdentity ('e' * 64) -WorkingSaveSha256 ('9' * 64)) -or
+            -CompatibilityIdentity ('e' * 64) -WorkingSaveSha256 ('9' * 64) -FixtureGameId 'game') -or
         [int]$qualWritten.maximumNativeSubmissions -ne 8 -or
         ((@($qualWritten.approvedProjectionIds) -join ',') -cne ($forecastIds -join ',')) -or
         -not (Test-Path -LiteralPath (Join-Path $writerApprovals 'qual-run.authorization.md') -PathType Leaf)) {
         throw 'The written qualification allowance is not what the launcher accepts.'
+    }
+    $finitePath = & $writerScript -Kind qualification -RunId 'finite-run' -SelectionRunId 'finite-select' -ExecutionMode instant @writerCommon |
+        Select-Object -Last 1
+    $finiteJson = [IO.File]::ReadAllText($finitePath)
+    $finiteWritten = $finiteJson | ConvertFrom-Json
+    if ($null -ne (Get-KbpQualificationAllowanceBuildRefusal -AllowanceJson $finiteJson -RunId 'finite-run' `
+            -BuildManifest $writerManifest -Recipe 'finite-direct-mixed' -ExecutionMode 'instant') -or
+        (Get-KbpQualificationAllowanceBuildRefusal -AllowanceJson $finiteJson -RunId 'finite-run' `
+            -BuildManifest $writerManifest -Recipe 'zero-cost-mixed' -ExecutionMode 'instant') -cne 'recipe-differs' -or
+        [string]$finiteWritten.recipe -cne 'finite-direct-mixed' -or [int]$finiteWritten.maximumNativeSubmissions -ne 4 -or
+        -not ([string]$finiteWritten.purpose).StartsWith('finite-direct-mixed casting-first qualification in instant mode') -or
+        ((@($finiteWritten.approvedProjectionIds) -join ',') -cne ($finiteIds -join ','))) {
+        throw 'The written finite qualification allowance is not what the launcher accepts.'
     }
     $classicPath = & $writerScript -Kind classic -RunId 'classic-run' -SelectionRunId 'classic-select' -ExecutionMode animated @writerCommon |
         Select-Object -Last 1
@@ -656,7 +785,7 @@ try {
     if ($null -ne (Get-KbpClassicAllowanceBuildRefusal -AllowanceJson $classicJson -RunId 'classic-run' `
             -BuildManifest $writerManifest -ExecutionMode 'animated') -or
         $null -ne (Get-KbpAllowanceFixtureBindingRefusal -AllowanceJson $classicJson -ProfileId 'full-user' `
-            -CompatibilityIdentity ('e' * 64) -WorkingSaveSha256 ('9' * 64)) -or
+            -CompatibilityIdentity ('e' * 64) -WorkingSaveSha256 ('9' * 64) -FixtureGameId 'game') -or
         [string]($classicJson | ConvertFrom-Json).approvedPlanDigest -cne ('d' * 64)) {
         throw 'The written Classic allowance is not what the launcher accepts.'
     }
@@ -667,6 +796,7 @@ try {
         'other-mode' = @{ Kind = 'classic'; RunId = 'classic-run-3'; SelectionRunId = 'classic-select'; ExecutionMode = 'instant' }
         'other-kind-evidence' = @{ Kind = 'qualification'; RunId = 'qual-run-2'; SelectionRunId = 'classic-select'; ExecutionMode = 'animated' }
         'reused-run-id' = @{ Kind = 'classic'; RunId = 'classic-select'; SelectionRunId = 'classic-select'; ExecutionMode = 'animated' }
+        'recipe-not-asked-for' = @{ Kind = 'qualification'; RunId = 'finite-run-2'; SelectionRunId = 'finite-unasked'; ExecutionMode = 'instant' }
     }
     foreach ($case in $writerRefusals.Keys) {
         $arguments = $writerRefusals[$case]

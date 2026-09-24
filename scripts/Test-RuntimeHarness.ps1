@@ -1637,11 +1637,16 @@ try {
         throw 'The launcher restoration branch was not found.'
     }
     $restoreBranch = $Matches[1]
+    # Final review C2: the policy feeds the comparison in the shared helper
+    # the launcher and Restore-Local both use.
+    $automationText = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'RuntimeAutomation.Common.ps1') -Raw
     if ($restoreBranch -match '\bthrow\b' -or $restoreBranch -match 'Write-Error' -or
         ([regex]::Matches($restoreBranch, '\$restoreFailure = ')).Count -ne 2 -or
-        $launcherText -notmatch '\$allowedChanged = @\(\$savePolicy\.allowedChanged\)' -or
-        $launcherText -notmatch '-AllowedChangedFileNames \$allowedChanged' -or
-        $launcherText -notmatch '\$savePolicy\.newFilesBlocking' -or
+        $automationText -notmatch '\$allowedChanged = @\(\$savePolicy\.allowedChanged\)' -or
+        $automationText -notmatch '-AllowedChangedFileNames \$allowedChanged' -or
+        $automationText -notmatch '\$savePolicy\.newFilesBlocking' -or
+        $launcherText -notmatch 'Complete-KbpProtectedSaveComparison -BaselinePath \$protectedBaselinePath' -or
+        $launcherText -notmatch 'Invoke-KbpProtectedSaveComparison -Before \$protectedBefore' -or
         $launcherText -notmatch '-RestoreFailure \$restoreFailure' -or
         $launcherText -notmatch '(?s)catch \{[^{}]*\$runFailure = \$_\s*\}\s*finally \{' -or
         $launcherText -notmatch "restoration-failure\.txt") {
@@ -1649,20 +1654,22 @@ try {
     }
     # A display-mode run restores the game's registry key inside the finally,
     # before the save comparison and the completion record, and folds a
-    # failure into the restoration failure.
+    # failure into the restoration failure. Final review C2: the saves are
+    # compared before the Mods restoration releases the run's lock.
     $finallyText = $launcherText.Substring($launcherText.IndexOf("`nfinally {"))
     $registryAt = $finallyText.IndexOf('Restore-KbpRegistrySnapshotFile -Path $displayRegistryPath')
     $modsAt = $finallyText.IndexOf("Restore-Local.ps1') -RunId `$runId")
-    $savesAt = $finallyText.IndexOf('Get-KbpProtectedSavePolicy -Scenario')
+    $savesAt = $finallyText.IndexOf('Complete-KbpProtectedSaveComparison -BaselinePath')
     $recordAt = $finallyText.IndexOf('New-KbpRunCompletionRecord')
     $enteredAt = $launcherText.IndexOf('$transactionEntered = $true')
     $snapshotAt = $launcherText.IndexOf('Save-KbpRegistrySnapshotFile -Path $displayRegistryPath')
-    if ($registryAt -lt 0 -or $modsAt -lt $registryAt -or $savesAt -lt $modsAt -or $recordAt -lt $savesAt -or
+    if ($registryAt -lt 0 -or $savesAt -lt $registryAt -or $modsAt -lt $savesAt -or $recordAt -lt $modsAt -or
         $enteredAt -lt 0 -or $snapshotAt -lt $enteredAt -or
         $finallyText -notmatch '\$restoreFailure = if \(\$null -eq \$restoreFailure\) \{ \$displayFailure \}') {
         throw 'The display-mode registry restoration is not inside the finally before the record, or drops its failure.'
     }
-    if ($launcherText -notmatch 'New-KbpRunCompletionRecord' -or $launcherText -notmatch 'Get-KbpProtectedSavePolicy' -or
+    if ($launcherText -notmatch 'New-KbpRunCompletionRecord' -or $launcherText -notmatch 'Invoke-KbpProtectedSaveComparison' -or
+        $automationText -notmatch '(?s)function Invoke-KbpProtectedSaveComparison \{.*?Get-KbpProtectedSavePolicy' -or
         $launcherText -match 'Write-Error "Kingmaker remains running' -or
         $launcherText -notmatch "try \{ & \(Join-Path \`$PSScriptRoot 'Restore-Local\.ps1'\)") {
         throw 'The launcher does not compute its completion record and save policy through the tested functions, or a restoration failure can still skip them.'
@@ -1694,6 +1701,117 @@ try {
         $driftRequest = New-KbpRuntimeRequest -RunId ('drift-' + $driftScenario) -EvidenceDirectory 'evidence' `
             -BuildManifest $driftManifest -TimeoutSeconds 60 -ExitAfterCompletion $true -Scenario $driftScenario
         if ($driftRequest.scenario -cne $driftScenario) { throw "Request for $driftScenario was not built." }
+    }
+    $passed++
+
+    # Final review C1/C2/C8: the protected-save baseline is kept beside the
+    # transaction; a pending comparison is an unresolved transaction; a
+    # blocking change is recorded and refuses later runs until the owner's
+    # acknowledgement exists; a fixture lock refuses a runtime entry.
+    . (Join-Path $PSScriptRoot 'RuntimeAutomation.Common.ps1')
+    $savesRoot = Join-Path $root 'protected-saves'
+    $saveFolder = Join-Path $savesRoot 'saves'
+    $saveState = Join-Path $savesRoot 'state'
+    $saveEvidence = Join-Path $savesRoot 'evidence'
+    $saveTransaction = Join-Path $saveState 'transactions\save-run'
+    foreach ($directory in @($saveFolder, $saveEvidence, $saveTransaction)) {
+        New-Item -ItemType Directory -Path $directory -Force | Out-Null
+    }
+    [IO.File]::WriteAllText((Join-Path $saveFolder 'Manual_1_Ordinary.zks'), 'ordinary')
+    [IO.File]::WriteAllText((Join-Path $saveFolder 'Manual_2_WORKING.zks'), 'working')
+    $saveSnapshot = Get-KbpSaveFolderSnapshot -SaveRoot $saveFolder
+    $baselinePath = Save-KbpProtectedSaveBaseline -TransactionDirectory $saveTransaction -RunId 'save-run' `
+        -Scenario 'live-cast-qual' -FixtureFamily 'Automation' -WorkingFileName 'Manual_2_WORKING.zks' `
+        -SaveRoot $saveFolder -Snapshot $saveSnapshot
+    $pending = $false
+    try { Assert-KbpNoUnresolvedTransaction $saveState -FixtureLockPath '' }
+    catch { $pending = $_.Exception.Message -like '*protected-save comparison of run save-run is pending*' }
+    [IO.File]::WriteAllText((Join-Path $saveFolder 'Manual_1_Ordinary.zks'), 'changed by the run')
+    $firstComparison = Complete-KbpProtectedSaveComparison -BaselinePath $baselinePath -EvidenceDirectory $saveEvidence `
+        -StateRoot $saveState -KnownProcessIds @()
+    $secondComparison = Complete-KbpProtectedSaveComparison -BaselinePath $baselinePath -EvidenceDirectory $saveEvidence `
+        -StateRoot $saveState -KnownProcessIds @()
+    Assert-KbpNoUnresolvedTransaction $saveState -FixtureLockPath ''
+    $violationBlocks = $false
+    try { Assert-KbpNoUnacknowledgedSaveViolation -StateRoot $saveState }
+    catch { $violationBlocks = $_.Exception.Message -like '*Run save-run changed protected saves (changed:Manual_1_Ordinary.zks)*' }
+    $saveEvidenceRecord = Read-KbpJson (Join-Path $saveEvidence 'protected-saves.json')
+    if (-not $pending -or @($firstComparison.blocking).Count -ne 1 -or @($secondComparison.blocking).Count -ne 1 -or
+        -not $violationBlocks -or (@($saveEvidenceRecord.blocking) -join ',') -cne 'changed:Manual_1_Ordinary.zks' -or
+        -not [bool](Read-KbpJson $baselinePath).compared) {
+        throw 'A protected-save violation was not kept, recorded and enforced.'
+    }
+    # The owner's acknowledgement lifts the block, exactly once.
+    $confirmScript = Join-Path $PSScriptRoot 'Confirm-KbpProtectedSaveReview.ps1'
+    & $confirmScript -RunId 'save-run' -ReviewedBy 'harness test' -Note 'test violation' -StateRoot $saveState -Confirm:$false | Out-Null
+    Assert-KbpNoUnacknowledgedSaveViolation -StateRoot $saveState
+    $acknowledgedTwice = $true
+    try { & $confirmScript -RunId 'save-run' -ReviewedBy 'harness test' -Note 'again' -StateRoot $saveState -Confirm:$false | Out-Null }
+    catch { $acknowledgedTwice = $false }
+    if ($acknowledgedTwice) { throw 'A protected-save violation was acknowledged twice.' }
+    # A clean run records nothing to acknowledge.
+    $cleanTransaction = Join-Path $saveState 'transactions\clean-run'
+    New-Item -ItemType Directory -Path $cleanTransaction -Force | Out-Null
+    $cleanBaseline = Save-KbpProtectedSaveBaseline -TransactionDirectory $cleanTransaction -RunId 'clean-run' `
+        -Scenario 'live-cast-qual' -FixtureFamily 'Automation' -WorkingFileName 'Manual_2_WORKING.zks' `
+        -SaveRoot $saveFolder -Snapshot (Get-KbpSaveFolderSnapshot -SaveRoot $saveFolder)
+    $cleanComparison = Complete-KbpProtectedSaveComparison -BaselinePath $cleanBaseline -EvidenceDirectory $saveEvidence `
+        -StateRoot $saveState -KnownProcessIds @()
+    if (@($cleanComparison.blocking).Count -ne 0 -or
+        (Test-Path -LiteralPath (Join-Path $saveState 'protected-save-violations\clean-run.json'))) {
+        throw 'A clean comparison recorded a violation.'
+    }
+    $fixtureLock = Join-Path $savesRoot 'fixture.lock'
+    [IO.File]::WriteAllText($fixtureLock, 'lock')
+    $fixtureBlocks = $false
+    try { Assert-KbpNoUnresolvedTransaction $saveState -FixtureLockPath $fixtureLock }
+    catch { $fixtureBlocks = $_.Exception.Message -like '*fixture bootstrap or teardown holds its lock*' }
+    if (-not $fixtureBlocks) { throw 'A fixture lock did not refuse a runtime entry.' }
+    # The launcher refuses before creating evidence, compares before the Mods
+    # restoration releases its lock, and reports every failure together;
+    # Restore-Local finishes a pending comparison before restoring.
+    $launcherText = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'Invoke-KingmakerRuntimeTest.ps1'))
+    $restoreText = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'Restore-Local.ps1'))
+    $refusalAt = $launcherText.IndexOf('Assert-KbpNoUnacknowledgedSaveViolation')
+    $evidenceAt = $launcherText.IndexOf('New-Item -ItemType Directory -Path $evidence')
+    $compareAt = $launcherText.IndexOf('Complete-KbpProtectedSaveComparison -BaselinePath $protectedBaselinePath')
+    $restoreAt = $launcherText.IndexOf("Restore-Local.ps1') -RunId `$runId -SkipProtectedSaveComparison")
+    if ($refusalAt -lt 0 -or $refusalAt -gt $evidenceAt -or $compareAt -lt 0 -or $restoreAt -lt 0 -or
+        $compareAt -gt $restoreAt -or -not $launcherText.Contains("`$failureParts.Add('Protected saves: ' + `$protectedSaveFailure)") -or
+        -not $launcherText.Contains('$completionFailure = ''Run completion record not written: ''') -or
+        -not $launcherText.Contains('$orchestration.status = $orchestration.finalStatus') -or
+        $restoreText.IndexOf('Complete-KbpProtectedSaveComparison') -lt 0 -or
+        $restoreText.IndexOf('Complete-KbpProtectedSaveComparison') -gt $restoreText.IndexOf('Restore-KbpRuntimeTransaction -RunId')) {
+        throw 'The launcher or Restore-Local does not keep the protected-save order.'
+    }
+    # Final review C7: the install rollback's lock confirmation is blocked
+    # only by a game running from its own root.
+    $lockRoot = Join-Path $savesRoot 'lock-root'
+    New-Item -ItemType Directory -Path $lockRoot -Force | Out-Null
+    $scopedLock = Join-Path $lockRoot 'deployment.lock'
+    $scopedGame = Join-Path $lockRoot 'Game'
+    $outsideGame = [pscustomobject]@{ Id = 4242; Path = 'D:\Elsewhere\Kingmaker.exe' }
+    $insideGame = [pscustomobject]@{ Id = 4343; Path = (Join-Path $scopedGame 'Kingmaker.exe') }
+    New-KbpOwnedLock $scopedLock 'rollback-test' 'token'
+    Confirm-KbpLockedWithoutForeignLease -LockPath $scopedLock -RunId 'rollback-test' -Token 'token' -SkipForeignLease `
+        -GameRoot $scopedGame -Processes @($outsideGame)
+    $insideBlocks = $false
+    try {
+        Confirm-KbpLockedWithoutForeignLease -LockPath $scopedLock -RunId 'rollback-test' -Token 'token' -SkipForeignLease `
+            -GameRoot $scopedGame -Processes @($insideGame)
+    }
+    catch { $insideBlocks = $_.Exception.Message -like '*is running from*' }
+    $rollbackText = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'Restore-InstallLocal.ps1'))
+    if (-not $insideBlocks -or (Test-Path -LiteralPath $scopedLock) -or
+        -not $rollbackText.Contains('-SkipForeignLease:(-not $liveGameRoot) `') -or
+        -not $rollbackText.Contains('    -GameRoot $gameRootFull')) {
+        throw 'The rollback lock confirmation is not scoped to its own game root.'
+    }
+    # Final review C8: an unbound process-id list is never passed on to the
+    # restoration after a failed entry.
+    $harnessText = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'RuntimeHarness.Common.ps1'))
+    if ($harnessText.Contains('-FixtureMode:$FixtureMode -KnownKingmakerProcessIds $KnownKingmakerProcessIds')) {
+        throw 'A failed entry still passes an unbound process-id list to the restoration.'
     }
     $passed++
 }
