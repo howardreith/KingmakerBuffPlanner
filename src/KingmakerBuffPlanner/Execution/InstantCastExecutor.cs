@@ -199,13 +199,13 @@ namespace KingmakerBuffPlanner.Execution
                                             CastExecutionStatus.FailedExecution,
                                             "unexpected-resource-spent-on-unlimited-source;" +
                                             result.Detail);
-                                    else if (step.Reservation.Unlimited &&
-                                        result.ResourceCountViolation != null)
-                                        // Review A7: counts that do not prove
-                                        // a free cast free are uncertainty.
+                                    else if (result.ResourceCountViolation != null)
+                                        // Review A7: counts that do not show
+                                        // what the reservation needs are
+                                        // uncertainty.
                                         report.Add(index, step,
                                             CastExecutionStatus.FailedExecution,
-                                            AvailableCountJudgement.UncertainPrefix +
+                                            AvailableCountJudgement.PrefixFor(step.Reservation) +
                                             result.ResourceCountViolation + ";" +
                                             result.Detail);
                                     if (!cleanup.Complete &&

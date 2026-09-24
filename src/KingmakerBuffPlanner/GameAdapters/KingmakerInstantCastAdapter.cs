@@ -245,9 +245,9 @@ namespace KingmakerBuffPlanner.GameAdapters
             int? availableAfter = KingmakerAnimatedCastAdapter.SafeAvailableCount(
                 sourceAbility);
             bool spent = AvailableCountJudgement.Spent(availableBefore, availableAfter);
-            // Review A7: a free casting must read unlimited and unchanged.
-            string countViolation = step.Reservation != null && step.Reservation.Unlimited
-                ? AvailableCountJudgement.FreeViolation(availableBefore, availableAfter) : null;
+            // Review A7: a free casting must read unlimited and unchanged; a
+            // finite one must read both of its counts (re-review).
+            string countViolation = AvailableCountJudgement.Violation(step.Reservation, availableBefore, availableAfter);
             bool providerSucceeded = !providerDirect ||
                 (providerStatus != null && providerStatus.Accepted &&
                     providerStatus.Committed &&
