@@ -827,6 +827,46 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         result.Stage = "inspection-validation";
                     }
                 }
+                else if (RuntimeTestProtocol.IsClassicCastScenario(_request.Scenario))
+                {
+                    // Classic acceptance (Unity-free rules in ClassicCastRecord):
+                    // a selection run records the authored plan and never
+                    // executes; a cast run claims only the judged steps.
+                    IList<string> violations = _classicRecord.Violations();
+                    bool planned = _classicRecord.PlanSteps >= 1 && !string.IsNullOrEmpty(_classicRecord.PlanDigest);
+                    result.Assertions.Add(planned
+                        ? RuntimeTestAssertion.Pass("classic-plan", "authored through the classic controls;>=1 step",
+                            "steps=" + _classicRecord.PlanSteps + ";digest=" + _classicRecord.PlanDigest +
+                                ";target=" + _classicTarget)
+                        : RuntimeTestAssertion.Fail("classic-plan", "authored through the classic controls;>=1 step",
+                            "steps=" + _classicRecord.PlanSteps + ";" + string.Join("|", _classicRecord.Failures.ToArray())));
+                    result.Assertions.Add(_classicRecord.CastingScenario
+                        ? (violations.Count == 0
+                            ? RuntimeTestAssertion.Pass("classic-cast",
+                                "grant used once;every step confirmed;effects applied;at-will counts unchanged;no finite change",
+                                "mode=" + _classicRecord.ExecutionMode + ";confirmed=" + _classicRecord.Confirmed + "/" +
+                                    _classicRecord.PlanSteps + ";" + _classicRecord.Grant)
+                            : RuntimeTestAssertion.Fail("classic-cast",
+                                "grant used once;every step confirmed;effects applied;at-will counts unchanged;no finite change",
+                                string.Join("|", violations.ToArray())))
+                        : (violations.Count == 0
+                            ? RuntimeTestAssertion.Pass("classic-select-no-dispatch", "no grant;no run",
+                                "grantAttempts=0;castingFirstRuns=0")
+                            : RuntimeTestAssertion.Fail("classic-select-no-dispatch", "no grant;no run",
+                                string.Join("|", violations.ToArray()))));
+                    bool classicLocked = UI.NativeCastingSessionPolicy.Locked && _classicWorkspaceClosed;
+                    result.Assertions.Add(classicLocked
+                        ? RuntimeTestAssertion.Pass("classic-session-locked",
+                            "session locked except the single-use grant;workspace closed", "locked=True;closed=True")
+                        : RuntimeTestAssertion.Fail("classic-session-locked",
+                            "session locked except the single-use grant;workspace closed", "locked=" +
+                                UI.NativeCastingSessionPolicy.Locked + ";closed=" + _classicWorkspaceClosed));
+                    if (!planned || violations.Count != 0 || !classicLocked)
+                    {
+                        result.Status = "FAIL";
+                        result.Stage = "classic-validation";
+                    }
+                }
                 else if (RuntimeTestProtocol.IsQualificationScenario(_request.Scenario))
                 {
                     // Qualification acceptance (Unity-free rules in
@@ -1647,6 +1687,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 liveBudgetSeconds = 600 + RuntimeTestProtocol.ProbeRunDeadlineSeconds;
             if (RuntimeTestProtocol.IsQualificationScenario(_request.Scenario))
                 liveBudgetSeconds = 600 + RuntimeTestProtocol.QualificationRunDeadlineSeconds;
+            if (RuntimeTestProtocol.IsClassicCastScenario(_request.Scenario))
+                liveBudgetSeconds = 600 + RuntimeTestProtocol.ClassicRunDeadlineSeconds;
             if (RuntimeTestProtocol.IsReloadScenario(_request.Scenario))
                 liveBudgetSeconds = 300 + LiveCampaignSaveLoader.ReloadBudgetSeconds;
             if (_livePhaseElapsed.Elapsed.TotalSeconds > liveBudgetSeconds)
@@ -1964,6 +2006,12 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         _liveUiPhase = 90;
                         return false;
                     }
+                    if (RuntimeTestProtocol.IsClassicCastScenario(_request.Scenario))
+                    {
+                        // Classic: back to the Classic planner and its routes.
+                        _liveUiPhase = 110;
+                        return false;
+                    }
                     if (RuntimeTestProtocol.IsQualificationScenario(_request.Scenario))
                     {
                         // Qualification: the production-path driver.
@@ -1997,6 +2045,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (_liveUiPhase == 55)
             {
                 return UpdateQualification();
+            }
+            if (_liveUiPhase == 110)
+            {
+                return UpdateClassicCast();
             }
             if (_liveUiPhase == 40)
             {
@@ -2935,6 +2987,317 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private string _inspectionSummary = string.Empty;
         private string _inspectionFailure;
 
+        // Classic cast scenarios (mission batch 3, section 6). The casting-
+        // first workspace is closed and the planner switched back to Classic
+        // (an automated session's forced default); the Classic screen's own
+        // controls author the Resistance cantrip for one target; the classic
+        // plan is recorded (select) or, with the run-bound allowance,
+        // executed once through the HUD's routine entry under a single-use
+        // grant for exactly that plan (cast), observed around the run and
+        // judged by ClassicCastRecord. Every other classic route stays
+        // locked.
+        internal const string ClassicCantripGuid = "7bc8e27cba24f0e43ae64ed201ad5785";
+
+        private bool UpdateClassicCast()
+        {
+            if (_classicStage == 0)
+            {
+                ProbeWorkspaceCloseResult closed = CloseProbeWorkspace();
+                _classicWorkspaceClosed = closed.Closed && closed.InputLeaseReleased &&
+                    string.IsNullOrEmpty(closed.Failure);
+                _classicRecord.CastingScenario = RuntimeTestProtocol.IsCastingClassicScenario(_request.Scenario);
+                _classicRecord.ExecutionMode = _request.Parameters["executionMode"] as string;
+                _classicStage = 1;
+                if (!_classicWorkspaceClosed)
+                    return FailClassic("workspace-not-closed:" + (closed.Failure ?? "lease-held"));
+                UI.CastingWorkspaceDevSelection.Enabled = false;
+                BuffPlannerUiRoot.HandlePlannerHotkey();
+                _classicClock = System.Diagnostics.Stopwatch.StartNew();
+                _log.Info("[KBP-CLASSIC] classic planner selected and opened;scenario=" + _request.Scenario + ".");
+                return false;
+            }
+            if (_classicStage == 1)
+            {
+                if (!BuffPlannerUiRoot.IsScreenOpen)
+                {
+                    if (_classicClock.Elapsed.TotalSeconds > 60) return FailClassic("classic-screen-not-open");
+                    return false;
+                }
+                if (BuffPlannerUiRoot.IsCastingWorkspaceOpen) return FailClassic("casting-first-workspace-open");
+                _classicTarget = BuffPlannerUiRoot.FirstClassicTargetForRuntime();
+                if (!BuffPlannerUiRoot.ConfigureClassicCastForRuntime(ClassicCantripGuid, _classicTarget,
+                        _classicRecord.ExecutionMode))
+                    return FailClassic("classic-authoring-refused:target=" + (_classicTarget ?? "none"));
+                _classicPlan = BuffPlannerUiRoot.ClassicPlanForRuntime("long");
+                _classicRecord.PlanSteps = _classicPlan == null ? 0 : _classicPlan.Steps.Count;
+                _classicRecord.PlanDigest = _classicPlan == null || _classicPlan.Steps.Count == 0
+                    ? null : ClassicPlanDigest.Of(_classicPlan);
+                WriteClassicPlan();
+                BuffPlannerUiRoot.CloseRuntimeSmoke();
+                _classicClock.Reset();
+                _classicClock.Start();
+                _classicStage = 2;
+                if (_classicRecord.PlanSteps < 1) return FailClassic("classic-plan-empty");
+                if (!_classicRecord.CastingScenario)
+                {
+                    PublishClassicRecord();
+                    _completed = true;
+                    return true;
+                }
+                return false;
+            }
+            if (_classicStage == 2)
+            {
+                if (BuffPlannerUiRoot.IsScreenOpen || !BuffPlannerUiRoot.WorldRunsForCasting)
+                {
+                    if (_classicClock.Elapsed.TotalSeconds > 120) return FailClassic("world-not-running-after-close");
+                    return false;
+                }
+                ClassicCastAllowance allowance = ReadClassicAllowance();
+                if (allowance == null) return FailClassic("allowance:" + _classicRecord.AllowanceStatus);
+                _classicBefore = new Dictionary<int, ProbeObservation>();
+                for (int index = 0; index < _classicPlan.Steps.Count; index++)
+                {
+                    CastStep step = _classicPlan.Steps[index];
+                    ProbeObservation before;
+                    try { before = new KingmakerProbeObserver().Observe(step, "classic-before:" + index, _probeClock); }
+                    catch (Exception exception) { return FailClassic("before-read:" + index + ":" + exception.GetType().Name); }
+                    if (before == null || !before.Succeeded ||
+                        !string.Equals(before.TargetUnitId, step.TargetUnitIds.FirstOrDefault(), StringComparison.Ordinal) ||
+                        before.AvailableForCast == null)
+                        return FailClassic("before-read:" + index + ":" + (before == null ? "null"
+                            : before.Failure ?? "incomplete"));
+                    _classicBefore[index] = before;
+                }
+                _classicPoolsBefore = ClassicFinitePools();
+                _classicGrant = new ClassicCastGrant(_request.RunId, "long", _classicRecord.PlanDigest,
+                    _classicRecord.ExecutionMode, allowance.MaximumNativeSubmissions);
+                if (!UI.NativeCastingSessionPolicy.ArmClassicGrant(_classicGrant))
+                    return FailClassic("grant-not-armed");
+                // The result this press produces is a NEW one (a result from
+                // earlier in the session never stands in for it).
+                _classicQuickBefore = BuffPlannerUiRoot.QuickResultForRuntime("long");
+                _log.Info("[KBP-CLASSIC] grant armed;pressing the Long routine;" + _classicGrant.Describe() + ".");
+                if (!BuffPlannerUiRoot.PressRoutineForRuntime("long"))
+                    return FailClassic("press-not-started");
+                _classicClock.Reset();
+                _classicClock.Start();
+                _classicStage = 3;
+                return false;
+            }
+            if (_classicStage == 3)
+            {
+                QuickExecutionResult quick = BuffPlannerUiRoot.QuickResultForRuntime("long");
+                if (BuffPlannerUiRoot.IsExecutingForRuntime || quick == null ||
+                    ReferenceEquals(quick, _classicQuickBefore))
+                {
+                    if (_classicClock.Elapsed.TotalSeconds > RuntimeTestProtocol.ClassicRunDeadlineSeconds)
+                        return FailClassic("classic-run-deadline");
+                    return false;
+                }
+                JudgeClassicRun(quick);
+                PublishClassicRecord();
+                _completed = true;
+                return true;
+            }
+            return false;
+        }
+
+        private bool FailClassic(string failure)
+        {
+            _classicRecord.Failures.Add(failure);
+            _log.Info("[KBP-CLASSIC] failed;" + failure + ".");
+            if (_classicGrant != null)
+            {
+                _classicRecord.Grant = _classicGrant.Describe();
+                _classicRecord.GrantConsumed = _classicGrant.Consumed;
+                _classicRecord.GrantAttempts = _classicGrant.Attempts;
+            }
+            PublishClassicRecord();
+            _completed = true;
+            return true;
+        }
+
+        // The run-bound classic allowance: this run, this build, this
+        // campaign, this casting mode and routine, and exactly the plan the
+        // classic controls just authored.
+        private ClassicCastAllowance ReadClassicAllowance()
+        {
+            object raw;
+            string json = _request.Parameters.TryGetValue("classicAllowance", out raw) ? raw as string : null;
+            string refusal = "absent";
+            ClassicCastAllowance allowance = json == null ? null
+                : ClassicCastAllowance.Parse(json, _request.RunId, out refusal);
+            _classicRecord.AllowanceStatus = allowance == null ? refusal : "parsed";
+            if (allowance == null) return null;
+            SingleCastProbeRuntimeIdentity measured = MeasureProbeRuntimeIdentity();
+            string campaign = Kingmaker.Game.Instance == null || Kingmaker.Game.Instance.Player == null
+                ? null : Kingmaker.Game.Instance.Player.GameId;
+            string mismatch =
+                measured.SourceCommit != allowance.SourceCommit ? "identity-mismatch:commit"
+                : measured.PackageSha256 != allowance.PackageSha256 ? "identity-mismatch:package"
+                : measured.DllSha256 != allowance.DllSha256 ? "identity-mismatch:dll"
+                : measured.AssemblyMvid != allowance.AssemblyMvid ? "identity-mismatch:mvid"
+                : !string.Equals(campaign, allowance.FixtureGameId, StringComparison.Ordinal) ? "fixture-mismatch"
+                : !string.Equals(_classicRecord.ExecutionMode, allowance.ExecutionMode, StringComparison.Ordinal)
+                    ? "execution-mode-mismatch"
+                : allowance.RoutineId != "long" ? "routine-mismatch"
+                : !string.Equals(_classicRecord.PlanDigest, allowance.ApprovedPlanDigest, StringComparison.Ordinal)
+                    ? "plan-differs-from-approval"
+                : _classicRecord.PlanSteps > allowance.MaximumNativeSubmissions ? "plan-over-budget"
+                : null;
+            _classicRecord.AllowanceStatus = mismatch ?? "valid";
+            return mismatch == null ? allowance : null;
+        }
+
+        // Remaining units of every finite pool of the party (spell levels,
+        // prepared slots, ability resources), for the no-finite-loss check.
+        private static Dictionary<string, int> ClassicFinitePools()
+        {
+            var pools = new Dictionary<string, int>(StringComparer.Ordinal);
+            CastingWorkspaceInputs inputs = BuffPlannerUiRoot.CastingWorkspaceFreshInputsForRuntime();
+            foreach (Domain.Providers.ResourcePoolSnapshot pool in inputs.Snapshot.ResourcePools)
+                if (pool.Kind != Domain.Providers.ResourcePoolKind.Unlimited && !pools.ContainsKey(pool.PoolKey))
+                    pools.Add(pool.PoolKey, pool.Kind == Domain.Providers.ResourcePoolKind.PreparedSlots
+                        ? pool.Tokens.Count(token => token.Available) : pool.Remaining);
+            return pools;
+        }
+
+        private void JudgeClassicRun(QuickExecutionResult quick)
+        {
+            _classicRecord.QuickDisposition = quick.Disposition.ToString();
+            _classicRecord.Grant = _classicGrant.Describe();
+            _classicRecord.GrantConsumed = _classicGrant.Consumed;
+            _classicRecord.GrantAttempts = _classicGrant.Attempts;
+            // The classic route never uses the casting-first host: none of
+            // its runs may have started in this session.
+            _classicRecord.CastingFirstRuns = BuffPlannerUiRoot.CastingRunsStartedForRuntime;
+            ExecutionReport report = BuffPlannerUiRoot.ClassicReportForRuntime;
+            if (report == null)
+            {
+                _classicRecord.Failures.Add("report-missing");
+                return;
+            }
+            _classicRecord.Planned = report.Planned;
+            _classicRecord.Submitted = report.Submitted;
+            _classicRecord.Confirmed = report.Confirmed;
+            _classicRecord.Failed = report.Failed;
+            var stopping = new[]
+            {
+                CastExecutionStatus.FailedValidation, CastExecutionStatus.FailedSubmission,
+                CastExecutionStatus.FailedExecution, CastExecutionStatus.TimedOutUnconfirmed,
+                CastExecutionStatus.ResidualStateUnsettled
+            };
+            for (int index = 0; index < _classicPlan.Steps.Count; index++)
+            {
+                CastStep step = _classicPlan.Steps[index];
+                List<CastExecutionRecord> records = report.Records.Where(record => record.StepIndex == index).ToList();
+                CastExecutionRecord stop = records.FirstOrDefault(record => stopping.Contains(record.Status));
+                string final = stop != null ? stop.Status.ToString()
+                    : records.Any(record => record.Status == CastExecutionStatus.EffectConfirmed) ? "EffectConfirmed"
+                    : records.Count == 0 ? "NoRecord" : records.Last().Status.ToString();
+                ProbeObservation before;
+                _classicBefore.TryGetValue(index, out before);
+                ProbeObservation after = null;
+                try { after = new KingmakerProbeObserver().Observe(step, "classic-after:" + index, _probeClock); }
+                catch (Exception exception)
+                {
+                    _classicRecord.Failures.Add("after-read:" + index + ":" + exception.GetType().Name);
+                }
+                _classicRecord.Steps.Add(new ClassicCastStepResult(index, step.Provider.Canonical,
+                    step.Provider.Ability.SourceKind == Domain.Identity.SourceKind.Spellbook &&
+                        step.Provider.SourceInstanceId == "level-0|heighten-0",
+                    step.TargetUnitIds.FirstOrDefault())
+                {
+                    FinalStatus = final,
+                    Detail = string.Join(" || ", records.Select(record => record.Status + ":" + record.Detail).ToArray()),
+                    Transition = CastingQualificationDriver.Transition(before, after),
+                    AvailableBefore = before == null ? null : before.AvailableForCast,
+                    AvailableAfter = after == null ? null : after.AvailableForCast
+                });
+            }
+            Dictionary<string, int> poolsAfter = ClassicFinitePools();
+            foreach (KeyValuePair<string, int> pool in _classicPoolsBefore.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+            {
+                int remaining;
+                _classicRecord.FinitePools.Add(pool.Key + ":" + pool.Value + ">" +
+                    (poolsAfter.TryGetValue(pool.Key, out remaining) ? remaining.ToString() : "missing"));
+            }
+        }
+
+        private void WriteClassicPlan()
+        {
+            var steps = new JArray();
+            if (_classicPlan != null)
+                for (int index = 0; index < _classicPlan.Steps.Count; index++)
+                {
+                    CastStep step = _classicPlan.Steps[index];
+                    steps.Add(new JObject
+                    {
+                        { "index", index },
+                        { "provider", step.Provider.Canonical },
+                        { "caster", step.Provider.CasterUnitId },
+                        { "spellbook", step.Provider.SpellbookGuid },
+                        { "sourceKind", step.Provider.Ability.SourceKind.ToString() },
+                        { "sourceInstance", step.Provider.SourceInstanceId },
+                        { "source", step.SourceId },
+                        { "targets", new JArray(step.TargetUnitIds.Cast<object>().ToArray()) },
+                        { "pool", step.Reservation == null ? null : step.Reservation.PoolKey },
+                        { "unlimited", step.Reservation != null && step.Reservation.Unlimited },
+                        { "strategy", step.ExecutionStrategy.ToString() }
+                    });
+                }
+            AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory, "classic-plan.json"), new JObject
+            {
+                { "schemaVersion", 1 },
+                { "runId", _request.RunId },
+                { "scenario", _request.Scenario },
+                { "executionMode", _classicRecord.ExecutionMode },
+                { "target", _classicTarget },
+                { "planDigest", _classicRecord.PlanDigest },
+                { "canonical", _classicPlan == null ? null : ClassicPlanDigest.Canonical(_classicPlan) },
+                { "steps", steps }
+            }.ToString(Formatting.Indented) + Environment.NewLine);
+        }
+
+        private void PublishClassicRecord()
+        {
+            _classicPublished = true;
+            ClassicCastRecord record = _classicRecord;
+            AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory, "classic-outcome.json"), new JObject
+            {
+                { "schemaVersion", 1 },
+                { "runId", _request.RunId },
+                { "scenario", _request.Scenario },
+                { "castingScenario", record.CastingScenario },
+                { "allowanceStatus", record.AllowanceStatus },
+                { "executionMode", record.ExecutionMode },
+                { "planDigest", record.PlanDigest },
+                { "planSteps", record.PlanSteps },
+                { "grant", record.Grant },
+                { "quickDisposition", record.QuickDisposition },
+                { "report", "planned=" + record.Planned + ";submitted=" + record.Submitted + ";confirmed=" +
+                    record.Confirmed + ";failed=" + record.Failed },
+                { "castingFirstRuns", record.CastingFirstRuns },
+                { "steps", new JArray(record.Steps.Select(step => (object)new JObject
+                    {
+                        { "index", step.StepIndex },
+                        { "provider", step.ProviderCanonical },
+                        { "levelZeroSpellbook", step.LevelZeroSpellbook },
+                        { "target", step.TargetUnitId },
+                        { "finalStatus", step.FinalStatus },
+                        { "transition", step.Transition },
+                        { "availableBefore", step.AvailableBefore.HasValue ? (JToken)step.AvailableBefore.Value : JValue.CreateNull() },
+                        { "availableAfter", step.AvailableAfter.HasValue ? (JToken)step.AvailableAfter.Value : JValue.CreateNull() },
+                        { "detail", step.Detail }
+                    }).ToArray()) },
+                { "finitePools", new JArray(record.FinitePools.Cast<object>().ToArray()) },
+                { "failures", new JArray(record.Failures.Cast<object>().ToArray()) },
+                { "violations", new JArray(record.Violations().Cast<object>().ToArray()) }
+            }.ToString(Formatting.Indented) + Environment.NewLine);
+            _log.Info("[KBP-CLASSIC] published;violations=" + string.Join("|", record.Violations().ToArray()) + ".");
+        }
+
         // Qualification scenario: the Unity-free driver runs the whole
         // sequence over the production path; this host only builds it with
         // the real adapters (fresh discovery, production executors, fresh
@@ -3064,6 +3427,18 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private CastingQualificationDriver _qualificationDriver;
         private CastingExecutionHost _qualificationHost;
         private int _qualificationRunsBefore = -1;
+
+        private readonly ClassicCastRecord _classicRecord = new ClassicCastRecord();
+        private int _classicStage;
+        private bool _classicWorkspaceClosed;
+        private bool _classicPublished;
+        private string _classicTarget;
+        private CastPlan _classicPlan;
+        private ClassicCastGrant _classicGrant;
+        private QuickExecutionResult _classicQuickBefore;
+        private Dictionary<int, ProbeObservation> _classicBefore;
+        private Dictionary<string, int> _classicPoolsBefore;
+        private System.Diagnostics.Stopwatch _classicClock;
         private bool _qualificationWorkspaceClosed;
         private bool _qualificationPublished;
 
@@ -3339,6 +3714,16 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             // in-flight executor restores temporary native state).
             if (_qualificationDriver != null) _qualificationDriver.Terminate(reason);
             if (_qualificationHost != null) _qualificationHost.Shutdown(reason);
+            if (RuntimeTestProtocol.IsClassicCastScenario(_request.Scenario) && _classicStage != 0 &&
+                !_classicPublished)
+            {
+                _classicRecord.Failures.Add("shutdown:" + reason);
+                try { PublishClassicRecord(); }
+                catch (Exception exception)
+                {
+                    _log.Error("[KBP-CLASSIC] record not published at shutdown.", exception);
+                }
+            }
             // Review P3-6: a run ended by shutdown still leaves its record.
             if (_qualificationDriver != null && !_qualificationPublished)
             {

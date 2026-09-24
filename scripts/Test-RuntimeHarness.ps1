@@ -1370,7 +1370,8 @@ try {
             @('live-cast-probe', 'Automation', $true),
             @('live-workspace-reload', 'Automation', $true), @('live-workspace-import', 'Automation', $true),
             @('live-workspace-qual', 'Advanced', $true),
-            @('live-cast-qual-select', 'Advanced', $true))) {
+            @('live-cast-qual-select', 'Advanced', $true),
+            @('live-classic-select', 'Automation', $false), @('live-classic-cast', 'Automation', $true))) {
         $policy = Get-KbpProtectedSavePolicy -Scenario $strictCase[0] -FixtureFamily $strictCase[1] -WorkingFileName 'W.zks'
         if (@($policy.allowedChanged).Count -ne 0 -or [bool]$policy.newFilesBlocking -ne $strictCase[2]) {
             throw ('The save policy for ' + $strictCase[0] + '/' + $strictCase[1] + ' is wrong.')

@@ -119,6 +119,7 @@
     <Compile Include="Execution\ExplicitCastingRunCoordinator.cs" />
     <Compile Include="Execution\SingleCastProbe.cs" />
     <Compile Include="Execution\AtWillCantripChoice.cs" />
+    <Compile Include="Execution\ClassicCastQualification.cs" />
     <Compile Include="Execution\CastingCapabilityInventory.cs" />
     <Compile Include="Execution\CastingQualification.cs" />
     <Compile Include="Execution\CastingQualificationDriver.cs" />

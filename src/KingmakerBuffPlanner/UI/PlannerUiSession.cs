@@ -548,8 +548,14 @@ namespace KingmakerBuffPlanner.UI
             }
             // An automation session never casts through the classic routes
             // either (NativeCastingSessionPolicy); the plan was still built
-            // and gated above, so the refusal is the only difference.
-            if (NativeCastingSessionPolicy.Locked)
+            // and gated above, so the refusal is the only difference. The
+            // one exception is an allowance-bound classic cast run's
+            // single-use grant for exactly this plan, routine and mode.
+            string grantRefusal = null;
+            if (NativeCastingSessionPolicy.Locked &&
+                !NativeCastingSessionPolicy.TryConsumeClassicGrant(routineId,
+                    Execution.ClassicPlanDigest.Of(preview.Plan), Model.Profile.Execution.Mode,
+                    preview.Plan.Steps.Count, out grantRefusal))
             {
                 LastExecutionReport = new ExecutionReport(preview.Plan);
                 Status = routineName + " was not cast: native casting is disabled in this " +
@@ -557,9 +563,12 @@ namespace KingmakerBuffPlanner.UI
                 Complete(completed, new QuickExecutionResult(routineId, routineName,
                     QuickExecutionDisposition.Refused, Status, preview.Plan.Steps.Count, 0, 0));
                 _log.Info("[KBP-QUICK] runtime-test lock refused;group=" + routineId +
-                    ";reason=" + NativeCastingSessionPolicy.LockReason + ".");
+                    ";reason=" + NativeCastingSessionPolicy.LockReason + ";grant=" + grantRefusal + ".");
                 yield break;
             }
+            if (NativeCastingSessionPolicy.Locked)
+                _log.Info("[KBP-QUICK] classic grant consumed;group=" + routineId + ";" +
+                    NativeCastingSessionPolicy.ClassicGrant.Describe() + ".");
             // The native state is about to change by design; the reviewed
             // baseline for this routine is spent with it.
             _review.Spent(routineId);

@@ -70,10 +70,12 @@ namespace KingmakerBuffPlanner.Tests
             Run("cantrips-cast-at-will-through-the-class-ability", TestCantripsCastAtWill);
             Run("at-will-cantrip-choice-refuses-what-is-not-the-authored-cantrip", TestAtWillCantripChoice);
             Run("capability-inventory-describes-the-party", TestCapabilityInventory);
+            Run("classic-cast-grant-digest-allowance-and-judgement", TestClassicCastCore);
             Run("qualification-finite-recipe", () => TestFiniteQualificationRecipe(root));
             Run("qualification-driver-refusals-and-deadline",
                 () => TestQualificationDriverRefusalsAndDeadline(root));
             Run("qualification-scenario-requests", () => TestQualificationScenarioRequests(root));
+            Run("classic-cast-scenario-requests-and-host-order", () => TestClassicScenarioRequests(root));
             // Last: it takes the process-wide runtime-test lock.
             Run("production-execution-wiring-and-session-lock", TestProductionExecutionWiring);
         }
@@ -1103,8 +1105,12 @@ namespace KingmakerBuffPlanner.Tests
             // The classic routine execution refuses under the session lock
             // before anything is spent or submitted.
             string classic = source(Path.Combine("UI", "PlannerUiSession.cs"));
-            int classicLock = classic.IndexOf("if (NativeCastingSessionPolicy.Locked)",
+            // The lock (with its one allowance-bound single-use exception for
+            // exactly the approved plan) precedes any spend or executor.
+            int classicLock = classic.Replace("\r\n", "\n").IndexOf(
+                "if (NativeCastingSessionPolicy.Locked &&\n                !NativeCastingSessionPolicy.TryConsumeClassicGrant(routineId,\n                    Execution.ClassicPlanDigest.Of(preview.Plan), Model.Profile.Execution.Mode,",
                 StringComparison.Ordinal);
+            classic = classic.Replace("\r\n", "\n");
             int classicSpend = classic.IndexOf("_review.Spent(routineId);", StringComparison.Ordinal);
             int classicExecutor = classic.IndexOf("ICastExecutor executor;", StringComparison.Ordinal);
             if (classicLock < 0 || classicSpend < 0 || classicExecutor < 0 ||
@@ -3042,6 +3048,132 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("A level-0 entry is priced as free without an at-will ability.");
         }
 
+        // The classic cast core: a plan digest that sees every step field; a
+        // single-use grant for exactly the approved routine, mode, plan and
+        // budget; the run-bound allowance; and the Unity-free judgement of a
+        // free classic cast (confirmed, effect applied, unlimited count
+        // unchanged, provenance recorded, a spellbook cantrip cast at will,
+        // no finite pool touched, no casting-first run).
+        private static void TestClassicCastCore()
+        {
+            CastingWorkspaceInputs inputs = QualificationInputs(true, true, null);
+            CastingQualificationSelection selection = CastingQualificationRecipe.SelectZeroCostMixed(
+                inputs, "fixture-campaign");
+            IReadOnlyList<CastingQualificationStepForecast> forecast = CastingQualificationForecast.Forecast(
+                selection, inputs, "fixture-campaign");
+            CastPlan stop = forecast[0].Projection.Plan;
+            CastPlan complete = forecast[1].Projection.Plan;
+            string digest = ClassicPlanDigest.Of(stop);
+            if (digest.Length != 64 || digest != ClassicPlanDigest.Of(stop) ||
+                digest == ClassicPlanDigest.Of(complete) ||
+                !ClassicPlanDigest.Canonical(stop).Contains("provider=") ||
+                !ClassicPlanDigest.Canonical(stop).StartsWith("steps=1:3;", StringComparison.Ordinal))
+                throw new InvalidOperationException("The classic plan digest is not exact: " +
+                    ClassicPlanDigest.Canonical(stop));
+            var grant = new ClassicCastGrant("run-1", "long", digest, "animated", 3);
+            string refusal;
+            if (grant.TryConsume("short", digest, "animated", 3, out refusal) ||
+                refusal != "classic-grant-routine:short" ||
+                grant.TryConsume("long", digest, "instant", 3, out refusal) ||
+                refusal != "classic-grant-mode:instant" ||
+                grant.TryConsume("long", new string('0', 64), "animated", 3, out refusal) ||
+                refusal != "classic-grant-plan-differs" ||
+                grant.TryConsume("long", digest, "animated", 4, out refusal) ||
+                refusal != "classic-grant-cap:4>3" ||
+                !grant.TryConsume("long", digest, "animated", 3, out refusal) || refusal != null ||
+                grant.TryConsume("long", digest, "animated", 3, out refusal) ||
+                refusal != "classic-grant-consumed" || grant.Attempts != 6 || !grant.Consumed)
+                throw new InvalidOperationException("The classic grant is not single-use and exact: " + refusal);
+            Func<Action<JObject>, string> allowanceJson = mutate =>
+            {
+                var root = new JObject
+                {
+                    { "schemaVersion", 1 }, { "kind", "kbp-classic-cast" }, { "runId", "classic-run-1" },
+                    { "sourceCommit", new string('c', 40) }, { "packageSha256", new string('a', 64) },
+                    { "dllSha256", new string('b', 64) }, { "assemblyMvid", "11111111-2222-3333-4444-555555555555" },
+                    { "fixtureGameId", "fixture-game" }, { "executionMode", "animated" }, { "routineId", "long" },
+                    { "approvedPlanDigest", digest }, { "maximumNativeSubmissions", 3 },
+                    { "approvedBy", "Howie" }, { "authority", "owner mission 2026-09-23 batch 3 section 6" }
+                };
+                if (mutate != null) mutate(root);
+                return root.ToString();
+            };
+            ClassicCastAllowance allowance = ClassicCastAllowance.Parse(allowanceJson(null), "classic-run-1", out refusal);
+            if (allowance == null || refusal != null || allowance.ApprovedPlanDigest != digest ||
+                allowance.ExecutionMode != "animated" || allowance.MaximumNativeSubmissions != 3)
+                throw new InvalidOperationException("A valid classic allowance was refused: " + refusal);
+            var cases = new Dictionary<string, Action<JObject>>
+            {
+                { "allowance-unknown-member:extra", o => o["extra"] = 1 },
+                { "allowance-missing-member:approvedPlanDigest", o => o.Remove("approvedPlanDigest") },
+                { "allowance-schema", o => o["schemaVersion"] = 2 },
+                { "allowance-kind", o => o["kind"] = "kbp-casting-qualification" },
+                { "allowance-submissions-range", o => o["maximumNativeSubmissions"] = 25 },
+                { "allowance-artifact-identity", o => o["dllSha256"] = "short" },
+                { "allowance-execution-mode", o => o["executionMode"] = "hybrid" },
+                { "allowance-routine", o => o["routineId"] = "all" },
+                { "allowance-plan-digest", o => o["approvedPlanDigest"] = "XYZ" },
+                { "allowance-approval-missing", o => o["approvedBy"] = string.Empty }
+            };
+            foreach (KeyValuePair<string, Action<JObject>> item in cases)
+                if (ClassicCastAllowance.Parse(allowanceJson(item.Value), "classic-run-1", out refusal) != null ||
+                    refusal != item.Key)
+                    throw new InvalidOperationException("Classic allowance case " + item.Key + " returned " + refusal);
+            if (ClassicCastAllowance.Parse(allowanceJson(null), "other-run", out refusal) != null ||
+                refusal != "allowance-run-mismatch")
+                throw new InvalidOperationException("A classic allowance served another run.");
+            Func<ClassicCastRecord> good = () =>
+            {
+                var record = new ClassicCastRecord
+                {
+                    CastingScenario = true, AllowanceStatus = "valid", ExecutionMode = "animated",
+                    PlanDigest = digest, PlanSteps = 1, Grant = "consumed", GrantConsumed = true,
+                    GrantAttempts = 1, QuickDisposition = "Completed", Planned = 1, Submitted = 1,
+                    Confirmed = 1, Failed = 0, CastingFirstRuns = 0
+                };
+                record.Steps.Add(new ClassicCastStepResult(0, "provider", true, "unit-t1")
+                {
+                    FinalStatus = "EffectConfirmed", Transition = "new-instance", AvailableBefore = -1,
+                    AvailableAfter = -1, Detail = "expected-effects-observed;resolution:at-will-cantrip-ability;authored=spellbook:b/level-0"
+                });
+                record.FinitePools.Add("unit|book|spontaneous-1:2>2");
+                return record;
+            };
+            if (good().Violations().Count != 0)
+                throw new InvalidOperationException("A clean classic cast was refused: " +
+                    string.Join("|", good().Violations().ToArray()));
+            var shapes = new Dictionary<string, Action<ClassicCastRecord>>
+            {
+                { "step0:status:TimedOutUnconfirmed", r => r.Steps[0].FinalStatus = "TimedOutUnconfirmed" },
+                { "step0:effect:unchanged", r => r.Steps[0].Transition = "unchanged" },
+                { "step0:availability:-1>0", r => r.Steps[0].AvailableAfter = 0 },
+                { "step0:availability:0>0", r => { r.Steps[0].AvailableBefore = 0; r.Steps[0].AvailableAfter = 0; } },
+                { "step0:availability-unread", r => r.Steps[0].AvailableBefore = null },
+                { "step0:resolution-unrecorded", r => r.Steps[0].Detail = "expected-effects-observed" },
+                { "step0:cantrip-not-at-will", r => r.Steps[0].Detail = "ok;resolution:known-spell:spellbook:b" },
+                { "grant:consumed", r => r.GrantAttempts = 2 },
+                { "disposition:Refused", r => r.QuickDisposition = "Refused" },
+                { "report:planned=1;submitted=1;confirmed=0;failed=1;steps=1", r => { r.Confirmed = 0; r.Failed = 1; } },
+                { "finite-pool:unit|book|spontaneous-1:2>1", r => r.FinitePools[0] = "unit|book|spontaneous-1:2>1" },
+                { "casting-first-runs:1", r => r.CastingFirstRuns = 1 },
+                { "allowance:execution-mode-mismatch", r => r.AllowanceStatus = "execution-mode-mismatch" }
+            };
+            foreach (KeyValuePair<string, Action<ClassicCastRecord>> shape in shapes)
+            {
+                ClassicCastRecord bad = good();
+                shape.Value(bad);
+                if (!bad.Violations().Contains(shape.Key))
+                    throw new InvalidOperationException("Classic judgement missed " + shape.Key + ": " +
+                        string.Join("|", bad.Violations().ToArray()));
+            }
+            var select = new ClassicCastRecord { CastingScenario = false, PlanDigest = digest, PlanSteps = 1 };
+            if (select.Violations().Count != 0)
+                throw new InvalidOperationException("A clean classic selection was refused.");
+            select.GrantAttempts = 1;
+            if (!select.Violations().Contains("select-grant-used"))
+                throw new InvalidOperationException("A selection run used the classic grant.");
+        }
+
         // The read-only capability inventory lists every unit, pool and
         // provider option the planner's own discovery sees, with the
         // effect's recipient shape (direct, self, pet, party, area).
@@ -3431,6 +3563,139 @@ namespace KingmakerBuffPlanner.Tests
                         string.Join(",", world.Fired.ToArray()) + " terminal=" + record.TerminalReason +
                         " failures=" + string.Join("|", record.Failures.ToArray()));
             }
+        }
+
+        // The classic cast scenarios: no-input workspace scenarios on the
+        // automation fixture only; the classic allowance only on the cast
+        // scenario; either casting mode. The host reads the allowance and
+        // every before-state before it arms the single-use grant, presses
+        // only after arming, never arms in a selection run, and judges only
+        // a result the press itself produced.
+        private static void TestClassicScenarioRequests(string root)
+        {
+            if (!RuntimeTestProtocol.IsClassicCastScenario("live-classic-select") ||
+                !RuntimeTestProtocol.IsClassicCastScenario("live-classic-cast") ||
+                RuntimeTestProtocol.IsCastingClassicScenario("live-classic-select") ||
+                !RuntimeTestProtocol.IsCastingClassicScenario("live-classic-cast") ||
+                !RuntimeTestProtocol.IsNoInputWorkspaceScenario("live-classic-cast") ||
+                !RuntimeTestProtocol.IsWorkspaceScenario("live-classic-select") ||
+                RuntimeTestProtocol.IsQualificationScenario("live-classic-cast") ||
+                RuntimeTestProtocol.IsAdvancedFamilyScenario("live-classic-cast") ||
+                RuntimeTestProtocol.IsProbeScenario("live-classic-cast") ||
+                RuntimeTestProtocol.IsClassicCastScenario("live-cast-qual"))
+                throw new InvalidOperationException("Classic scenario classification is wrong.");
+            Func<string, string, string, string, Action<Dictionary<string, object>>> set =
+                (scenario, family, extra, mode) => o =>
+                {
+                    o["scenario"] = scenario;
+                    var parameters = new Dictionary<string, object>
+                    {
+                        { "workingSaveName", family + "_WORKING" },
+                        { "workingFileName", "Manual_305_" + family + "_WORKING.zks" },
+                        { "workingSha256", new string('a', 64) },
+                        { "baselineSaveName", family + "_BASELINE" },
+                        { "baselineFileName", "Manual_304_" + family + "_BASELINE.zks" },
+                        { "baselineSha256", new string('b', 64) },
+                        { "expectedGameName", "Hedwirg" },
+                        { "expectedGameId", "df33d1ff-4ec8-4707-bfa0-5e059bf9a049" },
+                        { "executionMode", mode }
+                    };
+                    if (extra == "classic") parameters["classicAllowance"] = "{}";
+                    if (extra == "classic-number") parameters["classicAllowance"] = 1;
+                    if (extra == "qualification") parameters["qualificationAllowance"] = "{}";
+                    if (extra == "recipe") parameters["qualificationRecipe"] = "zero-cost-mixed";
+                    o["parameters"] = parameters;
+                };
+            var accepted = new Dictionary<string, Action<Dictionary<string, object>>>
+            {
+                { "select-animated", set("live-classic-select", "KBP_AUTOMATION", null, "animated") },
+                { "select-instant", set("live-classic-select", "KBP_AUTOMATION", null, "instant") },
+                { "cast-animated", set("live-classic-cast", "KBP_AUTOMATION", "classic", "animated") },
+                { "cast-instant", set("live-classic-cast", "KBP_AUTOMATION", "classic", "instant") },
+                // Without the allowance the host refuses before any grant.
+                { "cast-without-allowance", set("live-classic-cast", "KBP_AUTOMATION", null, "animated") }
+            };
+            var refused = new Dictionary<string, Action<Dictionary<string, object>>>
+            {
+                { "select-with-allowance", set("live-classic-select", "KBP_AUTOMATION", "classic", "animated") },
+                { "allowance-not-string", set("live-classic-cast", "KBP_AUTOMATION", "classic-number", "animated") },
+                { "advanced-select", set("live-classic-select", "KBP_ADVANCED", null, "animated") },
+                { "advanced-cast", set("live-classic-cast", "KBP_ADVANCED", "classic", "animated") },
+                { "qualification-allowance", set("live-classic-cast", "KBP_AUTOMATION", "qualification", "animated") },
+                { "recipe", set("live-classic-select", "KBP_AUTOMATION", "recipe", "animated") },
+                { "classic-on-qualification", set("live-cast-qual", "KBP_AUTOMATION", "classic", "instant") },
+                { "classic-on-workspace", set("live-workspace-qual", "KBP_AUTOMATION", "classic", "instant") },
+                { "unknown-mode", set("live-classic-cast", "KBP_AUTOMATION", "classic", "hybrid") }
+            };
+            string rejection;
+            foreach (KeyValuePair<string, Action<Dictionary<string, object>>> item in accepted)
+            {
+                string path = WriteRequest(root, "classic-ok-" + item.Key, item.Value);
+                if (ReadProtocol(new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path },
+                        out rejection) == null || rejection.Length != 0)
+                    throw new InvalidOperationException("A valid classic request was refused: " +
+                        item.Key + ":" + rejection);
+            }
+            foreach (KeyValuePair<string, Action<Dictionary<string, object>>> item in refused)
+            {
+                string path = WriteRequest(root, "classic-bad-" + item.Key, item.Value);
+                if (ReadProtocol(new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path },
+                        out rejection) != null || string.IsNullOrEmpty(rejection))
+                    throw new InvalidOperationException("An invalid classic request was accepted: " + item.Key);
+            }
+            DirectoryInfo directory = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
+            while (directory != null && !File.Exists(Path.Combine(directory.FullName, "KingmakerBuffPlanner.sln")))
+                directory = directory.Parent;
+            if (directory == null) throw new InvalidOperationException("Repository root was not discoverable.");
+            string source = Path.Combine(directory.FullName, "src", "KingmakerBuffPlanner");
+            string host = File.ReadAllText(Path.Combine(source, "RuntimeTesting", "RuntimeTestHost.cs"))
+                .Replace("\r\n", "\n");
+            string classic = SourceBlock(host, "private bool UpdateClassicCast()");
+            string arming = classic == null ? null : SourceBlock(classic, "if (_classicStage == 2)");
+            string authoring = classic == null ? null : SourceBlock(classic, "if (_classicStage == 1)");
+            string judging = classic == null ? null : SourceBlock(classic, "if (_classicStage == 3)");
+            if (arming == null || authoring == null || judging == null)
+                throw new InvalidOperationException("The classic host stages were not found.");
+            int allowanceRead = arming.IndexOf("ReadClassicAllowance();", StringComparison.Ordinal);
+            int beforeRead = arming.IndexOf("new KingmakerProbeObserver().Observe(step, \"classic-before:\"", StringComparison.Ordinal);
+            int poolsRead = arming.IndexOf("_classicPoolsBefore = ClassicFinitePools();", StringComparison.Ordinal);
+            int arm = arming.IndexOf("UI.NativeCastingSessionPolicy.ArmClassicGrant(_classicGrant)", StringComparison.Ordinal);
+            int quickBefore = arming.IndexOf("_classicQuickBefore = BuffPlannerUiRoot.QuickResultForRuntime(\"long\");", StringComparison.Ordinal);
+            int press = arming.IndexOf("if (!BuffPlannerUiRoot.PressRoutineForRuntime(\"long\"))", StringComparison.Ordinal);
+            if (allowanceRead < 0 || beforeRead < 0 || poolsRead < 0 || arm < 0 || quickBefore < 0 || press < 0 ||
+                !(allowanceRead < beforeRead && beforeRead < poolsRead && poolsRead < arm && arm < quickBefore &&
+                    quickBefore < press) ||
+                !arming.Contains("if (allowance == null) return FailClassic(") ||
+                !arming.Contains("before.AvailableForCast == null)") ||
+                Occurrences(host, "ArmClassicGrant(") != 1 ||
+                Occurrences(host, "PressRoutineForRuntime(\"long\")") != 1)
+                throw new InvalidOperationException("The classic host arms or presses before its allowance and before-reads.");
+            int selectReturn = authoring.IndexOf("if (!_classicRecord.CastingScenario)", StringComparison.Ordinal);
+            if (selectReturn < 0 || authoring.Contains("ArmClassicGrant") || authoring.Contains("PressRoutineForRuntime") ||
+                !SourceBlock(authoring, "if (!_classicRecord.CastingScenario)").Contains("return true;") ||
+                !authoring.Contains("BuffPlannerUiRoot.CloseRuntimeSmoke();"))
+                throw new InvalidOperationException("A classic selection run can reach the grant or the press.");
+            if (!judging.Contains("ReferenceEquals(quick, _classicQuickBefore)") ||
+                !judging.Contains("BuffPlannerUiRoot.IsExecutingForRuntime") ||
+                !judging.Contains("RuntimeTestProtocol.ClassicRunDeadlineSeconds"))
+                throw new InvalidOperationException("The classic host can judge a result its press did not produce.");
+            // The classic scenario routes to its own phase before the
+            // qualification routing, and its record survives a shutdown.
+            int classicRoute = host.IndexOf("if (RuntimeTestProtocol.IsClassicCastScenario(_request.Scenario))\n" +
+                "                    {\n                        // Classic: back to the Classic planner and its routes.\n" +
+                "                        _liveUiPhase = 110;", StringComparison.Ordinal);
+            int qualificationRoute = host.IndexOf("                        // Qualification: the production-path driver.",
+                StringComparison.Ordinal);
+            if (classicRoute < 0 || qualificationRoute < 0 || classicRoute > qualificationRoute ||
+                !host.Contains("if (_liveUiPhase == 110)\n            {\n                return UpdateClassicCast();") ||
+                !host.Contains("_classicRecord.Failures.Add(\"shutdown:\" + reason);"))
+                throw new InvalidOperationException("The classic scenario is not routed or recorded as designed.");
+            string policy = File.ReadAllText(Path.Combine(source, "UI", "NativeCastingSessionPolicy.cs"))
+                .Replace("\r\n", "\n");
+            string armBlock = SourceBlock(policy, "internal static bool ArmClassicGrant(");
+            if (armBlock == null || !armBlock.Contains("if (!Locked || grant == null || ClassicGrant != null) return false;") ||
+                Occurrences(policy, "ClassicGrant = ") != 1)
+                throw new InvalidOperationException("The classic grant can be armed outside a locked session or twice.");
         }
 
         // The qualification scenarios: no-input workspace scenarios, the

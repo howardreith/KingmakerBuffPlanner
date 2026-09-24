@@ -262,7 +262,15 @@ try {
         @{ Name = 'qual-select-animated'; Expect = '*instant mode only*'
            Args = @('-Scenario', 'live-cast-qual-select', '-ExecutionMode', 'animated', '-TimeoutSeconds', '900', '-WhatIf') },
         @{ Name = 'qual-select-short-timeout'; Expect = '*at least 900*'
-           Args = @('-Scenario', 'live-cast-qual-select', '-WhatIf') }
+           Args = @('-Scenario', 'live-cast-qual-select', '-WhatIf') },
+        @{ Name = 'classic-without-allowance'; Expect = '*requires -ClassicAllowancePath*'
+           Args = @('-Scenario', 'live-classic-cast', '-RunId', 'classic-gate-test', '-TimeoutSeconds', '900', '-WhatIf') },
+        @{ Name = 'classic-allowance-outside-approvals'; Expect = '*classic allowance must be an existing file under*'
+           Args = @('-Scenario', 'live-classic-cast', '-RunId', 'classic-gate-test', '-ClassicAllowancePath', $outsideQualification, '-TimeoutSeconds', '900', '-WhatIf') },
+        @{ Name = 'classic-select-with-allowance'; Expect = '*only valid with -Scenario live-classic-cast*'
+           Args = @('-Scenario', 'live-classic-select', '-ClassicAllowancePath', $outsideQualification, '-TimeoutSeconds', '900', '-WhatIf') },
+        @{ Name = 'classic-select-short-timeout'; Expect = '*at least 900*'
+           Args = @('-Scenario', 'live-classic-select', '-WhatIf') }
     )
     foreach ($case in $qualificationCases) {
         $ErrorActionPreference = 'Continue'
@@ -322,6 +330,37 @@ $launcherText = Get-Content -LiteralPath $launcher -Raw
 if ($launcherText -notmatch '-Recipe \$QualificationRecipe -ExecutionMode \$ExecutionMode' -or
     $launcherText -match "live-cast-qual runs in instant mode only") {
     throw 'The launcher does not bind the casting run to its allowance mode.'
+}
+# The classic allowance binds the build, one casting mode and a budget.
+function New-ClassicFixtureJson([hashtable]$Override) {
+    $value = [ordered]@{ schemaVersion = 1; kind = 'kbp-classic-cast'; runId = 'classic-bind-test'
+        sourceCommit = ('c' * 40); packageSha256 = ('a' * 64); dllSha256 = ('b' * 64)
+        assemblyMvid = '11111111-2222-3333-4444-555555555555'; fixtureGameId = 'game'
+        executionMode = 'animated'; routineId = 'long'; approvedPlanDigest = ('d' * 64); maximumNativeSubmissions = 3
+        approvedBy = 'Howie'; authority = 'owner mission 2026-09-23 batch 3 section 6' }
+    foreach ($key in $Override.Keys) { $value[$key] = $Override[$key] }
+    return ($value | ConvertTo-Json -Compress)
+}
+if ($null -ne (Get-KbpClassicAllowanceBuildRefusal -AllowanceJson (New-ClassicFixtureJson @{}) `
+        -RunId 'classic-bind-test' -BuildManifest $manifestFixture -ExecutionMode 'animated')) {
+    throw 'A matching classic allowance was refused by the build binding.'
+}
+$classicBindingCases = [ordered]@{
+    'package' = @{ packageSha256 = ('d' * 64) }; 'dll' = @{ dllSha256 = ('e' * 64) }
+    'mvid' = @{ assemblyMvid = '99999999-2222-3333-4444-555555555555' }
+    'commit' = @{ sourceCommit = ('f' * 40) }; 'run-id' = @{ runId = 'other-run' }
+    'kind' = @{ kind = 'kbp-casting-qualification' }; 'schema' = @{ schemaVersion = 2 }
+    'execution-mode' = @{ executionMode = 'hybrid' }; 'routine' = @{ routineId = 'short' }
+    'plan-digest' = @{ approvedPlanDigest = 'XYZ' }; 'submissions' = @{ maximumNativeSubmissions = 25 }
+}
+foreach ($case in $classicBindingCases.Keys) {
+    $refusal = Get-KbpClassicAllowanceBuildRefusal -AllowanceJson (New-ClassicFixtureJson $classicBindingCases[$case]) `
+        -RunId 'classic-bind-test' -BuildManifest $manifestFixture -ExecutionMode 'animated'
+    if ($refusal -cne $case) { throw "Classic binding case $case returned '$refusal'." }
+}
+if ((Get-KbpClassicAllowanceBuildRefusal -AllowanceJson (New-ClassicFixtureJson @{}) -RunId 'classic-bind-test' `
+        -BuildManifest $manifestFixture -ExecutionMode 'instant') -cne 'execution-mode-differs') {
+    throw 'A classic allowance ran in another casting mode.'
 }
 # The finite recipe binds; a recipe named on the launcher must match.
 $finiteJson = New-QualificationFixtureJson @{ recipe = 'finite-direct-mixed' }

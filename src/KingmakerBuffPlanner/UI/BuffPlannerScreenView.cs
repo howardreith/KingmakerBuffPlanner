@@ -307,11 +307,18 @@ namespace KingmakerBuffPlanner.UI
         }
         internal bool DispatchBlessRowForRuntime()
         {
-            if (_session.Model == null) return false;
-            const string bless = "90e59f4a4ada87243b7b3535a06d0638";
+            return DispatchSourceRowForRuntime("90e59f4a4ada87243b7b3535a06d0638");
+        }
+
+        // Selects the row of the given ability through the grid's own
+        // selection handler (a spellbook row first, as a player would find
+        // the spell in the spellbook).
+        internal bool DispatchSourceRowForRuntime(string abilityGuid)
+        {
+            if (_session.Model == null || string.IsNullOrEmpty(abilityGuid)) return false;
             SetupSourceRow source = _session.Model.Sources.Where(item =>
-                    item.Abilities.Any(ability => ability.BaseAbilityGuid == bless ||
-                        ability.VariantGuid == bless))
+                    item.Abilities.Any(ability => ability.BaseAbilityGuid == abilityGuid ||
+                        ability.VariantGuid == abilityGuid))
                 .OrderBy(item => item.Ability.SourceKind == SourceKind.Spellbook ? 0 : 1)
                 .FirstOrDefault();
             return source != null && _grid.SelectForRuntime(source.SourceId) &&
