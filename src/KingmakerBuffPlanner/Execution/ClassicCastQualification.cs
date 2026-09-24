@@ -270,6 +270,11 @@ namespace KingmakerBuffPlanner.Execution
         public int GrantAttempts { get; set; }
         public string QuickDisposition { get; set; }
         public int Planned { get; set; }
+        // How the executor issued each step: the animated executor queues
+        // and starts a native command (Queued, CastStarted), the instant
+        // executor submits the rule (Submitted); neither records the other.
+        public int Queued { get; set; }
+        public int CastStarted { get; set; }
         public int Submitted { get; set; }
         public int Confirmed { get; set; }
         public int Failed { get; set; }
@@ -279,6 +284,15 @@ namespace KingmakerBuffPlanner.Execution
         // pool of the party: no finite resource may change for free casts.
         public List<string> FinitePools { get; } = new List<string>();
         public List<string> Failures { get; } = new List<string>();
+
+        public string ReportLine
+        {
+            get
+            {
+                return "planned=" + Planned + ";queued=" + Queued + ";started=" + CastStarted + ";submitted=" +
+                    Submitted + ";confirmed=" + Confirmed + ";failed=" + Failed;
+            }
+        }
 
         public IList<string> Violations()
         {
@@ -294,9 +308,13 @@ namespace KingmakerBuffPlanner.Execution
             if (AllowanceStatus != "valid") violations.Add("allowance:" + AllowanceStatus);
             if (!GrantConsumed || GrantAttempts != 1) violations.Add("grant:" + (Grant ?? "none"));
             if (QuickDisposition != "Completed") violations.Add("disposition:" + (QuickDisposition ?? "none"));
-            if (Planned != PlanSteps || Confirmed != PlanSteps || Submitted != PlanSteps || Failed != 0)
-                violations.Add("report:planned=" + Planned + ";submitted=" + Submitted + ";confirmed=" +
-                    Confirmed + ";failed=" + Failed + ";steps=" + PlanSteps);
+            bool animated = ExecutionMode == "animated";
+            if (!animated && ExecutionMode != "instant") violations.Add("mode:" + (ExecutionMode ?? "none"));
+            bool issued = animated
+                ? Queued == PlanSteps && CastStarted == PlanSteps
+                : Submitted == PlanSteps;
+            if (Planned != PlanSteps || Confirmed != PlanSteps || !issued || Failed != 0)
+                violations.Add("report:" + ReportLine + ";steps=" + PlanSteps + ";mode=" + (ExecutionMode ?? "none"));
             if (Steps.Count != PlanSteps) violations.Add("steps-observed:" + Steps.Count);
             foreach (ClassicCastStepResult step in Steps)
             {
