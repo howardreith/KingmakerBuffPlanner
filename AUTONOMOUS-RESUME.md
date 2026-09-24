@@ -1,6 +1,49 @@
 # AUTONOMOUS-RESUME — top section is current; planning/CASTING-FIRST-MIGRATION-STATUS.md is the per-checkpoint tracker.
 
-## Release candidate 0.2.0-rc4 frozen at `863a182` (2026-09-24, LATEST)
+## Advanced seed and the path to rc5 (2026-09-24, LATEST)
+
+The owner created `KBP_ADVANCED_SEED` (a disposable *Beneath the Stolen
+Lands* save: cleric, brown-fur transmuter (Arcanist), alchemist with
+Transfusion, fighter; level 9; Gunslinger 0.0.136) and asked for the
+advanced qualification plus two rc4 source fixes and a mixed-coverage
+group case. Evidence from this fixture is labelled as a Beneath the Stolen
+Lands fixture, never as proof of main-campaign-specific behaviour.
+
+Done so far (O1 branch, not yet pushed as of this note):
+- `a134f0a` profile `advanced-gunslinger-0136` (the six approved 0.0.136
+  values, staged from the exact copy `examples\KingmakerGunslinger-0.0.136`
+  taken from the Gunslinger lab's 08:31 pre-deploy snapshot); BagOfTricks
+  resealed in both profiles as a frozen copy (`examples\BagOfTricks-20260924`,
+  cheats verified off; it rewrites Settings.xml at every game exit); the
+  launcher and host refuse any other pairing of profile and fixture.
+- `cb684f2` rc4 source review: reused archives verified byte-exact;
+  unreadable suppression or caster level never proves sufficiency.
+- `cbdc2fd` + `0c81925` mixed-coverage group castings (pre-covered
+  recipients keep their coverage) and the corrected skip-if-active claim.
+- `7de4726`, `b3621bf` inspection records the capability inventory with
+  effect leaves; `2e565bd` variant spells are plain buffs of themselves
+  (the finite selection had refused every variant) and the `group-mixed`
+  qualification recipe.
+- Live (advanced copy, from checkout `repo/KingmakerBuffPlanner-A1`,
+  builds frozen under `runtime-backups/qualification-frozen/`):
+  `advanced-inspect-20260924-01` PASS (non-casting; campaign
+  cb1f405d..., Tenebrous Depths I, party level 9, no pets, no unreadable
+  buff detail); `casting-qual-select-20260924-adv-finite-01` refused
+  (the variant-shape defect, fixed in `2e565bd`; nothing cast).
+
+Coordination: the Gunslinger development session shares this Kingmaker
+installation. Each side takes its own lock (ours
+`runtime-state\deployment.lock`, theirs `compatibility.lock`), waits for
+quiet, and messages before and after a batch; our runs stage frozen copies
+of Gunslinger and BagOfTricks and restore its installed state.
+
+Next: finite and group selections and casting runs on `2e565bd` (both
+modes), a full gate, push, the non-rod enhancement case (Powerful Change)
+if it can be observed, then rc5: freeze, chain (Classic regression,
+zero-cost, import, advanced inspect, finite, group), install/rollback,
+receipt, handoff.
+
+## Release candidate 0.2.0-rc4 frozen at `863a182` (2026-09-24)
 
 rc3 (`ea2a027`) was superseded after its final review; rc4 fixes those
 findings and four further independent review rounds of the fixes
