@@ -71,7 +71,7 @@ namespace KingmakerBuffPlanner.Infrastructure
                     throw new IOException("archive-read-back-differs:" + Path.GetFileName(path));
                 return path;
             }
-            string keyed = Path.Combine(directory, stem + ".sha256-" +
+            string keyed = Path.Combine(directory, stem + ".h" +
                 Hashing.Sha256Bytes(bytes).Substring(0, 16) + ".orig");
             if (File.Exists(keyed))
             {

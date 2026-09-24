@@ -142,7 +142,7 @@ namespace KingmakerBuffPlanner.UI
             string value = note ?? string.Empty;
             if (unitName != null)
                 foreach (string prefix in new[] { "already-active:", "already-covered:", "already-covered-longer:",
-                    "existing-active-recast:", "existing-insufficient:" })
+                    "existing-active-recast:", "existing-insufficient:", "existing-incomplete:" })
                     if (value.StartsWith(prefix, StringComparison.Ordinal))
                     {
                         string unit = FirstSegment(value, prefix);
@@ -162,6 +162,8 @@ namespace KingmakerBuffPlanner.UI
             if (value.StartsWith("existing-active-recast:", StringComparison.Ordinal))
                 return "active on " + FirstSegment(value, "existing-active-recast:") +
                     " but set to always recast";
+            if (value.StartsWith("existing-incomplete:", StringComparison.Ordinal))
+                return "partly present on " + FirstSegment(value, "existing-incomplete:") + " (will cast)";
             if (value.StartsWith("existing-insufficient:", StringComparison.Ordinal))
             {
                 string unit = FirstSegment(value, "existing-insufficient:");
