@@ -23,5 +23,31 @@ namespace KingmakerBuffPlanner.UI
             LockReason = "native-submission-disabled:runtime-test-session:" +
                 (string.IsNullOrEmpty(scenario) ? "unknown" : scenario);
         }
+
+        // The one exception an allowance-bound classic cast run arms: a
+        // single execution of exactly its approved classic plan. Armed only
+        // inside a locked session; every other classic execution stays
+        // refused.
+        internal static Execution.ClassicCastGrant ClassicGrant { get; private set; }
+
+        internal static bool ArmClassicGrant(Execution.ClassicCastGrant grant)
+        {
+            if (!Locked || grant == null || ClassicGrant != null) return false;
+            ClassicGrant = grant;
+            return true;
+        }
+
+        // Whether the locked classic route may execute this plan now (once).
+        internal static bool TryConsumeClassicGrant(string routineId, string planDigest,
+            string executionMode, int plannedSteps, out string refusal)
+        {
+            Execution.ClassicCastGrant grant = ClassicGrant;
+            if (grant == null)
+            {
+                refusal = "classic-grant-absent";
+                return false;
+            }
+            return grant.TryConsume(routineId, planDigest, executionMode, plannedSteps, out refusal);
+        }
     }
 }

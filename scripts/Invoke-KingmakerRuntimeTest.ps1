@@ -1,6 +1,6 @@
 ﻿[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
 param(
-    [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'live-ui-bootstrap', 'ui-native-contract-probe', 'final-no-save-core', 'performance-probe', 'launch-render-diagnostic', 'menu-input-diagnostic', 'live-workspace-qual', 'live-workspace-reload', 'live-workspace-import', 'live-workspace-manual', 'live-cast-probe-select', 'live-cast-probe', 'live-advanced-inspect', 'live-cast-qual-select', 'live-cast-qual')][string]$Scenario = 'mod-load-smoke',
+    [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'live-ui-bootstrap', 'ui-native-contract-probe', 'final-no-save-core', 'performance-probe', 'launch-render-diagnostic', 'menu-input-diagnostic', 'live-workspace-qual', 'live-workspace-reload', 'live-workspace-import', 'live-workspace-manual', 'live-cast-probe-select', 'live-cast-probe', 'live-advanced-inspect', 'live-cast-qual-select', 'live-cast-qual', 'live-classic-select', 'live-classic-cast')][string]$Scenario = 'mod-load-smoke',
     [ValidateSet('native-only', 'call-of-the-wild', 'human-reproduction', 'full-user')][string]$CompatibilityProfileId = 'native-only',
     [ValidateRange(5, 1800)][int]$TimeoutSeconds = 180,
     [ValidateRange(5, 300)][int]$LaunchTimeoutSeconds = 60,
@@ -35,6 +35,11 @@ param(
     # run defaults to zero-cost-mixed; a casting run takes its recipe from
     # the allowance, and when this is given as well it must name the same.
     [ValidateSet('zero-cost-mixed', 'finite-direct-mixed')][string]$QualificationRecipe,
+    # Classic cast (live-classic-cast only): the run-bound kbp-classic-cast
+    # allowance under the lab approvals directory naming the exact classic
+    # plan digest (from a live-classic-select run), the casting mode and a
+    # 1..24 submission budget.
+    [string]$ClassicAllowancePath,
     # Fixture family: the approved automation pair (default) or the
     # owner-designated advanced copy. The advanced copy is loaded only by
     # non-casting scenarios and only when it matches its guarded bootstrap
@@ -115,6 +120,30 @@ if ($Scenario -ceq 'live-cast-qual') {
 elseif (-not [string]::IsNullOrWhiteSpace($QualificationAllowancePath)) {
     throw '-QualificationAllowancePath is only valid with -Scenario live-cast-qual.'
 }
+$classicAllowanceJson = $null
+if ($Scenario -ceq 'live-classic-cast') {
+    if ([string]::IsNullOrWhiteSpace($ClassicAllowancePath)) {
+        throw 'live-classic-cast requires -ClassicAllowancePath (the run-bound classic allowance).'
+    }
+    if ([string]::IsNullOrWhiteSpace($RunId)) { throw 'live-classic-cast requires an explicit -RunId matching the allowance.' }
+    $classicApprovals = [IO.Path]::GetFullPath((Join-Path $root '..\..\approvals')).TrimEnd('\') + '\'
+    $classicFull = [IO.Path]::GetFullPath($ClassicAllowancePath)
+    if (-not $classicFull.StartsWith($classicApprovals, [StringComparison]::OrdinalIgnoreCase) -or
+        -not (Test-Path -LiteralPath $classicFull -PathType Leaf)) {
+        throw "The classic allowance must be an existing file under $classicApprovals"
+    }
+    $classicAllowanceJson = [IO.File]::ReadAllText($classicFull)
+    $classicRefusal = Get-KbpClassicAllowanceBuildRefusal -AllowanceJson $classicAllowanceJson `
+        -RunId $RunId -BuildManifest $buildManifest -ExecutionMode $ExecutionMode
+    if ($null -ne $classicRefusal) { throw "The classic allowance was refused: $classicRefusal" }
+}
+elseif (-not [string]::IsNullOrWhiteSpace($ClassicAllowancePath)) {
+    throw '-ClassicAllowancePath is only valid with -Scenario live-classic-cast.'
+}
+if (($Scenario -ceq 'live-classic-cast' -or $Scenario -ceq 'live-classic-select') -and
+    $TimeoutSeconds -lt 900) {
+    throw "TimeoutSeconds must be at least 900 for $Scenario (boot/load plus the classic run deadline); got $TimeoutSeconds."
+}
 if (-not [string]::IsNullOrWhiteSpace($QualificationRecipe) -and
     $Scenario -cne 'live-cast-qual' -and $Scenario -cne 'live-cast-qual-select') {
     throw '-QualificationRecipe is only valid with -Scenario live-cast-qual-select or live-cast-qual.'
@@ -164,7 +193,8 @@ $savePair = if ($Scenario -ceq 'live-ui-bootstrap' -or $Scenario -ceq 'live-work
     $Scenario -ceq 'live-workspace-manual' -or
     $Scenario -ceq 'live-cast-probe-select' -or $Scenario -ceq 'live-cast-probe' -or
     $Scenario -ceq 'live-advanced-inspect' -or $Scenario -ceq 'live-cast-qual-select' -or
-    $Scenario -ceq 'live-cast-qual') { Get-KbpDisposableSavePair -Family $FixtureFamily } else { $null }
+    $Scenario -ceq 'live-cast-qual' -or $Scenario -ceq 'live-classic-select' -or
+    $Scenario -ceq 'live-classic-cast') { Get-KbpDisposableSavePair -Family $FixtureFamily } else { $null }
 $advancedBinding = if ($FixtureFamily -ceq 'Advanced') { Assert-KbpAdvancedFixtureBinding -Pair $savePair } else { $null }
 $advancedInspectionRunId = if ($FixtureFamily -ceq 'Advanced' -and $Scenario -ceq 'live-cast-qual') {
     Assert-KbpAdvancedInspectionPassed -Binding $advancedBinding -Pair $savePair `
@@ -261,6 +291,10 @@ try {
     if ($null -ne $probeAllowanceJson) {
         # The host re-parses the allowance strictly against this run id.
         $scenarioParameters.probeAllowance = $probeAllowanceJson
+    }
+    if ($null -ne $classicAllowanceJson) {
+        # The host re-parses the classic allowance strictly against this run.
+        $scenarioParameters.classicAllowance = $classicAllowanceJson
     }
     if ($null -ne $qualificationAllowanceJson) {
         $scenarioParameters.qualificationAllowance = $qualificationAllowanceJson

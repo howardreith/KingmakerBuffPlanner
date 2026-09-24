@@ -189,7 +189,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 IsManualWorkspaceScenario(scenario) ||
                 IsProbeScenario(scenario) ||
                 IsInspectionScenario(scenario) ||
-                IsQualificationScenario(scenario);
+                IsQualificationScenario(scenario) ||
+                IsClassicCastScenario(scenario);
         }
 
         // The workspace scenario plus an in-game reload (mission section 8,
@@ -232,6 +233,25 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         }
 
         internal const int QualificationRunDeadlineSeconds = 240;
+
+        // Classic cast scenarios (mission batch 3, section 6): the Classic
+        // planner, the default mode, authored through its own screen
+        // controls. "live-classic-select" records the classic plan and its
+        // digest and never executes; "live-classic-cast" additionally needs
+        // the run-bound classic allowance and executes that exact plan once
+        // through the HUD's routine entry under a single-use grant.
+        internal static bool IsClassicCastScenario(string scenario)
+        {
+            return string.Equals(scenario, "live-classic-select", StringComparison.Ordinal) ||
+                IsCastingClassicScenario(scenario);
+        }
+
+        internal static bool IsCastingClassicScenario(string scenario)
+        {
+            return string.Equals(scenario, "live-classic-cast", StringComparison.Ordinal);
+        }
+
+        internal const int ClassicRunDeadlineSeconds = 180;
 
         // Read-only inspection of a loaded campaign copy (the advanced-copy
         // family first; the automation fixture is its smoke test): opens the
@@ -279,7 +299,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         {
             return IsManualWorkspaceScenario(scenario) || IsProbeScenario(scenario) ||
                 IsInspectionScenario(scenario) || IsQualificationScenario(scenario) ||
-                IsImportScenario(scenario);
+                IsImportScenario(scenario) || IsClassicCastScenario(scenario);
         }
 
         internal const int ProbeRunDeadlineSeconds = 60;
@@ -398,6 +418,18 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             bool hasRecipe = request.Parameters.ContainsKey("qualificationRecipe");
             if (hasRecipe && !IsQualificationScenario(request.Scenario))
                 throw new InvalidDataException("qualification-recipe-only-with-qualification");
+            // The classic allowance exists only on the classic cast scenario,
+            // as a string the host parses strictly against this run id.
+            bool hasClassic = request.Parameters.ContainsKey("classicAllowance");
+            if (hasClassic && !IsCastingClassicScenario(request.Scenario))
+                throw new InvalidDataException("classic-allowance-only-with-classic-cast");
+            if (IsClassicCastScenario(request.Scenario))
+            {
+                if (hasClassic && !(request.Parameters["classicAllowance"] is string))
+                    throw new InvalidDataException("classic-allowance-type");
+                ValidateLiveSaveParameters(request, 9 + (hasClassic ? 1 : 0));
+                return;
+            }
             if (IsQualificationScenario(request.Scenario))
             {
                 if (hasQualification && !(request.Parameters["qualificationAllowance"] is string))

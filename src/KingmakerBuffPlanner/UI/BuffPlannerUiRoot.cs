@@ -736,6 +736,49 @@ namespace KingmakerBuffPlanner.UI
                 _instance._screen.View.PrepareVisualEvidenceForRuntime(view);
         }
 
+        // Classic authoring through the classic screen's own controls: the
+        // grid row of the ability and the details panel's target toggle for
+        // the Long routine, then the casting mode. True when the routine now
+        // wants that target in that mode.
+        internal static bool ConfigureClassicCastForRuntime(string abilityGuid, string targetUnitId,
+            string executionMode)
+        {
+            if (_instance == null || _instance._screen.View == null ||
+                !_instance._screen.View.DispatchSourceRowForRuntime(abilityGuid)) return false;
+            PlannerSetupModel model = _instance._session.Model;
+            if (string.IsNullOrEmpty(targetUnitId)) return false;
+            if (!model.IsTargetWanted("long", targetUnitId) &&
+                !_instance._screen.View.DispatchTargetForRuntime(targetUnitId)) return false;
+            if (model.Profile.Execution.Mode != executionMode) model.ToggleExecutionMode();
+            _instance._screen.View.RefreshCatalogForRuntime();
+            return model.IsAssigned("long") && model.IsTargetWanted("long", targetUnitId) &&
+                model.Profile.Execution.Mode == executionMode;
+        }
+
+        // The first party member the classic model can target.
+        internal static string FirstClassicTargetForRuntime()
+        {
+            if (_instance == null || _instance._session == null || _instance._session.Model == null)
+                return null;
+            return _instance._session.Model.Snapshot.Units.Where(unit =>
+                    unit.TargetValidation.Alive && unit.TargetValidation.Conscious &&
+                    unit.TargetValidation.Friendly && unit.TargetValidation.Targetable)
+                .Select(unit => unit.UnitId).FirstOrDefault();
+        }
+
+        // The classic routine's plan exactly as its execution will compute it.
+        internal static CastPlan ClassicPlanForRuntime(string routineId)
+        {
+            if (_instance == null || _instance._session == null) return null;
+            RoutinePlanResult preview = _instance._session.PreviewRoutine(routineId);
+            return preview == null ? null : preview.Plan;
+        }
+
+        internal static ExecutionReport ClassicReportForRuntime
+        {
+            get { return _instance == null || _instance._session == null ? null : _instance._session.LastExecutionReport; }
+        }
+
         internal static bool SelectAndConfigureBlessForRuntime(string executionMode)
         {
             if (_instance == null || _instance._screen.View == null ||

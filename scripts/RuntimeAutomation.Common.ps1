@@ -100,7 +100,7 @@ function New-KbpRuntimeRequest {
         [ValidateSet('native-only', 'call-of-the-wild', 'human-reproduction', 'full-user')][string]$ProfileId = 'native-only',
         [object[]]$ExpectedOptionalMods = @(), [string[]]$ExpectedBlueprintGuids = @(),
         [hashtable]$Parameters = @{},
-        [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'live-ui-bootstrap', 'ui-native-contract-probe', 'final-no-save-core', 'performance-probe', 'launch-render-diagnostic', 'menu-input-diagnostic', 'live-workspace-qual', 'live-workspace-reload', 'live-workspace-import', 'live-workspace-manual', 'live-cast-probe-select', 'live-cast-probe', 'live-advanced-inspect', 'live-cast-qual-select', 'live-cast-qual')][string]$Scenario = 'mod-load-smoke')
+        [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'live-ui-bootstrap', 'ui-native-contract-probe', 'final-no-save-core', 'performance-probe', 'launch-render-diagnostic', 'menu-input-diagnostic', 'live-workspace-qual', 'live-workspace-reload', 'live-workspace-import', 'live-workspace-manual', 'live-cast-probe-select', 'live-cast-probe', 'live-advanced-inspect', 'live-cast-qual-select', 'live-cast-qual', 'live-classic-select', 'live-classic-cast')][string]$Scenario = 'mod-load-smoke')
     # This ValidateSet must equal the launcher's -Scenario set exactly
     # (Test-RuntimeHarness builds a request for every launcher scenario).
     return [ordered]@{
@@ -647,6 +647,40 @@ function Get-KbpQualificationAllowanceBuildRefusal {
     return $null
 }
 
+# The classic cast allowance (kind kbp-classic-cast, schema 1) must name this
+# run, this build, one casting mode (the launcher's) and a 1..24 budget.
+function Get-KbpClassicAllowanceBuildRefusal {
+    param([string]$AllowanceJson, [string]$RunId, $BuildManifest, [string]$ExecutionMode)
+    try { $allowance = $AllowanceJson | ConvertFrom-Json }
+    catch { return 'unreadable' }
+    if ($null -eq $allowance) { return 'unreadable' }
+    $names = @($allowance.PSObject.Properties | ForEach-Object Name)
+    foreach ($required in @('schemaVersion', 'kind', 'runId', 'sourceCommit', 'packageSha256', 'dllSha256',
+            'assemblyMvid', 'fixtureGameId', 'executionMode', 'routineId', 'approvedPlanDigest',
+            'maximumNativeSubmissions', 'approvedBy', 'authority')) {
+        if ($names -cnotcontains $required) { return "missing:$required" }
+    }
+    if (-not ($allowance.schemaVersion -is [int] -or $allowance.schemaVersion -is [long]) -or
+        [int]$allowance.schemaVersion -ne 1) { return 'schema' }
+    if ([string]$allowance.kind -cne 'kbp-classic-cast') { return 'kind' }
+    if ([string]$allowance.runId -cne $RunId) { return 'run-id' }
+    if ([string]$allowance.sourceCommit -cne [string]$BuildManifest.commit) { return 'commit' }
+    if ([string]$allowance.packageSha256 -cne [string]$BuildManifest.packageSha256) { return 'package' }
+    if ([string]$allowance.dllSha256 -cne [string]$BuildManifest.dllSha256) { return 'dll' }
+    if ([string]$allowance.assemblyMvid -cne [string]$BuildManifest.assemblyMvid) { return 'mvid' }
+    if (@('instant', 'animated') -cnotcontains [string]$allowance.executionMode) { return 'execution-mode' }
+    if (-not [string]::IsNullOrEmpty($ExecutionMode) -and [string]$allowance.executionMode -cne $ExecutionMode) {
+        return 'execution-mode-differs'
+    }
+    if ([string]$allowance.routineId -cne 'long') { return 'routine' }
+    if ([string]$allowance.approvedPlanDigest -cnotmatch '^[0-9a-f]{64}$') { return 'plan-digest' }
+    if (-not ($allowance.maximumNativeSubmissions -is [int] -or $allowance.maximumNativeSubmissions -is [long]) -or
+        [int]$allowance.maximumNativeSubmissions -lt 1 -or [int]$allowance.maximumNativeSubmissions -gt 24) {
+        return 'submissions'
+    }
+    return $null
+}
+
 # Advanced-copy binding: the pair found by name must be exactly the pair the
 # guarded bootstrap published - the immutable BASELINE bytes, the same
 # WORKING file and the same campaign - from exactly one completed advanced
@@ -773,11 +807,13 @@ function Get-KbpProtectedSavePolicy {
     # 1332ed8..542cd66, P1-2).
     $strict = $FixtureFamily -ceq 'Advanced' -or
         @('live-cast-qual', 'live-cast-qual-select', 'live-advanced-inspect', 'live-cast-probe',
-            'live-workspace-reload', 'live-workspace-import') -ccontains $Scenario
+            'live-workspace-reload', 'live-workspace-import', 'live-classic-select',
+            'live-classic-cast') -ccontains $Scenario
     return [pscustomobject]@{
         allowedChanged = if ($strict) { @() } else { @($WorkingFileName) }
         newFilesBlocking = $FixtureFamily -ceq 'Advanced' -or
-            @('live-cast-qual', 'live-cast-probe', 'live-workspace-reload', 'live-workspace-import') -ccontains $Scenario
+            @('live-cast-qual', 'live-cast-probe', 'live-workspace-reload', 'live-workspace-import',
+                'live-classic-cast') -ccontains $Scenario
     }
 }
 
