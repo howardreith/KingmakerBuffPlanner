@@ -1907,9 +1907,13 @@ try {
     [IO.File]::WriteAllText((Join-Path $unreadableFolder 'acknowledged\ack-garbled.json'), '{ garbage')
     $garbledAck = ''
     try { Assert-KbpNoUnacknowledgedSaveViolation -StateRoot $unreadableState } catch { $garbledAck = $_.Exception.Message }
-    [IO.File]::WriteAllText((Join-Path $unreadableFolder 'a-garbled.json'), '{ garbage')
+    # An unreadable record, in a state of its own (records are checked in
+    # culture order, which ignores hyphens).
+    $garbledState = Join-Path $savesRoot 'garbled-state'
+    New-Item -ItemType Directory -Path (Join-Path $garbledState 'protected-save-violations') -Force | Out-Null
+    [IO.File]::WriteAllText((Join-Path $garbledState 'protected-save-violations\a-garbled.json'), '{ garbage')
     $garbledRecord = ''
-    try { Assert-KbpNoUnacknowledgedSaveViolation -StateRoot $unreadableState } catch { $garbledRecord = $_.Exception.Message }
+    try { Assert-KbpNoUnacknowledgedSaveViolation -StateRoot $garbledState } catch { $garbledRecord = $_.Exception.Message }
     if ($garbledAck -notlike 'Run ack-garbled changed protected saves (changed:a)*' -or
         $garbledRecord -notlike 'The protected-save violation record a-garbled.json cannot be read*') {
         throw ('An unreadable record or acknowledgement did not block with its name: ' + $garbledAck + ' / ' + $garbledRecord)
