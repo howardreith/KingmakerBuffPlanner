@@ -771,6 +771,27 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     terminal.AppendAssertions(result, _manualReadyEvidence,
                         _workspaceInteractionEvidence);
                 }
+                else if (RuntimeTestProtocol.IsPhysicalWorkspaceScenario(_request.Scenario))
+                {
+                    // Physical-input acceptance (Unity-free rules in
+                    // PhysicalWorkspaceRecord): every action delivered by the
+                    // OS and acknowledged, and the view's own state after it.
+                    IList<string> violations = _physicalRecord.Violations();
+                    result.Assertions.Add(violations.Count == 0
+                        ? RuntimeTestAssertion.Pass("physical-workspace",
+                            "search typing, wheel, press target, focus loss, Escape (OS input)",
+                            "screen=" + _physicalRecord.ScreenWidth + "x" + _physicalRecord.ScreenHeight +
+                                ";text=" + _physicalRecord.SearchTextAfterFocus + ";selected=" +
+                                _physicalRecord.SelectedAfterClick + ";overflow=" + _physicalRecord.GridOverflows)
+                        : RuntimeTestAssertion.Fail("physical-workspace",
+                            "search typing, wheel, press target, focus loss, Escape (OS input)",
+                            string.Join("|", violations.ToArray())));
+                    if (violations.Count != 0)
+                    {
+                        result.Status = "FAIL";
+                        result.Stage = "physical-validation";
+                    }
+                }
                 else if (RuntimeTestProtocol.IsImportScenario(_request.Scenario))
                 {
                     // First-open import in game (mission section 11): the
@@ -1689,6 +1710,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 liveBudgetSeconds = 600 + RuntimeTestProtocol.QualificationRunDeadlineSeconds;
             if (RuntimeTestProtocol.IsClassicCastScenario(_request.Scenario))
                 liveBudgetSeconds = 600 + RuntimeTestProtocol.ClassicRunDeadlineSeconds;
+            if (RuntimeTestProtocol.IsPhysicalWorkspaceScenario(_request.Scenario))
+                liveBudgetSeconds = 600 + (int)PhysicalDeadlineSeconds;
             if (RuntimeTestProtocol.IsReloadScenario(_request.Scenario))
                 liveBudgetSeconds = 300 + LiveCampaignSaveLoader.ReloadBudgetSeconds;
             if (_livePhaseElapsed.Elapsed.TotalSeconds > liveBudgetSeconds)
@@ -2012,6 +2035,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         _liveUiPhase = 110;
                         return false;
                     }
+                    if (RuntimeTestProtocol.IsPhysicalWorkspaceScenario(_request.Scenario))
+                    {
+                        // Physical input only: search, wheel, a press
+                        // target, focus loss and Escape through the OS.
+                        _liveUiPhase = 120;
+                        return false;
+                    }
                     if (RuntimeTestProtocol.IsQualificationScenario(_request.Scenario))
                     {
                         // Qualification: the production-path driver.
@@ -2049,6 +2079,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (_liveUiPhase == 110)
             {
                 return UpdateClassicCast();
+            }
+            if (_liveUiPhase == 120)
+            {
+                return UpdatePhysicalWorkspace();
             }
             if (_liveUiPhase == 40)
             {
@@ -2658,6 +2692,12 @@ namespace KingmakerBuffPlanner.RuntimeTesting
 
         private void WritePhysicalInputRequest(string id, string kind, Vector2 position)
         {
+            WritePhysicalInputRequest(id, kind, position, null);
+        }
+
+        // extraJson: further members (",\"text\":\"...\"", ",\"delta\":-360"), or null.
+        private void WritePhysicalInputRequest(string id, string kind, Vector2 position, string extraJson)
+        {
             string path = Path.Combine(_request.EvidenceDirectory,
                 "physical-input-" + id + ".json");
             // Kingmaker changes JsonConvert.DefaultSettings to preserve object
@@ -2668,7 +2708,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 ",\"x\":" + position.x.ToString("R", CultureInfo.InvariantCulture) +
                 ",\"y\":" + position.y.ToString("R", CultureInfo.InvariantCulture) +
                 ",\"unityScreenWidth\":" + Screen.width +
-                ",\"unityScreenHeight\":" + Screen.height + "}";
+                ",\"unityScreenHeight\":" + Screen.height + (extraJson ?? string.Empty) + "}";
             AtomicFile.WriteUtf8(path, json + Environment.NewLine);
             _log.Info("[KBP-INPUT] physical action requested;id=" + id + ";action=" +
                 kind + ";x=" + position.x.ToString("F1") + ";y=" +
@@ -2986,6 +3026,217 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private string _inspectionDisposition = string.Empty;
         private string _inspectionSummary = string.Empty;
         private string _inspectionFailure;
+
+        // Physical-input workspace scenario (mission batch 3, section 10).
+        // Every action is a request the launcher delivers through the game
+        // window with the operating system's input, acknowledged in a file;
+        // this host only locates targets and reads the view's own state
+        // after each action. Nothing is authored, saved or cast.
+        private const double PhysicalDeadlineSeconds = 180;
+        private readonly PhysicalWorkspaceRecord _physicalRecord = new PhysicalWorkspaceRecord();
+        private int _physicalStep;
+        private string _physicalPending;
+        private string _physicalTile;
+        private string _physicalModeBefore;
+        private bool _physicalPublished;
+        private System.Diagnostics.Stopwatch _physicalClock;
+        private System.Diagnostics.Stopwatch _physicalSettle;
+
+        private bool UpdatePhysicalWorkspace()
+        {
+            CastingWorkspaceScreenView view = BuffPlannerUiRoot.CastingWorkspaceViewForRuntime;
+            if (_physicalClock == null)
+            {
+                _physicalClock = System.Diagnostics.Stopwatch.StartNew();
+                object screenRaw;
+                _physicalRecord.ExpectedScreen = _request.Parameters.TryGetValue("expectedScreen", out screenRaw)
+                    ? screenRaw as string : null;
+                _physicalRecord.ScreenWidth = Screen.width;
+                _physicalRecord.ScreenHeight = Screen.height;
+                _physicalRecord.FullScreen = Screen.fullScreen;
+                _physicalModeBefore = GameModeName();
+                BuffPlannerUiRoot.BeginPhysicalInputProbe();
+                _log.Info("[KBP-PHYSICAL] started;screen=" + Screen.width + "x" + Screen.height +
+                    ";fullScreen=" + Screen.fullScreen + ";mode=" + _physicalModeBefore + ".");
+            }
+            if (_physicalClock.Elapsed.TotalSeconds > PhysicalDeadlineSeconds)
+                return FinishPhysical("deadline:step" + _physicalStep);
+            if (_physicalPending != null)
+            {
+                if (!PhysicalInputAcknowledged(_physicalPending)) return false;
+                string ack = File.ReadAllText(Path.Combine(_request.EvidenceDirectory,
+                    "physical-input-" + _physicalPending + ".ack.json"));
+                JObject ackRoot = JObject.Parse(ack);
+                if (ackRoot.Value<bool?>("deliveryFailed") == true)
+                    return FinishPhysical("delivery-failed:" + _physicalPending + ":" + ackRoot.Value<string>("error"));
+                if (_physicalPending == "ws-focus-cycle") _physicalRecord.FocusCycle = ackRoot.Value<string>("detail");
+                _physicalRecord.Acknowledged.Add(_physicalPending);
+                _physicalPending = null;
+                _physicalSettle = System.Diagnostics.Stopwatch.StartNew();
+            }
+            double settled = _physicalSettle == null ? 0 : _physicalSettle.Elapsed.TotalSeconds;
+            if (view == null && _physicalStep >= 1 && _physicalStep <= 7)
+                return FinishPhysical("workspace-closed-early:step" + _physicalStep);
+            if (_physicalStep == 0)
+            {
+                Vector2? search = view == null ? null : view.ScreenPointForRuntime("search");
+                if (search == null) return FinishPhysical("search-not-on-screen");
+                return RequestPhysical("ws-click-search", "click", search.Value, null, 1);
+            }
+            if (_physicalStep == 1)
+            {
+                // Focus first (a click focuses an input field), then the
+                // wheel over the unfiltered grid.
+                if (!view.SearchFocusedForRuntime && settled < 3) return false;
+                _physicalRecord.SearchFocused = view.SearchFocusedForRuntime;
+                Vector2? grid = view.ScreenPointForRuntime("buff-grid");
+                if (grid == null) return FinishPhysical("grid-not-on-screen");
+                _physicalRecord.GridOverflows = view.BuffGridOverflowsForRuntime;
+                _physicalRecord.ScrollBefore = view.BuffGridScrollForRuntime;
+                return RequestPhysical("ws-wheel-grid", "wheel", grid.Value, ",\"delta\":-360", 2);
+            }
+            if (_physicalStep == 2)
+            {
+                if (settled < 1) return false;
+                _physicalRecord.ScrollAfter = view.BuffGridScrollForRuntime;
+                return RequestPhysical("ws-type-query", "type", Vector2.zero,
+                    ",\"text\":" + JsonConvert.ToString(PhysicalWorkspaceRecord.Query), 3);
+            }
+            if (_physicalStep == 3)
+            {
+                if (view.SearchTextForRuntime != PhysicalWorkspaceRecord.Query && settled < 3) return false;
+                if (settled < 0.5) return false;
+                _physicalRecord.SearchText = view.SearchTextForRuntime;
+                _physicalRecord.ModeAfterTyping = GameModeName() == _physicalModeBefore ? "planner" : GameModeName();
+                IList<string> visible = view.VisibleSourcesForRuntime();
+                _physicalRecord.VisibleAfterQuery.AddRange(visible);
+                // A matching tile that is not selected yet, else the match.
+                string pick = visible.Where(tile => tile.Split('|').Length == 3 &&
+                        tile.Split('|')[1].IndexOf(PhysicalWorkspaceRecord.Query, StringComparison.OrdinalIgnoreCase) >= 0)
+                    .OrderBy(tile => tile.Split('|')[2] == "True" ? 1 : 0).FirstOrDefault();
+                if (pick == null) return FinishPhysical("no-matching-tile");
+                _physicalTile = pick.Split('|')[0];
+                Vector2? tilePoint = view.ScreenPointForRuntime("tile:" + _physicalTile);
+                if (tilePoint == null) return FinishPhysical("tile-not-on-screen:" + _physicalTile);
+                CaptureScreenshot(Path.Combine(_request.EvidenceDirectory, "workspace-physical-query.png"));
+                return RequestPhysical("ws-click-tile", "click", tilePoint.Value, null, 4);
+            }
+            if (_physicalStep == 4)
+            {
+                if (view.SelectedSourceIdForRuntime != _physicalTile && settled < 3) return false;
+                _physicalRecord.ClickedSource = _physicalTile;
+                _physicalRecord.SelectedAfterClick = view.SelectedSourceIdForRuntime;
+                return RequestPhysical("ws-focus-cycle", "focus-cycle", Vector2.zero, null, 5);
+            }
+            if (_physicalStep == 5)
+            {
+                // The game window was minimized and restored by the launcher
+                // (the game may not update while minimized); it must regain
+                // focus with the workspace still open.
+                if (!Application.isFocused && settled < 10) return false;
+                _physicalRecord.FocusLostObserved = _physicalRecord.FocusCycle != null &&
+                    _physicalRecord.FocusCycle.IndexOf("minimized=True", StringComparison.Ordinal) >= 0;
+                _physicalRecord.FocusRegained = Application.isFocused;
+                _physicalRecord.WorkspaceOpenAfterFocus = BuffPlannerUiRoot.IsCastingWorkspaceOpen;
+                view = BuffPlannerUiRoot.CastingWorkspaceViewForRuntime;
+                Vector2? search = view == null ? null : view.ScreenPointForRuntime("search");
+                if (search == null) return FinishPhysical("search-not-on-screen-after-focus");
+                return RequestPhysical("ws-click-search-again", "click", search.Value, null, 6);
+            }
+            if (_physicalStep == 6)
+            {
+                if (!view.SearchFocusedForRuntime && settled < 3) return false;
+                return RequestPhysical("ws-type-more", "type", Vector2.zero,
+                    ",\"text\":" + JsonConvert.ToString(PhysicalWorkspaceRecord.QuerySuffix), 7);
+            }
+            if (_physicalStep == 7)
+            {
+                string expected = PhysicalWorkspaceRecord.Query + PhysicalWorkspaceRecord.QuerySuffix;
+                if (view.SearchTextForRuntime != expected && settled < 3) return false;
+                _physicalRecord.SearchTextAfterFocus = view.SearchTextForRuntime;
+                CaptureScreenshot(Path.Combine(_request.EvidenceDirectory, "workspace-physical-after-focus.png"));
+                return RequestPhysical("ws-escape", "key-escape", Vector2.zero, null, 8);
+            }
+            if (_physicalStep == 8)
+            {
+                if (BuffPlannerUiRoot.IsCastingWorkspaceOpen && settled < 5) return false;
+                if (settled < 1) return false;
+                _physicalRecord.ClosedByEscape = !BuffPlannerUiRoot.IsCastingWorkspaceOpen;
+                _physicalRecord.LeaseReleased = !BuffPlannerUiRoot.IsCastingWorkspaceInputLeaseHeldForRuntime;
+                _physicalRecord.ModeAfterClose = GameModeName();
+                return FinishPhysical(null);
+            }
+            return false;
+        }
+
+        private bool RequestPhysical(string id, string action, Vector2 position, string extraJson, int nextStep)
+        {
+            WritePhysicalInputRequest(id, action, position, extraJson);
+            _physicalPending = id;
+            _physicalStep = nextStep;
+            return false;
+        }
+
+        private static string GameModeName()
+        {
+            return Kingmaker.Game.Instance == null ? "none" : Kingmaker.Game.Instance.CurrentMode.ToString();
+        }
+
+        private bool FinishPhysical(string failure)
+        {
+            if (failure != null) _physicalRecord.Failures.Add(failure);
+            UiInputIsolationProbeResult isolation = BuffPlannerUiRoot.EndPhysicalInputProbe();
+            if (isolation != null)
+            {
+                _physicalRecord.PlayerCommands = isolation.PlayerCommandCount;
+                _physicalRecord.MovementCommands = isolation.MovementCommandCount;
+                _physicalRecord.AbilityCommands = isolation.AbilityCommandCount;
+                _physicalRecord.SelectionUnchanged = isolation.SelectionUnchanged;
+                _physicalRecord.CameraUnchanged = isolation.CameraUnchanged;
+            }
+            else _physicalRecord.Failures.Add("isolation-probe-missing");
+            PublishPhysicalRecord();
+            _completed = true;
+            return true;
+        }
+
+        private void PublishPhysicalRecord()
+        {
+            _physicalPublished = true;
+            PhysicalWorkspaceRecord record = _physicalRecord;
+            AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory, "physical-workspace.json"), new JObject
+            {
+                { "schemaVersion", 1 },
+                { "runId", _request.RunId },
+                { "expectedScreen", record.ExpectedScreen },
+                { "screen", record.ScreenWidth + "x" + record.ScreenHeight },
+                { "fullScreen", record.FullScreen },
+                { "acknowledged", new JArray(record.Acknowledged.Cast<object>().ToArray()) },
+                { "searchFocused", record.SearchFocused },
+                { "searchText", record.SearchText },
+                { "visibleAfterQuery", new JArray(record.VisibleAfterQuery.Cast<object>().ToArray()) },
+                { "modeBefore", _physicalModeBefore },
+                { "modeAfterTyping", record.ModeAfterTyping },
+                { "gridOverflows", record.GridOverflows },
+                { "scrollBefore", record.ScrollBefore.HasValue ? (JToken)record.ScrollBefore.Value : JValue.CreateNull() },
+                { "scrollAfter", record.ScrollAfter.HasValue ? (JToken)record.ScrollAfter.Value : JValue.CreateNull() },
+                { "clickedSource", record.ClickedSource },
+                { "selectedAfterClick", record.SelectedAfterClick },
+                { "focusCycle", record.FocusCycle },
+                { "focusRegained", record.FocusRegained },
+                { "workspaceOpenAfterFocus", record.WorkspaceOpenAfterFocus },
+                { "searchTextAfterFocus", record.SearchTextAfterFocus },
+                { "closedByEscape", record.ClosedByEscape },
+                { "leaseReleased", record.LeaseReleased },
+                { "modeAfterClose", record.ModeAfterClose },
+                { "isolation", "commands=" + record.PlayerCommands + "/" + record.MovementCommands + "/" +
+                    record.AbilityCommands + ";selectionUnchanged=" + record.SelectionUnchanged +
+                    ";cameraUnchanged=" + record.CameraUnchanged },
+                { "failures", new JArray(record.Failures.Cast<object>().ToArray()) },
+                { "violations", new JArray(record.Violations().Cast<object>().ToArray()) }
+            }.ToString(Formatting.Indented) + Environment.NewLine);
+            _log.Info("[KBP-PHYSICAL] published;violations=" + string.Join("|", record.Violations().ToArray()) + ".");
+        }
 
         // Classic cast scenarios (mission batch 3, section 6). The casting-
         // first workspace is closed and the planner switched back to Classic
@@ -3737,6 +3988,16 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             // in-flight executor restores temporary native state).
             if (_qualificationDriver != null) _qualificationDriver.Terminate(reason);
             if (_qualificationHost != null) _qualificationHost.Shutdown(reason);
+            if (RuntimeTestProtocol.IsPhysicalWorkspaceScenario(_request.Scenario) && _physicalClock != null &&
+                !_physicalPublished)
+            {
+                _physicalRecord.Failures.Add("shutdown:" + reason);
+                try { PublishPhysicalRecord(); }
+                catch (Exception exception)
+                {
+                    _log.Error("[KBP-PHYSICAL] record not published at shutdown.", exception);
+                }
+            }
             if (RuntimeTestProtocol.IsClassicCastScenario(_request.Scenario) && _classicStage != 0 &&
                 !_classicPublished)
             {

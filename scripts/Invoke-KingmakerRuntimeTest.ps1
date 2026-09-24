@@ -1,6 +1,6 @@
 ﻿[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
 param(
-    [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'live-ui-bootstrap', 'ui-native-contract-probe', 'final-no-save-core', 'performance-probe', 'launch-render-diagnostic', 'menu-input-diagnostic', 'live-workspace-qual', 'live-workspace-reload', 'live-workspace-import', 'live-workspace-manual', 'live-cast-probe-select', 'live-cast-probe', 'live-advanced-inspect', 'live-cast-qual-select', 'live-cast-qual', 'live-classic-select', 'live-classic-cast')][string]$Scenario = 'mod-load-smoke',
+    [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'live-ui-bootstrap', 'ui-native-contract-probe', 'final-no-save-core', 'performance-probe', 'launch-render-diagnostic', 'menu-input-diagnostic', 'live-workspace-qual', 'live-workspace-reload', 'live-workspace-import', 'live-workspace-manual', 'live-cast-probe-select', 'live-cast-probe', 'live-advanced-inspect', 'live-cast-qual-select', 'live-cast-qual', 'live-classic-select', 'live-classic-cast', 'live-workspace-physical')][string]$Scenario = 'mod-load-smoke',
     [ValidateSet('native-only', 'call-of-the-wild', 'human-reproduction', 'full-user')][string]$CompatibilityProfileId = 'native-only',
     [ValidateRange(5, 1800)][int]$TimeoutSeconds = 180,
     [ValidateRange(5, 300)][int]$LaunchTimeoutSeconds = 60,
@@ -44,7 +44,13 @@ param(
     # owner-designated advanced copy. The advanced copy is loaded only by
     # non-casting scenarios and only when it matches its guarded bootstrap
     # manifest exactly.
-    [ValidateSet('Automation', 'Advanced')][string]$FixtureFamily = 'Automation'
+    [ValidateSet('Automation', 'Advanced')][string]$FixtureFamily = 'Automation',
+    # Game window mode for live-workspace-physical (mission batch 3,
+    # section 10): the owner's own settings, or a borderless window of an
+    # exact size through Unity's launch arguments. A size larger than this
+    # session's display is refused before anything changes; the game's
+    # registry key (Unity PlayerPrefs) is restored byte-exact after exit.
+    [ValidateSet('owner', 'windowed-1920x1080', 'windowed-2560x1440')][string]$DisplayMode = 'owner'
 )
 
 Set-StrictMode -Version Latest
@@ -57,7 +63,7 @@ $WhatIfPreference = $false
 # Review of f7726c9..1332ed8, P3-J: ValidateSet binds case-insensitively,
 # but every later comparison is case-sensitive; continue with the
 # canonical spelling of each value (for example -Scenario LIVE-CAST-QUAL).
-foreach ($canonicalName in @('Scenario', 'CompatibilityProfileId', 'ExecutionMode', 'FixtureFamily', 'QualificationRecipe')) {
+foreach ($canonicalName in @('Scenario', 'CompatibilityProfileId', 'ExecutionMode', 'FixtureFamily', 'QualificationRecipe', 'DisplayMode')) {
     $bound = Get-Variable -Name $canonicalName -ValueOnly -ErrorAction SilentlyContinue
     if ([string]::IsNullOrEmpty([string]$bound)) { continue }
     $validSet = @((Get-Command -Name $PSCommandPath).Parameters[$canonicalName].Attributes |
@@ -140,6 +146,20 @@ if ($Scenario -ceq 'live-classic-cast') {
 elseif (-not [string]::IsNullOrWhiteSpace($ClassicAllowancePath)) {
     throw '-ClassicAllowancePath is only valid with -Scenario live-classic-cast.'
 }
+$displaySize = $null
+if ($DisplayMode -cne 'owner') {
+    if ($Scenario -cne 'live-workspace-physical') {
+        throw '-DisplayMode is only valid with -Scenario live-workspace-physical.'
+    }
+    $displaySize = $DisplayMode.Substring('windowed-'.Length)
+    $sessionDisplay = Get-KbpSessionDisplaySize
+    if (-not (Test-KbpDisplayModeSupported -Size $displaySize -DisplaySize $sessionDisplay)) {
+        throw "DisplayMode $DisplayMode is unsupported on this session's display ($sessionDisplay); nothing was changed."
+    }
+}
+if ($Scenario -ceq 'live-workspace-physical' -and $TimeoutSeconds -lt 900) {
+    throw "TimeoutSeconds must be at least 900 for $Scenario (boot/load plus the physical sequence); got $TimeoutSeconds."
+}
 if (($Scenario -ceq 'live-classic-cast' -or $Scenario -ceq 'live-classic-select') -and
     $TimeoutSeconds -lt 900) {
     throw "TimeoutSeconds must be at least 900 for $Scenario (boot/load plus the classic run deadline); got $TimeoutSeconds."
@@ -194,7 +214,8 @@ $savePair = if ($Scenario -ceq 'live-ui-bootstrap' -or $Scenario -ceq 'live-work
     $Scenario -ceq 'live-cast-probe-select' -or $Scenario -ceq 'live-cast-probe' -or
     $Scenario -ceq 'live-advanced-inspect' -or $Scenario -ceq 'live-cast-qual-select' -or
     $Scenario -ceq 'live-cast-qual' -or $Scenario -ceq 'live-classic-select' -or
-    $Scenario -ceq 'live-classic-cast') { Get-KbpDisposableSavePair -Family $FixtureFamily } else { $null }
+    $Scenario -ceq 'live-classic-cast' -or $Scenario -ceq 'live-workspace-physical') {
+    Get-KbpDisposableSavePair -Family $FixtureFamily } else { $null }
 $advancedBinding = if ($FixtureFamily -ceq 'Advanced') { Assert-KbpAdvancedFixtureBinding -Pair $savePair } else { $null }
 $advancedInspectionRunId = if ($FixtureFamily -ceq 'Advanced' -and $Scenario -ceq 'live-cast-qual') {
     Assert-KbpAdvancedInspectionPassed -Binding $advancedBinding -Pair $savePair `
@@ -263,6 +284,10 @@ $protectedSaveRoot = Join-Path $env:USERPROFILE 'AppData\LocalLow\Owlcat Games\P
 $protectedBefore = if ($null -ne $savePair) { Get-KbpSaveFolderSnapshot -SaveRoot $protectedSaveRoot } else { $null }
 $protectedSaveFailure = $null
 $protectedSavesCompared = $false
+# A display mode changes the game's registry settings for this run only:
+# the whole key is recorded now and restored byte-exact after exit.
+$displayRegistryBefore = if ($null -ne $displaySize) {
+    Get-KbpRegistryValueSnapshot -KeyPath $script:KbpGameRegistryKey } else { $null }
 $restoreFailure = $null
 $runFailure = $null
 $runSucceeded = $false
@@ -296,6 +321,10 @@ try {
         # The host re-parses the classic allowance strictly against this run.
         $scenarioParameters.classicAllowance = $classicAllowanceJson
     }
+    if ($null -ne $displaySize) {
+        # The host judges the screen it actually got against this size.
+        $scenarioParameters.expectedScreen = $displaySize
+    }
     if ($null -ne $qualificationAllowanceJson) {
         $scenarioParameters.qualificationAllowance = $qualificationAllowanceJson
     }
@@ -321,7 +350,8 @@ try {
     }
     Write-KbpJsonAtomic (Join-Path $evidence 'orchestration.json') $orchestration
     $preexisting = @(Get-Process -Name Kingmaker -ErrorAction SilentlyContinue | ForEach-Object Id)
-    $arguments = @('-applaunch', '640820', '-kbpRuntimeTestRequest', ('"' + $requestPath + '"'))
+    $arguments = @('-applaunch', '640820') + @(Get-KbpDisplayModeArguments -Size $displaySize) +
+        @('-kbpRuntimeTestRequest', ('"' + $requestPath + '"'))
     [void](Start-Process -FilePath $SteamPath -ArgumentList $arguments -PassThru)
     $process = Wait-KbpNewKingmakerProcess -PreexistingIds $preexisting -TimeoutSeconds $LaunchTimeoutSeconds
     $orchestration.stage = 'waiting-for-result'
@@ -336,7 +366,8 @@ try {
     $resultPath = Join-Path $evidence 'runtime-result.json'
     # The reload scenario is the workspace scenario plus an in-game reload:
     # the same launcher input sequence (UMM dismiss, planner hotkey).
-    $workspaceInputScenario = ($Scenario -ceq 'live-workspace-qual') -or ($Scenario -ceq 'live-workspace-reload')
+    $workspaceInputScenario = ($Scenario -ceq 'live-workspace-qual') -or ($Scenario -ceq 'live-workspace-reload') -or
+        ($Scenario -ceq 'live-workspace-physical')
     $physicalInputScenario = ($Scenario -ceq 'live-ui-bootstrap') -or $workspaceInputScenario -or
         ($Scenario -ceq 'menu-input-diagnostic')
     $plannerHotkeySent = $false
@@ -359,6 +390,7 @@ public static class KbpPhysicalInput {
   [DllImport("user32.dll")] static extern bool ScreenToClient(IntPtr hWnd, ref Point point);
   [DllImport("user32.dll")] static extern bool IsIconic(IntPtr hWnd);
   [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr hWnd, int command);
   [StructLayout(LayoutKind.Sequential)] public struct Point { public int X; public int Y; }
   [StructLayout(LayoutKind.Sequential)] public struct Rect { public int Left; public int Top; public int Right; public int Bottom; }
   public static void KeyDown(IntPtr window, byte key) {
@@ -411,6 +443,47 @@ public static class KbpPhysicalInput {
       throw new InvalidOperationException("Cursor drifted outside Kingmaker client; refusing blind click.");
     mouse_event(0x0002, 0, 0, 0, UIntPtr.Zero);
     mouse_event(0x0004, 0, 0, 0, UIntPtr.Zero);
+  }
+  // Lowercase letters and digits only, each a verified foreground key press
+  // (KeyDown refuses when the game is not the foreground window).
+  public static void TypeText(IntPtr window, string text) {
+    if (string.IsNullOrEmpty(text) || text.Length > 32) throw new InvalidOperationException("Physical typing needs 1..32 characters.");
+    foreach (char c in text) {
+      byte key;
+      if (c >= 'a' && c <= 'z') key = (byte)('A' + (c - 'a'));
+      else if (c >= '0' && c <= '9') key = (byte)c;
+      else throw new InvalidOperationException("Physical typing accepts lowercase letters and digits only.");
+      KeyDown(window, key);
+      System.Threading.Thread.Sleep(30);
+      KeyUp(key);
+      System.Threading.Thread.Sleep(70);
+    }
+  }
+  public static void Wheel(IntPtr window, int delta) {
+    // The same ownership revalidation as a click.
+    if (window == IntPtr.Zero || GetForegroundWindow() != window)
+      throw new InvalidOperationException("Kingmaker lost foreground before the wheel; refusing blind input.");
+    Point cursor;
+    Rect client;
+    if (!GetCursorPos(out cursor) || !GetClientRect(window, out client) || !ScreenToClient(window, ref cursor))
+      throw new InvalidOperationException("Kingmaker wheel-position verification failed.");
+    if (cursor.X < 0 || cursor.Y < 0 || cursor.X > client.Right || cursor.Y > client.Bottom)
+      throw new InvalidOperationException("Cursor drifted outside Kingmaker client; refusing blind wheel.");
+    mouse_event(0x0800, 0, 0, unchecked((uint)delta), UIntPtr.Zero);
+  }
+  // The game window's own focus loss: minimized, then restored and
+  // activated again. No other window is touched or activated.
+  public static string FocusCycle(IntPtr window) {
+    if (window == IntPtr.Zero) throw new InvalidOperationException("No Kingmaker window.");
+    ShowWindow(window, 6);
+    System.Threading.Thread.Sleep(1500);
+    bool minimized = IsIconic(window);
+    bool lostForeground = GetForegroundWindow() != window;
+    ShowWindow(window, 9);
+    System.Threading.Thread.Sleep(750);
+    bool active = Activate(window);
+    return "minimized=" + minimized + ";lostForeground=" + lostForeground + ";restored=" + !IsIconic(window) +
+      ";foreground=" + active;
   }
   public static string ClientCursor(IntPtr window) {
     Point point;
@@ -581,12 +654,21 @@ public static class KbpPhysicalInput {
                 if (-not $physicalDeliveryAttempts.ContainsKey($actionId)) { $physicalDeliveryAttempts[$actionId] = 0 }
                 $delivered = $false
                 $deliveryError = $null
-                for ($attempt = 1; $attempt -le 3 -and -not $delivered; $attempt++) {
+                $deliveryDetail = $null
+                # Typing and the focus cycle are never repeated: a retry
+                # after a partial delivery would change what was delivered.
+                $singleShot = @('type', 'focus-cycle') -ccontains [string]$physical.action
+                $maxAttempts = if ($singleShot) { 1 } else { 3 }
+                for ($attempt = 1; $attempt -le $maxAttempts -and -not $delivered; $attempt++) {
                     try {
                         if ([string]$physical.action -eq 'key-escape') {
                             [KbpPhysicalInput]::KeyDown($process.MainWindowHandle, [byte]0x1B)
                             Start-Sleep -Milliseconds 100
                             [KbpPhysicalInput]::KeyUp([byte]0x1B)
+                        } elseif ([string]$physical.action -eq 'type') {
+                            [KbpPhysicalInput]::TypeText($process.MainWindowHandle, [string]$physical.text)
+                        } elseif ([string]$physical.action -eq 'focus-cycle') {
+                            $deliveryDetail = [KbpPhysicalInput]::FocusCycle($process.MainWindowHandle)
                         } else {
                             [KbpPhysicalInput]::Move($process.MainWindowHandle,
                                 [double]$physical.x, [double]$physical.y,
@@ -594,6 +676,8 @@ public static class KbpPhysicalInput {
                             Start-Sleep -Milliseconds 250
                             if ([string]$physical.action -eq 'click') {
                                 [KbpPhysicalInput]::Click($process.MainWindowHandle)
+                            } elseif ([string]$physical.action -eq 'wheel') {
+                                [KbpPhysicalInput]::Wheel($process.MainWindowHandle, [int]$physical.delta)
                             } elseif ([string]$physical.action -ne 'hover') {
                                 throw "Unknown physical input action: $($physical.action)"
                             }
@@ -607,7 +691,7 @@ public static class KbpPhysicalInput {
                         Start-Sleep -Milliseconds 250
                     }
                 }
-                if (-not $delivered -and [int]$physicalDeliveryAttempts[$actionId] -ge 20) {
+                if (-not $delivered -and ($singleShot -or [int]$physicalDeliveryAttempts[$actionId] -ge 20)) {
                     # The in-game waiter must not hang forever: after bounded
                     # retries, acknowledge the failure explicitly so the
                     # scenario can fail honestly with evidence.
@@ -626,6 +710,7 @@ public static class KbpPhysicalInput {
                     action = [string]$physical.action; sentAtUtc = [DateTime]::UtcNow.ToString('o')
                     processId = $process.Id
                     windowsClientCursor = [KbpPhysicalInput]::ClientCursor($process.MainWindowHandle)
+                    detail = $deliveryDetail
                 })
                 $orchestration.stage = "physical-$actionId-sent"
                 Write-KbpJsonAtomic (Join-Path $evidence 'orchestration.json') $orchestration
@@ -696,6 +781,25 @@ finally {
             }
         } else {
             $restoreFailure = "Kingmaker remains running; exact Mods restoration is intentionally blocked. Transaction: $runId"
+        }
+        if ($null -ne $displayRegistryBefore) {
+            if (@(Get-Process -Name Kingmaker -ErrorAction SilentlyContinue).Count -eq 0) {
+                try {
+                    $displayDifferences = Restore-KbpRegistryValues -KeyPath $script:KbpGameRegistryKey `
+                        -Snapshot $displayRegistryBefore
+                    Write-KbpJsonAtomic (Join-Path $evidence 'display-mode.json') ([ordered]@{
+                        schemaVersion = 1; runId = $runId; displayMode = $DisplayMode; size = $displaySize
+                        restoredValues = @($displayDifferences); restorationVerified = $true
+                    })
+                }
+                catch {
+                    $displayFailure = 'Game registry restoration failed after the display-mode run: ' + $_.Exception.Message
+                    $restoreFailure = if ($null -eq $restoreFailure) { $displayFailure } else { $restoreFailure + ' | ' + $displayFailure }
+                }
+            } else {
+                $displayFailure = 'Kingmaker remains running; the game registry restoration is blocked.'
+                $restoreFailure = if ($null -eq $restoreFailure) { $displayFailure } else { $restoreFailure + ' | ' + $displayFailure }
+            }
         }
         if ($null -ne $restoreFailure) {
             Write-Warning $restoreFailure

@@ -143,6 +143,19 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             return true;
         }
 
+        // "<width>x<height>", each 640..7680.
+        internal static bool IsScreenSize(string value)
+        {
+            if (string.IsNullOrEmpty(value)) return false;
+            string[] parts = value.Split('x');
+            int width;
+            int height;
+            return parts.Length == 2 && parts[0].Length <= 4 && parts[1].Length <= 4 &&
+                parts[0].All(char.IsDigit) && parts[1].All(char.IsDigit) &&
+                int.TryParse(parts[0], out width) && int.TryParse(parts[1], out height) &&
+                width >= 640 && width <= 7680 && height >= 480 && height <= 4320;
+        }
+
         private static bool IsSha256(string value)
         {
             if (string.IsNullOrWhiteSpace(value) || value.Length != 64) return false;
@@ -190,7 +203,20 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 IsProbeScenario(scenario) ||
                 IsInspectionScenario(scenario) ||
                 IsQualificationScenario(scenario) ||
-                IsClassicCastScenario(scenario);
+                IsClassicCastScenario(scenario) ||
+                IsPhysicalWorkspaceScenario(scenario);
+        }
+
+        // Physical input in the casting-first workspace (mission batch 3,
+        // section 10): the workspace opens through the physical planner
+        // hotkey like live-workspace-qual; then search typing, the wheel, a
+        // press target, a focus loss of the game window and Escape are all
+        // delivered by the operating system's input, never by callbacks.
+        // Nothing is authored, saved or cast. An optional expectedScreen
+        // ("<width>x<height>") names the resolution the launcher requested.
+        internal static bool IsPhysicalWorkspaceScenario(string scenario)
+        {
+            return string.Equals(scenario, "live-workspace-physical", StringComparison.Ordinal);
         }
 
         // The workspace scenario plus an in-game reload (mission section 8,
@@ -418,6 +444,16 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             bool hasRecipe = request.Parameters.ContainsKey("qualificationRecipe");
             if (hasRecipe && !IsQualificationScenario(request.Scenario))
                 throw new InvalidDataException("qualification-recipe-only-with-qualification");
+            bool hasScreen = request.Parameters.ContainsKey("expectedScreen");
+            if (hasScreen && !IsPhysicalWorkspaceScenario(request.Scenario))
+                throw new InvalidDataException("expected-screen-only-with-physical");
+            if (IsPhysicalWorkspaceScenario(request.Scenario))
+            {
+                if (hasScreen && !IsScreenSize(request.Parameters["expectedScreen"] as string))
+                    throw new InvalidDataException("expected-screen");
+                ValidateLiveSaveParameters(request, 9 + (hasScreen ? 1 : 0));
+                return;
+            }
             // The classic allowance exists only on the classic cast scenario,
             // as a string the host parses strictly against this run id.
             bool hasClassic = request.Parameters.ContainsKey("classicAllowance");

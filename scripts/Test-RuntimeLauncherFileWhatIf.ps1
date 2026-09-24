@@ -270,7 +270,11 @@ try {
         @{ Name = 'classic-select-with-allowance'; Expect = '*only valid with -Scenario live-classic-cast*'
            Args = @('-Scenario', 'live-classic-select', '-ClassicAllowancePath', $outsideQualification, '-TimeoutSeconds', '900', '-WhatIf') },
         @{ Name = 'classic-select-short-timeout'; Expect = '*at least 900*'
-           Args = @('-Scenario', 'live-classic-select', '-WhatIf') }
+           Args = @('-Scenario', 'live-classic-select', '-WhatIf') },
+        @{ Name = 'display-mode-other-scenario'; Expect = '*only valid with -Scenario live-workspace-physical*'
+           Args = @('-Scenario', 'live-workspace-qual', '-DisplayMode', 'windowed-1920x1080', '-WhatIf') },
+        @{ Name = 'physical-short-timeout'; Expect = '*at least 900*'
+           Args = @('-Scenario', 'live-workspace-physical', '-WhatIf') }
     )
     foreach ($case in $qualificationCases) {
         $ErrorActionPreference = 'Continue'
@@ -361,6 +365,48 @@ foreach ($case in $classicBindingCases.Keys) {
 if ((Get-KbpClassicAllowanceBuildRefusal -AllowanceJson (New-ClassicFixtureJson @{}) -RunId 'classic-bind-test' `
         -BuildManifest $manifestFixture -ExecutionMode 'instant') -cne 'execution-mode-differs') {
     throw 'A classic allowance ran in another casting mode.'
+}
+# Display modes: a window larger than the session's display is refused; the
+# Unity arguments name exactly the size; the owner's settings add none.
+if (-not (Test-KbpDisplayModeSupported -Size '1920x1080' -DisplaySize '1920x1200') -or
+    (Test-KbpDisplayModeSupported -Size '2560x1440' -DisplaySize '1920x1200') -or
+    -not (Test-KbpDisplayModeSupported -Size '2560x1440' -DisplaySize '3840x2160') -or
+    (Test-KbpDisplayModeSupported -Size '1920x1080' -DisplaySize 'unknown') -or
+    @(Get-KbpDisplayModeArguments -Size $null).Count -ne 0 -or
+    ((Get-KbpDisplayModeArguments -Size '1920x1080') -join ' ') -cne '-screen-fullscreen 0 -popupwindow -screen-width 1920 -screen-height 1080') {
+    throw 'The display-mode rules are wrong.'
+}
+if ((Get-KbpSessionDisplaySize) -notmatch '^[0-9]{3,5}x[0-9]{3,5}$') { throw 'The session display size was not measured.' }
+# The game registry restoration, on a scratch key of this test only.
+$scratchName = 'KingmakerBuffPlannerLabTest-' + [Guid]::NewGuid().ToString('N')
+$scratchKey = 'HKCU:\Software\' + $scratchName
+$scratch = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey('Software\' + $scratchName)
+try {
+    $scratch.SetValue('Screenmanager Resolution Width_h182942802', 1920, [Microsoft.Win32.RegistryValueKind]::DWord)
+    $scratch.SetValue('Screenmanager Fullscreen mode_h3630240806', 1, [Microsoft.Win32.RegistryValueKind]::DWord)
+    $scratch.SetValue('Binary_h1', [byte[]](1, 2, 3, 0), [Microsoft.Win32.RegistryValueKind]::Binary)
+    $scratch.SetValue('Text_h2', 'kept', [Microsoft.Win32.RegistryValueKind]::String)
+    $scratch.SetValue('Large_h3', [long]5000000000, [Microsoft.Win32.RegistryValueKind]::QWord)
+    $snapshot = Get-KbpRegistryValueSnapshot -KeyPath $scratchKey
+    if (@(Restore-KbpRegistryValues -KeyPath $scratchKey -Snapshot $snapshot).Count -ne 0) {
+        throw 'An unchanged key was rewritten.'
+    }
+    $scratch.SetValue('Screenmanager Resolution Width_h182942802', 1600, [Microsoft.Win32.RegistryValueKind]::DWord)
+    $scratch.SetValue('Binary_h1', [byte[]](9), [Microsoft.Win32.RegistryValueKind]::Binary)
+    $scratch.DeleteValue('Text_h2')
+    $scratch.SetValue('Added_h4', 'new', [Microsoft.Win32.RegistryValueKind]::String)
+    $restoredValues = @(Restore-KbpRegistryValues -KeyPath $scratchKey -Snapshot $snapshot)
+    $after = Get-KbpRegistryValueSnapshot -KeyPath $scratchKey
+    if ((Compare-KbpRegistrySnapshot -Before $snapshot -After $after).Count -ne 0 -or $restoredValues.Count -ne 4 -or
+        [int]$scratch.GetValue('Screenmanager Resolution Width_h182942802') -ne 1920 -or
+        $scratch.GetValueKind('Large_h3') -ne [Microsoft.Win32.RegistryValueKind]::QWord -or
+        $null -ne $scratch.GetValue('Added_h4')) {
+        throw "The registry key was not restored exactly: $($restoredValues -join ', ')"
+    }
+}
+finally {
+    $scratch.Dispose()
+    [Microsoft.Win32.Registry]::CurrentUser.DeleteSubKeyTree('Software\' + $scratchName, $false)
 }
 # The finite recipe binds; a recipe named on the launcher must match.
 $finiteJson = New-QualificationFixtureJson @{ recipe = 'finite-direct-mixed' }

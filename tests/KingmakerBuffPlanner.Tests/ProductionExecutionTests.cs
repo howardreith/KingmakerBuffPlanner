@@ -72,6 +72,7 @@ namespace KingmakerBuffPlanner.Tests
             Run("capability-inventory-describes-the-party", TestCapabilityInventory);
             Run("classic-cast-grant-digest-allowance-and-judgement", TestClassicCastCore);
             Run("read-only-game-diagnostics-never-act", TestReadOnlyGameDiagnostics);
+            Run("physical-workspace-requests-and-judgement", () => TestPhysicalWorkspace(root));
             Run("persistence-round-trip-gaps-and-campaign-isolation",
                 () => TestPersistenceRoundTripAndCampaignIsolation(root));
             Run("qualification-finite-recipe", () => TestFiniteQualificationRecipe(root));
@@ -3431,6 +3432,121 @@ namespace KingmakerBuffPlanner.Tests
         {
             CastingPlanDocument fixture = CastingDocument(castings);
             return new CastingPlanDocument(campaignId, fixture.Routines, fixture.Castings);
+        }
+
+        // Batch 3, section 10: the physical-input workspace scenario (a
+        // workspace scenario with physical input, automation fixture only,
+        // an optional expected screen size) and its Unity-free judgement.
+        private static void TestPhysicalWorkspace(string root)
+        {
+            if (!RuntimeTestProtocol.IsPhysicalWorkspaceScenario("live-workspace-physical") ||
+                !RuntimeTestProtocol.IsWorkspaceScenario("live-workspace-physical") ||
+                RuntimeTestProtocol.IsNoInputWorkspaceScenario("live-workspace-physical") ||
+                RuntimeTestProtocol.IsAdvancedFamilyScenario("live-workspace-physical") ||
+                !RuntimeTestProtocol.IsScreenSize("1920x1080") || !RuntimeTestProtocol.IsScreenSize("2560x1440") ||
+                RuntimeTestProtocol.IsScreenSize("1920X1080") || RuntimeTestProtocol.IsScreenSize("100x100") ||
+                RuntimeTestProtocol.IsScreenSize("1920x") || RuntimeTestProtocol.IsScreenSize("-1920x1080"))
+                throw new InvalidOperationException("Physical workspace classification is wrong.");
+            Func<string, string, string, Action<Dictionary<string, object>>> set = (scenario, family, screen) => o =>
+            {
+                o["scenario"] = scenario;
+                var parameters = new Dictionary<string, object>
+                {
+                    { "workingSaveName", family + "_WORKING" },
+                    { "workingFileName", "Manual_305_" + family + "_WORKING.zks" },
+                    { "workingSha256", new string('a', 64) },
+                    { "baselineSaveName", family + "_BASELINE" },
+                    { "baselineFileName", "Manual_304_" + family + "_BASELINE.zks" },
+                    { "baselineSha256", new string('b', 64) },
+                    { "expectedGameName", "Hedwirg" },
+                    { "expectedGameId", "df33d1ff-4ec8-4707-bfa0-5e059bf9a049" },
+                    { "executionMode", "instant" }
+                };
+                if (screen != null) parameters["expectedScreen"] = screen;
+                o["parameters"] = parameters;
+            };
+            string rejection;
+            foreach (Action<Dictionary<string, object>> ok in new[]
+                {
+                    set("live-workspace-physical", "KBP_AUTOMATION", null),
+                    set("live-workspace-physical", "KBP_AUTOMATION", "1920x1080")
+                })
+            {
+                string path = WriteRequest(root, "physical-ok-" + Guid.NewGuid().ToString("N"), ok);
+                if (ReadProtocol(new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path },
+                        out rejection) == null || rejection.Length != 0)
+                    throw new InvalidOperationException("A valid physical request was refused: " + rejection);
+            }
+            foreach (Action<Dictionary<string, object>> bad in new[]
+                {
+                    set("live-workspace-physical", "KBP_ADVANCED", null),
+                    set("live-workspace-physical", "KBP_AUTOMATION", "wide"),
+                    set("live-workspace-qual", "KBP_AUTOMATION", "1920x1080")
+                })
+            {
+                string path = WriteRequest(root, "physical-bad-" + Guid.NewGuid().ToString("N"), bad);
+                if (ReadProtocol(new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path },
+                        out rejection) != null || string.IsNullOrEmpty(rejection))
+                    throw new InvalidOperationException("An invalid physical request was accepted.");
+            }
+            Func<PhysicalWorkspaceRecord> good = () =>
+            {
+                var record = new PhysicalWorkspaceRecord
+                {
+                    ExpectedScreen = "1920x1080", ScreenWidth = 1920, ScreenHeight = 1080, SearchFocused = true,
+                    SearchText = PhysicalWorkspaceRecord.Query, ModeAfterTyping = "planner", GridOverflows = false,
+                    ScrollBefore = 1f, ScrollAfter = 1f, ClickedSource = "source-resistance",
+                    SelectedAfterClick = "source-resistance", FocusCycle = "minimized=True;restored=True;foreground=True",
+                    FocusLostObserved = true, FocusRegained = true, WorkspaceOpenAfterFocus = true,
+                    SearchTextAfterFocus = PhysicalWorkspaceRecord.Query + PhysicalWorkspaceRecord.QuerySuffix,
+                    ClosedByEscape = true, LeaseReleased = true, SelectionUnchanged = true, CameraUnchanged = true
+                };
+                record.Acknowledged.AddRange(PhysicalWorkspaceRecord.Actions);
+                record.VisibleAfterQuery.Add("source-resistance|Resistance|False");
+                record.VisibleAfterQuery.Add("source-aid|Aid Another|True");
+                return record;
+            };
+            if (good().Violations().Count != 0)
+                throw new InvalidOperationException("A clean physical run was refused: " +
+                    string.Join("|", good().Violations().ToArray()));
+            var shapes = new Dictionary<string, Action<PhysicalWorkspaceRecord>>
+            {
+                { "screen:1920x1200!=1920x1080", r => r.ScreenHeight = 1200 },
+                { "unacknowledged:ws-focus-cycle", r => r.Acknowledged.Remove("ws-focus-cycle") },
+                { "search-not-focused", r => r.SearchFocused = false },
+                { "typed:resi", r => r.SearchText = "resi" },
+                { "unfiltered:source-light|Light|False", r => r.VisibleAfterQuery.Add("source-light|Light|False") },
+                { "no-match-shown", r => r.VisibleAfterQuery.RemoveAt(0) },
+                { "typing-changed-mode:Inventory", r => r.ModeAfterTyping = "Inventory" },
+                { "wheel:no-scroll:0>0", r => { r.GridOverflows = true; r.ScrollBefore = 0f; r.ScrollAfter = 0f; } },
+                { "wheel:moved-without-overflow:1>0.5", r => r.ScrollAfter = 0.5f },
+                { "scroll-unread", r => r.ScrollAfter = null },
+                { "tile-not-selected:source-resistance>source-aid", r => r.SelectedAfterClick = "source-aid" },
+                { "focus-cycle:minimized=False;restored=True;foreground=True",
+                    r => r.FocusCycle = "minimized=False;restored=True;foreground=True" },
+                { "focus-not-regained", r => r.FocusRegained = false },
+                { "workspace-lost-on-focus", r => r.WorkspaceOpenAfterFocus = false },
+                { "typing-after-focus:resis", r => r.SearchTextAfterFocus = "resis" },
+                { "escape-did-not-close", r => r.ClosedByEscape = false },
+                { "lease-held-after-close", r => r.LeaseReleased = false },
+                { "world-input-leaked:commands=1/0/0;selectionUnchanged=True;cameraUnchanged=True",
+                    r => r.PlayerCommands = 1 },
+                { "world-input-leaked:commands=0/0/0;selectionUnchanged=True;cameraUnchanged=False",
+                    r => r.CameraUnchanged = false }
+            };
+            foreach (KeyValuePair<string, Action<PhysicalWorkspaceRecord>> shape in shapes)
+            {
+                PhysicalWorkspaceRecord bad = good();
+                shape.Value(bad);
+                if (!bad.Violations().Contains(shape.Key))
+                    throw new InvalidOperationException("Physical judgement missed " + shape.Key + ": " +
+                        string.Join("|", bad.Violations().ToArray()));
+            }
+            PhysicalWorkspaceRecord owner = good();
+            owner.ExpectedScreen = null;
+            owner.ScreenHeight = 1200;
+            if (owner.Violations().Count != 0)
+                throw new InvalidOperationException("The owner's own display was judged against a size.");
         }
 
         // The area and cantrip diagnostics only read: no transition is used,
