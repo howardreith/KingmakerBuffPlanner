@@ -3105,7 +3105,9 @@ namespace KingmakerBuffPlanner.Tests
                 tokens.Count != 1 || tokens[0] != "tok|1,2;x=3:4" ||
                 ClassicPlanDigest.Of(variant(null, null, new MaterialReservation("item-guid", 1), null, null)) == same ||
                 ClassicPlanDigest.Of(variant(null, null, null, new[] { "metamagic-extend" }, null)) == same ||
-                ClassicPlanDigest.Of(variant(null, null, null, null, new Dictionary<string, int> { { "rod-pool", 1 } })) == same)
+                ClassicPlanDigest.Of(variant(null, null, null, null, new Dictionary<string, int> { { "rod-pool", 1 } })) == same ||
+                ClassicPlanDigest.Of(variant(null, null, null, null, new Dictionary<string, int> { { "rod-pool", 1 } })) ==
+                    ClassicPlanDigest.Of(variant(null, null, null, null, new Dictionary<string, int> { { "rod-pool", 2 } })))
                 throw new InvalidOperationException("A different classic step kept the approved digest.");
             var grant = new ClassicCastGrant("run-1", "long", digest, "animated", 3);
             string refusal;
@@ -3117,9 +3119,11 @@ namespace KingmakerBuffPlanner.Tests
                 refusal != "classic-grant-plan-differs" ||
                 grant.TryConsume("long", digest, "animated", 4, out refusal) ||
                 refusal != "classic-grant-cap:4>3" ||
+                grant.TryConsume("long", digest, "animated", 0, out refusal) ||
+                refusal != "classic-grant-cap:0>3" ||
                 !grant.TryConsume("long", digest, "animated", 3, out refusal) || refusal != null ||
                 grant.TryConsume("long", digest, "animated", 3, out refusal) ||
-                refusal != "classic-grant-consumed" || grant.Attempts != 6 || !grant.Consumed)
+                refusal != "classic-grant-consumed" || grant.Attempts != 7 || !grant.Consumed)
                 throw new InvalidOperationException("The classic grant is not single-use and exact: " + refusal);
             Func<Action<JObject>, string> allowanceJson = mutate =>
             {
