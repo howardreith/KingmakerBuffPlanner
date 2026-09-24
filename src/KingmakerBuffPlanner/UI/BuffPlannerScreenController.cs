@@ -96,8 +96,8 @@ namespace KingmakerBuffPlanner.UI
 
         // A result that arrives while the screen is closed (an accepted run
         // closes it) is shown the next time the screen opens - for the same
-        // campaign only, and dropped on an area change or a mode switch
-        // (focused re-review).
+        // campaign only; a result kept from before an area change or a mode
+        // switch is dropped (the interruption an area change reports is kept).
         private QuickExecutionResult _unshownResult;
         private string _unshownResultCampaign;
 

@@ -67,8 +67,9 @@ if ($pending) {
         $recorded = "recorded as $(@($unverifiable) -join ', ') for the owner's review"
         if ($unverifiableReason -ceq 'lock-not-held') {
             throw ("The protected saves of run $RunId can no longer be compared under its lock; $recorded. Its " +
-                "deployment lock is missing or not its own, so this script cannot restore the Mods folder either: " +
-                "the owner inspects runtime-state\deployment.lock and the Mods folder.")
+                "deployment lock ($([string]$state.lockPath)) is missing or not its own, so no script can restore the " +
+                "Mods folder either: the owner compares the Mods folder with the run's backup under runtime-backups " +
+                "and resolves the transaction by hand.")
         }
         throw "The protected saves of run $RunId can no longer be compared under its lock; $recorded."
     }
@@ -88,13 +89,21 @@ if ($pending) {
                 "restores: " + $compareError)
         }
         # Targeted review: closed only after the comparison was tried and
-        # failed, never while the game runs (a passing cause), and with why.
+        # failed, never while the game runs (a passing cause), and with why;
+        # last review: tried once more once the game is known to be closed.
         Assert-KbpNotRunning
-        $unverifiable = Close-KbpUnverifiableProtectedSaveComparison -BaselinePath $baselinePath `
-            -Reason 'comparison-failed' -Detail $compareError -EvidenceDirectory $evidenceDirectory `
-            -StateRoot $StateRoot -RunId $RunId
-        $saveFailure = "The protected saves of run $RunId could not be compared ($compareError); recorded as " +
-            "$(@($unverifiable) -join ', ') for the owner's review."
+        try {
+            $comparison = Complete-KbpProtectedSaveComparison -BaselinePath $baselinePath -EvidenceDirectory $evidenceDirectory `
+                -StateRoot $StateRoot
+        }
+        catch {
+            $compareError = $_.Exception.Message
+            $unverifiable = Close-KbpUnverifiableProtectedSaveComparison -BaselinePath $baselinePath `
+                -Reason 'comparison-failed' -Detail $compareError -EvidenceDirectory $evidenceDirectory `
+                -StateRoot $StateRoot -RunId $RunId
+            $saveFailure = "The protected saves of run $RunId could not be compared ($compareError); recorded as " +
+                "$(@($unverifiable) -join ', ') for the owner's review."
+        }
     }
     if ($null -ne $comparison) {
         if (@($comparison.blocking).Count -ne 0) {

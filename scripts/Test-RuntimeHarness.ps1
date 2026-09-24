@@ -1898,6 +1898,22 @@ try {
     if ($fieldMessage -notlike 'The protected-save violation record nofield.json is malformed (it names run '''')*resolved it by hand.') {
         throw ('A violation record missing its run did not block clearly: ' + $fieldMessage)
     }
+    # Last review: an unreadable record or acknowledgement blocks with a
+    # named message, never a raw parser error.
+    $unreadableState = Join-Path $savesRoot 'unreadable-state'
+    $unreadableFolder = Join-Path $unreadableState 'protected-save-violations'
+    New-Item -ItemType Directory -Path (Join-Path $unreadableFolder 'acknowledged') -Force | Out-Null
+    Write-KbpJsonAtomic (Join-Path $unreadableFolder 'ack-garbled.json') ([ordered]@{ schemaVersion = 1; runId = 'ack-garbled'; blocking = @('changed:a') })
+    [IO.File]::WriteAllText((Join-Path $unreadableFolder 'acknowledged\ack-garbled.json'), '{ garbage')
+    $garbledAck = ''
+    try { Assert-KbpNoUnacknowledgedSaveViolation -StateRoot $unreadableState } catch { $garbledAck = $_.Exception.Message }
+    [IO.File]::WriteAllText((Join-Path $unreadableFolder 'a-garbled.json'), '{ garbage')
+    $garbledRecord = ''
+    try { Assert-KbpNoUnacknowledgedSaveViolation -StateRoot $unreadableState } catch { $garbledRecord = $_.Exception.Message }
+    if ($garbledAck -notlike 'Run ack-garbled changed protected saves (changed:a)*' -or
+        $garbledRecord -notlike 'The protected-save violation record a-garbled.json cannot be read*') {
+        throw ('An unreadable record or acknowledgement did not block with its name: ' + $garbledAck + ' / ' + $garbledRecord)
+    }
     # Restore-Local against a test state root (each transaction is a stand-in
     # whose lock does not exist, so nothing can be restored): -Skip is refused
     # while the comparison is pending; a comparison that cannot be made
@@ -1969,7 +1985,7 @@ try {
     $noLockMessage = ''
     try { & $restoreScript -RunId 'rl-nolock' -StateRoot $rlState -EvidenceRoot $rlEvidence -Confirm:$false }
     catch { $noLockMessage = $_.Exception.Message }
-    if ($noLockMessage -notlike '*can no longer be compared under its lock; recorded as unverifiable:lock-not-held*cannot restore the Mods folder either*' -or
+    if ($noLockMessage -notlike '*can no longer be compared under its lock; recorded as unverifiable:lock-not-held*no script can restore the Mods folder either*' -or
         -not [bool](Read-KbpJson $noLockBaseline).compared) {
         throw ('A comparison without its lock was made: ' + $noLockMessage)
     }

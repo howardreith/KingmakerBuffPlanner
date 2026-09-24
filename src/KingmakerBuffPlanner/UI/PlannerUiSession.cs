@@ -836,9 +836,11 @@ namespace KingmakerBuffPlanner.UI
             string name = RoutineDisplayName(routineId);
             // Focused re-review: a run that never submitted a cast says so.
             bool submitted = LastExecutionReport != null && LastExecutionReport.AnyCastAttempted;
+            // Last review: accurate between casts as well as during one.
             Status = name + " stopped before it finished (" + (reason ?? "stopped") + "): " +
                 (submitted
-                    ? "the cast in progress was interrupted and cleaned up, and nothing after it was attempted."
+                    ? LastExecutionReport.Confirmed + " of " + LastExecutionReport.Planned +
+                        " casts were confirmed; a cast in progress, if any, was cleaned up, and nothing after it was attempted."
                     : "it had not cast anything yet, and nothing was attempted.");
             _log.Info("[KBP-QUICK] classic run ended by its owner;group=" + routineId +
                 ";reason=" + (reason ?? "stopped") + ".");
