@@ -90,7 +90,7 @@ if (-not (Test-Path -LiteralPath $backupPlanner -PathType Container)) {
     throw "Recorded prior backup is missing: $backupPlanner"
 }
 Assert-KbpPlannerIdentity $backupPlanner $priorVersion
-Assert-KbpNotRunning
+Assert-KbpGameRootNotRunning -GameRoot $gameRootFull
 # The live game root is shared with the owner's other lab: no rollback while
 # its runtime lease is held (an isolated test root is not shared).
 $liveGameRoot = -not $PSBoundParameters.ContainsKey('GameRoot')

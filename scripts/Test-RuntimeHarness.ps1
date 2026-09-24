@@ -1424,6 +1424,68 @@ try {
     if (-not $waitRefused -or $restoreWait -lt 0 -or $restoreWait -gt $restoreFirstMove) {
         throw "The restoration does not wait for the other lab's lease before moving the Mods folder."
     }
+    # A rollback is blocked only by a game running from its own game root;
+    # an unreadable process path blocks too.
+    $rootGame = Join-Path $root 'root-game'
+    $inside = [pscustomobject]@{ Id = 11; Path = (Join-Path $rootGame 'Kingmaker.exe') }
+    $outside = [pscustomobject]@{ Id = 12; Path = 'C:\Other Install\Kingmaker.exe' }
+    $unreadable = [pscustomobject]@{ Id = 13; Path = $null }
+    Assert-KbpGameRootNotRunning -GameRoot $rootGame -Processes @()
+    Assert-KbpGameRootNotRunning -GameRoot $rootGame -Processes @($outside)
+    foreach ($blockingCase in @(@($inside), @($unreadable), @($outside, $inside))) {
+        $blockedRoot = $false
+        try { Assert-KbpGameRootNotRunning -GameRoot $rootGame -Processes $blockingCase }
+        catch { $blockedRoot = $_.Exception.Message -like '*Kingmaker is running from*' }
+        if (-not $blockedRoot) { throw 'A game running from the root (or an unreadable one) did not block.' }
+    }
+    $restoreRootText = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'Restore-InstallLocal.ps1') -Raw
+    if ($restoreRootText -notmatch '(?m)^Assert-KbpGameRootNotRunning -GameRoot \$gameRootFull\s*$' -or
+        $restoreRootText -match '(?m)^Assert-KbpNotRunning\s*$') {
+        throw 'The rollback does not check the game running from its own root.'
+    }
+    # A live purity window: a change in a window the other lab left quiet
+    # fails at once; a change in a window it overlapped (a new run entry in
+    # its state folder) is rerun in a quiet window; overlap every time fails.
+    $purityState = Join-Path $root 'foreign-purity-state'
+    New-Item -ItemType Directory -Path $purityState | Out-Null
+    $purityLease = Join-Path $purityState 'purity.lock'
+    $purityTarget = Join-Path $root 'purity-target'
+    New-Item -ItemType Directory -Path $purityTarget | Out-Null
+    $purityCommon = @{ Targets = @($purityTarget); LeasePaths = @($purityLease); GameCount = { 0 }; LeaseWaitSeconds = 0 }
+    Invoke-KbpLivePurityWindow -Label 'pure' -Action { } @purityCommon
+    $quietChange = $null
+    try { Invoke-KbpLivePurityWindow -Label 'quiet-change' @purityCommon -Action {
+            Set-Content -LiteralPath (Join-Path $purityTarget ('ours-' + [Guid]::NewGuid().ToString('N'))) -Value 'x' } }
+    catch { $quietChange = $_.Exception.Message }
+    $script:purityCalls = 0
+    Invoke-KbpLivePurityWindow -Label 'foreign-once' @purityCommon -Action {
+        $script:purityCalls++
+        if ($script:purityCalls -eq 1) {
+            Set-Content -LiteralPath (Join-Path $purityState ('runtime-' + [Guid]::NewGuid().ToString('N'))) -Value 'run'
+            Set-Content -LiteralPath (Join-Path $purityTarget 'foreign-write') -Value 'x'
+        }
+    }
+    $alwaysForeign = $null
+    try { Invoke-KbpLivePurityWindow -Label 'foreign-always' @purityCommon -Action {
+            Set-Content -LiteralPath (Join-Path $purityState ('runtime-' + [Guid]::NewGuid().ToString('N'))) -Value 'run'
+            Set-Content -LiteralPath (Join-Path $purityTarget ('foreign-' + [Guid]::NewGuid().ToString('N'))) -Value 'x' } }
+    catch { $alwaysForeign = $_.Exception.Message }
+    $gameChange = $null
+    try { Invoke-KbpLivePurityWindow -Label 'game-running' -Targets @($purityTarget) -LeasePaths @($purityLease) `
+            -GameCount { 1 } -LeaseWaitSeconds 0 -Attempts 2 -Action {
+            Set-Content -LiteralPath (Join-Path $purityTarget ('game-' + [Guid]::NewGuid().ToString('N'))) -Value 'x' } }
+    catch { $gameChange = $_.Exception.Message }
+    if ($quietChange -notlike 'quiet-change changed:*' -or $script:purityCalls -ne 2 -or
+        $alwaysForeign -notlike 'foreign-always changed in each of 3 comparisons*' -or
+        $gameChange -notlike 'game-running changed in each of 2 comparisons*') {
+        throw "The live purity window is wrong: quiet=$quietChange; calls=$($script:purityCalls); always=$alwaysForeign; game=$gameChange"
+    }
+    foreach ($purityScript in @('Test-DeploymentWhatIf.ps1', 'Test-RuntimeLauncherFileWhatIf.ps1')) {
+        $purityText = Get-Content -LiteralPath (Join-Path $PSScriptRoot $purityScript) -Raw
+        if ($purityText -notmatch 'Invoke-KbpLivePurityWindow -Label' -or $purityText -match '\$before\[\$target\] = if') {
+            throw "$purityScript compares the live Mods folder outside the purity window."
+        }
+    }
     # The owner's other project may hold a live lease on the same
     # installation: nothing starts while its lock exists.
     $foreignLease = Join-Path $root 'foreign-runtime.lock'

@@ -72,72 +72,38 @@ $targets = @(
     $script:KbpRuntimeBackupRoot,
     $script:KbpRuntimeEvidenceRoot,
     (Join-Path $game 'Mods'))
-$before = @{}
-foreach ($target in $targets) {
-    $before[$target] = if (Test-Path -LiteralPath $target -PathType Container) {
-        @(Get-KbpDirectoryManifest $target)
-    } else { $null }
-}
 $launcher = Join-Path $PSScriptRoot 'Invoke-KingmakerRuntimeTest.ps1'
-$ErrorActionPreference = 'Continue'
-$output = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $launcher `
-        -Scenario 'mod-load-smoke' -WhatIf 2>&1)
-$childExit = $LASTEXITCODE
-$ErrorActionPreference = 'Stop'
-if ($childExit -ne 0) {
-    throw "Runtime launcher -File -WhatIf failed with exit code $childExit.: $($output -join ' ')"
-}
-if (-not (@($output | Where-Object { "$_" -like '*Runtime WhatIf preflight PASS*' }).Count -ge 1)) {
-    throw "Runtime launcher -File -WhatIf did not report the purity message.: $($output -join ' ')"
-}
-$changed = @()
-foreach ($target in $targets) {
-    $after = if (Test-Path -LiteralPath $target -PathType Container) {
-        @(Get-KbpDirectoryManifest $target)
-    } else { $null }
-    if ($null -eq $before[$target]) {
-        if ($null -ne $after) { $changed += @($target) }
+Invoke-KbpLivePurityWindow -Label 'Runtime launcher -File -WhatIf' -Targets $targets -Action {
+    $ErrorActionPreference = 'Continue'
+    $output = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $launcher `
+            -Scenario 'mod-load-smoke' -WhatIf 2>&1)
+    $childExit = $LASTEXITCODE
+    $ErrorActionPreference = 'Stop'
+    if ($childExit -ne 0) {
+        throw "Runtime launcher -File -WhatIf failed with exit code $childExit.: $($output -join ' ')"
     }
-    elseif (-not (Test-KbpManifestEqual @($before[$target]) @($after))) {
-        $changed += @($target)
+    if (-not (@($output | Where-Object { "$_" -like '*Runtime WhatIf preflight PASS*' }).Count -ge 1)) {
+        throw "Runtime launcher -File -WhatIf did not report the purity message.: $($output -join ' ')"
     }
 }
-if (@($changed).Count -ne 0) { throw "Runtime launcher -File -WhatIf changed: $($changed -join ', ')" }
 
 # Layer 4 (decision-evaluation failure sentinel): a REAL run under -File
 # (no -WhatIf, so the confirmation decision must be evaluated) must be
 # refused with a non-zero exit and must mutate nothing — the exact
 # mutation path a naive fallback would have enabled.
-$beforeReal = @{}
-foreach ($target in $targets) {
-    $beforeReal[$target] = if (Test-Path -LiteralPath $target -PathType Container) {
-        @(Get-KbpDirectoryManifest $target)
-    } else { $null }
-}
-$ErrorActionPreference = 'Continue'
-$realOutput = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $launcher `
-        -Scenario 'mod-load-smoke' 2>&1)
-$realExit = $LASTEXITCODE
-$ErrorActionPreference = 'Stop'
-if ($realExit -eq 0) {
-    throw "Runtime launcher -File real run must refuse (decision cannot be evaluated); it exited 0.: $($realOutput -join ' ')"
-}
-if (-not (@($realOutput | Where-Object { "$_" -like '*decision could not be evaluated*' }).Count -ge 1)) {
-    throw "Runtime launcher -File real run lacks the decision refusal message.: $($realOutput -join ' ')"
-}
-$changedReal = @()
-foreach ($target in $targets) {
-    $after = if (Test-Path -LiteralPath $target -PathType Container) {
-        @(Get-KbpDirectoryManifest $target)
-    } else { $null }
-    if ($null -eq $beforeReal[$target]) {
-        if ($null -ne $after) { $changedReal += @($target) }
+Invoke-KbpLivePurityWindow -Label 'Runtime launcher -File refused run' -Targets $targets -Action {
+    $ErrorActionPreference = 'Continue'
+    $realOutput = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $launcher `
+            -Scenario 'mod-load-smoke' 2>&1)
+    $realExit = $LASTEXITCODE
+    $ErrorActionPreference = 'Stop'
+    if ($realExit -eq 0) {
+        throw "Runtime launcher -File real run must refuse (decision cannot be evaluated); it exited 0.: $($realOutput -join ' ')"
     }
-    elseif (-not (Test-KbpManifestEqual @($beforeReal[$target]) @($after))) {
-        $changedReal += @($target)
+    if (-not (@($realOutput | Where-Object { "$_" -like '*decision could not be evaluated*' }).Count -ge 1)) {
+        throw "Runtime launcher -File real run lacks the decision refusal message.: $($realOutput -join ' ')"
     }
 }
-if (@($changedReal).Count -ne 0) { throw "Runtime launcher -File refused run changed: $($changedReal -join ', ')" }
 # Layer 5 (single-cast probe gating, review L6/probe preparation): the
 # casting probe cannot be launched without the owner's allowance file under
 # the lab approvals directory; the selection-only probe never takes one;
@@ -173,27 +139,14 @@ try {
     }
 }
 finally { Remove-Item -LiteralPath $outsideAllowance -Force -ErrorAction SilentlyContinue }
-$beforeSelect = @{}
-foreach ($target in $targets) {
-    $beforeSelect[$target] = if (Test-Path -LiteralPath $target -PathType Container) {
-        @(Get-KbpDirectoryManifest $target)
-    } else { $null }
-}
-$ErrorActionPreference = 'Continue'
-$selectOutput = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $launcher `
-        -Scenario 'live-cast-probe-select' -TimeoutSeconds 600 -WhatIf 2>&1)
-$selectExit = $LASTEXITCODE
-$ErrorActionPreference = 'Stop'
-if ($selectExit -ne 0 -or -not (@($selectOutput | Where-Object { "$_" -like '*Runtime WhatIf preflight PASS*' }).Count -ge 1)) {
-    throw "Selection-only probe -WhatIf failed.: $($selectOutput -join ' ')"
-}
-foreach ($target in $targets) {
-    $after = if (Test-Path -LiteralPath $target -PathType Container) {
-        @(Get-KbpDirectoryManifest $target)
-    } else { $null }
-    if (($null -eq $beforeSelect[$target]) -ne ($null -eq $after) -or
-        ($null -ne $after -and -not (Test-KbpManifestEqual @($beforeSelect[$target]) @($after)))) {
-        throw "Selection-only probe -WhatIf changed: $target"
+Invoke-KbpLivePurityWindow -Label 'Selection-only probe -WhatIf' -Targets $targets -Action {
+    $ErrorActionPreference = 'Continue'
+    $selectOutput = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $launcher `
+            -Scenario 'live-cast-probe-select' -TimeoutSeconds 600 -WhatIf 2>&1)
+    $selectExit = $LASTEXITCODE
+    $ErrorActionPreference = 'Stop'
+    if ($selectExit -ne 0 -or -not (@($selectOutput | Where-Object { "$_" -like '*Runtime WhatIf preflight PASS*' }).Count -ge 1)) {
+        throw "Selection-only probe -WhatIf failed.: $($selectOutput -join ' ')"
     }
 }
 # Layer 6 (review N1): allowance-to-build binding. A same-commit
