@@ -67,6 +67,16 @@ namespace KingmakerBuffPlanner.Execution
             new List<CastingQualificationTokenReading>();
         public List<string> UnreadTokenCastings { get; } = new List<string>();
         public List<string> Observations { get; } = new List<string>();
+        // The enhanced recipe: the caster reads (the enhancement's own
+        // resource and every activatable ability of the caster) before and
+        // after the step, and per casting the stat modifiers its effect gives
+        // its recipient before and after (a null list was not read).
+        public CasterEnhancementObservation CasterBefore { get; internal set; }
+        public CasterEnhancementObservation CasterAfter { get; internal set; }
+        public Dictionary<string, IReadOnlyList<string>> ModifiersBefore { get; } =
+            new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
+        public Dictionary<string, IReadOnlyList<string>> ModifiersAfter { get; } =
+            new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
 
         internal string TransitionOf(string castingId)
         {
@@ -133,6 +143,10 @@ namespace KingmakerBuffPlanner.Execution
         public int RunsStarted { get; set; }
         public int RunsReported { get; set; }
         public string CallbackFailure { get; set; }
+        // The enhanced recipe: the enhancement options the workspace offered
+        // for the focused enhanced casting before the edit and after it ("*"
+        // marks a selected one).
+        public IReadOnlyList<string> EnhancementOptions { get; set; } = new string[0];
 
         private bool HasDisableStep
         {
@@ -144,12 +158,18 @@ namespace KingmakerBuffPlanner.Execution
             get { return Selection != null && CastingQualificationRecipe.IsGroupRecipe(Selection.Recipe); }
         }
 
+        private bool IsEnhanced
+        {
+            get { return Selection != null && Selection.Recipe == CastingQualificationRecipe.EnhancedDirect; }
+        }
+
         // The judged steps of this record's recipe, in order.
         public IEnumerable<string> JudgedSteps
         {
             get
             {
                 if (IsGroup) return GroupStepNames;
+                if (IsEnhanced) return EnhancedStepNames;
                 return HasDisableStep
                     ? StepNames.Concat(new[] { CastingQualificationForecast.Disable, CastingQualificationForecast.Recover })
                     : StepNames;
@@ -189,9 +209,9 @@ namespace KingmakerBuffPlanner.Execution
             // The stop is the player's own: pressed once and taken by the
             // host as the player stop. An animated cast spans many frames,
             // so there the press must land while the first cast is in
-            // progress (the stop waits for it to complete). The group
-            // recipe has no stop step.
-            if (!IsGroup)
+            // progress (the stop waits for it to complete). The two-phase
+            // recipes have no stop step.
+            if (!IsGroup && !IsEnhanced)
             {
                 if (StopPress == null) violations.Add("stop-press:none");
                 else if (!StopPressHandled) violations.Add("stop-press:not-handled:" + StopPress);
@@ -230,6 +250,7 @@ namespace KingmakerBuffPlanner.Execution
         // casting is due again. Direct recipes show that a repeat casts
         // nothing.
         public static readonly string[] GroupStepNames = { "prime", "mixed" };
+        public static readonly string[] EnhancedStepNames = { "plain", "enhanced" };
 
         // The disable rules, applied the moment the disable step ends (so a
         // failed rule stops the run before the recover run is submitted)
@@ -334,6 +355,10 @@ namespace KingmakerBuffPlanner.Execution
             }
             else if (name == CastingQualificationForecast.Mixed)
                 failure = MixedFailure(step, castings);
+            else if (name == CastingQualificationForecast.Plain)
+                failure = PlainFailure(step, castings);
+            else if (name == CastingQualificationForecast.Enhanced)
+                failure = EnhancedFailure(step, castings);
             else if (name == "recast" || name == CastingQualificationForecast.Recover)
             {
                 // recast, and recover (the same Always recast plan as a new
@@ -389,6 +414,140 @@ namespace KingmakerBuffPlanner.Execution
             if (!grouped.PreCoveredRecipientUnitIds.SequenceEqual(new[] { castings[0].DirectTargetUnitId }))
                 return "pre-covered:" + string.Join(",", grouped.PreCoveredRecipientUnitIds.ToArray());
             return null;
+        }
+
+        // The enhanced recipe's plain step: the plain casting alone lands a
+        // new instance; the enhancement's resource and every activatable
+        // ability of the caster are exactly as before; its effect gives the
+        // recipient (who had none of it) the enhancement's stat a positive
+        // modifier of the enhancement's descriptor.
+        private string PlainFailure(CastingQualificationStepResult step, IReadOnlyList<PlannedCasting> castings)
+        {
+            string plain = castings[0].CastingId;
+            CastingQualificationEnhancement enhancement = Selection.Enhancement;
+            if (enhancement == null) return "enhancement:none";
+            if (step.Report.TerminalReason != "completed") return "report:" + step.Report.TerminalReason;
+            if (step.StateOf(plain) != CastingOutcomeState.EffectConfirmed ||
+                step.Report.Entries.Count != 1 || step.Report.Submitted != 1)
+                return "states:" + States(step);
+            if (step.TransitionOf(plain) != "new-instance")
+                return "effects:" + string.Join(",", step.Transitions.ToArray());
+            string caster = CasterFailure(step, 0);
+            if (caster != null) return caster;
+            IReadOnlyList<string> before = ModifiersOf(step.ModifiersBefore, plain);
+            IReadOnlyList<string> after = ModifiersOf(step.ModifiersAfter, plain);
+            if (before == null || after == null) return "modifiers:" + plain + ":unread";
+            if (before.Count != 0)
+                return "modifiers:" + plain + ":present-before:" + string.Join(";", before.ToArray());
+            int value;
+            if (!TryModifierValue(after, enhancement, out value) || value <= 0)
+                return "modifiers:" + plain + ":no-" + enhancement.ModifierPrefix + ":" +
+                    string.Join(";", after.ToArray());
+            return null;
+        }
+
+        // The enhanced step: the plain casting is skipped (its recipient keeps
+        // its instance and exactly its modifiers); the enhanced casting lands
+        // a new instance whose modifiers are the plain casting's with the
+        // enhancement's stat raised by exactly its increase; the
+        // enhancement's resource drops by exactly its units per cast; every
+        // activatable ability of the caster ends as it began (the one-shot
+        // choice consumed, nothing left on or switched off).
+        private string EnhancedFailure(CastingQualificationStepResult step, IReadOnlyList<PlannedCasting> castings)
+        {
+            string plain = castings[0].CastingId;
+            string enhanced = castings[1].CastingId;
+            CastingQualificationEnhancement enhancement = Selection.Enhancement;
+            if (enhancement == null) return "enhancement:none";
+            if (step.Report.TerminalReason != "completed") return "report:" + step.Report.TerminalReason;
+            if (step.StateOf(plain) != CastingOutcomeState.Skipped ||
+                step.StateOf(enhanced) != CastingOutcomeState.EffectConfirmed || step.Report.Submitted != 1)
+                return "states:" + States(step);
+            if (step.TransitionOf(plain) != "unchanged" || step.TransitionOf(enhanced) != "new-instance")
+                return "effects:" + string.Join(",", step.Transitions.ToArray());
+            string caster = CasterFailure(step, enhancement.UnitsPerCast);
+            if (caster != null) return caster;
+            CastingQualificationStepResult plainStep = Step(CastingQualificationForecast.Plain);
+            IReadOnlyList<string> reference = plainStep == null ? null
+                : ModifiersOf(plainStep.ModifiersAfter, plain);
+            if (reference == null) return "modifiers:plain-step-unread";
+            IReadOnlyList<string> kept = ModifiersOf(step.ModifiersAfter, plain);
+            if (kept == null || !kept.SequenceEqual(reference, StringComparer.Ordinal))
+                return "modifiers:" + plain + ":changed:" +
+                    (kept == null ? "unread" : string.Join(";", kept.ToArray()));
+            IReadOnlyList<string> before = ModifiersOf(step.ModifiersBefore, enhanced);
+            IReadOnlyList<string> after = ModifiersOf(step.ModifiersAfter, enhanced);
+            if (before == null || after == null) return "modifiers:" + enhanced + ":unread";
+            if (before.Count != 0)
+                return "modifiers:" + enhanced + ":present-before:" + string.Join(";", before.ToArray());
+            List<string> expected = Raised(reference, enhancement);
+            if (expected == null || !after.SequenceEqual(expected, StringComparer.Ordinal))
+                return "modifiers:" + enhanced + ":" + string.Join(";", after.ToArray()) + "!=" +
+                    (expected == null ? "none" : string.Join(";", expected.ToArray()));
+            return null;
+        }
+
+        // The caster reads of one step: both taken; the enhancement's own
+        // resource down by exactly the given spend; every activatable ability
+        // of the caster in exactly its state before the step.
+        private static string CasterFailure(CastingQualificationStepResult step, int spend)
+        {
+            CasterEnhancementObservation before = step.CasterBefore;
+            CasterEnhancementObservation after = step.CasterAfter;
+            if (before == null || after == null || !before.Succeeded || !after.Succeeded)
+                return "caster:unread:" + (before == null ? "none" : before.Describe()) + ">" +
+                    (after == null ? "none" : after.Describe());
+            if (before.Resource.Value - after.Resource.Value != spend)
+                return "enhancement-resource:" + before.Resource.Value + ">" + after.Resource.Value +
+                    ":expected-spend=" + spend;
+            List<string> changed = before.Activatables.Keys.Union(after.Activatables.Keys, StringComparer.Ordinal)
+                .Where(key =>
+                {
+                    bool prior;
+                    bool next;
+                    return !before.Activatables.TryGetValue(key, out prior) ||
+                        !after.Activatables.TryGetValue(key, out next) || prior != next;
+                })
+                .OrderBy(key => key, StringComparer.Ordinal).ToList();
+            if (changed.Count != 0)
+                return "cleanup:activatables-changed:" + string.Join(",", changed.ToArray());
+            return null;
+        }
+
+        private static IReadOnlyList<string> ModifiersOf(IDictionary<string, IReadOnlyList<string>> modifiers,
+            string castingId)
+        {
+            IReadOnlyList<string> value;
+            return modifiers != null && modifiers.TryGetValue(castingId, out value) ? value : null;
+        }
+
+        // The value of the one modifier the enhancement raises.
+        private static bool TryModifierValue(IEnumerable<string> modifiers,
+            CastingQualificationEnhancement enhancement, out int value)
+        {
+            value = 0;
+            List<string> matching = modifiers.Where(entry =>
+                entry.StartsWith(enhancement.ModifierPrefix, StringComparison.Ordinal)).ToList();
+            return matching.Count == 1 && int.TryParse(matching[0].Substring(enhancement.ModifierPrefix.Length),
+                System.Globalization.NumberStyles.AllowLeadingSign,
+                System.Globalization.CultureInfo.InvariantCulture, out value);
+        }
+
+        // The plain casting's modifiers with the enhancement's one raised by
+        // its increase (sorted like a read); null without that modifier.
+        private static List<string> Raised(IEnumerable<string> reference, CastingQualificationEnhancement enhancement)
+        {
+            int value;
+            List<string> modifiers = reference.ToList();
+            if (!TryModifierValue(modifiers, enhancement, out value)) return null;
+            List<string> raised = modifiers.Select(entry =>
+                    entry.StartsWith(enhancement.ModifierPrefix, StringComparison.Ordinal)
+                        ? enhancement.ModifierPrefix + (value + enhancement.Increase).ToString(
+                            System.Globalization.CultureInfo.InvariantCulture)
+                        : entry)
+                .ToList();
+            raised.Sort(StringComparer.Ordinal);
+            return raised;
         }
 
         // Resources of one step: each casting's native availability drops by
@@ -524,6 +683,9 @@ namespace KingmakerBuffPlanner.Execution
         // A read of one expected recipient of a group casting (its source
         // and that recipient's effects); null where no recipe needs it.
         private readonly Func<CastStep, string, string, ProbeObservation> _observeRecipient;
+        // The enhanced recipe's caster read (caster id, the enhancement's
+        // usage pool id); null where no recipe needs it.
+        private readonly Func<string, string, CasterEnhancementObservation> _observeCaster;
         private readonly Func<long> _clock;
         private readonly long _deadlineMillis;
         private readonly string _requestedRecipe;
@@ -567,9 +729,11 @@ namespace KingmakerBuffPlanner.Execution
             Func<bool> worldRunning = null, bool ownerPumpsHost = false,
             Func<string, bool> pressRoutine = null, Action<bool> setPlannerEnabled = null,
             Func<string> lifecycleProbe = null, Func<long> ownerTicks = null,
-            Func<CastStep, string, string, ProbeObservation> observeRecipient = null)
+            Func<CastStep, string, string, ProbeObservation> observeRecipient = null,
+            Func<string, string, CasterEnhancementObservation> observeCaster = null)
         {
             _observeRecipient = observeRecipient;
+            _observeCaster = observeCaster;
             _lifecycleProbe = lifecycleProbe;
             _ownerTicks = ownerTicks;
             _requestedRecipe = recipe;
@@ -698,6 +862,11 @@ namespace KingmakerBuffPlanner.Execution
                 case "group-author": GroupAuthor(); return;
                 case "mixed": Begin(CastingQualificationForecast.Mixed); return;
                 case "mixed-wait": Wait(false, "done"); return;
+                case "plain": Begin(CastingQualificationForecast.Plain); return;
+                case "plain-wait": Wait(false, "enhance-author"); return;
+                case "enhance-author": EnhanceAuthor(); return;
+                case "enhanced": Begin(CastingQualificationForecast.Enhanced); return;
+                case "enhanced-wait": Wait(false, "done"); return;
                 default: Finish("completed"); return;
             }
         }
@@ -755,10 +924,12 @@ namespace KingmakerBuffPlanner.Execution
         private void Author()
         {
             _session = _openSession(_boundary);
-            // The group recipe primes with its direct casting alone; the
-            // group castings join after the prime step.
+            // The two-phase recipes cast their first casting alone (the
+            // group recipe's direct casting, the enhanced recipe's plain
+            // one); the rest join after that step.
             bool group = CastingQualificationRecipe.IsGroupRecipe(Recipe);
-            foreach (PlannedCasting casting in group
+            bool twoPhase = CastingQualificationRecipe.IsTwoPhase(Recipe);
+            foreach (PlannedCasting casting in twoPhase
                 ? Record.Selection.Castings.Take(1) : Record.Selection.Castings)
             {
                 AuthoringEditResult added = _session.AddCastingForRuntime(casting);
@@ -770,7 +941,48 @@ namespace KingmakerBuffPlanner.Execution
             _session.PresentForReview(inputs);
             if (!_session.AcceptPresentedPlan(inputs)) { Fail("accept-refused"); return; }
             _startedMillis = _clock();
-            _phase = group ? "prime" : "stop";
+            _phase = group ? "prime" : twoPhase ? "plain" : "stop";
+        }
+
+        // Enhanced recipe: after the plain step the enhanced casting joins
+        // the plan WITHOUT its enhancement; the enhancement is then chosen on
+        // it through the workspace's own option for the focused casting (the
+        // options the inspector draws, and the session command its
+        // enhancement chip calls), and the changed plan is reviewed and
+        // accepted like any edit.
+        private void EnhanceAuthor()
+        {
+            PlannedCasting planned = Record.Selection.Castings[1];
+            string enhancementId = Record.Selection.Enhancement.EnhancementId;
+            AuthoringEditResult added = _session.AddCastingForRuntime(
+                planned.WithEnhancementSelections(new AuthoredEnhancementSelection[0]));
+            if (!added.Applied) { Fail("author-refused:" + planned.CastingId + ":" + added.Reason); return; }
+            CastingWorkspaceInputs inputs = _freshInputs();
+            _session.FocusCasting(planned.CastingId);
+            List<string> offered = _session.BuildView(inputs).FocusedEnhancements
+                .Select(value => value.EnhancementId + (value.Selected ? "*" : string.Empty)).ToList();
+            if (!offered.Contains(enhancementId))
+            {
+                Record.EnhancementOptions = offered.Select(value => "before:" + value).ToList();
+                Fail("enhancement-not-offered:" + enhancementId);
+                return;
+            }
+            PlannedCasting focused = _session.Document.Castings.First(value =>
+                string.Equals(value.CastingId, planned.CastingId, StringComparison.Ordinal));
+            AuthoringEditResult edited = _session.UpdateFocusedCasting(focused.WithEnhancementSelections(
+                focused.Enhancements.Where(value => value != null).Concat(new[]
+                    { new AuthoredEnhancementSelection(enhancementId, true, null) })));
+            List<string> selected = _session.BuildView(inputs).FocusedEnhancements
+                .Select(value => value.EnhancementId + (value.Selected ? "*" : string.Empty)).ToList();
+            Record.EnhancementOptions = offered.Select(value => "before:" + value)
+                .Concat(selected.Select(value => "after:" + value)).ToList();
+            if (!edited.Applied) { Fail("enhancement-refused:" + edited.Reason); return; }
+            if (!selected.Contains(enhancementId + "*")) { Fail("enhancement-not-selected:" + enhancementId); return; }
+            _session.Save();
+            inputs = _freshInputs();
+            _session.PresentForReview(inputs);
+            if (!_session.AcceptPresentedPlan(inputs)) { Fail("enhanced-accept-refused"); return; }
+            _phase = "enhanced";
         }
 
         // Group recipe: after the prime step the group castings join the
@@ -800,6 +1012,16 @@ namespace KingmakerBuffPlanner.Execution
             _observeSteps = StepsToObserve(name);
             _before = ObserveAll(step, name + "-before");
             string beforeFailure = BeforeReadFailure(_observeSteps, _before);
+            if (beforeFailure == null && Recipe == CastingQualificationRecipe.EnhancedDirect)
+            {
+                // The enhanced recipe also needs the caster read and every
+                // effect instance's modifiers before anything is submitted.
+                step.CasterBefore = ObserveCaster(step, name + "-before");
+                beforeFailure = step.CasterBefore.Succeeded
+                    ? _before.Where(pair => ModifiersOf(pair.Value) == null)
+                        .Select(pair => pair.Key + ":modifiers-unread").FirstOrDefault()
+                    : "caster:" + step.CasterBefore.Failure;
+            }
             if (beforeFailure != null)
             {
                 // Nothing was applied: zero native submissions for this step.
@@ -1146,6 +1368,54 @@ namespace KingmakerBuffPlanner.Execution
                 step.Availability.Add(castingId + ":" + Available(before) + ">" + Available(pair.Value));
                 RecordTokens(step, castingId, before, pair.Value);
             }
+            if (Recipe != CastingQualificationRecipe.EnhancedDirect) return;
+            step.CasterAfter = ObserveCaster(step, label);
+            foreach (KeyValuePair<string, ProbeObservation> pair in after)
+            {
+                ProbeObservation before;
+                _before.TryGetValue(pair.Key, out before);
+                step.ModifiersBefore[pair.Key] = ModifiersOf(before);
+                step.ModifiersAfter[pair.Key] = ModifiersOf(pair.Value);
+            }
+        }
+
+        // The stat modifiers of every observed instance together (sorted);
+        // null when the read failed or any instance's modifiers were unread.
+        internal static IReadOnlyList<string> ModifiersOf(ProbeObservation observation)
+        {
+            if (observation == null || !observation.Succeeded || observation.EffectInstances == null) return null;
+            var modifiers = new List<string>();
+            foreach (ProbeEffectInstance instance in observation.EffectInstances)
+            {
+                if (instance == null || instance.Modifiers == null) return null;
+                modifiers.AddRange(instance.Modifiers);
+            }
+            modifiers.Sort(StringComparer.Ordinal);
+            return modifiers;
+        }
+
+        private CasterEnhancementObservation ObserveCaster(CastingQualificationStepResult step, string label)
+        {
+            CastingQualificationEnhancement enhancement = Record.Selection == null ? null
+                : Record.Selection.Enhancement;
+            CasterEnhancementObservation observation;
+            if (_observeCaster == null || enhancement == null)
+                observation = CasterEnhancementObservation.Failed("caster-observer-missing");
+            else
+            {
+                try
+                {
+                    observation = _observeCaster(enhancement.CasterUnitId, enhancement.UsagePoolId) ??
+                        CasterEnhancementObservation.Failed("caster-observer-null");
+                }
+                catch (Exception exception)
+                {
+                    observation = CasterEnhancementObservation.Failed("observer-exception:" +
+                        exception.GetType().Name);
+                }
+            }
+            step.Observations.Add("caster:" + label + ":" + observation.Describe());
+            return observation;
         }
 
         internal static string Transition(ProbeObservation before, ProbeObservation after)

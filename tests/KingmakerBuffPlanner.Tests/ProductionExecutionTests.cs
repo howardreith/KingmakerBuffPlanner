@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using KingmakerBuffPlanner.Compatibility;
 using KingmakerBuffPlanner.Domain.Authoring;
 using KingmakerBuffPlanner.Domain.Effects;
 using KingmakerBuffPlanner.Domain.Identity;
@@ -103,6 +104,7 @@ namespace KingmakerBuffPlanner.Tests
                 () => TestPersistenceRoundTripAndCampaignIsolation(root));
             Run("qualification-finite-recipe", () => TestFiniteQualificationRecipe(root));
             Run("qualification-group-mixed-recipe", () => TestGroupQualificationRecipe(root));
+            Run("qualification-enhanced-direct-recipe", () => TestEnhancedQualificationRecipe(root));
             Run("qualification-driver-refusals-and-deadline",
                 () => TestQualificationDriverRefusalsAndDeadline(root));
             Run("qualification-scenario-requests", () => TestQualificationScenarioRequests(root));
@@ -4332,6 +4334,377 @@ namespace KingmakerBuffPlanner.Tests
             if (blindRecord.TerminalReason == "completed" || !blind.Fired.SequenceEqual(new[] { "qual-cast-1" }) ||
                 !blindRecord.Failures.Any(value => value.Contains("recipient-observer-missing")))
                 throw new InvalidOperationException("A group step ran without its recipient reads: " +
+                    blindRecord.TerminalReason + "|" + string.Join("|", blindRecord.Failures.ToArray()));
+        }
+
+        // An enhanced world (mission batch 3, section 8): a Brown-Fur arcanist
+        // whose Strength spell qualifies for Powerful Change: Strength (one
+        // Arcane Reservoir point per cast), another spell it does not
+        // qualify for, and a rod the recipe must not take. A landed cast
+        // gives its recipient the spell's Strength enhancement modifier,
+        // raised by 2 when its step carries the enhancement. Failure shapes
+        // ignore the enhancement, overspend the reservoir, leave the toggle
+        // on, or withdraw the option once the plain step has run.
+        private sealed class EnhancedBuffWorld : IInstantCastRuntimeAdapter, ICastRuntimeAdapter,
+            ICastEnhancementRuntimeAdapter
+        {
+            internal static readonly AbilityKey Strength =
+                new AbilityKey("strength-spell", null, 0, SourceKind.Spellbook, null);
+            internal static readonly AbilityKey Other =
+                new AbilityKey("other-spell", null, 0, SourceKind.Spellbook, null);
+            internal const string Toggle = "16c06d016437be9e9e6dac6211ff30a5";
+            internal static readonly string EnhancementId =
+                BrownFurPowerfulChangeProfile.EnhancementId("unit-arcanist", Toggle);
+            internal static readonly string[] Units = { "unit-arcanist", "unit-t1", "unit-t2" };
+            // "<unit>|<effect>" -> (instance key, end, modifiers).
+            internal readonly Dictionary<string, Tuple<string, long, string[]>> Active =
+                new Dictionary<string, Tuple<string, long, string[]>>(StringComparer.Ordinal);
+            internal readonly List<string> Fired = new List<string>();
+            internal readonly List<string> Prepared = new List<string>();
+            internal readonly SortedDictionary<string, bool> Toggles =
+                new SortedDictionary<string, bool>(StringComparer.Ordinal)
+                {
+                    { Toggle, false }, { "d1f274d1a129eedd8ef44efdb3426d7f", false }, { "share-toggle", false }
+                };
+            internal int Remaining = 3;
+            internal int Reservoir = 4;
+            internal int ReservoirSpend = 1;
+            internal bool IgnoreEnhancement;
+            internal bool LeaveToggleOn;
+            internal bool HideEnhancementAfterPlain;
+            internal bool OmitPowerfulChange;
+            internal string[] Whitelist = { "strength-spell" };
+            internal int AnimatedFrames = 3;
+            internal long Now;
+            private readonly Dictionary<CastStep, EffectBaseline> _baselines =
+                new Dictionary<CastStep, EffectBaseline>();
+            private int _instances;
+            private long _sequence;
+
+            public bool IsInCombat { get { return false; } }
+            public CastRuntimeValidation Validate(CastStep step) { return CastRuntimeValidation.Pass(); }
+            public CastEnhancementPreparation PrepareEnhancements(CastStep step)
+            {
+                Prepared.AddRange(step.EnhancementIds);
+                return CastEnhancementPreparation.Pass(null);
+            }
+            public InstantCastResult Fire(CastStep step)
+            {
+                Land(step);
+                return new InstantCastResult(true, true, EffectsObserved(step), true, "simulated-enhanced");
+            }
+            public IAnimatedCastOperation StartAnimated(CastStep step)
+            {
+                return new LandingAnimatedOperation(AnimatedFrames, () => Land(step), () => EffectsObserved(step));
+            }
+            public InstantCastCompletion InspectCompletion(CastStep step)
+            { return InstantCastCompletion.Settled("simulated-settled"); }
+            public InstantCastCompletion Cleanup(CastStep step)
+            { return InstantCastCompletion.Settled("simulated-clean"); }
+
+            private List<ObservedEffectInstance> Instances(string unit)
+            {
+                var instances = new List<ObservedEffectInstance>();
+                Tuple<string, long, string[]> instance;
+                if (Active.TryGetValue(unit + "|strength-buff", out instance))
+                    instances.Add(new ObservedEffectInstance(EffectKind.Buff, "strength-buff", instance.Item1,
+                        instance.Item2, false));
+                return instances;
+            }
+
+            internal void Land(CastStep step)
+            {
+                Fired.Add(step.AssignmentId);
+                _baselines[step] = new EffectBaseline(step.ExpectedRecipientUnitIds.ToDictionary(unit => unit,
+                    unit => (IEnumerable<ObservedEffectInstance>)Instances(unit), StringComparer.Ordinal));
+                bool enhanced = step.EnhancementIds.Contains(EnhancementId);
+                int bonus = enhanced && !IgnoreEnhancement ? 6 : 4;
+                Active[step.TargetUnitIds[0] + "|strength-buff"] = Tuple.Create("i" + (++_instances), Now + 600,
+                    new[] { "Strength/Enhancement/" + bonus });
+                Remaining--;
+                if (enhanced) Reservoir -= ReservoirSpend;
+                if (enhanced && LeaveToggleOn) Toggles[Toggle] = true;
+            }
+
+            public bool EffectsObserved(CastStep step)
+            {
+                EffectBaseline baseline;
+                return _baselines.TryGetValue(step, out baseline) &&
+                    AppliedEffectJudgement.AllReached(step.ExpectedRecipientUnitIds, step.ExpectedEffects,
+                        baseline, Instances);
+            }
+
+            internal ProbeObservation Observe(CastStep step, string label)
+            {
+                string unit = step.TargetUnitIds[0];
+                var instances = new List<ProbeEffectInstance>();
+                Tuple<string, long, string[]> instance;
+                if (Active.TryGetValue(unit + "|strength-buff", out instance))
+                    instances.Add(new ProbeEffectInstance("strength-buff", instance.Item1, instance.Item2,
+                        instance.Item3));
+                return ProbeObservation.Read(label, ++_sequence, DateTime.UtcNow, unit, Remaining, instances, null);
+            }
+
+            internal CasterEnhancementObservation ObserveCaster(string caster, string pool)
+            {
+                if (caster != "unit-arcanist" || pool != BrownFurPowerfulChangeProfile.UsagePoolId("unit-arcanist"))
+                    return CasterEnhancementObservation.Failed("wrong-caster-or-pool:" + caster + "|" + pool);
+                return CasterEnhancementObservation.Read(Reservoir, Toggles);
+            }
+
+            internal ActiveEffectSnapshot Live()
+            {
+                return LiveEffects(Active.Select(pair => On(pair.Key.Split('|')[0], pair.Key.Split('|')[1],
+                    80, 10, 0)).ToArray());
+            }
+
+            internal CastingWorkspaceInputs Inputs()
+            {
+                List<UnitSnapshot> units = Units.Select(id => new UnitSnapshot(id, id, false, string.Empty,
+                    new TargetValidationSnapshot(true, true, true, true))).ToList();
+                var strength = new ProviderSnapshot(new ProviderKey("unit-arcanist",
+                        BrownFurPowerfulChangeProfile.CastingSpellbookGuid, Strength, "level-2"),
+                    "Strength Spell", 2, "pool-arcanist", 1, null, null, 10, 100);
+                var other = new ProviderSnapshot(new ProviderKey("unit-arcanist",
+                        BrownFurPowerfulChangeProfile.CastingSpellbookGuid, Other, "level-1"),
+                    "Other Spell", 1, "pool-arcanist-1", 1, null, null, 10, 100);
+                var pools = new[]
+                {
+                    new ResourcePoolSnapshot("pool-arcanist", ResourcePoolKind.SpontaneousLevel, 3, Remaining, null),
+                    new ResourcePoolSnapshot("pool-arcanist-1", ResourcePoolKind.SpontaneousLevel, 3, 3, null)
+                };
+                List<string> everyone = Units.ToList();
+                var options = new List<ProviderPlanningOption>
+                {
+                    new ProviderPlanningOption(strength, everyone, new[] { "unit-arcanist" }, 10, 100,
+                        CastExecutionStrategy.DirectRuleCast, "fixture-strength",
+                        new Dictionary<string, IEnumerable<string>>(StringComparer.Ordinal)),
+                    new ProviderPlanningOption(other, everyone, new[] { "unit-arcanist" }, 10, 100,
+                        CastExecutionStrategy.DirectRuleCast, "fixture-other",
+                        new Dictionary<string, IEnumerable<string>>(StringComparer.Ordinal))
+                };
+                var effects = new Dictionary<string, EffectExpression>(StringComparer.Ordinal)
+                {
+                    { Strength.Canonical, new EffectLeafExpression(EffectKind.Buff, "strength-buff",
+                        EffectTarget.CurrentTarget, "fixture", "fixture/strength") },
+                    { Other.Canonical, new EffectLeafExpression(EffectKind.Buff, "other-buff",
+                        EffectTarget.CurrentTarget, "fixture", "fixture/other") }
+                };
+                var enhancements = new List<CastEnhancementSnapshot>
+                {
+                    new CastEnhancementSnapshot("metamagic-rod|unit-arcanist|rod-guid", "unit-arcanist",
+                        "rod-guid", "Extend Metamagic Rod", string.Empty, CastEnhancementCategory.MetamagicRod,
+                        8, 6, 3, new string[0])
+                };
+                if (!OmitPowerfulChange && (!HideEnhancementAfterPlain || Fired.Count == 0))
+                    enhancements.Add(new CastEnhancementSnapshot(EnhancementId, "unit-arcanist", Toggle,
+                        "Powerful Change: Strength", string.Empty, CastEnhancementCategory.ClassFeature, 0, 0,
+                        Reservoir, Whitelist, "Powerful Change: Strength",
+                        new[] { BrownFurPowerfulChangeProfile.CastingSpellbookGuid },
+                        BrownFurPowerfulChangeProfile.UsagePoolId("unit-arcanist"), false,
+                        "brown-fur-powerful-change", 1, false, "brown-fur-powerful-change", "Arcane Reservoir"));
+                return new CastingWorkspaceInputs(new PartyProviderSnapshot(units,
+                        new[] { strength, other }, pools), options, effects, enhancements, null, Live());
+            }
+        }
+
+        // An animated cast that lands after the given number of polls.
+        private sealed class LandingAnimatedOperation : IAnimatedCastOperation
+        {
+            private readonly int _frames;
+            private readonly Action _land;
+            private readonly Func<bool> _observed;
+            private int _polls;
+            private bool _landed;
+
+            internal LandingAnimatedOperation(int frames, Action land, Func<bool> observed)
+            {
+                _frames = frames;
+                _land = land;
+                _observed = observed;
+            }
+
+            public bool IsCompleted
+            {
+                get
+                {
+                    if (++_polls < _frames) return false;
+                    if (!_landed) { _landed = true; _land(); }
+                    return true;
+                }
+            }
+            public bool IsStarted { get { return _polls > 0; } }
+            public bool TimedOut { get { return false; } }
+            public bool Succeeded { get { return _landed; } }
+            public bool EffectsObserved { get { return _landed && _observed(); } }
+            public bool ResourceSpent { get { return _landed; } }
+            public string ResourceCountViolation { get { return null; } }
+            public bool HasResidualDeliveryState { get { return false; } }
+            public string Detail { get { return "simulated-animated;polls=" + _polls; } }
+            public void Dispose() { }
+        }
+
+        private static CastingQualificationAllowance EnhancedAllowance(EnhancedBuffWorld world, string mode)
+        {
+            CastingWorkspaceInputs inputs = world.Inputs();
+            CastingQualificationSelection selection =
+                CastingQualificationRecipe.SelectEnhancedDirect(inputs, "fixture-campaign");
+            IReadOnlyList<CastingQualificationStepForecast> forecast =
+                CastingQualificationForecast.Forecast(selection, inputs, "fixture-campaign");
+            string refusal;
+            return CastingQualificationAllowance.Parse(QualificationAllowanceJson(o =>
+            {
+                o["fixtureGameId"] = "fixture-campaign";
+                o["executionMode"] = mode;
+                o["recipe"] = CastingQualificationRecipe.EnhancedDirect;
+                o["approvedProjectionIds"] = new JArray(forecast.Select(step => (object)step.ProjectionId).ToArray());
+                o["maximumNativeSubmissions"] = 2;
+            }), "qual-run-1", out refusal);
+        }
+
+        private static CastingQualificationRecord RunEnhanced(string dir, EnhancedBuffWorld world, string mode,
+            bool casterReads = true)
+        {
+            Directory.CreateDirectory(dir);
+            long now = 0;
+            Func<long> clock = () => now;
+            var host = new CastingExecutionHost(settings => settings != null && settings.Mode == "animated"
+                ? (ICastExecutor)new AnimatedCastExecutor(world, true)
+                : new InstantCastExecutor(world, true), clock);
+            var record = new CastingQualificationRecord { CastingScenario = true, AllowanceStatus = "parsed" };
+            var driver = new CastingQualificationDriver(record, EnhancedAllowance(world, mode), "fixture-campaign",
+                world.Inputs, boundary => new CastingWorkspaceSession(dir, "fixture-campaign", boundary),
+                host, world.Observe, clock, 240000, null, null, false, null, null,
+                () => "fixture-lifecycle=1", () => 0L, null,
+                casterReads ? world.ObserveCaster : (Func<string, string, CasterEnhancementObservation>)null);
+            for (int i = 0; i < 4000 && !driver.Completed; i++) { now += 16; world.Now = now; driver.Update(); }
+            return record;
+        }
+
+        // The enhanced recipe (mission batch 3, section 8: a supported non-rod
+        // per-casting enhancement through the real UI, service and execution
+        // chain): selection and forecast; the driver in both modes, with the
+        // enhancement chosen through the workspace's option for the focused
+        // casting; the strength, resource and cleanup rules; no step without
+        // the caster reads.
+        private static void TestEnhancedQualificationRecipe(string root)
+        {
+            var world = new EnhancedBuffWorld();
+            CastingWorkspaceInputs inputs = world.Inputs();
+            CastingQualificationSelection selection =
+                CastingQualificationRecipe.SelectEnhancedDirect(inputs, "fixture-campaign");
+            string id = EnhancedBuffWorld.EnhancementId;
+            if (!selection.Selected || selection.Recipe != CastingQualificationRecipe.EnhancedDirect ||
+                selection.Castings.Count != 2 ||
+                selection.Castings.Any(casting => casting.CasterUnitId != "unit-arcanist" ||
+                    casting.Ability.Canonical != EnhancedBuffWorld.Strength.Canonical) ||
+                selection.Castings[0].DirectTargetUnitId != "unit-t1" || selection.Castings[0].Enhancements.Count != 0 ||
+                selection.Castings[1].DirectTargetUnitId != "unit-t2" ||
+                !selection.Castings[1].Enhancements.Select(value => value.EnhancementId).SequenceEqual(new[] { id }) ||
+                selection.Enhancement == null || selection.Enhancement.ModifierPrefix != "Strength/Enhancement/" ||
+                selection.Enhancement.Increase != 2 || selection.Enhancement.UnitsPerCast != 1 ||
+                selection.Enhancement.UsagePoolId != BrownFurPowerfulChangeProfile.UsagePoolId("unit-arcanist") ||
+                !selection.Coverage.SequenceEqual(new[]
+                    { "spontaneous", "class-feature-enhancement", "powerful-change:Strength" }))
+                throw new InvalidOperationException("The enhanced selection was wrong: " + selection.Refusal + " " +
+                    string.Join(",", selection.Castings.Select(casting => casting.CastingId + "=" +
+                        casting.DirectTargetUnitId + "+" + casting.Enhancements.Count).ToArray()) + " coverage=" +
+                    string.Join(",", selection.Coverage.ToArray()) + " rejections=" +
+                    string.Join(",", selection.Rejections.ToArray()));
+            IReadOnlyList<CastingQualificationStepForecast> forecast =
+                CastingQualificationForecast.Forecast(selection, inputs, "fixture-campaign");
+            if (forecast.Count != CastingQualificationRecipe.ForecastSteps(CastingQualificationRecipe.EnhancedDirect) ||
+                forecast.Any(step => step.Projection == null) ||
+                forecast[0].Name != "plain" || !forecast[0].CastingIds.SequenceEqual(new[] { "qual-cast-1" }) ||
+                forecast[0].Projection.Plan.Steps[0].EnhancementIds.Count != 0 ||
+                forecast[1].Name != "enhanced" || !forecast[1].CastingIds.SequenceEqual(new[] { "qual-cast-2" }) ||
+                !forecast[1].Projection.Plan.Steps[0].EnhancementIds.SequenceEqual(new[] { id }))
+                throw new InvalidOperationException("The enhanced forecast was wrong: " +
+                    string.Join(" | ", forecast.Select(step => step.Name + ":" + (step.Refusal ??
+                        string.Join(",", step.CastingIds.ToArray()))).ToArray()));
+            // Refused: only a rod (not a supported non-rod enhancement); no
+            // reservoir point left; no plain spell the enhancement applies to.
+            CastingQualificationSelection rodOnly = CastingQualificationRecipe.SelectEnhancedDirect(
+                new EnhancedBuffWorld { OmitPowerfulChange = true }.Inputs(), "fixture-campaign");
+            if (rodOnly.Selected ||
+                !rodOnly.Rejections.Contains("metamagic-rod|unit-arcanist|rod-guid|not-a-supported-non-rod-enhancement"))
+                throw new InvalidOperationException("A rod was taken as the enhanced recipe's enhancement: " +
+                    string.Join(",", rodOnly.Rejections.ToArray()));
+            CastingQualificationSelection dry = CastingQualificationRecipe.SelectEnhancedDirect(
+                new EnhancedBuffWorld { Reservoir = 0 }.Inputs(), "fixture-campaign");
+            CastingQualificationSelection unlisted = CastingQualificationRecipe.SelectEnhancedDirect(
+                new EnhancedBuffWorld { Whitelist = new[] { "unlisted-spell" } }.Inputs(), "fixture-campaign");
+            if (dry.Selected || !dry.Rejections.Contains(id + "|uses:0") ||
+                unlisted.Selected || !unlisted.Rejections.Contains(id + "|no-applicable-plain-spell"))
+                throw new InvalidOperationException("An enhanced selection without a usable enhancement was made: " +
+                    string.Join(",", dry.Rejections.ToArray()) + " / " + string.Join(",", unlisted.Rejections.ToArray()));
+            foreach (string mode in new[] { "instant", "animated" })
+            {
+                var run = new EnhancedBuffWorld();
+                CastingQualificationRecord record = RunEnhanced(Path.Combine(root, "qe-" + mode[0]), run, mode);
+                IList<string> violations = record.Violations();
+                CastingQualificationStepResult plain = record.Step("plain");
+                CastingQualificationStepResult enhanced = record.Step("enhanced");
+                if (violations.Count != 0 || record.TerminalReason != "completed" || record.ExecutionMode != mode ||
+                    !run.Fired.SequenceEqual(new[] { "qual-cast-1", "qual-cast-2" }) || !run.Prepared.Contains(id) ||
+                    run.Reservoir != 3 || run.Remaining != 1 || run.Toggles.Values.Any(value => value) ||
+                    plain == null || enhanced == null ||
+                    !plain.ModifiersAfter["qual-cast-1"].SequenceEqual(new[] { "Strength/Enhancement/4" }) ||
+                    !enhanced.ModifiersAfter["qual-cast-2"].SequenceEqual(new[] { "Strength/Enhancement/6" }) ||
+                    !enhanced.ModifiersAfter["qual-cast-1"].SequenceEqual(new[] { "Strength/Enhancement/4" }) ||
+                    plain.CasterBefore.Resource != 4 || plain.CasterAfter.Resource != 4 ||
+                    enhanced.CasterBefore.Resource != 4 || enhanced.CasterAfter.Resource != 3 ||
+                    !enhanced.Availability.Contains("qual-cast-2:2>1") ||
+                    !record.EnhancementOptions.SequenceEqual(new[]
+                    {
+                        "before:metamagic-rod|unit-arcanist|rod-guid", "before:" + id,
+                        "after:metamagic-rod|unit-arcanist|rod-guid", "after:" + id + "*"
+                    }))
+                    throw new InvalidOperationException("The enhanced qualification (" + mode + ") did not pass " +
+                        "exactly: " + record.TerminalReason + "|" + string.Join("|", violations.ToArray()) +
+                        "|fired=" + string.Join(",", run.Fired.ToArray()) + "|options=" +
+                        string.Join(",", record.EnhancementOptions.ToArray()) + "|" + (enhanced == null ? "no-enhanced"
+                            : string.Join(",", enhanced.Availability.ToArray()) + "|" +
+                                string.Join(",", enhanced.Observations.ToArray())));
+            }
+            // The enhanced cast must raise exactly the enhancement's modifier,
+            // spend exactly its units and leave every toggle as it was.
+            var shapes = new List<KeyValuePair<Action<EnhancedBuffWorld>, string>>
+            {
+                new KeyValuePair<Action<EnhancedBuffWorld>, string>(value => value.IgnoreEnhancement = true,
+                    "modifiers:qual-cast-2:Strength/Enhancement/4!=Strength/Enhancement/6"),
+                new KeyValuePair<Action<EnhancedBuffWorld>, string>(value => value.ReservoirSpend = 2,
+                    "enhancement-resource:4>2:expected-spend=1"),
+                new KeyValuePair<Action<EnhancedBuffWorld>, string>(value => value.LeaveToggleOn = true,
+                    "cleanup:activatables-changed:" + EnhancedBuffWorld.Toggle)
+            };
+            int shapeIndex = 0;
+            foreach (KeyValuePair<Action<EnhancedBuffWorld>, string> shape in shapes)
+            {
+                var bad = new EnhancedBuffWorld();
+                shape.Key(bad);
+                CastingQualificationRecord record = RunEnhanced(Path.Combine(root, "qe-bad" + (shapeIndex++)), bad,
+                    "instant");
+                if (record.TerminalReason == "completed" ||
+                    !record.Failures.Contains("enhanced-wait:step:" + shape.Value) ||
+                    !bad.Fired.SequenceEqual(new[] { "qual-cast-1", "qual-cast-2" }))
+                    throw new InvalidOperationException("A wrong enhanced cast was not refused as " + shape.Value +
+                        ": " + record.TerminalReason + "|" + string.Join("|", record.Violations().ToArray()));
+            }
+            // The enhancement is chosen only through the workspace's option:
+            // withdrawn after the plain step, nothing more is cast.
+            var hidden = new EnhancedBuffWorld { HideEnhancementAfterPlain = true };
+            CastingQualificationRecord hiddenRecord = RunEnhanced(Path.Combine(root, "qe-hidden"), hidden, "instant");
+            if (hiddenRecord.TerminalReason == "completed" || !hidden.Fired.SequenceEqual(new[] { "qual-cast-1" }) ||
+                !hiddenRecord.Failures.Any(value => value.Contains("enhancement-not-offered:" + id)))
+                throw new InvalidOperationException("An enhancement the workspace did not offer was cast: " +
+                    hiddenRecord.TerminalReason + "|" + string.Join("|", hiddenRecord.Failures.ToArray()));
+            // Without the caster reads no step starts.
+            var blind = new EnhancedBuffWorld();
+            CastingQualificationRecord blindRecord = RunEnhanced(Path.Combine(root, "qe-blind"), blind, "instant", false);
+            if (blindRecord.TerminalReason == "completed" || blind.Fired.Count != 0 ||
+                !blindRecord.Failures.Any(value => value.Contains("before-read:caster:caster-observer-missing")))
+                throw new InvalidOperationException("An enhanced step ran without its caster reads: " +
                     blindRecord.TerminalReason + "|" + string.Join("|", blindRecord.Failures.ToArray()));
         }
 

@@ -23,17 +23,70 @@ namespace KingmakerBuffPlanner.Execution
     // application and a refresh of an existing one are both observable.
     public sealed class ProbeEffectInstance
     {
-        public ProbeEffectInstance(string effectId, string instanceKey, long endTimeTicks)
+        public ProbeEffectInstance(string effectId, string instanceKey, long endTimeTicks,
+            IEnumerable<string> modifiers = null)
         {
             EffectId = effectId ?? string.Empty;
             InstanceKey = instanceKey ?? string.Empty;
             EndTimeTicks = endTimeTicks;
+            Modifiers = modifiers == null ? null : new ReadOnlyCollection<string>(modifiers
+                .Where(value => !string.IsNullOrEmpty(value))
+                .OrderBy(value => value, StringComparer.Ordinal).ToList());
         }
 
         public string EffectId { get; private set; }
         public string InstanceKey { get; private set; }
         public long EndTimeTicks { get; private set; }
-        public override string ToString() { return EffectId + "#" + InstanceKey + "@" + EndTimeTicks; }
+        // The stat modifiers this instance gives its unit, each
+        // "<stat>/<descriptor>/<value>", sorted; null when they were not read.
+        public IReadOnlyList<string> Modifiers { get; private set; }
+        public override string ToString()
+        {
+            return EffectId + "#" + InstanceKey + "@" + EndTimeTicks + (Modifiers == null ? string.Empty
+                : "{" + string.Join(";", Modifiers.ToArray()) + "}");
+        }
+    }
+
+    // The caster-side reads of the enhanced qualification (mission batch 3,
+    // section 8): the amount of the enhancement's own resource (for example
+    // the Arcane Reservoir) and every activatable ability of the caster with
+    // its on/off state, read from the game, never from the planner's
+    // discovery, so the paid resource and the cleanup are both observed.
+    public sealed class CasterEnhancementObservation
+    {
+        private CasterEnhancementObservation(string failure, int? resource,
+            IDictionary<string, bool> activatables)
+        {
+            Failure = failure;
+            Resource = resource;
+            Activatables = new ReadOnlyDictionary<string, bool>(new SortedDictionary<string, bool>(
+                activatables ?? new Dictionary<string, bool>(), StringComparer.Ordinal));
+        }
+
+        public static CasterEnhancementObservation Failed(string failure)
+        {
+            return new CasterEnhancementObservation(string.IsNullOrEmpty(failure) ? "unknown" : failure,
+                null, null);
+        }
+
+        public static CasterEnhancementObservation Read(int resource, IDictionary<string, bool> activatables)
+        {
+            return new CasterEnhancementObservation(null, resource, activatables);
+        }
+
+        public bool Succeeded { get { return Failure == null; } }
+        public string Failure { get; private set; }
+        public int? Resource { get; private set; }
+        // Blueprint id ("#<n>" added for a repeated one) -> switched on.
+        public IReadOnlyDictionary<string, bool> Activatables { get; private set; }
+
+        public string Describe()
+        {
+            if (!Succeeded) return "failed:" + Failure;
+            return "resource=" + Resource.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) +
+                ";activatables=" + Activatables.Count + ";on=" + string.Join(",", Activatables
+                    .Where(pair => pair.Value).Select(pair => pair.Key).ToArray());
+        }
     }
 
     // Review N3: one memorized slot as the observer sees it. Observation
