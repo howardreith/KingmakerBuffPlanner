@@ -742,11 +742,29 @@ namespace KingmakerBuffPlanner.Tests
             if (!newer.ReviewStoreWarning.StartsWith(
                     "review-state-save-failed:InvalidOperationException:review-state-file-protected:",
                     StringComparison.Ordinal) ||
+                PersistenceMessages.ForReviewWarning(newer.ReviewStoreWarning) == null ||
+                !PersistenceMessages.ForReviewWarning(newer.ReviewStoreWarning).StartsWith(
+                    "Plan accepted for this session only", StringComparison.Ordinal) ||
                 !File.ReadAllBytes(newerPath).SequenceEqual(newerBytes) ||
                 !newer.Apply(CastingApplyMode.Ordinary, "long", inputs).ReviewReason
                     .StartsWith("native-submission-disabled", StringComparison.Ordinal))
                 throw new InvalidOperationException("A newer review file was replaced or the acceptance lost: " +
                     newer.ReviewStoreWarning);
+            // Once the protected file is gone, a save succeeds and the stale
+            // warning is cleared.
+            File.Delete(newerPath);
+            Assert(newer.AcceptPresentedPlan(inputs));
+            if (newer.ReviewStoreWarning.Length != 0 || PersistenceMessages.ForReviewWarning(newer.ReviewStoreWarning) != null)
+                throw new InvalidOperationException("A saved review kept a stale warning: " + newer.ReviewStoreWarning);
+            // The workspace tells the player: Save and Accept show the words.
+            DirectoryInfo sourceRoot = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
+            while (sourceRoot != null && !File.Exists(Path.Combine(sourceRoot.FullName, "KingmakerBuffPlanner.sln")))
+                sourceRoot = sourceRoot.Parent;
+            string workspaceView = File.ReadAllText(Path.Combine(sourceRoot.FullName, "src", "KingmakerBuffPlanner",
+                "UI", "CastingWorkspaceScreenView.cs"));
+            if (!workspaceView.Contains("_footerResult.text = PersistenceMessages.ForSaveFailure(exception);") ||
+                !workspaceView.Contains("PersistenceMessages.ForReviewWarning(_session.ReviewStoreWarning)"))
+                throw new InvalidOperationException("The workspace does not show persistence refusals.");
         }
 
         // Nothing to submit is an honest no-op before review: every casting
@@ -3535,6 +3553,24 @@ namespace KingmakerBuffPlanner.Tests
             {
                 refusedSave = exception.Message == "refusing-to-overwrite-another-campaigns-primary";
             }
+            // Review B1: a primary that parses but that this repository cannot
+            // load (an unknown member here) is never replaced either.
+            string invalidPath = repository.GetProfilePath("campaign-c");
+            repository.Save(CastingPlanProfile.FromDocument(CampaignDocument("campaign-c",
+                DirectCasting("c-only", "long", "unit-wizard", "unit-t1", "source-bulls", CastingBuffAbility))));
+            JObject invalidRoot = JObject.Parse(File.ReadAllText(invalidPath));
+            invalidRoot["memberFromTheFuture"] = 1;
+            File.WriteAllText(invalidPath, invalidRoot.ToString());
+            byte[] invalidBytes = File.ReadAllBytes(invalidPath);
+            string invalidRefusal = null;
+            try { repository.Save(CastingPlanProfile.FromDocument(CampaignDocument("campaign-c"))); }
+            catch (InvalidDataException exception) { invalidRefusal = exception.Message; }
+            if (invalidRefusal == null ||
+                !invalidRefusal.StartsWith("refusing-to-overwrite-invalid-primary:", StringComparison.Ordinal) ||
+                !File.ReadAllBytes(invalidPath).SequenceEqual(invalidBytes) ||
+                PersistenceMessages.ForSaveFailure(new InvalidDataException(invalidRefusal)).IndexOf(
+                    "left unchanged", StringComparison.Ordinal) < 0)
+                throw new InvalidOperationException("An invalid primary was replaced: " + invalidRefusal);
             if (mismatch.Status == CastingPlanLoadStatus.Loaded || mismatch.Profile != null && mismatch.Profile
                     .ToDocument().Castings.Any(casting => casting.CastingId == "book-a") ||
                 !refusedSave || !File.ReadAllBytes(pathB).SequenceEqual(copied) ||

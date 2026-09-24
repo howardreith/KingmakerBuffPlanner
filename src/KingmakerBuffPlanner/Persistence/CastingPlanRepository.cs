@@ -142,17 +142,20 @@ namespace KingmakerBuffPlanner.Persistence
                 string owner = ReadCampaignId(previous);
                 if (owner != null && !string.Equals(owner, profile.CampaignId, StringComparison.Ordinal))
                     throw new InvalidDataException("refusing-to-overwrite-another-campaigns-primary");
-                // A candidate write must round-trip before it can replace a
-                // readable primary; a malformed previous primary is never
-                // rotated into the backup chain.
+                // A primary this repository cannot load for this campaign (an
+                // unknown member, an invalid casting, a newer revision's
+                // content) is never replaced or rotated (batch 3 review B1):
+                // its bytes stay; the save is refused and reported.
                 try
                 {
                     Deserialize(previous, profile.CampaignId);
-                    RotateBackups(path, previous);
                 }
-                catch (Exception)
+                catch (Exception exception)
                 {
+                    throw new InvalidDataException(
+                        "refusing-to-overwrite-invalid-primary:" + exception.Message, exception);
                 }
+                RotateBackups(path, previous);
             }
             AtomicFile.WriteUtf8(path, Serialize(profile));
         }

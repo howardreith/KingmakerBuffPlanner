@@ -930,7 +930,12 @@ namespace KingmakerBuffPlanner.UI
         private void PersistReviewState()
         {
             if (_reviewStore == null) return;
-            try { _reviewStore.Save(CampaignId, _review.AcceptedDigests); }
+            try
+            {
+                _reviewStore.Save(CampaignId, _review.AcceptedDigests);
+                // Saved: an earlier load or save problem no longer applies.
+                ReviewStoreWarning = string.Empty;
+            }
             catch (Exception exception)
             {
                 ReviewStoreWarning = "review-state-save-failed:" +
