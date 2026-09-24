@@ -119,6 +119,7 @@ else {
         'finite-direct-mixed' = "finite-direct-mixed casting-first qualification in $ExecutionMode mode (paid spell slots: stop, complete, repeat, recast)"
         'group-mixed' = "group-mixed casting-first qualification in $ExecutionMode mode (a direct casting primes one recipient; the caster-centred group casting then covers the others in one invocation with that recipient pre-covered, with a target-anchored group casting where one exists)"
         'ability-pool-direct' = "ability-pool-direct casting-first qualification in $ExecutionMode mode (one plain buff from an ability whose pool holds a single use: cast once, a repeat casts nothing, and Always recast is refused for want of the resource)"
+        'rod-extend-direct' = "rod-extend-direct casting-first qualification in $ExecutionMode mode (one direct buff cast plain, then again on another recipient with an Extend metamagic rod chosen through the workspace; the rod's charges, the buff's duration and the caster's toggles are read natively)"
         'enhanced-direct' = "enhanced-direct casting-first qualification in $ExecutionMode mode (one direct buff cast plain, then again on another recipient with a per-casting class-feature enhancement chosen through the workspace; the enhancement's resource, the stat modifier it raises and the caster's toggles are read natively)"
     }
     if ([string]$request.scenario -cne 'live-cast-qual-select' -or [bool]$outcome.castingScenario -or
