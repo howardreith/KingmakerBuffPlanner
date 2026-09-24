@@ -641,7 +641,8 @@ $launcherLf = $launcherText.Replace("`r`n", "`n")
 if (-not $launcherLf.Contains('if ($ManualRehearseDone) { $scenarioParameters.manualRehearsal = $true }') -or
     -not $launcherLf.Contains('manualRehearsal = [bool]$ManualRehearseDone') -or
     -not $launcherLf.Contains('-ManualRehearsal ([bool]$ManualRehearseDone)') -or
-    -not $launcherLf.Contains("finally {`n    # Final review C8: a key held by an interrupted chord is always released.")) {
+    -not $launcherLf.Contains("finally {`n    # Final review C8: a key held by an interrupted chord is always released.`n" +
+        "    try {`n        if (`$null -ne ('KbpPhysicalInput' -as [type])) { [KbpPhysicalInput]::ReleaseTrackedKeys() }")) {
     throw 'The rehearsal is not labelled in every record, or held keys are not released at the end.'
 }
 $rehearsalRecord = New-KbpRunCompletionRecord -RunId 'r' -Scenario 'live-workspace-manual' -FixtureFamily 'Automation' `

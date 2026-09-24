@@ -1781,6 +1781,7 @@ try {
         -not $launcherText.Contains('$completionFailure = ''Run completion record not written: ''') -or
         -not $launcherText.Contains('$orchestration.status = $orchestration.finalStatus') -or
         $restoreText.IndexOf('Complete-KbpProtectedSaveComparison') -lt 0 -or
+        -not $restoreText.Contains('if (-not $SkipProtectedSaveComparison -and (Test-Path -LiteralPath $baselinePath -PathType Leaf)) {') -or
         $restoreText.IndexOf('Complete-KbpProtectedSaveComparison') -gt $restoreText.IndexOf('Restore-KbpRuntimeTransaction -RunId')) {
         throw 'The launcher or Restore-Local does not keep the protected-save order.'
     }
