@@ -321,21 +321,34 @@ function Complete-KbpProtectedSaveComparison {
     return $comparison
 }
 
-# Every later run is refused while a recorded violation has no owner
-# acknowledgement (scripts\Confirm-KbpProtectedSaveReview.ps1).
-function Assert-KbpNoUnacknowledgedSaveViolation {
-    param([string]$StateRoot = $script:KbpRuntimeStateRoot)
+# Re-review (harness): a pending comparison whose run's lock was already
+# released can no longer be attributed to that run (another operation may
+# have changed the saves since). It is closed as unverifiable: recorded as a
+# blocking violation for the owner's review, never compared.
+function Close-KbpUnverifiableProtectedSaveComparison {
+    param(
+        [Parameter(Mandatory = $true)][string]$BaselinePath,
+        [Parameter(Mandatory = $true)][string]$Reason,
+        [Parameter(Mandatory = $true)][string]$EvidenceDirectory,
+        [string]$StateRoot = $script:KbpRuntimeStateRoot)
+    $baseline = Read-KbpJson $BaselinePath
+    if ([bool]$baseline.compared) { return @($baseline.blocking) }
+    $blocking = @('unverifiable:' + $Reason)
     $folder = Join-Path $StateRoot 'protected-save-violations'
-    if (-not (Test-Path -LiteralPath $folder -PathType Container)) { return }
-    foreach ($record in @(Get-ChildItem -LiteralPath $folder -Filter '*.json' -File |
-            Where-Object { $_.Name -notlike '*.acknowledged.json' } | Sort-Object Name)) {
-        $acknowledgement = Join-Path $folder ($record.BaseName + '.acknowledged.json')
-        if (-not (Test-Path -LiteralPath $acknowledgement -PathType Leaf)) {
-            $violation = Read-KbpJson $record.FullName
-            throw ("Run $($violation.runId) changed protected saves ($(@($violation.blocking) -join ', ')). " +
-                "No run starts until the owner has reviewed it and run scripts\Confirm-KbpProtectedSaveReview.ps1 -RunId $($violation.runId).")
-        }
+    New-Item -ItemType Directory -Path $folder -Force | Out-Null
+    $record = Join-Path $folder ([string]$baseline.runId + '.json')
+    if (-not (Test-Path -LiteralPath $record)) {
+        Write-KbpJsonAtomic $record ([ordered]@{
+            schemaVersion = 1; runId = [string]$baseline.runId; scenario = [string]$baseline.scenario
+            fixtureFamily = [string]$baseline.fixtureFamily; blocking = $blocking
+            evidenceDirectory = $EvidenceDirectory; recordedAtUtc = [DateTime]::UtcNow.ToString('o')
+        })
     }
+    $baseline.compared = $true
+    $baseline.blocking = $blocking
+    $baseline | Add-Member -NotePropertyName comparedAtUtc -NotePropertyValue ([DateTime]::UtcNow.ToString('o')) -Force
+    Write-KbpJsonAtomic $BaselinePath $baseline
+    return $blocking
 }
 
 function Wait-KbpNewKingmakerProcess {
@@ -1261,7 +1274,10 @@ function New-KbpRunCompletionRecord {
         [bool]$ProtectedSavesCompared,
         [string]$ProtectedSaveFailure,
         # Final review C5: a rehearsal of the manual session says so.
-        [bool]$ManualRehearsal)
+        [bool]$ManualRehearsal,
+        # Re-review (harness): a scenario without a fixture save compares
+        # no saves; its saves count as clean unless a failure is reported.
+        [bool]$ProtectedSavesApplicable = $true)
     $restored = $false
     if (-not [string]::IsNullOrWhiteSpace($TransactionStatePath) -and
         (Test-Path -LiteralPath $TransactionStatePath -PathType Leaf)) {
@@ -1271,7 +1287,8 @@ function New-KbpRunCompletionRecord {
     }
     if (-not [string]::IsNullOrWhiteSpace($RestoreFailure)) { $restored = $false }
     $game = if ([string]::IsNullOrWhiteSpace($GameResultStatus)) { 'none' } else { $GameResultStatus }
-    $clean = $ProtectedSavesCompared -and [string]::IsNullOrEmpty($ProtectedSaveFailure)
+    $clean = if ($ProtectedSavesApplicable) { $ProtectedSavesCompared -and [string]::IsNullOrEmpty($ProtectedSaveFailure) }
+        else { [string]::IsNullOrEmpty($ProtectedSaveFailure) }
     return [ordered]@{
         schemaVersion = 1; runId = $RunId; scenario = $Scenario; fixtureFamily = $FixtureFamily
         profileId = $ProfileId
@@ -1286,6 +1303,7 @@ function New-KbpRunCompletionRecord {
         kingmakerExited = $KingmakerExited
         restorationVerified = $restored
         restorationFailure = if ([string]::IsNullOrWhiteSpace($RestoreFailure)) { $null } else { $RestoreFailure }
+        protectedSavesApplicable = $ProtectedSavesApplicable
         protectedSavesCompared = $ProtectedSavesCompared
         protectedSavesClean = $clean
         manualRehearsal = $ManualRehearsal

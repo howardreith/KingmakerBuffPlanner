@@ -40,12 +40,17 @@ resources, group buffs and metamagic variants need the advanced copy.
   the exact projection of each executing step:
   - stop: all castings;
   - complete: the rest;
-  - recast: `qual-cast-1`.
+  - recast: `qual-cast-1`;
+  - disable: `qual-cast-1` again (the planner is disabled while that cast
+    is in progress, or before the step starts in instant mode, so nothing
+    lands);
+  - recover: `qual-cast-1` as a new run once the planner is enabled again.
 
-  The allowance names those three ids, in order. A step whose real
+  The allowance names those five ids, in order. A step whose real
   projection differs is refused, and nothing further is submitted.
-- **Budget.** At most 6 native submissions (3 + 2 + 1; the stop step
-  submits 1 of its 3). The mission ceiling is 24.
+- **Budget.** At most 8 native submissions (3 + 2 + 1 + 1 + 1; the stop
+  step submits 1 of its 3 and the disable step at most its 1). The
+  mission ceiling is 24.
 - **Deadlines.** The run has a 240-second deadline. Each executing step
   also has the production host deadline (20 s plus 45 s per casting).
   Any deadline ends the run through the host terminal.
@@ -76,16 +81,17 @@ violations.
 2. Selection run (non-casting):
    `Invoke-KingmakerRuntimeTest.ps1 -Scenario live-cast-qual-select -CompatibilityProfileId full-user -TimeoutSeconds 900 -RunId <fresh>`.
    900 seconds is the whole run's budget, counted from the game's start:
-   the launcher refuses less. The game host stops the run itself 60
-   seconds before it ends (no further native submission; the run fails
-   as `overall-deadline`), and at its own deadline the launcher writes an
+   the launcher refuses less. The game host stops the run itself a tenth
+   of that budget before it ends (10 to 45 seconds; 45 here), taking no
+   further native submission (the run fails as `overall-deadline`), and
+   at its own deadline the launcher writes an
    abort marker (`abort.json`) that the host obeys at once, then waits up
    to 120 seconds for the game to finish (final review C3). A game that
    still does not stop is reported as failed, its Mods restoration stays
    blocked while Kingmaker runs, and `Restore-Local.ps1 -RunId <runId>`
    recovers it once the game has exited.
    It writes `qual-outcome.json` with the selection, the party roster it
-   saw, and the three forecast projection ids and contracts.
+   saw, and the five forecast projection ids and contracts.
 3. Claude writes the allowance under the owner's delegated mission
    authority with `scripts\New-KbpRunAllowance.ps1 -Kind qualification`
    (schema 5), once, exclusively, under
