@@ -165,9 +165,10 @@ namespace KingmakerBuffPlanner.Execution
             return recipe == ZeroCostMixed || recipe == FiniteDirectMixed;
         }
 
-        // The zero-cost recipe ends with the disable step (its sources are
-        // free, so a further approved casting needs no further resource);
-        // the finite recipe keeps its prepared slots for the four steps.
+        // The zero-cost recipe ends with the disable and recover steps (its
+        // sources are free, so further approved castings need no further
+        // resource); the finite recipe keeps its prepared slots for the four
+        // steps.
         public static bool HasDisableStep(string recipe)
         {
             return recipe == ZeroCostMixed;
@@ -175,7 +176,7 @@ namespace KingmakerBuffPlanner.Execution
 
         public static int ForecastSteps(string recipe)
         {
-            return HasDisableStep(recipe) ? 4 : 3;
+            return HasDisableStep(recipe) ? 5 : 3;
         }
 
         public static CastingQualificationSelection Select(string recipe,
@@ -498,7 +499,10 @@ namespace KingmakerBuffPlanner.Execution
     //              so only it executes (after a close and reopen),
     //   disable  - (zero-cost recipe) the same plan again; the planner is
     //              disabled while that cast is in progress (animated) or
-    //              before the run's first step (instant), so nothing lands.
+    //              before the run's first step (instant), so nothing lands,
+    //   recover  - (zero-cost recipe) after the planner is enabled again,
+    //              the same plan as a NEW run: nothing resumed the stopped
+    //              run, and a fresh press is accepted and completes.
     // The repeat step (everything active) submits nothing. A later step
     // whose real projection differs from its forecast is refused.
     public static class CastingQualificationForecast
@@ -507,6 +511,7 @@ namespace KingmakerBuffPlanner.Execution
         public const string Complete = "complete";
         public const string Recast = "recast";
         public const string Disable = "disable";
+        public const string Recover = "recover";
 
         public static IReadOnlyList<CastingQualificationStepForecast> Forecast(
             CastingQualificationSelection selection, CastingWorkspaceInputs inputs,
@@ -557,6 +562,10 @@ namespace KingmakerBuffPlanner.Execution
                     spent.AddRange(recast.Projection.Plan.Steps.Select(step => step.Reservation));
                 CastingWorkspaceInputs afterRecast = WithSpent(inputs, spent);
                 steps.Add(Project(Disable, recastDocument, afterRecast,
+                    WithGranted(afterRecast, expected, selection.Castings.Select(grant))));
+                // recover: nothing landed and nothing was spent in the
+                // disabled run (free sources), so the same state again.
+                steps.Add(Project(Recover, recastDocument, afterRecast,
                     WithGranted(afterRecast, expected, selection.Castings.Select(grant))));
             }
             return new ReadOnlyCollection<CastingQualificationStepForecast>(steps);

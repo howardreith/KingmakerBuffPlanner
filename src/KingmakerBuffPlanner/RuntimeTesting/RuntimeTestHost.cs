@@ -3419,7 +3419,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     _request.Parameters.TryGetValue("qualificationRecipe", out recipeRaw)
                         ? recipeRaw as string : null,
                     () => BuffPlannerUiRoot.WorldRunsForCasting, true,
-                    BuffPlannerUiRoot.PressRoutineForRuntime, BuffPlannerUiRoot.SetEnabled);
+                    BuffPlannerUiRoot.PressRoutineForRuntime, BuffPlannerUiRoot.SetEnabled,
+                    () => "subscriptions=" + BuffPlannerUiRoot.ActiveEventSubscriptionsForRuntime +
+                        ";hudRoots=" + BuffPlannerUiRoot.HudRootCountForRuntime +
+                        ";hudInstalled=" + BuffPlannerUiRoot.IsHudInstalledForRuntime +
+                        ";plannerRoots=" + UnityEngine.Object.FindObjectsOfType<BuffPlannerUiRoot>().Length +
+                        ";mode=" + (Kingmaker.Game.Instance == null ? "none"
+                            : Kingmaker.Game.Instance.CurrentMode.ToString()));
                 _log.Info("[KBP-QUAL] driver built;casting=" + _qualificationRecord.CastingScenario +
                     ";allowance=" + _qualificationRecord.AllowanceStatus + ";workspaceClosed=" +
                     closed.Closed + ";campaign=" + campaignId + ".");
@@ -3538,6 +3544,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     { "disable", record.Disable },
                     { "disabledAt", record.DisabledAt },
                     { "acceptingAfterEnable", record.AcceptingAfterEnable },
+                    { "lifecycleBefore", record.LifecycleBefore },
+                    { "lifecycleAfter", record.LifecycleAfter },
+                    { "runsStarted", record.RunsStarted },
+                    { "runsReported", record.RunsReported },
+                    { "callbackFailure", record.CallbackFailure },
                     { "hostRunsBefore", _qualificationRunsBefore },
                     { "hostRunsStarted", _qualificationHost == null ? -1 : _qualificationHost.StartedRuns },
                     { "failures", new JArray(record.Failures.Cast<object>().ToArray()) },
