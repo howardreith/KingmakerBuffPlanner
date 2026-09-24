@@ -30,15 +30,29 @@ Worklist (updated as slices land; 2026-09-24 status in brackets):
    for the seed. [Waits for the seed: the party has no group buff.]
 5. Lifecycle: stop while pending, disable/unload, target loss, refusal,
    re-enable, a new accepted run; an area transition only on a safe route.
-   [Recover step `b63da88`: a new accepted run after the re-enable, the
-   lifecycle probe and run counts (8 mutants killed); live run pending.
-   Read-only area diagnostics `da0ee32` (live collection pending). An area
-   transition autosaves through `Game.LoadArea` for BeforeExit transitions
-   while autosave is on, and the save folder holds the owner's rotating
-   `Auto_N` files, so no transition is attempted unless the diagnostics show
-   a route without an autosave.]
+   [DONE for this fixture. Recover step `b63da88` (8 mutants killed): PASS
+   animated `casting-qual-cast-20260924-13f6d37-anim-01` (disable in
+   flight) and instant `…-inst-01` (disable before start, labeled so),
+   lifecycle probe identical, 5 runs started and 5 reported. Area
+   transition UNAVAILABLE: the only route (`MapExit` to the prologue's
+   end) autosaves BeforeExit with the game's autosave on. Receipt
+   `docs/evidence/casting-qual-recover-20260924-receipt.md`. Target or
+   provider loss and native refusal stay unit-tested only: producing them
+   live needs party or game-state manipulation, which is not authorized.]
 6. UI and physical input, 1920x1080 and other resolutions (session active).
+   [Scenario `live-workspace-physical` and `-DisplayMode` (`f945afc`): search
+   typing, wheel, a press target, the game window's own focus loss and
+   Escape through OS input; 1920x1080 as a borderless window with the game
+   registry restored byte-exact. 2560x1440 is larger than this RDP session
+   (1920x1200 physical, 125% scaling) and is refused without changing any
+   display setting. Live runs pending.]
 7. Persistence and import gaps; install and rollback of the final artifact.
+   [Persistence DONE `f524acf` from an independent audit: the review and
+   planner-mode stores no longer overwrite newer or unreadable files, the
+   plan repository no longer overwrites another campaign's file; new round
+   trips (two spellbooks, variant, metamagic, Always recast), same-directory
+   campaigns, and the Classic profile's bytes after workspace use (5 mutants
+   killed). Install and rollback wait for rc3.]
 8. Build reproducibility across checkouts (bounded, secondary).
 9. Independent reviews, rc3, full gate, native qualification on rc3,
    receipt, PR handoff.
