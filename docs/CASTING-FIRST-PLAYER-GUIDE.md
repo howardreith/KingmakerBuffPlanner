@@ -31,32 +31,49 @@ for the next time. The mode cannot be changed while a routine is running.
 **The next casting** (the inspector when no card is selected): choose the
 buff in the grid, then **Cast by** (the caster). If that caster can cast
 the buff in more than one way (the same spell in two spellbooks, or a
-spell and an item), **Cast from** lists each way with the resource it
-spends and its caster level; pick one, or Add is refused. Then choose the
-target (or the group origin and the recipients the group must reach), the
-enhancements, and **If the buff is already there**: skip this casting
-(the default) or cast it again anyway. **Plan settings** holds **Instant
-mode: animate buffs that cannot be instant**: in Instant mode, a buff that
-cannot be cast instantly is cast with its animation when this is on, and
-refused when it is off.
+spell and an item), **Cast from** lists each way by name - for a spell,
+the spellbook, its spell level and the kind of slot it spends (for
+example "Linzi: Bard level 1 (spell slot), caster level 5"); for an item
+or ability, the resource it spends - and its caster level; pick one, or
+Add is refused. A spell the caster knows at two levels of the same
+spellbook cannot be pinned to one of them in this version: that choice is
+refused with the reason. Then choose the target (or the group origin and
+the recipients the group must reach), the enhancements (choosing another
+caster keeps only the enhancements that caster has), and **If the buff is
+already there**: skip this casting (the default) or cast it again anyway.
+**Plan settings** holds **Instant mode: animate buffs that cannot be
+instant** (in Instant mode, a buff that cannot be cast instantly is cast
+with its animation when this is on, and refused when it is off) and
+**Cast only out of combat**; both are saved with the plan.
 
 **One existing casting** (press Edit on its card): the inspector edits only
 that casting.
 
 - **Cast by (this casting)** lists every way anyone in the party can cast
-  its buff: the caster and the exact spellbook level, item or ability.
+  its buff: the caster and the exact spellbook and level, item or ability.
   Picking one changes the caster and the source together and keeps
-  everything else; enhancements the new caster does not have are dropped
-  (a rod stays with its owner).
+  everything else. The same caster keeps all of its enhancements; another
+  caster keeps only the ones it has, and the footer names each one it
+  could not take (a rod stays with its owner; Undo brings it back).
 - **Routine and order** moves the casting to another routine (at its end)
   or one place earlier or later in its own.
 - **If the buff is already there** chooses skip or cast again.
 - Targets, group origin and coverage, enhancements, **Mark Ready**,
-  **Disable** and **Remove**, as before.
+  **Disable** and **Remove**, as before. A single-target casting can
+  become a group casting centred on its caster (its target becomes the
+  required coverage), and a group casting can become a single-target
+  casting on any member (**Or a single target**).
+- Review items of an imported casting are listed in words.
 
 An imported casting whose classic plan let the planner pick any caster
 gets its caster here: pick one under **Cast by**, press **Resolve review**,
-then **Mark Ready**. It keeps its place and its import record.
+then **Mark Ready**. One whose classic plan did not say single target or
+group becomes Ready the same way after you choose **Or a single target**
+(or keep it a group). Each keeps its place and its import record.
+
+The footer notes when running every routine in one pass would leave
+castings of the selected routine short of a resource that they have when
+their routine runs alone.
 
 ## How a plan runs
 
@@ -164,8 +181,9 @@ routine was checked in the game in both casting modes: Resistance cast
 through the at-will class ability, the effect landed, and no spell slot or
 ability pool changed. A classic routine now also stops at the first cast
 that is not confirmed, and it casts only while the game runs: **APPLY**
-in the open classic planner starts casting once you close the planner
-(the game is paused while it is open), and the planner says so.
+in the open classic planner checks the routine at once, then closes the
+planner and casts (the game is paused while the planner is open); the
+result is shown when you open the planner again.
 
 ## Files
 
@@ -182,11 +200,18 @@ All player data lives in the mod folder under `UserSettings`:
 A plan, review or mode file this version cannot read (for example one
 written by a newer planner) is never overwritten. Both planners say so
 when they open: the classic planner shows a new setup and **changes are
-not saved** in its status line, the casting-first planner shows an empty
-plan with saving blocked, and a loaded backup is named as such. Move the
-unreadable file aside to save again. A classic plan saved by version
-0.0.19 or earlier is read and imported as it is (its file is not
-rewritten).
+not saved** in its status line, and the casting-first planner shows an
+empty plan with **not saved** in its header for as long as saving is
+blocked. A backup loaded because the main file could not be read is
+named as such (saving stays refused until that file is moved aside); a
+backup loaded because the main file is missing saves normally. To save
+again, move the unreadable casting plan and its backups (`.bak1` to
+`.bak3`) out of `UserSettings` and press **Reload**: the casting-first
+planner then starts over (importing the classic plan into an empty plan,
+or keeping the castings you added meanwhile, which the next Save writes).
+A classic plan saved by version 0.0.19 or earlier is read and imported as
+it is (its file is not rewritten); the import uses the classic planner's
+own copy of the plan, matched to the party's current abilities.
 
 Installing a new version keeps `UserSettings` exactly. Rolling back to an
 older version keeps every file; a casting-first plan the older version

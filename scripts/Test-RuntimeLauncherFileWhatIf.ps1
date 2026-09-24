@@ -413,13 +413,15 @@ if ((Get-KbpClassicAllowanceBuildRefusal -AllowanceJson (New-ClassicFixtureJson 
         -RunId 'classic-bind-test' -BuildManifest $manifestFixture -ExecutionMode 'animated') -cne 'binding-format:compatibilityProfileId') {
     throw 'Binding format case: an unknown profile passed.'
 }
+# Re-review (harness): the WORKING save is re-checked with the protected
+# snapshot, once the run holds its deployment lock (after Deploy-Local).
 $probeBindingAt = $launcherText.IndexOf('Get-KbpAllowanceFixtureBindingRefusal -AllowanceJson $probeAllowanceJson')
 $workingRecheckAt = $launcherText.IndexOf('throw "The WORKING save changed after it was bound: $($savePair.working.fileName)"')
 $realDeployAt = $launcherText.IndexOf('$statePath = & (Join-Path $PSScriptRoot ''Deploy-Local.ps1'')')
 $finalStatusAt = $launcherText.IndexOf('$orchestration.finalStatus = if ([bool]$completionRecord.complete)')
 if ($probeBindingAt -lt 0 -or $workingRecheckAt -lt 0 -or $realDeployAt -lt 0 -or $finalStatusAt -lt 0 -or
-    $workingRecheckAt -gt $realDeployAt -or $finalStatusAt -lt $realDeployAt) {
-    throw 'The launcher does not bind the probe allowance, re-check the WORKING save, or record the final status.'
+    $workingRecheckAt -lt $realDeployAt -or $finalStatusAt -lt $realDeployAt) {
+    throw 'The launcher does not bind the probe allowance, re-check the WORKING save under its lock, or record the final status.'
 }
 $bindingAt = $launcherText.IndexOf('Get-KbpAllowanceFixtureBindingRefusal -AllowanceJson $classicAllowanceJson')
 $qualificationBindingAt = $launcherText.IndexOf('Get-KbpAllowanceFixtureBindingRefusal -AllowanceJson $qualificationAllowanceJson')

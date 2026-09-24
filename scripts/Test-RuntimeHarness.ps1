@@ -1849,6 +1849,66 @@ try {
     try { & $confirmScript -RunId 'other' -ReviewedBy 'harness test' -Note 'x' -StateRoot $oddState -Confirm:$false | Out-Null }
     catch { $mismatchRefused = $_.Exception.Message -like '*names run someone-else*' }
     if (-not $mismatchRefused) { throw 'A violation record naming another run was acknowledged.' }
+    # Nor does an acknowledgement planted for it lift the block.
+    New-Item -ItemType Directory -Path (Join-Path $oddFolder 'acknowledged') -Force | Out-Null
+    Write-KbpJsonAtomic (Join-Path $oddFolder 'acknowledged\other.json') ([ordered]@{ runId = 'someone-else'
+        violationRecordSha256 = (Get-KbpSha256 (Join-Path $oddFolder 'other.json')) })
+    Remove-Item -LiteralPath (Join-Path $oddFolder 'odd.acknowledged.json') -Force
+    $plantedBlocks = $false
+    try { Assert-KbpNoUnacknowledgedSaveViolation -StateRoot $oddState }
+    catch { $plantedBlocks = $_.Exception.Message -like '*Run someone-else changed protected saves*' }
+    if (-not $plantedBlocks) { throw 'An acknowledgement planted for a record naming another run lifted it.' }
+    # Restore-Local against a test state root (each transaction is a stand-in
+    # whose lock does not exist, so nothing can be restored): -Skip is refused
+    # while the comparison is pending; a comparison that cannot be made
+    # leaves everything as it was; a pending comparison of a restored run is
+    # closed as unverifiable; a violation is reported together with a
+    # restoration failure.
+    $restoreScript = Join-Path $PSScriptRoot 'Restore-Local.ps1'
+    $rlRoot = Join-Path $savesRoot 'restore-local'
+    $rlState = Join-Path $rlRoot 'state'
+    $rlEvidence = Join-Path $rlRoot 'evidence'
+    function New-RlTransaction([string]$Run, [string]$Status, [string]$RecordedSaveRoot) {
+        $directory = Join-Path $rlState ('transactions\' + $Run)
+        New-Item -ItemType Directory -Path $directory -Force | Out-Null
+        New-Item -ItemType Directory -Path (Join-Path $rlEvidence $Run) -Force | Out-Null
+        Write-KbpJsonAtomic (Join-Path $directory 'transaction.json') ([ordered]@{
+            schemaVersion = 1; runId = $Run; status = $Status; lockPath = (Join-Path $rlRoot 'no-such.lock'); token = 't' })
+        return (Save-KbpProtectedSaveBaseline -TransactionDirectory $directory -RunId $Run -Scenario 'live-cast-qual' `
+            -FixtureFamily 'Automation' -WorkingFileName 'Manual_2_WORKING.zks' -SaveRoot $RecordedSaveRoot `
+            -Snapshot (Get-KbpSaveFolderSnapshot -SaveRoot $saveFolder))
+    }
+    $skipBaseline = New-RlTransaction 'rl-skip' 'Deployed' $saveFolder
+    $skipRefused = $false
+    try { & $restoreScript -RunId 'rl-skip' -SkipProtectedSaveComparison -StateRoot $rlState -EvidenceRoot $rlEvidence -Confirm:$false }
+    catch { $skipRefused = $_.Exception.Message -like 'Refusing -SkipProtectedSaveComparison*' }
+    if (-not $skipRefused -or [bool](Read-KbpJson $skipBaseline).compared) {
+        throw 'Restore-Local skipped a pending protected-save comparison.'
+    }
+    $failBaseline = New-RlTransaction 'rl-fail' 'Deployed' (Join-Path $rlRoot 'missing-saves')
+    $failKept = $false
+    try { & $restoreScript -RunId 'rl-fail' -StateRoot $rlState -EvidenceRoot $rlEvidence -Confirm:$false }
+    catch { $failKept = $_.Exception.Message -like '*the Mods folder was not restored and the run''s lock is kept*' }
+    if (-not $failKept -or [bool](Read-KbpJson $failBaseline).compared -or
+        [string](Read-KbpJson (Join-Path $rlState 'transactions\rl-fail\transaction.json')).status -cne 'Deployed') {
+        throw 'Restore-Local went on after a protected-save comparison that could not be made.'
+    }
+    $releasedBaseline = New-RlTransaction 'rl-late' 'Restored' $saveFolder
+    $releasedClosed = $false
+    try { & $restoreScript -RunId 'rl-late' -StateRoot $rlState -EvidenceRoot $rlEvidence -Confirm:$false }
+    catch { $releasedClosed = $_.Exception.Message -like '*can no longer be compared*' }
+    if (-not $releasedClosed -or -not [bool](Read-KbpJson $releasedBaseline).compared -or
+        -not (Test-Path -LiteralPath (Join-Path $rlState 'protected-save-violations\rl-late.json') -PathType Leaf)) {
+        throw 'Restore-Local compared, or ignored, a pending comparison whose lock was already released.'
+    }
+    $null = New-RlTransaction 'rl-both' 'Deployed' $saveFolder
+    [IO.File]::WriteAllText((Join-Path $saveFolder 'Manual_1_Ordinary.zks'), 'changed again')
+    $bothMessage = ''
+    try { & $restoreScript -RunId 'rl-both' -StateRoot $rlState -EvidenceRoot $rlEvidence -Confirm:$false }
+    catch { $bothMessage = $_.Exception.Message }
+    if ($bothMessage -notlike 'Protected saves changed during run rl-both: changed:Manual_1_Ordinary.zks | Restoration: *') {
+        throw ('Restore-Local lost a save violation to a restoration failure: ' + $bothMessage)
+    }
     $confirmText = [IO.File]::ReadAllText($confirmScript)
     if (-not $confirmText.Contains('if ($production) {') -or -not $confirmText.Contains('$typed = Read-Host (') -or
         -not $confirmText.Contains("if ([string]`$typed -cne `$RunId) { throw 'The typed run id does not match; nothing was acknowledged.' }")) {
