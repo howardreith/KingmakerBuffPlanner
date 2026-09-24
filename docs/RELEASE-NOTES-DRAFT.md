@@ -1,37 +1,48 @@
-# Kingmaker Buff Planner 0.2.0-rc2 — Casting-first planner (release candidate)
+# Kingmaker Buff Planner 0.2.0-rc3 — Casting-first planner (release candidate)
 
 **This is a local release candidate for the owner's final review, not a
 public release.** Nothing is published, tagged or permanently installed
 before that review. The classic planner stays the default; the
 casting-first planner is an opt-in, experimental mode.
 
-## What changed since 0.2.0-rc1
+## What changed since 0.2.0-rc2
 
-- **Cantrips now cast in animated mode.** In rc1, a cantrip from a
-  spontaneous caster's spellbook (for example Resistance cast by a bard or
-  a sorcerer) failed when cast with animation. The planner gave the game
-  the spellbook's level-0 entry. The game casts that entry only with a
-  level-0 spell slot, and these classes have none. Kingmaker casts
-  cantrips at will through the ability each class grants for them, and
-  the planner now does the same in both casting modes. The fix is in the
-  casting code both planners share; the classic planner was not
-  separately checked in the game.
-- **Nothing the game would refuse is sent.** Before every cast, the
-  planner asks the game the same availability question the game's own
-  cast command asks. rc1's instant mode cast the spellbook entry anyway,
-  because the instant cast skips that check. It now uses the at-will
-  ability too.
-- **Level-0 spells without the at-will ability are budgeted.** Such a
-  spell spends a level-0 slot, or a memorized slot that the cast uses up,
-  as the game does. Only a cantrip backed by the at-will ability is free.
-- **Now checked in the game:**
-  - Animated casting, the default mode.
-  - Stopping a routine: the player's press during a cast in progress. The
-    cast finished and nothing after it started.
-  - Disabling the planner during a run. The cast in progress was
-    interrupted and nothing landed, and runs were possible again once the
-    planner was enabled.
-  - Every run went through the planner's own per-frame execution.
+- **The classic planner is now checked in the game.** Its Long routine,
+  authored with the Classic screen's own controls, cast the Resistance
+  cantrip through the HUD's routine button, in both animated and instant
+  mode. The cast went through the caster's at-will cantrip ability (the
+  evidence records which one). The effect reached the target, the at-will
+  count stayed unlimited, and no spell slot or ability pool changed.
+- **A failed cast stops a classic routine.** A classic routine now casts
+  one step at a time and stops at the first cast that is not confirmed;
+  the rest are reported as not attempted. Disabling the mod or leaving
+  the area during a classic routine ends it the same way a casting-first
+  run ends: the cast in progress is interrupted and cleaned up.
+- **Free stays free, paid stays paid.** The cast follows the budget the
+  plan reserved:
+  - A cantrip planned as free is cast only through the at-will ability.
+    If that ability is gone, the casting is refused. It never spends a
+    level-0 slot instead.
+  - A level-0 spell planned against a slot never turns into a free cast.
+  - An ability granted by a feature is cast from the same kind of source
+    (free or a resource pool) and the same pool the plan reserved.
+  - A cantrip the planner cannot attribute to one class ability (two
+    classes at different caster levels) is not offered, neither as a
+    spellbook cantrip nor as a class ability, rather than being priced as a
+    slot or cast at a guessed level.
+  - When the game cannot report a source's use count before and after a
+    cast, the cast is treated as uncertain and the routine stops; a free
+    source must also read as unlimited on both sides. A count the game
+    could not report is never taken as "nothing spent".
+- **Files the planner cannot read are never overwritten.** A plan, review
+  or mode file from a newer planner, or one it cannot read, is kept
+  byte-for-byte. Save and Accept say so in plain words ("Not saved: …
+  It was left unchanged").
+- **Test harness (not player-facing).** A test run's approval now names
+  the exact mod set, save and purpose it is for. The launcher reads each
+  run's evidence itself before accepting a pass. The disable step keeps
+  the planner disabled for several frames, the way the mod manager's
+  toggle does. Builds from different checkouts are now byte-identical.
 
 ## What it lets a player do
 
@@ -78,26 +89,28 @@ candidate commit; the release-candidate receipt has the counts) cover:
 - install rollback in isolated state;
 - the guarded publisher gate.
 
-Every guard added since rc1 has a mutant that the tests catch.
+Every guard added since rc2 has a mutant that the tests catch. Mutants
+show that the tests would notice a broken guard; they are not evidence
+of behavior in the game.
 
 **Native gameplay.** These are guarded runs on the disposable automation
 campaign, never an ordinary save. Each run checked in game that it had
 loaded the build it staged (commit, package, DLL and MVID). The receipt
-(`docs/evidence/rc-0.2.0-rc2-receipt.md`, added after the freeze) lists
+(`docs/evidence/rc-0.2.0-rc3-receipt.md`, added after the freeze) lists
 the runs repeated on the frozen candidate itself. These development runs
-found and then confirmed the change:
+checked the changes first:
 
 | Run | What it showed |
 | --- | --- |
-| `casting-qual-cast-20260923-a1-anim-01` (development build `9f2bdf6`) | Animated mode, before the fix. The player's stop landed during the first cast, as designed. The game's own cast command then failed that cantrip, and the routine halted: the failed casting was reported, nothing was spent, and the other two castings were not attempted. |
-| `casting-qual-select-20260923-d1-01` | The game's own view of each caster's level-0 spells: 0 level-0 slots per day, and cantrips usable at will through the class ability |
-| `casting-qual-cast-20260923-a2-anim-01` (fixed build `70f135a`) | Animated mode: stop by the player's press during the first cast; complete, skipping the active buff; repeat, with nothing to cast; recast after a reopen; disable during a cast, which was interrupted with nothing landing, then enable. Every step was as forecast, resources were unchanged (at will), and no save was written. |
-| `casting-qual-cast-20260923-a2-inst-01` (fixed build `70f135a`) | Instant mode: the same steps. The disable landed before the run's first step, so nothing was submitted. |
+| `classic-cast-20260924-00aca73-inst-01` | Classic planner, instant: the Long routine cast Resistance (Linzi on Hedwirg) through the at-will ability; new effect; count -1 → -1; spell levels unchanged |
+| `classic-cast-20260924-da0ee32-anim-02` | Classic planner, animated: the same, through the game's own cast command |
+| `casting-qual-cast-20260924-13f6d37-anim-01` | Casting-first, animated: stop, complete, repeat, recast, disable during a cast, then a new run after the enable that completed, with the planner's subscriptions and HUD unchanged |
+| `casting-qual-cast-20260924-13f6d37-inst-01` | Casting-first, instant: the same steps; the disable landed before the run's first step (disable before start, not an interruption of a cast) |
 
 **Restoration:** every run moved the owner's Mods folder aside, staged
 only the candidate and the approved mod set, and restored the folder
-byte-exact afterwards, including the installed KingmakerGunslinger
-0.0.136. Every save was compared before and after.
+byte-exact afterwards, including the installed KingmakerGunslinger.
+Every save was compared before and after.
 
 **Manual acceptance:** not yet. The consolidated supervised session is
 described in `docs/MANUAL-USABILITY-HANDOFF.md`.
@@ -106,11 +119,13 @@ described in `docs/MANUAL-USABILITY-HANDOFF.md`.
 - spells that spend prepared slots or spontaneous levels;
 - ability pools;
 - group spells, metamagic variants and rods;
-- an area change during a run;
+- an area change during a run (the test campaign's only exit autosaves
+  and ends the prologue);
 - pets;
-- layouts at resolutions other than 1920×1200.
+- keyboard and mouse input from a person, and layouts at resolutions
+  other than 1920×1200 (they need a connected desktop session).
 
-The finite-resource qualification is prepared and waits for an
+The finite-resource and group qualification is prepared and waits for an
 owner-designated advanced test save (`docs/ADVANCED-SEED-COMPATIBILITY.md`).
 
 ## Not supported in this version (shown on the card, refused by Apply)
@@ -127,7 +142,7 @@ Exit Kingmaker and Unity Mod Manager first.
 ```powershell
 # From the candidate's clean checkout:
 .\scripts\Build-Release.ps1
-.\scripts\Install-Local.ps1 -ReleaseManifestPath .\artifacts\release\0.2.0-rc2\release-manifest.json `
+.\scripts\Install-Local.ps1 -ReleaseManifestPath .\artifacts\release\0.2.0-rc3\release-manifest.json `
     -InstallId <id> -ExpectedPriorVersion 0.1.1-rc3
 # To return to the prior version, keeping settings edited since:
 .\scripts\Restore-InstallLocal.ps1 -InstallId <id>

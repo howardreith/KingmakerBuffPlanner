@@ -107,8 +107,10 @@ else has passed source and recorded-runtime tests only.
 | Several casters in one routine, each casting with its own caster | Runs | Yes (two casters, three castings) |
 | Skip if already active / Always recast | Runs | Yes, with free sources: an active effect is skipped, a repeat press casts nothing, Always recast casts again |
 | Stopping a running routine (press a routine button) | Runs | Yes: pressed during a cast in progress, that cast finished and nothing after it started |
-| Disabling the mod during a run | The run ends; a cast in progress is interrupted and cleaned up | Yes (animated): the cast in progress was interrupted and nothing landed; runs were possible again once the planner was enabled |
+| Disabling the mod during a run | The run ends; a cast in progress is interrupted and cleaned up | Yes: in animated mode during a cast (interrupted, nothing landed), in instant mode before the first cast; after the planner was enabled again a new run completed, with the planner's subscriptions and HUD unchanged |
 | A cast the game refuses | The routine stops there; nothing after it runs | Yes, once, before the cantrip fix: the failed cast was reported, nothing was spent and the rest were not attempted |
+| A free cantrip whose class ability is gone when the routine runs | Refused; it is never cast from a spell slot instead | Not in the game (source tests) |
+| A cast whose resource use the game cannot report | Treated as uncertain; the routine stops there | Not in the game (source tests) |
 | Close and reopen the planner; the accepted plan survives | Runs | Yes |
 | Spellbook spells from prepared slots or spontaneous levels, direct target | Runs, budgeted in order | Not yet (the test party has only cantrips) |
 | Exact prepared slots and ability pools shared across castings | Runs, budgeted in order | Not yet |
@@ -121,6 +123,12 @@ else has passed source and recorded-runtime tests only.
 A casting that cannot run is never silently changed into something that
 can: it has to be edited, disabled, or left out with Ready Casts Only.
 
+The classic planner (the default mode) shares the casting code. Its Long
+routine was checked in the game in both casting modes: Resistance cast
+through the at-will class ability, the effect landed, and no spell slot or
+ability pool changed. A classic routine now also stops at the first cast
+that is not confirmed.
+
 ## Files
 
 All player data lives in the mod folder under `UserSettings`:
@@ -132,6 +140,10 @@ All player data lives in the mod folder under `UserSettings`:
 | `kingmaker-buff-planner-review-<campaign>.json` | Which routine contents you accepted (digests only) |
 | `kingmaker-buff-planner-<campaign>.json` | The classic plan, never modified by the casting-first planner |
 | `kbp-casting-<hash>.orig` | Byte-exact archive of the classic plan taken at import |
+
+A plan, review or mode file this version cannot read (for example one
+written by a newer planner) is never overwritten: Save and Accept say that
+it was left unchanged.
 
 Installing a new version keeps `UserSettings` exactly. Rolling back to an
 older version keeps every file; a casting-first plan the older version
@@ -150,7 +162,9 @@ ordinary save) it has cast in the game:
   (skipping the buff already active), pressed again (nothing to cast),
   recast with Always recast after closing and reopening the planner, and
   disabled during a cast (interrupted, nothing landed, runs possible again
-  once enabled). Every step matched its prediction; no save was written.
+  once enabled), then run again as a new routine after the enable, which
+  completed with the planner's event subscriptions and HUD unchanged.
+  Every step matched its prediction; no save was written.
 
 The animated run also found a defect in the previous candidate: a
 spontaneous caster's cantrip failed because it was cast from the
