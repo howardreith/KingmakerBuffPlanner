@@ -54,6 +54,10 @@ Worklist (updated as slices land; 2026-09-24 status in brackets):
    campaigns, and the Classic profile's bytes after workspace use (5 mutants
    killed). Install and rollback wait for rc3.]
 8. Build reproducibility across checkouts (bounded, secondary).
+   [DONE `30c8483`: the only path-dependent bytes of two builds of `67fa087`
+   (G and G2) were the embedded PDB path; with PathMap, clean builds of
+   `30c8483` in G and G2 gave the identical DLL `a502e5c5…` and the
+   identical package `8a835fa6…`.]
 9. Independent reviews, rc3, full gate, native qualification on rc3,
    receipt, PR handoff.
 
