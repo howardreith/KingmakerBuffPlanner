@@ -138,8 +138,18 @@ namespace KingmakerBuffPlanner.Domain.Planning
             ProviderPlanningOption option)
         {
             if (context == null) throw new ArgumentNullException("context");
+            return Apply(context.SelectedEnhancements, option);
+        }
+
+        // The same rule for an explicit casting's applied enhancements (the
+        // casting-first compiler has no classic request context).
+        internal static ProviderPlanningOption Apply(
+            IEnumerable<CastEnhancementSnapshot> selectedEnhancements,
+            ProviderPlanningOption option)
+        {
             if (option == null) return null;
-            CastEnhancementSnapshot[] selected = context.SelectedEnhancements
+            CastEnhancementSnapshot[] selected = (selectedEnhancements ??
+                    new CastEnhancementSnapshot[0]).Where(value => value != null)
                 .ToArray();
             CastEnhancementSnapshot[] native = selected.Where(value =>
                 value.RequiresNativeCommand).ToArray();

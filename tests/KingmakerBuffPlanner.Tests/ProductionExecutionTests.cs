@@ -4376,6 +4376,11 @@ namespace KingmakerBuffPlanner.Tests
             internal bool PlainSpendsReservoir;
             internal bool AlterPlainAfterEnhanced;
             internal bool UnreadModifiers;
+            internal int PlainBonus = 4;
+            // How the enhancement executes: "direct" (the installed
+            // provider's own transaction, as live), "native" (a native
+            // command) or "none".
+            internal string Routing = "direct";
             internal string[] Whitelist = { "strength-spell" };
             internal int AnimatedFrames = 3;
             internal long Now;
@@ -4421,9 +4426,9 @@ namespace KingmakerBuffPlanner.Tests
                 _baselines[step] = new EffectBaseline(step.ExpectedRecipientUnitIds.ToDictionary(unit => unit,
                     unit => (IEnumerable<ObservedEffectInstance>)Instances(unit), StringComparer.Ordinal));
                 bool enhanced = step.EnhancementIds.Contains(EnhancementId);
-                int bonus = enhanced && !IgnoreEnhancement ? 6 : 4;
+                int bonus = enhanced && !IgnoreEnhancement ? PlainBonus + 2 : PlainBonus;
                 Active[step.TargetUnitIds[0] + "|strength-buff"] = Tuple.Create("i" + (++_instances), Now + 600,
-                    new[] { "Strength/Enhancement/" + bonus });
+                    bonus == int.MinValue ? new string[0] : new[] { "Strength/Enhancement/" + bonus });
                 Remaining--;
                 if (enhanced) Reservoir -= ReservoirSpend;
                 else if (PlainSpendsReservoir) Reservoir--;
@@ -4511,8 +4516,9 @@ namespace KingmakerBuffPlanner.Tests
                         "Powerful Change: Strength", string.Empty, CastEnhancementCategory.ClassFeature, 0, 0,
                         Reservoir, Whitelist, "Powerful Change: Strength",
                         new[] { BrownFurPowerfulChangeProfile.CastingSpellbookGuid },
-                        BrownFurPowerfulChangeProfile.UsagePoolId("unit-arcanist"), false,
-                        "brown-fur-powerful-change", 1, false, "brown-fur-powerful-change", "Arcane Reservoir"));
+                        BrownFurPowerfulChangeProfile.UsagePoolId("unit-arcanist"), Routing == "native",
+                        "brown-fur-powerful-change", 1, false, "brown-fur-powerful-change", "Arcane Reservoir",
+                        Routing == "direct" ? "brown-fur-direct-cast-v1" : null));
                 return new CastingWorkspaceInputs(new PartyProviderSnapshot(units,
                         new[] { strength, other }, pools), options, effects, enhancements, null, Live());
             }
@@ -4628,10 +4634,38 @@ namespace KingmakerBuffPlanner.Tests
                 forecast[0].Name != "plain" || !forecast[0].CastingIds.SequenceEqual(new[] { "qual-cast-1" }) ||
                 forecast[0].Projection.Plan.Steps[0].EnhancementIds.Count != 0 ||
                 forecast[1].Name != "enhanced" || !forecast[1].CastingIds.SequenceEqual(new[] { "qual-cast-2" }) ||
-                !forecast[1].Projection.Plan.Steps[0].EnhancementIds.SequenceEqual(new[] { id }))
+                !forecast[1].Projection.Plan.Steps[0].EnhancementIds.SequenceEqual(new[] { id }) ||
+                forecast[0].Projection.Plan.Steps[0].ExecutionStrategy != CastExecutionStrategy.DirectRuleCast ||
+                forecast[1].Projection.Plan.Steps[0].ExecutionStrategy != CastExecutionStrategy.ProviderDirectRuleCast)
                 throw new InvalidOperationException("The enhanced forecast was wrong: " +
                     string.Join(" | ", forecast.Select(step => step.Name + ":" + (step.Refusal ??
                         string.Join(",", step.CastingIds.ToArray()))).ToArray()));
+            // Routing (the casting-first compiler had kept the source's own
+            // rule cast, which never enrols the provider's transaction, so
+            // an Instant cast would land without its enhancement): the
+            // applied enhancements decide how the cast executes, exactly as
+            // for the classic planner; the plain casting is never rerouted.
+            foreach (KeyValuePair<string, CastExecutionStrategy> routing in new Dictionary<string, CastExecutionStrategy>
+                {
+                    { "direct", CastExecutionStrategy.ProviderDirectRuleCast },
+                    { "native", CastExecutionStrategy.NativeCommandRequired },
+                    { "none", CastExecutionStrategy.DirectRuleCast }
+                })
+            {
+                CastingWorkspaceInputs routed = new EnhancedBuffWorld { Routing = routing.Key }.Inputs();
+                CastingQualificationStepForecast projected = CastingQualificationForecast.Project("routing",
+                    CastingQualificationForecast.BuildDocument("fixture-campaign", selection.Castings), routed,
+                    routed.LiveEffects);
+                if (projected.Projection == null || projected.Projection.Plan.Steps.Count != 2 ||
+                    projected.Projection.Plan.Steps[0].ExecutionStrategy != CastExecutionStrategy.DirectRuleCast ||
+                    projected.Projection.Plan.Steps[1].ExecutionStrategy != routing.Value ||
+                    (routing.Key == "direct" && !projected.Projection.Plan.Steps[1].ExecutionStrategyReason.StartsWith(
+                        "provider-direct-cast:brown-fur-direct-cast-v1;enhancements:" + id, StringComparison.Ordinal)))
+                    throw new InvalidOperationException("An enhanced casting was routed wrongly (" + routing.Key + "): " +
+                        (projected.Projection == null ? projected.Refusal : string.Join(",",
+                            projected.Projection.Plan.Steps.Select(step => step.ExecutionStrategy + "/" +
+                                step.ExecutionStrategyReason).ToArray())));
+            }
             // Refused: only a rod (not a supported non-rod enhancement); no
             // reservoir point left; no plain spell the enhancement applies to.
             CastingQualificationSelection rodOnly = CastingQualificationRecipe.SelectEnhancedDirect(
@@ -4697,7 +4731,11 @@ namespace KingmakerBuffPlanner.Tests
                 Tuple.Create<Action<EnhancedBuffWorld>, string, string[]>(value => value.PlainSpendsReservoir = true,
                     "plain-wait:step:enhancement-resource:4>3:expected-spend=0", first),
                 Tuple.Create<Action<EnhancedBuffWorld>, string, string[]>(value => value.UnreadModifiers = true,
-                    "plain-wait:step:modifiers:qual-cast-1:unread", first)
+                    "plain-wait:step:modifiers:qual-cast-1:unread", first),
+                Tuple.Create<Action<EnhancedBuffWorld>, string, string[]>(value => value.PlainBonus = 0,
+                    "plain-wait:step:modifiers:qual-cast-1:no-Strength/Enhancement/:Strength/Enhancement/0", first),
+                Tuple.Create<Action<EnhancedBuffWorld>, string, string[]>(value => value.PlainBonus = int.MinValue,
+                    "plain-wait:step:modifiers:qual-cast-1:no-Strength/Enhancement/:", first)
             };
             int shapeIndex = 0;
             foreach (Tuple<Action<EnhancedBuffWorld>, string, string[]> shape in shapes)
