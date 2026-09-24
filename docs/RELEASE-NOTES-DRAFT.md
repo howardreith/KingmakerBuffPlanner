@@ -1,88 +1,80 @@
-# Kingmaker Buff Planner 0.2.0-rc4 — Casting-first planner (release candidate)
+# Kingmaker Buff Planner 0.2.0-rc5 — Casting-first planner (release candidate)
 
 **This is a local release candidate for the owner's final review, not a
 public release.** Nothing is published, tagged or permanently installed
 before that review. The classic planner stays the default; the
 casting-first planner is an opt-in, experimental mode.
 
-## What changed since 0.2.0-rc3
+## What changed since 0.2.0-rc4
 
-rc3's final independent review found defects, and rc4 fixes them; a
-second independent review of those fixes found more, fixed here too. For
-a player:
+The owner's review of the rc4 source found two defects. The
+qualification on the owner's advanced test campaign, and an independent
+review of the work, found more. All are fixed. For a player:
 
-- **Classic routines no longer give up while the game is paused.** A
-  classic routine now advances only while the game runs. **APPLY** in the
-  open classic planner checks the routine at once (a refusal is shown
-  there), then closes the planner and casts; the result is shown when the
-  planner opens again. In rc3 a paused game made the first cast look
-  unconfirmed, and the rest of the routine was abandoned.
-- **Plans saved by 0.0.19 import.** The first time the casting-first
-  planner opens a campaign, a classic plan saved by the released 0.0.19
-  (or older) is imported through the classic planner's own reading. Its
-  file is not rewritten. rc3 refused such plans.
-- **A cast counts only if it landed.** A cast is confirmed only when this
-  cast put the effect there: a new effect, or the old one renewed to a
-  later end, of the buff the spell grants (another effect of the same
-  name does not count). An effect that was already there, or one the
-  game suppresses, never confirms a cast. The exception is a group
-  casting cast for recipients that lack the buff while others already
-  have a provably good-enough one: those may keep theirs unchanged, or
-  the game may replace it with this cast's (the card warns when theirs
-  lasts longer than this cast). A group casting that would
-  reach nobody, or whose caster cannot be its origin, is blocked with a
-  reason instead of running; a party buff that also reaches pets is
-  planned as a party buff.
-- **Every casting can be fully edited.** Editing one casting now changes
-  its caster and exact source, its routine and its place in it, whether
-  it is cast again when the buff is already there, and whether it is a
-  single-target or a group casting. Sources are named exactly: the
-  spellbook, its spell level and the kind of slot, or the item or
-  ability. The same caster keeps its enhancements when it switches
-  source; another caster keeps only the ones it has, and the planner
-  names the ones it dropped (Undo restores them). An imported casting
-  whose classic plan let the planner pick any caster, or did not say
-  single target or group, can be completed and marked Ready in place. A
-  caster who can cast a buff in more than one way picks the exact one
-  when adding it; a spell known at two levels of one spellbook is refused
-  with the reason (this version cannot pin one). The animated fallback
-  and the out-of-combat rule have switches.
-- **Unreadable files are announced, and the remedy works.** Both
-  planners say when their saved file could not be read or comes from a
-  newer version, when a backup was loaded instead (and whether saving is
-  refused because of it), and when a change was not saved; the
-  casting-first header says so for as long as saving is blocked. Moving
-  the unreadable casting plan and its backups aside and pressing Reload
-  lets it save again, keeping castings added meanwhile. Only the files
-  the planner names are to be moved; a reload never discards castings
-  added in the session without a second press, and a classic plan
-  repaired after a failed import is imported (never an empty stand-in).
-- **Smaller fixes.** The casting-first planner never rewrites the classic
-  plan file. The spellbook button opens the casting-first planner
-  properly. The HUD tooltip never describes another campaign. A new
-  casting never reuses the number of a casting it has shown, even after
-  a reload. The footer counts the castings of the selected routine that
-  would run short of a resource if every routine ran in one pass. A
-  linked opposition-school slot pair counts as two slots in the budget,
-  and a slot whose cost could not be read counts as one. The first
-  import uses the classic planner's own copy of the plan, matched to the
-  party's current abilities.
-- **Test harness (not player-facing).** A changed ordinary save is
-  reported with every other failure and blocks later test runs until the
-  owner has reviewed it. The save comparison survives a launcher that
-  stops early. A live test run stops itself before its time limit and on
-  the launcher's abort signal, checked on every frame. Finite-resource
-  test approvals can be written. A rehearsal of the manual session is
-  labelled as one. More of the game's own checks run before a test
-  launches. After the second review: the saves are read and compared
-  while the test run holds its lock, which is kept until the comparison
-  is made; fixture changes and test runs cannot overlap; the owner's
-  acknowledgement of a save change is typed by the owner and bound to
-  that exact record; an incomplete run never reports success. After a
-  focused review of those fixes: a comparison that can never be made has
-  a recorded way out for the owner's review, a comparison is made only
-  while the run still holds its lock, and every scenario obeys the run's
-  stop rule.
+- **An effect the planner cannot fully read is never "good enough".** With
+  **If the buff is already there: skip this casting**, an existing buff
+  counts as already covering a recipient only when the planner could read
+  that it is not suppressed, the caster level it came from, and the
+  caster level of the planned casting. Otherwise the casting goes ahead
+  and the card says why: "not provably as strong" or "possibly
+  suppressed". rc4 treated an unreadable suppression flag as "not
+  suppressed" and an unreadable caster level as good enough.
+- **Group castings with mixed coverage.** Some recipients of a group
+  casting may already have an adequate buff while others do not. The
+  casting is then cast once for the others, at its usual cost, and the
+  card says "already active on (the character) (the cast goes ahead for
+  the others)". Those recipients may keep their buff unchanged, or the
+  game may replace it with this cast's. In the qualification run the game
+  replaced a longer buff with the shorter one, and the card now says so
+  beforehand ("... may shorten it"). Every other recipient still needs
+  the buff to land. Before, a kept instance made the whole cast count as
+  unconfirmed.
+- **Powerful Change in Instant mode.** A casting with Brown-Fur Powerful
+  Change, or another enhancement that needs its provider's own cast or a
+  native command, now casts that way in Instant mode, as the classic
+  planner always did. Before, the casting-first planner cast it by the
+  game's rule directly, a path the provider does not take part in, so the
+  spell would have landed without its enhancement. Animated mode was not
+  affected.
+- **Share Transmutation chosen as an enhancement is refused.** It changes
+  whom the spell reaches, which this version does not execute. The
+  casting keeps the choice, shows it, and is not cast. Before, it could
+  run with Share applied to the caster's own target.
+- **The card names the character.** Notes about a buff already on a
+  recipient now name the character instead of an internal id.
+- **Archived plans are checked byte for byte.** When a plan is migrated,
+  its original is archived. An archive already at the expected name is
+  reused only when it holds exactly the original bytes. A different file
+  there is kept untouched, and the original goes to a numbered name, or
+  to a name made from its own content once the numbered names are taken,
+  so a readable settings file can never become unreadable for want of an
+  archive name. The classic planner's pre-schema archive now keeps the
+  exact original bytes, byte-order mark included.
+
+For the release checks (not visible in play):
+- a separate compatibility profile for the owner's advanced test campaign
+  (Gunslinger 0.0.136, staged from an exact copy);
+- a frozen BagOfTricks copy whose cheats are verified off;
+- variant spells (such as the four forms of Protection from Alignment)
+  accepted by the qualification tooling's plain-buff check;
+- two new qualifications, group buffs with mixed coverage
+  (`group-mixed`) and a per-casting enhancement (`enhanced-direct`,
+  Powerful Change chosen through the workspace, with the stat modifier,
+  the Arcane Reservoir, the caster's toggles and the route that ran all
+  read from the game);
+- a capability inventory that lists the exact effects each source
+  applies.
+
+## What changed in 0.2.0-rc4 (history)
+
+Classic routines advance only while the game runs, and **APPLY** checks
+the routine at once and then casts with the planner closed. Plans saved
+by 0.0.19 import through the classic planner's own reading. A cast counts
+only if it landed. Every casting can be fully edited, with exact sources.
+Unreadable files are announced, with a remedy that works. The test harness
+gained ordinary-save and fixture protections. rc4 was superseded by rc5
+before release after the owner's review of its source
+(`docs/evidence/rc-0.2.0-rc4-receipt.md`).
 
 ## What changed in 0.2.0-rc3 (history)
 
@@ -251,7 +243,7 @@ Exit Kingmaker and Unity Mod Manager first.
 ```powershell
 # From the candidate's clean checkout:
 .\scripts\Build-Release.ps1
-.\scripts\Install-Local.ps1 -ReleaseManifestPath .\artifacts\release\0.2.0-rc4\release-manifest.json `
+.\scripts\Install-Local.ps1 -ReleaseManifestPath .\artifacts\release\0.2.0-rc5\release-manifest.json `
     -InstallId <id> -ExpectedPriorVersion 0.1.1-rc3
 # To return to the prior version, keeping settings edited since:
 .\scripts\Restore-InstallLocal.ps1 -InstallId <id>

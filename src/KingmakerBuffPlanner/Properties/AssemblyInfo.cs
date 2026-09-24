@@ -10,7 +10,7 @@ using System.Runtime.InteropServices;
 [assembly: Guid("8f690856-fc6e-4b4d-a41b-640ae21fce04")]
 [assembly: AssemblyVersion("0.2.0.0")]
 [assembly: AssemblyFileVersion("0.2.0.0")]
-[assembly: AssemblyInformationalVersion("0.2.0-rc4")]
+[assembly: AssemblyInformationalVersion("0.2.0-rc5")]
 // Review L5: the candidate-profile format this binary reads (install
 // rollback reads it from the restored binary).
 [assembly: AssemblyMetadata(
