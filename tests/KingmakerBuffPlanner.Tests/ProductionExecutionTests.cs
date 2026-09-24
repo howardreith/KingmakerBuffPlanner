@@ -558,6 +558,13 @@ namespace KingmakerBuffPlanner.Tests
             if (AppliedEffectJudgement.AllReached(recipients, expected, baseline,
                     unit => new[] { seen("old", 9000) }, recipients))
                 throw new InvalidOperationException("A cast that delivered to no one was confirmed.");
+            // Suppressed before the cast is not coverage: the same instance
+            // unsuppressed afterwards (unchanged) does not count as kept.
+            EffectBaseline suppressedBaseline = baselineWith("unit-t1",
+                new[] { new ObservedEffectInstance(EffectKind.Buff, "group-effect", "old", 9000, true) });
+            if (AppliedEffectJudgement.AllReached(recipients, expected, suppressedBaseline,
+                    afterWith(kept, null, null), covered))
+                throw new InvalidOperationException("A recipient suppressed before the cast counted as kept.");
 
             // Always recast: every recipient must be reached; nothing is exempt.
             ResolvedCasting recast = compile(ExistingEffectPolicy.Overwrite, mixed).CastingById("cast-g");
@@ -574,6 +581,22 @@ namespace KingmakerBuffPlanner.Tests
                     note.StartsWith("existing-insufficient:unit-t1", StringComparison.Ordinal) &&
                     note.Contains("caster-level-unverified")))
                 throw new InvalidOperationException("An unreadable caster level made a recipient pre-covered.");
+            // With required coverage, a predicted recipient outside it that is
+            // already adequately covered is pre-covered as well (the cast still
+            // reaches it, and a kept instance must not fail the cast).
+            ResolvedCasting required = compiler.Compile(CastingDocument(new PlannedCasting(
+                    "cast-g", "long", 0, "source-communal", CastingGroupAbility, "unit-cleric", null,
+                    CastingTargetMode.CasterCenteredOrigin, null, CastingOrigin.CasterCentered(),
+                    new[] { "unit-t2" }, null, null, ExistingEffectPolicy.SkipAlreadyActive, null,
+                    CastingAuthoringState.Ready, null)),
+                snapshot, options, effects, enhancements, "long", null, false, mixed).CastingById("cast-g");
+            if (required.Readiness != ResolvedCastingReadiness.Ready ||
+                !required.PreCoveredUnitIds.SequenceEqual(new[] { "unit-t1" }) ||
+                !required.ExistingEffectNotes.Any(note =>
+                    note.StartsWith("already-covered:unit-t1", StringComparison.Ordinal)))
+                throw new InvalidOperationException("A covered recipient outside the required coverage was not pre-covered: " +
+                    string.Join(",", required.PreCoveredUnitIds.ToArray()) + "|" +
+                    string.Join(",", required.ExistingEffectNotes.ToArray()));
             // Every recipient covered: one skip, no step.
             ActiveEffectSnapshot all = LiveEffects(casting.PredictedBeneficiaryUnitIds
                 .Select(unit => On(unit, "group-effect", null, 1, 0)).ToArray());
