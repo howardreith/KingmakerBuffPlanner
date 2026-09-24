@@ -1954,12 +1954,22 @@ try {
     try { & $restoreScript -RunId 'rl-fail' -CloseUnverifiableComparison -StateRoot $rlState -EvidenceRoot $rlEvidence -Confirm:$false }
     catch { $closeRefused = $_.Exception.Message -like 'Refusing -CloseUnverifiableComparison*' }
     if (-not $closeRefused) { throw 'A comparison that is not pending was closed again.' }
+    # Targeted review: closing tries the comparison first - one that can
+    # be made is made (here clean, so nothing is recorded).
+    $null = New-RlTransaction 'rl-closeok' 'Deployed' $saveFolder -HoldLock
+    $closeOkMessage = ''
+    try { & $restoreScript -RunId 'rl-closeok' -CloseUnverifiableComparison -StateRoot $rlState -EvidenceRoot $rlEvidence -Confirm:$false }
+    catch { $closeOkMessage = $_.Exception.Message }
+    if ((Test-Path -LiteralPath (Join-Path $rlState 'protected-save-violations\rl-closeok.json')) -or
+        $closeOkMessage -notlike '*identity is invalid*' -or $closeOkMessage -like '*unverifiable*') {
+        throw ('A comparison that could be made was closed as unverifiable: ' + $closeOkMessage)
+    }
     # A pending comparison whose lock is no longer the run's is never made.
     $noLockBaseline = New-RlTransaction 'rl-nolock' 'Deployed' $saveFolder
     $noLockMessage = ''
     try { & $restoreScript -RunId 'rl-nolock' -StateRoot $rlState -EvidenceRoot $rlEvidence -Confirm:$false }
     catch { $noLockMessage = $_.Exception.Message }
-    if ($noLockMessage -notlike '*can no longer be compared under its lock; recorded as unverifiable:lock-not-held*' -or
+    if ($noLockMessage -notlike '*can no longer be compared under its lock; recorded as unverifiable:lock-not-held*cannot restore the Mods folder either*' -or
         -not [bool](Read-KbpJson $noLockBaseline).compared) {
         throw ('A comparison without its lock was made: ' + $noLockMessage)
     }
