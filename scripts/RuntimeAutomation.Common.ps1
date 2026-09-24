@@ -608,10 +608,12 @@ function Get-KbpProbeAllowanceBuildRefusal {
     return $null
 }
 
-# Casting-qualification allowance (schema 3) against THIS build, before any
-# deployment: run id, commit, package, DLL, MVID, recipe and a 1..24
-# submission budget. The host re-parses it strictly and re-measures the
-# loaded identity; the forecast projections are checked in game.
+# Casting-qualification allowance (schema 5) against THIS build, before any
+# deployment: run id, commit, package, DLL, MVID, recipe, casting mode, a
+# 1..24 submission budget and a purpose; its profile, identity and WORKING
+# save are checked by Get-KbpAllowanceFixtureBindingRefusal once they are
+# resolved. The host re-parses it strictly and re-measures the loaded
+# identity; the forecast projections are checked in game.
 function Get-KbpQualificationAllowanceBuildRefusal {
     # -Recipe (optional): the recipe the launcher was asked for; the
     # allowance must name the same one. -ExecutionMode (optional): the
@@ -623,11 +625,12 @@ function Get-KbpQualificationAllowanceBuildRefusal {
     $names = @($allowance.PSObject.Properties | ForEach-Object Name)
     foreach ($required in @('schemaVersion', 'kind', 'runId', 'sourceCommit', 'packageSha256', 'dllSha256',
             'assemblyMvid', 'fixtureGameId', 'recipe', 'executionMode', 'approvedProjectionIds',
-            'maximumNativeSubmissions', 'approvedBy', 'authority')) {
+            'maximumNativeSubmissions', 'approvedBy', 'authority', 'compatibilityProfileId',
+            'compatibilityIdentity', 'workingSaveSha256', 'purpose')) {
         if ($names -cnotcontains $required) { return "missing:$required" }
     }
     if (-not ($allowance.schemaVersion -is [int] -or $allowance.schemaVersion -is [long]) -or
-        [int]$allowance.schemaVersion -ne 4) { return 'schema' }
+        [int]$allowance.schemaVersion -ne 5) { return 'schema' }
     if ([string]$allowance.kind -cne 'kbp-casting-qualification') { return 'kind' }
     if ([string]$allowance.runId -cne $RunId) { return 'run-id' }
     if ([string]$allowance.sourceCommit -cne [string]$BuildManifest.commit) { return 'commit' }
@@ -644,6 +647,24 @@ function Get-KbpQualificationAllowanceBuildRefusal {
         [int]$allowance.maximumNativeSubmissions -lt 1 -or [int]$allowance.maximumNativeSubmissions -gt 24) {
         return 'submissions'
     }
+    if ([string]::IsNullOrWhiteSpace([string]$allowance.purpose)) { return 'purpose' }
+    return $null
+}
+
+# Review C5: a casting allowance names the compatibility profile, its exact
+# identity digest (the external mod copies) and the WORKING save it was
+# approved for. Checked against the profile and save pair this launcher
+# resolved, before anything is deployed. $null when they match.
+function Get-KbpAllowanceFixtureBindingRefusal {
+    param([string]$AllowanceJson, [string]$ProfileId, [string]$CompatibilityIdentity, [string]$WorkingSaveSha256)
+    try { $allowance = $AllowanceJson | ConvertFrom-Json }
+    catch { return 'unreadable' }
+    if ($null -eq $allowance) { return 'unreadable' }
+    if ([string]::IsNullOrEmpty($ProfileId) -or [string]$allowance.compatibilityProfileId -cne $ProfileId) { return 'profile' }
+    if ([string]::IsNullOrEmpty($CompatibilityIdentity) -or
+        [string]$allowance.compatibilityIdentity -cne $CompatibilityIdentity) { return 'compatibility-identity' }
+    if ([string]::IsNullOrEmpty($WorkingSaveSha256) -or
+        [string]$allowance.workingSaveSha256 -cne $WorkingSaveSha256) { return 'working-save' }
     return $null
 }
 
@@ -677,8 +698,10 @@ function Get-KbpDisplayModeArguments {
     return @('-screen-fullscreen', '0', '-popupwindow', '-screen-width', $Matches[1], '-screen-height', $Matches[2])
 }
 
-# The classic cast allowance (kind kbp-classic-cast, schema 1) must name this
-# run, this build, one casting mode (the launcher's) and a 1..24 budget.
+# The classic cast allowance (kind kbp-classic-cast, schema 2) must name this
+# run, this build, one casting mode (the launcher's), a 1..24 budget and a
+# purpose; its profile, identity and WORKING save are checked by
+# Get-KbpAllowanceFixtureBindingRefusal once they are resolved.
 function Get-KbpClassicAllowanceBuildRefusal {
     param([string]$AllowanceJson, [string]$RunId, $BuildManifest, [string]$ExecutionMode)
     try { $allowance = $AllowanceJson | ConvertFrom-Json }
@@ -687,11 +710,12 @@ function Get-KbpClassicAllowanceBuildRefusal {
     $names = @($allowance.PSObject.Properties | ForEach-Object Name)
     foreach ($required in @('schemaVersion', 'kind', 'runId', 'sourceCommit', 'packageSha256', 'dllSha256',
             'assemblyMvid', 'fixtureGameId', 'executionMode', 'routineId', 'approvedPlanDigest',
-            'maximumNativeSubmissions', 'approvedBy', 'authority')) {
+            'maximumNativeSubmissions', 'approvedBy', 'authority', 'compatibilityProfileId',
+            'compatibilityIdentity', 'workingSaveSha256', 'purpose')) {
         if ($names -cnotcontains $required) { return "missing:$required" }
     }
     if (-not ($allowance.schemaVersion -is [int] -or $allowance.schemaVersion -is [long]) -or
-        [int]$allowance.schemaVersion -ne 1) { return 'schema' }
+        [int]$allowance.schemaVersion -ne 2) { return 'schema' }
     if ([string]$allowance.kind -cne 'kbp-classic-cast') { return 'kind' }
     if ([string]$allowance.runId -cne $RunId) { return 'run-id' }
     if ([string]$allowance.sourceCommit -cne [string]$BuildManifest.commit) { return 'commit' }
@@ -708,6 +732,7 @@ function Get-KbpClassicAllowanceBuildRefusal {
         [int]$allowance.maximumNativeSubmissions -lt 1 -or [int]$allowance.maximumNativeSubmissions -gt 24) {
         return 'submissions'
     }
+    if ([string]::IsNullOrWhiteSpace([string]$allowance.purpose)) { return 'purpose' }
     return $null
 }
 

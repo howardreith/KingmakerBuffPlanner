@@ -222,6 +222,21 @@ $advancedInspectionRunId = if ($FixtureFamily -ceq 'Advanced' -and $Scenario -ce
         -ProfileId $CompatibilityProfileId `
         -CompatibilityIdentity (Get-KbpCompatibilityIdentityDigest $compatibilityProfile)
 } else { $null }
+# Review C5: a casting allowance must name this profile, its exact identity
+# and this WORKING save; anything else is refused before any deployment.
+$allowanceWorkingSha256 = if ($null -eq $savePair) { $null } else { [string]$savePair.working.sha256 }
+if ($null -ne $qualificationAllowanceJson) {
+    $bindingRefusal = Get-KbpAllowanceFixtureBindingRefusal -AllowanceJson $qualificationAllowanceJson `
+        -ProfileId $CompatibilityProfileId -CompatibilityIdentity (Get-KbpCompatibilityIdentityDigest $compatibilityProfile) `
+        -WorkingSaveSha256 $allowanceWorkingSha256
+    if ($null -ne $bindingRefusal) { throw "The qualification allowance was refused: $bindingRefusal" }
+}
+if ($null -ne $classicAllowanceJson) {
+    $bindingRefusal = Get-KbpAllowanceFixtureBindingRefusal -AllowanceJson $classicAllowanceJson `
+        -ProfileId $CompatibilityProfileId -CompatibilityIdentity (Get-KbpCompatibilityIdentityDigest $compatibilityProfile) `
+        -WorkingSaveSha256 $allowanceWorkingSha256
+    if ($null -ne $bindingRefusal) { throw "The classic allowance was refused: $bindingRefusal" }
+}
 $steamSafety = Assert-KbpSteamSafety -SteamPath $SteamPath
 & (Join-Path $PSScriptRoot 'Deploy-Local.ps1') -PackagePath $package `
     -RunId 'runtime-whatif-preflight' -CompatibilityProfileId $CompatibilityProfileId `

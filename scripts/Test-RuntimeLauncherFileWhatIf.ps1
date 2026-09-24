@@ -289,11 +289,13 @@ try {
 }
 finally { Remove-Item -LiteralPath $outsideQualification -Force -ErrorAction SilentlyContinue }
 function New-QualificationFixtureJson([hashtable]$Override) {
-    $value = [ordered]@{ schemaVersion = 4; kind = 'kbp-casting-qualification'; runId = 'qual-bind-test'
+    $value = [ordered]@{ schemaVersion = 5; kind = 'kbp-casting-qualification'; runId = 'qual-bind-test'
         sourceCommit = ('c' * 40); packageSha256 = ('a' * 64); dllSha256 = ('b' * 64)
         assemblyMvid = '11111111-2222-3333-4444-555555555555'; fixtureGameId = 'game'
         recipe = 'zero-cost-mixed'; executionMode = 'instant'; approvedProjectionIds = @(('d' * 64)); maximumNativeSubmissions = 6
-        approvedBy = 'Howie'; authority = 'owner mission 2026-09-23 section 4' }
+        approvedBy = 'Howie'; authority = 'owner mission 2026-09-23 section 4'
+        compatibilityProfileId = 'full-user'; compatibilityIdentity = ('e' * 64); workingSaveSha256 = ('9' * 64)
+        purpose = 'casting-first qualification test' }
     foreach ($key in $Override.Keys) { $value[$key] = $Override[$key] }
     return ($value | ConvertTo-Json -Compress)
 }
@@ -307,7 +309,8 @@ $qualificationBindingCases = [ordered]@{
     'commit' = @{ sourceCommit = ('f' * 40) }; 'run-id' = @{ runId = 'other-run' }
     'kind' = @{ kind = 'kbp-single-cast-probe' }; 'recipe' = @{ recipe = 'other' }
     'submissions' = @{ maximumNativeSubmissions = 25 }
-    'schema' = @{ schemaVersion = 3 }; 'execution-mode' = @{ executionMode = 'hybrid' }
+    'schema' = @{ schemaVersion = 4 }; 'execution-mode' = @{ executionMode = 'hybrid' }
+    'purpose' = @{ purpose = ' ' }
 }
 foreach ($case in $qualificationBindingCases.Keys) {
     $refusal = Get-KbpQualificationAllowanceBuildRefusal -AllowanceJson (New-QualificationFixtureJson $qualificationBindingCases[$case]) `
@@ -337,11 +340,13 @@ if ($launcherText -notmatch '-Recipe \$QualificationRecipe -ExecutionMode \$Exec
 }
 # The classic allowance binds the build, one casting mode and a budget.
 function New-ClassicFixtureJson([hashtable]$Override) {
-    $value = [ordered]@{ schemaVersion = 1; kind = 'kbp-classic-cast'; runId = 'classic-bind-test'
+    $value = [ordered]@{ schemaVersion = 2; kind = 'kbp-classic-cast'; runId = 'classic-bind-test'
         sourceCommit = ('c' * 40); packageSha256 = ('a' * 64); dllSha256 = ('b' * 64)
         assemblyMvid = '11111111-2222-3333-4444-555555555555'; fixtureGameId = 'game'
         executionMode = 'animated'; routineId = 'long'; approvedPlanDigest = ('d' * 64); maximumNativeSubmissions = 3
-        approvedBy = 'Howie'; authority = 'owner mission 2026-09-23 batch 3 section 6' }
+        approvedBy = 'Howie'; authority = 'owner mission 2026-09-23 batch 3 section 6'
+        compatibilityProfileId = 'full-user'; compatibilityIdentity = ('e' * 64); workingSaveSha256 = ('9' * 64)
+        purpose = 'classic cast qualification test' }
     foreach ($key in $Override.Keys) { $value[$key] = $Override[$key] }
     return ($value | ConvertTo-Json -Compress)
 }
@@ -353,9 +358,10 @@ $classicBindingCases = [ordered]@{
     'package' = @{ packageSha256 = ('d' * 64) }; 'dll' = @{ dllSha256 = ('e' * 64) }
     'mvid' = @{ assemblyMvid = '99999999-2222-3333-4444-555555555555' }
     'commit' = @{ sourceCommit = ('f' * 40) }; 'run-id' = @{ runId = 'other-run' }
-    'kind' = @{ kind = 'kbp-casting-qualification' }; 'schema' = @{ schemaVersion = 2 }
+    'kind' = @{ kind = 'kbp-casting-qualification' }; 'schema' = @{ schemaVersion = 1 }
     'execution-mode' = @{ executionMode = 'hybrid' }; 'routine' = @{ routineId = 'short' }
     'plan-digest' = @{ approvedPlanDigest = 'XYZ' }; 'submissions' = @{ maximumNativeSubmissions = 25 }
+    'purpose' = @{ purpose = '' }
 }
 foreach ($case in $classicBindingCases.Keys) {
     $refusal = Get-KbpClassicAllowanceBuildRefusal -AllowanceJson (New-ClassicFixtureJson $classicBindingCases[$case]) `
@@ -365,6 +371,39 @@ foreach ($case in $classicBindingCases.Keys) {
 if ((Get-KbpClassicAllowanceBuildRefusal -AllowanceJson (New-ClassicFixtureJson @{}) -RunId 'classic-bind-test' `
         -BuildManifest $manifestFixture -ExecutionMode 'instant') -cne 'execution-mode-differs') {
     throw 'A classic allowance ran in another casting mode.'
+}
+# Review C5: both allowance kinds bind the profile, its identity and the
+# WORKING save; the launcher checks them against what it resolved before
+# anything is deployed.
+foreach ($fixtureJson in @((New-QualificationFixtureJson @{}), (New-ClassicFixtureJson @{}))) {
+    $bindingCases = [ordered]@{
+        'profile' = @('native-only', ('e' * 64), ('9' * 64))
+        'compatibility-identity' = @('full-user', ('f' * 64), ('9' * 64))
+        'working-save' = @('full-user', ('e' * 64), ('8' * 64))
+    }
+    if ($null -ne (Get-KbpAllowanceFixtureBindingRefusal -AllowanceJson $fixtureJson -ProfileId 'full-user' `
+            -CompatibilityIdentity ('e' * 64) -WorkingSaveSha256 ('9' * 64))) {
+        throw 'A matching allowance fixture binding was refused.'
+    }
+    foreach ($case in $bindingCases.Keys) {
+        $values = $bindingCases[$case]
+        $refusal = Get-KbpAllowanceFixtureBindingRefusal -AllowanceJson $fixtureJson -ProfileId $values[0] `
+            -CompatibilityIdentity $values[1] -WorkingSaveSha256 $values[2]
+        if ($refusal -cne $case) { throw "Allowance fixture binding case $case returned '$refusal'." }
+    }
+    if ((Get-KbpAllowanceFixtureBindingRefusal -AllowanceJson $fixtureJson -ProfileId 'full-user' `
+            -CompatibilityIdentity ('e' * 64) -WorkingSaveSha256 $null) -cne 'working-save') {
+        throw 'An allowance without a resolved WORKING save was accepted.'
+    }
+}
+$bindingAt = $launcherText.IndexOf('Get-KbpAllowanceFixtureBindingRefusal -AllowanceJson $classicAllowanceJson')
+$qualificationBindingAt = $launcherText.IndexOf('Get-KbpAllowanceFixtureBindingRefusal -AllowanceJson $qualificationAllowanceJson')
+$deployAt = $launcherText.IndexOf("-RunId 'runtime-whatif-preflight'")
+$pairAt = $launcherText.IndexOf('Get-KbpDisposableSavePair -Family $FixtureFamily')
+if ($bindingAt -lt 0 -or $qualificationBindingAt -lt 0 -or $pairAt -lt 0 -or $deployAt -lt 0 -or
+    $bindingAt -lt $pairAt -or $qualificationBindingAt -lt $pairAt -or
+    $bindingAt -gt $deployAt -or $qualificationBindingAt -gt $deployAt) {
+    throw 'The launcher does not bind allowances to the resolved profile and save before deploying.'
 }
 # Display modes: a window larger than the session's display is refused; the
 # Unity arguments name exactly the size; the owner's settings add none.

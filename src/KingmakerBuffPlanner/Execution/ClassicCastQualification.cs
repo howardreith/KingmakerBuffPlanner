@@ -144,14 +144,15 @@ namespace KingmakerBuffPlanner.Execution
     }
 
     // The run-bound allowance for one classic cast run (kind
-    // kbp-classic-cast, schema 1): the exact build, fixture campaign,
-    // casting mode, routine and approved plan digest, and a 1..24
-    // submission budget.
+    // kbp-classic-cast, schema 2): the exact build, fixture campaign,
+    // casting mode, routine and approved plan digest, a 1..24 submission
+    // budget, and (schema 2, review C5) the compatibility profile, its
+    // identity, the WORKING save and the purpose.
     public sealed class ClassicCastAllowance
     {
         private ClassicCastAllowance() { }
 
-        public const int AllowanceSchemaVersion = 1;
+        public const int AllowanceSchemaVersion = 2;
 
         public string RunId { get; private set; }
         public string SourceCommit { get; private set; }
@@ -165,12 +166,16 @@ namespace KingmakerBuffPlanner.Execution
         public int MaximumNativeSubmissions { get; private set; }
         public string ApprovedBy { get; private set; }
         public string Authority { get; private set; }
+        public string CompatibilityProfileId { get; private set; }
+        public string CompatibilityIdentity { get; private set; }
+        public string WorkingSaveSha256 { get; private set; }
+        public string Purpose { get; private set; }
 
         private static readonly string[] Members =
         {
             "schemaVersion", "kind", "runId", "sourceCommit", "packageSha256", "dllSha256",
             "assemblyMvid", "fixtureGameId", "executionMode", "routineId", "approvedPlanDigest",
-            "maximumNativeSubmissions", "approvedBy", "authority"
+            "maximumNativeSubmissions", "approvedBy", "authority", "compatibilityProfileId", "compatibilityIdentity", "workingSaveSha256", "purpose"
         };
 
         public static ClassicCastAllowance Parse(string json, string expectedRunId, out string refusal)
@@ -206,7 +211,11 @@ namespace KingmakerBuffPlanner.Execution
                 ApprovedPlanDigest = Text(root, "approvedPlanDigest"),
                 MaximumNativeSubmissions = maximum,
                 ApprovedBy = Text(root, "approvedBy"),
-                Authority = Text(root, "authority")
+                Authority = Text(root, "authority"),
+                CompatibilityProfileId = Text(root, "compatibilityProfileId"),
+                CompatibilityIdentity = Text(root, "compatibilityIdentity"),
+                WorkingSaveSha256 = Text(root, "workingSaveSha256"),
+                Purpose = Text(root, "purpose")
             };
             if (string.IsNullOrEmpty(expectedRunId) ||
                 !string.Equals(allowance.RunId, expectedRunId, StringComparison.Ordinal))
@@ -220,6 +229,9 @@ namespace KingmakerBuffPlanner.Execution
             { refusal = "allowance-artifact-identity"; return null; }
             if (string.IsNullOrEmpty(allowance.FixtureGameId))
             { refusal = "allowance-fixture-missing"; return null; }
+            refusal = AllowanceFixtureBinding.Refusal(allowance.CompatibilityProfileId,
+                allowance.CompatibilityIdentity, allowance.WorkingSaveSha256, allowance.Purpose);
+            if (refusal != null) return null;
             if (allowance.ExecutionMode != "instant" && allowance.ExecutionMode != "animated")
             { refusal = "allowance-execution-mode"; return null; }
             if (allowance.RoutineId != "long" && allowance.RoutineId != "important" &&
