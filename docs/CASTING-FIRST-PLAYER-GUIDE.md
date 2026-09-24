@@ -26,6 +26,38 @@ To switch back, choose **Classic planner** in the same panel. The classic
 plan is exactly as it was; the casting-first plan stays in its own file
 for the next time. The mode cannot be changed while a routine is running.
 
+## Adding and editing castings
+
+**The next casting** (the inspector when no card is selected): choose the
+buff in the grid, then **Cast by** (the caster). If that caster can cast
+the buff in more than one way (the same spell in two spellbooks, or a
+spell and an item), **Cast from** lists each way with the resource it
+spends and its caster level; pick one, or Add is refused. Then choose the
+target (or the group origin and the recipients the group must reach), the
+enhancements, and **If the buff is already there**: skip this casting
+(the default) or cast it again anyway. **Plan settings** holds **Instant
+mode: animate buffs that cannot be instant**: in Instant mode, a buff that
+cannot be cast instantly is cast with its animation when this is on, and
+refused when it is off.
+
+**One existing casting** (press Edit on its card): the inspector edits only
+that casting.
+
+- **Cast by (this casting)** lists every way anyone in the party can cast
+  its buff: the caster and the exact spellbook level, item or ability.
+  Picking one changes the caster and the source together and keeps
+  everything else; enhancements the new caster does not have are dropped
+  (a rod stays with its owner).
+- **Routine and order** moves the casting to another routine (at its end)
+  or one place earlier or later in its own.
+- **If the buff is already there** chooses skip or cast again.
+- Targets, group origin and coverage, enhancements, **Mark Ready**,
+  **Disable** and **Remove**, as before.
+
+An imported casting whose classic plan let the planner pick any caster
+gets its caster here: pick one under **Cast by**, press **Resolve review**,
+then **Mark Ready**. It keeps its place and its import record.
+
 ## How a plan runs
 
 Each saved casting is exactly one cast: one caster, one spell source and
@@ -64,8 +96,8 @@ Nothing is expanded, merged or substituted behind your back.
 - **Casting mode.** The footer button switches between **Animated**
   (native casting animations, the default) and **Instant**. Instant mode
   still uses animated casting where a step needs a native command, or
-  where you allowed the animated fallback. The choice is saved with the
-  plan. It changes only how the game performs the castings, never which
+  where you allowed the animated fallback (**Plan settings**). The choice
+  is saved with the plan. It changes only how the game performs the castings, never which
   castings run, their sources, targets or costs, so switching it does not
   need a new review; the mode in use is shown on the HUD tooltip and
   recorded in the log with every run.
@@ -88,7 +120,11 @@ what this casting would give:
   to expire is always recast).
 
 A weaker, expiring or unprovable existing effect is recast, and the card
-says why. **Always recast** casts regardless. For a group casting the
+says why. **Cast it again anyway** (Always recast) casts regardless. A
+cast counts as done only when this cast put the effect there: a new
+effect, or the old one renewed to a later end. An effect that was already
+there and did not change, or one the game suppresses, never confirms a
+cast; if nothing landed, the routine stops there and says so. For a group casting the
 intended recipients are its required coverage, or everyone it would
 reach when no coverage is required. A casting whose buff is already
 active does not need a free slot, so running a routine again right after
@@ -127,7 +163,9 @@ The classic planner (the default mode) shares the casting code. Its Long
 routine was checked in the game in both casting modes: Resistance cast
 through the at-will class ability, the effect landed, and no spell slot or
 ability pool changed. A classic routine now also stops at the first cast
-that is not confirmed.
+that is not confirmed, and it casts only while the game runs: **APPLY**
+in the open classic planner starts casting once you close the planner
+(the game is paused while it is open), and the planner says so.
 
 ## Files
 
@@ -142,8 +180,13 @@ All player data lives in the mod folder under `UserSettings`:
 | `kbp-casting-<hash>.orig` | Byte-exact archive of the classic plan taken at import |
 
 A plan, review or mode file this version cannot read (for example one
-written by a newer planner) is never overwritten: Save and Accept say that
-it was left unchanged.
+written by a newer planner) is never overwritten. Both planners say so
+when they open: the classic planner shows a new setup and **changes are
+not saved** in its status line, the casting-first planner shows an empty
+plan with saving blocked, and a loaded backup is named as such. Move the
+unreadable file aside to save again. A classic plan saved by version
+0.0.19 or earlier is read and imported as it is (its file is not
+rewritten).
 
 Installing a new version keeps `UserSettings` exactly. Rolling back to an
 older version keeps every file; a casting-first plan the older version

@@ -24,7 +24,13 @@ The PowerShell orchestrator must prove all of the following before live mutation
 - a transaction-owned lock, state file, backup, staged sentinel, and hashes;
 - restoration in `finally`, including byte-for-byte manifest verification.
 
-Unexpected dialogs, account state, cloud conflict, updates, credentials, purchases, unknown saves, ambiguous ownership, or failed restoration stop the harness. It sends no keyboard/mouse input and never force-terminates a process without separate explicit authority.
+Unexpected dialogs, account state, cloud conflict, updates, credentials, purchases, unknown saves, ambiguous ownership, or failed restoration stop the harness.
+
+Protected saves: every save file is hashed before a live run and compared after it, inside this lab's deployment lock (the other lab checks that lock, so it cannot have run in between). A comparison the launcher cannot make stays pending beside the run's transaction and refuses later runs until `scripts\Restore-Local.ps1 -RunId <run>` finishes it. A blocking change (a changed or removed ordinary save, or a new save where the scenario writes none) is reported with every other failure of the run, recorded under `runtime-state\protected-save-violations`, and refuses every later run until the owner has looked at the save folder and run `scripts\Confirm-KbpProtectedSaveReview.ps1 -RunId <run> -ReviewedBy <name> -Note <what was reviewed>`. Automation never runs that script.
+
+Deadlines: a live run ends itself at its `-TimeoutSeconds`, counted from the game's start, less a margin of a tenth (10 to 45 seconds), taking no further cast. At its own deadline the launcher writes `abort.json` into the run's evidence folder, which the game obeys at once, and waits up to 120 seconds for the result before reporting the run as abandoned (its restoration then waits for `Restore-Local.ps1 -RunId <run>`).
+
+A fixture bootstrap or teardown in progress (its `fixture.lock`) refuses a runtime entry, and the fixture script re-checks the deployment lock and the other lab's lease right before it touches the save folder. It sends no keyboard/mouse input and never force-terminates a process without separate explicit authority.
 
 The Steam preflight requires exactly one already-running client at the exact expected path, a current-session logoff occurring no earlier than the last login, an App 640820 `Sync Disabled`/`offlineMode=true` record after the last successful transfer, and the exact fully-installed app manifest/build. Raw account IDs, tokens, and log lines are not copied into evidence. The state is re-evaluated before every launch.
 
