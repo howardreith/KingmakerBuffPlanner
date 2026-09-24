@@ -63,6 +63,21 @@ Independent read-only review of the unpushed work (`45ba833..f7e4b34`,
 | The mixed-coverage notes named recipients by raw unit id | Fixed: the card names the character (every existing-effect note) |
 | Found live in the enhanced runs (`casting-qual-cast-20260924-adv-enh-*`): for Bull's Strength the workspace offered Powerful Change for Constitution, Dexterity, Intelligence and Wisdom too, because an enhancement with an empty spell list read as "any spell" (right for rods, wrong for class features) | Fixed: the focused casting and the draft offer an enhancement exactly when the compiler would accept it for the casting's providers; with no provider to judge, a class feature only for a spell it lists. A test models the live case (Powerful Change for a score no known spell raises is never offered) |
 
+Independent read-only re-review of those fixes before the rc5 freeze
+(`f7e4b34..6c92c61`), five findings, fixed in `6c7d682`:
+
+| Finding | Disposition |
+| --- | --- |
+| A chosen enhancement the casting can no longer take (a rod after switching to a higher-level spell) was hidden, and its chip is the only control that removes it | A chosen enhancement is always listed; only unchosen ones are filtered (draft and focused casting) |
+| Share Transmutation was still offered, though choosing it blocks | An enhancement that changes whom the spell reaches is never offered, only listed while chosen |
+| The draft ignored its pinned spellbook when filtering offers | The draft's pinned spellbook limits the offers, as the compiler does |
+| The content-keyed archive name added 24 characters to paths near the limit | Shortened (`stem.h<16 hex>.orig`) |
+| The partly-present existing-effect note showed a raw id and codes | "partly present on (the character) (will cast)" |
+
+The re-review found the route binding, the always-recorded strategy (projection ids unchanged, saved acceptances still hold), Share in imported classic plans, the focused spellbook filter and the null handling clean.
+
+Mutation after both reviews: 28 C# mutants for the enhanced recipe and the routing fix (22 killed; survivors equivalent or unreachable: an unreachable present-before check, a second check of a successful edit, an equivalent rod guard, the forecast check that earlier rules leave nothing to refuse, and recording the source's own strategy explicitly); 8 for the review fixes and 8 for the offer and re-review fixes, all killed; 6 PowerShell mutants for the staging, profile and recipe guards, all killed with the intended check.
+
 Mutation of the new logic: 31 C# mutants. 28 were killed, after two
 tests were added for real gaps (`48b5402`: a recipient suppressed before
 the cast is not kept coverage; a covered recipient outside the required
