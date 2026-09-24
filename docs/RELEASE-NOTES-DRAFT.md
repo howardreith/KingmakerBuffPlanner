@@ -25,7 +25,9 @@ a player:
   cast put the effect there: a new effect, or the old one renewed to a
   later end, of the buff the spell grants (another effect of the same
   name does not count). An effect that was already there, or one the
-  game suppresses, never confirms a cast. A group casting that would
+  game suppresses, never confirms a cast. The exception is a group
+  casting cast for recipients that lack the buff while others already
+  have a provably good-enough one: those may keep theirs unchanged. A group casting that would
   reach nobody, or whose caster cannot be its origin, is blocked with a
   reason instead of running; a party buff that also reaches pets is
   planned as a party buff.
@@ -184,8 +186,16 @@ the automation party's finite spell levels hold no buff.
   existing instance instead (a buff that does not replace itself, a
   longer-lasting instance already present, a permanent effect), the cast
   is reported as not confirmed and the routine stops there. The default
-  **If the buff is already there: skip this casting** avoids casting over
-  such an instance.
+  **If the buff is already there: skip this casting** avoids that only
+  when every intended recipient's existing effect is provably at least as
+  good, because the casting is then not cast at all. It does not avoid it
+  whenever the casting still casts over an existing instance: one that is
+  weaker, about to expire or not provably as good (for example when the
+  game does not let the planner read its caster level), or any instance
+  under **Always recast**. The one case handled is a group casting that
+  casts because some recipients lack the buff: a recipient whose existing
+  effect was provably good enough may keep it unchanged, and only the
+  others need the effect to land.
 - The classic planner has no press-again-to-stop: a started classic
   routine runs to its end or to its first unconfirmed cast.
 - The wait for a cast's confirmation is counted in game frames.

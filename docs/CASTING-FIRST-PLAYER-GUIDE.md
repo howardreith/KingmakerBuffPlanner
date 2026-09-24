@@ -126,8 +126,10 @@ Each casting has an existing-effect choice. **Skip if already active**
 has the complete effect, and the existing effect is at least as good as
 what this casting would give:
 
-- it is not suppressed;
-- it does not come from a lower caster level than this caster;
+- it is not suppressed, and the game let the planner read that;
+- it does not come from a lower caster level than this caster, with both
+  caster levels readable (an effect whose caster level cannot be read is
+  never assumed to be as strong);
 - it carries every strength-changing metamagic the casting would apply
   (Empower, Maximize, Extend, Heighten; Quicken and Reach do not count);
 - at least half of the duration this casting would give remains. This is
@@ -141,7 +143,18 @@ says why. **Cast it again anyway** (Always recast) casts regardless. A
 cast counts as done only when this cast put the effect there: a new
 effect, or the old one renewed to a later end. An effect that was already
 there and did not change, or one the game suppresses, never confirms a
-cast; if nothing landed, the routine stops there and says so. For a group casting the
+cast; if nothing landed, the routine stops there and says so. Skip if
+already active therefore does not prevent this whenever the casting
+still casts over an existing effect: if the game keeps that effect
+instead of replacing it, the cast is reported as not confirmed.
+
+One case is handled: a group casting that still casts because some of
+its recipients lack the buff, while others already have a provably
+good-enough one (for example a longer-lasting casting from earlier). It
+is cast once for the others, at its usual cost; the card says "already
+active on ... (the cast goes ahead for the others)". Those recipients may
+keep their effect unchanged; every other recipient still needs the effect
+to land. For a group casting the
 intended recipients are its required coverage, or everyone it would
 reach when no coverage is required. A casting whose buff is already
 active does not need a free slot, so running a routine again right after
