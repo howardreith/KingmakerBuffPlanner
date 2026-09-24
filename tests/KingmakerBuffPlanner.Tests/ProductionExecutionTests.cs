@@ -4036,7 +4036,7 @@ namespace KingmakerBuffPlanner.Tests
             string teardown = SourceBlock(root, "private void ReleaseAll()");
             string quick = SourceBlock(root, "private IEnumerator ExecuteQuickRoutine(");
             if (!session.Contains("var runner = new HaltingPlanRunner(executor);") ||
-                !session.Contains("IEnumerator work = runner.Run(preview.Plan, LastExecutionReport);") ||
+                !session.Contains("IEnumerator work = new WorldGatedEnumerator(runner.Run(preview.Plan, LastExecutionReport),") ||
                 session.Contains("executor.Execute(preview.Plan, LastExecutionReport)") ||
                 enable == null || !enable.Contains("_instance.EndClassicRun(\"mod-disabled\");") ||
                 unload == null || !unload.Contains("EndClassicRun(\"area-unloading\");") ||
@@ -4522,7 +4522,9 @@ namespace KingmakerBuffPlanner.Tests
                 new { Name = "other-kind", Before = none,
                     After = new[] { new ObservedEffectInstance(EffectKind.AreaBuff, "buff-a", "4", 500, false) }, Reached = false },
                 new { Name = "old-kept-plus-new", Before = old, After = new[] { old[0], instance("5", 300, false) }, Reached = true },
-                new { Name = "new-suppressed-beside-old", Before = old, After = new[] { old[0], instance("6", 300, true) }, Reached = false }
+                new { Name = "new-suppressed-beside-old", Before = old, After = new[] { old[0], instance("6", 300, true) }, Reached = false },
+                new { Name = "old-buff-with-new-area-instance", Before = old,
+                    After = new[] { old[0], new ObservedEffectInstance(EffectKind.AreaBuff, "buff-a", "7", 900, false) }, Reached = false }
             };
             foreach (var value in cases)
                 if (AppliedEffectJudgement.Reached(expected, value.Before, value.After) != value.Reached)
@@ -4579,6 +4581,13 @@ namespace KingmakerBuffPlanner.Tests
                 !reader.Contains("return AppliedEffectJudgement.AllReached(step.ExpectedRecipientUnitIds,") ||
                 !reader.Contains("catch (Exception) { return true; }"))
                 throw new InvalidOperationException("A live adapter confirms by presence or without its read before submission.");
+            // Re-review: a party effect that also reaches pets is planned as a
+            // party effect, before the pet-only branch.
+            string optionBuilder = source("KingmakerProviderOptionBuilder.cs");
+            int partyAt = optionBuilder.IndexOf("                else if (party)\n", StringComparison.Ordinal);
+            int petAt = optionBuilder.IndexOf("                else if (EffectExpressionTargetAnalysis.Contains(expression, EffectTarget.Pet))", StringComparison.Ordinal);
+            if (partyAt < 0 || petAt < 0 || partyAt > petAt)
+                throw new InvalidOperationException("A party-and-pet effect is planned as pet-only.");
         }
 
         // Final review A1: a Classic routine held by a paused world (or an
@@ -4641,13 +4650,27 @@ namespace KingmakerBuffPlanner.Tests
                 directory = directory.Parent;
             string rootSource = File.ReadAllText(Path.Combine(directory.FullName, "src", "KingmakerBuffPlanner", "UI",
                 "BuffPlannerUiRoot.cs")).Replace("\r\n", "\n");
-            if (!rootSource.Contains("routine = new WorldGatedEnumerator(_session.ExecuteRoutine(routineId,\n                    observedCompletion, readyOnlyExplicit), () => WorldRunsForCasting);"))
-                throw new InvalidOperationException("The Classic run is not gated on the world running.");
-            // A held run tells the open Classic screen why nothing happens yet.
-            if (!rootSource.Contains("if (!waitingNoticeShown && worldGate.HeldFrames > 0 && _screen != null && _screen.IsOpen)") ||
-                !rootSource.Contains("_screen.PresentNotice(QuickExecutionText.WaitingForWorld);") ||
-                !QuickExecutionText.WaitingForWorld.StartsWith("Casting starts when the game runs", StringComparison.Ordinal))
-                throw new InvalidOperationException("A Classic run held by the open screen does not say so.");
+            // Re-review: the session's checks run at the press and only its
+            // casting phase is gated, after it is marked executing; the gate
+            // uses the casting-first host's rule; an accepted run closes the
+            // open Classic screen (a frame later), and a result that arrives
+            // while the screen is closed is shown when it next opens.
+            string sessionSource = File.ReadAllText(Path.Combine(directory.FullName, "src", "KingmakerBuffPlanner", "UI",
+                "PlannerUiSession.cs")).Replace("\r\n", "\n");
+            string controllerSource = File.ReadAllText(Path.Combine(directory.FullName, "src", "KingmakerBuffPlanner", "UI",
+                "BuffPlannerScreenController.cs")).Replace("\r\n", "\n");
+            const string gatedRun = "IEnumerator work = new WorldGatedEnumerator(runner.Run(preview.Plan, LastExecutionReport),\n                worldRuns);";
+            int gatedAt = sessionSource.IndexOf(gatedRun, StringComparison.Ordinal);
+            int executingAt = sessionSource.IndexOf("            IsExecuting = true;\n", StringComparison.Ordinal);
+            if (gatedAt < 0 || executingAt < 0 || executingAt > gatedAt ||
+                !sessionSource.Contains("Func<bool> worldRuns = ClassicWorldRuns ?? (() => true);") ||
+                rootSource.Contains("new WorldGatedEnumerator(_session.ExecuteRoutine(") ||
+                !rootSource.Contains("_session.ClassicWorldRuns = () => WorldRunsForCasting && _castingWorkspace == null &&\n                (_screen == null || !_screen.IsOpen);") ||
+                !rootSource.Contains("if (!closeRequested && _session.IsExecuting && _screen != null && _screen.IsOpen)") ||
+                !rootSource.Contains("                if (_closeScreenForClassicRun)\n                {\n                    _closeScreenForClassicRun = false;") ||
+                !controllerSource.Contains("            else _unshownResult = result;") ||
+                !controllerSource.Contains("                    _view.ShowResult(_unshownResult);"))
+                throw new InvalidOperationException("The Classic run's checks, gate, screen close or result are not where they belong.");
         }
 
         // A cast's confirmation window of three frames: it confirms only if

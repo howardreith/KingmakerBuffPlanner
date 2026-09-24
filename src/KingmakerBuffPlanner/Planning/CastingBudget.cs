@@ -298,11 +298,11 @@ namespace KingmakerBuffPlanner.Planning
                     demand.Category, demand.PoolKey, reservation.Units,
                     reservation.TokenIds, null, reservation.Unlimited));
                 // Final review A4: what a funded casting uses is what it
-                // reserved (a linked prepared pair is two slots), so the
-                // requested and allocated sides of the pool line agree and a
-                // later unfunded casting shows as a real shortage.
-                Record(demand.PoolKey, demand.Category, castingId, reservation.Units,
-                    reservation.Units);
+                // reserved (a linked prepared pair is two slots), never less
+                // than its demand (an unverified zero cost still requests one
+                // unit), so a later unfunded casting shows as a real shortage.
+                Record(demand.PoolKey, demand.Category, castingId,
+                    Math.Max(demand.Units, reservation.Units), reservation.Units);
             }
             foreach (CastingDemand demand in demands)
             {

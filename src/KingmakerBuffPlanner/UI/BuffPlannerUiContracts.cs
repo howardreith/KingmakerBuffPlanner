@@ -609,14 +609,6 @@ namespace KingmakerBuffPlanner.UI
         }
     }
 
-    // Final review A1 follow-up: what the open Classic screen says while a
-    // run it started waits for the game (the screen itself pauses it).
-    public static class QuickExecutionText
-    {
-        public const string WaitingForWorld =
-            "Casting starts when the game runs: close the planner (the game is paused while it is open).";
-    }
-
     public enum QuickExecutionDisposition
     {
         Completed,

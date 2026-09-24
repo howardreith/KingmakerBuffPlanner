@@ -54,6 +54,11 @@ namespace KingmakerBuffPlanner.UI
                     throw new InvalidOperationException("Kingmaker campaign UI is not available.");
                 _view = new BuffPlannerScreenView(StaticCanvas.Instance, _session,
                     _diagnostics, () => Close(), _quickExecute, _quickExecuteReadyOnly);
+                if (_unshownResult != null)
+                {
+                    _view.ShowResult(_unshownResult);
+                    _unshownResult = null;
+                }
                 _readiness.Reset();
                 _validationTick = 0;
                 LastFailure = "candidate-awaiting-deferred-readiness";
@@ -87,14 +92,14 @@ namespace KingmakerBuffPlanner.UI
             return true;
         }
 
+        // A result that arrives while the screen is closed (an accepted run
+        // closes it) is shown the next time the screen opens.
+        private QuickExecutionResult _unshownResult;
+
         internal void Present(QuickExecutionResult result)
         {
             if (_view != null) _view.ShowResult(result);
-        }
-
-        internal void PresentNotice(string text)
-        {
-            if (_view != null) _view.ShowNotice(text);
+            else _unshownResult = result;
         }
 
         internal void Tick()

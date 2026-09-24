@@ -169,10 +169,11 @@ namespace KingmakerBuffPlanner.Persistence
             return archive;
         }
 
-        // The Classic loader's own contract (final review B1): a file the
-        // Classic planner loads is imported, including one written by a
+        // The Classic loader's own reading of the primary Classic file (final
+        // review B1): a file it reads is imported, including one written by a
         // released version with an older schema (0.0.19 wrote schema 4),
-        // migrated in memory only; a file it refuses is not imported. The
+        // migrated in memory only; a file it refuses is not imported, and a
+        // backup it would fall back to is not imported in its place. The
         // Classic file's bytes are never rewritten here.
         private static BuffPlannerProfile JsonConvertDeserialize(
             string json, string campaignId)
