@@ -34,6 +34,15 @@ Done so far (O1 branch, not yet pushed as of this note):
   casting through the workspace's own option; native reads of the
   Arcane Reservoir, every activatable ability of the caster, and the stat
   modifiers each effect instance gives.
+- `163a1bb` casting-first routes an enhanced casting as the classic
+  planner does (found reading the provider's design notes: a plain rule
+  cast never enrols Powerful Change, so Instant castings would have
+  landed unenhanced yet confirmed); `3868c39` the enhanced recipe binds
+  the route that ran; `f66246c` an independent review's findings: Share
+  chosen as an enhancement blocks, archive names never run out, notes
+  name characters; three documented limitations (worn-item enchantments
+  recast, same-routine coverage, the Instant fallback route only logged).
+  Mutants for all of it killed except equivalent or unreachable ones.
 - Live (advanced copy, from checkout `repo/KingmakerBuffPlanner-A1`,
   builds frozen under `runtime-backups/qualification-frozen/`):
   `advanced-inspect-20260924-01` PASS (non-casting; campaign
@@ -54,7 +63,7 @@ installation. Each side takes its own lock (ours
 quiet, and messages before and after a batch; our runs stage frozen copies
 of Gunslinger and BagOfTricks and restore its installed state.
 
-Next: the enhanced selection and casting runs on `9d530bc` (both modes;
+Next: the enhanced selection and casting runs on `f66246c` (both modes;
 C# mutation of the new rules in `repo/KingmakerBuffPlanner-M`), a full
 gate while neither lab runs the game, push, then rc5: freeze, chain
 (Classic regression, zero-cost, import, advanced inspect, finite, group,
