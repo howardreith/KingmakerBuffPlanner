@@ -323,7 +323,12 @@ function Enter-KbpRuntimeTransaction {
         [Parameter(Mandatory = $true)][ValidatePattern('^[A-Za-z0-9._-]{1,100}$')][string]$RunId,
         [switch]$FixtureMode,
         [int[]]$KnownKingmakerProcessIds,
-        $CompatibilityProfile
+        $CompatibilityProfile,
+        # The bounded retry of the two directory moves (a transient sharing
+        # lock on the live Mods folder refused the first move of live run
+        # casting-qual-select-20260924-45bff28-01); tests shorten it.
+        [ValidateRange(1, 20)][int]$MoveAttempts = 10,
+        [ValidateRange(0, 10000)][int]$MoveDelayMilliseconds = 3000
     )
     if ($PSBoundParameters.ContainsKey('KnownKingmakerProcessIds')) {
         Assert-KbpNotRunning -KnownProcessIds $KnownKingmakerProcessIds
@@ -362,6 +367,7 @@ function Enter-KbpRuntimeTransaction {
     New-Item -ItemType Directory -Path $transactionRoot | Out-Null
     New-Item -ItemType Directory -Path $backupRunRoot | Out-Null
     $statePath = Join-Path $transactionRoot 'transaction.json'
+    try {
     $mods = Join-Path $game 'Mods'
     $profileMods = if ($null -eq $CompatibilityProfile) { @() } else { @($CompatibilityProfile.mods) }
     $originalExisted = Test-Path -LiteralPath $mods -PathType Container
@@ -406,6 +412,24 @@ function Enter-KbpRuntimeTransaction {
         activatedAtUtc = $null; restoredAtUtc = $null; restorationFailure = $null
     }
     Write-KbpJsonAtomic $statePath $state
+    }
+    catch {
+        # Before the transaction state exists nothing was moved or staged
+        # (the live Mods was only read): the run's empty directories go and
+        # the lock is released, so a failed read never leaves an unresolved
+        # lock without a record to restore from.
+        $preStateFailure = $_
+        if (-not (Test-Path -LiteralPath $statePath)) {
+            foreach ($owned in @($backupRunRoot, $transactionRoot)) {
+                if ((Test-Path -LiteralPath $owned -PathType Container) -and
+                    @(Get-ChildItem -LiteralPath $owned -Force).Count -eq 0) {
+                    Remove-Item -LiteralPath $owned -Force
+                }
+            }
+            Remove-KbpOwnedLock $lockPath $RunId $token
+        }
+        throw $preStateFailure
+    }
     try {
         $mod = Expand-KbpPackageToStaging -PackagePath $package -StagingRunRoot $stagingRunRoot
         $stagedMods = Join-Path $stagingRunRoot 'Mods'
@@ -435,10 +459,14 @@ function Enter-KbpRuntimeTransaction {
         $state.stagedManifest = @(Get-KbpDirectoryManifest $stagedMods)
         Write-KbpJsonAtomic $statePath $state
 
-        if ($originalExisted) { Move-Item -LiteralPath $mods -Destination $originalBackup }
+        if ($originalExisted) {
+            [void](Move-KbpDirectoryWithRetry -Source $mods -Destination $originalBackup `
+                -Attempts $MoveAttempts -DelayMilliseconds $MoveDelayMilliseconds)
+        }
         $state.status = 'OriginalMoved'
         Write-KbpJsonAtomic $statePath $state
-        Move-Item -LiteralPath $stagedMods -Destination $mods
+        [void](Move-KbpDirectoryWithRetry -Source $stagedMods -Destination $mods `
+            -Attempts $MoveAttempts -DelayMilliseconds $MoveDelayMilliseconds)
         $state.status = 'Active'
         $state.activatedAtUtc = [DateTime]::UtcNow.ToString('o')
         Write-KbpJsonAtomic $statePath $state
@@ -528,9 +556,13 @@ function Restore-KbpRuntimeTransaction {
             $sentinelPath = Join-Path $mods '.kbp-runtime-sentinel.json'
             if (-not (Test-Path -LiteralPath $sentinelPath -PathType Leaf)) {
                 $liveManifest = @(Get-KbpDirectoryManifest $mods)
+                # Prepared included: the original's move can fail after the
+                # staged tree is ready (live run
+                # casting-qual-select-20260924-45bff28-01), leaving the
+                # original in place and no backup.
                 $interruptedBeforeActivation = $state.originalExisted -and
                     -not (Test-Path -LiteralPath $state.originalBackup) -and
-                    $state.status -in @('Preparing', 'RestorationFailed') -and
+                    $state.status -in @('Preparing', 'Prepared', 'RestorationFailed') -and
                     (Test-KbpManifestEqual @($state.originalManifest) $liveManifest)
                 if ($interruptedBeforeActivation) {
                     $preActivationNoOp = $true
