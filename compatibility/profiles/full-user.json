@@ -2,18 +2,19 @@
   "schemaVersion": 1,
   "profileId": "full-user",
   "status": "available",
-  "reason": "Entire installed mod set at 2026-09-19: the known-good configuration the disposable seed was created and human-verified with; staging swaps only KingmakerBuffPlanner to the candidate (single factor).",
+  "reason": "Entire installed mod set at 2026-09-19: the known-good configuration the disposable seed was created and human-verified with; staging swaps only KingmakerBuffPlanner to the candidate (single factor). BagOfTricks resealed 2026-09-24 (owner-approved) at its settings after the owner's advanced-fixture preparation: it rewrites its own Settings.xml at every game exit, so runs stage a frozen exact copy (version, info and assembly unchanged; its resource-altering cheats verified off; provenance beside the copy) and the installed directory is restored byte-exact.",
   "mods": [
     {
       "ummId": "BagOfTricks",
       "directoryName": "BagOfTricks",
       "version": "1.16.4",
       "assemblyName": "BagOfTricks.dll",
+      "fixtureRelativePath": "BagOfTricks-20260924",
       "infoSha256": "891c4a7864d2dd556a4628bcb19a8f6239a2bfbec9399f81e2414badc6de2974",
       "assemblySha256": "d03626594ece0f339aeef03ec7259684af7ddeb8b2edf41936f144848059a0e6",
-      "directoryManifestSha256": "c4487d11b2643a213b777a22cd1a79f5255aae320ca771e43afc7dd06aa2e205",
+      "directoryManifestSha256": "bc3e790b133c36d93f42b0fadbc6df1e1ffbe0c44999aad51f4471983400dac4",
       "fileCount": 40,
-      "totalBytes": 1805725
+      "totalBytes": 1805726
     },
     {
       "ummId": "BetterVendors",

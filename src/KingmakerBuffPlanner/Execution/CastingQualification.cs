@@ -145,7 +145,8 @@ namespace KingmakerBuffPlanner.Execution
         public static bool IsKnownProfile(string profileId)
         {
             return profileId == "native-only" || profileId == "call-of-the-wild" ||
-                profileId == "human-reproduction" || profileId == "full-user";
+                profileId == "human-reproduction" || profileId == "full-user" ||
+                profileId == "advanced-gunslinger-0136";
         }
 
         // Null when the binding is well formed, else the refusal.

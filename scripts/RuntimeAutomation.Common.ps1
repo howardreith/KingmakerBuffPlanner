@@ -97,7 +97,7 @@ function New-KbpRuntimeRequest {
     param(
         [string]$RunId, [string]$EvidenceDirectory, $BuildManifest,
         [int]$TimeoutSeconds, [bool]$ExitAfterCompletion,
-        [ValidateSet('native-only', 'call-of-the-wild', 'human-reproduction', 'full-user')][string]$ProfileId = 'native-only',
+        [ValidateSet('native-only', 'call-of-the-wild', 'human-reproduction', 'full-user', 'advanced-gunslinger-0136')][string]$ProfileId = 'native-only',
         [object[]]$ExpectedOptionalMods = @(), [string[]]$ExpectedBlueprintGuids = @(),
         [hashtable]$Parameters = @{},
         [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'live-ui-bootstrap', 'ui-native-contract-probe', 'final-no-save-core', 'performance-probe', 'launch-render-diagnostic', 'menu-input-diagnostic', 'live-workspace-qual', 'live-workspace-reload', 'live-workspace-import', 'live-workspace-manual', 'live-cast-probe-select', 'live-cast-probe', 'live-advanced-inspect', 'live-cast-qual-select', 'live-cast-qual', 'live-classic-select', 'live-classic-cast', 'live-workspace-physical')][string]$Scenario = 'mod-load-smoke')
@@ -887,7 +887,7 @@ function Get-KbpAllowanceBindingFormatRefusal {
     foreach ($name in @('compatibilityProfileId', 'compatibilityIdentity', 'workingSaveSha256', 'purpose')) {
         if (-not ($Allowance.$name -is [string])) { return "binding-format:$name" }
     }
-    if (@('native-only', 'call-of-the-wild', 'human-reproduction', 'full-user') -cnotcontains $Allowance.compatibilityProfileId) {
+    if (@('native-only', 'call-of-the-wild', 'human-reproduction', 'full-user', 'advanced-gunslinger-0136') -cnotcontains $Allowance.compatibilityProfileId) {
         return 'binding-format:compatibilityProfileId'
     }
     if ($Allowance.compatibilityIdentity -cnotmatch '^[0-9a-f]{64}$') { return 'binding-format:compatibilityIdentity' }

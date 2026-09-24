@@ -1,11 +1,11 @@
 # Advanced seed: the one missing input and its compatibility decision
 
-Status (2026-09-23): **waiting for the owner to designate the seed.** All
-advanced-copy tooling is implemented and tested (guarded bootstrap
-`-Family Advanced`, non-casting `live-advanced-inspect`, the
-`finite-direct-mixed` qualification recipe, and the rule that nothing
-casts on the advanced copy before a complete inspection of the same bound
-pair and compatibility identity).
+Status (2026-09-24): **seed designated and the advanced profile
+registered.** The owner created `KBP_ADVANCED_SEED` as a new, disposable
+*Beneath the Stolen Lands* save (a cleric, a brown-fur transmuter, an
+alchemist with Transfusion and a fighter, prepared for this fixture) under
+Gunslinger 0.0.136, and approved option 1 below. See "Decision" at the end.
+The 2026-09-23 request is kept below unchanged.
 
 ## The input
 
@@ -46,6 +46,39 @@ sync disabled for Kingmaker (`orchestration.json`, `steamSafety`:
 
 This is asked once (owner mission section 9); all other work continues
 meanwhile.
+
+## Decision (2026-09-24)
+
+- **Profile `advanced-gunslinger-0136`** (`compatibility/profiles/`): equal
+  to `full-user` in every entry except Gunslinger, which carries exactly
+  the six values in the table above. A test pins both: the advanced
+  Gunslinger entry to those values, and `full-user` to its exact 0.0.133
+  copy.
+- **Staged from exact copies.** The Gunslinger development session now
+  installs its own builds (0.0.139 on 2026-09-24), so the approved 0.0.136
+  bytes come from an exact external copy
+  (`examples\KingmakerGunslinger-0.0.136`, taken from that lab's
+  pre-deploy snapshot of 08:31 local and verified against all six values
+  before and after copying). Each run stages it in place of the installed
+  Gunslinger and restores the installed directory byte-exact.
+- **BagOfTricks resealed in both profiles** (owner-approved). It rewrites
+  its own `Settings.xml` whenever the game exits, so its identity moved
+  after the owner's preparation and again at the other session's exits.
+  Both profiles now stage one frozen copy (`examples\BagOfTricks-20260924`,
+  `bc3e790b...`, 1805726 bytes; version, info and assembly unchanged). Its
+  provenance records the resource-altering toggles verified off (unlimited
+  casting, metamagic, material components, infinite abilities, instant
+  cooldown, restore after combat, no resource cost, among others) and the
+  spells-per-day multiplier at 1.
+- **One pairing, both ways.** The launcher refuses the advanced copy under
+  any other profile, and the advanced profile with any other fixture,
+  before any save lookup or deployment; the host re-checks the same pairing
+  from the request (`live-save-family-profile`,
+  `advanced-profile-without-advanced-copy`).
+- The two sessions share the installation by lock: this lab's
+  `runtime-state\deployment.lock` and the Gunslinger lab's
+  `compatibility.lock` exclude each other; neither starts while the other's
+  lock or a game is present.
 
 ## What happens next (under the existing mission authority)
 

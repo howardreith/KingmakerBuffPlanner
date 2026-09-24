@@ -280,7 +280,9 @@ try {
     # External exact-copy fixture (owner authorization 2026-09-23): the
     # profile stages a sealed copy from the external fixture root; the
     # owner's installed directory (files and settings) is recorded before
-    # activation and is back byte-exact after restoration.
+    # activation and is back byte-exact after restoration. The copy's own
+    # directory carries its version (two copies of one mod can sit side by
+    # side); it is staged under the profile's directory name.
     $game = Join-Path $root 'game-external-fixture'
     $liveDep = Join-Path $game 'Mods\LiveDep'
     New-Item -ItemType Directory -Path (Join-Path $liveDep 'settings') -Force | Out-Null
@@ -291,7 +293,7 @@ try {
     Set-Content -LiteralPath (Join-Path $liveDep 'LiveDep.dll') -Value 'installed-assembly' -Encoding Ascii
     Set-Content -LiteralPath (Join-Path $liveDep 'settings\Settings.xml') -Value 'owner-settings' -Encoding Ascii
     $externalRoot = Join-Path $root 'external-fixtures'
-    $sealedDep = Join-Path $externalRoot 'LiveDep'
+    $sealedDep = Join-Path $externalRoot 'LiveDep-0.0.133'
     New-Item -ItemType Directory -Path (Join-Path $sealedDep 'data') -Force | Out-Null
     Set-Content -LiteralPath (Join-Path $sealedDep 'info.json') -Value '{"Id":"LiveDep","Version":"0.0.133"}' -Encoding Ascii
     Set-Content -LiteralPath (Join-Path $sealedDep 'LiveDep.dll') -Value 'sealed-assembly' -Encoding Ascii
@@ -302,7 +304,7 @@ try {
         profileId = 'fixture-external'
         mods = @([pscustomobject]@{
             ummId = 'LiveDep'; directoryName = 'LiveDep'; version = '0.0.133'
-            assemblyName = 'LiveDep.dll'; fixtureRelativePath = 'LiveDep'
+            assemblyName = 'LiveDep.dll'; fixtureRelativePath = 'LiveDep-0.0.133'
             infoSha256 = Get-KbpSha256 (Join-Path $sealedDep 'info.json')
             assemblySha256 = Get-KbpSha256 (Join-Path $sealedDep 'LiveDep.dll')
             directoryManifestSha256 = $sealedIdentity.directoryManifestSha256
@@ -348,6 +350,29 @@ try {
     try { Assert-KbpExternallyStagedLiveRestored -State $check -ModsPath (Join-Path $game 'Mods') }
     catch { $refused = $_.Exception.Message -like '*presence changed*' }
     if (-not $refused) { throw 'A vanished installed dependency passed.' }
+    # A profile naming one directory twice is refused before activation
+    # (a second copy would land inside the first), and Mods is back.
+    $game = Join-Path $root 'game-duplicate-fixture'
+    New-Item -ItemType Directory -Path (Join-Path $game 'Mods\Existing') -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $game 'Kingmaker.exe') -Value 'fixture' -Encoding Ascii
+    Set-Content -LiteralPath (Join-Path $game 'Mods\Existing\Info.json') -Value '{"Id":"Existing"}' -Encoding Ascii
+    $duplicateProfile = [pscustomobject]@{ profileId = 'fixture-duplicate'
+        mods = @($externalProfile.mods[0], $externalProfile.mods[0]) }
+    $before = @(Get-KbpDirectoryManifest (Join-Path $game 'Mods'))
+    $duplicateMessage = ''
+    $script:KbpExternalFixtureRoot = $externalRoot
+    try {
+        Enter-KbpRuntimeTransaction -PackagePath $package -KingmakerInstallDir $game `
+            -StateRoot $stateRoot -StagingRoot $stagingRoot -BackupRoot $backupRoot `
+            -RunId 'duplicate-fixture' -FixtureMode -KnownKingmakerProcessIds @() `
+            -CompatibilityProfile $duplicateProfile | Out-Null
+    }
+    catch { $duplicateMessage = $_.Exception.Message }
+    finally { $script:KbpExternalFixtureRoot = $priorExternalRoot }
+    if ($duplicateMessage -notlike '*stages one directory twice*' -or $duplicateMessage -like '*restoration also failed*' -or
+        -not (Test-KbpManifestEqual $before @(Get-KbpDirectoryManifest (Join-Path $game 'Mods')))) {
+        throw "A profile naming one directory twice was not refused cleanly: $duplicateMessage"
+    }
     $passed++
 
     # --- Guarded automation-fixture bootstrap (production script) ---
@@ -1724,6 +1749,73 @@ try {
         $driftRequest = New-KbpRuntimeRequest -RunId ('drift-' + $driftScenario) -EvidenceDirectory 'evidence' `
             -BuildManifest $driftManifest -TimeoutSeconds 60 -ExitAfterCompletion $true -Scenario $driftScenario
         if ($driftRequest.scenario -cne $driftScenario) { throw "Request for $driftScenario was not built." }
+    }
+    $passed++
+    # Profile drift: the launcher and the request accept the same profiles,
+    # exactly the available profiles in the repository, each a known
+    # allowance profile and each passing the real profile contract. The
+    # advanced profile is full-user with only its Gunslinger entry changed,
+    # to the six values the owner approved (mission batch 3, section 5); the
+    # automation profile still stages its exact 0.0.133 copy.
+    $launcherProfiles = @((Get-Command (Join-Path $PSScriptRoot 'Invoke-KingmakerRuntimeTest.ps1')).Parameters['CompatibilityProfileId'].Attributes |
+        Where-Object { $_ -is [System.Management.Automation.ValidateSetAttribute] } |
+        ForEach-Object { $_.ValidValues })
+    $requestProfiles = @((Get-Command New-KbpRuntimeRequest).Parameters['ProfileId'].Attributes |
+        Where-Object { $_ -is [System.Management.Automation.ValidateSetAttribute] } |
+        ForEach-Object { $_.ValidValues })
+    $profileRoot = Join-Path (Get-KbpRepositoryRoot) 'compatibility\profiles'
+    $availableProfiles = @(Get-ChildItem -LiteralPath $profileRoot -Filter '*.json' |
+        ForEach-Object { Read-KbpJson $_.FullName } |
+        Where-Object { [string]$_.status -ceq 'available' } | ForEach-Object { [string]$_.profileId })
+    if ($launcherProfiles.Count -lt 5 -or
+        @(Compare-Object -ReferenceObject $launcherProfiles -DifferenceObject $requestProfiles -CaseSensitive).Count -ne 0 -or
+        @(Compare-Object -ReferenceObject $launcherProfiles -DifferenceObject $availableProfiles -CaseSensitive).Count -ne 0) {
+        throw ('Launcher, request and repository profiles differ: launcher=' + ($launcherProfiles -join ',') +
+            ' request=' + ($requestProfiles -join ',') + ' available=' + ($availableProfiles -join ','))
+    }
+    foreach ($profileId in $launcherProfiles) {
+        $binding = [pscustomobject]@{ compatibilityProfileId = [string]$profileId; compatibilityIdentity = ('e' * 64)
+            workingSaveSha256 = ('9' * 64); purpose = 'profile drift' }
+        if ($null -ne (Get-KbpAllowanceBindingFormatRefusal -Allowance $binding)) {
+            throw "An allowance cannot name the profile $profileId."
+        }
+    }
+    $contractScript = Join-Path $PSScriptRoot 'compatibility\CompatibilityProfile.Common.ps1'
+    $contractIds = ($launcherProfiles -join ',')
+    $ErrorActionPreference = 'Continue'
+    $contractOutput = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -Command (
+        ". '$contractScript'; foreach (`$id in '$contractIds'.Split(',')) { " +
+        "`$p = Get-KbpCompatibilityProfile `$id; Write-Output ('CONTRACT=' + `$p.profileId) }") 2>&1)
+    $ErrorActionPreference = 'Stop'
+    foreach ($profileId in $launcherProfiles) {
+        if (@($contractOutput | Where-Object { "$_" -ceq "CONTRACT=$profileId" }).Count -ne 1) {
+            throw "The profile $profileId fails the profile contract: $($contractOutput -join ' ')"
+        }
+    }
+    $fullUser = Read-KbpJson (Join-Path $profileRoot 'full-user.json')
+    $advancedProfile = Read-KbpJson (Join-Path $profileRoot 'advanced-gunslinger-0136.json')
+    $fullUserMods = @{}
+    foreach ($mod in @($fullUser.mods)) { $fullUserMods[[string]$mod.ummId] = ($mod | ConvertTo-Json -Compress) }
+    $advancedGunslinger = @($advancedProfile.mods | Where-Object { [string]$_.ummId -ceq 'KingmakerGunslinger' })
+    $advancedOthers = @($advancedProfile.mods | Where-Object { [string]$_.ummId -cne 'KingmakerGunslinger' })
+    if (@($advancedProfile.mods).Count -ne @($fullUser.mods).Count -or $advancedGunslinger.Count -ne 1 -or
+        @($advancedOthers | Where-Object { $fullUserMods[[string]$_.ummId] -cne ($_ | ConvertTo-Json -Compress) }).Count -ne 0) {
+        throw 'The advanced profile differs from full-user outside its Gunslinger entry.'
+    }
+    $approved = $advancedGunslinger[0]
+    if ([string]$approved.version -cne '0.0.136' -or
+        [string]$approved.fixtureRelativePath -cne 'KingmakerGunslinger-0.0.136' -or
+        [string]$approved.directoryManifestSha256 -cne 'd08f0d5a2b3c9d9ef4fdc715caee1b76833d4128d97b9de8f8adb622c420e21f' -or
+        [int]$approved.fileCount -ne 238 -or [long]$approved.totalBytes -ne 47128988 -or
+        [string]$approved.assemblySha256 -cne 'c6cccdac914ed59fa4d85d020108588d7d12cfb4ac38cf5a162772bacc9b465c' -or
+        [string]$approved.infoSha256 -cne 'f66de05d5c6282eece8218b6c4f31d49dfc8ef9efa27dfeceeda712034717e17') {
+        throw 'The advanced profile Gunslinger entry is not the owner-approved 0.0.136 identity.'
+    }
+    $automationGunslinger = @($fullUser.mods | Where-Object { [string]$_.ummId -ceq 'KingmakerGunslinger' })
+    if ($automationGunslinger.Count -ne 1 -or [string]$automationGunslinger[0].version -cne '0.0.133' -or
+        [string]$automationGunslinger[0].fixtureRelativePath -cne 'KingmakerGunslinger' -or
+        [string]$automationGunslinger[0].directoryManifestSha256 -cne 'b8e4dd51e70b31bfbcd48744301023d71945114e572d82e52e6d0b4c65ebfb7c') {
+        throw 'The automation profile no longer stages its exact 0.0.133 copy.'
     }
     $passed++
 

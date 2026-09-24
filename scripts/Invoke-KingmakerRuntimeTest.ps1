@@ -1,7 +1,7 @@
 ﻿[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
 param(
     [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'live-ui-bootstrap', 'ui-native-contract-probe', 'final-no-save-core', 'performance-probe', 'launch-render-diagnostic', 'menu-input-diagnostic', 'live-workspace-qual', 'live-workspace-reload', 'live-workspace-import', 'live-workspace-manual', 'live-cast-probe-select', 'live-cast-probe', 'live-advanced-inspect', 'live-cast-qual-select', 'live-cast-qual', 'live-classic-select', 'live-classic-cast', 'live-workspace-physical')][string]$Scenario = 'mod-load-smoke',
-    [ValidateSet('native-only', 'call-of-the-wild', 'human-reproduction', 'full-user')][string]$CompatibilityProfileId = 'native-only',
+    [ValidateSet('native-only', 'call-of-the-wild', 'human-reproduction', 'full-user', 'advanced-gunslinger-0136')][string]$CompatibilityProfileId = 'native-only',
     [ValidateRange(5, 1800)][int]$TimeoutSeconds = 180,
     [ValidateRange(5, 300)][int]$LaunchTimeoutSeconds = 60,
     [ValidateSet('animated', 'instant')][string]$ExecutionMode = 'instant',
@@ -199,6 +199,14 @@ if ($FixtureFamily -ceq 'Advanced' -and $advancedScenarios -cnotcontains $Scenar
     $Scenario -cne 'live-cast-qual') {
     throw ("The advanced copy may only be loaded by the non-casting scenarios (" +
         ($advancedScenarios -join ', ') + ") or an allowance-bound live-cast-qual; refused: $Scenario.")
+}
+# The advanced copy runs only under its own compatibility profile (the
+# Gunslinger 0.0.136 installation its seed was created under), and that
+# profile only with the advanced copy (mission batch 3, section 5): the
+# automation configuration never runs that seed to make a guard pass.
+if (($FixtureFamily -ceq 'Advanced') -ne ($CompatibilityProfileId -ceq 'advanced-gunslinger-0136')) {
+    throw ("The advanced copy runs only with -CompatibilityProfileId advanced-gunslinger-0136, and that " +
+        "profile only with -FixtureFamily Advanced; refused: $FixtureFamily with $CompatibilityProfileId.")
 }
 $compatibilityProfile = Get-KbpCompatibilityProfile $CompatibilityProfileId
 Assert-KbpCompatibilityProfileFixtures -Profile $compatibilityProfile
