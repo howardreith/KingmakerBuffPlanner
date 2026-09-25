@@ -192,7 +192,8 @@ namespace KingmakerBuffPlanner.Planning
             IEnumerable<ResolvedCasting> castings,
             IEnumerable<string> diagnostics,
             IEnumerable<CastingBudgetLine> budgetLines = null,
-            IEnumerable<string> pendingImportNotices = null)
+            IEnumerable<string> pendingImportNotices = null,
+            CastingCapacity capacity = null)
         {
             Castings = new ReadOnlyCollection<ResolvedCasting>(castings.ToList());
             PendingImportNotices = new ReadOnlyCollection<string>(
@@ -200,7 +201,13 @@ namespace KingmakerBuffPlanner.Planning
             Diagnostics = new ReadOnlyCollection<string>(diagnostics.ToList());
             BudgetLines = new ReadOnlyCollection<CastingBudgetLine>(
                 (budgetLines ?? new CastingBudgetLine[0]).ToList());
+            Capacity = capacity;
         }
+
+        // What this plan can still fund after all of its reservations, by
+        // its own ledger rules (null only for a plan not built by the
+        // compiler). The workspace's caster/source counts come from here.
+        public CastingCapacity Capacity { get; private set; }
 
         // Exactly one resolved casting per planned casting, in persisted
         // order. Compilation never adds or removes castings.
@@ -375,7 +382,7 @@ namespace KingmakerBuffPlanner.Planning
             }
             AddDuplicateRequestWarnings(finalized, diagnostics);
             return new ExplicitCastingPlan(finalized, diagnostics, ledger.BuildReport(),
-                document.PendingImportNotices);
+                document.PendingImportNotices, new CastingCapacity(ledger));
         }
 
         private static ResolvedCasting CompileOne(

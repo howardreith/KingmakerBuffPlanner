@@ -210,6 +210,8 @@
     <Compile Include="UI\PlannerSetupModel.cs" />
     <Compile Include="UI\CastingWorkspaceModels.cs" />
     <Compile Include="UI\CastingWorkspaceSession.cs" />
+    <Compile Include="UI\CastingWorkspaceSession.Graph.cs" />
+    <Compile Include="UI\CastingGraphModels.cs" />
     <Compile Include="UI\CastingExecutionHost.cs" />
     <Compile Include="UI\NativeCastingSessionPolicy.cs" />
     <Compile Include="UI\CastingRunPresentation.cs" />
