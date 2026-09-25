@@ -52,7 +52,7 @@ product decision; it is not, by itself, a casting-first regression.
   owner viewed today.
 - **Most likely, not proved from DATA:** the owner ran the published
   `v0.2.0-rc6` alpha (package `f271f3e6…`, DLL `35d6cbb2…`, MVID
-  `4cb12c0d-…`) in its default Classic mode on his own machine (one
+  `4cb12c0d-…`) in its default Classic mode on the owner's own machine (one
   download beyond the publisher's verification). The owner's own UMM log
   line `[KBP-BOOT] Main.Load exited;version=…;commit=…` would pin the exact
   binary; nothing on DATA can.
@@ -84,23 +84,27 @@ Backend preserved: `CastingPlanDocument` (schema 6), `CastingAuthoringService`,
 a read-model/command client; no second writable model, no view-local
 counters, no graph coordinates persisted.
 
+"Source" below means the production session/compiler/ledger (or the
+predicate the live run applies) under the source-only suite; "live" means a
+guarded in-game run on the disposable fixture. No live claim is made yet.
+
 | ID | Scenario | Status |
 | --- | --- | --- |
 | G01 | Screenshot identity | Done (Phase 0 above) |
-| G02 | Buff → caster/source → target creates one casting and one connection | Planned |
-| G03 | Two casters, three targets, edit one only | Planned |
-| G04 | Multiple sources, non-double-counted capacity | Planned |
-| G05 | Spontaneous pool propagation across buffs; delete restores | Planned |
-| G06 | Shared enhancement pool, combined demand, atomic refusal | Planned |
-| G07 | Line/chip opens inspector; Extend / Powerful Change per casting | Planned |
-| G08 | Parallel same caster–target castings stay distinct | Planned |
-| G09 | Group casting: one origin/card, derived branches, missed coverage | Planned |
-| G10 | Hover sweep at 1920x1200 and 1920x1080 | Planned (needs live reproduction first) |
-| G11 | Button states and contrast | Planned |
-| G12 | Save/reload reconstruction | Planned |
-| G13 | Long names, crowded plan | Planned |
-| G14 | Input/lifecycle, no stale listeners | Planned |
-| G15 | No per-frame discovery or rebuild; stable object counts | Planned |
+| G02 | Buff → caster/source → target creates one casting and one connection | Source pass (`graph-buff-caster-target-creates-one-casting`, `graph-selection-and-focus-never-mutate`); live scripted in `live-workspace-qual`, not run |
+| G03 | Two casters, three targets, edit one only | Source pass (`graph-two-casters-three-targets-edit-one`); live scripted, not run |
+| G04 | Multiple sources, non-double-counted capacity | Source pass (`graph-multiple-sources-exact-counts`, `graph-capacity-comes-from-the-plan-ledger`, `graph-capacity-text-says-what-is-left`) |
+| G05 | Spontaneous pool propagation across buffs; delete restores | Source pass (`graph-spontaneous-pool-propagates-across-buffs`) |
+| G06 | Shared enhancement pool, combined demand, atomic refusal | Source pass (`graph-shared-enhancement-pool-blocks-atomically`) |
+| G07 | Line/chip opens inspector; Extend / Powerful Change per casting | Source pass (`graph-enhancement-edits-one-casting-and-budgets`); line corridor + chip focus scripted live, not run |
+| G08 | Parallel same caster–target castings stay distinct | Source pass (`graph-parallel-castings-stay-distinct`) |
+| G09 | Group casting: one origin/card, derived branches, missed coverage | Source pass (`graph-group-casting-one-origin-derived-branches`) |
+| G10 | Hover sweep at 1920x1200 and 1920x1080 | Fix and predicate in source (`planner-controls-own-one-pointer-highlight`, `hover-record-*`); live rc6 reproduction + sweep implemented in `live-workspace-qual`, **not run** (root cause not yet proved live) |
+| G11 | Button states and contrast | Palette source pass (`contrast-ratio-follows-wcag`, `button-palette-readable-in-every-state`); five-state in-game capture implemented, not run |
+| G12 | Save/reload reconstruction | Source pass (`graph-save-reload-reconstructs-connections`, `graph-unresolved-casting-keeps-its-connection`); live `live-workspace-reload`, not run |
+| G13 | Long names, crowded plan | Partial: chip geometry source pass (`graph-layout-chips-never-overlap`); crowded live frame not captured |
+| G14 | Input/lifecycle, no stale listeners | Partial: one planner root + single owner after close/reopen judged live (not run); reload ownership as in rc6 scenario |
+| G15 | No per-frame discovery or rebuild; stable object counts | Partial: the view rebuilds only on construction and commands (no Update/Tick); live object counts recorded (not run) |
 
 ## Checkpoints
 
@@ -124,3 +128,44 @@ counters, no graph coordinates persisted.
   closed without being run.
 - Next: capacity query in the planning layer, graph read model and
   commands in the session (with tests), then the Unity graph view.
+
+### Checkpoint 1 — 2026-09-25, graph workspace in source; live runs waiting
+
+- Branch `claude/casting-graph-ui-correction`; commits since `e8496ee`:
+  `767ca5c` (Phase 0), `5840b74` (capacity, graph read model, commands),
+  `0191a26` (graph view, palette, one pointer highlight, mode labels),
+  `757fc6b` (guarded scenario drives the graph; hover diagnostic).
+  Version string unchanged (`0.2.0-rc6`, the development convention between
+  candidates; no new candidate version before owner acceptance).
+- Source-only: `Source validation: PASS=42 FAIL=0`; `Protocol tests:
+  PASS=360 FAIL=0` (baseline 338; 22 graph/hover tests added, three
+  source-contract tests retargeted to the graph view without dropping an
+  assertion). The harness/WhatIf part of `Test-SourceOnly.ps1` refused to
+  run because Kingmaker was running (the Gunslinger lab's guarded batch,
+  PID 17744) — a correct refusal, rerun pending.
+- Local package from `757fc6b`: `KingmakerBuffPlanner-0.2.0-rc6-local-runtime.zip`
+  `3cb61c50…0618080`, DLL `762acc71…b39d2e2c`, MVID
+  `12536e30-50a9-4338-a7e8-23214d2f5230` (a development build of that
+  commit, not the published rc6). A documentation commit moves HEAD, so the
+  package is rebuilt from the exact HEAD before any guarded run.
+- Real defect found by the new tests and fixed: a material component with
+  zero count did not block a casting (the ledger kept the first observed
+  count); regression test in the graph suite.
+- Hover root cause, current theory (from the installed UnityEngine.UI IL,
+  not yet proved live): a pointer press selects any control whose
+  navigation is not None, and `Selectable.IsHighlighted` ORs in
+  `hasSelection`, so the clicked control stays lit while another is
+  hovered. The fix gives planner controls navigation None. The live
+  scenario reproduces the ghost with only `PlannerUiReproduction` switched
+  on the Classic screen before measuring the fix; until that run passes the
+  cause is a theory. Rejected as primary cause so far: stale rebuilt
+  controls (rebuilds deactivate before destroy and the probe reads active
+  controls only); a canvas-camera mismatch would show as
+  `highlight-not-under-cursor` / `aimed-control-not-topmost` in the sweep.
+- Live runs not started: the Gunslinger lab holds
+  `compatibility-state/compatibility.lock` for its batch and has priority.
+- Next: when the lock is released and no Kingmaker runs, rebuild the
+  package from HEAD, rerun the full source-only gate, then guarded
+  `live-workspace-qual` (default 1920x1200 and `-DisplayMode
+  windowed-1920x1080`) and `live-workspace-reload`; judge frames and
+  `hover-ownership.json`.

@@ -5,7 +5,24 @@ is the top section of `planning/CASTING-FIRST-MIGRATION-STATUS.md`. The
 entries below record past sessions, including temporary orchestration
 notes (watcher and preflight state) that are not product status.
 
-## Casting-graph UI correction started (2026-09-25, LATEST)
+## Casting-graph UI correction: source complete to checkpoint 1 (2026-09-25, LATEST)
+
+- Tracker: `planning/CASTING-GRAPH-UI-CORRECTION-STATUS.md` (G-ledger and
+  checkpoint 1). Branch `claude/casting-graph-ui-correction`, not pushed
+  yet; the draft stacked PR is opened through the guarded push helper.
+- Source gate at `757fc6b`: validation 42/42, protocol 360/360. The
+  harness/WhatIf tests refused while the Gunslinger lab's Kingmaker ran
+  (correct); rerun before any live run.
+- Before a live run: the full read-only reconciliation (no KMG or KBP lock
+  or sentinel, no Kingmaker process, KMG transactions Restored, Mods equal
+  to the owner's baseline, owner's session connected for frame runs), then
+  `Build-Local.ps1` at the exact HEAD, then `Test-SourceOnly.ps1`.
+- Live plan: `live-workspace-qual` (default display, then `-DisplayMode
+  windowed-1920x1080`), `live-workspace-reload`; judge frames and
+  `hover-ownership.json`; then prepare the supervised manual session and
+  stop for the owner's verdict.
+
+## Casting-graph UI correction started (2026-09-25)
 
 - The owner rejected the observed planner screen (a Classic view, proved in
   `planning/CASTING-GRAPH-UI-CORRECTION-STATUS.md`) and adopted the

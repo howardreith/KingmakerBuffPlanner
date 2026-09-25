@@ -11,7 +11,7 @@ This section is the single current status of the casting-first migration.
 Everything below it, and the older status in `AUTONOMOUS-RESUME.md` and
 `planning/DEFINITION-OF-DONE-MATRIX.md`, is history.
 
-- **Owner decision.** On 2026-09-25 the owner opened the planner in his
+- **Owner decision.** On 2026-09-25 the owner opened the planner in their
   normal game at 1920x1200 and rejected the observed experience (a
   four-column buff grid, `Casters: Automatic`, target portrait toggles,
   `Enhancement: None`, `Edit Assignments`, a separate `Assignments &

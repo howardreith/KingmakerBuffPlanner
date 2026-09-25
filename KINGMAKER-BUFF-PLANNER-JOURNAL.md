@@ -1,9 +1,33 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-09-25 casting-graph UI correction: graph workspace and hover diagnostic in source
+
+- Built the addendum's graph workspace on the preserved services: a
+  per-source capacity query simulated on a clone of the plan's own budget
+  ledger (never a view counter, never summed across shared pools), a graph
+  read model and graph commands on `CastingWorkspaceSession`, and a view
+  with catalogue → caster/source lane → castings → targets, wide line
+  corridors and a per-casting inspector.
+- A new test found a real ledger defect: a material component at zero did
+  not block a casting (the first observed count was kept). Fixed with a
+  regression test. Rejected shortcut: asserting the forecast text instead
+  of the refusal.
+- The guarded `live-workspace-qual`/`-reload` interaction now drives the
+  graph's own controls (caster, exact source row, target click). The old
+  target-then-Add sequence no longer exists in the view.
+- Hover: the installed UnityEngine.UI (read from its metadata) keeps a
+  clicked control Highlighted through `hasSelection` when its navigation is
+  not None. The fix (navigation None on planner controls) is in source; the
+  live scenario first reproduces the ghost with only the rc6 switch on the
+  Classic screen, then measures the fix, a real-cursor sweep, five button
+  states and one owner after close/reopen. Not run yet: the Gunslinger lab
+  holds the game.
+- Counts: source validation 42/42, protocol tests 360/360 at `757fc6b`.
+
 ## 2026-09-25 casting-graph UI correction: Phase 0 identity
 
-- The owner rejected the planner screen he saw at 1920x1200. Before
-  touching code, proved which screen it was: every label he reported is
+- The owner rejected the planner screen they saw at 1920x1200. Before
+  touching code, proved which screen it was: every reported label is
   rendered only by Classic view classes in both candidate binaries
   (`git grep` on the frozen rc6 and 0.1.1-rc3 trees), and the casting-first
   workspace renders none of them.
