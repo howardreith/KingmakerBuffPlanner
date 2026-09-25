@@ -557,9 +557,11 @@ namespace KingmakerBuffPlanner.Tests
             var root = new DiscoveryNode(DiscoveryNodeKind.Sequence, "list", new[]
             {
                 new DiscoveryNode(DiscoveryNodeKind.Empty, "null"),
-                new DiscoveryNode(DiscoveryNodeKind.RestorativeAction, "Kingmaker.Fixture.ContextActionRemoveBuff",
+                new DiscoveryNode(DiscoveryNodeKind.RestorativeAction,
+                    "Kingmaker.Fixture.ContextActionRemoveBuff, Assembly-CSharp, Version=0.0.0.0",
                     sourceContract: "restorative-action"),
-                new DiscoveryNode(DiscoveryNodeKind.OffensiveAction, "Kingmaker.Fixture.ContextActionDealDamage",
+                new DiscoveryNode(DiscoveryNodeKind.OffensiveAction,
+                    "Kingmaker.Fixture.ContextActionDealDamage, Assembly-CSharp, Version=0.0.0.0",
                     sourceContract: "offensive-action"),
                 new DiscoveryNode(DiscoveryNodeKind.Unknown, "Custom", sourceContract: "unsupported-action"),
                 EffectNode("buff")
@@ -567,8 +569,10 @@ namespace KingmakerBuffPlanner.Tests
             var sequence = (SequenceEffectExpression)new ActionGraphScanner().Scan(root).Expression;
             List<EmptyEffectExpression> empties = sequence.Children.Take(4).Cast<EmptyEffectExpression>().ToList();
             if (!empties[0].IsNoAction ||
-                empties[1].UnmodeledReason != "restorative-action:Kingmaker.Fixture.ContextActionRemoveBuff" ||
-                empties[2].UnmodeledReason != "offensive-action:Kingmaker.Fixture.ContextActionDealDamage" ||
+                empties[1].UnmodeledReason !=
+                    "restorative-action:Kingmaker.Fixture.ContextActionRemoveBuff, Assembly-CSharp, Version=0.0.0.0" ||
+                empties[2].UnmodeledReason !=
+                    "offensive-action:Kingmaker.Fixture.ContextActionDealDamage, Assembly-CSharp, Version=0.0.0.0" ||
                 empties[3].UnmodeledReason != "unknown-node:Custom" ||
                 new EmptyEffectExpression().IsNoAction ||
                 JsonConvert.SerializeObject(empties[1]) != "{\"expressionType\":\"empty\"}" ||
