@@ -178,14 +178,34 @@ candidate:
 
 A matching source diff alone does not make the new bytes tested.
 
+## Found after the freeze
+
+- **The capability inventory prints an unmodeled action's type as `0`.**
+  The adapter names an action type with its assembly and version
+  (`...ContextActionRemoveBuff, Assembly-CSharp, Version=0.0.0.0`), and the
+  inventory kept what follows the last dot, so rc6's live inventories read
+  `empty!restorative-action:0` where the documents show
+  `empty!restorative-action:ContextActionRemoveBuff`. The category (why
+  the action is unmodeled) is right; only the type name is lost. This is
+  diagnostic text in the evidence; nothing reads it back, and no planner
+  or qualification decision depends on it. The source test used names
+  without the assembly suffix. Fixed on the next-iteration branch
+  (`caea6ea`, local), with the test now using the adapter's own format.
+- **Ability pools with more than one use cannot be qualified on the
+  advanced campaign.** The party's only multi-use pool whose effect is a
+  plain buff is the Cleric's Agile Feet (9 uses a day), and it lasts one
+  round: it would expire between the use, repeat and recast steps. The
+  Mutagen (one use) remains the pool evidence.
+
 ## What is not yet shown
 
 - **Main-campaign-specific behaviour.** The advanced evidence comes from
   a *Beneath the Stolen Lands* fixture the owner built for testing.
 - **Pets** (none in either party), **ability pools with more than one
-  use** (the Cleric's domain powers, inventoried but not cast) and
-  **metamagic spell variants** (no metamagic spell is prepared on either
-  campaign): implemented and source-tested, not proven in the game.
+  use** (the advanced party's only plain one lasts a round; see above)
+  and **metamagic spell variants** (no metamagic spell is prepared on
+  either campaign): implemented and source-tested, not proven in the
+  game.
 - **An actual area transition.** Every exit of both test campaigns writes
   an autosave before leaving (the automation campaign's only exit also
   ends the prologue; both exits of the advanced campaign's *Tenebrous
@@ -221,8 +241,8 @@ A matching source diff alone does not make the new bytes tested.
    that is provably as strong and long (casting-first only; Classic reads
    presence as before). For Classic, the exact-enhancement rule is one
    flag on its steps plus its Classic qualification.
-3. An ability pool with more than one use (the Cleric's domain powers) on
-   the advanced campaign.
+3. An ability pool with more than one use, on a fixture where one lasts
+   longer than a round.
 4. An area transition, only if a test campaign offers an exit that writes
    no save, or after the owner's decision about the autosave setting.
 
