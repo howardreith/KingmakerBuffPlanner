@@ -26,6 +26,15 @@ builds), `RC6-repro` and the G2 gate build. Frozen copy
   and the supervised manual session; the decisions on Classic and
   toggles left on, and on worn-item enchantments; merge, release and
   permanent installation.
+- Armed 2026-09-25 00:10 for at most 12 hours: `scratchpad/rc6_frames.ps1`
+  waits for the owner's session to stay connected for two minutes, then
+  runs the deferred frame runs once (reload, layout 1200, layout 1080 as
+  attempt `-02`, the labelled rehearsal) through `rc6_chain.ps1 -Only`.
+  Status lines `FRAMES ...` in `rc6_chain.status`.
+- Found after the freeze (in the receipt): the inventory prints an
+  unmodeled action's type as `0` (diagnostic text only; fixed on the
+  local next branch, `caea6ea`); multi-use ability pools cannot be
+  qualified on the advanced campaign (the only plain one lasts a round).
 
 ## The next iteration toward rc6 (2026-09-24)
 
