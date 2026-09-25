@@ -1,4 +1,4 @@
-Set-StrictMode -Version Latest
+﻿Set-StrictMode -Version Latest
 
 . (Join-Path $PSScriptRoot 'RuntimeHarness.Common.ps1')
 
@@ -97,10 +97,12 @@ function New-KbpRuntimeRequest {
     param(
         [string]$RunId, [string]$EvidenceDirectory, $BuildManifest,
         [int]$TimeoutSeconds, [bool]$ExitAfterCompletion,
-        [ValidateSet('native-only', 'call-of-the-wild', 'human-reproduction')][string]$ProfileId = 'native-only',
+        [ValidateSet('native-only', 'call-of-the-wild', 'human-reproduction', 'full-user', 'advanced-gunslinger-0136')][string]$ProfileId = 'native-only',
         [object[]]$ExpectedOptionalMods = @(), [string[]]$ExpectedBlueprintGuids = @(),
         [hashtable]$Parameters = @{},
-        [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'live-ui-bootstrap', 'ui-native-contract-probe', 'final-no-save-core', 'performance-probe')][string]$Scenario = 'mod-load-smoke')
+        [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'live-ui-bootstrap', 'ui-native-contract-probe', 'final-no-save-core', 'performance-probe', 'launch-render-diagnostic', 'menu-input-diagnostic', 'live-workspace-qual', 'live-workspace-reload', 'live-workspace-import', 'live-workspace-manual', 'live-cast-probe-select', 'live-cast-probe', 'live-advanced-inspect', 'live-cast-qual-select', 'live-cast-qual', 'live-classic-select', 'live-classic-cast', 'live-workspace-physical')][string]$Scenario = 'mod-load-smoke')
+    # This ValidateSet must equal the launcher's -Scenario set exactly
+    # (Test-RuntimeHarness builds a request for every launcher scenario).
     return [ordered]@{
         schemaVersion = 1
         enabled = $true
@@ -121,8 +123,19 @@ function New-KbpRuntimeRequest {
 }
 
 function Get-KbpDisposableSavePair {
-    $saveRoot = Join-Path $env:USERPROFILE `
-        'AppData\LocalLow\Owlcat Games\Pathfinder Kingmaker\Saved Games'
+    # -Family selects the sealed pair: Automation (default, unchanged) or the
+    # separately approved Advanced copy. -SaveRoot exists for isolated tests;
+    # production always uses the exact Kingmaker save root.
+    param(
+        [ValidateSet('Automation', 'Advanced')][string]$Family = 'Automation',
+        [string]$SaveRoot
+    )
+    $prefix = if ($Family -ceq 'Advanced') { 'KBP_ADVANCED' } else { 'KBP_AUTOMATION' }
+    $baselineLabel = $prefix + '_BASELINE'
+    $workingLabel = $prefix + '_WORKING'
+    $saveRoot = if ([string]::IsNullOrWhiteSpace($SaveRoot)) {
+        Join-Path $env:USERPROFILE 'AppData\LocalLow\Owlcat Games\Pathfinder Kingmaker\Saved Games'
+    } else { $SaveRoot }
     if (-not (Test-Path -LiteralPath $saveRoot -PathType Container)) {
         throw 'The exact Kingmaker save root is unavailable.'
     }
@@ -137,7 +150,7 @@ function Get-KbpDisposableSavePair {
             if ($null -eq $entry) { continue }
             $reader = [IO.StreamReader]::new($entry.Open())
             $header = ($reader.ReadToEnd() | ConvertFrom-Json)
-            if ($header.Name -in @('KBP_AUTOMATION_BASELINE', 'KBP_AUTOMATION_WORKING')) {
+            if ($header.Name -cin @($baselineLabel, $workingLabel)) {
                 $matches += [pscustomobject]@{
                     name = [string]$header.Name; fileName = $file.Name; path = $file.FullName
                     sha256 = Get-KbpSha256 $file.FullName; gameName = [string]$header.GameName
@@ -147,7 +160,7 @@ function Get-KbpDisposableSavePair {
             }
         }
         catch [IO.InvalidDataException] {
-            if ($file.Name -like '*KBP_AUTOMATION_*') {
+            if ($file.Name -like ('*' + $prefix + '_*')) {
                 throw "Authorized disposable save archive is unreadable: $($file.Name)"
             }
             continue
@@ -157,20 +170,227 @@ function Get-KbpDisposableSavePair {
             if ($null -ne $archive) { $archive.Dispose() }
         }
     }
-    $baseline = @($matches | Where-Object name -ceq 'KBP_AUTOMATION_BASELINE')
-    $working = @($matches | Where-Object name -ceq 'KBP_AUTOMATION_WORKING')
+    $baseline = @($matches | Where-Object name -ceq $baselineLabel)
+    $working = @($matches | Where-Object name -ceq $workingLabel)
     if ($baseline.Count -ne 1 -or $working.Count -ne 1) {
         throw "Disposable save ambiguity: baseline=$($baseline.Count); working=$($working.Count)."
     }
-    if ($baseline[0].fileName -notmatch '^Manual_[0-9]+_KBP_AUTOMATION_BASELINE\.zks$' -or
-        $working[0].fileName -notmatch '^Manual_[0-9]+_KBP_AUTOMATION_WORKING\.zks$' -or
+    if ($baseline[0].fileName -cnotmatch ('^Manual_[0-9]+_' + $baselineLabel + '\.zks$') -or
+        $working[0].fileName -cnotmatch ('^Manual_[0-9]+_' + $workingLabel + '\.zks$') -or
         $baseline[0].path -ceq $working[0].path -or
         $baseline[0].gameId -cne $working[0].gameId -or
         $baseline[0].gameName -cne $working[0].gameName -or
         $baseline[0].area -cne $working[0].area) {
         throw 'Disposable save pair descriptors are not exact, distinct, and campaign-correlated.'
     }
-    return [pscustomobject]@{ baseline = $baseline[0]; working = $working[0] }
+    return [pscustomobject]@{ family = $Family; baseline = $baseline[0]; working = $working[0] }
+}
+
+# Protected-save comparison (advanced-copy safeguard): every save-folder
+# file by name, length and SHA-256.
+function Get-KbpSaveFolderSnapshot {
+    param([Parameter(Mandatory = $true)][string]$SaveRoot)
+    if (-not (Test-Path -LiteralPath $SaveRoot -PathType Container)) { throw "Save root is unavailable: $SaveRoot" }
+    $snapshot = [ordered]@{}
+    foreach ($file in @(Get-ChildItem -LiteralPath $SaveRoot -File -Force | Sort-Object Name)) {
+        $snapshot[$file.Name] = [pscustomobject]@{ length = $file.Length; sha256 = Get-KbpSha256 $file.FullName }
+    }
+    return $snapshot
+}
+
+# Returns every violation: a new file (e.g. an autosave or cloud sync), a
+# removed file, or a changed file other than the explicitly allowed ones
+# (the WORKING copy of the run). An empty result means protected saves are
+# byte-identical.
+function Compare-KbpSaveFolderSnapshot {
+    param(
+        [Parameter(Mandatory = $true)]$Before,
+        [Parameter(Mandatory = $true)]$After,
+        [string[]]$AllowedChangedFileNames = @()
+    )
+    $violations = New-Object System.Collections.Generic.List[string]
+    foreach ($name in @($After.Keys)) {
+        if (-not $Before.Contains($name)) { $violations.Add("new:$name"); continue }
+        if ($Before[$name].sha256 -cne $After[$name].sha256 -and
+            $AllowedChangedFileNames -cnotcontains $name) { $violations.Add("changed:$name") }
+    }
+    foreach ($name in @($Before.Keys)) {
+        if (-not $After.Contains($name)) { $violations.Add("removed:$name") }
+    }
+    return ,$violations.ToArray()
+}
+
+# Final review C1/C2: a run's protected-save baseline is kept beside its
+# transaction, not only in the launcher's memory, so a comparison the
+# launcher could not make (the game outlived it, or it was stopped) is
+# finished by Restore-Local.ps1 -RunId; until then the transaction counts as
+# unresolved. A blocking violation is recorded where every later run sees it
+# and blocks them until the owner has reviewed and acknowledged it.
+function Save-KbpProtectedSaveBaseline {
+    param(
+        [Parameter(Mandatory = $true)][string]$TransactionDirectory,
+        [Parameter(Mandatory = $true)][string]$RunId,
+        [Parameter(Mandatory = $true)][string]$Scenario,
+        [Parameter(Mandatory = $true)][string]$FixtureFamily,
+        [Parameter(Mandatory = $true)][string]$WorkingFileName,
+        [Parameter(Mandatory = $true)][string]$SaveRoot,
+        [Parameter(Mandatory = $true)]$Snapshot)
+    $files = @(foreach ($name in @($Snapshot.Keys)) {
+        [ordered]@{ name = [string]$name; length = [long]$Snapshot[$name].length; sha256 = [string]$Snapshot[$name].sha256 }
+    })
+    $path = Join-Path $TransactionDirectory 'protected-saves-before.json'
+    Write-KbpJsonAtomic $path ([ordered]@{
+        schemaVersion = 1; runId = $RunId; scenario = $Scenario; fixtureFamily = $FixtureFamily
+        workingFileName = $WorkingFileName; saveRoot = $SaveRoot; compared = $false; blocking = @()
+        files = $files
+    })
+    return $path
+}
+
+# Compares the saves now with the run's baseline under the run's policy,
+# writes the run's protected-saves.json and, for a blocking violation, the
+# run's violation record under the state root.
+function Invoke-KbpProtectedSaveComparison {
+    param(
+        [Parameter(Mandatory = $true)]$Before,
+        [Parameter(Mandatory = $true)][string]$RunId,
+        [Parameter(Mandatory = $true)][string]$Scenario,
+        [Parameter(Mandatory = $true)][string]$FixtureFamily,
+        [Parameter(Mandatory = $true)][string]$WorkingFileName,
+        [Parameter(Mandatory = $true)][string]$SaveRoot,
+        [Parameter(Mandatory = $true)][string]$EvidenceDirectory,
+        [string]$StateRoot = $script:KbpRuntimeStateRoot)
+    $savePolicy = Get-KbpProtectedSavePolicy -Scenario $Scenario -FixtureFamily $FixtureFamily `
+        -WorkingFileName $WorkingFileName
+    $allowedChanged = @($savePolicy.allowedChanged)
+    $violations = Compare-KbpSaveFolderSnapshot -Before $Before `
+        -After (Get-KbpSaveFolderSnapshot -SaveRoot $SaveRoot) -AllowedChangedFileNames $allowedChanged
+    # A casting qualification writes no save at all (review P3-9): even the
+    # WORKING save and new autosaves count against it.
+    $blocking = @($violations | Where-Object { $_ -notlike 'new:*' -or $savePolicy.newFilesBlocking })
+    if (Test-Path -LiteralPath $EvidenceDirectory -PathType Container) {
+        Write-KbpJsonAtomic (Join-Path $EvidenceDirectory 'protected-saves.json') ([ordered]@{
+            schemaVersion = 1; runId = $RunId; fixtureFamily = $FixtureFamily
+            allowedChanged = @($allowedChanged)
+            violations = @($violations); blocking = @($blocking)
+        })
+    }
+    if ($blocking.Count -ne 0) {
+        $folder = Join-Path $StateRoot 'protected-save-violations'
+        New-Item -ItemType Directory -Path $folder -Force | Out-Null
+        $record = Join-Path $folder ($RunId + '.json')
+        if (-not (Test-Path -LiteralPath $record)) {
+            Write-KbpJsonAtomic $record ([ordered]@{
+                schemaVersion = 1; runId = $RunId; scenario = $Scenario; fixtureFamily = $FixtureFamily
+                blocking = @($blocking); evidenceDirectory = $EvidenceDirectory
+                recordedAtUtc = [DateTime]::UtcNow.ToString('o')
+            })
+        }
+    }
+    return [pscustomobject]@{ violations = @($violations); blocking = @($blocking) }
+}
+
+# Finishes a run's pending comparison from its kept baseline (once: an
+# already compared baseline returns its recorded result). Kingmaker must
+# not run.
+function Complete-KbpProtectedSaveComparison {
+    param(
+        [Parameter(Mandatory = $true)][string]$BaselinePath,
+        [Parameter(Mandatory = $true)][string]$EvidenceDirectory,
+        [string]$StateRoot = $script:KbpRuntimeStateRoot,
+        [int[]]$KnownProcessIds)
+    $baseline = Read-KbpJson $BaselinePath
+    if ([bool]$baseline.compared) {
+        return [pscustomobject]@{ violations = @(); blocking = @($baseline.blocking) }
+    }
+    if ($PSBoundParameters.ContainsKey('KnownProcessIds')) {
+        Assert-KbpNotRunning -KnownProcessIds $KnownProcessIds
+    } else { Assert-KbpNotRunning }
+    $before = [ordered]@{}
+    foreach ($file in @($baseline.files)) {
+        $before[[string]$file.name] = [pscustomobject]@{ length = [long]$file.length; sha256 = [string]$file.sha256 }
+    }
+    $comparison = Invoke-KbpProtectedSaveComparison -Before $before -RunId ([string]$baseline.runId) `
+        -Scenario ([string]$baseline.scenario) -FixtureFamily ([string]$baseline.fixtureFamily) `
+        -WorkingFileName ([string]$baseline.workingFileName) -SaveRoot ([string]$baseline.saveRoot) `
+        -EvidenceDirectory $EvidenceDirectory -StateRoot $StateRoot
+    $baseline.compared = $true
+    $baseline.blocking = @($comparison.blocking)
+    $baseline | Add-Member -NotePropertyName comparedAtUtc -NotePropertyValue ([DateTime]::UtcNow.ToString('o')) -Force
+    Write-KbpJsonAtomic $BaselinePath $baseline
+    return $comparison
+}
+
+# Focused re-review: what the launcher does with the Mods folder at the end
+# of a run, as one tested rule: nothing without a transaction; blocked while
+# the game runs; withheld while a kept protected-save comparison is
+# unfinished (the lock stays until Restore-Local.ps1 -RunId compares);
+# otherwise restored.
+function Get-KbpRestorationDecision {
+    param([bool]$TransactionEntered, [bool]$KingmakerRunning, [bool]$BaselineKept, [bool]$SavesCompared)
+    if (-not $TransactionEntered) { return 'none' }
+    if ($KingmakerRunning) { return 'blocked-running' }
+    if ($BaselineKept -and -not $SavesCompared) { return 'withheld-pending' }
+    return 'restore'
+}
+
+# Whether the run still holds its deployment lock (its own run and token).
+function Test-KbpRunLockHeld {
+    param([Parameter(Mandatory = $true)]$State, [Parameter(Mandatory = $true)][string]$RunId)
+    try {
+        Assert-KbpOwnedLock ([string]$State.lockPath) $RunId ([string]$State.token)
+        return $true
+    }
+    catch { return $false }
+}
+
+# Re-review (harness): a pending comparison whose run's lock was already
+# released can no longer be attributed to that run (another operation may
+# have changed the saves since). It is closed as unverifiable: recorded as a
+# blocking violation for the owner's review, never compared.
+function Close-KbpUnverifiableProtectedSaveComparison {
+    param(
+        [Parameter(Mandatory = $true)][string]$BaselinePath,
+        [Parameter(Mandatory = $true)][string]$Reason,
+        [Parameter(Mandatory = $true)][string]$EvidenceDirectory,
+        [string]$StateRoot = $script:KbpRuntimeStateRoot,
+        # Focused re-review: the run, for a baseline that cannot be read,
+        # and why the comparison could not be made.
+        [string]$RunId,
+        [string]$Detail)
+    try { $baseline = Read-KbpJson $BaselinePath }
+    catch {
+        if ([string]::IsNullOrWhiteSpace($RunId)) { throw }
+        # The unreadable baseline is copied aside first and replaced by the
+        # closed one last, so an interruption leaves it pending (targeted
+        # review).
+        $kept = Join-Path (Split-Path -Parent $BaselinePath) ('protected-saves-before.unreadable-' +
+            [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssZ') + '.json')
+        Copy-Item -LiteralPath $BaselinePath -Destination $kept
+        $baseline = [pscustomobject]@{
+            schemaVersion = 1; runId = $RunId; scenario = 'unknown'; fixtureFamily = 'unknown'
+            workingFileName = ''; saveRoot = ''; compared = $false; blocking = @(); files = @()
+        }
+        $Reason = 'baseline-unreadable'
+    }
+    if ([bool]$baseline.compared) { return @($baseline.blocking) }
+    $blocking = @('unverifiable:' + $Reason)
+    $folder = Join-Path $StateRoot 'protected-save-violations'
+    New-Item -ItemType Directory -Path $folder -Force | Out-Null
+    $record = Join-Path $folder ([string]$baseline.runId + '.json')
+    if (-not (Test-Path -LiteralPath $record)) {
+        Write-KbpJsonAtomic $record ([ordered]@{
+            schemaVersion = 1; runId = [string]$baseline.runId; scenario = [string]$baseline.scenario
+            fixtureFamily = [string]$baseline.fixtureFamily; blocking = $blocking
+            detail = if ([string]::IsNullOrWhiteSpace($Detail)) { $null } else { $Detail }
+            evidenceDirectory = $EvidenceDirectory; recordedAtUtc = [DateTime]::UtcNow.ToString('o')
+        })
+    }
+    $baseline.compared = $true
+    $baseline.blocking = $blocking
+    $baseline | Add-Member -NotePropertyName comparedAtUtc -NotePropertyValue ([DateTime]::UtcNow.ToString('o')) -Force
+    Write-KbpJsonAtomic $BaselinePath $baseline
+    return $blocking
 }
 
 function Wait-KbpNewKingmakerProcess {
@@ -200,8 +420,12 @@ function Assert-KbpRuntimeResult {
         assemblySha256 = [pscustomobject]@{ expected = $BuildManifest.dllSha256; observed = $Result.assemblySha256 }
         gameVersion = [pscustomobject]@{ expected = '2.1.7'; observed = $Result.gameVersion }
         gameExecutableSha256 = [pscustomobject]@{ expected = '94a779c5423199fcb0470bd89884a3b3875dee2072eb1a7b1d7bc8e67accb1a1'; observed = $Result.gameExecutableSha256 }
-        ummVersion = [pscustomobject]@{ expected = '0.32.4.0'; observed = $Result.ummVersion }
-        ummSha256 = [pscustomobject]@{ expected = '1387468bc3af41c50fe51859a3bb7af4922891aa8f13a6187e7a348ceaabfd88'; observed = $Result.ummSha256 }
+        # UMM was updated on this machine from 0.32.4 to 0.33.0 between
+        # missions (2026-09-18); the pin records the verified installed
+        # identity (file version + SHA-256 of UnityModManager.dll) so the
+        # exact-match contract continues against the real environment.
+        ummVersion = [pscustomobject]@{ expected = '0.33.0.0'; observed = $Result.ummVersion }
+        ummSha256 = [pscustomobject]@{ expected = '63e5baf7b1738e4091b5fd17ccb738ecdb4d1dbf246061dfd55dc52835d52691'; observed = $Result.ummSha256 }
         harmonyVersion = [pscustomobject]@{ expected = '1.2.0.1'; observed = $Result.harmonyVersion }
         harmonySha256 = [pscustomobject]@{ expected = 'aa1cd48317254985d8b700cc74953477d1b40c3022ce9aa4c95ed2b8327e1292'; observed = $Result.harmonySha256 }
     }
@@ -214,10 +438,14 @@ function Assert-KbpRuntimeResult {
     if ($mismatches.Count -ne 0) { throw "Runtime result identity/hash mismatch: $($mismatches -join '; ')" }
     if ($Result.status -notin @('PASS', 'FAIL', 'BLOCKED')) { throw 'Runtime result status is invalid.' }
     if (@($Result.assertions).Count -lt 5) { throw 'Runtime result assertion list is incomplete.' }
-    if ([int]$Result.optionalLoadedAssemblyCount -ne @($Request.expectedOptionalMods).Count) {
+    if ($Result.status -ceq 'PASS' -and
+        [int]$Result.optionalLoadedAssemblyCount -ne @($Request.expectedOptionalMods).Count) {
+        # Failure-path results terminate before optional identity evaluation;
+        # the count contract is only asserted for completed runs.
         throw 'Loaded optional assembly count does not match the requested profile.'
     }
-    if ([int]$Result.optionalLoadedUmmEntryCount -ne @($Request.expectedOptionalMods).Count) {
+    if ($Result.status -ceq 'PASS' -and
+        [int]$Result.optionalLoadedUmmEntryCount -ne @($Request.expectedOptionalMods).Count) {
         throw 'Loaded optional UMM entry count does not match the requested profile.'
     }
     if ($Result.status -ceq 'BLOCKED') {
@@ -353,6 +581,26 @@ function Assert-KbpRuntimeResult {
             })
         }
         finally { $bitmap.Dispose() }
+    }
+    if ($Request.scenario -in @('launch-render-diagnostic', 'menu-input-diagnostic') -and
+        $Result.stage -cne 'unhandled-exception') {
+        $menuFramePath = Join-Path $Request.evidenceDirectory 'menu-frame.png'
+        if (-not (Test-Path -LiteralPath $menuFramePath -PathType Leaf) -or
+            [string]::IsNullOrWhiteSpace([string]$Result.menuFrameScreenshotSha256) -or
+            [string]$Result.menuFrameScreenshotSha256 -cne (Get-KbpSha256 $menuFramePath)) {
+            throw 'Menu diagnostic read-pixels screenshot evidence is missing or inconsistent.'
+        }
+        $menuMarkerPath = Join-Path $Request.evidenceDirectory 'menu-render.json'
+        if (-not (Test-Path -LiteralPath $menuMarkerPath -PathType Leaf)) {
+            throw 'Menu diagnostic render marker evidence is missing.'
+        }
+        if ($Request.scenario -ceq 'menu-input-diagnostic' -and [bool]$Result.menuWindowOpened) {
+            $windowFramePath = Join-Path $Request.evidenceDirectory 'menu-saveload-window.png'
+            if (-not (Test-Path -LiteralPath $windowFramePath -PathType Leaf) -or
+                [string]$Result.menuWindowScreenshotSha256 -cne (Get-KbpSha256 $windowFramePath)) {
+                throw 'Menu diagnostic save-load-window screenshot evidence is missing or inconsistent.'
+            }
+        }
     }
     if ($Request.scenario -in @('native-buff-catalog', 'final-no-save-core')) {
         $catalogPath = Join-Path $Request.evidenceDirectory 'native-buff-catalog.json'
@@ -507,5 +755,603 @@ function Assert-KbpRuntimeResult {
             -not [bool]$performance.meetsRequestedMinimum) {
             throw 'Performance profile is incomplete, mismatched, or below its requested minimum.'
         }
+    }
+}
+
+# Review N1: the launcher-side binding of an owner allowance to THIS build.
+# Returns $null when it matches, otherwise the first refusal reason.
+function Get-KbpProbeAllowanceBuildRefusal {
+    param([string]$AllowanceJson, [string]$RunId, $BuildManifest)
+    try { $allowance = $AllowanceJson | ConvertFrom-Json }
+    catch { return 'unreadable' }
+    if ($null -eq $allowance) { return 'unreadable' }
+    $names = @($allowance.PSObject.Properties | ForEach-Object Name)
+    foreach ($required in @('schemaVersion', 'kind', 'runId', 'sourceCommit', 'packageSha256', 'dllSha256',
+            'assemblyMvid', 'maximumNativeSubmissions', 'compatibilityProfileId', 'compatibilityIdentity',
+            'workingSaveSha256', 'purpose')) {
+        if ($names -cnotcontains $required) { return "missing:$required" }
+    }
+    if (-not ($allowance.schemaVersion -is [int] -or $allowance.schemaVersion -is [long]) -or
+        [int]$allowance.schemaVersion -ne 3) { return 'schema' }
+    if ([string]$allowance.kind -cne 'kbp-single-cast-probe') { return 'kind' }
+    if ([string]$allowance.runId -cne $RunId) { return 'run-id' }
+    if ([string]$allowance.sourceCommit -cne [string]$BuildManifest.commit) { return 'commit' }
+    if ([string]$allowance.packageSha256 -cne [string]$BuildManifest.packageSha256) { return 'package' }
+    if ([string]$allowance.dllSha256 -cne [string]$BuildManifest.dllSha256) { return 'dll' }
+    if ([string]$allowance.assemblyMvid -cne [string]$BuildManifest.assemblyMvid) { return 'mvid' }
+    if (-not ($allowance.maximumNativeSubmissions -is [int] -or $allowance.maximumNativeSubmissions -is [long]) -or
+        [int]$allowance.maximumNativeSubmissions -ne 1) { return 'submissions' }
+    $bindingFormat = Get-KbpAllowanceBindingFormatRefusal -Allowance $allowance
+    if ($null -ne $bindingFormat) { return $bindingFormat }
+    return Get-KbpAllowanceShapeRefusal -Allowance $allowance -Kind probe
+}
+
+# Casting-qualification allowance (schema 5) against THIS build, before any
+# deployment: run id, commit, package, DLL, MVID, recipe, casting mode, a
+# 1..24 submission budget and a purpose; its profile, identity and WORKING
+# save are checked by Get-KbpAllowanceFixtureBindingRefusal once they are
+# resolved. The host re-parses it strictly and re-measures the loaded
+# identity; the forecast projections are checked in game.
+function Get-KbpQualificationAllowanceBuildRefusal {
+    # -Recipe (optional): the recipe the launcher was asked for; the
+    # allowance must name the same one. -ExecutionMode (optional): the
+    # casting mode the launcher runs; schema 4 names the one approved.
+    param([string]$AllowanceJson, [string]$RunId, $BuildManifest, [string]$Recipe, [string]$ExecutionMode)
+    try { $allowance = $AllowanceJson | ConvertFrom-Json }
+    catch { return 'unreadable' }
+    if ($null -eq $allowance) { return 'unreadable' }
+    $names = @($allowance.PSObject.Properties | ForEach-Object Name)
+    foreach ($required in @('schemaVersion', 'kind', 'runId', 'sourceCommit', 'packageSha256', 'dllSha256',
+            'assemblyMvid', 'fixtureGameId', 'recipe', 'executionMode', 'approvedProjectionIds',
+            'maximumNativeSubmissions', 'approvedBy', 'authority', 'compatibilityProfileId',
+            'compatibilityIdentity', 'workingSaveSha256', 'purpose')) {
+        if ($names -cnotcontains $required) { return "missing:$required" }
+    }
+    if (-not ($allowance.schemaVersion -is [int] -or $allowance.schemaVersion -is [long]) -or
+        [int]$allowance.schemaVersion -ne 5) { return 'schema' }
+    if ([string]$allowance.kind -cne 'kbp-casting-qualification') { return 'kind' }
+    if ([string]$allowance.runId -cne $RunId) { return 'run-id' }
+    if ([string]$allowance.sourceCommit -cne [string]$BuildManifest.commit) { return 'commit' }
+    if ([string]$allowance.packageSha256 -cne [string]$BuildManifest.packageSha256) { return 'package' }
+    if ([string]$allowance.dllSha256 -cne [string]$BuildManifest.dllSha256) { return 'dll' }
+    if ([string]$allowance.assemblyMvid -cne [string]$BuildManifest.assemblyMvid) { return 'mvid' }
+    if (@('zero-cost-mixed', 'finite-direct-mixed', 'group-mixed', 'enhanced-direct', 'ability-pool-direct', 'rod-extend-direct') -cnotcontains [string]$allowance.recipe) { return 'recipe' }
+    if (-not [string]::IsNullOrEmpty($Recipe) -and [string]$allowance.recipe -cne $Recipe) { return 'recipe-differs' }
+    if (@('instant', 'animated') -cnotcontains [string]$allowance.executionMode) { return 'execution-mode' }
+    if (-not [string]::IsNullOrEmpty($ExecutionMode) -and [string]$allowance.executionMode -cne $ExecutionMode) {
+        return 'execution-mode-differs'
+    }
+    if (-not ($allowance.maximumNativeSubmissions -is [int] -or $allowance.maximumNativeSubmissions -is [long]) -or
+        [int]$allowance.maximumNativeSubmissions -lt 1 -or [int]$allowance.maximumNativeSubmissions -gt 24) {
+        return 'submissions'
+    }
+    $bindingFormat = Get-KbpAllowanceBindingFormatRefusal -Allowance $allowance
+    if ($null -ne $bindingFormat) { return $bindingFormat }
+    return Get-KbpAllowanceShapeRefusal -Allowance $allowance -Kind qualification
+}
+
+# Final review C7: the host parsers' shape rules, checked before anything is
+# deployed so a malformed allowance is refused before launch: exactly the
+# kind's members, a named approver (and authority), a fixture campaign, the
+# approved projection ids (1..8 lowercase SHA-256) or the probe's one
+# projection and its distinct caster, target and source.
+function Get-KbpAllowanceShapeRefusal {
+    param([Parameter(Mandatory = $true)]$Allowance,
+        [Parameter(Mandatory = $true)][ValidateSet('qualification', 'classic', 'probe')][string]$Kind)
+    $members = @{
+        qualification = @('schemaVersion', 'kind', 'runId', 'sourceCommit', 'packageSha256', 'dllSha256',
+            'assemblyMvid', 'fixtureGameId', 'recipe', 'executionMode', 'approvedProjectionIds',
+            'maximumNativeSubmissions', 'approvedBy', 'authority', 'compatibilityProfileId',
+            'compatibilityIdentity', 'workingSaveSha256', 'purpose')
+        classic = @('schemaVersion', 'kind', 'runId', 'sourceCommit', 'packageSha256', 'dllSha256',
+            'assemblyMvid', 'fixtureGameId', 'executionMode', 'routineId', 'approvedPlanDigest',
+            'maximumNativeSubmissions', 'approvedBy', 'authority', 'compatibilityProfileId',
+            'compatibilityIdentity', 'workingSaveSha256', 'purpose')
+        probe = @('schemaVersion', 'kind', 'runId', 'sourceCommit', 'packageSha256', 'dllSha256',
+            'assemblyMvid', 'approvedProjectionId', 'casterUnitId', 'targetUnitId', 'sourceId',
+            'maximumNativeSubmissions', 'approvedBy', 'compatibilityProfileId', 'compatibilityIdentity',
+            'workingSaveSha256', 'purpose')
+    }[$Kind]
+    $names = @($Allowance.PSObject.Properties | ForEach-Object Name)
+    foreach ($name in $names) { if ($members -cnotcontains $name) { return "unknown:$name" } }
+    foreach ($name in $members) { if ($names -cnotcontains $name) { return "missing:$name" } }
+    if (-not ($Allowance.approvedBy -is [string]) -or [string]::IsNullOrEmpty($Allowance.approvedBy)) { return 'approved-by' }
+    if ($Kind -cne 'probe') {
+        if (-not ($Allowance.authority -is [string]) -or [string]::IsNullOrEmpty($Allowance.authority)) { return 'authority' }
+        if (-not ($Allowance.fixtureGameId -is [string]) -or [string]::IsNullOrEmpty($Allowance.fixtureGameId)) { return 'fixture-game-id' }
+    }
+    if ($Kind -ceq 'qualification') {
+        $ids = @($Allowance.approvedProjectionIds)
+        if (-not ($Allowance.approvedProjectionIds -is [array]) -or $ids.Count -lt 1 -or $ids.Count -gt 8 -or
+            @($ids | Where-Object { -not ($_ -is [string]) -or $_ -cnotmatch '^[0-9a-f]{64}$' }).Count -ne 0) {
+            return 'projection-ids'
+        }
+    }
+    if ($Kind -ceq 'probe') {
+        if (-not ($Allowance.approvedProjectionId -is [string]) -or
+            $Allowance.approvedProjectionId -cnotmatch '^[0-9a-f]{64}$') { return 'projection-id' }
+        foreach ($name in @('casterUnitId', 'targetUnitId', 'sourceId')) {
+            if (-not ($Allowance.$name -is [string]) -or [string]::IsNullOrEmpty($Allowance.$name)) { return 'selection' }
+        }
+        if ([string]$Allowance.casterUnitId -ceq [string]$Allowance.targetUnitId) { return 'selection' }
+    }
+    return $null
+}
+
+# The fixture binding's own form, with the host parser's rules (re-review:
+# the launcher must not accept what the host would refuse only after
+# launch): JSON strings, a known profile, lowercase SHA-256 identity and
+# WORKING save, and a purpose of at most 400 characters.
+function Get-KbpAllowanceBindingFormatRefusal {
+    param([Parameter(Mandatory = $true)]$Allowance)
+    foreach ($name in @('compatibilityProfileId', 'compatibilityIdentity', 'workingSaveSha256', 'purpose')) {
+        if (-not ($Allowance.$name -is [string])) { return "binding-format:$name" }
+    }
+    if (@('native-only', 'call-of-the-wild', 'human-reproduction', 'full-user', 'advanced-gunslinger-0136') -cnotcontains $Allowance.compatibilityProfileId) {
+        return 'binding-format:compatibilityProfileId'
+    }
+    if ($Allowance.compatibilityIdentity -cnotmatch '^[0-9a-f]{64}$') { return 'binding-format:compatibilityIdentity' }
+    if ($Allowance.workingSaveSha256 -cnotmatch '^[0-9a-f]{64}$') { return 'binding-format:workingSaveSha256' }
+    if ([string]::IsNullOrWhiteSpace($Allowance.purpose) -or $Allowance.purpose.Length -gt 400) { return 'purpose' }
+    return $null
+}
+
+# Review C6: the launcher's own reading of a PASS run's scenario evidence,
+# independent of the host's verdict. A Classic cast ran exactly the approved
+# plan, once, under its grant; a Classic selection used no grant and ran no
+# Classic routine; a physical workspace run judged exactly the actions this
+# launcher delivered (every request acknowledged, none failed, the typed
+# text the one the host recorded). Other scenarios pass through.
+function Assert-KbpScenarioOutcome {
+    param([Parameter(Mandatory = $true)]$Request)
+    $scenario = [string]$Request.scenario
+    $directory = [string]$Request.evidenceDirectory
+    if ($scenario -ceq 'live-cast-qual-select' -or $scenario -ceq 'live-cast-qual') {
+        $path = Join-Path $directory 'qual-outcome.json'
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw 'Qualification outcome evidence is missing.' }
+        $outcome = Read-KbpJson $path
+        $cast = $scenario -ceq 'live-cast-qual'
+        if ([string]$outcome.runId -cne [string]$Request.runId -or [string]$outcome.scenario -cne $scenario -or
+            [bool]$outcome.castingScenario -ne $cast -or @($outcome.violations).Count -ne 0 -or
+            @($outcome.failures).Count -ne 0 -or $null -eq $outcome.selection -or
+            -not [bool]$outcome.selection.selected -or [string]$outcome.terminalReason -cne 'completed') {
+            throw "Qualification outcome evidence is inconsistent with a PASS: $path"
+        }
+        if (-not $cast) { return }
+        $allowance = [string]$Request.parameters.qualificationAllowance | ConvertFrom-Json
+        $forecastIds = @($outcome.forecast | ForEach-Object { [string]$_.projectionId })
+        if ([string]$outcome.allowanceStatus -cne 'valid' -or
+            ($forecastIds -join ',') -cne (@($allowance.approvedProjectionIds) -join ',') -or
+            [string]$outcome.executionMode -cne [string]$allowance.executionMode -or
+            [int]$outcome.maximumSubmissions -ne [int]$allowance.maximumNativeSubmissions -or
+            [int]$outcome.plannedSubmissions -gt [int]$allowance.maximumNativeSubmissions) {
+            throw "Qualification evidence does not show exactly the approved projections within the budget: $path"
+        }
+        return
+    }
+    # Final review C6: a probe PASS is read by the launcher too. A selection
+    # submits nothing; a cast used a valid allowance, submitted at most once,
+    # exactly the approved projection, from the measured build it was
+    # launched with, and cleaned up.
+    if ($scenario -ceq 'live-cast-probe-select' -or $scenario -ceq 'live-cast-probe') {
+        $path = Join-Path $directory 'probe-outcome.json'
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw 'Probe outcome evidence is missing.' }
+        $outcome = Read-KbpJson $path
+        $cast = $scenario -ceq 'live-cast-probe'
+        $entries = @($outcome.invocation.entries)
+        if ([string]$outcome.runId -cne [string]$Request.runId -or [bool]$outcome.castingScenario -ne $cast -or
+            [string]$outcome.terminalReason -cne 'completed' -or @($outcome.violations).Count -ne 0 -or
+            -not [bool]$outcome.cleanup.recorded -or @($outcome.cleanup.failures).Count -ne 0) {
+            throw "Probe outcome evidence is inconsistent with a PASS: $path"
+        }
+        if (-not $cast) {
+            if ([bool]$outcome.submitted -or $entries.Count -ne 0) { throw "A probe selection submitted a cast: $path" }
+            return
+        }
+        $allowance = [string]$Request.parameters.probeAllowance | ConvertFrom-Json
+        $approved = [string]$allowance.approvedProjectionId
+        $identity = 'commit=' + [string]$Request.expectedCommit + ';package=' + [string]$Request.expectedPackageSha256 +
+            ';dll=' + [string]$Request.expectedDllSha256 + ';mvid=' + [string]$allowance.assemblyMvid
+        $submissions = @($entries | Where-Object { [bool]$_.nativeSubmissionReported }).Count
+        if ([string]$outcome.allowanceStatus -cne 'valid' -or -not [bool]$outcome.submitted -or
+            $submissions -gt 1 -or [string]$outcome.invocation.outcomeProjectionId -cne $approved -or
+            [string]$outcome.submitReason -cne ('probe-submitted:' + $approved) -or
+            [string]$outcome.measuredIdentity -cne $identity) {
+            throw "Probe evidence does not show one submission of the approved projection by the measured build: $path"
+        }
+        return
+    }
+    if ($scenario -ceq 'live-classic-select' -or $scenario -ceq 'live-classic-cast') {
+        $path = Join-Path $directory 'classic-outcome.json'
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw 'Classic outcome evidence is missing.' }
+        $outcome = Read-KbpJson $path
+        $cast = $scenario -ceq 'live-classic-cast'
+        $steps = @($outcome.steps)
+        if ([int]$outcome.schemaVersion -ne 2 -or [string]$outcome.runId -cne [string]$Request.runId -or
+            [string]$outcome.scenario -cne $scenario -or [bool]$outcome.castingScenario -ne $cast -or
+            @($outcome.violations).Count -ne 0 -or @($outcome.failures).Count -ne 0 -or
+            [string]$outcome.planDigest -cnotmatch '^[0-9a-f]{64}$' -or [int]$outcome.planSteps -lt 1 -or
+            [string]$outcome.executionMode -cne [string]$Request.parameters.executionMode -or
+            [bool]$outcome.grantArmedAtEnd -or [int]$outcome.castingFirstRuns -ne 0) {
+            throw "Classic outcome evidence is inconsistent with a PASS: $path"
+        }
+        if (-not $cast) {
+            if ([bool]$outcome.grantConsumed -or [int]$outcome.grantAttempts -ne 0 -or [bool]$outcome.classicRunSeen) {
+                throw 'A Classic selection run used a grant or ran a Classic routine.'
+            }
+            return
+        }
+        $allowance = [string]$Request.parameters.classicAllowance | ConvertFrom-Json
+        if ([string]$outcome.allowanceStatus -cne 'valid' -or
+            [string]$outcome.planDigest -cne [string]$allowance.approvedPlanDigest -or
+            [string]$outcome.executionMode -cne [string]$allowance.executionMode -or
+            [int]$outcome.planSteps -gt [int]$allowance.maximumNativeSubmissions -or
+            -not [bool]$outcome.grantConsumed -or [int]$outcome.grantAttempts -ne 1 -or
+            [string]$outcome.quickDisposition -cne 'Completed' -or $steps.Count -ne [int]$outcome.planSteps -or
+            @($steps | Where-Object { [string]$_.finalStatus -cne 'EffectConfirmed' }).Count -ne 0) {
+            throw "Classic cast evidence does not show exactly the approved plan run once under its grant: $path"
+        }
+        return
+    }
+    if ($scenario -ceq 'live-workspace-physical') {
+        $path = Join-Path $directory 'physical-workspace.json'
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw 'Physical workspace evidence is missing.' }
+        $record = Read-KbpJson $path
+        $expected = @('ws-click-search', 'ws-wheel-grid', 'ws-type-query', 'ws-click-tile',
+            'ws-focus-cycle', 'ws-click-search-again', 'ws-type-more', 'ws-escape')
+        $acknowledged = @($record.acknowledged | ForEach-Object { [string]$_ })
+        if ([string]$record.runId -cne [string]$Request.runId -or @($record.violations).Count -ne 0 -or
+            @($record.failures).Count -ne 0 -or -not [bool]$record.openedPhysically -or
+            ($acknowledged -join ',') -cne ($expected -join ',')) {
+            throw "Physical workspace evidence is inconsistent with a PASS: $path"
+        }
+        $expectedScreen = [string]$Request.parameters.expectedScreen
+        if (-not [string]::IsNullOrEmpty($expectedScreen) -and [string]$record.screen -cne $expectedScreen) {
+            throw "The physical run judged another screen: $($record.screen) (expected $expectedScreen)."
+        }
+        # The launcher's own facts: it sent the planner hotkey, the host did
+        # not fall back to its programmatic open, and every request of the
+        # run is one of the eight judged actions.
+        $orchestration = Read-KbpJson (Join-Path $directory 'orchestration.json')
+        $orchestrationNames = @($orchestration.PSObject.Properties | ForEach-Object Name)
+        if ($orchestrationNames -cnotcontains 'plannerHotkeySentAtUtc' -or
+            [string]::IsNullOrEmpty([string]$orchestration.plannerHotkeySentAtUtc) -or
+            $orchestrationNames -cnotcontains 'kingmakerProcessId' -or
+            (Test-Path -LiteralPath (Join-Path $directory 'programmatic-open.json'))) {
+            throw 'The physical run was not opened through the planner hotkey this launcher sent.'
+        }
+        $requestNames = @(Get-ChildItem -LiteralPath $directory -Filter 'physical-input-*.json' -File |
+            Where-Object { $_.Name -notlike '*.ack.json' } | ForEach-Object Name | Sort-Object)
+        $expectedNames = @($expected | ForEach-Object { 'physical-input-{0}.json' -f $_ } | Sort-Object)
+        if (($requestNames -join ',') -cne ($expectedNames -join ',')) {
+            throw "The physical run requested other actions than the judged eight: $($requestNames -join ',')"
+        }
+        $typed = @{ 'ws-type-query' = [string]$record.query; 'ws-type-more' = [string]$record.querySuffix }
+        foreach ($actionId in $expected) {
+            $requestPath = Join-Path $directory ('physical-input-{0}.json' -f $actionId)
+            $ackPath = Join-Path $directory ('physical-input-{0}.ack.json' -f $actionId)
+            if (-not (Test-Path -LiteralPath $requestPath -PathType Leaf) -or
+                -not (Test-Path -LiteralPath $ackPath -PathType Leaf)) {
+                throw "Physical action $actionId has no request or no acknowledgement."
+            }
+            $sent = Read-KbpJson $requestPath
+            $ack = Read-KbpJson $ackPath
+            $failed = @($ack.PSObject.Properties | ForEach-Object Name) -ccontains 'deliveryFailed' -and [bool]$ack.deliveryFailed
+            if ([string]$sent.runId -cne [string]$Request.runId -or [string]$ack.runId -cne [string]$Request.runId -or
+                [string]$sent.actionId -cne $actionId -or [string]$ack.actionId -cne $actionId -or
+                [string]$ack.action -cne [string]$sent.action -or $failed) {
+                throw "Physical action $actionId was not delivered as the game requested it."
+            }
+            if ([string]$ack.processId -cne [string]$orchestration.kingmakerProcessId) {
+                throw "Physical action $actionId was acknowledged for another process."
+            }
+            if ($typed.ContainsKey($actionId) -and
+                ([string]::IsNullOrEmpty($typed[$actionId]) -or
+                    @($sent.PSObject.Properties | ForEach-Object Name) -cnotcontains 'text' -or
+                    @($ack.PSObject.Properties | ForEach-Object Name) -cnotcontains 'text' -or
+                    [string]$sent.text -cne $typed[$actionId] -or [string]$ack.text -cne $typed[$actionId])) {
+                throw "Physical action $actionId typed text the host did not record."
+            }
+        }
+        foreach ($ackFile in @(Get-ChildItem -LiteralPath $directory -Filter 'physical-input-*.ack.json' -File)) {
+            $ack = Read-KbpJson $ackFile.FullName
+            if (@($ack.PSObject.Properties | ForEach-Object Name) -ccontains 'deliveryFailed' -and [bool]$ack.deliveryFailed) {
+                throw "A physical action failed delivery: $($ackFile.Name)"
+            }
+        }
+        return
+    }
+}
+
+# Review C5: a casting allowance names the compatibility profile, its exact
+# identity digest (the external mod copies) and the WORKING save it was
+# approved for. Checked against the profile and save pair this launcher
+# resolved, before anything is deployed. $null when they match.
+function Get-KbpAllowanceFixtureBindingRefusal {
+    param([string]$AllowanceJson, [string]$ProfileId, [string]$CompatibilityIdentity, [string]$WorkingSaveSha256,
+        # Final review C7: an allowance that names its fixture campaign names
+        # the WORKING save's campaign.
+        [string]$FixtureGameId)
+    try { $allowance = $AllowanceJson | ConvertFrom-Json }
+    catch { return 'unreadable' }
+    if ($null -eq $allowance) { return 'unreadable' }
+    if ([string]::IsNullOrEmpty($ProfileId) -or [string]$allowance.compatibilityProfileId -cne $ProfileId) { return 'profile' }
+    if ([string]::IsNullOrEmpty($CompatibilityIdentity) -or
+        [string]$allowance.compatibilityIdentity -cne $CompatibilityIdentity) { return 'compatibility-identity' }
+    if ([string]::IsNullOrEmpty($WorkingSaveSha256) -or
+        [string]$allowance.workingSaveSha256 -cne $WorkingSaveSha256) { return 'working-save' }
+    if (@($allowance.PSObject.Properties | ForEach-Object Name) -ccontains 'fixtureGameId' -and
+        ([string]::IsNullOrEmpty($FixtureGameId) -or [string]$allowance.fixtureGameId -cne $FixtureGameId)) {
+        return 'fixture-game-id'
+    }
+    return $null
+}
+
+# This session's primary display in physical pixels, measured in a separate
+# DPI-aware process (this process keeps its own, proven DPI context).
+function Get-KbpSessionDisplaySize {
+    $script = 'Add-Type -TypeDefinition ''using System; using System.Runtime.InteropServices; public static class KbpDisplayProbe { [DllImport("user32.dll")] public static extern bool SetProcessDPIAware(); [DllImport("user32.dll")] public static extern int GetSystemMetrics(int index); }''; [void][KbpDisplayProbe]::SetProcessDPIAware(); [string][KbpDisplayProbe]::GetSystemMetrics(0) + ''x'' + [string][KbpDisplayProbe]::GetSystemMetrics(1)'
+    # Encoded: the embedded quotes survive the child command line intact.
+    $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
+    $output = @(& powershell.exe -NoProfile -NonInteractive -EncodedCommand $encoded 2>$null)
+    $size = [string]($output | Select-Object -Last 1)
+    if ($size -notmatch '^[0-9]{3,5}x[0-9]{3,5}$') { throw "The session display size could not be measured: $size" }
+    return $size
+}
+
+# Whether a <width>x<height> window fits the display.
+function Test-KbpDisplayModeSupported {
+    param([Parameter(Mandatory = $true)][string]$Size, [Parameter(Mandatory = $true)][string]$DisplaySize)
+    if ($Size -notmatch '^([0-9]+)x([0-9]+)$') { return $false }
+    $width = [int]$Matches[1]; $height = [int]$Matches[2]
+    if ($DisplaySize -notmatch '^([0-9]+)x([0-9]+)$') { return $false }
+    return $width -le [int]$Matches[1] -and $height -le [int]$Matches[2]
+}
+
+# Unity's own launch arguments for a borderless window of an exact size
+# (none for the owner's settings).
+function Get-KbpDisplayModeArguments {
+    param([string]$Size)
+    if ([string]::IsNullOrEmpty($Size)) { return @() }
+    if ($Size -notmatch '^([0-9]+)x([0-9]+)$') { throw "Display size is invalid: $Size" }
+    return @('-screen-fullscreen', '0', '-popupwindow', '-screen-width', $Matches[1], '-screen-height', $Matches[2])
+}
+
+# The classic cast allowance (kind kbp-classic-cast, schema 2) must name this
+# run, this build, one casting mode (the launcher's), a 1..24 budget and a
+# purpose; its profile, identity and WORKING save are checked by
+# Get-KbpAllowanceFixtureBindingRefusal once they are resolved.
+function Get-KbpClassicAllowanceBuildRefusal {
+    param([string]$AllowanceJson, [string]$RunId, $BuildManifest, [string]$ExecutionMode)
+    try { $allowance = $AllowanceJson | ConvertFrom-Json }
+    catch { return 'unreadable' }
+    if ($null -eq $allowance) { return 'unreadable' }
+    $names = @($allowance.PSObject.Properties | ForEach-Object Name)
+    foreach ($required in @('schemaVersion', 'kind', 'runId', 'sourceCommit', 'packageSha256', 'dllSha256',
+            'assemblyMvid', 'fixtureGameId', 'executionMode', 'routineId', 'approvedPlanDigest',
+            'maximumNativeSubmissions', 'approvedBy', 'authority', 'compatibilityProfileId',
+            'compatibilityIdentity', 'workingSaveSha256', 'purpose')) {
+        if ($names -cnotcontains $required) { return "missing:$required" }
+    }
+    if (-not ($allowance.schemaVersion -is [int] -or $allowance.schemaVersion -is [long]) -or
+        [int]$allowance.schemaVersion -ne 2) { return 'schema' }
+    if ([string]$allowance.kind -cne 'kbp-classic-cast') { return 'kind' }
+    if ([string]$allowance.runId -cne $RunId) { return 'run-id' }
+    if ([string]$allowance.sourceCommit -cne [string]$BuildManifest.commit) { return 'commit' }
+    if ([string]$allowance.packageSha256 -cne [string]$BuildManifest.packageSha256) { return 'package' }
+    if ([string]$allowance.dllSha256 -cne [string]$BuildManifest.dllSha256) { return 'dll' }
+    if ([string]$allowance.assemblyMvid -cne [string]$BuildManifest.assemblyMvid) { return 'mvid' }
+    if (@('instant', 'animated') -cnotcontains [string]$allowance.executionMode) { return 'execution-mode' }
+    if (-not [string]::IsNullOrEmpty($ExecutionMode) -and [string]$allowance.executionMode -cne $ExecutionMode) {
+        return 'execution-mode-differs'
+    }
+    if ([string]$allowance.routineId -cne 'long') { return 'routine' }
+    if ([string]$allowance.approvedPlanDigest -cnotmatch '^[0-9a-f]{64}$') { return 'plan-digest' }
+    if (-not ($allowance.maximumNativeSubmissions -is [int] -or $allowance.maximumNativeSubmissions -is [long]) -or
+        [int]$allowance.maximumNativeSubmissions -lt 1 -or [int]$allowance.maximumNativeSubmissions -gt 24) {
+        return 'submissions'
+    }
+    $bindingFormat = Get-KbpAllowanceBindingFormatRefusal -Allowance $allowance
+    if ($null -ne $bindingFormat) { return $bindingFormat }
+    return Get-KbpAllowanceShapeRefusal -Allowance $allowance -Kind classic
+}
+
+# Advanced-copy binding: the pair found by name must be exactly the pair the
+# guarded bootstrap published - the immutable BASELINE bytes, the same
+# WORKING file and the same campaign - from exactly one completed advanced
+# bootstrap. Any other advanced-named save, a second bootstrap, or a
+# changed BASELINE is refused before anything is deployed or launched.
+function Assert-KbpAdvancedFixtureBinding {
+    param(
+        [Parameter(Mandatory = $true)]$Pair,
+        [string]$FixtureStateRoot = (Join-Path $script:KbpLabRoot 'runtime-fixture-state')
+    )
+    if (-not (Test-Path -LiteralPath $FixtureStateRoot -PathType Container)) {
+        throw 'Advanced fixture binding: the fixture state root is missing.'
+    }
+    $bound = New-Object System.Collections.Generic.List[object]
+    foreach ($runRoot in @(Get-ChildItem -LiteralPath $FixtureStateRoot -Directory -Force)) {
+        $transactionPath = Join-Path $runRoot.FullName 'transaction.json'
+        if (-not (Test-Path -LiteralPath $transactionPath -PathType Leaf)) { continue }
+        $transaction = Read-KbpJson $transactionPath
+        if ([string]$transaction.status -cne 'Completed') { continue }
+        $manifestPath = [string]$transaction.manifestPath
+        if ([string]::IsNullOrWhiteSpace($manifestPath) -or
+            -not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) { continue }
+        $manifest = Read-KbpJson $manifestPath
+        if ([string]$manifest.baseline.fileName -cnotmatch '^Manual_[0-9]+_KBP_ADVANCED_BASELINE\.zks$') { continue }
+        $bound.Add([pscustomobject]@{
+            runId = [string]$transaction.runId; manifestPath = $manifestPath; manifest = $manifest
+        })
+    }
+    if ($bound.Count -ne 1) {
+        throw "Advanced fixture binding requires exactly one completed advanced bootstrap; found $($bound.Count)."
+    }
+    $record = $bound[0]
+    if ([string]$record.manifest.baseline.fileName -cne [string]$Pair.baseline.fileName -or
+        [string]$record.manifest.baseline.sha256 -cne [string]$Pair.baseline.sha256 -or
+        [string]$record.manifest.working.fileName -cne [string]$Pair.working.fileName -or
+        [string]$record.manifest.gameId -cne [string]$Pair.working.gameId -or
+        [string]$record.manifest.gameId -cne [string]$Pair.baseline.gameId) {
+        throw 'The advanced save pair does not match its bootstrap manifest (baseline bytes, file names or campaign).'
+    }
+    return $record
+}
+
+# The identity of a compatibility profile as a run used it: every mod entry
+# (directory, version, directory manifest, file count, bytes) and the
+# profile id, as one SHA-256. Evidence from a run with another identity
+# never qualifies a later run.
+function Get-KbpCompatibilityIdentityDigest {
+    param([Parameter(Mandatory = $true)]$Profile)
+    $lines = @('profile|' + [string]$Profile.profileId) + @(@($Profile.mods) | ForEach-Object {
+        [string]$_.directoryName + '|' + [string]$_.version + '|' + [string]$_.directoryManifestSha256 + '|' +
+            [string]$_.fileCount + '|' + [string]$_.totalBytes
+    } | Sort-Object)
+    $bytes = [Text.UTF8Encoding]::new($false).GetBytes(($lines -join "`n") + "`n")
+    $hasher = [Security.Cryptography.SHA256]::Create()
+    try { return ([BitConverter]::ToString($hasher.ComputeHash($bytes))).Replace('-', '').ToLowerInvariant() }
+    finally { $hasher.Dispose() }
+}
+
+# Review RC3 (mission section 9): nothing casts on the advanced copy before
+# a non-casting inspection of the SAME bound pair has passed its WHOLE
+# lifecycle: game PASS, harness success, owned Kingmaker exit, verified
+# Mods restoration and a clean protected-save comparison, recorded in
+# run-completion.json against the same fixture files and hashes, the same
+# campaign, the same binding manifest and the same compatibility identity.
+# Returns that inspection run id; throws when there is none.
+function Assert-KbpAdvancedInspectionPassed {
+    param(
+        [Parameter(Mandatory = $true)]$Binding,
+        [Parameter(Mandatory = $true)]$Pair,
+        [Parameter(Mandatory = $true)][string]$ProfileId,
+        [Parameter(Mandatory = $true)][string]$CompatibilityIdentity,
+        [string]$EvidenceRoot)
+    if ([string]::IsNullOrWhiteSpace($EvidenceRoot)) { $EvidenceRoot = $script:KbpRuntimeEvidenceRoot }
+    $required = @('schemaVersion', 'runId', 'scenario', 'fixtureFamily', 'profileId', 'compatibilityIdentity',
+        'advancedBindingManifest', 'fixture', 'gameResultStatus', 'harnessSucceeded', 'kingmakerExited',
+        'restorationVerified', 'protectedSavesCompared', 'protectedSavesClean', 'complete')
+    foreach ($directory in @(Get-ChildItem -LiteralPath $EvidenceRoot -Directory -ErrorAction SilentlyContinue |
+            Sort-Object Name)) {
+        $completionPath = Join-Path $directory.FullName 'run-completion.json'
+        if (-not (Test-Path -LiteralPath $completionPath -PathType Leaf)) { continue }
+        try { $completion = Read-KbpJson $completionPath } catch { continue }
+        $names = @($completion.PSObject.Properties | ForEach-Object Name)
+        if (@($required | Where-Object { $names -cnotcontains $_ }).Count -ne 0) { continue }
+        $fixture = $completion.fixture
+        if ($null -eq $fixture) { continue }
+        $fixtureNames = @($fixture.PSObject.Properties | ForEach-Object Name)
+        if (@('baselineFileName', 'baselineSha256', 'workingFileName', 'workingSha256', 'gameId' |
+                Where-Object { $fixtureNames -cnotcontains $_ }).Count -ne 0) { continue }
+        if ([string]$completion.scenario -cne 'live-advanced-inspect' -or
+            [string]$completion.fixtureFamily -cne 'Advanced' -or
+            [string]$completion.runId -cne $directory.Name -or
+            [string]$completion.advancedBindingManifest -cne [string]$Binding.manifestPath -or
+            [string]$completion.profileId -cne $ProfileId -or
+            [string]$completion.compatibilityIdentity -cne $CompatibilityIdentity -or
+            [string]$fixture.baselineFileName -cne [string]$Pair.baseline.fileName -or
+            [string]$fixture.baselineSha256 -cne [string]$Pair.baseline.sha256 -or
+            [string]$fixture.workingFileName -cne [string]$Pair.working.fileName -or
+            [string]$fixture.workingSha256 -cne [string]$Pair.working.sha256 -or
+            [string]$fixture.gameId -cne [string]$Pair.working.gameId) { continue }
+        if ([string]$completion.gameResultStatus -ceq 'PASS' -and [bool]$completion.harnessSucceeded -and
+            [bool]$completion.kingmakerExited -and [bool]$completion.restorationVerified -and
+            [bool]$completion.protectedSavesCompared -and [bool]$completion.protectedSavesClean -and
+            [bool]$completion.complete) {
+            return [string]$completion.runId
+        }
+    }
+    throw 'Casting on the advanced copy requires a completed live-advanced-inspect run (game PASS, owned exit, verified restoration, clean protected saves) of the same bound pair and compatibility identity first.'
+}
+
+# Which save changes a run may make. A casting qualification, its selection
+# run, the native casting probe and every advanced-copy run change no save
+# at all: the inspection must leave the bound WORKING bytes intact, or it
+# could never qualify a later casting run (review of e7c5207..f7726c9,
+# P3-4; f7726c9..1332ed8, P3-J). Other runs may change only the WORKING
+# save. New save files block on the advanced copy and for every native
+# casting run.
+function Get-KbpProtectedSavePolicy {
+    param(
+        [Parameter(Mandatory = $true)][string]$Scenario,
+        [Parameter(Mandatory = $true)][string]$FixtureFamily,
+        [Parameter(Mandatory = $true)][string]$WorkingFileName)
+    # The in-game reload and the first-open import load or read the WORKING
+    # save and must leave it and the save folder untouched as well (review of
+    # 1332ed8..542cd66, P1-2).
+    $strict = $FixtureFamily -ceq 'Advanced' -or
+        @('live-cast-qual', 'live-cast-qual-select', 'live-advanced-inspect', 'live-cast-probe',
+            'live-workspace-reload', 'live-workspace-import', 'live-classic-select',
+            'live-classic-cast', 'live-workspace-physical') -ccontains $Scenario
+    return [pscustomobject]@{
+        allowedChanged = if ($strict) { @() } else { @($WorkingFileName) }
+        newFilesBlocking = $FixtureFamily -ceq 'Advanced' -or
+            @('live-cast-qual', 'live-cast-probe', 'live-workspace-reload', 'live-workspace-import',
+                'live-classic-cast', 'live-workspace-physical') -ccontains $Scenario
+    }
+}
+
+# Review RC3: the whole-run terminal record, written last by the launcher.
+# A run is complete only when the game reported PASS, the harness itself
+# succeeded, Kingmaker exited, the Mods transaction was restored and
+# verified (read from the transaction's own state) and the protected saves
+# were compared clean. Later gates (advanced casting) read only this record.
+function New-KbpRunCompletionRecord {
+    param(
+        [Parameter(Mandatory = $true)][string]$RunId,
+        [Parameter(Mandatory = $true)][string]$Scenario,
+        [Parameter(Mandatory = $true)][string]$FixtureFamily,
+        [Parameter(Mandatory = $true)][string]$ProfileId,
+        [string]$CompatibilityIdentity,
+        [string]$AdvancedBindingManifest,
+        $SavePair,
+        [string]$GameResultStatus,
+        [bool]$HarnessSucceeded,
+        [bool]$KingmakerExited,
+        [string]$TransactionStatePath,
+        # The launcher's own restoration failure (a failed or blocked
+        # Restore-Local); never verified while it is set.
+        [string]$RestoreFailure,
+        [bool]$ProtectedSavesCompared,
+        [string]$ProtectedSaveFailure,
+        # Final review C5: a rehearsal of the manual session says so.
+        [bool]$ManualRehearsal,
+        # Re-review (harness): a scenario without a fixture save compares
+        # no saves; focused re-review: its saves are then recorded as not
+        # known (null), never as clean, and a reported failure still counts.
+        [bool]$ProtectedSavesApplicable = $true)
+    $restored = $false
+    if (-not [string]::IsNullOrWhiteSpace($TransactionStatePath) -and
+        (Test-Path -LiteralPath $TransactionStatePath -PathType Leaf)) {
+        $state = Read-KbpJson $TransactionStatePath
+        $restored = @($state.PSObject.Properties | ForEach-Object Name) -ccontains 'restorationVerified' -and
+            [bool]$state.restorationVerified
+    }
+    if (-not [string]::IsNullOrWhiteSpace($RestoreFailure)) { $restored = $false }
+    $game = if ([string]::IsNullOrWhiteSpace($GameResultStatus)) { 'none' } else { $GameResultStatus }
+    $clean = if ($ProtectedSavesApplicable) { $ProtectedSavesCompared -and [string]::IsNullOrEmpty($ProtectedSaveFailure) }
+        elseif ([string]::IsNullOrEmpty($ProtectedSaveFailure)) { $null } else { $false }
+    $savesSettled = ($clean -eq $true) -or (-not $ProtectedSavesApplicable -and $null -eq $clean)
+    return [ordered]@{
+        schemaVersion = 1; runId = $RunId; scenario = $Scenario; fixtureFamily = $FixtureFamily
+        profileId = $ProfileId
+        compatibilityIdentity = if ([string]::IsNullOrWhiteSpace($CompatibilityIdentity)) { $null } else { $CompatibilityIdentity }
+        advancedBindingManifest = if ([string]::IsNullOrWhiteSpace($AdvancedBindingManifest)) { $null } else { $AdvancedBindingManifest }
+        fixture = if ($null -eq $SavePair) { $null } else { [ordered]@{
+            baselineFileName = [string]$SavePair.baseline.fileName; baselineSha256 = [string]$SavePair.baseline.sha256
+            workingFileName = [string]$SavePair.working.fileName; workingSha256 = [string]$SavePair.working.sha256
+            gameId = [string]$SavePair.working.gameId } }
+        gameResultStatus = $game
+        harnessSucceeded = $HarnessSucceeded
+        kingmakerExited = $KingmakerExited
+        restorationVerified = $restored
+        restorationFailure = if ([string]::IsNullOrWhiteSpace($RestoreFailure)) { $null } else { $RestoreFailure }
+        protectedSavesApplicable = $ProtectedSavesApplicable
+        protectedSavesCompared = $ProtectedSavesCompared
+        protectedSavesClean = $clean
+        manualRehearsal = $ManualRehearsal
+        complete = ($game -ceq 'PASS') -and $HarnessSucceeded -and $KingmakerExited -and $restored -and $savesSettled
+        completedAtUtc = [DateTime]::UtcNow.ToString('o')
     }
 }

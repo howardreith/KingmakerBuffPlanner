@@ -50,6 +50,8 @@ namespace KingmakerBuffPlanner.Planning
             if (routine == null) throw new ArgumentException("Unknown routine.", "routineId");
             var requests = new List<BuffCastRequest>();
             var unsupported = new List<string>();
+            var unresolvable = new List<TargetPlanOutcome>();
+            var animatedFallback = new HashSet<string>(StringComparer.Ordinal);
             var abilitiesBySource = new Dictionary<string, IReadOnlyList<Domain.Identity.AbilityKey>>(StringComparer.Ordinal);
             foreach (SourceAssignmentProfile assignment in routine.Assignments
                 .OrderBy(a => a.SourceId, StringComparer.Ordinal))
@@ -61,6 +63,8 @@ namespace KingmakerBuffPlanner.Planning
                     !EffectExpressionAnalysis.ContainsLeaf(expression))
                 {
                     unsupported.Add(assignment.SourceId);
+                    RecordUnresolvableChildren(assignment, unresolvable,
+                        "source-unresolvable");
                     continue;
                 }
                 CastGroupingKind grouping;
@@ -68,13 +72,27 @@ namespace KingmakerBuffPlanner.Planning
                         expression, out grouping))
                 {
                     unsupported.Add(assignment.SourceId);
+                    RecordUnresolvableChildren(assignment, unresolvable,
+                        "source-graph-unsupported");
                     continue;
                 }
-                requests.Add(new BuffCastRequest(
-                    new BuffSourceDefinition(assignment.SourceId, abilities, expression, grouping),
-                    assignment.WantedTargetUnitIds, assignment.ExistingEffectPolicy,
-                    assignment.IgnoredPresenceMarkers, assignment.SelectedEnhancementIds));
                 abilitiesBySource[assignment.SourceId] = abilities;
+                var definition = new BuffSourceDefinition(assignment.SourceId, abilities, expression, grouping);
+                // Every child casting assignment becomes its own request with
+                // its own identity, pins, ordered targets, and enhancement
+                // selections; requests for one source never overwrite or
+                // conflate each other.
+                foreach (CastingAssignmentProfile casting in assignment.CastingAssignments)
+                {
+                    requests.Add(new BuffCastRequest(definition,
+                        casting.TargetUnitIds, assignment.ExistingEffectPolicy,
+                        assignment.IgnoredPresenceMarkers,
+                        casting.Enhancements.Select(selection =>
+                            new EnhancementRequest(selection.EnhancementId,
+                                selection.IsRequired)),
+                        casting.AssignmentId, casting.CasterUnitId,
+                        casting.ProviderKey, casting.SpellbookGuid, casting.Order));
+                }
             }
             ProviderSelectionPolicy policy = BuildPolicy(profile.ProviderPreferences);
             CastPlan plan = new CastPlanner(targeting).PlanRoutine(snapshot, requests,
@@ -82,11 +100,34 @@ namespace KingmakerBuffPlanner.Planning
             var fallbackProviderAbilities = new HashSet<string>(optionList
                 .Where(o => o.RequiresAnimatedExecution)
                 .Select(o => o.Provider.Key.Ability.Canonical), StringComparer.Ordinal);
-            return new RoutinePlanResult(plan, unsupported, routine.Assignments
-                .Where(a => abilitiesBySource.ContainsKey(a.SourceId) &&
-                    abilitiesBySource[a.SourceId].Any(ability =>
+            foreach (SourceAssignmentProfile assignment in routine.Assignments)
+            {
+                IReadOnlyList<Domain.Identity.AbilityKey> abilities;
+                if (abilitiesBySource.TryGetValue(assignment.SourceId, out abilities) &&
+                    abilities.Any(ability =>
                         fallbackProviderAbilities.Contains(ability.Canonical)))
-                .Select(a => a.SourceId));
+                    animatedFallback.Add(assignment.SourceId);
+            }
+            var completePlan = new CastPlan(plan.Steps, plan.Outcomes,
+                plan.Diagnostics.Concat(unresolvable.Select(request =>
+                    "unresolvable-request:" + request.AssignmentId + ":" +
+                    request.UnitId + ":" + request.Reason)).ToList(),
+                plan.ResourceAllocations, unresolvable);
+            return new RoutinePlanResult(completePlan, unsupported, animatedFallback);
+        }
+
+        // Configured targets beneath an unresolvable source stay visible as
+        // requested-but-unresolvable outcomes with their assignment identity.
+        private static void RecordUnresolvableChildren(
+            SourceAssignmentProfile assignment, List<TargetPlanOutcome> unresolvable,
+            string reason)
+        {
+            foreach (CastingAssignmentProfile casting in assignment.CastingAssignments)
+                foreach (string unitId in casting.TargetUnitIds)
+                    unresolvable.Add(new TargetPlanOutcome(assignment.SourceId,
+                        casting.AssignmentId, unitId,
+                        TargetOutcomeKind.Unfulfilled,
+                        casting.AssignmentId + ":" + reason, new string[0]));
         }
 
         private static IReadOnlyList<Domain.Identity.AbilityKey> ResolveAbilities(

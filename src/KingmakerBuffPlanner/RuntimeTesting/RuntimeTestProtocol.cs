@@ -9,6 +9,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
     internal static class RuntimeTestProtocol
     {
         internal const string ActivationFlag = "-kbpRuntimeTestRequest";
+
+        // The advanced copy's own compatibility profile (mission batch 3,
+        // section 5): the Gunslinger 0.0.136 installation its seed was
+        // created under. The advanced copy loads only under it, and it only
+        // with the advanced copy.
+        internal const string AdvancedProfileId = "advanced-gunslinger-0136";
+
         internal const string EvidenceRoot = @"C:\Dev\KingmakerBuffPlannerLab\runtime-evidence";
 
         internal static RuntimeTestRequest TryRead(string[] arguments, out string rejection)
@@ -77,7 +84,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (!IsSafeIdentifier(request.RunId)) throw new InvalidDataException("run-id");
             if (!IsSafeIdentifier(request.ProfileId) ||
                 (request.ProfileId != "native-only" && request.ProfileId != "call-of-the-wild" &&
-                 request.ProfileId != "human-reproduction"))
+                 request.ProfileId != "human-reproduction" && request.ProfileId != "full-user" &&
+                 request.ProfileId != AdvancedProfileId))
                 throw new InvalidDataException("profile-id");
             if (!IsKnownScenario(request.Scenario))
                 throw new InvalidDataException("scenario");
@@ -90,6 +98,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (request.TimeoutSeconds < 5 || request.TimeoutSeconds > 1800)
                 throw new InvalidDataException("timeout");
             ValidateParameters(request);
+            // A request that stages a save pair has had its family checked
+            // against the profile; any other request under the advanced
+            // profile has no advanced copy to run.
+            if (request.ProfileId == AdvancedProfileId && !request.Parameters.ContainsKey("workingSaveName"))
+                throw new InvalidDataException("advanced-profile-without-advanced-copy");
             if (request.ExpectedOptionalMods == null || request.ExpectedBlueprintGuids == null)
                 throw new InvalidDataException("compatibility-expectations");
             foreach (RuntimeExpectedOptionalMod mod in request.ExpectedOptionalMods)
@@ -103,7 +116,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 throw new InvalidDataException("duplicate-expected-blueprint-guid");
             if ((request.ProfileId == "native-only" && request.ExpectedOptionalMods.Count != 0) ||
                 (request.ProfileId == "call-of-the-wild" && request.ExpectedOptionalMods.Count != 1) ||
-                (request.ProfileId == "human-reproduction" && request.ExpectedOptionalMods.Count != 4))
+                (request.ProfileId == "human-reproduction" && request.ExpectedOptionalMods.Count != 3) ||
+                (request.ProfileId == "full-user" && request.ExpectedOptionalMods.Count != 15) ||
+                (request.ProfileId == AdvancedProfileId && request.ExpectedOptionalMods.Count != 15))
                 throw new InvalidDataException("profile-mod-expectation");
             if ((request.ProfileId == "native-only" && request.ExpectedBlueprintGuids.Count != 0) ||
                 (request.ProfileId == "call-of-the-wild" && request.ExpectedBlueprintGuids.Count < 3))
@@ -142,6 +157,19 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             return true;
         }
 
+        // "<width>x<height>", each 640..7680.
+        internal static bool IsScreenSize(string value)
+        {
+            if (string.IsNullOrEmpty(value)) return false;
+            string[] parts = value.Split('x');
+            int width;
+            int height;
+            return parts.Length == 2 && parts[0].Length <= 4 && parts[1].Length <= 4 &&
+                parts[0].All(char.IsDigit) && parts[1].All(char.IsDigit) &&
+                int.TryParse(parts[0], out width) && int.TryParse(parts[1], out height) &&
+                width >= 640 && width <= 7680 && height >= 480 && height <= 4320;
+        }
+
         private static bool IsSha256(string value)
         {
             if (string.IsNullOrWhiteSpace(value) || value.Length != 64) return false;
@@ -175,8 +203,218 @@ namespace KingmakerBuffPlanner.RuntimeTesting
 
         internal static bool IsLiveUiScenario(string scenario)
         {
-            return string.Equals(scenario, "live-ui-bootstrap", StringComparison.Ordinal);
+            return string.Equals(scenario, "live-ui-bootstrap", StringComparison.Ordinal) ||
+                IsWorkspaceScenario(scenario);
         }
+
+        internal static bool IsWorkspaceScenario(string scenario)
+        {
+            return string.Equals(scenario, "live-workspace-qual",
+                StringComparison.Ordinal) ||
+                IsReloadScenario(scenario) ||
+                IsImportScenario(scenario) ||
+                IsManualWorkspaceScenario(scenario) ||
+                IsProbeScenario(scenario) ||
+                IsInspectionScenario(scenario) ||
+                IsQualificationScenario(scenario) ||
+                IsClassicCastScenario(scenario) ||
+                IsPhysicalWorkspaceScenario(scenario);
+        }
+
+        // Physical input in the casting-first workspace (mission batch 3,
+        // section 10): the workspace opens through the physical planner
+        // hotkey like live-workspace-qual; then search typing, the wheel, a
+        // press target, a focus loss of the game window and Escape are all
+        // delivered by the operating system's input, never by callbacks.
+        // Nothing is authored, saved or cast. An optional expectedScreen
+        // ("<width>x<height>") names the resolution the launcher requested.
+        internal static bool IsPhysicalWorkspaceScenario(string scenario)
+        {
+            return string.Equals(scenario, "live-workspace-physical", StringComparison.Ordinal);
+        }
+
+        // The workspace scenario plus an in-game reload (mission section 8,
+        // save/reload): after the saved close and reopen, the planner is
+        // closed, the exact WORKING save is loaded again through the game's
+        // own Game.LoadGame under the guarded read-only loader, and the
+        // reopened planner must show the saved plan for the same campaign
+        // with one event subscription, one HUD root and no casting run.
+        internal static bool IsReloadScenario(string scenario)
+        {
+            return string.Equals(scenario, "live-workspace-reload", StringComparison.Ordinal);
+        }
+
+        // First-open import in game (mission section 11): before the first
+        // open the host writes a classic plan for the loaded campaign from
+        // live discovery; the first open must import it through the
+        // production migration (never modifying it, archiving it byte-exact,
+        // making nothing Ready on its own). No synthetic input; automation
+        // family only.
+        internal static bool IsImportScenario(string scenario)
+        {
+            return string.Equals(scenario, "live-workspace-import", StringComparison.Ordinal);
+        }
+
+        // Guarded casting qualification through the PRODUCTION path.
+        // "live-cast-qual-select" selects the recipe and forecasts every
+        // step projection without constructing any boundary;
+        // "live-cast-qual" additionally requires the run-bound schema-3
+        // allowance (qualificationAllowance parameter) naming exactly those
+        // projections, and is the only other path that can submit casts.
+        internal static bool IsQualificationScenario(string scenario)
+        {
+            return string.Equals(scenario, "live-cast-qual-select", StringComparison.Ordinal) ||
+                IsCastingQualificationScenario(scenario);
+        }
+
+        internal static bool IsCastingQualificationScenario(string scenario)
+        {
+            return string.Equals(scenario, "live-cast-qual", StringComparison.Ordinal);
+        }
+
+        internal const int QualificationRunDeadlineSeconds = 240;
+
+        // Final review C3: a live run is bounded by the launcher's own
+        // TimeoutSeconds, counted from the game's start, less a margin in
+        // which the host ends the run and publishes its result (a tenth of
+        // the timeout, 10 to 45 seconds); the launcher's abort marker,
+        // written at its own deadline, ends the run at once. Either stop is
+        // taken before any further native submission (the host's terminal
+        // shutdown). Null while the run may continue.
+        internal const string AbortMarkerFileName = "abort.json";
+
+        internal static int OverallDeadlineMarginSeconds(int timeoutSeconds)
+        {
+            return Math.Min(45, Math.Max(10, timeoutSeconds / 10));
+        }
+
+        internal static string RunStopReason(DateTime nowUtc, DateTime processStartUtc,
+            int timeoutSeconds, bool abortMarkerPresent)
+        {
+            if (abortMarkerPresent) return "aborted-by-launcher";
+            if (nowUtc >= processStartUtc.AddSeconds(
+                    timeoutSeconds - OverallDeadlineMarginSeconds(timeoutSeconds)))
+                return "overall-deadline";
+            return null;
+        }
+
+        // Classic cast scenarios (mission batch 3, section 6): the Classic
+        // planner, the default mode, authored through its own screen
+        // controls. "live-classic-select" records the classic plan and its
+        // digest and never executes; "live-classic-cast" additionally needs
+        // the run-bound classic allowance and executes that exact plan once
+        // through the HUD's routine entry under a single-use grant.
+        internal static bool IsClassicCastScenario(string scenario)
+        {
+            return string.Equals(scenario, "live-classic-select", StringComparison.Ordinal) ||
+                IsCastingClassicScenario(scenario);
+        }
+
+        internal static bool IsCastingClassicScenario(string scenario)
+        {
+            return string.Equals(scenario, "live-classic-cast", StringComparison.Ordinal);
+        }
+
+        internal const int ClassicRunDeadlineSeconds = 180;
+
+        // Read-only inspection of a loaded campaign copy (the advanced-copy
+        // family first; the automation fixture is its smoke test): opens the
+        // workspace through the production path with zero synthetic input,
+        // records campaign, roster, pools, providers, enhancements and live
+        // effects, closes the workspace, and never authors or submits.
+        internal static bool IsInspectionScenario(string scenario)
+        {
+            return string.Equals(scenario, "live-advanced-inspect", StringComparison.Ordinal);
+        }
+
+        // The advanced copy is inspected before anything casts on it: the
+        // non-casting inspection, workspace and qualification-selection
+        // scenarios may load it; a casting qualification may load it only
+        // with its run-bound allowance (and the launcher first requires a
+        // passing inspection of the same bound pair).
+        internal static bool IsAdvancedFamilyScenario(string scenario)
+        {
+            return IsInspectionScenario(scenario) ||
+                string.Equals(scenario, "live-workspace-qual", StringComparison.Ordinal) ||
+                string.Equals(scenario, "live-cast-qual-select", StringComparison.Ordinal) ||
+                IsManualWorkspaceScenario(scenario);
+        }
+
+        // Single-cast probe scenarios. BOTH request zero synthetic input and
+        // open the workspace through the production path like the manual
+        // scenario. "live-cast-probe-select" only discovers and records the
+        // exact probe selection and projection identity; it never constructs
+        // a dispatch boundary. "live-cast-probe" additionally requires the
+        // owner's run-bound one-shot allowance (probeAllowance parameter)
+        // and is the ONLY path that can submit a native cast.
+        internal static bool IsProbeScenario(string scenario)
+        {
+            return string.Equals(scenario, "live-cast-probe-select", StringComparison.Ordinal) ||
+                IsCastingProbeScenario(scenario);
+        }
+
+        internal static bool IsCastingProbeScenario(string scenario)
+        {
+            return string.Equals(scenario, "live-cast-probe", StringComparison.Ordinal);
+        }
+
+        // Workspace scenarios that must never request synthetic input.
+        internal static bool IsNoInputWorkspaceScenario(string scenario)
+        {
+            return IsManualWorkspaceScenario(scenario) || IsProbeScenario(scenario) ||
+                IsInspectionScenario(scenario) || IsQualificationScenario(scenario) ||
+                IsImportScenario(scenario) || IsClassicCastScenario(scenario);
+        }
+
+        internal const int ProbeRunDeadlineSeconds = 60;
+        // How long the probe waits for the world to run after closing the
+        // planner, in elapsed time.
+        internal const int ProbeWorldWaitSeconds = 30;
+
+        // The supervised manual-inspection scenario (review H1): the full
+        // guarded pipeline through the opened workspace, then a BOUNDED
+        // human-hold phase with all synthetic input suppressed. It requires
+        // an explicit manualHoldSeconds parameter; the host acknowledges
+        // manual-ready only with the workspace open and no input requested,
+        // and terminal outcomes are done-marker, stop-marker, or deadline
+        // (which is never acceptance).
+        internal static bool IsManualWorkspaceScenario(string scenario)
+        {
+            return string.Equals(scenario, "live-workspace-manual",
+                StringComparison.Ordinal);
+        }
+
+        internal static bool IsManualRehearsal(
+            System.Collections.Generic.IDictionary<string, object> parameters)
+        {
+            object raw;
+            return parameters != null && parameters.TryGetValue("manualRehearsal", out raw) &&
+                raw is bool && (bool)raw;
+        }
+
+        internal static int ReadManualHoldSeconds(
+            System.Collections.Generic.IDictionary<string, object> parameters)
+        {
+            if (parameters == null ||
+                !parameters.ContainsKey("manualHoldSeconds"))
+                throw new InvalidDataException("manual-hold-seconds-missing");
+            object raw = parameters["manualHoldSeconds"];
+            // Range-check at full width BEFORE narrowing (review C3): an
+            // out-of-range long must never wrap into an accepted int.
+            long seconds;
+            if (raw is int) seconds = (int)raw;
+            else if (raw is long) seconds = (long)raw;
+            else throw new InvalidDataException("manual-hold-seconds-invalid");
+            if (seconds < MinimumManualHoldSeconds ||
+                seconds > MaximumManualHoldSeconds)
+                throw new InvalidDataException("manual-hold-seconds-range");
+            return (int)seconds;
+        }
+
+        // The launcher's [ValidateRange(30, 1200)] on -ManualHoldSeconds is
+        // the same contract; the reader enforces it independently.
+        internal const int MinimumManualHoldSeconds = 30;
+        internal const int MaximumManualHoldSeconds = 1200;
 
         internal static bool IsNativeUiProbeScenario(string scenario)
         {
@@ -188,16 +426,135 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             return string.Equals(scenario, "performance-probe", StringComparison.Ordinal);
         }
 
+        internal static bool IsLaunchRenderDiagnosticScenario(string scenario)
+        {
+            return string.Equals(scenario, "launch-render-diagnostic", StringComparison.Ordinal);
+        }
+
+        internal static bool IsMenuInputDiagnosticScenario(string scenario)
+        {
+            return string.Equals(scenario, "menu-input-diagnostic", StringComparison.Ordinal);
+        }
+
+        internal static bool IsMenuDiagnosticScenario(string scenario)
+        {
+            return IsLaunchRenderDiagnosticScenario(scenario) ||
+                IsMenuInputDiagnosticScenario(scenario);
+        }
+
         private static bool IsKnownScenario(string scenario)
         {
             return string.Equals(scenario, "mod-load-smoke", StringComparison.Ordinal) ||
                 IsCatalogScenario(scenario) || IsUiScenario(scenario) ||
-                IsNativeUiProbeScenario(scenario) || IsPerformanceScenario(scenario);
+                IsNativeUiProbeScenario(scenario) || IsPerformanceScenario(scenario) ||
+                IsMenuDiagnosticScenario(scenario) ||
+                IsWorkspaceScenario(scenario);
         }
 
         private static void ValidateParameters(RuntimeTestRequest request)
         {
             if (request.Parameters == null) throw new InvalidDataException("parameters");
+            if (IsManualWorkspaceScenario(request.Scenario))
+            {
+                // The manual scenario carries the EXACT live-save contract
+                // plus exactly one permitted extension, the bounded hold
+                // (review I4): no early return may bypass the guarded save
+                // validation.
+                string[] manualExact =
+                {
+                    "workingSaveName", "workingFileName", "workingSha256",
+                    "baselineSaveName", "baselineFileName", "baselineSha256",
+                    "expectedGameName", "expectedGameId", "executionMode",
+                    "manualHoldSeconds"
+                };
+                // Final review C5: a rehearsal of the manual session is
+                // labelled in its own request (manualRehearsal: true).
+                bool rehearsal = request.Parameters.ContainsKey("manualRehearsal");
+                if (rehearsal && !IsManualRehearsal(request.Parameters))
+                    throw new InvalidDataException("manual-rehearsal-invalid");
+                int manualTotal = manualExact.Length + (rehearsal ? 1 : 0);
+                if (request.Parameters.Count != manualTotal ||
+                    manualExact.Any(name =>
+                        !request.Parameters.ContainsKey(name)))
+                    throw new InvalidDataException("manual-save-parameters");
+                ValidateLiveSaveParameters(request, manualTotal);
+                ReadManualHoldSeconds(request.Parameters);
+                return;
+            }
+            if (request.Parameters.ContainsKey("manualHoldSeconds"))
+                throw new InvalidDataException(
+                    "manual-hold-seconds-only-with-manual-scenario");
+            if (request.Parameters.ContainsKey("manualRehearsal"))
+                throw new InvalidDataException(
+                    "manual-rehearsal-only-with-manual-scenario");
+            // The probe allowance exists only on the casting probe scenario
+            // (never on selection-only or any other scenario), as a string
+            // the host parses strictly against this run id.
+            bool hasAllowance = request.Parameters.ContainsKey("probeAllowance");
+            if (hasAllowance && !IsCastingProbeScenario(request.Scenario))
+                throw new InvalidDataException("probe-allowance-only-with-casting-probe");
+            bool hasQualification = request.Parameters.ContainsKey("qualificationAllowance");
+            if (hasQualification && !IsCastingQualificationScenario(request.Scenario))
+                throw new InvalidDataException("qualification-allowance-only-with-casting-qualification");
+            bool hasRecipe = request.Parameters.ContainsKey("qualificationRecipe");
+            if (hasRecipe && !IsQualificationScenario(request.Scenario))
+                throw new InvalidDataException("qualification-recipe-only-with-qualification");
+            // A requested screen size exists only on the physical scenario and
+            // on the standard workspace scenario (the layout at another
+            // resolution, without physical input).
+            bool hasScreen = request.Parameters.ContainsKey("expectedScreen");
+            bool screenScenario = IsPhysicalWorkspaceScenario(request.Scenario) ||
+                string.Equals(request.Scenario, "live-workspace-qual", StringComparison.Ordinal);
+            if (hasScreen && !screenScenario)
+                throw new InvalidDataException("expected-screen-only-with-workspace-display");
+            if (IsPhysicalWorkspaceScenario(request.Scenario) || hasScreen)
+            {
+                if (hasScreen && !IsScreenSize(request.Parameters["expectedScreen"] as string))
+                    throw new InvalidDataException("expected-screen");
+                ValidateLiveSaveParameters(request, 9 + (hasScreen ? 1 : 0));
+                return;
+            }
+            // The classic allowance exists only on the classic cast scenario,
+            // as a string the host parses strictly against this run id.
+            bool hasClassic = request.Parameters.ContainsKey("classicAllowance");
+            if (hasClassic && !IsCastingClassicScenario(request.Scenario))
+                throw new InvalidDataException("classic-allowance-only-with-classic-cast");
+            if (IsClassicCastScenario(request.Scenario))
+            {
+                if (hasClassic && !(request.Parameters["classicAllowance"] is string))
+                    throw new InvalidDataException("classic-allowance-type");
+                ValidateLiveSaveParameters(request, 9 + (hasClassic ? 1 : 0));
+                return;
+            }
+            if (IsQualificationScenario(request.Scenario))
+            {
+                if (hasQualification && !(request.Parameters["qualificationAllowance"] is string))
+                    throw new InvalidDataException("qualification-allowance-type");
+                if (hasRecipe && !Execution.CastingQualificationRecipe.IsKnown(
+                        request.Parameters["qualificationRecipe"] as string))
+                    throw new InvalidDataException("qualification-recipe-unknown");
+                ValidateLiveSaveParameters(request, 9 + (hasQualification ? 1 : 0) + (hasRecipe ? 1 : 0),
+                    hasQualification);
+                // The selection run never casts and stays instant (its
+                // forecast does not depend on the mode); a casting run
+                // executes in the mode its allowance approves, animated or
+                // instant, and the host refuses any other.
+                if (!IsCastingQualificationScenario(request.Scenario) &&
+                    !string.Equals(request.Parameters["executionMode"] as string, "instant",
+                        StringComparison.Ordinal))
+                    throw new InvalidDataException("qualification-selection-instant-only");
+                return;
+            }
+            if (IsProbeScenario(request.Scenario))
+            {
+                if (hasAllowance && !(request.Parameters["probeAllowance"] is string))
+                    throw new InvalidDataException("probe-allowance-type");
+                ValidateLiveSaveParameters(request, 9 + (hasAllowance ? 1 : 0));
+                if (!string.Equals(request.Parameters["executionMode"] as string, "instant",
+                        StringComparison.Ordinal))
+                    throw new InvalidDataException("probe-execution-mode-instant-only");
+                return;
+            }
             if (IsPerformanceScenario(request.Scenario))
             {
                 string[] performanceNames =
@@ -231,13 +588,32 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 if (request.Parameters.Count != 0) throw new InvalidDataException("parameters");
                 return;
             }
+            string[] automaticExact =
+            {
+                "workingSaveName", "workingFileName", "workingSha256",
+                "baselineSaveName", "baselineFileName", "baselineSha256",
+                "expectedGameName", "expectedGameId", "executionMode"
+            };
+            if (request.Parameters.Count != automaticExact.Length)
+                throw new InvalidDataException("live-save-parameters");
+            ValidateLiveSaveParameters(request, automaticExact.Length);
+        }
+
+        // The guarded live-save contract shared by every scenario that
+        // stages the WORKING campaign (reviews I4): exact keys, required
+        // names, real SHA-256 values, distinct files, and a valid mode.
+        // allowanceBound: the request carries a run-bound casting allowance,
+        // the only way a casting scenario may load the advanced copy.
+        private static void ValidateLiveSaveParameters(
+            RuntimeTestRequest request, int expectedTotal, bool allowanceBound = false)
+        {
             string[] exact =
             {
                 "workingSaveName", "workingFileName", "workingSha256",
                 "baselineSaveName", "baselineFileName", "baselineSha256",
                 "expectedGameName", "expectedGameId", "executionMode"
             };
-            if (request.Parameters.Count != exact.Length ||
+            if (request.Parameters.Count != expectedTotal ||
                 exact.Any(name => !request.Parameters.ContainsKey(name)))
                 throw new InvalidDataException("live-save-parameters");
             foreach (string name in exact)
@@ -248,9 +624,20 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 if (name.EndsWith("Sha256", StringComparison.Ordinal) && !IsSha256(value))
                     throw new InvalidDataException("live-save-hash:" + name);
             }
-            if ((string)request.Parameters["workingSaveName"] != "KBP_AUTOMATION_WORKING" ||
-                (string)request.Parameters["baselineSaveName"] != "KBP_AUTOMATION_BASELINE")
+            string workingName = (string)request.Parameters["workingSaveName"];
+            string baselineName = (string)request.Parameters["baselineSaveName"];
+            bool automation = workingName == "KBP_AUTOMATION_WORKING" &&
+                baselineName == "KBP_AUTOMATION_BASELINE";
+            bool advanced = workingName == "KBP_ADVANCED_WORKING" &&
+                baselineName == "KBP_ADVANCED_BASELINE";
+            // Exactly one sealed family, never a mixed pair.
+            if (!automation && !advanced)
                 throw new InvalidDataException("live-save-names");
+            if (advanced && !IsAdvancedFamilyScenario(request.Scenario) &&
+                !(allowanceBound && IsCastingQualificationScenario(request.Scenario)))
+                throw new InvalidDataException("live-save-family-scenario");
+            if (advanced != (request.ProfileId == AdvancedProfileId))
+                throw new InvalidDataException("live-save-family-profile");
             if (string.Equals((string)request.Parameters["workingFileName"],
                 (string)request.Parameters["baselineFileName"], StringComparison.OrdinalIgnoreCase))
                 throw new InvalidDataException("live-save-files-not-distinct");

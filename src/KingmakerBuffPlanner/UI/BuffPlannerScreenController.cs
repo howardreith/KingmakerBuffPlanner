@@ -11,6 +11,7 @@ namespace KingmakerBuffPlanner.UI
         private readonly ModLog _log;
         private readonly PlannerScreenStateMachine _state;
         private readonly Action<string> _quickExecute;
+        private readonly Action<string> _quickExecuteReadyOnly;
         private readonly Func<bool> _onSetupVisible;
         private readonly SetupOpenSoundGate _soundGate = new SetupOpenSoundGate();
         private BuffPlannerScreenView _view;
@@ -23,12 +24,14 @@ namespace KingmakerBuffPlanner.UI
             BuffPlannerUiLifecycleDiagnostics diagnostics,
             ModLog log,
             Action<string> quickExecute,
-            Func<bool> onSetupVisible = null)
+            Func<bool> onSetupVisible = null,
+            Action<string> quickExecuteReadyOnly = null)
         {
             _session = session ?? throw new ArgumentNullException("session");
             _diagnostics = diagnostics ?? throw new ArgumentNullException("diagnostics");
             _log = log ?? throw new ArgumentNullException("log");
             _quickExecute = quickExecute ?? throw new ArgumentNullException("quickExecute");
+            _quickExecuteReadyOnly = quickExecuteReadyOnly;
             _onSetupVisible = onSetupVisible;
             _state = new PlannerScreenStateMachine(() => BuffPlannerInputLease.Acquire(
                 new KingmakerPlannerInputBoundary()));
@@ -50,7 +53,14 @@ namespace KingmakerBuffPlanner.UI
                 if (StaticCanvas.Instance == null)
                     throw new InvalidOperationException("Kingmaker campaign UI is not available.");
                 _view = new BuffPlannerScreenView(StaticCanvas.Instance, _session,
-                    _diagnostics, () => Close(), _quickExecute);
+                    _diagnostics, () => Close(), _quickExecute, _quickExecuteReadyOnly);
+                // Focused re-review: only a result of this campaign is shown.
+                if (_unshownResult != null && ClassicRunScreenPolicy.ShowStashedResult(_unshownResultCampaign,
+                        _session.Model == null || _session.Model.Profile == null
+                            ? null : _session.Model.Profile.CampaignId))
+                    _view.ShowResult(_unshownResult);
+                _unshownResult = null;
+                _unshownResultCampaign = null;
                 _readiness.Reset();
                 _validationTick = 0;
                 LastFailure = "candidate-awaiting-deferred-readiness";
@@ -84,9 +94,27 @@ namespace KingmakerBuffPlanner.UI
             return true;
         }
 
-        internal void Present(QuickExecutionResult result)
+        // A result that arrives while the screen is closed (an accepted run
+        // closes it) is shown the next time the screen opens - for the same
+        // campaign only; a result kept from before an area change or a mode
+        // switch is dropped (the interruption an area change reports is kept).
+        private QuickExecutionResult _unshownResult;
+        private string _unshownResultCampaign;
+
+        internal void Present(QuickExecutionResult result, string campaignId)
         {
             if (_view != null) _view.ShowResult(result);
+            else
+            {
+                _unshownResult = result;
+                _unshownResultCampaign = campaignId;
+            }
+        }
+
+        internal void DiscardUnshownResult()
+        {
+            _unshownResult = null;
+            _unshownResultCampaign = null;
         }
 
         internal void Tick()

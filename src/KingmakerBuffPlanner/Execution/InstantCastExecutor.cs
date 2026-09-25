@@ -36,6 +36,11 @@ namespace KingmakerBuffPlanner.Execution
                         "prior-instant-transaction-unsettled");
                 else if (_outOfCombatOnly && _runtime.IsInCombat)
                     report.Add(index, step, CastExecutionStatus.FailedValidation, "combat-policy");
+                else if (step.Reservation == null || !step.Reservation.CostKnown)
+                    // Review M1: an unknown cost (missing reservation or an
+                    // unverified zero) is never treated as free.
+                    report.Add(index, step, CastExecutionStatus.FailedValidation,
+                        "reservation-cost-unknown");
                 else
                 {
                     CastEnhancementPreparation enhancement = Prepare(step);
@@ -187,6 +192,22 @@ namespace KingmakerBuffPlanner.Execution
                                                 ? "expected-effects-observed;"
                                                 : "expected-effects-absent-after-confirmation-window;") +
                                             terminalDetail);
+                                    if (result.ResourceSpent && step.Reservation.Unlimited)
+                                        // Review M1: a verified free source must
+                                        // not consume a paid resource.
+                                        report.Add(index, step,
+                                            CastExecutionStatus.FailedExecution,
+                                            "unexpected-resource-spent-on-unlimited-source;" +
+                                            result.Detail);
+                                    else if (result.ResourceCountViolation != null)
+                                        // Review A7: counts that do not show
+                                        // what the reservation needs are
+                                        // uncertainty.
+                                        report.Add(index, step,
+                                            CastExecutionStatus.FailedExecution,
+                                            AvailableCountJudgement.PrefixFor(step.Reservation) +
+                                            result.ResourceCountViolation + ";" +
+                                            result.Detail);
                                     if (!cleanup.Complete &&
                                         cleanup.ResidualDeliveryState)
                                     {
@@ -272,9 +293,14 @@ namespace KingmakerBuffPlanner.Execution
 
         private CastEnhancementPreparation Prepare(CastStep step)
         {
-            if (step.EnhancementIds.Count == 0) return CastEnhancementPreparation.Pass(null);
+            // A casting-first step is prepared even with no enhancement, so
+            // nothing the casting did not choose stays switched on for it.
+            if (step.EnhancementIds.Count == 0 && !step.ExactEnhancements)
+                return CastEnhancementPreparation.Pass(null);
             var runtime = _runtime as ICastEnhancementRuntimeAdapter;
-            if (runtime == null) return CastEnhancementPreparation.Fail("runtime-adapter-unsupported");
+            if (runtime == null)
+                return step.EnhancementIds.Count == 0 ? CastEnhancementPreparation.Pass(null)
+                    : CastEnhancementPreparation.Fail("runtime-adapter-unsupported");
             try
             {
                 return runtime.PrepareEnhancements(step) ??

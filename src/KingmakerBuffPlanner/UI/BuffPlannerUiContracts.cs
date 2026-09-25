@@ -613,7 +613,8 @@ namespace KingmakerBuffPlanner.UI
     {
         Completed,
         Refused,
-        Failed
+        Failed,
+        CompletedWithFallback
     }
 
     public sealed class QuickExecutionResult
@@ -625,11 +626,14 @@ namespace KingmakerBuffPlanner.UI
             string message,
             int planned,
             int submitted,
-            int confirmed)
+            int confirmed,
+            bool usedAnimatedFallback = false)
         {
             RoutineId = routineId ?? string.Empty;
             RoutineName = routineName ?? string.Empty;
-            Disposition = disposition;
+            Disposition = disposition == QuickExecutionDisposition.Completed && usedAnimatedFallback
+                ? QuickExecutionDisposition.CompletedWithFallback : disposition;
+            UsedAnimatedFallback = usedAnimatedFallback;
             Message = message ?? string.Empty;
             Planned = planned;
             Submitted = submitted;
@@ -639,6 +643,7 @@ namespace KingmakerBuffPlanner.UI
         public string RoutineId { get; private set; }
         public string RoutineName { get; private set; }
         public QuickExecutionDisposition Disposition { get; private set; }
+        public bool UsedAnimatedFallback { get; private set; }
         public string Message { get; private set; }
         public int Planned { get; private set; }
         public int Submitted { get; private set; }
@@ -648,6 +653,9 @@ namespace KingmakerBuffPlanner.UI
     public interface IPlannerRoutineRunner
     {
         bool TryStart(string routineId, Action<QuickExecutionResult> completed);
+        // The explicit "Apply Ready Casts Only" path; implementations run the
+        // same execution lane with the partial gate consciously bypassed.
+        bool TryStartReadyOnly(string routineId, Action<QuickExecutionResult> completed);
     }
 
     public sealed class BuffPlannerQuickExecuteController
@@ -668,18 +676,17 @@ namespace KingmakerBuffPlanner.UI
 
         public bool Execute(string routineId)
         {
+            return Execute(routineId, false);
+        }
+
+        public bool Execute(string routineId, bool readyOnlyExplicit)
+        {
             string normalized = NormalizeRoutineId(routineId);
             _diagnostics.RecordListener(normalized);
             _diagnostics.RecordGroupResolved(normalized);
-            bool started = _runner.TryStart(normalized, result =>
-            {
-                _diagnostics.RecordPlanRevalidated(normalized);
-                if (result.Disposition == QuickExecutionDisposition.Refused)
-                    _diagnostics.RecordRefused(normalized);
-                else _diagnostics.RecordExecutionInvoked(normalized);
-                _present(result);
-                _diagnostics.RecordResultPresented(normalized);
-            });
+            bool started = readyOnlyExplicit
+                ? _runner.TryStartReadyOnly(normalized, PresentResult)
+                : _runner.TryStart(normalized, PresentResult);
             if (!started)
             {
                 var result = new QuickExecutionResult(normalized, DisplayName(normalized),
@@ -690,6 +697,16 @@ namespace KingmakerBuffPlanner.UI
                 _diagnostics.RecordResultPresented(normalized);
             }
             return started;
+        }
+
+        private void PresentResult(QuickExecutionResult result)
+        {
+            _diagnostics.RecordPlanRevalidated(result.RoutineId);
+            if (result.Disposition == QuickExecutionDisposition.Refused)
+                _diagnostics.RecordRefused(result.RoutineId);
+            else _diagnostics.RecordExecutionInvoked(result.RoutineId);
+            _present(result);
+            _diagnostics.RecordResultPresented(result.RoutineId);
         }
 
         private static string NormalizeRoutineId(string routineId)

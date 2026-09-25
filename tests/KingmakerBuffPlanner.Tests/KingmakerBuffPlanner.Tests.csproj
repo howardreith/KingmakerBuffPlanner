@@ -29,6 +29,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Program.cs" />
+    <Compile Include="ProductionExecutionTests.cs" />
     <Compile Include="TestBuildInfo.cs" />
     <Compile Include="..\..\src\KingmakerBuffPlanner\Discovery\ActionGraphScanner.cs"><Link>Discovery\ActionGraphScanner.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Discovery\AreaRecipientSemantics.cs"><Link>Discovery\AreaRecipientSemantics.cs</Link></Compile>
@@ -38,10 +39,14 @@
     <Compile Include="..\..\src\KingmakerBuffPlanner\Discovery\NativeCandidateClassifier.cs"><Link>Discovery\NativeCandidateClassifier.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Discovery\SelectableAbilityVariants.cs"><Link>Discovery\SelectableAbilityVariants.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Compatibility\SpellbookRoleResolver.cs"><Link>Compatibility\SpellbookRoleResolver.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Compatibility\CallOfTheWildMetamagicNames.cs"><Link>Compatibility\CallOfTheWildMetamagicNames.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Compatibility\BrownFurPowerfulChangeProfile.cs"><Link>Compatibility\BrownFurPowerfulChangeProfile.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\GameAdapters\CastEnhancementNaming.cs"><Link>GameAdapters\CastEnhancementNaming.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Domain\Effects\EffectExpression.cs"><Link>Domain\Effects\EffectExpression.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Domain\Effects\EffectAggregateIdentity.cs"><Link>Domain\Effects\EffectAggregateIdentity.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Domain\Effects\CatalogSourceIdentity.cs"><Link>Domain\Effects\CatalogSourceIdentity.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Domain\Identity\StableKeys.cs"><Link>Domain\Identity\StableKeys.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Domain\Authoring\CastingIntentModels.cs"><Link>Domain\Authoring\CastingIntentModels.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Domain\Providers\ProviderSnapshots.cs"><Link>Domain\Providers\ProviderSnapshots.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Domain\Planning\PlanningModels.cs"><Link>Domain\Planning\PlanningModels.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Domain\Planning\CastEnhancements.cs"><Link>Domain\Planning\CastEnhancements.cs</Link></Compile>
@@ -51,20 +56,72 @@
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\AnimatedCastExecutor.cs"><Link>Execution\AnimatedCastExecutor.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\InstantCastExecutor.cs"><Link>Execution\InstantCastExecutor.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\HybridCastExecutor.cs"><Link>Execution\HybridCastExecutor.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\ExplicitCastingRunCoordinator.cs"><Link>Execution\ExplicitCastingRunCoordinator.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\SingleCastProbe.cs"><Link>Execution\SingleCastProbe.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\CastingQualification.cs"><Link>Execution\CastingQualification.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\CastingCapabilityInventory.cs"><Link>Execution\CastingCapabilityInventory.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\AtWillCantripChoice.cs"><Link>Execution\AtWillCantripChoice.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\ClassicCastQualification.cs"><Link>Execution\ClassicCastQualification.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\HaltingPlanRunner.cs"><Link>Execution\HaltingPlanRunner.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\FactSourceChoice.cs"><Link>Execution\FactSourceChoice.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\AvailableCountJudgement.cs"><Link>Execution\AvailableCountJudgement.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\WorldGatedEnumerator.cs"><Link>Execution\WorldGatedEnumerator.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\ClassicRunScreenPolicy.cs"><Link>UI\ClassicRunScreenPolicy.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\AppliedEffectJudgement.cs"><Link>Execution\AppliedEffectJudgement.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\RuntimeTesting\LegacyProfileFixture.cs"><Link>RuntimeTesting\LegacyProfileFixture.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Persistence\PersistenceMessages.cs"><Link>Persistence\PersistenceMessages.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\RuntimeTesting\PhysicalWorkspaceRecord.cs"><Link>RuntimeTesting\PhysicalWorkspaceRecord.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\CastingQualificationDriver.cs"><Link>Execution\CastingQualificationDriver.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\SingleCastProbeObservation.cs"><Link>Execution\SingleCastProbeObservation.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\MaterialComponentAvailability.cs"><Link>Execution\MaterialComponentAvailability.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\ResourceLedger.cs"><Link>Planning\ResourceLedger.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\RoutinePlanService.cs"><Link>Planning\RoutinePlanService.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\CastingAuthoringService.cs"><Link>Planning\CastingAuthoringService.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\ExplicitCastingCompiler.cs"><Link>Planning\ExplicitCastingCompiler.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\CastingBudget.cs"><Link>Planning\CastingBudget.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\CastingForecast.cs"><Link>Planning\CastingForecast.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\CastingExecutionGate.cs"><Link>Planning\CastingExecutionGate.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\CastingTargetingModifiers.cs"><Link>Planning\CastingTargetingModifiers.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\CastingReviewCoordinator.cs"><Link>Planning\CastingReviewCoordinator.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\ExplicitCastingStepConverter.cs"><Link>Planning\ExplicitCastingStepConverter.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\EffectPresenceEvaluator.cs"><Link>Planning\EffectPresenceEvaluator.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\ExistingEffectAssessment.cs"><Link>Planning\ExistingEffectAssessment.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\CastPlanner.cs"><Link>Planning\CastPlanner.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Persistence\ProfileModels.cs"><Link>Persistence\ProfileModels.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Persistence\ProfileRepository.cs"><Link>Persistence\ProfileRepository.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Persistence\CastingPlanProfileModels.cs"><Link>Persistence\CastingPlanProfileModels.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Persistence\CastingPlanRepository.cs"><Link>Persistence\CastingPlanRepository.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Persistence\CastingReviewStore.cs"><Link>Persistence\CastingReviewStore.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Persistence\PlannerModeStore.cs"><Link>Persistence\PlannerModeStore.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Persistence\CastingPlanMigrationService.cs"><Link>Persistence\CastingPlanMigrationService.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Persistence\CastingPlanImporter.cs"><Link>Persistence\CastingPlanImporter.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Infrastructure\AtomicFile.cs"><Link>Infrastructure\AtomicFile.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Infrastructure\Hashing.cs"><Link>Infrastructure\Hashing.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\PlannerSetupModel.cs"><Link>UI\PlannerSetupModel.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingWorkspaceModels.cs"><Link>UI\CastingWorkspaceModels.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingWorkspaceSession.cs"><Link>UI\CastingWorkspaceSession.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingExecutionHost.cs"><Link>UI\CastingExecutionHost.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\NativeCastingSessionPolicy.cs"><Link>UI\NativeCastingSessionPolicy.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingRunPresentation.cs"><Link>UI\CastingRunPresentation.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingWorkspaceSessionBinding.cs"><Link>UI\CastingWorkspaceSessionBinding.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingWorkspaceDevSelection.cs"><Link>UI\CastingWorkspaceDevSelection.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\PlannerPresentationModels.cs"><Link>UI\PlannerPresentationModels.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\BuffPlannerUiContracts.cs"><Link>UI\BuffPlannerUiContracts.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CatalogUiDiagnostics.cs"><Link>UI\CatalogUiDiagnostics.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\BuffGridMetrics.cs"><Link>UI\BuffGridMetrics.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\PlannerHotkeyBinding.cs"><Link>UI\PlannerHotkeyBinding.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\AssignmentPresentationModels.cs"><Link>UI\AssignmentPresentationModels.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\SequentialForecastPlanner.cs"><Link>UI\SequentialForecastPlanner.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\PlannerReviewState.cs"><Link>UI\PlannerReviewState.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\PlannerReviewCoordinator.cs"><Link>UI\PlannerReviewCoordinator.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\AssignmentEligibility.cs"><Link>UI\AssignmentEligibility.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\SpellbookHandoffStateMachine.cs"><Link>UI\SpellbookHandoffStateMachine.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\SpellbookWindowLocator.cs"><Link>UI\SpellbookWindowLocator.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\NativeThemeModel.cs"><Link>UI\NativeThemeModel.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\NativeThemeDonorLookup.cs"><Link>UI\NativeThemeDonorLookup.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\NativeThemeResolver.cs"><Link>UI\NativeThemeResolver.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\NativeThemeRecovery.cs"><Link>UI\NativeThemeRecovery.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\ControlCaptionFit.cs"><Link>UI\ControlCaptionFit.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\RuntimeTesting\RuntimePaths.cs">
       <Link>RuntimeTesting\RuntimePaths.cs</Link>
     </Compile>
@@ -73,6 +130,18 @@
     </Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\RuntimeTesting\RuntimeTestProtocol.cs">
       <Link>RuntimeTesting\RuntimeTestProtocol.cs</Link>
+    </Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\RuntimeTesting\MenuFrameStats.cs">
+      <Link>RuntimeTesting\MenuFrameStats.cs</Link>
+    </Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\RuntimeTesting\LoadedAssemblyIdentity.cs">
+      <Link>RuntimeTesting\LoadedAssemblyIdentity.cs</Link>
+    </Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\RuntimeTesting\RuntimeTestResultModels.cs">
+      <Link>RuntimeTesting\RuntimeTestResultModels.cs</Link>
+    </Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\RuntimeTesting\WorkspaceScenarioContracts.cs">
+      <Link>RuntimeTesting\WorkspaceScenarioContracts.cs</Link>
     </Compile>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

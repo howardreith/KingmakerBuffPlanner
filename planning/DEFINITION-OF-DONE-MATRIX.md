@@ -1,5 +1,78 @@
 # Definition of Done Matrix
 
+> **Historical.** The casting-first release buckets below describe the
+> rc2 state of 2026-09-23 and are superseded. The current status, the
+> rc6 milestone scope and the current A01–A20 ledger are in the top
+> section of `planning/CASTING-FIRST-MIGRATION-STATUS.md`.
+
+## Casting-first migration — release buckets (updated 2026-09-23: release candidate 0.2.0-rc2 frozen at `ae0181d`; receipt `docs/evidence/rc-0.2.0-rc2-receipt.md`)
+
+No percentage or date is claimed; green unit tests do not measure
+readiness. Evidence words mean exactly this:
+
+- **implemented**: the code exists.
+- **stand-ins**: tested only with recording runtimes, scripted
+  observers or fake assemblies.
+- **in-game**: observed in a guarded live run.
+- **accepted**: the owner accepted it in a supervised session.
+- **not implemented**: the code does not exist.
+
+### Bucket 1 — Private advanced-copy UI inspection (casting disabled)
+
+| Capability | Status |
+| --- | --- |
+| Casting-first workspace opens through the production path (not the legacy screen) | in-game (WORKING fixture); not on an advanced party |
+| Bubble Buffs-style layout, search, scope toggle, portraits, coverage colours | in-game (camera and display frames); not accepted (owner glimpse only) |
+| Layout at resolutions and UI scales | 1920×1200 only: the workspace canvas and the native StaticCanvas both at scale 1.000 (`casting-ws-qual-20260923-t1-01`); how the native UI scales at other resolutions is not established, and other resolutions are not tested (changing the game resolution would change the owner's display settings) |
+| Legacy import on first open, failed-import blocking, review items, notices | first open with a classic plan **in-game** (`casting-ws-import-20260923-i1-01`: real migration, two drafts needing review, classic file byte-unchanged and archived); failed-import blocking and notices stand-ins only |
+| Large catalogue, multiple spellbooks, pets, long/group buffs at scale | not in-game (tiny fixture only) |
+| Input isolation | in-game (earlier HUD/UI runs); not re-checked on an advanced party |
+| Advanced-save disposable copy tooling | implemented + stand-ins: guarded bootstrap (`-Family Advanced`), family pair lookup, manifest binding, protocol family gate, non-casting `live-advanced-inspect`, protected-save comparison, whole-run completion record gating advanced casting. Not in-game: no `KBP_ADVANCED_SEED` yet (`docs/ADVANCED-SEED-COMPATIBILITY.md`) |
+
+### Bucket 2 — Private supported-subset gameplay alpha (after explicit native-test approvals)
+
+| Capability | Status |
+| --- | --- |
+| Explicit projection with complete identity, refusal of unsupported contracts | implemented + stand-ins |
+| Zero-cost (Unlimited) native reservations | **in-game**, both casting modes: cantrips cast at will through the class ability (count -1, unchanged); rc1 cast the spellbook's level-0 entry, which the game's own command refuses (0 level-0 slots per day), and that failed in animated mode (`casting-qual-cast-20260923-a1-anim-01`) |
+| One-shot probe boundary, fresh observations, owned terminal cleanup | **in-game**: constructed, submitted once, disposed, cleaned up (two identified runs) |
+| First native cast (cantrip) | **in-game PASS**: `casting-probe-cast-20260923-p2-02` (`320a1b6`) confirmed a new Resistance instance, free, zero violations; the earlier run p1-01 exposed casting inside the open planner (fixed). Receipt `docs/evidence/casting-probe-20260923-receipt.md` |
+| Casting only while the world runs (Default mode, not paused, planner closed) | implemented + stand-ins; **in-game** for the probe (`worldRunningAtSubmit=True`) |
+| Paid-slot cast (finite resource) | not run; needs its own request after the cantrip |
+| Production dispatch and run host (one run, per-frame pump, one terminal for stop/deadline/area change/disable/unload/teardown) | **in-game** for session Apply, the host and the real instant executor behind the qualification boundary (three runs: stop, complete, recast), pumped by the qualification driver; the production per-frame pump in the planner root (with its world gate and world clock), area change, disable, unload and animated mode not in game |
+| Live existing-effect policy (weaker/expiring/unprovable never satisfied; active effect needs no slot) | implemented + stand-ins |
+| Per-routine review acceptance persisted across sessions; skip flips are harmless refreshes | **in-game**: the recast step ran from a session reopened from disk, authorized by the restored acceptance |
+| Animated casting mode (the default) | **in-game PASS** on the candidate (`casting-qual-cast-20260923-rc2-anim-01`) |
+| Player's stop during a cast; disable during a run | **in-game**: the stop pressed through the HUD's routine entry while the first cast was in progress (it finished, nothing after it started); the planner's own disable while an animated cast was in progress (interrupted, nothing landed, runs possible again after enabling) |
+| Multi-cast routine, halting after failure, interruption, reload | multi-cast routine, cancellation between castings (the host's immediate cancel) and close/reopen **in-game** (zero-cost qualification); in-game save reload **in-game** (`casting-ws-reload-20260923-s2-01`: the exact test save loaded again, saved plan kept, one subscription, one HUD root, no run); the player's graceful stop (finish the cast in progress) and halting after a failed casting stand-ins only |
+| Casting qualification `zero-cost-mixed` (automation fixture): stop, complete, repeat, reopen, recast, judged per step and stopped at the first failure | **in-game PASS**: `casting-qual-cast-20260923-q1-01` on `d35b38f`, zero violations; receipt `docs/evidence/casting-qual-20260923-receipt.md` |
+| Casting qualification `finite-direct-mixed` (advanced copy): exact prepared slots, spontaneous levels, mixed casters, metamagic | implemented + stand-ins (exact token and availability judging); **not run** (needs a `KBP_ADVANCED_SEED`, a passing inspection and an allowance) |
+| Group casts, anchored origin | implemented + stand-ins; not in-game |
+
+### Bucket 3 — Public experimental prerelease
+
+| Requirement | Status |
+| --- | --- |
+| Advertised scope tested in-game (bucket 2 subset) | not started |
+| Unsupported features prominently disabled in the UI | implemented: cards show "cannot run in this version" (targeting modifiers, exact rod identity, required coverage outside the predicted area); Apply refuses them |
+| Deliberate activation path | implemented: UMM planner-mode setting, Classic by default; player guide `docs/CASTING-FIRST-PLAYER-GUIDE.md` |
+| Owner usability acceptance of the workspace | not accepted |
+| Source-type tabs, routine tabs with counts, per-card last-run outcome | source tabs invoked in game through their button handlers (callback coverage, not pointer reachability); routine tabs and last-run lines rendered in game frames; not accepted |
+| Player-facing resource names on cards and the budget footer; refusals in words; routine-wide header; editing label names the casting | **in-game** frames (`casting-ws-qual-20260923-r1-01`, `casting-ws-reload-20260923-s2-01`); not accepted |
+| Install/rollback on a real installation | **real installation, temporary**: the candidate's release package installed over the owner's 0.1.1-rc3 with Install-Local and rolled back with Restore-InstallLocal (`rc1-temp-deploy-20260923-01`); planner restored exactly, Mods manifest equal to before; failure handling on isolated fixtures (16 cases) |
+| Release packaging and publisher gates | Build-Release exercised for the candidate (two deterministic builds, validated, local-only); publisher gate tests 3/3; nothing published |
+| Candidate evidence on the frozen build | rc2 (`ae0181d`): selection, animated and instant casting qualification, first-open import, in-game reload and the manual-session rehearsal all PASS; rc1 (`f8562a6`) had the same set with instant casting only |
+
+### Bucket 4 — Full charter release
+
+| Requirement | Status |
+| --- | --- |
+| Exact rods / enhancement identity (A06) | not implemented |
+| Targeting modifiers (e.g. Share Transmutation) in execution | refused by the converter; not implemented |
+| Animated-mode gameplay, all class adapters | not in-game for casting-first |
+| Migration cutover and rollback on real data | stand-ins only |
+| A01–A20 final qualification | A01–A05, A07–A11 and parts of A12/A13 pass at domain level; the rest open |
+
 ## 0.0.13 Brown-Fur Powerful Change repair
 
 Published tag source/package/DLL/MVID:

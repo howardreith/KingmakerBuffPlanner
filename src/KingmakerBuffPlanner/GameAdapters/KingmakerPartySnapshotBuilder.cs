@@ -12,6 +12,7 @@ using KingmakerBuffPlanner.Discovery;
 using KingmakerBuffPlanner.Domain.Effects;
 using KingmakerBuffPlanner.Domain.Identity;
 using KingmakerBuffPlanner.Domain.Providers;
+using KingmakerBuffPlanner.Execution;
 
 namespace KingmakerBuffPlanner.GameAdapters
 {
@@ -22,6 +23,9 @@ namespace KingmakerBuffPlanner.GameAdapters
             new Dictionary<string, EffectExpression>(StringComparer.Ordinal);
         private readonly List<PartySourceDiscoveryTrace> _sourceTraces =
             new List<PartySourceDiscoveryTrace>();
+        // Fact providers refused as ambiguous (one ability, one pool, two
+        // caster levels); later duplicates are refused too.
+        private readonly HashSet<ProviderKey> _ambiguousFactKeys = new HashSet<ProviderKey>();
         private readonly List<PartyVariantEligibilityTrace> _variantTraces =
             new List<PartyVariantEligibilityTrace>();
         private readonly List<PartySpellbookRoleTrace> _spellbookRoleTraces =
@@ -48,6 +52,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                 throw new InvalidOperationException("Kingmaker player state is unavailable.");
             _effectsBySource.Clear();
             _sourceTraces.Clear();
+            _ambiguousFactKeys.Clear();
             _variantTraces.Clear();
             _spellbookRoleTraces.Clear();
             _rawCandidateCount = 0;
@@ -135,27 +140,95 @@ namespace KingmakerBuffPlanner.GameAdapters
         {
             for (int level = 0; level <= spellbook.MaxSpellLevel; level++)
             {
-                string poolKey = PoolKey(unit.UniqueId, spellbook.Blueprint.AssetGuid,
-                    level == 0 ? "unlimited" : "spontaneous-" + level);
                 if (level == 0)
-                    pools.Add(new ResourcePoolSnapshot(poolKey, ResourcePoolKind.Unlimited, 0, 0, null));
-                else
                 {
-                    int remaining = Math.Max(0, spellbook.GetSpontaneousSlots(level));
-                    int capacity = Math.Max(remaining, spellbook.GetSpellsPerDay(level));
-                    pools.Add(new ResourcePoolSnapshot(poolKey, ResourcePoolKind.SpontaneousLevel,
-                        capacity, remaining, null));
+                    ScanSpontaneousLevelZero(unit, spellbook, providers, pools);
+                    continue;
                 }
+                string poolKey = PoolKey(unit.UniqueId, spellbook.Blueprint.AssetGuid,
+                    "spontaneous-" + level);
+                int remaining = Math.Max(0, spellbook.GetSpontaneousSlots(level));
+                int capacity = Math.Max(remaining, spellbook.GetSpellsPerDay(level));
+                pools.Add(new ResourcePoolSnapshot(poolKey, ResourcePoolKind.SpontaneousLevel,
+                    capacity, remaining, null));
                 foreach (KingmakerAbilitySelection selection in ExpandOwned(
                     spellbook.GetKnownSpells(level), unit, spellbook.Blueprint.AssetGuid))
-                    AddSpellProvider(unit, spellbook, selection, poolKey, level == 0 ? 0 : 1,
+                    AddSpellProvider(unit, spellbook, selection, poolKey, 1,
                         new string[0], providers);
                 foreach (KingmakerAbilitySelection selection in ExpandOwned(
                     spellbook.GetCustomSpells(level), unit, spellbook.Blueprint.AssetGuid))
-                    AddSpellProvider(unit, spellbook, selection, poolKey, level == 0 ? 0 : 1,
+                    AddSpellProvider(unit, spellbook, selection, poolKey, 1,
                         new string[0], providers);
             }
         }
+
+        // Level 0: a spell the caster casts at will (the cantrip ability the
+        // class grants) costs nothing; one without it spends a level-0 slot,
+        // like any spontaneous level, exactly as the game's command does.
+        private void ScanSpontaneousLevelZero(
+            UnitEntityData unit,
+            Spellbook spellbook,
+            List<ProviderSnapshot> providers,
+            List<ResourcePoolSnapshot> pools)
+        {
+            string unlimitedKey = PoolKey(unit.UniqueId, spellbook.Blueprint.AssetGuid, "unlimited");
+            string slotKey = PoolKey(unit.UniqueId, spellbook.Blueprint.AssetGuid, "spontaneous-0");
+            bool unlimitedAdded = false;
+            bool slotsAdded = false;
+            foreach (KingmakerAbilitySelection selection in ExpandOwned(
+                    spellbook.GetKnownSpells(0), unit, spellbook.Blueprint.AssetGuid)
+                .Concat(ExpandOwned(spellbook.GetCustomSpells(0), unit, spellbook.Blueprint.AssetGuid)))
+            {
+                string ambiguity;
+                CantripPricing pricing = PriceCantrip(unit, spellbook, selection, out ambiguity);
+                if (pricing == CantripPricing.Unresolved)
+                {
+                    TraceUnresolvedCantrip(unit, spellbook, selection, ambiguity);
+                    continue;
+                }
+                if (pricing == CantripPricing.Free)
+                {
+                    if (!unlimitedAdded)
+                        pools.Add(new ResourcePoolSnapshot(unlimitedKey, ResourcePoolKind.Unlimited, 0, 0, null));
+                    unlimitedAdded = true;
+                    AddSpellProvider(unit, spellbook, selection, unlimitedKey, 0, new string[0], providers);
+                    continue;
+                }
+                if (!slotsAdded)
+                {
+                    int remaining = Math.Max(0, spellbook.GetSpontaneousSlots(0));
+                    pools.Add(new ResourcePoolSnapshot(slotKey, ResourcePoolKind.SpontaneousLevel,
+                        Math.Max(remaining, spellbook.GetSpellsPerDay(0)), remaining, null));
+                }
+                slotsAdded = true;
+                AddSpellProvider(unit, spellbook, selection, slotKey, 1, new string[0], providers);
+            }
+        }
+
+        private static CantripPricing PriceCantrip(UnitEntityData unit, Spellbook spellbook,
+            KingmakerAbilitySelection selection, out string ambiguity)
+        {
+            AbilityData atWill = KingmakerAtWillCantrips.Resolve(unit,
+                KingmakerAbilityVariants.ToAbilityKey(selection, SourceKind.Spellbook),
+                spellbook.CasterLevel, out ambiguity);
+            return AtWillCantripChoice.Price(atWill != null, ambiguity);
+        }
+
+        // Review A4: an ambiguous at-will cantrip is no provider at all (not
+        // a level-0 slot); the refusal stays visible in the discovery trace.
+        private void TraceUnresolvedCantrip(UnitEntityData unit, Spellbook spellbook,
+            KingmakerAbilitySelection selection, string ambiguity)
+        {
+            _rawCandidateCount++;
+            _sourceTraces.Add(new PartySourceDiscoveryTrace(
+                KingmakerAbilityVariants.ToAbilityKey(selection, SourceKind.Spellbook).Canonical,
+                selection.Concrete.Blueprint.AssetGuid, selection.DisplayName, unit.UniqueId,
+                spellbook.Blueprint.AssetGuid, !spellbook.Blueprint.Spontaneous, false,
+                UnresolvedCantripPrefix + ambiguity));
+        }
+
+        internal const string UnresolvedCantripPrefix = "unresolved-cantrip:";
+        internal const string UnresolvedFactPrefix = "unresolved-fact:";
 
         private void ScanPreparedSpellbook(
             UnitEntityData unit,
@@ -165,20 +238,53 @@ namespace KingmakerBuffPlanner.GameAdapters
         {
             var allSlots = spellbook.GetAllMemorizedSpells().Where(s => s != null && s.Spell != null)
                 .OrderBy(s => s.SpellLevel).ThenBy(s => s.Type).ThenBy(s => s.Index).ToList();
+            // A memorized level-0 spell the caster casts at will costs
+            // nothing; one without the cantrip ability is a prepared slot the
+            // cast consumes, as the game's own spend does.
             var cantripSlots = allSlots.Where(s => s.SpellLevel == 0).ToList();
+            var atWillSlots = new HashSet<SpellSlot>(ReferenceEqualityComparer<SpellSlot>.Instance);
+            var unresolvedSlots = new HashSet<SpellSlot>(ReferenceEqualityComparer<SpellSlot>.Instance);
             if (cantripSlots.Count != 0)
             {
                 string unlimitedKey = PoolKey(unit.UniqueId, spellbook.Blueprint.AssetGuid, "unlimited");
-                pools.Add(new ResourcePoolSnapshot(unlimitedKey, ResourcePoolKind.Unlimited, 0, 0, null));
+                bool unlimitedAdded = false;
                 foreach (IGrouping<string, SpellSlot> group in cantripSlots.GroupBy(
                     s => ToAbilityKey(s.Spell, SourceKind.Spellbook).Canonical, StringComparer.Ordinal))
                 {
-                    foreach (KingmakerAbilitySelection selection in ExpandOwned(
-                        new[] { group.First().Spell }, unit, spellbook.Blueprint.AssetGuid))
+                    List<KingmakerAbilitySelection> selections = ExpandOwned(
+                        new[] { group.First().Spell }, unit, spellbook.Blueprint.AssetGuid).ToList();
+                    if (selections.Count == 0) continue;
+                    var pricings = new List<CantripPricing>();
+                    var ambiguities = new List<string>();
+                    foreach (KingmakerAbilitySelection selection in selections)
+                    {
+                        string ambiguity;
+                        pricings.Add(PriceCantrip(unit, spellbook, selection, out ambiguity));
+                        ambiguities.Add(ambiguity);
+                    }
+                    // Review A4: slots of an ambiguous cantrip are neither free
+                    // nor paid providers; every variant of the group is traced
+                    // (the re-review: siblings never vanish silently).
+                    int firstUnresolved = pricings.IndexOf(CantripPricing.Unresolved);
+                    if (firstUnresolved >= 0)
+                    {
+                        for (int variant = 0; variant < selections.Count; variant++)
+                            TraceUnresolvedCantrip(unit, spellbook, selections[variant],
+                                pricings[variant] == CantripPricing.Unresolved ? ambiguities[variant]
+                                    : "group-of:" + ambiguities[firstUnresolved]);
+                        foreach (SpellSlot slot in group) unresolvedSlots.Add(slot);
+                        continue;
+                    }
+                    if (!pricings.All(pricing => pricing == CantripPricing.Free)) continue;
+                    if (!unlimitedAdded)
+                        pools.Add(new ResourcePoolSnapshot(unlimitedKey, ResourcePoolKind.Unlimited, 0, 0, null));
+                    unlimitedAdded = true;
+                    foreach (SpellSlot slot in group) atWillSlots.Add(slot);
+                    foreach (KingmakerAbilitySelection selection in selections)
                         AddSpellProvider(unit, spellbook, selection, unlimitedKey, 0, new string[0], providers);
                 }
             }
-            var slots = allSlots.Where(s => s.SpellLevel > 0).ToList();
+            var slots = allSlots.Where(s => !atWillSlots.Contains(s) && !unresolvedSlots.Contains(s)).ToList();
             if (slots.Count == 0) return;
             var ids = slots.ToDictionary(s => s, SlotId, ReferenceEqualityComparer<SpellSlot>.Instance);
             var tokens = new List<ResourceTokenSnapshot>();
@@ -243,8 +349,8 @@ namespace KingmakerBuffPlanner.GameAdapters
         {
             AbilityData data = selection.Concrete;
             AbilityData resourceContext = data.Resource != null ? data : selection.Source;
-            SourceKind sourceKind = resourceContext.Resource != null
-                ? SourceKind.AbilityResource : SourceKind.Fact;
+            SourceKind sourceKind;
+            string factPoolKey = FactPoolKey(unit.UniqueId, selection, out sourceKind);
             AbilityKey ability = KingmakerAbilityVariants.ToAbilityKey(selection, sourceKind);
             _rawCandidateCount++;
             EffectExpression expression;
@@ -262,7 +368,7 @@ namespace KingmakerBuffPlanner.GameAdapters
             int cost;
             if (resourceContext.Resource != null)
             {
-                string key = unit.UniqueId + "|resource|" + resourceContext.Resource.AssetGuid;
+                string key = factPoolKey;
                 int remaining = Math.Max(0,
                     unit.Descriptor.Resources.GetResourceAmount(resourceContext.Resource));
                 int capacity = Math.Max(remaining,
@@ -273,21 +379,53 @@ namespace KingmakerBuffPlanner.GameAdapters
             }
             else
             {
-                string key = unit.UniqueId + "|free|" +
-                    selection.SourceBlueprint.AssetGuid;
+                string key = factPoolKey;
                 pool = new ResourcePoolSnapshot(key, ResourcePoolKind.Unlimited, 0, 0, null);
                 cost = 0;
             }
             if (poolKeys.Add(pool.PoolKey)) pools.Add(pool);
             var keyForProvider = new ProviderKey(
                 unit.UniqueId, string.Empty, ability, string.Empty);
-            if (providers.Any(provider => provider.Key.Equals(keyForProvider))) return;
+            if (_ambiguousFactKeys.Contains(keyForProvider)) return;
+            ProviderSnapshot existing = providers.FirstOrDefault(provider => provider.Key.Equals(keyForProvider));
+            if (existing != null)
+            {
+                // Re-review of A4: the same ability from the same pool at two
+                // caster levels (one cantrip granted by two classes) is
+                // ambiguous; neither is offered, the refusal stays traced.
+                if (string.Equals(existing.ResourcePoolKey, pool.PoolKey, StringComparison.Ordinal) &&
+                    existing.EffectiveCasterLevel != CasterLevel(data))
+                {
+                    providers.Remove(existing);
+                    _ambiguousFactKeys.Add(keyForProvider);
+                    _sourceTraces.Add(new PartySourceDiscoveryTrace(
+                        ability.Canonical, data.Blueprint.AssetGuid, selection.DisplayName, unit.UniqueId,
+                        string.Empty, false, false, UnresolvedFactPrefix + "caster-levels:" +
+                        existing.EffectiveCasterLevel + "," + CasterLevel(data)));
+                }
+                return;
+            }
             string duration = DurationText(selection);
             providers.Add(new ProviderSnapshot(keyForProvider, selection.DisplayName, 0,
                 pool.PoolKey, cost, null, ToMaterialRequirement(selection),
                 CasterLevel(data), ExpectedDurationRounds(data, duration),
                 Description(selection), duration, selection.SourceDisplayName,
                 selection.VariantOrder));
+        }
+
+        // The pool a fact-granted ability spends, as discovery prices it and
+        // execution binds it (review A3): the concrete or source ability's
+        // resource, else a free pool of the source blueprint.
+        internal static string FactPoolKey(string unitId, KingmakerAbilitySelection selection, out SourceKind kind)
+        {
+            AbilityData resourceContext = selection.Concrete.Resource != null ? selection.Concrete : selection.Source;
+            if (resourceContext.Resource != null)
+            {
+                kind = SourceKind.AbilityResource;
+                return unitId + "|resource|" + resourceContext.Resource.AssetGuid;
+            }
+            kind = SourceKind.Fact;
+            return unitId + "|free|" + selection.SourceBlueprint.AssetGuid;
         }
 
         private void AddSpellProvider(
@@ -330,7 +468,22 @@ namespace KingmakerBuffPlanner.GameAdapters
                 source.SpellLevel, poolKey, cost, tokens,
                 ToMaterialRequirement(selection), CasterLevel(data),
                 ExpectedDurationRounds(data, duration), Description(selection),
-                duration, selection.SourceDisplayName, selection.VariantOrder));
+                duration, selection.SourceDisplayName, selection.VariantOrder,
+                SpellbookName(spellbook)));
+        }
+
+        // The spellbook as the game names it, else its class; empty when
+        // neither can be read.
+        private static string SpellbookName(Spellbook spellbook)
+        {
+            try
+            {
+                string name = spellbook.Blueprint.DisplayName;
+                if (string.IsNullOrWhiteSpace(name) && spellbook.Blueprint.CharacterClass != null)
+                    name = spellbook.Blueprint.CharacterClass.Name;
+                return name ?? string.Empty;
+            }
+            catch (Exception) { return string.Empty; }
         }
 
         private static int CasterLevel(AbilityData data)
@@ -423,7 +576,7 @@ namespace KingmakerBuffPlanner.GameAdapters
 
         private static string SlotId(SpellSlot slot)
         {
-            return "level-" + slot.SpellLevel + "|type-" + (int)slot.Type + "|index-" + slot.Index;
+            return PreparedSlotIds.Format(slot.SpellLevel, (int)slot.Type, slot.Index);
         }
 
         private static PreparedSlotKind ToSlotKind(SpellSlot slot)

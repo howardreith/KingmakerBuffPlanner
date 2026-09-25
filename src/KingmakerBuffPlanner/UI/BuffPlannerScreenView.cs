@@ -8,6 +8,8 @@ using Kingmaker.UI;
 using Kingmaker.UI.Common;
 using Kingmaker.UnitLogic.Abilities.Blueprints;
 using KingmakerBuffPlanner.Domain.Identity;
+using KingmakerBuffPlanner.Persistence;
+using KingmakerBuffPlanner.Domain.Providers;
 using KingmakerBuffPlanner.Planning;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -22,8 +24,10 @@ namespace KingmakerBuffPlanner.UI
         private readonly BuffPlannerUiLifecycleDiagnostics _diagnostics;
         private readonly Action _close;
         private readonly Action<string> _execute;
+        private readonly Action<string> _executeReadyOnly;
         private readonly PlannerUiTheme _theme;
         private readonly CatalogFilterState _filters = new CatalogFilterState();
+        private readonly StaticCanvas _nativeCanvas;
         private PlannerScreenViewModel _viewModel;
         private RectTransform _root;
         private Canvas _canvas;
@@ -32,6 +36,7 @@ namespace KingmakerBuffPlanner.UI
         private Image _blocker;
         private Text _status;
         private Text _result;
+        private string _shownPersistenceNotice;
         private Text _catalogSummary;
         private Text _routineLegend;
         private Text _tooltip;
@@ -44,18 +49,25 @@ namespace KingmakerBuffPlanner.UI
         private PlannerCasterPolicyChooserView _casterPolicyChooser;
         private PlannerSettingsView _settings;
         private PlannerDescriptionModal _description;
+        private PlannerCastingOrderView _castingOrder;
+        private PlannerAssignmentTargetChooserView _assignmentTargetChooser;
+        private PlannerNativeThemeSurface _nativeTheme;
         private Button _executeButton;
+        private Button _readyOnlyButton;
         private bool _disposed;
         private string _lastEnhancementRenderEvidence = string.Empty;
 
         internal BuffPlannerScreenView(StaticCanvas nativeCanvas, PlannerUiSession session,
-            BuffPlannerUiLifecycleDiagnostics diagnostics, Action close, Action<string> execute)
+            BuffPlannerUiLifecycleDiagnostics diagnostics, Action close, Action<string> execute,
+            Action<string> executeReadyOnly = null)
         {
             if (nativeCanvas == null) throw new ArgumentNullException("nativeCanvas");
+            _nativeCanvas = nativeCanvas;
             _session = session ?? throw new ArgumentNullException("session");
             _diagnostics = diagnostics ?? throw new ArgumentNullException("diagnostics");
             _close = close ?? throw new ArgumentNullException("close");
             _execute = execute ?? throw new ArgumentNullException("execute");
+            _executeReadyOnly = executeReadyOnly;
             _theme = PlannerUiTheme.Resolve(nativeCanvas);
             _viewModel = new PlannerScreenViewModel(session, _filters);
             try
@@ -173,6 +185,23 @@ namespace KingmakerBuffPlanner.UI
             {
                 _status.text = model.Snapshot.Units.Count + " targets | " +
                     model.Sources.Count + " buffs found";
+                // Final review B4: a saved setup that could not be read, or a
+                // change that was not saved, is always shown: once in full in
+                // the result line when it first appears, and in the status
+                // line for as long as it lasts.
+                string notice = _session.PersistenceNotice;
+                // Focused re-review: only a notice that refuses saves says so
+                // in the status line; a run waiting for the planner to close
+                // says that too.
+                if (_session.ClassicSavesRefused) _status.text += " | changes are not saved";
+                if (_session.IsExecuting)
+                    _status.text += " | a routine is waiting: close the planner to let it cast";
+                if (!string.IsNullOrEmpty(notice) &&
+                    !string.Equals(notice, _shownPersistenceNotice, StringComparison.Ordinal))
+                {
+                    _shownPersistenceNotice = notice;
+                    _result.text = notice;
+                }
                 if (string.IsNullOrWhiteSpace(_result.text))
                     _result.text = _session.ProfileStatus.StartsWith("No prior profile",
                         StringComparison.Ordinal) ? "New planner setup created for this campaign." :
@@ -185,7 +214,30 @@ namespace KingmakerBuffPlanner.UI
             _executeButton.interactable = ready;
             Text executeLabel = _executeButton.GetComponentInChildren<Text>(true);
             if (executeLabel != null) executeLabel.text = "APPLY " + ActiveRoutineId.ToUpperInvariant();
+            // The ready-only escape hatch exists exactly when the routine is
+            // incomplete; a complete routine never shows it.
+            bool incomplete = false;
+            if (_readyOnlyButton != null)
+            {
+                if (model != null && _session.LastPreview != null)
+                {
+                    try
+                    {
+                        incomplete = PartialExecutionGate.Evaluate(
+                            _session.LastPreview.Plan).Blocked;
+                    }
+                    catch { incomplete = false; }
+                }
+                _readyOnlyButton.interactable = ready && incomplete &&
+                    _executeReadyOnly != null;
+                _readyOnlyButton.gameObject.SetActive(_executeReadyOnly != null);
+            }
             KingmakerUiFactory.ForceLayoutAndSnap(_root);
+            // The visible controls now show exactly this plan: this is the
+            // presentation acknowledgment. Chooser/resource/forecast
+            // computations never reach here and never acknowledge.
+            if (model != null && !_session.IsExecuting)
+                _session.AcknowledgeDisplayedPlan(ActiveRoutineId);
         }
 
         private void RefreshCatalog(bool preserveScroll)
@@ -253,6 +305,13 @@ namespace KingmakerBuffPlanner.UI
             OpenCasterPolicyChooser();
         }
 
+        // Rebuilt chooser rows are plain owned controls; re-cover them with
+        // the already-resolved native theme without a fresh donor resolve.
+        private void ApplyNativeThemeTo(RectTransform scope)
+        {
+            if (_nativeTheme != null) _nativeTheme.ApplyTo(scope);
+        }
+
         private void RecordEnhancementRenderEvidence()
         {
             if (_selected == null || _session.Model == null) return;
@@ -266,11 +325,18 @@ namespace KingmakerBuffPlanner.UI
         }
         internal bool DispatchBlessRowForRuntime()
         {
-            if (_session.Model == null) return false;
-            const string bless = "90e59f4a4ada87243b7b3535a06d0638";
+            return DispatchSourceRowForRuntime("90e59f4a4ada87243b7b3535a06d0638");
+        }
+
+        // Selects the row of the given ability through the grid's own
+        // selection handler (a spellbook row first, as a player would find
+        // the spell in the spellbook).
+        internal bool DispatchSourceRowForRuntime(string abilityGuid)
+        {
+            if (_session.Model == null || string.IsNullOrEmpty(abilityGuid)) return false;
             SetupSourceRow source = _session.Model.Sources.Where(item =>
-                    item.Abilities.Any(ability => ability.BaseAbilityGuid == bless ||
-                        ability.VariantGuid == bless))
+                    item.Abilities.Any(ability => ability.BaseAbilityGuid == abilityGuid ||
+                        ability.VariantGuid == abilityGuid))
                 .OrderBy(item => item.Ability.SourceKind == SourceKind.Spellbook ? 0 : 1)
                 .FirstOrDefault();
             return source != null && _grid.SelectForRuntime(source.SourceId) &&
@@ -322,7 +388,9 @@ namespace KingmakerBuffPlanner.UI
                 CastingModeControlCount = allText.Count(text =>
                     text.text.StartsWith("Casting mode: ", StringComparison.Ordinal)),
                 RetiredPrimaryLabelCount = allText.Count(text => IsRetired(text.text)),
-                ThemeResolution = _theme.ResolutionSummary,
+                ThemeResolution = _theme.ResolutionSummary +
+                    (_nativeTheme == null ? string.Empty :
+                        "; native[" + _nativeTheme.Summary + "]"),
                 TextRenderingEvidence = BuildTextRenderingEvidence(),
                 NestedCanvasScalerCount = _root.GetComponentsInChildren<CanvasScaler>(true).Length,
                 FractionalRectCount = pixelSnapRects.Count(HasFractionalGeometry),
@@ -332,6 +400,12 @@ namespace KingmakerBuffPlanner.UI
         }
 
         internal void RefreshCatalogForRuntime() { RefreshCatalog(true); }
+
+        // The casting-mode control of the settings panel, invoked as a click.
+        internal bool ToggleExecutionModeForRuntime()
+        {
+            return _settings != null && _settings.InvokeCastingModeForRuntime();
+        }
 
         internal string DispatchCatalogControlsForRuntime()
         {
@@ -365,7 +439,11 @@ namespace KingmakerBuffPlanner.UI
 
         internal void ShowResult(QuickExecutionResult result)
         {
-            if (_result != null) _result.text = result == null ? _session.Status : result.Message;
+            // Focused re-review: a persistence notice stays beside the result.
+            string notice = _session.PersistenceNotice;
+            if (_result != null)
+                _result.text = (result == null ? _session.Status : result.Message) +
+                    (string.IsNullOrEmpty(notice) ? string.Empty : " " + notice);
             RefreshAll(true);
         }
 
@@ -466,14 +544,15 @@ namespace KingmakerBuffPlanner.UI
             {
                 _session.Model.SetAllValidTargets(ActiveRoutineId, false);
                 RefreshAll(true);
-            }, OpenCasterPolicyChooser, OpenEnhancementChooser, ShowTooltip);
+            }, OpenCasterPolicyChooser, OpenEnhancementChooser, ShowTooltip,
+            OpenCastingOrder);
             _enhancementChooser = new PlannerEnhancementChooserView(_root, _theme,
                 enhancementId =>
                 {
                     _session.Model.SetEnhancement(ActiveRoutineId, enhancementId);
                     RefreshAll(true);
                     OpenEnhancementChooser();
-                }, ShowTooltip);
+                }, ShowTooltip, ApplyNativeThemeTo);
             _casterPolicyChooser = new PlannerCasterPolicyChooserView(
                 _root, _theme,
                 (providerKey, enabled) =>
@@ -502,7 +581,52 @@ namespace KingmakerBuffPlanner.UI
                     _session.Model.ResetSelectedSourceProvidersToAutomatic();
                     RefreshCasterPolicyChooser();
                 },
-                ShowTooltip);
+                ShowTooltip, ApplyNativeThemeTo);
+            _castingOrder = new PlannerCastingOrderView(_root, _theme,
+                routineId => _session.GetCastingOrderRows(routineId),
+                routineId => _session.GetResourceUsageLines(routineId),
+                routineIds => _session.ForecastSequence(routineIds),
+                assignmentId =>
+                {
+                    _session.Model.MoveCastingAssignmentEarlier(ActiveRoutineId, assignmentId);
+                },
+                assignmentId =>
+                {
+                    _session.Model.MoveCastingAssignmentLater(ActiveRoutineId, assignmentId);
+                },
+                () => OpenCastingOrder(),
+                ShowTooltip, ApplyNativeThemeTo,
+                AddSelectedSourceAssignment,
+                assignmentId =>
+                {
+                    _session.Model.RemoveCastingAssignment(ActiveRoutineId,
+                        _session.Model.SelectedSourceId, assignmentId);
+                },
+                assignmentId =>
+                {
+                    _session.Model.CycleCastingAssignmentCaster(ActiveRoutineId,
+                        _session.Model.SelectedSourceId, assignmentId);
+                },
+                (assignmentId, unitId) =>
+                {
+                    _session.Model.RemoveTargetFromAssignment(ActiveRoutineId,
+                        _session.Model.SelectedSourceId, assignmentId, unitId);
+                },
+                (assignmentId, unitId) =>
+                {
+                    _session.Model.SplitCastingAssignment(ActiveRoutineId,
+                        _session.Model.SelectedSourceId, assignmentId, unitId);
+                },
+                (fromAssignmentId, toAssignmentId, unitId) =>
+                {
+                    _session.Model.MoveTargetToAssignment(ActiveRoutineId,
+                        _session.Model.SelectedSourceId, fromAssignmentId,
+                        toAssignmentId, unitId);
+                },
+                OpenAssignmentEnhancementChooser,
+                OpenAssignmentTargetChooser);
+            _assignmentTargetChooser = new PlannerAssignmentTargetChooserView(
+                _root, _theme, () => OpenCastingOrder(), ShowTooltip, ApplyNativeThemeTo);
             BuildFooter(frame);
             _settings = new PlannerSettingsView(frame, _theme, () =>
             {
@@ -523,6 +647,20 @@ namespace KingmakerBuffPlanner.UI
                 RefreshAll(true);
             }, () => _settings.Show(false));
             _description = new PlannerDescriptionModal(_root, _theme);
+            // Donor lookup is native-canvas scoped (P1: resolving from the
+            // planner root cannot reach ServiceWindow paths); application
+            // stays owned-scope on this root.
+            _nativeTheme = PlannerNativeThemeSurface.Attach(_root, _nativeCanvas);
+            // Every owned paper surface — main frame, blocker, nested modal
+            // frames — is registered explicitly so the book donor reaches the
+            // real rendered tree, not a few top-level names.
+            _nativeTheme.RegisterPaperSurface(frame);
+            _nativeTheme.RegisterPaperSurface(_enhancementChooser.PaperSurface);
+            _nativeTheme.RegisterPaperSurface(_casterPolicyChooser.PaperSurface);
+            _nativeTheme.RegisterPaperSurface(_castingOrder.PaperSurface);
+            _nativeTheme.RegisterPaperSurface(_assignmentTargetChooser.PaperSurface);
+            _nativeTheme.RegisterPaperSurface(_description.PaperSurface);
+            _nativeTheme.ApplyAll();
             _root.SetAsLastSibling();
             _root.gameObject.SetActive(true);
             PlannerPointerOwnership.Register(_root);
@@ -544,11 +682,123 @@ namespace KingmakerBuffPlanner.UI
             Button settings = KingmakerUiFactory.CreateButton("Settings", header, _theme,
                 "Settings", () => _settings.Show(!_settings.IsOpen));
             KingmakerUiFactory.SetAnchors((RectTransform)settings.transform,
-                0.82f, 0.14f, 0.93f, 0.86f);
+                0.46f, 0.14f, 0.57f, 0.86f);
+            // The header entry to the assignment/resource editor carries its
+            // full caption instead of the undiscoverable "Order"; the wider
+            // anchors plus caption fitting keep it readable at every
+            // supported resolution.
+            Button castingOrder = KingmakerUiFactory.CreateButton("CastingOrder", header,
+                _theme, "Assignments & Resources", OpenCastingOrder);
+            KingmakerUiFactory.SetAnchors((RectTransform)castingOrder.transform,
+                0.585f, 0.14f, 0.895f, 0.86f);
             Button close = KingmakerUiFactory.CreateButton("Close", header, _theme,
                 "X", () => _close());
             KingmakerUiFactory.SetAnchors((RectTransform)close.transform,
-                0.94f, 0.14f, 0.99f, 0.86f);
+                0.91f, 0.14f, 0.99f, 0.86f);
+            KingmakerUiFactory.FitButtonToCaption(
+                (RectTransform)castingOrder.transform, 220f, 34f);
+            KingmakerUiFactory.FitButtonToCaption(
+                (RectTransform)settings.transform, 96f, 34f);
+        }
+
+        private void OpenCastingOrder()
+        {
+            if (_castingOrder == null || _session.Model == null) return;
+            _enhancementChooser.Hide();
+            _casterPolicyChooser.Hide();
+            _castingOrder.Show(ActiveRoutineId);
+        }
+
+        private void OpenAssignmentTargetChooser(string sourceId, string assignmentId)
+        {
+            PlannerSetupModel model = _session.Model;
+            SetupSourceRow source = model == null ? null : model.SelectedSource;
+            if (source == null || source.SourceId != sourceId) return;
+            _castingOrder.Hide();
+            _enhancementChooser.Hide();
+            _casterPolicyChooser.Hide();
+            List<CastingAssignmentProfile> children = model
+                .GetCastingAssignments(ActiveRoutineId, sourceId).ToList();
+            CastingAssignmentProfile current = children.FirstOrDefault(child =>
+                child.AssignmentId == assignmentId);
+            if (current == null) return;
+            var rows = new List<AssignmentTargetRowViewModel>();
+            foreach (UnitSnapshot unit in model.Snapshot.Units)
+            {
+                string unitId = unit.UnitId;
+                bool assigned = current.TargetUnitIds.Contains(unitId);
+                // Assignment-specific legality: the selected child's own
+                // pins and enhancements decide, never another child's reach.
+                bool legal = model.IsTargetLegalForAssignment(source,
+                    ActiveRoutineId, assignmentId, unitId);
+                string reason = string.Empty;
+                bool siblingOwned = !assigned && children.Any(child =>
+                    child.AssignmentId != assignmentId &&
+                    child.TargetUnitIds.Contains(unitId));
+                if (!legal && !assigned && !siblingOwned)
+                    reason = "not reachable by this assignment";
+                else if (siblingOwned)
+                    reason = "assigned to another assignment — use Move to transfer";
+                rows.Add(new AssignmentTargetRowViewModel(unitId,
+                    string.IsNullOrWhiteSpace(unit.DisplayName) ? unitId : unit.DisplayName,
+                    assigned, legal && !siblingOwned, reason, () =>
+                    {
+                        try
+                        {
+                            model.ToggleAssignmentTarget(ActiveRoutineId, sourceId,
+                                assignmentId, unitId);
+                        }
+                        catch (InvalidOperationException) { }
+                    }));
+            }
+            _assignmentTargetChooser.Show(source.DisplayName + " — " + assignmentId, rows);
+        }
+
+        private void AddSelectedSourceAssignment()
+        {
+            PlannerSetupModel model = _session.Model;
+            if (model == null || model.SelectedSource == null) return;
+            model.AddCastingAssignment(ActiveRoutineId, model.SelectedSourceId);
+        }
+
+        private void OpenAssignmentEnhancementChooser(string sourceId, string assignmentId)
+        {
+            PlannerSetupModel model = _session.Model;
+            SetupSourceRow source = model == null ? null : model.SelectedSource;
+            if (source == null || source.SourceId != sourceId) return;
+            _casterPolicyChooser.Hide();
+            _castingOrder.Hide();
+            RoutinePlanResult preview = null;
+            try { preview = _session.PreviewRoutine(ActiveRoutineId); }
+            catch { preview = null; }
+            var selectedIds = model.GetAssignmentEnhancementIds(
+                ActiveRoutineId, sourceId, assignmentId).ToList();
+            var selections = selectedIds.Select(id =>
+            {
+                CastingAssignmentProfile assignment = model.FindCastingAssignment(
+                    ActiveRoutineId, sourceId, assignmentId);
+                EnhancementSelectionProfile match = assignment.Enhancements
+                    .FirstOrDefault(selection => selection.EnhancementId == id);
+                return new EnhancementSelectionSummary(id, match == null || match.IsRequired);
+            }).ToList();
+            _enhancementChooser.ShowForAssignment(
+                SelectedCastingViewModel.Create(source, model, ActiveRoutineId, preview,
+                    assignmentId),
+                sourceId, assignmentId, selections,
+                (sourceKey, assignmentKey, enhancementId) =>
+                {
+                    model.SetAssignmentEnhancement(ActiveRoutineId, sourceKey,
+                        assignmentKey, enhancementId);
+                    RefreshAll(true);
+                    OpenAssignmentEnhancementChooser(sourceKey, assignmentKey);
+                },
+                (sourceKey, assignmentKey, enhancementId, required) =>
+                {
+                    model.SetCastingAssignmentEnhancementPolicy(ActiveRoutineId, sourceKey,
+                        assignmentKey, enhancementId, required);
+                    RefreshAll(true);
+                    OpenAssignmentEnhancementChooser(sourceKey, assignmentKey);
+                });
         }
 
         private void BuildFooter(RectTransform frame)
@@ -567,11 +817,18 @@ namespace KingmakerBuffPlanner.UI
             Button close = KingmakerUiFactory.CreateButton("Close", footer, _theme,
                 "CLOSE", () => _close());
             KingmakerUiFactory.SetAnchors((RectTransform)close.transform,
-                0.72f, 0.12f, 0.82f, 0.88f);
+                0.72f, 0.12f, 0.80f, 0.88f);
+            _readyOnlyButton = KingmakerUiFactory.CreateButton("ExecuteReadyOnly", footer,
+                _theme, "APPLY READY ONLY", () =>
+                {
+                    if (_executeReadyOnly != null) _executeReadyOnly(ActiveRoutineId);
+                });
+            KingmakerUiFactory.SetAnchors((RectTransform)_readyOnlyButton.transform,
+                0.81f, 0.08f, 0.905f, 0.92f);
             _executeButton = KingmakerUiFactory.CreateButton("Execute", footer, _theme,
                 "APPLY LONG", () => _execute(ActiveRoutineId));
             KingmakerUiFactory.SetAnchors((RectTransform)_executeButton.transform,
-                0.83f, 0.08f, 0.985f, 0.92f);
+                0.91f, 0.08f, 0.985f, 0.92f);
         }
 
         private void ShowTooltip(string value)
@@ -638,7 +895,7 @@ namespace KingmakerBuffPlanner.UI
                 ability.BaseAbilityGuid);
         }
 
-        private static Sprite ResolvePortrait(string unitId)
+        internal static Sprite ResolvePortrait(string unitId)
         {
             if (Game.Instance == null || Game.Instance.Player == null) return null;
             foreach (UnitEntityData member in Game.Instance.Player.Party)
@@ -844,6 +1101,7 @@ namespace KingmakerBuffPlanner.UI
 
     internal sealed class PlannerDescriptionModal
     {
+        private readonly RectTransform _frame;
         private readonly Image _icon;
         private readonly Text _fallback;
         private readonly Text _name;
@@ -855,15 +1113,15 @@ namespace KingmakerBuffPlanner.UI
         {
             Root = KingmakerUiFactory.CreateRect("DescriptionModal", parent);
             KingmakerUiFactory.Stretch(Root);
-            Image backdrop = KingmakerUiFactory.AddPanel(Root,
-                new Color(0.05f, 0.035f, 0.025f, 0.82f));
+            Image backdrop = Root.gameObject.AddComponent<Image>();
+            backdrop.color = new Color(0.05f, 0.035f, 0.025f, 0.82f);
             backdrop.raycastTarget = true;
-            RectTransform frame = KingmakerUiFactory.CreateRect("DescriptionFrame", Root);
-            KingmakerUiFactory.SetAnchors(frame, 0.19f, 0.08f, 0.81f, 0.92f);
-            KingmakerUiFactory.AddFramedPanel(frame, theme.ParchmentRaised,
+            _frame = KingmakerUiFactory.CreateRect("DescriptionFrame", Root);
+            KingmakerUiFactory.SetAnchors(_frame, 0.19f, 0.08f, 0.81f, 0.92f);
+            KingmakerUiFactory.AddFramedPanel(_frame, theme.ParchmentRaised,
                 theme.GoldAccent, 3f);
 
-            RectTransform iconFrame = KingmakerUiFactory.CreateRect("AbilityIconFrame", frame);
+            RectTransform iconFrame = KingmakerUiFactory.CreateRect("AbilityIconFrame", _frame);
             KingmakerUiFactory.SetAnchors(iconFrame, 0.035f, 0.79f, 0.16f, 0.965f);
             KingmakerUiFactory.AddFramedPanel(iconFrame,
                 new Color(0.16f, 0.10f, 0.07f, 1f), theme.GoldAccent, 2f).raycastTarget = false;
@@ -876,25 +1134,25 @@ namespace KingmakerBuffPlanner.UI
                 "?", 40, TextAnchor.MiddleCenter);
             KingmakerUiFactory.Stretch(_fallback.rectTransform);
 
-            _name = KingmakerUiFactory.CreateText("AbilityName", frame, theme,
+            _name = KingmakerUiFactory.CreateText("AbilityName", _frame, theme,
                 string.Empty, 25, TextAnchor.MiddleLeft);
             _name.fontStyle = FontStyle.Bold;
             _name.color = theme.BurgundyPrimary;
             _name.horizontalOverflow = HorizontalWrapMode.Wrap;
             _name.verticalOverflow = VerticalWrapMode.Overflow;
             KingmakerUiFactory.SetAnchors(_name.rectTransform, 0.18f, 0.82f, 0.86f, 0.965f);
-            _meta = KingmakerUiFactory.CreateText("AbilityMeta", frame, theme,
+            _meta = KingmakerUiFactory.CreateText("AbilityMeta", _frame, theme,
                 string.Empty, 15, TextAnchor.MiddleLeft);
             _meta.color = theme.MutedBrownText;
             KingmakerUiFactory.SetAnchors(_meta.rectTransform, 0.18f, 0.75f, 0.86f, 0.82f);
 
-            Button close = KingmakerUiFactory.CreateButton("CloseDescription", frame, theme,
+            Button close = KingmakerUiFactory.CreateButton("CloseDescription", _frame, theme,
                 "X", Hide);
             KingmakerUiFactory.SetAnchors((RectTransform)close.transform,
                 0.89f, 0.90f, 0.965f, 0.97f);
 
             RectTransform content;
-            _scroll = KingmakerUiFactory.CreateScrollView("DescriptionScroll", frame,
+            _scroll = KingmakerUiFactory.CreateScrollView("DescriptionScroll", _frame,
                 theme, out content);
             KingmakerUiFactory.SetAnchors((RectTransform)_scroll.transform,
                 0.035f, 0.055f, 0.965f, 0.73f);
@@ -914,6 +1172,7 @@ namespace KingmakerBuffPlanner.UI
         }
 
         internal RectTransform Root { get; private set; }
+        internal RectTransform PaperSurface { get { return _frame; } }
         internal bool IsOpen { get { return Root.gameObject.activeSelf; } }
 
         internal void Show(SetupSourceRow source, BlueprintAbility ability, Sprite icon)

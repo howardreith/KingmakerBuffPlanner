@@ -53,3 +53,4 @@ _ReSharper*/
 .DS_Store
 Thumbs.db
 Desktop.ini
+scripts/Invoke-WorkspaceTest.ps1

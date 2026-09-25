@@ -41,10 +41,28 @@ if (-not $logSource.Contains('Environment.NewLine + exception')) {
 $assertions++
 
 $version = Get-KbpVersion
+# CLR AssemblyVersion/FileVersion must stay numeric; a semver prerelease
+# suffix lives only in AssemblyInformationalVersion and the UMM metadata.
+# Numeric releases pin the assembly version to <version>.0; prereleases pin
+# it to KbpAssemblyVersion (which must be numeric and derive from the same
+# release number).
+$numericAssembly = $version + '.0'
+$isPrereleaseVersion = $version -match '-'
+if ($isPrereleaseVersion) {
+    $props = Get-Content -LiteralPath (Join-Path $root 'Version.props') -Raw
+    if ($props -notmatch '<KbpAssemblyVersion>([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)</KbpAssemblyVersion>') {
+        throw 'Prerelease versions require a numeric KbpAssemblyVersion in Version.props.'
+    }
+    $numericAssembly = $Matches[1]
+    $releaseBase = ($version -split '-')[0]
+    if (-not $numericAssembly.StartsWith($releaseBase + '.', [StringComparison]::Ordinal)) {
+        throw "KbpAssemblyVersion $numericAssembly does not derive from prerelease base $releaseBase."
+    }
+}
 $assemblyInfo = Get-Content -LiteralPath (Join-Path $root `
     'src\KingmakerBuffPlanner\Properties\AssemblyInfo.cs') -Raw
-if (-not $assemblyInfo.Contains('[assembly: AssemblyVersion("' + $version + '.0")]') -or
-    -not $assemblyInfo.Contains('[assembly: AssemblyFileVersion("' + $version + '.0")]') -or
+if (-not $assemblyInfo.Contains('[assembly: AssemblyVersion("' + $numericAssembly + '")]') -or
+    -not $assemblyInfo.Contains('[assembly: AssemblyFileVersion("' + $numericAssembly + '")]') -or
     -not $assemblyInfo.Contains('[assembly: AssemblyInformationalVersion("' + $version + '")]')) {
     throw 'CLR assembly versions do not match Version.props.'
 }
@@ -152,7 +170,7 @@ if ($hudSource.Contains('"Feedback"') -or
     $hudSource.Contains('_feedback') -or
     $hudSource.Contains('void Present(QuickExecutionResult') -or
     $uiRootSource.Contains('_hud.Present(result)') -or
-    -not $uiRootSource.Contains('_screen.Present(result)') -or
+    -not $uiRootSource.Contains('_screen.Present(result,') -or
     -not $uiRootSource.Contains('Routine UI result:')) {
     throw 'Quick results must remain in the planner footer and UMM log, never a floating HUD object.'
 }
@@ -611,7 +629,7 @@ foreach ($physicalContract in @('umm-overlay-ready.json',
         'physical-umm-dismiss-sent', '[byte]0x1B', 'hotkey-ready.json',
         '[byte]0x11', '[byte]0x10', '[byte]0x42',
         'physical-input-*.json', 'ClientToScreen', 'SetCursorPos',
-        '[KbpPhysicalInput]::Click()')) {
+        '[KbpPhysicalInput]::Click($process.MainWindowHandle)')) {
     if (-not $runtimeHostSource.Contains($physicalContract) -and
         -not $runtimeScriptSource.Contains($physicalContract)) {
         throw "Live qualification must physically dismiss ShowOnStart UMM and then deliver the planner hotkey: $physicalContract"

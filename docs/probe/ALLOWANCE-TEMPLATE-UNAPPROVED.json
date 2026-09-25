@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 3,
+  "kind": "kbp-single-cast-probe",
+  "runId": "casting-probe-cast-20260923-01",
+  "sourceCommit": "SET-FROM-FREEZE-RECORD",
+  "packageSha256": "SET-FROM-FREEZE-RECORD",
+  "dllSha256": "SET-FROM-FREEZE-RECORD",
+  "assemblyMvid": "SET-FROM-FREEZE-RECORD",
+  "approvedProjectionId": "ee8e76b211eb8aa6deb213a5f9fd7699eba5061e67ffc00e245186068937cb89",
+  "casterUnitId": "2b56df7d-636e-4993-af38-5d54c6217e74",
+  "targetUnitId": "050aa19a-1cf1-40f3-b28e-59d8c2fbfebf",
+  "sourceId": "effect|fd7aa6ac895aeb318a5962d6fa358ee226c81e0cdb7dcd8d98ff163e5559df76",
+  "maximumNativeSubmissions": 1,
+  "approvedBy": "",
+  "compatibilityProfileId": "SET-FROM-SELECTION-RUN",
+  "compatibilityIdentity": "SET-FROM-SELECTION-RUN",
+  "workingSaveSha256": "SET-FROM-SELECTION-RUN",
+  "purpose": ""
+}

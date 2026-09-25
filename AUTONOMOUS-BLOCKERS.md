@@ -1,4 +1,168 @@
+# AUTONOMOUS-BLOCKERS — top section is current
+
+## Workspace visual qualification blockers — 2026-09-20
+
+- **BLOCKING (hypothesis intact, connected test not yet achieved):
+  fully-black captures whenever the owner's RDP session is disconnected
+  during the capture phase.** Bisection runs casting-ws-bisect-211500 /
+  -214500: open AND closed frames 100% black (workspace exonerated).
+  Run casting-ws-connected-224000 was STARTED with the session Active
+  (rdp-tcp#119), but the session disconnected DURING the run (state Disc
+  by completion; the rdp-tcp connection vanished) and all three captures
+  — control, open, closed — were 100% black (30 KB PNGs). Presenting
+  runs so far (17:30, 20:02) both occurred while the owner was
+  connected; every black run coincides with a disconnected session.
+  `Application.isFocused=True` in black runs does not discriminate
+  (stale focus is expected in a disconnected session). A VALID test
+  requires the owner connected and watching through the ~2-minute
+  capture window, then their observation of the game window decides the
+  lane: game rendered + black captures = automated capture-pipeline
+  repair; game also black on their screen = display/presentation
+  environment failure (stop launching; owner controls session/display
+  state). Owner observation also supplies separately labeled visual
+  evidence per the mission if captures stay broken.
+- **OPEN (classification pending a presenting session):** in
+  casting-ws-root-200200 the game presented (HUD visible, mean luma
+  0.107) with the workspace hierarchy fully presented, yet no workspace
+  UI was drawn in the frame. Possibly the two-update settle captured
+  before the nested canvas drew (now 750 ms wall-clock settle); if a
+  presenting session still shows no workspace, the nested-canvas draw
+  path under StaticCanvas is the defect.
+- Workspace CONSTRUCTION is proven live: hierarchy active, 1920x1200
+  rect under StaticCanvas, nested canvas enabled (sortingOrder 1000,
+  alpha 1.00), 19 renderable texts; production open path logged
+  `casting-first workspace opened;dispatch=native-submission-disabled`
+  (run casting-ws-root-200200 output_log lines 3979-3983).
+- Harness defect (latent, recorded, not swept): nine top-level guarded
+  scripts call `$PSCmdlet.ShouldProcess` which NullReferenceExceptions
+  under `powershell.exe -File` when confirmation must be evaluated. The
+  runtime launcher is repaired (narrow catch + WhatIf-contract fallback)
+  with a three-layer regression test; the other eight remain
+  `-Command`-only until each gets the same repair plus its own gate.
+
+## Casting-first migration blockers — 2026-09-19
+
+- RESOLVED (was the standing live-lane blocker): the authorized
+  automation save trio now exists in the real save directory
+  (SEED/BASELINE/WORKING at indices 303/304/305; read-only verified
+  during the Phase 1 checkpoint). Live lanes for donor inventory and
+  rendered smoke are actionable through the guarded harness when a
+  phase needs them. No live run has been performed yet in this mission.
+- T03 exact rod identity: still no qualified durable instance contract
+  in the inspected Assembly-CSharp surface (historical finding). The
+  new schema-6 model carries `ExactSourceRef` placeholders but the
+  compiler deliberately does not fake identity; blocked until a live
+  contract inspection (fixture now available) or an explicit decision
+  to keep pooled semantics honestly labeled.
+- Phase 2 known-open work (not blockers): shared atomic cross-casting
+  budget reservation; schema-5→6 import converter; both are the next
+  scheduled implementation steps, not external blockers.
+- All RC3 blockers below remain unchanged for the shipped rc3 product.
+
+## RC3 blockers — 2026-09-19
+
+- LIVE RENDER EVIDENCE: unchanged — guarded in-game runs were refused
+  while owner-controlled Kingmaker sessions were running; rendered
+  appearance, the visible spellbook button, and in-game chooser budgets
+  remain source-verified only, with the owner's five-minute check as the
+  acceptance path. One bounded closed-window retry per publication is
+  permitted; do not loop on it.
+- Actual native charge spending (A7) remains a separate untested lane.
+- T03 exact rod identity and same-context spellbook return: unchanged
+  (deferred by design / no durable contract).
+
+## RC2 recovery blockers — 2026-09-19
+
+- LIVE RENDER EVIDENCE: blocked by an owner-controlled Kingmaker process
+  (PID 1896) running during the bounded guarded attempt; installation and
+  `live-ui-bootstrap` were refused by the deployment guard exactly as
+  designed and nothing was touched. Rendered native appearance, the
+  visible spellbook button, and in-game chooser budget displays are
+  source-verified only; the owner's five-minute manual check (in the rc2
+  release notes) is the acceptance path. v0.1.1-rc2 was published in a
+  closed-window retry after two owner sessions blocked earlier attempts;
+  the guards refused correctly both times with zero mutations.
+- Actual native charge spending for the scarce-rod case (A7) remains a
+  separate untested lane; allocation/reservation behavior is covered by
+  deterministic planner tests.
+- T03 exact rod identity: unchanged — no qualified durable instance
+  contract found in the inspected Assembly-CSharp surface; pooled
+  per-caster semantics stay honestly labeled.
+- Same-context spellbook return after close: still deferred by design.
+
+## Z continuation blockers — 2026-09-18
+
+- LIVE LANES: waiting on ONE human-only seed save (`KBP_AUTOMATION_SEED`,
+  deliberately disposable campaign). The guarded bootstrap
+  (`scripts/New-KbpAutomationFixture.ps1`, harness-tested 12/12) seals the
+  pair and archives provenance once it exists. No other fixture route
+  remains: lab `runtime-backups`/`runtime-evidence` no longer exist, and
+  using any ordinary save is forbidden.
+- T03 exact rod identity: NO QUALIFIED DURABLE INSTANCE CONTRACT FOUND in
+  the inspected Assembly-CSharp surface (items expose no instance
+  identity; charges live on owner+blueprint facts). This is bounded to
+  the inspected implementation, not proven absent from the engine; live
+  fixture testing of two identical rods' native charge behavior and any
+  durable binding remains outstanding. Pooled semantics stay honestly
+  labeled; no invented IDs or slot/ordinal pins.
+- Theme donor promotion and spellbook placement/handoff/return verification
+  remain live-lane-only (blocked with the fixture above), not source
+  blockers.
+
+# AUTONOMOUS-BLOCKERS — top section is current
+
+## Z native-assignments blockers — 2026-09-18
+
+- LIVE LANES BLOCKED: the authorized `KBP_AUTOMATION_BASELINE`/
+  `KBP_AUTOMATION_WORKING` pair is absent; only `Manual_298_KMG_*` and
+  `Manual_299_KMG_*` remain and belong to another product (protected). All
+  save-backed qualification for the 0.1.0 candidate is BLOCKED, not deferred
+  to speculation. A Kingmaker process also started during qualification; the
+  deployment guard refused correctly and nothing was touched.
+- Theme donors UNQUALIFIED-LIVE: BoundedScan locators (button label text,
+  body text, input, scrollbar) need one live inventory capture to promote to
+  proven paths; exact sprite-name/border contracts deliberately unasserted
+  until then.
+- Spellbook entry: native-close affordance lookup assumes a child Button
+  named `Close`; placement, duplicate prevention across owners, and the
+  same-context return trip are unverified and unclaimed.
+- T03 exact rod-instance identity: cannot be proven without the installed
+  game's live item contracts; legacy pooled selections remain pooled and no
+  exact-item pin is claimed.
+
 # Autonomous Blockers
+
+## 2026-09-06 failed human validation: routing diagnosis
+
+Product-bearing checkpoint: `de57d90b38711c4c641d470900339bd8815a3fa8`.
+Final candidate ZIP/DLL/MVID and exact command counts are recorded in the
+investigation report's delivery checkpoint. The package remains diagnostic-only;
+final bridge 21/21, exact metadata 87/87, deterministic builds 2/2, candidate
+deployment purity 5/5 and release installer purity 5/5 all pass. No gameplay
+coverage is promoted. The reproducing-machine cast log remains the next action.
+
+Instant Share remains unresolved; gameplay **NOT VERIFIED**. On local machine
+DATA the installed Planner 0.0.19 / Gunslinger 0.0.115 DLLs match both released
+hashes and MVIDs. Executing the real production bridge accepts that pair and
+rejects the actual older 0.0.114 provider. No affected casting log or running
+game is available; the exact Kingmaker save root is absent.
+
+Active branch: `codex/kingmaker-buff-planner-instant-share-routing-diagnosis`;
+starting/audited HEAD: `fd0e6dc1c32dfc929a56dbc575163e641b150746`;
+version remains 0.0.19. Diagnostic-only source adds pre-cast routing evidence,
+loaded-pair identity, provider-direct phase records and visible fallback
+outcomes. The native transaction and resource policies are unchanged.
+Focused gates: source 42/42, behavior 150/150, harness 8/8, package 4/4,
+deployment WhatIf 5/5; candidate production bridge 21/21 assertions in 3/3
+processes. No failed checks are counted as passes.
+
+Commands, exact identity tables, evidence under
+`artifacts/instant-share-diagnosis/`, rejected theories, and limits are in
+[the investigation report](docs/INSTANT-SHARE-FAILED-VALIDATION.md). This supersedes any interpretation of the historical public
+release records below as proof that Instant Share worked in Howie's game.
+Exact next action: capture one affected cast from the reproducing machine and
+identify its capability/selected-executor/Fire discriminator. A diagnostic
+candidate is not a gameplay fix or authorization trigger for a new public release.
 
 ## 2026-09-06 paired public release complete
 

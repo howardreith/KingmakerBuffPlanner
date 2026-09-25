@@ -1,0 +1,176 @@
+{
+  "schemaVersion": 1,
+  "profileId": "advanced-gunslinger-0136",
+  "status": "available",
+  "reason": "Owner-approved advanced profile (mission batch 3 section 5) for the KBP_ADVANCED_SEED Beneath the Stolen Lands fixture only: the full-user mod set with the Gunslinger 0.0.136 installation the seed was created under (its six approved values), staged from an exact external copy because the installed Gunslinger now changes with its own development, and BagOfTricks from the same frozen copy as full-user. The automation profile and its 0.0.133 copy are unchanged.",
+  "mods": [
+    {
+      "ummId": "BagOfTricks",
+      "directoryName": "BagOfTricks",
+      "version": "1.16.4",
+      "assemblyName": "BagOfTricks.dll",
+      "fixtureRelativePath": "BagOfTricks-20260924",
+      "infoSha256": "891c4a7864d2dd556a4628bcb19a8f6239a2bfbec9399f81e2414badc6de2974",
+      "assemblySha256": "d03626594ece0f339aeef03ec7259684af7ddeb8b2edf41936f144848059a0e6",
+      "directoryManifestSha256": "bc3e790b133c36d93f42b0fadbc6df1e1ffbe0c44999aad51f4471983400dac4",
+      "fileCount": 40,
+      "totalBytes": 1805726
+    },
+    {
+      "ummId": "BetterVendors",
+      "directoryName": "BetterVendors",
+      "version": "2.0.8",
+      "assemblyName": "BetterVendors.dll",
+      "infoSha256": "64b3d2253d0c5b7ca4641a1532ee5a61fc169564b3d2afcecd03ca69d4ac501e",
+      "assemblySha256": "8843509852964d9016d2996a3050bfbe6f068360c4f2f6b8ff7f6440ca712009",
+      "directoryManifestSha256": "6df15a98257d5ddcbbeca798cf5a43feac7dc64a297947a0245c78b668bde7ef",
+      "fileCount": 5,
+      "totalBytes": 436271
+    },
+    {
+      "ummId": "CallOfTheWild",
+      "directoryName": "CallOfTheWild",
+      "version": "1.14.4c-2.1",
+      "assemblyName": "CallOfTheWild.dll",
+      "infoSha256": "32c0bc48c26eb22787e99fb1eb86d074df2cd7dcfe4804ce8eb381a3a589d44d",
+      "assemblySha256": "4ebf8e1ed3e66ffed72ea33ea325595629423dacd5bffa23e3c9109144b26915",
+      "directoryManifestSha256": "988e6130e4d60bdda1be400f2c055f40ae6e91a44b75f456eb4822c77b31dc15",
+      "fileCount": 266,
+      "totalBytes": 66186003
+    },
+    {
+      "ummId": "CheatMenu",
+      "directoryName": "CheatMenu",
+      "version": "1.2.3",
+      "assemblyName": "CheatMenu.dll",
+      "infoSha256": "c53e29e5ec0d221be4dfea1228f27cacd99660e75124b61f4f81afa3ef2a0274",
+      "assemblySha256": "7d659eb092073ab9e059414f8bfbdfe46991cede56b394f58f7ea2bcc1ff0845",
+      "directoryManifestSha256": "7960517c82371ec89f372cdbf0690ee627e1dc9e7e6679d11324b06480726ce5",
+      "fileCount": 3,
+      "totalBytes": 30594
+    },
+    {
+      "ummId": "CraftMagicItems",
+      "directoryName": "CraftMagicItems",
+      "version": "2.1.0",
+      "assemblyName": "CraftMagicItems.dll",
+      "infoSha256": "55c5a948f0f0afdcd45c81a5c528d667aec0dd5af166b1761b72b44b67ae533b",
+      "assemblySha256": "f7c06f32f18932e67bd8e36fa380bf593ec1e88a262c9f9ddb0812bc1d8b209a",
+      "directoryManifestSha256": "592d06ea8278dbd532c426d6a842996156fafa710708b8231bd276b14475e0e0",
+      "fileCount": 21,
+      "totalBytes": 675776
+    },
+    {
+      "ummId": "EddicKingmakerRespec",
+      "directoryName": "EddicKingmakerRespec",
+      "version": "1.0",
+      "assemblyName": "EddicKingmakerRespec.dll",
+      "infoSha256": "1a03b9341052e9a249e2bb2746f05c5bf3d2c0fef095b35714d45c453fa6e9f4",
+      "assemblySha256": "385c1ed87b5acb70092875ce28527cefb5698c64b61d3f706a27dc37161fc4d6",
+      "directoryManifestSha256": "32277bc9f35b781ec9c542228ebab9db7a3df01438d139055bd0a4cdb4f0e798",
+      "fileCount": 5,
+      "totalBytes": 32305
+    },
+    {
+      "ummId": "KingmakerBugfixes",
+      "directoryName": "KingmakerBugfixes",
+      "version": "1.3.3",
+      "assemblyName": "KingmakerBugfixes.dll",
+      "infoSha256": "7df54a9e58e80b127185b0a1298c777d9cfd8c29716b4b3c0a49013839e7f880",
+      "assemblySha256": "87888cbe4ca1b62e151560a8697bf07073dff4446a2e2bc522fac1804b63dca1",
+      "directoryManifestSha256": "a5159cc15713d5500d5192a4b90011d7c9ed6cfa96ba1f0b15ac6585d72d1561",
+      "fileCount": 9,
+      "totalBytes": 572405
+    },
+    {
+      "ummId": "KingmakerDiceRoller",
+      "directoryName": "KingmakerDiceRoller",
+      "version": "0.1.6",
+      "assemblyName": "KingmakerDiceRoller.dll",
+      "infoSha256": "70384594be0577161c2cae92b117b11ae350f14cda9d04163a4618313b9a24cc",
+      "assemblySha256": "e2803d3f70ac168d52de27a075b36e6562c7209e709d02c62485f7ded0b13092",
+      "directoryManifestSha256": "f7e1988f7b4c2034c3dd852116eb2b176a8f4351383e55faaaa9853245dcb8da",
+      "fileCount": 8,
+      "totalBytes": 604063
+    },
+    {
+      "ummId": "KingmakerGunslinger",
+      "directoryName": "KingmakerGunslinger",
+      "version": "0.0.136",
+      "assemblyName": "KingmakerGunslinger.dll",
+      "fixtureRelativePath": "KingmakerGunslinger-0.0.136",
+      "infoSha256": "f66de05d5c6282eece8218b6c4f31d49dfc8ef9efa27dfeceeda712034717e17",
+      "assemblySha256": "c6cccdac914ed59fa4d85d020108588d7d12cfb4ac38cf5a162772bacc9b465c",
+      "directoryManifestSha256": "d08f0d5a2b3c9d9ef4fdc715caee1b76833d4128d97b9de8f8adb622c420e21f",
+      "fileCount": 238,
+      "totalBytes": 47128988
+    },
+    {
+      "ummId": "KingmakerLastAzlantiPreserver",
+      "directoryName": "KingmakerLastAzlantiPreserver",
+      "version": "0.1.1",
+      "assemblyName": "KingmakerLastAzlantiPreserver.dll",
+      "infoSha256": "e6df585d8bc3971b8d72eea63de6ee7a21521294bdd2acc696018c8fd626d66f",
+      "assemblySha256": "5be7a3691fbdde8ea4d351d8a7aee6adb78a5b401c9ac896435748ba99c0e85b",
+      "directoryManifestSha256": "ac1a405af2dad9365d26513579a24eb436b588a98eb96c4762a6a046cf73dcbf",
+      "fileCount": 8,
+      "totalBytes": 242560
+    },
+    {
+      "ummId": "ProperFlanking2",
+      "directoryName": "ProperFlanking2",
+      "version": "1.2.3-2.1",
+      "assemblyName": "ProperFlanking20.dll",
+      "infoSha256": "9ce8ed5d1009d8c6c80e4981f225afcfc8940e7f54d32259406aca37fae48eb6",
+      "assemblySha256": "b12baf538f0568b51c3b0e26d8d061d0cc3ad61a18b3e63c8b008c439b8a2666",
+      "directoryManifestSha256": "b05b89d2407abd9e4213e52222a5ee285ea674cd6f4af3e578fea31a51ceb9cf",
+      "fileCount": 20,
+      "totalBytes": 745784
+    },
+    {
+      "ummId": "RacesUnleashed",
+      "directoryName": "RacesUnleashed",
+      "version": "1.0.11",
+      "assemblyName": "RacesUnleashed.dll",
+      "infoSha256": "d09c359945c6aa5be71f11301c746a7b043fe9c13b3d6fba6506781d9a9eb01f",
+      "assemblySha256": "6d18168cb90ffe60931addc8ee11e42b3ef647ef0e6d4b7ce8980d44659f4cb0",
+      "directoryManifestSha256": "c25eaf9b4f3e0f9f4dac11d7cdc9db23c8f8d3fdb37895cc14ab77a3df46fca8",
+      "fileCount": 362,
+      "totalBytes": 22933741
+    },
+    {
+      "ummId": "SkipIntro",
+      "directoryName": "SkipIntro",
+      "version": "1.3.1",
+      "assemblyName": "SkipIntro.dll",
+      "infoSha256": "31dd84e09cc02bf75d13cb8e12ddd2a00e895da3213559b0cb468d242e19c8a1",
+      "assemblySha256": "39802e09decb9a8c6665f97e4f347bd1d9a3acd4bfed2c98f2c72fb28ecc093a",
+      "directoryManifestSha256": "97d9422df1dd0ecc458402fd760057e1b19afae60f9676e2e6a48e426eac23bc",
+      "fileCount": 5,
+      "totalBytes": 42182
+    },
+    {
+      "ummId": "TweakOrTreat",
+      "directoryName": "TweakOrTreat",
+      "version": "1.1.0",
+      "assemblyName": "TweakOrTreat.dll",
+      "infoSha256": "139c1d6c79d6aa6adac8b725c50cbc3a9ad21dc3024ff2ce7f636ada7b04cd59",
+      "assemblySha256": "a518324e15632aba46d6c467b156a31e9afd282e9827dee3e79ad14673852b92",
+      "directoryManifestSha256": "ba00fca41fcd75da8e79fb07e48b396b37c7371b1137a1150f3ffb63ec9024e7",
+      "fileCount": 22,
+      "totalBytes": 1917778
+    },
+    {
+      "ummId": "ZFavoredClass",
+      "directoryName": "ZFavoredClass",
+      "version": "1.3.1",
+      "assemblyName": "ZFavoredClass.dll",
+      "infoSha256": "c7288e37b8a4a588e6cbacc43c4b0f64e3d82b397d873e73ec08af405595fd20",
+      "assemblySha256": "dcd3adf98d1a04c30d772381e7c56ce4beff35a98bcea165aff206a2f0aac26c",
+      "directoryManifestSha256": "75f4ad7cc401cfe3a7672a69faf66b2682ab08f3fcadc770425bc089368275b8",
+      "fileCount": 24,
+      "totalBytes": 1419177
+    }
+  ],
+  "expectedBlueprints": []
+}

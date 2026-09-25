@@ -42,6 +42,13 @@ namespace KingmakerBuffPlanner.Execution
                     report.Add(index, step, CastExecutionStatus.FailedValidation, "combat-policy");
                     continue;
                 }
+                if (step.Reservation == null || !step.Reservation.CostKnown)
+                {
+                    // Review M1: an unknown cost is never treated as free.
+                    report.Add(index, step, CastExecutionStatus.FailedValidation,
+                        "reservation-cost-unknown");
+                    continue;
+                }
                 CastEnhancementPreparation enhancement = Prepare(step);
                 if (!enhancement.Valid)
                 {
@@ -81,6 +88,7 @@ namespace KingmakerBuffPlanner.Execution
                 }
                 Exception cleanupFailure = null;
                 Exception operationFailure = null;
+                bool operationBodyCompleted = false;
                 try
                 {
                     report.Add(index, step, CastExecutionStatus.Queued, "animated-command-queued");
@@ -135,6 +143,20 @@ namespace KingmakerBuffPlanner.Execution
                                 report.Add(index, step,
                                     CastExecutionStatus.ResourceSpent,
                                     "native-command-spend-completed");
+                            if (operation.ResourceSpent && step.Reservation.Unlimited)
+                                report.Add(index, step,
+                                    CastExecutionStatus.FailedExecution,
+                                    "unexpected-resource-spent-on-unlimited-source;" +
+                                    operation.Detail);
+                            else if (operation.ResourceCountViolation != null)
+                                // Review A7: counts that do not show what the
+                                // reservation needs are uncertainty, never
+                                // success.
+                                report.Add(index, step,
+                                    CastExecutionStatus.FailedExecution,
+                                    AvailableCountJudgement.PrefixFor(step.Reservation) +
+                                    operation.ResourceCountViolation + ";" +
+                                    operation.Detail);
                         }
                         catch (Exception exception)
                         { operationFailure = exception; }
@@ -145,6 +167,7 @@ namespace KingmakerBuffPlanner.Execution
                             "animated-operation-exception:" +
                             operationFailure.GetType().FullName + ":" +
                             operationFailure.Message);
+                    operationBodyCompleted = true;
                 }
                 finally
                 {
@@ -154,6 +177,27 @@ namespace KingmakerBuffPlanner.Execution
                         cleanupFailure = exception;
                     }
                     finally { enhancement.Dispose(); }
+                    // Review L2: when the iterator is disposed while the
+                    // operation is in flight (owner cancellation), the code
+                    // after this block never runs; report the abandonment
+                    // and the cleanup outcome here instead of losing them.
+                    if (!operationBodyCompleted)
+                    {
+                        report.Add(index, step, CastExecutionStatus.FailedExecution,
+                            "animated-operation-abandoned-in-flight");
+                        bool residual;
+                        try { residual = operation.HasResidualDeliveryState; }
+                        catch (Exception) { residual = true; }
+                        if (cleanupFailure != null || residual)
+                            report.Add(index, step,
+                                CastExecutionStatus.ResidualStateUnsettled,
+                                cleanupFailure == null
+                                    ? "animated-delivery-state-remained-after-cancel-cleanup;" +
+                                        SafeDetail(operation)
+                                    : "animated-cancel-cleanup-exception:" +
+                                        cleanupFailure.GetType().FullName + ":" +
+                                        cleanupFailure.Message);
+                    }
                 }
                 try
                 {
@@ -184,11 +228,22 @@ namespace KingmakerBuffPlanner.Execution
             }
         }
 
+        private static string SafeDetail(IAnimatedCastOperation operation)
+        {
+            try { return operation.Detail; }
+            catch (Exception exception) { return "detail-exception:" + exception.GetType().Name; }
+        }
+
         private CastEnhancementPreparation Prepare(CastStep step)
         {
-            if (step.EnhancementIds.Count == 0) return CastEnhancementPreparation.Pass(null);
+            // A casting-first step is prepared even with no enhancement, so
+            // nothing the casting did not choose stays switched on for it.
+            if (step.EnhancementIds.Count == 0 && !step.ExactEnhancements)
+                return CastEnhancementPreparation.Pass(null);
             var runtime = _runtime as ICastEnhancementRuntimeAdapter;
-            if (runtime == null) return CastEnhancementPreparation.Fail("runtime-adapter-unsupported");
+            if (runtime == null)
+                return step.EnhancementIds.Count == 0 ? CastEnhancementPreparation.Pass(null)
+                    : CastEnhancementPreparation.Fail("runtime-adapter-unsupported");
             try
             {
                 return runtime.PrepareEnhancements(step) ??

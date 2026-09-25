@@ -10,9 +10,9 @@
       "assemblyName": "BagOfTricks.dll",
       "infoSha256": "891c4a7864d2dd556a4628bcb19a8f6239a2bfbec9399f81e2414badc6de2974",
       "assemblySha256": "d03626594ece0f339aeef03ec7259684af7ddeb8b2edf41936f144848059a0e6",
-      "directoryManifestSha256": "34d89823b1dc4e4be21a8a9053724abb444cd9f9a6857c6c5406afd62197f426",
-      "fileCount": 41,
-      "totalBytes": 1805907
+      "directoryManifestSha256": "c4487d11b2643a213b777a22cd1a79f5255aae320ca771e43afc7dd06aa2e205",
+      "fileCount": 40,
+      "totalBytes": 1805725
     },
     {
       "ummId": "CallOfTheWild",
@@ -21,7 +21,7 @@
       "assemblyName": "CallOfTheWild.dll",
       "infoSha256": "32c0bc48c26eb22787e99fb1eb86d074df2cd7dcfe4804ce8eb381a3a589d44d",
       "assemblySha256": "4ebf8e1ed3e66ffed72ea33ea325595629423dacd5bffa23e3c9109144b26915",
-      "directoryManifestSha256": "3f1758b235820f3f64671cf4da5490afc5319ab40fce3a0e07d175b0d67a7a9c",
+      "directoryManifestSha256": "988e6130e4d60bdda1be400f2c055f40ae6e91a44b75f456eb4822c77b31dc15",
       "fileCount": 266,
       "totalBytes": 66186003
     },
@@ -33,7 +33,7 @@
       "infoSha256": "c53e29e5ec0d221be4dfea1228f27cacd99660e75124b61f4f81afa3ef2a0274",
       "assemblySha256": "7d659eb092073ab9e059414f8bfbdfe46991cede56b394f58f7ea2bcc1ff0845",
       "loadedAssemblySha256": "8a7525e061cbe4ad83ec2720e9ee97f9b536a6cd8e7dadee3a44ef2ea9343b84",
-      "directoryManifestSha256": "97f78227fb945c8e5e3b4fdd87e78e72ef3cda64500679ffcaf46c2aae44612a",
+      "directoryManifestSha256": "7960517c82371ec89f372cdbf0690ee627e1dc9e7e6679d11324b06480726ce5",
       "fileCount": 3,
       "totalBytes": 30594
     }
