@@ -46,6 +46,17 @@ builds), `RC6-repro` and the G2 gate build. Frozen copy
   package `f271f3e6...`, DLL `35d6cbb2...`, MVID `4cb12c0d-...` unchanged;
   the owner's session was Active. Re-arm only after a new reconciliation
   passes.
+- 01:53 second preflight (after the Gunslinger session's "KMG finished"
+  at 01:52): the lab state passes. No KMG or KBP lock or sentinel, no
+  Kingmaker process, the three KMG deployment transactions Restored and
+  verified and its runtime leases Completed, the Mods content equal to
+  the owner's baseline (KingmakerGunslinger 0.0.136 again; only
+  write-time differences in 13 settings files the game rewrote on exit),
+  KBP clean, RC6 unchanged. The watcher still stays paused. The owner's
+  session was disconnected, with LogonUI in session 2, and Gunslinger
+  processes were still active (its DomainTests.exe from its own worktree
+  at 01:53:29). Next: when the owner connects and asks, repeat the
+  reconciliation; the frame runs start only if every condition passes.
 - Found after the freeze (in the receipt): the inventory prints an
   unmodeled action's type as `0` (diagnostic text only; fixed on the
   local next branch, `caea6ea`); multi-use ability pools cannot be
