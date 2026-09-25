@@ -125,13 +125,17 @@ namespace KingmakerBuffPlanner.Execution
             return expression.GetType().Name;
         }
 
-        // "restorative-action:Kingmaker.UnitLogic.Mechanics.Actions.ContextActionRemoveBuff"
-        // -> "restorative-action:ContextActionRemoveBuff".
+        // "restorative-action:Kingmaker.UnitLogic.Mechanics.Actions.ContextActionRemoveBuff,
+        // Assembly-CSharp, Version=0.0.0.0" -> "restorative-action:ContextActionRemoveBuff"
+        // (the adapter names a type with its assembly and version; rc6's
+        // inventory printed the version's last part, "0").
         private static string ShortReason(string reason)
         {
             int colon = reason.IndexOf(':');
             if (colon < 0) return reason;
             string detail = reason.Substring(colon + 1);
+            int comma = detail.IndexOf(',');
+            if (comma >= 0) detail = detail.Substring(0, comma);
             int dot = detail.LastIndexOf('.');
             return reason.Substring(0, colon + 1) + (dot < 0 ? detail : detail.Substring(dot + 1));
         }
