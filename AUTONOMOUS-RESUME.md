@@ -30,7 +30,10 @@ builds), `RC6-repro` and the G2 gate build. Frozen copy
   waits for the owner's session to stay connected for two minutes, then
   runs the deferred frame runs once (reload, layout 1200, layout 1080 as
   attempt `-02`, the labelled rehearsal) through `rc6_chain.ps1 -Only`.
-  Status lines `FRAMES ...` in `rc6_chain.status`.
+  Status lines `FRAMES ...` in `rc6_chain.status`. Stopped at 00:11,
+  before it ran anything, because the Gunslinger lab began a 2.5-3 hour
+  batch with short gaps in its lock; to be re-armed after its "KMG
+  finished" (launch: `powershell.exe -File scratchpadc6_frames.ps1`).
 - Found after the freeze (in the receipt): the inventory prints an
   unmodeled action's type as `0` (diagnostic text only; fixed on the
   local next branch, `caea6ea`); multi-use ability pools cannot be
