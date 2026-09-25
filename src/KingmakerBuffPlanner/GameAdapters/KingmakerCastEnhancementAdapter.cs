@@ -73,8 +73,12 @@ namespace KingmakerBuffPlanner.GameAdapters
         {
             KingmakerAnimatedCastAdapter.ResolvedCast resolved;
             string reason;
+            // A casting-first step with no enhancement whose cast cannot be
+            // resolved is left to the cast's own validation, which refuses it
+            // with the same reason as before (nothing will be cast).
             if (!KingmakerAnimatedCastAdapter.TryResolve(step, out resolved, out reason))
-                return CastEnhancementPreparation.Fail("cast-resolution:" + reason);
+                return step.EnhancementIds.Count == 0 ? CastEnhancementPreparation.Pass(null)
+                    : CastEnhancementPreparation.Fail("cast-resolution:" + reason);
             List<Entry> entries = RodEntries(resolved.Caster).Concat(
                 _brownFur.ForCast(resolved.Caster, step.Provider,
                     resolved.Ability).Select(value => new Entry(value.Ability,
@@ -90,8 +94,14 @@ namespace KingmakerBuffPlanner.GameAdapters
                 if (matches.Count == 0) return CastEnhancementPreparation.Fail("source-not-owned:" + id);
                 if (!matches[0].Snapshot.IsApplicable(step.Provider, resolved.Ability.SpellLevel))
                     return CastEnhancementPreparation.Fail("source-inapplicable:" + id);
-                Entry entry = matches.FirstOrDefault(value =>
-                    value.Ability.IsAvailable);
+                // Casting-first prefers the copy already running (then on),
+                // so a rod the player left on is the one used and no other
+                // copy has to be started or stopped for it.
+                Entry entry = step.ExactEnhancements
+                    ? matches.Where(value => value.Ability.IsAvailable)
+                        .OrderByDescending(value => value.Ability.IsRunning)
+                        .ThenByDescending(value => value.Ability.IsOn).FirstOrDefault()
+                    : matches.FirstOrDefault(value => value.Ability.IsAvailable);
                 if (entry == null) return CastEnhancementPreparation.Fail("source-exhausted:" + id);
                 selected.Add(entry);
             }
@@ -127,17 +137,54 @@ namespace KingmakerBuffPlanner.GameAdapters
                     states.Add(state);
                 }
                 state.OneShot = state.OneShot || entry.OneShot;
+                state.Rod = state.Rod || entry.Snapshot.Category == CastEnhancementCategory.MetamagicRod;
                 state.Selected = state.Selected || selected.Contains(entry);
             }
-            var lease = new ActivationLease(states);
+            var lease = new ActivationLease(states, step.ExactEnhancements);
             try
             {
-                foreach (State state in states)
-                    state.Ability.IsOn = state.Selected;
+                if (step.ExactEnhancements)
+                {
+                    // Casting-first: everything the casting did not choose is
+                    // switched off first. A toggle whose blueprint defers
+                    // deactivation keeps running, its buff applied, until the
+                    // next round after it is switched off
+                    // (ActivatableAbility.OnTurnOff), so an unchosen rod still
+                    // running is stopped now, its buff removed at once; the
+                    // chosen ones go on only after that.
+                    foreach (State state in states.Where(value => !value.Selected))
+                        state.Ability.IsOn = false;
+                    foreach (State state in states.Where(value => !value.Selected && value.Rod &&
+                            value.Ability.IsRunning))
+                        state.Ability.Stop(true);
+                    foreach (State state in states.Where(value => value.Selected))
+                        state.Ability.IsOn = true;
+                }
+                else
+                    foreach (State state in states)
+                        state.Ability.IsOn = state.Selected;
                 if (states.Any(value => value.Selected && !value.Ability.IsOn))
                 {
                     lease.Dispose();
                     return CastEnhancementPreparation.Fail("activation-refused");
+                }
+                // Casting-first: nothing the casting did not choose stays on or
+                // running for its cast; anything that does refuses the cast.
+                // Switching a stopped rod back on after the cast restarts it
+                // (the qualification's caster reads check that this costs no
+                // charge). The Brown Fur toggles stop at once only with the
+                // installed provider's own immediate-off patch; without it an
+                // unchosen one still running refuses the cast, visibly.
+                if (step.ExactEnhancements)
+                {
+                    State still = states.FirstOrDefault(value => !value.Selected &&
+                        (value.Ability.IsOn || value.Ability.IsRunning));
+                    if (still != null)
+                    {
+                        lease.Dispose();
+                        return CastEnhancementPreparation.Fail("deactivation-refused:" +
+                            (still.Ability.Blueprint == null ? "unknown" : still.Ability.Blueprint.AssetGuid));
+                    }
                 }
                 foreach (State state in states.Where(value => value.Selected &&
                     value.OneShot)) state.ArmedByLease = true;
@@ -269,6 +316,7 @@ namespace KingmakerBuffPlanner.GameAdapters
             internal bool IsOn;
             internal bool Selected;
             internal bool OneShot;
+            internal bool Rod;
             internal bool ArmedByLease;
             internal string ActivationGroupId;
         }
@@ -276,8 +324,13 @@ namespace KingmakerBuffPlanner.GameAdapters
         private sealed class ActivationLease : IDisposable
         {
             private readonly IReadOnlyList<State> _states;
+            private readonly bool _exact;
             private bool _disposed;
-            internal ActivationLease(IReadOnlyList<State> states) { _states = states; }
+            internal ActivationLease(IReadOnlyList<State> states, bool exact)
+            {
+                _states = states;
+                _exact = exact;
+            }
             public void Dispose()
             {
                 if (_disposed) return;
@@ -298,6 +351,18 @@ namespace KingmakerBuffPlanner.GameAdapters
                                 state.OneShot, state.ActivationGroupId,
                                 consumedGroups))
                             state.Ability.IsOn = state.IsOn;
+                    }
+                    catch (Exception) { }
+                }
+                // Casting-first: a rod switched on for the cast and back off
+                // would keep running until the next round, extending whatever
+                // is cast next; it is stopped now.
+                if (!_exact) return;
+                foreach (State state in _states.Where(value => value.Rod))
+                {
+                    try
+                    {
+                        if (!state.Ability.IsOn && state.Ability.IsRunning) state.Ability.Stop(true);
                     }
                     catch (Exception) { }
                 }

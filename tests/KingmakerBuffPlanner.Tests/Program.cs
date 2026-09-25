@@ -89,6 +89,7 @@ namespace KingmakerBuffPlanner.Tests
                 Run("scanner-reports-cycle", TestScannerCycle);
                 Run("scanner-reports-unknown-node", TestScannerUnknown);
                 Run("scanner-expression-wire-contract", TestScannerExpressionWireContract);
+                Run("scanner-records-why-nothing-was-modeled", TestScannerEmptyReasons);
                 Run("spellbook-role-filtering-is-structural-and-fail-soft",
                     TestSpellbookRoleResolution);
                 Run("installed-call-of-the-wild-spellbook-contract-is-exact",
@@ -545,6 +546,39 @@ namespace KingmakerBuffPlanner.Tests
                 !json.Contains("\"effectId\":\"wire-buff\"") ||
                 !json.Contains("\"actionPath\":\"wire-buff\""))
                 throw new InvalidOperationException("Effect expression JSON contract is incomplete: " + json);
+        }
+
+        // Independent review of the next iteration: an action the planner
+        // does not model (healing, removing a buff, damage, an unknown action)
+        // is not "nothing"; only a null action or an empty list is. The
+        // reason never reaches the serialized form.
+        private static void TestScannerEmptyReasons()
+        {
+            var root = new DiscoveryNode(DiscoveryNodeKind.Sequence, "list", new[]
+            {
+                new DiscoveryNode(DiscoveryNodeKind.Empty, "null"),
+                new DiscoveryNode(DiscoveryNodeKind.RestorativeAction, "Kingmaker.Fixture.ContextActionRemoveBuff",
+                    sourceContract: "restorative-action"),
+                new DiscoveryNode(DiscoveryNodeKind.OffensiveAction, "Kingmaker.Fixture.ContextActionDealDamage",
+                    sourceContract: "offensive-action"),
+                new DiscoveryNode(DiscoveryNodeKind.Unknown, "Custom", sourceContract: "unsupported-action"),
+                EffectNode("buff")
+            });
+            var sequence = (SequenceEffectExpression)new ActionGraphScanner().Scan(root).Expression;
+            List<EmptyEffectExpression> empties = sequence.Children.Take(4).Cast<EmptyEffectExpression>().ToList();
+            if (!empties[0].IsNoAction ||
+                empties[1].UnmodeledReason != "restorative-action:Kingmaker.Fixture.ContextActionRemoveBuff" ||
+                empties[2].UnmodeledReason != "offensive-action:Kingmaker.Fixture.ContextActionDealDamage" ||
+                empties[3].UnmodeledReason != "unknown-node:Custom" ||
+                new EmptyEffectExpression().IsNoAction ||
+                JsonConvert.SerializeObject(empties[1]) != "{\"expressionType\":\"empty\"}" ||
+                JsonConvert.SerializeObject(empties[0]) != "{\"expressionType\":\"empty\"}")
+                throw new InvalidOperationException("An empty expression does not record why nothing was modeled, " +
+                    "or the reason reached the serialized form.");
+            string structure = CastingCapabilityInventory.Structure(sequence);
+            if (structure != "seq(empty,empty!restorative-action:ContextActionRemoveBuff," +
+                    "empty!offensive-action:ContextActionDealDamage,empty!unknown-node:Custom,leaf:Buff:direct)")
+                throw new InvalidOperationException("The inventory hides what is unmodeled: " + structure);
         }
 
         private static void TestSpellbookRoleResolution()
@@ -15652,7 +15686,7 @@ namespace KingmakerBuffPlanner.Tests
             MaterialReservation material = null, bool clearMaterial = false,
             EffectExpression effects = null, string strategyReason = null,
             IEnumerable<string> enhancements = null, IDictionary<string, int> usage = null,
-            IEnumerable<string> omitted = null)
+            IEnumerable<string> omitted = null, bool? exact = null)
         {
             return new CastStep(sourceId ?? step.SourceId, castingId ?? step.AssignmentId,
                 step.Provider, step.AnchorUnitId,
@@ -15664,7 +15698,7 @@ namespace KingmakerBuffPlanner.Tests
                 strategyReason ?? step.ExecutionStrategyReason,
                 enhancements ?? step.EnhancementIds,
                 usage ?? step.EnhancementUsageByPool.ToDictionary(pair => pair.Key, pair => pair.Value),
-                omitted ?? step.OmittedEnhancementIds);
+                omitted ?? step.OmittedEnhancementIds, exactEnhancements: exact ?? step.ExactEnhancements);
         }
 
         private static void TestProjectionIdentityIsComplete()
@@ -15735,6 +15769,14 @@ namespace KingmakerBuffPlanner.Tests
             catch (NotSupportedException) { refused = true; }
             if (!refused)
                 throw new InvalidOperationException("An unrepresentable effect was identified.");
+            // Every explicit step applies exactly its enhancements; one that
+            // would not is never identified.
+            bool inexactRefused = false;
+            try { id(new[] { CloneStep(a, exact: false), b }); }
+            catch (NotSupportedException exception) { inexactRefused = exception.Message == "step-not-exact:0"; }
+            if (!inexactRefused || !a.ExactEnhancements || !b.ExactEnhancements)
+                throw new InvalidOperationException("An explicit step that does not apply exactly its enhancements " +
+                    "was identified.");
             // An undefined scope value is refused, never read as Standard.
             ExplicitStepConversion invalid = ExplicitCastingStepConverter.Convert(plan,
                 new CastingExecutionGate().Evaluate(plan, CastingApplyMode.Ordinary, "long"),

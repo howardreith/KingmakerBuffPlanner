@@ -77,6 +77,10 @@ namespace KingmakerBuffPlanner.Execution
             new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
         public Dictionary<string, IReadOnlyList<string>> ModifiersAfter { get; } =
             new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
+        // Per casting, the time left on its recipient's instance right after
+        // the step, in seconds (null when unread).
+        public Dictionary<string, double?> RemainingSecondsAfter { get; } =
+            new Dictionary<string, double?>(StringComparer.Ordinal);
 
         internal string TransitionOf(string castingId)
         {
@@ -147,6 +151,9 @@ namespace KingmakerBuffPlanner.Execution
         // for the focused enhanced casting before the edit and after it ("*"
         // marks a selected one).
         public IReadOnlyList<string> EnhancementOptions { get; set; } = new string[0];
+        // The ability-pool recipe: whether the Always recast edit was
+        // accepted (recorded; the exhausted plan may be refused either way).
+        public bool? ExhaustedAccepted { get; set; }
 
         private bool HasDisableStep
         {
@@ -160,7 +167,12 @@ namespace KingmakerBuffPlanner.Execution
 
         private bool IsEnhanced
         {
-            get { return Selection != null && Selection.Recipe == CastingQualificationRecipe.EnhancedDirect; }
+            get { return Selection != null && CastingQualificationRecipe.IsEnhancedRecipe(Selection.Recipe); }
+        }
+
+        private bool IsAbilityPool
+        {
+            get { return Selection != null && Selection.Recipe == CastingQualificationRecipe.AbilityPoolDirect; }
         }
 
         // The judged steps of this record's recipe, in order.
@@ -170,6 +182,7 @@ namespace KingmakerBuffPlanner.Execution
             {
                 if (IsGroup) return GroupStepNames;
                 if (IsEnhanced) return EnhancedStepNames;
+                if (IsAbilityPool) return AbilityPoolStepNames;
                 return HasDisableStep
                     ? StepNames.Concat(new[] { CastingQualificationForecast.Disable, CastingQualificationForecast.Recover })
                     : StepNames;
@@ -211,7 +224,7 @@ namespace KingmakerBuffPlanner.Execution
             // so there the press must land while the first cast is in
             // progress (the stop waits for it to complete). The two-phase
             // recipes have no stop step.
-            if (!IsGroup && !IsEnhanced)
+            if (!IsGroup && !IsEnhanced && !IsAbilityPool)
             {
                 if (StopPress == null) violations.Add("stop-press:none");
                 else if (!StopPressHandled) violations.Add("stop-press:not-handled:" + StopPress);
@@ -251,6 +264,7 @@ namespace KingmakerBuffPlanner.Execution
         // nothing.
         public static readonly string[] GroupStepNames = { "prime", "mixed" };
         public static readonly string[] EnhancedStepNames = { "plain", "enhanced" };
+        public static readonly string[] AbilityPoolStepNames = { "use", "repeat", "exhausted" };
 
         // The disable rules, applied the moment the disable step ends (so a
         // failed rule stops the run before the recover run is submitted)
@@ -292,6 +306,8 @@ namespace KingmakerBuffPlanner.Execution
                 return step.ApplyAllowed || step.Report != null ||
                     step.ApplyReason != "nothing-to-cast:" + castings.Count
                         ? "not-a-no-op:" + step.ApplyReason : null;
+            if (name == CastingQualificationForecast.Exhausted)
+                return ExhaustedFailure(step, first);
             if (step.Report == null) return "report:none";
             if (step.Report.CleanupFailures.Count != 0)
                 return "cleanup:" + string.Join("|", step.Report.CleanupFailures.ToArray());
@@ -355,6 +371,18 @@ namespace KingmakerBuffPlanner.Execution
             }
             else if (name == CastingQualificationForecast.Mixed)
                 failure = MixedFailure(step, castings);
+            else if (name == CastingQualificationForecast.Use)
+            {
+                // The ability alone lands a new instance; its pool's single
+                // use is spent (judged with the resources below).
+                if (step.Report.TerminalReason != "completed")
+                    failure = "report:" + step.Report.TerminalReason;
+                else if (step.StateOf(first) != CastingOutcomeState.EffectConfirmed ||
+                    step.Report.Entries.Count != 1 || step.Report.Submitted != 1)
+                    failure = "states:" + States(step);
+                else if (step.TransitionOf(first) != "new-instance")
+                    failure = "effects:" + string.Join(",", step.Transitions.ToArray());
+            }
             else if (name == CastingQualificationForecast.Plain)
                 failure = PlainFailure(step, castings);
             else if (name == CastingQualificationForecast.Enhanced)
@@ -416,6 +444,23 @@ namespace KingmakerBuffPlanner.Execution
             return null;
         }
 
+        // The ability-pool recipe's exhausted step: set to Always recast with
+        // its pool's single use spent, the casting is refused before
+        // anything is submitted, for want of the resource; the pool stays
+        // empty and the effect stays exactly as it was.
+        private static string ExhaustedFailure(CastingQualificationStepResult step, string casting)
+        {
+            if (step.ApplyAllowed || step.Report != null) return "not-refused:" + step.ApplyReason;
+            string reason = step.ApplyReason ?? string.Empty;
+            if (!reason.StartsWith("apply-refused:blocked-casting:" + casting + ":resource-pool-exhausted:", StringComparison.Ordinal))
+                return "refused-for-another-reason:" + reason;
+            if (!step.Availability.SequenceEqual(new[] { casting + ":0>0" }))
+                return "resource:" + string.Join(",", step.Availability.ToArray());
+            if (step.TransitionOf(casting) != "unchanged")
+                return "effects:" + string.Join(",", step.Transitions.ToArray());
+            return null;
+        }
+
         // The enhanced recipe's plain step: the plain casting alone lands a
         // new instance; the enhancement's resource and every activatable
         // ability of the caster are exactly as before; its effect gives the
@@ -439,11 +484,24 @@ namespace KingmakerBuffPlanner.Execution
             if (before == null || after == null) return "modifiers:" + plain + ":unread";
             if (before.Count != 0)
                 return "modifiers:" + plain + ":present-before:" + string.Join(";", before.ToArray());
+            if (enhancement.Kind == CastingQualificationEnhancement.DurationKind)
+            {
+                double? remaining;
+                step.RemainingSecondsAfter.TryGetValue(plain, out remaining);
+                return remaining == null || remaining.Value < CastingQualificationRecipe.MinimumJudgedSeconds
+                    ? "duration:" + plain + ":" + (remaining == null ? "unread" : Seconds(remaining.Value) + "<" +
+                        Seconds(CastingQualificationRecipe.MinimumJudgedSeconds)) : null;
+            }
             int value;
             if (!TryModifierValue(after, enhancement, out value) || value <= 0)
                 return "modifiers:" + plain + ":no-" + enhancement.ModifierPrefix + ":" +
                     string.Join(";", after.ToArray());
             return null;
+        }
+
+        private static string Seconds(double value)
+        {
+            return value.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
         }
 
         // The enhanced step: the plain casting is skipped (its recipient keeps
@@ -472,9 +530,14 @@ namespace KingmakerBuffPlanner.Execution
             CastStep forecastStep = ReservedStep(step.Name, enhanced, false);
             CastingOutcomeEntry entry = step.Report.Entries.FirstOrDefault(value =>
                 string.Equals(value.CastingId, enhanced, StringComparison.Ordinal));
+            // A rod works through the game's rule events: in Instant mode a
+            // plain rule cast (which reports its strategy) takes it.
             string route = ExecutionMode == "instant" && forecastStep != null &&
                 forecastStep.ExecutionStrategy == CastExecutionStrategy.ProviderDirectRuleCast
-                    ? ";provider-direct:True;" : "native-command-spend-completed";
+                    ? ";provider-direct:True;"
+                    : ExecutionMode == "instant" && forecastStep != null &&
+                        forecastStep.ExecutionStrategy == CastExecutionStrategy.DirectRuleCast
+                        ? ";strategy:DirectRuleCast;" : "native-command-spend-completed";
             if (entry == null || entry.Detail == null || !entry.Detail.Contains(route))
                 return "route:" + route.Trim(';') + ":" + (entry == null ? "none" : entry.Detail);
             string caster = CasterFailure(step, enhancement.UnitsPerCast);
@@ -492,6 +555,26 @@ namespace KingmakerBuffPlanner.Execution
             if (before == null || after == null) return "modifiers:" + enhanced + ":unread";
             if (before.Count != 0)
                 return "modifiers:" + enhanced + ":present-before:" + string.Join(";", before.ToArray());
+            if (enhancement.Kind == CastingQualificationEnhancement.DurationKind)
+            {
+                // The same strength, for the given factor of the plain
+                // casting's duration (5% and two rounds of slack for the
+                // frames between a cast and its read).
+                if (!after.SequenceEqual(reference, StringComparer.Ordinal))
+                    return "modifiers:" + enhanced + ":" + string.Join(";", after.ToArray()) + "!=" +
+                        string.Join(";", reference.ToArray());
+                double? plainRemaining;
+                double? enhancedRemaining;
+                plainStep.RemainingSecondsAfter.TryGetValue(plain, out plainRemaining);
+                step.RemainingSecondsAfter.TryGetValue(enhanced, out enhancedRemaining);
+                if (plainRemaining == null || enhancedRemaining == null || plainRemaining.Value <= 0)
+                    return "duration:unread";
+                double wanted = enhancement.DurationFactor * plainRemaining.Value;
+                if (Math.Abs(enhancedRemaining.Value - wanted) > 0.05 * wanted + 12)
+                    return "duration:" + enhanced + ":" + Seconds(enhancedRemaining.Value) + "!=" +
+                        Seconds(wanted);
+                return null;
+            }
             List<string> expected = Raised(reference, enhancement);
             if (expected == null || !after.SequenceEqual(expected, StringComparer.Ordinal))
                 return "modifiers:" + enhanced + ":" + string.Join(";", after.ToArray()) + "!=" +
@@ -874,6 +957,10 @@ namespace KingmakerBuffPlanner.Execution
                 case "group-author": GroupAuthor(); return;
                 case "mixed": Begin(CastingQualificationForecast.Mixed); return;
                 case "mixed-wait": Wait(false, "done"); return;
+                case "use": Begin(CastingQualificationForecast.Use); return;
+                case "use-wait": Wait(false, "repeat"); return;
+                case "exhausted-edit": ExhaustedEdit(); return;
+                case "exhausted": Exhausted(); return;
                 case "plain": Begin(CastingQualificationForecast.Plain); return;
                 case "plain-wait": Wait(false, "enhance-author"); return;
                 case "enhance-author": EnhanceAuthor(); return;
@@ -953,7 +1040,51 @@ namespace KingmakerBuffPlanner.Execution
             _session.PresentForReview(inputs);
             if (!_session.AcceptPresentedPlan(inputs)) { Fail("accept-refused"); return; }
             _startedMillis = _clock();
-            _phase = group ? "prime" : twoPhase ? "plain" : "stop";
+            _phase = group ? "prime" : twoPhase ? "plain"
+                : Recipe == CastingQualificationRecipe.AbilityPoolDirect ? "use" : "stop";
+        }
+
+        // Ability-pool recipe: the casting is set to Always recast through
+        // the session's own recast command (the inspector's control), then
+        // reviewed and accepted like any edit (the acceptance is recorded,
+        // not required: the plan is blocked for want of the resource).
+        private void ExhaustedEdit()
+        {
+            string castingId = Record.Selection.Castings[0].CastingId;
+            _session.FocusCasting(castingId);
+            AuthoringEditResult updated = _session.SetFocusedRecastPolicy(ExistingEffectPolicy.Overwrite);
+            if (!updated.Applied) { Fail("exhausted-edit-refused:" + updated.Reason); return; }
+            _session.Save();
+            CastingWorkspaceInputs inputs = _freshInputs();
+            _session.PresentForReview(inputs);
+            Record.ExhaustedAccepted = _session.AcceptPresentedPlan(inputs);
+            _phase = "exhausted";
+        }
+
+        // The exhausted step: its reads, one Apply that must be refused, and
+        // the same reads again (nothing may have changed).
+        private void Exhausted()
+        {
+            if (WorldHeld()) return;
+            var step = new CastingQualificationStepResult(CastingQualificationForecast.Exhausted);
+            Record.Steps.Add(step);
+            _observeSteps = StepsToObserve(CastingQualificationForecast.Exhausted);
+            _before = ObserveAll(step, "exhausted-before");
+            WorkspaceApplyResult result = _session.Apply(CastingApplyMode.Ordinary,
+                CastingQualificationRecipe.RoutineId, _freshInputs());
+            step.ApplyAllowed = result.Allowed;
+            step.ApplyReason = result.Allowed && result.Dispatch != null
+                ? result.Dispatch.Reason : result.ReviewReason;
+            if (result.Allowed && result.Dispatch != null && result.Dispatch.Submitted)
+            {
+                _host.Cancel("qualification-unexpected-run");
+                Fail("exhausted-submitted:" + step.ApplyReason);
+                return;
+            }
+            ObserveTransitions(step, "exhausted-after");
+            string failure = Record.StepFailure(CastingQualificationForecast.Exhausted);
+            if (failure != null) { Fail("step:" + failure); return; }
+            _phase = "done";
         }
 
         // Enhanced recipe: after the plain step the enhanced casting joins
@@ -1024,7 +1155,7 @@ namespace KingmakerBuffPlanner.Execution
             _observeSteps = StepsToObserve(name);
             _before = ObserveAll(step, name + "-before");
             string beforeFailure = BeforeReadFailure(_observeSteps, _before);
-            if (beforeFailure == null && Recipe == CastingQualificationRecipe.EnhancedDirect)
+            if (beforeFailure == null && CastingQualificationRecipe.IsEnhancedRecipe(Recipe))
             {
                 // The enhanced recipe also needs the caster read and every
                 // effect instance's modifiers before anything is submitted.
@@ -1231,7 +1362,7 @@ namespace KingmakerBuffPlanner.Execution
             // Only the exact no-op (every casting already active) continues.
             string failure = Record.StepFailure("repeat");
             if (failure != null) { Fail("step:" + failure); return; }
-            _phase = "recast-edit";
+            _phase = Recipe == CastingQualificationRecipe.AbilityPoolDirect ? "exhausted-edit" : "recast-edit";
         }
 
         private void RecastEdit()
@@ -1380,7 +1511,7 @@ namespace KingmakerBuffPlanner.Execution
                 step.Availability.Add(castingId + ":" + Available(before) + ">" + Available(pair.Value));
                 RecordTokens(step, castingId, before, pair.Value);
             }
-            if (Recipe != CastingQualificationRecipe.EnhancedDirect) return;
+            if (!CastingQualificationRecipe.IsEnhancedRecipe(Recipe)) return;
             step.CasterAfter = ObserveCaster(step, label);
             foreach (KeyValuePair<string, ProbeObservation> pair in after)
             {
@@ -1388,7 +1519,19 @@ namespace KingmakerBuffPlanner.Execution
                 _before.TryGetValue(pair.Key, out before);
                 step.ModifiersBefore[pair.Key] = ModifiersOf(before);
                 step.ModifiersAfter[pair.Key] = ModifiersOf(pair.Value);
+                step.RemainingSecondsAfter[pair.Key] = RemainingSeconds(pair.Value);
             }
+        }
+
+        // The longest time left on the observed instances at the read, in
+        // seconds; null without the game clock or any instance.
+        internal static double? RemainingSeconds(ProbeObservation observation)
+        {
+            if (observation == null || !observation.Succeeded || observation.GameTimeTicks == null ||
+                observation.EffectInstances == null || observation.EffectInstances.Count == 0)
+                return null;
+            long end = observation.EffectInstances.Max(instance => instance.EndTimeTicks);
+            return (end - observation.GameTimeTicks.Value) / (double)TimeSpan.TicksPerSecond;
         }
 
         // The stat modifiers of every observed instance together (sorted);
