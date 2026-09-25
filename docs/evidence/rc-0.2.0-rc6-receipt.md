@@ -26,7 +26,10 @@ one in `KingmakerBuffPlanner-RC6-repro` and the gate build in
 same package, DLL and MVID.
 
 Later commits on the branch after `24d9967` are receipts and handoff
-documents only; they change no source, script, test or version file.
+documents, and one source fix found after the freeze, `b4eed30` (below:
+the inventory's type names; diagnostic text and its test). That fix is
+not in the frozen package, so merging this branch as it stands is not
+merging the tested candidate: see "Artifact identity after merge".
 
 ## What changed since rc5
 
@@ -189,8 +192,11 @@ A matching source diff alone does not make the new bytes tested.
   the action is unmodeled) is right; only the type name is lost. This is
   diagnostic text in the evidence; nothing reads it back, and no planner
   or qualification decision depends on it. The source test used names
-  without the assembly suffix. Fixed on the next-iteration branch
-  (`caea6ea`, local), with the test now using the adapter's own format.
+  without the assembly suffix. Fixed after the freeze in `b4eed30` on
+  this branch (first committed locally as `caea6ea`), with the test now
+  using the adapter's own format. Source tests passed when it was made
+  (338, and a mutant restoring the rc6 text was killed); it was not
+  rebuilt, frozen or run in the game.
 - **Ability pools with more than one use cannot be qualified on the
   advanced campaign.** The party's only multi-use pool whose effect is a
   plain buff is the Cleric's Agile Feet (9 uses a day), and it lasts one
