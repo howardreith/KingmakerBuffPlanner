@@ -578,14 +578,15 @@ namespace KingmakerBuffPlanner.Domain.Planning
         public CastExecutionStrategy ExecutionStrategy { get; private set; }
         public string ExecutionStrategyReason { get; private set; }
         public IReadOnlyList<string> EnhancementIds { get; private set; }
-        // Casting-first steps: the cast applies exactly EnhancementIds. An
-        // enhancement the player left switched on in the game (an Extend
-        // rod, Powerful Change, Share Transmutation) is switched off for the
-        // cast and back on after it, or the cast is refused when the game
-        // would keep it applied (advanced qualification 2026-09-24: an
-        // Extend rod left on was spent on a casting that did not choose it).
-        // Classic steps leave the game's switches as they are when they
-        // choose no enhancement.
+        // Casting-first steps: of the enhancements the planner models
+        // (metamagic rods, Powerful Change, Share Transmutation), the cast
+        // applies exactly EnhancementIds. One the player left switched on in
+        // the game is switched off for the cast and back on after it, or the
+        // cast is refused when the game would keep it applied (advanced
+        // qualification 2026-09-24: an Extend rod left on was spent on a
+        // casting that did not choose it). Toggles of other mods that change
+        // spells are not managed. Classic steps leave the game's switches as
+        // they are when they choose no enhancement.
         public bool ExactEnhancements { get; private set; }
         public IReadOnlyList<string> OmittedEnhancementIds { get; private set; }
         public IReadOnlyDictionary<string, int> EnhancementUsageByPool

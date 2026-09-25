@@ -979,7 +979,8 @@ namespace KingmakerBuffPlanner.Execution
         // the read slack (5% and two rounds) stays well below the difference
         // between a plain and an extended cast; at a few seconds a cast that
         // was not extended would also pass (independent review of the next
-        // iteration).
+        // iteration). A source needs twice that expected, so its plain cast
+        // still lasts the minimum when it is read after the cast.
         public const int MinimumJudgedRounds = 10;
         public const double MinimumJudgedSeconds = MinimumJudgedRounds * 6.0;
 
@@ -1052,7 +1053,7 @@ namespace KingmakerBuffPlanner.Execution
                     }
                     if (!ExistingEffectSufficiency.IsPerLevelDuration(provider.DurationText))
                     { reject(key + "|duration-not-per-level:" + provider.DurationText); continue; }
-                    if (provider.ExpectedDurationRounds < MinimumJudgedRounds)
+                    if (provider.ExpectedDurationRounds < 2 * MinimumJudgedRounds)
                     {
                         reject(key + "|duration-too-short-to-judge:" +
                             provider.ExpectedDurationRounds.ToString(CultureInfo.InvariantCulture));
