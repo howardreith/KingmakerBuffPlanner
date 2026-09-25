@@ -1961,6 +1961,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 liveBudgetSeconds = 600 + (int)PhysicalDeadlineSeconds;
             if (RuntimeTestProtocol.IsReloadScenario(_request.Scenario))
                 liveBudgetSeconds = 300 + LiveCampaignSaveLoader.ReloadBudgetSeconds;
+            // The standard scenario also runs the pointer-highlight diagnostic
+            // (about thirty real-cursor moves, two Classic opens, four frames);
+            // the launcher's own timeout still bounds the whole run.
+            if (string.Equals(_request.Scenario, "live-workspace-qual", StringComparison.Ordinal))
+                liveBudgetSeconds = 300 + 300;
             if (_livePhaseElapsed.Elapsed.TotalSeconds > liveBudgetSeconds)
                 throw new TimeoutException("Live UI scenario timed out;phase=" + _liveUiPhase +
                     ";elapsedSeconds=" + _livePhaseElapsed.Elapsed.TotalSeconds.ToString("F1",
