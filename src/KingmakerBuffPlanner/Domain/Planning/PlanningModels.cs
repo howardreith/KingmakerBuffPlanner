@@ -525,8 +525,10 @@ namespace KingmakerBuffPlanner.Domain.Planning
             IEnumerable<string> enhancementIds = null,
             IDictionary<string, int> enhancementUsageByPool = null,
             IEnumerable<string> omittedEnhancementIds = null,
-            IEnumerable<string> preCoveredRecipientUnitIds = null)
+            IEnumerable<string> preCoveredRecipientUnitIds = null,
+            bool exactEnhancements = false)
         {
+            ExactEnhancements = exactEnhancements;
             SourceId = sourceId ?? string.Empty;
             AssignmentId = assignmentId ?? sourceId ?? string.Empty;
             Provider = provider;
@@ -576,6 +578,15 @@ namespace KingmakerBuffPlanner.Domain.Planning
         public CastExecutionStrategy ExecutionStrategy { get; private set; }
         public string ExecutionStrategyReason { get; private set; }
         public IReadOnlyList<string> EnhancementIds { get; private set; }
+        // Casting-first steps: the cast applies exactly EnhancementIds. An
+        // enhancement the player left switched on in the game (an Extend
+        // rod, Powerful Change, Share Transmutation) is switched off for the
+        // cast and back on after it, or the cast is refused when the game
+        // would keep it applied (advanced qualification 2026-09-24: an
+        // Extend rod left on was spent on a casting that did not choose it).
+        // Classic steps leave the game's switches as they are when they
+        // choose no enhancement.
+        public bool ExactEnhancements { get; private set; }
         public IReadOnlyList<string> OmittedEnhancementIds { get; private set; }
         public IReadOnlyDictionary<string, int> EnhancementUsageByPool
         { get; private set; }

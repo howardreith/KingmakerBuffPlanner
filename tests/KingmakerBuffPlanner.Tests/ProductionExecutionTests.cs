@@ -4403,6 +4403,16 @@ namespace KingmakerBuffPlanner.Tests
             internal bool PlainZeroDuration;
             internal bool WithEmpowerRod;
             internal static readonly long DurationTicks = TimeSpan.FromSeconds(600).Ticks;
+            internal long PlainDurationTicks = DurationTicks;
+            internal int ExpectedRounds = 100;
+            internal bool ConditionalStrength;
+            // The player left the Extend rod switched on in the game (as the
+            // advanced seed's transmuter): it applies to every cast that does
+            // not switch it off first. A preparation switches off whatever
+            // the step did not choose for the cast, as the game adapter does.
+            internal bool RodLeftOn;
+            private bool _rodSwitchedOff;
+            internal readonly List<string> PreparedSteps = new List<string>();
             // The game clock starts an hour in (it is never zero in play).
             internal long NowTicks { get { return (Now + 3600000) * TimeSpan.TicksPerMillisecond; } }
             // A second spellbook of the same caster that also holds the
@@ -4428,7 +4438,9 @@ namespace KingmakerBuffPlanner.Tests
             public CastEnhancementPreparation PrepareEnhancements(CastStep step)
             {
                 Prepared.AddRange(step.EnhancementIds);
-                return CastEnhancementPreparation.Pass(null);
+                PreparedSteps.Add(step.AssignmentId);
+                _rodSwitchedOff = !step.EnhancementIds.Contains(RodId);
+                return CastEnhancementPreparation.Pass(new CallbackDisposable(() => _rodSwitchedOff = false));
             }
             public InstantCastResult Fire(CastStep step)
             {
@@ -4463,10 +4475,10 @@ namespace KingmakerBuffPlanner.Tests
                 _baselines[step] = new EffectBaseline(step.ExpectedRecipientUnitIds.ToDictionary(unit => unit,
                     unit => (IEnumerable<ObservedEffectInstance>)Instances(unit), StringComparer.Ordinal));
                 bool enhanced = step.EnhancementIds.Contains(EnhancementId);
-                bool rod = step.EnhancementIds.Contains(RodId);
+                bool rod = step.EnhancementIds.Contains(RodId) || (RodLeftOn && !_rodSwitchedOff);
                 int bonus = enhanced && !IgnoreEnhancement ? PlainBonus + 2 : PlainBonus;
                 if (rod && RodChangesStrength) bonus++;
-                long duration = !rod && PlainZeroDuration ? 0 : (rod && !RodIgnored ? 2 : 1) * DurationTicks;
+                long duration = !rod && PlainZeroDuration ? 0 : (rod && !RodIgnored ? 2 : 1) * PlainDurationTicks;
                 Active[step.TargetUnitIds[0] + "|strength-buff"] = Tuple.Create("i" + (++_instances),
                     NowTicks + duration,
                     bonus == int.MinValue ? new string[0] : new[] { "Strength/Enhancement/" + bonus });
@@ -4524,7 +4536,7 @@ namespace KingmakerBuffPlanner.Tests
                     new TargetValidationSnapshot(true, true, true, true))).ToList();
                 var strength = new ProviderSnapshot(new ProviderKey("unit-arcanist",
                         BrownFurPowerfulChangeProfile.CastingSpellbookGuid, Strength, "level-2"),
-                    "Strength Spell", 2, "pool-arcanist", 1, null, null, 10, 100, string.Empty, DurationText);
+                    "Strength Spell", 2, "pool-arcanist", 1, null, null, 10, ExpectedRounds, string.Empty, DurationText);
                 var other = new ProviderSnapshot(new ProviderKey("unit-arcanist",
                         BrownFurPowerfulChangeProfile.CastingSpellbookGuid, Other, "level-1"),
                     "Other Spell", 1, "pool-arcanist-1", 1, null, null, 10, 100);
@@ -4551,8 +4563,14 @@ namespace KingmakerBuffPlanner.Tests
                         new Dictionary<string, IEnumerable<string>>(StringComparer.Ordinal)));
                 var effects = new Dictionary<string, EffectExpression>(StringComparer.Ordinal)
                 {
-                    { Strength.Canonical, new EffectLeafExpression(EffectKind.Buff, "strength-buff",
-                        EffectTarget.CurrentTarget, "fixture", "fixture/strength") },
+                    { Strength.Canonical, ConditionalStrength
+                        ? (EffectExpression)new ConditionalEffectExpression("fixture-condition",
+                            new EffectLeafExpression(EffectKind.Buff, "strength-buff", EffectTarget.CurrentTarget,
+                                "fixture", "fixture/strength-a"),
+                            new EffectLeafExpression(EffectKind.Buff, "strength-buff", EffectTarget.CurrentTarget,
+                                "fixture", "fixture/strength-b"))
+                        : new EffectLeafExpression(EffectKind.Buff, "strength-buff",
+                            EffectTarget.CurrentTarget, "fixture", "fixture/strength") },
                     { Other.Canonical, new EffectLeafExpression(EffectKind.Buff, "other-buff",
                         EffectTarget.CurrentTarget, "fixture", "fixture/other") }
                 };
@@ -5031,7 +5049,12 @@ namespace KingmakerBuffPlanner.Tests
                     500, 9, 0)).ToArray());
             }
 
-            internal static EffectExpression MutagenEffect()
+            // The Mutagen's first action: null does nothing (the shape the
+            // live Strength Mutagen showed); a reason is an action the planner
+            // does not model.
+            internal string MutagenEmptyReason;
+
+            internal static EffectExpression MutagenEffect(string emptyReason = null)
             {
                 var leaf = new EffectLeafExpression(EffectKind.Buff, "mutagen-buff", EffectTarget.CurrentTarget,
                     "fixture", "fixture/mutagen");
@@ -5039,7 +5062,7 @@ namespace KingmakerBuffPlanner.Tests
                 {
                     new SequenceEffectExpression(new EffectExpression[]
                     {
-                        new EmptyEffectExpression(),
+                        emptyReason == null ? EmptyEffectExpression.NoAction() : new EmptyEffectExpression(emptyReason),
                         new ConditionalEffectExpression("feral",
                             new SequenceEffectExpression(new EffectExpression[] { leaf }),
                             new SequenceEffectExpression(new EffectExpression[] { leaf }))
@@ -5084,7 +5107,7 @@ namespace KingmakerBuffPlanner.Tests
                 };
                 var effects = new Dictionary<string, EffectExpression>(StringComparer.Ordinal)
                 {
-                    { Mutagen.Canonical, MutagenEffect() },
+                    { Mutagen.Canonical, MutagenEffect(MutagenEmptyReason) },
                     { Domain.Canonical, new EffectLeafExpression(EffectKind.Buff, "domain-buff",
                         EffectTarget.CurrentTarget, "fixture", "fixture/domain") },
                     { Odd.Canonical, new ConditionalEffectExpression("odd",
@@ -5139,12 +5162,23 @@ namespace KingmakerBuffPlanner.Tests
             var leafA = new EffectLeafExpression(EffectKind.Buff, "a", EffectTarget.CurrentTarget, "f", "f/a");
             var leafB = new EffectLeafExpression(EffectKind.Buff, "b", EffectTarget.CurrentTarget, "f", "f/b");
             if (!ExplicitCastingStepConverter.IsPlainCurrentTargetBuff(new SequenceEffectExpression(
+                    new EffectExpression[] { EmptyEffectExpression.NoAction(), leafA }), "x") ||
+                // An action the planner does not model is not nothing:
+                // removing a buff, and damage hidden in one branch of a
+                // condition whose buffs match.
+                ExplicitCastingStepConverter.IsPlainCurrentTargetBuff(new SequenceEffectExpression(
+                    new EffectExpression[] { new EmptyEffectExpression("restorative-action:RemoveBuff"), leafA }), "x") ||
+                ExplicitCastingStepConverter.IsPlainCurrentTargetBuff(new ConditionalEffectExpression("c",
+                    new SequenceEffectExpression(new EffectExpression[]
+                        { new EmptyEffectExpression("offensive-action:DealDamage"), leafA }),
+                    new SequenceEffectExpression(new EffectExpression[] { leafA })), "x") ||
+                ExplicitCastingStepConverter.IsPlainCurrentTargetBuff(new SequenceEffectExpression(
                     new EffectExpression[] { new EmptyEffectExpression(), leafA }), "x") ||
                 !ExplicitCastingStepConverter.IsPlainCurrentTargetBuff(new ConditionalEffectExpression("c", leafA,
                     new SequenceEffectExpression(new EffectExpression[] { leafA })), "x") ||
                 ExplicitCastingStepConverter.IsPlainCurrentTargetBuff(new ConditionalEffectExpression("c", leafA, leafB), "x") ||
                 ExplicitCastingStepConverter.IsPlainCurrentTargetBuff(new SequenceEffectExpression(
-                    new EffectExpression[] { new EmptyEffectExpression() }), "x") ||
+                    new EffectExpression[] { EmptyEffectExpression.NoAction() }), "x") ||
                 !ExplicitCastingStepConverter.IsPlainCurrentTargetBuff(AbilityPoolWorld.MutagenEffect(), "mutagen"))
                 throw new InvalidOperationException("The plain-buff shape rule for empty actions and conditions was wrong.");
             var world = new AbilityPoolWorld();
@@ -5168,6 +5202,13 @@ namespace KingmakerBuffPlanner.Tests
                 !none.Rejections.Any(value => value.Contains("odd-power") && value.Contains("|effect-shape:")))
                 throw new InvalidOperationException("An ability-pool selection that cannot qualify was made: " +
                     string.Join(",", none.Rejections.ToArray()));
+            CastingQualificationSelection removing = CastingQualificationRecipe.SelectAbilityPool(
+                new AbilityPoolWorld { MutagenEmptyReason = "restorative-action:Kingmaker.Fixture.ContextActionRemoveBuff" }
+                    .Inputs(), "fixture-campaign");
+            if (removing.Selected || !removing.Rejections.Any(value => value.Contains("mutagen") &&
+                    value.Contains("|effect-shape:") && value.Contains("empty!restorative-action:ContextActionRemoveBuff")))
+                throw new InvalidOperationException("A Mutagen that also removes a buff was taken as a plain buff: " +
+                    string.Join(",", removing.Rejections.ToArray()));
             foreach (string mode in new[] { "instant", "animated" })
             {
                 var run = new AbilityPoolWorld();
@@ -5250,6 +5291,16 @@ namespace KingmakerBuffPlanner.Tests
                 !besideEmpower.Rejections.Contains("metamagic-rod|unit-arcanist|empower-guid|not-an-extend-rod"))
                 throw new InvalidOperationException("A rod other than Extend was taken, or refused silently: " +
                     string.Join(",", besideEmpower.Rejections.ToArray()));
+            CastingQualificationSelection conditional = CastingQualificationRecipe.SelectRodExtend(
+                new EnhancedBuffWorld { DurationText = "1 minute/level", ConditionalStrength = true }.Inputs(),
+                "fixture-campaign");
+            CastingQualificationSelection brief = CastingQualificationRecipe.SelectRodExtend(
+                new EnhancedBuffWorld { DurationText = "1 round/level", ExpectedRounds = 9 }.Inputs(), "fixture-campaign");
+            if (conditional.Selected || !conditional.Rejections.Any(value => value.Contains("|conditional-shape:")) ||
+                brief.Selected || !brief.Rejections.Any(value => value.EndsWith("|duration-too-short-to-judge:9",
+                    StringComparison.Ordinal)))
+                throw new InvalidOperationException("A rod casting whose doubling cannot be judged was taken: " +
+                    string.Join(",", conditional.Rejections.ToArray()) + " / " + string.Join(",", brief.Rejections.ToArray()));
             CastingQualificationSelection fixedDuration = CastingQualificationRecipe.SelectRodExtend(
                 new EnhancedBuffWorld().Inputs(), "fixture-campaign");
             if (fixedDuration.Selected ||
@@ -5287,6 +5338,62 @@ namespace KingmakerBuffPlanner.Tests
             var instant = new EnhancedBuffWorld { DurationText = "1 minute/level", PlainZeroDuration = true };
             CastingQualificationRecord instantRecord = RunEnhanced(Path.Combine(root, "qr-zero"), instant, "instant", true,
                 CastingQualificationRecipe.RodExtendDirect);
+            // The published observation carries the game clock, or why it
+            // could not be read, so remaining time can be recomputed.
+            string clocked = ProbeObservation.Read("p", 1, DateTime.UtcNow, "u", 1, null, null, 5L).Describe();
+            string unclocked = ProbeObservation.Read("p", 2, DateTime.UtcNow, "u", 1, null, null, null,
+                "NullReferenceException").Describe();
+            if (!clocked.Contains(";clock=5;") || !unclocked.Contains(";clock=failed:NullReferenceException;") ||
+                ProbeObservation.Read("p", 3, DateTime.UtcNow, "u", 1, null).Describe().Contains("clock"))
+                throw new InvalidOperationException("The published observation hides the game clock: " + clocked +
+                    " / " + unclocked);
+            // A plain duration too short to judge the doubling on fails the
+            // plain step (the provider claimed enough rounds).
+            var shortPlain = new EnhancedBuffWorld { DurationText = "1 minute/level",
+                PlainDurationTicks = TimeSpan.FromSeconds(30).Ticks };
+            CastingQualificationRecord shortRecord = RunEnhanced(Path.Combine(root, "qr-short"), shortPlain, "instant", true,
+                CastingQualificationRecipe.RodExtendDirect);
+            if (shortRecord.TerminalReason == "completed" || !shortRecord.Failures.Any(value =>
+                    value.StartsWith("plain-wait:step:duration:qual-cast-1:30.0<60.0", StringComparison.Ordinal)))
+                throw new InvalidOperationException("A plain duration too short to judge passed: " +
+                    string.Join("|", shortRecord.Failures.ToArray()));
+            // The live finding (advanced seed, 2026-09-24): the transmuter's
+            // Extend rods were switched on in the game, and the plain casting,
+            // which did not choose the rod, spent a charge and was extended.
+            // A casting-first step switches off what it did not choose.
+            foreach (string mode in new[] { "instant", "animated" })
+            {
+                var leftOn = new EnhancedBuffWorld { DurationText = "1 minute/level", RodLeftOn = true };
+                CastingQualificationRecord leftOnRecord = RunEnhanced(Path.Combine(root, "qr-on-" + mode[0]), leftOn, mode,
+                    true, CastingQualificationRecipe.RodExtendDirect);
+                CastingQualificationStepResult plainOn = leftOnRecord.Step("plain");
+                double? plainOnSeconds = plainOn == null ? null : plainOn.RemainingSecondsAfter["qual-cast-1"];
+                if (leftOnRecord.TerminalReason != "completed" || leftOnRecord.Violations().Count != 0 ||
+                    leftOn.RodCharges != 2 || !leftOn.PreparedSteps.SequenceEqual(new[] { "qual-cast-1", "qual-cast-2" }) ||
+                    plainOnSeconds == null || Math.Abs(plainOnSeconds.Value - 600) > 5)
+                    throw new InvalidOperationException("A rod left switched on reached a casting that did not choose it (" +
+                        mode + "): " + leftOnRecord.TerminalReason + "|" + string.Join("|", leftOnRecord.Failures.ToArray()) +
+                        "|charges=" + leftOn.RodCharges + "|plain=" + plainOnSeconds);
+            }
+            // The executor: the same plain step, exact (casting-first) and not
+            // (a classic step), with the rod left on.
+            var contrastWorld = new EnhancedBuffWorld { DurationText = "1 minute/level", RodLeftOn = true };
+            CastingWorkspaceInputs contrastInputs = contrastWorld.Inputs();
+            CastStep plainStep = CastingQualificationForecast.Forecast(
+                CastingQualificationRecipe.SelectRodExtend(contrastInputs, "fixture-campaign"), contrastInputs,
+                "fixture-campaign")[0].Projection.Plan.Steps[0];
+            foreach (bool exact in new[] { true, false })
+            {
+                var world = new EnhancedBuffWorld { DurationText = "1 minute/level", RodLeftOn = true };
+                var plan = new CastPlan(new[] { CloneStep(plainStep, exact: exact) }, new TargetPlanOutcome[0], new string[0]);
+                var report = new ExecutionReport(plan);
+                System.Collections.IEnumerator work = new InstantCastExecutor(world, true).Execute(plan, report);
+                while (work.MoveNext()) { }
+                bool prepared = world.PreparedSteps.Contains(plainStep.AssignmentId);
+                if (prepared != exact || world.RodCharges != (exact ? 3 : 2) || report.Submitted != 1)
+                    throw new InvalidOperationException("The executor's handling of an enhancement left on is wrong (exact=" +
+                        exact + "): prepared=" + prepared + " charges=" + world.RodCharges + " submitted=" + report.Submitted);
+            }
             if (!strongerRecord.Failures.Any(value => value.StartsWith("enhanced-wait:step:modifiers:qual-cast-2:", StringComparison.Ordinal)) ||
                 !instantRecord.Failures.Any(value => value.StartsWith("plain-wait:step:duration:qual-cast-1:", StringComparison.Ordinal)))
                 throw new InvalidOperationException("A rod cast of another strength, or a plain cast with no duration, passed: " +

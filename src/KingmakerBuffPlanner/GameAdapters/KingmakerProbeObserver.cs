@@ -70,10 +70,11 @@ namespace KingmakerBuffPlanner.GameAdapters
                     return ProbeObservation.Failed(phase, clock.Next(), DateTime.UtcNow, "source-ability-not-found");
                 List<ProbeEffectInstance> instances = Instances(target, ExpectedIds(step.ExpectedEffects));
                 long? gameTime = null;
+                string clockFailure = null;
                 try { gameTime = Game.Instance.TimeController.GameTime.Ticks; }
-                catch (Exception) { gameTime = null; }
+                catch (Exception exception) { clockFailure = exception.GetType().Name; }
                 return ProbeObservation.Read(phase, clock.Next(), DateTime.UtcNow, target.UniqueId,
-                    available, instances, reserved, gameTime);
+                    available, instances, reserved, gameTime, clockFailure);
             }
             catch (Exception exception)
             {

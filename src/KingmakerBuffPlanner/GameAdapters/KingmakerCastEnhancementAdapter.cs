@@ -73,8 +73,12 @@ namespace KingmakerBuffPlanner.GameAdapters
         {
             KingmakerAnimatedCastAdapter.ResolvedCast resolved;
             string reason;
+            // A casting-first step with no enhancement whose cast cannot be
+            // resolved is left to the cast's own validation, which refuses it
+            // with the same reason as before (nothing will be cast).
             if (!KingmakerAnimatedCastAdapter.TryResolve(step, out resolved, out reason))
-                return CastEnhancementPreparation.Fail("cast-resolution:" + reason);
+                return step.EnhancementIds.Count == 0 ? CastEnhancementPreparation.Pass(null)
+                    : CastEnhancementPreparation.Fail("cast-resolution:" + reason);
             List<Entry> entries = RodEntries(resolved.Caster).Concat(
                 _brownFur.ForCast(resolved.Caster, step.Provider,
                     resolved.Ability).Select(value => new Entry(value.Ability,
@@ -138,6 +142,31 @@ namespace KingmakerBuffPlanner.GameAdapters
                 {
                     lease.Dispose();
                     return CastEnhancementPreparation.Fail("activation-refused");
+                }
+                // Casting-first: nothing the casting did not choose stays on
+                // for its cast. A toggle whose blueprint defers deactivation
+                // keeps running, its buff applied, until the next round after
+                // it is switched off (ActivatableAbility.OnTurnOff), so an
+                // unchosen rod still running is stopped now, its buff removed
+                // at once; switching it back on after the cast restarts it
+                // (the qualification's caster reads check that this costs no
+                // charge). Anything else still on or running refuses the cast.
+                if (step.ExactEnhancements)
+                {
+                    foreach (Entry entry in entries.Where(value =>
+                        value.Snapshot.Category == CastEnhancementCategory.MetamagicRod))
+                    {
+                        State state = states.First(value => ReferenceEquals(value.Ability, entry.Ability));
+                        if (!state.Selected && state.Ability.IsRunning) state.Ability.Stop(true);
+                    }
+                    State still = states.FirstOrDefault(value => !value.Selected &&
+                        (value.Ability.IsOn || value.Ability.IsRunning));
+                    if (still != null)
+                    {
+                        lease.Dispose();
+                        return CastEnhancementPreparation.Fail("deactivation-refused:" +
+                            (still.Ability.Blueprint == null ? "unknown" : still.Ability.Blueprint.AssetGuid));
+                    }
                 }
                 foreach (State state in states.Where(value => value.Selected &&
                     value.OneShot)) state.ArmedByLease = true;
