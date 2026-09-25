@@ -388,6 +388,41 @@ namespace KingmakerBuffPlanner.UI
             if (_instance != null) _instance.CloseCastingWorkspace();
         }
 
+        // Runtime-only seams for the hover diagnostic: the Classic screen
+        // opened directly (whatever the planner mode, never while the
+        // workspace is open) so the rc6 reproduction and the corrected
+        // behaviour are compared on one binary, and the open planner roots.
+        internal static bool OpenClassicForRuntime()
+        {
+            if (_instance == null || _instance._castingWorkspace != null || _instance._screen == null) return false;
+            if (_instance._screen.LifecycleState != PlannerScreenLifecycleState.Closed) return false;
+            return _instance._screen.Open();
+        }
+
+        internal static GameObject ClassicRootForRuntime
+        {
+            get
+            {
+                return _instance == null || _instance._screen == null || _instance._screen.View == null
+                    ? null : _instance._screen.View.RootObject;
+            }
+        }
+
+        // Active planner roots in the scene (the workspace and the Classic
+        // screen): exactly one while a planner is open.
+        internal static int PlannerRootCountForRuntime()
+        {
+            int count = 0;
+            foreach (RectTransform rect in UnityEngine.Object.FindObjectsOfType<RectTransform>())
+            {
+                if (rect == null || !rect.gameObject.activeInHierarchy) continue;
+                if (string.Equals(rect.name, CastingWorkspaceScreenView.RootName, StringComparison.Ordinal) ||
+                    string.Equals(rect.name, BuffPlannerScreenView.RootName, StringComparison.Ordinal))
+                    count++;
+            }
+            return count;
+        }
+
         // Runtime seams for the guarded interaction scenario: the LIVE
         // session owned by the open workspace view and fresh production
         // inputs. The scenario issues canonical session commands (labeled

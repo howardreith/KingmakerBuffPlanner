@@ -9,6 +9,7 @@ using KingmakerBuffPlanner.Domain.Planning;
 using KingmakerBuffPlanner.Domain.Providers;
 using KingmakerBuffPlanner.Persistence;
 using KingmakerBuffPlanner.Planning;
+using KingmakerBuffPlanner.RuntimeTesting;
 using KingmakerBuffPlanner.UI;
 
 namespace KingmakerBuffPlanner.Tests
@@ -43,6 +44,205 @@ namespace KingmakerBuffPlanner.Tests
             Run("button-palette-readable-in-every-state", TestButtonPaletteReadableInEveryState);
             Run("planner-controls-own-one-pointer-highlight", TestPlannerControlsOwnOnePointerHighlight);
             Run("planner-mode-is-stated-by-each-view", TestPlannerModeStatedByEachView);
+            Run("hover-record-judges-one-owner-exit-and-alignment", TestHoverRecordJudgesOwnership);
+            Run("hover-record-requires-reproduction-and-coverage", TestHoverRecordRequiresCoverage);
+            Run("hover-diagnostic-only-hovers-and-restores-switch", TestHoverDiagnosticHostContract);
+        }
+
+        // ------------------------------------------------------------------
+        // Pointer-highlight evidence (HoverOwnershipRecord): the predicate the
+        // live qualification applies to Unity's own control states.
+        // ------------------------------------------------------------------
+
+        private static HoverSample Synthetic(string label, string surface, string behaviour, string owner,
+            string clicked, params string[] highlighted)
+        {
+            return new HoverSample(label, surface, behaviour, false, owner, clicked, owner, null, highlighted,
+                highlighted, null, false, null, null);
+        }
+
+        private static HoverSample Physical(string label, string aimed, string top, bool drawsHighlight,
+            bool? cursorInside, params string[] highlighted)
+        {
+            return new HoverSample(label, "graph", HoverBehaviour.Fixed, true, aimed, null,
+                drawsHighlight ? top : null, top, highlighted, highlighted, null, false, cursorInside, null);
+        }
+
+        // Every required reading, all single-owner: the record passes.
+        private static HoverOwnershipRecord CompleteHoverRecord()
+        {
+            var record = new HoverOwnershipRecord { ProbeAvailable = true, Screen = "1920x1200" };
+            record.Add(Physical("hover-graph-neutral", null, null, false, null));
+            record.Add(Synthetic("graph-click-then-hover", "graph", HoverBehaviour.Fixed, "Target.u2",
+                "SourceTab.All", "Target.u2"));
+            record.Add(Synthetic("graph-exit-0", "graph", HoverBehaviour.Fixed, null, null));
+            foreach (string name in new[] { "Caster.u1", "Provider.u1.0", "Target.u2", "Casting.c1", "Save" })
+                record.Add(Physical("sweep-" + name, name, name, true, true, name));
+            record.Add(Synthetic("classic-rc6-click-then-hover", "classic", HoverBehaviour.Rc6, "Target.u3",
+                "Routine.long", "Routine.long", "Target.u3"));
+            record.Add(Synthetic("classic-rc6-exit", "classic", HoverBehaviour.Rc6, null, null, "Routine.long"));
+            record.Add(Synthetic("classic-click-then-hover", "classic", HoverBehaviour.Fixed, "Target.u3",
+                "Routine.long", "Target.u3"));
+            record.Add(Synthetic("classic-exit", "classic", HoverBehaviour.Fixed, null, null));
+            record.Add(Synthetic("reopen-hover", "reopen", HoverBehaviour.Fixed, "Target.u2", null, "Target.u2"));
+            record.Add(Synthetic("reopen-exit", "reopen", HoverBehaviour.Fixed, null, null));
+            record.AddButton(new ButtonStateObservation("normal", "Reload", "Normal", false, null, null));
+            record.AddButton(new ButtonStateObservation("hover", "Save", "Highlighted", false, null, null));
+            record.AddButton(new ButtonStateObservation("pressed", "ExecutionMode", "Pressed", false, null, null));
+            record.AddButton(new ButtonStateObservation("selected", "Routine.long", "Normal", true, null, null));
+            record.AddButton(new ButtonStateObservation("disabled", "FocusedOrder.Earlier", "Disabled", false,
+                null, null));
+            record.PlannerRootsAfterReopen = 1;
+            record.Completed = true;
+            return record;
+        }
+
+        private static void TestHoverRecordJudgesOwnership()
+        {
+            HoverOwnershipRecord complete = CompleteHoverRecord();
+            Expect(complete.Violations().Count == 0,
+                "a complete single-owner record fails: " + string.Join(",", complete.Violations().ToArray()));
+            Expect(complete.GhostReproduced, "the rc6 click-then-hover with two highlights is not the ghost");
+
+            // Two drawn highlights after a click then a hover: the owner's bug.
+            HoverOwnershipRecord ghost = CompleteHoverRecord();
+            ghost.Add(Synthetic("classic-click-then-hover-2", "classic", HoverBehaviour.Fixed, "Target.u4",
+                "Routine.long", "Routine.long", "Target.u4"));
+            Expect(ghost.Violations().Any(value => value.StartsWith("more-than-one-hover-owner:classic-click-then-hover-2",
+                StringComparison.Ordinal)), "two highlights in the shipped behaviour are accepted");
+
+            // A highlight left behind when the pointer has gone.
+            HoverOwnershipRecord left = CompleteHoverRecord();
+            left.Add(Synthetic("graph-exit-late", "graph", HoverBehaviour.Fixed, null, null, "Caster.u1"));
+            Expect(left.Violations().Contains("highlight-without-pointer:graph-exit-late:Caster.u1"),
+                "a highlight without the pointer is accepted");
+
+            // The highlight on another control than the one under the pointer.
+            HoverOwnershipRecord misaligned = CompleteHoverRecord();
+            misaligned.Add(Synthetic("graph-hover-x", "graph", HoverBehaviour.Fixed, "Target.u2", null, "Target.u3"));
+            Expect(misaligned.Violations().Contains(
+                    "hover-owner-misaligned:graph-hover-x:expected=Target.u2;highlighted=Target.u3"),
+                "a highlight on the wrong control is accepted");
+
+            // A pointer-driven control holding the EventSystem selection.
+            HoverOwnershipRecord selection = CompleteHoverRecord();
+            selection.Add(new HoverSample("graph-selected", "graph", HoverBehaviour.Fixed, false, null, null, null,
+                null, null, null, "Save", true, null, null));
+            Expect(selection.Violations().Contains("planner-control-holds-selection:graph-selected:Save"),
+                "a planner control holding the selection is accepted");
+
+            // The live sweep: the aimed control must be what Unity finds on
+            // top there, and the highlight must be under Unity's cursor.
+            HoverOwnershipRecord occluded = CompleteHoverRecord();
+            occluded.Add(Physical("sweep-occluded", "Target.u2", "Line.c1.in", false, null));
+            Expect(occluded.Violations().Contains("aimed-control-not-topmost:sweep-occluded:aimed=Target.u2;top=Line.c1.in"),
+                "a control hidden under another hit target is accepted");
+            HoverOwnershipRecord offCursor = CompleteHoverRecord();
+            offCursor.Add(Physical("sweep-off", "Caster.u1", "Caster.u1", true, false, "Caster.u1"));
+            Expect(offCursor.Violations().Contains("highlight-not-under-cursor:sweep-off"),
+                "a highlight away from Unity's cursor is accepted");
+
+            // A corridor (no visible transition) takes the pointer without a
+            // drawn highlight: no owner expected, none drawn.
+            HoverOwnershipRecord corridor = CompleteHoverRecord();
+            corridor.Add(Physical("sweep-line", "Line.c1.in", "Line.c1.in", false, null));
+            Expect(corridor.Violations().Count == 0, "a line corridor hover is judged as a missing highlight");
+
+            // The rc6 reproduction is evidence, never judged as single-owner.
+            Expect(!complete.Violations().Any(value => value.Contains("classic-rc6")),
+                "the reproduction's intended ghost is reported as a product violation");
+        }
+
+        private static void TestHoverRecordRequiresCoverage()
+        {
+            var empty = new HoverOwnershipRecord();
+            IList<string> violations = empty.Violations();
+            foreach (string expected in new[]
+            {
+                "hover-probe-unavailable", "missing-sample:graph-synthetic-owner", "missing-sample:graph-synthetic-exit",
+                "missing-sample:classic-synthetic-owner", "missing-sample:reopen-synthetic-exit",
+                "missing-sample:graph-click-then-hover", "missing-sample:classic-click-then-hover",
+                "missing-sample:physical-aims=0<5", "missing-sample:physical-neutral", "rc6-ghost-not-reproduced",
+                "button-state-missing:pressed", "planner-roots-after-reopen=-1", "hover-sequence-incomplete"
+            })
+                Expect(violations.Contains(expected), "an empty record does not report " + expected);
+
+            // Without the reproduced ghost the fix proves nothing.
+            HoverOwnershipRecord unreproduced = CompleteHoverRecord();
+            var copy = new HoverOwnershipRecord { ProbeAvailable = true, Screen = "1920x1080" };
+            foreach (HoverSample sample in unreproduced.Samples)
+                if (sample.Behaviour != HoverBehaviour.Rc6) copy.Add(sample);
+            copy.Add(Synthetic("classic-rc6-click-then-hover", "classic", HoverBehaviour.Rc6, "Target.u3",
+                "Routine.long", "Target.u3"));
+            foreach (ButtonStateObservation button in unreproduced.Buttons) copy.AddButton(button);
+            copy.PlannerRootsAfterReopen = 1;
+            copy.Completed = true;
+            Expect(copy.Violations().SequenceEqual(new[] { "rc6-ghost-not-reproduced" }),
+                "an unreproduced rc6 ghost is accepted: " + string.Join(",", copy.Violations().ToArray()));
+
+            // Four aims are not a sweep.
+            var shortSweep = new HoverOwnershipRecord { ProbeAvailable = true };
+            foreach (HoverSample sample in CompleteHoverRecord().Samples.Where(value =>
+                    !(value.Physical && value.Label == "sweep-Save")))
+                shortSweep.Add(sample);
+            foreach (ButtonStateObservation button in CompleteHoverRecord().Buttons) shortSweep.AddButton(button);
+            shortSweep.PlannerRootsAfterReopen = 1;
+            shortSweep.Completed = true;
+            Expect(shortSweep.Violations().SequenceEqual(new[] { "missing-sample:physical-aims=4<5" }),
+                "a four-control sweep is accepted: " + string.Join(",", shortSweep.Violations().ToArray()));
+
+            // Each button state must be the one it claims.
+            var buttons = CompleteHoverRecord();
+            var wrong = new HoverOwnershipRecord { ProbeAvailable = true };
+            foreach (HoverSample sample in buttons.Samples) wrong.Add(sample);
+            foreach (ButtonStateObservation button in buttons.Buttons)
+                wrong.AddButton(button.State == "selected"
+                    ? new ButtonStateObservation("selected", "Routine.long", "Normal", false, null, null)
+                    : button);
+            wrong.PlannerRootsAfterReopen = 1;
+            wrong.Completed = true;
+            Expect(wrong.Violations().Count == 1 && wrong.Violations()[0].StartsWith(
+                    "button-state-not-shown:selected=Routine.long:Normal", StringComparison.Ordinal),
+                "a tab without the selected palette passes as selected");
+
+            // Close and reopen: exactly one planner root.
+            HoverOwnershipRecord twoRoots = CompleteHoverRecord();
+            twoRoots.PlannerRootsAfterReopen = 2;
+            Expect(twoRoots.Violations().SequenceEqual(new[] { "planner-roots-after-reopen=2" }),
+                "two planner roots after reopen are accepted");
+
+            // A failure recorded by the host fails the record.
+            HoverOwnershipRecord failed = CompleteHoverRecord();
+            failed.AddFailure("physical-delivery-failed:hover-sweep-3:foreground");
+            Expect(failed.Violations().SequenceEqual(new[] { "failure:physical-delivery-failed:hover-sweep-3:foreground" }),
+                "a failed physical delivery is accepted");
+        }
+
+        // The diagnostic hovers only (the sweep never clicks the game), runs
+        // only in live-workspace-qual, and turns the rc6 switch off on every
+        // terminal path.
+        private static void TestHoverDiagnosticHostContract()
+        {
+            string host = RuntimeSource("RuntimeTestHost.cs");
+            string request = SourceBlock(host, "private void RequestHover(");
+            Expect(request != null && request.Contains("WritePhysicalInputRequest(id, \"hover\", point);"),
+                "the hover sweep requests something other than a cursor move");
+            string update = SourceBlock(host, "private bool UpdateHoverOwnership()");
+            Expect(update != null && !update.Contains("RequestPhysical(") && !update.Contains("\"click\"") &&
+                !update.Contains("WritePhysicalInputRequest("), "the hover diagnostic requests physical clicks");
+            Expect(update.Contains("catch (Exception exception)") &&
+                SourceBlock(update, "catch (Exception exception)").Contains(
+                    "PlannerUiReproduction.Rc6ButtonBehaviour = false;"),
+                "a failed hover step leaves the rc6 switch on");
+            string finish = SourceBlock(host, "private bool FinishHover()");
+            Expect(finish != null && finish.Contains("PlannerUiReproduction.Rc6ButtonBehaviour = false;"),
+                "an early hover end leaves the rc6 switch on");
+            string enter = SourceBlock(host, "private void FinishWorkspaceInteraction()");
+            Expect(enter != null && enter.Contains("\"live-workspace-qual\"") && enter.Contains("_liveUiPhase = 140;"),
+                "the hover diagnostic is not limited to the standard workspace scenario");
+            Expect(Occurrences(host, "PlannerUiReproduction.Rc6ButtonBehaviour = _hoverStep == 6;") == 1 &&
+                Occurrences(host, "Rc6ButtonBehaviour = true") == 0,
+                "the rc6 switch is set outside the Classic reproduction step");
         }
 
         private static void TestContrastRatioFollowsWcag()
@@ -97,12 +297,22 @@ namespace KingmakerBuffPlanner.Tests
 
         private static string UiSource(string file)
         {
+            return ProductSource("UI", file);
+        }
+
+        private static string RuntimeSource(string file)
+        {
+            return ProductSource("RuntimeTesting", file);
+        }
+
+        private static string ProductSource(string folder, string file)
+        {
             DirectoryInfo directory = new DirectoryInfo(Environment.CurrentDirectory);
             while (directory != null && !File.Exists(Path.Combine(directory.FullName, "KingmakerBuffPlanner.sln")))
                 directory = directory.Parent;
             Expect(directory != null, "repository root not found");
             return CollapsedWhitespace(File.ReadAllText(Path.Combine(directory.FullName, "src",
-                "KingmakerBuffPlanner", "UI", file)));
+                "KingmakerBuffPlanner", folder, file)));
         }
 
         // The installed Unity UI draws the EventSystem's current selection as
