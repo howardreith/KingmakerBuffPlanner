@@ -1,10 +1,37 @@
 # AUTONOMOUS-RESUME — top section is current; planning/CASTING-FIRST-MIGRATION-STATUS.md is the per-checkpoint tracker.
 
-## Toward release candidate 0.2.0-rc6 (2026-09-24, LATEST)
+## Release candidate 0.2.0-rc6 frozen at `24d9967`; chain done (2026-09-25, LATEST)
+
+Candidate `24d9967f82e516f9ed4a4c1f06e6a842e18c5f96`: package
+`f271f3e6...`, DLL `35d6cbb2...`, MVID `4cb12c0d-78c6-4755-aa62-b6ad50e1a02b`;
+the same bytes from `repo/KingmakerBuffPlanner-RC6` (two deterministic
+builds), `RC6-repro` and the G2 gate build. Frozen copy
+`runtime-backups/rc-frozen/24d9967.../`. Receipt
+`docs/evidence/rc-0.2.0-rc6-receipt.md`.
+
+- Gate at the candidate: source 42, protocol 338, harness 38, package 4,
+  deploy WhatIf 5, launcher WhatIf 12, fixture 3, Restore-InstallLocal 16,
+  publisher 3.
+- Chain (`scratchpad/rc6_chain.ps1`, status `rc6_chain.status`): Classic
+  select and cast in both modes, zero-cost select and both modes, import:
+  PASS. `casting-ws-qual-20260924-rc6-1080-01` FAIL on black frames (the
+  session connected for a moment at 22:43 and disconnected; restored,
+  saves clean; not a product result); reload, 1200 layout and rehearsal
+  deferred; the chain now needs two minutes of stable connection before a
+  frame run. Resumed with `-Only` for the rest: advanced inspection and
+  finite, group, enhanced, ability-pool and rod, each a selection and both
+  modes: PASS. Temporary install and rollback: PASS (0.1.1-rc3 restored
+  exactly, 1117 entries).
+- Waiting on the owner: the connected session for the frame-judged runs
+  and the supervised manual session; the decisions on Classic and
+  toggles left on, and on worn-item enchantments; merge, release and
+  permanent installation.
+
+## The next iteration toward rc6 (2026-09-24)
 
 The next iteration (local branch `codex/kingmaker-buff-planner-next`,
-`a0e0e5a..64c6e22`) is merged into the PR branch (`a036627`, not yet
-pushed at this note) and versioned 0.2.0-rc6. Development evidence:
+`a0e0e5a..64c6e22`) was merged into the PR branch (`a036627`) and
+versioned 0.2.0-rc6 (`24d9967`). Development evidence:
 `docs/evidence/next-iteration-20260924-receipt.md`.
 
 - Mutagen (`ability-pool-direct`): PASS in both modes on `e2a4959` and on
@@ -31,11 +58,7 @@ pushed at this note) and versioned 0.2.0-rc6. Development evidence:
   Powerful Change qualifications PASS in both modes (the running rod copy
   used, no rod left running, plain casts no longer extended by the rod
   left on).
-- Remaining for rc6: the freeze from two worktrees, the gate at the
-  candidate, the rc6 chain (`scratchpad/rc6_chain.ps1`: Classic both
-  modes, zero-cost, import, the frame runs if the session is connected,
-  advanced inspection and five recipes in both modes, install and
-  rollback), the receipt, then push and the PR body.
+- rc6 then followed: freeze, gate, chain and receipt (the section above).
 
 ## Release candidate 0.2.0-rc5 frozen at `27234a4`; chain done (2026-09-24)
 

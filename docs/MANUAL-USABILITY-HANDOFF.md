@@ -1,12 +1,12 @@
 # Supervised manual usability session — implemented procedure
 
-**Release-candidate session (0.2.0-rc5).** This is the one consolidated
+**Release-candidate session (0.2.0-rc6).** This is the one consolidated
 manual acceptance session the mission asks for near the end. It runs the
 frozen candidate from its own clean checkout,
-`C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner-RC5`
-(commit `27234a4`; identities in `docs/evidence/rc-0.2.0-rc5-receipt.md`).
+`C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner-RC6`
+(commit `24d9967`; identities in `docs/evidence/rc-0.2.0-rc6-receipt.md`).
 The procedure was rehearsed end to end on rc2
-(`casting-ws-manual-20260923-rc2-rehearsal`); its rehearsal on the rc5
+(`casting-ws-manual-20260923-rc2-rehearsal`); its rehearsal on the rc6
 build judges game frames, so it runs first once your session is connected
 (with the other deferred frame-judged runs listed in the receipt), before
 you are asked to take part. In this session the planner authors and saves but cannot cast:
@@ -15,6 +15,12 @@ and the candidate's casting was qualified separately by the guarded runs
 listed in the receipt.
 
 What to look at first, because it changed since your last session (rc2).
+rc6 changes how a casting runs, not the workspace: a casting now uses
+exactly the enhancements it chose, and a rod or Brown-Fur switch you left
+on is switched off for the other castings and back on afterwards. Casting
+is disabled in this session, so this was qualified by the guarded runs in
+the receipt; you would see it only in ordinary play after installing.
+
 New in rc5:
 - **A buff already on some of a group's recipients**: the card says
   "already active on (the character) (the cast goes ahead for the
@@ -57,7 +63,7 @@ and legacy quick execution remain disabled; nothing can cast a buff.
 ## The supported command (exact)
 
 ```powershell
-& 'C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner-RC5\scripts\Invoke-KingmakerRuntimeTest.ps1' `
+& 'C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner-RC6\scripts\Invoke-KingmakerRuntimeTest.ps1' `
     -Scenario live-workspace-manual -CompatibilityProfileId full-user `
     -RunId casting-ws-manual-HHmm -ManualHoldSeconds 900 `
     -TimeoutSeconds 1500 -Confirm:$false
