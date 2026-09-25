@@ -1,74 +1,47 @@
-# Kingmaker Buff Planner 0.2.0-rc5 — Casting-first planner (release candidate)
+# Kingmaker Buff Planner 0.2.0-rc6 — Casting-first planner (release candidate)
 
 **This is a local release candidate for the owner's final review, not a
 public release.** Nothing is published, tagged or permanently installed
 before that review. The classic planner stays the default; the
 casting-first planner is an opt-in, experimental mode.
 
-## What changed since 0.2.0-rc4
+## What changed since 0.2.0-rc5
 
-The owner's review of the rc4 source found two defects. The
-qualification on the owner's advanced test campaign, and an independent
-review of the work, found more. All are fixed. For a player:
+The qualification of rc5 on the owner's advanced test campaign went on to
+ability pools and metamagic rods, and found one defect. For a player:
 
-- **An effect the planner cannot fully read is never "good enough".** With
-  **If the buff is already there: skip this casting**, an existing buff
-  counts as already covering a recipient only when the planner could read
-  that it is not suppressed, the caster level it came from, and the
-  caster level of the planned casting. Otherwise the casting goes ahead
-  and the card says why: "not provably as strong" or "possibly
-  suppressed". rc4 treated an unreadable suppression flag as "not
-  suppressed" and an unreadable caster level as good enough.
-- **Group castings with mixed coverage.** Some recipients of a group
-  casting may already have an adequate buff while others do not. The
-  casting is then cast once for the others, at its usual cost, and the
-  card says "already active on (the character) (the cast goes ahead for
-  the others)". Those recipients may keep their buff unchanged, or the
-  game may replace it with this cast's. In the qualification run the game
-  replaced a longer buff with the shorter one, and the card now says so
-  beforehand ("... may shorten it"). Every other recipient still needs
-  the buff to land. Before, a kept instance made the whole cast count as
-  unconfirmed.
-- **Powerful Change in Instant mode.** A casting with Brown-Fur Powerful
-  Change, or another enhancement that needs its provider's own cast or a
-  native command, now casts that way in Instant mode, as the classic
-  planner always did. Before, the casting-first planner cast it by the
-  game's rule directly, a path the provider does not take part in, so the
-  spell would have landed without its enhancement. Animated mode was not
-  affected.
-- **Share Transmutation chosen as an enhancement is refused.** It changes
-  whom the spell reaches, which this version does not execute. The
-  casting keeps the choice, shows it, and is not cast. Before, it could
-  run with Share applied to the caster's own target.
-- **The card names the character.** Notes about a buff already on a
-  recipient now name the character instead of an internal id.
-- **Only enhancements the casting can take are offered.** Powerful Change
-  for an ability score that none of the caster's spells raises was
-  offered on every spell (choosing it blocked the casting). The workspace
-  now offers exactly the enhancements the planner would accept for that
-  casting's source.
-- **Archived plans are checked byte for byte.** When a plan is migrated,
-  its original is archived. An archive already at the expected name is
-  reused only when it holds exactly the original bytes. A different file
-  there is kept untouched, and the original goes to a numbered name, or
-  to a name made from its own content once the numbered names are taken,
-  so a readable settings file can never become unreadable for want of an
-  archive name. The classic planner's pre-schema archive now keeps the
-  exact original bytes, byte-order mark included.
+- **A casting uses exactly the enhancements it chose.** A metamagic rod,
+  Powerful Change or Share Transmutation that you left switched on in the
+  game no longer applies to a casting that did not choose it. The planner
+  switches it off for that cast and back on afterwards. In rc5 an Extend
+  rod left on was spent on a casting that chose no rod, and the buff was
+  extended without being asked. The game keeps some switches running for
+  up to a round after they are switched off: a rod is stopped at once, and
+  anything else still running makes the casting refuse with its reason
+  rather than cast with it. When a casting chooses one copy of a rod you
+  carry twice, the copy already switched on is used.
 
 For the release checks (not visible in play):
-- a separate compatibility profile for the owner's advanced test campaign
-  (Gunslinger 0.0.136, staged from an exact copy);
-- a frozen BagOfTricks copy whose cheats are verified off;
-- variant spells (such as the four forms of Protection from Alignment)
-  accepted by the qualification tooling's plain-buff check;
-- two new qualifications, group buffs with mixed coverage
-  (`group-mixed`) and a per-casting enhancement (`enhanced-direct`,
-  Powerful Change chosen through the workspace, with the stat modifier,
-  the Arcane Reservoir, the caster's toggles and the route that ran all
-  read from the game);
-- a capability inventory that lists the exact effects each source
-  applies.
+- two new qualifications on the advanced campaign, both passed in both
+  modes: an ability pool (`ability-pool-direct`: the Alchemist's Mutagen,
+  one use a day) and an Extend rod chosen on a casting
+  (`rod-extend-direct`: the buff lasts twice as long at the same strength
+  for exactly one charge);
+- the qualification tooling's plain-buff check now tells an action that
+  does nothing from one the planner does not model (damage, healing,
+  removing a buff, an unknown action);
+- the published evidence carries the game clock and each switch's running
+  state.
+
+## What changed in 0.2.0-rc5 (history)
+
+An effect the planner cannot fully read is never "good enough"; group
+castings with mixed coverage cast once for the recipients that lack the
+buff; Powerful Change in Instant mode casts through its provider; Share
+Transmutation chosen as an enhancement is refused; the card names the
+character; only enhancements a casting can take are offered; archived
+plans are checked byte for byte. rc5 was superseded by rc6 before release
+(`docs/evidence/rc-0.2.0-rc5-receipt.md`).
 
 ## What changed in 0.2.0-rc4 (history)
 
@@ -160,11 +133,20 @@ build it staged (commit, package, DLL and MVID).
     target-anchored group, and a recipient already covered;
   - Powerful Change chosen on a casting: the enhanced recipient got +6
     where the plain one got +4, exactly one Arcane Reservoir point was
-    spent, and the caster's toggles were left as they were.
+    spent, and the caster's toggles were left as they were;
+  - an ability pool: the Alchemist's Mutagen spent its single daily use
+    and landed its buff; a repeat cast nothing; *Always recast* was
+    refused for want of the resource;
+  - an Extend rod chosen on a casting: the buff lasted twice as long (1080
+    s against 540 s) for exactly one charge, while a casting that did not
+    choose the rod spent none, although the player had left the rod
+    switched on.
 
-The receipt (`docs/evidence/rc-0.2.0-rc5-receipt.md`, added after the
-freeze) lists the runs made on the frozen rc5 candidate itself; earlier
-receipts keep the runs made on earlier candidates.
+The receipt (`docs/evidence/rc-0.2.0-rc6-receipt.md`, added after the
+freeze) lists the runs made on the frozen rc6 candidate itself; earlier
+receipts keep the runs made on earlier candidates, and
+`docs/evidence/next-iteration-20260924-receipt.md` the development runs
+that found and fixed the rod defect.
 
 **Restoration:** every run moved the owner's Mods folder aside, staged
 only the candidate and the approved mod set, and restored the folder
@@ -175,12 +157,10 @@ Every save was compared before and after.
 described in `docs/MANUAL-USABILITY-HANDOFF.md`.
 
 **Not yet checked in the game:**
-- ability pools (the advanced party's Mutagen and domain powers were
-  inventoried, not cast);
-- metamagic variants and rods (no metamagic spell was prepared, and the
-  rods were not used);
-- an area change during a run (the automation campaign's only exit
-  autosaves and ends the prologue);
+- ability pools with more than one use (the Cleric's domain powers), and
+  metamagic variants other than a rod (no metamagic spell was prepared);
+- an area change during a run (every exit of both test campaigns writes
+  an autosave before leaving, which the owner's terms forbid);
 - pets (neither test party has any);
 - keyboard and mouse input from a person, and any check that judges game
   frames (the workspace layout at 1920×1200 and 1920×1080, the in-game
@@ -244,6 +224,17 @@ not prove behaviour specific to the main campaign.
 - APPLY in the open classic planner now closes the planner so the party
   casts at once (the planner pauses the game). This changes the default
   planner's behaviour and is for the owner to confirm.
+- The classic planner leaves the game's switches as they are when a buff
+  chooses no enhancement: a rod left switched on applies to every eligible
+  classic cast and spends its charges. This is unchanged from 0.0.19 and
+  is for the owner to decide; the casting-first planner casts exactly
+  what each casting chose.
+- The casting-first planner manages only the enhancements it knows (rods,
+  Powerful Change, Share Transmutation). A spell-changing switch from
+  another mod that you leave on still applies to its casts. Brown-Fur's
+  switches stop at once only with the installed Brown-Fur provider's own
+  patch; without it, a casting whose caster has one still running refuses
+  with its reason.
 
 ## Not supported in this version (shown on the card, refused by Apply)
 
@@ -260,7 +251,7 @@ Exit Kingmaker and Unity Mod Manager first.
 ```powershell
 # From the candidate's clean checkout:
 .\scripts\Build-Release.ps1
-.\scripts\Install-Local.ps1 -ReleaseManifestPath .\artifacts\release\0.2.0-rc5\release-manifest.json `
+.\scripts\Install-Local.ps1 -ReleaseManifestPath .\artifacts\release\0.2.0-rc6\release-manifest.json `
     -InstallId <id> -ExpectedPriorVersion 0.1.1-rc3
 # To return to the prior version, keeping settings edited since:
 .\scripts\Restore-InstallLocal.ps1 -InstallId <id>

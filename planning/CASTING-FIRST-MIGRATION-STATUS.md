@@ -5,7 +5,20 @@ Linked from `AUTONOMOUS-RESUME.md`. Specification: the adopted
 `Kingmaker-Buff-Planner-Casting-First-Migration-Charter.md` (casting-first
 migration and native scroll UI charter v1.0, 2026-09-19).
 
-## CURRENT STATE — advanced seed qualification toward rc5 — 2026-09-24
+## CURRENT STATE — rc6: ability pools, rods and exact enhancements — 2026-09-24
+
+rc5 (`27234a4`) passed its chain. Qualification then went on to an ability
+pool (the Mutagen) and an Extend rod on the advanced seed. The rod run
+found a real defect: a rod the player had left switched on was spent on a
+casting that chose no rod. Casting-first castings now apply exactly their
+chosen enhancements (Classic is unchanged, an owner decision). The
+Mutagen, rod and Powerful Change qualifications passed in both modes on
+the fixed build. rc6 carries this work; its chain follows the freeze.
+Details: the top section of `AUTONOMOUS-RESUME.md`,
+`docs/evidence/next-iteration-20260924-receipt.md` and
+`docs/CASTING-FIRST-REVIEW-INDEX.md`.
+
+## CURRENT STATE — advanced seed qualification toward rc5 — 2026-09-24 (history)
 
 rc4 (`863a182`) was reviewed by the owner, who also designated the
 disposable Beneath the Stolen Lands save `KBP_ADVANCED_SEED`. The two

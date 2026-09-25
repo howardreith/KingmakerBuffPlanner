@@ -1,6 +1,43 @@
 # AUTONOMOUS-RESUME — top section is current; planning/CASTING-FIRST-MIGRATION-STATUS.md is the per-checkpoint tracker.
 
-## Release candidate 0.2.0-rc5 frozen at `27234a4`; chain done (2026-09-24, LATEST)
+## Toward release candidate 0.2.0-rc6 (2026-09-24, LATEST)
+
+The next iteration (local branch `codex/kingmaker-buff-planner-next`,
+`a0e0e5a..64c6e22`) is merged into the PR branch (`a036627`, not yet
+pushed at this note) and versioned 0.2.0-rc6. Development evidence:
+`docs/evidence/next-iteration-20260924-receipt.md`.
+
+- Mutagen (`ability-pool-direct`): PASS in both modes on `e2a4959` and on
+  the fixed `fb762e2` (use 1 > 0 with the buff landed, repeat casts
+  nothing, Always recast refused for the empty pool).
+- Extend rod (`rod-extend-direct`): on `e2a4959` the Animated run FAILED
+  at its plain step, a real defect: the transmuter's second rod copy was
+  switched on in the seed and the plain casting, which chose no rod,
+  spent a charge (6 > 5) and was extended (1079.6 s for Blur's 540 s).
+  Both executors skipped enhancement preparation for steps without
+  enhancements. Fixed in `fb762e2` (casting-first steps apply exactly
+  their chosen enhancements; an unchosen rod still running is stopped
+  because the game keeps a switched-off toggle running until the next
+  round, read from its IL), hardened in `64c6e22` after a second review.
+  On `fb762e2` both modes PASS: plain 540 s with no charge, rod 1080 s
+  for one charge.
+- Two independent reviews, all findings fixed or documented; mutants of
+  the new guards all killed. Area transition: route check only, both
+  seed exits autosave (unavailable).
+- Owner decision added: the Classic planner still lets a rod left
+  switched on apply to casts that choose no enhancement (unchanged from
+  0.0.19); recommendation: the casting-first rule.
+- Hardened build `64c6e22` (gate PASS, package `270199dc...`): rod and
+  Powerful Change qualifications PASS in both modes (the running rod copy
+  used, no rod left running, plain casts no longer extended by the rod
+  left on).
+- Remaining for rc6: the freeze from two worktrees, the gate at the
+  candidate, the rc6 chain (`scratchpad/rc6_chain.ps1`: Classic both
+  modes, zero-cost, import, the frame runs if the session is connected,
+  advanced inspection and five recipes in both modes, install and
+  rollback), the receipt, then push and the PR body.
+
+## Release candidate 0.2.0-rc5 frozen at `27234a4`; chain done (2026-09-24)
 
 Candidate `27234a445e95f2fc399857a880c35de0f397359f`: package
 `a05f1a83...`, DLL `785e1b79...`, MVID `171a1599-fef3-419b-b748-2833a10f9d75`;

@@ -189,10 +189,11 @@ else has passed source and recorded-runtime tests only.
 | Close and reopen the planner; the accepted plan survives | Runs | Yes |
 | Spellbook spells from prepared slots or spontaneous levels, direct target | Runs, budgeted in order | Yes, on the owner's advanced test campaign (a *Beneath the Stolen Lands* save), both modes: a spontaneous level and one exact prepared slot each spent exactly once per cast, the rest untouched |
 | Exact prepared slots shared across castings | Runs, budgeted in order | Yes (advanced campaign): the slot a casting reserved was the one spent |
-| Ability pools (for example Mutagen, domain powers) | Runs, budgeted in order | Not yet |
+| Ability pools (for example Mutagen, domain powers) | Runs, budgeted in order | Yes (advanced campaign), both modes: the Alchemist's Mutagen spent its one daily use and landed its buff; a repeat cast nothing; Always recast was refused for want of the resource. Pools with more than one use (domain powers): not yet |
 | Group spells, caster-centred or anchored origin, predicted coverage | Runs | Yes (advanced campaign), both modes: a communal spell reached all four members for one cast and one slot; a target-anchored group spell centred on a member; a member who already had the buff was counted as covered |
 | A per-casting class-feature enhancement (Brown-Fur Powerful Change) | Runs; in Instant mode through the provider's own transaction | Yes (advanced campaign), both modes: the enhanced recipient got +6 where the plain cast gave +4, one Arcane Reservoir point was spent, and the caster's toggles were left as they were |
-| Metamagic spell variants, metamagic rods (any matching rod) | Runs | Not yet |
+| Metamagic rods (any matching rod) | Runs; a casting uses exactly the rods it chose, and a rod you left switched on is switched off for the other castings and back on afterwards | Yes (advanced campaign), both modes: an Extend rod made Blur last 1080 s instead of 540 s for one charge, and a casting without the rod spent none although the rod had been left on |
+| Metamagic spell variants | Runs | Not yet |
 | Share Transmutation and other ways of changing whom a spell reaches (as a targeting modifier or an enhancement) | Shown as "cannot run in this version" or "not executed yet"; Apply refuses | n/a |
 | A specific physical rod or item | Shown as "cannot run in this version"; Apply refuses | n/a |
 | Group castings whose required recipients are outside the predicted area | Shown as "cannot run in this version"; Apply refuses | n/a |
@@ -266,9 +267,12 @@ spellbook's level-0 entry, which needs a level-0 slot these classes do
 not have. Cantrips are now cast at will through the ability the class
 grants, as in the game's own action bar.
 
-Spells that spend slots, group spells, metamagic and rods have not been
-cast in the game yet; they need a test campaign with a more advanced
-party. The workspace itself, the save and reopen cycle and the planner's
+On the owner's advanced test campaign (a disposable *Beneath the Stolen
+Lands* save), spells that spend slots, group spells, Powerful Change, the
+Alchemist's Mutagen and an Extend rod have been cast in both modes (see
+the table above). Metamagic spell variants, ability pools with more than
+one use, pets and an area change during a run have not been checked in
+the game yet. The workspace itself, the save and reopen cycle and the planner's
 text were checked in game frames; the owner has not yet accepted the
 workspace's usability. Treat casting-first mode as experimental and keep
 the classic planner for normal play.
