@@ -661,6 +661,10 @@ namespace KingmakerBuffPlanner.UI
             Text text = KingmakerUiFactory.CreateText(name, footer, _theme, string.Empty, 13, TextAnchor.MiddleLeft);
             text.horizontalOverflow = HorizontalWrapMode.Wrap;
             text.verticalOverflow = VerticalWrapMode.Truncate;
+            // Long budget lists shrink to fit before anything is cut.
+            text.resizeTextForBestFit = true;
+            text.resizeTextMinSize = 10;
+            text.resizeTextMaxSize = 13;
             KingmakerUiFactory.SetAnchors(text.rectTransform, 0f, from, 1f, to, 0f, 0f, 0f, 0f);
             return text;
         }
@@ -1618,10 +1622,12 @@ namespace KingmakerBuffPlanner.UI
         {
             _footerSelectedRun.text = view.SelectedRunLabel + ": " + (view.SelectedRunBudget.Count == 0
                 ? "nothing spent yet" : string.Join("   ", view.SelectedRunBudget.ToArray()));
+            // The conflict first: a long pool list may be cut short, the
+            // shortfall never is.
             string shortfall = WorkspaceFooterText.WholePlan(view.OnePassShortCount);
-            _footerOnePass.text = view.OnePassLabel + ": " + (view.OnePassBudget.Count == 0
-                ? "nothing spent yet" : string.Join("   ", view.OnePassBudget.ToArray())) +
-                (shortfall.Length == 0 ? string.Empty : "   " + shortfall);
+            _footerOnePass.text = (shortfall.Length == 0 ? string.Empty : shortfall + "   ") +
+                view.OnePassLabel + ": " + (view.OnePassBudget.Count == 0
+                    ? "nothing spent yet" : string.Join("   ", view.OnePassBudget.ToArray()));
             _footerOnePass.color = view.OnePassShortCount > 0 ? BlockedInk : _theme.DarkBrownText;
             if (_undoButton != null) KingmakerUiFactory.SetInteractable(_undoButton, _session.CanUndo);
         }

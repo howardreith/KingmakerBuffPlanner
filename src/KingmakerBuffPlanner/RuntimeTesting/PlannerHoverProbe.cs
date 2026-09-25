@@ -43,10 +43,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             return value is bool && (bool)value;
         }
 
-        // A control draws its highlight only through a visible transition.
+        // A control draws its highlight only through a visible transition and
+        // only while interactable: the installed Unity UI keeps a hovered
+        // disabled control's stored state Highlighted but draws Disabled.
         internal static bool DrawsHighlight(Selectable control)
         {
-            return control != null && control.transition != Selectable.Transition.None;
+            return control != null && control.transition != Selectable.Transition.None &&
+                control.IsInteractable();
         }
 
         internal static IList<Selectable> Controls(GameObject root)
@@ -217,6 +220,38 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             return centre;
         }
 
+        // The centre when the pointer can actually reach it: on screen and
+        // inside every clipping ancestor (a scroll view's viewport).
+        internal static Vector2? VisibleCentre(Component component)
+        {
+            Vector2? centre = ScreenCentre(component);
+            if (!centre.HasValue) return null;
+            foreach (RectMask2D clip in component.GetComponentsInParent<RectMask2D>())
+                if (clip.isActiveAndEnabled && !Contains(clip, centre.Value)) return null;
+            foreach (Mask clip in component.GetComponentsInParent<Mask>())
+                if (clip.isActiveAndEnabled && !Contains(clip, centre.Value)) return null;
+            return centre;
+        }
+
+        // Where every drawn highlight other than the expected owner sits
+        // relative to the cursor (Unity pixels, +y up): "name@dx,dy".
+        internal static string Ghosts(string expectedOwner, Vector2 cursor, params GameObject[] roots)
+        {
+            var ghosts = new List<string>();
+            foreach (GameObject root in roots)
+                foreach (Selectable control in Controls(root))
+                {
+                    if (StateOf(control) != "Highlighted" || !DrawsHighlight(control) ||
+                        string.Equals(control.name, expectedOwner, StringComparison.Ordinal)) continue;
+                    Vector2? centre = ScreenCentre(control);
+                    ghosts.Add(control.name + "@" + (centre.HasValue
+                        ? (centre.Value.x - cursor.x).ToString("F0", CultureInfo.InvariantCulture) + "," +
+                          (centre.Value.y - cursor.y).ToString("F0", CultureInfo.InvariantCulture)
+                        : "offscreen"));
+                }
+            return ghosts.Count == 0 ? "none" : string.Join("|", ghosts.ToArray());
+        }
+
         internal static bool Contains(Component component, Vector2 screenPoint)
         {
             RectTransform rect = component == null ? null : component.transform as RectTransform;
@@ -269,23 +304,35 @@ namespace KingmakerBuffPlanner.RuntimeTesting
 
         internal static ButtonStateObservation Observe(string state, Selectable control)
         {
-            if (control == null) return new ButtonStateObservation(state, null, null, false, null, null);
-            Color normal = control.colors.normalColor;
+            if (control == null)
+                return new ButtonStateObservation(state, null, null, false, false, false, null, null);
+            ColorBlock colors = control.colors;
             UiRgb selectedTint = PlannerButtonPalette.SelectedTint;
-            bool selectedPalette = Near(normal.r, selectedTint.R) && Near(normal.g, selectedTint.G) &&
-                Near(normal.b, selectedTint.B);
+            bool selectedPalette = Near(colors.normalColor.r, selectedTint.R) &&
+                Near(colors.normalColor.g, selectedTint.G) && Near(colors.normalColor.b, selectedTint.B);
+            bool interactable = control.IsInteractable();
+            string stored = StateOf(control);
+            // The colour the transition draws for what Unity would show now.
+            Color expected = !interactable ? colors.disabledColor
+                : stored == "Pressed" ? colors.pressedColor
+                : stored == "Highlighted" ? colors.highlightedColor
+                : colors.normalColor;
+            expected *= colors.colorMultiplier;
             Color tint = control.targetGraphic == null ? Color.clear
                 : control.targetGraphic.canvasRenderer.GetColor();
+            bool tintMatches = control.transition == Selectable.Transition.ColorTint &&
+                control.targetGraphic != null && Near(tint.r, expected.r) && Near(tint.g, expected.g) &&
+                Near(tint.b, expected.b) && Near(tint.a, expected.a);
             Rect? rect = ScreenRect(control);
-            return new ButtonStateObservation(state, control.name, StateOf(control), selectedPalette,
-                "#" + ColorUtility.ToHtmlStringRGBA(tint),
+            return new ButtonStateObservation(state, control.name, stored, interactable, selectedPalette,
+                tintMatches, "#" + ColorUtility.ToHtmlStringRGBA(tint),
                 rect.HasValue ? string.Format(CultureInfo.InvariantCulture, "{0:F0},{1:F0},{2:F0},{3:F0}",
                     rect.Value.x, rect.Value.y, rect.Value.width, rect.Value.height) : "offscreen");
         }
 
         private static bool Near(float a, float b)
         {
-            return Mathf.Abs(a - b) < 0.01f;
+            return Mathf.Abs(a - b) < 0.02f;
         }
 
         internal static string Point(Vector2 point)

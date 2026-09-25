@@ -513,6 +513,9 @@ namespace KingmakerBuffPlanner.UI
                 nodes.Add(new CastingGraphCasterNode(string.Empty, "Needs a caster", false, null,
                     "Imported castings whose caster is not chosen or not in the party.", true));
             string chosenCaster = Draft.CasterUnitId ?? SelectedCasterUnitId;
+            // Every row with the caster's name, so a pool shared across the
+            // party (item charges) is disclosed under each caster.
+            var allRows = new List<KeyValuePair<string, CastingGraphSourceRow>>();
             foreach (UnitSnapshot unit in inputs.Snapshot.Units)
             {
                 if (!capable.Contains(unit.UnitId) && !casting.Contains(unit.UnitId)) continue;
@@ -544,16 +547,27 @@ namespace KingmakerBuffPlanner.UI
                         pinnable, CastingGraphText.BlockedReason(estimate, pinnable), selectedRow,
                         IsGroupSource(inputs, source) == true));
                 }
-                foreach (CastingGraphSourceRow row in rows)
-                    row._sharedPoolWith.AddRange(rows.Where(other => !ReferenceEquals(other, row) &&
-                        string.Equals(other.PoolKey, row.PoolKey, StringComparison.Ordinal))
-                        .Select(other => other.Label));
+                string displayName = string.IsNullOrWhiteSpace(unit.DisplayName) ? unit.UnitId : unit.DisplayName;
+                allRows.AddRange(rows.Select(row => new KeyValuePair<string, CastingGraphSourceRow>(displayName, row)));
                 string note = !capable.Contains(unit.UnitId) ? "Cannot cast this buff now."
                     : rows.Count > 1 && !rows.Any(value => value.Selected) ? "Choose the exact source."
                     : rows.Count != 0 && rows.All(value => !value.Usable) ? "Nothing left to cast it with."
                     : string.Empty;
                 nodes.Add(new CastingGraphCasterNode(unit.UnitId, unit.DisplayName,
                     string.Equals(chosenCaster, unit.UnitId, StringComparison.Ordinal), rows, note, false));
+            }
+            // A pool is shared by every row that draws on it: the same
+            // caster's other sources by label, another caster's with the
+            // caster's name. Each row's count is what is left for it alone.
+            // At-will sources (no pool key) share nothing.
+            foreach (KeyValuePair<string, CastingGraphSourceRow> entry in allRows)
+            {
+                CastingGraphSourceRow row = entry.Value;
+                if (string.IsNullOrEmpty(row.PoolKey)) continue;
+                row._sharedPoolWith.AddRange(allRows.Where(other => !ReferenceEquals(other.Value, row) &&
+                        string.Equals(other.Value.PoolKey, row.PoolKey, StringComparison.Ordinal))
+                    .Select(other => string.Equals(other.Value.CasterUnitId, row.CasterUnitId, StringComparison.Ordinal)
+                        ? other.Value.Label : other.Key + ": " + other.Value.Label));
             }
             return nodes;
         }
@@ -655,8 +669,11 @@ namespace KingmakerBuffPlanner.UI
                     string key = shape.Substring(first + 1, last - first - 1);
                     int units;
                     int.TryParse(shape.Substring(last + 1), out units);
+                    // An at-will source's pool has no count to show.
+                    bool unlimited = category == CastingCostCategory.NativePool && capacity != null &&
+                        capacity.NativeKind(key) == ResourcePoolKind.Unlimited;
                     costLines.Add("Would spend: " + CostLabel(new CastingCostLine(category, key,
-                        Math.Max(units, 1), null, null)) + LeftAfterPlan(capacity, category, key, false));
+                        Math.Max(units, 1), null, null)) + LeftAfterPlan(capacity, category, key, unlimited));
                 }
             var enhancements = new List<CastingGraphEnhancementOption>();
             if (inputs.Enhancements != null && focused.CasterUnitId != null)

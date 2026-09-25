@@ -611,6 +611,13 @@ namespace KingmakerBuffPlanner.Planning
                 stop == null, category, limitingPool, stop, remaining, available, null);
         }
 
+        // The kind of a native pool the plan knows (an Unlimited pool's
+        // "remaining" is not a count); null for an unknown pool.
+        public ResourcePoolKind? NativeKind(string poolKey)
+        {
+            return _final.NativeKind(poolKey);
+        }
+
         // The source's native pool after the plan (units or available
         // prepared slots); null for an unknown pool.
         public int? NativeRemaining(string poolKey)

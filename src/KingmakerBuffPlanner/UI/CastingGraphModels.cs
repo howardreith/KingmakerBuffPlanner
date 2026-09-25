@@ -398,10 +398,13 @@ namespace KingmakerBuffPlanner.UI
                 string.Equals(value.UnitId, unitId, StringComparison.Ordinal));
         }
 
+        // A party member's caster node; never the "Needs a caster" node,
+        // which stands for no unit (review: a null id matched it).
         public CastingGraphCasterNode CasterById(string unitId)
         {
+            if (string.IsNullOrEmpty(unitId)) return null;
             return (Casters ?? new CastingGraphCasterNode[0]).FirstOrDefault(value =>
-                string.Equals(value.UnitId, unitId ?? string.Empty, StringComparison.Ordinal));
+                string.Equals(value.UnitId, unitId, StringComparison.Ordinal));
         }
     }
 
