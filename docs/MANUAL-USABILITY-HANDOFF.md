@@ -1,5 +1,68 @@
 # Supervised manual usability session — implemented procedure
 
+## Casting-graph workspace review (2026-09-25, current)
+
+This session asks for your verdict on the rebuilt casting-first workspace
+(addendum v1.1). It runs a development build of the branch
+`claude/casting-graph-ui-correction` from this checkout, rebuilt at the
+exact HEAD just before the session, in the same guarded transaction as
+every other run: the disposable `KBP_AUTOMATION_WORKING` campaign, Mods
+staged and restored exactly, native casting disabled (the planner authors
+and saves; nothing casts). It starts only after the automated frame runs
+of the same build have passed with your session connected.
+
+The command (the operating agent runs it and tells you when the
+workspace is ready):
+
+```powershell
+& 'C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\scripts\Invoke-KingmakerRuntimeTest.ps1' `
+    -Scenario live-workspace-manual -CompatibilityProfileId full-user `
+    -RunId casting-graph-manual-HHmm -ManualHoldSeconds 1200 `
+    -TimeoutSeconds 1620 -Confirm:$false
+```
+
+What to judge (in any order; say what you see, in your own words):
+
+1. **Which planner.** The header reads `Planner: Casting-first`. (The
+   Classic screen reads `Planner: Classic` and offers the switch.)
+2. **Layout.** A narrow searchable buff list on the left; the chosen buff
+   large at the top; casters and their sources on the left of the graph;
+   castings as lines and cards in the middle; targets on the right; the
+   inspector for one casting on the right; budgets and actions in the
+   footer.
+3. **Primary gesture.** Choose a buff, a caster (and its exact source row
+   when it has several), then click a target: exactly one line and one
+   card appear, and the card is focused. Clicking a target that already has
+   this buff shows that casting instead of adding a second.
+4. **Capacity.** Each source row says how many more castings it can pay
+   for after everything else in the plan (a shared pool is named as
+   shared). Add castings until one runs out: every row that draws on that
+   pool updates; remove one and the counts come back.
+5. **One casting at a time.** Click a line (it has a wide hit area) or a
+   card: the inspector shows only that casting. Enhancements list their
+   mechanism, whether required, cost, what is left of their pool after the
+   plan, the expected effect, and why an unavailable one cannot be taken.
+   Add one (for example Extend) and see the budget change; Undo.
+6. **Group buffs.** One card per casting with dashed branches to whoever
+   the area is predicted to reach; mark recipients as required; a required
+   recipient outside the area is shown as missed, never silently added.
+7. **Hover.** Sweep the pointer over rows, cards, lines, targets, tabs and
+   buttons, and click a tab or button then move away: exactly one
+   highlight, always the control under the pointer, and nothing stays lit.
+8. **Buttons.** Captions readable on every button: normal, hover, pressed,
+   disabled and selected (the chosen routine tab).
+9. **Save and reopen.** Save, close (Escape or the hotkey), reopen: the
+   same castings, lines and counts. Reload.
+10. **Crowded plan and long names.** Many castings between the same people
+    stay distinct and selectable; nothing overlaps.
+
+Say **"done"** (or **"stop"**) to end; the terminal procedure below is
+unchanged. Your verdict — accept, or reject with what is wrong — is quoted
+exactly in the status file; automated evidence is never presented as your
+acceptance.
+
+## Release-candidate session (0.2.0-rc6, history)
+
 **Release-candidate session (0.2.0-rc6).** This is the one consolidated
 manual acceptance session the mission asks for near the end. It runs the
 frozen candidate from its own clean checkout,
