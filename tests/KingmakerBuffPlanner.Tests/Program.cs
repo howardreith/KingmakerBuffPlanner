@@ -424,6 +424,7 @@ namespace KingmakerBuffPlanner.Tests
                 Run("probe-shutdown-before-selection-is-terminal", TestProbeShutdownBeforeSelectionIsTerminal);
                 Run("prepared-slot-observation-reads-exact-source", TestPreparedSlotObservationReadsExactSource);
                 RunProductionExecutionTests(root);
+                RunCastingGraphTests(root);
             }
             finally
             {

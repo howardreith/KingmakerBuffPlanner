@@ -43,6 +43,25 @@ namespace KingmakerBuffPlanner.Planning
                 .ToDictionary(p => p.PoolKey, p => new PoolState(p), StringComparer.Ordinal);
         }
 
+        private ResourceLedger(Dictionary<string, PoolState> pools)
+        {
+            _pools = pools;
+        }
+
+        // An independent copy of the current balances and token states. A
+        // capacity question is answered by reserving on a copy, so asking it
+        // never changes the plan it is asked about.
+        internal ResourceLedger Clone()
+        {
+            return new ResourceLedger(_pools.ToDictionary(
+                pair => pair.Key, pair => pair.Value.Copy(), StringComparer.Ordinal));
+        }
+
+        internal bool Knows(string poolKey)
+        {
+            return poolKey != null && _pools.ContainsKey(poolKey);
+        }
+
         public bool TryReserve(
             ProviderSnapshot provider,
             out ResourceReservation reservation,
@@ -126,6 +145,22 @@ namespace KingmakerBuffPlanner.Planning
                 Tokens = snapshot.Tokens.ToDictionary(t => t.TokenId, t => new TokenState(t), StringComparer.Ordinal);
             }
 
+            private PoolState()
+            {
+            }
+
+            internal PoolState Copy()
+            {
+                return new PoolState
+                {
+                    Key = Key,
+                    Kind = Kind,
+                    Remaining = Remaining,
+                    Tokens = Tokens.ToDictionary(pair => pair.Key, pair => pair.Value.Copy(),
+                        StringComparer.Ordinal)
+                };
+            }
+
             internal string Key;
             internal ResourcePoolKind Kind;
             internal int Remaining;
@@ -138,6 +173,15 @@ namespace KingmakerBuffPlanner.Planning
             {
                 Available = snapshot.Available;
                 LinkedTokenIds = snapshot.LinkedTokenIds;
+            }
+
+            private TokenState()
+            {
+            }
+
+            internal TokenState Copy()
+            {
+                return new TokenState { Available = Available, LinkedTokenIds = LinkedTokenIds };
             }
 
             internal bool Available;
