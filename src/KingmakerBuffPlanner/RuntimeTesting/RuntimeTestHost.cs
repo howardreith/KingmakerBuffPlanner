@@ -4906,16 +4906,20 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             return false;
         }
 
+        // The presented frame (what the owner sees): the camera-path lane
+        // renders planner text washed out (run casting-graph-qual-1200-01,
+        // ws-interact-authored.png against workspace-frame.png), so it cannot
+        // serve the contrast or hover frames.
         private void BeginHoverCapture(string fileName)
         {
             _hoverCapture = null;
-            MenuDiagnosticCaptureHost.CaptureMenuFrameThroughCameras(
+            MenuDiagnosticCaptureHost.CaptureMenuFrame(
                 Path.Combine(_request.EvidenceDirectory, fileName),
                 delegate(MenuFrameCapture capture, Exception failure)
                 {
                     capture.Failure = failure;
                     _hoverCapture = capture;
-                }, _log);
+                });
             _hoverCaptureName = fileName;
             _hoverClock = System.Diagnostics.Stopwatch.StartNew();
         }
@@ -5000,12 +5004,14 @@ namespace KingmakerBuffPlanner.RuntimeTesting
 
         // The owner's first action on the Classic screen: choose a buff by
         // clicking its card (a synthetic click through Unity's own handlers;
-        // the real cursor rests on a neutral point meanwhile).
+        // the real cursor rests on a neutral point meanwhile). A bound card
+        // is named "Source.<sourceId>" (PlannerViews BuffCardView.Bind; run
+        // casting-graph-qual-1200-01 looked for its pool name and found none).
         private void ClickClassicCard(string tag)
         {
             GameObject classic = BuffPlannerUiRoot.ClassicRootForRuntime;
             UnityEngine.UI.Selectable card = PlannerHoverProbe.Controls(classic).FirstOrDefault(control =>
-                control.name == "BuffCard" && control.IsInteractable() &&
+                control.name.StartsWith("Source.", StringComparison.Ordinal) && control.IsInteractable() &&
                 PlannerHoverProbe.VisibleCentre(control).HasValue);
             if (card == null)
             {

@@ -653,6 +653,13 @@ namespace KingmakerBuffPlanner.UI
             float textRight = right + 180f;
             foreach (Text line in new[] { _footerSelectedRun, _footerOnePass, _footerResult })
                 line.rectTransform.offsetMax = new Vector2(-textRight, 0f);
+            // The budget lines sit on the book's dark lower edge (seen in the
+            // 1920x1200 frame): dark ink gets its own parchment ground.
+            RectTransform ledger = KingmakerUiFactory.CreateRect("FooterLedger", footer);
+            KingmakerUiFactory.SetAnchors(ledger, 0f, 0f, 1f, 1f, -8f, textRight - 8f, -2f, -2f);
+            Image ground = KingmakerUiFactory.AddFramedPanel(ledger, _theme.ParchmentRaised, _theme.GoldAccent);
+            ground.raycastTarget = false;
+            ledger.SetAsFirstSibling();
             _footerResult.text = DescribeReadiness();
         }
 
