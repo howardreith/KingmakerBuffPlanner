@@ -151,9 +151,19 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private string[] _hoverButtons = new string[0];
         private readonly List<string> _hoverSweep = new List<string>();
         private int _hoverSweepIndex;
-        private string _hoverClassicRoutine;
-        private string _hoverClassicTarget;
         private bool _hoverClassicRowSelected;
+        private string _hoverPendingClicked;
+        private System.Diagnostics.Stopwatch _hoverAckClock;
+        private string _hoverAckCursor;
+        private string _hoverSettleCapture;
+        // The Classic sequence: one action per update; a physical move or a
+        // capture pauses it until done.
+        private readonly List<Action> _hoverScript = new List<Action>();
+        private int _hoverScriptIndex;
+        private int _hoverAfterScript;
+        private bool _hoverScriptCapture;
+        private string _hoverClassicClicked;
+        private bool _hoverClassicOpen;
 
         // Casters of the shown buff with a source the graph can pin.
         private static List<string> GraphCapableCasters(UI.CastingGraphView graph)
@@ -4398,6 +4408,16 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         {
             if (_shutdownReason == null)
                 _shutdownReason = string.IsNullOrEmpty(reason) ? "unspecified" : reason;
+            // The hover diagnostic's reproduction switch and Classic screen
+            // never outlive the run, whatever ends it (deadline, abort, host
+            // exception, disable or unload).
+            PlannerUiReproduction.Rc6ButtonBehaviour = false;
+            if (_hoverStarted && !_hover.Completed)
+            {
+                EndHoverClassic();
+                _hover.AddFailure("shutdown:" + reason);
+                WriteHoverEvidence();
+            }
             if (_probeOwner != null) _probeOwner.Terminate(reason);
             // The qualification run ends through the same host terminal (the
             // in-flight executor restores temporary native state).
@@ -4803,49 +4823,59 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             return view == null ? null : view.RootObject;
         }
 
-        private void RequestHover(string id, Vector2 point, string aimed, string surface, string behaviour,
-            bool sample, int after)
+        // Colour transitions (at most 0.1 s in the planner and the rc6
+        // behaviour) finish before a reading or a frame is taken.
+        private const int HoverSettleMilliseconds = 400;
+
+        private void RequestHover(string id, Vector2 point, string aimed, string clicked, string surface,
+            string behaviour, bool sample, int after)
         {
             WritePhysicalInputRequest(id, "hover", point);
             _hoverPending = id;
             _hoverPoint = point;
             _hoverAimed = aimed;
+            _hoverPendingClicked = clicked;
             _hoverPendingSurface = surface;
             _hoverPendingBehaviour = behaviour;
             _hoverPendingSample = sample;
             _hoverAfter = after;
             _hoverFrames = 0;
+            _hoverAckClock = null;
             _hoverClock = System.Diagnostics.Stopwatch.StartNew();
         }
 
-        // The pending physical move: acknowledged, then three frames for the
-        // input module to process the cursor, then Unity's reading there.
+        // The pending physical move: acknowledged, then at least three frames
+        // and the settle time for the input module and the transitions, then
+        // Unity's reading at the cursor.
         private bool UpdateHoverPending()
         {
-            if (!PhysicalInputAcknowledged(_hoverPending))
+            if (_hoverAckClock == null)
             {
-                if (_hoverClock.Elapsed.TotalSeconds > 45)
+                if (!PhysicalInputAcknowledged(_hoverPending))
                 {
-                    _hover.AddFailure("physical-timeout:" + _hoverPending);
+                    if (_hoverClock.Elapsed.TotalSeconds > 45)
+                    {
+                        _hover.AddFailure("physical-timeout:" + _hoverPending);
+                        _hoverPending = null;
+                        _hoverStep = _hoverAfter;
+                    }
+                    return false;
+                }
+                JObject ack = JObject.Parse(File.ReadAllText(Path.Combine(_request.EvidenceDirectory,
+                    "physical-input-" + _hoverPending + ".ack.json")));
+                if (ack.Value<bool?>("deliveryFailed") == true)
+                {
+                    _hover.AddFailure("physical-delivery-failed:" + _hoverPending + ":" + ack.Value<string>("error"));
                     _hoverPending = null;
                     _hoverStep = _hoverAfter;
+                    return false;
                 }
+                _hoverAckCursor = ack.Value<string>("windowsClientCursor");
+                _hoverAckClock = System.Diagnostics.Stopwatch.StartNew();
+                _hoverFrames = 0;
                 return false;
             }
-            JObject ack = JObject.Parse(File.ReadAllText(Path.Combine(_request.EvidenceDirectory,
-                "physical-input-" + _hoverPending + ".ack.json")));
-            if (ack.Value<bool?>("deliveryFailed") == true)
-            {
-                _hover.AddFailure("physical-delivery-failed:" + _hoverPending + ":" + ack.Value<string>("error"));
-                _hoverPending = null;
-                _hoverStep = _hoverAfter;
-                return false;
-            }
-            if (_hoverFrames < 3)
-            {
-                _hoverFrames++;
-                return false;
-            }
+            if (_hoverFrames++ < 3 || _hoverAckClock.ElapsedMilliseconds < HoverSettleMilliseconds) return false;
             if (_hoverPendingSample)
             {
                 GameObject root = _hoverPendingSurface == "classic"
@@ -4860,12 +4890,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         PlannerHoverProbe.DrawsHighlight(control)).ToList();
                 bool? inside = owners.Count == 1 ? PlannerHoverProbe.Contains(owners[0], mouse) : (bool?)null;
                 _hover.Add(PlannerHoverProbe.Sample(_hoverPending, _hoverPendingSurface, _hoverPendingBehaviour,
-                    true, _hoverAimed, null, expected, topUnder ? top.name : null, inside,
+                    true, _hoverAimed, _hoverPendingClicked, expected, topUnder ? top.name : null, inside,
                     "requested=" + PlannerHoverProbe.Point(_hoverPoint) + ";unityCursor=" +
-                    PlannerHoverProbe.Point(mouse) + ";client=" + ack.Value<string>("windowsClientCursor") +
-                    ";anyHit=" + anyHit, root));
+                    PlannerHoverProbe.Point(mouse) + ";client=" + _hoverAckCursor + ";anyHit=" + anyHit +
+                    ";ghosts=" + PlannerHoverProbe.Ghosts(expected, mouse, root), root));
             }
             _hoverPending = null;
+            _hoverAckClock = null;
             _hoverStep = _hoverAfter;
             return false;
         }
@@ -4900,11 +4931,126 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             return true;
         }
 
+        // A state set through Unity's handlers is drawn only after its colour
+        // transition: wait, then take the frame, then continue at next (which
+        // first waits for the capture).
+        private void SettleThenCapture(string fileName, int next)
+        {
+            _hoverSettleCapture = fileName;
+            _hoverAfter = next;
+            _hoverClock = System.Diagnostics.Stopwatch.StartNew();
+            _hoverStep = 17;
+        }
+
         private void HoverSynthetic(string label, string surface, string behaviour, string aimed, string clicked,
             GameObject root)
         {
             _hover.Add(PlannerHoverProbe.Sample(label, surface, behaviour, false, aimed, clicked, aimed, null,
                 null, string.Empty, root));
+        }
+
+        // ------------------------------------------------------------------
+        // The Classic screen: the owner's sequence with the real cursor, once
+        // with the rc6 behaviour (the reproduction) and once as shipped.
+        // ------------------------------------------------------------------
+
+        private string ClassicTarget(int index, bool interactableOnly)
+        {
+            GameObject classic = BuffPlannerUiRoot.ClassicRootForRuntime;
+            return PlannerHoverProbe.Controls(classic).Where(control =>
+                    control.name.StartsWith("Target.", StringComparison.Ordinal) &&
+                    (!interactableOnly || control.IsInteractable()) &&
+                    PlannerHoverProbe.VisibleCentre(control).HasValue)
+                .Select(control => control.name).Skip(index).FirstOrDefault();
+        }
+
+        private void AimClassicNeutral(string id, string behaviour)
+        {
+            Vector2? point = PlannerHoverProbe.NeutralPoint(BuffPlannerUiRoot.ClassicRootForRuntime);
+            if (!point.HasValue)
+            {
+                _hover.AddFailure("no-neutral-point:" + id);
+                return;
+            }
+            RequestHover(id, point.Value, null, null, "classic", behaviour, true, 20);
+        }
+
+        // optional: a sweep position past the last portrait is skipped.
+        private void AimClassicControl(string id, string behaviour, string name, string clicked, bool optional)
+        {
+            if (name == null)
+            {
+                if (!optional) _hover.AddFailure("classic-control-missing:" + id);
+                return;
+            }
+            Vector2? point = PlannerHoverProbe.VisibleCentre(
+                PlannerHoverProbe.Find(BuffPlannerUiRoot.ClassicRootForRuntime, name));
+            if (!point.HasValue)
+            {
+                _hover.AddNote("not-shown:" + id + ":" + name);
+                return;
+            }
+            RequestHover(id, point.Value, name, clicked, "classic", behaviour, true, 20);
+        }
+
+        // The owner's first action on the Classic screen: choose a buff by
+        // clicking its card (a synthetic click through Unity's own handlers;
+        // the real cursor rests on a neutral point meanwhile).
+        private void ClickClassicCard(string tag)
+        {
+            GameObject classic = BuffPlannerUiRoot.ClassicRootForRuntime;
+            UnityEngine.UI.Selectable card = PlannerHoverProbe.Controls(classic).FirstOrDefault(control =>
+                control.name == "BuffCard" && control.IsInteractable() &&
+                PlannerHoverProbe.VisibleCentre(control).HasValue);
+            if (card == null)
+            {
+                _hover.AddFailure("classic-card-missing:" + tag);
+                _hoverClassicClicked = null;
+                return;
+            }
+            bool took = PlannerHoverProbe.Click(card);
+            _hoverClassicClicked = card.name;
+            _hover.AddNote("classic-" + tag + "-click=" + card.name + ";tookSelection=" + took);
+        }
+
+        private void CloseClassicForHover()
+        {
+            BuffPlannerUiRoot.CloseRuntimeSmoke();
+            _hoverClassicOpen = false;
+            PlannerHoverProbe.ClearSelection();
+            PlannerUiReproduction.Rc6ButtonBehaviour = false;
+            _hoverFrames = 0;
+        }
+
+        private void BuildClassicHoverScript(bool rc6)
+        {
+            string tag = rc6 ? "rc6" : "fixed";
+            string behaviour = rc6 ? HoverBehaviour.Rc6 : HoverBehaviour.Fixed;
+            _hoverScript.Clear();
+            _hoverScriptIndex = 0;
+            _hoverScript.Add(() => AimClassicNeutral("hover-classic-" + tag + "-neutral", behaviour));
+            // A portrait hovered before anything was clicked: a second
+            // highlight here would be another cause than the selection.
+            _hoverScript.Add(() => AimClassicControl("hover-classic-" + tag + "-hover", behaviour,
+                ClassicTarget(0, true), null, false));
+            _hoverScript.Add(() => AimClassicNeutral("hover-classic-" + tag + "-neutral-2", behaviour));
+            _hoverScript.Add(() => ClickClassicCard(tag));
+            _hoverScript.Add(() => AimClassicControl("hover-classic-" + tag + "-click-then-hover", behaviour,
+                ClassicTarget(0, true), _hoverClassicClicked, false));
+            _hoverScript.Add(() =>
+            {
+                BeginHoverCapture("hover-classic-" + tag + ".png");
+                _hoverScriptCapture = true;
+            });
+            _hoverScript.Add(() => AimClassicNeutral("hover-classic-" + tag + "-after-click", behaviour));
+            if (!rc6)
+                for (int index = 0; index < 8; index++)
+                {
+                    int position = index;
+                    _hoverScript.Add(() => AimClassicControl("hover-classic-sweep-" + position, behaviour,
+                        ClassicTarget(position, false), null, true));
+                }
+            _hoverScript.Add(CloseClassicForHover);
         }
 
         private bool UpdateHoverOwnership()
@@ -4926,7 +5072,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         return FinishHover();
                     }
                     _hoverGraphNeutral = neutral.Value;
-                    RequestHover("hover-graph-neutral", neutral.Value, null, "graph", HoverBehaviour.Fixed, true, 1);
+                    RequestHover("hover-graph-neutral", neutral.Value, null, null, "graph", HoverBehaviour.Fixed,
+                        true, 1);
                     return false;
                 }
                 if (_hoverStep == 1)
@@ -4959,8 +5106,14 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     // One hovered node held for the frame the owner will see.
                     _hoverHeld = names[0];
                     PlannerHoverProbe.Enter(PlannerHoverProbe.Find(root, _hoverHeld));
-                    BeginHoverCapture("hover-graph-fixed.png");
-                    _hoverStep = 2;
+                    SettleThenCapture("hover-graph-fixed.png", 2);
+                    return false;
+                }
+                if (_hoverStep == 17)
+                {
+                    if (_hoverClock.ElapsedMilliseconds < HoverSettleMilliseconds) return false;
+                    BeginHoverCapture(_hoverSettleCapture);
+                    _hoverStep = _hoverAfter;
                     return false;
                 }
                 if (_hoverStep == 2)
@@ -4973,9 +5126,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     // control: it cannot move earlier than first.
                     Invoke("Casting." + _interactionCastIds.FirstOrDefault());
                     UnityEngine.UI.Selectable disabled = PlannerHoverProbe.Find(root, "FocusedOrder.Earlier");
-                    if (disabled == null || disabled.interactable)
+                    if (disabled == null || disabled.IsInteractable())
                         disabled = PlannerHoverProbe.Controls(root).FirstOrDefault(control =>
-                            control is UnityEngine.UI.Button && !control.interactable);
+                            control is UnityEngine.UI.Button && !control.IsInteractable());
                     UI.CastingWorkspaceSession session = BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
                     _hoverButtons = new[]
                     {
@@ -4985,8 +5138,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     };
                     PlannerHoverProbe.Enter(PlannerHoverProbe.Find(root, _hoverButtons[1]));
                     PlannerHoverProbe.Press(PlannerHoverProbe.Find(root, _hoverButtons[2]));
-                    BeginHoverCapture("button-states.png");
-                    _hoverStep = 3;
+                    SettleThenCapture("button-states.png", 3);
                     return false;
                 }
                 if (_hoverStep == 3)
@@ -4999,17 +5151,22 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     PlannerHoverProbe.Release(PlannerHoverProbe.Find(root, _hoverButtons[2]));
                     PlannerHoverProbe.Exit(PlannerHoverProbe.Find(root, _hoverButtons[1]));
                     Invoke("DoneEditing");
-                    _hoverSweep.Clear();
+                    // The live sweep: every visible target, and the other
+                    // kinds of control once each.
                     string caster = _interactionCasters.FirstOrDefault();
                     UI.CastingWorkspaceSession session = BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
+                    _hoverSweep.Clear();
                     _hoverSweep.AddRange(new[]
                     {
                         "Caster." + caster, "Provider." + caster + ".0",
-                        "Target." + _interactionTargets.FirstOrDefault(),
-                        "Casting." + _interactionCastIds.FirstOrDefault(),
-                        "Target." + _interactionTargets.LastOrDefault(),
-                        "Caster." + _interactionCasters.LastOrDefault(),
-                        "Source." + _interactionSourceId, "Save",
+                        "Casting." + _interactionCastIds.FirstOrDefault()
+                    });
+                    _hoverSweep.AddRange(PlannerHoverProbe.Controls(HoverWorkspaceRoot())
+                        .Where(control => control.name.StartsWith("Target.", StringComparison.Ordinal))
+                        .Select(control => control.name));
+                    _hoverSweep.AddRange(new[]
+                    {
+                        "Caster." + _interactionCasters.LastOrDefault(), "Source." + _interactionSourceId, "Save",
                         "Routine." + (session == null ? "long" : session.SelectedRoutineId)
                     });
                     _hoverSweepIndex = 0;
@@ -5018,21 +5175,20 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 }
                 if (_hoverStep == 4)
                 {
-                    // The live sweep: the real cursor over each control.
                     while (_hoverSweepIndex < _hoverSweep.Count)
                     {
                         string name = _hoverSweep[_hoverSweepIndex++];
-                        Vector2? point = PlannerHoverProbe.ScreenCentre(PlannerHoverProbe.Find(root, name));
+                        Vector2? point = PlannerHoverProbe.VisibleCentre(PlannerHoverProbe.Find(root, name));
                         if (!point.HasValue)
                         {
                             _hover.AddNote("sweep-not-shown:" + name);
                             continue;
                         }
-                        RequestHover("hover-sweep-" + _hoverSweepIndex, point.Value, name, "graph",
+                        RequestHover("hover-sweep-" + _hoverSweepIndex, point.Value, name, null, "graph",
                             HoverBehaviour.Fixed, true, 4);
                         return false;
                     }
-                    RequestHover("hover-graph-neutral-end", _hoverGraphNeutral, null, "graph",
+                    RequestHover("hover-graph-neutral-end", _hoverGraphNeutral, null, null, "graph",
                         HoverBehaviour.Fixed, true, 5);
                     return false;
                 }
@@ -5048,18 +5204,21 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 {
                     // Workspace (or the rc6 Classic screen) closed: open the
                     // Classic screen with the behaviour under test.
+                    bool rc6 = _hoverStep == 6;
                     if (BuffPlannerUiRoot.IsCastingWorkspaceOpen || BuffPlannerUiRoot.IsScreenOpen ||
                         _hoverFrames++ < 3) return false;
-                    PlannerUiReproduction.Rc6ButtonBehaviour = _hoverStep == 6;
+                    PlannerUiReproduction.Rc6ButtonBehaviour = rc6;
+                    _hoverClassicRowSelected = false;
                     if (!BuffPlannerUiRoot.OpenClassicForRuntime())
                     {
-                        _hover.AddFailure("classic-open-refused:" + (_hoverStep == 6 ? "rc6" : "fixed"));
+                        _hover.AddFailure("classic-open-refused:" + (rc6 ? "rc6" : "fixed"));
                         PlannerUiReproduction.Rc6ButtonBehaviour = false;
                         return FinishHover();
                     }
+                    _hoverClassicOpen = true;
                     _hoverFrames = 0;
                     _hoverClock = System.Diagnostics.Stopwatch.StartNew();
-                    _hoverStep = _hoverStep == 6 ? 7 : 11;
+                    _hoverStep = rc6 ? 7 : 11;
                     return false;
                 }
                 if (_hoverStep == 7 || _hoverStep == 11)
@@ -5069,71 +5228,36 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     {
                         if (_hoverClock.Elapsed.TotalSeconds <= 30) return false;
                         _hover.AddFailure("classic-not-open:" + (rc6 ? "rc6" : "fixed"));
-                        PlannerUiReproduction.Rc6ButtonBehaviour = false;
                         return FinishHover();
                     }
-                    _hoverClassicRoutine = PlannerHoverProbe.Controls(classic).Where(control =>
-                            control.name.StartsWith("Routine.", StringComparison.Ordinal) && control.interactable)
-                        .Select(control => control.name).FirstOrDefault();
-                    _hoverClassicTarget = PlannerHoverProbe.Controls(classic).Where(control =>
-                            control.name.StartsWith("Target.", StringComparison.Ordinal))
-                        .Select(control => control.name).FirstOrDefault();
-                    if (_hoverClassicTarget == null && !_hoverClassicRowSelected)
+                    if (ClassicTarget(0, true) == null && !_hoverClassicRowSelected)
                     {
                         // Portraits show for a selected buff: select the
-                        // first catalogue row (view state only), then retry.
+                        // first catalogue row (view state, not a pointer
+                        // click), then look again.
                         _hoverClassicRowSelected = true;
                         _hover.AddNote("classicFirstRowSelected=" + BuffPlannerUiRoot.SelectFirstRowForRuntime());
                         _hoverFrames = 0;
                         return false;
                     }
-                    Vector2? neutral = PlannerHoverProbe.NeutralPoint(classic);
-                    if (_hoverClassicRoutine == null || _hoverClassicTarget == null || !neutral.HasValue)
+                    BuildClassicHoverScript(rc6);
+                    _hoverAfterScript = rc6 ? 10 : 14;
+                    _hoverStep = 20;
+                    return false;
+                }
+                if (_hoverStep == 20)
+                {
+                    if (_hoverScriptCapture)
                     {
-                        _hover.AddFailure("classic-controls-missing:routine=" + (_hoverClassicRoutine ?? "none") +
-                            ";target=" + (_hoverClassicTarget ?? "none") + ";neutral=" + neutral.HasValue);
-                        PlannerUiReproduction.Rc6ButtonBehaviour = false;
-                        BuffPlannerUiRoot.CloseRuntimeSmoke();
-                        return FinishHover();
+                        if (!HoverCaptureDone()) return false;
+                        _hoverScriptCapture = false;
                     }
-                    RequestHover(rc6 ? "hover-classic-rc6-neutral" : "hover-classic-neutral", neutral.Value, null,
-                        "classic", rc6 ? HoverBehaviour.Rc6 : HoverBehaviour.Fixed, true, rc6 ? 8 : 12);
-                    return false;
-                }
-                if (_hoverStep == 8 || _hoverStep == 12)
-                {
-                    // Click the routine tab, then hover a portrait: the rc6
-                    // behaviour keeps the tab lit (two highlights); the
-                    // shipped one shows only the hovered portrait.
-                    bool rc6 = _hoverStep == 8;
-                    string behaviour = rc6 ? HoverBehaviour.Rc6 : HoverBehaviour.Fixed;
-                    bool took = PlannerHoverProbe.Click(PlannerHoverProbe.Find(classic, _hoverClassicRoutine));
-                    // The routine click rebinds the portraits: the hovered
-                    // one is chosen from what is shown after it.
-                    UnityEngine.UI.Selectable target = PlannerHoverProbe.Controls(classic).FirstOrDefault(control =>
-                        control.name.StartsWith("Target.", StringComparison.Ordinal) && control.interactable);
-                    _hoverClassicTarget = target == null ? "Target.none" : target.name;
-                    _hover.AddNote("classic" + (rc6 ? "Rc6" : "Fixed") + "Click=" + _hoverClassicRoutine +
-                        ";tookSelection=" + took + ";hover=" + _hoverClassicTarget);
-                    PlannerHoverProbe.Enter(target);
-                    HoverSynthetic(rc6 ? "classic-rc6-click-then-hover" : "classic-click-then-hover", "classic",
-                        behaviour, _hoverClassicTarget, _hoverClassicRoutine, classic);
-                    BeginHoverCapture(rc6 ? "hover-classic-rc6.png" : "hover-classic-fixed.png");
-                    _hoverStep = rc6 ? 9 : 13;
-                    return false;
-                }
-                if (_hoverStep == 9 || _hoverStep == 13)
-                {
-                    if (!HoverCaptureDone()) return false;
-                    bool rc6 = _hoverStep == 9;
-                    PlannerHoverProbe.Exit(PlannerHoverProbe.Find(classic, _hoverClassicTarget));
-                    HoverSynthetic(rc6 ? "classic-rc6-exit" : "classic-exit", "classic",
-                        rc6 ? HoverBehaviour.Rc6 : HoverBehaviour.Fixed, null, null, classic);
-                    BuffPlannerUiRoot.CloseRuntimeSmoke();
-                    PlannerHoverProbe.ClearSelection();
-                    PlannerUiReproduction.Rc6ButtonBehaviour = false;
-                    _hoverFrames = 0;
-                    _hoverStep = rc6 ? 10 : 14;
+                    if (_hoverScriptIndex >= _hoverScript.Count)
+                    {
+                        _hoverStep = _hoverAfterScript;
+                        return false;
+                    }
+                    _hoverScript[_hoverScriptIndex++]();
                     return false;
                 }
                 if (_hoverStep == 14)
@@ -5141,7 +5265,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     if (BuffPlannerUiRoot.IsScreenOpen || _hoverFrames++ < 3) return false;
                     // Park the cursor where the reopened workspace has no
                     // control, then continue into the close/reopen check.
-                    RequestHover("hover-park", _hoverGraphNeutral, null, "graph", HoverBehaviour.Fixed, false, 15);
+                    RequestHover("hover-park", _hoverGraphNeutral, null, null, "graph", HoverBehaviour.Fixed,
+                        false, 15);
                     return false;
                 }
                 if (_hoverStep == 15)
@@ -5161,7 +5286,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         _hoverStep = 31;
                         return false;
                     }
-                    RequestHover("hover-reopen-neutral", neutral.Value, null, "reopen", HoverBehaviour.Fixed, true, 31);
+                    RequestHover("hover-reopen-neutral", neutral.Value, null, null, "reopen", HoverBehaviour.Fixed,
+                        true, 31);
                     return false;
                 }
                 if (_hoverStep == 31)
@@ -5199,18 +5325,28 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             PlannerUiReproduction.Rc6ButtonBehaviour = false;
             _hoverPending = null;
             _hoverReopenChecked = true;
+            EndHoverClassic();
+            WriteHoverEvidence();
+            if (_liveUiPhase == 145) _liveUiPhase = 21;
+            else TransitionToBisectionClose();
+            return false;
+        }
+
+        // Closes the Classic screen the diagnostic opened, in whatever
+        // lifecycle state it is (opening included).
+        private void EndHoverClassic()
+        {
+            if (!_hoverClassicOpen) return;
+            _hoverClassicOpen = false;
             try
             {
-                if (BuffPlannerUiRoot.IsScreenOpen) BuffPlannerUiRoot.CloseRuntimeSmoke();
+                BuffPlannerUiRoot.CloseRuntimeSmoke();
             }
             catch (Exception exception)
             {
                 _hover.AddFailure("classic-close-failed:" + exception.Message);
             }
-            WriteHoverEvidence();
-            if (_liveUiPhase == 145) _liveUiPhase = 21;
-            else TransitionToBisectionClose();
-            return false;
+            PlannerHoverProbe.ClearSelection();
         }
 
         private void WriteHoverEvidence()
@@ -5226,6 +5362,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     { "screen", _hover.Screen },
                     { "probeAvailable", _hover.ProbeAvailable },
                     { "ghostReproduced", _hover.GhostReproduced },
+                    { "ghostWithoutClick", _hover.GhostWithoutClick },
+                    { "rootCause", _hover.RootCause },
                     { "completed", _hover.Completed },
                     { "plannerRootsAfterReopen", _hover.PlannerRootsAfterReopen },
                     { "graphSelectablesBeforeClose", _hover.GraphSelectablesBeforeClose },
@@ -5253,7 +5391,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                             { "state", button.State },
                             { "control", button.Control },
                             { "unityState", button.UnityState },
+                            { "interactable", button.Interactable },
                             { "selectedPalette", button.SelectedPalette },
+                            { "tintMatches", button.TintMatches },
                             { "tint", button.Tint },
                             { "screenRect", button.ScreenRect },
                             { "shown", button.Shown }
