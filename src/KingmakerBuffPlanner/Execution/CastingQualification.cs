@@ -975,6 +975,14 @@ namespace KingmakerBuffPlanner.Execution
         // events, so a plain rule cast takes it in Instant mode.
         public const double ExtendFactor = 2.0;
 
+        // The shortest plain duration the doubling is judged on. At a minute
+        // the read slack (5% and two rounds) stays well below the difference
+        // between a plain and an extended cast; at a few seconds a cast that
+        // was not extended would also pass (independent review of the next
+        // iteration).
+        public const int MinimumJudgedRounds = 10;
+        public const double MinimumJudgedSeconds = MinimumJudgedRounds * 6.0;
+
         public static CastingQualificationSelection SelectRodExtend(
             CastingWorkspaceInputs inputs, string campaignId)
         {
@@ -1035,8 +1043,21 @@ namespace KingmakerBuffPlanner.Execution
                         reject(key + "|effect-shape:" + CastingCapabilityInventory.Structure(expected));
                         continue;
                     }
+                    // The two castings go to two different recipients, so a
+                    // condition could give each a different duration.
+                    if (HasCondition(expected))
+                    {
+                        reject(key + "|conditional-shape:" + CastingCapabilityInventory.Structure(expected));
+                        continue;
+                    }
                     if (!ExistingEffectSufficiency.IsPerLevelDuration(provider.DurationText))
                     { reject(key + "|duration-not-per-level:" + provider.DurationText); continue; }
+                    if (provider.ExpectedDurationRounds < MinimumJudgedRounds)
+                    {
+                        reject(key + "|duration-too-short-to-judge:" +
+                            provider.ExpectedDurationRounds.ToString(CultureInfo.InvariantCulture));
+                        continue;
+                    }
                     if (CastsAvailable(inputs, provider, 2) < 2) { reject(key + "|fewer-than-two-casts"); continue; }
                     List<string> targets = RecipientsPerCasting(inputs, targetable, expected,
                         new[] { option, option });
@@ -1077,6 +1098,17 @@ namespace KingmakerBuffPlanner.Execution
             }
             return new CastingQualificationSelection("no-eligible-qualification-recipe", null, null,
                 null, considered, rejections, RodExtendDirect);
+        }
+
+        private static bool HasCondition(EffectExpression expression)
+        {
+            if (expression is ConditionalEffectExpression) return true;
+            var sequence = expression as SequenceEffectExpression;
+            if (sequence != null) return sequence.Children.Any(HasCondition);
+            var targeted = expression as TargetedEffectExpression;
+            if (targeted != null) return HasCondition(targeted.Child);
+            var referenced = expression as ReferencedAbilityExpression;
+            return referenced != null && HasCondition(referenced.Child);
         }
 
         // The enhanced steps' shape, for any per-casting enhancement: plain -

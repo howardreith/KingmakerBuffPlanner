@@ -232,7 +232,8 @@ namespace KingmakerBuffPlanner.Planning
                     casting.AppliedEnhancementIds,
                     enhancementUsage,
                     casting.OmittedEnhancementIds,
-                    mass ? casting.PreCoveredUnitIds : null));
+                    mass ? casting.PreCoveredUnitIds : null,
+                    true));
                 ids.Add(casting.CastingId);
             }
             if (steps.Count == 0)
@@ -283,12 +284,14 @@ namespace KingmakerBuffPlanner.Planning
         }
 
         // A plain buff on the chosen target: one or more buff leaves aimed at
-        // the current target, optionally in sequences (empty actions ignored),
-        // optionally under the discovery wrapper that references THE CAST
-        // ABILITY ITSELF, optionally under a condition whose two branches
-        // apply exactly the same plain buffs. Any other condition, references
-        // to any OTHER ability, area/party/caster targets and worn-item
-        // enchantments are unmodeled for the probe.
+        // the current target, optionally in sequences (actions that do
+        // nothing at all ignored), optionally under the discovery wrapper
+        // that references THE CAST ABILITY ITSELF, optionally under a
+        // condition whose two branches apply exactly the same plain buffs.
+        // An action the planner does not model (damage, healing, removing a
+        // buff, an unknown action), any other condition, references to any
+        // OTHER ability, area/party/caster targets and worn-item enchantments
+        // are unmodeled for the probe.
         // The cast ability itself is its base spell, or for a variant
         // provider the variant it casts (advanced fixture, 2026-09-24: every
         // variant spell's effect is wrapped in a reference to the variant, so
@@ -308,11 +311,11 @@ namespace KingmakerBuffPlanner.Planning
             var sequence = expression as SequenceEffectExpression;
             if (sequence != null)
             {
-                // An empty action (nothing the planner tracks, such as a
-                // mutagen's removal of an earlier mutagen) adds no effect;
-                // the rest must be plain, and something must act.
+                // An action that does nothing adds no effect; the rest must be
+                // plain, and something must act. An unmodeled action (damage,
+                // healing, removing a buff, an unknown action) is not plain.
                 List<EffectExpression> acting = sequence.Children
-                    .Where(child => !(child is EmptyEffectExpression)).ToList();
+                    .Where(child => !IsNoAction(child)).ToList();
                 return acting.Count != 0 && acting.All(child =>
                     IsPlainCurrentTargetBuff(child, castAbilityGuid, castVariantGuid));
             }
@@ -332,6 +335,12 @@ namespace KingmakerBuffPlanner.Planning
                         string.Equals(reference.AbilityId, castVariantGuid, StringComparison.Ordinal))) &&
                     IsPlainCurrentTargetBuff(reference.Child, castAbilityGuid, castVariantGuid);
             return false;
+        }
+
+        private static bool IsNoAction(EffectExpression expression)
+        {
+            var empty = expression as EmptyEffectExpression;
+            return empty != null && empty.IsNoAction;
         }
 
         private static IEnumerable<string> PlainLeafKeys(EffectExpression expression)
@@ -413,6 +422,10 @@ namespace KingmakerBuffPlanner.Planning
                 CastStep step = steps[index];
                 if (step.Provider == null || step.Reservation == null)
                     throw new NotSupportedException("step-incomplete:" + index);
+                // Every explicit step applies exactly its enhancements; the
+                // format implies it, so it is enforced rather than encoded.
+                if (!step.ExactEnhancements)
+                    throw new NotSupportedException("step-not-exact:" + index);
                 var stepObject = new JObject
                 {
                     { "index", index },

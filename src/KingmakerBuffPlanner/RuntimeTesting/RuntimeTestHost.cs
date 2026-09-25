@@ -3964,6 +3964,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     { "castingScenario", record.CastingScenario },
                     { "allowanceStatus", record.AllowanceStatus },
                     { "terminalReason", record.TerminalReason },
+                    { "exhaustedAccepted", record.ExhaustedAccepted.HasValue
+                        ? (JToken)record.ExhaustedAccepted.Value : JValue.CreateNull() },
                     { "selection", selection == null ? null : new JObject
                         {
                             { "selected", selection.Selected },

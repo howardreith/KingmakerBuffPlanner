@@ -94,7 +94,9 @@ namespace KingmakerBuffPlanner.Execution
         // A compact form of an effect expression's structure (at most 160
         // characters), so evidence shows why a source is or is not a plain
         // buff: leaf:<kind>:<target>, seq(...), cond(...), to:<target>(...),
-        // ref:<first 8 of the ability id>(...), empty.
+        // ref:<first 8 of the ability id>(...), empty (an action that does
+        // nothing) or empty!<what is unmodeled>, such as
+        // empty!restorative-action:ContextActionRemoveBuff.
         public static string Structure(EffectExpression effect)
         {
             string text = StructureOf(effect);
@@ -118,7 +120,20 @@ namespace KingmakerBuffPlanner.Execution
             if (referenced != null)
                 return "ref:" + (referenced.AbilityId ?? string.Empty).PadRight(8).Substring(0, 8).Trim() +
                     "(" + StructureOf(referenced.Child) + ")";
-            return expression is EmptyEffectExpression ? "empty" : expression.GetType().Name;
+            var empty = expression as EmptyEffectExpression;
+            if (empty != null) return empty.IsNoAction ? "empty" : "empty!" + ShortReason(empty.UnmodeledReason);
+            return expression.GetType().Name;
+        }
+
+        // "restorative-action:Kingmaker.UnitLogic.Mechanics.Actions.ContextActionRemoveBuff"
+        // -> "restorative-action:ContextActionRemoveBuff".
+        private static string ShortReason(string reason)
+        {
+            int colon = reason.IndexOf(':');
+            if (colon < 0) return reason;
+            string detail = reason.Substring(colon + 1);
+            int dot = detail.LastIndexOf('.');
+            return reason.Substring(0, colon + 1) + (dot < 0 ? detail : detail.Substring(dot + 1));
         }
 
         // The recipients an effect reaches, from its leaf and targeted

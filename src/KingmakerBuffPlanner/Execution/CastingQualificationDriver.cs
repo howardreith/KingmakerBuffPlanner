@@ -488,8 +488,9 @@ namespace KingmakerBuffPlanner.Execution
             {
                 double? remaining;
                 step.RemainingSecondsAfter.TryGetValue(plain, out remaining);
-                return remaining == null || remaining.Value <= 0
-                    ? "duration:" + plain + ":" + (remaining == null ? "unread" : Seconds(remaining.Value)) : null;
+                return remaining == null || remaining.Value < CastingQualificationRecipe.MinimumJudgedSeconds
+                    ? "duration:" + plain + ":" + (remaining == null ? "unread" : Seconds(remaining.Value) + "<" +
+                        Seconds(CastingQualificationRecipe.MinimumJudgedSeconds)) : null;
             }
             int value;
             if (!TryModifierValue(after, enhancement, out value) || value <= 0)
