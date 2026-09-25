@@ -103,6 +103,7 @@
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingWorkspaceSession.cs"><Link>UI\CastingWorkspaceSession.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingWorkspaceSession.Graph.cs"><Link>UI\CastingWorkspaceSession.Graph.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingGraphModels.cs"><Link>UI\CastingGraphModels.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\PlannerButtonPalette.cs"><Link>UI\PlannerButtonPalette.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingExecutionHost.cs"><Link>UI\CastingExecutionHost.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\NativeCastingSessionPolicy.cs"><Link>UI\NativeCastingSessionPolicy.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingRunPresentation.cs"><Link>UI\CastingRunPresentation.cs</Link></Compile>

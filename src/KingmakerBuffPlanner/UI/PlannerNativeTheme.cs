@@ -175,9 +175,46 @@ namespace KingmakerBuffPlanner.UI
             return false;
         }
 
+        // The donor lends its stone artwork only. Its own state sprites are not
+        // used: the planner's captions measured 3.0:1 on the lighter donor
+        // stone, so every state keeps the measured PlannerButtonPalette tints
+        // (addendum 6.2: readable text over donor fidelity).
         internal static void ApplyButton(Button donor, Button button)
         {
-            if (button == null) return;
+            if (button == null || button.image == null) return;
+            if (PlannerUiReproduction.Rc6ButtonBehaviour)
+            {
+                ApplyButtonRc6(donor, button);
+                return;
+            }
+            // Portrait tiles, cards and chips keep their own graphics: a donor
+            // stone state set laid over a custom control (with its outline)
+            // is exactly the kind of second highlight the owner reported.
+            if (button.GetComponent<PlannerActionButton>() == null)
+            {
+                KingmakerUiFactory.OwnPointerHighlight(button);
+                return;
+            }
+            if (donor != null && donor.targetGraphic is Image &&
+                ((Image)donor.targetGraphic).sprite != null)
+            {
+                ApplyImage((Image)donor.targetGraphic, button.image);
+                if (IsFactoryFallbackTint(button.image.color))
+                    button.image.color = Color.white;
+                button.image.raycastTarget = true;
+                button.targetGraphic = button.image;
+            }
+            bool selectedStyle = button.transition == Selectable.Transition.ColorTint &&
+                ApproximatelyTint(button.colors.normalColor, PlannerButtonPalette.SelectedTint);
+            KingmakerUiFactory.ApplyPalette(button, selectedStyle);
+            KingmakerUiFactory.OwnPointerHighlight(button);
+        }
+
+        // The rc6 behaviour, byte for byte, for the guarded reproduction
+        // only: every button (tiles and cards too) takes the donor stone and,
+        // with a complete donor state set, its sprite states.
+        private static void ApplyButtonRc6(Button donor, Button button)
+        {
             if (HasCompleteSpriteStates(donor))
             {
                 ApplyImage((Image)donor.targetGraphic, button.image);
@@ -202,6 +239,12 @@ namespace KingmakerBuffPlanner.UI
                     button.spriteState = sprites;
                 }
             }
+        }
+
+        private static bool ApproximatelyTint(Color color, UiRgb tint)
+        {
+            return Mathf.Abs(color.r - tint.R) < 0.01f && Mathf.Abs(color.g - tint.G) < 0.01f &&
+                Mathf.Abs(color.b - tint.B) < 0.01f;
         }
 
         internal static void ApplyText(Text donor, Text target)

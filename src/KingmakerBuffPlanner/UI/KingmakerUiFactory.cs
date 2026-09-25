@@ -47,7 +47,9 @@ namespace KingmakerBuffPlanner.UI
         internal Color ServiceSurface = new Color(0.965f, 0.865f, 0.665f, 0.70f);
         internal Color DarkBrownText = new Color(0.235f, 0.22f, 0.188f, 1f);
         internal Color MutedBrownText = new Color(0.541f, 0.392f, 0.271f, 1f);
-        internal Color ButtonText = new Color(0.965f, 0.894f, 0.710f, 1f);
+        // Warm ivory (PlannerButtonPalette.Caption): the light-cream caption it
+        // replaces measured 3.0:1 on the lighter stone.
+        internal Color ButtonText = new Color(0.980f, 0.955f, 0.870f, 1f);
         internal Color BurgundyPrimary = new Color(0.493f, 0.168f, 0.098f, 1f);
         internal Color GoldAccent = new Color(0.588f, 0.243f, 0.106f, 1f);
         internal Color GreenSuccess = new Color(0.329f, 0.569f, 0.357f, 1f);
@@ -103,6 +105,21 @@ namespace KingmakerBuffPlanner.UI
         {
             return sprite == null ? "fallback" : sprite.name;
         }
+    }
+
+    // Marker for the factory's stone action buttons (see CreateButton).
+    internal sealed class PlannerActionButton : MonoBehaviour
+    {
+    }
+
+    // Guarded runtime diagnostics only: restores the rc6 button behaviour
+    // (default navigation, donor state sprites on every button, the old
+    // light-cream caption and parchment tint), so one scenario can show the
+    // owner-reported screen and the corrected one on the same binary with
+    // only this switch changed. Production never sets it.
+    internal static class PlannerUiReproduction
+    {
+        internal static bool Rc6ButtonBehaviour { get; set; }
     }
 
     internal static class KingmakerUiFactory
@@ -176,9 +193,42 @@ namespace KingmakerBuffPlanner.UI
             UnityAction action)
         {
             RectTransform rect = CreateRect(name, parent);
-            Image image = AddPanel(rect, theme.ParchmentRaised, theme.NativeButtonNormal);
+            bool rc6 = PlannerUiReproduction.Rc6ButtonBehaviour;
+            // White base: the state tints of PlannerButtonPalette darken the
+            // native stone so the ivory caption reads in every state.
+            Image image = AddPanel(rect, rc6 ? theme.ParchmentRaised : Color.white,
+                theme.NativeButtonNormal);
             Button button = rect.gameObject.AddComponent<Button>();
             button.targetGraphic = image;
+            // Marks a stone action button: only these take the native button
+            // artwork and palette (portrait tiles and cards keep their own).
+            rect.gameObject.AddComponent<PlannerActionButton>();
+            if (rc6) ApplyRc6Colors(button, theme);
+            else ApplyPalette(button, false);
+            OwnPointerHighlight(button);
+            if (action != null) button.onClick.AddListener(action);
+            Text text = CreateText("Label", rect, theme, label, 17, TextAnchor.MiddleCenter);
+            text.color = rc6 ? ToColor(PlannerButtonPalette.PreviousCaption) : theme.ButtonText;
+            text.fontStyle = FontStyle.Bold;
+            text.resizeTextForBestFit = true;
+            text.resizeTextMinSize = 12;
+            text.resizeTextMaxSize = 17;
+            text.verticalOverflow = VerticalWrapMode.Overflow;
+            if (!rc6)
+            {
+                // A restrained shadow keeps glyph edges crisp on the stone.
+                Shadow shadow = text.gameObject.AddComponent<Shadow>();
+                shadow.effectColor = new Color(0f, 0f, 0f, 0.55f);
+                shadow.effectDistance = new Vector2(1f, -1f);
+            }
+            Stretch(text.rectTransform, 5, 5, 1, 1);
+            SetButtonLabel(button, label);
+            return button;
+        }
+
+        // The rc6 button colours, for the guarded reproduction only.
+        private static void ApplyRc6Colors(Button button, PlannerUiTheme theme)
+        {
             ColorBlock colors = button.colors;
             colors.normalColor = Color.white;
             colors.highlightedColor = new Color(1f, 0.92f, 0.72f, 1f);
@@ -192,17 +242,73 @@ namespace KingmakerBuffPlanner.UI
                 sprites.pressedSprite = theme.NativeButtonPressed;
                 button.spriteState = sprites;
             }
-            if (action != null) button.onClick.AddListener(action);
-            Text text = CreateText("Label", rect, theme, label, 17, TextAnchor.MiddleCenter);
-            text.color = theme.ButtonText;
-            text.fontStyle = FontStyle.Bold;
-            text.resizeTextForBestFit = true;
-            text.resizeTextMinSize = 12;
-            text.resizeTextMaxSize = 17;
-            text.verticalOverflow = VerticalWrapMode.Overflow;
-            Stretch(text.rectTransform, 5, 5, 1, 1);
-            SetButtonLabel(button, label);
-            return button;
+        }
+
+        // The planner's measured button states (PlannerButtonPalette) as a
+        // Unity colour transition on the stone. selected=true is a chosen tab
+        // or toggle (burgundy).
+        internal static void ApplyPalette(Selectable control, bool selected)
+        {
+            if (control == null) return;
+            control.transition = Selectable.Transition.ColorTint;
+            ColorBlock colors = control.colors;
+            colors.normalColor = ToColor(selected ? PlannerButtonPalette.SelectedTint : PlannerButtonPalette.NormalTint);
+            colors.highlightedColor = ToColor(selected ? PlannerButtonPalette.SelectedHoverTint : PlannerButtonPalette.HoverTint);
+            colors.pressedColor = ToColor(PlannerButtonPalette.PressedTint);
+            colors.disabledColor = ToColor(PlannerButtonPalette.DisabledTint);
+            colors.colorMultiplier = 1f;
+            colors.fadeDuration = 0.06f;
+            control.colors = colors;
+        }
+
+        // Enabled state and caption together: a disabled control keeps a
+        // legible, visibly muted caption (the colour transition only reaches
+        // the stone).
+        internal static void SetInteractable(Button button, bool interactable)
+        {
+            if (button == null) return;
+            button.interactable = interactable;
+            Transform child = button.transform.Find("Label");
+            Text label = child == null ? null : child.GetComponent<Text>();
+            if (label != null)
+                label.color = ToColor(interactable ? PlannerButtonPalette.Caption
+                    : PlannerButtonPalette.DisabledCaption);
+        }
+
+        // The installed Unity UI draws the EventSystem's current selection as
+        // Highlighted even after the pointer has left it (Selectable.
+        // IsHighlighted ORs in hasSelection), and a pointer press selects any
+        // control whose navigation is not None. So a clicked control stays lit
+        // while another is hovered: two highlights. Planner controls are
+        // pointer-driven and never take the selection, so the one highlight
+        // is the control under the pointer.
+        internal static void OwnPointerHighlight(Selectable control)
+        {
+            if (control == null || control is InputField) return;
+            if (PlannerUiReproduction.Rc6ButtonBehaviour) return;
+            Navigation navigation = control.navigation;
+            navigation.mode = Navigation.Mode.None;
+            control.navigation = navigation;
+        }
+
+        // Applies OwnPointerHighlight to every control under a root (rebuilt
+        // rows included); InputFields keep their focus behaviour.
+        internal static int OwnPointerHighlights(Transform root)
+        {
+            if (root == null) return 0;
+            int count = 0;
+            foreach (Selectable control in root.GetComponentsInChildren<Selectable>(true))
+            {
+                if (control == null || control is InputField) continue;
+                if (control.navigation.mode != Navigation.Mode.None) count++;
+                OwnPointerHighlight(control);
+            }
+            return count;
+        }
+
+        internal static Color ToColor(UiRgb value, float alpha = 1f)
+        {
+            return new Color(value.R, value.G, value.B, alpha);
         }
 
         internal static Text SetButtonLabel(Button button, string value)
