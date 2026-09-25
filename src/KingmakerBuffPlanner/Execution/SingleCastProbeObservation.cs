@@ -77,7 +77,8 @@ namespace KingmakerBuffPlanner.Execution
         public bool Succeeded { get { return Failure == null; } }
         public string Failure { get; private set; }
         public int? Resource { get; private set; }
-        // Blueprint id ("#<n>" added for a repeated one) -> switched on.
+        // Blueprint id ("#<n>" added for a repeated one) -> switched on, and
+        // the same id with "@running" -> running (its buff applied).
         public IReadOnlyDictionary<string, bool> Activatables { get; private set; }
 
         public string Describe()

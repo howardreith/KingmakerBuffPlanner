@@ -189,6 +189,9 @@ namespace KingmakerBuffPlanner.GameAdapters
                         key = ability.Blueprint.AssetGuid + "#" +
                             index.ToString(System.Globalization.CultureInfo.InvariantCulture);
                     activatables[key] = ability.IsOn;
+                    // Running: its buff applied (it can outlast being
+                    // switched off by up to a round).
+                    activatables[key + "@running"] = ability.IsRunning;
                 }
                 return CasterEnhancementObservation.Read(amount, activatables);
             }

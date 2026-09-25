@@ -5296,6 +5296,16 @@ namespace KingmakerBuffPlanner.Tests
                 "fixture-campaign");
             CastingQualificationSelection brief = CastingQualificationRecipe.SelectRodExtend(
                 new EnhancedBuffWorld { DurationText = "1 round/level", ExpectedRounds = 9 }.Inputs(), "fixture-campaign");
+            // Twice the judged minimum: at exactly ten rounds the plain cast
+            // would read under a minute and fail every time.
+            CastingQualificationSelection borderline = CastingQualificationRecipe.SelectRodExtend(
+                new EnhancedBuffWorld { DurationText = "1 round/level", ExpectedRounds = 19 }.Inputs(), "fixture-campaign");
+            CastingQualificationSelection enough = CastingQualificationRecipe.SelectRodExtend(
+                new EnhancedBuffWorld { DurationText = "1 round/level", ExpectedRounds = 20 }.Inputs(), "fixture-campaign");
+            if (borderline.Selected || !enough.Selected ||
+                !borderline.Rejections.Any(value => value.EndsWith("|duration-too-short-to-judge:19", StringComparison.Ordinal)))
+                throw new InvalidOperationException("The rod recipe's duration boundary is wrong: " +
+                    string.Join(",", borderline.Rejections.ToArray()));
             if (conditional.Selected || !conditional.Rejections.Any(value => value.Contains("|conditional-shape:")) ||
                 brief.Selected || !brief.Rejections.Any(value => value.EndsWith("|duration-too-short-to-judge:9",
                     StringComparison.Ordinal)))
