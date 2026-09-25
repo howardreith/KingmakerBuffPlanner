@@ -22,6 +22,17 @@ Everything below it, and the older status in `AUTONOMOUS-RESUME.md` and
 | Frozen copy | `runtime-backups/rc-frozen/24d9967.../` |
 | Receipt | `docs/evidence/rc-0.2.0-rc6-receipt.md` |
 
+**Published alpha.** At the owner's request (2026-09-25, for his own
+testing on his main campaign), the exact frozen package is published as
+the GitHub pre-release `v0.2.0-rc6`, "casting-first alpha":
+https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.2.0-rc6
+- The annotated tag resolves to `24d9967`.
+- The asset was downloaded again and verified: package `f271f3e6…`, DLL
+  `35d6cbb2…`, MVID `4cb12c0d-…`, four files.
+- The stable Latest release is still v0.0.19.
+- The alpha is not merged, and it does not replace the owner's acceptance
+  below.
+
 **Branch head.** The branch `codex/kingmaker-buff-planner-casting-first`
 (PR #2) is later than the candidate. After `24d9967` it adds receipts,
 status documents and one source fix made after the freeze, `b4eed30`
@@ -101,10 +112,11 @@ of rc6):
   is accepted, merge it with a merge commit (never a squash or rebase), so
   `24d9967` stays reachable.
 
-**Next finite step.** The owner connects to DATA, unlocks it, and keeps the
-remote-desktop window open and visible (not minimized or disconnected) for
-the whole sequence and the supervised session, then reruns the rc6
-acceptance mission. Nothing runs until then.
+**Next finite step.** The owner tests the published alpha on his main
+campaign. For the acceptance gate, he connects to DATA, unlocks it, and
+keeps the remote-desktop window open and visible (not minimized or
+disconnected) for the whole sequence and the supervised session, then
+reruns the rc6 acceptance mission. Nothing runs until then.
 
 ### A01–A20 ledger (charter acceptance cases; no percentage is claimed)
 
