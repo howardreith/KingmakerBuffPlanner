@@ -5,11 +5,42 @@ the one current status, and every other status document points here. Specificati
 `Kingmaker-Buff-Planner-Casting-First-Migration-Charter.md` (casting-first
 migration and native scroll UI charter v1.0, 2026-09-19).
 
-## CURRENT STATUS — the rc6 experimental milestone (authoritative; updated 2026-09-25)
+## CURRENT STATUS — owner rejected the observed UI; graph-workspace correction underway (authoritative; 2026-09-25)
 
 This section is the single current status of the casting-first migration.
 Everything below it, and the older status in `AUTONOMOUS-RESUME.md` and
 `planning/DEFINITION-OF-DONE-MATRIX.md`, is history.
+
+- **Owner decision.** On 2026-09-25 the owner opened the planner in his
+  normal game at 1920x1200 and rejected the observed experience (a
+  four-column buff grid, `Casters: Automatic`, target portrait toggles,
+  `Enhancement: None`, `Edit Assignments`, a separate `Assignments &
+  Resources` dialog, low-contrast text on gray stone buttons, and a second
+  hover highlight offset up and left of the cursor). The adopted correction
+  is `planning/CASTING-GRAPH-UI-ADDENDUM-v1.1.md`; the mission is
+  `planning/CASTING-GRAPH-UI-CORRECTION-MISSION.md`.
+- **Identity of that screen (proved):** the **Classic** planner view. Its
+  labels are rendered only by Classic view classes in both candidate
+  binaries (rc6 `24d9967` and 0.1.1-rc3 `2aad5d4`); the casting-first
+  workspace renders none of them. DATA holds 0.1.1-rc3 (DLL `78407dd4…`,
+  MVID `c0cc9cbc-…`) and had no argument-free game launch on 2026-09-25,
+  so the owner's session ran elsewhere — most likely the published rc6
+  alpha in its default Classic mode. Evidence:
+  `planning/CASTING-GRAPH-UI-CORRECTION-STATUS.md`.
+- **The rc6 evidence below remains historical evidence** for the canonical
+  model, execution, resources, migration, install and rollback. It never
+  observed the corrected UI and is not re-labelled to pretend otherwise.
+- **The owner has not accepted any casting-first UI as the release
+  experience.** A focused correction is underway on branch
+  `claude/casting-graph-ui-correction` (stacked on PR #2): the selected-buff
+  graph workspace (caster/source lane → casting connections → target lane,
+  per-casting inspector, one global authoritative budget), the ghost-hover
+  root cause, button-text contrast, and an unmistakable planner-mode label.
+- **No release, tag, merge, promotion or permanent installation is
+  authorized.** The rc6 acceptance items listed below (frame-judged runs,
+  supervised session) are superseded and will not be run on rc6.
+
+## The rc6 experimental milestone (history; was the current status until the owner's 2026-09-25 decision)
 
 **Frozen candidate.** 0.2.0-rc6:
 

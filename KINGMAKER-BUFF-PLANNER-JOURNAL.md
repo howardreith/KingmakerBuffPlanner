@@ -1,5 +1,25 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-09-25 casting-graph UI correction: Phase 0 identity
+
+- The owner rejected the planner screen he saw at 1920x1200. Before
+  touching code, proved which screen it was: every label he reported is
+  rendered only by Classic view classes in both candidate binaries
+  (`git grep` on the frozen rc6 and 0.1.1-rc3 trees), and the casting-first
+  workspace renders none of them.
+- DATA's installation is 0.1.1-rc3 (hash and MVID read from the file) and
+  saw no argument-free game launch on the day (Steam's process log), so the
+  owner's session ran on another machine, most likely the published rc6
+  alpha in its default Classic mode.
+- Rejected theory: "the casting-first workspace regressed into the grid".
+  The label-to-class mapping rules it out.
+- Rejected theory for the ghost hover: a second camera rendering the
+  planner canvas. An rc6 camera frame shows thickened text, but panels and
+  portraits are not doubled, so that artifact is text-material, not a
+  second render. The hover cause stays open until reproduced live.
+- The rc6 casting-first composition (in-game frames from the rc6 reload
+  run) also misses the addendum, so the graph workspace is built regardless.
+
 ## 2026-09-22 J-review repair (Claude takeover)
 
 - Took over from Z at `19ecbe8`; reconciled git, processes, locks and
