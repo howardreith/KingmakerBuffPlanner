@@ -7,7 +7,11 @@ Reviewed baseline: `c182061354e9e761c09648ca779ab334588ba379`
 (`fd0e6dc..c182061`); this index covers the casting-first commits
 `c182061..HEAD` (61 commits at first publication).
 
-Status: **release candidate 0.2.0-rc5.** 0.2.0-rc4 (frozen at `863a182`,
+Status: **release candidate 0.2.0-rc6.** 0.2.0-rc5 (frozen at `27234a4`,
+receipt `docs/evidence/rc-0.2.0-rc5-receipt.md`, superseded after the
+advanced qualification of a metamagic rod found that a rod the player had
+left switched on was spent on a casting that did not choose it),
+0.2.0-rc4 (frozen at `863a182`,
 receipt `docs/evidence/rc-0.2.0-rc4-receipt.md`, superseded after the
 owner's review of its source), 0.2.0-rc3 (frozen at `ea2a027`,
 receipt `docs/evidence/rc-0.2.0-rc3-receipt.md`, superseded after its final
@@ -26,8 +30,39 @@ qualification passed in game on `d35b38f`
 (`casting-qual-cast-20260923-q1-01`: stop, complete, repeat and a recast
 after a close and reopen, each exactly as forecast). On the owner's
 advanced seed (a disposable Beneath the Stolen Lands save) the finite,
-group and enhanced qualifications followed; see the section below and the
-rc5 receipt. Human usability and the native aesthetic pass remain open.
+group, enhanced, ability-pool and rod qualifications followed; see the
+sections below and the rc5 and rc6 receipts. Human usability and the native aesthetic pass remain open.
+
+## The next iteration after rc5: ability pools, rods, exact enhancements (2026-09-24)
+
+Developed on the local branch `codex/kingmaker-buff-planner-next`
+(`a0e0e5a..64c6e22`) and merged for rc6. Development evidence:
+`docs/evidence/next-iteration-20260924-receipt.md`.
+
+| Finding or request | Disposition |
+| --- | --- |
+| Ability pools (the advanced party's Mutagen) inventoried but never cast | `a0e0e5a`, tests `6af9242`: the `ability-pool-direct` recipe (one use spends the pool's single use and lands a new instance; a repeat under skip-if-active casts nothing; *Always recast* is refused for want of the resource, the game's count and the effect unchanged). The plain-buff check accepts a sequence with actions that do nothing and a condition whose two branches apply the same plain buffs (the Mutagen's shape). Qualified live on `e2a4959` and `fb762e2`, both modes |
+| Metamagic rods implemented but never used | `75c8133`, tests `e2a4959`: the `rod-extend-direct` recipe (the same per-level spell cast plain and then with an Extend rod chosen on the casting through the workspace; the extended recipient's buff must last twice as long at the same strength for exactly one charge). The probe reads the game clock and the rod's charges |
+| Found live: a rod the player left switched on was spent on a casting that chose no rod (`casting-qual-cast-20260924-adv-rod-anim-01`: rod charges 6 → 5, Blur 1079.6 s instead of 540 s) | Fixed in `fb762e2`: both executors skipped enhancement preparation for a step without enhancements. Casting-first steps are now marked `ExactEnhancements` and always prepared: every toggle the planner models that the casting did not choose is switched off for the cast and restored after. The game's own code (`ActivatableAbility.OnTurnOff`) keeps a switched-off toggle running until the next round unless its blueprint deactivates immediately, so an unchosen rod still running is stopped at once; anything else still on or running refuses the cast. Classic is unchanged (owner decision below). Regression test: a rod left on, both modes. Qualified live on `fb762e2`: plain 540 s with no charge, extended 1080 s for one charge, both modes |
+| Independent review of the next-iteration diff: every empty action counted as doing nothing, although discovery also produces one for damage, healing, removing a buff and unknown actions | Fixed in `fb762e2`: an empty expression records why (not serialized, no identity change); only a null action or an empty list is ignored; the inventory shows the reason (live: the Mutagen's first action is a null action) |
+| Same review: the rod's duration check was vacuous for durations of a few seconds; a condition could give the two recipients different durations | Fixed in `fb762e2` and `64c6e22`: the recipe refuses a conditional source and needs at least twenty rounds expected; the plain cast must last a minute |
+| Same review: the game clock and the exhausted step's accepted edit were not published | Fixed in `fb762e2` |
+| Review of `fb762e2`: with two copies of one rod, the chosen copy was started while the other's buff was applied, then the other was stopped | Worked live (the copies' buffs are separate instances); hardened in `64c6e22`: casting-first prefers the copy already running, and switches everything unchosen off (stopping running rods) before switching anything chosen on |
+| Same review: a rod switched on for the cast and back off kept running until the next round | Fixed in `64c6e22`: the lease stops it for casting-first steps; the caster read records each toggle's running state beside its switch |
+| Same review: the recipe accepted exactly ten rounds while the plain step needed a minute at its read | Fixed in `64c6e22`: twenty rounds |
+| Same review: "exact" covers only the enhancements the planner models; Brown Fur's toggles stop at once only with the installed provider's immediate-off patch | Documented: other mods' spell toggles are not managed (known limitation); without the Brown Fur patch an unchosen Brown Fur toggle still running refuses the cast visibly |
+| Area transition on the advanced seed | Route check only: both exits of *Tenebrous Depths, I* autosave before leaving and the game's autosave is on, so no exit is safe under the owner's terms. Not attempted |
+
+Owner decision: the Classic planner keeps the game's toggles as they are
+when a buff chooses no enhancement, so a rod left switched on applies to
+every eligible Classic cast and spends its charges. Recommendation: the
+same rule as casting-first.
+
+Mutation totals for this iteration: ability pool 8 (6 killed, 2 redundant
+survivors), rod 7 (7 killed), review fixes 15 (15 killed), the rod
+recipe's duration boundary 2 (2 killed). The game-side parts of the fix
+(switching toggles, stopping a rod, reading running state) cannot run
+without the game; they are judged by the live qualifications.
 
 ## The owner's rc4 source review and the advanced seed (2026-09-24)
 
