@@ -39,6 +39,135 @@ namespace KingmakerBuffPlanner.Tests
             Run("graph-save-reload-reconstructs-connections", () => TestGraphSaveReload(root));
             Run("graph-unresolved-casting-keeps-its-connection", () => TestGraphUnresolvedCasting(root));
             Run("graph-layout-chips-never-overlap", TestGraphLayoutGeometry);
+            Run("contrast-ratio-follows-wcag", TestContrastRatioFollowsWcag);
+            Run("button-palette-readable-in-every-state", TestButtonPaletteReadableInEveryState);
+            Run("planner-controls-own-one-pointer-highlight", TestPlannerControlsOwnOnePointerHighlight);
+            Run("planner-mode-is-stated-by-each-view", TestPlannerModeStatedByEachView);
+        }
+
+        private static void TestContrastRatioFollowsWcag()
+        {
+            var black = new UiRgb(0f, 0f, 0f);
+            var white = new UiRgb(1f, 1f, 1f);
+            Expect(Math.Abs(UiContrast.Ratio(black, white) - 21.0) < 0.01, "black on white is not 21:1");
+            Expect(Math.Abs(UiContrast.Ratio(white, black) - 21.0) < 0.01, "the ratio is not symmetric");
+            Expect(Math.Abs(UiContrast.Ratio(white, white) - 1.0) < 0.0001, "a colour on itself is not 1:1");
+            // sRGB 0.5 gray: relative luminance 0.2140 (WCAG), 3.98:1 on white.
+            Expect(Math.Abs(UiContrast.RelativeLuminance(new UiRgb(0.5f, 0.5f, 0.5f)) - 0.2140) < 0.0005 &&
+                Math.Abs(UiContrast.Ratio(new UiRgb(0.5f, 0.5f, 0.5f), white) - 3.98) < 0.01,
+                "mid-gray luminance is not the WCAG value");
+        }
+
+        // Addendum 6.2 / G11: normal actionable captions reach 4.5:1 against
+        // the LIGHTER measured stone of every enabled state; disabled stays
+        // legible (3:1) and visibly different; selected is a distinct hue.
+        private static void TestButtonPaletteReadableInEveryState()
+        {
+            foreach (PlannerButtonState state in new[]
+            {
+                PlannerButtonState.Normal, PlannerButtonState.Hover, PlannerButtonState.Pressed,
+                PlannerButtonState.Selected
+            })
+            {
+                double worst = PlannerButtonPalette.WorstCaseRatio(state);
+                double median = PlannerButtonPalette.MedianRatio(state);
+                Expect(worst >= PlannerButtonPalette.NormalTextMinimum && median >= worst,
+                    state + " caption is below 4.5:1 on the lighter stone: " + worst.ToString("0.00"));
+            }
+            double hoverSelected = UiContrast.Ratio(PlannerButtonPalette.Caption,
+                PlannerButtonPalette.StoneLight.Times(PlannerButtonPalette.SelectedHoverTint));
+            Expect(hoverSelected >= PlannerButtonPalette.NormalTextMinimum,
+                "a hovered selected tab is below 4.5:1: " + hoverSelected.ToString("0.00"));
+            double disabled = PlannerButtonPalette.WorstCaseRatio(PlannerButtonState.Disabled);
+            Expect(disabled >= PlannerButtonPalette.DisabledTextMinimum,
+                "a disabled caption is not legible: " + disabled.ToString("0.00"));
+            Expect(UiContrast.RelativeLuminance(PlannerButtonPalette.DisabledCaption) <
+                UiContrast.RelativeLuminance(PlannerButtonPalette.Caption) - 0.2,
+                "a disabled caption does not look disabled");
+            UiRgb selected = PlannerButtonPalette.SelectedTint;
+            Expect(selected.R >= 2f * selected.G && selected.R >= 2f * selected.B,
+                "the selected state is not a distinct burgundy");
+            // The measurement this correction answers stays recorded: the
+            // previous light-cream caption on the lighter native stone.
+            double previous = UiContrast.Ratio(PlannerButtonPalette.PreviousCaption,
+                PlannerButtonPalette.StoneLight);
+            Expect(previous < PlannerButtonPalette.NormalTextMinimum && previous > 2.8,
+                "the recorded previous contrast changed: " + previous.ToString("0.00"));
+        }
+
+        private static string UiSource(string file)
+        {
+            DirectoryInfo directory = new DirectoryInfo(Environment.CurrentDirectory);
+            while (directory != null && !File.Exists(Path.Combine(directory.FullName, "KingmakerBuffPlanner.sln")))
+                directory = directory.Parent;
+            Expect(directory != null, "repository root not found");
+            return CollapsedWhitespace(File.ReadAllText(Path.Combine(directory.FullName, "src",
+                "KingmakerBuffPlanner", "UI", file)));
+        }
+
+        // The installed Unity UI draws the EventSystem's current selection as
+        // Highlighted after the pointer leaves it (IsHighlighted ORs in
+        // hasSelection), so a pressed control with navigation stays lit
+        // beside the hovered one. Every planner control must therefore be
+        // pointer-highlighted only: the factory, the theme, and both views
+        // after each rebuild. (The live hover sweep proves the behaviour.)
+        private static void TestPlannerControlsOwnOnePointerHighlight()
+        {
+            string factory = UiSource("KingmakerUiFactory.cs");
+            string ownBlock = SourceBlock(factory, "internal static void OwnPointerHighlight(Selectable control)");
+            Expect(ownBlock != null && ownBlock.Contains("if (control == null || control is InputField) return;") &&
+                ownBlock.Contains("navigation.mode = Navigation.Mode.None;"),
+                "OwnPointerHighlight does not remove the selection navigation");
+            string create = SourceBlock(factory, "internal static Button CreateButton(");
+            Expect(create != null && create.Contains("OwnPointerHighlight(button);"),
+                "factory buttons can take the selection");
+            string theme = UiSource("PlannerNativeTheme.cs");
+            string apply = SourceBlock(theme, "internal static void ApplyButton(Button donor, Button button)");
+            Expect(apply != null && apply.Contains("if (button.GetComponent<PlannerActionButton>() == null) { " +
+                    "KingmakerUiFactory.OwnPointerHighlight(button); return; }") &&
+                apply.Contains("KingmakerUiFactory.OwnPointerHighlight(button);") &&
+                !apply.Contains("Transition.SpriteSwap"),
+                "the theme lays donor state sprites over planner controls");
+            Expect(Occurrences(theme, "Transition.SpriteSwap") == 1 &&
+                SourceBlock(theme, "private static void ApplyButtonRc6(Button donor, Button button)")
+                    .Contains("Transition.SpriteSwap"),
+                "donor sprite states are used outside the guarded reproduction");
+            string workspace = UiSource("CastingWorkspaceScreenView.cs");
+            string refresh = SourceBlock(workspace, "internal void RefreshView()");
+            Expect(refresh != null && refresh.Contains("KingmakerUiFactory.OwnPointerHighlights(_root);"),
+                "the workspace does not own its rebuilt controls' highlight");
+            string rowHover = SourceBlock(workspace, "private static void ApplyRowHover(Button button, bool selected)");
+            Expect(rowHover != null && rowHover.Contains("KingmakerUiFactory.OwnPointerHighlight(button);"),
+                "graph rows, chips and targets can take the selection");
+            string classic = UiSource("BuffPlannerScreenView.cs");
+            string classicRefresh = SourceBlock(classic, "private void RefreshAll(bool preserveScroll)");
+            Expect(classicRefresh != null && classicRefresh.Contains("KingmakerUiFactory.OwnPointerHighlights(_root);"),
+                "the Classic screen's rebuilt target portraits and cards can take the selection");
+            // The reproduction switch is only ever set by the runtime-test host.
+            foreach (string file in new[] { "CastingWorkspaceScreenView.cs", "BuffPlannerScreenView.cs",
+                "BuffPlannerUiRoot.cs", "PlannerViews.cs", "CastingWorkspaceSession.cs",
+                "CastingWorkspaceSession.Graph.cs" })
+                Expect(!UiSource(file).Contains("Rc6ButtonBehaviour ="),
+                    "production code sets the rc6 reproduction switch: " + file);
+        }
+
+        // Addendum 7: each view states which planner it is, from the view that
+        // actually renders; Classic offers a deliberate route to casting-first.
+        private static void TestPlannerModeStatedByEachView()
+        {
+            string workspace = UiSource("CastingWorkspaceScreenView.cs");
+            string classic = UiSource("BuffPlannerScreenView.cs");
+            string root = UiSource("BuffPlannerUiRoot.cs");
+            Expect(workspace.Contains("internal const string ModeLabel = \"Planner: Casting-first\";") &&
+                workspace.Contains("KingmakerUiFactory.CreateText(\"PlannerMode\", header, _theme, ModeLabel,"),
+                "the casting-first workspace does not state its mode");
+            Expect(classic.Contains("internal const string ModeLabel = \"Planner: Classic\";") &&
+                classic.Contains("KingmakerUiFactory.CreateText(\"PlannerMode\", header, _theme, ModeLabel,") &&
+                classic.Contains("\"SwitchToCastingFirst\""),
+                "the Classic screen does not state its mode or offer the casting-first route");
+            Expect(root.Contains("() => SwitchPlannerFromScreen(PlannerMode.CastingFirst)") &&
+                root.Contains(": () => SwitchPlannerFromScreen(PlannerMode.Classic)"),
+                "the planners are not wired to switch deliberately");
         }
 
         private const string GraphSourceA = "source-graph-a";

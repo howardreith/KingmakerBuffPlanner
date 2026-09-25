@@ -19,14 +19,18 @@ namespace KingmakerBuffPlanner.UI
         private int _validationTick;
         private readonly DeferredUiReadinessGate _readiness = new DeferredUiReadinessGate(2);
 
+        private readonly Action _switchToCastingFirst;
+
         internal BuffPlannerScreenController(
             PlannerUiSession session,
             BuffPlannerUiLifecycleDiagnostics diagnostics,
             ModLog log,
             Action<string> quickExecute,
             Func<bool> onSetupVisible = null,
-            Action<string> quickExecuteReadyOnly = null)
+            Action<string> quickExecuteReadyOnly = null,
+            Action switchToCastingFirst = null)
         {
+            _switchToCastingFirst = switchToCastingFirst;
             _session = session ?? throw new ArgumentNullException("session");
             _diagnostics = diagnostics ?? throw new ArgumentNullException("diagnostics");
             _log = log ?? throw new ArgumentNullException("log");
@@ -53,7 +57,8 @@ namespace KingmakerBuffPlanner.UI
                 if (StaticCanvas.Instance == null)
                     throw new InvalidOperationException("Kingmaker campaign UI is not available.");
                 _view = new BuffPlannerScreenView(StaticCanvas.Instance, _session,
-                    _diagnostics, () => Close(), _quickExecute, _quickExecuteReadyOnly);
+                    _diagnostics, () => Close(), _quickExecute, _quickExecuteReadyOnly,
+                    _switchToCastingFirst);
                 // Focused re-review: only a result of this campaign is shown.
                 if (_unshownResult != null && ClassicRunScreenPolicy.ShowStashedResult(_unshownResultCampaign,
                         _session.Model == null || _session.Model.Profile == null
