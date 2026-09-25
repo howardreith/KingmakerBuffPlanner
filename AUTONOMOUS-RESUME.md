@@ -34,6 +34,18 @@ builds), `RC6-repro` and the G2 gate build. Frozen copy
   before it ran anything, because the Gunslinger lab began a 2.5-3 hour
   batch with short gaps in its lock; to be re-armed after its "KMG
   finished" (launch: `powershell.exe -File scratchpadc6_frames.ps1`).
+- 00:43 re-arm preflight (the owner's rule: a full read-only
+  reconciliation, never an absent lock alone): FAILED, watcher stays
+  paused. A Gunslinger runtime run was in progress after "KMG finished"
+  (Kingmaker.exe started 00:42:47 with a KMG runtime-test request; the KMG
+  compatibility.lock held; KMG deployments at 00:11, 00:26, 00:41), and
+  Mods holds KingmakerGunslinger 0.0.139 (DLL `3c07668a...`) instead of
+  the owner's 0.0.136 (DLL `c6cccdac...`). KBP side clean (237
+  transactions Restored and verified, every temporary deploy RolledBack,
+  protected-save comparisons clean, no KBP lock); RC6 at `24d9967` with
+  package `f271f3e6...`, DLL `35d6cbb2...`, MVID `4cb12c0d-...` unchanged;
+  the owner's session was Active. Re-arm only after a new reconciliation
+  passes.
 - Found after the freeze (in the receipt): the inventory prints an
   unmodeled action's type as `0` (diagnostic text only; fixed on the
   local next branch, `caea6ea`); multi-use ability pools cannot be
