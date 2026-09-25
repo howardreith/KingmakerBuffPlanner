@@ -37,7 +37,26 @@ namespace KingmakerBuffPlanner.Domain.Effects
 
     public sealed class EmptyEffectExpression : EffectExpression
     {
-        public EmptyEffectExpression() : base("empty") { }
+        // An empty whose cause was not recorded: never taken as doing nothing.
+        public EmptyEffectExpression() : this("unrecorded") { }
+
+        // unmodeledReason null: a node that does nothing (a null action or an
+        // empty action list). Otherwise what the planner does not model there,
+        // such as "restorative-action:<type>", "offensive-action:<type>",
+        // "unknown-node:<type>", "maximum-depth" or "cycle" (independent
+        // review of the next iteration: a damaging or removing action is not
+        // a no-op). Used only to judge a plain buff; not part of any
+        // serialized form or identity.
+        public EmptyEffectExpression(string unmodeledReason) : base("empty")
+        {
+            UnmodeledReason = unmodeledReason;
+        }
+
+        public static EmptyEffectExpression NoAction() { return new EmptyEffectExpression(null); }
+
+        [JsonIgnore] public string UnmodeledReason { get; private set; }
+
+        [JsonIgnore] public bool IsNoAction { get { return UnmodeledReason == null; } }
     }
 
     public sealed class EffectLeafExpression : EffectExpression

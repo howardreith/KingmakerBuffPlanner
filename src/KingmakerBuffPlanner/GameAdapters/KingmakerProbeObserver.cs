@@ -69,8 +69,12 @@ namespace KingmakerBuffPlanner.GameAdapters
                 if (available == null && reserved == null)
                     return ProbeObservation.Failed(phase, clock.Next(), DateTime.UtcNow, "source-ability-not-found");
                 List<ProbeEffectInstance> instances = Instances(target, ExpectedIds(step.ExpectedEffects));
+                long? gameTime = null;
+                string clockFailure = null;
+                try { gameTime = Game.Instance.TimeController.GameTime.Ticks; }
+                catch (Exception exception) { clockFailure = exception.GetType().Name; }
                 return ProbeObservation.Read(phase, clock.Next(), DateTime.UtcNow, target.UniqueId,
-                    available, instances, reserved);
+                    available, instances, reserved, gameTime, clockFailure);
             }
             catch (Exception exception)
             {
@@ -144,13 +148,38 @@ namespace KingmakerBuffPlanner.GameAdapters
                         out caster) || caster.Descriptor == null)
                     return CasterEnhancementObservation.Failed("caster-not-in-party");
                 string[] parts = (usagePoolId ?? string.Empty).Split('|');
-                if (parts.Length != 3 || parts[0] != "class-feature-resource" || parts[1] != casterUnitId)
+                if (parts.Length != 3 || parts[1] != casterUnitId ||
+                    (parts[0] != "class-feature-resource" && parts[0] != "metamagic-rod"))
                     return CasterEnhancementObservation.Failed("pool-not-a-caster-resource:" + usagePoolId);
-                BlueprintAbilityResource resource =
-                    ResourcesLibrary.TryGetBlueprint<BlueprintAbilityResource>(parts[2]);
-                if (resource == null)
-                    return CasterEnhancementObservation.Failed("resource-blueprint-missing:" + parts[2]);
-                int amount = caster.Descriptor.Resources.GetResourceAmount(resource);
+                int amount;
+                if (parts[0] == "metamagic-rod")
+                {
+                    // A rod's charges: its toggle's own resource count (every
+                    // copy of that rod item the caster carries).
+                    int? charges = null;
+                    foreach (ActivatableAbility rod in caster.Descriptor.ActivatableAbilities.Enumerable)
+                    {
+                        if (rod == null || rod.Blueprint == null || rod.Blueprint.Buff == null ||
+                            rod.Blueprint.Buff.GetComponent<Kingmaker.Designers.Mechanics.Facts.MetamagicRodMechanics>() == null)
+                            continue;
+                        string item = rod.SourceItem != null && rod.SourceItem.Blueprint != null
+                            ? rod.SourceItem.Blueprint.AssetGuid : rod.Blueprint.AssetGuid;
+                        if (item != parts[2]) continue;
+                        if (rod.ResourceCount == null)
+                            return CasterEnhancementObservation.Failed("rod-charges-unread:" + parts[2]);
+                        charges = (charges ?? 0) + rod.ResourceCount.Value;
+                    }
+                    if (charges == null) return CasterEnhancementObservation.Failed("rod-missing:" + parts[2]);
+                    amount = charges.Value;
+                }
+                else
+                {
+                    BlueprintAbilityResource resource =
+                        ResourcesLibrary.TryGetBlueprint<BlueprintAbilityResource>(parts[2]);
+                    if (resource == null)
+                        return CasterEnhancementObservation.Failed("resource-blueprint-missing:" + parts[2]);
+                    amount = caster.Descriptor.Resources.GetResourceAmount(resource);
+                }
                 var activatables = new Dictionary<string, bool>(StringComparer.Ordinal);
                 foreach (ActivatableAbility ability in caster.Descriptor.ActivatableAbilities.Enumerable)
                 {
@@ -160,6 +189,9 @@ namespace KingmakerBuffPlanner.GameAdapters
                         key = ability.Blueprint.AssetGuid + "#" +
                             index.ToString(System.Globalization.CultureInfo.InvariantCulture);
                     activatables[key] = ability.IsOn;
+                    // Running: its buff applied (it can outlast being
+                    // switched off by up to a round).
+                    activatables[key + "@running"] = ability.IsRunning;
                 }
                 return CasterEnhancementObservation.Read(amount, activatables);
             }

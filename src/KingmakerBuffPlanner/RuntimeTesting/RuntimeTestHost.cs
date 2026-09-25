@@ -3947,6 +3947,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                                 string.Join(";", before.ToArray()) + "]") + ">" + (after == null ? "unread"
                                     : "[" + string.Join(";", after.ToArray()) + "]"));
                         }).ToArray()) },
+                    { "remainingSeconds", new JArray(step.RemainingSecondsAfter.Keys.OrderBy(key => key,
+                        StringComparer.Ordinal).Select(key => (object)(key + ":" + (step.RemainingSecondsAfter[key] == null
+                            ? "unread" : step.RemainingSecondsAfter[key].Value.ToString("0.0",
+                                System.Globalization.CultureInfo.InvariantCulture)))).ToArray()) },
                     { "observations", new JArray(step.Observations.Cast<object>().ToArray()) }
                 });
             }
@@ -3960,6 +3964,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     { "castingScenario", record.CastingScenario },
                     { "allowanceStatus", record.AllowanceStatus },
                     { "terminalReason", record.TerminalReason },
+                    { "exhaustedAccepted", record.ExhaustedAccepted.HasValue
+                        ? (JToken)record.ExhaustedAccepted.Value : JValue.CreateNull() },
                     { "selection", selection == null ? null : new JObject
                         {
                             { "selected", selection.Selected },
@@ -3987,7 +3993,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                                     { "usagePoolId", selection.Enhancement.UsagePoolId },
                                     { "unitsPerCast", selection.Enhancement.UnitsPerCast },
                                     { "modifier", selection.Enhancement.ModifierPrefix },
-                                    { "increase", selection.Enhancement.Increase }
+                                    { "increase", selection.Enhancement.Increase },
+                                    { "kind", selection.Enhancement.Kind },
+                                    { "durationFactor", selection.Enhancement.DurationFactor }
                                 } },
                             { "rejections", new JArray(selection.Rejections.Cast<object>().ToArray()) }
                         } },

@@ -293,9 +293,14 @@ namespace KingmakerBuffPlanner.Execution
 
         private CastEnhancementPreparation Prepare(CastStep step)
         {
-            if (step.EnhancementIds.Count == 0) return CastEnhancementPreparation.Pass(null);
+            // A casting-first step is prepared even with no enhancement, so
+            // nothing the casting did not choose stays switched on for it.
+            if (step.EnhancementIds.Count == 0 && !step.ExactEnhancements)
+                return CastEnhancementPreparation.Pass(null);
             var runtime = _runtime as ICastEnhancementRuntimeAdapter;
-            if (runtime == null) return CastEnhancementPreparation.Fail("runtime-adapter-unsupported");
+            if (runtime == null)
+                return step.EnhancementIds.Count == 0 ? CastEnhancementPreparation.Pass(null)
+                    : CastEnhancementPreparation.Fail("runtime-adapter-unsupported");
             try
             {
                 return runtime.PrepareEnhancements(step) ??

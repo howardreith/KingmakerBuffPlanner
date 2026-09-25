@@ -62,25 +62,25 @@ namespace KingmakerBuffPlanner.Discovery
             EffectTarget? targetOverride,
             string path)
         {
-            if (node == null) return new EmptyEffectExpression();
+            if (node == null) return EmptyEffectExpression.NoAction();
             if (depth > _maximumDepth)
             {
                 diagnostics.Add(new DiscoveryDiagnostic(
                     "maximum-depth", node.Identity, depth.ToString(), path));
-                return new EmptyEffectExpression();
+                return new EmptyEffectExpression("maximum-depth");
             }
             if (!active.Add(node))
             {
                 diagnostics.Add(new DiscoveryDiagnostic(
                     "cycle", node.Identity, "Active traversal cycle detected.", path));
-                return new EmptyEffectExpression();
+                return new EmptyEffectExpression("cycle");
             }
             try
             {
                 switch (node.Kind)
                 {
                     case DiscoveryNodeKind.Empty:
-                        return new EmptyEffectExpression();
+                        return EmptyEffectExpression.NoAction();
                     case DiscoveryNodeKind.Effect:
                         return new EffectLeafExpression(
                             node.EffectKind,
@@ -91,11 +91,11 @@ namespace KingmakerBuffPlanner.Discovery
                     case DiscoveryNodeKind.OffensiveAction:
                         diagnostics.Add(new DiscoveryDiagnostic(
                             "offensive-action", node.Identity, node.SourceContract, path));
-                        return new EmptyEffectExpression();
+                        return new EmptyEffectExpression("offensive-action:" + node.Identity);
                     case DiscoveryNodeKind.RestorativeAction:
                         diagnostics.Add(new DiscoveryDiagnostic(
                             "restorative-action", node.Identity, node.SourceContract, path));
-                        return new EmptyEffectExpression();
+                        return new EmptyEffectExpression("restorative-action:" + node.Identity);
                     case DiscoveryNodeKind.Sequence:
                         return VisitSequence(node, depth, active, diagnostics, targetOverride, path);
                     case DiscoveryNodeKind.Conditional:
@@ -116,7 +116,7 @@ namespace KingmakerBuffPlanner.Discovery
                     default:
                         diagnostics.Add(new DiscoveryDiagnostic(
                             "unknown-node", node.Identity, node.SourceContract, path));
-                        return new EmptyEffectExpression();
+                        return new EmptyEffectExpression("unknown-node:" + node.Identity);
                 }
             }
             finally { active.Remove(node); }
