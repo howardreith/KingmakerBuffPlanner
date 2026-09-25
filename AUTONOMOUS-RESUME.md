@@ -58,9 +58,12 @@ builds), `RC6-repro` and the G2 gate build. Frozen copy
   at 01:53:29). Next: when the owner connects and asks, repeat the
   reconciliation; the frame runs start only if every condition passes.
 - Found after the freeze (in the receipt): the inventory prints an
-  unmodeled action's type as `0` (diagnostic text only; fixed on the
-  local next branch, `caea6ea`); multi-use ability pools cannot be
-  qualified on the advanced campaign (the only plain one lasts a round).
+  unmodeled action's type as `0` (diagnostic text only; fixed in
+  `b4eed30`, pushed to this branch at the owner's request for review;
+  source tests passed when it was made, not rebuilt, frozen or run in the
+  game; first committed locally as `caea6ea`); multi-use
+  ability pools cannot be qualified on the advanced campaign (the only
+  plain one lasts a round).
 
 ## The next iteration toward rc6 (2026-09-24)
 
