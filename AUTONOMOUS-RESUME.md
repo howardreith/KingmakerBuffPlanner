@@ -5,7 +5,20 @@ is the top section of `planning/CASTING-FIRST-MIGRATION-STATUS.md`. The
 entries below record past sessions, including temporary orchestration
 notes (watcher and preflight state) that are not product status.
 
-## Release candidate 0.2.0-rc6 frozen at `24d9967`; chain done (2026-09-25, LATEST)
+## Casting-graph UI correction started (2026-09-25, LATEST)
+
+- The owner rejected the observed planner screen (a Classic view, proved in
+  `planning/CASTING-GRAPH-UI-CORRECTION-STATUS.md`) and adopted the
+  casting-graph addendum. Work continues on branch
+  `claude/casting-graph-ui-correction` (from `e8496ee`); its status file is
+  the tracker for this mission.
+- After the machine reboot: every worktree clean, 238/238 KBP transactions
+  Restored, deploys RolledBack, no lock or violation, no Kingmaker process.
+  The rc6 frame watcher below is superseded and was not re-armed.
+- The Gunslinger lab is active and has priority for the game; check its
+  lock/lease and running Kingmaker before any KBP runtime transaction.
+
+## Release candidate 0.2.0-rc6 frozen at `24d9967`; chain done (2026-09-25)
 
 Candidate `24d9967f82e516f9ed4a4c1f06e6a842e18c5f96`: package
 `f271f3e6...`, DLL `35d6cbb2...`, MVID `4cb12c0d-78c6-4755-aa62-b6ad50e1a02b`;
