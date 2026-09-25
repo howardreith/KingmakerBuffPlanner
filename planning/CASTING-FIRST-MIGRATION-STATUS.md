@@ -1,11 +1,137 @@
 # Casting-First Migration — Checkpoint Status
 
-Single source of truth for the casting-first migration mission progress.
-Linked from `AUTONOMOUS-RESUME.md`. Specification: the adopted
+Single source of truth for the casting-first migration: its top section is
+the one current status, and every other status document points here. Specification: the adopted
 `Kingmaker-Buff-Planner-Casting-First-Migration-Charter.md` (casting-first
 migration and native scroll UI charter v1.0, 2026-09-19).
 
-## CURRENT STATE — rc6: ability pools, rods and exact enhancements — 2026-09-24
+## CURRENT STATUS — the rc6 experimental milestone (authoritative; updated 2026-09-25)
+
+This section is the single current status of the casting-first migration.
+Everything below it, and the older status in `AUTONOMOUS-RESUME.md` and
+`planning/DEFINITION-OF-DONE-MATRIX.md`, is history.
+
+**Frozen candidate.** 0.2.0-rc6:
+
+| Item | Value |
+| --- | --- |
+| Commit | `24d9967f82e516f9ed4a4c1f06e6a842e18c5f96` |
+| Package SHA-256 | `f271f3e63e81cb59eb2c715887b351914c95acda10fdbe7581ef3ad36833d9b4` |
+| DLL SHA-256 | `35d6cbb2b457374a69ac93227e1af7dcc0bea974e0c1fd1a724839a92071ea07` |
+| MVID | `4cb12c0d-78c6-4755-aa62-b6ad50e1a02b` |
+| Frozen copy | `runtime-backups/rc-frozen/24d9967.../` |
+| Receipt | `docs/evidence/rc-0.2.0-rc6-receipt.md` |
+
+**Branch head.** The branch `codex/kingmaker-buff-planner-casting-first`
+(PR #2) is later than the candidate. After `24d9967` it adds receipts,
+status documents and one source fix made after the freeze, `b4eed30`
+(diagnostic type-name text in the capability inventory, and its test).
+That fix is not in the rc6 package.
+`git diff 24d9967 HEAD -- src scripts tests Version.props` shows exactly
+those two files. The branch head is not the tested binary.
+
+**Milestone scope.** An opt-in, experimental casting-first planner with the
+supported subset documented in the rc6 release notes. Classic stays the
+default. Unsupported or unresolved contracts stay visible and fail closed.
+This is not completion of the casting-first charter.
+
+**Passed in source** (gate at `24d9967`): source validation 42, protocol
+338, runtime harness 38, package 4, deployment WhatIf 5, launcher WhatIf 12,
+fixture inventory 3, Restore-InstallLocal 16, guarded publisher 3. The same
+package, DLL and MVID came out of three checkouts. Mutation: 30 of 32
+mutants on the rc6 work were killed; the two survivors are redundant
+second checks.
+
+**Passed in guarded gameplay** (frozen build, disposable fixtures only,
+every run restored exactly with its saves compared clean):
+- **Automation campaign:**
+  - Classic select and cast in both modes;
+  - the casting-first zero-cost qualification in both modes (stop in
+    flight, complete, repeat, recast, disable, recover);
+  - the first-open import of a 0.0.19 plan.
+- **Advanced campaign** (a *Beneath the Stolen Lands* fixture), each in
+  both modes: finite prepared and spontaneous resources, group castings,
+  Powerful Change, the Mutagen ability pool, and an Extend rod.
+- **Installation:** a temporary install of the exact package, then an
+  exact rollback to 0.1.1-rc3.
+
+**Frame-judged runs on rc6: none has passed yet.**
+- `casting-ws-qual-20260924-rc6-1080-01` (2026-09-24): FAIL on black
+  frames. The owner's session showed as connected for a moment and then
+  disconnected. The build identity checks and every assertion that does
+  not judge frames passed; restored, saves clean.
+- `casting-ws-reload-20260924-rc6-01` (2026-09-25): FAIL on black frames.
+  90 of 92 assertions passed; the two failures judge frames. The session
+  was connected and stable for two minutes before the run and had
+  disconnected by its end. Restored, saves clean.
+- Both are classified as session infrastructure, not product results.
+- Not yet run on rc6: the layout at 1920x1200, the layout at 1920x1080
+  (attempt 02) and the manual-session rehearsal.
+
+**Remaining for owner acceptance.** Each item runs once on the frozen RC6 checkout:
+the in-game reload (attempt 02), the layout at 1920x1200, the layout at
+1920x1080 (attempt 02) and the manual-session rehearsal. Then come the
+supervised usability session and the owner's explicit verdict on the
+experimental milestone and on the product decisions listed below.
+
+**Explicitly deferred** (each a separate follow-up PR or mission, not part
+of rc6):
+1. **Targeting and coverage:** Share Transmutation and other verified
+   targeting modifiers; repairable modifier intent; honest executable
+   partial group coverage.
+2. **Exact-item identity:** authorize a persistent per-item identity
+   experiment, or formally adopt pooled rod semantics.
+3. **Qualification expansion:** pets, multi-use ability pools, prepared
+   metamagic variants, area transitions, 1280x720 and other scales,
+   performance and allocation baselines, and the remaining A01-A20 cases.
+4. **Final cutover:** casting-first as the default after acceptance, the
+   final migration and rollback qualification, retiring the legacy
+   authoring UI, and complete charter acceptance.
+
+**Product decisions for rc6:**
+- Classic's existing enhancement-toggle behavior is unchanged: a rod left
+  switched on still applies to Classic casts.
+- Worn-item enchantments stay a disclosed limitation.
+
+**PR disposition.**
+- PR #1 (`codex/kingmaker-buff-planner-z-native-assignments`, `c182061`) is
+  closed unmerged and superseded by PR #2, which contains all of it.
+- PR #2 is titled "Casting-first planner integration — frozen 0.2.0-rc6
+  candidate at 24d9967". It stays a draft until the owner's verdict. If it
+  is accepted, merge it with a merge commit (never a squash or rebase), so
+  `24d9967` stays reachable.
+
+**Next finite step.** The owner connects to DATA, unlocks it, and keeps the
+remote-desktop window open and visible (not minimized or disconnected) for
+the whole sequence and the supervised session, then reruns the rc6
+acceptance mission. Nothing runs until then.
+
+### A01–A20 ledger (charter acceptance cases; no percentage is claimed)
+
+| Case | Status | Evidence and scope |
+| --- | --- | --- |
+| A01 Same buff, two casters, three targets, distinct enhancements | Passed at source/domain level | Domain tests. In game: one buff from two casters (finite recipe), and distinct per-casting enhancements with the sibling casting unchanged (Powerful Change and rod recipes); the full three-target case was not run |
+| A02 Three recipients of a single-target ability | Passed at source/domain level | Domain tests. In game: one native cost per casting (finite recipe, two recipients) |
+| A03 One group cast covering six recipients | Passed in game | One origin, one invocation and one slot reaching every party member, with per-recipient connections; the fixture party has four members, not six |
+| A04 One intended group recipient outside coverage | Passed at source/domain level | Missed coverage shown; no automatic second casting; a required recipient outside the predicted area is refused. Not run in game |
+| A05 Share targeting enabled/disabled | Explicitly unsupported for rc6 | Share Transmutation is refused with its reason; the eligibility logic passes at domain level |
+| A06 Exact rods, including two identical items | Blocked by product decision | rc6 uses pooled rods (any matching rod; a specific physical rod is refused). Per-item identity awaits the owner's decision (follow-up 2) |
+| A07 Two enhancements sharing a class-resource pool | Passed at source/domain level | Domain and policy tests; in game only one enhancement per casting |
+| A08 Linked prepared slots, materials and rod demand | Passed at source/domain level | Domain and policy tests. In game: exact prepared slots and a rod charge each spent exactly once |
+| A09 Cross-routine and ordered combined previews | Passed at source/domain level | Domain and policy tests |
+| A10 Required enhancement unavailable; legacy optional import | Passed at source/domain level | Domain and policy tests; in game, imported castings arrive as drafts that need review |
+| A11 Missing caster, source, variant, item or optional mod | Passed at source/domain level | Domain and policy tests |
+| A12 Group and automatic legacy assignment migration | Passed at source/domain level | In game: a genuine 0.0.19 plan imported into drafts (automatic assignments); group legacy assignments at source level |
+| A13 Corrupt or newer profile, interruption, multi-version rollback | Passed at source/domain level | Unreadable and newer files are never overwritten; Restore-InstallLocal 16 cases; a real temporary install and exact rollback |
+| A14 Same buff, different requested strength or duration | Partially supported | Skip-if-active accepts only a provably sufficient effect (in game); worn-item enchantments are always recast (disclosed limitation) |
+| A15 Mid-run depletion, cancellation, timeout, residual state | Passed in game | Stop in flight, disable and recover, cleanup observed, an exhausted pool refused before casting; mid-run depletion and timeouts at source level |
+| A16 Native theme missing or rebuilt, reopening, mod disable | Passed in game | Reopen, disable and re-enable with subscriptions and HUD unchanged; a missing or rebuilt theme donor at source level |
+| A17 Crowded enhancements, long names, supported scales | Not run | rc6's layout runs have not completed, because they need the owner's connected session. An earlier candidate showed the workspace at 1920x1200 in game; crowded enhancements, long names and other scales are not established |
+| A18 HUD, hotkey, spellbook, typing and Escape | Passed at source/domain level | One execution policy behind the HUD, hotkey and spellbook routes (source tests); the HUD routine entry was used in game; typing, Escape and physical input await the supervised session |
+| A19 Animated and instant/hybrid compatibility | Passed in game | Every qualification in both modes; routes, costs and temporary-state restoration verified separately |
+| A20 Planner closed/open idle and repeated edits | Not run | No performance or allocation baseline yet (follow-up 3) |
+
+## CURRENT STATE — rc6: ability pools, rods and exact enhancements — 2026-09-24 (history)
 
 rc5 (`27234a4`) passed its chain. Qualification then went on to an ability
 pool (the Mutagen) and an Extend rod on the advanced seed. The rod run

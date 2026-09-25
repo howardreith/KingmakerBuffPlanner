@@ -1,5 +1,10 @@
 # Definition of Done Matrix
 
+> **Historical.** The casting-first release buckets below describe the
+> rc2 state of 2026-09-23 and are superseded. The current status, the
+> rc6 milestone scope and the current A01–A20 ledger are in the top
+> section of `planning/CASTING-FIRST-MIGRATION-STATUS.md`.
+
 ## Casting-first migration — release buckets (updated 2026-09-23: release candidate 0.2.0-rc2 frozen at `ae0181d`; receipt `docs/evidence/rc-0.2.0-rc2-receipt.md`)
 
 No percentage or date is claimed; green unit tests do not measure
