@@ -1,4 +1,9 @@
-# AUTONOMOUS-RESUME — top section is current; planning/CASTING-FIRST-MIGRATION-STATUS.md is the per-checkpoint tracker.
+# AUTONOMOUS-RESUME — historical session log
+
+**Not current.** The single current status of the casting-first migration
+is the top section of `planning/CASTING-FIRST-MIGRATION-STATUS.md`. The
+entries below record past sessions, including temporary orchestration
+notes (watcher and preflight state) that are not product status.
 
 ## Release candidate 0.2.0-rc6 frozen at `24d9967`; chain done (2026-09-25, LATEST)
 
