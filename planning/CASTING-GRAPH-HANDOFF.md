@@ -113,9 +113,21 @@ Two conditions come from outside and have blocked most of this mission:
   the hover record fails (run `-02`).
 - **The Kingmaker Gunslinger lab (another agent) shares the install.** It
   holds `C:\Dev\KingmakerGunslingerLab\compatibility-state\compatibility.lock`
-  during its runs, with short gaps between steps. Wait for its explicit
-  "ended/restored" message (it sends one after restoring the owner's install);
-  never start in a lock gap. The owner gave Gunslinger priority.
+  during each run step, with short gaps between steps, and leaves its own
+  test build installed between batches. Never start in a lock gap. The owner
+  gave Gunslinger priority. At 2026-09-26 ~09:45 it announced another
+  requalification of about 1 h 45 min and withdrew its earlier
+  "ended/restored". Treat Gunslinger as finished only when one of these holds:
+  1. it sends you (or the owner relays) a new "ended/restored"; or
+  2. the owner confirms Gunslinger's work is finished; or
+  3. for 15 continuous minutes: no `compatibility.lock`, no Kingmaker
+     process, and `Mods\KingmakerGunslinger\KingmakerGunslinger.dll` equals
+     the owner's bytes (SHA-256 prefix `C6CCCDAC914ED59F`; Gunslinger restores
+     them only when it finishes). If a plain status file exists under
+     `C:\Dev\KingmakerGunslingerLab\compatibility-state\` that says
+     "ended/restored", it counts too.
+
+  If you are unsure, ask the owner; do not guess.
 
 Read-only reconciliation (PowerShell 7 or Windows PowerShell), run it and
 compare with the expected values:
