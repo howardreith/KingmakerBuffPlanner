@@ -5,7 +5,25 @@ is the top section of `planning/CASTING-FIRST-MIGRATION-STATUS.md`. The
 entries below record past sessions, including temporary orchestration
 notes (watcher and preflight state) that are not product status.
 
-## Casting-graph UI correction: checkpoint 2, first live run (2026-09-25, LATEST)
+## Casting-graph UI correction: handed off to Z.AI (2026-09-26, LATEST)
+
+- **Start here: `planning/CASTING-GRAPH-HANDOFF.md`** (self-contained
+  procedure, preconditions, commands, how to read results, rules).
+- Owner decisions 2026-09-26: publish as `codex/kingmaker-buff-planner-casting-graph`
+  through the guarded helper (pushed at `3ebdfe1`; draft stacked PR #3
+  https://github.com/howardreith/KingmakerBuffPlanner/pull/3 onto
+  `codex/kingmaker-buff-planner-casting-first`); the owner's in-game review
+  happens later today with Z.AI operating (Claude's weekly quota ended).
+- Live `casting-graph-qual-1200-02` (`3ebdfe1`, 05:45): FAIL — Windows
+  refused the game the foreground (the owner was using another window), so
+  most cursor moves were withheld by design; it still showed rc6 card click
+  `tookSelection=True`, shipped `tookSelection=False`, shipped
+  click-then-hover single-owner. Safety clean; 240/240 transactions
+  Restored.
+- The Gunslinger lab finished (its "ended/restored" 12:28Z, owner's KMG
+  0.0.136 byte-verified).
+
+## Casting-graph UI correction: checkpoint 2, first live run (2026-09-25)
 
 - Tracker: `planning/CASTING-GRAPH-UI-CORRECTION-STATUS.md` (checkpoint 2).
   HEAD after the documentation commit; the package is rebuilt at the exact

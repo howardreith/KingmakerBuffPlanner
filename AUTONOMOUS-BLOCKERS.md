@@ -1,5 +1,14 @@
 # AUTONOMOUS-BLOCKERS — top section is current
 
+## Casting-graph UI correction — 2026-09-26 (update)
+
+- Branch publication RESOLVED by the owner: pushed as
+  `codex/kingmaker-buff-planner-casting-graph` through the unchanged
+  guarded helper; draft PR #3.
+- Live runs still need the owner connected, hands-off, game window in front
+  (run `-02` failed on foreground activation), and the Gunslinger lab quiet.
+  Procedure: `planning/CASTING-GRAPH-HANDOFF.md`.
+
 ## Casting-graph UI correction — 2026-09-25 20:30 (update)
 
 - The Gunslinger lab finished its batch (its message at 21:51 UTC; KBP's own
