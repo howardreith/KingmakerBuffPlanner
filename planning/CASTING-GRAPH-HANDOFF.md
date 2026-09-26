@@ -117,17 +117,23 @@ Two conditions come from outside and have blocked most of this mission:
   test build installed between batches. Never start in a lock gap. The owner
   gave Gunslinger priority. At 2026-09-26 ~09:45 it announced another
   requalification of about 1 h 45 min and withdrew its earlier
-  "ended/restored". Treat Gunslinger as finished only when one of these holds:
-  1. it sends you (or the owner relays) a new "ended/restored"; or
-  2. the owner confirms Gunslinger's work is finished; or
-  3. for 15 continuous minutes: no `compatibility.lock`, no Kingmaker
-     process, and `Mods\KingmakerGunslinger\KingmakerGunslinger.dll` equals
-     the owner's bytes (SHA-256 prefix `C6CCCDAC914ED59F`; Gunslinger restores
-     them only when it finishes). If a plain status file exists under
-     `C:\Dev\KingmakerGunslingerLab\compatibility-state\` that says
-     "ended/restored", it counts too.
+  "ended/restored". Its status file is the primary signal:
+  `C:\Dev\KingmakerGunslingerLab\compatibility-state\kmg-runtime-status.txt`.
+  Its first line reads `running <UTC>: ...` while Gunslinger works and is
+  overwritten with `ended/restored <UTC>` only after the byte-verified
+  restore of the owner's install; any new Gunslinger run overwrites it with
+  `running ...` first. Check it immediately before every KBP run:
 
-  If you are unsure, ask the owner; do not guess.
+  ```powershell
+  Get-Content 'C:\Dev\KingmakerGunslingerLab\compatibility-state\kmg-runtime-status.txt' -TotalCount 1
+  ```
+
+  Treat Gunslinger as finished only when its first line starts with
+  `ended/restored` AND the lock is absent AND no Kingmaker runs AND
+  `Mods\KingmakerGunslinger\KingmakerGunslinger.dll` has the owner's bytes
+  (SHA-256 prefix `C6CCCDAC914ED59F`). If the file is missing or ambiguous,
+  a relayed "ended/restored" message or the owner's confirmation also
+  counts. If you are unsure, ask the owner; do not guess.
 
 Read-only reconciliation (PowerShell 7 or Windows PowerShell), run it and
 compare with the expected values:
