@@ -1,5 +1,13 @@
 # AUTONOMOUS-BLOCKERS — top section is current
 
+## Casting-graph UI correction — 2026-09-25 20:30 (update)
+
+- The Gunslinger lab finished its batch (its message at 21:51 UTC; KBP's own
+  reconciliation confirmed the restore). One live run was possible while the
+  owner was connected (19:25–19:41). Since then the owner's session connects
+  only briefly (10–90 s); frame runs wait for two minutes of stable
+  connection. The branch-publication decision below is still open.
+
 ## Casting-graph UI correction — 2026-09-25 17:40
 
 - **BLOCKING live runs (external, not a product result).** Two conditions

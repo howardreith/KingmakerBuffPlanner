@@ -99,8 +99,8 @@ guarded in-game run on the disposable fixture. No live claim is made yet.
 | G07 | Line/chip opens inspector; Extend / Powerful Change per casting | Source pass (`graph-enhancement-edits-one-casting-and-budgets`); line corridor + chip focus scripted live, not run |
 | G08 | Parallel same caster–target castings stay distinct | Source pass (`graph-parallel-castings-stay-distinct`) |
 | G09 | Group casting: one origin/card, derived branches, missed coverage | Source pass (`graph-group-casting-one-origin-derived-branches`) |
-| G10 | Hover sweep at 1920x1200 and 1920x1080 | Fix and predicate in source (`planner-controls-own-one-pointer-highlight`, `hover-record-*`); live rc6 reproduction + sweep implemented in `live-workspace-qual`, **not run** (root cause not yet proved live) |
-| G11 | Button states and contrast | Palette source pass (`contrast-ratio-follows-wcag`, `button-palette-readable-in-every-state`); five-state in-game capture implemented, not run |
+| G10 | Hover sweep at 1920x1200 and 1920x1080 | 1920x1200 sweep live in `casting-graph-qual-1200-01`: every judged reading single-owner and aligned; rc6 owner-sequence reproduction not yet run (harness lookup defect, repaired in `590ca28`); 1920x1080 not run; root cause **not yet proved** |
+| G11 | Button states and contrast | Palette source pass; five states drawn in game (1200-01, tints recorded); presented-frame capture for the pixel contrast measurement pending (1200-01 used the camera lane) |
 | G12 | Save/reload reconstruction | Source pass (`graph-save-reload-reconstructs-connections`, `graph-unresolved-casting-keeps-its-connection`); live `live-workspace-reload`, not run |
 | G13 | Long names, crowded plan | Partial: chip geometry source pass (`graph-layout-chips-never-overlap`); crowded live frame not captured |
 | G14 | Input/lifecycle, no stale listeners | Partial: one planner root + single owner after close/reopen judged live (not run); reload ownership as in rc6 scenario |
@@ -169,3 +169,71 @@ guarded in-game run on the disposable fixture. No live claim is made yet.
   `live-workspace-qual` (default 1920x1200 and `-DisplayMode
   windowed-1920x1080`) and `live-workspace-reload`; judge frames and
   `hover-ownership.json`.
+
+### Checkpoint 2 — 2026-09-25 20:30, review repaired; first live run
+
+- Independent read-only review of `e8496ee..757fc6b`: no correctness defect
+  in the session, capacity, compiler or undo logic; one blocking harness
+  defect and seven lesser ones, all repaired in `8e6a4e0` with tests:
+  - blocking: the installed Unity UI never stores `Disabled` in
+    `m_CurrentSelectionState` (Disabled is applied at transition time from
+    `IsInteractable`), so the disabled button state could never pass. Button
+    states are now judged from interactability, the stored state and the
+    drawn tint; a hovered disabled control no longer counts as an owner;
+  - the rc6 reproduction was true by construction (the harness clicked a
+    routine tab itself). It now follows the owner's report (mission §1: "the
+    correct hover plus a second visible hover effect offset up and left of
+    the cursor"): hover a Classic portrait with the real cursor before any
+    click, click a buff card, hover again; rc6 first, then shipped. Ghost
+    geometry relative to the cursor is recorded; a ghost without a click is
+    reported as a cause the selection theory does not explain;
+  - the rc6 switch now resets in the host's own shutdown (deadline, abort,
+    exception, disable, unload); sweeps aim only inside scroll viewports
+    and cover every visible target; transitions settle before readings;
+  - product: a party-shared pool (item charges) is disclosed under every
+    caster; an at-will source never shows "0 of 0 left"; `CasterById(null)`
+    no longer returns the "Needs a caster" node; the footer puts the one-pass
+    shortfall first and shrinks long budget lists.
+- `b1cb4e0`: live-workspace-qual gets 300 s more live budget for the
+  diagnostic (the launcher timeout still bounds the run).
+- **Live run `casting-graph-qual-1200-01`** (`b1cb4e0`, package `b5f41e29…`,
+  DLL `4ae3ab0a…`, MVID `cec009cf-…`; profile full-user; Automation
+  fixture; 1920x1200; owner session Active over RDP; 19:27–19:30):
+  - FAIL at `workspace-hover-validation` only. Every other assertion PASS:
+    frames non-black (open luma mean 0.548, changed fraction 0.906 against
+    the control frame); interaction sequence (buff chosen through its tile,
+    3 castings from 2 casters through caster → source row → target, refused
+    click clean, line corridor and card focus, inspector retarget, Undo,
+    Done, Save); reopen preserved (3 castings, clean); optional mods 16/16
+    identical.
+  - Hover record: 35 readings, all 30 judged (shipped-behaviour) readings
+    single-owner; the other 5 are rc6 evidence. The real cursor
+    landed within 2 px of every aim; graph sweep of 10 controls (casters,
+    source row, card, 3 targets, catalogue tile, Save, routine tab), Classic
+    sweep of all 3 portraits, reopen hover and exit; no planner control ever
+    held the selection; one planner root after reopen, 45 → 45 controls.
+    Five button states drawn with their palette tints (normal `#8F8578`,
+    hover `#B8A894`, pressed `#70665C`, selected `#CC4C38`, disabled
+    `#808080`). rc6: a portrait hovered before any click showed exactly one
+    highlight (no ghost without a click).
+  - Why it failed: the owner-sequence click never happened
+    (`classic-card-missing`): a bound Classic card is named
+    `Source.<sourceId>`, not its pool name `BuffCard`. Harness defect.
+  - Also found in that run's frames: the camera-path lane renders planner
+    text washed out and cannot see the Classic screen at all (a screen-space
+    overlay); the presented frame `workspace-frame.png` is legible (dark ink,
+    burgundy headings, ivory captions on dark stone). And a real product
+    defect: the footer's budget lines sat on the book's dark lower edge.
+  - Safety: Kingmaker exited; Mods restoration verified; protected saves
+    compared clean; transaction Restored.
+- Repaired in `590ca28`: the card lookup, hover/button frames from the
+  presented frame, and a parchment ground behind the footer text. Gate at
+  `590ca28`: source 42, protocol 362, harness 38, package 4, deploy WhatIf
+  5, launcher WhatIf 12, fixture 3, Restore-InstallLocal 16, publisher 3.
+- Blocked since 19:41: the owner's session connects only briefly (10–90 s
+  at 19:25–19:41, 20:11, 20:17, 20:25); a frame run needs two minutes of
+  stable connection before it starts and a connection through its ~3–5
+  minutes.
+- Next: on a stable connection, rebuild at HEAD, then `live-workspace-qual`
+  at 1920x1200 (`-02`), at `windowed-1920x1080`, and `live-workspace-reload`;
+  then the supervised manual session and the owner's verdict.

@@ -5,7 +5,20 @@ is the top section of `planning/CASTING-FIRST-MIGRATION-STATUS.md`. The
 entries below record past sessions, including temporary orchestration
 notes (watcher and preflight state) that are not product status.
 
-## Casting-graph UI correction: source complete to checkpoint 1 (2026-09-25, LATEST)
+## Casting-graph UI correction: checkpoint 2, first live run (2026-09-25, LATEST)
+
+- Tracker: `planning/CASTING-GRAPH-UI-CORRECTION-STATUS.md` (checkpoint 2).
+  HEAD after the documentation commit; the package is rebuilt at the exact
+  HEAD and the gate rerun before any live run.
+- Live `casting-graph-qual-1200-01` (1920x1200): FAIL only at the hover
+  record (Classic card lookup, repaired in `590ca28`); everything else
+  PASS; safety clean.
+- Waiting for a stable owner session (two minutes Active before a frame
+  run). Then: `-02` at 1920x1200, the 1920x1080 run, reload, then the
+  supervised manual session and the owner's verdict.
+- Not pushed: branch publication is the owner's decision (AUTONOMOUS-BLOCKERS).
+
+## Casting-graph UI correction: source complete to checkpoint 1 (2026-09-25)
 
 - Tracker: `planning/CASTING-GRAPH-UI-CORRECTION-STATUS.md` (G-ledger and
   checkpoint 1). Branch `claude/casting-graph-ui-correction`, not pushed
@@ -68,7 +81,8 @@ builds), `RC6-repro` and the G2 gate build. Frozen copy
   Status lines `FRAMES ...` in `rc6_chain.status`. Stopped at 00:11,
   before it ran anything, because the Gunslinger lab began a 2.5-3 hour
   batch with short gaps in its lock; to be re-armed after its "KMG
-  finished" (launch: `powershell.exe -File scratchpadc6_frames.ps1`).
+  finished" (launch: `powershell.exe -File scratchpad
+c6_frames.ps1`).
 - 00:43 re-arm preflight (the owner's rule: a full read-only
   reconciliation, never an absent lock alone): FAILED, watcher stays
   paused. A Gunslinger runtime run was in progress after "KMG finished"
