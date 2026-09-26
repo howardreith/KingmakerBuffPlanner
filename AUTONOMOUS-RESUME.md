@@ -17,6 +17,17 @@ notes (watcher and preflight state) that are not product status.
   run). Then: `-02` at 1920x1200, the 1920x1080 run, reload, then the
   supervised manual session and the owner's verdict.
 - Not pushed: branch publication is the owner's decision (AUTONOMOUS-BLOCKERS).
+- 23:05: the Gunslinger lab began its final qualification cycle (~2.5 h,
+  ~40 guarded launches, per-step lock with short gaps); it restores the
+  owner's KMG 0.0.136, byte-verifies, and sends "ended/restored" at the end.
+  KBP does not launch in the gaps. The gate at `44f038c` refused twice at
+  its WhatIf step while their game ran (correct); rerun it when quiet.
+- Resume order: "ended/restored" received → KBP read-only reconciliation
+  (no locks, no Kingmaker, Mods = owner baseline, 239/239 transactions
+  Restored, clean tree, package commit = HEAD) → gate → owner session
+  stable two minutes → `live-workspace-qual` 1200 (`-02`), 1080 windowed,
+  Advanced-fixture 1200 (spell slots and enhancements), `live-workspace-reload`
+  → supervised manual session → owner verdict.
 
 ## Casting-graph UI correction: source complete to checkpoint 1 (2026-09-25)
 
