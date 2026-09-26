@@ -19,19 +19,21 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         internal const string AlreadyReady = "already-ready";
     }
 
-    // One control-driven Add in the automatic interaction sequence. The
-    // State control is valid either as a real click or as a draft that was
-    // legitimately already Ready (review I5); correctness is carried by the
-    // exact-record booleans, never by the State outcome.
+    // One control-driven Add in the automatic interaction sequence. In the
+    // casting graph (addendum v1.1) the three controls are the caster, its
+    // exact source row, and the target whose click adds the casting. The
+    // state is AlreadyReady there (a graph casting is created Ready); a real
+    // State click is also accepted (review I5). Correctness is carried by
+    // the exact-record booleans, never by the state outcome.
     internal sealed class WorkspaceCastStepEvidence
     {
         internal WorkspaceCastStepEvidence(int ordinal, string casterControl,
-            string targetControl, string addControl, string stateOutcome,
+            string sourceControl, string addControl, string stateOutcome,
             bool grew, bool distinct, bool fieldsExact, bool siblingsUnchanged)
         {
             Ordinal = ordinal;
             CasterControl = casterControl ?? "missing";
-            TargetControl = targetControl ?? "missing";
+            SourceControl = sourceControl ?? "missing";
             AddControl = addControl ?? "missing";
             StateOutcome = stateOutcome ?? "missing";
             Grew = grew;
@@ -42,7 +44,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
 
         internal int Ordinal { get; private set; }
         internal string CasterControl { get; private set; }
-        internal string TargetControl { get; private set; }
+        internal string SourceControl { get; private set; }
         internal string AddControl { get; private set; }
         internal string StateOutcome { get; private set; }
         internal bool Grew { get; private set; }
@@ -60,7 +62,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             get
             {
                 return CasterControl == WorkspaceControlOutcome.Invoked &&
-                    TargetControl == WorkspaceControlOutcome.Invoked &&
+                    SourceControl == WorkspaceControlOutcome.Invoked &&
                     AddControl == WorkspaceControlOutcome.Invoked;
             }
         }
@@ -78,7 +80,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         {
             string n = Ordinal.ToString(CultureInfo.InvariantCulture);
             return "cast" + n + "=controls:" + CasterControl + "/" +
-                TargetControl + "/" + AddControl +
+                SourceControl + "/" + AddControl +
                 ";state" + n + "=" + StateOutcome +
                 ";cast" + n + "Exact=" + Exact;
         }
@@ -144,7 +146,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         }
 
         internal static WorkspaceCastStepEvidence Evaluate(int ordinal,
-            string casterControl, string targetControl, string stateOutcome,
+            string casterControl, string sourceControl, string stateOutcome,
             string addControl, IList<PlannedCasting> castingsAfter,
             int countBefore, IEnumerable<string> priorCastingIds,
             WorkspaceCastExpectation expected, string siblingsBefore,
@@ -163,7 +165,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     record == null ? null : record.CastingId),
                 siblingsBefore ?? string.Empty, StringComparison.Ordinal);
             return new WorkspaceCastStepEvidence(ordinal, casterControl,
-                targetControl, addControl, stateOutcome, grew, distinct,
+                sourceControl, addControl, stateOutcome, grew, distinct,
                 fieldsExact, siblingsUnchanged);
         }
     }
@@ -295,7 +297,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         step.Ordinal.ToString(CultureInfo.InvariantCulture));
                 if (!step.ControlsInvoked)
                     violations.Add(prefix + "controls=" + step.CasterControl +
-                        "/" + step.TargetControl + "/" + step.AddControl);
+                        "/" + step.SourceControl + "/" + step.AddControl);
                 if (!step.StateAccepted)
                     violations.Add(prefix + "state=" + step.StateOutcome);
                 if (!step.Grew) violations.Add(prefix + "not-added");

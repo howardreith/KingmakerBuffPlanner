@@ -30,6 +30,7 @@
   <ItemGroup>
     <Compile Include="Program.cs" />
     <Compile Include="ProductionExecutionTests.cs" />
+    <Compile Include="CastingGraphTests.cs" />
     <Compile Include="TestBuildInfo.cs" />
     <Compile Include="..\..\src\KingmakerBuffPlanner\Discovery\ActionGraphScanner.cs"><Link>Discovery\ActionGraphScanner.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Discovery\AreaRecipientSemantics.cs"><Link>Discovery\AreaRecipientSemantics.cs</Link></Compile>
@@ -100,6 +101,9 @@
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\PlannerSetupModel.cs"><Link>UI\PlannerSetupModel.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingWorkspaceModels.cs"><Link>UI\CastingWorkspaceModels.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingWorkspaceSession.cs"><Link>UI\CastingWorkspaceSession.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingWorkspaceSession.Graph.cs"><Link>UI\CastingWorkspaceSession.Graph.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingGraphModels.cs"><Link>UI\CastingGraphModels.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\PlannerButtonPalette.cs"><Link>UI\PlannerButtonPalette.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingExecutionHost.cs"><Link>UI\CastingExecutionHost.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\NativeCastingSessionPolicy.cs"><Link>UI\NativeCastingSessionPolicy.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingRunPresentation.cs"><Link>UI\CastingRunPresentation.cs</Link></Compile>
@@ -139,6 +143,9 @@
     </Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\RuntimeTesting\RuntimeTestResultModels.cs">
       <Link>RuntimeTesting\RuntimeTestResultModels.cs</Link>
+    </Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\RuntimeTesting\HoverOwnershipRecord.cs">
+      <Link>RuntimeTesting\HoverOwnershipRecord.cs</Link>
     </Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\RuntimeTesting\WorkspaceScenarioContracts.cs">
       <Link>RuntimeTesting\WorkspaceScenarioContracts.cs</Link>

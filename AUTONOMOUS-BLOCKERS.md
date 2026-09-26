@@ -1,5 +1,47 @@
 # AUTONOMOUS-BLOCKERS — top section is current
 
+## Casting-graph UI correction — 2026-09-26 (update)
+
+- Branch publication RESOLVED by the owner: pushed as
+  `codex/kingmaker-buff-planner-casting-graph` through the unchanged
+  guarded helper; draft PR #3.
+- Live runs still need the owner connected, hands-off, game window in front
+  (run `-02` failed on foreground activation), and the Gunslinger lab quiet.
+  Procedure: `planning/CASTING-GRAPH-HANDOFF.md`.
+
+## Casting-graph UI correction — 2026-09-25 20:30 (update)
+
+- The Gunslinger lab finished its batch (its message at 21:51 UTC; KBP's own
+  reconciliation confirmed the restore). One live run was possible while the
+  owner was connected (19:25–19:41). Since then the owner's session connects
+  only briefly (10–90 s); frame runs wait for two minutes of stable
+  connection. The branch-publication decision below is still open.
+
+## Casting-graph UI correction — 2026-09-25 17:40
+
+- **BLOCKING live runs (external, not a product result).** Two conditions
+  must hold together and neither did at 17:35: (1) the Gunslinger lab is
+  quiet — its batch (announced ~16:48, about 90 minutes) holds
+  `compatibility-state/compatibility.lock` with short gaps between runs;
+  Kingmaker PID 12696 started 17:35:36 under it; KBP waits for its
+  "finished" message, never for a lock gap alone; (2) the owner's desktop
+  session is connected — `qwinsta` showed `howard` session 3 `Disc` with
+  the console at the logon screen, the condition under which every frame
+  capture is black (section below). The frame-judged scenarios
+  (`live-workspace-qual` at 1920x1200 and 1920x1080, the hover sweep with
+  real cursor moves, `live-workspace-reload`) and the supervised manual
+  session need both.
+- **DECISION for the owner: how to publish the branch.** The mission names
+  the branch `claude/casting-graph-ui-correction` and asks for a draft
+  stacked PR onto `codex/kingmaker-buff-planner-casting-first`; AGENTS.md
+  allows publication only through `codex-policy/Push-KingmakerBuffPlanner.ps1`,
+  whose branch guard admits only `codex/kingmaker-buff-planner*` (or `main`
+  with a flag). Not pushed. Options: (a) the owner widens that helper's
+  allowlist to this branch name; (b) publish the same commits under a
+  `codex/kingmaker-buff-planner-casting-graph` branch through the unchanged
+  helper and open the draft PR from it. KBP does not edit the policy
+  helper or push around it on its own.
+
 ## Workspace visual qualification blockers — 2026-09-20
 
 - **BLOCKING (hypothesis intact, connected test not yet achieved):

@@ -1176,7 +1176,9 @@ namespace KingmakerBuffPlanner.Tests
             Func<string, string> source = name => File.ReadAllText(Path.Combine(directory.FullName, "src",
                 "KingmakerBuffPlanner", "UI", name)).Replace("\r\n", "\n");
             string session = source("PlannerUiSession.cs");
-            string workspaceSource = source("CastingWorkspaceScreenView.cs");
+            // Whitespace-collapsed: the casting-graph view keeps these exact
+            // statements at a different indentation.
+            string workspaceSource = CollapsedWhitespace(source("CastingWorkspaceScreenView.cs"));
             string castingSession = source("CastingWorkspaceSession.cs");
             if (!session.Contains("string primaryName = System.IO.Path.GetFileName(_profiles.GetProfilePath(campaignId));\n" +
                     "                PersistenceNotice = PersistenceMessages.ForClassicLoad(loaded.SourcePath,\n" +
@@ -1184,15 +1186,15 @@ namespace KingmakerBuffPlanner.Tests
                 !session.Contains("PersistenceNotice = PersistenceMessages.ForClassicSaveRefusal(refusal);") ||
                 !session.Contains("                PersistenceNotice = null;\n                ClassicSavesRefused = false;\n") ||
                 !source("BuffPlannerScreenView.cs").Contains("string notice = _session.PersistenceNotice;") ||
-                !workspaceSource.Contains("string import = PersistenceMessages.ForCastingLoad(_session.LoadStatus,\n" +
-                    "                    _session.PrimaryPlanFileExists, _session.LoadSourcePath, _session.LoadWarning) ??") ||
-                !workspaceSource.Contains(": PersistenceMessages.ForCastingLoad(status, _session.PrimaryPlanFileExists,\n" +
-                    "                            _session.LoadSourcePath, _session.LoadWarning) ??") ||
+                !workspaceSource.Contains(CollapsedWhitespace("string import = PersistenceMessages.ForCastingLoad(_session.LoadStatus,\n" +
+                    "                    _session.PrimaryPlanFileExists, _session.LoadSourcePath, _session.LoadWarning) ??")) ||
+                !workspaceSource.Contains(CollapsedWhitespace(": PersistenceMessages.ForCastingLoad(status, _session.PrimaryPlanFileExists,\n" +
+                    "                            _session.LoadSourcePath, _session.LoadWarning) ??")) ||
                 !workspaceSource.Contains("if (_session.IsDirty && Time.unscaledTime > _reloadArmedUntil)") ||
                 !source("BuffPlannerScreenView.cs").Contains("if (_session.ClassicSavesRefused) _status.text += \" | changes are not saved\";") ||
-                !workspaceSource.Contains("                (!_session.SavesRefused ? string.Empty\n" +
+                !workspaceSource.Contains(CollapsedWhitespace("                (!_session.SavesRefused ? string.Empty\n" +
                     "                    : _session.LegacyImportBlocked ? \" · not saved: the classic plan could not be imported\"\n" +
-                    "                    : \" · not saved: the plan file cannot be read\");") ||
+                    "                    : \" · not saved: the plan file cannot be read\");")) ||
                 !castingSession.Contains("\"Candidate persistence is blocked: \" + (LegacyImportBlocked ? \"legacy-import\" : LoadStatus.ToString()) +"))
                 throw new InvalidOperationException("A planner does not show its persistence notice.");
         }
@@ -1382,33 +1384,39 @@ namespace KingmakerBuffPlanner.Tests
             DirectoryInfo directory = new DirectoryInfo(Environment.CurrentDirectory);
             while (directory != null && !File.Exists(Path.Combine(directory.FullName, "KingmakerBuffPlanner.sln")))
                 directory = directory.Parent;
-            string view = File.ReadAllText(Path.Combine(directory.FullName, "src", "KingmakerBuffPlanner", "UI",
-                "CastingWorkspaceScreenView.cs")).Replace("\r\n", "\n");
+            // The casting-graph view (addendum v1.1) keeps every one of these
+            // controls; its read model words the review items (session).
+            string view = CollapsedWhitespace(File.ReadAllText(Path.Combine(directory.FullName, "src",
+                "KingmakerBuffPlanner", "UI", "CastingWorkspaceScreenView.cs")));
+            string graph = CollapsedWhitespace(File.ReadAllText(Path.Combine(directory.FullName, "src",
+                "KingmakerBuffPlanner", "UI", "CastingWorkspaceSession.Graph.cs")));
             foreach (string wiring in new[]
             {
-                "_session.SetFocusedProvider(captured.ProviderKey, _inputs())",
-                "_session.ChooseDraftProvider(captured.ProviderKey, _inputs())",
-                "_session.MoveFocusedCastingToRoutine(capturedRoutine)",
+                "_session.SetFocusedProvider(choice.ProviderKey, _inputs())",
+                "_session.SelectGraphSource(key, _inputs())",
+                "_session.MoveFocusedCastingToRoutine(routineId)",
                 "_session.MoveFocusedCastingWithinRoutine(-1)",
                 "_session.MoveFocusedCastingWithinRoutine(1)",
-                "_session.SetFocusedRecastPolicy(recastFocused",
+                "_session.SetFocusedRecastPolicy(inspector.RecastsExisting",
                 "_session.Draft.ExistingEffectPolicy = recastDraft",
                 "_session.SetAllowAnimatedFallback(!_session.AllowAnimatedFallback);",
-                // Re-review: the out-of-combat rule, the target-mode switches
-                // and review items in words.
+                // Re-review: the out-of-combat rule and the target-mode
+                // switches (imported castings in the wrong shape).
                 "_session.SetOutOfCombatOnly(!_session.OutOfCombatOnly);",
                 "bool? groupAbility = _session.FocusedCastingIsGroupAbility(_inputs());",
-                "                if (groupAbility == true)\n",
-                "                if (groupAbility == false)\n",
-                "\"FocusedMode.Group\", _inspectorContent, _theme,",
-                "Domain.Authoring.CastingTargetMode.CasterCenteredOrigin, null, null,\n" +
-                    "                                focused.DirectTargetUnitId == null ? null : new[] { focused.DirectTargetUnitId }),",
-                "CreatePortraitTile(\"FocusedSingle.\" + captured.UnitId, singleRow,",
-                ".Select(item => WorkspaceReasonText.DescribeReviewItem(item, reviewUnitName))",
+                "if (groupAbility == true)",
+                "else if (groupAbility == false)",
+                "ActionButton(\"FocusedMode.Group\", \"Make it a group casting (centred on the caster)\"",
+                "_session.SetFocusedTargeting(CastingTargetMode.CasterCenteredOrigin, null, null, " +
+                    "focused.DirectTargetUnitId == null ? null : new[] { focused.DirectTargetUnitId })",
+                "ActionButton(\"FocusedSingle.\" + unit, \"Single target: \" + target.DisplayName",
+                "_session.SetFocusedTargeting(CastingTargetMode.DirectTarget, unit, null, null)",
                 "WorkspaceFooterText.WholePlan(view.OnePassShortCount);"
             })
-                if (!view.Contains(wiring))
+                if (!view.Contains(CollapsedWhitespace(wiring)))
                     throw new InvalidOperationException("The focused editor has no control for: " + wiring);
+            if (!graph.Contains(".UnresolvedReviewItems.Select(item => WorkspaceReasonText.DescribeReviewItem(item, nameOf))"))
+                throw new InvalidOperationException("The inspector's review items are not in words.");
         }
 
         // Final review B7: a removed casting's id is never issued again in the
@@ -2942,6 +2950,26 @@ namespace KingmakerBuffPlanner.Tests
             return null;
         }
 
+        // Every run of whitespace as one space, so a source-contract check
+        // matches a statement whatever its indentation or line breaks.
+        private static string CollapsedWhitespace(string text)
+        {
+            var builder = new System.Text.StringBuilder((text ?? string.Empty).Length);
+            bool space = false;
+            foreach (char character in text ?? string.Empty)
+            {
+                if (char.IsWhiteSpace(character))
+                {
+                    space = true;
+                    continue;
+                }
+                if (space && builder.Length != 0) builder.Append(' ');
+                space = false;
+                builder.Append(character);
+            }
+            return builder.ToString();
+        }
+
         private static int Occurrences(string text, string value)
         {
             int count = 0;
@@ -3374,14 +3402,22 @@ namespace KingmakerBuffPlanner.Tests
             DirectoryInfo directory = new DirectoryInfo(Environment.CurrentDirectory);
             while (directory != null && !File.Exists(Path.Combine(directory.FullName, "KingmakerBuffPlanner.sln")))
                 directory = directory.Parent;
+            // Casting-graph view: the read model words every reason, review
+            // item and existing-effect note (with character names); the view
+            // prints only those words and never a raw reason code.
             string view = File.ReadAllText(Path.Combine(directory.FullName, "src", "KingmakerBuffPlanner",
                 "UI", "CastingWorkspaceScreenView.cs"));
-            string detail = SourceBlock(view,
-                "private static string BuildCardDetail(WorkspaceView view, WorkspaceCastingCard card)");
-            if (detail == null || !detail.Contains(".Select(WorkspaceReasonText.Describe)") ||
-                !detail.Contains(".Select(WorkspaceReasonText.DescribeReviewItem)") ||
-                !detail.Contains("unitId => UnitName(view, unitId)") ||
-                detail.Contains("string.Join(\", \", card.ReadinessReasons)"))
+            string graph = CollapsedWhitespace(File.ReadAllText(Path.Combine(directory.FullName, "src",
+                "KingmakerBuffPlanner", "UI", "CastingWorkspaceSession.Graph.cs")));
+            string chips = SourceBlock(graph, "private List<CastingGraphCasting> BuildGraphChips(");
+            string inspector = SourceBlock(graph, "private CastingGraphInspector BuildGraphInspector(");
+            if (chips == null || inspector == null ||
+                !chips.Contains(".Select(WorkspaceReasonText.Describe)") ||
+                !inspector.Contains(".Select(WorkspaceReasonText.Describe)") ||
+                !inspector.Contains("WorkspaceReasonText.DescribeReviewItem(item, nameOf)") ||
+                !inspector.Contains("CastingRunPresentation.DescribeExistingEffectNote(note, nameOf)") ||
+                view.Contains("ReadinessReasons") || view.Contains("ReviewItems.Select(") ||
+                view.Contains("UnresolvedReviewItems"))
                 throw new InvalidOperationException("Cards still print reason codes.");
         }
 

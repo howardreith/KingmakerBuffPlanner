@@ -57,11 +57,17 @@ namespace KingmakerBuffPlanner.UI
         private bool _disposed;
         private string _lastEnhancementRenderEvidence = string.Empty;
 
+        // Mode identity (addendum 7): this view is the Classic planner and
+        // says so; the casting-first workspace is reached deliberately.
+        internal const string ModeLabel = "Planner: Classic";
+        private readonly Action _switchToCastingFirst;
+
         internal BuffPlannerScreenView(StaticCanvas nativeCanvas, PlannerUiSession session,
             BuffPlannerUiLifecycleDiagnostics diagnostics, Action close, Action<string> execute,
-            Action<string> executeReadyOnly = null)
+            Action<string> executeReadyOnly = null, Action switchToCastingFirst = null)
         {
             if (nativeCanvas == null) throw new ArgumentNullException("nativeCanvas");
+            _switchToCastingFirst = switchToCastingFirst;
             _nativeCanvas = nativeCanvas;
             _session = session ?? throw new ArgumentNullException("session");
             _diagnostics = diagnostics ?? throw new ArgumentNullException("diagnostics");
@@ -233,6 +239,9 @@ namespace KingmakerBuffPlanner.UI
                 _readyOnlyButton.gameObject.SetActive(_executeReadyOnly != null);
             }
             KingmakerUiFactory.ForceLayoutAndSnap(_root);
+            // Rebuilt rows (target portraits, cards) never take the
+            // EventSystem selection, so only the hovered one highlights.
+            KingmakerUiFactory.OwnPointerHighlights(_root);
             // The visible controls now show exactly this plan: this is the
             // presentation acknowledgment. Chooser/resource/forecast
             // computations never reach here and never acknowledge.
@@ -435,6 +444,11 @@ namespace KingmakerBuffPlanner.UI
             _settings.Show(settings);
             Canvas.ForceUpdateCanvases();
             return true;
+        }
+
+        internal void ShowNotice(string text)
+        {
+            if (_result != null && !string.IsNullOrEmpty(text)) _result.text = text;
         }
 
         internal void ShowResult(QuickExecutionResult result)
@@ -675,6 +689,18 @@ namespace KingmakerBuffPlanner.UI
             Text title = KingmakerUiFactory.CreateText("Title", header, _theme,
                 "BUFF PLANNER", 28, TextAnchor.MiddleCenter);
             KingmakerUiFactory.Stretch(title.rectTransform, 100, 200, 4, 4);
+            Text mode = KingmakerUiFactory.CreateText("PlannerMode", header, _theme,
+                ModeLabel, 15, TextAnchor.MiddleLeft);
+            mode.fontStyle = FontStyle.Bold;
+            mode.color = _theme.BurgundyPrimary;
+            KingmakerUiFactory.SetAnchors(mode.rectTransform, 0.01f, 0.50f, 0.12f, 0.98f);
+            if (_switchToCastingFirst != null)
+            {
+                Button switchMode = KingmakerUiFactory.CreateButton("SwitchToCastingFirst", header,
+                    _theme, "Use the casting-first planner", () => _switchToCastingFirst());
+                KingmakerUiFactory.SetAnchors((RectTransform)switchMode.transform,
+                    0.12f, 0.50f, 0.30f, 0.97f);
+            }
             _status = KingmakerUiFactory.CreateText("Status", header, _theme,
                 string.Empty, 14, TextAnchor.LowerLeft);
             _status.color = _theme.MutedBrownText;

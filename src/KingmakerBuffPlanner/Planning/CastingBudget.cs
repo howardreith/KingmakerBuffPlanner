@@ -161,12 +161,91 @@ namespace KingmakerBuffPlanner.Planning
             {
                 MaterialRequirementSnapshot material = provider.MaterialComponent;
                 if (material == null) continue;
+                // Every required component is tracked, including one the
+                // party has none of: an untracked zero never blocked a casting
+                // (graph review). Providers reporting one item agree on the
+                // largest count, as the classic planner reads it.
                 int existing;
-                _materialInitial[material.ItemGuid] = material.AvailableCount;
-                _materialRemaining.TryGetValue(material.ItemGuid, out existing);
-                if (material.AvailableCount > existing)
+                if (!_materialRemaining.TryGetValue(material.ItemGuid, out existing) ||
+                    material.AvailableCount > existing)
+                {
                     _materialRemaining[material.ItemGuid] = material.AvailableCount;
+                    _materialInitial[material.ItemGuid] = material.AvailableCount;
+                }
             }
+        }
+
+        // A deep copy of every balance and every demand record: reservations
+        // on the copy never reach the original (capacity probes).
+        private CastingBudgetLedger(CastingBudgetLedger source)
+        {
+            _native = source._native.Clone();
+            _nativeKinds = source._nativeKinds;
+            _nativeInitial = source._nativeInitial;
+            foreach (KeyValuePair<string, int?> pair in source._enhancementInitial)
+                _enhancementInitial[pair.Key] = pair.Value;
+            foreach (KeyValuePair<string, int> pair in source._enhancementRemaining)
+                _enhancementRemaining[pair.Key] = pair.Value;
+            foreach (KeyValuePair<string, int> pair in source._materialInitial)
+                _materialInitial[pair.Key] = pair.Value;
+            foreach (KeyValuePair<string, int> pair in source._materialRemaining)
+                _materialRemaining[pair.Key] = pair.Value;
+            foreach (KeyValuePair<string, int> pair in source._requestedUnits)
+                _requestedUnits[pair.Key] = pair.Value;
+            foreach (KeyValuePair<string, int> pair in source._allocatedUnits)
+                _allocatedUnits[pair.Key] = pair.Value;
+            foreach (KeyValuePair<string, List<string>> pair in source._traces)
+                _traces[pair.Key] = new List<string>(pair.Value);
+            foreach (KeyValuePair<string, CastingCostCategory> pair in source._categoryBy)
+                _categoryBy[pair.Key] = pair.Value;
+        }
+
+        internal CastingBudgetLedger Clone()
+        {
+            return new CastingBudgetLedger(this);
+        }
+
+        internal ResourcePoolKind? NativeKind(string poolKey)
+        {
+            ResourcePoolKind kind;
+            return poolKey != null && _nativeKinds.TryGetValue(poolKey, out kind)
+                ? kind : (ResourcePoolKind?)null;
+        }
+
+        // Units (or available prepared slots) left after every reservation
+        // made so far; null for a pool this ledger does not know.
+        internal int? NativeRemaining(string poolKey)
+        {
+            return _native.Knows(poolKey) ? _native.GetRemaining(poolKey) : (int?)null;
+        }
+
+        internal int? NativeAvailableNow(string poolKey)
+        {
+            int available;
+            return poolKey != null && _nativeInitial.TryGetValue(poolKey, out available)
+                ? available : (int?)null;
+        }
+
+        // Null means the pool's balance is unknown (never zero).
+        internal int? EnhancementRemaining(string usagePoolId)
+        {
+            int remaining;
+            return usagePoolId != null && _enhancementRemaining.TryGetValue(usagePoolId, out remaining)
+                ? remaining : (int?)null;
+        }
+
+        internal int? EnhancementAvailableNow(string usagePoolId)
+        {
+            int? available;
+            return usagePoolId != null && _enhancementInitial.TryGetValue(usagePoolId, out available)
+                ? available : null;
+        }
+
+        internal int? MaterialRemaining(string itemGuid)
+        {
+            int remaining;
+            return itemGuid != null && _materialRemaining.TryGetValue(itemGuid, out remaining)
+                ? remaining : (int?)null;
         }
 
         // The complete cost vector of one casting: its native pool charge,
@@ -396,6 +475,206 @@ namespace KingmakerBuffPlanner.Planning
                 (_requestedUnits.TryGetValue(poolKey, out prior) ? prior : 0) + requested;
             _allocatedUnits[poolKey] =
                 (_allocatedUnits.TryGetValue(poolKey, out prior) ? prior : 0) + allocated;
+        }
+    }
+
+    public enum CastingCapacityKind
+    {
+        // A counted number of further castings the plan can still fund.
+        Finite,
+        // A verified Unlimited source with no finite enhancement or material
+        // demand: not limited, never "unknown".
+        Unlimited,
+        // The balance or the cost is not known: never shown as zero or free.
+        Unknown
+    }
+
+    // How many MORE castings of one exact source (with an optional
+    // enhancement set) the plan could still fund, and what stops it.
+    public sealed class CastingCapacityEstimate
+    {
+        internal CastingCapacityEstimate(
+            CastingCapacityKind kind,
+            int additionalCastings,
+            bool lowerBound,
+            CastingCostCategory? limitingCategory,
+            string limitingPoolKey,
+            string stopReason,
+            int? nativeRemaining,
+            int? nativeAvailableNow,
+            string unknownReason)
+        {
+            Kind = kind;
+            AdditionalCastings = kind == CastingCapacityKind.Finite ? additionalCastings : 0;
+            IsLowerBound = lowerBound;
+            LimitingCategory = limitingCategory;
+            LimitingPoolKey = limitingPoolKey ?? string.Empty;
+            StopReason = stopReason ?? string.Empty;
+            NativeRemaining = nativeRemaining;
+            NativeAvailableNow = nativeAvailableNow;
+            UnknownReason = unknownReason ?? string.Empty;
+        }
+
+        public CastingCapacityKind Kind { get; private set; }
+        // Further castings the plan can fund now (Finite only; 0 otherwise).
+        public int AdditionalCastings { get; private set; }
+        // The count reached CastingCapacity.CountCap: "at least" this many.
+        public bool IsLowerBound { get; private set; }
+        // Which component ran out first (Finite with a stop only).
+        public CastingCostCategory? LimitingCategory { get; private set; }
+        public string LimitingPoolKey { get; private set; }
+        // The ledger's own refusal that ended the count.
+        public string StopReason { get; private set; }
+        // The source's native pool after every reservation of the plan, and
+        // before any: units, or available prepared slots of the whole pool.
+        public int? NativeRemaining { get; private set; }
+        public int? NativeAvailableNow { get; private set; }
+        public string UnknownReason { get; private set; }
+
+        public bool CanFundAnother
+        {
+            get
+            {
+                return Kind == CastingCapacityKind.Unlimited ||
+                    (Kind == CastingCapacityKind.Finite && AdditionalCastings > 0);
+            }
+        }
+    }
+
+    // What a compiled plan can still fund once every reservation it made is
+    // in place. Each question reserves further hypothetical castings with the
+    // plan's OWN ledger rules (atomic cost vectors, shared pools, linked
+    // prepared slots, enhancement pools, materials) on an isolated copy of
+    // the plan's final ledger, so no view keeps a second ledger and asking
+    // never changes the plan. It answers "how many more of this exact
+    // source", which is why two sources sharing one pool each report the
+    // shared balance: their counts are alternatives, never a sum.
+    public sealed class CastingCapacity
+    {
+        // Counting stops here; a count that reaches it is a lower bound.
+        public const int CountCap = 99;
+        private const string ProbeCastingId = "capacity-probe";
+        private readonly CastingBudgetLedger _final;
+
+        internal CastingCapacity(CastingBudgetLedger final)
+        {
+            _final = final ?? throw new ArgumentNullException("final");
+        }
+
+        public CastingCapacityEstimate AdditionalCastings(
+            ProviderSnapshot provider,
+            IEnumerable<CastEnhancementSnapshot> enhancements = null)
+        {
+            if (provider == null) throw new ArgumentNullException("provider");
+            List<CastEnhancementSnapshot> selected = (enhancements ??
+                new CastEnhancementSnapshot[0]).Where(value => value != null).ToList();
+            string poolKey = provider.ResourcePoolKey;
+            ResourcePoolKind? kind = _final.NativeKind(poolKey);
+            int? remaining = _final.NativeRemaining(poolKey);
+            int? available = _final.NativeAvailableNow(poolKey);
+            if (kind == null)
+                return Unknown("resource-pool-unknown:" + poolKey, remaining, available);
+            // Review M1: a zero cost on a finite pool is an unverified cost,
+            // not a free cast; counting it would never end and would lie.
+            if (kind != ResourcePoolKind.Unlimited && kind != ResourcePoolKind.PreparedSlots &&
+                provider.UnitsPerCast == 0)
+                return Unknown("cost-unverified:" + poolKey, remaining, available);
+            foreach (CastEnhancementSnapshot enhancement in selected)
+                if (_final.EnhancementAvailableNow(enhancement.UsagePoolId) == null)
+                    return Unknown("enhancement-balance-unknown:" + enhancement.EnhancementId,
+                        remaining, available);
+            if (kind == ResourcePoolKind.Unlimited && provider.MaterialComponent == null &&
+                selected.Count == 0)
+                return new CastingCapacityEstimate(CastingCapacityKind.Unlimited, 0, false,
+                    null, null, null, remaining, available, null);
+            CastingBudgetLedger probe = _final.Clone();
+            int count = 0;
+            string stop = null;
+            while (count < CountCap)
+            {
+                IReadOnlyList<CastingDemand> demands = probe.DemandsFor(provider, selected);
+                IReadOnlyList<CastingCostLine> cost;
+                string reason;
+                if (!probe.TryReserveAtomically(ProbeCastingId, provider, demands,
+                        out cost, out reason))
+                {
+                    stop = reason ?? "reservation-refused";
+                    break;
+                }
+                count++;
+            }
+            CastingCostCategory? category = null;
+            string limitingPool = null;
+            if (stop != null)
+                Classify(stop, provider, selected, probe, out category, out limitingPool);
+            return new CastingCapacityEstimate(CastingCapacityKind.Finite, count,
+                stop == null, category, limitingPool, stop, remaining, available, null);
+        }
+
+        // The kind of a native pool the plan knows (an Unlimited pool's
+        // "remaining" is not a count); null for an unknown pool.
+        public ResourcePoolKind? NativeKind(string poolKey)
+        {
+            return _final.NativeKind(poolKey);
+        }
+
+        // The source's native pool after the plan (units or available
+        // prepared slots); null for an unknown pool.
+        public int? NativeRemaining(string poolKey)
+        {
+            return _final.NativeRemaining(poolKey);
+        }
+
+        public int? NativeAvailableNow(string poolKey)
+        {
+            return _final.NativeAvailableNow(poolKey);
+        }
+
+        // An enhancement usage pool after the plan; null when its balance is
+        // unknown (never zero).
+        public int? EnhancementRemaining(string usagePoolId)
+        {
+            return _final.EnhancementRemaining(usagePoolId);
+        }
+
+        public int? EnhancementAvailableNow(string usagePoolId)
+        {
+            return _final.EnhancementAvailableNow(usagePoolId);
+        }
+
+        private static CastingCapacityEstimate Unknown(string reason, int? remaining,
+            int? available)
+        {
+            return new CastingCapacityEstimate(CastingCapacityKind.Unknown, 0, false,
+                null, null, null, remaining, available, reason);
+        }
+
+        private static void Classify(string stop, ProviderSnapshot provider,
+            List<CastEnhancementSnapshot> selected, CastingBudgetLedger probe,
+            out CastingCostCategory? category, out string pool)
+        {
+            if (stop.StartsWith("enhancement-pool-exhausted:", StringComparison.Ordinal))
+            {
+                category = CastingCostCategory.EnhancementPool;
+                // The pool whose remaining balance cannot cover this casting's
+                // combined demand on it.
+                pool = selected
+                    .GroupBy(value => value.UsagePoolId, StringComparer.Ordinal)
+                    .Where(group => probe.EnhancementRemaining(group.Key) != null &&
+                        probe.EnhancementRemaining(group.Key).Value <
+                            group.Sum(value => value.UsageUnitsPerCast))
+                    .Select(group => group.Key).FirstOrDefault();
+                return;
+            }
+            if (stop.StartsWith("material-unavailable:", StringComparison.Ordinal))
+            {
+                category = CastingCostCategory.Material;
+                pool = provider.MaterialComponent == null ? null
+                    : provider.MaterialComponent.ItemGuid;
+                return;
+            }
+            category = CastingCostCategory.NativePool;
+            pool = provider.ResourcePoolKey;
         }
     }
 }

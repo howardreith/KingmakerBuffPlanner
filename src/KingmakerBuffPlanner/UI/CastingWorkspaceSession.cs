@@ -168,7 +168,7 @@ namespace KingmakerBuffPlanner.UI
     // a disclosed scope and Undo; Apply routes through presented-plan review
     // (per routine, restorable across sessions) and preflight on the
     // caller's inputs before the injected dispatch boundary.
-    public sealed class CastingWorkspaceSession
+    public sealed partial class CastingWorkspaceSession
     {
         private readonly CastingPlanRepository _repository;
         private readonly CastingExecutionGate _gate = new CastingExecutionGate();

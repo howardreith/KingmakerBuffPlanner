@@ -4,74 +4,99 @@ using System.Linq;
 using Kingmaker.Blueprints;
 using Kingmaker.UI;
 using Kingmaker.UnitLogic.Abilities.Blueprints;
-using KingmakerBuffPlanner.Domain.Identity;
 using KingmakerBuffPlanner.Domain.Authoring;
+using KingmakerBuffPlanner.Domain.Identity;
+using KingmakerBuffPlanner.Domain.Planning;
 using KingmakerBuffPlanner.Persistence;
+using KingmakerBuffPlanner.Planning;
 using UnityEngine;
 using UnityEngine.UI;
-using KingmakerBuffPlanner.Planning;
 
 namespace KingmakerBuffPlanner.UI
 {
-    // The primary casting-first workspace surface: one persistent parchment
-    // with a caster lane, casting-card lane, contextual inspector, and a
-    // review/Apply footer, rendered from the CastingWorkspaceSession read
-    // models and issuing only session commands. The view owns no planner
-    // state of its own — no second ledger, no targeting or budget logic.
+    // The casting-first workspace as the addendum v1.1 casting graph: a
+    // narrow buff catalogue; for the selected buff, the casters with their
+    // exact sources and what the whole plan leaves of each, one ink line and
+    // one chip per planned casting, and the targets; the selected casting's
+    // inspector; the two labelled budgets and the actions in the footer.
     //
-    // STATUS: the production planner view of the casting-first mode (the
-    // player selects the mode in the UMM settings panel; runtime-test
-    // workspace scenarios select it for their session). Apply routes the
-    // accepted, freshly preflighted plan to the production dispatch
-    // boundary and closes the view while the run proceeds.
+    // The view renders CastingWorkspaceSession.BuildGraph read models and
+    // sends session commands. It keeps no planner state of its own: no
+    // counter, no targeting or budget rule, no persisted geometry. Lines and
+    // chips are recomputed only on a refresh (a command, a selection, a
+    // resize), never per frame.
     internal sealed class CastingWorkspaceScreenView : IDisposable
     {
         internal const string RootName = "KingmakerBuffPlanner.CastingWorkspaceRoot";
+        // Mode identity (addendum 7): this view is the casting-first planner.
+        internal const string ModeLabel = "Planner: Casting-first";
+
+        private static readonly Color Ink = new Color(0.20f, 0.14f, 0.10f, 0.85f);
+        private static readonly Color InkFaint = new Color(0.20f, 0.14f, 0.10f, 0.35f);
+        private static readonly Color Burgundy = new Color(0.55f, 0.13f, 0.08f, 1f);
+        private static readonly Color BlockedInk = new Color(0.72f, 0.26f, 0.12f, 0.95f);
+        private static readonly Color LegalInk = new Color(0.22f, 0.42f, 0.22f, 0.95f);
+        private const float LineThickness = 2f;
+        private const float SelectedLineThickness = 4f;
+        private const float CorridorThickness = 24f;
 
         private readonly CastingWorkspaceSession _session;
         private readonly Func<CastingWorkspaceInputs> _inputs;
-        private float _reloadArmedUntil;
         private readonly Func<CastingWorkspaceInputs> _freshInputs;
         private readonly Action _close;
-        private Button _modeButton;
+        private readonly Action _switchToClassic;
         private PlannerUiTheme _theme;
         private PlannerNativeThemeSurface _nativeTheme;
         private RectTransform _root;
-        private RectTransform _buffGridContent;
+        private RectTransform _frame;
+        private int _uiLayer;
+        private bool _disposed;
+        private bool _importAnnounced;
+        private float _reloadArmedUntil;
+        private string _pageArtEvidence = "page=fallback;not-attempted";
+        private CastingGraphView _lastView;
+        private GraphLayoutResult _lastLayout;
+        private GraphLayoutMetrics _lastMetrics;
+        private bool _showProviders;
+        private bool _showRetargets;
+
+        // Header.
+        private Text _title;
+        private Text _headerStatus;
+        private RectTransform _routineBar;
+        // Catalogue.
         private InputField _buffSearch;
-        private Button _pinnedAdd;
-        private Button _scopeToggle;
-        private Button _pinnedDone;
+        private RectTransform _catalogueContent;
         private string _buffQuery = string.Empty;
         private PlannerSourceCategory _sourceCategory = PlannerSourceCategory.All;
         private readonly Dictionary<PlannerSourceCategory, Button> _categoryTabs =
             new Dictionary<PlannerSourceCategory, Button>();
-        private WorkspaceView _lastView;
-        private Text _castingsTitle;
-        private RectTransform _cardContent;
+        // Graph.
+        private Image _bannerIcon;
+        private Text _bannerTitle;
+        private Text _bannerDetail;
+        private Text _guidance;
+        private ScrollRect _graphScroll;
+        private RectTransform _graphViewport;
+        private RectTransform _graphContent;
+        // Inspector.
         private RectTransform _inspectorContent;
-        private Text _headerTitle;
-        private Text _headerStatus;
-        private Text _scopeLabel;
-        private Text _footerBudget;
+        private Text _inspectorTitle;
+        // Footer.
+        private Text _footerSelectedRun;
+        private Text _footerOnePass;
         private Text _footerResult;
-        private Button _applyButton;
+        private Button _modeButton;
         private Button _readyOnlyButton;
-        private Button _acceptButton;
         private Button _undoButton;
-        private Button _saveButton;
-        private Button _reloadButton;
-        private Vector2 _cardScrollPosition;
-        private RectTransform _routineBar;
-        private int _uiLayer;
-        private bool _disposed;
 
         internal CastingWorkspaceScreenView(
             StaticCanvas nativeCanvas,
             CastingWorkspaceSession session,
             Func<CastingWorkspaceInputs> inputsProvider,
             Func<CastingWorkspaceInputs> freshInputsProvider,
-            Action close)
+            Action close,
+            Action switchToClassic = null)
         {
             if (nativeCanvas == null)
                 throw new ArgumentNullException("nativeCanvas");
@@ -80,6 +105,7 @@ namespace KingmakerBuffPlanner.UI
             _freshInputs = freshInputsProvider ??
                 throw new ArgumentNullException("freshInputsProvider");
             _close = close ?? throw new ArgumentNullException("close");
+            _switchToClassic = switchToClassic;
             _theme = PlannerUiTheme.Resolve(nativeCanvas);
             Build(nativeCanvas);
         }
@@ -89,6 +115,13 @@ namespace KingmakerBuffPlanner.UI
             get { return _root == null ? null : _root.gameObject; }
         }
 
+        internal string PageArtEvidence { get { return _pageArtEvidence; } }
+
+        // The last rendered read model and geometry (runtime evidence only).
+        internal CastingGraphView LastGraphForRuntime { get { return _lastView; } }
+        internal GraphLayoutResult LastLayoutForRuntime { get { return _lastLayout; } }
+        internal GraphLayoutMetrics LastMetricsForRuntime { get { return _lastMetrics; } }
+
         public void Dispose()
         {
             if (_disposed) return;
@@ -97,82 +130,117 @@ namespace KingmakerBuffPlanner.UI
             _root = null;
         }
 
-        // One refresh renders the shared read models and — by being an
-        // actual on-screen presentation — feeds the review coordinator.
+        // Escape leaves the focused casting (its inspector) first; returns
+        // false when there was nothing to leave, so the caller closes.
+        internal bool HandleEscape()
+        {
+            if (_disposed || _session.EditingFocusCastingId == null) return false;
+            _session.ClearGraphFocus();
+            RefreshView();
+            return true;
+        }
+
+        internal void ShowNotice(string text)
+        {
+            if (_footerResult != null && !string.IsNullOrEmpty(text)) _footerResult.text = text;
+        }
+
+        // One refresh renders the shared read models and, being an actual
+        // presentation on screen, feeds the review coordinator.
         internal void RefreshView()
         {
             if (_disposed) return;
             CastingWorkspaceInputs inputs = _inputs();
-            WorkspaceView view = _session.BuildView(inputs);
+            CastingGraphView view = _session.BuildGraph(inputs);
             _session.PresentForReview(inputs);
-            _headerTitle.text = "Casting Workspace — " + view.SelectedSourceCaption;
-            // The routine's own gate and counts: what Apply of this routine
-            // would do, whichever buff is selected below.
-            _headerStatus.text = WorkspaceHeaderText.Describe(
-                _session.RoutineDisplayName(view.SelectedRoutineId), view.RoutineCastingCount,
-                view.RoutineReadyCount, view.SelectedRoutineGate.Allowed,
-                view.SelectedRoutineGate.BlockingReasons.Count) +
-                // Re-review: a plan that cannot be saved says so for as long as
-                // it lasts, not only in the first footer message.
-                (!_session.SavesRefused ? string.Empty
-                    : _session.LegacyImportBlocked ? " · not saved: the classic plan could not be imported"
-                    : " · not saved: the plan file cannot be read");
-            _scopeLabel.text = view.EditingScopeLabel;
             _lastView = view;
             if (!_importAnnounced && _footerResult != null)
             {
                 _importAnnounced = true;
-                // Final review B4: a plan file that could not be used is
-                // announced when the planner opens, before anything else.
                 string import = PersistenceMessages.ForCastingLoad(_session.LoadStatus,
                     _session.PrimaryPlanFileExists, _session.LoadSourcePath, _session.LoadWarning) ??
                     DescribeImport(_session);
                 if (import != null) _footerResult.text = import;
             }
-            RebuildBuffGrid(view);
-            RebuildCards(view);
+            RebuildHeader(view);
+            RebuildCatalogue(view);
+            RebuildBanner(view);
+            RebuildGraph(view);
             RebuildInspector(view);
-            RebuildRoutineBar(view);
             RebuildFooter(view);
+            // Borrowed native artwork, fonts and the click sound reach the
+            // rebuilt controls; every control is pointer-highlighted only.
+            if (_nativeTheme != null) _nativeTheme.ApplyTo(_root);
+            KingmakerUiFactory.OwnPointerHighlights(_root);
             PropagateUiLayer();
         }
+
+        // ------------------------------------------------------------------
+        // Runtime evidence seams (read-only)
+        // ------------------------------------------------------------------
 
         private static RectTransform RectOf(Component component)
         {
             return (RectTransform)component.transform;
         }
 
-        // Runtime evidence for the physical-input scenario (batch 3,
-        // section 10): where a named part of this view is on screen, in
-        // Unity screen pixels (origin bottom left); null when absent,
-        // inactive or off screen. Parts: "search", "buff-grid",
-        // "tile:<sourceId>".
+        // Where a named part of the view is on screen, in Unity screen pixels
+        // (origin bottom left); null when absent, inactive or off screen.
+        // Parts: "search", "buff-grid" (the catalogue), "tile:<sourceId>",
+        // "caster:<unitId>", "source:<unitId>:<index>", "target:<unitId>",
+        // "chip:<castingId>", "line:<castingId>" (the middle of the inbound
+        // segment's hit corridor).
         internal Vector2? ScreenPointForRuntime(string part)
         {
             RectTransform rect = null;
             if (part == "search") rect = _buffSearch == null ? null : RectOf(_buffSearch);
             else if (part == "buff-grid")
             {
-                ScrollRect scroll = BuffScroll();
+                ScrollRect scroll = CatalogueScroll();
                 rect = scroll == null ? null : RectOf(scroll);
             }
-            else if (part != null && part.StartsWith("tile:", StringComparison.Ordinal) && _buffGridContent != null)
-                rect = _buffGridContent.Find("Source." + part.Substring(5)) as RectTransform;
+            else if (part != null && part.StartsWith("tile:", StringComparison.Ordinal) && _catalogueContent != null)
+                rect = _catalogueContent.Find("Source." + part.Substring(5)) as RectTransform;
+            else if (part != null && _graphContent != null)
+            {
+                if (part.StartsWith("caster:", StringComparison.Ordinal))
+                    rect = FindGraphPart("Caster." + part.Substring(7));
+                else if (part.StartsWith("source:", StringComparison.Ordinal))
+                    rect = FindGraphPart("Provider." + part.Substring(7).Replace(':', '.'));
+                else if (part.StartsWith("target:", StringComparison.Ordinal))
+                    rect = FindGraphPart("Target." + part.Substring(7));
+                else if (part.StartsWith("chip:", StringComparison.Ordinal))
+                    rect = FindGraphPart("Casting." + part.Substring(5));
+                else if (part.StartsWith("line:", StringComparison.Ordinal))
+                    rect = FindGraphPart("Line." + part.Substring(5) + ".in");
+            }
+            return ScreenCentre(rect);
+        }
+
+        private RectTransform FindGraphPart(string name)
+        {
+            foreach (RectTransform rect in _graphContent.GetComponentsInChildren<RectTransform>(false))
+                if (rect != null && string.Equals(rect.name, name, StringComparison.Ordinal)) return rect;
+            return null;
+        }
+
+        private static Vector2? ScreenCentre(RectTransform rect)
+        {
             if (rect == null || !rect.gameObject.activeInHierarchy) return null;
             Canvas canvas = rect.GetComponentInParent<Canvas>();
             Camera camera = canvas == null || canvas.renderMode == RenderMode.ScreenSpaceOverlay
                 ? null : canvas.worldCamera;
             var corners = new Vector3[4];
             rect.GetWorldCorners(corners);
-            Vector2 center = RectTransformUtility.WorldToScreenPoint(camera, (corners[0] + corners[2]) * 0.5f);
-            if (center.x < 1f || center.y < 1f || center.x > Screen.width - 1 || center.y > Screen.height - 1)
+            Vector2 centre = RectTransformUtility.WorldToScreenPoint(camera, (corners[0] + corners[2]) * 0.5f);
+            if (centre.x < 1f || centre.y < 1f || centre.x > Screen.width - 1 || centre.y > Screen.height - 1)
                 return null;
-            return center;
+            return centre;
         }
 
-        private ScrollRect BuffScroll()
+        private ScrollRect CatalogueScroll()
         {
-            return _buffGridContent == null ? null : _buffGridContent.GetComponentInParent<ScrollRect>();
+            return _catalogueContent == null ? null : _catalogueContent.GetComponentInParent<ScrollRect>();
         }
 
         internal string SearchTextForRuntime
@@ -185,12 +253,12 @@ namespace KingmakerBuffPlanner.UI
             get { return _buffSearch != null && _buffSearch.isFocused; }
         }
 
-        // "<sourceId>|<label>|<selected>" for every buff tile shown now.
+        // "<sourceId>|<label>|<selected>" for every catalogue entry shown now.
         internal IList<string> VisibleSourcesForRuntime()
         {
             var tiles = new List<string>();
-            if (_buffGridContent == null) return tiles;
-            foreach (Transform child in _buffGridContent)
+            if (_catalogueContent == null) return tiles;
+            foreach (Transform child in _catalogueContent)
             {
                 if (child == null || !child.name.StartsWith("Source.", StringComparison.Ordinal)) continue;
                 Transform label = child.Find("Name");
@@ -205,7 +273,7 @@ namespace KingmakerBuffPlanner.UI
         {
             get
             {
-                ScrollRect scroll = BuffScroll();
+                ScrollRect scroll = CatalogueScroll();
                 return scroll == null ? (float?)null : scroll.verticalNormalizedPosition;
             }
         }
@@ -214,7 +282,7 @@ namespace KingmakerBuffPlanner.UI
         {
             get
             {
-                ScrollRect scroll = BuffScroll();
+                ScrollRect scroll = CatalogueScroll();
                 if (scroll == null || scroll.content == null) return false;
                 RectTransform viewport = scroll.viewport != null ? scroll.viewport : RectOf(scroll);
                 return scroll.content.rect.height > viewport.rect.height + 1f;
@@ -226,48 +294,21 @@ namespace KingmakerBuffPlanner.UI
             get { return _lastView == null ? null : _lastView.SelectedSourceId; }
         }
 
-        // The legacy import summary is shown once, on the first refresh
-        // after the session imported it.
-        private bool _importAnnounced;
-
-        private static string DescribeImport(CastingWorkspaceSession session)
-        {
-            if (session.LegacyImportBlocked)
-                return "Your previous plan could not be imported (" +
-                    session.LegacyImportBlockReason + "). It was NOT replaced: saving and " +
-                    "Apply are blocked. Repair or restore that file, then press Reload to retry.";
-            CastingImportReport report = session.ImportReport;
-            if (report == null) return null;
-            return "Imported " + report.ResultingCastingCount +
-                (report.ResultingCastingCount == 1 ? " casting" : " castings") +
-                " from your previous plan: " + report.ReadyCount + " ready, " +
-                report.DraftCount + " need review" +
-                (report.UnresolvedCasterCount == 0 ? string.Empty
-                    : ", " + report.UnresolvedCasterCount + " without a caster") +
-                (report.GroupReviewCount == 0 ? string.Empty
-                    : ", " + report.GroupReviewCount + " group(s) to confirm") +
-                (report.Warnings.Count == 0 ? string.Empty
-                    : " · " + report.Warnings.Count + " warning(s)") +
-                ". Your previous plan file was kept unchanged.";
-        }
+        // ------------------------------------------------------------------
+        // Construction
+        // ------------------------------------------------------------------
 
         private void Build(StaticCanvas nativeCanvas)
         {
             // Top-level canvas in the game's own service-window pattern
-            // (ScreenSpaceCamera bound to the native UI camera), matching
-            // FadeCanvas/StaticCanvas themselves. The previous structure —
-            // a nested canvas parented under StaticCanvas — demonstrably
-            // rendered in NO path (display or camera) across runs
-            // casting-ws-root-200200 and casting-ws-layout-011500, while
-            // the game's own camera-bound canvases render in both.
+            // (ScreenSpaceCamera bound to the native UI camera): a canvas
+            // nested under StaticCanvas rendered in no path in earlier runs.
             _root = KingmakerUiFactory.CreateRect(RootName, null);
             Canvas nativeRootCanvas = nativeCanvas.GetComponent<Canvas>();
             Canvas canvas = _root.gameObject.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceCamera;
-            canvas.worldCamera = nativeRootCanvas == null
-                ? null : nativeRootCanvas.worldCamera;
-            canvas.planeDistance = nativeRootCanvas == null
-                ? 100f : nativeRootCanvas.planeDistance;
+            canvas.worldCamera = nativeRootCanvas == null ? null : nativeRootCanvas.worldCamera;
+            canvas.planeDistance = nativeRootCanvas == null ? 100f : nativeRootCanvas.planeDistance;
             canvas.overrideSorting = true;
             canvas.sortingOrder = 32000;
             _root.gameObject.AddComponent<GraphicRaycaster>();
@@ -277,48 +318,33 @@ namespace KingmakerBuffPlanner.UI
             group.blocksRaycasts = true;
             KingmakerUiFactory.Stretch(_root);
             _nativeTheme = PlannerNativeThemeSurface.Attach(_root, nativeCanvas);
-            // Theme surface stays attached for owned paper styling.
-            // The native UI camera culls by layer: the game's own canvases
-            // sit on the native canvas's layer, while factory-created
-            // GameObjects default to layer 0 and are culled from every
-            // camera-bound path (the invisibility across runs 200200
-            // through 020500).
+            // The native UI camera culls by layer: every owned object carries
+            // the native canvas's layer (factory objects default to 0).
             _uiLayer = nativeCanvas.gameObject.layer;
             _root.gameObject.layer = _uiLayer;
-            // Modal world-input blocker behind the frame.
             RectTransform blocker = KingmakerUiFactory.CreateRect("Blocker", _root);
-            KingmakerUiFactory.AddPanel(blocker,
-                new Color(0f, 0f, 0f, 0.55f));
-            blocker.gameObject.AddComponent<GraphicRaycaster>();
+            KingmakerUiFactory.AddPanel(blocker, new Color(0f, 0f, 0f, 0.55f));
             KingmakerUiFactory.Stretch(blocker);
-            RectTransform frame = KingmakerUiFactory.CreateRect("Frame", _root);
-            KingmakerUiFactory.AddFramedPanel(frame,
-                _theme.ParchmentPanel, _theme.GoldAccent, 2f);
-            KingmakerUiFactory.Stretch(frame, 24, 24, 24, 60);
-            bool pageArt = ApplyNativePageArt(frame, nativeCanvas);
-            BuildHeader(frame);
-            BuildRoutineBar(frame);
-            BuildLanes(frame);
-            BuildFooter(frame);
-            if (pageArt) LetPageShowThroughLanes(frame);
+            _frame = KingmakerUiFactory.CreateRect("Frame", _root);
+            KingmakerUiFactory.AddFramedPanel(_frame, _theme.ParchmentPanel, _theme.GoldAccent, 2f);
+            KingmakerUiFactory.Stretch(_frame, 24, 24, 24, 60);
+            bool pageArt = ApplyNativePageArt(_frame, nativeCanvas);
+            BuildHeader(_frame);
+            BuildCatalogue(_frame);
+            BuildGraphArea(_frame);
+            BuildInspector(_frame);
+            BuildFooter(_frame);
+            if (pageArt) LetPageShowThrough();
             PropagateUiLayer();
         }
 
-        // Native page art (charter §6.1, docs/UI-END-GOAL.md): the planner
-        // sits on the game's own spellbook page, as Bubble Buffs does. The
-        // donor's sprite is borrowed onto OUR frame only — the native object
-        // is never modified — and a missing donor keeps the parchment
-        // fallback. Full-page art is not sliced, so it is stretched whole
-        // onto the one page-sized surface and never onto nested panels.
+        // The game's own spellbook page, borrowed onto OUR frame only (the
+        // donor is never modified); a missing donor keeps the parchment.
         internal static readonly string[] PageArtLocators =
         {
             "ServiceWindow/SpellBook/BookBackground",
             "ServiceWindow/CharacterScreen/BookBackground"
         };
-
-        private string _pageArtEvidence = "page=fallback;not-attempted";
-
-        internal string PageArtEvidence { get { return _pageArtEvidence; } }
 
         private bool ApplyNativePageArt(RectTransform frame, StaticCanvas nativeCanvas)
         {
@@ -336,8 +362,7 @@ namespace KingmakerBuffPlanner.UI
                     target.color = Color.white;
                     Outline outline = frame.GetComponent<Outline>();
                     if (outline != null) outline.enabled = false;
-                    _pageArtEvidence = "page=native;locator=" + locator +
-                        ";sprite=" + image.sprite.name;
+                    _pageArtEvidence = "page=native;locator=" + locator + ";sprite=" + image.sprite.name;
                     Debug.Log("[KBP-THEME] workspace page art " + _pageArtEvidence);
                     return true;
                 }
@@ -351,30 +376,22 @@ namespace KingmakerBuffPlanner.UI
             return false;
         }
 
-        // Over real page art the lanes become light framed boxes (Bubble
-        // Buffs' look) instead of opaque parchment slabs.
-        private void LetPageShowThroughLanes(RectTransform frame)
+        // Over real page art the panels are unfilled (the page shows through)
+        // and the header, which sits on the dark margin above the book, uses
+        // light ink.
+        private void LetPageShowThrough()
         {
-            foreach (ScrollRect scroll in frame.GetComponentsInChildren<ScrollRect>(true))
+            foreach (ScrollRect scroll in _frame.GetComponentsInChildren<ScrollRect>(true))
             {
                 Image panel = scroll.GetComponent<Image>();
-                // No fill at all: even a light parchment fill stacked into a
-                // heavy orange cast over the book (live frame qual-211523);
-                // the outline alone frames the box.
-                if (panel != null)
-                    panel.color = new Color(panel.color.r, panel.color.g,
-                        panel.color.b, 0f);
+                if (panel != null) panel.color = new Color(panel.color.r, panel.color.g, panel.color.b, 0f);
+                Outline outline = scroll.GetComponent<Outline>();
+                if (outline != null) outline.effectColor = new Color(0.45f, 0.32f, 0.20f, 0.35f);
             }
-            // The book art has transparent margins: header and footer text
-            // sit on the dark world there, so they switch to light ink.
-            foreach (Text text in new[] { _headerTitle, _headerStatus,
-                _scopeLabel, _footerBudget, _footerResult })
+            foreach (Text text in new[] { _title, _headerStatus })
                 if (text != null) text.color = _theme.ButtonText;
         }
 
-        // Every factory-created GameObject defaults to layer 0; rebuilt rows
-        // add more. The native UI camera's culling mask includes the native
-        // canvas layer only, so the whole owned tree must carry it to render.
         private void PropagateUiLayer()
         {
             if (_root == null) return;
@@ -384,59 +401,67 @@ namespace KingmakerBuffPlanner.UI
 
         private void BuildHeader(RectTransform frame)
         {
+            // Row 1, on the dark margin above the book: mode, title, status.
             RectTransform header = KingmakerUiFactory.CreateRect("Header", frame);
             KingmakerUiFactory.SetAnchors(header, 0f, 1f, 1f, 1f);
-            header.sizeDelta = new Vector2(0f, 52f);
-            header.anchoredPosition = Vector2.zero;
-            _headerTitle = KingmakerUiFactory.CreateText(
-                "Title", header, _theme, "Casting Workspace", 22, TextAnchor.MiddleLeft);
-            _headerTitle.fontStyle = FontStyle.Bold;
-            KingmakerUiFactory.Stretch(_headerTitle.rectTransform, 16, 12, 6, 4);
-            _headerStatus = KingmakerUiFactory.CreateText(
-                "Status", header, _theme, string.Empty, 16, TextAnchor.MiddleRight);
-            _headerStatus.color = _theme.MutedBrownText;
-            KingmakerUiFactory.Stretch(_headerStatus.rectTransform, 360, 16, 6, 4);
-            _scopeLabel = KingmakerUiFactory.CreateText(
-                "Scope", header, _theme, "Configure next casting", 15, TextAnchor.MiddleRight);
-            _scopeLabel.fontStyle = FontStyle.Bold;
-            KingmakerUiFactory.SetAnchors(_scopeLabel.rectTransform, 0f, 0f, 1f, 0f);
-            _scopeLabel.rectTransform.sizeDelta = new Vector2(0f, 18f);
-            _scopeLabel.rectTransform.anchoredPosition = Vector2.zero;
-        }
-
-        private void BuildRoutineBar(RectTransform frame)
-        {
+            header.pivot = new Vector2(0.5f, 1f);
+            header.sizeDelta = new Vector2(0f, 48f);
+            header.anchoredPosition = new Vector2(0f, 2f);
+            Text mode = KingmakerUiFactory.CreateText("PlannerMode", header, _theme, ModeLabel, 16,
+                TextAnchor.MiddleLeft);
+            mode.fontStyle = FontStyle.Bold;
+            mode.color = new Color(0.95f, 0.78f, 0.55f, 1f);
+            KingmakerUiFactory.SetAnchors(mode.rectTransform, 0f, 0f, 0f, 1f);
+            mode.rectTransform.pivot = new Vector2(0f, 0.5f);
+            mode.rectTransform.sizeDelta = new Vector2(230f, 0f);
+            mode.rectTransform.anchoredPosition = new Vector2(16f, 0f);
+            if (_switchToClassic != null)
+            {
+                Button classic = KingmakerUiFactory.CreateButton("SwitchToClassic", header, _theme,
+                    "Use the Classic planner", () => _switchToClassic());
+                RectTransform rect = RectOf(classic);
+                KingmakerUiFactory.SetAnchors(rect, 0f, 0f, 0f, 1f);
+                rect.pivot = new Vector2(0f, 0.5f);
+                rect.sizeDelta = new Vector2(210f, -10f);
+                rect.anchoredPosition = new Vector2(250f, 0f);
+            }
+            _title = KingmakerUiFactory.CreateText("Title", header, _theme, "Buff Planner — casting plan", 22,
+                TextAnchor.MiddleLeft);
+            _title.fontStyle = FontStyle.Bold;
+            KingmakerUiFactory.SetAnchors(_title.rectTransform, 0f, 0f, 0.62f, 1f, 480f, 0f, 0f, 0f);
+            _headerStatus = KingmakerUiFactory.CreateText("Status", header, _theme, string.Empty, 15,
+                TextAnchor.MiddleRight);
+            KingmakerUiFactory.SetAnchors(_headerStatus.rectTransform, 0.55f, 0f, 1f, 1f, 0f, 16f, 0f, 0f);
+            Button close = KingmakerUiFactory.CreateButton("Close", header, _theme, "Close", () => _close());
+            RectTransform closeRect = RectOf(close);
+            KingmakerUiFactory.SetAnchors(closeRect, 1f, 0f, 1f, 1f);
+            closeRect.pivot = new Vector2(1f, 0.5f);
+            closeRect.sizeDelta = new Vector2(90f, -10f);
+            closeRect.anchoredPosition = new Vector2(-8f, 0f);
+            _headerStatus.rectTransform.offsetMax = new Vector2(-110f, 0f);
+            // Row 2, on the book's top edge: the routines.
             _routineBar = KingmakerUiFactory.CreateRect("RoutineBar", frame);
-            KingmakerUiFactory.SetAnchors(_routineBar, 0f, 0.90f, 1f, 0.945f);
+            KingmakerUiFactory.SetAnchors(_routineBar, 0f, 0.900f, 1f, 0.950f, 52f, 52f, 0f, 0f);
         }
 
-        private void BuildLanes(RectTransform frame)
+        private void BuildCatalogue(RectTransform frame)
         {
-            // Bubble Buffs-like composition (docs/UI-END-GOAL.md): an icon
-            // grid of buffs across the top; the selected buff's castings —
-            // the atomic unit — lower left; the inspector lower right.
-            RectTransform buffs = KingmakerUiFactory.CreateRect("Buffs", frame);
-            KingmakerUiFactory.SetAnchors(buffs, 0f, 0.565f, 1f, 0.885f);
-            // Inset inside the book's printed page edges (titles clipped
-            // against the left edge in live frame qual-211922).
-            buffs.offsetMin = new Vector2(PageInset, 0f);
-            buffs.offsetMax = new Vector2(-PageInset, 0f);
-            Text buffTitle;
-            _buffGridContent = BuildLanePanel(buffs, "Buffs", out buffTitle);
-            _buffSearch = KingmakerUiFactory.CreateInputField(
-                "BuffSearch", buffs, _theme, "Search buffs…");
-            RectTransform searchRect = RectOf(_buffSearch);
-            KingmakerUiFactory.SetAnchors(searchRect, 0.55f, 1f, 1f, 1f);
-            searchRect.pivot = new Vector2(0.5f, 1f);
-            searchRect.sizeDelta = new Vector2(0f, BuffBarHeight);
-            searchRect.anchoredPosition = Vector2.zero;
-            ScrollRect buffScroll = _buffGridContent.GetComponentInParent<ScrollRect>();
-            if (buffScroll != null)
-                KingmakerUiFactory.SetAnchors(RectOf(buffScroll), 0f, 0f, 1f, 1f, 0f, 0f, 0f, BuffBarHeight + 4f);
+            RectTransform lane = KingmakerUiFactory.CreateRect("Catalogue", frame);
+            KingmakerUiFactory.SetAnchors(lane, 0.028f, 0.085f, 0.163f, 0.895f);
+            Text title = KingmakerUiFactory.CreateText("LaneTitle", lane, _theme, "Buffs", 16, TextAnchor.MiddleLeft);
+            title.fontStyle = FontStyle.Bold;
+            title.color = Burgundy;
+            KingmakerUiFactory.SetAnchors(title.rectTransform, 0f, 1f, 1f, 1f);
+            title.rectTransform.pivot = new Vector2(0.5f, 1f);
+            title.rectTransform.sizeDelta = new Vector2(0f, 22f);
+            _buffSearch = KingmakerUiFactory.CreateInputField("BuffSearch", lane, _theme, "Search buffs…");
+            RectTransform search = RectOf(_buffSearch);
+            KingmakerUiFactory.SetAnchors(search, 0f, 1f, 1f, 1f);
+            search.pivot = new Vector2(0.5f, 1f);
+            search.sizeDelta = new Vector2(0f, 28f);
+            search.anchoredPosition = new Vector2(0f, -24f);
             foreach (Text text in _buffSearch.GetComponentsInChildren<Text>(true))
             {
-                // The factory's 17px text with 5px insets was clipped to
-                // nothing in a 22px field (live frame qual-205126).
                 text.fontSize = 14;
                 text.resizeTextMaxSize = 14;
                 text.verticalOverflow = VerticalWrapMode.Overflow;
@@ -444,254 +469,1103 @@ namespace KingmakerBuffPlanner.UI
             }
             _buffSearch.onValueChanged.AddListener(value =>
             {
-                // Filtering is view-only: it never touches the session,
-                // the draft or the document.
+                // View-only filter: never the session, draft or document.
                 _buffQuery = value ?? string.Empty;
                 if (_lastView != null)
                 {
-                    RebuildBuffGrid(_lastView);
+                    RebuildCatalogue(_lastView);
+                    KingmakerUiFactory.OwnPointerHighlights(_catalogueContent);
                     PropagateUiLayer();
                 }
             });
-            // Source-type tabs (Bubble Buffs and the classic catalogue):
-            // view-only filters like the search, between the lane title and
-            // the search field.
-            float tabLeft = 0.12f;
-            foreach (PlannerSourceCategory category in new[]
-                {
-                    PlannerSourceCategory.All, PlannerSourceCategory.Spells,
-                    PlannerSourceCategory.Abilities, PlannerSourceCategory.Other
-                })
+            PlannerSourceCategory[] categories =
             {
-                PlannerSourceCategory captured = category;
-                Button tab = KingmakerUiFactory.CreateButton("SourceTab." + captured, buffs,
-                    _theme, captured.ToString(), () => Click(() =>
+                PlannerSourceCategory.All, PlannerSourceCategory.Spells,
+                PlannerSourceCategory.Abilities, PlannerSourceCategory.Other
+            };
+            for (int index = 0; index < categories.Length; index++)
+            {
+                PlannerSourceCategory captured = categories[index];
+                Button tab = KingmakerUiFactory.CreateButton("SourceTab." + captured, lane, _theme,
+                    captured.ToString(), () =>
                     {
                         _sourceCategory = captured;
-                        foreach (KeyValuePair<PlannerSourceCategory, Button> pair in _categoryTabs)
-                            StyleTab(pair.Value, pair.Key == _sourceCategory);
                         if (_lastView != null)
                         {
-                            RebuildBuffGrid(_lastView);
+                            RebuildCatalogue(_lastView);
+                            KingmakerUiFactory.OwnPointerHighlights(_catalogueContent);
                             PropagateUiLayer();
                         }
-                    }));
-                RectTransform tabRect = RectOf(tab);
-                KingmakerUiFactory.SetAnchors(tabRect, tabLeft, 1f, tabLeft + 0.1f, 1f);
-                tabRect.pivot = new Vector2(0.5f, 1f);
-                tabRect.sizeDelta = new Vector2(0f, BuffBarHeight);
-                tabRect.anchoredPosition = Vector2.zero;
+                    });
+                RectTransform rect = RectOf(tab);
+                KingmakerUiFactory.SetAnchors(rect, index * 0.25f, 1f, (index + 1) * 0.25f, 1f, 1f, 1f, 0f, 0f);
+                rect.pivot = new Vector2(0.5f, 1f);
+                rect.sizeDelta = new Vector2(-2f, 26f);
+                rect.anchoredPosition = new Vector2(0f, -56f);
                 foreach (Text text in tab.GetComponentsInChildren<Text>(true))
                 {
-                    // Thin 22px tabs with 13px text read as squashed bars
-                    // (live frame casting-ws-qual-20260923-q2-03).
-                    text.fontSize = 14;
-                    text.resizeTextMaxSize = 14;
-                    text.verticalOverflow = VerticalWrapMode.Overflow;
+                    text.fontSize = 13;
+                    text.resizeTextMaxSize = 13;
+                    text.resizeTextMinSize = 10;
                 }
-                StyleTab(tab, captured == _sourceCategory);
                 _categoryTabs[captured] = tab;
-                tabLeft += 0.105f;
             }
-            UnityEngine.Object.DestroyImmediate(
-                _buffGridContent.GetComponent<VerticalLayoutGroup>());
-            GridLayoutGroup grid =
-                _buffGridContent.gameObject.AddComponent<GridLayoutGroup>();
-            grid.cellSize = new Vector2(352f, 60f);
-            grid.spacing = new Vector2(8f, 6f);
-            grid.padding = new RectOffset(6, 6, 6, 6);
-            grid.startCorner = GridLayoutGroup.Corner.UpperLeft;
-            grid.startAxis = GridLayoutGroup.Axis.Horizontal;
-            grid.childAlignment = TextAnchor.UpperLeft;
-            RectTransform cards = KingmakerUiFactory.CreateRect("Cards", frame);
-            // Castings on the left page, inspector on the right page: the
-            // spine runs down the frame's center (live frame qual-215709
-            // showed the castings lane text crossing the gutter).
-            KingmakerUiFactory.SetAnchors(cards, 0f, 0.085f, 0.5f, 0.55f);
-            cards.offsetMin = new Vector2(PageInset, 0f);
-            cards.offsetMax = new Vector2(-PageInset * 0.6f, 0f);
-            _cardContent = BuildLanePanel(cards, "Castings", out _castingsTitle);
-            _scopeToggle = KingmakerUiFactory.CreateButton(
-                "CastingsScope", cards, _theme, "Show whole routine", () => Click(() =>
-                {
-                    _session.ShowWholeRoutine = !_session.ShowWholeRoutine;
-                    RefreshView();
-                }));
-            PinToTitleRow(RectOf(_scopeToggle));
-            RectOf(_scopeToggle).anchorMin = new Vector2(0.68f, 1f);
-            RectTransform inspector = KingmakerUiFactory.CreateRect("Inspector", frame);
-            KingmakerUiFactory.SetAnchors(inspector, 0.5f, 0.085f, 1f, 0.55f);
-            inspector.offsetMin = new Vector2(PageInset * 0.6f, 0f);
-            inspector.offsetMax = new Vector2(-PageInset, 0f);
-            Text inspectorTitle;
-            _inspectorContent = BuildLanePanel(inspector, "Inspector", out inspectorTitle);
-            // The primary action is pinned to the inspector's title row so
-            // it is always visible (it sat below the fold at the end of the
-            // scrolling inspector in live frame qual-220104). Add Casting
-            // while configuring the next casting; Done while editing one.
-            _pinnedAdd = KingmakerUiFactory.CreateButton(
-                "AddCasting", inspector, _theme, "Add Casting", () => Click(() =>
-                {
-                    AuthoringEditResult result = _session.AddCastingFromDraft(_inputs());
-                    if (!result.Applied)
-                        _footerResult.text = "Add refused: " + WorkspaceRefusalText.Describe(result.Reason);
-                    RefreshView();
-                }));
-            PinToTitleRow(RectOf(_pinnedAdd));
-            _pinnedDone = KingmakerUiFactory.CreateButton(
-                "DoneEditing", inspector, _theme, "Done — back to next casting",
-                () => Click(() =>
-                {
-                    _session.FocusCasting(null);
-                    RefreshView();
-                }));
-            PinToTitleRow(RectOf(_pinnedDone));
-        }
-
-        private const float PageInset = 44f;
-        // Height of the buff lane's source tabs and search field.
-        private const float BuffBarHeight = 26f;
-
-        private static void PinToTitleRow(RectTransform rect)
-        {
-            KingmakerUiFactory.SetAnchors(rect, 0.52f, 1f, 1f, 1f);
-            rect.pivot = new Vector2(0.5f, 1f);
-            rect.sizeDelta = new Vector2(0f, 26f);
-            rect.anchoredPosition = new Vector2(0f, 3f);
-        }
-
-        private RectTransform BuildLanePanel(RectTransform lane, string title,
-            out Text label)
-        {
-            label = KingmakerUiFactory.CreateText(
-                "LaneTitle", lane, _theme, title, 16, TextAnchor.MiddleLeft);
-            label.fontStyle = FontStyle.Bold;
-            KingmakerUiFactory.SetAnchors(label.rectTransform, 0f, 1f, 1f, 1f);
-            label.rectTransform.sizeDelta = new Vector2(0f, 22f);
-            RectTransform content;
-            ScrollRect scroll = KingmakerUiFactory.CreateScrollView(
-                "Scroll", lane, _theme, out content, 12f);
-            // The scroll view must FILL its lane below the title: left at
-            // its default 100x100 centered rect it rendered as a small box
-            // mid-lane in every live run (rehearsal-6, gseries-081000).
-            KingmakerUiFactory.SetAnchors(RectOf(scroll), 0f, 0f, 1f, 1f,
-                0f, 0f, 0f, 24f);
-            // Content stays top-anchored (factory contract) and grows with
-            // its rows so the lane scrolls to the final row instead of being
-            // clipped to the viewport height.
-            ContentSizeFitter fitter =
-                content.gameObject.AddComponent<ContentSizeFitter>();
+            ScrollRect scroll = KingmakerUiFactory.CreateScrollView("Scroll", lane, _theme,
+                out _catalogueContent, 10f);
+            KingmakerUiFactory.SetAnchors(RectOf(scroll), 0f, 0f, 1f, 1f, 0f, 0f, 0f, 88f);
+            ContentSizeFitter fitter = _catalogueContent.gameObject.AddComponent<ContentSizeFitter>();
             fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-            return content;
+        }
+
+        private void BuildGraphArea(RectTransform frame)
+        {
+            RectTransform area = KingmakerUiFactory.CreateRect("Graph", frame);
+            KingmakerUiFactory.SetAnchors(area, 0.172f, 0.085f, 0.742f, 0.895f);
+            // Banner: the selected buff, prominently, and the next step.
+            RectTransform banner = KingmakerUiFactory.CreateRect("Banner", area);
+            KingmakerUiFactory.SetAnchors(banner, 0f, 1f, 1f, 1f);
+            banner.pivot = new Vector2(0.5f, 1f);
+            banner.sizeDelta = new Vector2(0f, 74f);
+            RectTransform icon = KingmakerUiFactory.CreateRect("Icon", banner);
+            KingmakerUiFactory.SetAnchors(icon, 0f, 1f, 0f, 1f);
+            icon.pivot = new Vector2(0f, 1f);
+            icon.sizeDelta = new Vector2(52f, 52f);
+            icon.anchoredPosition = new Vector2(2f, -2f);
+            _bannerIcon = icon.gameObject.AddComponent<Image>();
+            _bannerIcon.preserveAspect = true;
+            _bannerIcon.raycastTarget = false;
+            _bannerTitle = KingmakerUiFactory.CreateText("BuffName", banner, _theme, string.Empty, 24,
+                TextAnchor.UpperLeft);
+            _bannerTitle.fontStyle = FontStyle.Bold;
+            _bannerTitle.horizontalOverflow = HorizontalWrapMode.Wrap;
+            _bannerTitle.resizeTextForBestFit = true;
+            _bannerTitle.resizeTextMinSize = 16;
+            _bannerTitle.resizeTextMaxSize = 24;
+            KingmakerUiFactory.SetAnchors(_bannerTitle.rectTransform, 0f, 1f, 1f, 1f);
+            _bannerTitle.rectTransform.pivot = new Vector2(0f, 1f);
+            _bannerTitle.rectTransform.offsetMin = new Vector2(64f, -32f);
+            _bannerTitle.rectTransform.offsetMax = new Vector2(-4f, 0f);
+            _bannerDetail = KingmakerUiFactory.CreateText("BuffDetail", banner, _theme, string.Empty, 14,
+                TextAnchor.UpperLeft);
+            _bannerDetail.color = _theme.MutedBrownText;
+            KingmakerUiFactory.SetAnchors(_bannerDetail.rectTransform, 0f, 1f, 1f, 1f);
+            _bannerDetail.rectTransform.offsetMin = new Vector2(64f, -52f);
+            _bannerDetail.rectTransform.offsetMax = new Vector2(-4f, -32f);
+            _guidance = KingmakerUiFactory.CreateText("Guidance", banner, _theme, string.Empty, 15,
+                TextAnchor.UpperLeft);
+            _guidance.color = Burgundy;
+            _guidance.fontStyle = FontStyle.Bold;
+            KingmakerUiFactory.SetAnchors(_guidance.rectTransform, 0f, 1f, 1f, 1f);
+            _guidance.rectTransform.offsetMin = new Vector2(64f, -74f);
+            _guidance.rectTransform.offsetMax = new Vector2(-4f, -52f);
+            // Lane captions.
+            RectTransform captions = KingmakerUiFactory.CreateRect("LaneCaptions", area);
+            KingmakerUiFactory.SetAnchors(captions, 0f, 1f, 1f, 1f);
+            captions.pivot = new Vector2(0.5f, 1f);
+            captions.sizeDelta = new Vector2(0f, 22f);
+            captions.anchoredPosition = new Vector2(0f, -78f);
+            AddLaneCaption(captions, "CasterCaption", "Who casts it · from which source", 0f, 0.36f);
+            AddLaneCaption(captions, "CastingCaption", "Castings · one line is one cast", 0.36f, 0.76f);
+            AddLaneCaption(captions, "TargetCaption", "Who receives it", 0.76f, 1f);
+            _graphScroll = KingmakerUiFactory.CreateScrollView("Scroll", area, _theme, out _graphContent, 10f);
+            KingmakerUiFactory.SetAnchors(RectOf(_graphScroll), 0f, 0f, 1f, 1f, 0f, 0f, 0f, 102f);
+            _graphViewport = _graphScroll.viewport;
+            // Absolute placement: the graph lays itself out (no layout group),
+            // so anchors and lines use the same computed geometry.
+            UnityEngine.Object.DestroyImmediate(_graphContent.GetComponent<VerticalLayoutGroup>());
+            _graphContent.anchorMin = new Vector2(0f, 1f);
+            _graphContent.anchorMax = new Vector2(1f, 1f);
+            _graphContent.pivot = new Vector2(0.5f, 1f);
+        }
+
+        private void AddLaneCaption(RectTransform parent, string name, string caption, float from, float to)
+        {
+            Text text = KingmakerUiFactory.CreateText(name, parent, _theme, caption, 14, TextAnchor.MiddleLeft);
+            text.fontStyle = FontStyle.Bold;
+            text.color = Burgundy;
+            KingmakerUiFactory.SetAnchors(text.rectTransform, from, 0f, to, 1f, 6f, 4f, 0f, 0f);
+        }
+
+        private void BuildInspector(RectTransform frame)
+        {
+            RectTransform lane = KingmakerUiFactory.CreateRect("Inspector", frame);
+            KingmakerUiFactory.SetAnchors(lane, 0.752f, 0.085f, 0.972f, 0.895f);
+            _inspectorTitle = KingmakerUiFactory.CreateText("LaneTitle", lane, _theme, "Casting", 16,
+                TextAnchor.MiddleLeft);
+            _inspectorTitle.fontStyle = FontStyle.Bold;
+            _inspectorTitle.color = Burgundy;
+            KingmakerUiFactory.SetAnchors(_inspectorTitle.rectTransform, 0f, 1f, 1f, 1f);
+            _inspectorTitle.rectTransform.pivot = new Vector2(0.5f, 1f);
+            _inspectorTitle.rectTransform.sizeDelta = new Vector2(0f, 24f);
+            ScrollRect scroll = KingmakerUiFactory.CreateScrollView("Scroll", lane, _theme,
+                out _inspectorContent, 10f);
+            KingmakerUiFactory.SetAnchors(RectOf(scroll), 0f, 0f, 1f, 1f, 0f, 0f, 0f, 28f);
+            ContentSizeFitter fitter = _inspectorContent.gameObject.AddComponent<ContentSizeFitter>();
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            VerticalLayoutGroup layout = _inspectorContent.GetComponent<VerticalLayoutGroup>();
+            if (layout != null)
+            {
+                layout.spacing = 3f;
+                layout.padding = new RectOffset(8, 8, 6, 10);
+            }
         }
 
         private void BuildFooter(RectTransform frame)
         {
             RectTransform footer = KingmakerUiFactory.CreateRect("Footer", frame);
-            KingmakerUiFactory.SetAnchors(footer, 0f, 0f, 1f, 0.06f);
-            footer.offsetMin = Vector2.zero;
-            footer.offsetMax = Vector2.zero;
-            _footerBudget = KingmakerUiFactory.CreateText(
-                "Budget", footer, _theme, string.Empty, 14, TextAnchor.MiddleLeft);
-            // Lower-left third only: the budget never runs under the buttons
-            // (the first starts at 34 percent of the width); long text wraps
-            // and is truncated inside that area.
-            _footerBudget.fontSize = 13;
-            _footerBudget.horizontalOverflow = HorizontalWrapMode.Wrap;
-            _footerBudget.verticalOverflow = VerticalWrapMode.Truncate;
-            KingmakerUiFactory.SetAnchors(_footerBudget.rectTransform, 0f, 0f, 0.33f, 0.55f);
-            _footerBudget.rectTransform.offsetMin = new Vector2(12f, 2f);
-            _footerBudget.rectTransform.offsetMax = new Vector2(-4f, 0f);
-            _footerResult = KingmakerUiFactory.CreateText(
-                "Result", footer, _theme, string.Empty, 14, TextAnchor.MiddleLeft);
-            _footerResult.color = _theme.MutedBrownText;
-            KingmakerUiFactory.SetAnchors(_footerResult.rectTransform, 0f, 1f, 0.55f, 1f);
-            _footerResult.rectTransform.sizeDelta = new Vector2(0f, 16f);
-            _footerResult.rectTransform.anchoredPosition = Vector2.zero;
-            _saveButton = KingmakerUiFactory.CreateButton(
-                "Save", footer, _theme, "Save", () => Click(() =>
-                {
-                    // A refused save (a protected file) is told, never silent.
-                    try
-                    {
-                        _session.Save();
-                        _footerResult.text = "Casting plan saved.";
-                    }
-                    catch (Exception exception)
-                    {
-                        _footerResult.text = PersistenceMessages.ForSaveFailure(exception);
-                    }
-                }));
-            KingmakerUiFactory.SetAnchors(RectOf(_saveButton), 0.34f, 0.2f, 0.42f, 0.8f);
-            _reloadButton = KingmakerUiFactory.CreateButton(
-                "Reload", footer, _theme, "Reload", () => Click(() =>
-                {
-                    // Focused re-review: a reload that can replace unsaved
-                    // changes asks for a second press first.
-                    if (_session.IsDirty && Time.unscaledTime > _reloadArmedUntil)
-                    {
-                        _reloadArmedUntil = Time.unscaledTime + 5f;
-                        _footerResult.text = "Reload replaces this plan with the saved one, and unsaved changes " +
-                            "can be lost. Press Reload again to continue.";
-                        return;
-                    }
-                    _reloadArmedUntil = 0f;
-                    CastingPlanLoadStatus status = _session.Reload();
-                    _footerResult.text = _session.LegacyImportBlocked
-                        ? DescribeImport(_session)
-                        : PersistenceMessages.ForCastingLoad(status, _session.PrimaryPlanFileExists,
-                            _session.LoadSourcePath, _session.LoadWarning) ??
-                            (_session.LastReloadNote == "kept-unsaved"
-                                ? "No casting plan is saved yet; your castings were kept. Save writes them."
-                                : _session.LastReloadNote == "imported-into-unsaved"
-                                    ? "Your classic plan was imported alongside your castings and saved."
-                                    : _session.ImportReport != null ? DescribeImport(_session)
-                                    : status == CastingPlanLoadStatus.Absent
-                                        ? "No casting plan is saved yet; Save writes one."
-                                        : "Reloaded the saved casting plan.");
-                    RefreshView();
-                }));
-            KingmakerUiFactory.SetAnchors(RectOf(_reloadButton), 0.43f, 0.2f, 0.51f, 0.8f);
-            _undoButton = KingmakerUiFactory.CreateButton(
-                "Undo", footer, _theme, "Undo", () => Click(() =>
-                {
-                    _session.Undo();
-                    RefreshView();
-                }));
-            KingmakerUiFactory.SetAnchors(RectOf(_undoButton), 0.62f, 0.2f, 0.70f, 0.8f);
-            _acceptButton = KingmakerUiFactory.CreateButton(
-                "Accept", footer, _theme, "Accept Plan", () => Click(() =>
-                {
-                    bool accepted = _session.AcceptPresentedPlan(_inputs());
-                    string reviewWarning = PersistenceMessages.ForReviewWarning(_session.ReviewStoreWarning);
-                    _footerResult.text = !accepted
-                        ? "Acceptance refused: plan changed or not presented."
-                        : reviewWarning ?? "Plan accepted.";
-                }));
-            KingmakerUiFactory.SetAnchors(RectOf(_acceptButton), 0.71f, 0.15f, 0.83f, 0.85f);
-            _applyButton = KingmakerUiFactory.CreateButton(
-                "Apply", footer, _theme, "Review & Apply", () => Click(() =>
-                    RunApply(CastingApplyMode.Ordinary)));
-            KingmakerUiFactory.SetAnchors(RectOf(_applyButton), 0.84f, 0.15f, 0.97f, 0.85f);
-            _readyOnlyButton = KingmakerUiFactory.CreateButton(
-                "ReadyOnly", footer, _theme, "Ready Casts Only", () => Click(() =>
-                    RunApply(CastingApplyMode.ReadyCastsOnly)));
-            RectOf(_readyOnlyButton).anchorMin = new Vector2(0.62f, 0f);
-            RectOf(_readyOnlyButton).anchorMax = new Vector2(0.97f, 0.12f);
+            KingmakerUiFactory.SetAnchors(footer, 0f, 0f, 1f, 0.078f, 52f, 44f, 6f, 0f);
+            _footerSelectedRun = FooterLine(footer, "SelectedRunBudget", 0.67f, 1f);
+            _footerOnePass = FooterLine(footer, "OnePassBudget", 0.34f, 0.67f);
+            _footerResult = FooterLine(footer, "Result", 0f, 0.34f);
+            _footerResult.color = Burgundy;
+            string[] names = { "Save", "Reload", "ExecutionMode", "Undo", "Accept", "Apply" };
+            string[] captions = { "Save", "Reload", ModeCaption(), "Undo", "Accept Plan", "Review & Apply" };
+            Action[] actions =
+            {
+                SaveCommand, ReloadCommand, ToggleModeCommand, UndoCommand, AcceptCommand,
+                () => RunApply(CastingApplyMode.Ordinary)
+            };
+            float[] widths = { 90f, 90f, 150f, 90f, 130f, 160f };
+            float right = 0f;
+            for (int index = names.Length - 1; index >= 0; index--)
+            {
+                Action action = actions[index];
+                Button button = KingmakerUiFactory.CreateButton(names[index], footer, _theme, captions[index],
+                    () => Command(action));
+                RectTransform rect = RectOf(button);
+                KingmakerUiFactory.SetAnchors(rect, 1f, 0.12f, 1f, 0.88f);
+                rect.pivot = new Vector2(1f, 0.5f);
+                rect.sizeDelta = new Vector2(widths[index], 0f);
+                rect.anchoredPosition = new Vector2(-right, 0f);
+                right += widths[index] + 8f;
+                if (names[index] == "ExecutionMode") _modeButton = button;
+                if (names[index] == "Undo") _undoButton = button;
+            }
+            _readyOnlyButton = KingmakerUiFactory.CreateButton("ReadyOnly", footer, _theme, "Ready Casts Only",
+                () => Command(() => RunApply(CastingApplyMode.ReadyCastsOnly)));
+            RectTransform ready = RectOf(_readyOnlyButton);
+            KingmakerUiFactory.SetAnchors(ready, 1f, 0.12f, 1f, 0.88f);
+            ready.pivot = new Vector2(1f, 0.5f);
+            ready.sizeDelta = new Vector2(170f, 0f);
+            ready.anchoredPosition = new Vector2(-right, 0f);
             _readyOnlyButton.gameObject.SetActive(false);
-            // Per-plan execution mode (saved with the plan): native
-            // animated casting, or Instant.
-            _modeButton = KingmakerUiFactory.CreateButton(
-                "ExecutionMode", footer, _theme, ModeCaption(), () => Click(() =>
-                {
-                    _session.SetExecutionMode(
-                        _session.ExecutionMode == "instant" ? "animated" : "instant");
-                    SetModeCaption();
-                    _footerResult.text = "Casting mode: " + _session.ExecutionMode +
-                        " (Save to keep it).";
-                }));
-            KingmakerUiFactory.SetAnchors(RectOf(_modeButton), 0.52f, 0.2f, 0.61f, 0.8f);
+            // The text lines end where the buttons begin.
+            float textRight = right + 180f;
+            foreach (Text line in new[] { _footerSelectedRun, _footerOnePass, _footerResult })
+                line.rectTransform.offsetMax = new Vector2(-textRight, 0f);
+            // The budget lines sit on the book's dark lower edge (seen in the
+            // 1920x1200 frame): dark ink gets its own parchment ground.
+            RectTransform ledger = KingmakerUiFactory.CreateRect("FooterLedger", footer);
+            KingmakerUiFactory.SetAnchors(ledger, 0f, 0f, 1f, 1f, -8f, textRight - 8f, -2f, -2f);
+            Image ground = KingmakerUiFactory.AddFramedPanel(ledger, _theme.ParchmentRaised, _theme.GoldAccent);
+            ground.raycastTarget = false;
+            ledger.SetAsFirstSibling();
             _footerResult.text = DescribeReadiness();
+        }
+
+        private Text FooterLine(RectTransform footer, string name, float from, float to)
+        {
+            Text text = KingmakerUiFactory.CreateText(name, footer, _theme, string.Empty, 13, TextAnchor.MiddleLeft);
+            text.horizontalOverflow = HorizontalWrapMode.Wrap;
+            text.verticalOverflow = VerticalWrapMode.Truncate;
+            // Long budget lists shrink to fit before anything is cut.
+            text.resizeTextForBestFit = true;
+            text.resizeTextMinSize = 10;
+            text.resizeTextMaxSize = 13;
+            KingmakerUiFactory.SetAnchors(text.rectTransform, 0f, from, 1f, to, 0f, 0f, 0f, 0f);
+            return text;
+        }
+
+        // ------------------------------------------------------------------
+        // Rebuilds (on refresh only)
+        // ------------------------------------------------------------------
+
+        private void RebuildHeader(CastingGraphView view)
+        {
+            _headerStatus.text = WorkspaceHeaderText.Describe(view.SelectedRoutineName,
+                view.RoutineCastingCount, view.RoutineReadyCount,
+                view.SelectedRoutineGate != null && view.SelectedRoutineGate.Allowed,
+                view.SelectedRoutineGate == null ? 0 : view.SelectedRoutineGate.BlockingReasons.Count) +
+                (!_session.SavesRefused ? string.Empty
+                    : _session.LegacyImportBlocked ? " · not saved: the classic plan could not be imported"
+                    : " · not saved: the plan file cannot be read");
+            KingmakerUiFactory.DestroyChildren(_routineBar);
+            Text label = KingmakerUiFactory.CreateText("RoutineLabel", _routineBar, _theme, "Routine:", 15,
+                TextAnchor.MiddleLeft);
+            label.fontStyle = FontStyle.Bold;
+            KingmakerUiFactory.SetAnchors(label.rectTransform, 0f, 0f, 0f, 1f);
+            label.rectTransform.pivot = new Vector2(0f, 0.5f);
+            label.rectTransform.sizeDelta = new Vector2(80f, 0f);
+            float x = 84f;
+            foreach (CastingGraphRoutineTab routine in view.Routines)
+            {
+                string captured = routine.RoutineId;
+                Button tab = KingmakerUiFactory.CreateButton("Routine." + captured, _routineBar, _theme,
+                    routine.Name + " (" + routine.CastingCount + ")", () => Command(() =>
+                        _session.SelectRoutine(captured)));
+                KingmakerUiFactory.ApplyPalette(tab, routine.Selected);
+                RectTransform rect = RectOf(tab);
+                KingmakerUiFactory.SetAnchors(rect, 0f, 0.08f, 0f, 0.92f);
+                rect.pivot = new Vector2(0f, 0.5f);
+                rect.sizeDelta = new Vector2(150f, 0f);
+                rect.anchoredPosition = new Vector2(x, 0f);
+                x += 158f;
+            }
+            Text scope = KingmakerUiFactory.CreateText("RoutineScope", _routineBar, _theme,
+                "New castings go to the selected routine; each routine runs on its own.", 13,
+                TextAnchor.MiddleLeft);
+            scope.color = _theme.MutedBrownText;
+            KingmakerUiFactory.SetAnchors(scope.rectTransform, 0f, 0f, 1f, 1f, x + 10f, 0f, 0f, 0f);
+        }
+
+        private void RebuildCatalogue(CastingGraphView view)
+        {
+            foreach (KeyValuePair<PlannerSourceCategory, Button> pair in _categoryTabs)
+                KingmakerUiFactory.ApplyPalette(pair.Value, pair.Key == _sourceCategory);
+            KingmakerUiFactory.DestroyChildren(_catalogueContent);
+            int shown = 0;
+            foreach (CastingGraphCatalogueEntry entry in view.Catalogue)
+            {
+                // The selected buff stays listed even when filtered out.
+                if (!entry.Selected &&
+                    (!WorkspaceSourceLabels.Matches(entry.Source, _buffQuery) ||
+                     !WorkspaceSourceLabels.MatchesCategory(entry.Source, _sourceCategory))) continue;
+                shown++;
+                string captured = entry.SourceId;
+                RectTransform rect = KingmakerUiFactory.CreateRect("Source." + captured, _catalogueContent);
+                KingmakerUiFactory.AddLayout(rect, 52f);
+                Image background = KingmakerUiFactory.AddPanel(rect,
+                    entry.Selected ? new Color(1f, 0.95f, 0.84f, 0.95f) : new Color(1f, 1f, 1f, 0f));
+                Button button = rect.gameObject.AddComponent<Button>();
+                button.targetGraphic = background;
+                ApplyRowHover(button, entry.Selected);
+                button.onClick.AddListener(() => Command(() => _session.SelectGraphBuff(captured, _inputs())));
+                if (entry.Selected)
+                {
+                    RectTransform rule = KingmakerUiFactory.CreateRect("Selected", rect);
+                    KingmakerUiFactory.SetAnchors(rule, 0f, 0f, 0f, 1f);
+                    rule.pivot = new Vector2(0f, 0.5f);
+                    rule.sizeDelta = new Vector2(4f, 0f);
+                    KingmakerUiFactory.AddPanel(rule, Burgundy).raycastTarget = false;
+                }
+                AddIcon(rect, entry.Source.IconAbility, 36f, 8f);
+                Text name = KingmakerUiFactory.CreateText("Name", rect, _theme, entry.Label, 14, TextAnchor.UpperLeft);
+                name.fontStyle = entry.Selected ? FontStyle.Bold : FontStyle.Normal;
+                name.resizeTextForBestFit = true;
+                name.resizeTextMinSize = 11;
+                name.resizeTextMaxSize = 14;
+                KingmakerUiFactory.Stretch(name.rectTransform, 50, 4, 17, 3);
+                Text count = KingmakerUiFactory.CreateText("Count", rect, _theme,
+                    entry.RoutineCount + " in " + view.SelectedRoutineName +
+                        (entry.PlanCount == entry.RoutineCount ? string.Empty : " · " + entry.PlanCount + " in plan"),
+                    12, TextAnchor.LowerLeft);
+                count.color = entry.RoutineCount == 0 ? _theme.MutedBrownText : _theme.GreenSuccess;
+                KingmakerUiFactory.Stretch(count.rectTransform, 50, 4, 3, 34);
+            }
+            if (shown == 0)
+            {
+                Text none = KingmakerUiFactory.CreateText("NoMatch", _catalogueContent, _theme,
+                    _buffQuery.Length == 0 ? "No buffs here." : "No buff matches \"" + _buffQuery + "\".",
+                    13, TextAnchor.MiddleLeft);
+                none.color = _theme.MutedBrownText;
+                KingmakerUiFactory.AddLayout(none.rectTransform, 30f);
+            }
+        }
+
+        private void RebuildBanner(CastingGraphView view)
+        {
+            Sprite icon = ResolveAbilityIcon(view.SelectedSourceIcon);
+            _bannerIcon.sprite = icon;
+            _bannerIcon.color = icon == null ? new Color(0f, 0f, 0f, 0f) : Color.white;
+            _bannerTitle.text = view.SelectedSourceCaption;
+            string kind = view.SelectedSourceIsGroup == true ? "Group buff: one casting reaches everyone in its area"
+                : view.SelectedSourceIsGroup == false ? "Single target: one casting per recipient"
+                : "Targeting not understood";
+            _bannerDetail.text = kind + " · " + view.Castings.Count + " in " + view.SelectedRoutineName +
+                (view.OtherRoutineCastings == 0 ? string.Empty
+                    : " · " + view.OtherRoutineCastings + " in other routines (shown there)");
+            _guidance.text = view.Guidance;
+        }
+
+        private GraphLayoutMetrics MetricsFor(float width)
+        {
+            var metrics = new GraphLayoutMetrics();
+            float usable = Mathf.Max(600f, width);
+            metrics.CasterLaneWidth = Mathf.Round(usable * 0.36f);
+            metrics.TargetLaneWidth = Mathf.Round(usable * 0.24f);
+            metrics.ChipLaneWidth = usable - metrics.CasterLaneWidth - metrics.TargetLaneWidth;
+            metrics.ChipWidth = Mathf.Min(190f, metrics.ChipLaneWidth - 40f);
+            return metrics;
+        }
+
+        // The graph viewport's size. A just-created root canvas may not have
+        // taken the screen's size yet; the frame's anchors then give it
+        // (the canvas has no scaler, so canvas units are screen pixels).
+        private Vector2 GraphViewportSize()
+        {
+            Canvas.ForceUpdateCanvases();
+            Rect rect = _graphViewport.rect;
+            if (rect.width > 300f && rect.height > 200f) return rect.size;
+            float frameWidth = Mathf.Max(800f, Screen.width - 48f);
+            float frameHeight = Mathf.Max(600f, Screen.height - 84f);
+            return new Vector2(frameWidth * (0.742f - 0.172f) - 16f,
+                frameHeight * (0.895f - 0.085f) - 102f - 6f);
+        }
+
+        private void RebuildGraph(CastingGraphView view)
+        {
+            float scroll = _graphScroll == null ? 1f : _graphScroll.verticalNormalizedPosition;
+            KingmakerUiFactory.DestroyChildren(_graphContent);
+            Vector2 viewport = GraphViewportSize();
+            GraphLayoutMetrics m = MetricsFor(viewport.x);
+            GraphLayoutResult layout = CastingGraphLayout.Compute(view, m);
+            _lastLayout = layout;
+            _lastMetrics = m;
+            float height = Mathf.Max(layout.Height, viewport.y);
+            _graphContent.sizeDelta = new Vector2(0f, height);
+            RectTransform lines = Layer("Lines");
+            RectTransform chips = Layer("Chips");
+            RectTransform casters = Layer("Casters");
+            RectTransform targets = Layer("Targets");
+            if (view.Casters.Count == 0)
+                Hint(casters, "NoCaster", view.SelectedSourceId.Length == 0 ? string.Empty
+                    : "Nobody in the party can cast this buff now.", 6f, 10f, m.CasterLaneWidth - 12f);
+            foreach (CastingGraphCasterNode caster in view.Casters)
+                BuildCasterNode(casters, caster, layout, m);
+            foreach (CastingGraphTargetNode target in view.Targets)
+                BuildTargetNode(targets, target, layout, m);
+            if (view.Castings.Count == 0 && view.SelectedSourceId.Length != 0)
+                Hint(chips, "NoCasting", "No castings of this buff in " + view.SelectedRoutineName +
+                    " yet. Choose a caster on the left, then click who receives it: each click adds one casting.",
+                    m.ChipLaneLeft + 16f, 40f, m.ChipLaneWidth - 32f);
+            foreach (GraphConnection connection in layout.Connections)
+            {
+                CastingGraphCasting casting = view.CastingById(connection.CastingId);
+                if (casting == null) continue;
+                Color colour = casting.Selected ? Burgundy
+                    : casting.Readiness == ResolvedCastingReadiness.Blocked ? BlockedInk
+                    : casting.Readiness == ResolvedCastingReadiness.Ready ||
+                      casting.Readiness == ResolvedCastingReadiness.AlreadySatisfied ? Ink : InkFaint;
+                float thickness = casting.Selected ? SelectedLineThickness : LineThickness;
+                DrawSegment(lines, "Ink." + casting.CastingId + ".in", connection.Inbound, colour, thickness);
+                DrawSegment(lines, "Ink." + casting.CastingId + ".out", connection.Outbound, colour, thickness);
+                foreach (KeyValuePair<string, GraphSegment> branch in connection.Branches)
+                    DrawDashed(lines, "Branch." + casting.CastingId + "." + branch.Key, branch.Value,
+                        casting.Selected ? Burgundy : InkFaint, 1.5f);
+                // Wide invisible corridors: the line is easy to click without
+                // pixel precision; both select this casting only.
+                Corridor(lines, "Line." + casting.CastingId + ".in", connection.Inbound, casting.CastingId);
+                Corridor(lines, "Line." + casting.CastingId + ".out", connection.Outbound, casting.CastingId);
+            }
+            foreach (GraphChipPlacement placement in layout.Chips)
+            {
+                CastingGraphCasting casting = view.CastingById(placement.CastingId);
+                if (casting != null) BuildChip(chips, casting, placement, m);
+            }
+            if (_graphScroll != null)
+            {
+                Canvas.ForceUpdateCanvases();
+                _graphScroll.verticalNormalizedPosition = Mathf.Clamp01(scroll);
+            }
+        }
+
+        private RectTransform Layer(string name)
+        {
+            RectTransform layer = KingmakerUiFactory.CreateRect(name, _graphContent);
+            KingmakerUiFactory.Stretch(layer);
+            return layer;
+        }
+
+        // Positions a child at graph coordinates (top-left origin, y down).
+        private static RectTransform Place(RectTransform rect, float x, float y, float width, float height)
+        {
+            rect.anchorMin = new Vector2(0f, 1f);
+            rect.anchorMax = new Vector2(0f, 1f);
+            rect.pivot = new Vector2(0f, 1f);
+            rect.sizeDelta = new Vector2(width, height);
+            rect.anchoredPosition = new Vector2(x, -y);
+            return rect;
+        }
+
+        private void Hint(RectTransform parent, string name, string text, float x, float y, float width)
+        {
+            if (string.IsNullOrEmpty(text)) return;
+            Text hint = KingmakerUiFactory.CreateText(name, parent, _theme, text, 14, TextAnchor.UpperLeft);
+            hint.color = _theme.MutedBrownText;
+            hint.fontStyle = FontStyle.Italic;
+            Place(hint.rectTransform, x, y, width, 80f);
+        }
+
+        private void BuildCasterNode(RectTransform layer, CastingGraphCasterNode caster, GraphLayoutResult layout,
+            GraphLayoutMetrics m)
+        {
+            float top;
+            if (!layout.CasterTops.TryGetValue(caster.UnitId, out top)) return;
+            string captured = caster.UnitId;
+            RectTransform header = Place(KingmakerUiFactory.CreateRect("Caster." + (caster.IsUnresolved
+                ? "unresolved" : caster.UnitId), layer), 0f, top, m.CasterLaneWidth - 6f, m.CasterHeaderHeight - 4f);
+            Image background = KingmakerUiFactory.AddPanel(header, caster.Selected
+                ? new Color(1f, 0.95f, 0.84f, 0.95f) : new Color(1f, 1f, 1f, 0f));
+            if (!caster.IsUnresolved)
+            {
+                Button button = header.gameObject.AddComponent<Button>();
+                button.targetGraphic = background;
+                ApplyRowHover(button, caster.Selected);
+                button.onClick.AddListener(() => Command(() => _session.SelectGraphCaster(captured, _inputs())));
+            }
+            if (caster.Selected)
+            {
+                RectTransform rule = KingmakerUiFactory.CreateRect("Selected", header);
+                KingmakerUiFactory.SetAnchors(rule, 0f, 0f, 0f, 1f);
+                rule.pivot = new Vector2(0f, 0.5f);
+                rule.sizeDelta = new Vector2(4f, 0f);
+                KingmakerUiFactory.AddPanel(rule, Burgundy).raycastTarget = false;
+            }
+            AddPortrait(header, caster.IsUnresolved ? null : caster.UnitId, 44f, 8f);
+            Text name = KingmakerUiFactory.CreateText("Name", header, _theme, caster.DisplayName, 16, TextAnchor.UpperLeft);
+            name.fontStyle = FontStyle.Bold;
+            KingmakerUiFactory.Stretch(name.rectTransform, 60, 4, 22, 4);
+            if (caster.Note.Length != 0)
+            {
+                Text note = KingmakerUiFactory.CreateText("Note", header, _theme, caster.Note, 12, TextAnchor.LowerLeft);
+                note.color = caster.IsUnresolved ? BlockedInk : _theme.MutedBrownText;
+                KingmakerUiFactory.Stretch(note.rectTransform, 60, 4, 4, 30);
+            }
+            for (int index = 0; index < caster.Sources.Count; index++)
+            {
+                CastingGraphSourceRow row = caster.Sources[index];
+                float rowTop;
+                if (!layout.SourceRowTops.TryGetValue(CastingGraphLayout.SourceRowKey(caster.UnitId, row.ProviderKey),
+                        out rowTop)) continue;
+                RectTransform rect = Place(KingmakerUiFactory.CreateRect("Provider." + caster.UnitId + "." + index,
+                    layer), 22f, rowTop, m.CasterLaneWidth - 24f, m.SourceRowHeight - 4f);
+                Image rowBackground = KingmakerUiFactory.AddPanel(rect, row.Selected
+                    ? new Color(0.99f, 0.90f, 0.78f, 1f) : new Color(1f, 0.97f, 0.90f, 0.55f));
+                Outline outline = rect.gameObject.AddComponent<Outline>();
+                outline.effectColor = row.Selected ? Burgundy : new Color(0.45f, 0.32f, 0.20f, 0.45f);
+                outline.effectDistance = row.Selected ? new Vector2(2f, -2f) : new Vector2(1f, -1f);
+                Button button = rect.gameObject.AddComponent<Button>();
+                button.targetGraphic = rowBackground;
+                ApplyRowHover(button, row.Selected);
+                string key = row.ProviderKey;
+                button.onClick.AddListener(() => Command(() =>
+                    Surface(_session.SelectGraphSource(key, _inputs()), "source")));
+                Text label = KingmakerUiFactory.CreateText("Label", rect, _theme, row.Label +
+                        (row.IsGroup ? "  (group)" : string.Empty), 14, TextAnchor.UpperLeft);
+                label.fontStyle = FontStyle.Bold;
+                KingmakerUiFactory.Stretch(label.rectTransform, 8, 6, 20, 3);
+                string capacity = row.CapacityText + " · " + row.PoolLabel +
+                    (row.SharedPoolWith.Count == 0 ? string.Empty : " (shared with " +
+                        string.Join(", ", row.SharedPoolWith.ToArray()) + ")");
+                Text count = KingmakerUiFactory.CreateText("Capacity", rect, _theme,
+                    row.Usable ? capacity : row.BlockedReason + " " + capacity, 12, TextAnchor.LowerLeft);
+                count.color = row.Usable ? new Color(0.22f, 0.36f, 0.22f, 1f) : BlockedInk;
+                count.resizeTextForBestFit = true;
+                count.resizeTextMinSize = 10;
+                count.resizeTextMaxSize = 12;
+                KingmakerUiFactory.Stretch(count.rectTransform, 8, 6, 3, 21);
+            }
+        }
+
+        private void BuildTargetNode(RectTransform layer, CastingGraphTargetNode target, GraphLayoutResult layout,
+            GraphLayoutMetrics m)
+        {
+            float top;
+            if (!layout.TargetTops.TryGetValue(target.UnitId, out top)) return;
+            string captured = target.UnitId;
+            RectTransform rect = Place(KingmakerUiFactory.CreateRect("Target." + target.UnitId, layer),
+                m.TargetLaneLeft + 6f, top, m.TargetLaneWidth - 8f, m.TargetNodeHeight);
+            bool legal = target.Legality == CastingGraphTargetLegality.Legal;
+            bool illegal = target.Legality == CastingGraphTargetLegality.Illegal;
+            Image background = KingmakerUiFactory.AddPanel(rect, legal
+                ? new Color(0.93f, 0.97f, 0.88f, 0.80f) : new Color(1f, 0.97f, 0.90f, 0.45f));
+            Outline outline = rect.gameObject.AddComponent<Outline>();
+            outline.effectColor = legal ? LegalInk : new Color(0.45f, 0.32f, 0.20f, 0.35f);
+            outline.effectDistance = legal ? new Vector2(2f, -2f) : new Vector2(1f, -1f);
+            Button button = rect.gameObject.AddComponent<Button>();
+            button.targetGraphic = background;
+            ApplyRowHover(button, false);
+            button.onClick.AddListener(() => Command(() => AddCastingTo(captured)));
+            Image portrait = AddPortrait(rect, target.UnitId, 62f, 6f);
+            if (portrait != null && illegal) portrait.color = new Color(0.55f, 0.50f, 0.48f, 0.75f);
+            Text name = KingmakerUiFactory.CreateText("Name", rect, _theme, target.DisplayName, 15, TextAnchor.UpperLeft);
+            name.fontStyle = FontStyle.Bold;
+            KingmakerUiFactory.Stretch(name.rectTransform, 74, 4, 50, 6);
+            Text hint = KingmakerUiFactory.CreateText("Hint", rect, _theme,
+                illegal ? target.IllegalReason : target.Hint, 12, TextAnchor.UpperLeft);
+            hint.color = illegal ? BlockedInk : legal ? LegalInk : _theme.MutedBrownText;
+            hint.horizontalOverflow = HorizontalWrapMode.Wrap;
+            KingmakerUiFactory.Stretch(hint.rectTransform, 74, 4, 4, 28);
+        }
+
+        private void BuildChip(RectTransform layer, CastingGraphCasting casting, GraphChipPlacement placement,
+            GraphLayoutMetrics m)
+        {
+            string captured = casting.CastingId;
+            RectTransform rect = Place(KingmakerUiFactory.CreateRect("Casting." + casting.CastingId, layer),
+                placement.Left.X, placement.Top, m.ChipWidth, m.ChipHeight);
+            Image background = KingmakerUiFactory.AddPanel(rect, casting.Selected
+                ? new Color(1f, 0.93f, 0.80f, 1f) : new Color(0.99f, 0.95f, 0.86f, 1f));
+            Outline outline = rect.gameObject.AddComponent<Outline>();
+            outline.effectColor = casting.Selected ? Burgundy
+                : casting.Readiness == ResolvedCastingReadiness.Blocked ? BlockedInk : Ink;
+            outline.effectDistance = casting.Selected ? new Vector2(3f, -3f) : new Vector2(1f, -1f);
+            Button button = rect.gameObject.AddComponent<Button>();
+            button.targetGraphic = background;
+            ApplyRowHover(button, casting.Selected);
+            button.onClick.AddListener(() => Command(() => _session.FocusGraphCasting(captured)));
+            string status = casting.StatusLabel +
+                (casting.ShortInOnePass ? " · short in one pass" : string.Empty) +
+                (casting.RedundantInOnePass ? " · covered earlier" : string.Empty) +
+                (casting.NeedsReview ? " · review" : string.Empty);
+            Text first = KingmakerUiFactory.CreateText("Status", rect, _theme, casting.OrderLabel + "  " + status,
+                14, TextAnchor.UpperLeft);
+            first.fontStyle = FontStyle.Bold;
+            first.color = casting.Readiness == ResolvedCastingReadiness.Blocked || casting.ShortInOnePass
+                ? BlockedInk : _theme.DarkBrownText;
+            first.resizeTextForBestFit = true;
+            first.resizeTextMinSize = 11;
+            first.resizeTextMaxSize = 14;
+            KingmakerUiFactory.Stretch(first.rectTransform, 7, 5, 22, 3);
+            string detail = casting.IsGroup
+                ? "Group · reaches " + casting.Beneficiaries.Count +
+                    (casting.CoverageGaps.Count == 0 ? string.Empty : " · misses " + casting.CoverageGaps.Count)
+                : casting.EnhancementBadges.Count == 0 ? "no enhancement"
+                : string.Join(", ", casting.EnhancementBadges.ToArray());
+            if (casting.IsGroup && casting.EnhancementBadges.Count != 0)
+                detail += " · " + string.Join(", ", casting.EnhancementBadges.ToArray());
+            Text second = KingmakerUiFactory.CreateText("Detail", rect, _theme, detail, 12, TextAnchor.LowerLeft);
+            second.color = _theme.MutedBrownText;
+            second.resizeTextForBestFit = true;
+            second.resizeTextMinSize = 10;
+            second.resizeTextMaxSize = 12;
+            KingmakerUiFactory.Stretch(second.rectTransform, 7, 5, 4, 24);
+        }
+
+        // A straight ink segment: one rotated Image (graph y points down,
+        // Unity's up, so the angle is negated).
+        private void DrawSegment(RectTransform layer, string name, GraphSegment segment, Color colour,
+            float thickness)
+        {
+            if (segment.Length < 0.5f) return;
+            RectTransform rect = KingmakerUiFactory.CreateRect(name, layer);
+            rect.anchorMin = new Vector2(0f, 1f);
+            rect.anchorMax = new Vector2(0f, 1f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.sizeDelta = new Vector2(segment.Length, thickness);
+            rect.anchoredPosition = new Vector2(segment.Center.X, -segment.Center.Y);
+            rect.localRotation = Quaternion.Euler(0f, 0f, -segment.AngleDegrees);
+            Image image = rect.gameObject.AddComponent<Image>();
+            image.color = colour;
+            image.raycastTarget = false;
+        }
+
+        // Derived beneficiary branch: dashes along the segment (never a
+        // casting, never clickable).
+        private void DrawDashed(RectTransform layer, string name, GraphSegment segment, Color colour, float thickness)
+        {
+            const float dash = 7f;
+            const float gap = 5f;
+            if (segment.Length < 1f) return;
+            float dx = (segment.To.X - segment.From.X) / segment.Length;
+            float dy = (segment.To.Y - segment.From.Y) / segment.Length;
+            int index = 0;
+            for (float start = 0f; start < segment.Length; start += dash + gap)
+            {
+                float end = Mathf.Min(segment.Length, start + dash);
+                var from = new GraphPoint(segment.From.X + dx * start, segment.From.Y + dy * start);
+                var to = new GraphPoint(segment.From.X + dx * end, segment.From.Y + dy * end);
+                DrawSegment(layer, name + "." + index++, new GraphSegment(from, to), colour, thickness);
+            }
+        }
+
+        // The invisible, wide hit corridor along a connection segment.
+        private void Corridor(RectTransform layer, string name, GraphSegment segment, string castingId)
+        {
+            if (segment.Length < 2f) return;
+            RectTransform rect = KingmakerUiFactory.CreateRect(name, layer);
+            rect.anchorMin = new Vector2(0f, 1f);
+            rect.anchorMax = new Vector2(0f, 1f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.sizeDelta = new Vector2(segment.Length, CorridorThickness);
+            rect.anchoredPosition = new Vector2(segment.Center.X, -segment.Center.Y);
+            rect.localRotation = Quaternion.Euler(0f, 0f, -segment.AngleDegrees);
+            Image image = rect.gameObject.AddComponent<Image>();
+            image.color = new Color(0f, 0f, 0f, 0f);
+            image.raycastTarget = true;
+            Button button = rect.gameObject.AddComponent<Button>();
+            button.targetGraphic = image;
+            button.transition = Selectable.Transition.None;
+            string captured = castingId;
+            button.onClick.AddListener(() => Command(() => _session.FocusGraphCasting(captured)));
+        }
+
+        // Rows, chips and portraits: a restrained hover on their own panel,
+        // exactly one control at a time (pointer-only highlight).
+        private static void ApplyRowHover(Button button, bool selected)
+        {
+            button.transition = Selectable.Transition.ColorTint;
+            ColorBlock colors = button.colors;
+            colors.normalColor = Color.white;
+            colors.highlightedColor = selected ? new Color(0.97f, 0.90f, 0.82f, 1f) : new Color(0.90f, 0.84f, 0.74f, 1f);
+            colors.pressedColor = new Color(0.80f, 0.72f, 0.60f, 1f);
+            colors.disabledColor = new Color(0.75f, 0.75f, 0.75f, 0.8f);
+            colors.colorMultiplier = 1f;
+            colors.fadeDuration = 0.05f;
+            button.colors = colors;
+            KingmakerUiFactory.OwnPointerHighlight(button);
+        }
+
+        private Image AddPortrait(RectTransform parent, string unitId, float size, float x)
+        {
+            RectTransform rect = KingmakerUiFactory.CreateRect("Portrait", parent);
+            KingmakerUiFactory.SetAnchors(rect, 0f, 1f, 0f, 1f);
+            rect.pivot = new Vector2(0f, 1f);
+            rect.sizeDelta = new Vector2(size * 0.78f, size);
+            rect.anchoredPosition = new Vector2(x, -4f);
+            Sprite portrait = unitId == null ? null : BuffPlannerScreenView.ResolvePortrait(unitId);
+            Image image = rect.gameObject.AddComponent<Image>();
+            image.sprite = portrait;
+            image.preserveAspect = true;
+            image.raycastTarget = false;
+            image.color = portrait == null ? new Color(0.35f, 0.25f, 0.18f, 0.35f) : Color.white;
+            return image;
+        }
+
+        private void AddIcon(RectTransform parent, AbilityKey ability, float size, float x)
+        {
+            RectTransform rect = KingmakerUiFactory.CreateRect("Icon", parent);
+            KingmakerUiFactory.SetAnchors(rect, 0f, 0.5f, 0f, 0.5f);
+            rect.pivot = new Vector2(0f, 0.5f);
+            rect.sizeDelta = new Vector2(size, size);
+            rect.anchoredPosition = new Vector2(x, 0f);
+            Sprite icon = ResolveAbilityIcon(ability);
+            Image image = rect.gameObject.AddComponent<Image>();
+            image.sprite = icon;
+            image.preserveAspect = true;
+            image.raycastTarget = false;
+            image.color = icon == null ? new Color(0f, 0f, 0f, 0f) : Color.white;
+        }
+
+        private static Sprite ResolveAbilityIcon(AbilityKey ability)
+        {
+            if (ability == null) return null;
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(ability.VariantGuid))
+                {
+                    BlueprintAbility concrete = ResourcesLibrary.TryGetBlueprint<BlueprintAbility>(ability.VariantGuid);
+                    if (concrete != null && concrete.Icon != null) return concrete.Icon;
+                }
+                BlueprintAbility parent = ResourcesLibrary.TryGetBlueprint<BlueprintAbility>(ability.BaseAbilityGuid);
+                return parent == null ? null : parent.Icon;
+            }
+            catch (Exception)
+            {
+                // A non-ability source (item, fact) shows no icon.
+                return null;
+            }
+        }
+
+        // ------------------------------------------------------------------
+        // Inspector
+        // ------------------------------------------------------------------
+
+        private void RebuildInspector(CastingGraphView view)
+        {
+            KingmakerUiFactory.DestroyChildren(_inspectorContent);
+            RebuildImportNotices();
+            if (view.Inspector == null)
+            {
+                _inspectorTitle.text = "Next casting";
+                RebuildNextCasting(view);
+                return;
+            }
+            RebuildCastingInspector(view, view.Inspector);
+        }
+
+        private void RebuildNextCasting(CastingGraphView view)
+        {
+            CastingGraphCasterNode caster = view.CasterById(view.SelectedCasterUnitId);
+            CastingGraphSourceRow row = caster == null ? null
+                : caster.Sources.FirstOrDefault(value => value.Selected);
+            Line("Steps", "1. Buff: " + (view.SelectedSourceId.Length == 0 ? "choose one on the left"
+                : view.SelectedSourceCaption), 14, _theme.DarkBrownText, true);
+            Line("StepCaster", "2. Caster: " + (caster == null ? "click a caster in the left lane"
+                : caster.DisplayName + (row != null ? " · " + row.Label
+                    : caster.Sources.Count > 1 ? " · now choose the exact source under the caster" : string.Empty)),
+                14, _theme.DarkBrownText, false);
+            Line("StepTarget", "3. Target: " + (row == null ? "available once the source is chosen"
+                : view.SelectedSourceIsGroup == true ? "click the unit the group is centred on"
+                : "click who receives it; each click adds one casting"), 14, _theme.DarkBrownText, false);
+            Line("StepEdit", "4. Click a casting's line or card to set its enhancements.", 14,
+                _theme.DarkBrownText, false);
+            if (row != null)
+            {
+                Section("Chosen source");
+                Line("SourceDetail", row.Detail, 13, _theme.DarkBrownText, false);
+                Line("SourceCapacity", row.CapacityText + " after the whole plan · " + row.PoolLabel, 13,
+                    row.Usable ? LegalInk : BlockedInk, false);
+                if (!row.Usable) Line("SourceBlocked", row.BlockedReason, 13, BlockedInk, false);
+            }
+            // The next casting's existing-effect choice (each casting keeps its
+            // own afterwards; its inspector changes only that one).
+            bool recastDraft = _session.Draft.ExistingEffectPolicy == ExistingEffectPolicy.Overwrite;
+            ActionButton("DraftRecastPolicy", recastDraft ? "[x] New castings: cast again even if active"
+                : "[  ] New castings: cast again even if active (now: skip)", () =>
+            {
+                _session.Draft.ExistingEffectPolicy = recastDraft
+                    ? ExistingEffectPolicy.SkipAlreadyActive : ExistingEffectPolicy.Overwrite;
+            });
+            Section("Plan settings");
+            ActionButton("AnimatedFallback", (_session.AllowAnimatedFallback ? "[x] " : "[  ] ") +
+                "Instant mode: animate buffs that cannot be instant", () =>
+            {
+                _session.SetAllowAnimatedFallback(!_session.AllowAnimatedFallback);
+                _footerResult.text = "Animated fallback " + (_session.AllowAnimatedFallback ? "on" : "off") +
+                    " (Save to keep it).";
+            });
+            ActionButton("OutOfCombatOnly", (_session.OutOfCombatOnly ? "[x] " : "[  ] ") +
+                "Cast only out of combat", () =>
+            {
+                _session.SetOutOfCombatOnly(!_session.OutOfCombatOnly);
+                _footerResult.text = "Out-of-combat only " + (_session.OutOfCombatOnly ? "on" : "off") +
+                    " (Save to keep it).";
+            });
+        }
+
+        private string _inspectedCastingId;
+
+        private void RebuildCastingInspector(CastingGraphView view, CastingGraphInspector inspector)
+        {
+            if (!string.Equals(_inspectedCastingId, inspector.CastingId, StringComparison.Ordinal))
+            {
+                // Another casting: its choosers start closed.
+                _inspectedCastingId = inspector.CastingId;
+                _showProviders = false;
+                _showRetargets = false;
+            }
+            _inspectorTitle.text = inspector.Title;
+            ActionButton("DoneEditing", "Done (back to the next casting)", () => _session.ClearGraphFocus());
+            Line("Headline", inspector.Headline, 17, _theme.DarkBrownText, true);
+            CastingGraphCasting chip = inspector.Chip;
+            string status = chip == null ? "Not shown in this routine" : chip.StatusLabel;
+            Line("CastingStatus", "Status: " + status, 14,
+                chip != null && chip.Readiness == ResolvedCastingReadiness.Blocked ? BlockedInk : LegalInk, true);
+            foreach (string reason in inspector.Reasons)
+                Line("Reason", "· " + reason, 13, BlockedInk, false);
+            if (chip != null && chip.ShortInOnePass)
+                Line("ShortInOnePass", "· short of a resource when every routine runs in one pass", 13, BlockedInk, false);
+            if (chip != null && chip.RedundantInOnePass)
+                Line("Redundant", "· an earlier identical casting already gives this in one pass; with \"skip if " +
+                    "active\" it would be skipped and spend nothing", 13, _theme.MutedBrownText, false);
+            if (inspector.ExecutionLimitation.Length != 0)
+                Line("Limitation", "Cannot run in this version: " + inspector.ExecutionLimitation, 13, BlockedInk, false);
+            if (inspector.ReviewItems.Count != 0)
+            {
+                Section("Imported: needs your review");
+                foreach (string item in inspector.ReviewItems) Line("ReviewItem", "· " + item, 13, BlockedInk, false);
+                ActionButton("ResolveImportReview", "Resolve review (keep current choices)", () =>
+                    Surface(_session.ResolveFocusedImportReview(), "resolve review"));
+            }
+            // Caster and source.
+            Section("Cast by");
+            Line("CasterSource", inspector.CasterName + " · " + inspector.SourceLabel, 14, _theme.DarkBrownText, false);
+            ActionButton("ToggleProviders", _showProviders ? "Hide other casters and sources"
+                : "Change caster or source (" + inspector.Providers.Count + ")", () => _showProviders = !_showProviders);
+            if (_showProviders)
+                for (int index = 0; index < inspector.Providers.Count; index++)
+                {
+                    WorkspaceProviderChoice choice = inspector.Providers[index];
+                    ActionButton("FocusedProvider." + index, (choice.Selected ? "[x] " : "[  ] ") + choice.Label,
+                        () => Surface(_session.SetFocusedProvider(choice.ProviderKey, _inputs()), "caster"));
+                }
+            // Target or group coverage.
+            PlannedCasting focused = inspector.Casting;
+            bool group = focused.TargetMode != CastingTargetMode.DirectTarget;
+            Section(group ? "Group" : "Target");
+            Line("TargetLabel", inspector.TargetLabel, 14, _theme.DarkBrownText, false);
+            // An imported casting may be in the wrong shape for its buff: a
+            // single-target casting of a group buff can become one group
+            // casting centred on its caster (its target stays required), and
+            // a group casting of a single-target buff can become a casting on
+            // one chosen member. Offered only when the buff needs it.
+            bool? groupAbility = _session.FocusedCastingIsGroupAbility(_inputs());
+            if (!group)
+            {
+                if (groupAbility == true)
+                    ActionButton("FocusedMode.Group", "Make it a group casting (centred on the caster)",
+                        () => Surface(_session.SetFocusedTargeting(CastingTargetMode.CasterCenteredOrigin, null, null,
+                            focused.DirectTargetUnitId == null ? null : new[] { focused.DirectTargetUnitId }),
+                            "mode"));
+            }
+            else if (groupAbility == false)
+            {
+                Line("SingleHint", "This buff has one target per casting: choose who receives it.", 13,
+                    BlockedInk, false);
+                foreach (CastingGraphTargetNode target in view.Targets)
+                {
+                    string unit = target.UnitId;
+                    ActionButton("FocusedSingle." + unit, "Single target: " + target.DisplayName,
+                        () => Surface(_session.SetFocusedTargeting(CastingTargetMode.DirectTarget, unit, null, null),
+                            "mode"));
+                }
+            }
+            if (group && inspector.CoverageText.Length != 0)
+                Line("Coverage", inspector.CoverageText, 13,
+                    chip != null && chip.CoverageGaps.Count != 0 ? BlockedInk : _theme.DarkBrownText, false);
+            ActionButton("ToggleRetargets", _showRetargets ? "Hide other " + (group ? "centres" : "targets")
+                : group ? "Move the centre, or mark required recipients" : "Move to another target",
+                () => _showRetargets = !_showRetargets);
+            if (_showRetargets)
+            {
+                foreach (CastingGraphTargetNode target in inspector.Retargets)
+                {
+                    string unit = target.UnitId;
+                    ActionButton("Retarget." + unit, (group ? "Centre on " : "Move to ") + target.DisplayName,
+                        () => Surface(_session.RetargetFocusedCasting(unit), "retarget"));
+                }
+                if (group)
+                    foreach (CastingGraphTargetNode target in view.Targets)
+                    {
+                        string unit = target.UnitId;
+                        bool required = inspector.Casting.RequiredCoverageUnitIds.Contains(unit);
+                        ActionButton("Coverage." + unit, (required ? "[x] " : "[  ] ") + "Required: " +
+                            target.DisplayName, () => Surface(_session.SetFocusedCoverage(unit, !required), "coverage"));
+                    }
+            }
+            // Enhancements: this casting only.
+            Section("Enhancements (this casting only)");
+            if (inspector.Enhancements.Count == 0)
+                Line("NoEnhancement", "None available for this caster and source.", 13, _theme.MutedBrownText, false);
+            foreach (CastingGraphEnhancementOption option in inspector.Enhancements)
+            {
+                string id = option.EnhancementId;
+                Button toggle = ActionButton("Enhancement." + id,
+                    (option.Selected ? "[x] " : "[  ] ") + option.Name + (option.Selected && !option.Required
+                        ? " (optional, imported)" : string.Empty),
+                    () => Surface(_session.ToggleFocusedEnhancement(id, _inputs()), "enhancement"));
+                if (!option.Selected && option.UnavailableReason.Length != 0)
+                    KingmakerUiFactory.SetInteractable(toggle, false);
+                if (option.Selected) KingmakerUiFactory.ApplyPalette(toggle, true);
+                Line("EnhancementSource", option.Mechanism + " · " + option.SourceName, 12, _theme.MutedBrownText, false);
+                Line("EnhancementEffect", "Effect: " + option.ExpectedEffect, 12, _theme.DarkBrownText, false);
+                Line("EnhancementCost", "Cost: " + option.CostText + " · " + option.BudgetText, 12,
+                    option.PoolRemaining == 0 && !option.Selected ? BlockedInk : _theme.DarkBrownText, false);
+                if (option.UnavailableReason.Length != 0 && !option.Selected)
+                    Line("EnhancementUnavailable", option.UnavailableReason, 12, BlockedInk, false);
+            }
+            Section("Cost of this casting");
+            if (inspector.CostLines.Count == 0)
+                Line("NoCost", "Nothing is reserved for it now.", 13, _theme.MutedBrownText, false);
+            foreach (string cost in inspector.CostLines) Line("Cost", "· " + cost, 13, _theme.DarkBrownText, false);
+            // Routine, order, existing effect, state.
+            Section("Routine and order");
+            Line("RoutineLine", "Casting " + (inspector.Casting.Order + 1) + " of " + inspector.RoutineCount +
+                " in " + inspector.RoutineName, 13, _theme.DarkBrownText, false);
+            foreach (CastingGraphRoutineTab routine in view.Routines)
+            {
+                string routineId = routine.RoutineId;
+                if (string.Equals(routineId, inspector.Casting.RoutineId, StringComparison.Ordinal)) continue;
+                ActionButton("FocusedRoutine." + routineId, "Move to " + routine.Name,
+                    () => Surface(_session.MoveFocusedCastingToRoutine(routineId), "move"));
+            }
+            Button earlier = ActionButton("FocusedOrder.Earlier", "Cast earlier",
+                () => Surface(_session.MoveFocusedCastingWithinRoutine(-1), "move"));
+            KingmakerUiFactory.SetInteractable(earlier, inspector.CanMoveEarlier);
+            Button later = ActionButton("FocusedOrder.Later", "Cast later",
+                () => Surface(_session.MoveFocusedCastingWithinRoutine(1), "move"));
+            KingmakerUiFactory.SetInteractable(later, inspector.CanMoveLater);
+            Section("If the buff is already there");
+            ActionButton("FocusedRecastPolicy", inspector.RecastsExisting ? "[x] Cast it again anyway"
+                : "[  ] Cast it again anyway (now: skip it)",
+                () => Surface(_session.SetFocusedRecastPolicy(inspector.RecastsExisting
+                    ? ExistingEffectPolicy.SkipAlreadyActive : ExistingEffectPolicy.Overwrite), "recast"));
+            foreach (string note in inspector.ExistingEffectNotes)
+                Line("ExistingEffect", "· " + note, 12, _theme.MutedBrownText, false);
+            if (inspector.LastRun.Length != 0)
+                Line("LastRun", "Last run: " + inspector.LastRun, 12, _theme.MutedBrownText, false);
+            Section("This casting");
+            bool disabled = inspector.Casting.State == CastingAuthoringState.Disabled;
+            if (inspector.Casting.State != CastingAuthoringState.Ready)
+                ActionButton("Enable", "Mark Ready", () => Surface(_session.SetFocusedCastingState(
+                    CastingAuthoringState.Ready), "mark ready"));
+            if (!disabled)
+                ActionButton("Disable", "Disable (keep it, do not cast)", () => Surface(
+                    _session.SetFocusedCastingState(CastingAuthoringState.Disabled), "disable"));
+            ActionButton("Duplicate", "Duplicate (a second, separate casting)", () =>
+            {
+                CastingGraphEditResult result = _session.DuplicateFocusedCasting();
+                if (!result.Applied) Surface(result.Edit, "duplicate");
+                else _footerResult.text = "Added a separate casting (Undo removes it).";
+            });
+            ActionButton("Remove", "Remove this casting", () =>
+            {
+                AuthoringEditResult result = _session.RemoveFocusedCasting();
+                if (!result.Applied) Surface(result, "remove");
+                else _footerResult.text = "Casting removed (Undo restores it).";
+            });
+        }
+
+        private void RebuildImportNotices()
+        {
+            IReadOnlyList<string> pending = _session.PendingImportNotices;
+            if (pending.Count == 0) return;
+            Section("Imported plan-wide constraints (" + pending.Count + ")");
+            foreach (string notice in pending) Line("ImportNotice", "· " + notice, 12, _theme.MutedBrownText, false);
+            Line("ImportNoticeRule", "Apply is refused until these are acknowledged.", 12, BlockedInk, false);
+            ActionButton("AcknowledgeImportNotices", "Acknowledge imported constraints", () =>
+            {
+                AuthoringEditResult result = _session.AcknowledgeImportNotices();
+                Surface(result, "acknowledge");
+                if (result.Applied) _footerResult.text = "Acknowledged (Undo reverts): " + result.Scope;
+            });
+        }
+
+        private void Section(string caption)
+        {
+            Text label = KingmakerUiFactory.CreateText("Section." + caption, _inspectorContent, _theme, caption, 14,
+                TextAnchor.LowerLeft);
+            label.fontStyle = FontStyle.Bold;
+            label.color = Burgundy;
+            KingmakerUiFactory.AddLayout(label.rectTransform, 26f);
+        }
+
+        private Text Line(string name, string text, int size, Color colour, bool bold)
+        {
+            Text line = KingmakerUiFactory.CreateText(name, _inspectorContent, _theme, text, size,
+                TextAnchor.UpperLeft);
+            line.color = colour;
+            line.fontStyle = bold ? FontStyle.Bold : FontStyle.Normal;
+            line.horizontalOverflow = HorizontalWrapMode.Wrap;
+            line.verticalOverflow = VerticalWrapMode.Overflow;
+            // Wrapped text takes its own preferred height in the column.
+            return line;
+        }
+
+        private Button ActionButton(string name, string caption, Action action)
+        {
+            Button button = KingmakerUiFactory.CreateButton(name, _inspectorContent, _theme, caption,
+                () => Command(action));
+            foreach (Text text in button.GetComponentsInChildren<Text>(true))
+            {
+                text.fontSize = 14;
+                text.resizeTextMaxSize = 14;
+                text.resizeTextMinSize = 11;
+                text.alignment = TextAnchor.MiddleLeft;
+            }
+            KingmakerUiFactory.AddLayout(RectOf(button), 30f);
+            return button;
+        }
+
+        // ------------------------------------------------------------------
+        // Commands (all go through the session; the view refreshes after)
+        // ------------------------------------------------------------------
+
+        private void Command(Action action)
+        {
+            if (_disposed) return;
+            try
+            {
+                action();
+            }
+            catch (Exception exception)
+            {
+                // A failed command is told, never swallowed into a stale view.
+                _footerResult.text = "That did not work: " + exception.Message;
+                Debug.LogError("[KBP-WORKSPACE] command failed: " + exception);
+            }
+            RefreshView();
+        }
+
+        private void AddCastingTo(string unitId)
+        {
+            CastingGraphEditResult result = _session.AddGraphCasting(unitId, _inputs());
+            if (result.Applied)
+            {
+                _footerResult.text = "Added one casting (Undo removes it). Click its line or card to add enhancements.";
+                _showProviders = false;
+                _showRetargets = false;
+                return;
+            }
+            if (result.ShowedExisting)
+            {
+                _footerResult.text = "That target already has a casting of this buff here: it is shown. " +
+                    "Use Duplicate for a second one.";
+                return;
+            }
+            Surface(result.Edit, "add");
+        }
+
+        // A denied operation explains itself; an applied one with a note
+        // shows the note.
+        private void Surface(AuthoringEditResult result, string action)
+        {
+            if (result == null) return;
+            if (!result.Applied)
+                _footerResult.text = char.ToUpperInvariant(action[0]) + action.Substring(1) + " refused: " +
+                    WorkspaceRefusalText.Describe(result.Reason);
+            else if (!string.IsNullOrEmpty(result.Reason))
+                _footerResult.text = char.ToUpperInvariant(action[0]) + action.Substring(1) + ": " + result.Reason;
+        }
+
+        private void SaveCommand()
+        {
+            try
+            {
+                _session.Save();
+                _footerResult.text = "Casting plan saved.";
+            }
+            catch (Exception exception)
+            {
+                _footerResult.text = PersistenceMessages.ForSaveFailure(exception);
+            }
+        }
+
+        private void ReloadCommand()
+        {
+            // A reload that can replace unsaved changes asks for a second press.
+            if (_session.IsDirty && Time.unscaledTime > _reloadArmedUntil)
+            {
+                _reloadArmedUntil = Time.unscaledTime + 5f;
+                _footerResult.text = "Reload replaces this plan with the saved one, and unsaved changes can be " +
+                    "lost. Press Reload again to continue.";
+                return;
+            }
+            _reloadArmedUntil = 0f;
+            CastingPlanLoadStatus status = _session.Reload();
+            _footerResult.text = _session.LegacyImportBlocked
+                ? DescribeImport(_session)
+                : PersistenceMessages.ForCastingLoad(status, _session.PrimaryPlanFileExists,
+                    _session.LoadSourcePath, _session.LoadWarning) ??
+                  (_session.LastReloadNote == "kept-unsaved"
+                      ? "No casting plan is saved yet; your castings were kept. Save writes them."
+                      : _session.LastReloadNote == "imported-into-unsaved"
+                          ? "Your classic plan was imported alongside your castings and saved."
+                          : _session.ImportReport != null ? DescribeImport(_session)
+                          : status == CastingPlanLoadStatus.Absent
+                              ? "No casting plan is saved yet; Save writes one."
+                              : "Reloaded the saved casting plan.");
+        }
+
+        private void ToggleModeCommand()
+        {
+            _session.SetExecutionMode(_session.ExecutionMode == "instant" ? "animated" : "instant");
+            KingmakerUiFactory.SetButtonLabel(_modeButton, ModeCaption());
+            _footerResult.text = "Casting mode: " + _session.ExecutionMode + " (Save to keep it).";
+        }
+
+        private void UndoCommand()
+        {
+            if (!_session.Undo()) _footerResult.text = "Nothing to undo.";
+        }
+
+        private void AcceptCommand()
+        {
+            bool accepted = _session.AcceptPresentedPlan(_inputs());
+            string warning = PersistenceMessages.ForReviewWarning(_session.ReviewStoreWarning);
+            _footerResult.text = !accepted ? "Acceptance refused: the plan changed or was not shown."
+                : warning ?? "Plan accepted for " + _session.RoutineDisplayName(_session.SelectedRoutineId) + ".";
         }
 
         private string ModeCaption()
@@ -699,15 +1573,6 @@ namespace KingmakerBuffPlanner.UI
             return _session.ExecutionMode == "instant" ? "Mode: Instant" : "Mode: Animated";
         }
 
-        private void SetModeCaption()
-        {
-            Text caption = _modeButton == null ? null
-                : _modeButton.GetComponentInChildren<Text>();
-            if (caption != null) caption.text = ModeCaption();
-        }
-
-        // The last run result when there is one; otherwise whether native
-        // casting is available in this session.
         private string DescribeReadiness()
         {
             if (!string.IsNullOrEmpty(_session.LastAttemptMessage))
@@ -718,8 +1583,7 @@ namespace KingmakerBuffPlanner.UI
                     _session.RoutineDisplayName(last.ScopeRoutineId), _session.CastingLabel);
             string disposition = _session.DispatchDisposition ?? string.Empty;
             if (disposition == "native-casting-enabled")
-                return "Review the plan, press Accept Plan, then Review & Apply (or use the " +
-                    "routine buttons).";
+                return "Review the plan, press Accept Plan, then Review & Apply (or use the routine buttons).";
             if (disposition == "native-casting-busy")
                 return "A routine is running; press its button again to stop it.";
             return "Native casting is not available in this session (" + disposition + ").";
@@ -732,1149 +1596,65 @@ namespace KingmakerBuffPlanner.UI
             try { inputs = _freshInputs(); }
             catch (Exception exception)
             {
-                // A stale plan is never executed: without fresh discovery
-                // nothing is submitted.
-                _footerResult.text = name + " was not cast: the party state could not be " +
-                    "refreshed (" + exception.Message + ").";
+                // Without fresh discovery nothing is submitted.
+                _footerResult.text = name + " was not cast: the party state could not be refreshed (" +
+                    exception.Message + ").";
                 return;
             }
-            WorkspaceApplyResult result = _session.Apply(
-                mode, _session.SelectedRoutineId, inputs);
-            if (!result.Allowed && result.GateDecision != null &&
-                !result.GateDecision.Allowed && mode == CastingApplyMode.Ordinary)
+            WorkspaceApplyResult result = _session.Apply(mode, _session.SelectedRoutineId, inputs);
+            if (!result.Allowed && result.GateDecision != null && !result.GateDecision.Allowed &&
+                mode == CastingApplyMode.Ordinary)
             {
                 int notReady = _lastView == null ? 0
                     : Math.Max(0, _lastView.RoutineCastingCount - _lastView.RoutineReadyCount);
                 _footerResult.text = "Apply blocked: " + (notReady == 1 ? "1 casting is" : notReady + " castings are") +
-                    " not ready (see the cards). Fix them, or use Ready Casts Only to run the ready ones.";
+                    " not ready (red lines and cards). Fix them, or use Ready Casts Only to run the ready ones.";
                 _readyOnlyButton.gameObject.SetActive(true);
                 return;
             }
             if (result.Allowed && result.Dispatch != null && result.Dispatch.Submitted)
             {
-                // The run proceeds in the world: the workspace closes so the
-                // party can act, and the result is reported when it ends.
+                // The run proceeds in the world; the result is reported at its end.
                 _close();
                 return;
             }
             _footerResult.text = CastingRunPresentation.DescribeRefusal(name, result);
-            if (result.Dispatch != null && !result.Dispatch.Submitted &&
-                result.Projection != null && result.Projection.Converted)
+            if (result.Dispatch != null && !result.Dispatch.Submitted && result.Projection != null &&
+                result.Projection.Converted)
                 _footerResult.text += " Would run " + result.Projection.Plan.Steps.Count +
-                    (result.Projection.Plan.Steps.Count == 1 ? " cast" : " casts") +
-                    " in order.";
+                    (result.Projection.Plan.Steps.Count == 1 ? " cast" : " casts") + " in order.";
         }
 
-        private void Click(Action action)
+        private void RebuildFooter(CastingGraphView view)
         {
-            PlannerNativeTheme.PlayClick(null);
-            action();
+            _footerSelectedRun.text = view.SelectedRunLabel + ": " + (view.SelectedRunBudget.Count == 0
+                ? "nothing spent yet" : string.Join("   ", view.SelectedRunBudget.ToArray()));
+            // The conflict first: a long pool list may be cut short, the
+            // shortfall never is.
+            string shortfall = WorkspaceFooterText.WholePlan(view.OnePassShortCount);
+            _footerOnePass.text = (shortfall.Length == 0 ? string.Empty : shortfall + "   ") +
+                view.OnePassLabel + ": " + (view.OnePassBudget.Count == 0
+                    ? "nothing spent yet" : string.Join("   ", view.OnePassBudget.ToArray()));
+            _footerOnePass.color = view.OnePassShortCount > 0 ? BlockedInk : _theme.DarkBrownText;
+            if (_undoButton != null) KingmakerUiFactory.SetInteractable(_undoButton, _session.CanUndo);
         }
 
-        private void RebuildBuffGrid(WorkspaceView view)
+        private static string DescribeImport(CastingWorkspaceSession session)
         {
-            KingmakerUiFactory.DestroyChildren(_buffGridContent);
-            if (view.Draft == null) return;
-            IReadOnlyDictionary<string, int> counts =
-                WorkspaceBuffSummary.CastingsBySource(
-                    _session.Document.Castings, view.SelectedRoutineId);
-            int shown = 0;
-            foreach (WorkspaceSourceOption source in view.Draft.Sources)
-            {
-                // The selected buff stays visible even when filtered out.
-                if (!source.Selected &&
-                    (!WorkspaceSourceLabels.Matches(source, _buffQuery) ||
-                     !WorkspaceSourceLabels.MatchesCategory(source, _sourceCategory))) continue;
-                shown++;
-                WorkspaceSourceOption captured = source;
-                int count;
-                counts.TryGetValue(captured.SourceId, out count);
-                RectTransform rect = KingmakerUiFactory.CreateRect(
-                    "Source." + captured.SourceId, _buffGridContent);
-                Image background = KingmakerUiFactory.AddPanel(rect,
-                    captured.Selected ? _theme.ParchmentRaised : _theme.ParchmentPanel);
-                Button button = rect.gameObject.AddComponent<Button>();
-                button.targetGraphic = background;
-                button.onClick.AddListener(() => Click(() =>
-                {
-                    _session.SelectBuff(captured.SourceId);
-                    _session.Draft.SourceId = captured.SourceId;
-                    RefreshView();
-                }));
-                if (captured.Selected)
-                {
-                    RectTransform rule = KingmakerUiFactory.CreateRect("Selected", rect);
-                    KingmakerUiFactory.SetAnchors(rule, 0f, 0f, 0f, 1f);
-                    rule.sizeDelta = new Vector2(5f, 0f);
-                    rule.pivot = new Vector2(0f, 0.5f);
-                    KingmakerUiFactory.AddPanel(rule, _theme.GoldAccent).raycastTarget = false;
-                }
-                RectTransform iconRect = KingmakerUiFactory.CreateRect("Icon", rect);
-                KingmakerUiFactory.SetAnchors(iconRect, 0f, 0f, 0f, 1f, 8f, 0f, 5f, 5f);
-                iconRect.pivot = new Vector2(0f, 0.5f);
-                iconRect.sizeDelta = new Vector2(50f, -10f);
-                iconRect.anchoredPosition = new Vector2(8f, 0f);
-                Sprite icon = ResolveAbilityIcon(captured.IconAbility);
-                Image iconImage = iconRect.gameObject.AddComponent<Image>();
-                iconImage.sprite = icon;
-                iconImage.preserveAspect = true;
-                iconImage.raycastTarget = false;
-                iconImage.color = icon == null ? _theme.MutedBrownText : Color.white;
-                Text name = KingmakerUiFactory.CreateText("Name", rect, _theme,
-                    captured.Label, 15, TextAnchor.UpperLeft);
-                name.fontStyle = captured.Selected ? FontStyle.Bold : FontStyle.Normal;
-                KingmakerUiFactory.Stretch(name.rectTransform, 66, 8, 20, 4);
-                string routineName = _session.RoutineDisplayName(view.SelectedRoutineId);
-                Text castings = KingmakerUiFactory.CreateText("Count", rect, _theme,
-                    count == 0 ? "no castings in " + routineName
-                        : count + (count == 1 ? " casting" : " castings") +
-                          " in " + routineName,
-                    12, TextAnchor.LowerLeft);
-                castings.color = count == 0 ? _theme.MutedBrownText : _theme.GreenSuccess;
-                KingmakerUiFactory.Stretch(castings.rectTransform, 66, 8, 3, 36);
-            }
-            if (shown == 0)
-            {
-                string where = _sourceCategory == PlannerSourceCategory.All
-                    ? string.Empty : " under " + _sourceCategory;
-                Text none = KingmakerUiFactory.CreateText("NoMatch", _buffGridContent,
-                    _theme, _buffQuery.Length == 0
-                        ? "No buffs" + where + "."
-                        : "No buff matches \"" + _buffQuery + "\"" + where + ".", 14,
-                    TextAnchor.MiddleLeft);
-                none.color = _theme.MutedBrownText;
-            }
-        }
-
-        private static Sprite ResolveAbilityIcon(AbilityKey ability)
-        {
-            if (ability == null) return null;
-            try
-            {
-                if (!string.IsNullOrWhiteSpace(ability.VariantGuid))
-                {
-                    BlueprintAbility concrete =
-                        ResourcesLibrary.TryGetBlueprint<BlueprintAbility>(
-                            ability.VariantGuid);
-                    if (concrete != null && concrete.Icon != null) return concrete.Icon;
-                }
-                BlueprintAbility parent =
-                    ResourcesLibrary.TryGetBlueprint<BlueprintAbility>(
-                        ability.BaseAbilityGuid);
-                return parent == null ? null : parent.Icon;
-            }
-            catch (Exception)
-            {
-                // A non-ability source (item, fact) simply shows no icon.
-                return null;
-            }
-        }
-
-        // A portrait tile: the primary hit area for choosing a caster or a
-        // recipient (charter §6.2). Selected tiles carry a gold frame;
-        // coverage tints follow Bubble Buffs' legend.
-        private Button CreatePortraitTile(string name, Transform parent,
-            string unitId, string label, bool selected, Color tint,
-            UnityEngine.Events.UnityAction action)
-        {
-            RectTransform rect = KingmakerUiFactory.CreateRect(name, parent);
-            Image frame = KingmakerUiFactory.AddPanel(rect,
-                selected ? _theme.GoldAccent : _theme.ParchmentPanel);
-            Button button = rect.gameObject.AddComponent<Button>();
-            button.targetGraphic = frame;
-            if (action != null) button.onClick.AddListener(action);
-            RectTransform picture = KingmakerUiFactory.CreateRect("Portrait", rect);
-            KingmakerUiFactory.SetAnchors(picture, 0f, 0.2f, 1f, 1f, 4f, 4f, 2f, 4f);
-            Sprite portrait = BuffPlannerScreenView.ResolvePortrait(unitId);
-            Image image = picture.gameObject.AddComponent<Image>();
-            image.sprite = portrait;
-            image.preserveAspect = true;
-            image.raycastTarget = false;
-            image.color = portrait == null ? new Color(0f, 0f, 0f, 0.08f) : tint;
-            Text caption = KingmakerUiFactory.CreateText("Label", rect, _theme,
-                label, 13, TextAnchor.MiddleCenter);
-            caption.color = selected ? _theme.ButtonText : _theme.DarkBrownText;
-            caption.fontStyle = selected ? FontStyle.Bold : FontStyle.Normal;
-            caption.resizeTextForBestFit = true;
-            caption.resizeTextMinSize = 10;
-            caption.resizeTextMaxSize = 13;
-            KingmakerUiFactory.SetAnchors(caption.rectTransform, 0f, 0f, 1f, 0.2f, 2f, 2f, 1f, 0f);
-            return button;
-        }
-
-        private static string SourceLabel(WorkspaceView view, string sourceId)
-        {
-            WorkspaceSourceOption match = view == null || view.Draft == null ? null :
-                view.Draft.Sources.FirstOrDefault(source => string.Equals(
-                    source.SourceId, sourceId, StringComparison.Ordinal));
-            return match == null ? "unnamed buff" : match.Label;
-        }
-
-        private static string UnitName(WorkspaceView view, string unitId)
-        {
-            WorkspaceTargetOption match = view == null || view.Draft == null ? null :
-                view.Draft.Targets.FirstOrDefault(target => string.Equals(
-                    target.UnitId, unitId, StringComparison.Ordinal));
-            return match == null ? unitId : match.DisplayName;
-        }
-
-        private RectTransform CreateTileRow(string name)
-        {
-            RectTransform row = KingmakerUiFactory.CreateRect(name, _inspectorContent);
-            GridLayoutGroup grid = row.gameObject.AddComponent<GridLayoutGroup>();
-            grid.cellSize = new Vector2(88f, 112f);
-            grid.spacing = new Vector2(6f, 6f);
-            grid.childAlignment = TextAnchor.UpperLeft;
-            return row;
-        }
-
-        // Enhancements are compact chips (Extend, rods, metamagic) laid out
-        // in rows; a selected chip is gold, an unselected one keeps the
-        // native button look. Selected enhancements on a new casting are
-        // requirements, never silently dropped.
-        private RectTransform CreateChipRow(string name)
-        {
-            RectTransform row = KingmakerUiFactory.CreateRect(name, _inspectorContent);
-            GridLayoutGroup grid = row.gameObject.AddComponent<GridLayoutGroup>();
-            grid.cellSize = new Vector2(236f, 30f);
-            grid.spacing = new Vector2(6f, 6f);
-            grid.childAlignment = TextAnchor.UpperLeft;
-            return row;
-        }
-
-        private void StyleChip(Button chip, bool selected)
-        {
-            Image image = chip.targetGraphic as Image;
-            if (image != null)
-                image.color = selected ? _theme.GoldAccent : Color.white;
-            Transform labelNode = chip.transform.Find("Label");
-            Text label = labelNode == null ? null : labelNode.GetComponent<Text>();
-            if (label != null && selected)
-                label.text = "● " + label.text;
-        }
-
-        private Color CoverageTint(WorkspaceRecipientCoverage coverage)
-        {
-            switch (coverage)
-            {
-                case WorkspaceRecipientCoverage.CoveredReady:
-                    return new Color(0.55f, 1f, 0.55f, 1f);
-                case WorkspaceRecipientCoverage.CoveredNotReady:
-                    return new Color(1f, 0.85f, 0.40f, 1f);
-                default:
-                    return Color.white;
-            }
-        }
-
-        private void RebuildCards(WorkspaceView view)
-        {
-            ScrollRect scroll = _cardContent.GetComponentInParent<ScrollRect>();
-            if (scroll != null) _cardScrollPosition = scroll.normalizedPosition;
-            KingmakerUiFactory.DestroyChildren(_cardContent);
-            _castingsTitle.text = _session.ShowWholeRoutine
-                ? "Every casting in " + view.SelectedRoutineId + " — each card is one cast"
-                : "Castings of " + view.SelectedSourceCaption + " — each card is one cast";
-            KingmakerUiFactory.SetButtonLabel(_scopeToggle, _session.ShowWholeRoutine
-                ? "Only this buff" : "Show whole routine");
-            if (view.Cards.Count == 0)
-            {
-                Text hint = KingmakerUiFactory.CreateText(
-                    "EmptyHint", _cardContent, _theme,
-                    "No castings of this buff yet.\n" +
-                    "Choose who casts it and who receives it in the Inspector, " +
-                    "then press Add Casting. Each casting is one cast of one " +
-                    "buff and can be edited on its own.", 15, TextAnchor.UpperLeft);
-                hint.color = _theme.MutedBrownText;
-                hint.horizontalOverflow = HorizontalWrapMode.Wrap;
-                KingmakerUiFactory.AddLayout(hint.rectTransform, 90f);
-            }
-            foreach (WorkspaceCastingCard card in view.Cards)
-            {
-                RectTransform entry = KingmakerUiFactory.CreateRect(
-                    "Card." + card.CastingId, _cardContent);
-                KingmakerUiFactory.AddFramedPanel(entry,
-                    card.EditingFocus
-                        ? _theme.ParchmentRaised : _theme.ParchmentPanel,
-                    _theme.GoldAccent);
-                KingmakerUiFactory.AddLayout(entry, 96f);
-                AddCardPortrait(entry, "CasterPortrait", card.CasterUnitId, 8f);
-                if (card.DirectTargetUnitId != null)
-                {
-                    Text arrow = KingmakerUiFactory.CreateText("Arrow", entry, _theme,
-                        "→", 22, TextAnchor.MiddleCenter);
-                    KingmakerUiFactory.SetAnchors(arrow.rectTransform, 0f, 0f, 0f, 1f);
-                    arrow.rectTransform.pivot = new Vector2(0f, 0.5f);
-                    arrow.rectTransform.sizeDelta = new Vector2(24f, 0f);
-                    arrow.rectTransform.anchoredPosition = new Vector2(76f, 0f);
-                    AddCardPortrait(entry, "TargetPortrait", card.DirectTargetUnitId, 102f);
-                }
-                else
-                {
-                    // Group casting: one cast, several predicted
-                    // beneficiaries (small portraits); intended recipients
-                    // outside predicted coverage stay visible in red —
-                    // never silently covered by another casting.
-                    Text arrow = KingmakerUiFactory.CreateText("Arrow", entry, _theme,
-                        "⇉", 20, TextAnchor.MiddleCenter);
-                    KingmakerUiFactory.SetAnchors(arrow.rectTransform, 0f, 0f, 0f, 1f);
-                    arrow.rectTransform.pivot = new Vector2(0f, 0.5f);
-                    arrow.rectTransform.sizeDelta = new Vector2(24f, 0f);
-                    arrow.rectTransform.anchoredPosition = new Vector2(76f, 0f);
-                    var shown = new List<KeyValuePair<string, bool>>();
-                    foreach (string unit in card.PredictedBeneficiaryUnitIds ?? new string[0])
-                        shown.Add(new KeyValuePair<string, bool>(unit, false));
-                    foreach (string unit in card.CoverageGapUnitIds ?? new string[0])
-                        shown.Add(new KeyValuePair<string, bool>(unit, true));
-                    for (int index = 0; index < shown.Count && index < 6; index++)
-                    {
-                        RectTransform small = KingmakerUiFactory.CreateRect(
-                            "Beneficiary." + shown[index].Key, entry);
-                        KingmakerUiFactory.SetAnchors(small, 0f, 0.5f, 0f, 0.5f);
-                        small.pivot = new Vector2(0f, 0.5f);
-                        small.sizeDelta = new Vector2(30f, 38f);
-                        small.anchoredPosition = new Vector2(
-                            102f + (index % 3) * 32f, index < 3 ? 20f : -20f);
-                        Sprite portrait = BuffPlannerScreenView.ResolvePortrait(shown[index].Key);
-                        Image image = small.gameObject.AddComponent<Image>();
-                        image.sprite = portrait;
-                        image.preserveAspect = true;
-                        image.raycastTarget = false;
-                        image.color = portrait == null ? new Color(0f, 0f, 0f, 0.08f)
-                            : shown[index].Value ? new Color(1f, 0.45f, 0.45f, 1f) : Color.white;
-                    }
-                }
-                string coverage = card.CoverageSummary.Length == 0
-                    ? string.Empty : " · " + card.CoverageSummary;
-                string buffName = _session.ShowWholeRoutine
-                    ? SourceLabel(view, card.SourceId) + ": " : string.Empty;
-                Text title = KingmakerUiFactory.CreateText(
-                    "Title", entry, _theme,
-                    buffName + card.Headline + "   (" + card.Subtitle + ")", 16,
-                    TextAnchor.MiddleLeft);
-                title.fontStyle = FontStyle.Bold;
-                KingmakerUiFactory.SetAnchors(title.rectTransform, 0f, 0.55f, 0.62f, 1f,
-                    176f, 4f, 0f, 4f);
-                Text status = KingmakerUiFactory.CreateText(
-                    "Status", entry, _theme,
-                    card.StatusLabel + coverage, 14, TextAnchor.UpperRight);
-                KingmakerUiFactory.SetAnchors(status.rectTransform, 0.55f, 0.55f, 0.98f, 0.92f);
-                Text detail = KingmakerUiFactory.CreateText(
-                    "Detail", entry, _theme,
-                    BuildCardDetail(view, card), 13, TextAnchor.UpperLeft);
-                KingmakerUiFactory.SetAnchors(detail.rectTransform, 0f, 0.05f, 0.85f, 0.55f,
-                    176f, 8f, 2f, 2f);
-                Button edit = KingmakerUiFactory.CreateButton(
-                    "Edit." + card.CastingId, entry, _theme, "Edit", () => Click(() =>
-                    {
-                        _session.FocusCasting(card.CastingId);
-                        RefreshView();
-                    }));
-                KingmakerUiFactory.SetAnchors(RectOf(edit), 0.86f, 0.08f, 0.98f, 0.4f);
-            }
-            if (scroll != null) scroll.normalizedPosition = _cardScrollPosition;
-        }
-
-        private void AddCardPortrait(RectTransform entry, string name,
-            string unitId, float x)
-        {
-            RectTransform picture = KingmakerUiFactory.CreateRect(name, entry);
-            KingmakerUiFactory.SetAnchors(picture, 0f, 0f, 0f, 1f);
-            picture.pivot = new Vector2(0f, 0.5f);
-            picture.sizeDelta = new Vector2(66f, -12f);
-            picture.anchoredPosition = new Vector2(x, 0f);
-            Sprite portrait = BuffPlannerScreenView.ResolvePortrait(unitId);
-            Image image = picture.gameObject.AddComponent<Image>();
-            image.sprite = portrait;
-            image.preserveAspect = true;
-            image.raycastTarget = false;
-            image.color = portrait == null ? new Color(0f, 0f, 0f, 0.08f) : Color.white;
-        }
-
-        private static string BuildCardDetail(WorkspaceView view, WorkspaceCastingCard card)
-        {
-            var parts = new List<string>();
-            if (card.DirectTargetUnitId != null)
-                parts.Add("Target: " + (card.DirectTargetDisplayName ??
-                    card.DirectTargetUnitId));
-            if (card.OriginLabel.Length != 0) parts.Add(card.OriginLabel);
-            if (card.EnhancementLabels.Count != 0)
-                parts.Add("Enhancements: " + string.Join(", ", card.EnhancementLabels));
-            if (card.CostLabels.Count != 0)
-                parts.Add("Cost: " + string.Join(", ", card.CostLabels));
-            if (card.CoverageGapDisplayNames.Count != 0)
-                parts.Add("Outside coverage: " + string.Join(", ",
-                    card.CoverageGapDisplayNames));
-            // Player-facing reasons; the import reason is not repeated when the
-            // review items themselves are listed.
-            string[] reasons = card.ReadinessReasons
-                .Where(code => card.ReviewItems.Count == 0 ||
-                    !code.StartsWith("import-review-unresolved", StringComparison.Ordinal))
-                .Select(WorkspaceReasonText.Describe).Distinct(StringComparer.Ordinal).ToArray();
-            if (reasons.Length != 0)
-                parts.Add("Why not ready: " + string.Join("; ", reasons));
-            if (card.ReviewItems.Count != 0)
-                parts.Add("Imported, needs your review: " + string.Join("; ", card.ReviewItems
-                    .Select(WorkspaceReasonText.DescribeReviewItem).Distinct(StringComparer.Ordinal).ToArray()));
-            if (card.ExecutionLimitation != null)
-                parts.Add("Cannot run in this version: " +
-                    CastingRunPresentation.DescribeLimitation(card.ExecutionLimitation));
-            if (card.ExistingEffectNotes.Count != 0)
-                parts.Add("Existing effect: " + string.Join("; ", card.ExistingEffectNotes
-                    .Select(note => CastingRunPresentation.DescribeExistingEffectNote(note,
-                        unitId => UnitName(view, unitId))).ToArray()));
-            if (card.LastRunOutcome != null) parts.Add("Last run: " + card.LastRunOutcome);
-            return string.Join("  ·  ", parts);
-        }
-
-        private void RebuildInspector(WorkspaceView view)
-        {
-            bool editing = view.EditingScope == WorkspaceEditingScope.EditingSingleCasting;
-            if (_pinnedAdd != null) _pinnedAdd.gameObject.SetActive(!editing);
-            if (_pinnedDone != null) _pinnedDone.gameObject.SetActive(editing);
-            KingmakerUiFactory.DestroyChildren(_inspectorContent);
-            Text scope = KingmakerUiFactory.CreateText(
-                "Scope", _inspectorContent, _theme, view.EditingScopeLabel, 16,
-                TextAnchor.MiddleLeft);
-            scope.fontStyle = FontStyle.Bold;
-            KingmakerUiFactory.AddLayout(scope.rectTransform, 30f);
-            RebuildImportNotices();
-            if (view.EditingScope == WorkspaceEditingScope.EditingSingleCasting)
-            {
-                RebuildFocusedCastingEditor(view);
-                return;
-            }
-            RebuildDraftEditor(view);
-        }
-
-        // Review L1: plan-wide legacy constraints are shown with an explicit,
-        // undoable acknowledgement; until then no apply mode runs.
-        private void RebuildImportNotices()
-        {
-            IReadOnlyList<string> pending = _session.PendingImportNotices;
-            if (pending.Count == 0) return;
-            AddInspectorCaption("Imported plan-wide constraints (" + pending.Count + ")");
-            Text notices = KingmakerUiFactory.CreateText(
-                "ImportNotices", _inspectorContent, _theme,
-                string.Join("\n", pending.ToArray()) +
-                "\nApply is refused until these are acknowledged.",
-                12, TextAnchor.UpperLeft);
-            notices.color = _theme.MutedBrownText;
-            KingmakerUiFactory.AddLayout(notices.rectTransform, 18f * (pending.Count + 1));
-            Button acknowledge = KingmakerUiFactory.CreateButton(
-                "AcknowledgeImportNotices", _inspectorContent, _theme,
-                "Acknowledge imported constraints", () => Click(() =>
-                {
-                    AuthoringEditResult result = _session.AcknowledgeImportNotices();
-                    SurfaceRefusal(result, "acknowledge");
-                    if (result.Applied)
-                        _footerResult.text = "Acknowledged (Undo reverts): " + result.Scope;
-                    RefreshView();
-                }));
-            KingmakerUiFactory.AddLayout(RectOf(acknowledge), 30f);
-        }
-
-        private void RebuildFocusedCastingEditor(WorkspaceView view)
-        {
-            Domain.Authoring.PlannedCasting focused =
-                _session.Document.Castings.FirstOrDefault(casting =>
-                    casting != null && string.Equals(casting.CastingId,
-                        _session.EditingFocusCastingId, StringComparison.Ordinal));
-            if (focused == null)
-            {
-                Text missing = KingmakerUiFactory.CreateText(
-                    "Missing", _inspectorContent, _theme,
-                    "Focused casting is absent from the document.", 13,
-                    TextAnchor.UpperLeft);
-                missing.color = _theme.MutedBrownText;
-                KingmakerUiFactory.AddLayout(missing.rectTransform, 34f);
-                return;
-            }
-            if (focused.Provenance != null &&
-                focused.Provenance.UnresolvedReviewItems.Count != 0)
-            {
-                Func<string, string> reviewUnitName = unitId => UnitName(view, unitId);
-                AddInspectorCaption("Imported: needs review");
-                Text items = KingmakerUiFactory.CreateText(
-                    "ImportReviewItems", _inspectorContent, _theme,
-                    string.Join("\n", focused.Provenance.UnresolvedReviewItems
-                        .Select(item => WorkspaceReasonText.DescribeReviewItem(item, reviewUnitName))
-                        .ToArray()) +
-                    "\nThis casting cannot run until the review is resolved.",
-                    12, TextAnchor.UpperLeft);
-                items.color = _theme.MutedBrownText;
-                KingmakerUiFactory.AddLayout(items.rectTransform,
-                    18f * (focused.Provenance.UnresolvedReviewItems.Count + 1));
-                Button resolve = KingmakerUiFactory.CreateButton(
-                    "ResolveImportReview", _inspectorContent, _theme,
-                    "Resolve review (keep current choices)", () => Click(() =>
-                    {
-                        AuthoringEditResult result = _session.ResolveFocusedImportReview();
-                        SurfaceRefusal(result, "resolve review");
-                        if (result.Applied)
-                            _footerResult.text = "Resolved (Undo reverts): " + result.Scope;
-                        RefreshView();
-                    }));
-                KingmakerUiFactory.AddLayout(RectOf(resolve), 30f);
-            }
-            // Final review B2/B3: who casts this casting, from exactly which
-            // spellbook level, item or ability; an imported casting whose old
-            // plan let the planner pick any caster gets its caster here.
-            AddInspectorCaption("Cast by (this casting)");
-            if (view.FocusedProviders.Count == 0)
-            {
-                Text noProvider = KingmakerUiFactory.CreateText(
-                    "NoFocusedProvider", _inspectorContent, _theme,
-                    "Nobody in the party can cast this buff right now.", 13,
-                    TextAnchor.MiddleLeft);
-                noProvider.color = _theme.MutedBrownText;
-                KingmakerUiFactory.AddLayout(noProvider.rectTransform, 26f);
-            }
-            for (int index = 0; index < view.FocusedProviders.Count; index++)
-            {
-                WorkspaceProviderChoice captured = view.FocusedProviders[index];
-                Button provider = KingmakerUiFactory.CreateButton(
-                    "FocusedProvider." + index, _inspectorContent, _theme,
-                    (captured.Selected ? "[x] " : "[  ] ") + captured.Label,
-                    () => Click(() =>
-                    {
-                        SurfaceRefusal(_session.SetFocusedProvider(captured.ProviderKey, _inputs()), "caster");
-                        RefreshView();
-                    }));
-                KingmakerUiFactory.AddLayout(RectOf(provider), 30f);
-            }
-            AddInspectorCaption("Routine and order");
-            RectTransform focusedRoutineRow = CreateChipRow("FocusedRoutineChips");
-            foreach (string routineId in view.RoutineIds)
-            {
-                string capturedRoutine = routineId;
-                Button move = KingmakerUiFactory.CreateButton(
-                    "FocusedRoutine." + capturedRoutine, focusedRoutineRow, _theme,
-                    _session.RoutineDisplayName(capturedRoutine), () => Click(() =>
-                    {
-                        SurfaceRefusal(_session.MoveFocusedCastingToRoutine(capturedRoutine), "move");
-                        RefreshView();
-                    }));
-                StyleChip(move, string.Equals(focused.RoutineId, capturedRoutine,
-                    StringComparison.Ordinal));
-            }
-            RectTransform focusedOrderRow = CreateChipRow("FocusedOrderChips");
-            Button earlier = KingmakerUiFactory.CreateButton(
-                "FocusedOrder.Earlier", focusedOrderRow, _theme, "Cast earlier", () => Click(() =>
-                {
-                    SurfaceRefusal(_session.MoveFocusedCastingWithinRoutine(-1), "move");
-                    RefreshView();
-                }));
-            StyleChip(earlier, false);
-            Button later = KingmakerUiFactory.CreateButton(
-                "FocusedOrder.Later", focusedOrderRow, _theme, "Cast later", () => Click(() =>
-                {
-                    SurfaceRefusal(_session.MoveFocusedCastingWithinRoutine(1), "move");
-                    RefreshView();
-                }));
-            StyleChip(later, false);
-            AddInspectorCaption("If the buff is already there");
-            bool recastFocused = focused.ExistingEffectPolicy ==
-                Domain.Planning.ExistingEffectPolicy.Overwrite;
-            Button recastPolicy = KingmakerUiFactory.CreateButton(
-                "FocusedRecastPolicy", _inspectorContent, _theme,
-                recastFocused ? "[x] Cast it again anyway" : "[  ] Cast it again anyway (now: skip it)",
-                () => Click(() =>
-                {
-                    SurfaceRefusal(_session.SetFocusedRecastPolicy(recastFocused
-                        ? Domain.Planning.ExistingEffectPolicy.SkipAlreadyActive
-                        : Domain.Planning.ExistingEffectPolicy.Overwrite), "recast");
-                    RefreshView();
-                }));
-            KingmakerUiFactory.AddLayout(RectOf(recastPolicy), 30f);
-            bool directRecord = focused.TargetMode ==
-                Domain.Authoring.CastingTargetMode.DirectTarget;
-            bool? groupAbility = _session.FocusedCastingIsGroupAbility(_inputs());
-            AddInspectorCaption(directRecord
-                ? "Retarget (direct)" : "Group targeting");
-            if (directRecord)
-            {
-                RectTransform retargetRow = CreateTileRow("RetargetTiles");
-                foreach (WorkspaceTargetOption target in view.Draft.Targets)
-                {
-                    WorkspaceTargetOption captured = target;
-                    bool selected = string.Equals(focused.DirectTargetUnitId,
-                        captured.UnitId, StringComparison.Ordinal);
-                    CreatePortraitTile("Target." + captured.UnitId, retargetRow,
-                        captured.UnitId, captured.DisplayName, selected, Color.white,
-                        () => Click(() =>
-                        {
-                            AuthoringEditResult result = _session
-                                .SetFocusedTargeting(
-                                    Domain.Authoring.CastingTargetMode.DirectTarget,
-                                    captured.UnitId, null, null);
-                            SurfaceRefusal(result, "retarget");
-                            RefreshView();
-                        }));
-                }
-                // Re-review: a single-target casting of a group buff can become
-                // a group casting centred on its caster (its target becomes the
-                // required coverage); offered only for a group buff (focused
-                // re-review).
-                if (groupAbility == true)
-                {
-                    Button toGroup = KingmakerUiFactory.CreateButton(
-                        "FocusedMode.Group", _inspectorContent, _theme,
-                        "Make it a group casting (centred on the caster)", () => Click(() =>
-                        {
-                            SurfaceRefusal(_session.SetFocusedTargeting(
-                                Domain.Authoring.CastingTargetMode.CasterCenteredOrigin, null, null,
-                                focused.DirectTargetUnitId == null ? null : new[] { focused.DirectTargetUnitId }),
-                                "mode");
-                            RefreshView();
-                        }));
-                    KingmakerUiFactory.AddLayout(RectOf(toGroup), 30f);
-                }
-            }
-            else
-            {
-                // Group records edit origin and coverage through the
-                // group-aware command — never direct-target cloning
-                // (review G2).
-                Button casterOrigin = KingmakerUiFactory.CreateButton(
-                    "FocusedOrigin.Caster", _inspectorContent, _theme,
-                    focused.Origin != null && focused.Origin.IsCasterCentered
-                        ? "[x] Origin: caster" : "[  ] Origin: caster",
-                    () => Click(() =>
-                    {
-                        AuthoringEditResult result = _session
-                            .SetFocusedTargeting(
-                                Domain.Authoring.CastingTargetMode.CasterCenteredOrigin,
-                                null, null, focused.RequiredCoverageUnitIds);
-                        SurfaceRefusal(result, "origin");
-                        RefreshView();
-                    }));
-                KingmakerUiFactory.AddLayout(RectOf(casterOrigin), 30f);
-                RectTransform focusedOriginRow = CreateTileRow("FocusedOriginTiles");
-                foreach (WorkspaceOriginOption origin in view.FocusedOrigins)
-                {
-                    WorkspaceOriginOption captured = origin;
-                    CreatePortraitTile("FocusedOrigin." + captured.AnchorUnitId,
-                        focusedOriginRow, captured.AnchorUnitId,
-                        "Origin: " + UnitName(view, captured.AnchorUnitId),
-                        captured.Selected, Color.white,
-                        () => Click(() =>
-                        {
-                            AuthoringEditResult result = _session
-                                .SetFocusedTargeting(
-                                    Domain.Authoring.CastingTargetMode.AnchoredOrigin,
-                                    null, captured.AnchorUnitId,
-                                    focused.RequiredCoverageUnitIds);
-                            SurfaceRefusal(result, "origin");
-                            RefreshView();
-                        }));
-                }
-                AddInspectorCaption("Required coverage");
-                RectTransform focusedCoverageRow = CreateTileRow("FocusedCoverageTiles");
-                foreach (WorkspaceTargetOption target in view.Draft.Targets)
-                {
-                    WorkspaceTargetOption captured = target;
-                    bool covered = focused.RequiredCoverageUnitIds.Contains(
-                        captured.UnitId);
-                    CreatePortraitTile("FocusedCoverage." + captured.UnitId,
-                        focusedCoverageRow, captured.UnitId, captured.DisplayName,
-                        covered, Color.white,
-                        () => Click(() =>
-                        {
-                            var coverage = focused.RequiredCoverageUnitIds
-                                .Where(unitId => !string.Equals(unitId,
-                                    captured.UnitId, StringComparison.Ordinal))
-                                .ToList();
-                            if (!covered) coverage.Add(captured.UnitId);
-                            AuthoringEditResult result = _session
-                                .SetFocusedTargeting(focused.TargetMode, null,
-                                    focused.Origin == null ||
-                                        focused.Origin.IsCasterCentered
-                                        ? null
-                                        : focused.Origin.AnchorUnitId,
-                                    coverage);
-                            SurfaceRefusal(result, "coverage");
-                            RefreshView();
-                        }));
-                }
-                // Re-review: a group casting of a single-target buff (for
-                // example an imported one whose old plan did not say single
-                // target or group) can become a single-target casting on a
-                // chosen member; offered only for a single-target buff
-                // (focused re-review), and the recipients it no longer reaches
-                // are named.
-                if (groupAbility == false)
-                {
-                    AddInspectorCaption("Or a single target");
-                    RectTransform singleRow = CreateTileRow("FocusedSingleTiles");
-                    foreach (WorkspaceTargetOption target in view.Draft.Targets)
-                    {
-                        WorkspaceTargetOption captured = target;
-                        CreatePortraitTile("FocusedSingle." + captured.UnitId, singleRow,
-                            captured.UnitId, captured.DisplayName, false, Color.white,
-                            () => Click(() =>
-                            {
-                                SurfaceRefusal(_session.SetFocusedTargeting(
-                                    Domain.Authoring.CastingTargetMode.DirectTarget,
-                                    captured.UnitId, null, null), "mode");
-                                RefreshView();
-                            }));
-                    }
-                }
-            }
-            AddInspectorCaption("Enhancements (this casting)");
-            RectTransform focusedChips = CreateChipRow("FocusedEnhancementChips");
-            foreach (WorkspaceEnhancementOption enhancement in
-                view.FocusedEnhancements)
-            {
-                WorkspaceEnhancementOption captured = enhancement;
-                bool selected = focused.Enhancements.Any(selection =>
-                    selection != null && string.Equals(
-                        selection.EnhancementId,
-                        captured.EnhancementId,
-                        StringComparison.Ordinal));
-                Button toggle = KingmakerUiFactory.CreateButton(
-                    "FocusedEnhancement." + captured.EnhancementId,
-                    focusedChips, _theme, captured.Label,
-                    () => Click(() =>
-                    {
-                        var selections = focused.Enhancements
-                            .Where(selection => selection != null &&
-                                !string.Equals(selection.EnhancementId,
-                                    captured.EnhancementId,
-                                    StringComparison.Ordinal))
-                            .ToList();
-                        if (!selected)
-                            selections.Add(
-                                new Domain.Authoring.AuthoredEnhancementSelection(
-                                    captured.EnhancementId, true, null));
-                        ApplyFocusedEdit(
-                            focused.WithEnhancementSelections(selections));
-                    }));
-                StyleChip(toggle, selected);
-            }
-            if (view.FocusedEnhancements.Count == 0)
-            {
-                Text none = KingmakerUiFactory.CreateText(
-                    "NoFocusedEnhancement", _inspectorContent, _theme,
-                    "None available for this casting's caster and ability.",
-                    13, TextAnchor.MiddleLeft);
-                none.color = _theme.MutedBrownText;
-                KingmakerUiFactory.AddLayout(none.rectTransform, 26f);
-            }
-            AddInspectorCaption("Casting state");
-            Button disable = KingmakerUiFactory.CreateButton(
-                "Disable", _inspectorContent, _theme, "Disable", () => Click(() =>
-                {
-                    SurfaceRefusal(_session.SetFocusedCastingState(
-                        Domain.Authoring.CastingAuthoringState.Disabled), "disable");
-                    RefreshView();
-                }));
-            KingmakerUiFactory.AddLayout(RectOf(disable), 30f);
-            Button enable = KingmakerUiFactory.CreateButton(
-                "Enable", _inspectorContent, _theme, "Mark Ready", () => Click(() =>
-                {
-                    SurfaceRefusal(_session.SetFocusedCastingState(
-                        Domain.Authoring.CastingAuthoringState.Ready), "mark ready");
-                    RefreshView();
-                }));
-            KingmakerUiFactory.AddLayout(RectOf(enable), 30f);
-            Button remove = KingmakerUiFactory.CreateButton(
-                "Remove", _inspectorContent, _theme, "Remove", () => Click(() =>
-                {
-                    _session.RemoveFocusedCasting();
-                    RefreshView();
-                }));
-            KingmakerUiFactory.AddLayout(RectOf(remove), 30f);
-        }
-
-        // A denied operation must explain itself, not silently redraw the
-        // unchanged screen (review G2).
-        private void SurfaceRefusal(AuthoringEditResult result, string action)
-        {
-            if (result != null && !result.Applied)
-                _footerResult.text = action + " refused: " + WorkspaceRefusalText.Describe(result.Reason);
-            else if (result != null && result.Applied &&
-                !string.IsNullOrEmpty(result.Reason))
-                _footerResult.text = action + ": " + result.Reason;
-        }
-
-        private void ApplyFocusedEdit(Domain.Authoring.PlannedCasting replacement)
-        {
-            AuthoringEditResult result = _session.UpdateFocusedCasting(replacement);
-            if (!result.Applied)
-                _footerResult.text = "Edit refused: " + WorkspaceRefusalText.Describe(result.Reason);
-            RefreshView();
-        }
-
-        // The next-casting draft editor: every control writes ONLY the
-        // session draft and canonical session commands — never a second
-        // ledger (review R1).
-        private void RebuildDraftEditor(WorkspaceView view)
-        {
-            WorkspaceDraftView draft = view.Draft;
-            if (draft == null)
-            {
-                Text missing = KingmakerUiFactory.CreateText(
-                    "Missing", _inspectorContent, _theme,
-                    "Discovery produced no catalogue for the draft editor.",
-                    13, TextAnchor.UpperLeft);
-                missing.color = _theme.MutedBrownText;
-                KingmakerUiFactory.AddLayout(missing.rectTransform, 48f);
-                return;
-            }
-            Text buffLine = KingmakerUiFactory.CreateText("DraftBuff", _inspectorContent,
-                _theme, "Buff: " + view.SelectedSourceCaption +
-                "  (choose another in the grid above)", 14, TextAnchor.MiddleLeft);
-            KingmakerUiFactory.AddLayout(buffLine.rectTransform, 24f);
-            AddInspectorCaption("Cast by");
-            if (draft.CapableCasters.Count == 0)
-            {
-                Text none = KingmakerUiFactory.CreateText(
-                    "NoCaster", _inspectorContent, _theme,
-                    "No eligible caster for this buff.", 13, TextAnchor.MiddleLeft);
-                none.color = _theme.MutedBrownText;
-                KingmakerUiFactory.AddLayout(none.rectTransform, 26f);
-            }
-            RectTransform casterRow = CreateTileRow("CasterTiles");
-            foreach (WorkspaceCasterRow caster in draft.CapableCasters)
-            {
-                WorkspaceCasterRow captured = caster;
-                bool selected = string.Equals(draft.CasterUnitId,
-                    captured.UnitId, StringComparison.Ordinal);
-                CreatePortraitTile("DraftCaster." + captured.UnitId, casterRow,
-                    captured.UnitId,
-                    string.IsNullOrEmpty(captured.DisplayName)
-                        ? captured.UnitId : captured.DisplayName,
-                    selected, captured.ReadinessReasons.Count == 0
-                        ? Color.white : new Color(0.75f, 0.75f, 0.75f, 1f),
-                    () => Click(() =>
-                    {
-                        _session.ChooseDraftCaster(captured.UnitId);
-                        RefreshView();
-                    }));
-            }
-            // Final review B3: a caster who can cast this buff in more than
-            // one way (two spellbooks, or a spell and an item) picks the
-            // exact one here; otherwise Add is refused as ambiguous.
-            if (view.DraftProviders.Count > 1)
-            {
-                AddInspectorCaption("Cast from");
-                for (int index = 0; index < view.DraftProviders.Count; index++)
-                {
-                    WorkspaceProviderChoice captured = view.DraftProviders[index];
-                    Button choose = KingmakerUiFactory.CreateButton(
-                        "DraftProvider." + index, _inspectorContent, _theme,
-                        (captured.Selected ? "[x] " : "[  ] ") + captured.Label,
-                        () => Click(() =>
-                        {
-                            SurfaceRefusal(_session.ChooseDraftProvider(captured.ProviderKey, _inputs()), "source");
-                            RefreshView();
-                        }));
-                    KingmakerUiFactory.AddLayout(RectOf(choose), 30f);
-                }
-            }
-            AddInspectorCaption("Targeting");
-            bool direct = draft.TargetMode ==
-                Domain.Authoring.CastingTargetMode.DirectTarget;
-            Button mode = KingmakerUiFactory.CreateButton(
-                "Mode", _inspectorContent, _theme,
-                direct ? "Mode: single target" : "Mode: group from origin",
-                () => Click(() =>
-                {
-                    // One coherent shape operation: the session command
-                    // clears/rebuilds the incompatible fields (review F3).
-                    AuthoringEditResult result = direct
-                        ? _session.SetDraftTargeting(
-                            Domain.Authoring.CastingTargetMode.CasterCenteredOrigin,
-                            null, null, null)
-                        : _session.SetDraftTargeting(
-                            Domain.Authoring.CastingTargetMode.DirectTarget,
-                            draft.DirectTargetUnitId, null, null);
-                    SurfaceRefusal(result, "mode");
-                    RefreshView();
-                }));
-            KingmakerUiFactory.AddLayout(RectOf(mode), 30f);
-            if (direct)
-            {
-                AddInspectorCaption("Cast on");
-                RectTransform targetRow = CreateTileRow("TargetTiles");
-                foreach (WorkspaceTargetOption target in draft.Targets)
-                {
-                    WorkspaceTargetOption captured = target;
-                    bool selected = string.Equals(draft.DirectTargetUnitId,
-                        captured.UnitId, StringComparison.Ordinal);
-                    bool illegal = captured.Legal == false;
-                    Button tile = CreatePortraitTile("DraftTarget." + captured.UnitId, targetRow,
-                        captured.UnitId, captured.DisplayName, selected,
-                        illegal ? new Color(1f, 0.45f, 0.45f, 1f)
-                            : CoverageTint(WorkspaceBuffSummary.CoverageFor(
-                                view.SelectedBuffCards, view.SelectedSourceId,
-                                view.SelectedRoutineId, captured.UnitId)),
-                        () => Click(() =>
-                        {
-                            _session.SetDraftTargeting(
-                                Domain.Authoring.CastingTargetMode.DirectTarget,
-                                captured.UnitId, null, null);
-                            RefreshView();
-                        }));
-                    // An illegal recipient cannot become a casting target.
-                    if (illegal) tile.interactable = false;
-                }
-                Text legend = KingmakerUiFactory.CreateText("CoverageLegend",
-                    _inspectorContent, _theme,
-                    "Green: already has a Ready casting of this buff · " +
-                    "Amber: has one that is not Ready · Red: this caster cannot target them",
-                    12, TextAnchor.MiddleLeft);
-                legend.color = _theme.MutedBrownText;
-                KingmakerUiFactory.AddLayout(legend.rectTransform, 20f);
-            }
-            else
-            {
-                Button casterOrigin = KingmakerUiFactory.CreateButton(
-                    "Origin.Caster", _inspectorContent, _theme,
-                    string.IsNullOrEmpty(draft.OriginAnchorUnitId)
-                        ? "[x] Origin: caster" : "[  ] Origin: caster",
-                    () => Click(() =>
-                    {
-                        AuthoringEditResult result = _session.SetDraftTargeting(
-                            Domain.Authoring.CastingTargetMode.CasterCenteredOrigin,
-                            null, null, _session.Draft.RequiredCoverageUnitIds);
-                        SurfaceRefusal(result, "origin");
-                        RefreshView();
-                    }));
-                KingmakerUiFactory.AddLayout(RectOf(casterOrigin), 30f);
-                RectTransform originRow = CreateTileRow("OriginTiles");
-                foreach (WorkspaceOriginOption origin in draft.Origins)
-                {
-                    WorkspaceOriginOption captured = origin;
-                    CreatePortraitTile("Origin." + captured.AnchorUnitId, originRow,
-                        captured.AnchorUnitId,
-                        "Origin: " + UnitName(view, captured.AnchorUnitId),
-                        captured.Selected, Color.white,
-                        () => Click(() =>
-                        {
-                            AuthoringEditResult result = _session.SetDraftTargeting(
-                                Domain.Authoring.CastingTargetMode.AnchoredOrigin,
-                                null, captured.AnchorUnitId,
-                                _session.Draft.RequiredCoverageUnitIds);
-                            SurfaceRefusal(result, "origin");
-                            RefreshView();
-                        }));
-                }
-                AddInspectorCaption("Required coverage (intended recipients)");
-                RectTransform coverageRow = CreateTileRow("CoverageTiles");
-                foreach (WorkspaceTargetOption target in draft.Targets)
-                {
-                    WorkspaceTargetOption captured = target;
-                    bool covered = _session.Draft.RequiredCoverageUnitIds
-                        .Contains(captured.UnitId);
-                    CreatePortraitTile("DraftCoverage." + captured.UnitId, coverageRow,
-                        captured.UnitId, captured.DisplayName, covered, Color.white,
-                        () => Click(() =>
-                        {
-                            var coverage = _session.Draft
-                                .RequiredCoverageUnitIds
-                                .Where(unitId => !string.Equals(unitId,
-                                    captured.UnitId, StringComparison.Ordinal))
-                                .ToList();
-                            if (!covered) coverage.Add(captured.UnitId);
-                            // H2b: a coverage edit preserves the CURRENT
-                            // group mode and origin — a caster-centered
-                            // spell never needs an anchor.
-                            AuthoringEditResult result = _session
-                                .SetDraftTargeting(draft.TargetMode, null,
-                                    string.IsNullOrEmpty(draft.OriginAnchorUnitId)
-                                        ? null : draft.OriginAnchorUnitId,
-                                    coverage);
-                            SurfaceRefusal(result, "coverage");
-                            RefreshView();
-                        }));
-                }
-                AddInspectorCaption("Switch back to single target");
-                if (!string.IsNullOrEmpty(draft.RememberedDirectTargetUnitId))
-                {
-                    Button restore = KingmakerUiFactory.CreateButton(
-                        "Mode.Restore", _inspectorContent, _theme,
-                        "Restore recipient: " + draft.RememberedDirectTargetUnitId,
-                        () => Click(() =>
-                        {
-                            AuthoringEditResult result = _session.SetDraftTargeting(
-                                Domain.Authoring.CastingTargetMode.DirectTarget,
-                                null, null, null);
-                            SurfaceRefusal(result, "mode");
-                            RefreshView();
-                        }));
-                    KingmakerUiFactory.AddLayout(RectOf(restore), 30f);
-                }
-                foreach (WorkspaceTargetOption target in draft.Targets)
-                {
-                    WorkspaceTargetOption captured = target;
-                    Button pick = KingmakerUiFactory.CreateButton(
-                        "Mode.PickReturn." + captured.UnitId, _inspectorContent,
-                        _theme,
-                        "Single target on " + captured.DisplayName,
-                        () => Click(() =>
-                        {
-                            AuthoringEditResult result = _session.SetDraftTargeting(
-                                Domain.Authoring.CastingTargetMode.DirectTarget,
-                                captured.UnitId, null, null);
-                            SurfaceRefusal(result, "mode");
-                            RefreshView();
-                        }));
-                    KingmakerUiFactory.AddLayout(RectOf(pick), 30f);
-                }
-            }
-            AddInspectorCaption("Enhancements");
-            if (draft.Enhancements.Count == 0)
-            {
-                Text none = KingmakerUiFactory.CreateText(
-                    "NoEnhancement", _inspectorContent, _theme,
-                    "None available for this caster and ability.", 13,
-                    TextAnchor.MiddleLeft);
-                none.color = _theme.MutedBrownText;
-                KingmakerUiFactory.AddLayout(none.rectTransform, 26f);
-            }
-            RectTransform draftChips = CreateChipRow("EnhancementChips");
-            foreach (WorkspaceEnhancementOption enhancement in
-                draft.Enhancements)
-            {
-                WorkspaceEnhancementOption captured = enhancement;
-                Button toggle = KingmakerUiFactory.CreateButton(
-                    "Enhancement." + captured.EnhancementId, draftChips,
-                    _theme, captured.Label,
-                    () => Click(() =>
-                    {
-                        if (captured.Selected)
-                            _session.Draft.Enhancements.RemoveAll(selection =>
-                                selection != null && string.Equals(
-                                    selection.EnhancementId,
-                                    captured.EnhancementId,
-                                    StringComparison.Ordinal));
-                        else
-                            _session.Draft.Enhancements.Add(
-                                new Domain.Authoring.AuthoredEnhancementSelection(
-                                    captured.EnhancementId, true, null));
-                        RefreshView();
-                    }));
-                StyleChip(toggle, captured.Selected);
-            }
-            AddInspectorCaption("State");
-            Button state = KingmakerUiFactory.CreateButton(
-                "State", _inspectorContent, _theme,
-                "State: " + draft.State, () => Click(() =>
-                {
-                    _session.Draft.State = draft.State ==
-                        Domain.Authoring.CastingAuthoringState.Ready
-                        ? Domain.Authoring.CastingAuthoringState.Draft
-                        : Domain.Authoring.CastingAuthoringState.Ready;
-                    RefreshView();
-                }));
-            KingmakerUiFactory.AddLayout(RectOf(state), 30f);
-            // Final review B2: whether the new casting is skipped while its
-            // effect is already on the target, or cast again anyway.
-            AddInspectorCaption("If the buff is already there");
-            bool recastDraft = _session.Draft.ExistingEffectPolicy ==
-                Domain.Planning.ExistingEffectPolicy.Overwrite;
-            Button draftRecast = KingmakerUiFactory.CreateButton(
-                "DraftRecastPolicy", _inspectorContent, _theme,
-                recastDraft ? "[x] Cast it again anyway" : "[  ] Cast it again anyway (now: skip it)",
-                () => Click(() =>
-                {
-                    _session.Draft.ExistingEffectPolicy = recastDraft
-                        ? Domain.Planning.ExistingEffectPolicy.SkipAlreadyActive
-                        : Domain.Planning.ExistingEffectPolicy.Overwrite;
-                    RefreshView();
-                }));
-            KingmakerUiFactory.AddLayout(RectOf(draftRecast), 30f);
-            // Final review B2: the plan's animated fallback (the player guide
-            // describes it): in Instant mode, a buff that cannot be cast
-            // instantly is cast with its animation instead of being refused.
-            AddInspectorCaption("Plan settings");
-            Button fallback = KingmakerUiFactory.CreateButton(
-                "AnimatedFallback", _inspectorContent, _theme,
-                (_session.AllowAnimatedFallback ? "[x] " : "[  ] ") +
-                    "Instant mode: animate buffs that cannot be instant",
-                () => Click(() =>
-                {
-                    _session.SetAllowAnimatedFallback(!_session.AllowAnimatedFallback);
-                    _footerResult.text = "Animated fallback " +
-                        (_session.AllowAnimatedFallback ? "on" : "off") + " (Save to keep it).";
-                    RefreshView();
-                }));
-            KingmakerUiFactory.AddLayout(RectOf(fallback), 30f);
-            Button outOfCombat = KingmakerUiFactory.CreateButton(
-                "OutOfCombatOnly", _inspectorContent, _theme,
-                (_session.OutOfCombatOnly ? "[x] " : "[  ] ") + "Cast only out of combat",
-                () => Click(() =>
-                {
-                    _session.SetOutOfCombatOnly(!_session.OutOfCombatOnly);
-                    _footerResult.text = "Out-of-combat only " +
-                        (_session.OutOfCombatOnly ? "on" : "off") + " (Save to keep it).";
-                    RefreshView();
-                }));
-            KingmakerUiFactory.AddLayout(RectOf(outOfCombat), 30f);
-        }
-
-        private void AddInspectorCaption(string caption)
-        {
-            Text label = KingmakerUiFactory.CreateText(
-                "Caption." + caption, _inspectorContent, _theme, caption, 14,
-                TextAnchor.MiddleLeft);
-            label.fontStyle = FontStyle.Bold;
-            label.color = _theme.MutedBrownText;
-            KingmakerUiFactory.AddLayout(label.rectTransform, 24f);
-        }
-
-        private void RebuildRoutineBar(WorkspaceView view)
-        {
-            if (_routineBar == null) return;
-            KingmakerUiFactory.DestroyChildren(_routineBar);
-            foreach (string routineId in view.RoutineIds)
-            {
-                string captured = routineId;
-                bool selected = string.Equals(view.SelectedRoutineId, captured,
-                    StringComparison.Ordinal);
-                int count = _session.Document.Castings.Count(value => value != null &&
-                    string.Equals(value.RoutineId, captured, StringComparison.Ordinal));
-                Button tab = KingmakerUiFactory.CreateButton(
-                    "Routine." + captured, _routineBar, _theme,
-                    _session.RoutineDisplayName(captured) + " (" + count + ")",
-                    () => Click(() =>
-                    {
-                        _session.SelectRoutine(captured);
-                        RefreshView();
-                    }));
-                StyleTab(tab, selected);
-                RectOf(tab).pivot = new Vector2(0f, 0.5f);
-                RectOf(tab).anchorMin = new Vector2(0f, 0.1f);
-                RectOf(tab).anchorMax = new Vector2(0f, 0.9f);
-                RectOf(tab).sizeDelta = new Vector2(170f, 0f);
-                RectOf(tab).anchoredPosition = new Vector2(
-                    16f + view.RoutineIds.TakeWhile(id =>
-                        !string.Equals(id, captured, StringComparison.Ordinal))
-                        .Count() * 178f, 0f);
-            }
-        }
-
-        // A selected tab (routine or source type) is gold with a bold label
-        // (the chip convention); the others keep the native button look.
-        private void StyleTab(Button tab, bool selected)
-        {
-            Image image = tab.targetGraphic as Image;
-            if (image != null) image.color = selected ? _theme.GoldAccent : Color.white;
-            Transform labelNode = tab.transform.Find("Label");
-            Text label = labelNode == null ? null : labelNode.GetComponent<Text>();
-            if (label != null) label.fontStyle = selected ? FontStyle.Bold : FontStyle.Normal;
-        }
-
-        private void RebuildFooter(WorkspaceView view)
-        {
-            IReadOnlyList<string> lines = WorkspaceBudgetRow.FooterLines(view.BudgetRows);
-            _footerBudget.text = lines.Count == 0
-                ? "No resource demand yet."
-                : string.Join("   ", lines.ToArray());
-            string wholePlan = WorkspaceFooterText.WholePlan(view.OnePassShortCount);
-            if (wholePlan.Length != 0) _footerBudget.text += "   " + wholePlan;
+            if (session.LegacyImportBlocked)
+                return "Your previous plan could not be imported (" + session.LegacyImportBlockReason +
+                    "). It was NOT replaced: saving and Apply are blocked. Repair or restore that file, then press " +
+                    "Reload to retry.";
+            CastingImportReport report = session.ImportReport;
+            if (report == null) return null;
+            return "Imported " + report.ResultingCastingCount +
+                (report.ResultingCastingCount == 1 ? " casting" : " castings") +
+                " from your previous plan: " + report.ReadyCount + " ready, " + report.DraftCount + " need review" +
+                (report.UnresolvedCasterCount == 0 ? string.Empty : ", " + report.UnresolvedCasterCount +
+                    " without a caster") +
+                (report.GroupReviewCount == 0 ? string.Empty : ", " + report.GroupReviewCount + " group(s) to confirm") +
+                (report.Warnings.Count == 0 ? string.Empty : " · " + report.Warnings.Count + " warning(s)") +
+                ". Your previous plan file was kept unchanged.";
         }
     }
 }

@@ -270,6 +270,23 @@ namespace KingmakerBuffPlanner.UI
             return null;
         }
 
+        // The deliberate in-planner route between the planners (addendum 7):
+        // the mode is saved exactly like the UMM setting, the open planner
+        // closes and the chosen one opens. A refusal (a routine running, an
+        // automated session) changes nothing and is shown in the planner.
+        private void SwitchPlannerFromScreen(PlannerMode mode)
+        {
+            string refusal = SetPlannerMode(mode);
+            if (refusal != null)
+            {
+                _log.Info("[KBP-MODE] planner switch refused;mode=" + mode + ";reason=" + refusal + ".");
+                if (_screen != null && _screen.View != null) _screen.View.ShowNotice(refusal);
+                if (_castingWorkspace != null) _castingWorkspace.ShowNotice(refusal);
+                return;
+            }
+            if (!OpenSetup()) LogUiUnavailable("planner-switch:" + mode);
+        }
+
         // Casting-first routes are active for the chosen mode, or for a
         // runtime-test session that selected the workspace.
         private bool CastingFirstActive
@@ -369,6 +386,41 @@ namespace KingmakerBuffPlanner.UI
         internal static void CloseCastingWorkspaceForRuntime()
         {
             if (_instance != null) _instance.CloseCastingWorkspace();
+        }
+
+        // Runtime-only seams for the hover diagnostic: the Classic screen
+        // opened directly (whatever the planner mode, never while the
+        // workspace is open) so the rc6 reproduction and the corrected
+        // behaviour are compared on one binary, and the open planner roots.
+        internal static bool OpenClassicForRuntime()
+        {
+            if (_instance == null || _instance._castingWorkspace != null || _instance._screen == null) return false;
+            if (_instance._screen.LifecycleState != PlannerScreenLifecycleState.Closed) return false;
+            return _instance._screen.Open();
+        }
+
+        internal static GameObject ClassicRootForRuntime
+        {
+            get
+            {
+                return _instance == null || _instance._screen == null || _instance._screen.View == null
+                    ? null : _instance._screen.View.RootObject;
+            }
+        }
+
+        // Active planner roots in the scene (the workspace and the Classic
+        // screen): exactly one while a planner is open.
+        internal static int PlannerRootCountForRuntime()
+        {
+            int count = 0;
+            foreach (RectTransform rect in UnityEngine.Object.FindObjectsOfType<RectTransform>())
+            {
+                if (rect == null || !rect.gameObject.activeInHierarchy) continue;
+                if (string.Equals(rect.name, CastingWorkspaceScreenView.RootName, StringComparison.Ordinal) ||
+                    string.Equals(rect.name, BuffPlannerScreenView.RootName, StringComparison.Ordinal))
+                    count++;
+            }
+            return count;
         }
 
         // Runtime seams for the guarded interaction scenario: the LIVE
@@ -1262,7 +1314,8 @@ namespace KingmakerBuffPlanner.UI
             _quick = new BuffPlannerQuickExecuteController(this, _diagnostics, PresentQuickResult);
             _screen = new BuffPlannerScreenController(_session, _diagnostics, log,
                 routineId => ExecuteRoutineRequest(routineId), PlayNativeSetupOpenSound,
-                routineId => ExecuteRoutineRequest(routineId, true));
+                routineId => ExecuteRoutineRequest(routineId, true),
+                () => SwitchPlannerFromScreen(PlannerMode.CastingFirst));
             _hud = new BuffPlannerHudButtonController(_session, _diagnostics, log,
                 () => { OpenSetup(); }, routineId => ExecuteRoutineRequest(routineId),
                 CastingFirstRoutineTooltip);
@@ -1354,7 +1407,11 @@ namespace KingmakerBuffPlanner.UI
                 _castingWorkspace = new CastingWorkspaceScreenView(
                     StaticCanvas.Instance, workspaceSession,
                     BuildCastingWorkspaceInputs, BuildFreshCastingWorkspaceInputs,
-                    CloseCastingWorkspace);
+                    CloseCastingWorkspace,
+                    // A runtime-test session selects the workspace itself and
+                    // cannot switch planners (SetPlannerMode refuses there).
+                    CastingWorkspaceDevSelection.Enabled ? (Action)null
+                        : () => SwitchPlannerFromScreen(PlannerMode.Classic));
                 _workspaceInputLease = lease;
                 lease = null;
                 _castingWorkspace.RefreshView();
@@ -1699,10 +1756,15 @@ namespace KingmakerBuffPlanner.UI
                 if (_spellbookEntry != null) _spellbookEntry.Tick();
                 if (_castingWorkspace != null && Input.GetKeyDown(KeyCode.Escape))
                 {
-                    // Escape closes the owned workspace before the legacy
-                    // screen is consulted; the two are never open together.
-                    CloseCastingWorkspace();
-                    _log.Info("[KBP-BOOT] casting workspace close requested;source=Escape.");
+                    // Escape first leaves the workspace's own focused casting
+                    // (its inspector); only then does it close the workspace,
+                    // before the legacy screen is consulted (never open
+                    // together).
+                    if (!_castingWorkspace.HandleEscape())
+                    {
+                        CloseCastingWorkspace();
+                        _log.Info("[KBP-BOOT] casting workspace close requested;source=Escape.");
+                    }
                 }
                 if (_screen.LifecycleState != PlannerScreenLifecycleState.Closed &&
                     Input.GetKeyDown(KeyCode.Escape)) _screen.Close();

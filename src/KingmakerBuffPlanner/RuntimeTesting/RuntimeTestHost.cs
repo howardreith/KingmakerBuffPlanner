@@ -130,29 +130,176 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private readonly List<string> _interactionCastIds = new List<string>();
         private readonly List<string> _interactionCastTargets = new List<string>();
         private string _interactionRetarget;
+        // Pointer-highlight diagnostic (phases 140 and 145).
+        private readonly HoverOwnershipRecord _hover = new HoverOwnershipRecord();
+        private bool _hoverStarted;
+        private bool _hoverReopenChecked;
+        private int _hoverStep;
+        private int _hoverAfter;
+        private int _hoverFrames;
+        private string _hoverPending;
+        private Vector2 _hoverPoint;
+        private string _hoverAimed;
+        private string _hoverPendingSurface;
+        private string _hoverPendingBehaviour;
+        private bool _hoverPendingSample;
+        private System.Diagnostics.Stopwatch _hoverClock = new System.Diagnostics.Stopwatch();
+        private MenuFrameCapture _hoverCapture;
+        private string _hoverCaptureName;
+        private Vector2 _hoverGraphNeutral;
+        private string _hoverHeld;
+        private string[] _hoverButtons = new string[0];
+        private readonly List<string> _hoverSweep = new List<string>();
+        private int _hoverSweepIndex;
+        private bool _hoverClassicRowSelected;
+        private string _hoverPendingClicked;
+        private System.Diagnostics.Stopwatch _hoverAckClock;
+        private string _hoverAckCursor;
+        private string _hoverSettleCapture;
+        // The Classic sequence: one action per update; a physical move or a
+        // capture pauses it until done.
+        private readonly List<Action> _hoverScript = new List<Action>();
+        private int _hoverScriptIndex;
+        private int _hoverAfterScript;
+        private bool _hoverScriptCapture;
+        private string _hoverClassicClicked;
+        private bool _hoverClassicOpen;
 
-        // A recipient for a scripted cast: legal for the caster in the draft
-        // (when a session is given), never the caster itself, avoiding the
-        // listed units when another choice exists.
-        private string InteractionTarget(UI.CastingWorkspaceSession session, CastingWorkspaceInputs inputs,
-            string caster, ICollection<string> avoid)
+        // Casters of the shown buff with a source the graph can pin.
+        private static List<string> GraphCapableCasters(UI.CastingGraphView graph)
         {
-            List<string> candidates = _interactionTargets.Where(unit =>
-                !string.Equals(unit, caster, StringComparison.Ordinal)).ToList();
-            if (session != null && inputs != null)
+            return graph.Casters.Where(caster => !caster.IsUnresolved &&
+                    caster.Sources.Any(row => row.Pinnable))
+                .Select(caster => caster.UnitId).ToList();
+        }
+
+        // Legal recipients of the shown buff for the chosen caster, never the
+        // caster itself (Aid Another cannot target its caster).
+        private static List<string> GraphLegalOthers(UI.CastingGraphView graph, string caster)
+        {
+            return graph.Targets.Where(target =>
+                    target.Legality == UI.CastingGraphTargetLegality.Legal &&
+                    !string.Equals(target.UnitId, caster, StringComparison.Ordinal))
+                .Select(target => target.UnitId).ToList();
+        }
+
+        // The scripted sequence adds three single-target castings from two
+        // casters to three different recipients, so it needs a single-target
+        // buff two casters can give to at least two others each. Choosing a
+        // buff or caster is focus only (never a document mutation); the
+        // caller restores the shown buff and selects the chosen one through
+        // its real catalogue control.
+        private static string ChooseInteractionSource(UI.CastingWorkspaceSession session,
+            CastingWorkspaceInputs inputs, out int probed)
+        {
+            probed = 0;
+            List<string> order = session.BuildGraph(inputs).Catalogue
+                .OrderByDescending(entry => entry.Selected).Select(entry => entry.SourceId).ToList();
+            foreach (string sourceId in order.Take(80))
             {
-                UI.WorkspaceView view = session.BuildView(inputs);
-                if (view.Draft != null)
+                probed++;
+                session.SelectGraphBuff(sourceId, inputs);
+                UI.CastingGraphView graph = session.BuildGraph(inputs);
+                if (graph.SelectedSourceIsGroup != false || graph.Targets.Count < 3) continue;
+                List<string> casters = GraphCapableCasters(graph);
+                if (casters.Count < 2) continue;
+                bool enough = true;
+                foreach (string caster in casters.Take(2))
                 {
-                    List<string> legal = view.Draft.Targets
-                        .Where(option => option.Legal != false &&
-                            !string.Equals(option.UnitId, caster, StringComparison.Ordinal))
-                        .Select(option => option.UnitId).ToList();
-                    if (legal.Count != 0) candidates = legal;
+                    session.SelectGraphCaster(caster, inputs);
+                    if (GraphLegalOthers(session.BuildGraph(inputs), caster).Count < 2) enough = false;
                 }
+                if (enough) return sourceId;
             }
-            return candidates.FirstOrDefault(unit => avoid == null || !avoid.Contains(unit)) ??
-                candidates.FirstOrDefault() ?? _interactionTargets[0];
+            return null;
+        }
+
+        // The index of the caster's source row to click: usable and pinnable
+        // first, then pinnable (a row short of casts still adds a casting,
+        // which the plan then reports short).
+        private static int UsableSourceRow(UI.CastingWorkspaceSession session, CastingWorkspaceInputs inputs,
+            string caster)
+        {
+            UI.CastingGraphCasterNode node = session.BuildGraph(inputs).CasterById(caster);
+            if (node == null) return -1;
+            for (int index = 0; index < node.Sources.Count; index++)
+                if (node.Sources[index].Usable && node.Sources[index].Pinnable) return index;
+            for (int index = 0; index < node.Sources.Count; index++)
+                if (node.Sources[index].Pinnable) return index;
+            return -1;
+        }
+
+        // A legal recipient for the chosen caster and source that no casting
+        // of the buff in this routine reaches yet (the graph shows, never
+        // steals, an assigned target) and that is not the caster.
+        private string GraphInteractionTarget(UI.CastingWorkspaceSession session, CastingWorkspaceInputs inputs,
+            string caster)
+        {
+            UI.CastingGraphView graph = session.BuildGraph(inputs);
+            List<string> legal = GraphLegalOthers(graph, caster);
+            string free = legal.FirstOrDefault(unit =>
+            {
+                UI.CastingGraphTargetNode node = graph.TargetById(unit);
+                return node != null && node.CastingIds.Count == 0 && !_interactionCastTargets.Contains(unit);
+            });
+            return free ?? legal.FirstOrDefault() ?? _interactionTargets.FirstOrDefault(unit =>
+                !string.Equals(unit, caster, StringComparison.Ordinal)) ?? _interactionTargets[0];
+        }
+
+        // Another legal recipient for the focused casting: neither its caster
+        // nor its current recipient, preferably one no other casting reaches.
+        private string GraphRetarget(UI.CastingWorkspaceSession session, CastingWorkspaceInputs inputs,
+            string castingId)
+        {
+            UI.CastingGraphView graph = session.BuildGraph(inputs);
+            Domain.Authoring.PlannedCasting casting = session.Document.Castings.FirstOrDefault(value =>
+                value != null && string.Equals(value.CastingId, castingId, StringComparison.Ordinal));
+            string caster = casting == null ? null : casting.CasterUnitId;
+            string current = casting == null ? null : casting.DirectTargetUnitId;
+            List<string> candidates = (graph.Inspector != null &&
+                    string.Equals(graph.Inspector.CastingId, castingId, StringComparison.Ordinal)
+                    ? graph.Inspector.Retargets.Select(target => target.UnitId)
+                    : _interactionTargets)
+                .Where(unit => !string.Equals(unit, caster, StringComparison.Ordinal) &&
+                    !string.Equals(unit, current, StringComparison.Ordinal)).ToList();
+            return candidates.FirstOrDefault(unit => !_interactionCastTargets.Contains(unit)) ??
+                candidates.FirstOrDefault() ?? current ?? _interactionTargets[0];
+        }
+
+        // The focused inspector's retarget control for a unit. Its list opens
+        // through its own toggle only when closed (the toggle would close an
+        // open list).
+        private static string InvokeRetarget(string unitId)
+        {
+            string outcome = Invoke("Retarget." + unitId);
+            // Missing, or only a same-frame destroyed-pending copy: closed.
+            if (!outcome.StartsWith("control-missing", StringComparison.Ordinal) &&
+                !outcome.StartsWith("control-inactive", StringComparison.Ordinal)) return outcome;
+            string toggle = Invoke("ToggleRetargets");
+            if (toggle != WorkspaceControlOutcome.Invoked) return "toggle-" + toggle;
+            return Invoke("Retarget." + unitId);
+        }
+
+        // A focus change made directly on the session (not through a
+        // control) is rendered before the next control is looked up.
+        private static void RefreshWorkspaceForRuntime()
+        {
+            UI.CastingWorkspaceScreenView view = BuffPlannerUiRoot.CastingWorkspaceViewForRuntime;
+            if (view != null) view.RefreshView();
+        }
+
+        // The standard workspace scenario continues into the pointer-highlight
+        // diagnostic before its close/reopen; the reload scenario goes
+        // straight to the close.
+        private void FinishWorkspaceInteraction()
+        {
+            if (string.Equals(_request.Scenario, "live-workspace-qual", StringComparison.Ordinal))
+            {
+                _hoverStep = 0;
+                _liveUiPhase = 140;
+                return;
+            }
+            TransitionToBisectionClose();
         }
         private string _interactionSourceId;
         private MenuFrameCapture _workspaceCameraOpenCapture;
@@ -1150,6 +1297,24 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                                 "saved plan, same campaign, one subscription, one HUD root, no run, clean",
                                 reloadEvidence));
                     }
+                    // The pointer highlight (addendum v1.1): judged on Unity's
+                    // own control states by HoverOwnershipRecord; the rc6
+                    // ghost must be reproduced for the fix to mean anything.
+                    bool hoverOwned = true;
+                    if (string.Equals(_request.Scenario, "live-workspace-qual", StringComparison.Ordinal))
+                    {
+                        PlannerUiReproduction.Rc6ButtonBehaviour = false;
+                        WriteHoverEvidence();
+                        IList<string> hoverViolations = _hover.Violations();
+                        hoverOwned = hoverViolations.Count == 0;
+                        string hoverEvidence = _hover.Describe() + (hoverOwned ? string.Empty
+                            : ";violations=" + string.Join(",", hoverViolations.ToArray()));
+                        const string hoverExpected =
+                            "one highlight, under the pointer, gone on exit; rc6 ghost reproduced; five button states";
+                        result.Assertions.Add(hoverOwned
+                            ? RuntimeTestAssertion.Pass("workspace-hover-ownership", hoverExpected, hoverEvidence)
+                            : RuntimeTestAssertion.Fail("workspace-hover-ownership", hoverExpected, hoverEvidence));
+                    }
                     if (!workspaceOpen || !frameCaptured || !engineCaptured ||
                         !nonBlack || !presented || !controlCaptured || !visibleChange)
                     {
@@ -1165,6 +1330,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     {
                         result.Status = "FAIL";
                         result.Stage = "workspace-reload-validation";
+                    }
+                    else if (!hoverOwned)
+                    {
+                        result.Status = "FAIL";
+                        result.Stage = "workspace-hover-validation";
                     }
 
                 }
@@ -1791,6 +1961,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 liveBudgetSeconds = 600 + (int)PhysicalDeadlineSeconds;
             if (RuntimeTestProtocol.IsReloadScenario(_request.Scenario))
                 liveBudgetSeconds = 300 + LiveCampaignSaveLoader.ReloadBudgetSeconds;
+            // The standard scenario also runs the pointer-highlight diagnostic
+            // (about thirty real-cursor moves, two Classic opens, four frames);
+            // the launcher's own timeout still bounds the whole run.
+            if (string.Equals(_request.Scenario, "live-workspace-qual", StringComparison.Ordinal))
+                liveBudgetSeconds = 300 + 300;
             if (_livePhaseElapsed.Elapsed.TotalSeconds > liveBudgetSeconds)
                 throw new TimeoutException("Live UI scenario timed out;phase=" + _liveUiPhase +
                     ";elapsedSeconds=" + _livePhaseElapsed.Elapsed.TotalSeconds.ToString("F1",
@@ -2307,6 +2482,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             {
                 return UpdateWorkspaceInteraction();
             }
+            if (_liveUiPhase == 140 || _liveUiPhase == 145)
+            {
+                return UpdateHoverOwnership();
+            }
             if (_liveUiPhase == 19)
             {
                 if (_workspaceClosedWaitUpdates < 4)
@@ -2359,6 +2538,14 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     (_workspaceReopenEvidence ?? string.Empty).Contains("preserved=True");
                 if (RuntimeTestProtocol.IsReloadScenario(_request.Scenario) && !reloadable)
                     _workspaceReloadEvidence = "passed=False;skipped:interaction-or-reopen-failed";
+                if (_hoverStarted && !_hoverReopenChecked)
+                {
+                    // The pointer-highlight diagnostic's close/reopen reading.
+                    _hoverReopenChecked = true;
+                    _hoverStep = 30;
+                    _liveUiPhase = 145;
+                    return false;
+                }
                 _liveUiPhase = RuntimeTestProtocol.IsReloadScenario(_request.Scenario) && reloadable ? 80 : 21;
                 return false;
             }
@@ -4226,6 +4413,16 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         {
             if (_shutdownReason == null)
                 _shutdownReason = string.IsNullOrEmpty(reason) ? "unspecified" : reason;
+            // The hover diagnostic's reproduction switch and Classic screen
+            // never outlive the run, whatever ends it (deadline, abort, host
+            // exception, disable or unload).
+            PlannerUiReproduction.Rc6ButtonBehaviour = false;
+            if (_hoverStarted && !_hover.Completed)
+            {
+                EndHoverClassic();
+                _hover.AddFailure("shutdown:" + reason);
+                WriteHoverEvidence();
+            }
             if (_probeOwner != null) _probeOwner.Terminate(reason);
             // The qualification run ends through the same host terminal (the
             // in-flight executor restores temporary native state).
@@ -4366,29 +4563,28 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     BuffPlannerUiRoot.CastingWorkspaceInputsForRuntime();
                 if (_workspaceInteractionStep == 0)
                 {
-                    WorkspaceView view = session.BuildView(currentInputs);
-                    _interactionCasters.Clear();
-                    _interactionTargets.Clear();
-                    if (view.Draft != null)
-                    {
-                        foreach (UI.WorkspaceCasterRow caster in
-                            view.Draft.CapableCasters)
-                            _interactionCasters.Add(caster.UnitId);
-                        foreach (UI.WorkspaceTargetOption target in
-                            view.Draft.Targets)
-                            _interactionTargets.Add(target.UnitId);
-                        UI.WorkspaceSourceOption selected =
-                            view.Draft.Sources.FirstOrDefault(source =>
-                                source.Selected) ??
-                            view.Draft.Sources.FirstOrDefault();
-                        _interactionSourceId = selected == null
-                            ? view.SelectedSourceId : selected.SourceId;
-                    }
-                    if (string.IsNullOrEmpty(_interactionSourceId))
-                        _interactionSourceId = view.SelectedSourceId;
+                    // The casting graph (addendum v1.1): a single-target buff
+                    // two casters can give; the buff is then selected through
+                    // its real catalogue tile.
+                    string shownSource = session.SelectedSourceId;
+                    int probed;
+                    string chosenSource = ChooseInteractionSource(session, currentInputs, out probed);
+                    if (!string.IsNullOrEmpty(shownSource)) session.SelectGraphBuff(shownSource, currentInputs);
+                    RefreshWorkspaceForRuntime();
+                    _interactionSourceId = chosenSource ?? shownSource;
+                    _workspaceInteraction.AddNote("interactionSource=" + (chosenSource ?? "none-suitable") +
+                        ";probed=" + probed);
                     // Full canonical signature before/after browsing.
                     string beforeBrowse = session.DocumentIntentSignature();
                     string buffControl = Invoke("Source." + _interactionSourceId);
+                    UI.CastingGraphView graph = session.BuildGraph(currentInputs);
+                    _interactionCasters.Clear();
+                    _interactionTargets.Clear();
+                    _interactionCasters.AddRange(GraphCapableCasters(graph));
+                    foreach (UI.CastingGraphTargetNode target in graph.Targets)
+                        _interactionTargets.Add(target.UnitId);
+                    _workspaceInteraction.AddNote("buffSelected=" + string.Equals(session.SelectedSourceId,
+                        _interactionSourceId, StringComparison.Ordinal));
                     // The source-type tabs are view-only: Spells, then back
                     // to All, inside the same no-mutation check.
                     string spellsTab = Invoke("SourceTab.Spells");
@@ -4402,9 +4598,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     _workspaceInteraction.RecordBrowse(browseClean, buffControl,
                         _interactionCasters.Count, _interactionTargets.Count);
                     SyncInteractionEvidence();
-                    session.SelectRoutine(view.RoutineIds.Count == 0
-                        ? "long" : view.RoutineIds[0]);
-                    session.BuildView(currentInputs);
+                    session.SelectRoutine(graph.Routines.Count == 0
+                        ? "long" : graph.Routines[0].RoutineId);
+                    RefreshWorkspaceForRuntime();
                     BeginWorkspaceCameraCapture("ws-interact-browse.png", false);
                     _workspaceInteractionStep = 1;
                     return false;
@@ -4424,41 +4620,38 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     string siblingsBefore =
                         WorkspaceCastStepEvaluator.SiblingSignature(
                             session.Document.Castings, null);
-                    string casterClick = Invoke("DraftCaster." + caster);
-                    // A legal recipient for THIS caster, never the caster
-                    // itself (live run casting-ws-reload-20260923-s3-01: the
-                    // first buff, Aid Another, cannot target its caster), and
-                    // cast 3 goes to someone other than cast 1's recipient.
-                    string target = InteractionTarget(session, currentInputs, caster,
-                        index == 2 && _interactionCastTargets.Count > 0
-                            ? new[] { _interactionCastTargets[0] } : new string[0]);
+                    // The graph gesture: the caster, its exact source row, then
+                    // the target whose click adds the casting.
+                    string casterClick = Invoke("Caster." + caster);
+                    int row = UsableSourceRow(session, currentInputs, caster);
+                    string sourceClick = row < 0 ? "control-missing:Provider." + caster + ".usable"
+                        : Invoke("Provider." + caster + "." + row);
+                    // A legal recipient for THIS source that no casting of the
+                    // buff in this routine has yet (the graph shows, never
+                    // steals, an assigned target), and never the caster itself
+                    // (Aid Another cannot target its caster).
+                    string target = GraphInteractionTarget(session, currentInputs, caster);
                     _interactionCastTargets.Add(target);
-                    string targetClick = Invoke("DraftTarget." + target);
-                    // Expected record resolved from the POST-selection draft
-                    // (review H4): exact ability, spellbook, routine, state,
-                    // and enhancement set — not just non-null fields.
+                    // Expected record from the POST-selection draft (review
+                    // H4): the exact chosen source's ability and spellbook.
                     var expected = new WorkspaceCastExpectation
                     {
                         CasterUnitId = caster,
                         DirectTargetUnitId = target,
                         SourceId = _interactionSourceId,
-                        Ability = session.DraftAbilityFor(currentInputs),
-                        SpellbookGuid = session.DraftSpellbookFor(currentInputs),
+                        Ability = session.Draft.Ability,
+                        SpellbookGuid = string.IsNullOrEmpty(session.Draft.SpellbookGuid)
+                            ? null : session.Draft.SpellbookGuid,
                         RoutineId = session.SelectedRoutineId
                     };
-                    // The visible state control is clicked only when the
-                    // draft is not already Ready (the button toggles).
-                    string stateClick = session.Draft.State ==
-                        Domain.Authoring.CastingAuthoringState.Ready
-                        ? WorkspaceControlOutcome.AlreadyReady : Invoke("State");
-                    string addClick = Invoke("AddCasting");
+                    string addClick = Invoke("Target." + target);
                     var castings = session.Document.Castings;
                     Domain.Authoring.PlannedCasting created;
                     WorkspaceCastStepEvidence step =
                         _workspaceInteraction.RecordCastStep(
                             WorkspaceCastStepEvaluator.Evaluate(index + 1,
-                                casterClick, targetClick, stateClick, addClick,
-                                castings.ToList(), beforeCount,
+                                casterClick, sourceClick, WorkspaceControlOutcome.AlreadyReady,
+                                addClick, castings.ToList(), beforeCount,
                                 _interactionCastIds, expected, siblingsBefore,
                                 out created));
                     if (created != null)
@@ -4482,18 +4675,17 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 }
                 if (_workspaceInteractionStep == 4)
                 {
-                    // Negative case: an Add with NO recipient chosen must be
-                    // refused and leave the document untouched (review G4).
-                    session.Draft.SourceId = _interactionSourceId;
-                    session.Draft.CasterUnitId = _interactionCasters[0];
-                    session.Draft.DirectTargetUnitId = null;
-                    session.Draft.TargetMode =
-                        Domain.Authoring.CastingTargetMode.DirectTarget;
-                    session.Draft.Enhancements.Clear();
-                    session.BuildView(currentInputs);
+                    // Negative case: with NO caster chosen, a target click must
+                    // be refused and leave the document untouched (review G4;
+                    // the graph's analogue of an Add with nothing chosen).
+                    session.SelectCaster(null);
+                    session.Draft.CasterUnitId = null;
+                    session.Draft.Ability = null;
+                    session.Draft.SpellbookGuid = null;
+                    RefreshWorkspaceForRuntime();
                     string signatureBefore = session.DocumentIntentSignature();
                     int countBefore = session.Document.Castings.Count;
-                    string refusedAdd = Invoke("AddCasting");
+                    string refusedAdd = Invoke("Target." + _interactionTargets[0]);
                     bool refusedClean =
                         session.Document.Castings.Count == countBefore &&
                         string.Equals(session.DocumentIntentSignature(),
@@ -4506,17 +4698,25 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 }
                 if (_workspaceInteractionStep == 5)
                 {
+                    // A casting's LINE (its wide hit corridor) and its CHIP both
+                    // open that casting's inspector (G07).
+                    string lineId = _interactionCastIds.Count > 0 ? _interactionCastIds[0] : string.Empty;
+                    string lineClick = Invoke("Line." + lineId + ".in");
+                    bool lineFocused = string.Equals(session.EditingFocusCastingId, lineId,
+                        StringComparison.Ordinal);
+                    _workspaceInteraction.AddNote("lineControl=" + lineClick + ";lineFocused=" + lineFocused);
                     string editId = _interactionCastIds.Count > 1
                         ? _interactionCastIds[1] : string.Empty;
-                    string editClick = Invoke("Edit." + editId);
+                    string editClick = Invoke("Casting." + editId);
                     Domain.Authoring.PlannedCasting focused =
                         session.Document.Castings.FirstOrDefault(casting =>
                             casting != null && string.Equals(casting.CastingId,
                                 editId, StringComparison.Ordinal));
-                    bool editFocused = focused != null &&
+                    bool editFocused = focused != null && lineFocused &&
                         string.Equals(session.EditingFocusCastingId, editId,
                             StringComparison.Ordinal);
-                    _workspaceInteraction.EditControl = editClick;
+                    _workspaceInteraction.EditControl = editClick == WorkspaceControlOutcome.Invoked &&
+                        lineClick != WorkspaceControlOutcome.Invoked ? "line:" + lineClick : editClick;
                     _workspaceInteraction.EditFocused = editFocused;
                     SyncInteractionEvidence();
                     BeginWorkspaceCameraCapture("ws-interact-authored.png", false);
@@ -4525,20 +4725,19 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 }
                 if (_workspaceInteractionStep == 6)
                 {
-                    // Retarget through the FOCUSED editor's real control.
+                    // Retarget through the FOCUSED inspector's real control.
                     string editId = _interactionCastIds.Count > 1
                         ? _interactionCastIds[1] : string.Empty;
-                    // Another legal recipient for cast 2's caster: neither the
+                    // Another legal recipient for cast 2's source: neither the
                     // caster nor its current recipient; the re-edit reuses it.
-                    _interactionRetarget = InteractionTarget(null, null, _interactionCasters[1],
-                        _interactionCastTargets.Count > 1 ? new[] { _interactionCastTargets[1] } : new string[0]);
+                    _interactionRetarget = GraphRetarget(session, currentInputs, editId);
                     string newTarget = _interactionRetarget;
                     // Baseline BEFORE the edit: Undo must restore exactly
                     // this, so it is captured before the retarget control
                     // fires, never after.
                     _workspaceIntentBeforeEdit =
                         session.DocumentIntentSignature();
-                    string retargetClick = Invoke("Target." + newTarget);
+                    string retargetClick = InvokeRetarget(newTarget);
                     Domain.Authoring.PlannedCasting focused =
                         session.Document.Castings.FirstOrDefault(casting =>
                             casting != null && string.Equals(casting.CastingId,
@@ -4572,10 +4771,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     // their controls.
                     string editId = _interactionCastIds.Count > 1
                         ? _interactionCastIds[1] : string.Empty;
-                    string newTarget = _interactionRetarget ?? InteractionTarget(null, null, _interactionCasters[1],
-                        _interactionCastTargets.Count > 1 ? new[] { _interactionCastTargets[1] } : new string[0]);
-                    Invoke("Edit." + editId);
-                    Invoke("Target." + newTarget);
+                    string newTarget = _interactionRetarget ?? GraphRetarget(session, currentInputs, editId);
+                    Invoke("Casting." + editId);
+                    InvokeRetarget(newTarget);
                     string doneClick = Invoke("DoneEditing");
                     bool doneCleared = session.EditingFocusCastingId == null;
                     string saveClick = Invoke("Save");
@@ -4591,7 +4789,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     SyncInteractionEvidence();
                     _log.Info("[KBP-WORKSPACE] interaction authored and saved;" +
                         _workspaceInteractionEvidence + ".");
-                    TransitionToBisectionClose();
+                    FinishWorkspaceInteraction();
                     return false;
                 }
             }
@@ -4611,6 +4809,617 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private void SyncInteractionEvidence()
         {
             _workspaceInteractionEvidence = _workspaceInteraction.Describe();
+        }
+
+        // ------------------------------------------------------------------
+        // Pointer-highlight diagnostic (live-workspace-qual only; addendum
+        // v1.1: exactly one highlight, on the control under the pointer).
+        // Unity's own control states are read (PlannerHoverProbe) while the
+        // real cursor is parked on a neutral point or swept over controls;
+        // the owner-reported rc6 ghost is reproduced on the Classic screen
+        // with only PlannerUiReproduction switched, then the shipped
+        // behaviour is measured on the same binary. Hover moves only: the
+        // sweep never clicks.
+        // ------------------------------------------------------------------
+
+        private GameObject HoverWorkspaceRoot()
+        {
+            UI.CastingWorkspaceScreenView view = BuffPlannerUiRoot.CastingWorkspaceViewForRuntime;
+            return view == null ? null : view.RootObject;
+        }
+
+        // Colour transitions (at most 0.1 s in the planner and the rc6
+        // behaviour) finish before a reading or a frame is taken.
+        private const int HoverSettleMilliseconds = 400;
+
+        private void RequestHover(string id, Vector2 point, string aimed, string clicked, string surface,
+            string behaviour, bool sample, int after)
+        {
+            WritePhysicalInputRequest(id, "hover", point);
+            _hoverPending = id;
+            _hoverPoint = point;
+            _hoverAimed = aimed;
+            _hoverPendingClicked = clicked;
+            _hoverPendingSurface = surface;
+            _hoverPendingBehaviour = behaviour;
+            _hoverPendingSample = sample;
+            _hoverAfter = after;
+            _hoverFrames = 0;
+            _hoverAckClock = null;
+            _hoverClock = System.Diagnostics.Stopwatch.StartNew();
+        }
+
+        // The pending physical move: acknowledged, then at least three frames
+        // and the settle time for the input module and the transitions, then
+        // Unity's reading at the cursor.
+        private bool UpdateHoverPending()
+        {
+            if (_hoverAckClock == null)
+            {
+                if (!PhysicalInputAcknowledged(_hoverPending))
+                {
+                    if (_hoverClock.Elapsed.TotalSeconds > 45)
+                    {
+                        _hover.AddFailure("physical-timeout:" + _hoverPending);
+                        _hoverPending = null;
+                        _hoverStep = _hoverAfter;
+                    }
+                    return false;
+                }
+                JObject ack = JObject.Parse(File.ReadAllText(Path.Combine(_request.EvidenceDirectory,
+                    "physical-input-" + _hoverPending + ".ack.json")));
+                if (ack.Value<bool?>("deliveryFailed") == true)
+                {
+                    _hover.AddFailure("physical-delivery-failed:" + _hoverPending + ":" + ack.Value<string>("error"));
+                    _hoverPending = null;
+                    _hoverStep = _hoverAfter;
+                    return false;
+                }
+                _hoverAckCursor = ack.Value<string>("windowsClientCursor");
+                _hoverAckClock = System.Diagnostics.Stopwatch.StartNew();
+                _hoverFrames = 0;
+                return false;
+            }
+            if (_hoverFrames++ < 3 || _hoverAckClock.ElapsedMilliseconds < HoverSettleMilliseconds) return false;
+            if (_hoverPendingSample)
+            {
+                GameObject root = _hoverPendingSurface == "classic"
+                    ? BuffPlannerUiRoot.ClassicRootForRuntime : HoverWorkspaceRoot();
+                Vector2 mouse = Input.mousePosition;
+                bool anyHit;
+                UnityEngine.UI.Selectable top = PlannerHoverProbe.TopControlAt(mouse, out anyHit);
+                bool topUnder = top != null && PlannerHoverProbe.IsUnder(top.gameObject, new[] { root });
+                string expected = topUnder && PlannerHoverProbe.DrawsHighlight(top) ? top.name : null;
+                List<UnityEngine.UI.Selectable> owners = PlannerHoverProbe.Controls(root)
+                    .Where(control => PlannerHoverProbe.StateOf(control) == "Highlighted" &&
+                        PlannerHoverProbe.DrawsHighlight(control)).ToList();
+                bool? inside = owners.Count == 1 ? PlannerHoverProbe.Contains(owners[0], mouse) : (bool?)null;
+                _hover.Add(PlannerHoverProbe.Sample(_hoverPending, _hoverPendingSurface, _hoverPendingBehaviour,
+                    true, _hoverAimed, _hoverPendingClicked, expected, topUnder ? top.name : null, inside,
+                    "requested=" + PlannerHoverProbe.Point(_hoverPoint) + ";unityCursor=" +
+                    PlannerHoverProbe.Point(mouse) + ";client=" + _hoverAckCursor + ";anyHit=" + anyHit +
+                    ";ghosts=" + PlannerHoverProbe.Ghosts(expected, mouse, root), root));
+            }
+            _hoverPending = null;
+            _hoverAckClock = null;
+            _hoverStep = _hoverAfter;
+            return false;
+        }
+
+        // The presented frame (what the owner sees): the camera-path lane
+        // renders planner text washed out (run casting-graph-qual-1200-01,
+        // ws-interact-authored.png against workspace-frame.png), so it cannot
+        // serve the contrast or hover frames.
+        private void BeginHoverCapture(string fileName)
+        {
+            _hoverCapture = null;
+            MenuDiagnosticCaptureHost.CaptureMenuFrame(
+                Path.Combine(_request.EvidenceDirectory, fileName),
+                delegate(MenuFrameCapture capture, Exception failure)
+                {
+                    capture.Failure = failure;
+                    _hoverCapture = capture;
+                });
+            _hoverCaptureName = fileName;
+            _hoverClock = System.Diagnostics.Stopwatch.StartNew();
+        }
+
+        // True once the named capture completed (a failure is recorded, not
+        // thrown: the frame is evidence for the owner, not the verdict).
+        private bool HoverCaptureDone()
+        {
+            if (_hoverCapture == null || !string.Equals(_hoverCapture.FileName, _hoverCaptureName,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                if (_hoverClock.Elapsed.TotalSeconds <= 30) return false;
+                _hover.AddFailure("capture-timeout:" + _hoverCaptureName);
+                return true;
+            }
+            if (_hoverCapture.Failure != null)
+                _hover.AddFailure("capture-failed:" + _hoverCaptureName + ":" + _hoverCapture.Failure.Message);
+            return true;
+        }
+
+        // A state set through Unity's handlers is drawn only after its colour
+        // transition: wait, then take the frame, then continue at next (which
+        // first waits for the capture).
+        private void SettleThenCapture(string fileName, int next)
+        {
+            _hoverSettleCapture = fileName;
+            _hoverAfter = next;
+            _hoverClock = System.Diagnostics.Stopwatch.StartNew();
+            _hoverStep = 17;
+        }
+
+        private void HoverSynthetic(string label, string surface, string behaviour, string aimed, string clicked,
+            GameObject root)
+        {
+            _hover.Add(PlannerHoverProbe.Sample(label, surface, behaviour, false, aimed, clicked, aimed, null,
+                null, string.Empty, root));
+        }
+
+        // ------------------------------------------------------------------
+        // The Classic screen: the owner's sequence with the real cursor, once
+        // with the rc6 behaviour (the reproduction) and once as shipped.
+        // ------------------------------------------------------------------
+
+        private string ClassicTarget(int index, bool interactableOnly)
+        {
+            GameObject classic = BuffPlannerUiRoot.ClassicRootForRuntime;
+            return PlannerHoverProbe.Controls(classic).Where(control =>
+                    control.name.StartsWith("Target.", StringComparison.Ordinal) &&
+                    (!interactableOnly || control.IsInteractable()) &&
+                    PlannerHoverProbe.VisibleCentre(control).HasValue)
+                .Select(control => control.name).Skip(index).FirstOrDefault();
+        }
+
+        private void AimClassicNeutral(string id, string behaviour)
+        {
+            Vector2? point = PlannerHoverProbe.NeutralPoint(BuffPlannerUiRoot.ClassicRootForRuntime);
+            if (!point.HasValue)
+            {
+                _hover.AddFailure("no-neutral-point:" + id);
+                return;
+            }
+            RequestHover(id, point.Value, null, null, "classic", behaviour, true, 20);
+        }
+
+        // optional: a sweep position past the last portrait is skipped.
+        private void AimClassicControl(string id, string behaviour, string name, string clicked, bool optional)
+        {
+            if (name == null)
+            {
+                if (!optional) _hover.AddFailure("classic-control-missing:" + id);
+                return;
+            }
+            Vector2? point = PlannerHoverProbe.VisibleCentre(
+                PlannerHoverProbe.Find(BuffPlannerUiRoot.ClassicRootForRuntime, name));
+            if (!point.HasValue)
+            {
+                _hover.AddNote("not-shown:" + id + ":" + name);
+                return;
+            }
+            RequestHover(id, point.Value, name, clicked, "classic", behaviour, true, 20);
+        }
+
+        // The owner's first action on the Classic screen: choose a buff by
+        // clicking its card (a synthetic click through Unity's own handlers;
+        // the real cursor rests on a neutral point meanwhile). A bound card
+        // is named "Source.<sourceId>" (PlannerViews BuffCardView.Bind; run
+        // casting-graph-qual-1200-01 looked for its pool name and found none).
+        private void ClickClassicCard(string tag)
+        {
+            GameObject classic = BuffPlannerUiRoot.ClassicRootForRuntime;
+            UnityEngine.UI.Selectable card = PlannerHoverProbe.Controls(classic).FirstOrDefault(control =>
+                control.name.StartsWith("Source.", StringComparison.Ordinal) && control.IsInteractable() &&
+                PlannerHoverProbe.VisibleCentre(control).HasValue);
+            if (card == null)
+            {
+                _hover.AddFailure("classic-card-missing:" + tag);
+                _hoverClassicClicked = null;
+                return;
+            }
+            bool took = PlannerHoverProbe.Click(card);
+            _hoverClassicClicked = card.name;
+            _hover.AddNote("classic-" + tag + "-click=" + card.name + ";tookSelection=" + took);
+        }
+
+        private void CloseClassicForHover()
+        {
+            BuffPlannerUiRoot.CloseRuntimeSmoke();
+            _hoverClassicOpen = false;
+            PlannerHoverProbe.ClearSelection();
+            PlannerUiReproduction.Rc6ButtonBehaviour = false;
+            _hoverFrames = 0;
+        }
+
+        private void BuildClassicHoverScript(bool rc6)
+        {
+            string tag = rc6 ? "rc6" : "fixed";
+            string behaviour = rc6 ? HoverBehaviour.Rc6 : HoverBehaviour.Fixed;
+            _hoverScript.Clear();
+            _hoverScriptIndex = 0;
+            _hoverScript.Add(() => AimClassicNeutral("hover-classic-" + tag + "-neutral", behaviour));
+            // A portrait hovered before anything was clicked: a second
+            // highlight here would be another cause than the selection.
+            _hoverScript.Add(() => AimClassicControl("hover-classic-" + tag + "-hover", behaviour,
+                ClassicTarget(0, true), null, false));
+            _hoverScript.Add(() => AimClassicNeutral("hover-classic-" + tag + "-neutral-2", behaviour));
+            _hoverScript.Add(() => ClickClassicCard(tag));
+            _hoverScript.Add(() => AimClassicControl("hover-classic-" + tag + "-click-then-hover", behaviour,
+                ClassicTarget(0, true), _hoverClassicClicked, false));
+            _hoverScript.Add(() =>
+            {
+                BeginHoverCapture("hover-classic-" + tag + ".png");
+                _hoverScriptCapture = true;
+            });
+            _hoverScript.Add(() => AimClassicNeutral("hover-classic-" + tag + "-after-click", behaviour));
+            if (!rc6)
+                for (int index = 0; index < 8; index++)
+                {
+                    int position = index;
+                    _hoverScript.Add(() => AimClassicControl("hover-classic-sweep-" + position, behaviour,
+                        ClassicTarget(position, false), null, true));
+                }
+            _hoverScript.Add(CloseClassicForHover);
+        }
+
+        private bool UpdateHoverOwnership()
+        {
+            try
+            {
+                if (_hoverPending != null) return UpdateHoverPending();
+                GameObject root = HoverWorkspaceRoot();
+                GameObject classic = BuffPlannerUiRoot.ClassicRootForRuntime;
+                if (_hoverStep == 0)
+                {
+                    _hoverStarted = true;
+                    _hover.ProbeAvailable = PlannerHoverProbe.Available;
+                    _hover.Screen = UnityEngine.Screen.width + "x" + UnityEngine.Screen.height;
+                    Vector2? neutral = PlannerHoverProbe.NeutralPoint(root);
+                    if (!_hover.ProbeAvailable || !neutral.HasValue)
+                    {
+                        _hover.AddFailure(!_hover.ProbeAvailable ? "probe-members-missing" : "no-neutral-point:graph");
+                        return FinishHover();
+                    }
+                    _hoverGraphNeutral = neutral.Value;
+                    RequestHover("hover-graph-neutral", neutral.Value, null, null, "graph", HoverBehaviour.Fixed,
+                        true, 1);
+                    return false;
+                }
+                if (_hoverStep == 1)
+                {
+                    // A click on a view-only control, then hovers: the click
+                    // must not keep the control lit (the owner's ghost).
+                    UnityEngine.UI.Selectable tab = PlannerHoverProbe.Find(root, "SourceTab.All");
+                    bool took = PlannerHoverProbe.Click(tab);
+                    _hover.AddNote("graphClick=" + (tab == null ? "missing" : tab.name) + ";tookSelection=" + took);
+                    string[] names =
+                    {
+                        "Target." + _interactionTargets.FirstOrDefault(),
+                        "Caster." + _interactionCasters.FirstOrDefault(),
+                        "Casting." + _interactionCastIds.FirstOrDefault()
+                    };
+                    for (int index = 0; index < names.Length; index++)
+                    {
+                        UnityEngine.UI.Selectable control = PlannerHoverProbe.Find(root, names[index]);
+                        if (control == null)
+                        {
+                            _hover.AddFailure("graph-control-missing:" + names[index]);
+                            continue;
+                        }
+                        PlannerHoverProbe.Enter(control);
+                        HoverSynthetic(index == 0 ? "graph-click-then-hover" : "graph-hover-" + index, "graph",
+                            HoverBehaviour.Fixed, control.name, index == 0 && tab != null ? tab.name : null, root);
+                        PlannerHoverProbe.Exit(control);
+                        HoverSynthetic("graph-exit-" + index, "graph", HoverBehaviour.Fixed, null, null, root);
+                    }
+                    // One hovered node held for the frame the owner will see.
+                    _hoverHeld = names[0];
+                    PlannerHoverProbe.Enter(PlannerHoverProbe.Find(root, _hoverHeld));
+                    SettleThenCapture("hover-graph-fixed.png", 2);
+                    return false;
+                }
+                if (_hoverStep == 17)
+                {
+                    if (_hoverClock.ElapsedMilliseconds < HoverSettleMilliseconds) return false;
+                    BeginHoverCapture(_hoverSettleCapture);
+                    _hoverStep = _hoverAfter;
+                    return false;
+                }
+                if (_hoverStep == 2)
+                {
+                    if (!HoverCaptureDone()) return false;
+                    HoverSynthetic("graph-hover-captured", "graph", HoverBehaviour.Fixed, _hoverHeld, null, root);
+                    PlannerHoverProbe.Exit(PlannerHoverProbe.Find(root, _hoverHeld));
+                    // Five button states in one frame. The first casting's
+                    // inspector (focus only) gives a naturally disabled
+                    // control: it cannot move earlier than first.
+                    Invoke("Casting." + _interactionCastIds.FirstOrDefault());
+                    UnityEngine.UI.Selectable disabled = PlannerHoverProbe.Find(root, "FocusedOrder.Earlier");
+                    if (disabled == null || disabled.IsInteractable())
+                        disabled = PlannerHoverProbe.Controls(root).FirstOrDefault(control =>
+                            control is UnityEngine.UI.Button && !control.IsInteractable());
+                    UI.CastingWorkspaceSession session = BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
+                    _hoverButtons = new[]
+                    {
+                        "Reload", "Save", "ExecutionMode",
+                        "Routine." + (session == null ? "long" : session.SelectedRoutineId),
+                        disabled == null ? "none" : disabled.name
+                    };
+                    PlannerHoverProbe.Enter(PlannerHoverProbe.Find(root, _hoverButtons[1]));
+                    PlannerHoverProbe.Press(PlannerHoverProbe.Find(root, _hoverButtons[2]));
+                    SettleThenCapture("button-states.png", 3);
+                    return false;
+                }
+                if (_hoverStep == 3)
+                {
+                    if (!HoverCaptureDone()) return false;
+                    for (int index = 0; index < HoverOwnershipRecord.RequiredButtonStates.Length; index++)
+                        _hover.AddButton(PlannerHoverProbe.Observe(HoverOwnershipRecord.RequiredButtonStates[index],
+                            PlannerHoverProbe.Find(root, _hoverButtons[index])));
+                    // Let go without a click (a click would toggle the mode).
+                    PlannerHoverProbe.Release(PlannerHoverProbe.Find(root, _hoverButtons[2]));
+                    PlannerHoverProbe.Exit(PlannerHoverProbe.Find(root, _hoverButtons[1]));
+                    Invoke("DoneEditing");
+                    // The live sweep: every visible target, and the other
+                    // kinds of control once each.
+                    string caster = _interactionCasters.FirstOrDefault();
+                    UI.CastingWorkspaceSession session = BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
+                    _hoverSweep.Clear();
+                    _hoverSweep.AddRange(new[]
+                    {
+                        "Caster." + caster, "Provider." + caster + ".0",
+                        "Casting." + _interactionCastIds.FirstOrDefault()
+                    });
+                    _hoverSweep.AddRange(PlannerHoverProbe.Controls(HoverWorkspaceRoot())
+                        .Where(control => control.name.StartsWith("Target.", StringComparison.Ordinal))
+                        .Select(control => control.name));
+                    _hoverSweep.AddRange(new[]
+                    {
+                        "Caster." + _interactionCasters.LastOrDefault(), "Source." + _interactionSourceId, "Save",
+                        "Routine." + (session == null ? "long" : session.SelectedRoutineId)
+                    });
+                    _hoverSweepIndex = 0;
+                    _hoverStep = 4;
+                    return false;
+                }
+                if (_hoverStep == 4)
+                {
+                    while (_hoverSweepIndex < _hoverSweep.Count)
+                    {
+                        string name = _hoverSweep[_hoverSweepIndex++];
+                        Vector2? point = PlannerHoverProbe.VisibleCentre(PlannerHoverProbe.Find(root, name));
+                        if (!point.HasValue)
+                        {
+                            _hover.AddNote("sweep-not-shown:" + name);
+                            continue;
+                        }
+                        RequestHover("hover-sweep-" + _hoverSweepIndex, point.Value, name, null, "graph",
+                            HoverBehaviour.Fixed, true, 4);
+                        return false;
+                    }
+                    RequestHover("hover-graph-neutral-end", _hoverGraphNeutral, null, null, "graph",
+                        HoverBehaviour.Fixed, true, 5);
+                    return false;
+                }
+                if (_hoverStep == 5)
+                {
+                    _hover.GraphSelectablesBeforeClose = PlannerHoverProbe.Controls(root).Count;
+                    BuffPlannerUiRoot.CloseCastingWorkspaceForRuntime();
+                    _hoverFrames = 0;
+                    _hoverStep = 6;
+                    return false;
+                }
+                if (_hoverStep == 6 || _hoverStep == 10)
+                {
+                    // Workspace (or the rc6 Classic screen) closed: open the
+                    // Classic screen with the behaviour under test.
+                    bool rc6 = _hoverStep == 6;
+                    if (BuffPlannerUiRoot.IsCastingWorkspaceOpen || BuffPlannerUiRoot.IsScreenOpen ||
+                        _hoverFrames++ < 3) return false;
+                    PlannerUiReproduction.Rc6ButtonBehaviour = rc6;
+                    _hoverClassicRowSelected = false;
+                    if (!BuffPlannerUiRoot.OpenClassicForRuntime())
+                    {
+                        _hover.AddFailure("classic-open-refused:" + (rc6 ? "rc6" : "fixed"));
+                        PlannerUiReproduction.Rc6ButtonBehaviour = false;
+                        return FinishHover();
+                    }
+                    _hoverClassicOpen = true;
+                    _hoverFrames = 0;
+                    _hoverClock = System.Diagnostics.Stopwatch.StartNew();
+                    _hoverStep = rc6 ? 7 : 11;
+                    return false;
+                }
+                if (_hoverStep == 7 || _hoverStep == 11)
+                {
+                    bool rc6 = _hoverStep == 7;
+                    if (!BuffPlannerUiRoot.IsScreenOpen || classic == null || _hoverFrames++ < 5)
+                    {
+                        if (_hoverClock.Elapsed.TotalSeconds <= 30) return false;
+                        _hover.AddFailure("classic-not-open:" + (rc6 ? "rc6" : "fixed"));
+                        return FinishHover();
+                    }
+                    if (ClassicTarget(0, true) == null && !_hoverClassicRowSelected)
+                    {
+                        // Portraits show for a selected buff: select the
+                        // first catalogue row (view state, not a pointer
+                        // click), then look again.
+                        _hoverClassicRowSelected = true;
+                        _hover.AddNote("classicFirstRowSelected=" + BuffPlannerUiRoot.SelectFirstRowForRuntime());
+                        _hoverFrames = 0;
+                        return false;
+                    }
+                    BuildClassicHoverScript(rc6);
+                    _hoverAfterScript = rc6 ? 10 : 14;
+                    _hoverStep = 20;
+                    return false;
+                }
+                if (_hoverStep == 20)
+                {
+                    if (_hoverScriptCapture)
+                    {
+                        if (!HoverCaptureDone()) return false;
+                        _hoverScriptCapture = false;
+                    }
+                    if (_hoverScriptIndex >= _hoverScript.Count)
+                    {
+                        _hoverStep = _hoverAfterScript;
+                        return false;
+                    }
+                    _hoverScript[_hoverScriptIndex++]();
+                    return false;
+                }
+                if (_hoverStep == 14)
+                {
+                    if (BuffPlannerUiRoot.IsScreenOpen || _hoverFrames++ < 3) return false;
+                    // Park the cursor where the reopened workspace has no
+                    // control, then continue into the close/reopen check.
+                    RequestHover("hover-park", _hoverGraphNeutral, null, null, "graph", HoverBehaviour.Fixed,
+                        false, 15);
+                    return false;
+                }
+                if (_hoverStep == 15)
+                {
+                    TransitionToBisectionClose();
+                    return false;
+                }
+                // Phase 145: after the production close and reopen.
+                if (_hoverStep == 30)
+                {
+                    _hover.PlannerRootsAfterReopen = BuffPlannerUiRoot.PlannerRootCountForRuntime();
+                    _hover.GraphSelectablesAfterReopen = PlannerHoverProbe.Controls(root).Count;
+                    Vector2? neutral = PlannerHoverProbe.NeutralPoint(root);
+                    if (!neutral.HasValue)
+                    {
+                        _hover.AddFailure("no-neutral-point:reopen");
+                        _hoverStep = 31;
+                        return false;
+                    }
+                    RequestHover("hover-reopen-neutral", neutral.Value, null, null, "reopen", HoverBehaviour.Fixed,
+                        true, 31);
+                    return false;
+                }
+                if (_hoverStep == 31)
+                {
+                    string name = "Target." + _interactionTargets.FirstOrDefault();
+                    UnityEngine.UI.Selectable target = PlannerHoverProbe.Find(root, name);
+                    if (target == null) _hover.AddFailure("reopen-control-missing:" + name);
+                    PlannerHoverProbe.Enter(target);
+                    HoverSynthetic("reopen-hover", "reopen", HoverBehaviour.Fixed, target == null ? null : name, null,
+                        root);
+                    PlannerHoverProbe.Exit(target);
+                    HoverSynthetic("reopen-exit", "reopen", HoverBehaviour.Fixed, null, null, root);
+                    _hover.Completed = true;
+                    WriteHoverEvidence();
+                    _liveUiPhase = 21;
+                    return false;
+                }
+                _hover.AddFailure("hover-step-unknown:" + _hoverStep);
+                return FinishHover();
+            }
+            catch (Exception exception)
+            {
+                PlannerUiReproduction.Rc6ButtonBehaviour = false;
+                _hover.AddFailure("error=" + exception.GetType().Name + ":" + exception.Message);
+                _log.Error("[KBP-HOVER] hover diagnostic step " + _hoverStep + " failed.", exception);
+                return FinishHover();
+            }
+        }
+
+        // An early end: the rc6 switch is off, no Classic screen stays open,
+        // the evidence is written, and the standard close/reopen continues
+        // (the incomplete record fails its own assertion).
+        private bool FinishHover()
+        {
+            PlannerUiReproduction.Rc6ButtonBehaviour = false;
+            _hoverPending = null;
+            _hoverReopenChecked = true;
+            EndHoverClassic();
+            WriteHoverEvidence();
+            if (_liveUiPhase == 145) _liveUiPhase = 21;
+            else TransitionToBisectionClose();
+            return false;
+        }
+
+        // Closes the Classic screen the diagnostic opened, in whatever
+        // lifecycle state it is (opening included).
+        private void EndHoverClassic()
+        {
+            if (!_hoverClassicOpen) return;
+            _hoverClassicOpen = false;
+            try
+            {
+                BuffPlannerUiRoot.CloseRuntimeSmoke();
+            }
+            catch (Exception exception)
+            {
+                _hover.AddFailure("classic-close-failed:" + exception.Message);
+            }
+            PlannerHoverProbe.ClearSelection();
+        }
+
+        private void WriteHoverEvidence()
+        {
+            try
+            {
+                IList<string> violations = _hover.Violations();
+                var root = new JObject
+                {
+                    { "schemaVersion", 1 },
+                    { "runId", _request.RunId },
+                    { "scenario", _request.Scenario },
+                    { "screen", _hover.Screen },
+                    { "probeAvailable", _hover.ProbeAvailable },
+                    { "ghostReproduced", _hover.GhostReproduced },
+                    { "ghostWithoutClick", _hover.GhostWithoutClick },
+                    { "rootCause", _hover.RootCause },
+                    { "completed", _hover.Completed },
+                    { "plannerRootsAfterReopen", _hover.PlannerRootsAfterReopen },
+                    { "graphSelectablesBeforeClose", _hover.GraphSelectablesBeforeClose },
+                    { "graphSelectablesAfterReopen", _hover.GraphSelectablesAfterReopen },
+                    { "samples", new JArray(_hover.Samples.Select(sample => (object)new JObject
+                        {
+                            { "label", sample.Label },
+                            { "surface", sample.Surface },
+                            { "behaviour", sample.Behaviour },
+                            { "physical", sample.Physical },
+                            { "aimed", sample.Aimed },
+                            { "clicked", sample.Clicked },
+                            { "expectedOwner", sample.ExpectedOwner },
+                            { "topControl", sample.TopControl },
+                            { "highlighted", new JArray(sample.Highlighted.Cast<object>().ToArray()) },
+                            { "pointerInside", new JArray(sample.PointerInside.Cast<object>().ToArray()) },
+                            { "selection", sample.Selection },
+                            { "selectionIsPlannerControl", sample.SelectionIsPlannerControl },
+                            { "cursorInsideOwner", sample.CursorInsideOwner },
+                            { "detail", sample.Detail },
+                            { "violations", new JArray(sample.Judge().Cast<object>().ToArray()) }
+                        }).ToArray()) },
+                    { "buttonStates", new JArray(_hover.Buttons.Select(button => (object)new JObject
+                        {
+                            { "state", button.State },
+                            { "control", button.Control },
+                            { "unityState", button.UnityState },
+                            { "interactable", button.Interactable },
+                            { "selectedPalette", button.SelectedPalette },
+                            { "tintMatches", button.TintMatches },
+                            { "tint", button.Tint },
+                            { "screenRect", button.ScreenRect },
+                            { "shown", button.Shown }
+                        }).ToArray()) },
+                    { "notes", new JArray(_hover.Notes.Cast<object>().ToArray()) },
+                    { "failures", new JArray(_hover.Failures.Cast<object>().ToArray()) },
+                    { "violations", new JArray(violations.Cast<object>().ToArray()) }
+                };
+                AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory, "hover-ownership.json"),
+                    root.ToString(Formatting.Indented) + Environment.NewLine);
+            }
+            catch (Exception exception)
+            {
+                _log.Error("[KBP-HOVER] hover evidence could not be written.", exception);
+            }
         }
 
         private static string Invoke(string buttonName)

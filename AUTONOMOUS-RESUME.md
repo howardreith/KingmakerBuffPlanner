@@ -5,7 +5,79 @@ is the top section of `planning/CASTING-FIRST-MIGRATION-STATUS.md`. The
 entries below record past sessions, including temporary orchestration
 notes (watcher and preflight state) that are not product status.
 
-## Release candidate 0.2.0-rc6 frozen at `24d9967`; chain done (2026-09-25, LATEST)
+## Casting-graph UI correction: handed off to Z.AI (2026-09-26, LATEST)
+
+- **Start here: `planning/CASTING-GRAPH-HANDOFF.md`** (self-contained
+  procedure, preconditions, commands, how to read results, rules).
+- Owner decisions 2026-09-26: publish as `codex/kingmaker-buff-planner-casting-graph`
+  through the guarded helper (pushed at `3ebdfe1`; draft stacked PR #3
+  https://github.com/howardreith/KingmakerBuffPlanner/pull/3 onto
+  `codex/kingmaker-buff-planner-casting-first`); the owner's in-game review
+  happens later today with Z.AI operating (Claude's weekly quota ended).
+- Live `casting-graph-qual-1200-02` (`3ebdfe1`, 05:45): FAIL — Windows
+  refused the game the foreground (the owner was using another window), so
+  most cursor moves were withheld by design; it still showed rc6 card click
+  `tookSelection=True`, shipped `tookSelection=False`, shipped
+  click-then-hover single-owner. Safety clean; 240/240 transactions
+  Restored.
+- The Gunslinger lab finished (its "ended/restored" 12:28Z, owner's KMG
+  0.0.136 byte-verified).
+
+## Casting-graph UI correction: checkpoint 2, first live run (2026-09-25)
+
+- Tracker: `planning/CASTING-GRAPH-UI-CORRECTION-STATUS.md` (checkpoint 2).
+  HEAD after the documentation commit; the package is rebuilt at the exact
+  HEAD and the gate rerun before any live run.
+- Live `casting-graph-qual-1200-01` (1920x1200): FAIL only at the hover
+  record (Classic card lookup, repaired in `590ca28`); everything else
+  PASS; safety clean.
+- Waiting for a stable owner session (two minutes Active before a frame
+  run). Then: `-02` at 1920x1200, the 1920x1080 run, reload, then the
+  supervised manual session and the owner's verdict.
+- Not pushed: branch publication is the owner's decision (AUTONOMOUS-BLOCKERS).
+- 23:05: the Gunslinger lab began its final qualification cycle (~2.5 h,
+  ~40 guarded launches, per-step lock with short gaps); it restores the
+  owner's KMG 0.0.136, byte-verifies, and sends "ended/restored" at the end.
+  KBP does not launch in the gaps. The gate at `44f038c` refused twice at
+  its WhatIf step while their game ran (correct); rerun it when quiet.
+- Resume order: "ended/restored" received → KBP read-only reconciliation
+  (no locks, no Kingmaker, Mods = owner baseline, 239/239 transactions
+  Restored, clean tree, package commit = HEAD) → gate → owner session
+  stable two minutes → `live-workspace-qual` 1200 (`-02`), 1080 windowed,
+  Advanced-fixture 1200 (spell slots and enhancements), `live-workspace-reload`
+  → supervised manual session → owner verdict.
+
+## Casting-graph UI correction: source complete to checkpoint 1 (2026-09-25)
+
+- Tracker: `planning/CASTING-GRAPH-UI-CORRECTION-STATUS.md` (G-ledger and
+  checkpoint 1). Branch `claude/casting-graph-ui-correction`, not pushed
+  yet; the draft stacked PR is opened through the guarded push helper.
+- Source gate at `757fc6b`: validation 42/42, protocol 360/360. The
+  harness/WhatIf tests refused while the Gunslinger lab's Kingmaker ran
+  (correct); rerun before any live run.
+- Before a live run: the full read-only reconciliation (no KMG or KBP lock
+  or sentinel, no Kingmaker process, KMG transactions Restored, Mods equal
+  to the owner's baseline, owner's session connected for frame runs), then
+  `Build-Local.ps1` at the exact HEAD, then `Test-SourceOnly.ps1`.
+- Live plan: `live-workspace-qual` (default display, then `-DisplayMode
+  windowed-1920x1080`), `live-workspace-reload`; judge frames and
+  `hover-ownership.json`; then prepare the supervised manual session and
+  stop for the owner's verdict.
+
+## Casting-graph UI correction started (2026-09-25)
+
+- The owner rejected the observed planner screen (a Classic view, proved in
+  `planning/CASTING-GRAPH-UI-CORRECTION-STATUS.md`) and adopted the
+  casting-graph addendum. Work continues on branch
+  `claude/casting-graph-ui-correction` (from `e8496ee`); its status file is
+  the tracker for this mission.
+- After the machine reboot: every worktree clean, 238/238 KBP transactions
+  Restored, deploys RolledBack, no lock or violation, no Kingmaker process.
+  The rc6 frame watcher below is superseded and was not re-armed.
+- The Gunslinger lab is active and has priority for the game; check its
+  lock/lease and running Kingmaker before any KBP runtime transaction.
+
+## Release candidate 0.2.0-rc6 frozen at `24d9967`; chain done (2026-09-25)
 
 Candidate `24d9967f82e516f9ed4a4c1f06e6a842e18c5f96`: package
 `f271f3e6...`, DLL `35d6cbb2...`, MVID `4cb12c0d-78c6-4755-aa62-b6ad50e1a02b`;
@@ -38,7 +110,8 @@ builds), `RC6-repro` and the G2 gate build. Frozen copy
   Status lines `FRAMES ...` in `rc6_chain.status`. Stopped at 00:11,
   before it ran anything, because the Gunslinger lab began a 2.5-3 hour
   batch with short gaps in its lock; to be re-armed after its "KMG
-  finished" (launch: `powershell.exe -File scratchpadc6_frames.ps1`).
+  finished" (launch: `powershell.exe -File scratchpad
+c6_frames.ps1`).
 - 00:43 re-arm preflight (the owner's rule: a full read-only
   reconciliation, never an absent lock alone): FAILED, watcher stays
   paused. A Gunslinger runtime run was in progress after "KMG finished"

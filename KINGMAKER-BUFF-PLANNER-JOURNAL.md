@@ -1,5 +1,72 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-09-25 casting-graph UI correction: review repairs and the first live run
+
+- An independent review found the disabled button state unobservable: the
+  installed Unity UI applies Disabled at transition time and never stores
+  it. Rejected fix: reading `Disabled` from another private member (there is
+  none). Chosen: interactability plus the drawn tint.
+- The review also showed the rc6 reproduction proved the mechanism by
+  construction. It now replays the owner's words: hover a portrait with the
+  real cursor, click a buff card, hover again, and record where any second
+  highlight sits relative to the cursor.
+- First live run (`casting-graph-qual-1200-01`, 1920x1200): the graph
+  interaction, reopen and frames passed; all 30 judged hover readings were
+  single-owner and aligned to the real cursor within 2 px. It failed only
+  because the harness looked for Classic cards by their pool name; a bound
+  card is named `Source.<sourceId>`.
+- The same run showed that the camera capture lane washes out planner text
+  and cannot see the Classic screen at all (a screen-space overlay). The
+  presented frame is legible. Hover and button frames now use the
+  presented frame. Rejected theory: "the graph's text is too pale" — true
+  only of the camera lane.
+- Real product defect seen in the presented frame: the footer budget lines
+  sat on the book's dark lower edge; they now have a parchment ground.
+
+## 2026-09-25 casting-graph UI correction: graph workspace and hover diagnostic in source
+
+- Built the addendum's graph workspace on the preserved services: a
+  per-source capacity query simulated on a clone of the plan's own budget
+  ledger (never a view counter, never summed across shared pools), a graph
+  read model and graph commands on `CastingWorkspaceSession`, and a view
+  with catalogue → caster/source lane → castings → targets, wide line
+  corridors and a per-casting inspector.
+- A new test found a real ledger defect: a material component at zero did
+  not block a casting (the first observed count was kept). Fixed with a
+  regression test. Rejected shortcut: asserting the forecast text instead
+  of the refusal.
+- The guarded `live-workspace-qual`/`-reload` interaction now drives the
+  graph's own controls (caster, exact source row, target click). The old
+  target-then-Add sequence no longer exists in the view.
+- Hover: the installed UnityEngine.UI (read from its metadata) keeps a
+  clicked control Highlighted through `hasSelection` when its navigation is
+  not None. The fix (navigation None on planner controls) is in source; the
+  live scenario first reproduces the ghost with only the rc6 switch on the
+  Classic screen, then measures the fix, a real-cursor sweep, five button
+  states and one owner after close/reopen. Not run yet: the Gunslinger lab
+  holds the game.
+- Counts: source validation 42/42, protocol tests 360/360 at `757fc6b`.
+
+## 2026-09-25 casting-graph UI correction: Phase 0 identity
+
+- The owner rejected the planner screen they saw at 1920x1200. Before
+  touching code, proved which screen it was: every reported label is
+  rendered only by Classic view classes in both candidate binaries
+  (`git grep` on the frozen rc6 and 0.1.1-rc3 trees), and the casting-first
+  workspace renders none of them.
+- DATA's installation is 0.1.1-rc3 (hash and MVID read from the file) and
+  saw no argument-free game launch on the day (Steam's process log), so the
+  owner's session ran on another machine, most likely the published rc6
+  alpha in its default Classic mode.
+- Rejected theory: "the casting-first workspace regressed into the grid".
+  The label-to-class mapping rules it out.
+- Rejected theory for the ghost hover: a second camera rendering the
+  planner canvas. An rc6 camera frame shows thickened text, but panels and
+  portraits are not doubled, so that artifact is text-material, not a
+  second render. The hover cause stays open until reproduced live.
+- The rc6 casting-first composition (in-game frames from the rc6 reload
+  run) also misses the addendum, so the graph workspace is built regardless.
+
 ## 2026-09-22 J-review repair (Claude takeover)
 
 - Took over from Z at `19ecbe8`; reconciled git, processes, locks and

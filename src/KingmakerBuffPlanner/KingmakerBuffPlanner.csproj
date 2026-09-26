@@ -195,6 +195,8 @@
     <Compile Include="RuntimeTesting\AdvancedCopyInspection.cs" />
     <Compile Include="RuntimeTesting\RuntimeTestResultModels.cs" />
     <Compile Include="RuntimeTesting\WorkspaceScenarioContracts.cs" />
+    <Compile Include="RuntimeTesting\HoverOwnershipRecord.cs" />
+    <Compile Include="RuntimeTesting\PlannerHoverProbe.cs" />
     <Compile Include="RuntimeTesting\LiveCampaignSaveLoader.cs" />
     <Compile Include="RuntimeTesting\UiInputIsolationProbe.cs" />
     <Compile Include="RuntimeTesting\HarmonyPatchInventoryExporter.cs" />
@@ -210,6 +212,9 @@
     <Compile Include="UI\PlannerSetupModel.cs" />
     <Compile Include="UI\CastingWorkspaceModels.cs" />
     <Compile Include="UI\CastingWorkspaceSession.cs" />
+    <Compile Include="UI\CastingWorkspaceSession.Graph.cs" />
+    <Compile Include="UI\CastingGraphModels.cs" />
+    <Compile Include="UI\PlannerButtonPalette.cs" />
     <Compile Include="UI\CastingExecutionHost.cs" />
     <Compile Include="UI\NativeCastingSessionPolicy.cs" />
     <Compile Include="UI\CastingRunPresentation.cs" />
