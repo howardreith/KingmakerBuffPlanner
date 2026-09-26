@@ -1,5 +1,28 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-09-25 casting-graph UI correction: review repairs and the first live run
+
+- An independent review found the disabled button state unobservable: the
+  installed Unity UI applies Disabled at transition time and never stores
+  it. Rejected fix: reading `Disabled` from another private member (there is
+  none). Chosen: interactability plus the drawn tint.
+- The review also showed the rc6 reproduction proved the mechanism by
+  construction. It now replays the owner's words: hover a portrait with the
+  real cursor, click a buff card, hover again, and record where any second
+  highlight sits relative to the cursor.
+- First live run (`casting-graph-qual-1200-01`, 1920x1200): the graph
+  interaction, reopen and frames passed; all 30 judged hover readings were
+  single-owner and aligned to the real cursor within 2 px. It failed only
+  because the harness looked for Classic cards by their pool name; a bound
+  card is named `Source.<sourceId>`.
+- The same run showed that the camera capture lane washes out planner text
+  and cannot see the Classic screen at all (a screen-space overlay). The
+  presented frame is legible. Hover and button frames now use the
+  presented frame. Rejected theory: "the graph's text is too pale" — true
+  only of the camera lane.
+- Real product defect seen in the presented frame: the footer budget lines
+  sat on the book's dark lower edge; they now have a parchment ground.
+
 ## 2026-09-25 casting-graph UI correction: graph workspace and hover diagnostic in source
 
 - Built the addendum's graph workspace on the preserved services: a
