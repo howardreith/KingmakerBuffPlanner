@@ -12,7 +12,10 @@ SHA-256 `f4d6b174f6e17c7234f11016fc998439098a4d6be1ac09761c1c88c67899da09`;
 addendum `899378da…9b6fe6`, mission `e271c96c…eca086` (copied verbatim).
 
 Branch: `claude/casting-graph-ui-correction`, created from the remote head
-of `codex/kingmaker-buff-planner-casting-first` (`e8496ee`, PR #2 head).
+of `codex/kingmaker-buff-planner-casting-first` (`e8496ee`, PR #2 head);
+published by the owner's decision (2026-09-26) as
+`codex/kingmaker-buff-planner-casting-graph` through the guarded helper,
+draft stacked PR #3. Continue on the `codex/` branch.
 No release, tag, merge or permanent installation is authorized.
 
 ## Phase 0 — identity of the screen the owner rejected (2026-09-25)
@@ -237,3 +240,25 @@ guarded in-game run on the disposable fixture. No live claim is made yet.
 - Next: on a stable connection, rebuild at HEAD, then `live-workspace-qual`
   at 1920x1200 (`-02`), at `windowed-1920x1080`, and `live-workspace-reload`;
   then the supervised manual session and the owner's verdict.
+
+### Checkpoint 3 — 2026-09-26, handoff to Z.AI
+
+- The Gunslinger lab ended its work at 01:44 (owner's KMG 0.0.136 restored
+  and byte-verified); KBP reconciled clean (239/239 transactions Restored),
+  rebuilt at `3ebdfe1` (package `e895d39c…`, DLL `9e85417a…`, MVID
+  `f5f7b1ef-3680-428c-a55c-5b619e45b23c`) and passed the full gate (source
+  42, protocol 362, harness 38, package 4, deploy WhatIf 5, launcher WhatIf
+  12, fixture 3, Restore-InstallLocal 16, publisher 3).
+- Live `casting-graph-qual-1200-02` (`3ebdfe1`, owner session Active,
+  05:45–05:50): FAIL at `workspace-hover-validation` — 18 physical moves
+  refused with `Kingmaker foreground activation failed` (the game window was
+  not in front; the planner hotkey was also not delivered and the host used
+  its programmatic open). Evidence still showed the mechanism: rc6 Classic
+  card click `tookSelection=True`; shipped `tookSelection=False`; the shipped
+  real-cursor click-then-hover had exactly one highlight; the five button
+  states drawn. Safety clean; 240/240 transactions Restored.
+- Owner decisions: publish under the `codex/` name through the unchanged
+  helper (pushed `3ebdfe1`, draft PR #3); the in-game review "later today";
+  Claude's quota ended, so Z.AI continues from
+  `planning/CASTING-GRAPH-HANDOFF.md`.
+- Next: the handoff's §3, from reconciliation and the gate at HEAD onward.
