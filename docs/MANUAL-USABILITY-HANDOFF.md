@@ -4,7 +4,7 @@
 
 This session asks for your verdict on the rebuilt casting-first workspace
 (addendum v1.1). It runs a development build of the branch
-`claude/casting-graph-ui-correction` from this checkout, rebuilt at the
+`codex/kingmaker-buff-planner-casting-graph` from this checkout, rebuilt at the
 exact HEAD just before the session, in the same guarded transaction as
 every other run: the disposable `KBP_AUTOMATION_WORKING` campaign, Mods
 staged and restored exactly, native casting disabled (the planner authors
