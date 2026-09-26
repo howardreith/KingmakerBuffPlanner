@@ -32,7 +32,8 @@ Everything below it, and the older status in `AUTONOMOUS-RESUME.md` and
   observed the corrected UI and is not re-labelled to pretend otherwise.
 - **The owner has not accepted any casting-first UI as the release
   experience.** A focused correction is underway on branch
-  `claude/casting-graph-ui-correction` (stacked on PR #2): the selected-buff
+  `codex/kingmaker-buff-planner-casting-graph` (draft stacked PR #3 onto
+  `codex/kingmaker-buff-planner-casting-first`, PR #2): the selected-buff
   graph workspace (caster/source lane → casting connections → target lane,
   per-casting inspector, one global authoritative budget), the ghost-hover
   root cause, button-text contrast, and an unmistakable planner-mode label.
