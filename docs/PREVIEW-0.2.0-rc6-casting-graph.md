@@ -27,14 +27,52 @@ per-casting enhancements; two labelled budgets in the footer (this routine
 alone, and the whole plan in one pass). Classic mode is still included and
 every screen states which planner is active.
 
-## Installing (normal UMM install)
+## Installing on your own computer (archive first — never delete)
+
+Your saved plans and settings live INSIDE the mod folder
+(`KingmakerBuffPlanner\UserSettings`), so the only safe way to try this
+preview is to archive the previous installation before replacing it:
+
+1. Close the game completely.
+2. Make a backup folder OUTSIDE the game's `Mods` tree, for example
+   `KingmakerBuffPlanner-backup-<date>` next to your Downloads.
+3. Copy the ENTIRE previous `Mods\KingmakerBuffPlanner` folder — binary AND
+   `UserSettings` — into that backup folder. Verify the copy (compare a few
+   files by size, or hash the folder if you can). This archive is your
+   exact way back.
+4. Unzip this preview's `KingmakerBuffPlanner` folder into `Mods`,
+   replacing the old one. Do not keep a second copy of the folder inside
+   `Mods` (a duplicate loadable mod confuses UMM).
+5. Launch the game and enable the mod in UMM as usual.
+
+## Verifying the loaded build
+
+This preview shares the development version string `0.2.0-rc6` with the
+earlier alpha, so verify by commit: open the game once, then check the UMM
+log (`Mods\UnityModManager\Log.txt`) for the boot line
+`[KBP-BOOT] Main.Load exited;version=0.2.0-rc6;commit=<commit>` — it must
+name the commit printed on this handoff. The delivery filename also carries
+`casting-graph` and the commit.
+
+## Rolling back to your previous version
 
 1. Close the game.
-2. Copy the zip's `KingmakerBuffPlanner` folder into
-   `...\Pathfinder Kingmaker\Mods\` (replacing any older copy), or install
-   through Unity Mod Manager as usual.
-3. Launch the game; open UMM (`CTRL+U` by default); enable
-   `Kingmaker Buff Planner`.
+2. First archive the trial's own data: copy the current
+   `Mods\KingmakerBuffPlanner\UserSettings` (your preview-era plans) to
+   another folder OUTSIDE `Mods`. Plans you authored in the preview stay
+   recoverable there, but an older build will not show them in its UI
+   without a forward conversion — do not copy newer plan files into an
+   older installation's settings by hand.
+3. Delete the preview's `KingmakerBuffPlanner` folder from `Mods` and copy
+   your step-3 backup folder back in its place. Because that backup
+   contains its own `UserSettings`, your previous plans, review state and
+   planner mode return exactly as they were.
+4. Launch and confirm the UMM log's `commit=` names your previous build.
+
+On the DATA lab machine only, the guarded `Restore-InstallLocal.ps1`
+tooling performs this same semantics transactionally (byte-exact prior
+restore, trial profiles archived rather than deleted); the manual steps
+above are the portable equivalent for any other computer.
 
 ## Entering Casting-first
 
@@ -61,14 +99,6 @@ every screen states which planner is active.
    globally. Undo removes the last edit.
 6. Save; close with Escape (first Escape leaves the inspector); reopen or
    reload — the castings, lines and counts reconstruct from the saved plan.
-
-## Rollback
-
-- Disable the mod in UMM, or delete `Mods\KingmakerBuffPlanner`. The saved
-  plan lives in the mod's `UserSettings` folder and is not touched by game
-  saves. To return to a previous version, restore the old folder (your
-  normal installation on this machine — 0.1.1-rc3 — was never modified by
-  this work; automated runs stage and restore transactionally).
 
 ## Evidence at this build (honest state)
 

@@ -93,6 +93,8 @@ namespace KingmakerBuffPlanner.Tests
             Run("live-run-stops-at-its-overall-deadline-or-abort-marker", TestLiveRunStopRule);
             Run("physical-input-helper-shares-the-game-s-physical-pixel-space",
                 TestPhysicalInputDpiContract);
+            Run("preview-guide-archives-before-replacing-and-verifies-identity",
+                TestPreviewGuideSafetyContract);
             Run("confirmation-needs-an-instance-this-attempt-applied", TestAppliedEffectJudgement);
             Run("cantrip-route-follows-the-reservation-and-ambiguity-stays-unresolved", TestCantripRouteAndPricing);
             Run("fact-source-choice-keeps-the-provider-kind-and-reserved-pool", TestFactSourceChoice);
@@ -7076,6 +7078,36 @@ namespace KingmakerBuffPlanner.Tests
                 !helper.Contains("static KbpPhysicalInput() { try { SetProcessDPIAware(); } catch { } }"))
                 throw new InvalidOperationException("The physical input helper does not declare process DPI " +
                     "awareness before its coordinate math; windowed cursor aims drift by the DPI scale.");
+        }
+
+        // The preview guide is safety-relevant operator documentation: the
+        // saved plans live inside the mod folder it tells the owner to
+        // replace, so it must teach archive-first replacement, an explicit
+        // outside-Mods backup of binary AND UserSettings, archiving the
+        // trial's own plans before a downgrade, and loading-identity
+        // verification by commit (the version string alone is ambiguous).
+        private static void TestPreviewGuideSafetyContract()
+        {
+            DirectoryInfo directory = new DirectoryInfo(Environment.CurrentDirectory);
+            while (directory != null && !File.Exists(Path.Combine(directory.FullName, "KingmakerBuffPlanner.sln")))
+                directory = directory.Parent;
+            string guide = File.ReadAllText(Path.Combine(directory.FullName, "docs",
+                "PREVIEW-0.2.0-rc6-casting-graph.md")).Replace("\r\n", "\n");
+            if (!guide.Contains("archive first") || !guide.Contains("OUTSIDE the game's `Mods` tree") ||
+                !guide.Contains("`KingmakerBuffPlanner\\UserSettings`") ||
+                !guide.Contains("Copy the ENTIRE previous") ||
+                !guide.Contains("archive the trial's own data") ||
+                !guide.Contains("[KBP-BOOT] Main.Load exited;version=0.2.0-rc6;commit=<commit>") ||
+                !guide.Contains("casting-graph"))
+                throw new InvalidOperationException("The preview guide no longer teaches the " +
+                    "archive-first install/rollback procedure or commit-based identity verification.");
+            int rollback = guide.IndexOf("## Rolling back to your previous version",
+                StringComparison.Ordinal);
+            if (rollback < 0 || guide.IndexOf("Delete the preview's `KingmakerBuffPlanner` folder",
+                    StringComparison.Ordinal) < 0 ||
+                guide.IndexOf("Delete the preview's", StringComparison.Ordinal) < rollback)
+                throw new InvalidOperationException("A delete instruction outside the " +
+                    "archive-first rollback sequence crept back into the guide.");
         }
 
         // Final review A3: presence alone never confirms. Only an instance
