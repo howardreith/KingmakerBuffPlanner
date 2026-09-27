@@ -196,6 +196,7 @@
     <Compile Include="RuntimeTesting\RuntimeTestResultModels.cs" />
     <Compile Include="RuntimeTesting\WorkspaceScenarioContracts.cs" />
     <Compile Include="RuntimeTesting\HoverOwnershipRecord.cs" />
+    <Compile Include="RuntimeTesting\WorkspaceBudgetEvidence.cs" />
     <Compile Include="RuntimeTesting\PlannerHoverProbe.cs" />
     <Compile Include="RuntimeTesting\LiveCampaignSaveLoader.cs" />
     <Compile Include="RuntimeTesting\UiInputIsolationProbe.cs" />

@@ -95,6 +95,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private bool _workspaceOpenNonBlack;
         private int _workspaceInteractionStep;
         private string _workspaceInteractionEvidence = "not-run";
+        private WorkspaceBudgetEvidence _workspaceBudget;
         private string _workspaceReopenEvidence = "not-run";
         private string _workspaceReloadEvidence = "not-run";
         private string _reloadLoadedEvidence;
@@ -295,6 +296,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         {
             if (string.Equals(_request.Scenario, "live-workspace-qual", StringComparison.Ordinal))
             {
+                // The authoritative global-budget proof runs while the
+                // interaction's saved state is exactly current, through the
+                // session's production commands and read models only, and
+                // restores the document before the hover diagnostic sees it.
+                RunBudgetProof();
                 _hoverStep = 0;
                 _liveUiPhase = 140;
                 return;
@@ -1284,6 +1290,26 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                             "exact IDs and order after close/reopen", reopenEvidence)
                         : RuntimeTestAssertion.Fail("workspace-reopen-preserves-intent",
                             "exact IDs and order after close/reopen", reopenEvidence));
+                    bool budgetHeld = true;
+                    if (_workspaceBudget != null)
+                    {
+                        // Global accounting across buffs and castings (G05/G06
+                        // live): one shared spontaneous pool observed on two
+                        // buffs, one shared enhancement pool on two castings,
+                        // each restored by removal; an unaffordable combined
+                        // demand blocks atomically or the limitation is
+                        // recorded honestly. "unsupported" (the fixture has
+                        // no such pool) is not a violation.
+                        IList<string> budgetViolations = _workspaceBudget.Violations().ToList();
+                        budgetHeld = budgetViolations.Count == 0;
+                        string budgetEvidence = _workspaceBudget.Describe() + (budgetHeld
+                            ? string.Empty : ";violations=" + string.Join(",", budgetViolations.ToArray()));
+                        const string budgetExpected =
+                            "cross-buff pool + shared enhancement: add removes, remove restores, insufficient is atomic";
+                        result.Assertions.Add(budgetHeld
+                            ? RuntimeTestAssertion.Pass("workspace-budget-evidence", budgetExpected, budgetEvidence)
+                            : RuntimeTestAssertion.Fail("workspace-budget-evidence", budgetExpected, budgetEvidence));
+                    }
                     bool reloadPassed = true;
                     if (RuntimeTestProtocol.IsReloadScenario(_request.Scenario))
                     {
@@ -1325,6 +1351,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     {
                         result.Status = "FAIL";
                         result.Stage = "workspace-interaction-validation";
+                    }
+                    else if (!budgetHeld)
+                    {
+                        result.Status = "FAIL";
+                        result.Stage = "workspace-budget-validation";
                     }
                     else if (!reloadPassed)
                     {
@@ -4809,6 +4840,374 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private void SyncInteractionEvidence()
         {
             _workspaceInteractionEvidence = _workspaceInteraction.Describe();
+        }
+
+        // ------------------------------------------------------------------
+        // Global-budget evidence (graph addendum v1.1 §4): the compiled
+        // plans' own numbers, observed across TWO buffs for one shared
+        // spontaneous pool and across TWO castings for one shared
+        // enhancement pool — before, after one production command, and
+        // after its removal. An unaffordable combined demand must block
+        // the whole casting atomically (nothing reserved). Session
+        // commands and BuildGraph read models only; the scenario counts
+        // nothing itself, and the document is restored exactly before the
+        // hover diagnostic runs.
+        // ------------------------------------------------------------------
+
+        private void RunBudgetProof()
+        {
+            _workspaceBudget = new WorkspaceBudgetEvidence();
+            try
+            {
+                UI.CastingWorkspaceSession session = BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
+                CastingWorkspaceInputs inputs = BuffPlannerUiRoot.CastingWorkspaceInputsForRuntime();
+                if (session == null || inputs == null)
+                {
+                    _workspaceBudget.CrossBuffStatus = "unsupported:no-session";
+                    _workspaceBudget.SharedEnhancementStatus = "unsupported:no-session";
+                }
+                else
+                {
+                    RunCrossBuffPoolProof(session, inputs);
+                    RunSharedEnhancementProof(session, inputs);
+                    session.ClearGraphFocus();
+                }
+            }
+            catch (Exception exception)
+            {
+                _workspaceBudget.AddNote("error=" + exception.GetType().Name + ":" + exception.Message);
+                if (string.IsNullOrEmpty(_workspaceBudget.CrossBuffStatus))
+                    _workspaceBudget.CrossBuffStatus = "error";
+                if (string.IsNullOrEmpty(_workspaceBudget.SharedEnhancementStatus))
+                    _workspaceBudget.SharedEnhancementStatus = "error";
+            }
+            try
+            {
+                File.WriteAllText(Path.Combine(_request.EvidenceDirectory,
+                    "workspace-budget-evidence.json"),
+                    JsonConvert.SerializeObject(_workspaceBudget, Formatting.Indented));
+            }
+            catch (Exception exception)
+            {
+                _log.Error("[KBP-WORKSPACE] budget evidence could not be written.", exception);
+            }
+            _log.Info("[KBP-WORKSPACE] budget evidence;" + _workspaceBudget.Describe() + ".");
+        }
+
+        private void RunCrossBuffPoolProof(UI.CastingWorkspaceSession session, CastingWorkspaceInputs inputs)
+        {
+            _workspaceBudget.CrossBuffAttempted = true;
+            string restoreSource = session.SelectedSourceId;
+            string restoreRoutine = session.SelectedRoutineId;
+            try
+            {
+                string poolKey;
+                string buffA;
+                string buffB;
+                UI.CastingGraphSourceRow rowA;
+                UI.CastingGraphSourceRow rowB;
+                int unitsPerCastA;
+                if (!TryFindSharedSpontaneousPool(session, inputs, out poolKey, out buffA, out rowA,
+                        out buffB, out rowB, out unitsPerCastA))
+                {
+                    _workspaceBudget.CrossBuffStatus = "unsupported:no-shared-spontaneous-pool";
+                    return;
+                }
+                _workspaceBudget.PoolKey = poolKey;
+                _workspaceBudget.PoolKind = ResourcePoolKind.SpontaneousLevel.ToString();
+                _workspaceBudget.BuffA = buffA;
+                _workspaceBudget.BuffB = buffB;
+                _workspaceBudget.CasterUnitId = rowA.CasterUnitId;
+                _workspaceBudget.RowALabel = rowA.Label;
+                _workspaceBudget.RowBLabel = rowB.Label;
+                _workspaceBudget.ConsumedUnitsPerCastA = unitsPerCastA;
+                // Before: buff B's own row on the shared pool.
+                session.SelectGraphBuff(buffB, inputs);
+                UI.CastingGraphSourceRow row = FindPoolRow(session.BuildGraph(inputs), rowB.CasterUnitId, poolKey);
+                if (row == null || row.Capacity == null || row.Capacity.NativeRemaining == null)
+                {
+                    _workspaceBudget.CrossBuffStatus = "unsupported:buff-b-row-unreadable";
+                    return;
+                }
+                _workspaceBudget.BeforeRemaining = row.Capacity.NativeRemaining;
+                _workspaceBudget.BeforeBuffBAdditional = row.Capacity.AdditionalCastings;
+                // One production casting for buff A from the shared pool.
+                session.SelectGraphBuff(buffA, inputs);
+                session.SelectGraphCaster(rowA.CasterUnitId, inputs);
+                session.SelectGraphSource(rowA.ProviderKey, inputs);
+                UI.CastingGraphView graphA = session.BuildGraph(inputs);
+                UI.CastingGraphEditResult added = null;
+                foreach (string target in GraphLegalOthers(graphA, rowA.CasterUnitId))
+                {
+                    added = session.AddGraphCasting(target, inputs);
+                    if (added.Applied) break;
+                    added = null;
+                }
+                if (added == null)
+                {
+                    _workspaceBudget.CrossBuffStatus = "unsupported:no-legal-target-for-buff-a";
+                    return;
+                }
+                _workspaceBudget.AddedCastingId = added.CastingId;
+                // After the add: the same row of buff B.
+                session.SelectGraphBuff(buffB, inputs);
+                row = FindPoolRow(session.BuildGraph(inputs), rowB.CasterUnitId, poolKey);
+                if (row == null || row.Capacity == null)
+                {
+                    _workspaceBudget.CrossBuffStatus = "error:buff-b-row-lost-after-add";
+                    return;
+                }
+                _workspaceBudget.AfterAddRemaining = row.Capacity.NativeRemaining;
+                _workspaceBudget.AfterAddBuffBAdditional = row.Capacity.AdditionalCastings;
+                // Removal must restore the pool exactly.
+                session.FocusGraphCasting(added.CastingId);
+                AuthoringEditResult removed = session.RemoveFocusedCasting();
+                if (!removed.Applied)
+                {
+                    _workspaceBudget.CrossBuffStatus = "error:remove-refused:" + removed.Reason;
+                    return;
+                }
+                session.SelectGraphBuff(buffB, inputs);
+                row = FindPoolRow(session.BuildGraph(inputs), rowB.CasterUnitId, poolKey);
+                _workspaceBudget.AfterRemoveRemaining = row == null || row.Capacity == null
+                    ? (int?)null : row.Capacity.NativeRemaining;
+                _workspaceBudget.AfterRemoveBuffBAdditional = row == null || row.Capacity == null
+                    ? (int?)null : row.Capacity.AdditionalCastings;
+                _workspaceBudget.CrossBuffStatus = "proved";
+            }
+            finally
+            {
+                if (!string.IsNullOrEmpty(restoreSource))
+                    session.SelectGraphBuff(restoreSource, inputs);
+                if (!string.IsNullOrEmpty(restoreRoutine))
+                    session.SelectRoutine(restoreRoutine);
+            }
+        }
+
+        // The first spontaneous pool two different buffs of ONE caster both
+        // draw on, with the units per cast of buff A's provider.
+        private bool TryFindSharedSpontaneousPool(UI.CastingWorkspaceSession session,
+            CastingWorkspaceInputs inputs, out string poolKey, out string buffA,
+            out UI.CastingGraphSourceRow rowA, out string buffB, out UI.CastingGraphSourceRow rowB,
+            out int unitsPerCastA)
+        {
+            poolKey = null;
+            buffA = null;
+            buffB = null;
+            rowA = null;
+            rowB = null;
+            unitsPerCastA = 0;
+            string restoreSource = session.SelectedSourceId;
+            var byPool = new Dictionary<string, List<KeyValuePair<string, UI.CastingGraphSourceRow>>>(
+                StringComparer.Ordinal);
+            int scanned = 0;
+            try
+            {
+                foreach (UI.CastingGraphCatalogueEntry entry in session.BuildGraph(inputs).Catalogue)
+                {
+                    if (scanned++ >= 150)
+                    {
+                        _workspaceBudget.AddNote("catalogue-scan-capped=150");
+                        break;
+                    }
+                    session.SelectGraphBuff(entry.SourceId, inputs);
+                    UI.CastingGraphView graph = session.BuildGraph(inputs);
+                    if (graph.SelectedSourceIsGroup == true) continue;
+                    foreach (UI.CastingGraphCasterNode node in graph.Casters)
+                    {
+                        if (node.UnitId == null || node.UnitId.Length == 0) continue;
+                        foreach (UI.CastingGraphSourceRow row in node.Sources)
+                        {
+                            if (row.PoolKind != ResourcePoolKind.SpontaneousLevel || row.Capacity == null ||
+                                row.Capacity.Kind != CastingCapacityKind.Finite ||
+                                row.Capacity.AdditionalCastings < 1 ||
+                                row.Capacity.NativeRemaining == null) continue;
+                            List<KeyValuePair<string, UI.CastingGraphSourceRow>> rows;
+                            if (!byPool.TryGetValue(row.PoolKey, out rows))
+                            {
+                                rows = new List<KeyValuePair<string, UI.CastingGraphSourceRow>>();
+                                byPool[row.PoolKey] = rows;
+                            }
+                            if (rows.Any(value => string.Equals(value.Key, entry.SourceId,
+                                    StringComparison.Ordinal))) continue;
+                            rows.Add(new KeyValuePair<string, UI.CastingGraphSourceRow>(entry.SourceId, row));
+                            if (rows.Count >= 2)
+                            {
+                                poolKey = row.PoolKey;
+                                buffA = rows[0].Key;
+                                rowA = rows[0].Value;
+                                buffB = rows[1].Key;
+                                rowB = rows[1].Value;
+                                UI.CastingGraphSourceRow chosenA = rowA;
+                                ProviderPlanningOption option = inputs.ProviderOptions.FirstOrDefault(
+                                    value => value != null && value.Provider != null && string.Equals(
+                                        value.Provider.Key.Canonical, chosenA.ProviderKey, StringComparison.Ordinal));
+                                unitsPerCastA = option == null ? 0 : option.Provider.UnitsPerCast;
+                                return unitsPerCastA > 0;
+                            }
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                if (!string.IsNullOrEmpty(restoreSource))
+                    session.SelectGraphBuff(restoreSource, inputs);
+            }
+            return false;
+        }
+
+        private static UI.CastingGraphSourceRow FindPoolRow(UI.CastingGraphView graph, string casterUnitId,
+            string poolKey)
+        {
+            UI.CastingGraphCasterNode node = graph.Casters.FirstOrDefault(value =>
+                string.Equals(value.UnitId, casterUnitId, StringComparison.Ordinal));
+            return node == null ? null : node.Sources.FirstOrDefault(value =>
+                string.Equals(value.PoolKey, poolKey, StringComparison.Ordinal));
+        }
+
+        private void RunSharedEnhancementProof(UI.CastingWorkspaceSession session, CastingWorkspaceInputs inputs)
+        {
+            _workspaceBudget.SharedEnhancementAttempted = true;
+            // The hover sweep afterwards looks controls up on the
+            // interaction's own buff and routine; both are restored here.
+            string restoreSource = session.SelectedSourceId;
+            string restoreRoutine = session.SelectedRoutineId;
+            try
+            {
+                List<string> castingIds = _interactionCastIds.Where(value => !string.IsNullOrEmpty(value)).ToList();
+                if (castingIds.Count < 2)
+                {
+                    _workspaceBudget.SharedEnhancementStatus = "unsupported:fewer-than-two-castings";
+                    return;
+                }
+                IReadOnlyList<CastEnhancementSnapshot> enhancements = inputs.Enhancements;
+                if (enhancements == null || enhancements.Count == 0)
+                {
+                    _workspaceBudget.SharedEnhancementStatus = "unsupported:no-enhancements";
+                    return;
+                }
+                int tried = 0;
+                foreach (CastEnhancementSnapshot enhancement in enhancements)
+                {
+                    if (enhancement == null || string.IsNullOrEmpty(enhancement.UsagePoolId) ||
+                        enhancement.UsageUnitsPerCast <= 0 || enhancement.AffectsTargeting) continue;
+                    if (tried++ >= 40)
+                    {
+                        _workspaceBudget.AddNote("enhancement-scan-capped=40");
+                        break;
+                    }
+                    for (int first = 0; first < castingIds.Count; first++)
+                    {
+                        for (int second = 0; second < castingIds.Count; second++)
+                        {
+                            if (second == first) continue;
+                            if (TrySharedEnhancementSequence(session, inputs, enhancement,
+                                    castingIds[first], castingIds[second]))
+                                return;
+                        }
+                    }
+                }
+                _workspaceBudget.SharedEnhancementStatus = "unsupported:no-finite-shared-enhancement";
+            }
+            finally
+            {
+                if (!string.IsNullOrEmpty(restoreSource))
+                    session.SelectGraphBuff(restoreSource, inputs);
+                if (!string.IsNullOrEmpty(restoreRoutine))
+                    session.SelectRoutine(restoreRoutine);
+            }
+        }
+
+        // One enhancement, two castings: the pool the whole plan leaves is
+        // the same number in both inspectors; one toggle moves it for both;
+        // removal restores it; a combined demand the pool cannot fund blocks
+        // the casting atomically (nothing reserved) when the fixture is that
+        // tight, and is recorded as not provable when it is not.
+        private bool TrySharedEnhancementSequence(UI.CastingWorkspaceSession session,
+            CastingWorkspaceInputs inputs, CastEnhancementSnapshot enhancement,
+            string firstCastingId, string secondCastingId)
+        {
+            session.FocusGraphCasting(secondCastingId);
+            UI.CastingGraphInspector secondInspector = session.BuildGraph(inputs).Inspector;
+            UI.CastingGraphEnhancementOption secondOption = secondInspector == null
+                ? null : secondInspector.Enhancements.FirstOrDefault(value =>
+                    string.Equals(value.EnhancementId, enhancement.EnhancementId, StringComparison.Ordinal));
+            if (secondOption == null || secondOption.PoolRemaining == null) return false;
+            int before = secondOption.PoolRemaining.Value;
+            session.FocusGraphCasting(firstCastingId);
+            if (!session.ToggleFocusedEnhancement(enhancement.EnhancementId, inputs).Applied)
+            {
+                session.ClearGraphFocus();
+                return false;
+            }
+            session.FocusGraphCasting(secondCastingId);
+            int? afterFirstOn = PoolRemainingOf(session, inputs, secondCastingId, enhancement.EnhancementId);
+            if (afterFirstOn == null)
+            {
+                session.FocusGraphCasting(firstCastingId);
+                session.ToggleFocusedEnhancement(enhancement.EnhancementId, inputs);
+                session.ClearGraphFocus();
+                return false;
+            }
+            // The second casting takes it too: affordable, or the atomic
+            // refusal (the casting blocks, nothing is reserved).
+            AuthoringEditResult secondToggle = session.ToggleFocusedEnhancement(enhancement.EnhancementId, inputs);
+            if (!secondToggle.Applied)
+            {
+                _workspaceBudget.AddNote("second-toggle-refused:" + secondToggle.Reason);
+                session.FocusGraphCasting(firstCastingId);
+                session.ToggleFocusedEnhancement(enhancement.EnhancementId, inputs);
+                session.ClearGraphFocus();
+                return false;
+            }
+            bool secondBlocked = session.BuildGraph(inputs).Castings.FirstOrDefault(value =>
+                string.Equals(value.CastingId, secondCastingId, StringComparison.Ordinal)) is UI.CastingGraphCasting chip &&
+                chip.Readiness == ResolvedCastingReadiness.Blocked;
+            string secondReason = session.BuildGraph(inputs).Castings.Where(value =>
+                string.Equals(value.CastingId, secondCastingId, StringComparison.Ordinal))
+                .Select(value => value.ReasonText).FirstOrDefault() ?? string.Empty;
+            int? afterSecondOn = PoolRemainingOf(session, inputs, firstCastingId, enhancement.EnhancementId);
+            // Undo both, then the pool must read exactly as it started.
+            session.FocusGraphCasting(secondCastingId);
+            session.ToggleFocusedEnhancement(enhancement.EnhancementId, inputs);
+            session.FocusGraphCasting(firstCastingId);
+            session.ToggleFocusedEnhancement(enhancement.EnhancementId, inputs);
+            int? afterFirstOff = PoolRemainingOf(session, inputs, secondCastingId, enhancement.EnhancementId);
+            session.ClearGraphFocus();
+            _workspaceBudget.EnhancementId = enhancement.EnhancementId;
+            _workspaceBudget.EnhancementName = string.IsNullOrWhiteSpace(enhancement.EffectDisplayName)
+                ? enhancement.DisplayName : enhancement.EffectDisplayName;
+            _workspaceBudget.UsagePoolId = enhancement.UsagePoolId;
+            _workspaceBudget.UsagePoolLabel = secondOption.PoolLabel;
+            _workspaceBudget.UsageUnitsPerCast = enhancement.UsageUnitsPerCast;
+            _workspaceBudget.FirstCastingId = firstCastingId;
+            _workspaceBudget.SecondCastingId = secondCastingId;
+            _workspaceBudget.BeforePoolRemaining = before;
+            _workspaceBudget.AfterFirstOn = afterFirstOn;
+            _workspaceBudget.AfterSecondOn = afterSecondOn;
+            _workspaceBudget.AfterFirstOff = afterFirstOff;
+            bool affordable = before >= 2 * enhancement.UsageUnitsPerCast;
+            _workspaceBudget.AtomicRefusalStatus = affordable ? "not-provable-on-this-fixture"
+                : secondBlocked ? "observed" : "violated";
+            _workspaceBudget.AtomicRefusalEvidence = "before=" + before + ";units=" +
+                enhancement.UsageUnitsPerCast + ";secondBlocked=" + secondBlocked + ";reason=" + secondReason +
+                ";reservedByBlockedCasting=" + (afterSecondOn == null ? "unknown"
+                    : (afterSecondOn.Value - afterFirstOn.Value).ToString());
+            _workspaceBudget.SharedEnhancementStatus = "proved";
+            return true;
+        }
+
+        private static int? PoolRemainingOf(UI.CastingWorkspaceSession session, CastingWorkspaceInputs inputs,
+            string castingId, string enhancementId)
+        {
+            session.FocusGraphCasting(castingId);
+            UI.CastingGraphInspector inspector = session.BuildGraph(inputs).Inspector;
+            if (inspector == null || !string.Equals(inspector.CastingId, castingId, StringComparison.Ordinal))
+                return null;
+            UI.CastingGraphEnhancementOption option = inspector.Enhancements.FirstOrDefault(value =>
+                string.Equals(value.EnhancementId, enhancementId, StringComparison.Ordinal));
+            return option == null ? null : option.PoolRemaining;
         }
 
         // ------------------------------------------------------------------

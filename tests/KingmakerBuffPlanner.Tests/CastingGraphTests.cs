@@ -50,6 +50,96 @@ namespace KingmakerBuffPlanner.Tests
             Run("hover-record-judges-one-owner-exit-and-alignment", TestHoverRecordJudgesOwnership);
             Run("hover-record-requires-reproduction-and-coverage", TestHoverRecordRequiresCoverage);
             Run("hover-diagnostic-only-hovers-and-restores-switch", TestHoverDiagnosticHostContract);
+            Run("budget-evidence-judges-exact-deltas-and-restores", TestBudgetEvidenceJudging);
+        }
+
+        // The live qualification's global-budget record (G05/G06): the
+        // numbers must move by exactly the consumed units, come back on
+        // removal, be seen by the OTHER buff/casting, and an honest
+        // "unsupported" fixture is never a violation.
+        private static void TestBudgetEvidenceJudging()
+        {
+            var clean = new WorkspaceBudgetEvidence
+            {
+                CrossBuffAttempted = true,
+                CrossBuffStatus = "proved",
+                PoolKey = "pool-1",
+                PoolKind = "SpontaneousLevel",
+                BuffA = "buff-a",
+                BuffB = "buff-b",
+                ConsumedUnitsPerCastA = 1,
+                BeforeRemaining = 3,
+                AfterAddRemaining = 2,
+                AfterRemoveRemaining = 3,
+                BeforeBuffBAdditional = 2,
+                AfterAddBuffBAdditional = 1,
+                AfterRemoveBuffBAdditional = 2,
+                SharedEnhancementAttempted = true,
+                SharedEnhancementStatus = "proved",
+                EnhancementId = "extend",
+                UsageUnitsPerCast = 1,
+                FirstCastingId = "cast-1",
+                SecondCastingId = "cast-2",
+                BeforePoolRemaining = 3,
+                AfterFirstOn = 2,
+                AfterSecondOn = 1,
+                AfterFirstOff = 3,
+                AtomicRefusalStatus = "not-provable-on-this-fixture"
+            };
+            if (clean.Violations().Any())
+                throw new InvalidOperationException("A correct budget record must not violate: " +
+                    string.Join(",", clean.Violations().ToArray()));
+            var wrongDelta = new WorkspaceBudgetEvidence
+            {
+                CrossBuffAttempted = true, CrossBuffStatus = "proved", BuffA = "a", BuffB = "b",
+                ConsumedUnitsPerCastA = 1, BeforeRemaining = 3, AfterAddRemaining = 1, AfterRemoveRemaining = 3
+            };
+            if (!wrongDelta.Violations().Any() || !wrongDelta.Violations().First().Contains("cross-buff-add-delta"))
+                throw new InvalidOperationException("A wrong add delta must be a cross-buff violation.");
+            var notRestored = new WorkspaceBudgetEvidence
+            {
+                CrossBuffAttempted = true, CrossBuffStatus = "proved", BuffA = "a", BuffB = "b",
+                ConsumedUnitsPerCastA = 1, BeforeRemaining = 3, AfterAddRemaining = 2, AfterRemoveRemaining = 2
+            };
+            if (!notRestored.Violations().Any())
+                throw new InvalidOperationException("A pool that does not come back on removal must violate.");
+            var secondBlind = new WorkspaceBudgetEvidence
+            {
+                SharedEnhancementAttempted = true, SharedEnhancementStatus = "proved",
+                EnhancementId = "e", UsageUnitsPerCast = 1, FirstCastingId = "c1", SecondCastingId = "c2",
+                BeforePoolRemaining = 3, AfterFirstOn = 2, AfterSecondOn = 2, AfterFirstOff = 3
+            };
+            if (!secondBlind.Violations().Any() ||
+                !secondBlind.Violations().First().Contains("same-pool"))
+                throw new InvalidOperationException("A second casting that does not see the shared pool must violate.");
+            var atomicObserved = new WorkspaceBudgetEvidence
+            {
+                SharedEnhancementAttempted = true, SharedEnhancementStatus = "proved",
+                EnhancementId = "e", UsageUnitsPerCast = 1, FirstCastingId = "c1", SecondCastingId = "c2",
+                BeforePoolRemaining = 1, AfterFirstOn = 0, AfterSecondOn = 0, AfterFirstOff = 1,
+                AtomicRefusalStatus = "observed",
+                AtomicRefusalEvidence = "secondBlocked=True;reservedByBlockedCasting=0"
+            };
+            if (atomicObserved.Violations().Any())
+                throw new InvalidOperationException("A blocked casting that reserved nothing is the atomic " +
+                    "guarantee, not a violation: " + string.Join(",", atomicObserved.Violations().ToArray()));
+            var atomicViolated = new WorkspaceBudgetEvidence
+            {
+                SharedEnhancementAttempted = true, SharedEnhancementStatus = "proved",
+                EnhancementId = "e", UsageUnitsPerCast = 1, FirstCastingId = "c1", SecondCastingId = "c2",
+                BeforePoolRemaining = 1, AfterFirstOn = 0, AfterSecondOn = null, AfterFirstOff = 1,
+                AtomicRefusalStatus = "violated",
+                AtomicRefusalEvidence = "secondBlocked=False"
+            };
+            if (!atomicViolated.Violations().Any() || !atomicViolated.Violations().First().Contains("atomic-refusal"))
+                throw new InvalidOperationException("A broken atomic refusal must surface as a violation.");
+            var unsupported = new WorkspaceBudgetEvidence
+            {
+                CrossBuffAttempted = true, CrossBuffStatus = "unsupported:no-shared-spontaneous-pool",
+                SharedEnhancementAttempted = true, SharedEnhancementStatus = "unsupported:no-finite-shared-enhancement"
+            };
+            if (unsupported.Violations().Any())
+                throw new InvalidOperationException("An honestly unsupported fixture is not a violation.");
         }
 
         // ------------------------------------------------------------------
