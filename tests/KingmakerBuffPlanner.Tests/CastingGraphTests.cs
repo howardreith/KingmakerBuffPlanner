@@ -53,10 +53,13 @@ namespace KingmakerBuffPlanner.Tests
             Run("budget-evidence-judges-exact-deltas-and-restores", TestBudgetEvidenceJudging);
         }
 
-        // The live qualification's global-budget record (G05/G06): the
-        // numbers must move by exactly the consumed units, come back on
-        // removal, be seen by the OTHER buff/casting, and an honest
-        // "unsupported" fixture is never a violation.
+        // The live qualification's global-budget record (reviews E1-E4):
+        // errors and unknown/empty statuses are always violations; a
+        // genuine absent capability violates only when its phase is
+        // required on the fixture; "proved" demands the complete numbers:
+        // raw ledger AND the other buff's displayed capacity with exact
+        // cost-aware math, the second casting's enhancement observation,
+        // the blocked candidate's whole cost vector, and verified cleanup.
         private static void TestBudgetEvidenceJudging()
         {
             var clean = new WorkspaceBudgetEvidence
@@ -68,11 +71,12 @@ namespace KingmakerBuffPlanner.Tests
                 BuffA = "buff-a",
                 BuffB = "buff-b",
                 ConsumedUnitsPerCastA = 1,
-                BeforeRemaining = 3,
-                AfterAddRemaining = 2,
-                AfterRemoveRemaining = 3,
+                ConsumedUnitsPerCastB = 2,
+                BeforeRemaining = 5,
+                AfterAddRemaining = 4,
+                AfterRemoveRemaining = 5,
                 BeforeBuffBAdditional = 2,
-                AfterAddBuffBAdditional = 1,
+                AfterAddBuffBAdditional = 2,
                 AfterRemoveBuffBAdditional = 2,
                 SharedEnhancementAttempted = true,
                 SharedEnhancementStatus = "proved",
@@ -84,62 +88,143 @@ namespace KingmakerBuffPlanner.Tests
                 AfterFirstOn = 2,
                 AfterSecondOn = 1,
                 AfterFirstOff = 3,
-                AtomicRefusalStatus = "not-provable-on-this-fixture"
+                AtomicRefusalStatus = "not-provable-on-this-fixture",
+                CleanupVerified = true
             };
-            if (clean.Violations().Any())
-                throw new InvalidOperationException("A correct budget record must not violate: " +
-                    string.Join(",", clean.Violations().ToArray()));
-            var wrongDelta = new WorkspaceBudgetEvidence
+            if (clean.Evaluate(true, true).Any())
+                throw new InvalidOperationException("A correct record must not violate: " +
+                    string.Join(",", clean.Evaluate(true, true).ToArray()));
+            // E2: the displayed count must follow the raw pool exactly
+            // (5->3 units with B costing 2 means 2->1 casts left; the
+            // stale 2 must be rejected).
+            var staleDisplay = new WorkspaceBudgetEvidence
             {
                 CrossBuffAttempted = true, CrossBuffStatus = "proved", BuffA = "a", BuffB = "b",
-                ConsumedUnitsPerCastA = 1, BeforeRemaining = 3, AfterAddRemaining = 1, AfterRemoveRemaining = 3
+                ConsumedUnitsPerCastA = 2, ConsumedUnitsPerCastB = 2,
+                BeforeRemaining = 5, AfterAddRemaining = 3, AfterRemoveRemaining = 5,
+                BeforeBuffBAdditional = 2, AfterAddBuffBAdditional = 2, AfterRemoveBuffBAdditional = 2,
+                SharedEnhancementAttempted = false, SharedEnhancementStatus = null,
+                CleanupVerified = true
             };
-            if (!wrongDelta.Violations().Any() || !wrongDelta.Violations().First().Contains("cross-buff-add-delta"))
-                throw new InvalidOperationException("A wrong add delta must be a cross-buff violation.");
-            var notRestored = new WorkspaceBudgetEvidence
+            IList<string> stale = staleDisplay.Evaluate(false, false);
+            if (!stale.Any(value => value.Contains("cross-buff-display-stale=2!=1")))
+                throw new InvalidOperationException("A displayed count that ignores the drained " +
+                    "pool must fail: " + string.Join(",", stale.ToArray()));
+            // E2: missing displayed numbers are a violation once proved.
+            var missingNumbers = new WorkspaceBudgetEvidence
             {
                 CrossBuffAttempted = true, CrossBuffStatus = "proved", BuffA = "a", BuffB = "b",
-                ConsumedUnitsPerCastA = 1, BeforeRemaining = 3, AfterAddRemaining = 2, AfterRemoveRemaining = 2
+                ConsumedUnitsPerCastA = 1, ConsumedUnitsPerCastB = 1,
+                BeforeRemaining = 3, AfterAddRemaining = 2, AfterRemoveRemaining = 3,
+                SharedEnhancementAttempted = false, SharedEnhancementStatus = null,
+                CleanupVerified = true
             };
-            if (!notRestored.Violations().Any())
-                throw new InvalidOperationException("A pool that does not come back on removal must violate.");
-            var secondBlind = new WorkspaceBudgetEvidence
+            if (!missingNumbers.Evaluate(false, false).Any(value => value.Contains("cross-buff-numbers-missing")))
+                throw new InvalidOperationException("Missing displayed observations must fail a " +
+                    "proved phase.");
+            // E2: the second casting's enhancement observation is required.
+            var noSecond = new WorkspaceBudgetEvidence
             {
                 SharedEnhancementAttempted = true, SharedEnhancementStatus = "proved",
                 EnhancementId = "e", UsageUnitsPerCast = 1, FirstCastingId = "c1", SecondCastingId = "c2",
-                BeforePoolRemaining = 3, AfterFirstOn = 2, AfterSecondOn = 2, AfterFirstOff = 3
+                BeforePoolRemaining = 3, AfterFirstOn = 2, AfterSecondOn = null, AfterFirstOff = 3,
+                AtomicRefusalStatus = "not-provable-on-this-fixture",
+                CleanupVerified = true, CrossBuffAttempted = false, CrossBuffStatus = null
             };
-            if (!secondBlind.Violations().Any() ||
-                !secondBlind.Violations().First().Contains("same-pool"))
-                throw new InvalidOperationException("A second casting that does not see the shared pool must violate.");
+            if (!noSecond.Evaluate(false, false).Any(value => value.Contains("enhancement-numbers-missing")))
+                throw new InvalidOperationException("A missing second-casting observation must fail.");
+            // E1: an error status is a violation even when the phase is
+            // optional; unknown and empty statuses are errors too.
+            foreach (string bad in new[] { "error:remove-refused:x", null, "", "weird" })
+            {
+                var errored = new WorkspaceBudgetEvidence
+                {
+                    CrossBuffAttempted = true, CrossBuffStatus = bad,
+                    SharedEnhancementAttempted = true,
+                    SharedEnhancementStatus = "not-run:unsupported:no-enhancements",
+                    CleanupVerified = true
+                };
+                if (!errored.Evaluate(false, false).Any(value => value.Contains("cross-buff:error")))
+                    throw new InvalidOperationException("Status [" + bad + "] must be an error " +
+                        "violation even when optional.");
+            }
+            // E1: unattempted phases violate; a genuine unsupported capability
+            // passes only when not required, and fails when required.
+            var unattempted = new WorkspaceBudgetEvidence
+            {
+                CrossBuffAttempted = false, CrossBuffStatus = null,
+                SharedEnhancementAttempted = false, SharedEnhancementStatus = null,
+                CleanupVerified = true
+            };
+            if (!unattempted.Evaluate(false, false).Any(value => value.Contains("not-attempted")))
+                throw new InvalidOperationException("An unattempted phase must be a violation.");
+            var unsupported = new WorkspaceBudgetEvidence
+            {
+                CrossBuffAttempted = true,
+                CrossBuffStatus = "not-run:unsupported:no-shared-spontaneous-pool",
+                SharedEnhancementAttempted = true,
+                SharedEnhancementStatus = "not-run:unsupported:no-finite-shared-enhancement",
+                CleanupVerified = true
+            };
+            if (unsupported.Evaluate(false, false).Any())
+                throw new InvalidOperationException("An honestly unsupported capability is not a " +
+                    "violation when the phase is optional.");
+            if (!unsupported.Evaluate(true, true).Any(value => value.Contains("required-phase-not-run")))
+                throw new InvalidOperationException("A required phase recorded as unsupported must " +
+                    "fail on that fixture.");
+            // E3: the blocked candidate's whole cost vector. Every touched
+            // pool must equal its absence: the base reservation released,
+            // nothing new reserved anywhere.
             var atomicObserved = new WorkspaceBudgetEvidence
             {
                 SharedEnhancementAttempted = true, SharedEnhancementStatus = "proved",
                 EnhancementId = "e", UsageUnitsPerCast = 1, FirstCastingId = "c1", SecondCastingId = "c2",
                 BeforePoolRemaining = 1, AfterFirstOn = 0, AfterSecondOn = 0, AfterFirstOff = 1,
                 AtomicRefusalStatus = "observed",
-                AtomicRefusalEvidence = "secondBlocked=True;reservedByBlockedCasting=0"
+                AtomicRefusalEvidence = "secondBlocked=True",
+                CleanupVerified = true,
+                CrossBuffAttempted = true, CrossBuffStatus = "not-run:unsupported:isolated-case"
             };
-            if (atomicObserved.Violations().Any())
-                throw new InvalidOperationException("A blocked casting that reserved nothing is the atomic " +
-                    "guarantee, not a violation: " + string.Join(",", atomicObserved.Violations().ToArray()));
-            var atomicViolated = new WorkspaceBudgetEvidence
+            atomicObserved.BlockedTogglePools.Add(new BlockedPoolObservation
+            {
+                PoolId = "native-1", Kind = "native", BeforeToggle = 3, AfterToggle = 4,
+                BaseReservationReleased = 1
+            });
+            atomicObserved.BlockedTogglePools.Add(new BlockedPoolObservation
+            {
+                PoolId = "enh-1", Kind = "enhancement", BeforeToggle = 0, AfterToggle = 0,
+                BaseReservationReleased = 0
+            });
+            if (atomicObserved.Evaluate(false, false).Any())
+                throw new InvalidOperationException("A blocked candidate that reserved nothing " +
+                    "anywhere is the atomic guarantee: " +
+                    string.Join(",", atomicObserved.Evaluate(false, false).ToArray()));
+            var atomicLeak = new WorkspaceBudgetEvidence
             {
                 SharedEnhancementAttempted = true, SharedEnhancementStatus = "proved",
                 EnhancementId = "e", UsageUnitsPerCast = 1, FirstCastingId = "c1", SecondCastingId = "c2",
-                BeforePoolRemaining = 1, AfterFirstOn = 0, AfterSecondOn = null, AfterFirstOff = 1,
-                AtomicRefusalStatus = "violated",
-                AtomicRefusalEvidence = "secondBlocked=False"
+                BeforePoolRemaining = 1, AfterFirstOn = 0, AfterSecondOn = 0, AfterFirstOff = 1,
+                AtomicRefusalStatus = "observed",
+                AtomicRefusalEvidence = "secondBlocked=True",
+                CleanupVerified = true, CrossBuffAttempted = false, CrossBuffStatus = null
             };
-            if (!atomicViolated.Violations().Any() || !atomicViolated.Violations().First().Contains("atomic-refusal"))
-                throw new InvalidOperationException("A broken atomic refusal must surface as a violation.");
-            var unsupported = new WorkspaceBudgetEvidence
+            atomicLeak.BlockedTogglePools.Add(new BlockedPoolObservation
             {
-                CrossBuffAttempted = true, CrossBuffStatus = "unsupported:no-shared-spontaneous-pool",
-                SharedEnhancementAttempted = true, SharedEnhancementStatus = "unsupported:no-finite-shared-enhancement"
+                PoolId = "native-1", Kind = "native", BeforeToggle = 3, AfterToggle = 3,
+                BaseReservationReleased = 1
+            });
+            if (!atomicLeak.Evaluate(false, false).Any(value => value.Contains("atomic-refusal-reserved")))
+                throw new InvalidOperationException("A pool that did not release the blocked " +
+                    "candidate's base reservation must fail the cost vector.");
+            // E4: cleanup must be verified; a failed cleanup is a violation.
+            var cleanupFailed = new WorkspaceBudgetEvidence
+            {
+                CrossBuffAttempted = false, CrossBuffStatus = null,
+                SharedEnhancementAttempted = false, SharedEnhancementStatus = null,
+                CleanupVerified = false, CleanupEvidence = "failed:intent-signature-differs"
             };
-            if (unsupported.Violations().Any())
-                throw new InvalidOperationException("An honestly unsupported fixture is not a violation.");
+            if (!cleanupFailed.Evaluate(false, false).Any(value => value.Contains("cleanup-failed")))
+                throw new InvalidOperationException("A failed cleanup must fail the evidence.");
         }
 
         // ------------------------------------------------------------------
