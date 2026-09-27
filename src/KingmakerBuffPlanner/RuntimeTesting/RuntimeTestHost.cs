@@ -4949,13 +4949,74 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             }
             try
             {
-                // The game's JsonConvert.DefaultSettings preserves object
-                // references, which collapses this record to {$id:1}; the
-                // explicit-settings Serialize helper is the codebase's
-                // established workaround (review E1: a failed evidence
-                // write must be visible, and so must a hollow one).
+                // Review E1: the evidence FILE is part of the proof, and a
+                // hollow write is a failed write. Member-attributed JObject
+                // construction (the WriteHoverEvidence pattern) is used
+                // because attribute-free POCO serialization hollowed out
+                // in the game process ({$id:1} under the game's
+                // DefaultSettings, {} even with explicit settings) while
+                // the same record serialized fully under the game's
+                // Newtonsoft in the source suite.
+                var root = new JObject
+                {
+                    { "schemaVersion", 1 },
+                    { "runId", _request.RunId },
+                    { "crossBuffAttempted", _workspaceBudget.CrossBuffAttempted },
+                    { "crossBuffStatus", _workspaceBudget.CrossBuffStatus },
+                    { "poolKey", _workspaceBudget.PoolKey },
+                    { "poolKind", _workspaceBudget.PoolKind },
+                    { "buffA", _workspaceBudget.BuffA },
+                    { "buffB", _workspaceBudget.BuffB },
+                    { "casterUnitId", _workspaceBudget.CasterUnitId },
+                    { "rowALabel", _workspaceBudget.RowALabel },
+                    { "rowBLabel", _workspaceBudget.RowBLabel },
+                    { "beforeRemaining", _workspaceBudget.BeforeRemaining },
+                    { "afterAddRemaining", _workspaceBudget.AfterAddRemaining },
+                    { "afterRemoveRemaining", _workspaceBudget.AfterRemoveRemaining },
+                    { "consumedUnitsPerCastA", _workspaceBudget.ConsumedUnitsPerCastA },
+                    { "consumedUnitsPerCastB", _workspaceBudget.ConsumedUnitsPerCastB },
+                    { "additionalBIsLowerBound", _workspaceBudget.AdditionalBIsLowerBound },
+                    { "beforeBuffBAdditional", _workspaceBudget.BeforeBuffBAdditional },
+                    { "afterAddBuffBAdditional", _workspaceBudget.AfterAddBuffBAdditional },
+                    { "afterRemoveBuffBAdditional", _workspaceBudget.AfterRemoveBuffBAdditional },
+                    { "addedCastingId", _workspaceBudget.AddedCastingId },
+                    { "sharedEnhancementAttempted", _workspaceBudget.SharedEnhancementAttempted },
+                    { "sharedEnhancementStatus", _workspaceBudget.SharedEnhancementStatus },
+                    { "enhancementId", _workspaceBudget.EnhancementId },
+                    { "enhancementName", _workspaceBudget.EnhancementName },
+                    { "usagePoolId", _workspaceBudget.UsagePoolId },
+                    { "usagePoolLabel", _workspaceBudget.UsagePoolLabel },
+                    { "usageUnitsPerCast", _workspaceBudget.UsageUnitsPerCast },
+                    { "firstCastingId", _workspaceBudget.FirstCastingId },
+                    { "secondCastingId", _workspaceBudget.SecondCastingId },
+                    { "beforePoolRemaining", _workspaceBudget.BeforePoolRemaining },
+                    { "afterFirstOn", _workspaceBudget.AfterFirstOn },
+                    { "afterSecondOn", _workspaceBudget.AfterSecondOn },
+                    { "afterFirstOff", _workspaceBudget.AfterFirstOff },
+                    { "atomicRefusalStatus", _workspaceBudget.AtomicRefusalStatus },
+                    { "atomicRefusalEvidence", _workspaceBudget.AtomicRefusalEvidence },
+                    { "cleanupVerified", _workspaceBudget.CleanupVerified },
+                    { "cleanupEvidence", _workspaceBudget.CleanupEvidence }
+                };
+                var pools = new JArray();
+                foreach (BlockedPoolObservation pool in _workspaceBudget.BlockedTogglePools)
+                {
+                    pools.Add(new JObject
+                    {
+                        { "poolId", pool.PoolId },
+                        { "kind", pool.Kind },
+                        { "beforeToggle", pool.BeforeToggle },
+                        { "afterToggle", pool.AfterToggle },
+                        { "baseReservationReleased", pool.BaseReservationReleased }
+                    });
+                }
+                root.Add("blockedTogglePools", pools);
+                root.Add("notes", new JArray(_workspaceBudget.Notes.Select(note => (JToken)note)));
+                string written = root.ToString(Formatting.Indented);
+                if (written.Length < 10 || !written.Contains("crossBuffStatus"))
+                    throw new InvalidOperationException("hollow-budget-evidence");
                 File.WriteAllText(Path.Combine(_request.EvidenceDirectory,
-                    "workspace-budget-evidence.json"), Serialize(_workspaceBudget));
+                    "workspace-budget-evidence.json"), written + Environment.NewLine);
             }
             catch (Exception exception)
             {

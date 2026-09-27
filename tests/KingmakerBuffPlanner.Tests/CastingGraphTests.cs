@@ -225,6 +225,28 @@ namespace KingmakerBuffPlanner.Tests
             };
             if (!cleanupFailed.Evaluate(false, false).Any(value => value.Contains("cleanup-failed")))
                 throw new InvalidOperationException("A failed cleanup must fail the evidence.");
+            // The evidence FILE must carry the record: the game's Newtonsoft
+            // has reference-preserving DefaultSettings, and an
+            // explicit-settings serialization (the codebase's Serialize
+            // helper shape) must still emit every public member - a hollow
+            // {} or {$id:1} write is a failed evidence write (review E1).
+            var populated = new WorkspaceBudgetEvidence
+            {
+                CrossBuffAttempted = true, CrossBuffStatus = "proved", BuffA = "a", BuffB = "b",
+                CleanupVerified = true
+            };
+            populated.Notes.Add("note-one");
+            string json = Newtonsoft.Json.JsonConvert.SerializeObject(populated,
+                Newtonsoft.Json.Formatting.Indented,
+                new Newtonsoft.Json.JsonSerializerSettings
+                {
+                    PreserveReferencesHandling = Newtonsoft.Json.PreserveReferencesHandling.None,
+                    ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Error,
+                    TypeNameHandling = Newtonsoft.Json.TypeNameHandling.None
+                });
+            if (!json.Contains("CrossBuffStatus") || !json.Contains("proved") || !json.Contains("note-one"))
+                throw new InvalidOperationException("The budget evidence record serializes hollow [" +
+                    json + "]; the evidence file would be empty.");
         }
 
         // ------------------------------------------------------------------
