@@ -5,7 +5,26 @@ is the top section of `planning/CASTING-FIRST-MIGRATION-STATUS.md`. The
 entries below record past sessions, including temporary orchestration
 notes (watcher and preflight state) that are not product status.
 
-## Casting-graph UI correction: handed off to Z.AI (2026-09-26, LATEST)
+## Casting-graph preview: autonomous session checkpoint 4 (2026-09-27, LATEST)
+
+- **Start here: `planning/CASTING-GRAPH-UI-CORRECTION-STATUS.md`
+  (checkpoint 4) and `docs/PREVIEW-0.2.0-rc6-casting-graph.md`.**
+- HEAD `8b387dc` (draft PR #3): windowed-input DPI repair `f115632` + live
+  budget-evidence scenario `8b387dc`; full gate PASS; preview package
+  `8412ac10…304fea2` / DLL `bfdefd57…` / MVID `b8e3e120-…` (local-only).
+- **Blocked live lane (external)**: the unattended console proof and the
+  windowed/Advanced/reload runs need the session on the physical console;
+  the one-shot transfer task (`kbp-register-console-task.ps1`,
+  `kbp-console-attach.ps1` in the lab root) requires ONE UAC click while
+  the owner is connected, then fires automatically when the viewer
+  disconnects (proven twice). Session is currently Disc.
+- On the owner's next connection: issue the registration UAC
+  (informational notice, already authorized), wait for the disconnect,
+  verify `console howard Active`, then run the four guarded scenarios one
+  at a time at `8b387dc` with full restoration checks, and update the
+  preview evidence table.
+
+## Casting-graph UI correction: handed off to Z.AI (2026-09-26)
 
 - **Start here: `planning/CASTING-GRAPH-HANDOFF.md`** (self-contained
   procedure, preconditions, commands, how to read results, rules).

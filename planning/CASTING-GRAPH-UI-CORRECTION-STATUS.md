@@ -262,3 +262,44 @@ guarded in-game run on the disposable fixture. No live claim is made yet.
   Claude's quota ended, so Z.AI continues from
   `planning/CASTING-GRAPH-HANDOFF.md`.
 - Next: the handoff's §3, from reconciliation and the gate at HEAD onward.
+
+## Checkpoint 4 — 2026-09-27, Z.AI autonomous session (owner standing authorization)
+
+- **HEAD `8b387dc`** (draft PR #3): `f115632` windowed physical-input repair
+  (`SetProcessDPIAware` in the launcher's input helper + text-contract
+  regression; root cause of `casting-graph-qual-1080-01`'s ±~53 px windowed
+  aim drift while fullscreen stayed within 2 px), `8b387dc` live
+  cross-buff/shared-enhancement budget evidence (new
+  `workspace-budget-evidence` assertion + `WorkspaceBudgetEvidence` record +
+  judging regression; honest `unsupported`/scan-cap notes when a fixture
+  cannot support a phase).
+- **Full gate at `8b387dc`**: source 42, protocol 364, harness 38, package 4,
+  deploy WhatIf 5, launcher WhatIf 12, fixture 3, Restore-InstallLocal 16,
+  publisher 3. Package `8412ac10…304fea2`, DLL `bfdefd57…ff506c92`, MVID
+  `b8e3e120-3dae-4fdb-ae13-73d61f711254`; release preview built
+  deterministically ×2 (`artifacts/release/0.2.0-rc6/…`, local-only; guide
+  `docs/PREVIEW-0.2.0-rc6-casting-graph.md`).
+- **Unattended desktop infrastructure**: the "RDP must be Active" rule was
+  operator-only (no executable session gate anywhere; the real behaviors are
+  `SetForegroundWindow` refusal and headless-session black captures).
+  Session-to-console transfer proven twice via a one-shot, self-removing
+  SYSTEM scheduled task firing on viewer disconnect (`tscon exit=0`,
+  session `console howard 3 Active`, no viewer attached). The task needs one
+  UAC click per arming while the owner is connected. A first fire failed on a
+  qwinsta parse bug (SYSTEM-context rows lack the `>` marker) and the task
+  self-deleted; parser fixed, re-armed, then fired successfully twice. The
+  live unattended proof at `8b387dc` was still pending at checkpoint time
+  (owner's viewer cycles consumed both armed tasks; the session was left
+  Disc awaiting the next arming).
+- **Live evidence standing from earlier commits** (product behavior, not
+  invalidated by the harness-only changes): 1200-03 interaction/reopen PASS,
+  shipped hover clean, rc6 ghost NOT reproduced (sticky selection exists —
+  `tookSelection=True` rc6 vs `False` shipped — but no second visible
+  highlight; root cause remains unproved per mission §9);
+  adv-1200-01 interaction PASS on the Advanced fixture (physical input
+  withheld after the owner's mid-run disconnect — infrastructure).
+- **Next**: on the owner's next connection, re-arm the transfer task (one
+  UAC click), then run unattended console proof → windowed-1080 (DPI-fix
+  validation) → Advanced (budget proof live) → reload, one at a time with
+  full restoration checks; then update the preview evidence table and this
+  checkpoint.

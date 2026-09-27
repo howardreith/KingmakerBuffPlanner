@@ -1,5 +1,48 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-09-27 autonomous session: windowed-input repair, live budget proof, unattended desktop, preview package
+
+- The owner's standing authorization: own the work through a usable private
+  preview. Sequence: reconciled at `1c78237`; bounded review of PR #3 had
+  found no defect; doc corrections pushed; the four-run sequence started.
+- Live `casting-graph-qual-1200-03`: interaction/reopen/frames PASS; the
+  shipped hover clean (single-owner, aligned); the rc6 reproduction took the
+  selection but drew NO second highlight — the sticky-selection mechanism is
+  real, the visible ghost is not explained by it; root cause stays unproved.
+- Live `casting-graph-qual-1080-01`: product hover clean, but three sweep
+  aims landed off-control — the delivered cursor drifted ±~53 px from the
+  requested Unity point in windowed mode only (fullscreen within 2 px).
+  Diagnosis: the launcher's injected input lived in a DPI-virtualized pixel
+  space while the game window is DPI-aware. Repair `f115632`:
+  `SetProcessDPIAware()` in the input helper's static constructor +
+  text-contract regression; live re-verification pending.
+- Live `casting-graph-qual-adv-1200-01` (Advanced): interaction PASS; every
+  physical move refused after the owner disconnected mid-run (foreground
+  activation fails closed without a display) — the trigger for the unattended
+  desktop work.
+- `8b387dc`: the live-workspace-qual scenario now proves the global budget
+  across TWO buffs (one shared spontaneous pool, exact unit deltas, restore
+  on removal) and TWO castings (one shared enhancement pool, atomic refusal
+  when unfundable — a blocked casting reserves nothing), all through
+  production session commands and BuildGraph read models with honest
+  unsupported/scan-cap notes; new `workspace-budget-evidence` assertion;
+  judging regression in the graph suite (protocol 364/364). Full gate PASS
+  at `8b387dc`; preview package built deterministically ×2
+  (`8412ac10…304fea2`, DLL `bfdefd57…`, MVID `b8e3e120-…`, local-only;
+  guide `docs/PREVIEW-0.2.0-rc6-casting-graph.md`).
+- Unattended desktop: "RDP must be Active" exists only in operator
+  documents (no executable session gate). Session-to-console transfer proven
+  (twice, `tscon exit=0`, `console howard 3 Active`, no viewer) through a
+  one-shot self-removing SYSTEM task firing on viewer disconnect; each
+  arming costs one UAC click while the owner is connected. Two operator
+  lessons paid for: the task's session-row parse must not assume the
+  interactive `>` marker (first fire failed and self-deleted), and operator
+  helper logs must not live under `runtime-state` (the deployment WhatIf
+  purity check correctly failed the gate until they moved).
+- The unattended proof run and the windowed/Advanced/reload re-runs at
+  `8b387dc` remain pending on the owner's next connection (one UAC click
+  re-arms the transfer; the desktop then stays usable unattended).
+
 ## 2026-09-25 casting-graph UI correction: review repairs and the first live run
 
 - An independent review found the disabled button state unobservable: the
