@@ -147,6 +147,9 @@
     <Compile Include="..\..\src\KingmakerBuffPlanner\RuntimeTesting\HoverOwnershipRecord.cs">
       <Link>RuntimeTesting\HoverOwnershipRecord.cs</Link>
     </Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\RuntimeTesting\WorkspaceBudgetEvidence.cs">
+      <Link>RuntimeTesting\WorkspaceBudgetEvidence.cs</Link>
+    </Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\RuntimeTesting\WorkspaceScenarioContracts.cs">
       <Link>RuntimeTesting\WorkspaceScenarioContracts.cs</Link>
     </Compile>
