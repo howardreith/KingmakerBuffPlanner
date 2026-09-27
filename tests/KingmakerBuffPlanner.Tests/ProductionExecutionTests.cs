@@ -91,6 +91,8 @@ namespace KingmakerBuffPlanner.Tests
             Run("at-will-cantrip-choice-refuses-what-is-not-the-authored-cantrip", TestAtWillCantripChoice);
             Run("classic-run-advances-only-while-the-world-runs", TestWorldGatedClassicRun);
             Run("live-run-stops-at-its-overall-deadline-or-abort-marker", TestLiveRunStopRule);
+            Run("physical-input-helper-shares-the-game-s-physical-pixel-space",
+                TestPhysicalInputDpiContract);
             Run("confirmation-needs-an-instance-this-attempt-applied", TestAppliedEffectJudgement);
             Run("cantrip-route-follows-the-reservation-and-ambiguity-stays-unresolved", TestCantripRouteAndPricing);
             Run("fact-source-choice-keeps-the-provider-kind-and-reserved-pool", TestFactSourceChoice);
@@ -7049,6 +7051,31 @@ namespace KingmakerBuffPlanner.Tests
                 !launcher.Contains("if ($null -ne $abortWrittenUtc -and [string]$result.status -ceq 'PASS') {"))
                 throw new InvalidOperationException("The stop rule is not checked on every update or in the menu diagnostics, " +
                     "the deadline is not logged, or a PASS after the abort is accepted.");
+        }
+
+        // The windowed 1080 run (casting-graph-qual-1080-01) delivered its
+        // physical cursor up to ~53 px off the requested Unity point while
+        // fullscreen runs stayed within 2 px: the launcher's injected input
+        // lived in a DPI-virtualized coordinate space while the game window
+        // is DPI-aware. The helper must declare process DPI awareness before
+        // any client-rect or cursor math, or windowed aims keep drifting.
+        private static void TestPhysicalInputDpiContract()
+        {
+            DirectoryInfo directory = new DirectoryInfo(Environment.CurrentDirectory);
+            while (directory != null && !File.Exists(Path.Combine(directory.FullName, "KingmakerBuffPlanner.sln")))
+                directory = directory.Parent;
+            string launcher = File.ReadAllText(Path.Combine(directory.FullName, "scripts",
+                "Invoke-KingmakerRuntimeTest.ps1")).Replace("\r\n", "\n");
+            int classStart = launcher.IndexOf("public static class KbpPhysicalInput", StringComparison.Ordinal);
+            if (classStart < 0)
+                throw new InvalidOperationException("The physical input helper is missing from the launcher.");
+            int helperEnd = launcher.IndexOf("public static class", classStart + 10, StringComparison.Ordinal);
+            if (helperEnd < 0) helperEnd = launcher.Length;
+            string helper = launcher.Substring(classStart, helperEnd - classStart);
+            if (!helper.Contains("[DllImport(\"user32.dll\")] static extern bool SetProcessDPIAware();") ||
+                !helper.Contains("static KbpPhysicalInput() { try { SetProcessDPIAware(); } catch { } }"))
+                throw new InvalidOperationException("The physical input helper does not declare process DPI " +
+                    "awareness before its coordinate math; windowed cursor aims drift by the DPI scale.");
         }
 
         // Final review A3: presence alone never confirms. Only an instance

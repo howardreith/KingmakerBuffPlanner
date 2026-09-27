@@ -444,6 +444,14 @@ try {
 using System;
 using System.Runtime.InteropServices;
 public static class KbpPhysicalInput {
+  // The game window is DPI-aware; this helper must see the same physical
+  // pixel space or every windowed-mode client-rect/coordinate conversion
+  // drifts by the DPI scale (the 1080-windowed run aimed up to ~53 px off
+  // while fullscreen stayed within 2 px). Declaring awareness once, before
+  // any coordinate math, makes GetClientRect/ClientToScreen/SetCursorPos
+  // operate in physical pixels for the whole process.
+  [DllImport("user32.dll")] static extern bool SetProcessDPIAware();
+  static KbpPhysicalInput() { try { SetProcessDPIAware(); } catch { } }
   [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr hWnd);
   [DllImport("user32.dll")] static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);
   [DllImport("user32.dll")] static extern bool SetCursorPos(int x, int y);
