@@ -371,9 +371,10 @@ namespace KingmakerBuffPlanner.Tests
             HoverOwnershipRecord unexplained = CompleteHoverRecord();
             unexplained.Add(PhysicalOn("classic", HoverBehaviour.Rc6, "hover-classic-rc6-hover-2", "Target.u2",
                 null, "Target.u2", true, null, "Target.u2", "Target.u3"));
-            Expect(unexplained.GhostWithoutClick && unexplained.RootCause == "not-proved" &&
-                unexplained.Violations().Contains("rc6-ghost-without-click:cause-not-explained"),
+            Expect(unexplained.GhostWithoutClick && unexplained.RootCause == "not-proved",
                 "a ghost without a click is explained as the selection");
+            Expect(!unexplained.Violations().Any(value => value.Contains("rc6-ghost")),
+                "an investigation anomaly must not surface as a product violation");
         }
 
         private static void TestHoverRecordRequiresCoverage()
@@ -384,21 +385,27 @@ namespace KingmakerBuffPlanner.Tests
             {
                 "hover-probe-unavailable", "missing-sample:graph-synthetic-owner", "missing-sample:graph-synthetic-exit",
                 "missing-sample:reopen-synthetic-owner", "missing-sample:reopen-synthetic-exit",
-                "missing-sample:graph-click-then-hover", "missing-sample:classic-click-then-hover",
-                "missing-sample:classic-physical-neutral", "missing-sample:physical-aims=0<5",
-                "missing-sample:physical-neutral", "rc6-ghost-not-reproduced",
+                "missing-sample:graph-click-then-hover", "missing-sample:physical-aims=0<5",
+                "missing-sample:physical-neutral",
                 "button-state-missing:pressed", "planner-roots-after-reopen=-1", "hover-sequence-incomplete"
             })
                 Expect(violations.Contains(expected), "an empty record does not report " + expected);
 
-            // Without the ghost reproduced by the real cursor the fix proves
-            // nothing; a synthetic-only ghost does not count.
+            // The historical rc6 investigation is separate from the product
+            // gate (mission 2026-09-27 §5): a reproduced-negative does not
+            // violate the product contract - the outcome is preserved on
+            // the record - and the shipped Classic sequence belongs to the
+            // investigation's own delivery contract.
             HoverOwnershipRecord synthetic = CopyOf(CompleteHoverRecord(),
                 sample => sample.Behaviour != HoverBehaviour.Rc6);
             synthetic.Add(Synthetic("classic-rc6-synthetic", "classic", HoverBehaviour.Rc6, "Target.u3",
                 "BuffCard", "BuffCard", "Target.u3"));
-            Expect(synthetic.Violations().SequenceEqual(new[] { "rc6-ghost-not-reproduced" }),
-                "a synthetic-only rc6 ghost is accepted: " + string.Join(",", synthetic.Violations().ToArray()));
+            Expect(synthetic.Violations().Count == 0 && !synthetic.GhostReproduced,
+                "a reproduced-negative must not violate the product hover gate: " +
+                string.Join(",", synthetic.Violations().ToArray()));
+            Expect(empty.HistoricalReproductionViolations().Contains("missing-sample:classic-click-then-hover") &&
+                empty.HistoricalReproductionViolations().Contains("missing-sample:classic-physical-neutral"),
+                "an undelivered investigation must report its missing owner sequence");
 
             // Four aims (three graph controls and the Classic portrait) are
             // not a sweep.
@@ -407,13 +414,17 @@ namespace KingmakerBuffPlanner.Tests
             Expect(shortSweep.Violations().SequenceEqual(new[] { "missing-sample:physical-aims=4<5" }),
                 "a four-control sweep is accepted: " + string.Join(",", shortSweep.Violations().ToArray()));
 
-            // The owner's sequence on the shipped Classic screen is required.
+            // The owner's sequence on the shipped Classic screen is required
+            // only of the historical investigation, not the product gate.
             HoverOwnershipRecord noClassic = CopyOf(CompleteHoverRecord(), sample =>
                 !(sample.Surface == "classic" && sample.Behaviour == HoverBehaviour.Fixed));
-            Expect(noClassic.Violations().SequenceEqual(new[]
-                    { "missing-sample:classic-click-then-hover", "missing-sample:classic-physical-neutral" }),
-                "a run without the shipped Classic sequence is accepted: " +
+            Expect(noClassic.Violations().Count == 0,
+                "a missing Classic investigation sequence must not fail the product gate: " +
                 string.Join(",", noClassic.Violations().ToArray()));
+            Expect(noClassic.HistoricalReproductionViolations().SequenceEqual(new[]
+                    { "missing-sample:classic-click-then-hover", "missing-sample:classic-physical-neutral" }),
+                "a run without the shipped Classic sequence is accepted as delivered: " +
+                string.Join(",", noClassic.HistoricalReproductionViolations().ToArray()));
 
             // Each button state must be the one it claims, and drawn.
             HoverOwnershipRecord notSelected = CopyOf(CompleteHoverRecord(), null, observation =>

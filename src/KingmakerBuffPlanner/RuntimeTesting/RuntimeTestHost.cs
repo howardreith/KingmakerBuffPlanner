@@ -1343,10 +1343,18 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                                 "saved plan, same campaign, one subscription, one HUD root, no run, clean",
                                 reloadEvidence));
                     }
-                    // The pointer highlight (addendum v1.1): judged on Unity's
-                    // own control states by HoverOwnershipRecord; the rc6
-                    // ghost must be reproduced for the fix to mean anything.
+                    // The pointer highlight (addendum v1.1), judged on Unity's
+                    // own control states by HoverOwnershipRecord. The
+                    // CURRENT-PRODUCT contract is one highlight under the
+                    // pointer, gone on exit, no planner selection, the five
+                    // button states, one root and stable counts. The
+                    // historical rc6 ghost investigation is a separate,
+                    // non-gating record: its owner sequence must merely be
+                    // DELIVERED, and its outcome — reproduced, or
+                    // reproduced-negative with the theory unproved — is
+                    // preserved verbatim and never edited to PASS.
                     bool hoverOwned = true;
+                    bool reproductionDelivered = true;
                     if (string.Equals(_request.Scenario, "live-workspace-qual", StringComparison.Ordinal))
                     {
                         PlannerUiReproduction.Rc6ButtonBehaviour = false;
@@ -1356,10 +1364,24 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         string hoverEvidence = _hover.Describe() + (hoverOwned ? string.Empty
                             : ";violations=" + string.Join(",", hoverViolations.ToArray()));
                         const string hoverExpected =
-                            "one highlight, under the pointer, gone on exit; rc6 ghost reproduced; five button states";
+                            "one highlight, under the pointer, gone on exit; no planner selection; five button states; one root; stable counts";
                         result.Assertions.Add(hoverOwned
                             ? RuntimeTestAssertion.Pass("workspace-hover-ownership", hoverExpected, hoverEvidence)
                             : RuntimeTestAssertion.Fail("workspace-hover-ownership", hoverExpected, hoverEvidence));
+                        IList<string> reproductionViolations = _hover.HistoricalReproductionViolations();
+                        reproductionDelivered = reproductionViolations.Count == 0;
+                        const string reproductionExpected =
+                            "owner sequence delivered with the rc6 behaviour; outcome recorded verbatim (reproduced, or reproduced-negative; theory unproved)";
+                        string reproductionEvidence = "ghostReproduced=" + _hover.GhostReproduced +
+                            ";ghostWithoutClick=" + _hover.GhostWithoutClick +
+                            ";rootCause=" + _hover.RootCause +
+                            (reproductionDelivered ? string.Empty
+                                : ";violations=" + string.Join(",", reproductionViolations.ToArray()));
+                        result.Assertions.Add(reproductionDelivered
+                            ? RuntimeTestAssertion.Pass("workspace-hover-rc6-reproduction",
+                                reproductionExpected, reproductionEvidence)
+                            : RuntimeTestAssertion.Fail("workspace-hover-rc6-reproduction",
+                                reproductionExpected, reproductionEvidence));
                     }
                     if (!workspaceOpen || !frameCaptured || !engineCaptured ||
                         !nonBlack || !presented || !controlCaptured || !visibleChange)
@@ -1386,6 +1408,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     {
                         result.Status = "FAIL";
                         result.Stage = "workspace-hover-validation";
+                    }
+                    else if (!reproductionDelivered)
+                    {
+                        result.Status = "FAIL";
+                        result.Stage = "workspace-hover-reproduction";
                     }
 
                 }
@@ -4922,9 +4949,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             }
             try
             {
+                // The game's JsonConvert.DefaultSettings preserves object
+                // references, which collapses this record to {$id:1}; the
+                // explicit-settings Serialize helper is the codebase's
+                // established workaround (review E1: a failed evidence
+                // write must be visible, and so must a hollow one).
                 File.WriteAllText(Path.Combine(_request.EvidenceDirectory,
-                    "workspace-budget-evidence.json"),
-                    JsonConvert.SerializeObject(_workspaceBudget, Formatting.Indented));
+                    "workspace-budget-evidence.json"), Serialize(_workspaceBudget));
             }
             catch (Exception exception)
             {
