@@ -1,5 +1,21 @@
 # AUTONOMOUS-BLOCKERS — top section is current
 
+## Casting-graph preview — 2026-09-27 (update)
+
+- **BLOCKING the remaining live runs (external, one interaction).** The
+  unattended console proof and the windowed/Advanced/reload runs at
+  `8b387dc` need Howie's graphical session attached to the physical
+  console. The transfer mechanism is proven (`tscon exit=0` twice); the
+  one-shot self-removing task (`C:\Dev\KingmakerBuffPlannerLab\
+  kbp-register-console-task.ps1`) needs ONE UAC consent while the owner is
+  connected, then fires automatically on the next viewer disconnect.
+  Nothing else is blocked: HEAD `8b387dc` is gated, the preview package is
+  built (`docs/PREVIEW-0.2.0-rc6-casting-graph.md`), and all source work
+  for the requested slice is complete.
+- The Gunslinger lab is quiet (`ended/restored`, no lock); no Kingmaker
+  process; transactions all Restored; the frozen preview artifact is
+  unchanged.
+
 ## Casting-graph UI correction — 2026-09-26 (update)
 
 - Branch publication RESOLVED by the owner: pushed as
