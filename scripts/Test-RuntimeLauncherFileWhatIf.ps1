@@ -873,6 +873,21 @@ try {
     if (@(Restore-KbpRegistryValues -KeyPath $scratchKey -Snapshot $snapshot).Count -ne 0) {
         throw 'An unchanged key was rewritten.'
     }
+    # The windowed screen values the launcher applies for a display-mode run
+    # (the game's saved options override Unity's command-line flags): set,
+    # verified, and reversed exactly by the same restore machinery.
+    Set-KbpWindowedScreenValues -KeyPath $scratchKey -Size '1920x1080'
+    if ([int]$scratch.GetValue('Screenmanager Resolution Width_h182942802') -ne 1920 -or
+        [int]$scratch.GetValue('Screenmanager Resolution Height_h2627697771') -ne 1080 -or
+        [int]$scratch.GetValue('Screenmanager Fullscreen mode_h3630240806') -ne 0 -or
+        [int]$scratch.GetValue('Screenmanager Resolution Use Native_h1405027254') -ne 0) {
+        throw 'The windowed screen values were not applied.'
+    }
+    @(Restore-KbpRegistryValues -KeyPath $scratchKey -Snapshot $snapshot) | Out-Null
+    if ((Compare-KbpRegistrySnapshot -Before $snapshot -After (Get-KbpRegistryValueSnapshot -KeyPath $scratchKey)).Count -ne 0 -or
+        [int]$scratch.GetValue('Screenmanager Fullscreen mode_h3630240806') -ne 1) {
+        throw 'The windowed screen values were not restored to the owner''s exact state.'
+    }
     $scratch.SetValue('Screenmanager Resolution Width_h182942802', 1600, [Microsoft.Win32.RegistryValueKind]::DWord)
     $scratch.SetValue('Binary_h1', [byte[]](9), [Microsoft.Win32.RegistryValueKind]::Binary)
     $scratch.DeleteValue('Text_h2')

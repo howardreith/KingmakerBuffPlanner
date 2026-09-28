@@ -77,6 +77,33 @@ function Confirm-KbpLockedWithoutForeignLease {
 # the game's settings. A display-mode run restores it byte-exact.
 $script:KbpGameRegistryKey = 'HKCU:\Software\Owlcat Games\Pathfinder Kingmaker'
 
+# The game's saved graphics options override Unity's -screen-fullscreen
+# command line (a windowed run launched fullscreen in
+# casting-graph-qual-1080-01/-02 while claiming the windowed mode), so a
+# windowed run sets the Unity screen-manager values itself, for this run
+# only: the launcher snapshots the key first and restores the owner's
+# values exactly afterwards (Restore-KbpRegistryValues above, verified by
+# the launcher's registry-restoration check).
+function Set-KbpWindowedScreenValues {
+    param(
+        [Parameter(Mandatory = $true)][string]$KeyPath,
+        [Parameter(Mandatory = $true)][string]$Size)
+    if ($Size -notmatch '^([0-9]+)x([0-9]+)$') { throw "Display size is invalid: $Size" }
+    $subKey = $KeyPath -replace '^HKCU:\\', ''
+    $key = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey($subKey)
+    try {
+        $key.SetValue('Screenmanager Resolution Width_h182942802', [int]$Matches[1],
+            [Microsoft.Win32.RegistryValueKind]::DWord)
+        $key.SetValue('Screenmanager Resolution Height_h2627697771', [int]$Matches[2],
+            [Microsoft.Win32.RegistryValueKind]::DWord)
+        $key.SetValue('Screenmanager Fullscreen mode_h3630240806', 0,
+            [Microsoft.Win32.RegistryValueKind]::DWord)
+        $key.SetValue('Screenmanager Resolution Use Native_h1405027254', 0,
+            [Microsoft.Win32.RegistryValueKind]::DWord)
+    }
+    finally { $key.Dispose() }
+}
+
 function Get-KbpRegistryCanonical([string]$Kind, $Value) {
     $data = if ($Value -is [byte[]]) { [Convert]::ToBase64String([byte[]]$Value) }
         elseif ($Value -is [string[]]) { (@($Value) | ForEach-Object {

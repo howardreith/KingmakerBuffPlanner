@@ -357,6 +357,10 @@ try {
         $displayRegistryPath = Join-Path $script:KbpRuntimeStateRoot "transactions\$runId\display-registry.json"
         Save-KbpRegistrySnapshotFile -Path $displayRegistryPath -KeyPath $script:KbpGameRegistryKey `
             -Snapshot (Get-KbpRegistryValueSnapshot -KeyPath $script:KbpGameRegistryKey) -RunId $runId
+        # The snapshot above is the owner's exact state; the windowed values
+        # apply to this run only and are restored by it (the game's saved
+        # options otherwise override Unity's command-line screen flags).
+        Set-KbpWindowedScreenValues -KeyPath $script:KbpGameRegistryKey -Size $displaySize
     }
     $scenarioParameters = if ($null -ne $savePair) { @{
         workingSaveName = $savePair.working.name; workingFileName = $savePair.working.fileName
