@@ -5090,7 +5090,18 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 session.SelectGraphSource(rowA.ProviderKey, inputs);
                 UI.CastingGraphView graphA = session.BuildGraph(inputs);
                 UI.CastingGraphEditResult added = null;
-                foreach (string target in GraphLegalOthers(graphA, rowA.CasterUnitId))
+                // Prefer targets no existing casting of this buff reaches:
+                // the graph shows (never steals) an assigned target, whose
+                // click is a legitimate ShowedExisting, not an applicable
+                // add for the proof.
+                List<string> legalA = GraphLegalOthers(graphA, rowA.CasterUnitId);
+                List<string> orderedTargets = legalA.Where(unit =>
+                {
+                    UI.CastingGraphTargetNode node = graphA.Targets.FirstOrDefault(value =>
+                        string.Equals(value.UnitId, unit, StringComparison.Ordinal));
+                    return node == null || node.CastingIds.Count == 0;
+                }).Concat(legalA).ToList();
+                foreach (string target in orderedTargets)
                 {
                     UI.CastingGraphEditResult attempt = session.AddGraphCasting(target, inputs);
                     if (attempt.Applied) { added = attempt; break; }
@@ -5196,10 +5207,14 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         if (node.UnitId == null || node.UnitId.Length == 0) continue;
                         foreach (UI.CastingGraphSourceRow row in node.Sources)
                         {
+                            // Pinnable only: a spell known at two levels of
+                            // one spellbook (a twin) refuses every target
+                            // (provider-not-pinnable), which is an authoring
+                            // limitation, not a pool observation.
                             if (row.PoolKind != ResourcePoolKind.SpontaneousLevel || row.Capacity == null ||
                                 row.Capacity.Kind != CastingCapacityKind.Finite ||
                                 row.Capacity.AdditionalCastings < 1 ||
-                                row.Capacity.NativeRemaining == null) continue;
+                                row.Capacity.NativeRemaining == null || !row.Pinnable) continue;
                             List<KeyValuePair<string, UI.CastingGraphSourceRow>> rows;
                             if (!byPool.TryGetValue(row.PoolKey, out rows))
                             {
