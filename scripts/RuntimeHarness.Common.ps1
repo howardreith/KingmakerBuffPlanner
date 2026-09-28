@@ -100,6 +100,12 @@ function Set-KbpWindowedScreenValues {
             [Microsoft.Win32.RegistryValueKind]::DWord)
         $key.SetValue('Screenmanager Resolution Use Native_h1405027254', 0,
             [Microsoft.Win32.RegistryValueKind]::DWord)
+        # The game's own options layer: its DisplayMode enum is serialized
+        # as one ASCII character ('0' Windowed, '1' FullScreen - the value
+        # observed on this machine while fullscreen); the Unity values
+        # above alone are overridden at boot.
+        $key.SetValue('DisplayMode_h1925482108', [byte[]](48),
+            [Microsoft.Win32.RegistryValueKind]::Binary)
     }
     finally { $key.Dispose() }
 }
