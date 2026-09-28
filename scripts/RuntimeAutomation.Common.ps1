@@ -53,24 +53,30 @@ function Test-KbpSteamSessionLogState {
         [Parameter(Mandatory = $true)]$CloudLinesApp,
         [Parameter(Mandatory = $true)][DateTime]$SteamStartTime,
         [Parameter(Mandatory = $true)]$PriorCloudLinesApp)
-    if ($ConnectionLines.Count -eq 0) { return @('no connection lines this Steam session') }
     $lastLoggedOn = @($ConnectionLines | Where-Object message -match '\[(Logged On|Logging On|Connected),' |
         Sort-Object timestamp | Select-Object -Last 1)
     $lastLoggedOff = @($ConnectionLines | Where-Object message -match '\[(Logged Off|Logging Off),' |
         Sort-Object timestamp | Select-Object -Last 1)
+    if ($ConnectionLines.Count -eq 0) {
+        return [pscustomobject]@{ problems = @('no connection lines this Steam session') }
+    }
     if ($lastLoggedOff.Count -ne 1 -or
         ($lastLoggedOn.Count -eq 1 -and $lastLoggedOff[0].timestamp -lt $lastLoggedOn[0].timestamp)) {
-        return @('Steam Offline Mode is not proven for the current session')
+        return [pscustomobject]@{ problems = @('Steam Offline Mode is not proven for the current session') }
     }
     if ($CloudLinesApp.Count -eq 0) {
         if ($PriorCloudLinesApp.Count -eq 0) {
-            return @('no App 640820 cloud evidence exists at all')
+            return [pscustomobject]@{ problems = @('no App 640820 cloud evidence exists at all') }
         }
         $last = $PriorCloudLinesApp[-1].message
         if ($last -notmatch 'Failed sync.*offlineMode=true|YldWriteCacheDirectoryToFile') {
-            return @('fresh Steam session without terminal App 640820 cloud state')
+            return [pscustomobject]@{ problems = @('fresh Steam session without terminal App 640820 cloud state') }
         }
-        return @()
+        return [pscustomobject]@{
+            problems = @()
+            loggedOffAt = $lastLoggedOff[0].timestamp
+            offlineCloudAt = $PriorCloudLinesApp[-1].timestamp
+        }
     }
     $offlineCloud = @($CloudLinesApp | Where-Object message -match 'Sync Disabled.*offlineMode=true|offlineMode=true' |
         Sort-Object timestamp | Select-Object -Last 1)
@@ -78,9 +84,13 @@ function Test-KbpSteamSessionLogState {
         Sort-Object timestamp | Select-Object -Last 1)
     if ($offlineCloud.Count -ne 1 -or
         ($successfulTransfer.Count -eq 1 -and $offlineCloud[0].timestamp -le $successfulTransfer[0].timestamp)) {
-        return @('Steam Cloud disabled/offline state is not proven after the latest App 640820 transfer')
+        return [pscustomobject]@{ problems = @('Steam Cloud disabled/offline state is not proven after the latest App 640820 transfer') }
     }
-    return @()
+    return [pscustomobject]@{
+        problems = @()
+        loggedOffAt = $lastLoggedOff[0].timestamp
+        offlineCloudAt = $offlineCloud[0].timestamp
+    }
 }
 
 function Assert-KbpSteamSafety {
@@ -104,9 +114,11 @@ function Assert-KbpSteamSafety {
         Where-object message -match '^\[AppID 640820\]')
     $priorCloud = @(Get-KbpTimestampedLogLines $cloudLog ([DateTime]::MinValue) |
         Where-Object message -match '^\[AppID 640820\]')
-    $problems = @(Test-KbpSteamSessionLogState -ConnectionLines $connection -CloudLinesApp $cloud `
-        -SteamStartTime $steam.StartTime -PriorCloudLinesApp $priorCloud)
-    if ($problems.Count -ne 0) { throw ('Current Steam-session safety logs are incomplete. ' + ($problems -join '; ')) }
+    $steamState = Test-KbpSteamSessionLogState -ConnectionLines $connection -CloudLinesApp $cloud `
+        -SteamStartTime $steam.StartTime -PriorCloudLinesApp $priorCloud
+    if (@($steamState.problems).Count -ne 0) {
+        throw ('Current Steam-session safety logs are incomplete. ' + ($steamState.problems -join '; '))
+    }
 
     $appManifest = Join-Path $steamRoot 'steamapps\appmanifest_640820.acf'
     $manifestText = Get-Content -LiteralPath $appManifest -Raw
@@ -117,8 +129,8 @@ function Assert-KbpSteamSafety {
     return [ordered]@{
         steamProcessId = $steam.Id
         steamStartedAtUtc = $steam.StartTime.ToUniversalTime().ToString('o')
-        loggedOffAtUtc = $lastLoggedOff[0].timestamp.ToUniversalTime().ToString('o')
-        offlineCloudAtUtc = $offlineCloud[0].timestamp.ToUniversalTime().ToString('o')
+        loggedOffAtUtc = $steamState.loggedOffAt.ToUniversalTime().ToString('o')
+        offlineCloudAtUtc = $steamState.offlineCloudAt.ToUniversalTime().ToString('o')
         cloudPolicy = 'Sync Disabled; offlineMode=true'
         appManifestSha256 = Get-KbpSha256 $appManifest
     }
