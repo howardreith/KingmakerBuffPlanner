@@ -5299,51 +5299,162 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             // interaction's own buff and routine; both are restored here.
             string restoreSource = session.SelectedSourceId;
             string restoreRoutine = session.SelectedRoutineId;
+            List<string> proofOwnedCastingIds = new List<string>();
             try
             {
                 List<string> castingIds = _interactionCastIds.Where(value => !string.IsNullOrEmpty(value)).ToList();
-                if (castingIds.Count < 2)
-                {
-                    _workspaceBudget.SharedEnhancementStatus = "not-run:unsupported:fewer-than-two-castings";
-                    return;
-                }
                 IReadOnlyList<CastEnhancementSnapshot> enhancements = inputs.Enhancements;
                 if (enhancements == null || enhancements.Count == 0)
                 {
                     _workspaceBudget.SharedEnhancementStatus = "not-run:unsupported:no-enhancements";
                     return;
                 }
-                int tried = 0;
-                foreach (CastEnhancementSnapshot enhancement in enhancements)
+                if (castingIds.Count < 2)
                 {
-                    if (enhancement == null || string.IsNullOrEmpty(enhancement.UsagePoolId) ||
-                        enhancement.UsageUnitsPerCast <= 0 || enhancement.AffectsTargeting) continue;
-                    if (tried++ >= 40)
-                    {
-                        _workspaceBudget.AddNote("enhancement-scan-capped=40");
-                        break;
-                    }
-                    for (int first = 0; first < castingIds.Count; first++)
-                    {
-                        for (int second = 0; second < castingIds.Count; second++)
-                        {
-                            if (second == first) continue;
-                            if (TrySharedEnhancementSequence(session, inputs, enhancement,
-                                    castingIds[first], castingIds[second]))
-                                return;
-                        }
-                    }
+                    // The interaction left fewer than two castings (its own
+                    // refusal is not this phase's): author proof-owned
+                    // castings below from an enhancement-bearing caster.
+                    _workspaceBudget.AddNote("interaction-castings=" + castingIds.Count);
                 }
+                else
+                {
+                    if (TryEnhancementAmongCastings(session, inputs, enhancements, castingIds))
+                        return;
+                }
+                // Self-sufficient fallback: the interaction's buff may have
+                // nothing eligible even though the fixture supports shared
+                // enhancement pools (the Advanced run of beta-e7ad1476).
+                // Author TWO proof-owned castings of one single-target buff
+                // from a caster that owns a finite-pool, non-targeting
+                // enhancement, prove the pool across them, and remove both
+                // in the verified cleanup.
+                if (TryAuthorEnhancementCastings(session, inputs, enhancements, proofOwnedCastingIds) &&
+                    TryEnhancementAmongCastings(session, inputs, enhancements, proofOwnedCastingIds))
+                    return;
                 _workspaceBudget.SharedEnhancementStatus =
                     "not-run:unsupported:no-finite-shared-enhancement";
             }
             finally
             {
+                // Review E4: proof-owned castings are removed on every path,
+                // each removal checked.
+                foreach (string castingId in proofOwnedCastingIds)
+                {
+                    try
+                    {
+                        session.FocusGraphCasting(castingId);
+                        AuthoringEditResult cleanup = session.RemoveFocusedCasting();
+                        if (!cleanup.Applied)
+                            _workspaceBudget.CleanupEvidence = "failed:enhancement-casting-cleanup:" +
+                                cleanup.Reason;
+                    }
+                    catch (Exception exception)
+                    {
+                        _workspaceBudget.CleanupEvidence = "failed:enhancement-casting-cleanup:" +
+                            exception.GetType().Name;
+                    }
+                }
                 if (!string.IsNullOrEmpty(restoreSource))
                     session.SelectGraphBuff(restoreSource, inputs);
                 if (!string.IsNullOrEmpty(restoreRoutine))
                     session.SelectRoutine(restoreRoutine);
             }
+        }
+
+        private bool TryEnhancementAmongCastings(UI.CastingWorkspaceSession session,
+            CastingWorkspaceInputs inputs, IReadOnlyList<CastEnhancementSnapshot> enhancements,
+            List<string> castingIds)
+        {
+            int tried = 0;
+            int skippedNoNumber = 0;
+            int skippedRefused = 0;
+            foreach (CastEnhancementSnapshot enhancement in enhancements)
+            {
+                if (enhancement == null || string.IsNullOrEmpty(enhancement.UsagePoolId) ||
+                    enhancement.UsageUnitsPerCast <= 0 || enhancement.AffectsTargeting) continue;
+                if (tried++ >= 40)
+                {
+                    _workspaceBudget.AddNote("enhancement-scan-capped=40");
+                    break;
+                }
+                for (int first = 0; first < castingIds.Count; first++)
+                {
+                    for (int second = 0; second < castingIds.Count; second++)
+                    {
+                        if (second == first) continue;
+                        int? secondBefore = PoolRemainingOf(session, inputs, castingIds[second],
+                            enhancement.EnhancementId);
+                        int? firstBefore = PoolRemainingOf(session, inputs, castingIds[first],
+                            enhancement.EnhancementId);
+                        if (secondBefore == null || firstBefore == null) { skippedNoNumber++; continue; }
+                        if (TrySharedEnhancementSequence(session, inputs, enhancement,
+                                castingIds[first], castingIds[second]))
+                            return true;
+                        skippedRefused++;
+                    }
+                }
+            }
+            _workspaceBudget.AddNote("enhancement-candidates-skipped:no-number=" + skippedNoNumber +
+                ";refused=" + skippedRefused);
+            return false;
+        }
+
+        // Two fresh proof-owned castings from one caster that owns a finite
+        // non-targeting enhancement, on one strictly single-target buff the
+        // caster can reach two legal recipients with.
+        private bool TryAuthorEnhancementCastings(UI.CastingWorkspaceSession session,
+            CastingWorkspaceInputs inputs, IReadOnlyList<CastEnhancementSnapshot> enhancements,
+            List<string> proofOwnedCastingIds)
+        {
+            foreach (CastEnhancementSnapshot enhancement in enhancements)
+            {
+                if (enhancement == null || string.IsNullOrEmpty(enhancement.UsagePoolId) ||
+                    enhancement.UsageUnitsPerCast <= 0 || enhancement.AffectsTargeting) continue;
+                string caster = enhancement.CasterUnitId;
+                if (string.IsNullOrEmpty(caster)) continue;
+                string restoreSource = session.SelectedSourceId;
+                try
+                {
+                    foreach (UI.CastingGraphCatalogueEntry entry in session.BuildGraph(inputs).Catalogue)
+                    {
+                        session.SelectGraphBuff(entry.SourceId, inputs);
+                        UI.CastingGraphView graph = session.BuildGraph(inputs);
+                        if (graph.SelectedSourceIsGroup != false) continue;
+                        UI.CastingGraphCasterNode node = graph.Casters.FirstOrDefault(value =>
+                            string.Equals(value.UnitId, caster, StringComparison.Ordinal));
+                        if (node == null) continue;
+                        UI.CastingGraphSourceRow row = null;
+                        foreach (UI.CastingGraphSourceRow candidate in node.Sources)
+                            if (candidate.Pinnable && candidate.Usable) { row = candidate; break; }
+                        if (row == null) continue;
+                        session.SelectGraphCaster(caster, inputs);
+                        session.SelectGraphSource(row.ProviderKey, inputs);
+                        UI.CastingGraphView selected = session.BuildGraph(inputs);
+                        List<string> legal = GraphLegalOthers(selected, caster);
+                        if (legal.Count < 2) continue;
+                        UI.CastingGraphEditResult first = session.AddGraphCasting(legal[0], inputs);
+                        if (!first.Applied) continue;
+                        UI.CastingGraphEditResult second = session.AddGraphCasting(legal[1], inputs);
+                        if (!second.Applied)
+                        {
+                            session.FocusGraphCasting(first.CastingId);
+                            session.RemoveFocusedCasting();
+                            continue;
+                        }
+                        proofOwnedCastingIds.Add(first.CastingId);
+                        proofOwnedCastingIds.Add(second.CastingId);
+                        _workspaceBudget.AddNote("enhancement-proof-owned-castings=" + first.CastingId +
+                            "," + second.CastingId + ";e=" + enhancement.EnhancementId);
+                        return true;
+                    }
+                }
+                finally
+                {
+                    if (!string.IsNullOrEmpty(restoreSource))
+                        session.SelectGraphBuff(restoreSource, inputs);
+                }
+            }
+            return false;
         }
 
         // One enhancement, two castings. BEFORE any mutation, both castings'
