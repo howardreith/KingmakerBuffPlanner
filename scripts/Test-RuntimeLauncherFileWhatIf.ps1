@@ -884,7 +884,7 @@ try {
         throw 'The windowed screen values were not applied.'
     }
     @(Restore-KbpRegistryValues -KeyPath $scratchKey -Snapshot $snapshot) | Out-Null
-    if ((Compare-KbpRegistrySnapshot -Before $snapshot -After (Get-KbpRegistryValueSnapshot -KeyPath $scratchKey)).Count -ne 0 -or
+    if (@(Compare-KbpRegistrySnapshot -Before $snapshot -After (Get-KbpRegistryValueSnapshot -KeyPath $scratchKey)).Count -ne 0 -or
         [int]$scratch.GetValue('Screenmanager Fullscreen mode_h3630240806') -ne 1) {
         throw 'The windowed screen values were not restored to the owner''s exact state.'
     }
