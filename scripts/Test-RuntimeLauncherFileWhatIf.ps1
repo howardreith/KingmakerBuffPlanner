@@ -848,6 +848,56 @@ try {
     }
 }
 finally { Remove-Item -LiteralPath $writerRoot -Recurse -Force -ErrorAction SilentlyContinue }
+# The Steam-session log judgement (Test-KbpSteamSessionLogState): mid-
+# session requires the full post-start offline/transfer evidence; a fresh
+# Steam session with no game yet is accepted ONLY when the last recorded
+# App 640820 line is the terminal offline state (the reboot false-negative
+# repair - Steam writes these lines only at game lifecycle events).
+function SteamLine([string]$timestamp, [string]$message) {
+    return [pscustomobject]@{
+        timestamp = [DateTime]::ParseExact($timestamp, 'yyyy-MM-dd HH:mm:ss',
+            [Globalization.CultureInfo]::InvariantCulture)
+        message = $message
+    }
+}
+$steamConnection = @(
+    (SteamLine '2026-09-28 10:19:32' '[Logged Off, 0, 0] [U:1:1] CCMInterface::SetSteamID('),
+    (SteamLine '2026-09-28 10:37:10' 'Connect: connectivity test OK'))
+$midSessionCloud = @(
+    (SteamLine '2026-09-28 11:00:00' '[AppID 640820] Starting sync (AC Exit,Sync Disabled,)'),
+    (SteamLine '2026-09-28 11:00:01' '[AppID 640820] Failed sync for ''AC Exit,Sync Disabled,'' [login=false][offlineMode=true]'))
+$settledPriorCloud = @(
+    (SteamLine '2026-09-28 08:18:08' '[AppID 640820] AutoCloud complete'),
+    (SteamLine '2026-09-28 08:18:08' '[AppID 640820] Failed sync for ''AC Exit,Sync Disabled,'' [login=false][offlineMode=true]'),
+    (SteamLine '2026-09-28 08:18:08' '[AppID 640820] YldWriteCacheDirectoryToFile - saved'))
+$transferAfterOfflineCloud = @(
+    (SteamLine '2026-09-28 11:00:00' '[AppID 640820] Failed sync for ''AC Exit,Sync Disabled,'' [login=false][offlineMode=true]'),
+    (SteamLine '2026-09-28 11:05:00' '[AppID 640820] Upload OK'))
+$unsettledPriorCloud = @(
+    (SteamLine '2026-09-28 08:18:08' '[AppID 640820] Starting sync (AC Exit,Sync Disabled,)'))
+$steamStart = [DateTime]::ParseExact('2026-09-28 10:19:25', 'yyyy-MM-dd HH:mm:ss',
+    [Globalization.CultureInfo]::InvariantCulture)
+if (@(Test-KbpSteamSessionLogState -ConnectionLines $steamConnection -CloudLinesApp $midSessionCloud `
+        -SteamStartTime $steamStart -PriorCloudLinesApp @()).Count -ne 0) {
+    throw 'A mid-session offline cloud state was refused.'
+}
+if (@(Test-KbpSteamSessionLogState -ConnectionLines $steamConnection -CloudLinesApp @() `
+        -SteamStartTime $steamStart -PriorCloudLinesApp $settledPriorCloud).Count -ne 0) {
+    throw 'A fresh Steam session with terminal prior App 640820 state was refused (the reboot false negative).'
+}
+if (@(Test-KbpSteamSessionLogState -ConnectionLines $steamConnection -CloudLinesApp $transferAfterOfflineCloud `
+        -SteamStartTime $steamStart -PriorCloudLinesApp @()).Count -eq 0) {
+    throw 'A successful transfer after the offline line was accepted.'
+}
+if (@(Test-KbpSteamSessionLogState -ConnectionLines $steamConnection -CloudLinesApp @() `
+        -SteamStartTime $steamStart -PriorCloudLinesApp $unsettledPriorCloud).Count -eq 0) {
+    throw 'A fresh session with an unsettled prior cloud state was accepted.'
+}
+if (@(Test-KbpSteamSessionLogState -ConnectionLines @() -CloudLinesApp $midSessionCloud `
+        -SteamStartTime $steamStart -PriorCloudLinesApp @()).Count -eq 0) {
+    throw 'A session without connection evidence was accepted.'
+}
+
 # Display modes: a window larger than the session's display is refused; the
 # Unity arguments name exactly the size; the owner's settings add none.
 if (-not (Test-KbpDisplayModeSupported -Size '1920x1080' -DisplaySize '1920x1200') -or

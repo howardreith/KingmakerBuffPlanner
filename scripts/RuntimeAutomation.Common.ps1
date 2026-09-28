@@ -39,6 +39,50 @@ function Get-KbpTimestampedLogLines([string]$Path, [DateTime]$NotBefore) {
     return @($records)
 }
 
+# The Steam-session log judgement, pure over log lines so its rules can be
+# regression-tested with fixtures (see Test-RuntimeLauncherFileWhatIf.ps1).
+# Steam writes App 640820 cloud lines only at GAME lifecycle events, so a
+# freshly started Steam session with no game yet legitimately has none:
+# in that state the durable offline/sync-disabled condition is proven by
+# the LAST recorded 640820 line being the terminal offline failure that
+# follows AutoCloud complete (or its final cache write). Mid-session, the
+# full post-start evidence is required exactly as before.
+function Test-KbpSteamSessionLogState {
+    param(
+        [Parameter(Mandatory = $true)]$ConnectionLines,
+        [Parameter(Mandatory = $true)]$CloudLinesApp,
+        [Parameter(Mandatory = $true)][DateTime]$SteamStartTime,
+        [Parameter(Mandatory = $true)]$PriorCloudLinesApp)
+    if ($ConnectionLines.Count -eq 0) { return @('no connection lines this Steam session') }
+    $lastLoggedOn = @($ConnectionLines | Where-Object message -match '\[(Logged On|Logging On|Connected),' |
+        Sort-Object timestamp | Select-Object -Last 1)
+    $lastLoggedOff = @($ConnectionLines | Where-Object message -match '\[(Logged Off|Logging Off),' |
+        Sort-Object timestamp | Select-Object -Last 1)
+    if ($lastLoggedOff.Count -ne 1 -or
+        ($lastLoggedOn.Count -eq 1 -and $lastLoggedOff[0].timestamp -lt $lastLoggedOn[0].timestamp)) {
+        return @('Steam Offline Mode is not proven for the current session')
+    }
+    if ($CloudLinesApp.Count -eq 0) {
+        if ($PriorCloudLinesApp.Count -eq 0) {
+            return @('no App 640820 cloud evidence exists at all')
+        }
+        $last = $PriorCloudLinesApp[-1].message
+        if ($last -notmatch 'Failed sync.*offlineMode=true|YldWriteCacheDirectoryToFile') {
+            return @('fresh Steam session without terminal App 640820 cloud state')
+        }
+        return @()
+    }
+    $offlineCloud = @($CloudLinesApp | Where-Object message -match 'Sync Disabled.*offlineMode=true|offlineMode=true' |
+        Sort-Object timestamp | Select-Object -Last 1)
+    $successfulTransfer = @($CloudLinesApp | Where-Object message -match '(Download|Upload) OK|Success\.' |
+        Sort-Object timestamp | Select-Object -Last 1)
+    if ($offlineCloud.Count -ne 1 -or
+        ($successfulTransfer.Count -eq 1 -and $offlineCloud[0].timestamp -le $successfulTransfer[0].timestamp)) {
+        return @('Steam Cloud disabled/offline state is not proven after the latest App 640820 transfer')
+    }
+    return @()
+}
+
 function Assert-KbpSteamSafety {
     param([string]$SteamPath = 'C:\Program Files (x86)\Steam\steam.exe')
     if (-not (Test-Path -LiteralPath $SteamPath -PathType Leaf)) { throw 'The exact Steam executable is missing.' }
@@ -57,25 +101,12 @@ function Assert-KbpSteamSafety {
     $cloudLog = Join-Path $steamRoot 'logs\cloud_log.txt'
     $connection = @(Get-KbpTimestampedLogLines $connectionLog $steam.StartTime)
     $cloud = @(Get-KbpTimestampedLogLines $cloudLog $steam.StartTime |
+        Where-object message -match '^\[AppID 640820\]')
+    $priorCloud = @(Get-KbpTimestampedLogLines $cloudLog ([DateTime]::MinValue) |
         Where-Object message -match '^\[AppID 640820\]')
-    if ($connection.Count -eq 0 -or $cloud.Count -eq 0) { throw 'Current Steam-session safety logs are incomplete.' }
-
-    $lastLoggedOn = @($connection | Where-Object message -match '\[(Logged On|Logging On|Connected),' |
-        Sort-Object timestamp | Select-Object -Last 1)
-    $lastLoggedOff = @($connection | Where-Object message -match '\[(Logged Off|Logging Off),' |
-        Sort-Object timestamp | Select-Object -Last 1)
-    if ($lastLoggedOff.Count -ne 1 -or
-        ($lastLoggedOn.Count -eq 1 -and $lastLoggedOff[0].timestamp -lt $lastLoggedOn[0].timestamp)) {
-        throw 'Steam Offline Mode is not proven for the current session.'
-    }
-    $offlineCloud = @($cloud | Where-Object message -match 'Sync Disabled.*offlineMode=true|offlineMode=true' |
-        Sort-Object timestamp | Select-Object -Last 1)
-    $successfulTransfer = @($cloud | Where-Object message -match '(Download|Upload) OK|Success\.' |
-        Sort-Object timestamp | Select-Object -Last 1)
-    if ($offlineCloud.Count -ne 1 -or
-        ($successfulTransfer.Count -eq 1 -and $offlineCloud[0].timestamp -le $successfulTransfer[0].timestamp)) {
-        throw 'Steam Cloud disabled/offline state is not proven after the latest App 640820 transfer.'
-    }
+    $problems = Test-KbpSteamSessionLogState -ConnectionLines $connection -CloudLinesApp $cloud `
+        -SteamStartTime $steam.StartTime -PriorCloudLinesApp $priorCloud
+    if ($problems.Count -ne 0) { throw ('Current Steam-session safety logs are incomplete. ' + ($problems -join '; ')) }
 
     $appManifest = Join-Path $steamRoot 'steamapps\appmanifest_640820.acf'
     $manifestText = Get-Content -LiteralPath $appManifest -Raw
