@@ -877,24 +877,24 @@ $unsettledPriorCloud = @(
     (SteamLine '2026-09-28 08:18:08' '[AppID 640820] Starting sync (AC Exit,Sync Disabled,)'))
 $steamStart = [DateTime]::ParseExact('2026-09-28 10:19:25', 'yyyy-MM-dd HH:mm:ss',
     [Globalization.CultureInfo]::InvariantCulture)
-if (@(Test-KbpSteamSessionLogState -ConnectionLines $steamConnection -CloudLinesApp $midSessionCloud `
-        -SteamStartTime $steamStart -PriorCloudLinesApp @()).Count -ne 0) {
+if (@((Test-KbpSteamSessionLogState -ConnectionLines $steamConnection -CloudLinesApp $midSessionCloud `
+        -SteamStartTime $steamStart -PriorCloudLinesApp @()).problems).Count -ne 0) {
     throw 'A mid-session offline cloud state was refused.'
 }
-if (@(Test-KbpSteamSessionLogState -ConnectionLines $steamConnection -CloudLinesApp @() `
-        -SteamStartTime $steamStart -PriorCloudLinesApp $settledPriorCloud).Count -ne 0) {
+if (@((Test-KbpSteamSessionLogState -ConnectionLines $steamConnection -CloudLinesApp @() `
+        -SteamStartTime $steamStart -PriorCloudLinesApp $settledPriorCloud).problems).Count -ne 0) {
     throw 'A fresh Steam session with terminal prior App 640820 state was refused (the reboot false negative).'
 }
-if (@(Test-KbpSteamSessionLogState -ConnectionLines $steamConnection -CloudLinesApp $transferAfterOfflineCloud `
-        -SteamStartTime $steamStart -PriorCloudLinesApp @()).Count -eq 0) {
+if (@((Test-KbpSteamSessionLogState -ConnectionLines $steamConnection -CloudLinesApp $transferAfterOfflineCloud `
+        -SteamStartTime $steamStart -PriorCloudLinesApp @()).problems).Count -eq 0) {
     throw 'A successful transfer after the offline line was accepted.'
 }
-if (@(Test-KbpSteamSessionLogState -ConnectionLines $steamConnection -CloudLinesApp @() `
-        -SteamStartTime $steamStart -PriorCloudLinesApp $unsettledPriorCloud).Count -eq 0) {
+if (@((Test-KbpSteamSessionLogState -ConnectionLines $steamConnection -CloudLinesApp @() `
+        -SteamStartTime $steamStart -PriorCloudLinesApp $unsettledPriorCloud).problems).Count -eq 0) {
     throw 'A fresh session with an unsettled prior cloud state was accepted.'
 }
-if (@(Test-KbpSteamSessionLogState -ConnectionLines @() -CloudLinesApp $midSessionCloud `
-        -SteamStartTime $steamStart -PriorCloudLinesApp @()).Count -eq 0) {
+if (@((Test-KbpSteamSessionLogState -ConnectionLines @() -CloudLinesApp $midSessionCloud `
+        -SteamStartTime $steamStart -PriorCloudLinesApp @()).problems).Count -eq 0) {
     throw 'A session without connection evidence was accepted.'
 }
 
