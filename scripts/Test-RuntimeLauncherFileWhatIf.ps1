@@ -880,7 +880,8 @@ try {
     if ([int]$scratch.GetValue('Screenmanager Resolution Width_h182942802') -ne 1920 -or
         [int]$scratch.GetValue('Screenmanager Resolution Height_h2627697771') -ne 1080 -or
         [int]$scratch.GetValue('Screenmanager Fullscreen mode_h3630240806') -ne 0 -or
-        [int]$scratch.GetValue('Screenmanager Resolution Use Native_h1405027254') -ne 0) {
+        [int]$scratch.GetValue('Screenmanager Resolution Use Native_h1405027254') -ne 0 -or
+        (($scratch.GetValue('DisplayMode_h1925482108') -join ',') -cne '48')) {
         throw 'The windowed screen values were not applied.'
     }
     @(Restore-KbpRegistryValues -KeyPath $scratchKey -Snapshot $snapshot) | Out-Null
