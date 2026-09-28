@@ -5105,6 +5105,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 {
                     UI.CastingGraphEditResult attempt = session.AddGraphCasting(target, inputs);
                     if (attempt.Applied) { added = attempt; break; }
+                    _workspaceBudget.AddNote("buffA-add-refused:" + target + ":" +
+                        (attempt.Edit == null ? "null" : attempt.Edit.Reason));
                 }
                 if (added == null)
                 {
@@ -5201,7 +5203,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     }
                     session.SelectGraphBuff(entry.SourceId, inputs);
                     UI.CastingGraphView graph = session.BuildGraph(inputs);
-                    if (graph.SelectedSourceIsGroup == true) continue;
+                    // Strictly-understood single-target targeting only: a
+                    // null (unanalysed, e.g. some variant) targeting passes
+                    // a "not group" check but AddGraphCasting rightly
+                    // refuses it for every target.
+                    if (graph.SelectedSourceIsGroup != false) continue;
                     foreach (UI.CastingGraphCasterNode node in graph.Casters)
                     {
                         if (node.UnitId == null || node.UnitId.Length == 0) continue;
