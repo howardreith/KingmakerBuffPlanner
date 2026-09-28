@@ -5110,6 +5110,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 }
                 if (added == null)
                 {
+                    _workspaceBudget.AddNote("buffA-legal-targets=" + legalA.Count +
+                        ";ordered=" + orderedTargets.Count);
                     _workspaceBudget.CrossBuffStatus = "error:no-applicable-target-for-buff-a";
                     return;
                 }
@@ -5247,6 +5249,21 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                                     !unitsByProvider.TryGetValue(rows[1].Value.ProviderKey,
                                         out unitsPerCastB) ||
                                     unitsPerCastA <= 0 || unitsPerCastB <= 0) return false;
+                                // Buff A must have at least one legal recipient
+                                // for its own caster at scan time: a source
+                                // whose reach covers nobody (observed with a
+                                // variant spell on the Advanced fixture) can
+                                // never be authored, and the pair is useless.
+                                session.SelectGraphBuff(rows[0].Key, inputs);
+                                UI.CastingGraphView graphA0 = session.BuildGraph(inputs);
+                                session.SelectGraphCaster(rows[0].Value.CasterUnitId, inputs);
+                                graphA0 = session.BuildGraph(inputs);
+                                if (GraphLegalOthers(graphA0, rows[0].Value.CasterUnitId).Count < 1)
+                                {
+                                    _workspaceBudget.AddNote("pool-skipped-no-legal-target:" + rows[0].Key);
+                                    byPool.Remove(row.PoolKey);
+                                    continue;
+                                }
                                 poolKey = row.PoolKey;
                                 buffA = rows[0].Key;
                                 rowA = rows[0].Value;
