@@ -104,8 +104,8 @@ function Assert-KbpSteamSafety {
         Where-object message -match '^\[AppID 640820\]')
     $priorCloud = @(Get-KbpTimestampedLogLines $cloudLog ([DateTime]::MinValue) |
         Where-Object message -match '^\[AppID 640820\]')
-    $problems = Test-KbpSteamSessionLogState -ConnectionLines $connection -CloudLinesApp $cloud `
-        -SteamStartTime $steam.StartTime -PriorCloudLinesApp $priorCloud
+    $problems = @(Test-KbpSteamSessionLogState -ConnectionLines $connection -CloudLinesApp $cloud `
+        -SteamStartTime $steam.StartTime -PriorCloudLinesApp $priorCloud)
     if ($problems.Count -ne 0) { throw ('Current Steam-session safety logs are incomplete. ' + ($problems -join '; ')) }
 
     $appManifest = Join-Path $steamRoot 'steamapps\appmanifest_640820.acf'
