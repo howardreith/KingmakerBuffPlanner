@@ -351,6 +351,15 @@ namespace KingmakerBuffPlanner.UI
             }
         }
 
+        // One more persistence attempt after a failure (review addendum
+        // §2): the footer's retry action and lifecycle flush paths use it.
+        public bool RetryFailedSave()
+        {
+            if (!SaveFailed && !SaveRefused && !IsDirty) return true;
+            PersistNow("retry");
+            return IntentIsDurable;
+        }
+
         // Passive save state for the footer (v1.2 §2): "saved" for the
         // durable current revision, otherwise the precise condition.
         public string AutosaveStatus

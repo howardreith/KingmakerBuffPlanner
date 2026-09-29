@@ -427,6 +427,7 @@ namespace KingmakerBuffPlanner.Tests
                 RunCastingGraphTests(root);
                 RunAutosaveLifecycleTests(root);
                 RunSharePlanningTests(root);
+                RunUndoHistoryTests(root);
             }
             finally
             {
