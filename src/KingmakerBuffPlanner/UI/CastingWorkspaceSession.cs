@@ -754,6 +754,16 @@ namespace KingmakerBuffPlanner.UI
         internal static bool OffersEnhancement(CastEnhancementSnapshot enhancement, AbilityKey ability,
             string spellbookGuid, CastingWorkspaceInputs inputs)
         {
+            return OffersEnhancement(enhancement, ability, spellbookGuid, inputs, null);
+        }
+
+        // The offer boundary also applies the meaningful-choice policy
+        // (everyday-use v1.2 §8): applicable and fundable is not enough -
+        // the choice must mean something for this exact provider. The
+        // focused provider (when known) supplies the relevance facts.
+        internal static bool OffersEnhancement(CastEnhancementSnapshot enhancement, AbilityKey ability,
+            string spellbookGuid, CastingWorkspaceInputs inputs, ProviderSnapshot focusedProvider)
+        {
             if (enhancement == null || ability == null) return false;
             // An enhancement that changes whom the spell reaches (Share
             // Transmutation) is not executed in this version: never offered,
@@ -769,7 +779,19 @@ namespace KingmakerBuffPlanner.UI
                     (spellbookGuid == null || string.Equals(option.Provider.Key.SpellbookGuid,
                         spellbookGuid, StringComparison.Ordinal)))
                 .Select(option => option.Provider).ToList();
-            if (providers.Count != 0) return providers.Any(provider => enhancement.IsApplicable(provider));
+            if (providers.Count != 0)
+            {
+                // Meaningful choices only: an applicable rod with no
+                // meaningful effect on this buff is not offered.
+                foreach (ProviderSnapshot provider in providers)
+                {
+                    if (!enhancement.IsApplicable(provider)) continue;
+                    if (!Domain.Planning.CastEnhancementRelevance.IsRelevantOffer(enhancement, provider))
+                        continue;
+                    return true;
+                }
+                return false;
+            }
             bool listed = enhancement.AbilityWhiteList.Contains(ability.BaseAbilityGuid) ||
                 enhancement.AbilityWhiteList.Contains(ability.VariantGuid);
             return listed || (enhancement.Category != CastEnhancementCategory.ClassFeature &&

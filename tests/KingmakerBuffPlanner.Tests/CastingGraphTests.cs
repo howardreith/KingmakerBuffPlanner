@@ -51,6 +51,62 @@ namespace KingmakerBuffPlanner.Tests
             Run("hover-record-requires-reproduction-and-coverage", TestHoverRecordRequiresCoverage);
             Run("hover-diagnostic-only-hovers-and-restores-switch", TestHoverDiagnosticHostContract);
             Run("budget-evidence-judges-exact-deltas-and-restores", TestBudgetEvidenceJudging);
+            Run("rod-offers-are-meaningful-for-the-exact-buff", TestRodRelevancePolicy);
+        }
+
+        // Everyday-use v1.2 §8: a rod applicable and fundable is still not
+        // offered when it means nothing for a beneficial buff. The policy
+        // is keyed on the verified metamagic masks (vanilla + Call of the
+        // Wild values), never display names; selected irrelevant options
+        // stay removable, and unknown masks stay offered.
+        private static void TestRodRelevancePolicy()
+        {
+            ProviderSnapshot Spell(int durationRounds)
+            {
+                AbilityKey ability = new AbilityKey("good-hope", null, 0,
+                    SourceKind.Spellbook, "book");
+                return new ProviderSnapshot(new ProviderKey("unit-bard", "book-bard", ability, "pool-2"),
+                    "Good Hope", 2, "pool-2", 1, null, null, 5,
+                    durationRounds, string.Empty, "50 rounds", string.Empty, 0, "book");
+            }
+            ProviderSnapshot spell = Spell(50);
+            ProviderSnapshot instant = Spell(0);
+            CastEnhancementSnapshot Rod(int mask, string name)
+            {
+                return new CastEnhancementSnapshot("rod-" + mask, "unit-bard", "bp-" + mask,
+                    name, string.Empty, CastEnhancementCategory.MetamagicRod,
+                    mask, 3, 3, null, name, null, "pool-" + mask, false, null, 1, false, null,
+                    "Rod charges", null);
+            }
+            // The owner's Good Hope list: Piercing, Persistent, Selective
+            // (and Quicken in this execution model) must not be offered.
+            if (KingmakerBuffPlanner.Domain.Planning.CastEnhancementRelevance.IsRelevantOffer(
+                    Rod(0x80000, "Piercing"), spell))
+                throw new InvalidOperationException("Piercing was offered for a beneficial buff.");
+            if (KingmakerBuffPlanner.Domain.Planning.CastEnhancementRelevance.IsRelevantOffer(
+                    Rod(0x10000000, "Persistent"), spell))
+                throw new InvalidOperationException("Persistent was offered for a beneficial buff.");
+            if (KingmakerBuffPlanner.Domain.Planning.CastEnhancementRelevance.IsRelevantOffer(
+                    Rod(0x2000000, "Selective"), spell))
+                throw new InvalidOperationException("Selective was offered for a beneficial buff.");
+            if (KingmakerBuffPlanner.Domain.Planning.CastEnhancementRelevance.IsRelevantOffer(
+                    Rod(0x4, "Quicken"), spell))
+                throw new InvalidOperationException("Quicken was offered for an out-of-combat buff apply.");
+            if (KingmakerBuffPlanner.Domain.Planning.CastEnhancementRelevance.IsRelevantOffer(
+                    Rod(0x2000, "Threnodic"), spell))
+                throw new InvalidOperationException("Threnodic was offered without undead-recipient facts.");
+            // Extend stays exactly when the spell has a real duration.
+            if (!KingmakerBuffPlanner.Domain.Planning.CastEnhancementRelevance.IsRelevantOffer(
+                    Rod(0x8, "Extend"), spell))
+                throw new InvalidOperationException("Extend was hidden for a spell with a real duration.");
+            if (KingmakerBuffPlanner.Domain.Planning.CastEnhancementRelevance.IsRelevantOffer(
+                    Rod(0x8, "Extend"), instant))
+                throw new InvalidOperationException("Extend was offered for a spell with no duration.");
+            // Unknown masks stay offered (no false negatives), and class
+            // features are not this policy's business.
+            if (!KingmakerBuffPlanner.Domain.Planning.CastEnhancementRelevance.IsRelevantOffer(
+                    Rod(1, "Empower"), spell))
+                throw new InvalidOperationException("An unknown-mask rod was hidden as irrelevant.");
         }
 
         // The live qualification's global-budget record (reviews E1-E4):
