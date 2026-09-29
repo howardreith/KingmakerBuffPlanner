@@ -1502,8 +1502,38 @@ namespace KingmakerBuffPlanner.UI
                 _session.ProviderOptions,
                 _session.Model.EffectsBySource,
                 _session.Model.Enhancements,
-                null,
+                ShareModifiersFor(_session.Model.Snapshot),
                 _session.ActiveEffects);
+        }
+
+        // The pure Share Transmutation modifier registered from the exact
+        // party snapshot (everyday-use v1.2 §7): planning-time target
+        // expansion with the verified reservoir demand; no live state.
+        private static KingmakerBuffPlanner.Planning.ICastingTargetingModifier[]
+            ShareModifiersFor(KingmakerBuffPlanner.Domain.Providers.PartyProviderSnapshot snapshot)
+        {
+            if (snapshot == null || snapshot.Units.Count == 0)
+                return new KingmakerBuffPlanner.Planning.ICastingTargetingModifier[0];
+            var legal = new System.Collections.Generic.List<string>();
+            string reservoirOwner = null;
+            foreach (var unit in snapshot.Units)
+            {
+                if (unit.TargetValidation == null || !unit.TargetValidation.Alive ||
+                    !unit.TargetValidation.Friendly) continue;
+                legal.Add(unit.UnitId);
+                if (reservoirOwner == null) reservoirOwner = unit.UnitId;
+            }
+            if (reservoirOwner == null)
+                return new KingmakerBuffPlanner.Planning.ICastingTargetingModifier[0];
+            // One registration per caster that owns the Brown-Fur feature
+            // is resolved at execution; the planning modifier declares the
+            // reservoir of the casting's own caster at demand time, so a
+            // single registration keyed by pool id per caster is built.
+            return snapshot.Units
+                .Select(unit => new KingmakerBuffPlanner.GameAdapters.ShareCastingModifier(
+                    Compatibility.BrownFurPowerfulChangeProfile.UsagePoolId(unit.UnitId), legal))
+                .Cast<KingmakerBuffPlanner.Planning.ICastingTargetingModifier>()
+                .ToArray();
         }
 
         // Resolves (or reuses) the casting-first session for the loaded
