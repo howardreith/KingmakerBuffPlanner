@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using KingmakerBuffPlanner.Domain.Authoring;
 using KingmakerBuffPlanner.Domain.Identity;
 using KingmakerBuffPlanner.Domain.Planning;
@@ -13,17 +14,29 @@ using KingmakerBuffPlanner.UI;
 
 namespace KingmakerBuffPlanner.Tests
 {
-    // Everyday-use v1.2 §7 Share Transmutation planning pipeline: the pure
-    // modifier expands a personal transmutation to the verified legal allies
-    // with the verified reservoir demand in the atomic cost vector; the
-    // graph gesture carries the draft's Share selection; disabling Share
-    // keeps an existing ally casting as blocked, repairable, persisted.
+    // Everyday-use v1.2 §7 Share Transmutation planning pipeline (review
+    // F2/F4/F5): the pure modifier carries the VERIFIED exact-source
+    // contract (supported ability + spellbook whitelists, per-caster legal
+    // recipients), separates legality from affordability (a zero reservoir
+    // never refuses an already-satisfied or structurally-valid casting),
+    // and the shared ledger fails closed on demanded pools it has no
+    // verified balance for. The graph gesture carries the draft's Share
+    // selection through the same resolver; disabling Share keeps an
+    // existing ally casting blocked, repairable, persisted.
     internal static partial class Program
     {
+        private const string ShareActivatableGuid =
+            "8641e6c39ff133ad71f669e35e1ee688";
+        private const string WizardReservoir = "class-feature-resource|unit-wiz|reservoir";
+
         private static void RunSharePlanningTests(string root)
         {
             Run("share-expands-personal-targets-purely", TestSharePureExpansion);
             Run("share-graph-gesture-carries-and-persists", () => TestShareGraphPersistence(root));
+            Run("share-compile-budget-is-atomic-and-fail-closed", () => TestShareCompileBudget(root));
+            Run("share-zero-reservoir-versus-active-effects", () => TestShareZeroReservoir(root));
+            Run("share-ordinary-discovery-never-arms-the-native-toggle",
+                TestShareDiscoveryBoundary);
         }
 
         private static AbilityKey ShapeAbility()
@@ -46,20 +59,57 @@ namespace KingmakerBuffPlanner.Tests
                 new[] { caster }, new string[0], 5, 600);
         }
 
+        // The VERIFIED capability shape the host builds from the installed
+        // integration's snapshot: reservoir identity and per-use cost, the
+        // exact supported sources, and the verified recipients.
+        private static ShareCastingModifier.ShareCapability Capability(
+            string caster, string poolId, int unitsPerUse, int? remaining,
+            IEnumerable<string> recipients = null)
+        {
+            return new ShareCastingModifier.ShareCapability(caster, poolId,
+                unitsPerUse, remaining, new[] { "beast-shape" }, new[] { "book" },
+                recipients ?? new[] { "unit-cleric", "unit-fighter" });
+        }
+
+        // The Share enhancement snapshot exactly as the integration emits
+        // it (whitelists = the verified supported sources; the reservoir
+        // pool the ledger must know to fund the modifier's demand).
+        private static CastEnhancementSnapshot ShareEnhancement(
+            string caster, string poolId, int? remaining)
+        {
+            return new CastEnhancementSnapshot(
+                "share-transmutation|" + caster + "|" + ShareActivatableGuid,
+                caster, ShareActivatableGuid,
+                "Share Transmutation", "Share a personal transmutation with an ally.",
+                CastEnhancementCategory.ClassFeature, 0, 0, remaining,
+                new[] { "beast-shape" }, "Share Transmutation", new[] { "book" },
+                poolId, false, "brown-fur-share-transmutation", 1, true,
+                "brown-fur-share-transmutation", "Arcane Reservoir", null);
+        }
+
+        private static PlannedCasting SharedCasting(string id, string caster, string target,
+            int order = 0, ExistingEffectPolicy policy = ExistingEffectPolicy.SkipAlreadyActive)
+        {
+            return new PlannedCasting(id, "long", order, "source-shape",
+                ShapeAbility(), caster, "book", CastingTargetMode.DirectTarget,
+                target, null, null,
+                new[] { new TargetingModifierSelection(ShareCastingModifier.Id, true, null) },
+                null, policy, null, CastingAuthoringState.Ready, null);
+        }
+
         private static void TestSharePureExpansion()
         {
-            // Review addendum §3: verified per-caster capabilities; the
-            // reservoir and cost follow the casting's OWN caster regardless
-            // of registration/party order.
+            // Review addendum §3 + F2: verified per-caster capabilities
+            // carrying the EXACT-SOURCE contract; the reservoir and cost
+            // follow the casting's OWN caster regardless of
+            // registration/party order.
             var capabilities = new[]
             {
-                new ShareCastingModifier.ShareCapability("unit-wiz",
-                    "class-feature-resource|unit-wiz|reservoir", 1, 3),
-                new ShareCastingModifier.ShareCapability("unit-sorcerer",
-                    "class-feature-resource|unit-sorcerer|reservoir", 2, 1)
+                Capability("unit-wiz", "class-feature-resource|unit-wiz|reservoir", 1, 3),
+                Capability("unit-sorcerer", "class-feature-resource|unit-sorcerer|reservoir",
+                    2, 1)
             };
-            var share = new ShareCastingModifier(capabilities,
-                new[] { "unit-cleric", "unit-fighter", "unit-wiz", "unit-sorcerer" });
+            var share = new ShareCastingModifier(capabilities);
             var casting = new PlannedCasting("cast-share", "long", 0, "source-shape",
                 ShapeAbility(), "unit-wiz", "book", CastingTargetMode.DirectTarget,
                 "unit-cleric", null, null, null, null,
@@ -90,10 +140,14 @@ namespace KingmakerBuffPlanner.Tests
                 demands[0].UsagePoolId != "class-feature-resource|unit-wiz|reservoir")
                 throw new InvalidOperationException("Share did not declare the verified " +
                     "reservoir demand.");
-            // No legal allies → feature unavailable, honestly.
-            var none = new ShareCastingModifier(capabilities, new string[0]);
+            // No legal recipients in the CAPABILITY: honest refusal.
+            var none = new ShareCastingModifier(new[]
+            {
+                Capability("unit-wiz", "class-feature-resource|unit-wiz|reservoir", 1, 3,
+                    new string[0])
+            });
             if (none.Apply(casting, PersonalOption("unit-wiz")).IsApplied)
-                throw new InvalidOperationException("Share applied with no legal allies.");
+                throw new InvalidOperationException("Share applied with no legal recipients.");
             // §3: a NON-FIRST capable caster costs its OWN reservoir with
             // its OWN per-use cost (the sorcerer costs 2, not the first
             // registrant's 1), independent of registration order.
@@ -113,40 +167,111 @@ namespace KingmakerBuffPlanner.Tests
                 sorcererDemands[0].Units != 2)
                 throw new InvalidOperationException("the non-first caster was costed against " +
                     "another caster's reservoir or cost.");
-            // Reversed registration order resolves identically.
-            var reversed = new ShareCastingModifier(capabilities.Reverse(),
-                new[] { "unit-cleric", "unit-fighter", "unit-wiz", "unit-sorcerer" });
+            // Reversed registration order resolves identically (F2:
+            // reordering capability records never changes legality or cost).
+            var reversed = new ShareCastingModifier(capabilities.Reverse());
+            CastingModifierResult reversedApply = reversed.Apply(sorcererCasting,
+                PersonalOption("unit-sorcerer"));
             IReadOnlyList<ModifierUsageDemand> reversedDemands = reversed.UsageDemands(
                 sorcererCasting, PersonalOption("unit-sorcerer"));
-            if (reversedDemands[0].UsagePoolId != sorcererDemands[0].UsagePoolId ||
+            if (!reversedApply.IsApplied ||
+                reversedDemands[0].UsagePoolId != sorcererDemands[0].UsagePoolId ||
                 reversedDemands[0].Units != sorcererDemands[0].Units)
-                throw new InvalidOperationException("registration order changed the cost.");
-            // An INELIGIBLE first member: an incapable caster is refused
-            // (honest feature-unavailable) and never costed as free — the
-            // demand is unsatisfiable, so the compiler blocks atomically.
+                throw new InvalidOperationException("registration order changed the outcome.");
+            // An INELIGIBLE caster: an incapable caster is refused (honest
+            // feature-unavailable) and never costed as free.
             var plain = new PlannedCasting("cast-plain", "long", 0, "source-shape",
                 ShapeAbility(), "unit-fighter", "book", CastingTargetMode.DirectTarget,
                 "unit-cleric", null, null, null, null,
                 ExistingEffectPolicy.SkipAlreadyActive, null, CastingAuthoringState.Ready, null);
             CastingModifierResult incapable = share.Apply(plain, PersonalOption("unit-fighter"));
             if (incapable.IsApplied || !incapable.UnavailableReason.StartsWith(
-                    "share-feature-unavailable"))
+                "share-feature-unavailable"))
                 throw new InvalidOperationException("an incapable caster was not refused: " +
                     incapable.UnavailableReason);
             IReadOnlyList<ModifierUsageDemand> incapableDemand = share.UsageDemands(
                 plain, PersonalOption("unit-fighter"));
             if (incapableDemand[0].Units != int.MaxValue)
                 throw new InvalidOperationException("an unverified caster was costed as free.");
-            // Reservoir exhausted (verified remaining 0): honest refusal.
-            var drained = new[]
+
+            // F2: the exact-source contract. The SAME verified caster, but
+            // sources the integration never verified — each is refused.
+            // A different spellbook's copy of the shape spell.
+            var wrongBook = new ProviderKey("unit-wiz", "other-book", ShapeAbility(),
+                "pool-unit-wiz");
+            CastingModifierResult wrongSpellbook = share.Apply(casting,
+                OptionOf(wrongBook, "unit-wiz"));
+            if (wrongSpellbook.IsApplied || !wrongSpellbook.UnavailableReason.Contains(
+                    "share-source-not-supported:spellbook-not-qualified"))
+                throw new InvalidOperationException("an unverified spellbook was accepted: " +
+                    wrongSpellbook.UnavailableReason);
+            // An unrelated personal self-only spell in the right book.
+            var otherAbility = new AbilityKey("unrelated-self-buff", null, 0,
+                SourceKind.Spellbook, "book");
+            CastingModifierResult wrongAbility = share.Apply(casting,
+                OptionOf(new ProviderKey("unit-wiz", "book", otherAbility, "pool-unit-wiz"),
+                    "unit-wiz"));
+            if (wrongAbility.IsApplied || !wrongAbility.UnavailableReason.Contains(
+                    "share-source-not-supported:ability-not-qualified"))
+                throw new InvalidOperationException("an unverified ability was accepted: " +
+                    wrongAbility.UnavailableReason);
+            // A non-spellbook source kind (an item or special source).
+            var itemAbility = new AbilityKey("beast-shape", null, 0, SourceKind.Item, null);
+            CastingModifierResult wrongKind = share.Apply(casting,
+                OptionOf(new ProviderKey("unit-wiz", "book", itemAbility, "pool-unit-wiz"),
+                    "unit-wiz"));
+            if (wrongKind.IsApplied || !wrongKind.UnavailableReason.Contains(
+                    "share-source-not-supported:source-not-genuine-spellbook-spell"))
+                throw new InvalidOperationException("a non-genuine spellbook source was " +
+                    "accepted: " + wrongKind.UnavailableReason);
+            // A VERIFIED VARIANT guid is supported (the selected identity,
+            // not just the base).
+            var variantAbility = new AbilityKey("beast-shape", "beast-shape-bear-variant", 0,
+                SourceKind.Spellbook, "book");
+            var variantCapability = new ShareCastingModifier(new[]
             {
                 new ShareCastingModifier.ShareCapability("unit-wiz",
-                    "class-feature-resource|unit-wiz|reservoir", 1, 0)
-            };
-            var drainedShare = new ShareCastingModifier(drained,
-                new[] { "unit-cleric" });
-            if (drainedShare.Apply(casting, PersonalOption("unit-wiz")).IsApplied)
-                throw new InvalidOperationException("Share applied with an exhausted reservoir.");
+                    "class-feature-resource|unit-wiz|reservoir", 1, 3,
+                    new[] { "beast-shape-bear-variant" }, new[] { "book" },
+                    new[] { "unit-cleric" })
+            });
+            CastingModifierResult variant = variantCapability.Apply(
+                new PlannedCasting("cast-variant", "long", 0, "source-shape",
+                    variantAbility, "unit-wiz", "book", CastingTargetMode.DirectTarget,
+                    "unit-cleric", null, null, null, null, ExistingEffectPolicy.SkipAlreadyActive,
+                    null, CastingAuthoringState.Ready, null),
+                OptionOf(new ProviderKey("unit-wiz", "book", variantAbility, "pool-unit-wiz"),
+                    "unit-wiz"));
+            if (!variant.IsApplied)
+                throw new InvalidOperationException("a verified variant was refused: " +
+                    variant.UnavailableReason);
+
+            // F4: a verified-zero remaining balance is NOT a refusal —
+            // legality and cost shape survive, the ledger decides funding.
+            var drained = new ShareCastingModifier(new[]
+            {
+                Capability("unit-wiz", "class-feature-resource|unit-wiz|reservoir", 1, 0)
+            });
+            CastingModifierResult drainedResult = drained.Apply(casting,
+                PersonalOption("unit-wiz"));
+            if (!drainedResult.IsApplied)
+                throw new InvalidOperationException("a zero reservoir refused a legal " +
+                    "casting: " + drainedResult.UnavailableReason);
+            IReadOnlyList<ModifierUsageDemand> drainedDemands = drained.UsageDemands(
+                casting, drainedResult.Option);
+            if (drainedDemands[0].UsagePoolId != "class-feature-resource|unit-wiz|reservoir" ||
+                drainedDemands[0].Units != 1)
+                throw new InvalidOperationException("a zero reservoir changed the cost shape.");
+        }
+
+        private static ProviderPlanningOption OptionOf(ProviderKey key, string caster)
+        {
+            return new ProviderPlanningOption(
+                new ProviderSnapshot(key, "Beast Shape II — Bear", 2,
+                    "pool-" + key.CasterUnitId, 1, null, null, 5, 600,
+                    "You become a bear.", "10 minutes", string.Empty, 0,
+                    string.IsNullOrEmpty(key.SpellbookGuid) ? "book" : key.SpellbookGuid),
+                new[] { caster }, new string[0], 5, 600);
         }
 
         private static void TestShareGraphPersistence(string root)
@@ -179,7 +304,9 @@ namespace KingmakerBuffPlanner.Tests
             });
             // §3: ONE registration with the wizard's VERIFIED capability
             // (the shape the host builds from verified facts); §4: the same
-            // expression INSTANCE under both catalogue keys.
+            // expression INSTANCE under both catalogue keys. F5: the real
+            // enhancement snapshot supplies the reservoir balance the
+            // ledger funds.
             var shapeExpression = new Domain.Effects.EffectLeafExpression(
                 Domain.Effects.EffectKind.Buff, "buff-shape",
                 Domain.Effects.EffectTarget.CurrentTarget, "shape", "shape/a");
@@ -190,21 +317,13 @@ namespace KingmakerBuffPlanner.Tests
             };
             var shareModifiers = new ICastingTargetingModifier[]
             {
-                new ShareCastingModifier(
-                    new[]
-                    {
-                        new ShareCastingModifier.ShareCapability("unit-wiz",
-                            "class-feature-resource|unit-wiz|reservoir", 1, 3)
-                    },
-                    units.Where(u => u.TargetValidation.Friendly).Select(u => u.UnitId))
+                new ShareCastingModifier(new[] { Capability("unit-wiz", WizardReservoir, 1, 3,
+                    units.Where(u => u.TargetValidation.Friendly).Select(u => u.UnitId)) })
             };
             var inputs = new CastingWorkspaceInputs(snapshot,
-                new[]
-                {
-                    new ProviderPlanningOption(providers[0],
-                        new[] { "unit-wiz" }, new string[0], 5, 600)
-                },
-                effects, new CastEnhancementSnapshot[0], shareModifiers);
+                new[] { PersonalOption("unit-wiz") },
+                effects, new[] { ShareEnhancement("unit-wiz", WizardReservoir, 3) },
+                shareModifiers);
             // Enable Share on the NEXT casting before choosing the target
             // (the owner's authoring order), then click the ally.
             session.SelectGraphBuff("source-shape", inputs);
@@ -223,6 +342,21 @@ namespace KingmakerBuffPlanner.Tests
             if (!added.Applied)
                 throw new InvalidOperationException("the shared authoring was refused: " +
                     (added.Edit == null ? "none" : added.Edit.Reason));
+            // F5: through the compiler the shared casting is READY with the
+            // exact combined cost vector (one spell slot + one reservoir
+            // use) reserved atomically.
+            ExplicitCastingPlan plan = session.CompilePlan(inputs);
+            ResolvedCasting compiled = plan.CastingById(added.CastingId);
+            if (compiled == null || compiled.Readiness != ResolvedCastingReadiness.Ready)
+                throw new InvalidOperationException("the shared casting did not compile " +
+                    "Ready: " + (compiled == null ? "missing" : string.Join(";",
+                        compiled.ReadinessReasons.ToArray())));
+            if (!compiled.PredictedBeneficiaryUnitIds.Contains("unit-cleric"))
+                throw new InvalidOperationException("the shared target was not predicted.");
+            if (compiled.Cost.Count(line => line.Category == CastingCostCategory.EnhancementPool &&
+                    line.PoolKey == WizardReservoir) != 1 ||
+                compiled.Cost.First(line => line.PoolKey == WizardReservoir).Units != 1)
+                throw new InvalidOperationException("the reservoir cost was not reserved.");
             // The persisted record carries the per-casting Share intent.
             var repository = new CastingPlanRepository(dir);
             PlannedCasting persisted = repository.Load("campaign:share").Profile
@@ -244,7 +378,7 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("two allies did not mean two records.");
             // Disabling Share on the FIRST casting leaves its non-self
             // target visibly blocked and repairable — never deleted or
-            // retargeted to the caster.
+            // retargeted to the caster — and Undo restores the Ready plan.
             session.FocusGraphCasting(added.CastingId);
             var withoutShare = new PlannedCasting(persisted.CastingId, persisted.RoutineId,
                 persisted.Order, persisted.SourceId, persisted.Ability, persisted.CasterUnitId,
@@ -260,12 +394,611 @@ namespace KingmakerBuffPlanner.Tests
                     StringComparison.Ordinal) || disabled.TargetingModifiers.Count != 0)
                 throw new InvalidOperationException("disabling Share changed the target or " +
                     "left the selection.");
+            ExplicitCastingPlan blockedPlan = session.CompilePlan(inputs);
+            ResolvedCasting blocked = blockedPlan.CastingById(added.CastingId);
+            if (blocked == null || blocked.Readiness != ResolvedCastingReadiness.Blocked ||
+                !blocked.ReadinessReasons.Any(reason => reason.StartsWith("target-unreachable:unit-cleric",
+                    StringComparison.Ordinal)))
+                throw new InvalidOperationException("the unshared ally casting is not visibly " +
+                    "blocked for the honest reason.");
+            if (!session.Undo())
+                throw new InvalidOperationException("undo of the Share-off edit was refused.");
+            ExplicitCastingPlan restoredPlan = session.CompilePlan(inputs);
+            ResolvedCasting restored = restoredPlan.CastingById(added.CastingId);
+            if (restored == null || restored.Readiness != ResolvedCastingReadiness.Ready)
+                throw new InvalidOperationException("undo did not restore the Ready shared " +
+                    "casting: " + (restored == null ? "missing" : string.Join(";",
+                        restored.ReadinessReasons.ToArray())));
             var reload = new CastingWorkspaceSession(dir, "campaign:share");
             PlannedCasting reloaded = reload.Document.Castings.First(
                 value => value.CastingId == added.CastingId);
             if (!string.Equals(reloaded.DirectTargetUnitId, "unit-cleric",
-                    StringComparison.Ordinal))
-                throw new InvalidOperationException("reload lost the blocked ally intent.");
+                    StringComparison.Ordinal) || reloaded.TargetingModifiers.Count != 1)
+                throw new InvalidOperationException("reload lost the blocked ally intent or " +
+                    "the restored Share selection.");
+        }
+
+        // F5: the integrated compile/budget contract. Real enhancement and
+        // resource snapshots feed the ledger; the modifier's demand is part
+        // of the atomic vector; an unfundable vector reserves NOTHING; a
+        // demanded pool with no verified balance (missing or unknown) can
+        // never fund a cast; Share + Powerful Change on ONE shared pool
+        // validate as combined demand.
+        private static void TestShareCompileBudget(string root)
+        {
+            var units = new[]
+            {
+                new UnitSnapshot("unit-wiz", "Wiz", false, null,
+                    new TargetValidationSnapshot(true, true, true, true)),
+                new UnitSnapshot("unit-cleric", "Cleric", false, null,
+                    new TargetValidationSnapshot(true, true, true, true)),
+                new UnitSnapshot("unit-fighter", "Fighter", false, null,
+                    new TargetValidationSnapshot(true, true, true, true))
+            };
+            var shapeExpression = new Domain.Effects.EffectLeafExpression(
+                Domain.Effects.EffectKind.Buff, "buff-shape",
+                Domain.Effects.EffectTarget.CurrentTarget, "shape", "shape/a");
+            var effects = new Dictionary<string, Domain.Effects.EffectExpression>
+            {
+                { "source-shape", shapeExpression },
+                { ShapeAbility().Canonical, shapeExpression }
+            };
+            var party = new PartyProviderSnapshot(units, new[]
+            {
+                new ProviderSnapshot(
+                    new ProviderKey("unit-wiz", "book", ShapeAbility(), "pool-unit-wiz"),
+                    "Beast Shape II — Bear", 2, "pool-unit-wiz", 1, null, null, 5, 600,
+                    "You become a bear.", "10 minutes", string.Empty, 0, "book")
+            }, new[]
+            {
+                new ResourcePoolSnapshot("pool-unit-wiz", ResourcePoolKind.SpontaneousLevel,
+                    10, 10, null)
+            });
+            // Two allies are TWO explicit invocations with a COMBINED
+            // reservoir demand, both funded atomically.
+            {
+                var share = new ShareCastingModifier(new[]
+                    { Capability("unit-wiz", WizardReservoir, 1, 2) });
+                var document = new CastingPlanDocument("campaign:budget",
+                    new[] { new RoutineDefinition("long", "Long") },
+                    new[]
+                    {
+                        SharedCasting("share-1", "unit-wiz", "unit-cleric", 0),
+                        SharedCasting("share-2", "unit-wiz", "unit-fighter", 1)
+                    }, null);
+                ExplicitCastingPlan plan = new ExplicitCastingCompiler().Compile(document,
+                    party, new[] { PersonalOption("unit-wiz") }, effects,
+                    new[] { ShareEnhancement("unit-wiz", WizardReservoir, 2) },
+                    null, new[] { share });
+                foreach (string id in new[] { "share-1", "share-2" })
+                {
+                    ResolvedCasting casting = plan.CastingById(id);
+                    if (casting == null || casting.Readiness != ResolvedCastingReadiness.Ready)
+                        throw new InvalidOperationException(id + " did not compile Ready: " +
+                            (casting == null ? "missing" : string.Join(";",
+                                casting.ReadinessReasons.ToArray())));
+                    if (casting.Cost.Count(line => line.Category == CastingCostCategory.NativePool) != 1)
+                        throw new InvalidOperationException(id + " lost its native slot cost.");
+                    if (casting.Cost.First(line => line.PoolKey == WizardReservoir).Units != 1)
+                        throw new InvalidOperationException(id + " lost its reservoir cost.");
+                }
+                CastingBudgetLine reservoir = plan.BudgetLines.First(
+                    line => line.PoolKey == WizardReservoir);
+                if (reservoir.AllocatedUsage != 2 || reservoir.RequestedUsage != 2 ||
+                    reservoir.ForecastRemaining != 0)
+                    throw new InvalidOperationException("the shared reservoir was not " +
+                        "accounted as combined demand: " + reservoir.AllocatedUsage);
+            }
+            // A reservoir that funds only the FIRST casting: the second is
+            // blocked for the real shortage, reserves NOTHING (no partial
+            // reservation, no native slot), and the first keeps its exact
+            // allocation.
+            {
+                var share = new ShareCastingModifier(new[]
+                    { Capability("unit-wiz", WizardReservoir, 1, 1) });
+                var document = new CastingPlanDocument("campaign:budget",
+                    new[] { new RoutineDefinition("long", "Long") },
+                    new[]
+                    {
+                        SharedCasting("share-1", "unit-wiz", "unit-cleric", 0),
+                        SharedCasting("share-2", "unit-wiz", "unit-fighter", 1)
+                    }, null);
+                ExplicitCastingPlan plan = new ExplicitCastingCompiler().Compile(document,
+                    party, new[] { PersonalOption("unit-wiz") }, effects,
+                    new[] { ShareEnhancement("unit-wiz", WizardReservoir, 1) },
+                    null, new[] { share });
+                ResolvedCasting first = plan.CastingById("share-1");
+                ResolvedCasting second = plan.CastingById("share-2");
+                if (first == null || first.Readiness != ResolvedCastingReadiness.Ready)
+                    throw new InvalidOperationException("the fundable shared casting was " +
+                        "blocked: " + (first == null ? "missing" : string.Join(";",
+                            first.ReadinessReasons.ToArray())));
+                if (second == null || second.Readiness != ResolvedCastingReadiness.Blocked ||
+                    !second.ReadinessReasons.Any(reason => reason.StartsWith(
+                        "enhancement-pool-exhausted:" + WizardReservoir,
+                        StringComparison.Ordinal)))
+                    throw new InvalidOperationException("the unfundable shared casting was " +
+                        "not blocked for the real shortage.");
+                if (second.Cost.Count != 0)
+                    throw new InvalidOperationException("the blocked casting reserved a " +
+                        "partial cost vector.");
+                CastingBudgetLine native = plan.BudgetLines.First(
+                    line => line.PoolKey == "pool-unit-wiz");
+                CastingBudgetLine reservoir = plan.BudgetLines.First(
+                    line => line.PoolKey == WizardReservoir);
+                if (native.AllocatedUsage != 1 || reservoir.AllocatedUsage != 1)
+                    throw new InvalidOperationException("a rejected vector still reserved " +
+                        "native slots or reservoir units.");
+            }
+            // A demanded pool whose verified balance is UNKNOWN (null):
+            // unfundable (fail-closed), never silently free.
+            {
+                var share = new ShareCastingModifier(new[]
+                    { Capability("unit-wiz", WizardReservoir, 1, null) });
+                var document = new CastingPlanDocument("campaign:budget",
+                    new[] { new RoutineDefinition("long", "Long") },
+                    new[] { SharedCasting("share-1", "unit-wiz", "unit-cleric") }, null);
+                ExplicitCastingPlan plan = new ExplicitCastingCompiler().Compile(document,
+                    party, new[] { PersonalOption("unit-wiz") }, effects,
+                    new[] { ShareEnhancement("unit-wiz", WizardReservoir, null) },
+                    null, new[] { share });
+                ResolvedCasting casting = plan.CastingById("share-1");
+                if (casting == null || casting.Readiness != ResolvedCastingReadiness.Blocked ||
+                    !casting.ReadinessReasons.Any(reason => reason.StartsWith(
+                        "enhancement-balance-unknown:" + WizardReservoir,
+                        StringComparison.Ordinal)))
+                    throw new InvalidOperationException("an unknown balance funded a cast: " +
+                        (casting == null ? "missing" : string.Join(";",
+                            casting.ReadinessReasons.ToArray())));
+            }
+            {
+                // No enhancement snapshot AT ALL: the demanded pool is
+                // unknown to the ledger and must refuse.
+                var share = new ShareCastingModifier(new[]
+                    { Capability("unit-wiz", WizardReservoir, 1, 3) });
+                var document = new CastingPlanDocument("campaign:budget",
+                    new[] { new RoutineDefinition("long", "Long") },
+                    new[] { SharedCasting("share-1", "unit-wiz", "unit-cleric") }, null);
+                ExplicitCastingPlan plan = new ExplicitCastingCompiler().Compile(document,
+                    party, new[] { PersonalOption("unit-wiz") }, effects,
+                    new CastEnhancementSnapshot[0], null, new[] { share });
+                ResolvedCasting casting = plan.CastingById("share-1");
+                if (casting == null || casting.Readiness != ResolvedCastingReadiness.Blocked ||
+                    !casting.ReadinessReasons.Any(reason => reason.StartsWith(
+                        "enhancement-pool-unknown:" + WizardReservoir,
+                        StringComparison.Ordinal)))
+                    throw new InvalidOperationException("a missing demanded pool funded a " +
+                        "cast: " + (casting == null ? "missing" : string.Join(";",
+                            casting.ReadinessReasons.ToArray())));
+            }
+            // Share + Powerful Change spend ONE shared reservoir: combined
+            // demand funds with 2 left, blocks with 1, and the blocked
+            // vector reserves nothing (the ordinary fundable casting after
+            // it still gets its full allocation).
+            {
+                // Both snapshots report ONE shared reservoir, so they agree
+                // on its balance (the ledger takes the conservative minimum
+                // of the reports for one pool).
+                Func<int?, CastEnhancementSnapshot> powerfulChangeOf = remainingUses =>
+                    new CastEnhancementSnapshot(
+                    "powerful-change|unit-wiz", "unit-wiz", "powerful-change-guid",
+                    "Powerful Change", "Spend the reservoir for a stronger form.",
+                    CastEnhancementCategory.ClassFeature, 0, 0, remainingUses,
+                    new[] { "beast-shape" }, "Powerful Change", new[] { "book" },
+                    WizardReservoir, false, "powerful-change", 1, false,
+                    "powerful-change", "Arcane Reservoir", null);
+                var share = new ShareCastingModifier(new[]
+                    { Capability("unit-wiz", WizardReservoir, 1, 2) });
+                var combined = new PlannedCasting("share-pc", "long", 0, "source-shape",
+                    ShapeAbility(), "unit-wiz", "book", CastingTargetMode.DirectTarget,
+                    "unit-cleric", null, null,
+                    new[] { new TargetingModifierSelection(ShareCastingModifier.Id, true, null) },
+                    new[] { new AuthoredEnhancementSelection("powerful-change|unit-wiz", true, null) },
+                    ExistingEffectPolicy.SkipAlreadyActive, null, CastingAuthoringState.Ready, null);
+                var ordinary = new PlannedCasting("plain-1", "long", 1, "source-shape",
+                    ShapeAbility(), "unit-wiz", "book", CastingTargetMode.DirectTarget,
+                    "unit-wiz", null, null, null, null,
+                    ExistingEffectPolicy.SkipAlreadyActive, null, CastingAuthoringState.Ready, null);
+                var document = new CastingPlanDocument("campaign:budget",
+                    new[] { new RoutineDefinition("long", "Long") },
+                    new[] { combined, ordinary }, null);
+                ExplicitCastingPlan funded = new ExplicitCastingCompiler().Compile(document,
+                    party, new[] { PersonalOption("unit-wiz") }, effects,
+                    new[] { ShareEnhancement("unit-wiz", WizardReservoir, 2), powerfulChangeOf(2) },
+                    null, new[] { share });
+                ResolvedCasting fundedCombined = funded.CastingById("share-pc");
+                if (fundedCombined == null || fundedCombined.Readiness != ResolvedCastingReadiness.Ready)
+                    throw new InvalidOperationException("the combined shared-pool casting did " +
+                        "not fund: " + (fundedCombined == null ? "missing" : string.Join(";",
+                            fundedCombined.ReadinessReasons.ToArray())));
+                if (fundedCombined.Cost.First(line => line.PoolKey == WizardReservoir).Units != 2)
+                    throw new InvalidOperationException("the combined vector did not carry the " +
+                        "shared pool's full demand.");
+                // Same plan with only ONE use left: the combined casting
+                // blocks atomically; the ordinary casting still funds.
+                var shortDocument = new CastingPlanDocument("campaign:budget",
+                    new[] { new RoutineDefinition("long", "Long") },
+                    new[] { combined, ordinary }, null);
+                ExplicitCastingPlan shortPlan = new ExplicitCastingCompiler().Compile(
+                    shortDocument, party, new[] { PersonalOption("unit-wiz") }, effects,
+                    new[] { ShareEnhancement("unit-wiz", WizardReservoir, 1), powerfulChangeOf(1) },
+                    null, new[] { share });
+                ResolvedCasting blockedCombined = shortPlan.CastingById("share-pc");
+                ResolvedCasting ordinaryResolved = shortPlan.CastingById("plain-1");
+                if (blockedCombined == null || blockedCombined.Readiness != ResolvedCastingReadiness.Blocked ||
+                    !blockedCombined.ReadinessReasons.Any(reason => reason.StartsWith(
+                        "enhancement-pool-exhausted:" + WizardReservoir,
+                        StringComparison.Ordinal)))
+                    throw new InvalidOperationException("the combined shortage did not block " +
+                        "for the shared pool's real deficit.");
+                if (blockedCombined.Cost.Count != 0)
+                    throw new InvalidOperationException("the blocked combined casting " +
+                        "reserved a partial vector.");
+                if (ordinaryResolved == null || ordinaryResolved.Readiness != ResolvedCastingReadiness.Ready)
+                    throw new InvalidOperationException("the independently fundable ordinary " +
+                        "casting was harmed by the earlier shortage.");
+                CastingBudgetLine nativeAfterShortage = shortPlan.BudgetLines.First(
+                    line => line.PoolKey == "pool-unit-wiz");
+                if (nativeAfterShortage.AllocatedUsage != 1)
+                    throw new InvalidOperationException("the blocked combined vector still " +
+                        "reserved its native slot.");
+            }
+        }
+
+        // F4: legality versus affordability at a verified-zero reservoir.
+        // A sufficiently active effect is AlreadySatisfied with zero
+        // reservation; a missing/insufficient effect is a resource block;
+        // Overwrite (always recast) is a resource block even with the
+        // active effect; and a routine containing the skipped shared
+        // casting leaves an independently fundable ordinary casting
+        // untouched.
+        private static void TestShareZeroReservoir(string root)
+        {
+            var units = new[]
+            {
+                new UnitSnapshot("unit-wiz", "Wiz", false, null,
+                    new TargetValidationSnapshot(true, true, true, true)),
+                new UnitSnapshot("unit-cleric", "Cleric", false, null,
+                    new TargetValidationSnapshot(true, true, true, true))
+            };
+            var shapeExpression = new Domain.Effects.EffectLeafExpression(
+                Domain.Effects.EffectKind.Buff, "buff-shape",
+                Domain.Effects.EffectTarget.CurrentTarget, "shape", "shape/a");
+            var effects = new Dictionary<string, Domain.Effects.EffectExpression>
+            {
+                { "source-shape", shapeExpression },
+                { ShapeAbility().Canonical, shapeExpression }
+            };
+            var snapshot = new PartyProviderSnapshot(units, new[]
+            {
+                new ProviderSnapshot(
+                    new ProviderKey("unit-wiz", "book", ShapeAbility(), "pool-unit-wiz"),
+                    "Beast Shape II — Bear", 2, "pool-unit-wiz", 1, null, null, 5, 600,
+                    "You become a bear.", "10 minutes", string.Empty, 0, "book")
+            }, new[]
+            {
+                new ResourcePoolSnapshot("pool-unit-wiz", ResourcePoolKind.SpontaneousLevel,
+                    10, 10, null)
+            });
+            var share = new ShareCastingModifier(new[]
+                { Capability("unit-wiz", WizardReservoir, 1, 0, new[] { "unit-cleric" }) });
+            var enhancements = new[] { ShareEnhancement("unit-wiz", WizardReservoir, 0) };
+            // A sufficient live instance of the exact effect on the ally.
+            var active = ActiveEffectSnapshot.FromInstances(
+                new Dictionary<string, IEnumerable<ActiveEffectInstance>>
+                {
+                    {
+                        "unit-cleric",
+                        new[] { new ActiveEffectInstance(Domain.Effects.EffectKind.Buff,
+                            "buff-shape", 5000, 10, 0) }
+                    }
+                });
+            Func<PlannedCasting, ActiveEffectSnapshot, ExplicitCastingPlan> compile =
+                (casting, live) =>
+                {
+                    var document = new CastingPlanDocument("campaign:zero",
+                        new[] { new RoutineDefinition("long", "Long") },
+                        new[] { casting }, null);
+                    return new ExplicitCastingCompiler().Compile(document, snapshot,
+                        new[] { PersonalOption("unit-wiz") }, effects, enhancements,
+                        null, new[] { share }, false, live);
+                };
+            // Sufficient active effect + zero reservoir => AlreadySatisfied,
+            // zero reservation/submission cost.
+            ResolvedCasting satisfied = compile(
+                SharedCasting("share-skip", "unit-wiz", "unit-cleric"), active)
+                .CastingById("share-skip");
+            if (satisfied == null || satisfied.Readiness != ResolvedCastingReadiness.AlreadySatisfied)
+                throw new InvalidOperationException("a satisfied shared casting was blocked at " +
+                    "a zero reservoir: " + (satisfied == null ? "missing" : string.Join(";",
+                        satisfied.ReadinessReasons.ToArray())));
+            if (satisfied.Cost.Count != 0)
+                throw new InvalidOperationException("the skipped casting reserved a cost.");
+            // Missing effect + zero reservoir => resource block.
+            ResolvedCasting blocked = compile(
+                SharedCasting("share-need", "unit-wiz", "unit-cleric"), null)
+                .CastingById("share-need");
+            if (blocked == null || blocked.Readiness != ResolvedCastingReadiness.Blocked ||
+                !blocked.ReadinessReasons.Any(reason => reason.StartsWith(
+                    "enhancement-pool-exhausted:" + WizardReservoir,
+                    StringComparison.Ordinal)))
+                throw new InvalidOperationException("a needed shared casting at a zero " +
+                    "reservoir was not blocked as a resource shortage: " +
+                    (blocked == null ? "missing" : string.Join(";",
+                        blocked.ReadinessReasons.ToArray())));
+            // Overwrite (always recast) + zero reservoir => resource block,
+            // never AlreadySatisfied.
+            ResolvedCasting recast = compile(
+                SharedCasting("share-recast", "unit-wiz", "unit-cleric",
+                    0, ExistingEffectPolicy.Overwrite), active)
+                .CastingById("share-recast");
+            if (recast == null || recast.Readiness != ResolvedCastingReadiness.Blocked ||
+                !recast.ReadinessReasons.Any(reason => reason.StartsWith(
+                    "enhancement-pool-exhausted:" + WizardReservoir,
+                    StringComparison.Ordinal)))
+                throw new InvalidOperationException("an always-recast shared casting was " +
+                    "satisfied by an active effect at a zero reservoir: " +
+                    (recast == null ? "missing" : string.Join(";",
+                        recast.ReadinessReasons.ToArray())));
+            // A routine containing the skipped shared casting and an
+            // independently fundable ordinary casting: the ordinary one
+            // keeps its full funding.
+            var ordinary = new PlannedCasting("plain-1", "long", 1, "source-shape",
+                ShapeAbility(), "unit-wiz", "book", CastingTargetMode.DirectTarget,
+                "unit-wiz", null, null, null, null,
+                ExistingEffectPolicy.SkipAlreadyActive, null, CastingAuthoringState.Ready, null);
+            var mixed = new CastingPlanDocument("campaign:zero",
+                new[] { new RoutineDefinition("long", "Long") },
+                new[]
+                {
+                    SharedCasting("share-skip", "unit-wiz", "unit-cleric"),
+                    ordinary
+                }, null);
+            ExplicitCastingPlan mixedPlan = new ExplicitCastingCompiler().Compile(mixed,
+                snapshot, new[] { PersonalOption("unit-wiz") }, effects, enhancements,
+                null, new[] { share }, false, active);
+            ResolvedCasting mixedSkip = mixedPlan.CastingById("share-skip");
+            ResolvedCasting mixedPlain = mixedPlan.CastingById("plain-1");
+            if (mixedSkip == null || mixedSkip.Readiness != ResolvedCastingReadiness.AlreadySatisfied)
+                throw new InvalidOperationException("the mixed routine lost the skip.");
+            if (mixedPlain == null || mixedPlain.Readiness != ResolvedCastingReadiness.Ready)
+                throw new InvalidOperationException("the ordinary fundable casting was harmed " +
+                    "by the skipped shared casting.");
+            CastingBudgetLine native = mixedPlan.BudgetLines.FirstOrDefault(
+                line => line.PoolKey == "pool-unit-wiz");
+            if (native == null || native.AllocatedUsage != 1)
+                throw new InvalidOperationException("the ordinary casting did not reserve its " +
+                    "native slot.");
+        }
+
+        // F3: the ordinary discovery path NEVER mutates native activatable
+        // state. This is an exact assembly-backed boundary proof over the
+        // BUILT production assembly: every method on the ordinary
+        // discovery path (Discover, ForCast, IsSupportedSpell, Snapshot,
+        // TryDescribePersisted, TryResolveToggle, the blueprint validators,
+        // and the enhancement adapter's Discover) contains zero calls to
+        // ActivatableAbility state mutation; the isolated probe
+        // TryProbeShareTargeting is the ONLY method that arms the toggle
+        // (and doubles as the scan's positive control — if the scanner can
+        // see the probe's arming, it would see any arming re-added to the
+        // ordinary path).
+        private static void TestShareDiscoveryBoundary()
+        {
+            string assemblyPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
+                "..", "build", "Release", "KingmakerBuffPlanner.dll");
+            if (!File.Exists(assemblyPath))
+                throw new InvalidOperationException("the built production assembly was not " +
+                    "found at " + assemblyPath);
+            Assembly production = Assembly.LoadFrom(assemblyPath);
+            Type compatibility = production.GetType(
+                "KingmakerBuffPlanner.Compatibility.BrownFurShareTransmutationCompatibility");
+            if (compatibility == null)
+                throw new InvalidOperationException("the compatibility type is missing.");
+            const BindingFlags flags = BindingFlags.Public | BindingFlags.NonPublic |
+                BindingFlags.Static | BindingFlags.Instance | BindingFlags.DeclaredOnly;
+            MethodInfo probe = compatibility.GetMethod("TryProbeShareTargeting", flags);
+            if (probe == null)
+                throw new InvalidOperationException("the isolated probe is missing.");
+            // The positive control FIRST: the scanner must find the probe's
+            // own arming (set_IsOn), proving it detects exactly the pattern
+            // the ordinary path must not contain.
+            if (FindActivatableMutations(probe).Count == 0)
+                throw new InvalidOperationException("the scan did not detect the probe's " +
+                    "own arming call (the boundary proof is blind).");
+            string[] ordinaryNames =
+            {
+                "Discover", "ForCast", "TryDescribePersisted", "IsSupportedSpell",
+                "TryResolveToggle", "TryValidateNativeRuntime", "Snapshot",
+                "ValidToggleBlueprint", "ValidFeatureBlueprint"
+            };
+            foreach (string name in ordinaryNames)
+            {
+                foreach (MethodInfo method in compatibility.GetMethods(flags)
+                    .Where(value => value.Name == name))
+                {
+                    List<string> mutations = FindActivatableMutations(method);
+                    if (mutations.Count != 0)
+                        throw new InvalidOperationException("ordinary discovery path method " +
+                            name + " mutates native activatable state: " +
+                            string.Join(",", mutations.ToArray()));
+                }
+            }
+            // The probe is the ONLY method of the compatibility type that
+            // touches activatable state mutation.
+            foreach (MethodInfo method in compatibility.GetMethods(flags)
+                .Where(value => value.GetMethodBody() != null))
+            {
+                bool isProbe = method == probe;
+                List<string> mutations = FindActivatableMutations(method);
+                if (isProbe && mutations.Count == 0)
+                    throw new InvalidOperationException("the probe lost its arming call.");
+                if (!isProbe && mutations.Count != 0)
+                    throw new InvalidOperationException("a non-probe method (" + method.Name +
+                        ") mutates native activatable state: " +
+                        string.Join(",", mutations.ToArray()));
+            }
+            // The enhancement adapter's own ordinary discovery (Discover,
+            // Combine, TryDescribePersisted, RodEntries) is equally pure.
+            Type adapter = production.GetType(
+                "KingmakerBuffPlanner.GameAdapters.KingmakerCastEnhancementAdapter");
+            if (adapter == null)
+                throw new InvalidOperationException("the enhancement adapter type is missing.");
+            foreach (string name in new[] { "Discover", "Combine", "TryDescribePersisted" })
+            {
+                foreach (MethodInfo method in adapter.GetMethods(flags)
+                    .Where(value => value.Name == name && value.GetMethodBody() != null))
+                {
+                    List<string> mutations = FindActivatableMutations(method);
+                    if (mutations.Count != 0)
+                        throw new InvalidOperationException("the adapter's ordinary discovery (" +
+                            name + ") mutates native activatable state: " +
+                            string.Join(",", mutations.ToArray()));
+                }
+            }
+            // Static ctors of both types stay pure too.
+            foreach (Type type in new[] { compatibility, adapter })
+            {
+                ConstructorInfo ctor = type.TypeInitializer;
+                if (ctor != null && FindActivatableMutations(ctor).Count != 0)
+                    throw new InvalidOperationException(type.Name +
+                        "'s static initializer mutates native activatable state.");
+            }
+        }
+
+        // Walks a method body's IL and returns every call/callvirt whose
+        // target is a state-mutating member declared by ActivatableAbility
+        // (the set_IsOn setter, TurnOn/TurnOff, Stop, set_ResourceCount).
+        private static List<string> FindActivatableMutations(MethodBase method)
+        {
+            var found = new List<string>();
+            MethodBody body = method.GetMethodBody();
+            if (body == null) return found;
+            byte[] il = body.GetILAsByteArray();
+            Module module = method.Module;
+            int position = 0;
+            while (position < il.Length)
+            {
+                int op = il[position];
+                if (op == 0xFE && position + 1 < il.Length)
+                {
+                    op = 0xFE00 | il[position + 1];
+                    position += 2;
+                }
+                else position++;
+                int operandSize;
+                if (!IlOperandSize(op, il, position, out operandSize)) break;
+                if ((op == 0x28 || op == 0x6F) && position + 4 <= il.Length)
+                {
+                    int token = BitConverter.ToInt32(il, position);
+                    try
+                    {
+                        MethodBase target = module.ResolveMember(token,
+                            method.DeclaringType == null ? null
+                                : method.DeclaringType.GetGenericArguments(),
+                            null) as MethodBase;
+                        if (target != null && IsActivatableMutation(target))
+                            found.Add(target.Name);
+                    }
+                    catch (Exception)
+                    {
+                        // Unresolvable tokens are not activatable mutations;
+                        // the resolved-set assertion above stays exact.
+                    }
+                }
+                position += operandSize;
+            }
+            return found;
+        }
+
+        // True only for the state-mutating members DECLARED on (or
+        // inherited by) the game's ActivatableAbility: the toggle setter,
+        // explicit turn on/off, stop, and the resource-count setter.
+        private static bool IsActivatableMutation(MethodBase target)
+        {
+            if (target.Name != "set_IsOn" && target.Name != "TurnOn" &&
+                target.Name != "TurnOff" && target.Name != "Stop" &&
+                target.Name != "set_ResourceCount")
+                return false;
+            for (Type walker = target.DeclaringType; walker != null; walker = walker.BaseType)
+                if (walker.FullName ==
+                    "Kingmaker.UnitLogic.ActivatableAbilities.ActivatableAbility")
+                    return true;
+            return false;
+        }
+
+        // Operand sizes for the single- and two-byte opcodes that appear in
+        // these method bodies (table-driven from System.Reflection.Emit so
+        // the walker cannot misparse a prefix).
+        private static bool IlOperandSize(int op, byte[] il, int position, out int size)
+        {
+            size = 0;
+            System.Reflection.Emit.OpCode code;
+            if (op < 0x100 && IlSingleByte().TryGetValue(op, out code) ||
+                op >= 0xFE00 && IlTwoByte().TryGetValue(op & 0xFF, out code))
+            {
+                switch (code.OperandType)
+                {
+                    case System.Reflection.Emit.OperandType.InlineNone:
+                        size = 0;
+                        return true;
+                    case System.Reflection.Emit.OperandType.ShortInlineBrTarget:
+                    case System.Reflection.Emit.OperandType.ShortInlineI:
+                    case System.Reflection.Emit.OperandType.ShortInlineVar:
+                        size = 1;
+                        return true;
+                    case System.Reflection.Emit.OperandType.InlineVar:
+                        size = 2;
+                        return true;
+                    case System.Reflection.Emit.OperandType.InlineI8:
+                    case System.Reflection.Emit.OperandType.InlineR:
+                        size = 8;
+                        return true;
+                    case System.Reflection.Emit.OperandType.InlineSwitch:
+                        if (position + 4 <= il.Length)
+                        {
+                            size = 4 + 4 * BitConverter.ToInt32(il, position);
+                            return true;
+                        }
+                        return false;
+                    default:
+                        size = 4;
+                        return true;
+                }
+            }
+            return false;
+        }
+
+        private static Dictionary<int, System.Reflection.Emit.OpCode> _ilSingleByte;
+        private static Dictionary<int, System.Reflection.Emit.OpCode> _ilTwoByte;
+
+        private static Dictionary<int, System.Reflection.Emit.OpCode> IlSingleByte()
+        {
+            if (_ilSingleByte != null) return _ilSingleByte;
+            _ilSingleByte = new Dictionary<int, System.Reflection.Emit.OpCode>();
+            foreach (System.Reflection.Emit.OpCode code in
+                typeof(System.Reflection.Emit.OpCodes).GetFields(
+                    BindingFlags.Public | BindingFlags.Static)
+                .Select(field => (System.Reflection.Emit.OpCode)field.GetValue(null)))
+            {
+                if (code.Value >= 0 && code.Value < 0x100 && !_ilSingleByte.ContainsKey(code.Value))
+                    _ilSingleByte[code.Value] = code;
+            }
+            return _ilSingleByte;
+        }
+
+        private static Dictionary<int, System.Reflection.Emit.OpCode> IlTwoByte()
+        {
+            if (_ilTwoByte != null) return _ilTwoByte;
+            _ilTwoByte = new Dictionary<int, System.Reflection.Emit.OpCode>();
+            foreach (System.Reflection.Emit.OpCode code in
+                typeof(System.Reflection.Emit.OpCodes).GetFields(
+                    BindingFlags.Public | BindingFlags.Static)
+                .Select(field => (System.Reflection.Emit.OpCode)field.GetValue(null)))
+            {
+                if (code.Value < 0 && !_ilTwoByte.ContainsKey(code.Value & 0xFF))
+                    _ilTwoByte[code.Value & 0xFF] = code;
+            }
+            return _ilTwoByte;
         }
     }
 }

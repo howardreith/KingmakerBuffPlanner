@@ -155,24 +155,26 @@ namespace KingmakerBuffPlanner.UI
                 // §4: the draft's selected targeting modifiers resolve
                 // BEFORE the reach check — a personal spell with Share
                 // selected reaches the allies the verified modifier adds,
-                // exactly as the compiler will judge it.
+                // exactly as the compiler will judge it. The modifier sees
+                // the COMPLETE prospective intent (review F2: the same
+                // resolver the compiler uses, never a null casting).
+                casting = new PlannedCasting(castingId, SelectedRoutineId, 0, source,
+                    option.Provider.Key.Ability, caster, NullIfEmpty(option.Provider.Key.SpellbookGuid),
+                    CastingTargetMode.DirectTarget, unitId, null, null,
+                    Draft.TargetingModifiers.ToList(), Draft.Enhancements.ToList(),
+                    Draft.ExistingEffectPolicy, null, CastingAuthoringState.Ready, null);
                 ProviderPlanningOption effective = option;
                 if (Draft.TargetingModifiers.Count != 0)
                 {
                     string modifierRefusal;
                     effective = ApplyGraphTargetingModifiers(Draft.TargetingModifiers,
-                        _lastInputs, option, out modifierRefusal);
+                        _lastInputs, casting, option, out modifierRefusal);
                     if (effective == null) return GraphRefusal(modifierRefusal);
                 }
                 if (!effective.ReachableTargetIds.Contains(unitId))
                     return GraphRefusal("target-unreachable:" + unitId);
                 string invalid = InvalidTargetReason(unit);
                 if (invalid != null) return GraphRefusal(invalid + ":" + unitId);
-                casting = new PlannedCasting(castingId, SelectedRoutineId, 0, source,
-                    option.Provider.Key.Ability, caster, NullIfEmpty(option.Provider.Key.SpellbookGuid),
-                    CastingTargetMode.DirectTarget, unitId, null, null,
-                    Draft.TargetingModifiers.ToList(), Draft.Enhancements.ToList(),
-                    Draft.ExistingEffectPolicy, null, CastingAuthoringState.Ready, null);
             }
             else
             {
@@ -396,13 +398,24 @@ namespace KingmakerBuffPlanner.UI
                 : FindProviderOption(inputs, source, chosenRow.ProviderKey);
             // §4: the target lane shows the SAME eligibility the Add path
             // and the compiler judge — the draft's selected targeting
-            // modifiers applied to the chosen option.
+            // modifiers applied to the chosen option, with the complete
+            // prospective draft intent (review F2).
             ProviderPlanningOption targetOption = chosenOption;
-            if (chosenOption != null && Draft.TargetingModifiers.Count != 0)
+            if (chosenOption != null && Draft.TargetingModifiers.Count != 0 &&
+                !string.IsNullOrEmpty(Draft.CasterUnitId ?? chosenCaster?.UnitId))
             {
                 string targetModifierRefusal;
                 targetOption = ApplyGraphTargetingModifiers(Draft.TargetingModifiers,
-                    inputs, chosenOption, out targetModifierRefusal);
+                    inputs,
+                    new PlannedCasting("draft-prospective", SelectedRoutineId, 0, source,
+                        chosenOption.Provider.Key.Ability,
+                        Draft.CasterUnitId ?? chosenCaster.UnitId,
+                        NullIfEmpty(chosenOption.Provider.Key.SpellbookGuid),
+                        CastingTargetMode.DirectTarget,
+                        Draft.CasterUnitId ?? chosenCaster.UnitId, null, null,
+                        Draft.TargetingModifiers.ToList(), Draft.Enhancements.ToList(),
+                        Draft.ExistingEffectPolicy, null, CastingAuthoringState.Ready, null),
+                    chosenOption, out targetModifierRefusal);
             }
             view.Targets = BuildGraphTargets(inputs, targetOption, view.SelectedSourceIsGroup == true,
                 chips, nameOf);
@@ -785,10 +798,12 @@ namespace KingmakerBuffPlanner.UI
             if (option != null)
             {
                 // §4: retarget eligibility sees the focused casting's own
-                // selected modifiers, mirroring the compiler.
+                // selected modifiers, mirroring the compiler — with the
+                // COMPLETE focused intent (review F2).
                 string retargetModifierRefusal;
                 ProviderPlanningOption retargetOption = ApplyGraphTargetingModifiers(
-                    focused.TargetingModifiers, inputs, option, out retargetModifierRefusal);
+                    focused.TargetingModifiers, inputs, focused, option,
+                    out retargetModifierRefusal);
                 if (retargetOption != null) option = retargetOption;
                 bool group = focused.TargetMode != CastingTargetMode.DirectTarget;
                 foreach (UnitSnapshot unit in inputs.Snapshot.Units)
@@ -877,13 +892,18 @@ namespace KingmakerBuffPlanner.UI
                 .ToList();
         }
 
-        // Review addendum §4: the SAME pure modifier-aware targeting the
-        // compiler applies, for the graph's own eligibility decisions
-        // (next-casting targets, Add, focused retarget). Returns null and
-        // the refusal reason when a selected modifier cannot apply.
+        // Review addendum §4 / F2: the SAME pure modifier-aware targeting
+        // the compiler applies, for the graph's own eligibility decisions
+        // (next-casting targets, Add, focused retarget). The modifier
+        // receives the COMPLETE intent record — the prospective casting
+        // being authored (draft or focused) — exactly as the compiler's
+        // ApplyTargetingModifiers passes the real record; there is no
+        // second resolver loop with a null casting. Returns null and the
+        // refusal reason when a selected modifier cannot apply.
         private static ProviderPlanningOption ApplyGraphTargetingModifiers(
             IReadOnlyList<TargetingModifierSelection> selections,
-            CastingWorkspaceInputs inputs, ProviderPlanningOption option, out string refusal)
+            CastingWorkspaceInputs inputs, PlannedCasting casting,
+            ProviderPlanningOption option, out string refusal)
         {
             refusal = null;
             foreach (TargetingModifierSelection selection in
@@ -902,7 +922,7 @@ namespace KingmakerBuffPlanner.UI
                     refusal = "targeting-modifier-unavailable:" + selection.ModifierId;
                     return null;
                 }
-                CastingModifierResult result = resolved.Apply(null, option);
+                CastingModifierResult result = resolved.Apply(casting, option);
                 if (!result.IsApplied)
                 {
                     refusal = "targeting-modifier-unavailable:" + selection.ModifierId + ":" +

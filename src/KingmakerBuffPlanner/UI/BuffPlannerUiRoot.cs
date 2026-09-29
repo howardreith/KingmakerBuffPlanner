@@ -1507,13 +1507,18 @@ namespace KingmakerBuffPlanner.UI
         }
 
         // The pure Share Transmutation modifier (everyday-use v1.2 §7,
-        // review addendum §3): ONE registration whose capability facts are
-        // the VERIFIED targeting-affecting enhancement snapshots the
-        // installed-provider integration produced — feature ownership per
-        // caster, that caster's own reservoir identity and per-use cost.
-        // A casting by any capable caster resolves its OWN reservoir;
-        // party order cannot misattribute cost, and an incapable caster
-        // is refused honestly. Planning-time only: no live state.
+        // review addendum §3, review F2): ONE registration whose capability
+        // facts are the VERIFIED targeting-affecting enhancement snapshots
+        // the installed-provider integration produced — feature ownership
+        // per caster, that caster's own reservoir identity and per-use
+        // cost, AND the exact supported ability/spellbook whitelists the
+        // integration verified for that caster. The capability carries the
+        // whole exact-source contract (plus its own legal recipients), so
+        // the pure modifier can never accept an unrelated self-only source
+        // of a caster whose one spell was verified. A casting by any
+        // capable caster resolves its OWN reservoir; party order cannot
+        // misattribute cost, and an incapable caster is refused honestly.
+        // Planning-time only: no live state.
         private static KingmakerBuffPlanner.Planning.ICastingTargetingModifier[]
             ShareModifiersFor(
                 KingmakerBuffPlanner.Domain.Providers.PartyProviderSnapshot snapshot,
