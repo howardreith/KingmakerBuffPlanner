@@ -23,12 +23,7 @@ namespace KingmakerBuffPlanner.Tests
         private static void RunSharePlanningTests(string root)
         {
             Run("share-expands-personal-targets-purely", TestSharePureExpansion);
-            // RESUME POINT: the graph-gesture fixture below is complete but
-            // its synthetic party fixture does not yet serve the graph
-            // catalogue (BuildGraph returns zero caster nodes — the source/
-            // effect expression must satisfy the live scan's serving rule).
-            // Fix the fixture's effects/providers, then re-enable this Run.
-            // Run("share-graph-gesture-carries-and-persists", () => TestShareGraphPersistence(root));
+            Run("share-graph-gesture-carries-and-persists", () => TestShareGraphPersistence(root));
         }
 
         private static AbilityKey ShapeAbility()
@@ -53,8 +48,18 @@ namespace KingmakerBuffPlanner.Tests
 
         private static void TestSharePureExpansion()
         {
-            var share = new ShareCastingModifier("class-feature-resource|unit-wiz|reservoir",
-                new[] { "unit-cleric", "unit-fighter", "unit-wiz" });
+            // Review addendum §3: verified per-caster capabilities; the
+            // reservoir and cost follow the casting's OWN caster regardless
+            // of registration/party order.
+            var capabilities = new[]
+            {
+                new ShareCastingModifier.ShareCapability("unit-wiz",
+                    "class-feature-resource|unit-wiz|reservoir", 1, 3),
+                new ShareCastingModifier.ShareCapability("unit-sorcerer",
+                    "class-feature-resource|unit-sorcerer|reservoir", 2, 1)
+            };
+            var share = new ShareCastingModifier(capabilities,
+                new[] { "unit-cleric", "unit-fighter", "unit-wiz", "unit-sorcerer" });
             var casting = new PlannedCasting("cast-share", "long", 0, "source-shape",
                 ShapeAbility(), "unit-wiz", "book", CastingTargetMode.DirectTarget,
                 "unit-cleric", null, null, null, null,
@@ -86,9 +91,62 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("Share did not declare the verified " +
                     "reservoir demand.");
             // No legal allies → feature unavailable, honestly.
-            var none = new ShareCastingModifier("pool", new string[0]);
+            var none = new ShareCastingModifier(capabilities, new string[0]);
             if (none.Apply(casting, PersonalOption("unit-wiz")).IsApplied)
                 throw new InvalidOperationException("Share applied with no legal allies.");
+            // §3: a NON-FIRST capable caster costs its OWN reservoir with
+            // its OWN per-use cost (the sorcerer costs 2, not the first
+            // registrant's 1), independent of registration order.
+            var sorcererCasting = new PlannedCasting("cast-sorc", "long", 0, "source-shape",
+                ShapeAbility(), "unit-sorcerer", "book", CastingTargetMode.DirectTarget,
+                "unit-fighter", null, null, null, null,
+                ExistingEffectPolicy.SkipAlreadyActive, null, CastingAuthoringState.Ready, null);
+            CastingModifierResult sorcerer = share.Apply(sorcererCasting,
+                PersonalOption("unit-sorcerer"));
+            if (!sorcerer.IsApplied)
+                throw new InvalidOperationException("the non-first capable caster was " +
+                    "refused: " + sorcerer.UnavailableReason);
+            IReadOnlyList<ModifierUsageDemand> sorcererDemands = share.UsageDemands(
+                sorcererCasting, sorcerer.Option);
+            if (sorcererDemands.Count != 1 ||
+                sorcererDemands[0].UsagePoolId != "class-feature-resource|unit-sorcerer|reservoir" ||
+                sorcererDemands[0].Units != 2)
+                throw new InvalidOperationException("the non-first caster was costed against " +
+                    "another caster's reservoir or cost.");
+            // Reversed registration order resolves identically.
+            var reversed = new ShareCastingModifier(capabilities.Reverse(),
+                new[] { "unit-cleric", "unit-fighter", "unit-wiz", "unit-sorcerer" });
+            IReadOnlyList<ModifierUsageDemand> reversedDemands = reversed.UsageDemands(
+                sorcererCasting, PersonalOption("unit-sorcerer"));
+            if (reversedDemands[0].UsagePoolId != sorcererDemands[0].UsagePoolId ||
+                reversedDemands[0].Units != sorcererDemands[0].Units)
+                throw new InvalidOperationException("registration order changed the cost.");
+            // An INELIGIBLE first member: an incapable caster is refused
+            // (honest feature-unavailable) and never costed as free — the
+            // demand is unsatisfiable, so the compiler blocks atomically.
+            var plain = new PlannedCasting("cast-plain", "long", 0, "source-shape",
+                ShapeAbility(), "unit-fighter", "book", CastingTargetMode.DirectTarget,
+                "unit-cleric", null, null, null, null,
+                ExistingEffectPolicy.SkipAlreadyActive, null, CastingAuthoringState.Ready, null);
+            CastingModifierResult incapable = share.Apply(plain, PersonalOption("unit-fighter"));
+            if (incapable.IsApplied || !incapable.UnavailableReason.StartsWith(
+                    "share-feature-unavailable"))
+                throw new InvalidOperationException("an incapable caster was not refused: " +
+                    incapable.UnavailableReason);
+            IReadOnlyList<ModifierUsageDemand> incapableDemand = share.UsageDemands(
+                plain, PersonalOption("unit-fighter"));
+            if (incapableDemand[0].Units != int.MaxValue)
+                throw new InvalidOperationException("an unverified caster was costed as free.");
+            // Reservoir exhausted (verified remaining 0): honest refusal.
+            var drained = new[]
+            {
+                new ShareCastingModifier.ShareCapability("unit-wiz",
+                    "class-feature-resource|unit-wiz|reservoir", 1, 0)
+            };
+            var drainedShare = new ShareCastingModifier(drained,
+                new[] { "unit-cleric" });
+            if (drainedShare.Apply(casting, PersonalOption("unit-wiz")).IsApplied)
+                throw new InvalidOperationException("Share applied with an exhausted reservoir.");
         }
 
         private static void TestShareGraphPersistence(string root)
@@ -119,20 +177,27 @@ namespace KingmakerBuffPlanner.Tests
                 new ResourcePoolSnapshot("pool-unit-wiz", ResourcePoolKind.SpontaneousLevel,
                     10, 10, null)
             });
+            // §3: ONE registration with the wizard's VERIFIED capability
+            // (the shape the host builds from verified facts); §4: the same
+            // expression INSTANCE under both catalogue keys.
+            var shapeExpression = new Domain.Effects.EffectLeafExpression(
+                Domain.Effects.EffectKind.Buff, "buff-shape",
+                Domain.Effects.EffectTarget.CurrentTarget, "shape", "shape/a");
             var effects = new Dictionary<string, Domain.Effects.EffectExpression>
             {
-                { "source-shape", new Domain.Effects.EffectLeafExpression(
-                    Domain.Effects.EffectKind.Buff, "buff-shape",
-                    Domain.Effects.EffectTarget.CurrentTarget, "shape", "shape/a") },
-                { ShapeAbility().Canonical, new Domain.Effects.EffectLeafExpression(
-                    Domain.Effects.EffectKind.Buff, "buff-shape",
-                    Domain.Effects.EffectTarget.CurrentTarget, "shape", "shape/a") }
+                { "source-shape", shapeExpression },
+                { ShapeAbility().Canonical, shapeExpression }
             };
-            var shareModifiers = units.Select(unit => (ICastingTargetingModifier)
+            var shareModifiers = new ICastingTargetingModifier[]
+            {
                 new ShareCastingModifier(
-                    "class-feature-resource|" + unit.UnitId + "|reservoir",
-                    units.Where(u => u.TargetValidation.Friendly)
-                        .Select(u => u.UnitId))).ToArray();
+                    new[]
+                    {
+                        new ShareCastingModifier.ShareCapability("unit-wiz",
+                            "class-feature-resource|unit-wiz|reservoir", 1, 3)
+                    },
+                    units.Where(u => u.TargetValidation.Friendly).Select(u => u.UnitId))
+            };
             var inputs = new CastingWorkspaceInputs(snapshot,
                 new[]
                 {

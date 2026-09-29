@@ -152,7 +152,19 @@ namespace KingmakerBuffPlanner.UI
             string castingId = NextCastingId();
             if (!group.Value)
             {
-                if (!option.ReachableTargetIds.Contains(unitId))
+                // §4: the draft's selected targeting modifiers resolve
+                // BEFORE the reach check — a personal spell with Share
+                // selected reaches the allies the verified modifier adds,
+                // exactly as the compiler will judge it.
+                ProviderPlanningOption effective = option;
+                if (Draft.TargetingModifiers.Count != 0)
+                {
+                    string modifierRefusal;
+                    effective = ApplyGraphTargetingModifiers(Draft.TargetingModifiers,
+                        _lastInputs, option, out modifierRefusal);
+                    if (effective == null) return GraphRefusal(modifierRefusal);
+                }
+                if (!effective.ReachableTargetIds.Contains(unitId))
                     return GraphRefusal("target-unreachable:" + unitId);
                 string invalid = InvalidTargetReason(unit);
                 if (invalid != null) return GraphRefusal(invalid + ":" + unitId);
@@ -847,6 +859,43 @@ namespace KingmakerBuffPlanner.UI
                 .ThenBy(option => option.Provider.SpellLevel)
                 .ThenBy(option => option.Provider.Key.Canonical, StringComparer.Ordinal)
                 .ToList();
+        }
+
+        // Review addendum §4: the SAME pure modifier-aware targeting the
+        // compiler applies, for the graph's own eligibility decisions
+        // (next-casting targets, Add, focused retarget). Returns null and
+        // the refusal reason when a selected modifier cannot apply.
+        private static ProviderPlanningOption ApplyGraphTargetingModifiers(
+            IReadOnlyList<TargetingModifierSelection> selections,
+            CastingWorkspaceInputs inputs, ProviderPlanningOption option, out string refusal)
+        {
+            refusal = null;
+            foreach (TargetingModifierSelection selection in
+                (IEnumerable<TargetingModifierSelection>)(selections ??
+                    new TargetingModifierSelection[0]))
+            {
+                if (selection == null || !selection.Enabled) continue;
+                IReadOnlyList<ICastingTargetingModifier> registered = inputs == null
+                    ? new ICastingTargetingModifier[0]
+                    : inputs.TargetingModifiers ?? new ICastingTargetingModifier[0];
+                ICastingTargetingModifier resolved = registered.FirstOrDefault(value =>
+                    value != null && string.Equals(value.ModifierId, selection.ModifierId,
+                        StringComparison.Ordinal));
+                if (resolved == null)
+                {
+                    refusal = "targeting-modifier-unavailable:" + selection.ModifierId;
+                    return null;
+                }
+                CastingModifierResult result = resolved.Apply(null, option);
+                if (!result.IsApplied)
+                {
+                    refusal = "targeting-modifier-unavailable:" + selection.ModifierId + ":" +
+                        result.UnavailableReason;
+                    return null;
+                }
+                option = result.Option;
+            }
+            return option;
         }
 
         // True for a group ability, false for a single-target one, null when
