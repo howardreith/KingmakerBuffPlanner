@@ -425,6 +425,7 @@ namespace KingmakerBuffPlanner.Tests
                 Run("prepared-slot-observation-reads-exact-source", TestPreparedSlotObservationReadsExactSource);
                 RunProductionExecutionTests(root);
                 RunCastingGraphTests(root);
+                RunAutosaveLifecycleTests(root);
             }
             finally
             {

@@ -31,6 +31,7 @@
     <Compile Include="Program.cs" />
     <Compile Include="ProductionExecutionTests.cs" />
     <Compile Include="CastingGraphTests.cs" />
+    <Compile Include="AutosaveLifecycleTests.cs" />
     <Compile Include="TestBuildInfo.cs" />
     <Compile Include="..\..\src\KingmakerBuffPlanner\Discovery\ActionGraphScanner.cs"><Link>Discovery\ActionGraphScanner.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Discovery\AreaRecipientSemantics.cs"><Link>Discovery\AreaRecipientSemantics.cs</Link></Compile>
