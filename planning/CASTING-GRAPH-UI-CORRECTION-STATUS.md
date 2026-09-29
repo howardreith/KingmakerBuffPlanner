@@ -303,3 +303,17 @@ guarded in-game run on the disposable fixture. No live claim is made yet.
   validation) → Advanced (budget proof live) → reload, one at a time with
   full restoration checks; then update the preview evidence table and this
   checkpoint.
+
+## Checkpoint 5 — 2026-09-29, private beta live-qualified and delivered (draft)
+
+**Outcome: the private-beta slice is live-qualified at `ec34705c` and delivered for the owner's self-paced trial (draft GitHub release, asset hash re-verified after download).**
+
+- **Save/reload**: `beta-ec34705c-reload-01` PASS (0 non-PASS; exact reconstruction; restoration verified).
+- **Advanced required budget** at `0dd82937`: 94/94 — cross-buff spontaneous pool PROVED (remain 6-5-6, displayed capacity 6>5>6), shared enhancement pool PROVED (rod Uses 3-2-..-3), **complete-cost atomic refusal OBSERVED live** (a natively blocked prepared casting reserved nothing: prepared 25>25, rod 2>2), cleanup verified.
+- **Native-cast matrix** at `ec34705c` (guarded runs, frozen-build allowances, disposable fixtures, all restorations verified): finite-direct-mixed instant+animated PASS, group-mixed PASS, enhanced-direct PASS, rod-extend-direct PASS, ability-pool-direct PASS.
+- **Fullscreen-1080 console (unattended)**: PASS (windowed label corrected — see below).
+- **Windowed 1920x1080: NOT QUALIFIED.** The game options layer overrides every passive windowing mechanism (CLI flags, Unity Screenmanager values, its DisplayMode option; all transactional, registry restored exactly). The 1080 evidence is fullscreen-1080; the DPI-awareness repair is unverified for windowed sub-rect mapping.
+- **Unattended dispatch infrastructure** (owner-approved): reusable SID-pinned console-transfer task (protected payload, survives reboots) + unprivileged durable dispatcher; acceptance passed (two consecutive unattended jobs, no owner event); cause of earlier losses diagnosed as RDP-reconnect displacement + one-shot task self-deletion.
+- Converging harness repairs, each gated: cross-buff scan (pinnable / strictly-understood targeting / authorable buff A), self-sufficient shared-enhancement phase (ability-offers-enhancement), atomic refusal judged by actual compiled readiness, budget assertion scoped to its scenario, Steam fresh-session false negative, evidence-judge regressions (protocol 365).
+- **Not qualified / pending**: windowed mode; owner subjective UI verdict (this delivery is for exactly that trial).
+- Identity: package `214b795b…e8b20564`, DLL `21e10bab…9ebc6e`, MVID `45389687-…`; handoff folder `handoff\KingmakerBuffPlanner-casting-graph-ec34705c\`; draft release with asset (hash re-verified `214B795B…`); guide `docs/PREVIEW-0.2.0-rc6-casting-graph.md` (archive-first install/rollback).
