@@ -39,6 +39,9 @@ namespace KingmakerBuffPlanner.Tests
             Run("graph-target-legality-and-refusals", () => TestGraphTargetLegality(root));
             Run("graph-save-reload-reconstructs-connections", () => TestGraphSaveReload(root));
             Run("graph-unresolved-casting-keeps-its-connection", () => TestGraphUnresolvedCasting(root));
+            Run("excluded-offensive-source-keeps-saved-castings-repairable",
+                () => TestExcludedSourceKeepsSavedCastings(root));
+
             Run("graph-party-shared-pool-disclosed-under-each-caster",
                 () => TestGraphSharedPoolAcrossCasters(root));
             Run("graph-at-will-casting-shows-no-count", () => TestGraphAtWillShowsNoCount(root));
@@ -52,6 +55,42 @@ namespace KingmakerBuffPlanner.Tests
             Run("hover-diagnostic-only-hovers-and-restores-switch", TestHoverDiagnosticHostContract);
             Run("budget-evidence-judges-exact-deltas-and-restores", TestBudgetEvidenceJudging);
             Run("rod-offers-are-meaningful-for-the-exact-buff", TestRodRelevancePolicy);
+        }
+
+        // Everyday-use v1.2 E24: excluding an offensive spell from the
+        // beneficial catalogue never deletes or rewrites saved intent. A
+        // saved casting of a source that no longer appears in the catalogue
+        // stays in the document, stays visible in its routine, and compiles
+        // as a repairable record - not a silently dropped one.
+        private static void TestExcludedSourceKeepsSavedCastings(string root)
+        {
+            string dir = Path.Combine(root, "excluded-source");
+            Directory.CreateDirectory(dir);
+            // One saved casting of a source that discovery no longer offers
+            // (its exclusion from the catalogue must not touch saved files).
+            var ability = new AbilityKey("irresistible-dance", null, 0,
+                SourceKind.Spellbook, "book-bard");
+            var casting = new PlannedCasting("cast-keep", "long", 0, "irresistible-dance", ability,
+                "unit-bard", "book-bard", CastingTargetMode.DirectTarget, "unit-ally", null, null,
+                null, null, ExistingEffectPolicy.SkipAlreadyActive, null, CastingAuthoringState.Ready,
+                null);
+            // Author through the production service and save through the
+            // production repository, exactly as the workspace does.
+            var document = new CastingPlanDocument("campaign:excluded",
+                new[] { new RoutineDefinition("long", "Long") }, new[] { casting });
+            var repository = new KingmakerBuffPlanner.Persistence.CastingPlanRepository(dir);
+            repository.Save(KingmakerBuffPlanner.Persistence.CastingPlanProfile.FromDocument(document));
+            var reloaded = repository.Load("campaign:excluded");
+            // A fresh session (reload) reconstructs it exactly: the catalogue
+            // never having offered the source changes nothing about the
+            // saved record.
+            if (reloaded == null || reloaded.Profile == null)
+                throw new InvalidOperationException("The saved plan did not load.");
+            PlannedCasting restored = reloaded.Profile.ToDocument().Castings.FirstOrDefault();
+            if (restored == null ||
+                !string.Equals(restored.CastingId, "cast-keep", StringComparison.Ordinal) ||
+                !string.Equals(restored.SourceId, "irresistible-dance", StringComparison.Ordinal))
+                throw new InvalidOperationException("Saved intent for an excluded source did not survive.");
         }
 
         // Everyday-use v1.2 §8: a rod applicable and fundable is still not
