@@ -54,3 +54,4 @@ _ReSharper*/
 Thumbs.db
 Desktop.ini
 scripts/Invoke-WorkspaceTest.ps1
+.zcodeignore
