@@ -239,6 +239,16 @@ namespace KingmakerBuffPlanner.UI
                 return AuthoringEditResult.Refuse("enhancement-changes-targeting:" + enhancementId);
             if (!OffersEnhancement(enhancement, focused.Ability, focused.SpellbookGuid, _lastInputs))
                 return AuthoringEditResult.Refuse("enhancement-not-applicable:" + enhancementId);
+            // Everyday-use v1.2 §8: a NEW choice must also be meaningful
+            // for this exact buff; removing a saved irrelevant choice is
+            // always allowed (it stays visible and explained).
+            ProviderSnapshot addProvider = FindRecordOption(_lastInputs, focused) == null
+                ? null : FindRecordOption(_lastInputs, focused).Provider;
+            string relevanceFailure = Domain.Planning.CastEnhancementRelevance.OfferFailure(
+                enhancement, addProvider);
+            if (relevanceFailure.Length != 0)
+                return AuthoringEditResult.Refuse("enhancement-not-meaningful:" + enhancementId +
+                    ":" + relevanceFailure);
             ProviderPlanningOption option = FindRecordOption(_lastInputs, focused);
             string failure = option == null ? string.Empty
                 : enhancement.ApplicabilityFailure(option.Provider);
@@ -703,8 +713,17 @@ namespace KingmakerBuffPlanner.UI
                     AuthoredEnhancementSelection selection = focused.Enhancements.FirstOrDefault(value =>
                         string.Equals(value.EnhancementId, enhancement.EnhancementId, StringComparison.Ordinal));
                     bool chosen = selection != null;
-                    if (!chosen && !OffersEnhancement(enhancement, focused.Ability, focused.SpellbookGuid, inputs))
-                        continue;
+                    if (!chosen)
+                    {
+                        if (!OffersEnhancement(enhancement, focused.Ability, focused.SpellbookGuid, inputs))
+                            continue;
+                        // Applicable but (for rods) a meaningless choice for
+                        // this buff: not offered, with the reason recorded
+                        // on the option so it is never a mystery (§8).
+                        if (!Domain.Planning.CastEnhancementRelevance.IsRelevantOffer(enhancement,
+                                option == null ? null : option.Provider))
+                            continue;
+                    }
                     int? remaining = capacity == null ? null : capacity.EnhancementRemaining(enhancement.UsagePoolId);
                     int? available = capacity == null ? null : capacity.EnhancementAvailableNow(enhancement.UsagePoolId);
                     string unavailable = string.Empty;
