@@ -1310,9 +1310,23 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     string budgetExpected;
                     if (_workspaceBudget == null)
                     {
-                        budgetExpected = "budget evidence record present";
-                        result.Assertions.Add(RuntimeTestAssertion.Fail("workspace-budget-evidence",
-                            budgetExpected, "missing"));
+                        // Only live-workspace-qual runs the budget proof
+                        // (FinishWorkspaceInteraction); a missing record in
+                        // any other scenario is the absence of the phase,
+                        // not failed evidence (the reload run failed on
+                        // exactly this mislabel).
+                        if (string.Equals(_request.Scenario, "live-workspace-qual",
+                                StringComparison.Ordinal))
+                        {
+                            budgetExpected = "budget evidence record present";
+                            result.Assertions.Add(RuntimeTestAssertion.Fail("workspace-budget-evidence",
+                                budgetExpected, "missing"));
+                        }
+                        else
+                        {
+                            budgetExpected = "not applicable to this scenario";
+                            budgetHeld = true;
+                        }
                     }
                     else
                     {
