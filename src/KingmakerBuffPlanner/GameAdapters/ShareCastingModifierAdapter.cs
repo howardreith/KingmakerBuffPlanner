@@ -8,26 +8,53 @@ using KingmakerBuffPlanner.Planning;
 
 namespace KingmakerBuffPlanner.GameAdapters
 {
-    // The pure planning-side Share Transmutation (everyday-use v1.2 §7).
-    // It expands a PERSONAL transmutation's reachable set to the verified
-    // legal allies from the party snapshot and declares the verified native
-    // reservoir demand; it never arms a live toggle, never reads live game
-    // state and never spends anything. The same construction always yields
-    // the same result (recompilation cannot leak state). Execution-time
-    // native setup/restore is the executor's business, not this class's.
+    // The pure planning-side Share Transmutation (everyday-use v1.2 §7,
+    // review addendum §3). ONE registration resolves the exact casting's
+    // caster through immutable VERIFIED capability facts — the
+    // targeting-affecting enhancement snapshots the installed-provider
+    // integration produced (feature ownership, the caster's own reservoir
+    // identity and per-use cost) — so a casting by any capable caster is
+    // costed against ITS OWN reservoir regardless of party order, and an
+    // incapable caster is refused honestly. It expands a PERSONAL
+    // transmutation to the verified legal allies, declares the reservoir
+    // demand in the compiler's atomic cost vector, and never arms a live
+    // toggle, reads live game state or spends anything. Deterministic:
+    // same facts → same result.
     public sealed class ShareCastingModifier : ICastingTargetingModifier
     {
         public const string Id = "share-transmutation";
-        private const int ReservoirUnitsPerUse = 1;
 
-        private readonly string _reservoirPoolId;
+        // One verified capability: the feature-owning caster's reservoir
+        // pool and per-use cost, exactly as the installed provider
+        // integration reported them.
+        public sealed class ShareCapability
+        {
+            public ShareCapability(string casterUnitId, string reservoirPoolId,
+                int unitsPerUse, int? remainingUses)
+            {
+                if (string.IsNullOrWhiteSpace(casterUnitId))
+                    throw new ArgumentException("Caster unit ID is required.", "casterUnitId");
+                CasterUnitId = casterUnitId;
+                ReservoirPoolId = reservoirPoolId;
+                UnitsPerUse = Math.Max(1, unitsPerUse);
+                RemainingUses = remainingUses;
+            }
+
+            public string CasterUnitId { get; private set; }
+            public string ReservoirPoolId { get; private set; }
+            public int UnitsPerUse { get; private set; }
+            public int? RemainingUses { get; private set; }
+        }
+
+        private readonly Dictionary<string, ShareCapability> _capabilities;
         private readonly IReadOnlyList<string> _legalAllies;
 
-        public ShareCastingModifier(string reservoirPoolId, IEnumerable<string> legalAllies)
+        public ShareCastingModifier(IEnumerable<ShareCapability> capabilities,
+            IEnumerable<string> legalAllies)
         {
-            if (string.IsNullOrWhiteSpace(reservoirPoolId))
-                throw new ArgumentException("Reservoir pool ID is required.", "reservoirPoolId");
-            _reservoirPoolId = reservoirPoolId;
+            _capabilities = (capabilities ?? new ShareCapability[0])
+                .Where(value => value != null)
+                .ToDictionary(value => value.CasterUnitId, StringComparer.Ordinal);
             _legalAllies = (legalAllies ?? new string[0])
                 .Where(value => !string.IsNullOrWhiteSpace(value))
                 .Distinct(StringComparer.Ordinal)
@@ -45,8 +72,13 @@ namespace KingmakerBuffPlanner.GameAdapters
             if (option == null || option.Provider == null)
                 return CastingModifierResult.Unavailable("share-source-unresolved");
             string caster = option.Provider.Key.CasterUnitId;
+            ShareCapability capability;
+            if (!_capabilities.TryGetValue(caster, out capability))
+                return CastingModifierResult.Unavailable("share-feature-unavailable:" + caster);
             if (_legalAllies.Count == 0)
-                return CastingModifierResult.Unavailable("share-feature-unavailable");
+                return CastingModifierResult.Unavailable("share-no-legal-recipient");
+            if (capability.RemainingUses != null && capability.RemainingUses.Value <= 0)
+                return CastingModifierResult.Unavailable("share-reservoir-exhausted:" + caster);
             // Personal spells reach only their caster; Share extends exactly
             // those to the verified legal allies. A spell that can already
             // target others does not need (and cannot use) Share.
@@ -74,10 +106,21 @@ namespace KingmakerBuffPlanner.GameAdapters
         public IReadOnlyList<ModifierUsageDemand> UsageDemands(
             PlannedCasting casting, ProviderPlanningOption option)
         {
-            // The verified Brown-Fur Share toggle spends the same arcane
-            // reservoir as Powerful Change; declaring it here puts both in
-            // ONE atomic cost vector (combined demand, reserved once).
-            return new[] { new ModifierUsageDemand(_reservoirPoolId, ReservoirUnitsPerUse) };
+            ShareCapability capability = null;
+            string caster = casting == null ? null : casting.CasterUnitId;
+            if (caster != null) _capabilities.TryGetValue(caster, out capability);
+            if (capability == null && option != null && option.Provider != null)
+                _capabilities.TryGetValue(option.Provider.Key.CasterUnitId, out capability);
+            if (capability == null)
+            {
+                // An unverified caster must never be costed as free: an
+                // unsatisfiable demand blocks the casting atomically.
+                return new[] { new ModifierUsageDemand("share-unverified-caster", int.MaxValue) };
+            }
+            return new[]
+            {
+                new ModifierUsageDemand(capability.ReservoirPoolId, capability.UnitsPerUse)
+            };
         }
     }
 }

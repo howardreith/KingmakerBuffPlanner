@@ -1502,38 +1502,48 @@ namespace KingmakerBuffPlanner.UI
                 _session.ProviderOptions,
                 _session.Model.EffectsBySource,
                 _session.Model.Enhancements,
-                ShareModifiersFor(_session.Model.Snapshot),
+                ShareModifiersFor(_session.Model.Snapshot, _session.Model.Enhancements),
                 _session.ActiveEffects);
         }
 
-        // The pure Share Transmutation modifier registered from the exact
-        // party snapshot (everyday-use v1.2 §7): planning-time target
-        // expansion with the verified reservoir demand; no live state.
+        // The pure Share Transmutation modifier (everyday-use v1.2 §7,
+        // review addendum §3): ONE registration whose capability facts are
+        // the VERIFIED targeting-affecting enhancement snapshots the
+        // installed-provider integration produced — feature ownership per
+        // caster, that caster's own reservoir identity and per-use cost.
+        // A casting by any capable caster resolves its OWN reservoir;
+        // party order cannot misattribute cost, and an incapable caster
+        // is refused honestly. Planning-time only: no live state.
         private static KingmakerBuffPlanner.Planning.ICastingTargetingModifier[]
-            ShareModifiersFor(KingmakerBuffPlanner.Domain.Providers.PartyProviderSnapshot snapshot)
+            ShareModifiersFor(
+                KingmakerBuffPlanner.Domain.Providers.PartyProviderSnapshot snapshot,
+                System.Collections.Generic.IReadOnlyList<Domain.Planning.CastEnhancementSnapshot> enhancements)
         {
-            if (snapshot == null || snapshot.Units.Count == 0)
+            if (snapshot == null || snapshot.Units.Count == 0 || enhancements == null)
                 return new KingmakerBuffPlanner.Planning.ICastingTargetingModifier[0];
-            var legal = new System.Collections.Generic.List<string>();
-            string reservoirOwner = null;
-            foreach (var unit in snapshot.Units)
+            var capabilities = new System.Collections.Generic.List<
+                KingmakerBuffPlanner.GameAdapters.ShareCastingModifier.ShareCapability>();
+            foreach (Domain.Planning.CastEnhancementSnapshot enhancement in enhancements)
             {
-                if (unit.TargetValidation == null || !unit.TargetValidation.Alive ||
-                    !unit.TargetValidation.Friendly) continue;
-                legal.Add(unit.UnitId);
-                if (reservoirOwner == null) reservoirOwner = unit.UnitId;
+                if (enhancement == null || !enhancement.AffectsTargeting) continue;
+                if (!string.Equals(enhancement.SourceBlueprintGuid,
+                        Compatibility.BrownFurShareTransmutationProfile.ActivatableGuid,
+                        StringComparison.Ordinal)) continue;
+                capabilities.Add(
+                    new KingmakerBuffPlanner.GameAdapters.ShareCastingModifier.ShareCapability(
+                        enhancement.CasterUnitId, enhancement.UsagePoolId,
+                        enhancement.UsageUnitsPerCast, enhancement.RemainingUses));
             }
-            if (reservoirOwner == null)
+            if (capabilities.Count == 0)
                 return new KingmakerBuffPlanner.Planning.ICastingTargetingModifier[0];
-            // One registration per caster that owns the Brown-Fur feature
-            // is resolved at execution; the planning modifier declares the
-            // reservoir of the casting's own caster at demand time, so a
-            // single registration keyed by pool id per caster is built.
-            return snapshot.Units
-                .Select(unit => new KingmakerBuffPlanner.GameAdapters.ShareCastingModifier(
-                    Compatibility.BrownFurPowerfulChangeProfile.UsagePoolId(unit.UnitId), legal))
-                .Cast<KingmakerBuffPlanner.Planning.ICastingTargetingModifier>()
-                .ToArray();
+            var legal = snapshot.Units
+                .Where(unit => unit.TargetValidation != null && unit.TargetValidation.Alive &&
+                    unit.TargetValidation.Friendly)
+                .Select(unit => unit.UnitId).ToList();
+            return new KingmakerBuffPlanner.Planning.ICastingTargetingModifier[]
+            {
+                new KingmakerBuffPlanner.GameAdapters.ShareCastingModifier(capabilities, legal)
+            };
         }
 
         // Resolves (or reuses) the casting-first session for the loaded
