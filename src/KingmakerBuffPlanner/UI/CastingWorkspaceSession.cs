@@ -844,6 +844,8 @@ namespace KingmakerBuffPlanner.UI
                 var displays = new Dictionary<string, string>(StringComparer.Ordinal);
                 var icons = new Dictionary<string, AbilityKey>(StringComparer.Ordinal);
                 var kinds = new Dictionary<string, List<SourceKind>>(StringComparer.Ordinal);
+                var baseTexts = new Dictionary<string, string>(StringComparer.Ordinal);
+                var baseDurations = new Dictionary<string, string>(StringComparer.Ordinal);
                 foreach (string sourceId in sourceIds.OrderBy(
                          value => value, StringComparer.Ordinal))
                 {
@@ -876,6 +878,16 @@ namespace KingmakerBuffPlanner.UI
                         .FirstOrDefault();
                     if (iconOption != null)
                         icons[sourceId] = iconOption.Provider.Key.Ability;
+                    // Base spell text for the right-click inspect: the
+                    // lowest-variant provider's native description.
+                    ProviderPlanningOption textOption = serving
+                        .OrderBy(value => value.Provider.VariantOrder)
+                        .FirstOrDefault(value =>
+                            !string.IsNullOrWhiteSpace(value.Provider.Description));
+                    baseTexts[sourceId] = textOption == null
+                        ? string.Empty : textOption.Provider.Description;
+                    baseDurations[sourceId] = textOption == null
+                        ? string.Empty : textOption.Provider.DurationText;
                     descriptors.Add(new WorkspaceSourceDescriptor(sourceId,
                         string.IsNullOrWhiteSpace(display) ? sourceId : display,
                         serving.Select(value => value.Provider.DisplayName),
@@ -896,7 +908,8 @@ namespace KingmakerBuffPlanner.UI
                         descriptor.SourceId, displays[descriptor.SourceId],
                         string.Equals(descriptor.SourceId, selectedSource,
                             StringComparison.Ordinal), detail, icon,
-                        kinds[descriptor.SourceId]));
+                        kinds[descriptor.SourceId],
+                        baseTexts[descriptor.SourceId], baseDurations[descriptor.SourceId]));
                 }
             }
             return WorkspaceSourceLabels.GridOrder(sources);

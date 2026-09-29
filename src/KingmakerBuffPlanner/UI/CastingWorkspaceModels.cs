@@ -315,7 +315,8 @@ namespace KingmakerBuffPlanner.UI
         internal WorkspaceSourceOption(
             string sourceId, string displayName, bool selected,
             string detail = null, AbilityKey iconAbility = null,
-            IEnumerable<SourceKind> sourceKinds = null)
+            IEnumerable<SourceKind> sourceKinds = null,
+            string description = "", string durationText = "")
         {
             SourceId = sourceId ?? string.Empty;
             DisplayName = string.IsNullOrWhiteSpace(displayName)
@@ -325,6 +326,8 @@ namespace KingmakerBuffPlanner.UI
             IconAbility = iconAbility;
             SourceKinds = (sourceKinds ?? new SourceKind[0]).Distinct()
                 .OrderBy(kind => kind).ToList();
+            Description = description ?? string.Empty;
+            DurationText = durationText ?? string.Empty;
         }
 
         // How the party can provide this buff (spellbook, ability resource,
@@ -339,6 +342,11 @@ namespace KingmakerBuffPlanner.UI
         public string SourceId { get; private set; }
         public string DisplayName { get; private set; }
         public bool Selected { get; private set; }
+        // Base native spell description/duration (the lowest-variant
+        // provider's), labelled as base by the inspect when no exact
+        // caster/source row is selected.
+        public string Description { get; private set; }
+        public string DurationText { get; private set; }
         // Distinguishes sources that share a display name (for example two
         // "Aid Another" sources); empty when the name is already unique.
         public string Detail { get; private set; }

@@ -365,6 +365,9 @@ namespace KingmakerBuffPlanner.UI
             view.SelectedCasterUnitId = chosenCaster == null ? null : chosenCaster.UnitId;
             CastingGraphSourceRow chosenRow = chosenCaster == null ? null
                 : chosenCaster.Sources.FirstOrDefault(value => value.Selected);
+            view.SelectedSourceDescription = chosenRow == null ? string.Empty : chosenRow.Description;
+            view.SelectedSourceDurationText = chosenRow == null ? string.Empty : chosenRow.DurationText;
+            view.SelectedSourceExact = chosenRow != null;
             view.SelectedProviderKey = chosenRow == null ? null : chosenRow.ProviderKey;
             ProviderPlanningOption chosenOption = chosenRow == null ? null
                 : FindProviderOption(inputs, source, chosenRow.ProviderKey);
@@ -426,6 +429,14 @@ namespace KingmakerBuffPlanner.UI
                     .Select(WorkspaceReasonText.Describe).FirstOrDefault() ??
                     (review ? "imported: needs your review" : string.Empty);
                 ResolvedCasting whole = onePass.CastingById(casting.CastingId);
+                ProviderPlanningOption chipOption = casting.Provider == null ? null
+                    : inputs.ProviderOptions.FirstOrDefault(value => value != null &&
+                        value.Provider != null && string.Equals(value.Provider.Key.Canonical,
+                            casting.Provider.Canonical, StringComparison.Ordinal));
+                string chipDescription = chipOption == null
+                    ? string.Empty : chipOption.Provider.Description;
+                string chipDuration = chipOption == null
+                    ? string.Empty : chipOption.Provider.DurationText;
                 chips.Add(new CastingGraphCasting(casting.CastingId, casting.RoutineId,
                     casting.Order, casting.CasterUnitId,
                     casting.Provider == null ? null : casting.Provider.Canonical,
@@ -443,7 +454,8 @@ namespace KingmakerBuffPlanner.UI
                     casting.IsExecutable && whole != null &&
                         whole.Readiness == ResolvedCastingReadiness.Blocked,
                     casting.IsExecutable && whole != null &&
-                        whole.Readiness == ResolvedCastingReadiness.AlreadySatisfied));
+                        whole.Readiness == ResolvedCastingReadiness.AlreadySatisfied,
+                    chipDescription, chipDuration));
             }
             // Parallel castings (same caster, source and target) stay distinct.
             foreach (IGrouping<string, CastingGraphCasting> same in chips.GroupBy(value =>
@@ -545,7 +557,8 @@ namespace KingmakerBuffPlanner.UI
                         CastingGraphText.Capacity(estimate, pool == null ? (ResourcePoolKind?)null : pool.Kind,
                             provider.UnitsPerCast),
                         pinnable, CastingGraphText.BlockedReason(estimate, pinnable), selectedRow,
-                        IsGroupSource(inputs, source) == true));
+                        IsGroupSource(inputs, source) == true,
+                        provider.Description, provider.DurationText));
                 }
                 string displayName = string.IsNullOrWhiteSpace(unit.DisplayName) ? unit.UnitId : unit.DisplayName;
                 allRows.AddRange(rows.Select(row => new KeyValuePair<string, CastingGraphSourceRow>(displayName, row)));
@@ -751,11 +764,17 @@ namespace KingmakerBuffPlanner.UI
                           " (outside the predicted area; no second casting is added for them)");
             CastingOutcomeEntry lastRun = LastRunReport == null ? null : LastRunReport.Entries
                 .FirstOrDefault(entry => string.Equals(entry.CastingId, focused.CastingId, StringComparison.Ordinal));
+            ProviderPlanningOption inspectOption = option;
+            string inspectDescription = inspectOption == null ? string.Empty
+                : inspectOption.Provider.Description;
+            string inspectDuration = inspectOption == null ? string.Empty
+                : inspectOption.Provider.DurationText;
             return new CastingGraphInspector(focused, chip,
                 "Casting " + (focused.Order + 1) + " in " + RoutineDisplayName(focused.RoutineId),
                 casterName + " → " + targetLabel, casterName, sourceLabel, targetLabel,
                 RoutineDisplayName(focused.RoutineId), routineCount, reasons, reviewItems, costLines,
                 enhancements, providers, retargets, coverageText,
+                inspectDescription, inspectDuration,
                 resolved == null ? null : CastingRunPresentation.DescribeLimitation(
                     ExplicitCastingStepConverter.StandardExecutionLimitation(resolved)),
                 resolved == null ? new string[0] : resolved.ExistingEffectNotes.Select(note =>
