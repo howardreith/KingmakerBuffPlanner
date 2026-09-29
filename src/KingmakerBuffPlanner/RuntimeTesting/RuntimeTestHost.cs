@@ -5434,6 +5434,18 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         if (legal.Count < 2) continue;
                         UI.CastingGraphEditResult first = session.AddGraphCasting(legal[0], inputs);
                         if (!first.Applied) continue;
+                        // The authored buff's ability must actually offer this
+                        // enhancement (a rod offers only metamagic-able spells):
+                        // unless the first casting's inspector exposes the
+                        // shared number, the pair proves nothing and is
+                        // removed before the next candidate is tried.
+                        if (PoolRemainingOf(session, inputs, first.CastingId,
+                                enhancement.EnhancementId) == null)
+                        {
+                            session.FocusGraphCasting(first.CastingId);
+                            session.RemoveFocusedCasting();
+                            continue;
+                        }
                         UI.CastingGraphEditResult second = session.AddGraphCasting(legal[1], inputs);
                         if (!second.Applied)
                         {
