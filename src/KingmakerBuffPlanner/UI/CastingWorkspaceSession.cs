@@ -189,13 +189,15 @@ namespace KingmakerBuffPlanner.UI
         // profile; loaded with it and written back by Save (never reset).
         private UiProfile _uiSettings = UiProfile.Default();
         private ExecutionProfile _executionSettings = ExecutionProfile.Default();
-        private readonly CastingReviewStore _reviewStore;
+        // Mutable only through InitializeReviewStore (ctor paths).
+        private CastingReviewStore _reviewStore;
 
         public CastingWorkspaceSession(
             string modPath, string campaignId,
             ICastingDispatchBoundary dispatchBoundary = null,
             IDictionary<string, CastGroupingKind> legacyGroupings = null,
-            Func<ClassicPlanInMemory> legacyProfile = null)
+            Func<ClassicPlanInMemory> legacyProfile = null,
+            PendingSessionRecovery recovery = null)
         {
             if (string.IsNullOrWhiteSpace(modPath))
                 throw new ArgumentException("Absolute mod path is required.", "modPath");
@@ -208,6 +210,40 @@ namespace KingmakerBuffPlanner.UI
             _legacyProfile = legacyProfile;
             _dispatch = dispatchBoundary ?? new DisabledCastingDispatchBoundary();
             CampaignId = campaignId;
+            if (recovery != null)
+            {
+                // Review F1: adoption of a failed-flush intent. The
+                // recovered document/settings are this session's own
+                // authoritative state (the stored bytes may be stale or
+                // unreadable — that is why the intent needed recovery), so
+                // nothing is loaded from disk. The session then immediately
+                // attempts to make the intent durable; until that succeeds
+                // it stays honestly non-durable (dirty), never "Saved".
+                if (!string.Equals(recovery.ModPath, modPath, StringComparison.Ordinal) ||
+                    !string.Equals(recovery.CampaignId, campaignId, StringComparison.Ordinal))
+                    throw new ArgumentException(
+                        "The pending recovery belongs to a different mod path or campaign.",
+                        "recovery");
+                LoadStatus = CastingPlanLoadStatus.Loaded;
+                LoadWarning = string.Empty;
+                LoadSourcePath = _repository.GetProfilePath(campaignId);
+                LastReloadNote = "recovered-pending:" + recovery.AutosaveStatus;
+                ReplaceAuthoring(new CastingAuthoringService(recovery.Document));
+                _uiSettings = new UiProfile
+                {
+                    Scale = recovery.UiSettings.Scale,
+                    Hotkey = recovery.UiSettings.Hotkey
+                };
+                _executionSettings = CopyOf(recovery.ExecutionSettings);
+                _executionSettingsChosen = false;
+                RaiseCastingIdMark(_authoring.Document.Castings.Select(
+                    value => value.CastingId));
+                SelectedRoutineId = "long";
+                InitializeReviewStore();
+                _savedIntentSignature = string.Empty;
+                PersistNow("recovery");
+                return;
+            }
             CastingPlanLoadResult loaded = _repository.Load(campaignId);
             LoadStatus = loaded.Status;
             LoadWarning = loaded.Warning;
@@ -251,13 +287,19 @@ namespace KingmakerBuffPlanner.UI
             // overwrite, never "Saved" for an undurable revision).
             RaiseCastingIdMark(_authoring.Document.Castings.Select(value => value.CastingId));
             SelectedRoutineId = "long";
-            // Accepted review state from an earlier session: it authorizes
-            // only contents whose digest still matches exactly.
-            _reviewStore = Path.IsPathRooted(modPath)
-                ? new CastingReviewStore(modPath) : null;
+            InitializeReviewStore();
+        }
+
+        // Accepted review state from an earlier session: it authorizes only
+        // contents whose digest still matches exactly. Shared by the normal
+        // load path and recovery adoption (review F1).
+        private void InitializeReviewStore()
+        {
+            _reviewStore = Path.IsPathRooted(_modPath)
+                ? new CastingReviewStore(_modPath) : null;
             if (_reviewStore != null)
             {
-                CastingReviewStoreLoad review = _reviewStore.Load(campaignId);
+                CastingReviewStoreLoad review = _reviewStore.Load(CampaignId);
                 ReviewStoreWarning = review.Warning;
                 foreach (KeyValuePair<string, string> pair in review.AcceptedDigests)
                     _review.RestoreAccepted(pair.Key, pair.Value);
@@ -358,6 +400,18 @@ namespace KingmakerBuffPlanner.UI
             if (!SaveFailed && !SaveRefused && !IsDirty) return true;
             PersistNow("retry");
             return IntentIsDurable;
+        }
+
+        // The explicit handoff of a non-durable intent to a recovery owner
+        // (review F1): the LATEST document and settings, bound to this
+        // session's own mod path and campaign, for a future session of the
+        // exact same campaign to adopt. This is the ONLY way intent leaves
+        // this session other than a successful save.
+        public PendingSessionRecovery CaptureRecovery()
+        {
+            return new PendingSessionRecovery(_modPath, CampaignId,
+                _authoring.Document, _uiSettings, _executionSettings,
+                _autosaveStatus ?? AutosaveStatus);
         }
 
         // Passive save state for the footer (v1.2 §2): "saved" for the

@@ -22,6 +22,8 @@ namespace KingmakerBuffPlanner.Tests
             Run("autosave-run-refuses-when-persistence-fails", () => TestAutosaveRunDurability(root));
             Run("autosave-recovers-at-lifecycle-boundaries", () => TestAutosaveLifecycleBoundaries(root));
             Run("acknowledge-import-notices-persists-like-any-edit", () => TestAcknowledgePersistence(root));
+            Run("failed-flush-intent-has-a-reachable-recovery-owner",
+                () => TestRecoveryOwnerTransition(root));
         }
 
         private static AbilityKey LifecycleAbility()
@@ -229,32 +231,89 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("the recovered run did not submit the " +
                     "complete latest durable intent: " +
                     boundary.RecordedSubmissions[0]);
-            // §5: exact ordered identities and targets from the run's own
-            // gate decision — an omitted or reordered casting fails this.
-            if (applied.GateDecision == null ||
-                applied.GateDecision.ExecutableCastingIds.Count != 2 ||
-                !string.Equals(applied.GateDecision.ExecutableCastingIds[0], "cast-1",
-                    StringComparison.Ordinal) ||
-                !string.Equals(applied.GateDecision.ExecutableCastingIds[1], "cast-2",
-                    StringComparison.Ordinal))
-                throw new InvalidOperationException("the recovered run's executable set is " +
-                    "not exactly [cast-1, cast-2] in order.");
-            var submitted = session.Document.Castings.Where(value =>
-                applied.GateDecision.ExecutableCastingIds.Contains(value.CastingId)).ToList();
-            if (submitted.Any(value => !string.Equals(value.DirectTargetUnitId,
-                    value.CastingId == "cast-1" ? "unit-t1" : "unit-t2",
-                    StringComparison.Ordinal)) ||
-                submitted.Any(value => !string.Equals(value.CasterUnitId, "unit-cleric",
-                    StringComparison.Ordinal) ||
-                    !string.Equals(value.SourceId, "source-lifecycle", StringComparison.Ordinal)))
-                throw new InvalidOperationException("the submitted castings' exact targets, " +
-                    "caster or source drifted.");
-            // The LIVE post-run intent equals the durable intent (the run
-            // flush persisted exactly what was submitted).
-            if (session.IsDirty)
-                throw new InvalidOperationException("the run left the session non-durable.");
-            if (session.AutosaveStatus != "saved" || session.IsDirty)
-                throw new InvalidOperationException("the run flush did not restore durability.");
+            // §5/E1: the SUBMITTED PROJECTION the dispatch boundary
+            // received — read from the boundary itself, never re-derived
+            // from the document — proves the exact ordered steps, targets,
+            // provider/caster/source identities and reserved costs. A
+            // target changed only during conversion is detected here.
+            ExplicitStepConversion submitted = boundary.LastProjection;
+            if (submitted == null || !submitted.Converted)
+                throw new InvalidOperationException("the boundary saw no converted " +
+                    "projection for the recovered run.");
+            if (applied.Projection != null &&
+                !ReferenceEquals(applied.Projection, submitted))
+                throw new InvalidOperationException("the returned projection is not the " +
+                    "projection the boundary received.");
+            if (submitted.CastingIds.Count != 2 ||
+                !string.Equals(submitted.CastingIds[0], "cast-1", StringComparison.Ordinal) ||
+                !string.Equals(submitted.CastingIds[1], "cast-2", StringComparison.Ordinal))
+                throw new InvalidOperationException("the submitted projection's ordered " +
+                    "casting ids are not exactly [cast-1, cast-2].");
+            if (submitted.Plan.Steps.Count != 2)
+                throw new InvalidOperationException("the submitted projection does not " +
+                    "carry exactly two executor steps.");
+            for (int index = 0; index < 2; index++)
+            {
+                CastStep step = submitted.Plan.Steps[index];
+                string expectedCasting = index == 0 ? "cast-1" : "cast-2";
+                string expectedTarget = index == 0 ? "unit-t1" : "unit-t2";
+                if (!string.Equals(step.AssignmentId, expectedCasting, StringComparison.Ordinal))
+                    throw new InvalidOperationException("step " + index + " is not " +
+                        expectedCasting + ".");
+                if (step.TargetUnitIds.Count != 1 ||
+                    !string.Equals(step.TargetUnitIds[0], expectedTarget,
+                        StringComparison.Ordinal))
+                    throw new InvalidOperationException("step " + index + " target is not " +
+                        expectedTarget + ".");
+                if (!string.Equals(step.SourceId, "source-lifecycle", StringComparison.Ordinal))
+                    throw new InvalidOperationException("step " + index + " source drifted.");
+                if (step.Provider == null ||
+                    !string.Equals(step.Provider.CasterUnitId, "unit-cleric",
+                        StringComparison.Ordinal) ||
+                    !string.Equals(step.Provider.SpellbookGuid, "book",
+                        StringComparison.Ordinal) ||
+                    !string.Equals(step.Provider.Ability.Canonical,
+                        LifecycleAbility().Canonical, StringComparison.Ordinal))
+                    throw new InvalidOperationException("step " + index + " provider identity " +
+                        "drifted.");
+                if (step.Reservation == null || step.Reservation.Units != 1 ||
+                    !string.Equals(step.Reservation.PoolKey, "pool-1",
+                        StringComparison.Ordinal))
+                    throw new InvalidOperationException("step " + index + " did not reserve " +
+                        "its exact native cost.");
+            }
+            if (submitted.ProjectionId.Length == 0 || submitted.CanonicalContract.Length == 0)
+                throw new InvalidOperationException("the submitted projection has no " +
+                    "identity hash.");
+            // The run flush restored the LIVE session's durability too.
+            if (session.IsDirty || session.AutosaveStatus != "saved")
+                throw new InvalidOperationException("the run flush did not restore the live " +
+                    "session's durability: " + session.AutosaveStatus);
+            // E1: durability from an actual FRESH READ, not IsDirty.
+            var durableRead = new CastingWorkspaceSession(dir, "campaign:life");
+            if (durableRead.Document.Castings.Count != 2 || durableRead.IsDirty)
+                throw new InvalidOperationException("the durable file is not exactly the " +
+                    "submitted intent.");
+            // E1: the submitted intent is IMMUTABLE after a later editor
+            // mutation — the projection object, its steps and their targets
+            // do not change when the document gains a third casting.
+            string[] submittedTargets = submitted.Plan.Steps
+                .SelectMany(step => step.TargetUnitIds).ToArray();
+            if (!session.AddCastingForRuntime(LifecycleCasting("cast-3", "unit-t3")).Applied)
+                throw new InvalidOperationException("the later edit was refused.");
+            if (!ReferenceEquals(boundary.LastProjection, submitted) ||
+                submitted.Plan.Steps.Count != 2)
+                throw new InvalidOperationException("a later editor mutation changed the " +
+                    "submitted projection.");
+            if (!submitted.Plan.Steps.SelectMany(step => step.TargetUnitIds)
+                    .SequenceEqual(submittedTargets))
+                throw new InvalidOperationException("a later editor mutation changed the " +
+                    "submitted steps' targets.");
+            // The later mutation is itself durable (fresh read), and never
+            // replaced the submitted projection's identity on the boundary.
+            var afterMutation = new CastingWorkspaceSession(dir, "campaign:life");
+            if (afterMutation.Document.Castings.Count != 3)
+                throw new InvalidOperationException("the later edit was not durable.");
         }
 
 
@@ -355,6 +414,130 @@ namespace KingmakerBuffPlanner.Tests
                 fresh.Document.AcknowledgedImportNotices.Count == 0)
                 throw new InvalidOperationException("acknowledgement did not survive a fresh " +
                     "load.");
+        }
+
+        // Review F1: the PRODUCTION transition owner (the same
+        // CastingSessionOwner the UI root uses) retains a failed-flush
+        // intent through campaign switches AND root teardown. The mod
+        // directory is SHARED with campaign-keyed files (exactly like the
+        // installed mod), the old-session reference is deliberately
+        // dropped, and recovery happens purely through the owner's own
+        // factory — nothing is recoverable only via a test-held object.
+        private static void TestRecoveryOwnerTransition(string root)
+        {
+            string dir = Path.Combine(root, "recovery-owner-shared-mod");
+            Directory.CreateDirectory(dir);
+            var store = new CastingWorkspaceRecoveryStore();
+            var messages = new System.Collections.Generic.List<string>();
+            Func<string, CastingWorkspaceSession> factory = id =>
+                new CastingWorkspaceSession(dir, id,
+                    new DisabledCastingDispatchBoundary(), null, null,
+                    store.Take(dir, id));
+            var owner = new CastingSessionOwner(factory, store, messages.Add);
+            CastingWorkspaceSession sessionA;
+            if (owner.Ensure("campaign:A", out sessionA) != null)
+                throw new InvalidOperationException("the owner refused campaign A.");
+            if (!sessionA.AddCastingForRuntime(LifecycleCasting("cast-a1", "unit-t1")).Applied)
+                throw new InvalidOperationException("A baseline authoring refused.");
+            if (sessionA.IsDirty)
+                throw new InvalidOperationException("A baseline was not durable.");
+            string planA = RepositoryOf(dir).GetProfilePath("campaign:A");
+            string baseline = File.ReadAllText(planA);
+            // Campaign switch WHILE A's latest edit cannot persist: the
+            // owner registers the intent for recovery (bound to campaign A
+            // and this mod path) before the binding changes.
+            using (var hold = new FileStream(planA, FileMode.Open, FileAccess.Read,
+                FileShare.Read))
+            {
+                if (!sessionA.AddCastingForRuntime(LifecycleCasting("cast-a2", "unit-t2")).Applied)
+                    throw new InvalidOperationException("locked A authoring refused.");
+                CastingWorkspaceSession sessionB;
+                if (owner.Ensure("campaign:B", out sessionB) != null)
+                    throw new InvalidOperationException("the owner refused campaign B.");
+                if (sessionB.CampaignId != "campaign:B" || sessionB.Document.Castings.Count != 0)
+                    throw new InvalidOperationException("B started contaminated by A.");
+                if (File.ReadAllText(planA) != baseline)
+                    throw new InvalidOperationException("the last good A file was disturbed.");
+            }
+            if (!store.HasPending(dir, "campaign:A"))
+                throw new InvalidOperationException("the failed-flush intent was not given a " +
+                    "recovery owner.");
+            if (!messages.Any(message => message.Contains("discard-time flush failed") &&
+                    message.Contains("campaign=campaign:A")))
+                throw new InvalidOperationException("the failure was not reported with its " +
+                    "campaign.");
+            // NO test-held reference to A's session: recovery goes through
+            // the owner alone, after storage healed.
+            sessionA = null;
+            CastingWorkspaceSession back;
+            if (owner.Ensure("campaign:A", out back) != null)
+                throw new InvalidOperationException("the owner refused the return to A.");
+            if (back.Document.Castings.Count != 2 ||
+                !back.Document.Castings.Any(value => value.CastingId == "cast-a2"))
+                throw new InvalidOperationException("returning to A did not recover the " +
+                    "latest intent: " + back.Document.Castings.Count);
+            if (back.IsDirty || back.AutosaveStatus != "saved")
+                throw new InvalidOperationException("the recovered intent was not made " +
+                    "durable on adoption: " + back.AutosaveStatus);
+            var freshA = new CastingWorkspaceSession(dir, "campaign:A");
+            if (freshA.Document.Castings.Count != 2)
+                throw new InvalidOperationException("A's durable file is not the recovered " +
+                    "intent.");
+            if (store.Count != 0)
+                throw new InvalidOperationException("adoption left a stale recovery entry.");
+            // Root teardown with a FAILED flush: the SAME owner releases;
+            // a REPLACEMENT owner (a new UI root in the same process)
+            // adopts the intent through the shared store.
+            string planA2 = RepositoryOf(dir).GetProfilePath("campaign:A");
+            string baseline2 = File.ReadAllText(planA2);
+            using (var hold = new FileStream(planA2, FileMode.Open, FileAccess.Read,
+                FileShare.Read))
+            {
+                if (!back.AddCastingForRuntime(LifecycleCasting("cast-a3", "unit-t3")).Applied)
+                    throw new InvalidOperationException("locked teardown authoring refused.");
+                owner.Release("root-teardown");
+                if (!store.HasPending(dir, "campaign:A"))
+                    throw new InvalidOperationException("teardown did not hand the intent to " +
+                        "the recovery owner.");
+                if (File.ReadAllText(planA2) != baseline2)
+                    throw new InvalidOperationException("teardown disturbed the last good " +
+                        "file.");
+            }
+            back = null;
+            var replacementOwner = new CastingSessionOwner(factory, store, messages.Add);
+            CastingWorkspaceSession revived;
+            if (replacementOwner.Ensure("campaign:A", out revived) != null)
+                throw new InvalidOperationException("the replacement owner refused A.");
+            if (revived.Document.Castings.Count != 3 ||
+                revived.IsDirty || revived.AutosaveStatus != "saved")
+                throw new InvalidOperationException("the replacement root did not recover the " +
+                    "latest teardown intent: " + revived.Document.Castings.Count + ";" +
+                    revived.AutosaveStatus);
+            // Storage heals BEFORE the controlled discard: the transition's
+            // own retry succeeds, nothing is registered, and a later
+            // session loads the durable file normally.
+            string planA3 = RepositoryOf(dir).GetProfilePath("campaign:A");
+            string baseline3 = File.ReadAllText(planA3);
+            CastingWorkspaceSession current;
+            if (replacementOwner.Ensure("campaign:A", out current) != null)
+                throw new InvalidOperationException("the replacement owner lost its session.");
+            using (var hold = new FileStream(planA3, FileMode.Open, FileAccess.Read,
+                FileShare.Read))
+            {
+                if (!current.AddCastingForRuntime(LifecycleCasting("cast-a4", "unit-t1")).Applied)
+                    throw new InvalidOperationException("heal-case authoring refused.");
+            }
+            // Storage healed (lock released) BEFORE switching away.
+            CastingWorkspaceSession sessionB2;
+            if (replacementOwner.Ensure("campaign:B", out sessionB2) != null)
+                throw new InvalidOperationException("the healed switch was refused.");
+            if (store.Count != 0)
+                throw new InvalidOperationException("a healed flush still registered a " +
+                    "recovery entry.");
+            var freshA2 = new CastingWorkspaceSession(dir, "campaign:A");
+            if (freshA2.Document.Castings.Count != 4)
+                throw new InvalidOperationException("the healed flush did not persist the " +
+                    "latest intent: " + freshA2.Document.Castings.Count);
         }
 
         private static PartyProviderSnapshot PartyForLifecycle()
