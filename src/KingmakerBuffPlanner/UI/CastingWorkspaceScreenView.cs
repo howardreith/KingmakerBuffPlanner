@@ -415,16 +415,11 @@ namespace KingmakerBuffPlanner.UI
             mode.rectTransform.pivot = new Vector2(0f, 0.5f);
             mode.rectTransform.sizeDelta = new Vector2(230f, 0f);
             mode.rectTransform.anchoredPosition = new Vector2(16f, 0f);
-            if (_switchToClassic != null)
-            {
-                Button classic = KingmakerUiFactory.CreateButton("SwitchToClassic", header, _theme,
-                    "Use the Classic planner", () => _switchToClassic());
-                RectTransform rect = RectOf(classic);
-                KingmakerUiFactory.SetAnchors(rect, 0f, 0f, 0f, 1f);
-                rect.pivot = new Vector2(0f, 0.5f);
-                rect.sizeDelta = new Vector2(210f, -10f);
-                rect.anchoredPosition = new Vector2(250f, 0f);
-            }
+            // Everyday-use v1.2: the graph is the only normal authoring
+            // route; the prominent in-planner Classic switch is retired.
+            // Classic recovery remains available through the mod settings
+            // toggle and the retained importer/rollback during the bounded
+            // retirement.
             _title = KingmakerUiFactory.CreateText("Title", header, _theme, "Buff Planner — casting plan", 22,
                 TextAnchor.MiddleLeft);
             _title.fontStyle = FontStyle.Bold;

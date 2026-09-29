@@ -33,7 +33,7 @@ namespace KingmakerBuffPlanner.Tests
             Run("review-signature-skip-flip-is-harmless", TestReviewSignatureSkipFlipIsHarmless);
             Run("review-state-is-per-routine-and-restorable", TestReviewStatePerRoutine);
             Run("review-store-round-trip-and-refusals", () => TestReviewStore(root));
-            Run("planner-mode-store-defaults-to-classic", () => TestPlannerModeStore(root));
+            Run("planner-mode-store-defaults-to-casting-first", () => TestPlannerModeStore(root));
             Run("session-save-preserves-player-settings",
                 () => TestSessionSavePreservesSettings(root));
             Run("session-acceptance-survives-reopen",
@@ -806,28 +806,37 @@ namespace KingmakerBuffPlanner.Tests
             Directory.CreateDirectory(dir);
             var store = new PlannerModeStore(dir);
             string warning;
-            if (store.Load(out warning) != PlannerMode.Classic || warning.Length != 0)
-                throw new InvalidOperationException("An absent mode file was not Classic.");
+            // Everyday-use v1.2: the graph is the default and only normal
+            // authoring route; an absent mode file means casting-first.
+            if (store.Load(out warning) != PlannerMode.CastingFirst || warning.Length != 0)
+                throw new InvalidOperationException("An absent mode file was not casting-first.");
             store.Save(PlannerMode.CastingFirst);
             if (store.Load(out warning) != PlannerMode.CastingFirst || warning.Length != 0)
                 throw new InvalidOperationException("The casting-first mode did not round-trip.");
             if (!File.ReadAllText(store.FilePath).Contains("\"casting-first\""))
                 throw new InvalidOperationException("The mode file is not the documented format.");
+            // An explicit classic value is honored during the bounded
+            // retirement and remains a successful, deliberately changeable
+            // read (recovery/migration path, not the ordinary default).
             store.Save(PlannerMode.Classic);
-            if (store.Load(out warning) != PlannerMode.Classic)
-                throw new InvalidOperationException("Classic did not round-trip.");
+            if (store.Load(out warning) != PlannerMode.Classic ||
+                warning != "planner-mode-explicit-classic")
+                throw new InvalidOperationException("An explicit classic choice was not honored.");
+            store.Save(PlannerMode.CastingFirst);
+            if (store.Load(out warning) != PlannerMode.CastingFirst || warning.Length != 0)
+                throw new InvalidOperationException("Deliberately switching away from classic was refused.");
             File.WriteAllText(store.FilePath, "{\"schemaVersion\":1,\"mode\":\"turbo\"}");
-            if (store.Load(out warning) != PlannerMode.Classic ||
+            if (store.Load(out warning) != PlannerMode.CastingFirst ||
                 warning != "planner-mode-ignored:unknown-mode")
-                throw new InvalidOperationException("An unknown mode activated something.");
+                throw new InvalidOperationException("An unknown mode was not ignored safely.");
             File.WriteAllText(store.FilePath, "{\"schemaVersion\":2,\"mode\":\"casting-first\"}");
-            if (store.Load(out warning) != PlannerMode.Classic ||
+            if (store.Load(out warning) != PlannerMode.CastingFirst ||
                 warning != "planner-mode-ignored:schema-version")
-                throw new InvalidOperationException("A newer mode file activated casting-first.");
+                throw new InvalidOperationException("A newer mode file was not ignored safely.");
             File.WriteAllText(store.FilePath, "garbage");
-            if (store.Load(out warning) != PlannerMode.Classic ||
+            if (store.Load(out warning) != PlannerMode.CastingFirst ||
                 !warning.StartsWith("planner-mode-ignored:unreadable", StringComparison.Ordinal))
-                throw new InvalidOperationException("A corrupt mode file activated casting-first.");
+                throw new InvalidOperationException("A corrupt mode file was not ignored safely.");
             // Batch 3, section 11: the toggle never replaces a mode file the
             // store refuses to read; it reports why and keeps the bytes.
             foreach (string content in new[]

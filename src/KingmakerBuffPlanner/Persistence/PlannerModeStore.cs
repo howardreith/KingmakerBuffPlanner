@@ -16,8 +16,11 @@ namespace KingmakerBuffPlanner.Persistence
 
     // The deliberate, player-chosen planner mode (UMM settings panel). It is
     // stored beside the profiles in UserSettings, which installation and
-    // rollback preserve. Absent or unreadable means Classic: the
-    // experimental planner is never activated by accident.
+    // rollback preserve. Everyday-use v1.2: the casting-first graph is the
+    // default and the only normal authoring route, so an absent store means
+    // CastingFirst. An explicit "classic" value is honored during the
+    // bounded Classic retirement (recovery/migration), never as the
+    // ordinary new-install experience.
     public sealed class PlannerModeStore
     {
         internal const int SchemaVersion = 1;
@@ -39,26 +42,29 @@ namespace KingmakerBuffPlanner.Persistence
         public PlannerMode Load(out string warning)
         {
             warning = string.Empty;
-            if (!File.Exists(FilePath)) return PlannerMode.Classic;
+            if (!File.Exists(FilePath)) return PlannerMode.CastingFirst;
             try
             {
                 JObject root = JObject.Parse(File.ReadAllText(FilePath));
                 if (root.Value<int?>("schemaVersion") != SchemaVersion)
                 {
                     warning = "planner-mode-ignored:schema-version";
-                    return PlannerMode.Classic;
+                    return PlannerMode.CastingFirst;
                 }
                 string mode = root.Value<string>("mode");
-                if (string.Equals(mode, "casting-first", StringComparison.Ordinal))
-                    return PlannerMode.CastingFirst;
-                if (!string.Equals(mode, "classic", StringComparison.Ordinal))
+                if (string.Equals(mode, "classic", StringComparison.Ordinal))
+                {
+                    warning = "planner-mode-explicit-classic";
+                    return PlannerMode.Classic;
+                }
+                if (!string.Equals(mode, "casting-first", StringComparison.Ordinal))
                     warning = "planner-mode-ignored:unknown-mode";
-                return PlannerMode.Classic;
+                return PlannerMode.CastingFirst;
             }
             catch (Exception exception)
             {
                 warning = "planner-mode-ignored:unreadable:" + exception.GetType().Name;
-                return PlannerMode.Classic;
+                return PlannerMode.CastingFirst;
             }
         }
 
@@ -66,12 +72,13 @@ namespace KingmakerBuffPlanner.Persistence
         {
             // A mode file this store refuses to read (another schema, an
             // unknown mode, unreadable) is never replaced: the toggle
-            // reports why and the file keeps its bytes.
+            // reports why and the file keeps its bytes. An explicit classic
+            // value is a successful read and may be deliberately changed.
             if (File.Exists(FilePath))
             {
                 string refused;
                 Load(out refused);
-                if (refused.Length != 0)
+                if (refused.StartsWith("planner-mode-ignored", StringComparison.Ordinal))
                     throw new InvalidOperationException(FileName + " was left unchanged (" + refused +
                         "): it is unreadable or from another planner version.");
             }
