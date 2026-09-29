@@ -37,7 +37,16 @@ namespace KingmakerBuffPlanner.UI
         private BuffPlannerHudButtonController _hud;
         private BuffPlannerScreenController _screen;
         private BuffPlannerInputLease _workspaceInputLease;
-        private CastingWorkspaceSession _castingWorkspaceSession;
+        // Review F1: every controlled session transition (campaign switch,
+        // teardown) goes through this owner, which hands a failed-flush
+        // intent to the process-wide recovery store before relinquishing
+        // it — a replacement root or a return to the campaign adopts it
+        // through the normal factory.
+        private CastingSessionOwner _castingSessions;
+        private CastingWorkspaceSession CastingSession
+        {
+            get { return _castingSessions == null ? null : _castingSessions.Current; }
+        }
         private CastingWorkspaceScreenView _castingWorkspace;
         private BuffPlannerSpellbookEntryController _spellbookEntry;
         private BuffPlannerQuickExecuteController _quick;
@@ -229,8 +238,8 @@ namespace KingmakerBuffPlanner.UI
 
         internal static string CastingDispatchDispositionForRuntime
         {
-            get { return _instance == null || _instance._castingWorkspaceSession == null
-                ? "no-session" : _instance._castingWorkspaceSession.DispatchDisposition; }
+            get { return _instance == null || _instance.CastingSession == null
+                ? "no-session" : _instance.CastingSession.DispatchDisposition; }
         }
 
         internal static bool IsCastingRunActive
@@ -430,7 +439,7 @@ namespace KingmakerBuffPlanner.UI
         // the rendered view states between steps.
         internal static CastingWorkspaceSession CastingWorkspaceSessionForRuntime()
         {
-            return _instance == null ? null : _instance._castingWorkspaceSession;
+            return _instance == null ? null : _instance.CastingSession;
         }
 
         internal static CastingWorkspaceInputs CastingWorkspaceInputsForRuntime()
@@ -1307,6 +1316,9 @@ namespace KingmakerBuffPlanner.UI
             _castingHost = new CastingExecutionHost(CreateCastingExecutor,
                 () => _castingWorldClock.Milliseconds);
             _castingHost.RunCompleted = OnCastingRunCompleted;
+            _castingSessions = new CastingSessionOwner(CreateCastingSession,
+                CastingWorkspaceRecoveryStore.Default,
+                message => _log.Info(message));
             _log.Info("[KBP-MODE] planner mode=" + _plannerMode +
                 (_plannerModeWarning.Length == 0 ? string.Empty : ";warning=" + _plannerModeWarning) +
                 ";nativeCastingLocked=" + NativeCastingSessionPolicy.Locked + ".");
@@ -1537,17 +1549,22 @@ namespace KingmakerBuffPlanner.UI
                 capabilities.Add(
                     new KingmakerBuffPlanner.GameAdapters.ShareCastingModifier.ShareCapability(
                         enhancement.CasterUnitId, enhancement.UsagePoolId,
-                        enhancement.UsageUnitsPerCast, enhancement.RemainingUses));
+                        enhancement.UsageUnitsPerCast, enhancement.RemainingUses,
+                        enhancement.AbilityWhiteList, enhancement.SpellbookWhiteList,
+                        // Verified recipients for this capability: the alive,
+                        // friendly party the integration's recipient rule
+                        // reaches. Per-capability (not a global list), so a
+                        // future per-source recipient contract plugs in here.
+                        snapshot.Units
+                            .Where(unit => unit.TargetValidation != null &&
+                                unit.TargetValidation.Alive && unit.TargetValidation.Friendly)
+                            .Select(unit => unit.UnitId)));
             }
             if (capabilities.Count == 0)
                 return new KingmakerBuffPlanner.Planning.ICastingTargetingModifier[0];
-            var legal = snapshot.Units
-                .Where(unit => unit.TargetValidation != null && unit.TargetValidation.Alive &&
-                    unit.TargetValidation.Friendly)
-                .Select(unit => unit.UnitId).ToList();
             return new KingmakerBuffPlanner.Planning.ICastingTargetingModifier[]
             {
-                new KingmakerBuffPlanner.GameAdapters.ShareCastingModifier(capabilities, legal)
+                new KingmakerBuffPlanner.GameAdapters.ShareCastingModifier(capabilities)
             };
         }
 
@@ -1566,29 +1583,28 @@ namespace KingmakerBuffPlanner.UI
                 ? null : _session.Model.Profile.CampaignId;
             if (string.IsNullOrEmpty(campaignId))
                 return string.IsNullOrEmpty(_session.Status) ? "no campaign is loaded" : _session.Status;
-            session = CastingWorkspaceSessionBinding.Resolve(
-                _castingWorkspaceSession, campaignId,
-                delegate(string id) { return CreateCastingSession(id); },
-                delegate(string message) { _log.Info(message); });
-            if (session == null) return "campaign identity unresolved";
-            if (!ReferenceEquals(session, _castingWorkspaceSession))
-            {
-                // Review addendum §2: the OLD campaign's intent gets a
-                // durability attempt before the binding changes; its file
-                // is its own campaign's, never the new one's.
-                FlushSessionForDiscard("campaign-switch:" + campaignId);
-            }
-            _castingWorkspaceSession = session;
-            return null;
+            // Review F1: the transition owner performs the binding change:
+            // the outgoing campaign's intent gets a durability attempt, and
+            // a failure an explicit reachable recovery owner, before the
+            // binding changes. Its file is its own campaign's, never the
+            // new one's.
+            return _castingSessions.Ensure(campaignId, out session);
         }
 
         private CastingWorkspaceSession CreateCastingSession(string campaignId)
         {
+            // Review F1: a session whose discard-time flush failed left its
+            // latest intent with the recovery store, bound to this exact
+            // mod path and campaign; the new session adopts it (and tries
+            // to make it durable at once) instead of loading stale bytes.
+            PendingSessionRecovery pending = _castingSessions == null
+                ? null : _castingSessions.Recovery.Take(_modPath, campaignId);
             return new CastingWorkspaceSession(_modPath, campaignId, CreateDispatchBoundary(),
                 _session.Model == null ? null : _session.Model.SourceGroupings(),
                 () => _session.Model == null ? null
                     : new ClassicPlanInMemory(_session.Model.Profile, _session.ClassicPrimarySha256,
-                        _session.Model.SourceGroupings()));
+                        _session.Model.SourceGroupings()),
+                pending);
         }
 
         // Ordinary play submits through the production boundary; a
@@ -1598,9 +1614,9 @@ namespace KingmakerBuffPlanner.UI
             if (NativeCastingSessionPolicy.Locked)
                 return new DisabledCastingDispatchBoundary(NativeCastingSessionPolicy.LockReason);
             return new NativeCastingDispatchBoundary(_castingHost,
-                () => _castingWorkspaceSession == null
+                () => CastingSession == null
                     ? ExecutionProfile.Default()
-                    : _castingWorkspaceSession.ExecutionSettings,
+                    : CastingSession.ExecutionSettings,
                 message => _log.Info("[KBP-CF-RUN] " + message));
         }
 
@@ -1631,7 +1647,7 @@ namespace KingmakerBuffPlanner.UI
         {
             // The next inputs re-read discovery (spent slots, new effects).
             _lastWorkspaceInputsRefreshUtc = DateTime.MinValue;
-            CastingWorkspaceSession session = _castingWorkspaceSession;
+            CastingWorkspaceSession session = CastingSession;
             string routineId = string.IsNullOrEmpty(report.ScopeRoutineId)
                 ? "long" : report.ScopeRoutineId;
             string name = session == null ? routineId : session.RoutineDisplayName(routineId);
@@ -1673,7 +1689,7 @@ namespace KingmakerBuffPlanner.UI
                         StringComparison.Ordinal)
                         ? name + " is running. Press again to stop it after the cast in progress."
                         : "Another routine is running. Press to stop it after the cast in progress.");
-            CastingWorkspaceSession session = _castingWorkspaceSession;
+            CastingWorkspaceSession session = CastingSession;
             // Final review B7: a session, or a press result, kept from another
             // campaign never describes the one now loaded.
             string loadedCampaignId = Game.Instance == null || Game.Instance.Player == null
@@ -2109,33 +2125,6 @@ namespace KingmakerBuffPlanner.UI
             if (_hud != null) _hud.Dispose();
         }
 
-        // Review addendum §2: attempt durability before a controlled
-        // discard. A failed save is surfaced, never silent; the session is
-        // NOT nulled while its edits are still the only copy — teardown
-        // keeps the object for the process's remainder, and a campaign
-        // switch keeps the ORIGINAL session bound to its own campaign (the
-        // dirty intent stays recoverable there; it is never relabeled as
-        // the new campaign's plan). Forced process termination with an
-        // unwritable store remains a physical limit, distinct from this
-        // voluntary-discard policy.
-        private void FlushSessionForDiscard(string cause)
-        {
-            CastingWorkspaceSession retained = _castingWorkspaceSession;
-            if (retained == null) return;
-            if (!retained.IsDirty) return;
-            string before = retained.AutosaveStatus;
-            _log.Info("[KBP-WORKSPACE] flush-before-discard;cause=" + cause +
-                ";autosave=" + before + ".");
-            // PersistNow is private; Apply's flush path is the sanctioned
-            // durable-flush entry, but a run is not requested here, so the
-            // session's own public surface is used: RetryFailedSave.
-            retained.RetryFailedSave();
-            if (retained.IsDirty)
-                _log.Info("[KBP-WORKSPACE] discard-time flush failed;cause=" + cause +
-                    ";autosave=" + retained.AutosaveStatus +
-                    ";the in-memory edits remain held by the retained session.");
-        }
-
         private void ReleaseAll()
         {
             if (_disposed) return;
@@ -2146,16 +2135,19 @@ namespace KingmakerBuffPlanner.UI
             EndClassicRun("root-teardown");
             StopAllCoroutines();
             CloseCastingWorkspace();
-            if (_castingWorkspaceSession != null)
+            if (_castingSessions != null)
             {
-                // Review addendum §2: flush first; on failure KEEP the
-                // session (the process is ending, but the object stays
-                // reachable and the failure is logged loudly, never a
-                // silent drop).
-                FlushSessionForDiscard("root-teardown");
+                // Review F1: teardown goes through the transition owner:
+                // flush first; on failure the latest intent is REGISTERED
+                // with the process-wide recovery store (a replacement root
+                // adopts it through the normal factory), the session object
+                // stays held by the owner for the process's remainder, and
+                // the failure is logged loudly, never a silent drop.
+                _castingSessions.Release("root-teardown");
                 _log.Info("[KBP-WORKSPACE] session release at teardown;dirty=" +
-                    _castingWorkspaceSession.IsDirty + ";autosave=" +
-                    _castingWorkspaceSession.AutosaveStatus + ".");
+                    (_castingSessions.Current == null ? false : _castingSessions.Current.IsDirty) +
+                    ";autosave=" + (_castingSessions.Current == null
+                        ? "no-session" : _castingSessions.Current.AutosaveStatus) + ".");
             }
             if (_runtimePhysicalProbe != null) _runtimePhysicalProbe.Dispose();
             _runtimePhysicalProbe = null;
