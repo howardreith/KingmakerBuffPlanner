@@ -5569,9 +5569,17 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             _workspaceBudget.AfterFirstOn = afterFirstOn;
             _workspaceBudget.AfterSecondOn = afterSecondOn;
             _workspaceBudget.AfterFirstOff = afterFirstOff;
-            bool affordable = before >= 2 * enhancement.UsageUnitsPerCast;
-            _workspaceBudget.AtomicRefusalStatus = affordable ? "not-provable-on-this-fixture"
-                : secondBlocked ? "observed" : "violated";
+            // The atomic refusal follows the second casting's ACTUAL
+            // compiled readiness: a blocked candidate reserved nothing in
+            // any component of its cost vector (observed live in
+            // beta-11787809-adv-01, where a natively blocked prepared
+            // casting left both its prepared pool and the shared rod pool
+            // untouched). Pool affordability alone cannot decide this -
+            // the whole cost vector can be unfundable on a native
+            // component while the enhancement pool still has room.
+            _workspaceBudget.AtomicRefusalStatus = secondBlocked ? "observed"
+                : before >= 2 * enhancement.UsageUnitsPerCast
+                    ? "not-provable-on-this-fixture" : "violated";
             _workspaceBudget.AtomicRefusalEvidence = "before=" + before + ";units=" +
                 enhancement.UsageUnitsPerCast + ";secondBlocked=" + secondBlocked +
                 ";reason=" + secondReason;
