@@ -47,8 +47,50 @@ targeting, profile protection, protected saves, or native safeguards.
 - Windowed mode and the unreproduced historical hover remain separate
   known limitations.
 
-## Status
+## Status (updated as slices complete)
 
-- [x] Package read; branch created; state reconciled (labs quiet,
-      279/279 transactions final, installs byte-intact).
-- [ ] Slice 1 … Slice 4 (this file is updated as slices complete).
+- [x] Package read; branch `codex/kingmaker-buff-planner-everyday-use`
+      created from `dd50ed1`; state reconciled.
+- [x] Map + milestone record committed `8a8a996`.
+- [x] Slice 1a — casting-first default, Classic switch retired
+      (`f94e560`: PlannerModeStore defaults casting-first; explicit
+      classic honored + changeable; toggle never replaces refused files;
+      in-planner 'Use the Classic planner' button removed).
+- [x] Slice 1b-1 — Instant default (`4ff89c4`: ExecutionProfile.Default
+      now instant, single default site; explicit animated preserved;
+      regressions updated: migration lands instant, new plan starts
+      instant, single toggle lands animated).
+- [x] Slice 1b-2 — continuous scroll (`867558f`: book sprite retired,
+      page=continuous-scroll;book-art-retired evidence; no donor read).
+- Protocol suite 365/365 at each step. Gates NOT yet rerun for the
+  branch (no game run staged yet — gate before the first live batch).
+- [ ] Slice 1b-3 — right-click full spell description (verify the
+      installed Kingmaker inspect/tooltip contract: right-click on a
+      catalogue row / selected-spell header / casting spell; native
+      route or mod-owned scrollable panel fed by native localized data;
+      lifecycle isolation; no authoring side effects).
+- [ ] Slice 1b-4 — enhancement relevance service (hide irrelevant
+      Piercing/Persistent/Selective for beneficial spells like Good
+      Hope; keep Extend/Powerful Change where eligible; selected
+      irrelevant options stay visible/removable; backend validation
+      agrees with offers).
+- [ ] Slice 1b-5 — beneficial catalogue: trace the LIVE catalogue path
+      for Irresistible Dance (audit/export classifier vs live graph
+      catalogue); fix at the shared structural boundary (disposition /
+      carrier/marker / variants); narrow verified identity override via
+      EffectOverrideRegistry only with documented exception + regression;
+      excluded saved intent stays visible + blocked (E23/E24).
+- [ ] Slice 2 — autosave + one-run-intent (see map row 5-6; the
+      acceptance-contract removal in RuntimeTestHost's
+      workspace-budget-evidence is already scenario-scoped).
+- [ ] Slice 3 — Share Transmutation (adapter over the pure
+      ICastingTargetingModifier contract; never copy the legacy
+      toggle-swallowing pattern into planning; execution-time native
+      bridge only; combined Share+PowerfulChange reservoir demand from
+      the installed implementation).
+- [ ] Slice 4 — cutover, full gate at candidate, dispatcher batch (six
+      evidence groups of 02 §E), private delivery + E01-E27 matrix.
+
+Continuation note: work tree must stay clean for the gate; the
+dispatcher/build-jobs/freeze flow is proven (see
+kbp-operator-note-casting-graph-20260926.txt and dispatch\history).
