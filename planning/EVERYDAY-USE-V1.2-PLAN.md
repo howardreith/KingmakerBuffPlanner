@@ -49,6 +49,51 @@ targeting, profile protection, protected saves, or native safeguards.
 
 ## Status (updated as slices complete)
 
+### Session 4 (2026-09-29 late) — review addendum §1–§5 all repaired and pushed (b1d1aef, 375/375)
+
+- §1 (`3f5c2b9`): PushHistory trim keeps the NEWEST 64 in LIFO order (the
+  old code kept the oldest and inverted the stack — 65 edits' first Undo
+  restored the near-empty start and autosaved it). Regression: exact
+  contents after every Undo through the 65-edit floor, a 66-edit repeat,
+  honest refusal below the floor, fresh-session durable read.
+- §2 (`3f5c2b9`): AcknowledgeImportNotices announces (autosaves +
+  survives fresh load); teardown and campaign-switch attempt durability via
+  FlushSessionForDiscard/RetryFailedSave, keep the retained session on
+  failure (recoverable under its ORIGINAL campaign), never relabel.
+  Regressions: locked-save retry refused/healed; A-failure → switch → B
+  clean → A recovers; acknowledgement persistence.
+- §3 (`c973c1c`): Share is ONE registration resolving the exact casting's
+  caster from VERIFIED capability facts (the targeting-affecting
+  enhancement snapshots the installed-provider integration produced —
+  feature ownership, own reservoir identity, per-use cost and remaining
+  from the installed contract). Caster-exact costs regardless of party
+  order; incapable/exhausted refused honestly; unverified never free.
+- §4 (`c973c1c`+`b01a49b`): fixture identity fixed (one expression
+  instance under both catalogue keys — production matching unchanged); the
+  production defect it exposed repaired — AddGraphCasting, the
+  next-casting target lane and focused retarget all resolve the
+  draft's/focused casting's selected modifiers through the same pure
+  semantics as the compiler BEFORE eligibility. The graph-gesture
+  regression runs the production path: caster/source → Share before any
+  connection → ally → exact persisted per-casting modifier intent; second
+  ally = second record; Share-off keeps the ally target blocked/
+  repairable through reload.
+- §5 (`b1d1aef`): R1 verifies durable state after EVERY step; R2 edits
+  after the second reload replacement and proves genuine Undo, live-vs-
+  durable comparison; R3 holds the boundary by direct reference, asserts
+  both castings, the gate's exact ordered executable set, and the
+  submitted castings' exact targets/caster/source.
+- §6 REMAINS: Share UI control (Next-casting + inspector toggle — session
+  command surface exists via Draft.TargetingModifiers +
+  UpdateFocusedCasting); execution-only native bridge (arm exact verified
+  toggle → cast once → restore on ALL paths); converter currently refuses
+  targeting-modifier castings fail-closed — extend it to represent/execute
+  the complete contract (do NOT just remove the restriction); combined
+  Share+PowerfulChange reservoir live proof; Classic route-map completion
+  (HUD/hotkey/spellbook/settings all → graph); gates at candidate;
+  unattended batch (also judges scroll frames + right-click live);
+  E01–E27 matrix; private delivery.
+
 ### Session 3 (2026-09-29 night) — R1–R3 repaired; Share planning pipeline in
 
 - **R1–R3 REPAIRED** (`dd8fb79`, protocol 370/370 then 371/371): ONE
