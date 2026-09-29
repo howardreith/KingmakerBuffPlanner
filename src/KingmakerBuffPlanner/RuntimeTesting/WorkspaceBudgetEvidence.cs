@@ -207,6 +207,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     (BeforePoolRemaining.Value - UsageUnitsPerCast));
             if (AfterFirstOff.Value != BeforePoolRemaining.Value)
                 violations.Add("enhancement-off-did-not-restore");
+            // The second observation follows the second casting's ACTUAL
+            // compiled readiness: a blocked candidate reserved nothing
+            // anywhere (the whole-cost atomic refusal), so every observed
+            // number stands still; an executable candidate consumes
+            // normally from the same shared pool.
             int expectedSecond = string.Equals(AtomicRefusalStatus, "observed",
                 StringComparison.Ordinal)
                 ? AfterFirstOn.Value
@@ -243,10 +248,12 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     violations.Add("atomic-refusal-pool-unreadable:" + pool.PoolId);
                     continue;
                 }
-                // Expected: the blocked candidate's absence. Its prior base
-                // reservation is released (added back) and nothing new is
-                // reserved in any pool it touches.
-                int expected = pool.BeforeToggle.Value + pool.BaseReservationReleased;
+                // Across the blocked candidate's toggle, NOTHING may change
+                // in any pool it touches: the unfundable casting allocated
+                // no component. (Whether a prior base reservation existed
+                // and was released is an authoring-time observation carried
+                // in the notes, not an arithmetic assumption.)
+                int expected = pool.BeforeToggle.Value;
                 if (pool.AfterToggle.Value != expected)
                     violations.Add("atomic-refusal-reserved:" + pool.PoolId + "=" +
                         pool.AfterToggle.Value + "!=" + expected);

@@ -187,7 +187,7 @@ namespace KingmakerBuffPlanner.Tests
             };
             atomicObserved.BlockedTogglePools.Add(new BlockedPoolObservation
             {
-                PoolId = "native-1", Kind = "native", BeforeToggle = 3, AfterToggle = 4,
+                PoolId = "native-1", Kind = "native", BeforeToggle = 3, AfterToggle = 3,
                 BaseReservationReleased = 1
             });
             atomicObserved.BlockedTogglePools.Add(new BlockedPoolObservation
@@ -210,12 +210,12 @@ namespace KingmakerBuffPlanner.Tests
             };
             atomicLeak.BlockedTogglePools.Add(new BlockedPoolObservation
             {
-                PoolId = "native-1", Kind = "native", BeforeToggle = 3, AfterToggle = 3,
-                BaseReservationReleased = 1
+                PoolId = "native-1", Kind = "native", BeforeToggle = 3, AfterToggle = 2,
+                BaseReservationReleased = 0
             });
             if (!atomicLeak.Evaluate(false, false).Any(value => value.Contains("atomic-refusal-reserved")))
-                throw new InvalidOperationException("A pool that did not release the blocked " +
-                    "candidate's base reservation must fail the cost vector.");
+                throw new InvalidOperationException("A pool that moved during the blocked " +
+                    "candidate's toggle must fail the cost vector.");
             // E4: cleanup must be verified; a failed cleanup is a violation.
             var cleanupFailed = new WorkspaceBudgetEvidence
             {
